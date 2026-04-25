@@ -47,10 +47,9 @@ describe('AiAgentsOnboardingPrompt', () => {
     )
 
     expect(screen.getByText('No AI agents detected')).toBeInTheDocument()
-    expect(screen.getByTestId('claude-onboarding-screen')).toBeInTheDocument()
-    expect(screen.getByText('Claude Code not detected')).toBeInTheDocument()
     expect(screen.getByTestId('ai-agents-onboarding-install-claude_code')).toBeInTheDocument()
     expect(screen.getByTestId('ai-agents-onboarding-install-codex')).toBeInTheDocument()
+    expect(screen.getByTestId('ai-agents-onboarding-install-opencode')).toBeInTheDocument()
     expect(screen.getByTestId('ai-agents-onboarding-continue')).toHaveTextContent('Continue without it')
   })
 
@@ -68,9 +67,11 @@ describe('AiAgentsOnboardingPrompt', () => {
 
     fireEvent.click(screen.getByTestId('ai-agents-onboarding-install-claude_code'))
     fireEvent.click(screen.getByTestId('ai-agents-onboarding-install-codex'))
+    fireEvent.click(screen.getByTestId('ai-agents-onboarding-install-opencode'))
 
     expect(openExternalUrl).toHaveBeenCalledWith('https://docs.anthropic.com/en/docs/claude-code')
     expect(openExternalUrl).toHaveBeenCalledWith('https://developers.openai.com/codex/cli')
+    expect(openExternalUrl).toHaveBeenCalledWith('https://opencode.ai')
   })
 
   it('uses the surrounding surface as a drag region and excludes the card', () => {

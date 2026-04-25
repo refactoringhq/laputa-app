@@ -124,6 +124,7 @@ export const ZH_HANS_TRANSLATIONS = {
   'settings.aiAgents.description': '选择 Tolaria 在 AI 面板和命令面板中使用的 CLI AI 代理。',
   'settings.aiAgents.default': '默认 AI 代理',
   'settings.aiAgents.installed': '已安装',
+  'settings.aiAgents.checking': '检查中…',
   'settings.aiAgents.missing': '缺失',
   'settings.aiAgents.ready': '{agent}{version} 已可使用。',
   'settings.aiAgents.notInstalled': '{agent} 尚未安装。你仍可先选择它，稍后再安装。',

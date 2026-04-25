@@ -15,6 +15,7 @@ const settings = {
 const aiAgentsStatus = {
   claude_code: { status: 'installed' as const, version: '1.0.20' },
   codex: { status: 'missing' as const, version: null },
+  opencode: { status: 'missing' as const, version: null },
 }
 
 describe('useAiAgentPreferences', () => {
@@ -63,9 +64,28 @@ describe('useAiAgentPreferences', () => {
       aiAgentsStatus: {
         claude_code: { status: 'missing', version: null },
         codex: { status: 'missing', version: null },
+        opencode: { status: 'missing', version: null },
       },
     }))
 
     expect(result.current.defaultAiAgentReady).toBe(true)
+  })
+
+  it('picks the first installed agent when no preference is set', () => {
+    const noPreferenceSettings = { ...settings, default_ai_agent: null }
+    const statuses = {
+      claude_code: { status: 'missing' as const, version: null },
+      codex: { status: 'missing' as const, version: null },
+      opencode: { status: 'installed' as const, version: '0.18.0' },
+    }
+
+    const { result } = renderHook(() => useAiAgentPreferences({
+      settings: noPreferenceSettings,
+      saveSettings: vi.fn(),
+      aiAgentsStatus: statuses,
+    }))
+
+    expect(result.current.defaultAiAgent).toBe('opencode')
+    expect(result.current.defaultAiAgentLabel).toBe('OpenCode')
   })
 })

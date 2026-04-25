@@ -68,8 +68,18 @@ export function normalizeStoredAiAgent(value: string | null | undefined): AiAgen
   return null
 }
 
-export function resolveDefaultAiAgent(value: string | null | undefined): AiAgentId {
-  return normalizeStoredAiAgent(value) ?? DEFAULT_AI_AGENT
+export function resolveDefaultAiAgent(value: string | null | undefined, statuses?: AiAgentsStatus): AiAgentId {
+  const stored = normalizeStoredAiAgent(value)
+  if (stored) return stored
+
+  if (statuses) {
+    const firstInstalled = AI_AGENT_DEFINITIONS.find(
+      (definition) => statuses[definition.id].status === 'installed',
+    )
+    if (firstInstalled) return firstInstalled.id
+  }
+
+  return DEFAULT_AI_AGENT
 }
 
 export function getAiAgentDefinition(agent: AiAgentId): AiAgentDefinition {

@@ -122,6 +122,7 @@ export const EN_TRANSLATIONS = {
   'settings.aiAgents.description': 'Choose which CLI AI agent Tolaria uses in the AI panel and command palette.',
   'settings.aiAgents.default': 'Default AI agent',
   'settings.aiAgents.installed': 'installed',
+  'settings.aiAgents.checking': 'checking…',
   'settings.aiAgents.missing': 'missing',
   'settings.aiAgents.ready': '{agent}{version} is ready to use.',
   'settings.aiAgents.notInstalled': '{agent} is not installed yet. You can still select it now and install it later.',

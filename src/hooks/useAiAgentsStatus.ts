@@ -5,10 +5,11 @@ import {
   createCheckingAiAgentsStatus,
   createMissingAiAgentsStatus,
   normalizeAiAgentsStatus,
+  type AiAgentId,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 
-type RawAiAgentsStatus = Partial<Record<'claude_code' | 'codex', { installed?: boolean | null; version?: string | null }>>
+type RawAiAgentsStatus = Partial<Record<AiAgentId, { installed?: boolean | null; version?: string | null }>>
 
 function tauriCall<T>(command: string): Promise<T> {
   return isTauri() ? invoke<T>(command) : mockInvoke<T>(command)

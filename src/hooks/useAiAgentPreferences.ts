@@ -24,8 +24,8 @@ export function useAiAgentPreferences({
   onToast,
 }: UseAiAgentPreferencesArgs) {
   const defaultAiAgent = useMemo(
-    () => resolveDefaultAiAgent(settings.default_ai_agent),
-    [settings.default_ai_agent],
+    () => resolveDefaultAiAgent(settings.default_ai_agent, aiAgentsStatus),
+    [settings.default_ai_agent, aiAgentsStatus],
   )
 
   const defaultAiAgentLabel = getAiAgentDefinition(defaultAiAgent).label

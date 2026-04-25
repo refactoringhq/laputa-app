@@ -79,7 +79,6 @@ export function AiAgentsOnboardingPrompt({
   onContinue,
 }: AiAgentsOnboardingPromptProps) {
   const copy = getPromptCopy(statuses)
-  const showLegacyClaudeCompatibility = statuses.claude_code.status !== 'installed'
   const missingAgents = AI_AGENT_DEFINITIONS.filter((definition) => statuses[definition.id].status === 'missing')
 
   return (
@@ -103,18 +102,7 @@ export function AiAgentsOnboardingPrompt({
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-          {showLegacyClaudeCompatibility ? (
-            <div
-              className="rounded-lg border border-[var(--feedback-warning-border)] bg-[var(--feedback-warning-bg)] px-4 py-3 text-left"
-              data-testid="claude-onboarding-screen"
-            >
-              <div className="text-sm font-medium text-[var(--feedback-warning-text)]">Claude Code not detected</div>
-              <p className="mt-1 text-xs leading-5 text-[var(--feedback-warning-text)]">
-                Install Claude Code or continue without it.
-              </p>
-            </div>
-          ) : null}
+        <CardContent>
           <AgentStatusList statuses={statuses} />
         </CardContent>
 
@@ -136,7 +124,6 @@ export function AiAgentsOnboardingPrompt({
               type="button"
               onClick={onContinue}
               disabled={isAiAgentsStatusChecking(statuses)}
-              data-testid={showLegacyClaudeCompatibility ? 'claude-onboarding-continue' : undefined}
             >
               {hasAnyInstalledAiAgent(statuses) ? 'Continue' : 'Continue without it'}
             </Button>

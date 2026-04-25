@@ -19,6 +19,57 @@ describe('aiAgents helpers', () => {
     expect(resolveDefaultAiAgent(null)).toBe('claude_code')
   })
 
+  it('picks the first installed agent when no preference is set', () => {
+    const statuses = {
+      claude_code: { status: 'missing' as const, version: null },
+      codex: { status: 'missing' as const, version: null },
+      opencode: { status: 'installed' as const, version: '0.18.0' },
+    }
+
+    expect(resolveDefaultAiAgent(null, statuses)).toBe('opencode')
+    expect(resolveDefaultAiAgent(undefined, statuses)).toBe('opencode')
+  })
+
+  it('respects definitions order when picking installed agent', () => {
+    const statuses = {
+      claude_code: { status: 'installed' as const, version: '1.0.0' },
+      codex: { status: 'installed' as const, version: '2.0.0' },
+      opencode: { status: 'installed' as const, version: '0.18.0' },
+    }
+
+    expect(resolveDefaultAiAgent(null, statuses)).toBe('claude_code')
+  })
+
+  it('falls back to Claude Code when no agent is installed', () => {
+    const statuses = {
+      claude_code: { status: 'missing' as const, version: null },
+      codex: { status: 'missing' as const, version: null },
+      opencode: { status: 'missing' as const, version: null },
+    }
+
+    expect(resolveDefaultAiAgent(null, statuses)).toBe('claude_code')
+  })
+
+  it('prefers stored value over installed status', () => {
+    const statuses = {
+      claude_code: { status: 'missing' as const, version: null },
+      codex: { status: 'installed' as const, version: '2.0.0' },
+      opencode: { status: 'missing' as const, version: null },
+    }
+
+    expect(resolveDefaultAiAgent('codex', statuses)).toBe('codex')
+  })
+
+  it('falls back to Claude Code during checking phase', () => {
+    const statuses = {
+      claude_code: { status: 'checking' as const, version: null },
+      codex: { status: 'checking' as const, version: null },
+      opencode: { status: 'checking' as const, version: null },
+    }
+
+    expect(resolveDefaultAiAgent(null, statuses)).toBe('claude_code')
+  })
+
   it('normalizes raw status payloads', () => {
     const statuses = normalizeAiAgentsStatus({
       claude_code: { installed: true, version: '1.0.20' },

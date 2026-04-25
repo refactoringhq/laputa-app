@@ -120,6 +120,7 @@ function isSaveShortcut(event: ReactKeyboardEvent): boolean {
 function createSettingsDraft(
   settings: Settings,
   explicitOrganizationEnabled: boolean,
+  aiAgentsStatus: AiAgentsStatus,
 ): SettingsDraft {
   return {
     pullInterval: settings.auto_pull_interval_minutes ?? 5,
@@ -133,7 +134,7 @@ function createSettingsDraft(
       DEFAULT_AUTOGIT_INACTIVE_THRESHOLD_SECONDS,
     ),
     autoAdvanceInboxAfterOrganize: settings.auto_advance_inbox_after_organize ?? false,
-    defaultAiAgent: resolveDefaultAiAgent(settings.default_ai_agent),
+    defaultAiAgent: resolveDefaultAiAgent(settings.default_ai_agent, aiAgentsStatus),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
     themeMode: resolveSettingsDraftThemeMode(settings.theme_mode),
     uiLanguage: settings.ui_language ?? SYSTEM_UI_LANGUAGE,
@@ -243,7 +244,9 @@ function SettingsPanelInner({
   onSaveExplicitOrganization,
   onClose,
 }: SettingsPanelInnerProps) {
-  const [draft, setDraft] = useState(() => createSettingsDraft(settings, explicitOrganizationEnabled))
+  const [draft, setDraft] = useState(() =>
+    createSettingsDraft(settings, explicitOrganizationEnabled, aiAgentsStatus),
+  )
   const panelRef = useRef<HTMLDivElement>(null)
   const draftLocale = resolveEffectiveLocale(draft.uiLanguage, [systemLocale])
   const t = createTranslator(draftLocale)
@@ -735,7 +738,9 @@ function buildDefaultAiAgentOptions(aiAgentsStatus: AiAgentsStatus, t: Translate
     const status = aiAgentsStatus[definition.id]
     const suffix = status.status === 'installed'
       ? ` (${t('settings.aiAgents.installed')}${status.version ? ` ${status.version}` : ''})`
-      : ` (${t('settings.aiAgents.missing')})`
+      : status.status === 'checking'
+        ? ` (${t('settings.aiAgents.checking')})`
+        : ` (${t('settings.aiAgents.missing')})`
     return {
       value: definition.id,
       label: `${definition.label}${suffix}`,
