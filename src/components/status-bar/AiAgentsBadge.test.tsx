@@ -12,6 +12,7 @@ vi.mock('../../utils/url', async () => {
 const installedStatuses = {
   claude_code: { status: 'installed' as const, version: '1.0.20' },
   codex: { status: 'installed' as const, version: '0.37.0' },
+  opencode: { status: 'missing' as const, version: null },
 }
 
 function render(ui: ReactElement) {

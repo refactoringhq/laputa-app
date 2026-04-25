@@ -19,6 +19,7 @@ const vaults: VaultOption[] = [
 const installedAiAgentsStatus = {
   claude_code: { status: 'installed' as const, version: '1.0.20' },
   codex: { status: 'installed' as const, version: '0.37.0' },
+  opencode: { status: 'missing' as const, version: null },
 }
 
 const DEFAULT_WINDOW_WIDTH = 1280

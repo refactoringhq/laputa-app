@@ -23,6 +23,7 @@ describe('AiAgentsOnboardingPrompt', () => {
         statuses={{
           claude_code: { status: 'installed', version: '1.0.20' },
           codex: { status: 'missing', version: null },
+          opencode: { status: 'missing', version: null },
         }}
         onContinue={vi.fn()}
       />,
@@ -39,6 +40,7 @@ describe('AiAgentsOnboardingPrompt', () => {
         statuses={{
           claude_code: { status: 'missing', version: null },
           codex: { status: 'missing', version: null },
+          opencode: { status: 'missing', version: null },
         }}
         onContinue={vi.fn()}
       />,
@@ -58,6 +60,7 @@ describe('AiAgentsOnboardingPrompt', () => {
         statuses={{
           claude_code: { status: 'missing', version: null },
           codex: { status: 'missing', version: null },
+          opencode: { status: 'missing', version: null },
         }}
         onContinue={vi.fn()}
       />,
@@ -76,6 +79,7 @@ describe('AiAgentsOnboardingPrompt', () => {
         statuses={{
           claude_code: { status: 'installed', version: '1.0.20' },
           codex: { status: 'missing', version: null },
+          opencode: { status: 'missing', version: null },
         }}
         onContinue={vi.fn()}
       />,
