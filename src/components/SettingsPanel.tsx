@@ -252,8 +252,8 @@ function SettingsPanelInner({
   const t = createTranslator(draftLocale)
 
   useEffect(() => {
-    setDraft(createSettingsDraft(settings, explicitOrganizationEnabled))
-  }, [explicitOrganizationEnabled, settings])
+    setDraft(createSettingsDraft(settings, explicitOrganizationEnabled, aiAgentsStatus))
+  }, [aiAgentsStatus, explicitOrganizationEnabled, settings])
 
   useEffect(() => {
     const timer = setTimeout(() => {

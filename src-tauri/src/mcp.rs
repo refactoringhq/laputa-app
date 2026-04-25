@@ -5,6 +5,17 @@ use std::process::{Child, Command};
 const MCP_SERVER_NAME: &str = "tolaria";
 const LEGACY_MCP_SERVER_NAME: &str = "laputa";
 
+/// Format of the MCP config file being written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConfigFormat {
+    /// Standard format used by Claude Code and Cursor: `mcpServers` key with
+    /// `command` (string) + `args` (array) + `env` (map).
+    Standard,
+    /// OpenCode format: `mcp` key with `type` ("local"), `command` (array),
+    /// and `environment` (map).
+    Opencode,
+}
+
 /// Status of the MCP server installation.
 #[derive(Debug, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -135,14 +146,32 @@ fn mcp_config_paths_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".claude").join("mcp.json"),
         home.join(".cursor").join("mcp.json"),
         home.join(".config").join("mcp").join("mcp.json"),
+        home.join(".config").join("opencode").join("opencode.json"),
     ]
+}
+
+fn detect_config_format(config_path: &Path) -> ConfigFormat {
+    let raw = config_path.to_string_lossy();
+    if raw.contains(".config/opencode/") {
+        ConfigFormat::Opencode
+    } else {
+        ConfigFormat::Standard
+    }
 }
 
 fn read_registered_mcp_entry(config_path: &Path) -> Option<serde_json::Value> {
     let raw = std::fs::read_to_string(config_path).ok()?;
     let config: serde_json::Value = serde_json::from_str(&raw).ok()?;
+
+    let format = detect_config_format(config_path);
+
+    let key = match format {
+        ConfigFormat::Standard => "mcpServers",
+        ConfigFormat::Opencode => "mcp",
+    };
+
     config
-        .get("mcpServers")
+        .get(key)
         .and_then(|value| value.as_object())
         .and_then(|servers| {
             servers
@@ -153,15 +182,34 @@ fn read_registered_mcp_entry(config_path: &Path) -> Option<serde_json::Value> {
 }
 
 fn entry_index_js_exists(entry: &serde_json::Value) -> bool {
-    entry["args"]
+    if let Some(js) = entry["args"]
         .as_array()
         .and_then(|args| args.first())
         .and_then(|value| value.as_str())
-        .is_some_and(|index_js| Path::new(index_js).exists())
+    {
+        if Path::new(js).exists() {
+            return true;
+        }
+    }
+
+    if let Some(js) = entry["command"]
+        .as_array()
+        .and_then(|cmd| cmd.get(1))
+        .and_then(|value| value.as_str())
+    {
+        if Path::new(js).exists() {
+            return true;
+        }
+    }
+
+    false
 }
 
 fn entry_targets_vault(entry: &serde_json::Value, vault_path: &Path) -> bool {
-    let Some(entry_vault_path) = entry["env"]["VAULT_PATH"].as_str() else {
+    let Some(entry_vault_path) = entry["env"]["VAULT_PATH"]
+        .as_str()
+        .or_else(|| entry["environment"]["VAULT_PATH"].as_str())
+    else {
         return false;
     };
 
@@ -184,12 +232,31 @@ fn build_mcp_entry(index_js: &str, vault_path: &str) -> serde_json::Value {
     })
 }
 
+/// Build an OpenCode-format MCP server entry.
+fn build_opencode_mcp_entry(index_js: &str, vault_path: &str) -> serde_json::Value {
+    serde_json::json!({
+        "type": "local",
+        "command": ["node", index_js],
+        "environment": { "VAULT_PATH": vault_path }
+    })
+}
+
+/// Build the appropriate MCP entry based on config format.
+fn build_entry(index_js: &str, vault_path: &str, format: ConfigFormat) -> serde_json::Value {
+    match format {
+        ConfigFormat::Standard => build_mcp_entry(index_js, vault_path),
+        ConfigFormat::Opencode => build_opencode_mcp_entry(index_js, vault_path),
+    }
+}
+
 /// Write MCP registration to a list of config file paths.
 /// Returns "registered" on first registration, "updated" if already present.
-fn register_mcp_to_configs(entry: &serde_json::Value, config_paths: &[PathBuf]) -> String {
+fn register_mcp_to_configs(index_js: &str, vault_path: &str, config_paths: &[PathBuf]) -> String {
     let mut status = "registered";
     for config_path in config_paths {
-        match upsert_mcp_config(config_path, entry) {
+        let format = detect_config_format(config_path);
+        let entry = build_entry(index_js, vault_path, format);
+        match upsert_mcp_config(config_path, &entry, format) {
             Ok(true) => status = "updated",
             Ok(false) => {}
             Err(e) => log::warn!("Failed to update {}: {}", config_path.display(), e),
@@ -198,18 +265,24 @@ fn register_mcp_to_configs(entry: &serde_json::Value, config_paths: &[PathBuf]) 
     status.to_string()
 }
 
-/// Register Tolaria as an MCP server in external AI tool config files.
+/// Register Tolaria as an MCP server in Claude Code, Cursor, OpenCode, and generic MCP config files.
 pub fn register_mcp(vault_path: &str) -> Result<String, String> {
     let server_dir = mcp_server_dir()?;
     let index_js = server_dir.join("index.js").to_string_lossy().into_owned();
 
-    let entry = build_mcp_entry(&index_js, vault_path);
-
-    Ok(register_mcp_to_configs(&entry, &mcp_config_paths()))
+    Ok(register_mcp_to_configs(
+        &index_js,
+        vault_path,
+        &mcp_config_paths(),
+    ))
 }
 
 /// Insert or update the Tolaria entry in an MCP config file.
-fn upsert_mcp_config(config_path: &Path, entry: &serde_json::Value) -> Result<bool, String> {
+fn upsert_mcp_config(
+    config_path: &Path,
+    entry: &serde_json::Value,
+    format: ConfigFormat,
+) -> Result<bool, String> {
     if let Some(parent) = config_path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Cannot create dir {}: {e}", parent.display()))?;
@@ -224,15 +297,20 @@ fn upsert_mcp_config(config_path: &Path, entry: &serde_json::Value) -> Result<bo
         serde_json::json!({})
     };
 
+    let key = match format {
+        ConfigFormat::Standard => "mcpServers",
+        ConfigFormat::Opencode => "mcp",
+    };
+
     let servers = config
         .as_object_mut()
         .ok_or("Config is not a JSON object")?
-        .entry("mcpServers")
+        .entry(key)
         .or_insert_with(|| serde_json::json!({}));
 
     let servers = servers
         .as_object_mut()
-        .ok_or("mcpServers is not a JSON object")?;
+        .ok_or(format!("{} is not a JSON object", key))?;
 
     let was_update =
         servers.get(MCP_SERVER_NAME).is_some() || servers.get(LEGACY_MCP_SERVER_NAME).is_some();
@@ -250,7 +328,8 @@ fn upsert_mcp_config(config_path: &Path, entry: &serde_json::Value) -> Result<bo
 fn remove_mcp_from_configs(config_paths: &[PathBuf]) -> String {
     let mut removed_any = false;
     for config_path in config_paths {
-        match remove_mcp_from_config(config_path) {
+        let format = detect_config_format(config_path);
+        match remove_mcp_from_config(config_path, format) {
             Ok(true) => removed_any = true,
             Ok(false) => {}
             Err(e) => log::warn!("Failed to update {}: {}", config_path.display(), e),
@@ -264,7 +343,7 @@ fn remove_mcp_from_configs(config_paths: &[PathBuf]) -> String {
     }
 }
 
-fn remove_mcp_from_config(config_path: &Path) -> Result<bool, String> {
+fn remove_mcp_from_config(config_path: &Path, format: ConfigFormat) -> Result<bool, String> {
     if !config_path.exists() {
         return Ok(false);
     }
@@ -278,12 +357,17 @@ fn remove_mcp_from_config(config_path: &Path) -> Result<bool, String> {
         return Err("Config is not a JSON object".into());
     };
 
-    let Some(servers_value) = config_object.get_mut("mcpServers") else {
+    let key = match format {
+        ConfigFormat::Standard => "mcpServers",
+        ConfigFormat::Opencode => "mcp",
+    };
+
+    let Some(servers_value) = config_object.get_mut(key) else {
         return Ok(false);
     };
 
     let Some(servers) = servers_value.as_object_mut() else {
-        return Err("mcpServers is not a JSON object".into());
+        return Err(format!("{} is not a JSON object", key));
     };
 
     let removed_primary = servers.remove(MCP_SERVER_NAME).is_some();
@@ -293,7 +377,7 @@ fn remove_mcp_from_config(config_path: &Path) -> Result<bool, String> {
     }
 
     if servers.is_empty() {
-        config_object.remove("mcpServers");
+        config_object.remove(key);
     }
 
     let json = serde_json::to_string_pretty(&config)
@@ -376,12 +460,37 @@ mod tests {
     }
 
     #[test]
+    fn build_opencode_mcp_entry_produces_correct_json() {
+        let entry = build_opencode_mcp_entry("/path/to/index.js", "/my/vault");
+        assert_eq!(entry["type"], "local");
+        assert_eq!(entry["command"][0], "node");
+        assert_eq!(entry["command"][1], "/path/to/index.js");
+        assert_eq!(entry["environment"]["VAULT_PATH"], "/my/vault");
+    }
+
+    #[test]
+    fn build_entry_selects_standard_format() {
+        let entry = build_entry("/idx.js", "/vault", ConfigFormat::Standard);
+        assert_eq!(entry["command"], "node");
+        assert_eq!(entry["args"][0], "/idx.js");
+        assert!(!entry["type"].is_string());
+    }
+
+    #[test]
+    fn build_entry_selects_opencode_format() {
+        let entry = build_entry("/idx.js", "/vault", ConfigFormat::Opencode);
+        assert_eq!(entry["type"], "local");
+        assert_eq!(entry["command"][0], "node");
+        assert_eq!(entry["command"][1], "/idx.js");
+    }
+
+    #[test]
     fn upsert_creates_new_config() {
         let tmp = tempfile::tempdir().unwrap();
         let config_path = tmp.path().join("mcp.json");
         let entry = build_mcp_entry("/test/index.js", "/test/vault");
 
-        let was_update = upsert_mcp_config(&config_path, &entry).unwrap();
+        let was_update = upsert_mcp_config(&config_path, &entry, ConfigFormat::Standard).unwrap();
         assert!(!was_update);
 
         let config = read_config(&config_path);
@@ -401,10 +510,10 @@ mod tests {
         let config_path = tmp.path().join("mcp.json");
 
         let entry1 = build_mcp_entry("/test/index.js", "/vault/v1");
-        upsert_mcp_config(&config_path, &entry1).unwrap();
+        upsert_mcp_config(&config_path, &entry1, ConfigFormat::Standard).unwrap();
 
         let entry2 = build_mcp_entry("/test/index.js", "/vault/v2");
-        let was_update = upsert_mcp_config(&config_path, &entry2).unwrap();
+        let was_update = upsert_mcp_config(&config_path, &entry2, ConfigFormat::Standard).unwrap();
         assert!(was_update);
 
         let config = read_config(&config_path);
@@ -431,7 +540,7 @@ mod tests {
         std::fs::write(&config_path, serde_json::to_string(&existing).unwrap()).unwrap();
 
         let entry = build_mcp_entry("/test/index.js", "/vault");
-        let was_update = upsert_mcp_config(&config_path, &entry).unwrap();
+        let was_update = upsert_mcp_config(&config_path, &entry, ConfigFormat::Standard).unwrap();
         assert!(was_update);
 
         let config = read_config(&config_path);
@@ -454,7 +563,7 @@ mod tests {
         );
 
         let entry = build_mcp_entry("/test/index.js", "/vault");
-        upsert_mcp_config(&config_path, &entry).unwrap();
+        upsert_mcp_config(&config_path, &entry, ConfigFormat::Standard).unwrap();
 
         let raw = std::fs::read_to_string(&config_path).unwrap();
         let config: serde_json::Value = serde_json::from_str(&raw).unwrap();
@@ -477,7 +586,7 @@ mod tests {
         );
 
         let entry = build_mcp_entry("/test/index.js", "/vault");
-        upsert_mcp_config(&config_path, &entry).unwrap();
+        upsert_mcp_config(&config_path, &entry, ConfigFormat::Standard).unwrap();
 
         let config = read_config(&config_path);
         assert_eq!(config["model"], "sonnet");
@@ -492,17 +601,120 @@ mod tests {
         let config_path = tmp.path().join("nested").join("dir").join("mcp.json");
         let entry = build_mcp_entry("/test/index.js", "/vault");
 
-        upsert_mcp_config(&config_path, &entry).unwrap();
+        upsert_mcp_config(&config_path, &entry, ConfigFormat::Standard).unwrap();
         assert!(config_path.exists());
+    }
+
+    #[test]
+    fn upsert_opencode_creates_new_config() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp
+            .path()
+            .join(".config")
+            .join("opencode")
+            .join("opencode.json");
+        let entry = build_opencode_mcp_entry("/test/index.js", "/test/vault");
+
+        let was_update = upsert_mcp_config(&config_path, &entry, ConfigFormat::Opencode).unwrap();
+        assert!(!was_update);
+
+        let config = read_config(&config_path);
+        assert_eq!(config["mcp"][MCP_SERVER_NAME]["type"], "local");
+        assert_eq!(config["mcp"][MCP_SERVER_NAME]["command"][0], "node");
+        assert_eq!(
+            config["mcp"][MCP_SERVER_NAME]["command"][1],
+            "/test/index.js"
+        );
+        assert_eq!(
+            config["mcp"][MCP_SERVER_NAME]["environment"]["VAULT_PATH"],
+            "/test/vault"
+        );
+    }
+
+    #[test]
+    fn upsert_opencode_updates_existing_config() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp.path().join("opencode.json");
+        let existing = build_opencode_mcp_entry("/old/index.js", "/old/vault");
+
+        let was_update =
+            upsert_mcp_config(&config_path, &existing, ConfigFormat::Opencode).unwrap();
+        assert!(!was_update);
+
+        let updated = build_opencode_mcp_entry("/new/index.js", "/new/vault");
+        let was_update = upsert_mcp_config(&config_path, &updated, ConfigFormat::Opencode).unwrap();
+        assert!(was_update);
+
+        let config = read_config(&config_path);
+        assert_eq!(
+            config["mcp"][MCP_SERVER_NAME]["command"][1],
+            "/new/index.js"
+        );
+        assert_eq!(
+            config["mcp"][MCP_SERVER_NAME]["environment"]["VAULT_PATH"],
+            "/new/vault"
+        );
+    }
+
+    #[test]
+    fn upsert_opencode_migrates_legacy_server_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp.path().join("opencode.json");
+
+        let existing = serde_json::json!({
+            "mcp": {
+                "laputa": {
+                    "type": "local",
+                    "command": ["node", "/old/index.js"],
+                    "environment": { "VAULT_PATH": "/old" }
+                }
+            }
+        });
+        std::fs::write(&config_path, serde_json::to_string(&existing).unwrap()).unwrap();
+
+        let entry = build_opencode_mcp_entry("/test/index.js", "/vault");
+        let was_update = upsert_mcp_config(&config_path, &entry, ConfigFormat::Opencode).unwrap();
+        assert!(was_update);
+
+        let config = read_config(&config_path);
+        assert!(config["mcp"][LEGACY_MCP_SERVER_NAME].is_null());
+        assert_eq!(
+            config["mcp"][MCP_SERVER_NAME]["command"][1],
+            "/test/index.js"
+        );
+    }
+
+    #[test]
+    fn upsert_opencode_preserves_other_servers() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp.path().join("opencode.json");
+
+        let existing = serde_json::json!({
+            "provider": { "openai": { "npm": "@ai-sdk/openai" } },
+            "mcp": {
+                "tavily": {
+                    "type": "remote",
+                    "url": "https://mcp.tavily.com/mcp"
+                }
+            }
+        });
+        std::fs::write(&config_path, serde_json::to_string(&existing).unwrap()).unwrap();
+
+        let entry = build_opencode_mcp_entry("/test/index.js", "/vault");
+        upsert_mcp_config(&config_path, &entry, ConfigFormat::Opencode).unwrap();
+
+        let config = read_config(&config_path);
+        assert_eq!(config["provider"]["openai"]["npm"], "@ai-sdk/openai");
+        assert_eq!(config["mcp"]["tavily"]["type"], "remote");
+        assert!(config["mcp"][MCP_SERVER_NAME].is_object());
     }
 
     #[test]
     fn register_mcp_to_configs_returns_registered_for_new() {
         let tmp = tempfile::tempdir().unwrap();
         let config = tmp.path().join("claude").join("mcp.json");
-        let entry = build_mcp_entry("/test/index.js", "/vault");
 
-        let status = register_mcp_to_configs(&entry, &[config]);
+        let status = register_mcp_to_configs("/test/index.js", "/vault", &[config]);
         assert_eq!(status, "registered");
     }
 
@@ -510,13 +722,37 @@ mod tests {
     fn register_mcp_to_configs_returns_updated_for_existing() {
         let tmp = tempfile::tempdir().unwrap();
         let config = tmp.path().join("mcp.json");
-        let entry = build_mcp_entry("/test/index.js", "/vault");
 
-        // First call
-        register_mcp_to_configs(&entry, std::slice::from_ref(&config));
-        // Second call
-        let status = register_mcp_to_configs(&entry, &[config]);
+        register_mcp_to_configs("/test/index.js", "/vault", &[config.clone()]);
+        let status = register_mcp_to_configs("/test/index.js", "/vault", &[config]);
         assert_eq!(status, "updated");
+    }
+
+    #[test]
+    fn register_mcp_to_configs_routes_formats_correctly() {
+        let tmp = tempfile::tempdir().unwrap();
+        let standard_cfg = tmp.path().join(".claude.json");
+        let opencode_cfg = tmp
+            .path()
+            .join(".config")
+            .join("opencode")
+            .join("opencode.json");
+
+        register_mcp_to_configs(
+            "/test/index.js",
+            "/vault",
+            &[standard_cfg.clone(), opencode_cfg.clone()],
+        );
+
+        let std_config: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&standard_cfg).unwrap()).unwrap();
+        assert_eq!(std_config["mcpServers"][MCP_SERVER_NAME]["command"], "node");
+        assert!(!std_config["mcpServers"][MCP_SERVER_NAME]["args"].is_null());
+
+        let oc_config: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&opencode_cfg).unwrap()).unwrap();
+        assert_eq!(oc_config["mcp"][MCP_SERVER_NAME]["type"], "local");
+        assert!(!oc_config["mcp"][MCP_SERVER_NAME]["command"].is_null());
     }
 
     #[test]
@@ -546,7 +782,6 @@ mod tests {
         let mut child = spawn_ws_bridge(vault_path).unwrap();
         assert!(child.id() > 0, "child process should have a valid PID");
 
-        // Clean up: kill the spawned process
         child.kill().unwrap();
         child.wait().unwrap();
     }
@@ -558,15 +793,18 @@ mod tests {
         let claude_cfg = tmp.path().join("claude").join("mcp.json");
         let cursor_cfg = tmp.path().join("cursor").join("mcp.json");
         let generic_cfg = tmp.path().join(".config").join("mcp").join("mcp.json");
+        let opencode_cfg = tmp.path().join(".config").join("opencode").join("opencode.json");
         let entry = build_mcp_entry("/test/index.js", "/vault");
 
         register_mcp_to_configs(
-            &entry,
+            "/test/index.js",
+            "/vault",
             &[
                 claude_user_cfg.clone(),
                 claude_cfg.clone(),
                 cursor_cfg.clone(),
                 generic_cfg.clone(),
+                opencode_cfg.clone(),
             ],
         );
 
@@ -574,6 +812,7 @@ mod tests {
         assert!(claude_cfg.exists());
         assert!(cursor_cfg.exists());
         assert!(generic_cfg.exists());
+        assert!(opencode_cfg.exists());
 
         let raw = std::fs::read_to_string(&claude_user_cfg).unwrap();
         let config: serde_json::Value = serde_json::from_str(&raw).unwrap();
@@ -595,25 +834,48 @@ mod tests {
                 home.join(".claude").join("mcp.json"),
                 home.join(".cursor").join("mcp.json"),
                 home.join(".config").join("mcp").join("mcp.json"),
+                home.join(".config").join("opencode").join("opencode.json"),
             ]
         );
     }
+
+    #[test]
+    fn detect_config_format_identifies_opencode_path() {
+        assert_eq!(
+            detect_config_format(Path::new("/Users/test/.config/opencode/opencode.json")),
+            ConfigFormat::Opencode
+        );
+    }
+
+    #[test]
+    fn detect_config_format_identifies_standard_paths() {
+        assert_eq!(
+            detect_config_format(Path::new("/Users/test/.claude.json")),
+            ConfigFormat::Standard
+        );
+        assert_eq!(
+            detect_config_format(Path::new("/Users/test/.claude/mcp.json")),
+            ConfigFormat::Standard
+        );
+        assert_eq!(
+            detect_config_format(Path::new("/Users/test/.cursor/mcp.json")),
+            ConfigFormat::Standard
+        );
+    }
+
     #[test]
     fn upsert_returns_error_for_invalid_json() {
         let tmp = tempfile::tempdir().unwrap();
         let config_path = tmp.path().join("mcp.json");
         std::fs::write(&config_path, "not valid json{{{{").unwrap();
         let entry = build_mcp_entry("/test/index.js", "/vault");
-        let result = upsert_mcp_config(&config_path, &entry);
+        let result = upsert_mcp_config(&config_path, &entry, ConfigFormat::Standard);
         assert!(result.is_err());
     }
 
     #[test]
     fn register_mcp_to_configs_handles_empty_list() {
-        let entry = build_mcp_entry("/test/index.js", "/vault");
-        // Empty config list — function should return "registered" (no existing)
-        let status = register_mcp_to_configs(&entry, &[]);
-        // With empty config list, there were no updates, so status should be "registered"
+        let status = register_mcp_to_configs("/test/index.js", "/vault", &[]);
         assert_eq!(status, "registered");
     }
 
@@ -654,6 +916,32 @@ mod tests {
     }
 
     #[test]
+    fn read_registered_mcp_entry_reads_opencode_format() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp
+            .path()
+            .join(".config")
+            .join("opencode")
+            .join("opencode.json");
+        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+
+        let config = serde_json::json!({
+            "mcp": {
+                "tolaria": {
+                    "type": "local",
+                    "command": ["node", "/test/index.js"],
+                    "environment": { "VAULT_PATH": "/opencode/vault" }
+                }
+            }
+        });
+        std::fs::write(&config_path, serde_json::to_string(&config).unwrap()).unwrap();
+
+        let entry = read_registered_mcp_entry(&config_path).unwrap();
+        assert_eq!(entry["type"], "local");
+        assert_eq!(entry["environment"]["VAULT_PATH"], "/opencode/vault");
+    }
+
+    #[test]
     fn read_registered_mcp_entry_returns_none_for_invalid_or_missing_servers() {
         let tmp = tempfile::tempdir().unwrap();
         let invalid_path = tmp.path().join("invalid.json");
@@ -690,13 +978,47 @@ mod tests {
     }
 
     #[test]
+    fn entry_index_js_exists_works_with_opencode_command_array() {
+        let tmp = tempfile::tempdir().unwrap();
+        let index_js = tmp.path().join("index.js");
+        std::fs::write(&index_js, "console.log('ok');").unwrap();
+
+        let existing = serde_json::json!({
+            "type": "local",
+            "command": ["node", index_js.to_string_lossy()],
+            "environment": { "VAULT_PATH": "/vault" }
+        });
+        assert!(entry_index_js_exists(&existing));
+
+        let missing = serde_json::json!({
+            "type": "local",
+            "command": ["node", tmp.path().join("missing.js").to_string_lossy()],
+            "environment": { "VAULT_PATH": "/vault" }
+        });
+        assert!(!entry_index_js_exists(&missing));
+    }
+
+    #[test]
+    fn entry_index_js_exists_prefers_standard_args() {
+        let tmp = tempfile::tempdir().unwrap();
+        let good_js = tmp.path().join("good.js");
+        std::fs::write(&good_js, "// ok").unwrap();
+
+        let entry = serde_json::json!({
+            "args": [good_js.to_string_lossy()],
+            "command": ["node", tmp.path().join("missing.js").to_string_lossy()]
+        });
+        assert!(entry_index_js_exists(&entry));
+    }
+
+    #[test]
     fn upsert_returns_error_for_non_object_config() {
         let tmp = tempfile::tempdir().unwrap();
         let config_path = tmp.path().join("mcp.json");
         std::fs::write(&config_path, "[]").unwrap();
 
         let entry = build_mcp_entry("/test/index.js", "/vault");
-        let result = upsert_mcp_config(&config_path, &entry);
+        let result = upsert_mcp_config(&config_path, &entry, ConfigFormat::Standard);
         assert!(matches!(result, Err(ref error) if error.contains("Config is not a JSON object")));
     }
 
@@ -710,10 +1032,24 @@ mod tests {
         std::fs::write(&config_path, serde_json::to_string(&config).unwrap()).unwrap();
 
         let entry = build_mcp_entry("/test/index.js", "/vault");
-        let result = upsert_mcp_config(&config_path, &entry);
+        let result = upsert_mcp_config(&config_path, &entry, ConfigFormat::Standard);
         assert!(
             matches!(result, Err(ref error) if error.contains("mcpServers is not a JSON object"))
         );
+    }
+
+    #[test]
+    fn upsert_opencode_returns_error_for_non_object_mcp_key() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp.path().join("opencode.json");
+        let config = serde_json::json!({
+            "mcp": []
+        });
+        std::fs::write(&config_path, serde_json::to_string(&config).unwrap()).unwrap();
+
+        let entry = build_opencode_mcp_entry("/test/index.js", "/vault");
+        let result = upsert_mcp_config(&config_path, &entry, ConfigFormat::Opencode);
+        assert!(matches!(result, Err(ref error) if error.contains("mcp is not a JSON object")));
     }
 
     #[test]
@@ -729,13 +1065,53 @@ mod tests {
         });
         std::fs::write(&config_path, serde_json::to_string(&config).unwrap()).unwrap();
 
-        let removed = remove_mcp_from_config(&config_path).unwrap();
+        let removed = remove_mcp_from_config(&config_path, ConfigFormat::Standard).unwrap();
         assert!(removed);
 
         let updated = read_config(&config_path);
         assert!(updated["mcpServers"][MCP_SERVER_NAME].is_null());
         assert!(updated["mcpServers"][LEGACY_MCP_SERVER_NAME].is_null());
         assert!(updated["mcpServers"]["other-server"].is_object());
+    }
+
+    #[test]
+    fn remove_mcp_from_config_removes_opencode_entries() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp.path().join("opencode.json");
+        let config = serde_json::json!({
+            "mcp": {
+                "tolaria": { "type": "local", "command": ["node", "/index.js"] },
+                "laputa": { "type": "local", "command": ["node", "/legacy.js"] },
+                "tavily": { "type": "remote", "url": "https://mcp.tavily.com/mcp" }
+            }
+        });
+        std::fs::write(&config_path, serde_json::to_string(&config).unwrap()).unwrap();
+
+        let removed = remove_mcp_from_config(&config_path, ConfigFormat::Opencode).unwrap();
+        assert!(removed);
+
+        let updated = read_config(&config_path);
+        assert!(updated["mcp"][MCP_SERVER_NAME].is_null());
+        assert!(updated["mcp"][LEGACY_MCP_SERVER_NAME].is_null());
+        assert_eq!(updated["mcp"]["tavily"]["type"], "remote");
+    }
+
+    #[test]
+    fn remove_mcp_from_config_removes_key_when_empty() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp.path().join("opencode.json");
+        let config = serde_json::json!({
+            "mcp": {
+                "tolaria": { "type": "local", "command": ["node", "/index.js"] }
+            }
+        });
+        std::fs::write(&config_path, serde_json::to_string(&config).unwrap()).unwrap();
+
+        let removed = remove_mcp_from_config(&config_path, ConfigFormat::Opencode).unwrap();
+        assert!(removed);
+
+        let updated = read_config(&config_path);
+        assert!(updated["mcp"].is_null());
     }
 
     #[test]
@@ -749,7 +1125,7 @@ mod tests {
         });
         std::fs::write(&config_path, serde_json::to_string(&config).unwrap()).unwrap();
 
-        let removed = remove_mcp_from_config(&config_path).unwrap();
+        let removed = remove_mcp_from_config(&config_path, ConfigFormat::Standard).unwrap();
         assert!(!removed);
     }
 
@@ -777,6 +1153,32 @@ mod tests {
     }
 
     #[test]
+    fn check_mcp_status_returns_installed_for_opencode_format() {
+        let tmp = tempfile::tempdir().unwrap();
+        let vault_path = tmp.path().join("vault");
+        std::fs::create_dir_all(&vault_path).unwrap();
+        let index_js = write_index_js(tmp.path());
+
+        let config_dir = tmp.path().join(".config").join("opencode");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        let config_path = config_dir.join("opencode.json");
+        let config = serde_json::json!({
+            "mcp": {
+                "tolaria": {
+                    "type": "local",
+                    "command": ["node", index_js.to_string_lossy()],
+                    "environment": { "VAULT_PATH": vault_path.to_string_lossy() }
+                }
+            }
+        });
+        std::fs::write(&config_path, serde_json::to_string(&config).unwrap()).unwrap();
+
+        let entry = read_registered_mcp_entry(&config_path).unwrap();
+        assert!(entry_targets_vault(&entry, &vault_path));
+        assert!(entry_index_js_exists(&entry));
+    }
+
+    #[test]
     fn entry_targets_vault_requires_matching_existing_directory() {
         let tmp = tempfile::tempdir().unwrap();
         let first_vault = tmp.path().join("vault-a");
@@ -786,6 +1188,23 @@ mod tests {
 
         let entry = serde_json::json!({
             "env": { "VAULT_PATH": first_vault.to_string_lossy() }
+        });
+
+        assert!(entry_targets_vault(&entry, &first_vault));
+        assert!(!entry_targets_vault(&entry, &second_vault));
+    }
+
+    #[test]
+    fn entry_targets_vault_works_with_opencode_environment_key() {
+        let tmp = tempfile::tempdir().unwrap();
+        let first_vault = tmp.path().join("vault-a");
+        let second_vault = tmp.path().join("vault-b");
+        std::fs::create_dir_all(&first_vault).unwrap();
+        std::fs::create_dir_all(&second_vault).unwrap();
+
+        let entry = serde_json::json!({
+            "type": "local",
+            "environment": { "VAULT_PATH": first_vault.to_string_lossy() }
         });
 
         assert!(entry_targets_vault(&entry, &first_vault));

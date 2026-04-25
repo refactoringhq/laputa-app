@@ -74,9 +74,10 @@ export function McpSetupDialog({
             <div>~/.claude/mcp.json</div>
             <div>~/.cursor/mcp.json</div>
             <div>~/.config/mcp/mcp.json</div>
+            <div>~/.config/opencode/opencode.json</div>
           </div>
           <p>
-            Claude Code CLI reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.claude.json</code>, Cursor reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.cursor/mcp.json</code>, and the generic <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.config/mcp/mcp.json</code> path is picked up by other MCP-compatible tools. Cancel leaves all files untouched, reconnect is idempotent, and disconnect removes Tolaria&apos;s entry again.
+            Each tool uses its own config format: Claude Code reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.claude.json</code>, Cursor reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.cursor/mcp.json</code>, the generic <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.config/mcp/mcp.json</code> is picked up by other MCP-compatible tools, and OpenCode reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.config/opencode/opencode.json</code>. Cancel leaves all files untouched, reconnect is idempotent, and disconnect removes Tolaria&apos;s entry again.
           </p>
         </div>
 
