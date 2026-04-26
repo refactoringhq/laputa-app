@@ -15,6 +15,8 @@ export const ZH_HANS_TRANSLATIONS = {
   'command.useSystemLanguage': '使用系统语言',
   'command.switchToEnglish': '切换到英文',
   'command.switchToChinese': '切换到简体中文',
+  'command.useLightMode': '使用浅色模式',
+  'command.useDarkMode': '使用深色模式',
   'command.openH1Setting': '打开 H1 自动重命名设置',
   'command.contribute': '参与贡献',
   'command.checkUpdates': '检查更新',

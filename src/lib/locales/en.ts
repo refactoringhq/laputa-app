@@ -13,6 +13,8 @@ export const EN_TRANSLATIONS = {
   'command.useSystemLanguage': 'Use System Language',
   'command.switchToEnglish': 'Switch Language to English',
   'command.switchToChinese': 'Switch Language to Simplified Chinese',
+  'command.useLightMode': 'Use Light Mode',
+  'command.useDarkMode': 'Use Dark Mode',
   'command.openH1Setting': 'Open H1 Auto-Rename Setting',
   'command.contribute': 'Contribute',
   'command.checkUpdates': 'Check for Updates',

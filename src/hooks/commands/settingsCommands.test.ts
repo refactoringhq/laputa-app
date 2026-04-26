@@ -67,6 +67,37 @@ describe('buildSettingsCommands', () => {
     expect(onSetUiLanguage).toHaveBeenCalledWith('zh-Hans')
   })
 
+  it('adds quick theme mode commands when a setter is available', () => {
+    const onSetThemeMode = vi.fn()
+
+    const commands = buildSettingsCommands({
+      onOpenSettings: vi.fn(),
+      onSetThemeMode,
+    })
+
+    const lightMode = commands.find((item) => item.id === 'use-light-mode')
+    const darkMode = commands.find((item) => item.id === 'use-dark-mode')
+
+    expect(lightMode).toMatchObject({
+      label: 'Use Light Mode',
+      enabled: true,
+      group: 'Settings',
+    })
+    expect(lightMode?.keywords).toContain('light mode')
+    expect(darkMode).toMatchObject({
+      label: 'Use Dark Mode',
+      enabled: true,
+      group: 'Settings',
+    })
+    expect(darkMode?.keywords).toContain('dark mode')
+
+    lightMode?.execute()
+    darkMode?.execute()
+
+    expect(onSetThemeMode).toHaveBeenNthCalledWith(1, 'light')
+    expect(onSetThemeMode).toHaveBeenNthCalledWith(2, 'dark')
+  })
+
   it('localizes language commands', () => {
     const commands = buildSettingsCommands({
       onOpenSettings: vi.fn(),
