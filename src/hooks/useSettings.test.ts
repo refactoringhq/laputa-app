@@ -81,7 +81,7 @@ function changedSettings(): Settings {
     anonymous_id: null,
     release_channel: null,
     theme_mode: null,
-    ui_language: 'zh-Hans',
+    ui_language: 'zh-CN',
     default_ai_agent: null,
   }
 }
@@ -119,7 +119,7 @@ describe('useSettings', () => {
 
     const settings = await renderLoadedSettings()
 
-    expect(settings.ui_language).toBe('zh-Hans')
+    expect(settings.ui_language).toBe('zh-CN')
     expect(mockInvokeFn).not.toHaveBeenCalledWith('get_settings', {})
   })
 
@@ -136,7 +136,7 @@ describe('useSettings', () => {
   it('normalizes unsupported language preferences on load', async () => {
     mockSettingsStore = {
       ...savedSettings,
-      ui_language: 'fr-FR' as Settings['ui_language'],
+      ui_language: 'xx-ZZ' as Settings['ui_language'],
     }
 
     const settings = await renderLoadedSettings()

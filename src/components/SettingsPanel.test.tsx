@@ -78,7 +78,7 @@ describe('SettingsPanel', () => {
     rerender(
       <SettingsPanel
         open={true}
-        settings={{ ...emptySettings, ui_language: 'zh-Hans' }}
+        settings={{ ...emptySettings, ui_language: 'zh-CN' }}
         onSave={onSave}
         onClose={onClose}
       />
@@ -122,7 +122,7 @@ describe('SettingsPanel', () => {
         open={true}
         settings={emptySettings}
         locale="en"
-        systemLocale="zh-Hans"
+        systemLocale="zh-CN"
         onSave={onSave}
         onClose={onClose}
       />
@@ -157,7 +157,7 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByTestId('settings-save'))
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      ui_language: 'zh-Hans',
+      ui_language: 'zh-CN',
     }))
   })
 

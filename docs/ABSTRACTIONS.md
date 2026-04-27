@@ -586,12 +586,13 @@ The app uses internal light and dark themes owned by Tolaria (see [ADR-0081](adr
 
 ## Localization
 
-App UI strings are centralized in `src/lib/i18n.ts` (see [ADR-0084](adr/0084-app-localization-foundation.md)):
+App UI strings are resolved through `src/lib/i18n.ts`, with flat JSON catalogs in `src/lib/locales/*.json` (see [ADR-0087](adr/0087-json-catalogs-and-lara-cli-localization.md)):
 
-- `AppLocale`: currently `'en' | 'zh-Hans'`
+- `AppLocale`: canonical locale tags such as `'en'`, `'zh-CN'`, `'fr-FR'`, `'es-419'`
 - `UiLanguagePreference`: `'system' | AppLocale`; persisted settings serialize `system` as `null`
-- `resolveEffectiveLocale()`: maps an explicit preference or system/browser language list to the effective supported locale
+- `resolveEffectiveLocale()`: maps an explicit preference or system/browser language list to the effective supported locale, including legacy aliases
 - `translate()` / `createTranslator()`: resolve keys with English fallback and simple `{name}` interpolation
+- `scripts/validate-locales.mjs`: asserts every checked-in locale catalog matches the English keyset and stays flat-string-only
 
 `App.tsx` owns the effective locale and passes it to localized app chrome through props. Settings and command-palette language commands call back into `saveSettings`, so UI language changes update the current session without touching vault content or reopening the vault.
 
@@ -705,12 +706,12 @@ interface Settings {
   anonymous_id: string | null
   release_channel: string | null // null = stable default, "alpha" = every-push prerelease feed
   theme_mode: 'light' | 'dark' | null
-  ui_language: 'en' | 'zh-Hans' | null
+  ui_language: AppLocale | null
   default_ai_agent: 'claude_code' | 'codex' | null
 }
 ```
 
-Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is installation-local because it controls device comfort rather than vault structure. `ui_language` is also installation-local: `null` follows the supported system language with English fallback, while explicit values pin the UI language for this installation. `default_ai_agent` is an installation-local preference that selects which supported CLI agent the AI panel, command palette AI mode, and status bar should target by default. The AutoGit fields are also installation-local: `useAutoGit` consumes them to schedule automatic checkpoints, while `useCommitFlow` and the status bar quick action reuse the same checkpoint runner and deterministic automatic commit message generation.
+Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is installation-local because it controls device comfort rather than vault structure. `ui_language` is also installation-local: `null` follows the supported system language with English fallback, while explicit values pin the UI language for this installation. Stored legacy aliases such as `zh-Hans` are normalized to canonical locale codes before the setting reaches React state. `default_ai_agent` is an installation-local preference that selects which supported CLI agent the AI panel, command palette AI mode, and status bar should target by default. The AutoGit fields are also installation-local: `useAutoGit` consumes them to schedule automatic checkpoints, while `useCommitFlow` and the status bar quick action reuse the same checkpoint runner and deterministic automatic commit message generation.
 
 ## Telemetry
 

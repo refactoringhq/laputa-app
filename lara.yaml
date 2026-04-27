@@ -1,0 +1,30 @@
+version: "1.0.0"
+
+project:
+  instruction: >
+    Tolaria is a desktop knowledge-management app. Keep product names, CLI names,
+    markdown wikilinks, frontmatter keys, file paths, and placeholders like
+    {agent}, {zoom}, {language}, {name}, {label}, {file}, and {count} unchanged.
+
+locales:
+  source: en
+  target:
+    - it-IT
+    - fr-FR
+    - de-DE
+    - ru-RU
+    - es-ES
+    - pt-BR
+    - pt-PT
+    - es-419
+    - zh-CN
+    - ja-JP
+    - ko-KR
+
+files:
+  json:
+    include:
+      - "src/lib/locales/[locale].json"
+    exclude: []
+    lockedKeys: []
+    ignoredKeys: []

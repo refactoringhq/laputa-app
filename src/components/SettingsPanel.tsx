@@ -18,6 +18,7 @@ import {
 import { Moon, Sun, X } from '@phosphor-icons/react'
 import type { Settings } from '../types'
 import {
+  APP_LOCALES,
   SYSTEM_UI_LANGUAGE,
   createTranslator,
   localeDisplayName,
@@ -673,8 +674,10 @@ function buildLanguageOptions(t: Translate, locale: AppLocale, systemLocale: App
         language: localeDisplayName(systemLocale, locale),
       }),
     },
-    { value: 'en', label: t('settings.language.en') },
-    { value: 'zh-Hans', label: t('settings.language.zhHans') },
+    ...APP_LOCALES.map((appLocale) => ({
+      value: appLocale,
+      label: localeDisplayName(appLocale, locale),
+    })),
   ]
 }
 

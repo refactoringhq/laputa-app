@@ -1,16 +1,12 @@
 import type { VaultEntry } from '../../types'
 import { Info } from '@phosphor-icons/react'
 import { countWords } from '../../utils/wikilinks'
-import { translate, type AppLocale } from '../../lib/i18n'
-
-function dateLocale(locale: AppLocale): string {
-  return locale === 'zh-Hans' ? 'zh-CN' : 'en-US'
-}
+import { getLocaleDateLocale, translate, type AppLocale } from '../../lib/i18n'
 
 function formatDate(timestamp: number | null, locale: AppLocale): string {
   if (!timestamp) return '\u2014'
   const d = new Date(timestamp * 1000)
-  return d.toLocaleDateString(dateLocale(locale), { year: 'numeric', month: 'short', day: 'numeric' })
+  return d.toLocaleDateString(getLocaleDateLocale(locale), { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function formatFileSize(bytes: number): string {

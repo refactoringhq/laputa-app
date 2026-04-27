@@ -32,7 +32,7 @@ Examples:
 - ✅ Vault: `_pinned_properties` in a Type note (every device should show the same pinned properties)
 - ✅ Vault: `_icon: shapes` in a Type note (icon is part of the type's identity)
 - ✅ App settings: `zoom: 1.3` (machine-specific preference)
-- ✅ App settings: `ui_language: "zh-Hans"` (installation-specific UI language)
+- ✅ App settings: `ui_language: "zh-CN"` (installation-specific UI language)
 
 ### No hardcoded exceptions
 
@@ -100,7 +100,7 @@ flowchart LR
 | Frontmatter parsing | gray_matter | 0.2 |
 | AI (agent panel) | CLI agent adapters (Claude Code + Codex) | - |
 | Search | Keyword (walkdir-based file scan) | - |
-| Localization | App-owned dictionary (`src/lib/i18n.ts`) | English fallback + `zh-Hans` |
+| Localization | App-owned runtime + JSON catalogs (`src/lib/i18n.ts`, `src/lib/locales/*.json`, `lara.yaml`) | English fallback + Lara CLI sync |
 | MCP | @modelcontextprotocol/sdk | 1.0 |
 | Tests | Vitest (unit), Playwright (E2E/smoke), cargo test (Rust) | - |
 | Package manager | pnpm | - |
@@ -420,7 +420,7 @@ The app uses internal app-owned light and dark themes (see [ADR-0081](adr/0081-i
 
 ## Localization
 
-Tolaria's app chrome uses an app-owned localization layer in `src/lib/i18n.ts` (see [ADR-0084](adr/0084-app-localization-foundation.md)). English is the canonical fallback, and Simplified Chinese (`zh-Hans`) is the first additional locale. The installation-local `ui_language` setting stores an explicit locale when the user chooses one; `null` means "follow the system language when Tolaria supports it, otherwise English." Missing translation keys fall back to English so partially translated locales do not render broken placeholders.
+Tolaria's app chrome uses an app-owned localization runtime in `src/lib/i18n.ts`, backed by flat JSON catalogs in `src/lib/locales/` and Lara CLI synchronization through `lara.yaml` (see [ADR-0087](adr/0087-json-catalogs-and-lara-cli-localization.md)). `en.json` is the canonical source catalog, locale files are one file per locale, and English remains the fallback for any missing locale file or key. The installation-local `ui_language` setting stores an explicit locale when the user chooses one; `null` means "follow the system language when Tolaria supports it, otherwise English." Legacy stored values such as `zh-Hans` are normalized to canonical locale codes like `zh-CN`.
 
 `App.tsx` derives the effective locale from settings and browser/system language hints, then passes it down to localized surfaces. Settings exposes a keyboard-accessible shadcn `Select`, and the command palette includes actions to open language settings or switch directly to a supported language.
 

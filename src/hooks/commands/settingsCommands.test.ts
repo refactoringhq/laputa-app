@@ -57,21 +57,21 @@ describe('buildSettingsCommands', () => {
       onSetUiLanguage,
     })
 
-    const chinese = commands.find((item) => item.id === 'switch-language-zh-hans')
+    const chinese = commands.find((item) => item.id === 'switch-language-zh-cn')
     expect(chinese).toMatchObject({
       label: 'Switch Language to Simplified Chinese',
       enabled: true,
     })
 
     chinese?.execute()
-    expect(onSetUiLanguage).toHaveBeenCalledWith('zh-Hans')
+    expect(onSetUiLanguage).toHaveBeenCalledWith('zh-CN')
   })
 
   it('localizes language commands', () => {
     const commands = buildSettingsCommands({
       onOpenSettings: vi.fn(),
-      locale: 'zh-Hans',
-      systemLocale: 'zh-Hans',
+      locale: 'zh-CN',
+      systemLocale: 'zh-CN',
       selectedUiLanguage: 'system',
       onSetUiLanguage: vi.fn(),
     })

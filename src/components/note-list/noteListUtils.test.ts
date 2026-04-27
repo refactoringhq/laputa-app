@@ -40,7 +40,7 @@ describe('resolveHeaderTitle', () => {
 
   it('localizes built-in note list titles', () => {
     const selection: SidebarSelection = { kind: 'filter', filter: 'archived' }
-    expect(resolveHeaderTitle(selection, null, [], 'zh-Hans')).toBe('归档')
+    expect(resolveHeaderTitle(selection, null, [], 'zh-CN')).toBe('归档')
   })
 
   it('keeps user-authored view names unchanged', () => {

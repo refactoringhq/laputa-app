@@ -157,7 +157,8 @@ tolaria/
 │   ├── lib/
 │   │   ├── aiAgents.ts           # Shared agent registry + status helpers
 │   │   ├── appUpdater.ts         # Frontend wrapper around channel-aware updater commands
-│   │   ├── i18n.ts               # App-owned localization dictionary and locale resolution
+│   │   ├── i18n.ts               # App-owned localization runtime and locale resolution
+│   │   ├── locales/              # JSON locale catalogs (English source + translated locales)
 │   │   ├── releaseChannel.ts     # Alpha/stable normalization helpers
 │   │   └── utils.ts              # Tailwind merge + cn() helper
 │   │
@@ -212,6 +213,7 @@ tolaria/
 ├── scripts/                      # Build/utility scripts
 │
 ├── package.json                  # Frontend dependencies + scripts
+├── lara.yaml                     # Lara CLI locale sync configuration
 ├── vite.config.ts                # Vite bundler config
 ├── tsconfig.json                 # TypeScript config
 ├── playwright.config.ts          # Full Playwright regression config

@@ -2,9 +2,11 @@ import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../appCommandCata
 import type { CommandAction } from './types'
 import { rememberFeedbackDialogOpener } from '../../lib/feedbackDialogOpener'
 import {
+  APP_LOCALES,
   SYSTEM_UI_LANGUAGE,
   createTranslator,
   localeDisplayName,
+  localeSearchKeywords,
   type AppLocale,
   type UiLanguagePreference,
 } from '../../lib/i18n'
@@ -100,22 +102,20 @@ function buildLanguageCommands({
       enabled: canSwitchLanguage && selectedUiLanguage !== SYSTEM_UI_LANGUAGE,
       execute: () => onSetUiLanguage?.(SYSTEM_UI_LANGUAGE),
     },
-    {
-      id: 'switch-language-en',
-      label: t('command.switchToEnglish'),
-      group: 'Settings',
-      keywords: ['language', 'locale', 'english', 'en'],
-      enabled: canSwitchLanguage && selectedUiLanguage !== 'en',
-      execute: () => onSetUiLanguage?.('en'),
-    },
-    {
-      id: 'switch-language-zh-hans',
-      label: t('command.switchToChinese'),
-      group: 'Settings',
-      keywords: ['language', 'locale', 'chinese', 'simplified', 'zh', '中文'],
-      enabled: canSwitchLanguage && selectedUiLanguage !== 'zh-Hans',
-      execute: () => onSetUiLanguage?.('zh-Hans'),
-    },
+    ...APP_LOCALES.map((targetLocale) => ({
+      id: `switch-language-${targetLocale.toLowerCase()}`,
+      label: t('command.switchLanguage', {
+        language: localeDisplayName(targetLocale, locale),
+      }),
+      group: 'Settings' as const,
+      keywords: [
+        'language',
+        'locale',
+        ...localeSearchKeywords(targetLocale),
+      ],
+      enabled: canSwitchLanguage && selectedUiLanguage !== targetLocale,
+      execute: () => onSetUiLanguage?.(targetLocale),
+    })),
   ]
 }
 

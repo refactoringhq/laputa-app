@@ -5,7 +5,7 @@ import { isTauri, mockInvoke } from '../mock-tauri'
 import { useDragRegion } from '../hooks/useDragRegion'
 import type { PulseCommit, PulseFile } from '../types'
 import { relativeDate } from '../utils/noteListHelpers'
-import { translate, type AppLocale } from '../lib/i18n'
+import { getLocaleDateLocale, translate, type AppLocale } from '../lib/i18n'
 import {
   Plus, Minus, PencilSimple, GitCommit, ArrowSquareOut,
   FileText, CaretDown, CaretRight, Pulse,
@@ -57,7 +57,7 @@ function formatDayLabel(dateKey: string, locale: AppLocale): string {
   if (isYesterday(dateKey)) return translate(locale, 'pulse.yesterday')
 
   const date = new Date(`${dateKey}T00:00:00`)
-  const dateLocale = locale === 'zh-Hans' ? 'zh-CN' : 'en-US'
+  const dateLocale = getLocaleDateLocale(locale)
   return date.toLocaleDateString(dateLocale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 }
 

@@ -50,7 +50,7 @@ function makeReadyStatus(overrides?: Partial<Extract<UpdateStatus, { state: 'rea
   }
 }
 
-function renderBanner(status: UpdateStatus, actions = makeActions(), locale: 'en' | 'zh-Hans' = 'en') {
+function renderBanner(status: UpdateStatus, actions = makeActions(), locale: 'en' | 'zh-CN' = 'en') {
   const view = render(<UpdateBanner status={status} actions={actions} locale={locale} />)
   return { ...view, actions }
 }
@@ -87,7 +87,7 @@ describe('UpdateBanner', () => {
     renderBanner(makeAvailableStatus({
       version: '2026.4.16-alpha.3',
       displayVersion: 'Alpha 2026.4.16.3',
-    }), makeActions(), 'zh-Hans')
+    }), makeActions(), 'zh-CN')
 
     expect(screen.getByText(/Tolaria Alpha 2026\.4\.16\.3/)).toBeTruthy()
     expect(screen.getByText(/可用/)).toBeTruthy()

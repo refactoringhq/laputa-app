@@ -209,7 +209,7 @@ describe('DynamicPropertiesPanel', () => {
     renderPanel({
       frontmatter: { Status: 'Active', 'Belongs to': 'some-team' },
       onAddProperty,
-      locale: 'zh-Hans',
+      locale: 'zh-CN',
     })
 
     expect(screen.getByText('Type')).toBeInTheDocument()

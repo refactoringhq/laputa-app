@@ -244,7 +244,7 @@ describe('CommandPalette', () => {
   })
 
   it('localizes command palette chrome', () => {
-    render(<CommandPalette open={true} commands={commands} locale="zh-Hans" onClose={onClose} />)
+    render(<CommandPalette open={true} commands={commands} locale="zh-CN" onClose={onClose} />)
     const input = screen.getByPlaceholderText('输入命令...')
     fireEvent.change(input, { target: { value: 'zzzzzzz' } })
 

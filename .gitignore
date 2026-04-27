@@ -70,5 +70,6 @@ CODE-HEALTH-REPORT.md
 *.key.pub
 
 # Local environment variables (never commit)
+.env
 .env.local
 .env.*.local
