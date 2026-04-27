@@ -68,10 +68,23 @@ describe('filterEntries', () => {
       makeEntry({ path: '/vault/note/real-note.md', title: 'Real Note', isA: 'Note' }),
       makeEntry({ path: '/vault/attachments/reference.md', title: 'Attachment Markdown', isA: 'Note' }),
       makeEntry({ path: '/vault/attachments/nested/diagram.md', title: 'Nested Attachment Markdown', isA: 'Note' }),
+      makeEntry({ path: 'C:\\Users\\luca\\Vault\\attachments\\windows.md', title: 'Windows Attachment Markdown', isA: 'Note' }),
     ]
 
     const result = filterEntries(entries, allSelection, 'open')
     expect(result.map((entry) => entry.title)).toEqual(['Real Note'])
+  })
+
+  it('matches slash-based folder selections against Windows entry paths', () => {
+    const entries = [
+      makeEntry({ path: 'C:\\Users\\luca\\Vault\\Client Work\\Alpha.md', title: 'Alpha' }),
+      makeEntry({ path: 'C:\\Users\\luca\\Vault\\Client Work\\Nested\\Beta.md', title: 'Beta' }),
+      makeEntry({ path: 'C:\\Users\\luca\\Vault\\Client Work Archive\\Old.md', title: 'Archive' }),
+      makeEntry({ path: 'C:\\Users\\luca\\Vault\\客户\\计划.md', title: 'Unicode' }),
+    ]
+
+    expect(filterEntries(entries, { kind: 'folder', path: 'Client Work' }).map((entry) => entry.title)).toEqual(['Alpha', 'Beta'])
+    expect(filterEntries(entries, { kind: 'folder', path: '客户' }).map((entry) => entry.title)).toEqual(['Unicode'])
   })
 })
 
