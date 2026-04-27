@@ -55,6 +55,10 @@ interface InlineMathMatch extends LatexPayload {
   end: number
 }
 
+interface CompletedInlineMathMatch extends InlineMathMatch {
+  start: number
+}
+
 interface MarkdownSource {
   markdown: string
 }
@@ -135,6 +139,30 @@ function readInlineMath({ text, index }: TextPosition): InlineMathMatch | null {
 
   const latex = text.slice(index + 1, end)
   return isValidInlineLatex({ latex }) ? { latex, end } : null
+}
+
+function isCompletedInlineMathEnd({ text, index }: TextPosition): boolean {
+  return isInlineMathEnd({ text, index }) && text[index - 1] !== '$'
+}
+
+function findCompletedInlineMathStart({ text, index: end }: TextPosition): number {
+  for (let i = end - 1; i >= 0; i--) {
+    if (isInlineMathEnd({ text, index: i }) && text[i - 1] !== '$') {
+      return i
+    }
+  }
+  return -1
+}
+
+export function readCompletedInlineMathAtEnd({ text }: { text: string }): CompletedInlineMathMatch | null {
+  const end = text.length - 1
+  if (end < 1 || !isCompletedInlineMathEnd({ text, index: end })) return null
+
+  const start = findCompletedInlineMathStart({ text, index: end })
+  if (start === -1) return null
+
+  const latex = text.slice(start + 1, end)
+  return isValidInlineLatex({ latex }) ? { latex, start, end } : null
 }
 
 function replaceInlineMath({ line }: MarkdownLine): string {

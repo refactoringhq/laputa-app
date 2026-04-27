@@ -364,8 +364,7 @@ function useEditorChangeHandler(options: {
     if (!tab) return
 
     const blocks = editor.document
-    const restored = restoreWikilinksInBlocks(blocks)
-    const rawBodyMarkdown = compactMarkdown(editor.blocksToMarkdownLossy(restored as typeof blocks))
+    const rawBodyMarkdown = serializeEditorBody(editor)
     const bodyMarkdown = vaultPathRef.current
       ? portableImageUrls(rawBodyMarkdown, vaultPathRef.current)
       : rawBodyMarkdown
