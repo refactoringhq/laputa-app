@@ -444,6 +444,10 @@ interface PulseCommit {
 - `pullAndPush()`: pulls then auto-pushes for divergence recovery
 - `ConflictNoteBanner`: inline banner in editor for conflicted notes (Keep mine / Keep theirs)
 
+### External Vault Refresh
+
+External vault mutations are any disk writes Tolaria did not just perform through its own save path: Git pulls, AI-agent writes, filesystem watcher events, and edits from another app. These changes must route through `refreshPulledVaultState()` rather than calling `reloadVault()` in isolation. The shared refresh abstraction reloads entries, folders, and saved views together, preserves unsaved active-editor content, reopens a clean active note from disk, and closes the active tab if the file disappeared. `useVaultWatcher` supplies changed filesystem paths to this abstraction after debouncing and after filtering recent app-owned saves.
+
 `useGitRemoteStatus` is the commit-time companion to `useAutoSync`:
 - Re-checks `git_remote_status` when the Commit dialog opens and right before submit
 - Converts `hasRemote: false` into a local-only commit path

@@ -424,6 +424,7 @@ interface AppSaveDeps {
   replaceEntry: (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, newContent: string) => void
   resolvedPath: string
   initialH1AutoRenameEnabled: boolean
+  onInternalVaultWrite?: (path: string) => void
 }
 
 function useAppSaveStateRefs({
@@ -592,6 +593,7 @@ function useEditorPersistence({
   loadModifiedFiles,
   trackUnsaved,
   clearUnsaved,
+  onInternalVaultWrite,
   reloadViews,
   scheduleUntitledRename,
   resolveCurrentPath,
@@ -603,6 +605,7 @@ function useEditorPersistence({
   loadModifiedFiles: AppSaveDeps['loadModifiedFiles']
   trackUnsaved?: AppSaveDeps['trackUnsaved']
   clearUnsaved: AppSaveDeps['clearUnsaved']
+  onInternalVaultWrite?: AppSaveDeps['onInternalVaultWrite']
   reloadViews: AppSaveDeps['reloadViews']
   scheduleUntitledRename: (path: string, content: string) => void
   resolveCurrentPath: (path: string) => string
@@ -613,10 +616,11 @@ function useEditorPersistence({
   }, [loadModifiedFiles])
 
   const onNotePersisted = useCallback((path: string, content: string) => {
+    onInternalVaultWrite?.(path)
     clearUnsaved(path)
     if (path.endsWith('.yml')) reloadViews?.()
     scheduleUntitledRename(path, content)
-  }, [clearUnsaved, reloadViews, scheduleUntitledRename])
+  }, [clearUnsaved, onInternalVaultWrite, reloadViews, scheduleUntitledRename])
 
   const {
     handleSave: handleSaveRaw,
@@ -746,6 +750,7 @@ export function useAppSave({
   trackUnsaved, clearUnsaved, unsavedPaths, tabs, activeTabPath, handleRenameNote,
   handleRenameFilename: handleRenameFilenameRaw, replaceEntry, resolvedPath,
   initialH1AutoRenameEnabled,
+  onInternalVaultWrite,
 }: AppSaveDeps) {
   const contentChangeRef = useRef<(path: string, content: string) => void>(() => {})
   const { tabsRef, activeTabPathRef, unsavedPathsRef } = useAppSaveStateRefs({ tabs, activeTabPath, unsavedPaths })
@@ -769,6 +774,7 @@ export function useAppSave({
     loadModifiedFiles,
     trackUnsaved,
     clearUnsaved,
+    onInternalVaultWrite,
     reloadViews,
     scheduleUntitledRename,
     resolveCurrentPath,
@@ -799,14 +805,7 @@ export function useAppSave({
   })
 
   return {
-    contentChangeRef,
-    handleContentChange,
-    handleFilenameRename,
-    handleSave,
-    handleTitleSync,
-    savePending,
-    savePendingForPath,
-    trackRenamedPath: registerRenamedPath,
-    flushBeforeAction,
+    contentChangeRef, handleContentChange, handleFilenameRename, handleSave, handleTitleSync,
+    savePending, savePendingForPath, trackRenamedPath: registerRenamedPath, flushBeforeAction,
   }
 }

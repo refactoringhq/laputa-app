@@ -29,6 +29,7 @@ import { useAiAgentsStatus } from './hooks/useAiAgentsStatus'
 import { useVaultAiGuidanceStatus } from './hooks/useVaultAiGuidanceStatus'
 import { useAutoGit } from './hooks/useAutoGit'
 import { useVaultLoader } from './hooks/useVaultLoader'
+import { useRecentVaultWrites, useVaultWatcher } from './hooks/useVaultWatcher'
 import { useAiAgentPreferences } from './hooks/useAiAgentPreferences'
 import { useSettings } from './hooks/useSettings'
 import { useDocumentThemeMode } from './hooks/useDocumentThemeMode'
@@ -369,6 +370,7 @@ function App() {
   }, [resolvedPath, setToastMessage])
 
   const vault = useVaultLoader(noteWindowParams ? '' : resolvedPath)
+  const recentVaultWrites = useRecentVaultWrites({ vaultPath: noteWindowParams ? '' : resolvedPath })
   const {
     status: vaultAiGuidanceStatus,
     refresh: refreshVaultAiGuidance,
@@ -588,6 +590,11 @@ function App() {
       vault.reloadViews,
       vault.unsavedPaths,
     ])
+  useVaultWatcher({
+    vaultPath: noteWindowParams ? '' : resolvedPath,
+    onVaultChanged: handlePulledVaultUpdate,
+    filterChangedPaths: recentVaultWrites.filterExternalPaths,
+  })
   const autoSync = useAutoSync({
     enabled: gitRepoState === 'ready',
     vaultPath: resolvedPath,
@@ -739,6 +746,7 @@ function App() {
     handleRenameNote: notes.handleRenameNote, handleRenameFilename: notes.handleRenameFilename,
     replaceEntry: vault.replaceEntry, resolvedPath,
     initialH1AutoRenameEnabled: settings.initial_h1_auto_rename_enabled !== false,
+    onInternalVaultWrite: recentVaultWrites.markInternalWrite,
   })
 
   const aiActivity = useAiActivity({
@@ -747,7 +755,7 @@ function App() {
     onSetFilter: (filterType) => {
       handleSetSelection({ kind: 'sectionGroup', type: filterType })
     },
-    onVaultChanged: () => { vault.reloadVault() },
+    onVaultChanged: (path) => { void handlePulledVaultUpdate(path ? [path] : []) },
   })
 
   const handleInitializeProperties = useCallback(async (path: string) => {
@@ -1350,6 +1358,12 @@ function App() {
     () => activeDeletedFile ? () => { void handleDiscardFile(activeDeletedFile.relativePath) } : undefined,
     [activeDeletedFile, handleDiscardFile],
   )
+  const reloadVaultForCommand = vault.reloadVault
+  const handleManualVaultReload = useCallback(async () => {
+    const entries = await reloadVaultForCommand()
+    setToastMessage(`Vault reloaded (${entries.length} ${entries.length === 1 ? 'entry' : 'entries'})`)
+    return entries
+  }, [reloadVaultForCommand, setToastMessage])
 
   const commands = useAppCommands({
     activeTabPath: notes.activeTabPath, activeTabPathRef: notes.activeTabPathRef,
@@ -1416,7 +1430,7 @@ function App() {
     onSetDefaultAiAgent: aiAgentPreferences.setDefaultAiAgent,
     onCycleDefaultAiAgent: aiAgentPreferences.cycleDefaultAiAgent,
     selectedAiAgentLabel: aiAgentPreferences.defaultAiAgentLabel,
-    onReloadVault: vault.reloadVault,
+    onReloadVault: handleManualVaultReload,
     onRepairVault: handleRepairVault,
     onSetNoteIcon: handleSetNoteIconCommand,
     onRemoveNoteIcon: handleRemoveNoteIconCommand,
@@ -1615,7 +1629,7 @@ function App() {
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
         <RenameDetectedBanner renames={detectedRenames} onUpdate={handleUpdateWikilinks} onDismiss={handleDismissRenames} />
-        <StatusBar noteCount={vault.entries.length} modifiedCount={vault.modifiedFiles.length} vaultPath={resolvedPath} vaults={vaultSwitcher.allVaults} onSwitchVault={vaultSwitcher.switchVault} onOpenSettings={dialogs.openSettings} onOpenFeedback={openFeedback} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onCommitPush={handleCommitPush} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} onTriggerSync={autoSync.triggerSync} onPullAndPush={autoSync.pullAndPush} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} onRemoveVault={vaultSwitcher.removeVault} mcpStatus={mcpStatus} onInstallMcp={openMcpSetupDialog} aiAgentsStatus={aiAgentsStatus} vaultAiGuidanceStatus={vaultAiGuidanceStatus} defaultAiAgent={aiAgentPreferences.defaultAiAgent} onSetDefaultAiAgent={aiAgentPreferences.setDefaultAiAgent} onRestoreVaultAiGuidance={() => { void restoreVaultAiGuidance() }} locale={appLocale} />
+        <StatusBar noteCount={vault.entries.length} modifiedCount={vault.modifiedFiles.length} vaultPath={resolvedPath} vaults={vaultSwitcher.allVaults} onSwitchVault={vaultSwitcher.switchVault} onOpenSettings={dialogs.openSettings} onOpenFeedback={openFeedback} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onCommitPush={handleCommitPush} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} onTriggerSync={autoSync.triggerSync} onPullAndPush={autoSync.pullAndPush} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} onRemoveVault={vaultSwitcher.removeVault} mcpStatus={mcpStatus} onInstallMcp={openMcpSetupDialog} aiAgentsStatus={aiAgentsStatus} vaultAiGuidanceStatus={vaultAiGuidanceStatus} defaultAiAgent={aiAgentPreferences.defaultAiAgent} onSetDefaultAiAgent={aiAgentPreferences.setDefaultAiAgent} onRestoreVaultAiGuidance={() => { void restoreVaultAiGuidance() }} locale={appLocale} />
         <GitSetupDialog open={shouldShowGitSetupDialog} onInitGit={handleInitGitRepo} onDismiss={dismissGitSetupDialog} />
         <DeleteProgressNotice count={deleteActions.pendingDeleteCount} />
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />

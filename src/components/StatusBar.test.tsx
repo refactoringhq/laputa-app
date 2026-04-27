@@ -85,6 +85,11 @@ describe('StatusBar', () => {
     expect(screen.getByText('b?')).toBeInTheDocument()
   })
 
+  it('shows the vault reload badge while a reload is active', () => {
+    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} isVaultReloading />)
+    expect(screen.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
+  })
+
   it('calls onCheckForUpdates when clicking build number', () => {
     const onCheckForUpdates = vi.fn()
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} buildNumber="b281" onCheckForUpdates={onCheckForUpdates} />)

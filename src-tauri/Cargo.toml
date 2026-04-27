@@ -20,6 +20,7 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 log = "0.4"
+notify = "6.1"
 tauri = { version = "2.10.0", features = ["protocol-asset", "devtools"] }
 tauri-plugin-log = "2"
 gray_matter = "0.2"

@@ -317,6 +317,8 @@
   "status.vault.cloneGit": "Clone Git repo",
   "status.vault.cloneGettingStarted": "Clone Getting Started Vault",
   "status.vault.notFound": "Vault not found: {path}",
+  "status.vault.reloading": "Reloading vault...",
+  "status.vault.reloadingTooltip": "Reloading vault from disk",
   "status.vault.remove": "Remove {label} from list",
   "status.remote.noneConfigured": "No remote configured",
   "status.remote.inSync": "In sync with remote",

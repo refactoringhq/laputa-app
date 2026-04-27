@@ -24,6 +24,7 @@ import {
   OfflineBadge,
   PulseBadge,
   SyncBadge,
+  VaultReloadingBadge,
 } from './StatusBarBadges'
 import { ICON_STYLE, SEP_STYLE } from './styles'
 import type { VaultOption } from './types'
@@ -52,6 +53,7 @@ interface StatusBarPrimarySectionProps {
   onCommitPush?: () => void
   onInitializeGit?: () => void
   isOffline?: boolean
+  isVaultReloading?: boolean
   isGitVault?: boolean
   syncStatus: SyncStatus
   lastSyncTime: number | null
@@ -192,6 +194,7 @@ function StatusBarPrimaryBadges({
   claudeCodeStatus,
   claudeCodeVersion,
   isOffline,
+  isVaultReloading,
   compact,
   locale,
 }: {
@@ -219,12 +222,14 @@ function StatusBarPrimaryBadges({
   claudeCodeStatus?: ClaudeCodeStatus
   claudeCodeVersion?: string | null
   isOffline: boolean
+  isVaultReloading: boolean
   compact: boolean
   locale: AppLocale
 }) {
   return (
     <>
       <OfflineBadge isOffline={isOffline} showSeparator={!compact} compact={compact} locale={locale} />
+      <VaultReloadingBadge isReloading={isVaultReloading} showSeparator={!compact} compact={compact} locale={locale} />
       {isGitVault ? (
         <>
           <NoRemoteBadge remoteStatus={visibleRemoteStatus} onAddRemote={onAddRemote} showSeparator={!compact} compact={compact} locale={locale} />
@@ -311,6 +316,7 @@ export function StatusBarPrimarySection({
   onCommitPush,
   onInitializeGit,
   isOffline = false,
+  isVaultReloading = false,
   isGitVault = true,
   syncStatus,
   lastSyncTime,
@@ -402,7 +408,7 @@ export function StatusBarPrimarySection({
         onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
         claudeCodeStatus={claudeCodeStatus}
         claudeCodeVersion={claudeCodeVersion}
-        isOffline={isOffline}
+        isOffline={isOffline} isVaultReloading={isVaultReloading}
         compact={compact}
         locale={locale}
       />

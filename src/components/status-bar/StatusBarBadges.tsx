@@ -552,6 +552,32 @@ export function OfflineBadge({
   )
 }
 
+export function VaultReloadingBadge({
+  isReloading,
+  showSeparator = true,
+  compact = false,
+  locale = 'en',
+}: {
+  isReloading?: boolean
+  showSeparator?: boolean
+  compact?: boolean
+  locale?: AppLocale
+}) {
+  if (!isReloading) return null
+
+  return (
+    <>
+      <StatusBarSeparator show={showSeparator} />
+      <StatusBarAction copy={{ label: translate(locale, 'status.vault.reloadingTooltip') }} testId="status-vault-reloading" compact={compact}>
+        <span style={ICON_STYLE}>
+          <Loader2 size={13} className="animate-spin" />
+          {compact ? null : translate(locale, 'status.vault.reloading')}
+        </span>
+      </StatusBarAction>
+    </>
+  )
+}
+
 export function NoRemoteBadge({
   remoteStatus,
   onAddRemote,

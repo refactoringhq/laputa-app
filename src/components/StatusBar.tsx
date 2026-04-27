@@ -70,6 +70,7 @@ interface StatusBarProps {
   onCommitPush?: () => void
   onInitializeGit?: () => void
   isOffline?: boolean
+  isVaultReloading?: boolean
   isGitVault?: boolean
   syncStatus?: SyncStatus
   lastSyncTime?: number | null
@@ -117,6 +118,7 @@ function StatusBarPrimaryFromFooter({
   onCommitPush,
   onInitializeGit,
   isOffline = false,
+  isVaultReloading = false,
   isGitVault = true,
   syncStatus = 'idle',
   lastSyncTime = null,
@@ -156,6 +158,7 @@ function StatusBarPrimaryFromFooter({
       onCommitPush={onCommitPush}
       onInitializeGit={onInitializeGit}
       isOffline={isOffline}
+      isVaultReloading={isVaultReloading}
       isGitVault={isGitVault}
       syncStatus={syncStatus}
       lastSyncTime={lastSyncTime}

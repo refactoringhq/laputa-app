@@ -706,6 +706,34 @@ describe('useVaultLoader', () => {
   })
 
   describe('reloadVault', () => {
+    it('reports reload progress while reload_vault is pending', async () => {
+      const reload = createDeferred<VaultEntry[]>()
+      backendInvokeFn.mockImplementation(((cmd: string) => {
+        if (cmd === 'list_vault') return Promise.resolve(mockEntries)
+        if (cmd === 'reload_vault') return reload.promise
+        if (cmd === 'get_modified_files') return Promise.resolve([])
+        if (cmd === 'list_vault_folders') return Promise.resolve([])
+        if (cmd === 'list_views') return Promise.resolve([])
+        return Promise.resolve(null)
+      }) as typeof defaultMockInvoke)
+
+      const { result } = await renderVaultLoader()
+
+      let pendingReload: Promise<VaultEntry[]> | null = null
+      act(() => {
+        pendingReload = result.current.reloadVault()
+      })
+
+      expect(result.current.isReloading).toBe(true)
+
+      await act(async () => {
+        reload.resolve(mockEntries)
+        await pendingReload!
+      })
+
+      expect(result.current.isReloading).toBe(false)
+    })
+
     it('refreshes entries from reload_vault and reloads modified files', async () => {
       const reloadedEntry = {
         ...mockEntries[0],
@@ -819,77 +847,84 @@ describe('useVaultLoader', () => {
 
 describe('resolveNoteStatus', () => {
   const mf = (path: string, status: string): ModifiedFile => ({ path, relativePath: path.replace('/vault/', ''), status })
+  const status = (
+    path: string,
+    newPaths: Set<string>,
+    modifiedFiles: ModifiedFile[],
+    pendingSavePaths?: Set<string>,
+    unsavedPaths?: Set<string>,
+  ) => resolveNoteStatus({ path, newPaths, modifiedFiles, pendingSavePaths, unsavedPaths })
 
   it('returns new when path is in newPaths (not yet on disk)', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
   })
 
   it('returns new for untracked files in git', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'untracked')])).toBe('new')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'untracked')])).toBe('new')
   })
 
   it('returns new for added files in git', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'added')])).toBe('new')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'added')])).toBe('new')
   })
 
   it('returns modified for git-modified files', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
   })
 
   it('returns clean for files not in git status', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [])).toBe('clean')
+    expect(status('/vault/x.md', new Set(), [])).toBe('clean')
   })
 
   it('returns modified for deleted files so deleted previews keep diff affordances', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'deleted')])).toBe('modified')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'deleted')])).toBe('modified')
   })
 
   it('returns clean for unsupported git statuses', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'renamed')])).toBe('clean')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'renamed')])).toBe('clean')
   })
 
   it('newPaths takes priority over git modified', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [mf('/vault/x.md', 'modified')])).toBe('new')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [mf('/vault/x.md', 'modified')])).toBe('new')
   })
 
   it('pendingSave takes priority over new status', () => {
     const pendingSave = new Set(['/vault/x.md'])
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [], pendingSave)).toBe('pendingSave')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [], pendingSave)).toBe('pendingSave')
   })
 
   it('pendingSave takes priority over modified status', () => {
     const pendingSave = new Set(['/vault/x.md'])
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], pendingSave)).toBe('pendingSave')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], pendingSave)).toBe('pendingSave')
   })
 
   it('pendingSave takes priority over clean status', () => {
     const pendingSave = new Set(['/vault/x.md'])
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [], pendingSave)).toBe('pendingSave')
+    expect(status('/vault/x.md', new Set(), [], pendingSave)).toBe('pendingSave')
   })
 
   it('without pendingSavePaths parameter, behavior is unchanged', () => {
     // Omitting the optional parameter should produce the same results as before
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [])).toBe('clean')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
+    expect(status('/vault/x.md', new Set(), [])).toBe('clean')
   })
 
   it('empty pendingSavePaths set does not affect other statuses', () => {
     const emptyPending = new Set<string>()
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [], emptyPending)).toBe('new')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], emptyPending)).toBe('modified')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [], emptyPending)).toBe('clean')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [], emptyPending)).toBe('new')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], emptyPending)).toBe('modified')
+    expect(status('/vault/x.md', new Set(), [], emptyPending)).toBe('clean')
   })
 
   it('unsaved takes priority over all other statuses', () => {
     const unsaved = new Set(['/vault/x.md'])
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [], undefined, unsaved)).toBe('unsaved')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], undefined, unsaved)).toBe('unsaved')
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [], new Set(['/vault/x.md']), unsaved)).toBe('unsaved')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [], undefined, unsaved)).toBe('unsaved')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], undefined, unsaved)).toBe('unsaved')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [], new Set(['/vault/x.md']), unsaved)).toBe('unsaved')
   })
 
   it('without unsavedPaths parameter, behavior is unchanged', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
   })
 })

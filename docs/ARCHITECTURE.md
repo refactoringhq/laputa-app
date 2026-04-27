@@ -83,6 +83,10 @@ flowchart LR
 4. **Recovery via reload**: If state ever diverges from disk (crash, external edit, race condition), `Reload Vault` (Cmd+K → "Reload Vault") invalidates the cache and does a full filesystem rescan via the `reload_vault` Tauri command, replacing all React state. The `reload_vault_entry` command can re-read a single file.
 5. **Cache is disposable**: The `reload_vault` command deletes the cache file before rescanning, guaranteeing fresh data. The cache never contains data that doesn't exist on the filesystem.
 
+#### External Change Detection
+
+The main window starts a native watcher for the active vault through `start_vault_watcher` / `stop_vault_watcher` (`src-tauri/src/vault_watcher.rs`, backed by Rust `notify`). The watcher emits `vault-changed` events for content paths and ignores churn from `.git/`, `node_modules/`, temp files, and `.tolaria-rename-txn`. `useVaultWatcher` batches those events, suppresses recent app-owned saves, and sends the remaining external paths through `refreshPulledVaultState()` so folders, saved views, note-list state, and the clean active editor all refresh under the ADR-0071 unsaved-edit rules. `useVaultLoader.isReloading` drives the status-bar reload spinner for both manual and watcher-triggered reloads.
+
 ## Tech Stack
 
 | Layer | Technology | Version |
@@ -99,6 +103,7 @@ flowchart LR
 | Build | Vite | 7.3.1 |
 | Backend language | Rust (edition 2021) | 1.77.2 |
 | Frontmatter parsing | gray_matter | 0.2 |
+| Filesystem watcher | notify | 6.1 |
 | AI (agent panel) | CLI agent adapters (Claude Code + Codex) | - |
 | Search | Keyword (walkdir-based file scan) | - |
 | Localization | App-owned runtime + JSON catalogs (`src/lib/i18n.ts`, `src/lib/locales/*.json`, `lara.yaml`) | English fallback + Lara CLI sync |
@@ -656,6 +661,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `batch_delete_notes` | Permanently delete notes from disk |
 | `reload_vault` | Sync the active vault asset scope, invalidate cache, and full rescan from filesystem → `Vec<VaultEntry>` |
 | `reload_vault_entry` | Re-read a single file from disk → `VaultEntry` |
+| `start_vault_watcher` / `stop_vault_watcher` | Start or stop native active-vault filesystem change events |
 | `check_vault_exists` | Check if vault path exists |
 | `create_empty_vault` | Create a git-backed vault, then seed root `AGENTS.md`, `CLAUDE.md`, `type.md`, and `note.md` defaults |
 | `create_getting_started_vault` | Clone the public Getting Started vault, refresh Tolaria-managed guidance/config defaults, and keep the cloned repo clean |

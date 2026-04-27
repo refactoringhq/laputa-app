@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import type { VaultEntry, FolderNode, GitCommit, ModifiedFile, NoteStatus, GitPushResult, ViewFile } from '../types'
@@ -160,9 +160,21 @@ function usePendingSaveTracker() {
   return { pendingSavePaths, addPendingSave, removePendingSave }
 }
 
-export function resolveNoteStatus(
-  path: string, newPaths: Set<string>, modifiedFiles: ModifiedFile[], pendingSavePaths?: Set<string>, unsavedPaths?: Set<string>,
-): NoteStatus {
+interface ResolveNoteStatusOptions {
+  path: string
+  newPaths: Set<string>
+  modifiedFiles: ModifiedFile[]
+  pendingSavePaths?: Set<string>
+  unsavedPaths?: Set<string>
+}
+
+export function resolveNoteStatus({
+  path,
+  newPaths,
+  modifiedFiles,
+  pendingSavePaths,
+  unsavedPaths,
+}: ResolveNoteStatusOptions): NoteStatus {
   if (unsavedPaths?.has(path)) return 'unsaved'
   if (pendingSavePaths?.has(path)) return 'pendingSave'
   if (newPaths.has(path)) return 'new'
@@ -173,18 +185,31 @@ export function resolveNoteStatus(
   return 'clean'
 }
 
-export function useVaultLoader(vaultPath: string) {
-  const [entries, setEntries] = useState<VaultEntry[]>([])
-  const [folders, setFolders] = useState<FolderNode[]>([])
-  const [isLoading, setIsLoading] = useState(() => hasVaultPath(vaultPath))
-  const [views, setViews] = useState<ViewFile[]>([])
-  const [modifiedFiles, setModifiedFiles] = useState<ModifiedFile[]>([])
-  const [modifiedFilesError, setModifiedFilesError] = useState<string | null>(null)
-  const tracker = useNewNoteTracker()
-  const pendingSave = usePendingSaveTracker()
-  const unsaved = useUnsavedTracker()
-  const isCurrentVaultPath = useCurrentVaultPathGuard(vaultPath)
-
+function useInitialVaultLoad({
+  vaultPath,
+  tracker,
+  unsaved,
+  isCurrentVaultPath,
+  resetReloading,
+  setEntries,
+  setFolders,
+  setIsLoading,
+  setModifiedFiles,
+  setModifiedFilesError,
+  setViews,
+}: {
+  vaultPath: string
+  tracker: ReturnType<typeof useNewNoteTracker>
+  unsaved: ReturnType<typeof useUnsavedTracker>
+  isCurrentVaultPath: (path: string) => boolean
+  resetReloading: () => void
+  setEntries: (entries: VaultEntry[]) => void
+  setFolders: (folders: FolderNode[]) => void
+  setIsLoading: (isLoading: boolean) => void
+  setModifiedFiles: (files: ModifiedFile[]) => void
+  setModifiedFilesError: (message: string | null) => void
+  setViews: (views: ViewFile[]) => void
+}) {
   useEffect(() => {
     const path = vaultPath
     resetVaultState({
@@ -197,10 +222,9 @@ export function useVaultLoader(vaultPath: string) {
       setModifiedFilesError,
       setViews,
     })
+    resetReloading()
 
-    if (!hasVaultPath(path)) {
-      return
-    }
+    if (!hasVaultPath(path)) return
 
     let cancelled = false
     void loadInitialVaultState({
@@ -212,7 +236,24 @@ export function useVaultLoader(vaultPath: string) {
       setViews,
     })
     return () => { cancelled = true }
-  }, [vaultPath, tracker.clear, unsaved.clearAll, isCurrentVaultPath])
+  }, [
+    vaultPath,
+    tracker.clear,
+    unsaved.clearAll,
+    isCurrentVaultPath,
+    resetReloading,
+    setEntries,
+    setFolders,
+    setIsLoading,
+    setModifiedFiles,
+    setModifiedFilesError,
+    setViews,
+  ])
+}
+
+function useModifiedFilesLoader(vaultPath: string, isCurrentVaultPath: (path: string) => boolean) {
+  const [modifiedFiles, setModifiedFiles] = useState<ModifiedFile[]>([])
+  const [modifiedFilesError, setModifiedFilesError] = useState<string | null>(null)
 
   const loadModifiedFiles = useCallback(async () => {
     const path = vaultPath
@@ -225,8 +266,7 @@ export function useVaultLoader(vaultPath: string) {
 
     try {
       const files = await tauriCall<ModifiedFile[]>('get_modified_files', { vaultPath: path }, {})
-      if (!isCurrentVaultPath(path)) return
-      setModifiedFiles(files)
+      if (isCurrentVaultPath(path)) setModifiedFiles(files)
     } catch (err) {
       if (!isCurrentVaultPath(path)) return
       const message = typeof err === 'string' ? err : 'Failed to load changes'
@@ -238,13 +278,26 @@ export function useVaultLoader(vaultPath: string) {
 
   useEffect(() => { loadModifiedFiles() }, [loadModifiedFiles]) // eslint-disable-line react-hooks/set-state-in-effect -- trigger initial load
 
+  return {
+    modifiedFiles,
+    modifiedFilesError,
+    setModifiedFiles,
+    setModifiedFilesError,
+    loadModifiedFiles,
+  }
+}
+
+function useEntryMutations(
+  setEntries: Dispatch<SetStateAction<VaultEntry[]>>,
+  trackNew: (path: string) => void,
+) {
   const addEntry = useCallback((entry: VaultEntry) => {
     setEntries((prev) => {
       if (prev.some(e => e.path === entry.path)) return prev
       return [entry, ...prev]
     })
-    tracker.trackNew(entry.path)
-  }, [tracker])
+    trackNew(entry.path)
+  }, [setEntries, trackNew])
 
   const updateEntry = useCallback((path: string, patch: Partial<VaultEntry>) => {
     setEntries((prev) => {
@@ -255,22 +308,26 @@ export function useVaultLoader(vaultPath: string) {
       })
       return changed ? next : prev
     })
-  }, [])
+  }, [setEntries])
 
   const removeEntry = useCallback((path: string) => {
     setEntries((prev) => prev.filter((e) => e.path !== path))
-  }, [])
+  }, [setEntries])
 
   const removeEntries = useCallback((paths: string[]) => {
     if (paths.length === 0) return
     const pathSet = new Set(paths)
     setEntries((prev) => prev.filter((entry) => !pathSet.has(entry.path)))
-  }, [])
+  }, [setEntries])
 
   const replaceEntry = useCallback((oldPath: string, patch: Partial<VaultEntry> & { path: string }) => {
     setEntries((prev) => prev.map((e) => e.path === oldPath ? { ...e, ...patch } : e))
-  }, [])
+  }, [setEntries])
 
+  return { addEntry, updateEntry, removeEntry, removeEntries, replaceEntry }
+}
+
+function useGitLoaders(vaultPath: string) {
   const loadGitHistory = useCallback(async (path: string): Promise<GitCommit[]> => {
     try { return await tauriCall<GitCommit[]>('get_file_history', { vaultPath, path }, { path }) }
     catch (err) { console.warn('Failed to load git history:', err); return [] }
@@ -282,45 +339,69 @@ export function useVaultLoader(vaultPath: string) {
   const loadDiff = useCallback((path: string): Promise<string> =>
     tauriCall<string>('get_file_diff', { vaultPath, path }, { path }), [vaultPath])
 
-  const getNoteStatus = useCallback((path: string): NoteStatus =>
-    resolveNoteStatus(path, tracker.newPaths, modifiedFiles, pendingSave.pendingSavePaths, unsaved.unsavedPaths), [tracker.newPaths, modifiedFiles, pendingSave.pendingSavePaths, unsaved.unsavedPaths])
-
   const commitAndPush = useCallback((message: string): Promise<GitPushResult> =>
     commitWithPush(vaultPath, message), [vaultPath])
 
-  const reloadFolders = useCallback(
-    () => {
-      const path = vaultPath
-      return loadVaultFolders(path)
-        .then((f) => {
-          if (!isCurrentVaultPath(path)) return [] as FolderNode[]
-          const nextFolders = f ?? []
-          setFolders(nextFolders)
-          return nextFolders
-        })
-        .catch(() => [] as FolderNode[])
-    },
-    [vaultPath, isCurrentVaultPath],
-  )
+  return { loadGitHistory, loadDiffAtCommit, loadDiff, commitAndPush }
+}
 
-  const reloadVault = useCallback(
-    () => {
-      const path = vaultPath
-      clearPrefetchCache()
-      return tauriCall<VaultEntry[]>('reload_vault', { path })
-        .then((entries) => {
-          if (!isCurrentVaultPath(path)) return [] as VaultEntry[]
-          setEntries(entries)
-          void loadModifiedFiles()
-          return entries
-        })
-        .catch((err) => { console.warn('Vault reload failed:', err); return [] as VaultEntry[] })
-    },
-    [vaultPath, loadModifiedFiles, isCurrentVaultPath],
-  )
+function useVaultReloads({
+  vaultPath,
+  isCurrentVaultPath,
+  loadModifiedFiles,
+  setEntries,
+  setFolders,
+  setViews,
+}: {
+  vaultPath: string
+  isCurrentVaultPath: (path: string) => boolean
+  loadModifiedFiles: () => Promise<void>
+  setEntries: (entries: VaultEntry[]) => void
+  setFolders: (folders: FolderNode[]) => void
+  setViews: (views: ViewFile[]) => void
+}) {
+  const [activeReloads, setActiveReloads] = useState(0)
+  const isReloading = activeReloads > 0
+  const beginReload = useCallback(() => setActiveReloads((count) => count + 1), [])
+  const finishReload = useCallback(() => setActiveReloads((count) => Math.max(0, count - 1)), [])
+  const resetReloading = useCallback(() => setActiveReloads(0), [])
+
+  const reloadFolders = useCallback(async () => {
+    const path = vaultPath
+    if (!hasVaultPath(path)) return [] as FolderNode[]
+    try {
+      const folders = await loadVaultFolders(path)
+      if (!isCurrentVaultPath(path)) return [] as FolderNode[]
+      const nextFolders = folders ?? []
+      setFolders(nextFolders)
+      return nextFolders
+    } catch {
+      return [] as FolderNode[]
+    }
+  }, [vaultPath, isCurrentVaultPath, setFolders])
+
+  const reloadVault = useCallback(async () => {
+    const path = vaultPath
+    if (!hasVaultPath(path)) return [] as VaultEntry[]
+    clearPrefetchCache()
+    beginReload()
+    try {
+      const entries = await tauriCall<VaultEntry[]>('reload_vault', { path })
+      if (!isCurrentVaultPath(path)) return [] as VaultEntry[]
+      setEntries(entries)
+      void loadModifiedFiles()
+      return entries
+    } catch (err) {
+      console.warn('Vault reload failed:', err)
+      return [] as VaultEntry[]
+    } finally {
+      finishReload()
+    }
+  }, [vaultPath, beginReload, finishReload, loadModifiedFiles, isCurrentVaultPath, setEntries])
 
   const reloadViews = useCallback(async () => {
     const path = vaultPath
+    if (!hasVaultPath(path)) return []
     try {
       const nextViews = await loadVaultViews(path)
       if (!isCurrentVaultPath(path)) return []
@@ -329,13 +410,70 @@ export function useVaultLoader(vaultPath: string) {
       return resolvedViews
     } catch { /* views are optional */ }
     return []
-  }, [vaultPath, isCurrentVaultPath])
+  }, [vaultPath, isCurrentVaultPath, setViews])
+
+  return { isReloading, reloadFolders, reloadVault, reloadViews, resetReloading }
+}
+
+export function useVaultLoader(vaultPath: string) {
+  const [entries, setEntries] = useState<VaultEntry[]>([])
+  const [folders, setFolders] = useState<FolderNode[]>([])
+  const [isLoading, setIsLoading] = useState(() => hasVaultPath(vaultPath))
+  const [views, setViews] = useState<ViewFile[]>([])
+  const tracker = useNewNoteTracker()
+  const pendingSave = usePendingSaveTracker()
+  const unsaved = useUnsavedTracker()
+  const isCurrentVaultPath = useCurrentVaultPathGuard(vaultPath)
+  const {
+    modifiedFiles,
+    modifiedFilesError,
+    setModifiedFiles,
+    setModifiedFilesError,
+    loadModifiedFiles,
+  } = useModifiedFilesLoader(vaultPath, isCurrentVaultPath)
+  const entryMutations = useEntryMutations(setEntries, tracker.trackNew)
+  const gitLoaders = useGitLoaders(vaultPath)
+  const vaultReloads = useVaultReloads({
+    vaultPath,
+    isCurrentVaultPath,
+    loadModifiedFiles,
+    setEntries,
+    setFolders,
+    setViews,
+  })
+
+  useInitialVaultLoad({
+    vaultPath,
+    tracker,
+    unsaved,
+    isCurrentVaultPath,
+    resetReloading: vaultReloads.resetReloading,
+    setEntries,
+    setFolders,
+    setIsLoading,
+    setModifiedFiles,
+    setModifiedFilesError,
+    setViews,
+  })
+
+  const getNoteStatus = useCallback((path: string): NoteStatus =>
+    resolveNoteStatus({
+      path,
+      newPaths: tracker.newPaths,
+      modifiedFiles,
+      pendingSavePaths: pendingSave.pendingSavePaths,
+      unsavedPaths: unsaved.unsavedPaths,
+    }), [tracker.newPaths, modifiedFiles, pendingSave.pendingSavePaths, unsaved.unsavedPaths])
 
   return {
-    entries, folders, isLoading, views, modifiedFiles, modifiedFilesError,
-    addEntry, updateEntry, removeEntry, removeEntries, replaceEntry,
-    loadModifiedFiles, loadGitHistory, loadDiff, loadDiffAtCommit,
-    getNoteStatus, commitAndPush, reloadVault, reloadFolders, reloadViews,
+    entries, folders, isLoading, isReloading: vaultReloads.isReloading, views, modifiedFiles, modifiedFilesError,
+    ...entryMutations,
+    loadModifiedFiles,
+    ...gitLoaders,
+    getNoteStatus,
+    reloadVault: vaultReloads.reloadVault,
+    reloadFolders: vaultReloads.reloadFolders,
+    reloadViews: vaultReloads.reloadViews,
     addPendingSave: pendingSave.addPendingSave,
     removePendingSave: pendingSave.removePendingSave,
     unsavedPaths: unsaved.unsavedPaths,
