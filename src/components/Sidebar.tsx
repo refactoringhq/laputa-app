@@ -53,6 +53,8 @@ interface SidebarProps {
   onCancelRenameFolder?: () => void
   showInbox?: boolean
   inboxCount?: number
+  showAIChat?: boolean
+  onToggleAIChat?: () => void
   locale?: AppLocale
   onCollapse?: () => void
 }
@@ -78,6 +80,8 @@ interface SidebarNavigationProps extends Pick<
   | 'onCancelRenameFolder'
   | 'showInbox'
   | 'inboxCount'
+  | 'showAIChat'
+  | 'onToggleAIChat'
   | 'onCreateNewType'
   | 'locale'
 > {
@@ -116,6 +120,8 @@ function SidebarNavigation({
   onCancelRenameFolder,
   showInbox = true,
   inboxCount = 0,
+  showAIChat = false,
+  onToggleAIChat,
   locale = 'en',
   onCreateNewType,
   activeCount,
@@ -144,6 +150,8 @@ function SidebarNavigation({
         inboxCount={inboxCount}
         activeCount={activeCount}
         archivedCount={archivedCount}
+        showAIChat={showAIChat}
+        onToggleAIChat={onToggleAIChat}
         locale={locale}
       />
       {hasFavorites && (
@@ -242,6 +250,8 @@ export const Sidebar = memo(function Sidebar({
   onCancelRenameFolder,
   showInbox = true,
   inboxCount = 0,
+  showAIChat = false,
+  onToggleAIChat,
   locale = 'en',
   onCollapse,
   onCreateNewType,
@@ -304,6 +314,8 @@ export const Sidebar = memo(function Sidebar({
         onCancelRenameFolder={onCancelRenameFolder}
         showInbox={showInbox}
         inboxCount={inboxCount}
+        showAIChat={showAIChat}
+        onToggleAIChat={onToggleAIChat}
         locale={locale}
         onCreateNewType={onCreateNewType}
         activeCount={activeCount}

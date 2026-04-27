@@ -1,4 +1,4 @@
-import { Archive, FileText, Tray } from '@phosphor-icons/react'
+import { Archive, FileText, Sparkle, Tray } from '@phosphor-icons/react'
 import type { SidebarSelection } from '../../types'
 import { isSelectionActive, NavItem } from '../SidebarParts'
 import { translate, type AppLocale } from '../../lib/i18n'
@@ -10,6 +10,8 @@ interface SidebarTopNavProps {
   inboxCount: number
   activeCount: number
   archivedCount: number
+  showAIChat?: boolean
+  onToggleAIChat?: () => void
   locale?: AppLocale
 }
 
@@ -20,6 +22,8 @@ export function SidebarTopNav({
   inboxCount,
   activeCount,
   archivedCount,
+  showAIChat = false,
+  onToggleAIChat,
   locale = 'en',
 }: SidebarTopNavProps) {
   return (
@@ -56,6 +60,14 @@ export function SidebarTopNav({
         activeBadgeClassName="bg-primary text-primary-foreground"
         onClick={() => onSelect({ kind: 'filter', filter: 'archived' })}
       />
+      {onToggleAIChat && (
+        <NavItem
+          icon={Sparkle}
+          label={translate(locale, 'sidebar.nav.aiChat')}
+          isActive={showAIChat}
+          onClick={onToggleAIChat}
+        />
+      )}
     </div>
   )
 }
