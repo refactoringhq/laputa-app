@@ -1,30 +1,34 @@
 import { test, expect, type Page } from '@playwright/test'
 import path from 'path'
+import { APP_COMMAND_IDS } from '../../src/hooks/appCommandCatalog'
 import {
   createFixtureVaultCopy,
   openFixtureVaultDesktopHarness,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
+import { triggerShortcutCommand } from './testBridge'
 
 const PROJECT_NOTE_PATH = path.join('project', 'alpha-project.md')
-const PROJECT_NOTE_CONTENT = `---
-Is A: Project
-Status: Done
-Owner:
-  - "[[Note B]]"
-Related to:
-  - "[[Note B]]"
-  - "[[Note C]]"
----
-
-# Alpha Project
-
-This is a test project that references other notes.
-
-## Notes
-
-See [[Note B]] for details and [[Note C]] for additional context.
-`
+const PROJECT_NOTE_CONTENT = [
+  '---',
+  'Is A: Project',
+  'Status: Done',
+  'Owner:',
+  '  - "[[Note B]]"',
+  'Related to:',
+  '  - "[[Note B]]"',
+  '  - "[[Note C]]"',
+  '---',
+  '',
+  '# Alpha Project',
+  '',
+  'This is a test project that references other notes.',
+  '',
+  '## Notes',
+  '',
+  'See [[Note B]] for details and [[Note C]] for additional context.',
+  '',
+].join('\r\n')
 
 let tempVaultDir: string
 
@@ -47,7 +51,7 @@ async function showStatusChipInInbox(page: Page): Promise<void> {
 }
 
 async function openRawEditor(page: Page): Promise<void> {
-  await page.keyboard.press('Control+Backslash')
+  await triggerShortcutCommand(page, APP_COMMAND_IDS.editToggleRawEditor)
   await expect(page.getByTestId('raw-editor-codemirror')).toBeVisible({ timeout: 5_000 })
 }
 
@@ -91,7 +95,7 @@ test.describe('Raw editor frontmatter propagation', () => {
     removeFixtureVaultCopy(tempVaultDir)
   })
 
-  test('raw frontmatter edits immediately update inspector relationships and note-list chips @smoke', async ({ page }) => {
+  test('CRLF raw frontmatter updates inspector relationships and note-list chips @smoke', async ({ page }) => {
     const notePath = path.join(tempVaultDir, PROJECT_NOTE_PATH)
 
     await openFixtureVaultDesktopHarness(page, tempVaultDir)
@@ -104,7 +108,8 @@ test.describe('Raw editor frontmatter propagation', () => {
     await openRawEditor(page)
     await replaceRawEditorContent(page, PROJECT_NOTE_CONTENT)
     await page.waitForTimeout(800)
-    await page.keyboard.press('Control+Shift+i')
+    await expect(page.getByTestId('raw-editor-yaml-error')).toHaveCount(0)
+    await triggerShortcutCommand(page, APP_COMMAND_IDS.viewToggleProperties)
 
     await expect(
       page.locator('[data-testid="editable-property"]').filter({ hasText: 'Owner' }),
