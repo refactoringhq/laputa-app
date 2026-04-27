@@ -19,8 +19,6 @@ import {
 } from '../SidebarParts'
 import { TypeCustomizePopover } from '../TypeCustomizePopover'
 import { useDragRegion } from '../../hooks/useDragRegion'
-import { NoteDropTarget } from '../note-retargeting/NoteDropTarget'
-import { useNoteRetargetingContext } from '../note-retargeting/noteRetargetingContext'
 import { SidebarGroupHeader } from './SidebarGroupHeader'
 import { SidebarViewItem } from './SidebarViewItem'
 import { countByFilter } from '../../utils/noteListHelpers'
@@ -108,7 +106,6 @@ function SortableSection({
   group: SectionGroup
   sectionProps: SidebarSectionProps
 }) {
-  const noteRetargeting = useNoteRetargetingContext()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.type })
   const itemCount = countByFilter(sectionProps.entries, group.type).open
   const isRenaming = sectionProps.renamingType === group.type
@@ -139,14 +136,7 @@ function SortableSection({
       }}
       {...attributes}
     >
-      {noteRetargeting ? (
-        <NoteDropTarget
-          canAcceptNotePath={(notePath) => noteRetargeting.canDropNoteOnType(notePath, group.type)}
-          onDropNote={(notePath) => noteRetargeting.dropNoteOnType(notePath, group.type)}
-        >
-          {content}
-        </NoteDropTarget>
-      ) : content}
+      {content}
     </div>
   )
 }

@@ -20,7 +20,6 @@ import { ExternalLink } from 'lucide-react'
 import { useDocumentThemeMode } from '../hooks/useDocumentThemeMode'
 import { useEditorTheme } from '../hooks/useTheme'
 import { useImageDrop } from '../hooks/useImageDrop'
-import { useNoteWikilinkDrop } from '../hooks/useNoteWikilinkDrop'
 import { buildTypeEntryMap } from '../utils/typeColors'
 import { preFilterWikilinks, deduplicateByPath, MIN_QUERY_LENGTH } from '../utils/wikilinkSuggestions'
 import { filterPersonMentions, PERSON_MENTION_MIN_QUERY } from '../utils/personMentionSuggestions'
@@ -448,7 +447,6 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
   const typeEntryMap = useMemo(() => buildTypeEntryMap(entries), [entries])
   const baseItems = useMemo(() => buildBaseSuggestionItems(entries), [entries])
   const insertWikilink = useInsertWikilink(editor)
-  useNoteWikilinkDrop({ containerRef, onInsertTarget: insertWikilink, vaultPath })
   const {
     getWikilinkItems,
     getPersonMentionItems,

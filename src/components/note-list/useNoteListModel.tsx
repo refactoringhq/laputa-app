@@ -12,7 +12,6 @@ import type { AppLocale } from '../../lib/i18n'
 import type { NoteListFilter } from '../../utils/noteListHelpers'
 import { countByFilter, countAllByFilter, countAllNotesByFilter } from '../../utils/noteListHelpers'
 import { NoteItem } from '../NoteItem'
-import { DraggableNoteItem } from '../note-retargeting/DraggableNoteItem'
 import { prefetchNoteContent } from '../../hooks/useTabManagement'
 import type { MultiSelectState } from '../../hooks/useMultiSelect'
 import { isDeletedNoteEntry, resolveHeaderTitle, type DeletedNoteEntry } from './noteListUtils'
@@ -369,22 +368,21 @@ function useRenderItem({
         onContextMenu={contextMenuHandler}
       />
     ) : (
-      <DraggableNoteItem key={entry.path} notePath={entry.path}>
-        <NoteItem
-          entry={entry}
-          isSelected={options?.forceSelected || selectedNotePath === entry.path}
-          isMultiSelected={multiSelect.selectedPaths.has(entry.path)}
-          isHighlighted={entry.path === noteListKeyboard.highlightedPath}
-          noteStatus={resolvedGetNoteStatus(entry.path)}
-          changeStatus={getChangeStatus(entry.path)}
-          typeEntryMap={typeEntryMap}
-          allEntries={entries}
-          displayPropsOverride={displayPropsOverride}
-          onClickNote={handleClickNote}
-          onPrefetch={prefetchNoteContent}
-          onContextMenu={contextMenuHandler}
-        />
-      </DraggableNoteItem>
+      <NoteItem
+        key={entry.path}
+        entry={entry}
+        isSelected={options?.forceSelected || selectedNotePath === entry.path}
+        isMultiSelected={multiSelect.selectedPaths.has(entry.path)}
+        isHighlighted={entry.path === noteListKeyboard.highlightedPath}
+        noteStatus={resolvedGetNoteStatus(entry.path)}
+        changeStatus={getChangeStatus(entry.path)}
+        typeEntryMap={typeEntryMap}
+        allEntries={entries}
+        displayPropsOverride={displayPropsOverride}
+        onClickNote={handleClickNote}
+        onPrefetch={prefetchNoteContent}
+        onContextMenu={contextMenuHandler}
+      />
     )
   ), [
     contextMenuHandler,

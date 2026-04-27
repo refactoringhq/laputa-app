@@ -1,8 +1,6 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { trackEvent } from '../lib/telemetry'
 import type { EditorView } from '@codemirror/view'
-import { useNoteWikilinkDrop } from '../hooks/useNoteWikilinkDrop'
-import { insertWikilinkAtCursor } from '../utils/rawEditorInsertions'
 import { MIN_QUERY_LENGTH } from '../utils/wikilinkSuggestions'
 import { buildTypeEntryMap } from '../utils/typeColors'
 import { NoteSearchList } from './NoteSearchList'
@@ -331,19 +329,7 @@ function useRawEditorWikilinkInsertion({
     applyWikilinkChange(view, replacement)
   }, [applyWikilinkChange, viewRef])
 
-  const insertDroppedWikilink = useCallback((target: string) => {
-    const view = viewRef.current
-    if (!view) return
-
-    applyWikilinkChange(
-      view,
-      insertWikilinkAtCursor(view.state.doc.toString(), view.state.selection.main.head, target),
-    )
-  }, [applyWikilinkChange, viewRef])
-
   useEffect(() => { insertWikilinkRef.current = insertAutocompleteWikilink }, [insertAutocompleteWikilink, insertWikilinkRef])
-
-  return { insertDroppedWikilink }
 }
 
 export function RawEditorView({ content, path, entries, onContentChange, onSave, latestContentRef, vaultPath, locale = 'en' }: RawEditorViewProps) {
@@ -357,7 +343,7 @@ export function RawEditorView({ content, path, entries, onContentChange, onSave,
     onEscape: autocompleteController.handleEscape,
   })
 
-  const { insertDroppedWikilink } = useRawEditorWikilinkInsertion({
+  useRawEditorWikilinkInsertion({
     debounceRef: pendingChanges.debounceRef,
     insertWikilinkRef: autocompleteController.insertWikilinkRef,
     latestDocRef: pendingChanges.latestDocRef,
@@ -366,7 +352,6 @@ export function RawEditorView({ content, path, entries, onContentChange, onSave,
     setAutocomplete: autocompleteController.setAutocomplete,
     viewRef,
   })
-  useNoteWikilinkDrop({ containerRef, onInsertTarget: insertDroppedWikilink, vaultPath })
 
   const dropdownPosition = getRawEditorDropdownPosition(autocompleteController.autocomplete, DROPDOWN_MAX_HEIGHT, window)
 

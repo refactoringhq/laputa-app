@@ -22,7 +22,6 @@ import { TelemetryConsentDialog } from './components/TelemetryConsentDialog'
 import { FeedbackDialog } from './components/FeedbackDialog'
 import { McpSetupDialog } from './components/McpSetupDialog'
 import { NoteRetargetingDialogs } from './components/note-retargeting/NoteRetargetingDialogs'
-import { NoteRetargetingProvider } from './components/note-retargeting/noteRetargetingContext'
 import { useTelemetry } from './hooks/useTelemetry'
 import { useMcpStatus } from './hooks/useMcpStatus'
 import { useAiAgentsOnboarding } from './hooks/useAiAgentsOnboarding'
@@ -1518,8 +1517,7 @@ function App() {
   }
 
   return (
-    <NoteRetargetingProvider value={noteRetargetingUi.contextValue}>
-      <div className="app-shell">
+    <div className="app-shell">
         <div className="app">
           {sidebarVisible && (
             <>
@@ -1676,8 +1674,7 @@ function App() {
             onCancel={folderActions.cancelDeleteFolder}
           />
         )}
-      </div>
-    </NoteRetargetingProvider>
+    </div>
   )
 }
 

@@ -4,8 +4,6 @@ import type { ReactNode } from 'react'
 import type { VaultEntry } from '../types'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 
-const NOTE_DRAG_MIME = 'application/x-laputa-note-path'
-
 const state = vi.hoisted(() => ({
   capturedLinkToolbarProps: null as null | Record<string, unknown>,
   capturedToolbarProps: null as null | Record<string, unknown>,
@@ -256,30 +254,6 @@ function createEditor() {
   }
 }
 
-function createMockDataTransfer(seedData: Record<string, string>): DataTransfer {
-  const data = new Map(Object.entries(seedData))
-  const types = Array.from(data.keys())
-
-  return {
-    dropEffect: 'none',
-    effectAllowed: 'move',
-    setData(type: string, value: string) {
-      data.set(type, value)
-      if (!types.includes(type)) types.push(type)
-    },
-    getData(type: string) {
-      return data.get(type) ?? ''
-    },
-    clearData() {
-      data.clear()
-      types.splice(0, types.length)
-    },
-    get types() {
-      return types
-    },
-  } as DataTransfer
-}
-
 describe('SingleEditorView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -357,54 +331,6 @@ describe('SingleEditorView', () => {
       expect.objectContaining({ id: 'cursor-block' }),
       'after',
     )
-  })
-
-  it('inserts a canonical wikilink when a note is dropped onto the editor surface', () => {
-    const editor = createEditor()
-
-    render(
-      <SingleEditorView
-        editor={editor as never}
-        entries={[makeEntry()]}
-        onNavigateWikilink={vi.fn()}
-        vaultPath="/vault"
-      />,
-    )
-
-    const noteDropData = createMockDataTransfer({
-      [NOTE_DRAG_MIME]: '/vault/Projects/Alpha.md',
-      'text/plain': '/vault/Projects/Alpha.md',
-    })
-
-    fireEvent.drop(screen.getByTestId('blocknote-view').parentElement as HTMLElement, {
-      dataTransfer: noteDropData,
-    })
-
-    expect(editor.insertInlineContent).toHaveBeenCalledWith([
-      { type: 'wikilink', props: { target: 'Projects/Alpha' } },
-      ' ',
-    ], { updateSelection: true })
-  })
-
-  it('ignores dropped plain text that is not a markdown note path', () => {
-    const editor = createEditor()
-
-    render(
-      <SingleEditorView
-        editor={editor as never}
-        entries={[makeEntry()]}
-        onNavigateWikilink={vi.fn()}
-        vaultPath="/vault"
-      />,
-    )
-
-    fireEvent.drop(screen.getByTestId('blocknote-view').parentElement as HTMLElement, {
-      dataTransfer: createMockDataTransfer({
-        'text/plain': 'Just some dragged text',
-      }),
-    })
-
-    expect(editor.insertInlineContent).not.toHaveBeenCalled()
   })
 
   it('wires the toolbar mouse guard and suggestion item click handlers', () => {

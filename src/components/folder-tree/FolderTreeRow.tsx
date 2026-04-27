@@ -1,7 +1,5 @@
 import { memo, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
 import type { FolderNode, SidebarSelection } from '../../types'
-import { NoteDropTarget } from '../note-retargeting/NoteDropTarget'
-import { useNoteRetargetingContext } from '../note-retargeting/noteRetargetingContext'
 import { FolderNameInput } from './FolderNameInput'
 import { FolderItemRow } from './FolderItemRow'
 import { translate, type AppLocale } from '../../lib/i18n'
@@ -120,7 +118,6 @@ export const FolderTreeRow = memo(function FolderTreeRow({
   const isSelected = selection.kind === 'folder' && selection.path === node.path
   const depthIndent = depth * 16
   const contentInset = 16
-  const noteRetargeting = useNoteRetargetingContext()
   const selectFolder = useCallback(() => {
     onSelect({ kind: 'folder', path: node.path })
   }, [node.path, onSelect])
@@ -151,16 +148,7 @@ export const FolderTreeRow = memo(function FolderTreeRow({
           onCancelRenameFolder={onCancelRenameFolder}
           onRenameFolder={onRenameFolder}
         />
-      ) : (
-        noteRetargeting ? (
-          <NoteDropTarget
-            canAcceptNotePath={(notePath) => noteRetargeting.canDropNoteOnFolder(notePath, node.path)}
-            onDropNote={(notePath) => noteRetargeting.dropNoteOnFolder(notePath, node.path)}
-          >
-            {row}
-          </NoteDropTarget>
-        ) : row
-      )}
+      ) : row}
       <FolderChildren
         depth={depth}
         expanded={expanded}
