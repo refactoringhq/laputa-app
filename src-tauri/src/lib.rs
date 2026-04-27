@@ -7,6 +7,10 @@ pub mod git;
 pub mod mcp;
 #[cfg(desktop)]
 pub mod menu;
+pub mod opencode_cli;
+mod opencode_config;
+mod opencode_discovery;
+mod opencode_events;
 pub mod search;
 pub mod settings;
 pub mod telemetry;

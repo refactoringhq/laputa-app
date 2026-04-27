@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 const APP_CONFIG_DIR: &str = "com.tolaria.app";
 const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
+const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &["claude_code", "codex", "opencode"];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Settings {
@@ -50,7 +51,7 @@ pub fn effective_release_channel(value: Option<&str>) -> &'static str {
 
 pub fn normalize_default_ai_agent(value: Option<&str>) -> Option<String> {
     match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
-        Some(agent) if agent == "claude_code" || agent == "codex" => Some(agent),
+        Some(agent) if SUPPORTED_DEFAULT_AI_AGENTS.contains(&agent.as_str()) => Some(agent),
         _ => None,
     }
 }
@@ -346,6 +347,15 @@ mod tests {
             ..Default::default()
         });
         assert!(loaded.default_ai_agent.is_none());
+    }
+
+    #[test]
+    fn test_opencode_default_ai_agent_is_preserved() {
+        let loaded = save_and_reload(Settings {
+            default_ai_agent: Some("opencode".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("opencode"));
     }
 
     #[test]

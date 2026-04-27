@@ -29,12 +29,15 @@ export function shouldSuppressBlockNoteHandleHoverUpdate({
   point,
   container,
   doc,
+  hasPressedButton = false,
 }: {
   eventTarget: EventTarget | null
   point: { x: number; y: number }
   container: HTMLElement | null
   doc: Document
+  hasPressedButton?: boolean
 }) {
+  if (hasPressedButton) return false
   if (!container) return false
 
   const editor = container.querySelector('.bn-editor')
@@ -68,6 +71,7 @@ export function useBlockNoteSideMenuHoverGuard(
         point: { x: event.clientX, y: event.clientY },
         container: containerRef.current,
         doc,
+        hasPressedButton: event.buttons !== 0,
       })) {
         return
       }

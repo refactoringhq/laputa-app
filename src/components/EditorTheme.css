@@ -29,6 +29,10 @@
   gap: 0 !important;
 }
 
+.editor__blocknote-container .bn-side-menu [draggable="true"] * {
+  pointer-events: none;
+}
+
 /* More horizontal space between drag handle and content */
 .editor__blocknote-container .bn-side-menu ~ * ,
 .editor__blocknote-container [class*="bn-side-menu"] {
