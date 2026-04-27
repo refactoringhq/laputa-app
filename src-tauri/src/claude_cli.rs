@@ -330,6 +330,7 @@ where
     let mut cmd = Command::new(bin);
     cmd.args(args)
         .env_remove("CLAUDECODE") // prevent "nested session" guard
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     if let Some(dir) = cwd {
@@ -940,6 +941,99 @@ mod tests {
         assert!(matches!(&events[1], ClaudeStreamEvent::TextDelta { text } if text == "Hi"));
         assert!(matches!(&events[2], ClaudeStreamEvent::Result { .. }));
         assert!(matches!(&events[3], ClaudeStreamEvent::Done));
+    }
+
+    #[test]
+    fn run_subprocess_closes_stdin_even_when_parent_stdin_pipe_is_open() {
+        use std::io::Read;
+        use std::time::{Duration, Instant};
+
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .arg("stdin_probe_parent_child")
+            .arg("--ignored")
+            .arg("--nocapture")
+            .env("TOLARIA_STDIN_PROBE_CHILD", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let child_stdin = child.stdin.take().unwrap();
+        let mut stdout = child.stdout.take().unwrap();
+        let mut stderr = child.stderr.take().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+
+        let status = loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                break status;
+            }
+            if Instant::now() >= deadline {
+                child.kill().unwrap();
+                drop(child_stdin);
+                panic!("stdin probe child timed out");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+
+        drop(child_stdin);
+        let mut stdout_text = String::new();
+        let mut stderr_text = String::new();
+        stdout.read_to_string(&mut stdout_text).unwrap();
+        stderr.read_to_string(&mut stderr_text).unwrap();
+
+        assert!(
+            status.success(),
+            "stdin probe child failed with {status}\nstdout:\n{stdout_text}\nstderr:\n{stderr_text}"
+        );
+    }
+
+    #[ignore = "spawned by run_subprocess_closes_stdin_even_when_parent_stdin_pipe_is_open"]
+    #[test]
+    fn stdin_probe_parent_child() {
+        if std::env::var_os("TOLARIA_STDIN_PROBE_CHILD").is_none() {
+            return;
+        }
+
+        let fake_bin = std::env::current_exe().unwrap();
+        let args = vec![
+            "stdin_probe_mock_claude_child".to_string(),
+            "--ignored".to_string(),
+            "--nocapture".to_string(),
+        ];
+        std::env::set_var("TOLARIA_STDIN_PROBE_MOCK_CLAUDE_CHILD", "1");
+        let mut events = vec![];
+        let result = run_claude_subprocess(&fake_bin, &args, None, &mut |event| events.push(event));
+        std::env::remove_var("TOLARIA_STDIN_PROBE_MOCK_CLAUDE_CHILD");
+
+        assert_eq!(result.unwrap(), "stdin-ok");
+        assert!(matches!(
+            events.first(),
+            Some(ClaudeStreamEvent::Result { text, session_id })
+                if text == "stdin closed" && session_id == "stdin-ok"
+        ));
+        assert!(matches!(events.last(), Some(ClaudeStreamEvent::Done)));
+    }
+
+    #[ignore = "spawned by stdin_probe_parent_child"]
+    #[test]
+    fn stdin_probe_mock_claude_child() {
+        if std::env::var_os("TOLARIA_STDIN_PROBE_MOCK_CLAUDE_CHILD").is_none() {
+            return;
+        }
+
+        use std::io::Read;
+
+        let mut stdin = String::new();
+        std::io::stdin().read_to_string(&mut stdin).unwrap();
+        assert!(stdin.is_empty(), "stdin was not EOF");
+        println!(
+            "{}",
+            serde_json::json!({
+                "type": "result",
+                "result": "stdin closed",
+                "session_id": "stdin-ok"
+            })
+        );
     }
 
     #[cfg(unix)]
