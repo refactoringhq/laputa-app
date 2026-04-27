@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, memo } from 'react'
+import { useRef, useEffect, useCallback, memo, useState } from 'react'
 import { useEditorTabSwap } from '../hooks/useEditorTabSwap'
 import { useCreateBlockNote } from '@blocknote/react'
 import '@blocknote/mantine/style.css'
@@ -19,6 +19,7 @@ import { EditorRightPanel } from './EditorRightPanel'
 import { EditorContent } from './EditorContent'
 import { FilePreview } from './FilePreview'
 import { schema } from './editorSchema'
+import type { RawEditorFindRequest } from './RawEditorFindBar'
 import {
   applyPendingRawExitContent,
   resolvePendingRawExitContent,
@@ -89,6 +90,8 @@ interface EditorProps {
   leftPanelsCollapsed?: boolean
   /** Mutable ref that Editor registers its raw-mode toggle into, for command palette access. */
   rawToggleRef?: React.MutableRefObject<() => void>
+  /** Mutable ref that Editor registers editor find commands into, for shortcuts and menus. */
+  findInNoteRef?: React.MutableRefObject<((options?: { replace?: boolean }) => void) | null>
   /** Mutable ref that Editor registers its diff-mode toggle into, for command palette access. */
   diffToggleRef?: React.MutableRefObject<() => void>
   onFileCreated?: (relativePath: string) => void
@@ -279,6 +282,43 @@ function useRegisterRawContentFlush({
   }, [flushPendingRawContent, flushPendingRawContentRef])
 }
 
+function useEditorFindCommand({
+  activeTab,
+  findInNoteRef,
+  handleToggleRawExclusive,
+  rawMode,
+}: {
+  activeTab: Tab | null
+  findInNoteRef?: EditorProps['findInNoteRef']
+  handleToggleRawExclusive: () => void
+  rawMode: boolean
+}): RawEditorFindRequest | null {
+  const [findRequest, setFindRequest] = useState<RawEditorFindRequest | null>(null)
+  const handleFindInNote = useCallback((options: { replace?: boolean } = {}) => {
+    if (!activeTab || activeTab.entry.fileKind === 'binary') return
+    if (!rawMode) handleToggleRawExclusive()
+
+    setFindRequest((current) => ({
+      id: (current?.id ?? 0) + 1,
+      path: activeTab.entry.path,
+      replace: options.replace === true,
+    }))
+  }, [activeTab, handleToggleRawExclusive, rawMode])
+
+  useEffect(() => {
+    if (!findInNoteRef) return
+
+    findInNoteRef.current = handleFindInNote
+    return () => {
+      if (findInNoteRef.current === handleFindInNote) {
+        findInNoteRef.current = null
+      }
+    }
+  }, [findInNoteRef, handleFindInNote])
+
+  return findRequest
+}
+
 function EditorLayout({
   tabs,
   activeTab,
@@ -311,6 +351,7 @@ function EditorLayout({
   onUnarchiveNote,
   vaultPath,
   rawModeContent,
+  findRequest,
   rawLatestContentRef,
   onRenameFilename,
   noteLayout,
@@ -371,6 +412,7 @@ function EditorLayout({
   onUnarchiveNote?: (path: string) => void
   vaultPath?: string
   rawModeContent: string | null
+  findRequest?: RawEditorFindRequest | null
   rawLatestContentRef: React.MutableRefObject<string | null>
   onRenameFilename?: (path: string, newFilenameStem: string) => void
   noteLayout?: NoteLayout
@@ -446,6 +488,7 @@ function EditorLayout({
               onUnarchiveNote={onUnarchiveNote}
               vaultPath={vaultPath}
               rawModeContent={rawModeContent}
+              findRequest={findRequest}
               rawLatestContentRef={rawLatestContentRef}
               onRenameFilename={onRenameFilename}
               noteLayout={noteLayout}
@@ -511,7 +554,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
     noteLayout, onToggleNoteLayout,
     onFileCreated, onFileModified, onVaultChanged,
     isConflicted, onKeepMine, onKeepTheirs,
-    flushPendingRawContentRef,
+    flushPendingRawContentRef, findInNoteRef,
     locale,
   } = props
 
@@ -530,6 +573,13 @@ export const Editor = memo(function Editor(props: EditorProps) {
     getNoteStatus,
     rawToggleRef: props.rawToggleRef, diffToggleRef: props.diffToggleRef,
   })
+  const findRequest = useEditorFindCommand({
+    activeTab,
+    findInNoteRef,
+    handleToggleRawExclusive,
+    rawMode,
+  })
+
   useRegisterRawContentFlush({
     activeTab,
     rawLatestContentRef,
@@ -571,6 +621,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
       onUnarchiveNote={onUnarchiveNote}
       vaultPath={vaultPath}
       rawModeContent={rawModeContent}
+      findRequest={findRequest}
       rawLatestContentRef={rawLatestContentRef}
       onRenameFilename={onRenameFilename}
       noteLayout={noteLayout}

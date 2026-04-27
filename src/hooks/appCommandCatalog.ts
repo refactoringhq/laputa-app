@@ -9,6 +9,8 @@ export const APP_COMMAND_IDS = {
   fileNewType: 'file-new-type',
   fileQuickOpen: 'file-quick-open',
   fileSave: 'file-save',
+  editFindInNote: 'edit-find-in-note',
+  editReplaceInNote: 'edit-replace-in-note',
   editFindInVault: 'edit-find-in-vault',
   editToggleRawEditor: 'edit-toggle-raw-editor',
   editToggleDiff: 'edit-toggle-diff',
@@ -80,6 +82,8 @@ type SimpleHandlerKey =
   | 'onCreateType'
   | 'onQuickOpen'
   | 'onSave'
+  | 'onFindInNote'
+  | 'onReplaceInNote'
   | 'onSearch'
   | 'onToggleRawEditor'
   | 'onToggleDiff'
@@ -166,6 +170,16 @@ export const APP_COMMAND_DEFINITIONS: Record<AppCommandId, AppCommandDefinition>
     route: { kind: 'handler', handler: 'onSave' },
     menuOwned: true,
     shortcut: { combo: 'command-or-ctrl', key: 's', code: 'KeyS', display: '⌘S' },
+  },
+  [APP_COMMAND_IDS.editFindInNote]: {
+    route: { kind: 'handler', handler: 'onFindInNote' },
+    menuOwned: true,
+    preferredShortcutQaMode: 'renderer-shortcut-event',
+    shortcut: { combo: 'command-or-ctrl', key: 'f', code: 'KeyF', display: '⌘F' },
+  },
+  [APP_COMMAND_IDS.editReplaceInNote]: {
+    route: { kind: 'handler', handler: 'onReplaceInNote' },
+    menuOwned: true,
   },
   [APP_COMMAND_IDS.editFindInVault]: {
     route: { kind: 'handler', handler: 'onSearch' },
@@ -344,6 +358,7 @@ const MANUAL_NATIVE_ACCELERATOR_QA_COMMAND_SET = new Set<AppCommandId>([
   APP_COMMAND_IDS.fileNewNote,
   APP_COMMAND_IDS.fileQuickOpen,
   APP_COMMAND_IDS.fileSave,
+  APP_COMMAND_IDS.editFindInNote,
   APP_COMMAND_IDS.editFindInVault,
   APP_COMMAND_IDS.viewToggleAiChat,
   APP_COMMAND_IDS.viewCommandPalette,

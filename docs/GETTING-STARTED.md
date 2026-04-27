@@ -340,6 +340,8 @@ type SidebarSelection =
 
 Commands whose availability depends on the current note or Git state must also flow through `update_menu_state` so the native menu stays in sync with the command palette. The deleted-note restore action in Changes view is the reference example: the row opens a deleted diff preview, the command palette exposes "Restore Deleted Note", and the Note menu enables the same action only while that preview is active.
 
+Current-note find/replace is a surface-aware command: editor focus enables "Find in Note" / "Replace in Note" and routes Cmd+F into raw CodeMirror mode; note-list focus enables existing note-list search instead. When adding another focus-dependent command, mirror this pattern with an availability event consumed by `useMenuEvents.ts` and `update_menu_state`.
+
 For automated shortcut QA, use the explicit proof path from `appCommandCatalog.ts`:
 
 - `window.__laputaTest.triggerShortcutCommand()` for deterministic renderer shortcut-event coverage

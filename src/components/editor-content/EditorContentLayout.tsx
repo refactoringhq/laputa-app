@@ -1,6 +1,8 @@
 import type React from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../../lib/i18n'
+import { dispatchEditorFindAvailability } from '../../utils/editorFindEvents'
 import { DiffView } from '../DiffView'
 import { BreadcrumbBar } from '../BreadcrumbBar'
 import { ArchivedNoteBanner } from '../ArchivedNoteBanner'
@@ -69,6 +71,7 @@ function DiffModeView({ diffContent, locale = 'en', onToggleDiff }: { diffConten
 function RawModeEditorSection({
   activeTab,
   entries,
+  findRequest,
   rawMode,
   rawModeContent,
   onRawContentChange,
@@ -78,7 +81,7 @@ function RawModeEditorSection({
   locale,
 }: Pick<
   EditorContentModel,
-  'activeTab' | 'entries' | 'onRawContentChange' | 'onSave' | 'rawLatestContentRef' | 'rawModeContent' | 'vaultPath'
+  'activeTab' | 'entries' | 'findRequest' | 'onRawContentChange' | 'onSave' | 'rawLatestContentRef' | 'rawModeContent' | 'vaultPath'
 > & {
   rawMode: boolean
   locale?: AppLocale
@@ -86,17 +89,22 @@ function RawModeEditorSection({
   if (!rawMode || !activeTab) return null
 
   return (
-    <RawEditorView
-      key={activeTab.entry.path}
-      content={rawModeContent ?? activeTab.content}
-      path={activeTab.entry.path}
-      entries={entries}
-      onContentChange={onRawContentChange ?? (() => {})}
-      onSave={onSave ?? (() => {})}
-      latestContentRef={rawLatestContentRef}
-      vaultPath={vaultPath}
-      locale={locale}
-    />
+    <EditorFindScope className="editor-scroll-area">
+      <div className="editor-content-wrapper editor-content-wrapper--raw">
+        <RawEditorView
+          key={activeTab.entry.path}
+          content={rawModeContent ?? activeTab.content}
+          path={activeTab.entry.path}
+          entries={entries}
+          findRequest={findRequest}
+          onContentChange={onRawContentChange ?? (() => {})}
+          onSave={onSave ?? (() => {})}
+          latestContentRef={rawLatestContentRef}
+          vaultPath={vaultPath}
+          locale={locale}
+        />
+      </div>
+    </EditorFindScope>
   )
 }
 
@@ -205,7 +213,7 @@ function EditorCanvas({
   if (!showEditor) return null
 
   return (
-    <div className="editor-scroll-area" style={cssVars as React.CSSProperties}>
+    <EditorFindScope className="editor-scroll-area" style={cssVars as React.CSSProperties}>
       <div className="editor-content-wrapper">
         <SingleEditorView
           editor={editor}
@@ -216,6 +224,39 @@ function EditorCanvas({
           editable={!isDeletedPreview}
         />
       </div>
+    </EditorFindScope>
+  )
+}
+
+function EditorFindScope({
+  children,
+  className,
+  style,
+}: {
+  children: React.ReactNode
+  className?: string
+  style?: React.CSSProperties
+}) {
+  const scopeRef = useRef<HTMLDivElement | null>(null)
+  const syncAvailability = useCallback(() => {
+    const activeElement = document.activeElement
+    const enabled = activeElement instanceof Node
+      && scopeRef.current?.contains(activeElement) === true
+    dispatchEditorFindAvailability(enabled)
+  }, [])
+
+  useEffect(() => () => dispatchEditorFindAvailability(false), [])
+
+  return (
+    <div
+      ref={scopeRef}
+      className={className}
+      data-editor-find-scope="true"
+      onFocusCapture={() => dispatchEditorFindAvailability(true)}
+      onBlurCapture={() => requestAnimationFrame(syncAvailability)}
+      style={style}
+    >
+      {children}
     </div>
   )
 }
@@ -249,6 +290,7 @@ export function EditorContentLayout(model: EditorContentModel) {
     rawLatestContentRef,
     rawModeContent,
     noteLayout,
+    findRequest,
     locale,
   } = model
   const rootClassName = cn(
@@ -311,6 +353,7 @@ export function EditorContentLayout(model: EditorContentModel) {
       <RawModeEditorSection
         activeTab={activeTab}
         entries={entries}
+        findRequest={findRequest}
         rawMode={effectiveRawMode}
         rawModeContent={rawModeContent}
         onRawContentChange={onRawContentChange}

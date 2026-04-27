@@ -28,6 +28,8 @@ const STATIC_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
   'create-note': 'command.note.newNote',
   'create-type': 'command.note.newType',
   'save-note': 'command.note.saveNote',
+  'find-in-note': 'command.note.findInNote',
+  'replace-in-note': 'command.note.replaceInNote',
   'delete-note': 'command.note.deleteNote',
   'restore-deleted-note': 'command.note.restoreDeleted',
   'set-note-icon': 'command.note.setIcon',

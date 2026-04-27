@@ -16,6 +16,7 @@ import {
 import { useCodeMirror } from '../hooks/useCodeMirror'
 import type { VaultEntry } from '../types'
 import { translate, type AppLocale } from '../lib/i18n'
+import { RawEditorFindBar, type RawEditorFindRequest } from './RawEditorFindBar'
 
 export interface RawEditorViewProps {
   content: string
@@ -28,6 +29,7 @@ export interface RawEditorViewProps {
    *  Allows the parent to flush debounced content before unmount. */
   latestContentRef?: React.MutableRefObject<string | null>
   locale?: AppLocale
+  findRequest?: RawEditorFindRequest | null
 }
 
 const DEBOUNCE_MS = 500
@@ -332,32 +334,76 @@ function useRawEditorWikilinkInsertion({
   useEffect(() => { insertWikilinkRef.current = insertAutocompleteWikilink }, [insertAutocompleteWikilink, insertWikilinkRef])
 }
 
-export function RawEditorView({ content, path, entries, onContentChange, onSave, latestContentRef, vaultPath, locale = 'en' }: RawEditorViewProps) {
+export function RawEditorView({ content, path, entries, onContentChange, onSave, latestContentRef, vaultPath, locale = 'en', findRequest }: RawEditorViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [rawDoc, setRawDoc] = useState(content)
+  const [findOpen, setFindOpen] = useState(false)
+  const [replaceOpen, setReplaceOpen] = useState(false)
   const pendingChanges = useRawEditorPendingChanges({ content, latestContentRef, onContentChange, onSave, path })
-  const autocompleteController = useRawEditorAutocompleteController({ entries, vaultPath })
+  const {
+    autocomplete,
+    handleAutocompleteKey,
+    handleCursorActivity,
+    handleEscape: handleAutocompleteEscape,
+    handleItemHover,
+    insertWikilinkRef,
+    setAutocomplete,
+  } = useRawEditorAutocompleteController({ entries, vaultPath })
+  const handleDocChange = useCallback((doc: string) => {
+    setRawDoc(doc)
+    pendingChanges.handleDocChange(doc)
+  }, [pendingChanges])
+  const handleEscape = useCallback(() => {
+    if (handleAutocompleteEscape()) return true
+    if (!findOpen) return false
+
+    setFindOpen(false)
+    return true
+  }, [findOpen, handleAutocompleteEscape])
   const viewRef = useCodeMirror(containerRef, content, {
-    onDocChange: pendingChanges.handleDocChange,
-    onCursorActivity: autocompleteController.handleCursorActivity,
+    onDocChange: handleDocChange,
+    onCursorActivity: handleCursorActivity,
     onSave: pendingChanges.handleSave,
-    onEscape: autocompleteController.handleEscape,
+    onEscape: handleEscape,
   })
 
   useRawEditorWikilinkInsertion({
     debounceRef: pendingChanges.debounceRef,
-    insertWikilinkRef: autocompleteController.insertWikilinkRef,
+    insertWikilinkRef,
     latestDocRef: pendingChanges.latestDocRef,
     onContentChangeRef: pendingChanges.onContentChangeRef,
     pathRef: pendingChanges.pathRef,
-    setAutocomplete: autocompleteController.setAutocomplete,
+    setAutocomplete,
     viewRef,
   })
 
-  const dropdownPosition = getRawEditorDropdownPosition(autocompleteController.autocomplete, DROPDOWN_MAX_HEIGHT, window)
+  useEffect(() => {
+    setRawDoc(content)
+  }, [content])
+
+  useEffect(() => {
+    if (!findRequest || findRequest.path !== path) return
+    setAutocomplete(null)
+    setFindOpen(true)
+    setReplaceOpen(findRequest.replace)
+  }, [findRequest, path, setAutocomplete])
+
+  const dropdownPosition = getRawEditorDropdownPosition(autocomplete, DROPDOWN_MAX_HEIGHT, window)
 
   return (
-    <div className="flex flex-1 flex-col min-h-0 relative" style={{ background: 'var(--background)' }} onKeyDown={autocompleteController.handleAutocompleteKey} role="presentation">
+    <div className="flex flex-1 flex-col min-h-0 relative" style={{ background: 'var(--background)' }} onKeyDown={handleAutocompleteKey} role="presentation">
       <RawEditorYamlErrorBanner error={pendingChanges.yamlError} />
+      <RawEditorFindBar
+        doc={rawDoc}
+        locale={locale}
+        onClose={() => setFindOpen(false)}
+        onReplaceOpenChange={setReplaceOpen}
+        open={findOpen}
+        path={path}
+        replaceOpen={replaceOpen}
+        request={findRequest}
+        viewRef={viewRef}
+      />
       <div
         ref={containerRef}
         className="raw-editor-codemirror flex flex-1 min-h-0"
@@ -365,8 +411,8 @@ export function RawEditorView({ content, path, entries, onContentChange, onSave,
         aria-label={translate(locale, 'editor.raw.label')}
       />
       <RawEditorAutocompleteDropdown
-        autocomplete={autocompleteController.autocomplete}
-        onItemHover={autocompleteController.handleItemHover}
+        autocomplete={autocomplete}
+        onItemHover={handleItemHover}
         position={dropdownPosition}
       />
     </div>

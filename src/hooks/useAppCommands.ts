@@ -24,6 +24,8 @@ interface AppCommandsConfig {
   onQuickOpen: () => void
   onCommandPalette: () => void
   onSearch: () => void
+  onFindInNote?: () => void
+  onReplaceInNote?: () => void
   onCreateNote: () => void
   onCreateNoteOfType: (type: string) => void
   onSave: () => void
@@ -139,6 +141,8 @@ type CommandRegistryCoreActions = Pick<
   | 'onCreateNote'
   | 'onCreateNoteOfType'
   | 'onSave'
+  | 'onFindInNote'
+  | 'onReplaceInNote'
   | 'onOpenSettings'
   | 'onOpenFeedback'
   | 'onDeleteNote'
@@ -219,6 +223,8 @@ function createKeyboardActions(
     onQuickOpen: config.onQuickOpen,
     onCommandPalette: config.onCommandPalette,
     onSearch: config.onSearch,
+    onFindInNote: config.onFindInNote,
+    onReplaceInNote: config.onReplaceInNote,
     onCreateNote: config.onCreateNote,
     onSave: config.onSave,
     onOpenSettings: config.onOpenSettings,
@@ -269,6 +275,8 @@ function createMenuEventActionHandlers(
   | 'onZoomOut'
   | 'onZoomReset'
   | 'onDeleteNote'
+  | 'onFindInNote'
+  | 'onReplaceInNote'
   | 'onSearch'
   | 'onToggleRawEditor'
   | 'onToggleDiff'
@@ -292,6 +300,8 @@ function createMenuEventActionHandlers(
     onZoomOut: config.onZoomOut,
     onZoomReset: config.onZoomReset,
     onDeleteNote: config.onDeleteNote,
+    onFindInNote: config.onFindInNote,
+    onReplaceInNote: config.onReplaceInNote,
     onSearch: config.onSearch,
     onToggleRawEditor: config.onToggleRawEditor,
     onToggleDiff: config.onToggleDiff,
@@ -407,6 +417,8 @@ function createCommandRegistryCoreConfig(
     onToggleInspector: config.onToggleInspector,
     onToggleDiff: config.onToggleDiff,
     onToggleRawEditor: config.onToggleRawEditor,
+    onFindInNote: config.onFindInNote,
+    onReplaceInNote: config.onReplaceInNote,
     noteLayout: config.noteLayout,
     onToggleNoteLayout: config.onToggleNoteLayout,
     onToggleAIChat: config.onToggleAIChat,

@@ -13,6 +13,8 @@ const FILE_QUICK_OPEN: &str = "file-quick-open";
 const FILE_QUICK_OPEN_ALIAS: &str = "file-quick-open-alias";
 const FILE_SAVE: &str = "file-save";
 
+const EDIT_FIND_IN_NOTE: &str = "edit-find-in-note";
+const EDIT_REPLACE_IN_NOTE: &str = "edit-replace-in-note";
 const EDIT_FIND_IN_VAULT: &str = "edit-find-in-vault";
 const EDIT_TOGGLE_NOTE_LIST_SEARCH: &str = "edit-toggle-note-list-search";
 const EDIT_TOGGLE_RAW_EDITOR: &str = "edit-toggle-raw-editor";
@@ -62,6 +64,8 @@ const CUSTOM_IDS: &[&str] = &[
     FILE_QUICK_OPEN,
     FILE_QUICK_OPEN_ALIAS,
     FILE_SAVE,
+    EDIT_FIND_IN_NOTE,
+    EDIT_REPLACE_IN_NOTE,
     EDIT_FIND_IN_VAULT,
     EDIT_TOGGLE_NOTE_LIST_SEARCH,
     EDIT_TOGGLE_RAW_EDITOR,
@@ -111,6 +115,9 @@ const NOTE_DEPENDENT_IDS: &[&str] = &[
     VIEW_TOGGLE_BACKLINKS,
     NOTE_OPEN_IN_NEW_WINDOW,
 ];
+
+/// IDs of menu items that depend on the editor being the active surface.
+const EDITOR_FIND_DEPENDENT_IDS: &[&str] = &[EDIT_FIND_IN_NOTE, EDIT_REPLACE_IN_NOTE];
 
 /// IDs of menu items that depend on the note list being the active surface.
 const NOTE_LIST_SEARCH_DEPENDENT_IDS: &[&str] = &[EDIT_TOGGLE_NOTE_LIST_SEARCH];
@@ -191,6 +198,15 @@ fn build_file_menu(app: &App) -> MenuResult {
 }
 
 fn build_edit_menu(app: &App) -> MenuResult {
+    let find_in_note = MenuItemBuilder::new("Find in Note")
+        .id(EDIT_FIND_IN_NOTE)
+        .accelerator("CmdOrCtrl+F")
+        .enabled(false)
+        .build(app)?;
+    let replace_in_note = MenuItemBuilder::new("Replace in Note")
+        .id(EDIT_REPLACE_IN_NOTE)
+        .enabled(false)
+        .build(app)?;
     let find_in_vault = MenuItemBuilder::new("Find in Vault")
         .id(EDIT_FIND_IN_VAULT)
         .accelerator("CmdOrCtrl+Shift+F")
@@ -214,6 +230,8 @@ fn build_edit_menu(app: &App) -> MenuResult {
         .separator()
         .select_all()
         .separator()
+        .item(&find_in_note)
+        .item(&replace_in_note)
         .item(&find_in_vault)
         .item(&toggle_note_list_search)
         .item(&toggle_diff)
@@ -468,6 +486,11 @@ pub fn set_note_items_enabled(app_handle: &AppHandle, enabled: bool) {
     set_items_enabled(app_handle, NOTE_DEPENDENT_IDS, enabled);
 }
 
+/// Enable or disable menu items that depend on the editor being the active surface.
+pub fn set_editor_find_items_enabled(app_handle: &AppHandle, enabled: bool) {
+    set_items_enabled(app_handle, EDITOR_FIND_DEPENDENT_IDS, enabled);
+}
+
 /// Enable or disable menu items that depend on the note list being the active surface.
 pub fn set_note_list_search_items_enabled(app_handle: &AppHandle, enabled: bool) {
     set_items_enabled(app_handle, NOTE_LIST_SEARCH_DEPENDENT_IDS, enabled);
@@ -506,6 +529,8 @@ mod tests {
             FILE_NEW_TYPE,
             FILE_QUICK_OPEN,
             FILE_SAVE,
+            EDIT_FIND_IN_NOTE,
+            EDIT_REPLACE_IN_NOTE,
             EDIT_FIND_IN_VAULT,
             EDIT_TOGGLE_NOTE_LIST_SEARCH,
             EDIT_TOGGLE_RAW_EDITOR,
@@ -560,6 +585,16 @@ mod tests {
             assert!(
                 CUSTOM_IDS.contains(id),
                 "note-list-search-dependent ID {id} not in CUSTOM_IDS"
+            );
+        }
+    }
+
+    #[test]
+    fn editor_find_dependent_ids_are_subset_of_custom_ids() {
+        for id in EDITOR_FIND_DEPENDENT_IDS {
+            assert!(
+                CUSTOM_IDS.contains(id),
+                "editor-find-dependent ID {id} not in CUSTOM_IDS"
             );
         }
     }
