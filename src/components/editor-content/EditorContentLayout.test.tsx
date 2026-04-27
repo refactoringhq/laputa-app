@@ -108,4 +108,18 @@ describe('EditorContentLayout', () => {
     expect(container.firstElementChild).toHaveClass('editor-content-layout--left')
     expect(screen.getByTestId('breadcrumb-bar')).toHaveAttribute('data-note-layout', 'left')
   })
+
+  it('keeps raw mode out of the centered rich-editor content wrapper', () => {
+    render(<EditorContentLayout {...createModel({
+      effectiveRawMode: true,
+      showEditor: false,
+      noteLayout: 'centered',
+    })} />)
+
+    const rawEditor = screen.getByTestId('raw-editor-view')
+    const findScope = rawEditor.closest('[data-editor-find-scope="true"]')
+
+    expect(findScope).toHaveClass('editor-scroll-area')
+    expect(rawEditor.closest('.editor-content-wrapper')).toBeNull()
+  })
 })
