@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{ExitStatus, Stdio};
 
 /// Status returned by `check_claude_cli`.
 #[derive(Debug, Serialize, Clone)]
@@ -79,7 +79,7 @@ pub(crate) fn find_claude_binary() -> Result<PathBuf, String> {
 }
 
 fn find_claude_binary_on_path() -> Option<PathBuf> {
-    Command::new(claude_path_lookup_command())
+    crate::hidden_command(claude_path_lookup_command())
         .arg("claude")
         .output()
         .ok()
@@ -114,7 +114,7 @@ fn user_shell_candidates() -> Vec<PathBuf> {
 }
 
 fn command_path_from_shell(shell: &Path, command: &str) -> Option<PathBuf> {
-    Command::new(shell)
+    crate::hidden_command(shell)
         .arg("-lc")
         .arg(format!("command -v {command}"))
         .output()
@@ -193,7 +193,7 @@ pub fn check_cli() -> ClaudeCliStatus {
         }
     };
 
-    let version = Command::new(&bin)
+    let version = crate::hidden_command(&bin)
         .arg("--version")
         .output()
         .ok()
@@ -327,15 +327,7 @@ fn run_claude_subprocess<F>(
 where
     F: FnMut(ClaudeStreamEvent),
 {
-    let mut cmd = Command::new(bin);
-    cmd.args(args)
-        .env_remove("CLAUDECODE") // prevent "nested session" guard
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    if let Some(dir) = cwd {
-        cmd.current_dir(dir);
-    }
+    let mut cmd = build_claude_command(bin, args, cwd);
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn claude: {e}"))?;
@@ -390,6 +382,23 @@ where
     emit(ClaudeStreamEvent::Done);
 
     Ok(state.session_id)
+}
+
+fn build_claude_command(
+    bin: &PathBuf,
+    args: &[String],
+    cwd: Option<&str>,
+) -> std::process::Command {
+    let mut cmd = crate::hidden_command(bin);
+    cmd.args(args)
+        .env_remove("CLAUDECODE") // prevent "nested session" guard
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
+    cmd
 }
 
 fn format_failed_claude_exit(stderr_output: &str, status: ExitStatus) -> String {
@@ -594,6 +603,9 @@ fn extract_tool_result_text(json: &serde_json::Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsStr;
+    use std::ffi::OsString;
+    use std::process::Command;
 
     #[test]
     fn check_cli_returns_status() {
@@ -906,6 +918,33 @@ mod tests {
     }
 
     // --- run_claude_subprocess with mock scripts ---
+
+    #[test]
+    fn build_claude_command_keeps_streaming_process_contract() {
+        let bin = PathBuf::from("claude");
+        let args = vec!["-p".to_string(), "hello".to_string()];
+        let command = build_claude_command(&bin, &args, Some("/tmp/vault"));
+        let actual_args: Vec<OsString> = command.get_args().map(OsStr::to_os_string).collect();
+        let claude_code_env = command
+            .get_envs()
+            .find(|(key, _)| *key == OsStr::new("CLAUDECODE"))
+            .map(|(_, value)| value.map(OsStr::to_os_string));
+
+        assert_eq!(
+            (
+                command.get_program().to_os_string(),
+                actual_args,
+                command.get_current_dir().map(Path::to_path_buf),
+                claude_code_env,
+            ),
+            (
+                OsString::from("claude"),
+                vec![OsString::from("-p"), OsString::from("hello")],
+                Some(PathBuf::from("/tmp/vault")),
+                Some(None),
+            ),
+        );
+    }
 
     #[cfg(unix)]
     fn run_mock_script(script: &str) -> (Result<String, String>, Vec<ClaudeStreamEvent>) {

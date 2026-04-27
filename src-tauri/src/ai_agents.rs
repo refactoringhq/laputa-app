@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -113,7 +113,7 @@ fn availability_from_codex() -> AiAgentAvailability {
 }
 
 fn version_for_binary(binary: &PathBuf) -> Option<String> {
-    Command::new(binary)
+    crate::hidden_command(binary)
         .arg("--version")
         .output()
         .ok()
@@ -138,7 +138,7 @@ fn find_codex_binary() -> Result<PathBuf, String> {
 }
 
 fn find_codex_binary_on_path() -> Option<PathBuf> {
-    Command::new("which")
+    crate::hidden_command("which")
         .arg("codex")
         .output()
         .ok()
@@ -165,7 +165,7 @@ fn user_shell_candidates() -> Vec<PathBuf> {
 }
 
 fn command_path_from_shell(shell: &Path, command: &str) -> Option<PathBuf> {
-    Command::new(shell)
+    crate::hidden_command(shell)
         .arg("-lc")
         .arg(format!("command -v {command}"))
         .output()
@@ -225,13 +225,7 @@ where
     let args = build_codex_args(&request)?;
     let prompt = build_codex_prompt(&request);
 
-    let mut command = Command::new(binary);
-    command
-        .args(args)
-        .arg(prompt)
-        .current_dir(&request.vault_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    let mut command = build_codex_command(&binary, args, prompt, &request.vault_path);
 
     let mut child = command
         .spawn()
@@ -287,6 +281,22 @@ where
     emit(AiAgentStreamEvent::Done);
 
     Ok(thread_id)
+}
+
+fn build_codex_command(
+    binary: &Path,
+    args: Vec<String>,
+    prompt: String,
+    vault_path: &str,
+) -> std::process::Command {
+    let mut command = crate::hidden_command(binary);
+    command
+        .args(args)
+        .arg(prompt)
+        .current_dir(vault_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    command
 }
 
 fn build_codex_args(request: &AiAgentStreamRequest) -> Result<Vec<String>, String> {
@@ -456,6 +466,7 @@ fn map_claude_event(event: crate::claude_cli::ClaudeStreamEvent) -> Option<AiAge
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsStr;
 
     #[test]
     fn normalize_status_contains_both_agents() {
@@ -495,6 +506,25 @@ mod tests {
             assert!(args.contains(&"--json".to_string()));
             assert!(args.contains(&"-C".to_string()));
         }
+    }
+
+    #[test]
+    fn build_codex_command_keeps_agent_process_contract() {
+        let binary = PathBuf::from("codex");
+        let args = vec!["exec".to_string(), "--json".to_string()];
+        let command = build_codex_command(&binary, args, "Summarize".into(), "/tmp/vault");
+        let actual_args: Vec<&OsStr> = command.get_args().collect();
+
+        assert_eq!(command.get_program(), OsStr::new("codex"));
+        assert_eq!(
+            actual_args,
+            vec![
+                OsStr::new("exec"),
+                OsStr::new("--json"),
+                OsStr::new("Summarize")
+            ]
+        );
+        assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/vault")));
     }
 
     #[test]
