@@ -76,6 +76,12 @@ describe('parseFrontmatter', () => {
     expect(fm['Owner']).toBe('[[person/alice]]')
     expect(fm['Belongs to']).toBe('[[project/alpha]]')
   })
+
+  it('parses CRLF frontmatter from Windows-authored notes', () => {
+    const fm = parseFrontmatter('---\r\ntype: Note\r\nstatus: Active\r\n---\r\n# Title')
+    expect(fm['type']).toBe('Note')
+    expect(fm['status']).toBe('Active')
+  })
 })
 
 describe('detectFrontmatterState', () => {
@@ -97,6 +103,10 @@ describe('detectFrontmatterState', () => {
 
   it('returns "valid" for well-formed frontmatter', () => {
     expect(detectFrontmatterState('---\ntitle: Hello\ntype: Note\n---\nBody')).toBe('valid')
+  })
+
+  it('returns "valid" for CRLF frontmatter', () => {
+    expect(detectFrontmatterState('---\r\ntitle: Hello\r\ntype: Note\r\n---\r\nBody')).toBe('valid')
   })
 
   it('returns "valid" for frontmatter with only a title', () => {
