@@ -568,7 +568,7 @@ fn refresh_cloned_vault_config_files(vault_path: &Path) -> Result<(), String> {
         return Ok(());
     }
 
-    ensure_commit_identity(vault_path)?;
+    crate::git::ensure_author_config(vault_path)?;
     crate::git::git_commit(
         path_to_utf8(vault_path, "Vault path")?,
         "Initialize Tolaria config files",
@@ -591,38 +591,6 @@ fn vault_has_pending_changes(vault_path: &Path) -> Result<bool, String> {
         "git status failed: {}",
         String::from_utf8_lossy(&output.stderr).trim()
     ))
-}
-
-fn ensure_commit_identity(vault_path: &Path) -> Result<(), String> {
-    for (key, fallback) in [
-        ("user.name", "Tolaria"),
-        ("user.email", "vault@tolaria.app"),
-    ] {
-        let output = crate::hidden_command("git")
-            .args(["config", key])
-            .current_dir(vault_path)
-            .output()
-            .map_err(|e| format!("Failed to inspect git config {key}: {e}"))?;
-
-        if output.status.success() && !String::from_utf8_lossy(&output.stdout).trim().is_empty() {
-            continue;
-        }
-
-        let set_output = crate::hidden_command("git")
-            .args(["config", key, fallback])
-            .current_dir(vault_path)
-            .output()
-            .map_err(|e| format!("Failed to set git config {key}: {e}"))?;
-
-        if !set_output.status.success() {
-            return Err(format!(
-                "git config {key} failed: {}",
-                String::from_utf8_lossy(&set_output.stderr).trim()
-            ));
-        }
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

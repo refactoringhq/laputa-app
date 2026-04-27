@@ -129,21 +129,23 @@ fn git_command_label<'a>(args: &'a [&'a str]) -> &'a str {
 }
 
 /// Set local user.name and user.email if not already configured.
-fn ensure_author_config(dir: &Path) -> Result<(), String> {
+pub(crate) fn ensure_author_config(dir: &Path) -> Result<(), String> {
     for (key, fallback) in [
         ("user.name", "Tolaria"),
         ("user.email", "vault@tolaria.app"),
     ] {
-        let check = git_command()
-            .args(["config", key])
+        let local = git_command()
+            .args(["config", "--local", key])
             .current_dir(dir)
             .output()
-            .map_err(|e| format!("Failed to check git config: {}", e))?;
+            .map_err(|e| format!("Failed to check git config {key}: {e}"))?;
 
-        let value = String::from_utf8_lossy(&check.stdout);
-        if !check.status.success() || value.trim().is_empty() {
-            run_git(dir, &["config", key, fallback])?;
+        let value = String::from_utf8_lossy(&local.stdout);
+        if local.status.success() && !value.trim().is_empty() {
+            continue;
         }
+
+        run_git(dir, &["config", "--local", key, fallback])?;
     }
     Ok(())
 }

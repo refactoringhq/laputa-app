@@ -254,6 +254,50 @@ function createEditor() {
   }
 }
 
+function renderEditorHarness(editor = createEditor()) {
+  render(
+    <SingleEditorView
+      editor={editor as never}
+      entries={[makeEntry()]}
+      onNavigateWikilink={vi.fn()}
+    />,
+  )
+
+  const container = screen.getByTestId('blocknote-view').closest('.editor__blocknote-container')
+  expect(container).toBeTruthy()
+  return { container: container!, editor }
+}
+
+function createCodeBlockFixture(text: string) {
+  const codeBlock = document.createElement('div')
+  codeBlock.setAttribute('data-content-type', 'codeBlock')
+  const pre = document.createElement('pre')
+  const code = document.createElement('code')
+  code.textContent = text
+  pre.appendChild(code)
+  codeBlock.appendChild(pre)
+  return { codeBlock, code }
+}
+
+function selectNodeContents(node: Node) {
+  const range = document.createRange()
+  range.selectNodeContents(node)
+  const selection = window.getSelection()
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+}
+
+function appendToolbarButton(container: Element, className: string, text: string) {
+  const toolbar = document.createElement('div')
+  toolbar.className = className
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.textContent = text
+  toolbar.appendChild(button)
+  container.appendChild(toolbar)
+  return button
+}
+
 describe('SingleEditorView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -448,6 +492,39 @@ describe('SingleEditorView', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
+  it('copies selected fenced code text without markdown escape backslashes', () => {
+    const json = '{\n  "id": "Demo"\n}'
+    const { container } = renderEditorHarness()
+    const { codeBlock, code } = createCodeBlockFixture(json)
+    container.appendChild(codeBlock)
+    selectNodeContents(code)
+
+    const clipboardData = { setData: vi.fn() }
+    fireEvent.copy(code, { clipboardData })
+
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', json)
+  })
+
+  it('does not override full-note copy selections that merely include a code block', () => {
+    const { container } = renderEditorHarness()
+    const paragraph = document.createElement('p')
+    paragraph.textContent = 'Before'
+    const { codeBlock, code } = createCodeBlockFixture('const value = 1')
+    container.append(paragraph, codeBlock)
+
+    const range = document.createRange()
+    range.setStartBefore(paragraph)
+    range.setEndAfter(codeBlock)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+
+    const clipboardData = { setData: vi.fn() }
+    fireEvent.copy(code, { clipboardData })
+
+    expect(clipboardData.setData).not.toHaveBeenCalled()
+  })
+
   it('routes clicks on the empty title wrapper back into the H1 block', async () => {
     const editor = createEditor()
 
@@ -489,26 +566,8 @@ describe('SingleEditorView', () => {
   })
 
   it('ignores editor-container click handling for link toolbar interactions', () => {
-    const editor = createEditor()
-
-    render(
-      <SingleEditorView
-        editor={editor as never}
-        entries={[makeEntry()]}
-        onNavigateWikilink={vi.fn()}
-      />,
-    )
-
-    const container = screen.getByTestId('blocknote-view').closest('.editor__blocknote-container')
-    expect(container).toBeTruthy()
-
-    const linkToolbar = document.createElement('div')
-    linkToolbar.className = 'bn-link-toolbar'
-    const linkAction = document.createElement('button')
-    linkAction.type = 'button'
-    linkAction.textContent = 'Open in a new tab'
-    linkToolbar.appendChild(linkAction)
-    container?.appendChild(linkToolbar)
+    const { container, editor } = renderEditorHarness()
+    const linkAction = appendToolbarButton(container, 'bn-link-toolbar', 'Open in a new tab')
 
     fireEvent.click(linkAction)
 
@@ -517,26 +576,8 @@ describe('SingleEditorView', () => {
   })
 
   it('ignores editor-container click handling for BlockNote side-menu actions', () => {
-    const editor = createEditor()
-
-    render(
-      <SingleEditorView
-        editor={editor as never}
-        entries={[makeEntry()]}
-        onNavigateWikilink={vi.fn()}
-      />,
-    )
-
-    const container = screen.getByTestId('blocknote-view').closest('.editor__blocknote-container')
-    expect(container).toBeTruthy()
-
-    const sideMenu = document.createElement('div')
-    sideMenu.className = 'bn-side-menu'
-    const action = document.createElement('button')
-    action.type = 'button'
-    action.textContent = 'Add block'
-    sideMenu.appendChild(action)
-    container?.appendChild(sideMenu)
+    const { container, editor } = renderEditorHarness()
+    const action = appendToolbarButton(container, 'bn-side-menu', 'Add block')
 
     fireEvent.click(action)
 

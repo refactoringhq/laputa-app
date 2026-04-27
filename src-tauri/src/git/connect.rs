@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Output;
 
-use super::git_command;
+use super::{ensure_author_config, git_command};
 
 const DEFAULT_REMOTE_NAME: &str = "origin";
 
@@ -91,6 +91,8 @@ pub fn git_add_remote(vault_path: &str, remote_url: &str) -> Result<GitAddRemote
             "This vault already has a remote configured.",
         ));
     }
+
+    ensure_author_config(vault)?;
 
     let branch = current_branch(vault)?;
     if branch.is_empty() {
@@ -444,6 +446,28 @@ mod tests {
         git_commit(path.to_str().unwrap(), message).unwrap();
     }
 
+    fn clear_local_author(path: &Path) {
+        for key in ["user.name", "user.email"] {
+            StdCommand::new("git")
+                .args(["config", "--local", "--unset-all", key])
+                .current_dir(path)
+                .output()
+                .unwrap();
+        }
+    }
+
+    fn local_author_is_configured(path: &Path) -> bool {
+        ["user.name", "user.email"].into_iter().all(|key| {
+            let output = StdCommand::new("git")
+                .args(["config", "--local", key])
+                .current_dir(path)
+                .output()
+                .unwrap();
+
+            output.status.success() && !String::from_utf8_lossy(&output.stdout).trim().is_empty()
+        })
+    }
+
     #[test]
     fn disconnect_all_remotes_removes_every_remote() {
         let dir = setup_git_repo();
@@ -487,6 +511,26 @@ mod tests {
         let status = git_remote_status(local.path().to_str().unwrap()).unwrap();
         assert!(status.has_remote);
         assert_eq!((status.ahead, status.behind), (0, 0));
+    }
+
+    #[test]
+    fn git_add_remote_sets_local_identity_when_existing_repo_has_none() {
+        let local = setup_git_repo();
+        create_local_commit(local.path(), "note.md", "Local", "Initial local commit");
+        clear_local_author(local.path());
+        assert!(!local_author_is_configured(local.path()));
+
+        let bare = TempDir::new().unwrap();
+        init_bare_remote(bare.path());
+
+        let result = git_add_remote(
+            local.path().to_str().unwrap(),
+            bare.path().to_str().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(result.status, "connected");
+        assert!(local_author_is_configured(local.path()));
     }
 
     #[test]

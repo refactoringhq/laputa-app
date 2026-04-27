@@ -224,6 +224,62 @@ function isSelectionInsideElement(element: HTMLElement): boolean {
 
 const TITLE_HEADING_SELECTOR = 'h1, [data-content-type="heading"][data-level="1"], [data-content-type="heading"]:not([data-level])'
 const TITLE_HEADING_WRAPPER_SELECTOR = '.bn-block-outer, .bn-block'
+const CODE_BLOCK_SELECTOR = '[data-content-type="codeBlock"]'
+
+function nodeElement(node: Node | null): HTMLElement | null {
+  if (!node) return null
+  if (node instanceof HTMLElement) return node
+  return node.parentElement
+}
+
+function hasSingleActiveRange(selection: Selection | null): selection is Selection {
+  return Boolean(selection && selection.rangeCount === 1 && !selection.isCollapsed)
+}
+
+function closestCodeBlockInContainer(options: {
+  range: Range
+  container: HTMLElement
+}): HTMLElement | null {
+  const { range, container } = options
+  const codeBlock = nodeElement(range.commonAncestorContainer)
+    ?.closest<HTMLElement>(CODE_BLOCK_SELECTOR)
+
+  return codeBlock && container.contains(codeBlock) ? codeBlock : null
+}
+
+function nodeBelongsToElement(node: Node, element: HTMLElement): boolean {
+  const elementNode = nodeElement(node)
+  return Boolean(elementNode && element.contains(elementNode))
+}
+
+function rangeBelongsToElement(range: Range, element: HTMLElement): boolean {
+  return nodeBelongsToElement(range.startContainer, element)
+    && nodeBelongsToElement(range.endContainer, element)
+}
+
+function selectedCodeBlockRange(options: {
+  selection: Selection | null
+  container: HTMLElement
+}): Range | null {
+  const { selection, container } = options
+  if (!hasSingleActiveRange(selection)) return null
+
+  const range = selection.getRangeAt(0)
+  const codeBlock = closestCodeBlockInContainer({ range, container })
+  if (!codeBlock || !rangeBelongsToElement(range, codeBlock)) return null
+
+  return range
+}
+
+function selectedCodeBlockText(options: {
+  selection: Selection | null
+  container: HTMLElement
+}): string | null {
+  const range = selectedCodeBlockRange(options)
+  if (!range) return null
+
+  return options.selection?.toString() || range.cloneContents().textContent || ''
+}
 
 function findTitleHeadingElement(target: HTMLElement): HTMLElement | null {
   const directHeading = target.closest<HTMLElement>(TITLE_HEADING_SELECTOR)
@@ -332,6 +388,17 @@ function useCompositionAwareEditorChange(options: {
     pendingChangeRef.current = false
     onChangeRef.current?.()
   }, [])
+}
+
+function handleCodeBlockCopy(event: React.ClipboardEvent<HTMLDivElement>) {
+  const codeText = selectedCodeBlockText({
+    selection: window.getSelection(),
+    container: event.currentTarget,
+  })
+  if (codeText === null) return
+
+  event.clipboardData.setData('text/plain', codeText)
+  event.preventDefault()
 }
 
 function buildBaseSuggestionItems(entries: VaultEntry[]) {
@@ -460,7 +527,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
   })
 
   return (
-    <div ref={containerRef} className={`editor__blocknote-container${isDragOver ? ' editor__blocknote-container--drag-over' : ''}`} style={cssVars as React.CSSProperties} onClick={handleContainerClick}>
+    <div ref={containerRef} className={`editor__blocknote-container${isDragOver ? ' editor__blocknote-container--drag-over' : ''}`} style={cssVars as React.CSSProperties} onClick={handleContainerClick} onCopyCapture={handleCodeBlockCopy}>
       {isDragOver && (
         <div className="editor__drop-overlay">
           <div className="editor__drop-overlay-label">Drop image here</div>
