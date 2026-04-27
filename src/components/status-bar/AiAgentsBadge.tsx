@@ -1,6 +1,5 @@
 import { AlertTriangle, ChevronsUpDown } from 'lucide-react'
 import { Sparkle } from '@phosphor-icons/react'
-import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { Button } from '@/components/ui/button'
 import {
   AI_AGENT_DEFINITIONS,
@@ -240,6 +239,7 @@ export function AiAgentsBadge({
   const selectedAgentReady = isAiAgentInstalled(statuses, defaultAgent)
   const showWarning = hasAiAgentWarning(statuses, defaultAgent, guidanceStatus)
   const showSwitcherCue = !showWarning && canShowSwitcherCue(statuses, defaultAgent)
+  const tooltip = badgeTooltip(locale, statuses, defaultAgent, guidanceStatus)
 
   if (isAiAgentsStatusChecking(statuses)) return null
 
@@ -247,24 +247,24 @@ export function AiAgentsBadge({
     <>
       <CompactSeparator compact={compact} />
       <DropdownMenu>
-        <ActionTooltip copy={{ label: badgeTooltip(locale, statuses, defaultAgent, guidanceStatus) }} side="top">
-          <DropdownMenuTrigger asChild={true}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              className={triggerButtonClassName(compact)}
-              aria-label={translate(locale, 'status.ai.openOptions')}
-              data-testid="status-ai-agents"
-            >
-              <span style={{ ...ICON_STYLE, color: showWarning ? 'var(--accent-orange)' : 'var(--muted-foreground)' }}>
-                <Sparkle size={13} weight="fill" />
-                <TriggerLabel compact={compact} defaultAgent={defaultAgent} />
-                <TriggerStateIcon showWarning={showWarning} showSwitcherCue={showSwitcherCue} />
-              </span>
-            </Button>
-          </DropdownMenuTrigger>
-        </ActionTooltip>
+        <DropdownMenuTrigger asChild={true}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className={triggerButtonClassName(compact)}
+            aria-label={translate(locale, 'status.ai.openOptions')}
+            title={tooltip}
+            data-tooltip-mode="native-title"
+            data-testid="status-ai-agents"
+          >
+            <span style={{ ...ICON_STYLE, color: showWarning ? 'var(--accent-orange)' : 'var(--muted-foreground)' }}>
+              <Sparkle size={13} weight="fill" />
+              <TriggerLabel compact={compact} defaultAgent={defaultAgent} />
+              <TriggerStateIcon showWarning={showWarning} showSwitcherCue={showSwitcherCue} />
+            </span>
+          </Button>
+        </DropdownMenuTrigger>
         <AgentMenuContent
           statuses={statuses}
           guidanceStatus={guidanceStatus}
