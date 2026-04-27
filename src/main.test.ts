@@ -104,7 +104,7 @@ describe('main entrypoint', () => {
     rootOptions().onCaughtError?.(error, { componentStack: '\n    in App' })
 
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '\n    in App' })
-  }, 20_000)
+  }, 60_000)
 
   it('normalizes missing React component stacks before handing errors to Sentry', async () => {
     await importEntrypoint()

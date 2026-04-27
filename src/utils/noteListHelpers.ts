@@ -397,8 +397,14 @@ function applySubFilter(entries: VaultEntry[], subFilter: NoteListFilter): Vault
 }
 
 function isInFolder(entryPath: string, folderRelPath: string): boolean {
-  const needle = '/' + folderRelPath + '/'
-  return entryPath.includes(needle) || entryPath.startsWith(folderRelPath + '/')
+  const folderPath = normalizeFolderPath(folderRelPath)
+  if (!folderPath) return false
+  const normalizedEntryPath = normalizeFolderPath(entryPath)
+  return normalizedEntryPath.includes(`/${folderPath}/`) || normalizedEntryPath.startsWith(`${folderPath}/`)
+}
+
+function normalizeFolderPath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
 }
 
 export function isAllNotesEntry(entry: VaultEntry): boolean {
