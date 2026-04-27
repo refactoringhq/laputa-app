@@ -327,25 +327,25 @@ describe('BreadcrumbBar — raw editor toggle', () => {
   })
 })
 
-describe('BreadcrumbBar — note width toggle', () => {
-  it('shows the wide width action while normal', () => {
-    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteWidth="normal" onToggleNoteWidth={vi.fn()} />)
+describe('BreadcrumbBar — note layout toggle', () => {
+  it('shows the left-align layout action while centered', () => {
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteLayout="centered" onToggleNoteLayout={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: 'Switch this note to wide width' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Switch to left-aligned note layout' })).toBeInTheDocument()
   })
 
-  it('shows the normal width action while wide', () => {
-    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteWidth="wide" onToggleNoteWidth={vi.fn()} />)
+  it('shows the centered layout action while left-aligned', () => {
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteLayout="left" onToggleNoteLayout={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: 'Switch this note to normal width' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Switch to centered note layout' })).toBeInTheDocument()
   })
 
-  it('calls onToggleNoteWidth when the width button is clicked', () => {
-    const onToggleNoteWidth = vi.fn()
-    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteWidth="normal" onToggleNoteWidth={onToggleNoteWidth} />)
+  it('calls onToggleNoteLayout when the layout button is clicked', () => {
+    const onToggleNoteLayout = vi.fn()
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteLayout="centered" onToggleNoteLayout={onToggleNoteLayout} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Switch this note to wide width' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to left-aligned note layout' }))
 
-    expect(onToggleNoteWidth).toHaveBeenCalledOnce()
+    expect(onToggleNoteLayout).toHaveBeenCalledOnce()
   })
 })

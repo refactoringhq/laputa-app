@@ -335,7 +335,14 @@ export function useNoteActions(config: NoteActionsConfig) {
 
   const runFrontmatterOp = useCallback(
     (op: 'update' | 'delete', path: string, key: string, value?: FrontmatterValue, options?: FrontmatterOpOptions) =>
-      runFrontmatterAndApply(op, path, key, value, { updateTab: updateTabContent, updateEntry, toast: setToastMessage, getEntry: (p) => entries.find((e) => e.path === p) }, options),
+      runFrontmatterAndApply({
+        op,
+        path,
+        key,
+        value,
+        callbacks: { updateTab: updateTabContent, updateEntry, toast: setToastMessage, getEntry: (p) => entries.find((e) => e.path === p) },
+        options,
+      }),
     [updateTabContent, updateEntry, setToastMessage, entries],
   )
   const frontmatterActions = useFrontmatterActionHandlers({

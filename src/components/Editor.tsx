@@ -7,7 +7,7 @@ import { uploadImageFile } from '../hooks/useImageDrop'
 import { DEFAULT_AI_AGENT, type AiAgentId } from '../lib/aiAgents'
 import { translate, type AppLocale } from '../lib/i18n'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
-import type { VaultEntry, GitCommit, NoteStatus, NoteWidthMode } from '../types'
+import type { VaultEntry, GitCommit, NoteLayout, NoteStatus } from '../types'
 import type { NoteListItem } from '../utils/ai-context'
 import type { FrontmatterValue } from './Inspector'
 import { ResizeHandle } from './ResizeHandle'
@@ -79,8 +79,8 @@ interface EditorProps {
   onSave?: () => void
   /** Called when the user explicitly renames the filename from the breadcrumb. */
   onRenameFilename?: (path: string, newFilenameStem: string) => void
-  noteWidth?: NoteWidthMode
-  onToggleNoteWidth?: () => void
+  noteLayout?: NoteLayout
+  onToggleNoteLayout?: () => void
   canGoBack?: boolean
   canGoForward?: boolean
   onGoBack?: () => void
@@ -312,8 +312,8 @@ function EditorLayout({
   rawModeContent,
   rawLatestContentRef,
   onRenameFilename,
-  noteWidth,
-  onToggleNoteWidth,
+  noteLayout,
+  onToggleNoteLayout,
   isConflicted,
   onKeepMine,
   onKeepTheirs,
@@ -372,8 +372,8 @@ function EditorLayout({
   rawModeContent: string | null
   rawLatestContentRef: React.MutableRefObject<string | null>
   onRenameFilename?: (path: string, newFilenameStem: string) => void
-  noteWidth?: NoteWidthMode
-  onToggleNoteWidth?: () => void
+  noteLayout?: NoteLayout
+  onToggleNoteLayout?: () => void
   isConflicted?: boolean
   onKeepMine?: (path: string) => void
   onKeepTheirs?: (path: string) => void
@@ -447,8 +447,8 @@ function EditorLayout({
               rawModeContent={rawModeContent}
               rawLatestContentRef={rawLatestContentRef}
               onRenameFilename={onRenameFilename}
-              noteWidth={noteWidth}
-              onToggleNoteWidth={onToggleNoteWidth}
+              noteLayout={noteLayout}
+              onToggleNoteLayout={onToggleNoteLayout}
               isConflicted={isConflicted}
               onKeepMine={onKeepMine}
               onKeepTheirs={onKeepTheirs}
@@ -507,7 +507,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
     onToggleFavorite, onToggleOrganized, onRevealFile, onCopyFilePath, onOpenExternalFile,
     onDeleteNote, onArchiveNote, onUnarchiveNote,
     onContentChange, onSave, onRenameFilename,
-    noteWidth, onToggleNoteWidth,
+    noteLayout, onToggleNoteLayout,
     onFileCreated, onFileModified, onVaultChanged,
     isConflicted, onKeepMine, onKeepTheirs,
     flushPendingRawContentRef,
@@ -572,8 +572,8 @@ export const Editor = memo(function Editor(props: EditorProps) {
       rawModeContent={rawModeContent}
       rawLatestContentRef={rawLatestContentRef}
       onRenameFilename={onRenameFilename}
-      noteWidth={noteWidth}
-      onToggleNoteWidth={onToggleNoteWidth}
+      noteLayout={noteLayout}
+      onToggleNoteLayout={onToggleNoteLayout}
       isConflicted={isConflicted}
       onKeepMine={onKeepMine}
       onKeepTheirs={onKeepTheirs}

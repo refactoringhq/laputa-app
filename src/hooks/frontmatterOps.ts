@@ -7,6 +7,15 @@ import { updateMockContent, trackMockChange } from '../mock-tauri'
 import { parseFrontmatter } from '../utils/frontmatter'
 import { canonicalSystemMetadataKey, isSystemMetadataKey } from '../utils/systemMetadata'
 
+type FrontmatterCommand = 'update_frontmatter' | 'delete_frontmatter_property'
+type FrontmatterKey = string
+type FrontmatterOp = 'update' | 'delete'
+type MarkdownContent = string
+type ToastMessage = string | null
+type VaultPath = string
+type WikilinkText = string
+type ScalarPropertyValue = string | number | boolean | null
+
 const ENTRY_DELETE_MAP: Record<string, Partial<VaultEntry>> = {
   title: { title: '' },
   type: { isA: null }, is_a: { isA: null }, status: { status: null }, color: { color: null },
@@ -15,19 +24,18 @@ const ENTRY_DELETE_MAP: Record<string, Partial<VaultEntry>> = {
   _archived: { archived: false }, archived: { archived: false },
   _order: { order: null },
   template: { template: null }, _sort: { sort: null }, visible: { visible: null },
-  _width: { noteWidth: null },
   _organized: { organized: false },
   _favorite: { favorite: false }, _favorite_index: { favoriteIndex: null },
   _list_properties_display: { listPropertiesDisplay: [] },
 }
 
 /** Check if a string contains a wikilink pattern `[[...]]`. */
-function isWikilink(s: string): boolean {
-  return s.startsWith('[[') && s.includes(']]')
+function isWikilink(value: WikilinkText): boolean {
+  return value.startsWith('[[') && value.includes(']]')
 }
 
 /** Extract wikilink strings from a FrontmatterValue. Returns empty array if none. */
-function extractWikilinks(value: FrontmatterValue): string[] {
+function extractWikilinks(value: FrontmatterValue): WikilinkText[] {
   if (typeof value === 'string') return isWikilink(value) ? [value] : []
   if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string' && isWikilink(v))
   return []
@@ -37,16 +45,23 @@ function extractWikilinks(value: FrontmatterValue): string[] {
  * Relationship patch: a partial update to merge into `entry.relationships`.
  * Keys map to their new ref arrays. A `null` value means "remove this key".
  */
-export type RelationshipPatch = Record<string, string[] | null>
+export type RelationshipPatch = Record<FrontmatterKey, WikilinkText[] | null>
 
 /** Properties patch: a partial update to merge into `entry.properties`.
  *  Keys map to their new scalar values. A `null` value means "remove this key". */
-export type PropertiesPatch = Record<string, string | number | boolean | null>
+export type PropertiesPatch = Record<FrontmatterKey, ScalarPropertyValue>
 
 export interface EntryPatchResult {
   patch: Partial<VaultEntry>
   relationshipPatch: RelationshipPatch | null
   propertiesPatch: PropertiesPatch | null
+}
+
+interface FrontmatterPatchInput {
+  key: FrontmatterKey
+  lookupKey: FrontmatterKey
+  systemMetadataKey: boolean
+  value?: FrontmatterValue
 }
 
 function applyRecordPatch<T>(
@@ -61,54 +76,98 @@ function applyRecordPatch<T>(
   return merged
 }
 
-/** Map a frontmatter key+value to the corresponding VaultEntry field(s). */
-export function frontmatterToEntryPatch(
-  op: 'update' | 'delete', key: string, value?: FrontmatterValue,
-): EntryPatchResult {
-  const lookupKey = canonicalSystemMetadataKey(key)
-  const systemMetadataKey = isSystemMetadataKey(key)
-  if (op === 'delete') {
-    const relationshipPatch = systemMetadataKey ? null : { [key]: null }
-    const propertiesPatch = !systemMetadataKey && !(lookupKey in ENTRY_DELETE_MAP) ? { [key]: null } : null
-    return { patch: ENTRY_DELETE_MAP[lookupKey] ?? {}, relationshipPatch, propertiesPatch }
-  }
-  const str = value != null ? String(value) : null
-  const arr = Array.isArray(value) ? value.map(String) : []
-  const updates: Record<string, Partial<VaultEntry>> = {
+function frontmatterString(value: FrontmatterValue | undefined): string | null {
+  return value != null ? String(value) : null
+}
+
+function frontmatterStringList(value: FrontmatterValue | undefined): string[] {
+  return Array.isArray(value) ? value.map(String) : []
+}
+
+function frontmatterNumber(value: FrontmatterValue | undefined): number | null {
+  return typeof value === 'number' ? value : null
+}
+
+function visibleValue(value: FrontmatterValue | undefined): false | null {
+  return value === false ? false : null
+}
+
+function scalarPropertyValue(value: FrontmatterValue): ScalarPropertyValue {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value
+  return String(value)
+}
+
+function knownFrontmatterUpdates(value: FrontmatterValue | undefined): Record<FrontmatterKey, Partial<VaultEntry>> {
+  const str = frontmatterString(value)
+  const arr = frontmatterStringList(value)
+  return {
     title: { title: str ?? '' },
     type: { isA: str }, is_a: { isA: str }, status: { status: str }, color: { color: str },
     _icon: { icon: str }, _sidebar_label: { sidebarLabel: str },
     aliases: { aliases: arr }, belongs_to: { belongsTo: arr }, related_to: { relatedTo: arr },
     _archived: { archived: Boolean(value) }, archived: { archived: Boolean(value) },
-    _order: { order: typeof value === 'number' ? value : null },
+    _order: { order: frontmatterNumber(value) },
     template: { template: str },
     _sort: { sort: str },
     view: { view: str },
-    _width: { noteWidth: str === 'wide' || str === 'normal' ? str : null },
-    visible: { visible: value === false ? false : null },
+    visible: { visible: visibleValue(value) },
     _organized: { organized: Boolean(value) },
     _favorite: { favorite: Boolean(value) },
-    _favorite_index: { favoriteIndex: typeof value === 'number' ? value : null },
-    _list_properties_display: { listPropertiesDisplay: Array.isArray(value) ? value.map(String) : [] },
+    _favorite_index: { favoriteIndex: frontmatterNumber(value) },
+    _list_properties_display: { listPropertiesDisplay: arr },
   }
-  // Also update the relationships map for wikilink-containing values
+}
+
+function deleteEntryPatch({ key, lookupKey, systemMetadataKey }: FrontmatterPatchInput): EntryPatchResult {
+  const relationshipPatch = systemMetadataKey ? null : { [key]: null }
+  const propertiesPatch = !systemMetadataKey && !(lookupKey in ENTRY_DELETE_MAP) ? { [key]: null } : null
+  return { patch: ENTRY_DELETE_MAP[lookupKey] ?? {}, relationshipPatch, propertiesPatch }
+}
+
+function relationshipUpdatePatch(
+  key: FrontmatterKey,
+  systemMetadataKey: boolean,
+  value: FrontmatterValue | undefined,
+): RelationshipPatch | null {
   const wikilinks = value != null ? extractWikilinks(value) : []
-  const relationshipPatch: RelationshipPatch | null =
-    !systemMetadataKey && wikilinks.length > 0 ? { [key]: wikilinks } : null
-  // For unknown keys (custom properties), produce a propertiesPatch
-  const isKnownKey = lookupKey in updates
-  const propertiesPatch: PropertiesPatch | null =
-    !systemMetadataKey && !isKnownKey && value != null
-      ? { [key]: typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? value : String(value) }
-      : null
-  return { patch: updates[lookupKey] ?? {}, relationshipPatch, propertiesPatch }
+  return !systemMetadataKey && wikilinks.length > 0 ? { [key]: wikilinks } : null
+}
+
+function propertiesUpdatePatch({
+  key,
+  lookupKey,
+  systemMetadataKey,
+  value,
+}: FrontmatterPatchInput): PropertiesPatch | null {
+  const knownUpdates = knownFrontmatterUpdates(value)
+  if (systemMetadataKey || lookupKey in knownUpdates || value == null) return null
+  return { [key]: scalarPropertyValue(value) }
+}
+
+function updateEntryPatch(input: FrontmatterPatchInput): EntryPatchResult {
+  const updates = knownFrontmatterUpdates(input.value)
+  return {
+    patch: updates[input.lookupKey] ?? {},
+    relationshipPatch: relationshipUpdatePatch(input.key, input.systemMetadataKey, input.value),
+    propertiesPatch: propertiesUpdatePatch(input),
+  }
+}
+
+/** Map a frontmatter key+value to the corresponding VaultEntry field(s). */
+export function frontmatterToEntryPatch(
+  op: FrontmatterOp, key: FrontmatterKey, value?: FrontmatterValue,
+): EntryPatchResult {
+  const lookupKey = canonicalSystemMetadataKey(key)
+  const systemMetadataKey = isSystemMetadataKey(key)
+  const input = { key, lookupKey, systemMetadataKey, value }
+  return op === 'delete' ? deleteEntryPatch(input) : updateEntryPatch(input)
 }
 
 /** Parse frontmatter from full content and return a merged VaultEntry patch for all known fields. */
-export function contentToEntryPatch(content: string): Partial<VaultEntry> {
+export function contentToEntryPatch(content: MarkdownContent): Partial<VaultEntry> {
   const fm = parseFrontmatter(content)
   const merged: Partial<VaultEntry> = {}
-  const customProps: Record<string, string | number | boolean | null> = {}
+  const customProps: Record<FrontmatterKey, ScalarPropertyValue> = {}
   for (const [key, value] of Object.entries(fm)) {
     const { patch, propertiesPatch } = frontmatterToEntryPatch('update', key, value)
     Object.assign(merged, patch)
@@ -118,25 +177,30 @@ export function contentToEntryPatch(content: string): Partial<VaultEntry> {
   return merged
 }
 
-async function invokeFrontmatter(command: string, args: Record<string, unknown>): Promise<string> {
+async function invokeFrontmatter(command: FrontmatterCommand, args: Record<string, unknown>): Promise<MarkdownContent> {
   return invoke<string>(command, args)
 }
 
-function applyMockFrontmatterUpdate(path: string, key: string, value: FrontmatterValue): string {
+function applyMockFrontmatterUpdate(path: VaultPath, key: FrontmatterKey, value: FrontmatterValue): MarkdownContent {
   const content = updateMockFrontmatter(path, key, value)
   updateMockContent(path, content)
   trackMockChange(path)
   return content
 }
 
-function applyMockFrontmatterDelete(path: string, key: string): string {
+function applyMockFrontmatterDelete(path: VaultPath, key: FrontmatterKey): MarkdownContent {
   const content = deleteMockFrontmatterProperty(path, key)
   updateMockContent(path, content)
   trackMockChange(path)
   return content
 }
 
-async function executeFrontmatterOp(op: 'update' | 'delete', path: string, key: string, value?: FrontmatterValue): Promise<string> {
+async function executeFrontmatterOp(
+  op: FrontmatterOp,
+  path: VaultPath,
+  key: FrontmatterKey,
+  value?: FrontmatterValue,
+): Promise<MarkdownContent> {
   if (op === 'update') {
     return isTauri() ? invokeFrontmatter('update_frontmatter', { path, key, value }) : applyMockFrontmatterUpdate(path, key, value!)
   }
@@ -148,55 +212,100 @@ export interface FrontmatterOpOptions {
   silent?: boolean
 }
 
+export interface FrontmatterApplyCallbacks {
+  updateTab: (path: VaultPath, content: MarkdownContent) => void
+  updateEntry: (path: VaultPath, patch: Partial<VaultEntry>) => void
+  toast: (message: ToastMessage) => void
+  getEntry?: (path: VaultPath) => VaultEntry | undefined
+}
+
+export interface FrontmatterRunRequest {
+  op: FrontmatterOp
+  path: VaultPath
+  key: FrontmatterKey
+  value?: FrontmatterValue
+  callbacks: FrontmatterApplyCallbacks
+  options?: FrontmatterOpOptions
+}
+
 /** Apply a properties patch by merging into the existing properties map. */
 export function applyPropertiesPatch(
-  existing: Record<string, string | number | boolean | null>, propPatch: PropertiesPatch,
-): Record<string, string | number | boolean | null> {
+  existing: Record<FrontmatterKey, ScalarPropertyValue>, propPatch: PropertiesPatch,
+): Record<FrontmatterKey, ScalarPropertyValue> {
   return applyRecordPatch(existing, propPatch)
 }
 
 /** Apply a relationship patch by merging into the existing relationships map. */
 export function applyRelationshipPatch(
-  existing: Record<string, string[]>, relPatch: RelationshipPatch,
-): Record<string, string[]> {
+  existing: Record<FrontmatterKey, WikilinkText[]>, relPatch: RelationshipPatch,
+): Record<FrontmatterKey, WikilinkText[]> {
   return applyRecordPatch(existing, relPatch)
+}
+
+function patchNeedsExistingEntry(result: EntryPatchResult): boolean {
+  return Boolean(result.relationshipPatch || result.propertiesPatch)
+}
+
+function buildFullEntryPatch(
+  path: VaultPath,
+  callbacks: FrontmatterApplyCallbacks,
+  result: EntryPatchResult,
+): Partial<VaultEntry> {
+  const fullPatch = { ...result.patch }
+  if (!patchNeedsExistingEntry(result) || !callbacks.getEntry) return fullPatch
+
+  const current = callbacks.getEntry(path)
+  if (!current) return fullPatch
+
+  if (result.relationshipPatch) {
+    fullPatch.relationships = applyRelationshipPatch(current.relationships, result.relationshipPatch)
+  }
+  if (result.propertiesPatch) {
+    fullPatch.properties = applyPropertiesPatch(current.properties, result.propertiesPatch)
+  }
+  return fullPatch
+}
+
+function applyEntryPatch(path: VaultPath, callbacks: FrontmatterApplyCallbacks, result: EntryPatchResult) {
+  const fullPatch = buildFullEntryPatch(path, callbacks, result)
+  if (Object.keys(fullPatch).length > 0) callbacks.updateEntry(path, fullPatch)
+}
+
+function successToastMessage(op: FrontmatterOp): ToastMessage {
+  return op === 'update' ? 'Property updated' : 'Property deleted'
+}
+
+function notifyFrontmatterSuccess(op: FrontmatterOp, callbacks: FrontmatterApplyCallbacks, options?: FrontmatterOpOptions) {
+  if (!options?.silent) callbacks.toast(successToastMessage(op))
+}
+
+function failureToastMessage(op: FrontmatterOp): ToastMessage {
+  return `Failed to ${op} property`
+}
+
+function handleFrontmatterFailure(
+  op: FrontmatterOp,
+  err: unknown,
+  callbacks: FrontmatterApplyCallbacks,
+  options?: FrontmatterOpOptions,
+): undefined {
+  console.error(`Failed to ${op} frontmatter:`, err)
+  if (options?.silent) throw err
+  callbacks.toast(failureToastMessage(op))
+  return undefined
 }
 
 /** Run a frontmatter update/delete and apply the result to state.
  *  Returns the new file content on success, or undefined on failure. */
-export async function runFrontmatterAndApply(
-  op: 'update' | 'delete', path: string, key: string, value: FrontmatterValue | undefined,
-  callbacks: {
-    updateTab: (p: string, c: string) => void
-    updateEntry: (p: string, patch: Partial<VaultEntry>) => void
-    toast: (m: string | null) => void
-    getEntry?: (p: string) => VaultEntry | undefined
-  },
-  options?: FrontmatterOpOptions,
-): Promise<string | undefined> {
+export async function runFrontmatterAndApply(request: FrontmatterRunRequest): Promise<MarkdownContent | undefined> {
+  const { op, path, key, value, callbacks, options } = request
   try {
     const newContent = await executeFrontmatterOp(op, path, key, value)
     callbacks.updateTab(path, newContent)
-    const { patch, relationshipPatch, propertiesPatch } = frontmatterToEntryPatch(op, key, value)
-    const fullPatch = { ...patch }
-    if ((relationshipPatch || propertiesPatch) && callbacks.getEntry) {
-      const current = callbacks.getEntry(path)
-      if (current) {
-        if (relationshipPatch) {
-          fullPatch.relationships = applyRelationshipPatch(current.relationships, relationshipPatch)
-        }
-        if (propertiesPatch) {
-          fullPatch.properties = applyPropertiesPatch(current.properties, propertiesPatch)
-        }
-      }
-    }
-    if (Object.keys(fullPatch).length > 0) callbacks.updateEntry(path, fullPatch)
-    if (!options?.silent) callbacks.toast(op === 'update' ? 'Property updated' : 'Property deleted')
+    applyEntryPatch(path, callbacks, frontmatterToEntryPatch(op, key, value))
+    notifyFrontmatterSuccess(op, callbacks, options)
     return newContent
   } catch (err) {
-    console.error(`Failed to ${op} frontmatter:`, err)
-    if (options?.silent) throw err
-    callbacks.toast(`Failed to ${op} property`)
-    return undefined
+    return handleFrontmatterFailure(op, err, callbacks, options)
   }
 }

@@ -18,7 +18,6 @@ const defaultSettings: Settings = {
   theme_mode: null,
   ui_language: null,
   default_ai_agent: null,
-  note_width_mode: null,
 }
 
 const savedSettings: Settings = {
@@ -35,7 +34,6 @@ const savedSettings: Settings = {
   theme_mode: null,
   ui_language: null,
   default_ai_agent: null,
-  note_width_mode: null,
 }
 
 let mockSettingsStore: Settings = { ...defaultSettings }
@@ -85,7 +83,6 @@ function changedSettings(): Settings {
     theme_mode: null,
     ui_language: 'zh-Hans',
     default_ai_agent: null,
-    note_width_mode: 'wide',
   }
 }
 
@@ -134,16 +131,6 @@ describe('useSettings', () => {
 
     const settings = await renderLoadedSettings()
     expect(settings.release_channel).toBeNull()
-  })
-
-  it('normalizes invalid note width settings on load', async () => {
-    mockSettingsStore = {
-      ...savedSettings,
-      note_width_mode: 'full' as Settings['note_width_mode'],
-    }
-
-    const settings = await renderLoadedSettings()
-    expect(settings.note_width_mode).toBeNull()
   })
 
   it('normalizes unsupported language preferences on load', async () => {

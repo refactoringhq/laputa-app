@@ -60,14 +60,6 @@ fn preferred_relationship_refs(
         .unwrap_or_default()
 }
 
-fn normalize_note_width(value: Option<String>) -> Option<String> {
-    match value?.trim().to_ascii_lowercase().as_str() {
-        "normal" => Some("normal".to_string()),
-        "wide" => Some("wide".to_string()),
-        _ => None,
-    }
-}
-
 pub(crate) fn derive_markdown_title_from_content(content: &str, filename: &str) -> String {
     let matter = Matter::<YAML>::new();
     let parsed = matter.parse(content);
@@ -157,7 +149,6 @@ pub fn parse_md_file(path: &Path, git_dates: Option<(u64, u64)>) -> Result<Vault
         template: frontmatter.template.and_then(|v| v.into_scalar()),
         sort: frontmatter.sort.and_then(|v| v.into_scalar()),
         view: frontmatter.view.and_then(|v| v.into_scalar()),
-        note_width: normalize_note_width(frontmatter.width.and_then(|v| v.into_scalar())),
         visible: frontmatter.visible,
         organized: frontmatter.organized.unwrap_or(false),
         favorite: frontmatter.favorite.unwrap_or(false),

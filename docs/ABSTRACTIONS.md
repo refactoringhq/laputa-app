@@ -47,7 +47,6 @@ _icon: shapes             # icon assigned to a type
 _color: blue              # color assigned to a type
 _order: 10                # sort order in the sidebar
 _sidebar_label: Projects  # override label in sidebar
-_width: wide              # per-note reading width: normal or wide
 ```
 
 **This convention is universal** — apply it to all future system-level frontmatter fields. When a new feature needs to store configuration in a note's frontmatter (especially in Type notes), use `_field_name` to keep it hidden from normal user-facing surfaces while still stored on-disk as plain text.
@@ -93,7 +92,6 @@ classDiagram
         +Boolean archived
         +Boolean trashed ⚠ legacy
         +Number? trashedAt ⚠ legacy
-        +String? noteWidth
         +Record~string,string~ properties
     }
 
@@ -144,13 +142,10 @@ interface VaultEntry {
   archived: boolean         // Archived flag
   trashed: boolean          // Kept for backward compatibility (Trash system removed — delete is permanent)
   trashedAt: number | null  // Kept for backward compatibility (Trash system removed)
-  noteWidth?: 'normal' | 'wide' | null  // Per-note `_width` reading preference
   properties: Record<string, string>  // Scalar frontmatter fields (custom properties)
   fileKind?: 'markdown' | 'text' | 'binary'  // Controls editor/raw/preview behavior
 }
 ```
-
-Per-note reading width uses the system property `_width: normal | wide`. It is hidden from the Properties panel by the underscore convention, parsed into `VaultEntry.noteWidth`, and updated through the breadcrumb width toggle or the command palette. When absent or invalid, the renderer falls back to the app-level `settings.note_width_mode` default and then to `normal`.
 
 ### File kinds and binary previews
 
@@ -652,7 +647,7 @@ No indexing step required — search runs directly against the filesystem.
 
 Per-vault settings stored locally and scoped by vault path:
 - Managed by `useVaultConfig` hook and `vaultConfigStore`
-- Settings: zoom, view mode, editor mode, tag colors, status colors, property display modes, Inbox/All Notes note-list column overrides, explicit organization workflow toggle
+- Settings: zoom, view mode, editor mode, note layout, tag colors, status colors, property display modes, Inbox/All Notes note-list column overrides, explicit organization workflow toggle
 - One-time migration from localStorage (`configMigration.ts`)
 
 ### AI Guidance Files
@@ -709,7 +704,6 @@ interface Settings {
   release_channel: string | null // null = stable default, "alpha" = every-push prerelease feed
   theme_mode: 'light' | 'dark' | null
   ui_language: 'en' | 'zh-Hans' | null
-  note_width_mode: 'normal' | 'wide' | null
   default_ai_agent: 'claude_code' | 'codex' | null
 }
 ```

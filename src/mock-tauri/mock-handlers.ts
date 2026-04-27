@@ -114,7 +114,6 @@ let mockSettings: Settings = {
   theme_mode: null,
   ui_language: null,
   default_ai_agent: 'claude_code',
-  note_width_mode: null,
 }
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
@@ -424,7 +423,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       theme_mode: s.theme_mode ?? null,
       ui_language: s.ui_language ?? null,
       default_ai_agent: s.default_ai_agent ?? null,
-      note_width_mode: s.note_width_mode ?? null,
     }
     return null
   },

@@ -7,7 +7,7 @@ import { useCommandRegistry } from './useCommandRegistry'
 import type { CommandAction } from './useCommandRegistry'
 import { useKeyboardNavigation } from './useKeyboardNavigation'
 import { useMenuEvents } from './useMenuEvents'
-import type { NoteWidthMode, SidebarSelection, SidebarFilter, VaultEntry } from '../types'
+import type { NoteLayout, SidebarSelection, SidebarFilter, VaultEntry } from '../types'
 import { requestAddRemote } from '../utils/addRemoteEvents'
 import type { NoteListFilter } from '../utils/noteListHelpers'
 import type { ViewMode } from './useViewMode'
@@ -39,9 +39,8 @@ interface AppCommandsConfig {
   onToggleInspector: () => void
   onToggleDiff?: () => void
   onToggleRawEditor?: () => void
-  noteWidth?: NoteWidthMode
-  onSetNoteWidth?: (width: NoteWidthMode) => void
-  onSetDefaultNoteWidth?: (width: NoteWidthMode) => void
+  noteLayout?: NoteLayout
+  onToggleNoteLayout?: () => void
   activeNoteModified: boolean
   onZoomIn: () => void
   onZoomOut: () => void
@@ -152,9 +151,8 @@ type CommandRegistryCoreActions = Pick<
   | 'onToggleInspector'
   | 'onToggleDiff'
   | 'onToggleRawEditor'
-  | 'noteWidth'
-  | 'onSetNoteWidth'
-  | 'onSetDefaultNoteWidth'
+  | 'noteLayout'
+  | 'onToggleNoteLayout'
   | 'onToggleAIChat'
 >
 type CommandRegistryVaultActions = Pick<
@@ -409,9 +407,8 @@ function createCommandRegistryCoreConfig(
     onToggleInspector: config.onToggleInspector,
     onToggleDiff: config.onToggleDiff,
     onToggleRawEditor: config.onToggleRawEditor,
-    noteWidth: config.noteWidth,
-    onSetNoteWidth: config.onSetNoteWidth,
-    onSetDefaultNoteWidth: config.onSetDefaultNoteWidth,
+    noteLayout: config.noteLayout,
+    onToggleNoteLayout: config.onToggleNoteLayout,
     onToggleAIChat: config.onToggleAIChat,
   }
 }

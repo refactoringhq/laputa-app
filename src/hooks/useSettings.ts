@@ -5,7 +5,6 @@ import { normalizeStoredAiAgent } from '../lib/aiAgents'
 import { serializeUiLanguagePreference } from '../lib/i18n'
 import { normalizeReleaseChannel, serializeReleaseChannel } from '../lib/releaseChannel'
 import { normalizeThemeMode } from '../lib/themeMode'
-import { normalizeNoteWidthMode } from '../utils/noteWidth'
 import type { Settings } from '../types'
 
 async function invokeNativeIfAvailable<T>(command: string, tauriArgs: Record<string, unknown>): Promise<T | undefined> {
@@ -40,7 +39,6 @@ const EMPTY_SETTINGS: Settings = {
   theme_mode: null,
   ui_language: null,
   default_ai_agent: null,
-  note_width_mode: null,
 }
 
 function normalizeSettings(settings: Settings): Settings {
@@ -52,7 +50,6 @@ function normalizeSettings(settings: Settings): Settings {
     theme_mode: normalizeThemeMode(settings.theme_mode),
     ui_language: serializeUiLanguagePreference(settings.ui_language),
     default_ai_agent: normalizeStoredAiAgent(settings.default_ai_agent),
-    note_width_mode: normalizeNoteWidthMode(settings.note_width_mode),
   }
 }
 

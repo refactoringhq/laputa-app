@@ -2,7 +2,7 @@ import type React from 'react'
 import { useRef } from 'react'
 import type { useCreateBlockNote } from '@blocknote/react'
 import type { AppLocale } from '../../lib/i18n'
-import type { NoteStatus, NoteWidthMode, VaultEntry } from '../../types'
+import type { NoteLayout, NoteStatus, VaultEntry } from '../../types'
 import { useEditorTheme } from '../../hooks/useTheme'
 import { deriveEditorContentState } from './editorContentState'
 
@@ -43,8 +43,8 @@ export interface EditorContentProps {
   rawModeContent?: string | null
   rawLatestContentRef?: React.MutableRefObject<string | null>
   onRenameFilename?: (path: string, newFilenameStem: string) => void
-  noteWidth?: NoteWidthMode
-  onToggleNoteWidth?: () => void
+  noteLayout?: NoteLayout
+  onToggleNoteLayout?: () => void
   isConflicted?: boolean
   onKeepMine?: (path: string) => void
   onKeepTheirs?: (path: string) => void

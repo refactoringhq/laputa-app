@@ -21,7 +21,6 @@ pub struct Settings {
     pub ui_language: Option<String>,
     pub initial_h1_auto_rename_enabled: Option<bool>,
     pub default_ai_agent: Option<String>,
-    pub note_width_mode: Option<String>,
 }
 
 fn normalize_optional_string(value: Option<String>) -> Option<String> {
@@ -59,13 +58,6 @@ pub fn normalize_default_ai_agent(value: Option<&str>) -> Option<String> {
 pub fn normalize_theme_mode(value: Option<&str>) -> Option<String> {
     match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
         Some(mode) if mode == "light" || mode == "dark" => Some(mode),
-        _ => None,
-    }
-}
-
-pub fn normalize_note_width_mode(value: Option<&str>) -> Option<String> {
-    match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
-        Some(mode) if mode == "normal" || mode == "wide" => Some(mode),
         _ => None,
     }
 }
@@ -118,7 +110,6 @@ fn normalize_settings(settings: Settings) -> Settings {
         ui_language: normalize_ui_language(settings.ui_language.as_deref()),
         initial_h1_auto_rename_enabled: settings.initial_h1_auto_rename_enabled,
         default_ai_agent: normalize_default_ai_agent(settings.default_ai_agent.as_deref()),
-        note_width_mode: normalize_note_width_mode(settings.note_width_mode.as_deref()),
     }
 }
 
@@ -261,7 +252,6 @@ mod tests {
             ui_language: Some("zh-Hans".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
-            note_width_mode: Some("wide".to_string()),
         };
         let json = serde_json::to_string(&settings).unwrap();
         let parsed: Settings = serde_json::from_str(&json).unwrap();
@@ -289,7 +279,6 @@ mod tests {
             ui_language: Some("zh-Hans".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
-            note_width_mode: Some("wide".to_string()),
             ..Default::default()
         });
         assert_eq!(loaded.auto_pull_interval_minutes, Some(10));
@@ -302,7 +291,6 @@ mod tests {
         assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
         assert_eq!(loaded.initial_h1_auto_rename_enabled, Some(false));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
-        assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
     }
 
     #[test]
@@ -313,7 +301,6 @@ mod tests {
             theme_mode: Some("  dark  ".to_string()),
             ui_language: Some("  zh-cn  ".to_string()),
             default_ai_agent: Some("  codex  ".to_string()),
-            note_width_mode: Some("  wide  ".to_string()),
             ..Default::default()
         });
         assert_eq!(loaded.anonymous_id.as_deref(), Some("test-uuid"));
@@ -321,7 +308,6 @@ mod tests {
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
         assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
-        assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
     }
 
     #[test]
@@ -369,15 +355,6 @@ mod tests {
             ..Default::default()
         });
         assert!(loaded.theme_mode.is_none());
-    }
-
-    #[test]
-    fn test_invalid_note_width_mode_is_filtered() {
-        let loaded = save_and_reload(Settings {
-            note_width_mode: Some("full".to_string()),
-            ..Default::default()
-        });
-        assert!(loaded.note_width_mode.is_none());
     }
 
     #[test]

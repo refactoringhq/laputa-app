@@ -32,8 +32,8 @@ type BreadcrumbActions = Pick<
   | 'onArchiveNote'
   | 'onUnarchiveNote'
   | 'onRenameFilename'
-  | 'noteWidth'
-  | 'onToggleNoteWidth'
+  | 'noteLayout'
+  | 'onToggleNoteLayout'
 >
 
 function EditorLoadingSkeleton() {
@@ -86,21 +86,17 @@ function RawModeEditorSection({
   if (!rawMode || !activeTab) return null
 
   return (
-    <div className="editor-scroll-area">
-      <div className="editor-content-wrapper editor-content-wrapper--raw">
-        <RawEditorView
-          key={activeTab.entry.path}
-          content={rawModeContent ?? activeTab.content}
-          path={activeTab.entry.path}
-          entries={entries}
-          onContentChange={onRawContentChange ?? (() => {})}
-          onSave={onSave ?? (() => {})}
-          latestContentRef={rawLatestContentRef}
-          vaultPath={vaultPath}
-          locale={locale}
-        />
-      </div>
-    </div>
+    <RawEditorView
+      key={activeTab.entry.path}
+      content={rawModeContent ?? activeTab.content}
+      path={activeTab.entry.path}
+      entries={entries}
+      onContentChange={onRawContentChange ?? (() => {})}
+      onSave={onSave ?? (() => {})}
+      latestContentRef={rawLatestContentRef}
+      vaultPath={vaultPath}
+      locale={locale}
+    />
   )
 }
 
@@ -147,8 +143,8 @@ function ActiveTabBreadcrumb({
       onArchive={bindPath(actions.onArchiveNote, path)}
       onUnarchive={bindPath(actions.onUnarchiveNote, path)}
       onRenameFilename={actions.onRenameFilename}
-      noteWidth={actions.noteWidth}
-      onToggleNoteWidth={actions.onToggleNoteWidth}
+      noteLayout={actions.noteLayout}
+      onToggleNoteLayout={actions.onToggleNoteLayout}
       locale={locale}
     />
   )
@@ -252,12 +248,12 @@ export function EditorContentLayout(model: EditorContentModel) {
     isDeletedPreview,
     rawLatestContentRef,
     rawModeContent,
-    noteWidth,
+    noteLayout,
     locale,
   } = model
   const rootClassName = cn(
     'flex flex-1 flex-col min-w-0 min-h-0',
-    noteWidth === 'wide' ? 'editor-content-width--wide' : 'editor-content-width--normal',
+    noteLayout === 'left' ? 'editor-content-layout--left' : 'editor-content-layout--centered',
   )
 
   if (!activeTab) {
@@ -296,8 +292,8 @@ export function EditorContentLayout(model: EditorContentModel) {
           onArchiveNote: model.onArchiveNote,
           onUnarchiveNote: model.onUnarchiveNote,
           onRenameFilename: model.onRenameFilename,
-          noteWidth: model.noteWidth,
-          onToggleNoteWidth: model.onToggleNoteWidth,
+          noteLayout: model.noteLayout,
+          onToggleNoteLayout: model.onToggleNoteLayout,
         }}
       />
       <EditorChrome

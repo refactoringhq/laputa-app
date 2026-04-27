@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { EditorContentLayout } from './EditorContentLayout'
 
 vi.mock('../BreadcrumbBar', () => ({
-  BreadcrumbBar: ({ noteWidth }: { noteWidth?: string }) => <div data-testid="breadcrumb-bar" data-note-width={noteWidth} />,
+  BreadcrumbBar: ({ noteLayout }: { noteLayout?: string }) => <div data-testid="breadcrumb-bar" data-note-layout={noteLayout} />,
 }))
 
 vi.mock('../ArchivedNoteBanner', () => ({
@@ -63,8 +63,8 @@ function createModel(overrides: Record<string, unknown> = {}) {
     onEditorChange: vi.fn(),
     isDeletedPreview: false,
     rawLatestContentRef: { current: null },
-    noteWidth: 'normal',
-    onToggleNoteWidth: vi.fn(),
+    noteLayout: 'centered',
+    onToggleNoteLayout: vi.fn(),
     forceRawMode: false,
     showAIChat: false,
     onToggleAIChat: vi.fn(),
@@ -102,10 +102,10 @@ describe('EditorContentLayout', () => {
     expect(screen.queryByTestId('title-field-input')).not.toBeInTheDocument()
   })
 
-  it('marks the editor content root and breadcrumb with the note width preference', () => {
-    const { container } = render(<EditorContentLayout {...createModel({ noteWidth: 'wide' })} />)
+  it('marks the editor content root and breadcrumb with the note layout preference', () => {
+    const { container } = render(<EditorContentLayout {...createModel({ noteLayout: 'left' })} />)
 
-    expect(container.firstElementChild).toHaveClass('editor-content-width--wide')
-    expect(screen.getByTestId('breadcrumb-bar')).toHaveAttribute('data-note-width', 'wide')
+    expect(container.firstElementChild).toHaveClass('editor-content-layout--left')
+    expect(screen.getByTestId('breadcrumb-bar')).toHaveAttribute('data-note-layout', 'left')
   })
 })

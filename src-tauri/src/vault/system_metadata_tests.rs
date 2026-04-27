@@ -34,31 +34,6 @@ fn parses_canonical_system_metadata_keys() {
 }
 
 #[test]
-fn parses_note_width_without_property_leak() {
-    let dir = TempDir::new().unwrap();
-    let entry = parse_test_entry(
-        &dir,
-        "note.md",
-        "---\ntype: Note\n_width: wide\n---\n# Note\n",
-    );
-
-    assert_eq!(entry.note_width.as_deref(), Some("wide"));
-    assert!(!entry.properties.contains_key("_width"));
-}
-
-#[test]
-fn parses_bare_width_as_custom_property() {
-    let dir = TempDir::new().unwrap();
-    let entry = parse_test_entry(&dir, "note.md", "---\nwidth: 320\n---\n# Note\n");
-
-    assert!(entry.note_width.is_none());
-    assert_eq!(
-        entry.properties.get("width").and_then(|v| v.as_i64()),
-        Some(320)
-    );
-}
-
-#[test]
 fn parses_legacy_system_metadata_keys_without_property_leaks() {
     let dir = TempDir::new().unwrap();
     let entry = parse_test_entry(
