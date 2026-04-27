@@ -1,11 +1,26 @@
-export function isInsertBeforeInput(nativeEvent: Pick<InputEvent, 'inputType'>) {
-  return typeof nativeEvent.inputType === 'string'
-    && nativeEvent.inputType.startsWith('insert')
+type BeforeInputLike = {
+  inputType?: unknown
+}
+
+type PlainTextBeforeInputLike = BeforeInputLike & {
+  data?: unknown
+  isComposing?: unknown
+}
+
+type PlainTextBeforeInput = PlainTextBeforeInputLike & {
+  data: string
+  inputType: 'insertText'
+  isComposing?: false
+}
+
+export function isInsertBeforeInput(nativeEvent: BeforeInputLike) {
+  const { inputType } = nativeEvent
+  return typeof inputType === 'string' && inputType.startsWith('insert')
 }
 
 export function isPlainTextBeforeInput(
-  nativeEvent: Pick<InputEvent, 'data' | 'inputType' | 'isComposing'>,
-): nativeEvent is Pick<InputEvent, 'inputType' | 'isComposing'> & { data: string } {
+  nativeEvent: PlainTextBeforeInputLike,
+): nativeEvent is PlainTextBeforeInput {
   return nativeEvent.inputType === 'insertText'
     && !nativeEvent.isComposing
     && typeof nativeEvent.data === 'string'

@@ -549,6 +549,7 @@ describe('WikilinkChatInput', () => {
   it('treats missing inputType as a non-insert beforeinput event', () => {
     expect(() => isInsertBeforeInput({} as InputEvent)).not.toThrow()
     expect(isInsertBeforeInput({} as InputEvent)).toBe(false)
+    expect(isInsertBeforeInput({ inputType: 42 })).toBe(false)
     expect(isInsertBeforeInput({ inputType: 'insertFromPaste' } as InputEvent)).toBe(true)
   })
 
@@ -562,6 +563,26 @@ describe('WikilinkChatInput', () => {
     })
 
     expect(() => fireEvent(editor, beforeInputEvent)).not.toThrow()
+
+    updateEditorText('still works')
+    expect(editor.textContent).toContain('still works')
+  })
+
+  it('ignores beforeinput events with non-string inputType instead of calling startsWith', () => {
+    render(<Controlled />)
+
+    const editor = screen.getByTestId('agent-input')
+    const startsWith = vi.fn(() => true)
+    const beforeInputEvent = new Event('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperty(beforeInputEvent, 'inputType', {
+      value: { startsWith },
+    })
+
+    expect(() => fireEvent(editor, beforeInputEvent)).not.toThrow()
+    expect(startsWith).not.toHaveBeenCalled()
 
     updateEditorText('still works')
     expect(editor.textContent).toContain('still works')
