@@ -518,6 +518,52 @@ describe('useEditorTabSwap raw mode sync', () => {
     })
   })
 
+  it('serializes rich inline math nodes back to Markdown on editor changes', async () => {
+    vi.spyOn(document, 'querySelector').mockReturnValue({ scrollTop: 0 } as unknown as Element)
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
+
+    const onContentChange = vi.fn()
+    const docRef = { current: blocksA as unknown[] }
+    const mockEditor = makeMockEditor(docRef)
+    Object.defineProperty(mockEditor, 'document', { get: () => docRef.current })
+    mockEditor.blocksToMarkdownLossy.mockImplementation((blocks: unknown[]) => (
+      (blocks as Array<{ content?: Array<{ text?: string }> }>)
+        .map((block) => block.content?.map((item) => item.text ?? '').join('') ?? '')
+        .join('\n\n')
+    ))
+
+    const tabA = makeTab('a.md', 'Note A')
+
+    const { result } = renderHook(
+      () => useEditorTabSwap({
+        tabs: [tabA],
+        activeTabPath: 'a.md',
+        editor: mockEditor as never,
+        onContentChange,
+      }),
+    )
+
+    await act(() => new Promise(r => setTimeout(r, 0)))
+
+    docRef.current = [{
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: 'Inline ', styles: {} },
+        { type: 'mathInline', props: { latex: 'x^2' } },
+      ],
+      children: [],
+    }]
+
+    act(() => {
+      result.current.handleEditorChange()
+    })
+
+    expect(onContentChange).toHaveBeenCalledWith(
+      'a.md',
+      '---\ntitle: Note A\n---\nInline $x^2$\n',
+    )
+  })
+
   it('re-parses from tab.content when rawMode transitions from true to false', async () => {
     vi.spyOn(document, 'querySelector').mockReturnValue({ scrollTop: 0 } as unknown as Element)
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })

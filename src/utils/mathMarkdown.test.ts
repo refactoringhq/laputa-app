@@ -4,6 +4,7 @@ import {
   MATH_INLINE_TYPE,
   injectMathInBlocks,
   preProcessMathMarkdown,
+  readCompletedInlineMathAtEnd,
   serializeMathAwareBlocks,
 } from './mathMarkdown'
 
@@ -106,5 +107,19 @@ describe('math markdown round-trip', () => {
     ].join('\n')
 
     expect(preProcessMathMarkdown({ markdown })).toBe(markdown)
+  })
+
+  it('recognizes completed inline math at the end of text', () => {
+    expect(readCompletedInlineMathAtEnd({ text: 'Energy is $E=mc^2$' })).toEqual({
+      latex: 'E=mc^2',
+      start: 10,
+      end: 17,
+    })
+  })
+
+  it('ignores incomplete, escaped, and display-style dollar sequences at text end', () => {
+    expect(readCompletedInlineMathAtEnd({ text: 'Energy is $E=mc^2' })).toBeNull()
+    expect(readCompletedInlineMathAtEnd({ text: String.raw`Energy is $E=mc^2\$` })).toBeNull()
+    expect(readCompletedInlineMathAtEnd({ text: '$$x^2$$' })).toBeNull()
   })
 })
