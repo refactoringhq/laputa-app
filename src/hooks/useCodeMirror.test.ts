@@ -97,6 +97,26 @@ describe('useCodeMirror', () => {
     expect(onDocChange).not.toHaveBeenCalled()
   })
 
+  it('lets app Escape handling run before the CodeMirror default keymap', () => {
+    const ref = { current: container }
+    const onEscape = vi.fn(() => true)
+    const { result } = renderHook(() =>
+      useCodeMirror(ref, 'hello', { ...noopCallbacks, onEscape }),
+    )
+    const view = result.current.current!
+
+    act(() => {
+      view.focus()
+      view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'Escape',
+      }))
+    })
+
+    expect(onEscape).toHaveBeenCalledOnce()
+  })
+
   it('does not sync when content matches current editor state', () => {
     const ref = { current: container }
     const { result, rerender } = renderHook(

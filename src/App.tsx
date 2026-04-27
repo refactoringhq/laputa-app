@@ -1112,6 +1112,7 @@ function App() {
   const rawToggleRef = useRef<() => void>(() => {})
   // Diff-toggle ref: Editor registers its handleToggleDiff here so the command palette can call it
   const diffToggleRef = useRef<() => void>(() => {})
+  const findInNoteRef = useRef<((options?: { replace?: boolean }) => void) | null>(null)
 
   const { setViewMode, sidebarVisible, noteListVisible } = useViewMode(noteWindowParams ? 'editor-only' : undefined)
   const { noteLayout, toggleNoteLayout } = useNoteLayout()
@@ -1294,6 +1295,12 @@ function App() {
     () => canToggleRichEditor ? () => rawToggleRef.current() : undefined,
     [canToggleRichEditor],
   )
+  const findInNoteCommand = useCallback(() => {
+    findInNoteRef.current?.({ replace: false })
+  }, [])
+  const replaceInNoteCommand = useCallback(() => {
+    findInNoteRef.current?.({ replace: true })
+  }, [])
   const removeActiveVaultCommand = useCallback(() => {
     vaultSwitcher.removeVault(vaultSwitcher.vaultPath)
   }, [vaultSwitcher])
@@ -1354,6 +1361,8 @@ function App() {
     selection: effectiveSelection,
     onQuickOpen: dialogs.openQuickOpen, onCommandPalette: dialogs.openCommandPalette,
     onSearch: dialogs.openSearch,
+    onFindInNote: findInNoteCommand,
+    onReplaceInNote: activeDeletedFile ? undefined : replaceInNoteCommand,
     onCreateNote: notes.handleCreateNoteImmediate,
     onCreateNoteOfType: notes.handleCreateNoteImmediate,
     onSave: appSave.handleSave,
@@ -1586,6 +1595,7 @@ function App() {
               noteLayout={noteLayout}
               onToggleNoteLayout={toggleNoteLayout}
               rawToggleRef={rawToggleRef}
+              findInNoteRef={findInNoteRef}
               diffToggleRef={diffToggleRef}
               canGoBack={canGoBack}
               canGoForward={canGoForward}

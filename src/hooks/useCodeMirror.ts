@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { EditorView, lineNumbers, highlightActiveLine, keymap } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Prec } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { frontmatterHighlightPlugin, frontmatterHighlightTheme } from '../extensions/frontmatterHighlight'
 import { markdownLanguage } from '../extensions/markdownHighlight'
@@ -70,13 +70,13 @@ function buildBaseTheme() {
 }
 
 function buildSaveKeymap(callbacks: { current: CodeMirrorCallbacks }) {
-  return keymap.of([{
+  return Prec.highest(keymap.of([{
     key: 'Mod-s',
     run: () => { callbacks.current.onSave(); return true },
   }, {
     key: 'Escape',
     run: () => callbacks.current.onEscape(),
-  }])
+  }]))
 }
 
 function buildArrowLigaturesExtension() {

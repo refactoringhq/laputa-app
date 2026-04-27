@@ -5,6 +5,7 @@ import type { AppLocale } from '../../lib/i18n'
 import type { NoteLayout, NoteStatus, VaultEntry } from '../../types'
 import { useEditorTheme } from '../../hooks/useTheme'
 import { deriveEditorContentState } from './editorContentState'
+import type { RawEditorFindRequest } from '../RawEditorFindBar'
 
 export interface Tab {
   entry: VaultEntry
@@ -41,6 +42,7 @@ export interface EditorContentProps {
   onUnarchiveNote?: (path: string) => void
   vaultPath?: string
   rawModeContent?: string | null
+  findRequest?: RawEditorFindRequest | null
   rawLatestContentRef?: React.MutableRefObject<string | null>
   onRenameFilename?: (path: string, newFilenameStem: string) => void
   noteLayout?: NoteLayout

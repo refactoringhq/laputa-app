@@ -176,7 +176,7 @@ fn setup_linux_window_chrome(_app: &mut tauri::App) -> Result<(), Box<dyn std::e
 }
 
 #[cfg(any(test, all(desktop, target_os = "macos")))]
-const MACOS_WEBVIEW_RESERVED_COMMAND_KEYS: &[&str] = &["O"];
+const MACOS_WEBVIEW_RESERVED_COMMAND_KEYS: &[&str] = &["O", "F"];
 #[cfg(any(test, all(desktop, target_os = "macos")))]
 const MACOS_WEBVIEW_RESERVED_COMMAND_SHIFT_KEYS: &[&str] = &["L"];
 
@@ -405,6 +405,7 @@ pub fn run() {
 mod tests {
     use super::linux_appimage_startup_env_overrides_with;
     use super::StartupEnvOverride;
+    use super::MACOS_WEBVIEW_RESERVED_COMMAND_KEYS;
     use super::MACOS_WEBVIEW_RESERVED_COMMAND_SHIFT_KEYS;
 
     #[cfg(all(desktop, unix))]
@@ -412,6 +413,7 @@ mod tests {
 
     #[test]
     fn macos_webview_shortcut_prevention_includes_ai_panel_shortcut() {
+        assert_eq!(MACOS_WEBVIEW_RESERVED_COMMAND_KEYS, ["O", "F"]);
         assert_eq!(MACOS_WEBVIEW_RESERVED_COMMAND_SHIFT_KEYS, ["L"]);
     }
 

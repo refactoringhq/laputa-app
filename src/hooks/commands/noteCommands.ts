@@ -1,4 +1,5 @@
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../appCommandCatalog'
+import { buildEditorFindCommands } from './editorFindCommands'
 import type { CommandAction } from './types'
 
 interface NoteCommandsConfig {
@@ -10,6 +11,8 @@ interface NoteCommandsConfig {
   onCreateNote: () => void
   onCreateType?: () => void
   onSave: () => void
+  onFindInNote?: () => void
+  onReplaceInNote?: () => void
   onDeleteNote: (path: string) => void
   onArchiveNote: (path: string) => void
   onUnarchiveNote: (path: string) => void
@@ -84,6 +87,7 @@ function buildCoreNoteCommands(config: NoteCommandsConfig): CommandAction[] {
       enabled: config.hasActiveNote,
       execute: config.onSave,
     }),
+    ...buildEditorFindCommands(config),
   ]
 }
 
