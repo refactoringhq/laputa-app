@@ -59,7 +59,7 @@ function PropertyRow({ propKey, value, editingKey, displayMode, autoMode, vaultS
         <DisplayModeSelector propKey={propKey} currentMode={displayMode} autoMode={autoMode} onSelect={onDisplayModeChange} />
         <span className="min-w-0 flex-1 truncate">{humanizePropertyKey(propKey)}</span>
         {onDelete && (
-          <button className="border-none bg-transparent p-0 text-sm leading-none text-muted-foreground opacity-0 transition-all hover:text-destructive group-hover/prop:opacity-100" onClick={() => onDelete(propKey)} title={translate(locale, 'inspector.properties.deleteProperty')}>&times;</button>
+          <button className="cursor-pointer border-none bg-transparent p-0 text-sm leading-none text-muted-foreground opacity-0 transition-all hover:text-destructive group-hover/prop:opacity-100" onClick={() => onDelete(propKey)} title={translate(locale, 'inspector.properties.deleteProperty')}>&times;</button>
         )}
       </span>
       <div className="min-w-0">
