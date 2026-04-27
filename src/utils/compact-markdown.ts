@@ -76,7 +76,8 @@ function processMarkdownLine(
 }
 
 function isFenceDelimiter({ line }: MarkdownLineValue): boolean {
-  return line.trimStart().startsWith('```')
+  const trimmed = line.trimStart()
+  return trimmed.startsWith('```') || trimmed.startsWith('~~~')
 }
 
 function normalizeMarkdownLine({ line }: MarkdownLineValue): string {

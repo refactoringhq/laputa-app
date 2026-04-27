@@ -509,6 +509,15 @@ Defined in `src/utils/mathMarkdown.ts`, `src/components/editorSchema.tsx`, and s
 - `serializeMathAwareBlocks()` converts math nodes back to Markdown delimiters before save, raw-mode entry, and editor-position snapshots.
 - Raw CodeMirror mode always shows the plain Markdown source, so imported technical notes stay editable outside Tolaria.
 
+### Mermaid Diagrams
+
+Defined in `src/utils/mermaidMarkdown.ts`, `src/components/MermaidDiagram.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
+
+- Fenced `mermaid` blocks become `mermaidBlock` schema nodes before BlockNote sees the Markdown body.
+- Each `mermaidBlock` stores the original fenced Markdown plus the diagram body, so raw-mode entry and saves can restore the canonical source instead of serializing generated SVG.
+- The rich editor renders diagrams with the `mermaid` package and uses the original source as an inline fallback when rendering fails.
+- `serializeMermaidAwareBlocks()` wraps the math-aware serializer so math, wikilinks, and diagrams share the same Markdown-first save path.
+
 ### Formatting Surface Policy
 
 Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tolariaEditorFormattingConfig.ts`:
@@ -527,24 +536,25 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 ```mermaid
 flowchart LR
     A["📄 Raw markdown\n(from disk)"] --> B["splitFrontmatter()\n→ yaml + body"]
-    B --> C["preProcessWikilinks(body)\n[[target]] → ‹token›"]
-    C --> D["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
-    D --> E["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
-    E --> F["injectWikilinks + injectMathInBlocks\n tokens → schema nodes"]
-    F --> G["editor.replaceBlocks()\n→ rendered editor"]
+    B --> C["preProcessMermaidMarkdown(body)\nmermaid fence → token"]
+    C --> D["preProcessWikilinks(body)\n[[target]] → ‹token›"]
+    D --> E["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
+    E --> F["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
+    F --> G["injectWikilinks + injectMathInBlocks + injectMermaidInBlocks\n tokens → schema nodes"]
+    G --> H["editor.replaceBlocks()\n→ rendered editor"]
 
     style A fill:#f8f9fa,stroke:#6c757d,color:#000
-    style G fill:#d4edda,stroke:#28a745,color:#000
+    style H fill:#d4edda,stroke:#28a745,color:#000
 ```
 
-> Wikilink placeholder tokens use `\u2039` and `\u203A`; math placeholder tokens use ASCII sentinels with URI-encoded LaTeX payloads.
+> Wikilink placeholder tokens use `\u2039` and `\u203A`; math and Mermaid placeholder tokens use ASCII sentinels with URI-encoded payloads.
 
 ### BlockNote-to-Markdown Pipeline (Save)
 
 ```mermaid
 flowchart LR
     A["✏️ BlockNote blocks\n(editor state)"] --> B["blocksToMarkdownLossy()"]
-    B --> C["restoreWikilinks + serializeMathAwareBlocks()\nschema nodes → Markdown source"]
+    B --> C["restoreWikilinks + serializeMermaidAwareBlocks()\nschema nodes → Markdown source"]
     C --> D["prepend frontmatter yaml"]
     D --> E["invoke('save_note_content')\n→ disk write"]
 

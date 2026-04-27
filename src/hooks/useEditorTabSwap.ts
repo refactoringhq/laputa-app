@@ -3,7 +3,8 @@ import type { useCreateBlockNote } from '@blocknote/react'
 import type { VaultEntry } from '../types'
 import { splitFrontmatter, preProcessWikilinks, injectWikilinks, restoreWikilinksInBlocks } from '../utils/wikilinks'
 import { compactMarkdown } from '../utils/compact-markdown'
-import { injectMathInBlocks, preProcessMathMarkdown, serializeMathAwareBlocks } from '../utils/mathMarkdown'
+import { injectMathInBlocks, preProcessMathMarkdown } from '../utils/mathMarkdown'
+import { injectMermaidInBlocks, preProcessMermaidMarkdown, serializeMermaidAwareBlocks } from '../utils/mermaidMarkdown'
 import { failNoteOpenTrace, finishNoteOpenTrace } from '../utils/noteOpenPerformance'
 import { resolveImageUrls, portableImageUrls } from '../utils/vaultImages'
 import {
@@ -134,6 +135,19 @@ async function parseMarkdownBlocks(
   return result as EditorBlocks
 }
 
+function preProcessEditorMarkdown(markdown: string, vaultPath?: string): string {
+  const withMermaid = preProcessMermaidMarkdown({ markdown })
+  const withImages = vaultPath ? resolveImageUrls(withMermaid, vaultPath) : withMermaid
+  const withWikilinks = preProcessWikilinks(withImages)
+  return preProcessMathMarkdown({ markdown: withWikilinks })
+}
+
+function injectEditorMarkdownBlocks(blocks: EditorBlocks): EditorBlocks {
+  const withWikilinks = injectWikilinks(blocks)
+  const withMath = injectMathInBlocks(withWikilinks)
+  return injectMermaidInBlocks(withMath) as EditorBlocks
+}
+
 async function resolveBlocksForTarget(
   options: {
     editor: ReturnType<typeof useCreateBlockNote>
@@ -148,8 +162,7 @@ async function resolveBlocksForTarget(
   if (cached?.sourceContent === content) return cached
 
   const body = extractEditorBody(content)
-  const withImages = vaultPath ? resolveImageUrls(body, vaultPath) : body
-  const preprocessed = preProcessMathMarkdown({ markdown: preProcessWikilinks(withImages) })
+  const preprocessed = preProcessEditorMarkdown(body, vaultPath)
   const fastPathBlocks = buildFastPathBlocks({ preprocessed })
   if (fastPathBlocks) {
     const nextState = { blocks: fastPathBlocks, scrollTop: 0, sourceContent: content }
@@ -158,9 +171,7 @@ async function resolveBlocksForTarget(
   }
 
   const parsed = normalizeParsedImageBlocks(await parseMarkdownBlocks(editor, preprocessed)) as EditorBlocks
-  const withWikilinks = injectWikilinks(parsed)
-  const withMath = injectMathInBlocks(withWikilinks)
-  const nextState = { blocks: withMath, scrollTop: 0, sourceContent: content }
+  const nextState = { blocks: injectEditorMarkdownBlocks(parsed), scrollTop: 0, sourceContent: content }
   cacheEditorState(cache, targetPath, nextState)
   return nextState
 }
@@ -247,13 +258,10 @@ async function resolveEmptyHeadingHtml(
   if (remainder === null) return null
   if (!remainder.trim()) return '<h1></h1><p></p>'
 
-  const withImages = vaultPath ? resolveImageUrls(remainder, vaultPath) : remainder
   const parsed = normalizeParsedImageBlocks(
-    await parseMarkdownBlocks(editor, preProcessMathMarkdown({ markdown: preProcessWikilinks(withImages) })),
+    await parseMarkdownBlocks(editor, preProcessEditorMarkdown(remainder, vaultPath)),
   ) as EditorBlocks
-  const withWikilinks = injectWikilinks(parsed)
-  const withMath = injectMathInBlocks(withWikilinks)
-  return `<h1></h1>${editor.blocksToHTMLLossy(withMath as typeof parsed)}`
+  return `<h1></h1>${editor.blocksToHTMLLossy(injectEditorMarkdownBlocks(parsed) as typeof parsed)}`
 }
 
 function findActiveTab(options: {
@@ -268,7 +276,7 @@ function findActiveTab(options: {
 
 function serializeEditorBody(editor: ReturnType<typeof useCreateBlockNote>): string {
   const restored = restoreWikilinksInBlocks(editor.document)
-  return compactMarkdown(serializeMathAwareBlocks(editor, restored))
+  return compactMarkdown(serializeMermaidAwareBlocks(editor, restored))
 }
 
 function normalizeTabBody(options: { content: string }): string {

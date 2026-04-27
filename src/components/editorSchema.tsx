@@ -5,8 +5,10 @@ import { createReactBlockSpec, createReactInlineContentSpec } from '@blocknote/r
 import { resolveWikilinkColor as resolveColor } from '../utils/wikilinkColors'
 import { resolveEntry } from '../utils/wikilink'
 import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/mathMarkdown'
+import { MERMAID_BLOCK_TYPE } from '../utils/mermaidMarkdown'
 import type { VaultEntry } from '../types'
 import { NoteTitleIcon } from './NoteTitleIcon'
+import { MermaidDiagram } from './MermaidDiagram'
 
 // Module-level cache so the WikiLink renderer (defined outside React) can access entries
 export const _wikilinkEntriesRef: { current: VaultEntry[] } = { current: [] }
@@ -104,11 +106,31 @@ const MathBlock = createReactBlockSpec(
   },
 )
 
+const MermaidBlock = createReactBlockSpec(
+  {
+    type: MERMAID_BLOCK_TYPE,
+    propSchema: {
+      source: { default: '' },
+      diagram: { default: '' },
+    },
+    content: 'none',
+  },
+  {
+    render: (props) => (
+      <MermaidDiagram
+        diagram={props.block.props.diagram}
+        source={props.block.props.source}
+      />
+    ),
+  },
+)
+
 const codeBlock = createCodeBlockSpec({
   ...codeBlockOptions,
   defaultLanguage: 'text',
 })
 const mathBlock = MathBlock()
+const mermaidBlock = MermaidBlock()
 
 export const schema = BlockNoteSchema.create({
   inlineContentSpecs: {
@@ -120,5 +142,6 @@ export const schema = BlockNoteSchema.create({
   blockSpecs: {
     codeBlock,
     mathBlock,
+    mermaidBlock,
   },
 })

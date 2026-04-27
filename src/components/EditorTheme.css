@@ -268,6 +268,59 @@
   white-space: pre-wrap;
 }
 
+.editor__blocknote-container .mermaid-diagram {
+  width: 100%;
+  margin: 10px 0;
+  color: var(--colors-text);
+}
+
+.editor__blocknote-container .mermaid-diagram__viewport {
+  max-width: 100%;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--surface-editor);
+}
+
+.editor__blocknote-container .mermaid-diagram__viewport:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.editor__blocknote-container .mermaid-diagram__viewport svg {
+  display: block;
+  max-width: none;
+  min-width: min-content;
+  height: auto;
+  margin: 0 auto;
+}
+
+.editor__blocknote-container .mermaid-diagram--error {
+  padding: 12px;
+  border: 1px solid var(--destructive);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+.editor__blocknote-container .mermaid-diagram--error figcaption {
+  margin-bottom: 8px;
+  color: var(--destructive);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.editor__blocknote-container .mermaid-diagram--error pre {
+  max-width: 100%;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--inline-styles-code-background-color);
+  color: var(--inline-styles-code-color);
+  font-size: 0.85rem;
+}
+
 .editor__blocknote-container[data-follow-links] .bn-editor a,
 .editor__blocknote-container[data-follow-links] .wikilink {
   cursor: pointer;

@@ -2,7 +2,7 @@ import type { useCreateBlockNote } from '@blocknote/react'
 import type { VaultEntry } from '../types'
 import { splitFrontmatter, restoreWikilinksInBlocks } from '../utils/wikilinks'
 import { compactMarkdown } from '../utils/compact-markdown'
-import { serializeMathAwareBlocks } from '../utils/mathMarkdown'
+import { serializeMermaidAwareBlocks } from '../utils/mermaidMarkdown'
 import { portableImageUrls } from '../utils/vaultImages'
 
 interface Tab {
@@ -30,7 +30,7 @@ export function serializeEditorDocumentToMarkdown(
 ): string {
   const blocks = editor.document
   const restored = restoreWikilinksInBlocks(blocks)
-  const rawBodyMarkdown = compactMarkdown(serializeMathAwareBlocks(editor, restored))
+  const rawBodyMarkdown = compactMarkdown(serializeMermaidAwareBlocks(editor, restored))
   const bodyMarkdown = vaultPath ? portableImageUrls(rawBodyMarkdown, vaultPath) : rawBodyMarkdown
   const [frontmatter] = splitFrontmatter(tabContent)
   return `${frontmatter}${bodyMarkdown}`
