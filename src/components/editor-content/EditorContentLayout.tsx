@@ -90,20 +90,18 @@ function RawModeEditorSection({
 
   return (
     <EditorFindScope className="editor-scroll-area">
-      <div className="editor-content-wrapper editor-content-wrapper--raw">
-        <RawEditorView
-          key={activeTab.entry.path}
-          content={rawModeContent ?? activeTab.content}
-          path={activeTab.entry.path}
-          entries={entries}
-          findRequest={findRequest}
-          onContentChange={onRawContentChange ?? (() => {})}
-          onSave={onSave ?? (() => {})}
-          latestContentRef={rawLatestContentRef}
-          vaultPath={vaultPath}
-          locale={locale}
-        />
-      </div>
+      <RawEditorView
+        key={activeTab.entry.path}
+        content={rawModeContent ?? activeTab.content}
+        path={activeTab.entry.path}
+        entries={entries}
+        findRequest={findRequest}
+        onContentChange={onRawContentChange ?? (() => {})}
+        onSave={onSave ?? (() => {})}
+        latestContentRef={rawLatestContentRef}
+        vaultPath={vaultPath}
+        locale={locale}
+      />
     </EditorFindScope>
   )
 }
