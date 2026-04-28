@@ -14455,6 +14455,101 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "view_color_sidebar_row",
+      "x": 960,
+      "y": 13980,
+      "name": "Saved View color metadata - sidebar row",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 420,
+      "height": 128,
+      "fill": "$--sidebar",
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "$--sidebar-border"
+      },
+      "layout": "vertical",
+      "gap": 10,
+      "padding": 16,
+      "children": [
+        {
+          "type": "text",
+          "id": "view_color_sidebar_header",
+          "fill": "$--muted-foreground",
+          "content": "VIEWS",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "view_color_sidebar_active_row",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "$--accent-blue-light",
+          "cornerRadius": 4,
+          "padding": [
+            6,
+            8,
+            6,
+            16
+          ],
+          "alignItems": "center",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "view_color_sidebar_icon",
+              "fill": "$--accent-blue",
+              "content": "rocket",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "view_color_sidebar_label",
+              "fill": "$--accent-blue",
+              "width": "fill_container",
+              "content": "Active Projects",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "500",
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "view_color_sidebar_count",
+              "fill": "$--text-inverse",
+              "content": "4",
+              "fontFamily": "Inter",
+              "fontSize": 10,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "view_color_sidebar_note",
+          "fill": "$--muted-foreground",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "Saved Views with color metadata use the accent for the icon, active label, active row tint, and active count pill; invalid or missing colors keep the default active row treatment.",
+          "lineHeight": 1.45,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal",
+          "letterSpacing": 0
+        }
+      ]
     }
   ],
   "themes": {

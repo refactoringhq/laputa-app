@@ -1492,6 +1492,69 @@ describe('Sidebar', () => {
       expect(screen.queryByText('rocket')).not.toBeInTheDocument()
     })
 
+    it('uses saved view color metadata for sidebar accents', () => {
+      const coloredViews = [{
+        filename: 'active-projects.yml',
+        definition: {
+          name: 'Active Projects',
+          icon: 'rocket',
+          color: 'blue',
+          sort: null,
+          filters: { all: [{ field: 'type', op: 'equals' as const, value: 'Project' }] },
+        },
+      }]
+
+      render(
+        <Sidebar
+          entries={mockEntries}
+          selection={{ kind: 'view', filename: 'active-projects.yml' }}
+          onSelect={() => {}}
+          views={coloredViews}
+        />
+      )
+
+      const navItem = screen.getByText('Active Projects').closest('[class*="cursor-pointer"]') as HTMLElement
+      const icon = navItem.querySelector('svg')
+      const countChip = within(navItem).getByTestId('view-count-chip')
+
+      expect(navItem).toHaveStyle({
+        background: 'var(--accent-blue-light)',
+        color: 'var(--accent-blue)',
+      })
+      expect(icon).toHaveStyle({ color: 'var(--accent-blue)' })
+      expect(countChip).toHaveStyle({
+        background: 'var(--accent-blue)',
+        color: 'var(--text-inverse)',
+      })
+    })
+
+    it('keeps the default active styling when a saved view color is invalid', () => {
+      const invalidColorViews = [{
+        filename: 'active-projects.yml',
+        definition: {
+          name: 'Active Projects',
+          icon: 'rocket',
+          color: 'not-a-token',
+          sort: null,
+          filters: { all: [{ field: 'type', op: 'equals' as const, value: 'Project' }] },
+        },
+      }]
+
+      render(
+        <Sidebar
+          entries={mockEntries}
+          selection={{ kind: 'view', filename: 'active-projects.yml' }}
+          onSelect={() => {}}
+          views={invalidColorViews}
+        />
+      )
+
+      const navItem = screen.getByText('Active Projects').closest('[class*="cursor-pointer"]') as HTMLElement
+
+      expect(navItem.className).toContain('text-primary')
+      expect(navItem.getAttribute('style')).not.toContain('--accent-')
+    })
+
     it('does not show count chip for views with 0 matching notes', () => {
       const emptyView = [{
         filename: 'empty.yml',

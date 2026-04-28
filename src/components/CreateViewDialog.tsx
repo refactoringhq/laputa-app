@@ -8,6 +8,7 @@ import type { FilterGroup, ViewDefinition } from '../types'
 
 type SaveViewResult = boolean | void
 type SaveViewHandler = (definition: ViewDefinition) => SaveViewResult | Promise<SaveViewResult>
+type InitialViewFormValues = Pick<ViewDefinition, 'name' | 'icon' | 'color' | 'filters'>
 
 interface CreateViewDialogProps {
   open: boolean
@@ -22,6 +23,7 @@ interface CreateViewDialogFormProps {
   availableFields: string[]
   initialName: string
   initialIcon: string
+  initialColor: string | null
   initialFilters: FilterGroup
   isEditing: boolean
   onClose: () => void
@@ -32,6 +34,7 @@ function CreateViewDialogForm({
   availableFields,
   initialName,
   initialIcon,
+  initialColor,
   initialFilters,
   isEditing,
   onClose,
@@ -58,7 +61,7 @@ function CreateViewDialogForm({
     const definition: ViewDefinition = {
       name: trimmed,
       icon: icon || null,
-      color: null,
+      color: initialColor,
       sort: null,
       filters,
     }
@@ -142,9 +145,27 @@ function CreateViewDialogForm({
   )
 }
 
+function getInitialViewFormValues(
+  editingView: ViewDefinition | null | undefined,
+  availableFields: string[],
+): InitialViewFormValues {
+  return {
+    name: editingView?.name ?? '',
+    icon: editingView?.icon ?? '',
+    color: editingView?.color ?? null,
+    filters: editingView?.filters ?? { all: [{ field: availableFields[0] ?? 'type', op: 'equals', value: '' }] },
+  }
+}
+
+function getDialogDescription(isEditing: boolean) {
+  return isEditing
+    ? 'Update the name, icon, and filters for this saved view.'
+    : 'Create a saved view by choosing a name, icon, and filter rules.'
+}
+
 export function CreateViewDialog({ open, onClose, onCreate, availableFields, editingView }: CreateViewDialogProps) {
   const isEditing = !!editingView
-  const initialFilters = editingView?.filters ?? { all: [{ field: availableFields[0] ?? 'type', op: 'equals', value: '' }] }
+  const initialValues = getInitialViewFormValues(editingView, availableFields)
   const formKey = editingView ? `edit:${editingView.name}` : `create:${availableFields[0] ?? 'type'}`
 
   return (
@@ -153,16 +174,17 @@ export function CreateViewDialog({ open, onClose, onCreate, availableFields, edi
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit View' : 'Create View'}</DialogTitle>
           <DialogDescription className="sr-only">
-            {isEditing ? 'Update the name, icon, and filters for this saved view.' : 'Create a saved view by choosing a name, icon, and filter rules.'}
+            {getDialogDescription(isEditing)}
           </DialogDescription>
         </DialogHeader>
         {open && (
           <CreateViewDialogForm
             key={formKey}
             availableFields={availableFields}
-            initialName={editingView?.name ?? ''}
-            initialIcon={editingView?.icon ?? ''}
-            initialFilters={initialFilters}
+            initialName={initialValues.name}
+            initialIcon={initialValues.icon ?? ''}
+            initialColor={initialValues.color}
+            initialFilters={initialValues.filters}
             isEditing={isEditing}
             onClose={onClose}
             onCreate={onCreate}

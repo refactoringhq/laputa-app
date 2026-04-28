@@ -11,6 +11,17 @@ describe('CreateViewDialog', () => {
     availableFields: ['type', 'status', 'title'],
   }
 
+  function makeEditingView(overrides: Partial<ViewDefinition> = {}): ViewDefinition {
+    return {
+      name: 'Active Projects',
+      icon: '🚀',
+      color: null,
+      sort: null,
+      filters: { all: [{ field: 'type', op: 'equals', value: 'Project' }] },
+      ...overrides,
+    }
+  }
+
   it('shows "Create View" title in create mode', () => {
     render(<CreateViewDialog {...defaultProps} />)
     expect(screen.getByText('Create View')).toBeInTheDocument()
@@ -18,46 +29,28 @@ describe('CreateViewDialog', () => {
   })
 
   it('shows "Edit View" title when editingView is provided', () => {
-    const editingView: ViewDefinition = {
-      name: 'Active Projects',
-      icon: '🚀',
-      color: null,
-      sort: null,
-      filters: { all: [{ field: 'type', op: 'equals', value: 'Project' }] },
-    }
-    render(<CreateViewDialog {...defaultProps} editingView={editingView} />)
+    render(<CreateViewDialog {...defaultProps} editingView={makeEditingView()} />)
     expect(screen.getByText('Edit View')).toBeInTheDocument()
     expect(screen.getByText('Save')).toBeInTheDocument()
   })
 
   it('pre-populates name field in edit mode', () => {
-    const editingView: ViewDefinition = {
-      name: 'Active Projects',
-      icon: '🚀',
-      color: null,
-      sort: null,
-      filters: { all: [{ field: 'type', op: 'equals', value: 'Project' }] },
-    }
-    render(<CreateViewDialog {...defaultProps} editingView={editingView} />)
+    render(<CreateViewDialog {...defaultProps} editingView={makeEditingView()} />)
     const input = screen.getByPlaceholderText(/Active Projects|Reading List/i)
     expect(input).toHaveValue('Active Projects')
   })
 
-  it('preserves emoji icon when editing a view', async () => {
+  it('preserves existing icon and markdown-defined color when editing a view', async () => {
     const onCreate = vi.fn()
-    const editingView: ViewDefinition = {
-      name: 'Monday',
-      icon: '🗂️',
-      color: null,
-      sort: null,
-      filters: { all: [{ field: 'type', op: 'equals', value: 'Project' }] },
-    }
+    const editingView = makeEditingView({ name: 'Monday', icon: '🗂️', color: 'blue' })
     render(<CreateViewDialog {...defaultProps} onCreate={onCreate} editingView={editingView} />)
+
     // Submit the form without changing anything
     fireEvent.submit(screen.getByText('Save').closest('form')!)
+
     await waitFor(() => {
       expect(onCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ icon: '🗂️' })
+        expect.objectContaining({ icon: '🗂️', color: 'blue' })
       )
     })
   })
