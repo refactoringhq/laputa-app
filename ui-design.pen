@@ -33,6 +33,101 @@
     },
     {
       "type": "frame",
+      "id": "manual_view_ordering_sidebar",
+      "x": 0,
+      "y": 12740,
+      "name": "Manual saved View ordering - sidebar row",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 420,
+      "height": 206,
+      "fill": "$--sidebar",
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "$--sidebar-border"
+      },
+      "layout": "vertical",
+      "gap": 10,
+      "padding": 16,
+      "children": [
+        {
+          "type": "text",
+          "id": "manual_view_ordering_hdr",
+          "fill": "$--muted-foreground",
+          "content": "VIEWS",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "manual_view_ordering_row",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "$--accent",
+          "cornerRadius": 4,
+          "padding": [
+            6,
+            8,
+            6,
+            8
+          ],
+          "alignItems": "center",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "manual_view_ordering_grip",
+              "fill": "$--muted-foreground",
+              "content": "grip",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "500",
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "manual_view_ordering_name",
+              "fill": "$--foreground",
+              "width": "fill_container",
+              "content": "Active Projects",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "500",
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "manual_view_ordering_actions",
+              "fill": "$--muted-foreground",
+              "content": "up down edit delete",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "500",
+              "letterSpacing": 0
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "manual_view_ordering_note",
+          "fill": "$--muted-foreground",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "Saved Views follow the ordered Types mental model: drag handle for pointer users, explicit up/down icon buttons for keyboard and command-palette flows.",
+          "lineHeight": 1.45,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal",
+          "letterSpacing": 0
+        }
+      ]
+    },
+    {
+      "type": "frame",
       "id": "mOf4J",
       "x": 0,
       "y": 100,

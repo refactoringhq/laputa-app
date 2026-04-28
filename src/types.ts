@@ -215,6 +215,8 @@ export interface ViewDefinition {
   name: string
   icon: string | null
   color: string | null
+  /** Display order for saved Views in sidebar/list surfaces (lower = higher). */
+  order?: number | null
   sort: string | null
   listPropertiesDisplay?: string[]
   filters: FilterGroup

@@ -24,6 +24,7 @@ import {
 import { useSidebarTypeInteractions } from './sidebar/useSidebarTypeInteractions'
 import type { AppLocale } from '../lib/i18n'
 import type { FolderFileActions } from '../hooks/useFileActions'
+import type { ViewMoveDirection } from '../utils/viewOrdering'
 
 interface SidebarProps {
   entries: VaultEntry[]
@@ -43,6 +44,8 @@ interface SidebarProps {
   onCreateView?: () => void
   onEditView?: (filename: string) => void
   onDeleteView?: (filename: string) => void
+  onReorderViews?: (orderedFilenames: string[]) => void
+  onMoveView?: (filename: string, direction: ViewMoveDirection) => void
   folders?: FolderNode[]
   onCreateFolder?: (name: string) => Promise<boolean> | boolean
   onRenameFolder?: (folderPath: string, nextName: string) => Promise<boolean> | boolean
@@ -68,6 +71,8 @@ interface SidebarNavigationProps extends Pick<
   | 'onCreateView'
   | 'onEditView'
   | 'onDeleteView'
+  | 'onReorderViews'
+  | 'onMoveView'
   | 'folders'
   | 'onCreateFolder'
   | 'onRenameFolder'
@@ -106,6 +111,8 @@ function SidebarNavigation({
   onCreateView,
   onEditView,
   onDeleteView,
+  onReorderViews,
+  onMoveView,
   folders = [],
   onCreateFolder,
   onRenameFolder,
@@ -170,6 +177,9 @@ function SidebarNavigation({
           onCreateView={onCreateView}
           onEditView={onEditView}
           onDeleteView={onDeleteView}
+          onReorderViews={onReorderViews}
+          onMoveView={onMoveView}
+          sensors={sensors}
           entries={entries}
           locale={locale}
         />
@@ -232,6 +242,8 @@ export const Sidebar = memo(function Sidebar({
   onCreateView,
   onEditView,
   onDeleteView,
+  onReorderViews,
+  onMoveView,
   folders = [],
   onCreateFolder,
   onRenameFolder,
@@ -268,6 +280,7 @@ export const Sidebar = memo(function Sidebar({
     const reordered = computeReorder(sectionIds, active.id as string, over.id as string)
     if (reordered) onReorderSections?.(reordered.map((typeName, order) => ({ typeName, order })))
   }, [sectionIds, onReorderSections])
+  const viewActions = { onCreateView, onEditView, onDeleteView, onReorderViews, onMoveView }
 
   const sectionProps: SidebarSectionProps = {
     entries,
@@ -291,9 +304,7 @@ export const Sidebar = memo(function Sidebar({
         onSelectFavorite={onSelectFavorite}
         onReorderFavorites={onReorderFavorites}
         views={views}
-        onCreateView={onCreateView}
-        onEditView={onEditView}
-        onDeleteView={onDeleteView}
+        {...viewActions}
         folders={folders}
         onCreateFolder={onCreateFolder}
         onRenameFolder={onRenameFolder}

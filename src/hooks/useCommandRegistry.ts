@@ -83,6 +83,11 @@ interface CommandRegistryConfig {
   onToggleInspector: () => void
   onToggleDiff?: () => void
   onToggleRawEditor?: () => void
+  selectedViewName?: string
+  onMoveSelectedViewUp?: () => void
+  onMoveSelectedViewDown?: () => void
+  canMoveSelectedViewUp?: boolean
+  canMoveSelectedViewDown?: boolean
   onFindInNote?: () => void
   onReplaceInNote?: () => void
   noteLayout?: NoteLayout
@@ -119,6 +124,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     onQuickOpen, onCreateNote, onCreateNoteOfType, onSave, onOpenSettings, onOpenFeedback,
     onDeleteNote, onArchiveNote, onUnarchiveNote,
     onCommitPush, onPull, onResolveConflicts, onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor, onFindInNote, onReplaceInNote, noteLayout, onToggleNoteLayout, onToggleAIChat, onOpenVault, onCreateEmptyVault,
+    selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown, canMoveSelectedViewUp, canMoveSelectedViewDown,
     activeNoteModified,
     onZoomIn, onZoomOut, onZoomReset, zoomLevel,
     onSelect, onRenameFolder, onDeleteFolder, onRevealSelectedFolder, onCopySelectedFolderPath,
@@ -214,11 +220,13 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     hasActiveNote, activeNoteModified, onSetViewMode, onToggleInspector,
     onToggleDiff, onToggleRawEditor, noteLayout, onToggleNoteLayout, onToggleAIChat, zoomLevel, onZoomIn, onZoomOut, onZoomReset,
     onCustomizeNoteListColumns, canCustomizeNoteListColumns, noteListColumnsLabel,
+    selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown, canMoveSelectedViewUp, canMoveSelectedViewDown,
   }), [
     hasActiveNote, activeNoteModified, onSetViewMode, onToggleInspector,
     onToggleDiff, onToggleRawEditor, noteLayout, onToggleNoteLayout, onToggleAIChat,
     zoomLevel, onZoomIn, onZoomOut, onZoomReset,
     onCustomizeNoteListColumns, canCustomizeNoteListColumns, noteListColumnsLabel,
+    selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown, canMoveSelectedViewUp, canMoveSelectedViewDown,
   ])
 
   const settingsCommands = useMemo(() => buildSettingsCommands({

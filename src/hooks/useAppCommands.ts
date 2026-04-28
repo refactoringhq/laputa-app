@@ -41,6 +41,11 @@ interface AppCommandsConfig {
   onToggleInspector: () => void
   onToggleDiff?: () => void
   onToggleRawEditor?: () => void
+  selectedViewName?: string
+  onMoveSelectedViewUp?: () => void
+  onMoveSelectedViewDown?: () => void
+  canMoveSelectedViewUp?: boolean
+  canMoveSelectedViewDown?: boolean
   noteLayout?: NoteLayout
   onToggleNoteLayout?: () => void
   activeNoteModified: boolean
@@ -155,6 +160,11 @@ type CommandRegistryCoreActions = Pick<
   | 'onToggleInspector'
   | 'onToggleDiff'
   | 'onToggleRawEditor'
+  | 'selectedViewName'
+  | 'onMoveSelectedViewUp'
+  | 'onMoveSelectedViewDown'
+  | 'canMoveSelectedViewUp'
+  | 'canMoveSelectedViewDown'
   | 'noteLayout'
   | 'onToggleNoteLayout'
   | 'onToggleAIChat'
@@ -417,6 +427,11 @@ function createCommandRegistryCoreConfig(
     onToggleInspector: config.onToggleInspector,
     onToggleDiff: config.onToggleDiff,
     onToggleRawEditor: config.onToggleRawEditor,
+    selectedViewName: config.selectedViewName,
+    onMoveSelectedViewUp: config.onMoveSelectedViewUp,
+    onMoveSelectedViewDown: config.onMoveSelectedViewDown,
+    canMoveSelectedViewUp: config.canMoveSelectedViewUp,
+    canMoveSelectedViewDown: config.canMoveSelectedViewDown,
     onFindInNote: config.onFindInNote,
     onReplaceInNote: config.onReplaceInNote,
     noteLayout: config.noteLayout,

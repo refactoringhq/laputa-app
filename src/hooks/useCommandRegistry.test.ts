@@ -359,6 +359,53 @@ describe('useCommandRegistry', () => {
     expect(onToggleNoteLayout).toHaveBeenCalledOnce()
   })
 
+  it('exposes command palette actions for moving the selected saved view', () => {
+    const onMoveSelectedViewUp = vi.fn()
+    const onMoveSelectedViewDown = vi.fn()
+    const config = makeConfig({
+      selectedViewName: 'Active Projects',
+      onMoveSelectedViewUp,
+      onMoveSelectedViewDown,
+      canMoveSelectedViewUp: true,
+      canMoveSelectedViewDown: true,
+    })
+    const { result } = renderHook(() => useCommandRegistry(config))
+
+    const moveUp = findCommand(result.current, 'move-view-up')
+    const moveDown = findCommand(result.current, 'move-view-down')
+
+    expect(moveUp).toMatchObject({
+      label: 'Move Active Projects Up',
+      group: 'View',
+      enabled: true,
+    })
+    expect(moveDown).toMatchObject({
+      label: 'Move Active Projects Down',
+      group: 'View',
+      enabled: true,
+    })
+
+    moveUp!.execute()
+    moveDown!.execute()
+
+    expect(onMoveSelectedViewUp).toHaveBeenCalledOnce()
+    expect(onMoveSelectedViewDown).toHaveBeenCalledOnce()
+  })
+
+  it('disables saved view move commands at list boundaries', () => {
+    const config = makeConfig({
+      selectedViewName: 'Top View',
+      onMoveSelectedViewUp: vi.fn(),
+      onMoveSelectedViewDown: vi.fn(),
+      canMoveSelectedViewUp: false,
+      canMoveSelectedViewDown: true,
+    })
+    const { result } = renderHook(() => useCommandRegistry(config))
+
+    expect(findCommand(result.current, 'move-view-up')?.enabled).toBe(false)
+    expect(findCommand(result.current, 'move-view-down')?.enabled).toBe(true)
+  })
+
   it('updates note layout command copy when left alignment is active', () => {
     const config = makeConfig({ noteLayout: 'left' })
     const { result } = renderHook(() => useCommandRegistry(config))

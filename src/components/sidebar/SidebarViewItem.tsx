@@ -1,11 +1,14 @@
-import { useMemo } from 'react'
+import { useMemo, type HTMLAttributes } from 'react'
 import type { VaultEntry, ViewFile } from '../../types'
 import { evaluateView } from '../../utils/viewFilters'
 import { Funnel, PencilSimple, Trash } from '@phosphor-icons/react'
+import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { NoteTitleIcon } from '../NoteTitleIcon'
 import { SidebarCountPill } from '../SidebarParts'
 import { SIDEBAR_ITEM_PADDING } from './sidebarStyles'
 import { translate, type AppLocale } from '../../lib/i18n'
+import type { ViewMoveDirection } from '../../utils/viewOrdering'
 
 interface SidebarViewItemProps {
   view: ViewFile
@@ -13,6 +16,10 @@ interface SidebarViewItemProps {
   onSelect: () => void
   onEditView?: (filename: string) => void
   onDeleteView?: (filename: string) => void
+  onMoveView?: (filename: string, direction: ViewMoveDirection) => void
+  canMoveUp?: boolean
+  canMoveDown?: boolean
+  dragHandleProps?: HTMLAttributes<HTMLButtonElement>
   entries: VaultEntry[]
   locale?: AppLocale
 }
@@ -23,6 +30,10 @@ export function SidebarViewItem({
   onSelect,
   onEditView,
   onDeleteView,
+  onMoveView,
+  canMoveUp = false,
+  canMoveDown = false,
+  dragHandleProps,
   entries,
   locale = 'en',
 }: SidebarViewItemProps) {
@@ -39,6 +50,20 @@ export function SidebarViewItem({
         style={{ padding: showCount ? SIDEBAR_ITEM_PADDING.withCount : SIDEBAR_ITEM_PADDING.regular, borderRadius: 4 }}
         onClick={onSelect}
       >
+        {dragHandleProps && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="-ml-1 h-5 w-4 min-w-0 cursor-grab rounded p-0 text-muted-foreground hover:bg-transparent hover:text-foreground active:cursor-grabbing"
+            title={translate(locale, 'sidebar.action.reorderView')}
+            aria-label={translate(locale, 'sidebar.action.reorderView')}
+            onClick={(event) => event.stopPropagation()}
+            {...dragHandleProps}
+          >
+            <GripVertical size={12} />
+          </Button>
+        )}
         {icon}
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{view.definition.name}</span>
         {showCount && (
@@ -51,25 +76,59 @@ export function SidebarViewItem({
         )}
       </div>
       <div className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+        {onMoveView && (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="h-5 w-5 min-w-0 rounded p-0 text-muted-foreground hover:bg-transparent hover:text-foreground disabled:opacity-30"
+              disabled={!canMoveUp}
+              onClick={(event) => { event.stopPropagation(); onMoveView(view.filename, 'up') }}
+              title={translate(locale, 'sidebar.action.moveViewUp')}
+              aria-label={translate(locale, 'sidebar.action.moveViewUp')}
+            >
+              <ArrowUp size={12} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="h-5 w-5 min-w-0 rounded p-0 text-muted-foreground hover:bg-transparent hover:text-foreground disabled:opacity-30"
+              disabled={!canMoveDown}
+              onClick={(event) => { event.stopPropagation(); onMoveView(view.filename, 'down') }}
+              title={translate(locale, 'sidebar.action.moveViewDown')}
+              aria-label={translate(locale, 'sidebar.action.moveViewDown')}
+            >
+              <ArrowDown size={12} />
+            </Button>
+          </>
+        )}
         {onEditView && (
-          <button
-            className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="h-5 w-5 min-w-0 rounded p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
             onClick={(event) => { event.stopPropagation(); onEditView(view.filename) }}
             title={translate(locale, 'sidebar.action.editView')}
             aria-label={translate(locale, 'sidebar.action.editView')}
           >
             <PencilSimple size={12} />
-          </button>
+          </Button>
         )}
         {onDeleteView && (
-          <button
-            className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="h-5 w-5 min-w-0 rounded p-0 text-muted-foreground hover:bg-transparent hover:text-destructive"
             onClick={(event) => { event.stopPropagation(); onDeleteView(view.filename) }}
             title={translate(locale, 'sidebar.action.deleteView')}
             aria-label={translate(locale, 'sidebar.action.deleteView')}
           >
             <Trash size={12} />
-          </button>
+          </Button>
         )}
       </div>
     </div>
