@@ -115,7 +115,7 @@ tolaria/
 │   │   ├── useNoteRename.ts     # Note renaming + wikilink updates
 │   │   ├── useAiAgent.ts         # Legacy Claude-specific stream helpers reused by the shared agent hook
 │   │   ├── useCliAiAgent.ts      # Selected AI agent state + normalized tool tracking
-│   │   ├── useAiAgentsStatus.ts  # Claude/Codex availability polling
+│   │   ├── useAiAgentsStatus.ts  # Claude/Codex/OpenCode/Pi availability polling
 │   │   ├── useAiAgentPreferences.ts # Default-agent persistence + cycling
 │   │   ├── useAiActivity.ts      # MCP UI bridge listener
 │   │   ├── useAutoSync.ts        # Auto git pull/push
@@ -191,6 +191,7 @@ tolaria/
 │   │   ├── search.rs             # Keyword search (walkdir-based)
 │   │   ├── ai_agents.rs          # Shared CLI-agent detection + stream adapters
 │   │   ├── claude_cli.rs         # Claude CLI subprocess management
+│   │   ├── pi_cli.rs             # Pi CLI subprocess management
 │   │   ├── mcp.rs                # MCP server lifecycle + explicit config registration/removal
 │   │   ├── app_updater.rs        # Alpha/stable updater endpoint selection
 │   │   ├── settings.rs           # App settings persistence
@@ -261,8 +262,9 @@ tolaria/
 | `src-tauri/src/frontmatter/ops.rs` | YAML manipulation — how properties are updated/deleted in files. |
 | `src-tauri/src/git/` | All git operations (clone, commit, pull, push, conflicts, pulse, add-remote). |
 | `src-tauri/src/search.rs` | Keyword search — scans vault files with walkdir. |
-| `src-tauri/src/ai_agents.rs` | Shared CLI-agent availability checks, safe-default Codex adapter, and stream normalization. |
+| `src-tauri/src/ai_agents.rs` | Shared CLI-agent availability checks, adapter dispatch, and stream normalization. |
 | `src-tauri/src/claude_cli.rs` | Claude CLI subprocess spawning + NDJSON stream parsing. |
+| `src-tauri/src/pi_cli.rs` | Pi subprocess spawning through JSON mode and transient MCP adapter config. |
 | `src-tauri/src/app_updater.rs` | Desktop updater bridge — selects alpha/stable manifests and streams install progress. |
 
 ### Editor
@@ -418,7 +420,7 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 2. **Context building**: Edit `src/utils/ai-context.ts` for what data is sent to the agent
 3. **Tool action display**: Edit `src/components/AiActionCard.tsx`
 4. **Claude CLI arguments**: Edit `src-tauri/src/claude_cli.rs` (`run_agent_stream()`; keep app-managed launches on strict Tolaria MCP config, `acceptEdits`, and the scoped file/search tool list)
-5. **Shared agent adapters / Codex args**: Edit `src-tauri/src/ai_agents.rs` (keep Codex sandboxed with active-vault `workspace-write`; do not use the dangerous bypass unless an ADR explicitly designs a new mode)
+5. **Shared agent adapters / Codex/Pi args**: Edit `src-tauri/src/ai_agents.rs` plus the per-agent adapter modules (keep Codex sandboxed with active-vault `workspace-write`, keep Pi on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode)
 
 ### Work with external MCP setup
 

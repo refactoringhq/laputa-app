@@ -16,6 +16,7 @@ const aiAgentsStatus = {
   claude_code: { status: 'installed' as const, version: '1.0.20' },
   codex: { status: 'missing' as const, version: null },
   opencode: { status: 'missing' as const, version: null },
+  pi: { status: 'missing' as const, version: null },
 }
 
 describe('useAiAgentPreferences', () => {
@@ -65,6 +66,7 @@ describe('useAiAgentPreferences', () => {
         claude_code: { status: 'missing', version: null },
         codex: { status: 'missing', version: null },
         opencode: { status: 'missing', version: null },
+        pi: { status: 'missing', version: null },
       },
     }))
 

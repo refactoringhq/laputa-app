@@ -725,7 +725,7 @@ interface Settings {
   release_channel: string | null // null = stable default, "alpha" = every-push prerelease feed
   theme_mode: 'light' | 'dark' | null
   ui_language: AppLocale | null
-  default_ai_agent: 'claude_code' | 'codex' | 'opencode' | null
+  default_ai_agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | null
 }
 ```
 

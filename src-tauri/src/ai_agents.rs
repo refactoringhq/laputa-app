@@ -9,6 +9,7 @@ pub enum AiAgentId {
     ClaudeCode,
     Codex,
     Opencode,
+    Pi,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -22,6 +23,7 @@ pub struct AiAgentsStatus {
     pub claude_code: AiAgentAvailability,
     pub codex: AiAgentAvailability,
     pub opencode: AiAgentAvailability,
+    pub pi: AiAgentAvailability,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -66,6 +68,7 @@ pub fn get_ai_agents_status() -> AiAgentsStatus {
         claude_code: availability_from_claude(),
         codex: availability_from_codex(),
         opencode: availability_from_opencode(),
+        pi: availability_from_pi(),
     }
 }
 
@@ -94,6 +97,14 @@ where
                 vault_path: request.vault_path,
             };
             crate::opencode_cli::run_agent_stream(mapped, emit)
+        }
+        AiAgentId::Pi => {
+            let mapped = crate::pi_cli::AgentStreamRequest {
+                message: request.message,
+                system_prompt: request.system_prompt,
+                vault_path: request.vault_path,
+            };
+            crate::pi_cli::run_agent_stream(mapped, emit)
         }
     }
 }
@@ -125,6 +136,10 @@ fn availability_from_codex() -> AiAgentAvailability {
 
 fn availability_from_opencode() -> AiAgentAvailability {
     crate::opencode_cli::check_cli()
+}
+
+fn availability_from_pi() -> AiAgentAvailability {
+    crate::pi_cli::check_cli()
 }
 
 fn version_for_binary(binary: &PathBuf) -> Option<String> {
@@ -484,11 +499,12 @@ mod tests {
     use std::ffi::OsStr;
 
     #[test]
-    fn normalize_status_contains_both_agents() {
+    fn normalize_status_contains_all_agents() {
         let status = get_ai_agents_status();
         assert!(matches!(status.claude_code.installed, true | false));
         assert!(matches!(status.codex.installed, true | false));
         assert!(matches!(status.opencode.installed, true | false));
+        assert!(matches!(status.pi.installed, true | false));
     }
 
     #[test]

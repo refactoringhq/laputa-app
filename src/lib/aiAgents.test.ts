@@ -11,6 +11,7 @@ describe('aiAgents helpers', () => {
     expect(normalizeStoredAiAgent('claude_code')).toBe('claude_code')
     expect(normalizeStoredAiAgent('codex')).toBe('codex')
     expect(normalizeStoredAiAgent('opencode')).toBe('opencode')
+    expect(normalizeStoredAiAgent('pi')).toBe('pi')
     expect(normalizeStoredAiAgent('cursor')).toBeNull()
   })
 
@@ -24,16 +25,19 @@ describe('aiAgents helpers', () => {
       claude_code: { installed: true, version: '1.0.20' },
       codex: { installed: false, version: null },
       opencode: { installed: true, version: '0.3.1' },
+      pi: { installed: true, version: '0.70.2' },
     })
 
     expect(statuses.claude_code).toEqual({ status: 'installed', version: '1.0.20' })
     expect(statuses.codex).toEqual({ status: 'missing', version: null })
     expect(statuses.opencode).toEqual({ status: 'installed', version: '0.3.1' })
+    expect(statuses.pi).toEqual({ status: 'installed', version: '0.70.2' })
   })
 
-  it('cycles between the supported agents', () => {
+  it('cycles through the supported agents', () => {
     expect(getNextAiAgentId('claude_code')).toBe('codex')
     expect(getNextAiAgentId('codex')).toBe('opencode')
-    expect(getNextAiAgentId('opencode')).toBe('claude_code')
+    expect(getNextAiAgentId('opencode')).toBe('pi')
+    expect(getNextAiAgentId('pi')).toBe('claude_code')
   })
 })
