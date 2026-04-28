@@ -1,5 +1,7 @@
 use crate::settings;
+use chrono::NaiveDate;
 use regex::Regex;
+use std::borrow::Cow;
 use std::sync::Mutex;
 
 /// Global Sentry guard — must live for the duration of the app.
@@ -44,6 +46,41 @@ fn parse_embedded_sentry_dsn(raw: Option<&str>) -> Option<sentry::types::Dsn> {
     normalize_http_like_value(&normalized).parse().ok()
 }
 
+fn is_stable_calendar_release(version: &str) -> bool {
+    let mut parts = version.split('.');
+    let (Some(year), Some(month), Some(day)) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+
+    if parts.next().is_some() {
+        return false;
+    }
+
+    let (Ok(year), Ok(month), Ok(day)) = (
+        year.parse::<i32>(),
+        month.parse::<u32>(),
+        day.parse::<u32>(),
+    ) else {
+        return false;
+    };
+
+    NaiveDate::from_ymd_opt(year, month, day).is_some()
+}
+
+fn sentry_release_for_version(version: &'static str) -> Option<Cow<'static, str>> {
+    is_stable_calendar_release(version).then(|| version.into())
+}
+
+fn sentry_release_kind(version: &str) -> &'static str {
+    if is_stable_calendar_release(version) {
+        "stable"
+    } else if version.contains('-') {
+        "prerelease"
+    } else {
+        "internal"
+    }
+}
+
 /// Initialize Sentry if the user has opted in to crash reporting.
 /// Returns `true` if Sentry was initialized, `false` if skipped.
 pub fn init_sentry_from_settings() -> bool {
@@ -61,9 +98,10 @@ pub fn init_sentry_from_settings() -> bool {
     };
 
     let anonymous_id = settings.anonymous_id.unwrap_or_default();
+    let build_version = env!("CARGO_PKG_VERSION");
     let guard = sentry::init(sentry::ClientOptions {
         dsn: Some(dsn),
-        release: Some(env!("CARGO_PKG_VERSION").into()),
+        release: sentry_release_for_version(build_version),
         send_default_pii: false,
         before_send: Some(std::sync::Arc::new(|mut event| {
             if let Some(ref mut msg) = event.message {
@@ -79,6 +117,8 @@ pub fn init_sentry_from_settings() -> bool {
             id: Some(anonymous_id),
             ..Default::default()
         }));
+        scope.set_tag("tolaria.build_version", build_version);
+        scope.set_tag("tolaria.release_kind", sentry_release_kind(build_version));
     });
 
     *SENTRY_GUARD.lock().unwrap() = Some(guard);
@@ -159,5 +199,27 @@ mod tests {
     fn test_init_sentry_returns_false_without_dsn() {
         // Without SENTRY_DSN env var set at compile time, init should return false
         assert!(!init_sentry_from_settings());
+    }
+
+    #[test]
+    fn test_sentry_release_for_stable_calendar_version() {
+        assert!(sentry_release_for_version("2026.4.28").is_some());
+    }
+
+    #[test]
+    fn test_sentry_release_for_alpha_version_is_none() {
+        assert!(sentry_release_for_version("2026.4.28-alpha.7").is_none());
+    }
+
+    #[test]
+    fn test_sentry_release_for_local_dev_version_is_none() {
+        assert!(sentry_release_for_version("0.1.0").is_none());
+    }
+
+    #[test]
+    fn test_sentry_release_kind_classifies_versions() {
+        assert_eq!(sentry_release_kind("2026.4.28"), "stable");
+        assert_eq!(sentry_release_kind("2026.4.28-alpha.7"), "prerelease");
+        assert_eq!(sentry_release_kind("0.1.0"), "internal");
     }
 }

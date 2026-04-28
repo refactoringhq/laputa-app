@@ -944,7 +944,7 @@ sequenceDiagram
 **Architecture:**
 - **Rust:** `sentry` crate initialized in `lib.rs::setup()` via `telemetry::init_sentry_from_settings()`
 - **JS:** `@sentry/react` + `posthog-js` initialized lazily by `useTelemetry` hook; the React root also wires `onCaughtError`, `onUncaughtError`, and `onRecoverableError` through `Sentry.reactErrorHandler()` so production React invariants include component stack context when crash reporting is enabled.
-- **Release grouping:** packaged release workflows pass `VITE_SENTRY_RELEASE` from the computed build version so frontend Sentry events group by the shipped alpha or stable version.
+- **Release grouping:** packaged release workflows pass `VITE_SENTRY_RELEASE` from the computed build version, but the app only assigns Sentry's `release` field for stable calendar builds (`YYYY.M.D`). Alpha/prerelease/internal builds omit `release` so they do not create normal Sentry Releases entries, while both frontend and Rust Sentry scopes tag `tolaria.build_version` and `tolaria.release_kind` for diagnostics.
 - **Settings:** `telemetry_consent`, `crash_reporting_enabled`, `analytics_enabled`, `anonymous_id` in `Settings` struct
 - **Consent:** `TelemetryConsentDialog` shown when `telemetry_consent === null`
 

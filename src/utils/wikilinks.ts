@@ -2,10 +2,16 @@
 const WL_START = '\u2039WIKILINK:'
 const WL_END = '\u203A'
 const WL_RE = new RegExp(`${WL_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^${WL_END}]+)${WL_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g')
+const WIKILINK_RE = /\[\[([^\]]+)\]\]/g
+const FORMAT_MARKERS = new Set(['*', '_', '`', '~'])
 
 /** Pre-process markdown: replace [[target]] with placeholder tokens */
 export function preProcessWikilinks(md: string): string {
-  return md.replace(/\[\[([^\]]+)\]\]/g, (_m, target) => `${WL_START}${target}${WL_END}`)
+  const lines = md.split('\n')
+  const tableLines = findMarkdownTableLines(lines)
+  return lines.map((line, index) => (
+    tableLines[index] ? line : replaceWikilinksWithPlaceholders(line)
+  )).join('\n')
 }
 
 // Minimal shape of a BlockNote block for wikilink processing
@@ -24,6 +30,54 @@ interface InlineItem {
 }
 
 type ContentTransform = (content: InlineItem[]) => InlineItem[]
+
+function replaceWikilinksWithPlaceholders(line: string): string {
+  return line.replace(WIKILINK_RE, (_match, target) => `${WL_START}${target}${WL_END}`)
+}
+
+function findMarkdownTableLines(lines: string[]): boolean[] {
+  const tableLines = lines.map(() => false)
+  for (let index = 0; index < lines.length - 1; index++) {
+    if (!isPotentialTableRow(lines[index]) || !isMarkdownTableSeparator(lines[index + 1])) {
+      continue
+    }
+
+    tableLines[index] = true
+    tableLines[index + 1] = true
+    index = markTableBodyLines(lines, tableLines, index + 2) - 1
+  }
+  return tableLines
+}
+
+function markTableBodyLines(lines: string[], tableLines: boolean[], start: number): number {
+  let index = start
+  while (index < lines.length && isPotentialTableRow(lines[index])) {
+    tableLines[index] = true
+    index++
+  }
+  return index
+}
+
+function isPotentialTableRow(line: string): boolean {
+  const trimmed = line.trim()
+  return trimmed.includes('|') && trimmed !== '|'
+}
+
+function isMarkdownTableSeparator(line: string): boolean {
+  const cells = splitTableCells(line)
+  return cells.length > 1 && cells.every(isMarkdownTableSeparatorCell)
+}
+
+function splitTableCells(line: string): string[] {
+  let trimmed = line.trim()
+  if (trimmed.startsWith('|')) trimmed = trimmed.slice(1)
+  if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1)
+  return trimmed.split('|').map((cell) => cell.trim()).filter(Boolean)
+}
+
+function isMarkdownTableSeparatorCell(cell: string): boolean {
+  return /^:?-{3,}:?$/.test(cell)
+}
 
 /** Walk blocks recursively, applying a transform to each block's inline content */
 function walkBlocks(blocks: unknown[], transform: ContentTransform, clone = false): unknown[] {
@@ -188,21 +242,15 @@ function stripMarkdownChars(s: string): string {
   let result = ''
   let i = 0
   while (i < s.length) {
-    if (s[i] === '[' && s[i + 1] === '[') {
-      i += 2
-      let inner = ''
-      while (i < s.length - 1 && !(s[i] === ']' && s[i + 1] === ']')) { inner += s[i]; i++ }
-      if (i < s.length - 1) i += 2
-      const pipe = inner.indexOf('|')
-      result += pipe !== -1 ? inner.slice(pipe + 1) : inner
+    if (s.startsWith('[[', i)) {
+      const parsed = readUntilSequence(s, i + 2, ']]')
+      result += wikilinkDisplayText(parsed.text)
+      i = parsed.nextIndex
     } else if (s[i] === '[') {
-      i++
-      let text = ''
-      while (i < s.length && s[i] !== ']') { text += s[i]; i++ }
-      if (i < s.length) i++
-      if (i < s.length && s[i] === '(') { i++; while (i < s.length && s[i] !== ')') i++; if (i < s.length) i++ }
-      result += text
-    } else if (s[i] === '*' || s[i] === '_' || s[i] === '`' || s[i] === '~') {
+      const parsed = readUntilChar(s, i + 1, ']')
+      result += parsed.text
+      i = skipMarkdownLinkDestination(s, parsed.nextIndex)
+    } else if (FORMAT_MARKERS.has(s[i])) {
       i++
     } else {
       result += s[i]
@@ -210,6 +258,30 @@ function stripMarkdownChars(s: string): string {
     }
   }
   return result
+}
+
+function readUntilSequence(value: string, start: number, sequence: string): { text: string, nextIndex: number } {
+  const end = value.indexOf(sequence, start)
+  if (end === -1) return { text: value.slice(start), nextIndex: value.length }
+  return { text: value.slice(start, end), nextIndex: end + sequence.length }
+}
+
+function readUntilChar(value: string, start: number, char: string): { text: string, nextIndex: number } {
+  const end = value.indexOf(char, start)
+  if (end === -1) return { text: value.slice(start), nextIndex: value.length }
+  return { text: value.slice(start, end), nextIndex: end + 1 }
+}
+
+function skipMarkdownLinkDestination(value: string, start: number): number {
+  if (value[start] !== '(') return start
+
+  const end = value.indexOf(')', start + 1)
+  return end === -1 ? value.length : end + 1
+}
+
+function wikilinkDisplayText(inner: string): string {
+  const pipe = inner.indexOf('|')
+  return pipe === -1 ? inner : inner.slice(pipe + 1)
 }
 
 /** Extract sub-heading text (## , ### , etc.) stripped of the # prefix. */
