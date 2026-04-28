@@ -58,6 +58,16 @@ _organized: true
 This file is only a Claude Code compatibility shim. Keep shared agent instructions in `AGENTS.md`.
 ";
 
+const GEMINI_MD_SHIM: &str = "---
+type: Note
+_organized: true
+---
+
+@AGENTS.md
+
+This file is only a Gemini CLI compatibility shim. Keep shared agent instructions in `AGENTS.md`.
+";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AiGuidanceFileState {
@@ -71,7 +81,14 @@ pub enum AiGuidanceFileState {
 pub struct VaultAiGuidanceStatus {
     pub agents_state: AiGuidanceFileState,
     pub claude_state: AiGuidanceFileState,
+    pub gemini_state: AiGuidanceFileState,
     pub can_restore: bool,
+}
+
+struct GuidancePaths {
+    agents: PathBuf,
+    claude: PathBuf,
+    gemini: PathBuf,
 }
 
 #[derive(Debug, Default)]
@@ -109,10 +126,21 @@ fn matches_claude_shim(content: &str) -> bool {
         || trimmed == CLAUDE_MD_SHIM.trim()
 }
 
+fn matches_gemini_shim(content: &str) -> bool {
+    content.trim() == GEMINI_MD_SHIM.trim()
+}
+
 fn claude_shim_can_be_replaced(path: &Path) -> bool {
     !path.exists() || {
         let content = read_file_or_empty(path);
         content.trim().is_empty() || matches_claude_shim(&content)
+    }
+}
+
+fn gemini_shim_can_be_replaced(path: &Path) -> bool {
+    !path.exists() || {
+        let content = read_file_or_empty(path);
+        content.trim().is_empty() || matches_gemini_shim(&content)
     }
 }
 
@@ -150,9 +178,12 @@ fn classify_guidance_file(
     AiGuidanceFileState::Custom
 }
 
-fn guidance_paths(vault_path: &Path) -> (PathBuf, PathBuf) {
-    let vault = vault_path;
-    (vault.join("AGENTS.md"), vault.join("CLAUDE.md"))
+fn guidance_paths(vault_path: &Path) -> GuidancePaths {
+    GuidancePaths {
+        agents: vault_path.join("AGENTS.md"),
+        claude: vault_path.join("CLAUDE.md"),
+        gemini: vault_path.join("GEMINI.md"),
+    }
 }
 
 fn classify_agents_file(path: &Path) -> AiGuidanceFileState {
@@ -167,6 +198,10 @@ fn classify_claude_file(path: &Path) -> AiGuidanceFileState {
     classify_guidance_file(path, matches_claude_shim, claude_shim_can_be_replaced)
 }
 
+fn classify_gemini_file(path: &Path) -> AiGuidanceFileState {
+    classify_guidance_file(path, matches_gemini_shim, gemini_shim_can_be_replaced)
+}
+
 fn guidance_file_needs_restore(state: AiGuidanceFileState) -> bool {
     matches!(
         state,
@@ -175,27 +210,41 @@ fn guidance_file_needs_restore(state: AiGuidanceFileState) -> bool {
 }
 
 fn build_ai_guidance_status(vault_path: &Path) -> VaultAiGuidanceStatus {
-    let (agents_path, claude_path) = guidance_paths(vault_path);
-    let agents_state = classify_agents_file(&agents_path);
-    let claude_state = classify_claude_file(&claude_path);
+    let paths = guidance_paths(vault_path);
+    let agents_state = classify_agents_file(&paths.agents);
+    let claude_state = classify_claude_file(&paths.claude);
+    let gemini_state = classify_gemini_file(&paths.gemini);
 
     VaultAiGuidanceStatus {
         agents_state,
         claude_state,
+        gemini_state,
         can_restore: guidance_file_needs_restore(agents_state)
-            || guidance_file_needs_restore(claude_state),
+            || guidance_file_needs_restore(claude_state)
+            || guidance_file_needs_restore(gemini_state),
     }
 }
 
 fn sync_claude_shim_file(vault_path: &Path) -> Result<bool, String> {
-    let (_, claude_path) = guidance_paths(vault_path);
-    sync_managed_file(&claude_path, CLAUDE_MD_SHIM, claude_shim_can_be_replaced)
+    let paths = guidance_paths(vault_path);
+    sync_managed_file(&paths.claude, CLAUDE_MD_SHIM, claude_shim_can_be_replaced)
 }
 
-fn sync_ai_guidance_files(vault_path: &Path) -> Result<bool, String> {
+fn sync_gemini_shim_file(vault_path: &Path) -> Result<bool, String> {
+    let paths = guidance_paths(vault_path);
+    sync_managed_file(&paths.gemini, GEMINI_MD_SHIM, gemini_shim_can_be_replaced)
+}
+
+fn sync_required_ai_guidance_files(vault_path: &Path) -> Result<bool, String> {
     let wrote_agents = sync_default_agents_file(vault_path)?;
     let wrote_claude = sync_claude_shim_file(vault_path)?;
     Ok(wrote_agents || wrote_claude)
+}
+
+fn sync_all_ai_guidance_files(vault_path: &Path) -> Result<bool, String> {
+    let wrote_required = sync_required_ai_guidance_files(vault_path)?;
+    let wrote_gemini = sync_gemini_shim_file(vault_path)?;
+    Ok(wrote_required || wrote_gemini)
 }
 
 fn migrate_legacy_agents_file(
@@ -241,8 +290,8 @@ fn cleanup_empty_config_dir(vault: &Path) -> Result<bool, String> {
 }
 
 pub(super) fn sync_default_agents_file(vault_path: &Path) -> Result<bool, String> {
-    let (agents_path, _) = guidance_paths(vault_path);
-    sync_managed_file(&agents_path, AGENTS_MD, root_agents_can_be_replaced)
+    let paths = guidance_paths(vault_path);
+    sync_managed_file(&paths.agents, AGENTS_MD, root_agents_can_be_replaced)
 }
 
 pub fn get_ai_guidance_status(
@@ -255,7 +304,7 @@ pub fn restore_ai_guidance_files(
     vault_path: impl AsRef<str>,
 ) -> Result<VaultAiGuidanceStatus, String> {
     let vault_path = Path::new(vault_path.as_ref());
-    sync_ai_guidance_files(vault_path)?;
+    sync_all_ai_guidance_files(vault_path)?;
     Ok(build_ai_guidance_status(vault_path))
 }
 
@@ -263,7 +312,7 @@ pub fn restore_ai_guidance_files(
 /// Also seeds Tolaria-managed root type definitions used by repair/bootstrap flows.
 pub fn seed_config_files(vault_path: impl AsRef<str>) {
     let vault_path = Path::new(vault_path.as_ref());
-    if sync_ai_guidance_files(vault_path).unwrap_or(false) {
+    if sync_required_ai_guidance_files(vault_path).unwrap_or(false) {
         log::info!("Seeded vault AI guidance files at vault root");
     }
 
@@ -307,7 +356,7 @@ pub fn migrate_agents_md(vault_path: impl AsRef<str>) {
         log::info!("Removed empty config/ directory");
     }
 
-    let _ = sync_ai_guidance_files(vault);
+    let _ = sync_required_ai_guidance_files(vault);
 }
 
 /// Repair config files: ensure `AGENTS.md` at vault root and root type definitions.
@@ -320,7 +369,7 @@ pub fn repair_config_files(vault_path: impl AsRef<str>) -> Result<String, String
 
     migrate_legacy_agents_file(&root_agents, &config_agents)?;
     let _ = cleanup_empty_config_dir(vault)?;
-    sync_ai_guidance_files(vault)?;
+    sync_required_ai_guidance_files(vault)?;
 
     write_if_missing(&vault.join("type.md"), TYPE_TYPE_DEFINITION)?;
     write_if_missing(&vault.join("note.md"), NOTE_TYPE_DEFINITION)?;
@@ -355,6 +404,10 @@ mod tests {
         fs::write(vault.join("CLAUDE.md"), content).unwrap();
     }
 
+    fn write_root_gemini(vault: &Path, content: &str) {
+        fs::write(vault.join("GEMINI.md"), content).unwrap();
+    }
+
     fn write_legacy_agents(vault: &Path, content: &str) {
         fs::write(config_dir(vault).join("agents.md"), content).unwrap();
     }
@@ -365,6 +418,10 @@ mod tests {
 
     fn read_root_claude(vault: &Path) -> String {
         fs::read_to_string(vault.join("CLAUDE.md")).unwrap()
+    }
+
+    fn read_root_gemini(vault: &Path) -> String {
+        fs::read_to_string(vault.join("GEMINI.md")).unwrap()
     }
 
     type VaultOperation = fn(&Path);
@@ -454,15 +511,52 @@ mod tests {
         assert!(content.contains(expected_root_text));
     }
 
+    fn assert_required_agents_file_seeded(vault: &Path) {
+        assert!(vault.join("AGENTS.md").exists());
+        assert!(read_root_agents(vault).contains("Tolaria Vault"));
+    }
+
+    fn assert_required_guidance_shims_seeded(vault: &Path) {
+        assert_eq!(read_root_claude(vault), CLAUDE_MD_SHIM);
+        assert!(!vault.join("GEMINI.md").exists());
+    }
+
+    fn assert_required_guidance_files_seeded(vault: &Path) {
+        assert_required_agents_file_seeded(vault);
+        assert_required_guidance_shims_seeded(vault);
+    }
+
+    fn assert_root_type_definitions_seeded(vault: &Path) {
+        assert!(vault.join("type.md").exists());
+        assert!(vault.join("note.md").exists());
+        assert!(!vault.join("config").exists());
+    }
+
+    fn assert_type_definition_content(vault: &Path) {
+        let type_content = fs::read_to_string(vault.join("type.md")).unwrap();
+        let note_content = fs::read_to_string(vault.join("note.md")).unwrap();
+        assert_type_definition_body(&type_content);
+        assert_note_definition_body(&note_content);
+    }
+
+    fn assert_type_definition_body(type_content: &str) {
+        assert!(type_content.contains("type: Type"));
+        assert!(type_content.contains("# Type"));
+        assert!(type_content.contains("visible: false"));
+    }
+
+    fn assert_note_definition_body(note_content: &str) {
+        assert!(note_content.contains("type: Type"));
+        assert!(note_content.contains("# Note"));
+    }
+
     #[test]
     fn test_seed_config_files_creates_guidance_files_at_root() {
         let (_dir, vault) = create_vault();
 
         seed_config_files(vault.to_str().unwrap());
 
-        assert!(vault.join("AGENTS.md").exists());
-        assert!(read_root_agents(&vault).contains("Tolaria Vault"));
-        assert_eq!(read_root_claude(&vault), CLAUDE_MD_SHIM);
+        assert_required_guidance_files_seeded(&vault);
     }
 
     #[test]
@@ -471,16 +565,8 @@ mod tests {
 
         seed_config_files(vault.to_str().unwrap());
 
-        assert!(vault.join("type.md").exists());
-        assert!(vault.join("note.md").exists());
-        let type_content = fs::read_to_string(vault.join("type.md")).unwrap();
-        let note_content = fs::read_to_string(vault.join("note.md")).unwrap();
-        assert!(type_content.contains("type: Type"));
-        assert!(type_content.contains("# Type"));
-        assert!(type_content.contains("visible: false"));
-        assert!(note_content.contains("type: Type"));
-        assert!(note_content.contains("# Note"));
-        assert!(!vault.join("config").exists());
+        assert_root_type_definitions_seeded(&vault);
+        assert_type_definition_content(&vault);
     }
 
     #[test]
@@ -604,20 +690,12 @@ mod tests {
         let msg = repair_config_files(vault.to_str().unwrap()).unwrap();
         assert_eq!(msg, "Config files repaired");
 
-        assert!(vault.join("AGENTS.md").exists());
-        assert!(vault.join("CLAUDE.md").exists());
-        assert!(vault.join("type.md").exists());
-        assert!(vault.join("note.md").exists());
-        assert!(!vault.join("config").exists());
-
-        let agents = read_root_agents(&vault);
-        assert!(agents.contains("Tolaria Vault"));
-        let type_content = fs::read_to_string(vault.join("type.md")).unwrap();
-        assert!(type_content.contains("# Type"));
-        assert!(type_content.contains("visible: false"));
-        let note_content = fs::read_to_string(vault.join("note.md")).unwrap();
-        assert!(note_content.contains("type: Type"));
-        assert!(note_content.contains("general-purpose document"));
+        assert_required_guidance_files_seeded(&vault);
+        assert_root_type_definitions_seeded(&vault);
+        assert_type_definition_content(&vault);
+        assert!(fs::read_to_string(vault.join("note.md"))
+            .unwrap()
+            .contains("general-purpose document"));
     }
 
     #[test]
@@ -656,9 +734,15 @@ mod tests {
         write_root_claude(&vault, "");
 
         let status = get_ai_guidance_status(vault.to_str().unwrap()).unwrap();
-        assert_eq!(status.agents_state, AiGuidanceFileState::Custom);
-        assert_eq!(status.claude_state, AiGuidanceFileState::Broken);
-        assert!(status.can_restore);
+        assert_eq!(
+            status,
+            VaultAiGuidanceStatus {
+                agents_state: AiGuidanceFileState::Custom,
+                claude_state: AiGuidanceFileState::Broken,
+                gemini_state: AiGuidanceFileState::Missing,
+                can_restore: true,
+            }
+        );
     }
 
     #[test]
@@ -668,11 +752,18 @@ mod tests {
         write_root_claude(&vault, "");
 
         let status = restore_ai_guidance_files(vault.to_str().unwrap()).unwrap();
-        assert_eq!(status.agents_state, AiGuidanceFileState::Custom);
-        assert_eq!(status.claude_state, AiGuidanceFileState::Managed);
-        assert!(!status.can_restore);
+        assert_eq!(
+            status,
+            VaultAiGuidanceStatus {
+                agents_state: AiGuidanceFileState::Custom,
+                claude_state: AiGuidanceFileState::Managed,
+                gemini_state: AiGuidanceFileState::Managed,
+                can_restore: false,
+            }
+        );
         assert!(read_root_agents(&vault).contains("Custom Agent Config"));
         assert_eq!(read_root_claude(&vault), CLAUDE_MD_SHIM);
+        assert_eq!(read_root_gemini(&vault), GEMINI_MD_SHIM);
     }
 
     #[test]
@@ -681,8 +772,28 @@ mod tests {
         write_root_agents(&vault, "");
 
         let status = restore_ai_guidance_files(vault.to_str().unwrap()).unwrap();
-        assert_eq!(status.agents_state, AiGuidanceFileState::Managed);
-        assert_eq!(status.claude_state, AiGuidanceFileState::Managed);
+        assert_eq!(
+            status,
+            VaultAiGuidanceStatus {
+                agents_state: AiGuidanceFileState::Managed,
+                claude_state: AiGuidanceFileState::Managed,
+                gemini_state: AiGuidanceFileState::Managed,
+                can_restore: false,
+            }
+        );
+    }
+
+    #[test]
+    fn test_restore_ai_guidance_files_preserves_custom_gemini() {
+        let (_dir, vault) = create_vault();
+        write_root_agents(&vault, AGENTS_MD);
+        write_root_claude(&vault, CLAUDE_MD_SHIM);
+        write_root_gemini(&vault, "# Custom Gemini instructions\nDo not overwrite\n");
+
+        let status = restore_ai_guidance_files(vault.to_str().unwrap()).unwrap();
+
+        assert_eq!(status.gemini_state, AiGuidanceFileState::Custom);
         assert!(!status.can_restore);
+        assert!(read_root_gemini(&vault).contains("Custom Gemini instructions"));
     }
 }

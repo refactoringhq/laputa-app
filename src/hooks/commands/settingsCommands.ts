@@ -149,7 +149,7 @@ function buildMaintenanceCommands({
       id: 'install-mcp',
       label: mcpStatus === 'installed' ? 'Manage External AI Tools…' : 'Set Up External AI Tools…',
       group: 'Settings',
-      keywords: ['mcp', 'ai', 'tools', 'external', 'setup', 'details', 'copy', 'export', 'manual', 'config', 'connect', 'disconnect', 'claude', 'codex', 'cursor', 'consent'],
+      keywords: ['mcp', 'ai', 'tools', 'external', 'setup', 'details', 'copy', 'export', 'manual', 'config', 'connect', 'disconnect', 'claude', 'gemini', 'codex', 'cursor', 'consent'],
       enabled: true,
       execute: () => onInstallMcp?.(),
     },

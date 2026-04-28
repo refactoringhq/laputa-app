@@ -154,14 +154,17 @@ mod tests {
         let initial = get_vault_ai_guidance_status(vault_path.clone()).unwrap();
         assert_eq!(initial.agents_state, AiGuidanceFileState::Missing);
         assert_eq!(initial.claude_state, AiGuidanceFileState::Missing);
+        assert_eq!(initial.gemini_state, AiGuidanceFileState::Missing);
         assert!(initial.can_restore);
 
         let restored = restore_vault_ai_guidance(vault_path.clone()).unwrap();
         assert_eq!(restored.agents_state, AiGuidanceFileState::Managed);
         assert_eq!(restored.claude_state, AiGuidanceFileState::Managed);
+        assert_eq!(restored.gemini_state, AiGuidanceFileState::Managed);
         assert!(!restored.can_restore);
 
         assert!(dir.path().join("AGENTS.md").exists());
         assert!(dir.path().join("CLAUDE.md").exists());
+        assert!(dir.path().join("GEMINI.md").exists());
     }
 }

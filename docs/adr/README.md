@@ -142,3 +142,5 @@ proposed → active → superseded
 | [0085](0085-non-git-vault-support.md) | Non-git vaults open with explicit later Git initialization | active |
 | [0088](0088-markdown-durable-mermaid-diagrams.md) | Markdown-durable Mermaid diagrams in notes | active |
 | [0089](0089-active-vault-filesystem-watcher.md) | Active vault filesystem watcher | active |
+| [0090](0090-pi-cli-agent-adapter.md) | Pi CLI agent adapter | active |
+| [0091](0091-gemini-cli-external-ai-setup.md) | Gemini CLI external AI setup | active |
