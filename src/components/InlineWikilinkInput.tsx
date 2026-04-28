@@ -82,6 +82,17 @@ function isSelectAllShortcut(event: React.KeyboardEvent<HTMLDivElement>) {
   return event.key.toLowerCase() === 'a' && (event.metaKey || event.ctrlKey)
 }
 
+function isLineBreakShortcut(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  isComposing: boolean,
+) {
+  return event.key === 'Enter'
+    && event.shiftKey
+    && !isComposing
+    && !event.nativeEvent.isComposing
+    && event.keyCode !== 229
+}
+
 export const UNSUPPORTED_INLINE_PASTE_MESSAGE = 'Only text paste is supported in the AI composer right now.'
 
 function hasUnsupportedClipboardPayload(clipboardData: DataTransfer) {
@@ -288,6 +299,12 @@ export function InlineWikilinkInput({
 
     if (!isInsertBeforeInput(nativeEvent)) return
 
+    if (nativeEvent.inputType === 'insertLineBreak') {
+      nativeEvent.preventDefault()
+      insertTransferText('\n')
+      return
+    }
+
     if (isPlainTextBeforeInput(nativeEvent)) {
       nativeEvent.preventDefault()
       insertTransferText(nativeEvent.data)
@@ -422,6 +439,12 @@ export function InlineWikilinkInput({
   const submitValue = () =>
     submitInlineValue({ onSubmit, submitOnEmpty, value, references })
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!disabled && isLineBreakShortcut(event, isComposingRef.current)) {
+      event.preventDefault()
+      insertTransferText('\n')
+      return
+    }
+
     if (isSelectAllShortcut(event)) {
       event.preventDefault()
       selectAllContent()
