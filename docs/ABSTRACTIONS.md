@@ -705,7 +705,7 @@ Tolaria tracks managed vault-level AI guidance separately from normal note conte
 `useAiAgentsOnboarding(enabled)` adds a separate first-launch agent step:
 - Reads a local dismissal flag for the AI agents prompt (with a legacy fallback to the older Claude-only key)
 - Only shows after vault onboarding has already resolved to a ready state
-- Uses `get_ai_agents_status`, whose backend treats the app process path, login-shell path, and supported local/toolchain/app install locations, including Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
+- Uses `get_ai_agents_status`, whose backend treats the app process path, login-shell path, and supported local/toolchain/app install locations, including nvm-managed Node installs plus Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
 - Persists dismissal locally once the user continues
 
 ### Remote Git Operations
