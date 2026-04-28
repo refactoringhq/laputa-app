@@ -67,6 +67,53 @@ type TestTableBlock = {
   type?: string
   content?: { type?: string; columnWidths?: Array<number | null> }
 }
+type SuggestionAction = () => void
+type SuggestionItemWithClick = { onItemClick?: SuggestionAction }
+
+function isEditorReadyForSuggestionAction(
+  editor: ReturnType<typeof useCreateBlockNote>,
+  container: HTMLElement | null,
+) {
+  if (!container?.isConnected) return false
+
+  const editorElement = editor.domElement
+  if (!(editorElement instanceof HTMLElement)) return true
+
+  return editorElement.isConnected && container.contains(editorElement)
+}
+
+function runSuggestionActionSafely({
+  action,
+  container,
+  editor,
+}: {
+  action: SuggestionAction
+  container: HTMLElement | null
+  editor: ReturnType<typeof useCreateBlockNote>
+}) {
+  if (!isEditorReadyForSuggestionAction(editor, container)) return
+
+  try {
+    action()
+  } catch (error) {
+    console.warn('[editor] Ignored stale suggestion menu action:', error)
+  }
+}
+
+function guardSuggestionMenuItems<T extends SuggestionItemWithClick>(
+  items: T[],
+  runEditorAction: (action: SuggestionAction) => void,
+): T[] {
+  return items.map((item) => {
+    if (!item.onItemClick) return item
+
+    const onItemClick = item.onItemClick
+    return {
+      ...item,
+      onItemClick: () => runEditorAction(onItemClick),
+    }
+  })
+}
 
 function SharedContextBlockNoteView(props: React.ComponentProps<typeof BlockNoteViewRaw>) {
   const { children, className, theme, ...rest } = props
@@ -412,20 +459,26 @@ function buildBaseSuggestionItems(entries: VaultEntry[]) {
   })))
 }
 
-function useInsertWikilink(editor: ReturnType<typeof useCreateBlockNote>) {
+function useInsertWikilink(
+  editor: ReturnType<typeof useCreateBlockNote>,
+  runEditorAction: (action: SuggestionAction) => void,
+) {
   return useCallback((target: string) => {
-    editor.insertInlineContent([
-      { type: 'wikilink' as const, props: { target } },
-      " ",
-    ], { updateSelection: true })
-    trackEvent('wikilink_inserted')
-  }, [editor])
+    runEditorAction(() => {
+      editor.insertInlineContent([
+        { type: 'wikilink' as const, props: { target } },
+        " ",
+      ], { updateSelection: true })
+      trackEvent('wikilink_inserted')
+    })
+  }, [editor, runEditorAction])
 }
 
 function useSuggestionMenuItems(options: {
   baseItems: ReturnType<typeof buildBaseSuggestionItems>
   editor: ReturnType<typeof useCreateBlockNote>
   insertWikilink: (target: string) => void
+  runEditorAction: (action: SuggestionAction) => void
   typeEntryMap: Record<string, VaultEntry>
   vaultPath?: string
 }) {
@@ -433,6 +486,7 @@ function useSuggestionMenuItems(options: {
     baseItems,
     editor,
     insertWikilink,
+    runEditorAction,
     typeEntryMap,
     vaultPath,
   } = options
@@ -447,8 +501,11 @@ function useSuggestionMenuItems(options: {
       : filterPersonMentions(baseItems, normalizedQuery)
 
     const items = attachClickHandlers(candidates, insertWikilink, vaultPath ?? '')
-    return enrichSuggestionItems(items, normalizedQuery, typeEntryMap)
-  }, [baseItems, insertWikilink, typeEntryMap, vaultPath])
+    return guardSuggestionMenuItems(
+      enrichSuggestionItems(items, normalizedQuery, typeEntryMap),
+      runEditorAction,
+    )
+  }, [baseItems, insertWikilink, runEditorAction, typeEntryMap, vaultPath])
 
   const getWikilinkItems = useCallback(async (query: string): Promise<WikilinkSuggestionItem[]> => (
     buildItems(query, '[[') ?? []
@@ -458,9 +515,17 @@ function useSuggestionMenuItems(options: {
     buildItems(query, '@') ?? []
   ), [buildItems])
 
-  const getSlashMenuItems = useCallback(async (query: string) => (
-    getTolariaSlashMenuItems(editor, query)
-  ), [editor])
+  const getSlashMenuItems = useCallback(async (query: string) => {
+    try {
+      return guardSuggestionMenuItems(
+        await Promise.resolve(getTolariaSlashMenuItems(editor, query)),
+        runEditorAction,
+      )
+    } catch (error) {
+      console.warn('[editor] Ignored stale slash menu query:', error)
+      return []
+    }
+  }, [editor, runEditorAction])
 
   return {
     getWikilinkItems,
@@ -513,7 +578,14 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
 
   const typeEntryMap = useMemo(() => buildTypeEntryMap(entries), [entries])
   const baseItems = useMemo(() => buildBaseSuggestionItems(entries), [entries])
-  const insertWikilink = useInsertWikilink(editor)
+  const runEditorAction = useCallback((action: SuggestionAction) => {
+    runSuggestionActionSafely({
+      action,
+      container: containerRef.current,
+      editor,
+    })
+  }, [editor])
+  const insertWikilink = useInsertWikilink(editor, runEditorAction)
   const {
     getWikilinkItems,
     getPersonMentionItems,
@@ -522,6 +594,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
     baseItems,
     editor,
     insertWikilink,
+    runEditorAction,
     typeEntryMap,
     vaultPath,
   })
@@ -568,13 +641,13 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
           triggerCharacter="[["
           getItems={getWikilinkItems}
           suggestionMenuComponent={WikilinkSuggestionMenu}
-          onItemClick={(item: WikilinkSuggestionItem) => item.onItemClick()}
+          onItemClick={(item: WikilinkSuggestionItem) => runEditorAction(item.onItemClick)}
         />
         <SuggestionMenuController
           triggerCharacter="@"
           getItems={getPersonMentionItems}
           suggestionMenuComponent={WikilinkSuggestionMenu}
-          onItemClick={(item: WikilinkSuggestionItem) => item.onItemClick()}
+          onItemClick={(item: WikilinkSuggestionItem) => runEditorAction(item.onItemClick)}
         />
       </SharedContextBlockNoteView>
     </div>
