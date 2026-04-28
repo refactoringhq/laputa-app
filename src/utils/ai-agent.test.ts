@@ -1,11 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-// Mock the mock-tauri module before importing ai-agent
-vi.mock('../mock-tauri', () => ({
-  isTauri: () => false,
-}))
-
-import { buildAgentSystemPrompt, streamClaudeAgent } from './ai-agent'
+import { buildAgentSystemPrompt } from './ai-agent'
 
 // --- buildAgentSystemPrompt ---
 
@@ -30,31 +25,5 @@ describe('buildAgentSystemPrompt', () => {
     const prompt = buildAgentSystemPrompt()
     expect(prompt).toContain('[[')
     expect(prompt).toMatch(/wikilink/i)
-  })
-})
-
-// --- streamClaudeAgent ---
-
-describe('streamClaudeAgent', () => {
-  it('calls onText and onDone in non-Tauri environment', async () => {
-    const onText = vi.fn()
-    const onToolStart = vi.fn()
-    const onDone = vi.fn()
-    const onError = vi.fn()
-
-    await streamClaudeAgent('test message', 'system prompt', '/tmp/vault', {
-      onText,
-      onToolStart,
-      onError,
-      onDone,
-    })
-
-    // Wait for the setTimeout mock response
-    await new Promise(r => setTimeout(r, 400))
-
-    expect(onText).toHaveBeenCalledWith(expect.stringContaining('Build Laputa App'))
-    expect(onDone).toHaveBeenCalled()
-    expect(onError).not.toHaveBeenCalled()
-    expect(onToolStart).not.toHaveBeenCalled()
   })
 })

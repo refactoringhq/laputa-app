@@ -23,6 +23,8 @@ export interface AiAgentMessage {
   id?: string
 }
 
+export type AgentStatus = 'idle' | 'thinking' | 'tool-executing' | 'done' | 'error'
+
 export interface AgentExecutionContext {
   agent: AiAgentId
   ready: boolean

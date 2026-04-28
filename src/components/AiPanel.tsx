@@ -56,7 +56,6 @@ export function AiPanelView({
 }: AiPanelViewProps) {
   const defaultAiAgent = providedDefaultAiAgent ?? DEFAULT_AI_AGENT
   const defaultAiAgentReady = providedDefaultAiAgentReady ?? true
-  const useLegacyAiExperience = providedDefaultAiAgent === undefined && providedDefaultAiAgentReady === undefined
   const inputRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const agentLabel = getAiAgentDefinition(defaultAiAgent).label
@@ -100,7 +99,6 @@ export function AiPanelView({
       <AiPanelHeader
         agentLabel={agentLabel}
         agentReady={defaultAiAgentReady}
-        legacyCopy={useLegacyAiExperience}
         onClose={onClose}
         onNewChat={handleNewChat}
       />
@@ -110,7 +108,6 @@ export function AiPanelView({
       <AiPanelMessageHistory
         agentLabel={agentLabel}
         agentReady={defaultAiAgentReady}
-        legacyCopy={useLegacyAiExperience}
         messages={agent.messages}
         isActive={isActive}
         onOpenNote={onOpenNote}

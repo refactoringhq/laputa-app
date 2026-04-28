@@ -1,6 +1,6 @@
 #[cfg(desktop)]
 use crate::ai_agents::{AiAgentStreamRequest, AiAgentsStatus};
-use crate::claude_cli::{AgentStreamRequest, ChatStreamRequest, ClaudeCliStatus};
+use crate::claude_cli::{ChatStreamRequest, ClaudeCliStatus};
 use crate::vault::VaultAiGuidanceStatus;
 
 use super::expand_tilde;
@@ -83,14 +83,6 @@ define_desktop_stream_command!(
 
 #[cfg(desktop)]
 define_desktop_stream_command!(
-    stream_claude_agent,
-    AgentStreamRequest,
-    "claude-agent-stream",
-    crate::claude_cli::run_agent_stream
-);
-
-#[cfg(desktop)]
-define_desktop_stream_command!(
     stream_ai_agent,
     AiAgentStreamRequest,
     "ai-agent-stream",
@@ -136,15 +128,6 @@ pub fn get_ai_agents_status() -> AiAgentsStatus {
 pub async fn stream_claude_chat(
     _app_handle: tauri::AppHandle,
     _request: ChatStreamRequest,
-) -> Result<String, String> {
-    Err("Claude CLI is not available on mobile".into())
-}
-
-#[cfg(mobile)]
-#[tauri::command]
-pub async fn stream_claude_agent(
-    _app_handle: tauri::AppHandle,
-    _request: AgentStreamRequest,
 ) -> Result<String, String> {
     Err("Claude CLI is not available on mobile".into())
 }

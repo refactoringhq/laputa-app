@@ -1,7 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import type { AgentFileCallbacks, AgentStatus } from '../hooks/useAiAgent'
-import { detectFileOperation } from '../hooks/useAiAgent'
-import type { AiAgentMessage } from './aiAgentConversation'
+import type { AgentStatus, AiAgentMessage } from './aiAgentConversation'
+import { detectFileOperation, type AgentFileCallbacks } from './aiAgentFileOperations'
 import {
   markReasoningDone,
   updateMessage,
@@ -73,7 +72,12 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
       const info = toolInputMapRef.current.get(toolId)
       if (info) {
-        detectFileOperation(info.tool, info.input, vaultPath, fileCallbacksRef.current)
+        detectFileOperation({
+          toolName: info.tool,
+          input: info.input,
+          vaultPath,
+          callbacks: fileCallbacksRef.current,
+        })
       }
 
       updateMessage(setMessages, messageId, (message) => ({
