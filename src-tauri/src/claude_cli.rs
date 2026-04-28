@@ -590,11 +590,9 @@ fn dispatch_assistant_content_block<F>(
     F: FnMut(ClaudeStreamEvent),
 {
     match block["type"].as_str() {
-        Some("text") => {
-            if emit_text {
-                if let Some(text) = block["text"].as_str() {
-                    emit_text_delta(text, state, emit);
-                }
+        Some("text") if emit_text => {
+            if let Some(text) = block["text"].as_str() {
+                emit_text_delta(text, state, emit);
             }
         }
         Some("tool_use") => {
