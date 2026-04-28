@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { isTauri, mockInvoke } from '../mock-tauri'
 import type { VaultEntry, FolderNode, GitCommit, ModifiedFile, NoteStatus, GitPushResult, ViewFile } from '../types'
 import {
   GITIGNORED_VISIBILITY_CHANGED_EVENT,
@@ -8,46 +6,16 @@ import {
   type GitignoredVisibilityChangedEvent,
 } from '../lib/gitignoredVisibilityEvents'
 import { clearPrefetchCache } from './useTabManagement'
-
-function tauriCall<T>(command: string, tauriArgs: Record<string, unknown>, mockArgs?: Record<string, unknown>): Promise<T> {
-  return isTauri() ? invoke<T>(command, tauriArgs) : mockInvoke<T>(command, mockArgs ?? tauriArgs)
-}
-
-function hasVaultPath(vaultPath: string): boolean {
-  return vaultPath.trim().length > 0
-}
-
-function loadVaultEntries(vaultPath: string): Promise<VaultEntry[]> {
-  const command = isTauri() ? 'reload_vault' : 'list_vault'
-  return tauriCall<VaultEntry[]>(command, { path: vaultPath })
-}
-
-async function loadVaultData(vaultPath: string) {
-  if (!isTauri()) console.info('[mock] Using mock Tauri data for browser testing')
-  const entries = await loadVaultEntries(vaultPath)
-  console.log(`Vault scan complete: ${entries.length} entries found`)
-  return { entries }
-}
-
-function loadVaultFolders(vaultPath: string): Promise<FolderNode[]> {
-  return tauriCall<FolderNode[]>('list_vault_folders', { path: vaultPath })
-}
-
-function loadVaultViews(vaultPath: string): Promise<ViewFile[]> {
-  return tauriCall<ViewFile[]>('list_views', { vaultPath })
-}
-
-async function loadVaultChrome(vaultPath: string) {
-  const [folders, views] = await Promise.all([
-    loadVaultFolders(vaultPath).catch(() => [] as FolderNode[]),
-    loadVaultViews(vaultPath).catch(() => [] as ViewFile[]),
-  ])
-
-  return {
-    folders: folders ?? [],
-    views: views ?? [],
-  }
-}
+import {
+  commitWithPush,
+  hasVaultPath,
+  loadVaultChrome,
+  loadVaultData,
+  loadVaultFolders,
+  loadVaultViews,
+  reloadVaultEntries,
+  tauriCall,
+} from './vaultLoaderCommands'
 
 function resetVaultState(options: {
   clearNewPaths: () => void
@@ -78,11 +46,11 @@ async function loadInitialVaultState(options: {
   setViews: (views: ViewFile[]) => void
 }) {
   const { path, isCurrentVaultPath, setEntries, setFolders, setIsLoading, setViews } = options
-  const chromeLoad = loadVaultChrome(path)
+  const chromeLoad = loadVaultChrome({ vaultPath: path })
 
   setIsLoading(true)
   try {
-    const { entries } = await loadVaultData(path)
+    const { entries } = await loadVaultData({ vaultPath: path })
     if (isCurrentVaultPath(path)) setEntries(entries)
   } catch (err) {
     console.warn('Vault scan failed:', err)
@@ -104,15 +72,6 @@ function useCurrentVaultPathGuard(vaultPath: string) {
   }, [vaultPath])
 
   return useCallback((path: string) => currentPathRef.current === path, [])
-}
-
-async function commitWithPush(vaultPath: string, message: string): Promise<GitPushResult> {
-  if (!isTauri()) {
-    await mockInvoke<string>('git_commit', { message })
-    return mockInvoke<GitPushResult>('git_push', {})
-  }
-  await invoke<string>('git_commit', { vaultPath, message })
-  return invoke<GitPushResult>('git_push', { vaultPath })
 }
 
 function useNewNoteTracker() {
@@ -242,7 +201,7 @@ function useInitialVaultLoad({
     })
     resetReloading()
 
-    if (!hasVaultPath(path)) return
+    if (!hasVaultPath({ vaultPath: path })) return
 
     let cancelled = false
     void loadInitialVaultState({
@@ -277,13 +236,17 @@ function useModifiedFilesLoader(vaultPath: string, isCurrentVaultPath: (path: st
     const path = vaultPath
     setModifiedFilesError(null)
 
-    if (!hasVaultPath(path)) {
+    if (!hasVaultPath({ vaultPath: path })) {
       setModifiedFiles([])
       return
     }
 
     try {
-      const files = await tauriCall<ModifiedFile[]>('get_modified_files', { vaultPath: path }, {})
+      const files = await tauriCall<ModifiedFile[]>({
+        command: 'get_modified_files',
+        tauriArgs: { vaultPath: path },
+        mockArgs: {},
+      })
       if (isCurrentVaultPath(path)) setModifiedFiles(files)
     } catch (err) {
       if (!isCurrentVaultPath(path)) return
@@ -347,18 +310,32 @@ function useEntryMutations(
 
 function useGitLoaders(vaultPath: string) {
   const loadGitHistory = useCallback(async (path: string): Promise<GitCommit[]> => {
-    try { return await tauriCall<GitCommit[]>('get_file_history', { vaultPath, path }, { path }) }
+    try {
+      return await tauriCall<GitCommit[]>({
+        command: 'get_file_history',
+        tauriArgs: { vaultPath, path },
+        mockArgs: { path },
+      })
+    }
     catch (err) { console.warn('Failed to load git history:', err); return [] }
   }, [vaultPath])
 
   const loadDiffAtCommit = useCallback((path: string, commitHash: string): Promise<string> =>
-    tauriCall<string>('get_file_diff_at_commit', { vaultPath, path, commitHash }, { path, commitHash }), [vaultPath])
+    tauriCall<string>({
+      command: 'get_file_diff_at_commit',
+      tauriArgs: { vaultPath, path, commitHash },
+      mockArgs: { path, commitHash },
+    }), [vaultPath])
 
   const loadDiff = useCallback((path: string): Promise<string> =>
-    tauriCall<string>('get_file_diff', { vaultPath, path }, { path }), [vaultPath])
+    tauriCall<string>({
+      command: 'get_file_diff',
+      tauriArgs: { vaultPath, path },
+      mockArgs: { path },
+    }), [vaultPath])
 
   const commitAndPush = useCallback((message: string): Promise<GitPushResult> =>
-    commitWithPush(vaultPath, message), [vaultPath])
+    commitWithPush({ vaultPath, message }), [vaultPath])
 
   return { loadGitHistory, loadDiffAtCommit, loadDiff, commitAndPush }
 }
@@ -386,9 +363,9 @@ function useVaultReloads({
 
   const reloadFolders = useCallback(async () => {
     const path = vaultPath
-    if (!hasVaultPath(path)) return [] as FolderNode[]
+    if (!hasVaultPath({ vaultPath: path })) return [] as FolderNode[]
     try {
-      const folders = await loadVaultFolders(path)
+      const folders = await loadVaultFolders({ vaultPath: path })
       if (!isCurrentVaultPath(path)) return [] as FolderNode[]
       const nextFolders = folders ?? []
       setFolders(nextFolders)
@@ -400,11 +377,11 @@ function useVaultReloads({
 
   const reloadVault = useCallback(async () => {
     const path = vaultPath
-    if (!hasVaultPath(path)) return [] as VaultEntry[]
+    if (!hasVaultPath({ vaultPath: path })) return [] as VaultEntry[]
     clearPrefetchCache()
     beginReload()
     try {
-      const entries = await tauriCall<VaultEntry[]>('reload_vault', { path })
+      const entries = await reloadVaultEntries({ vaultPath: path })
       if (!isCurrentVaultPath(path)) return [] as VaultEntry[]
       setEntries(entries)
       void loadModifiedFiles()
@@ -419,9 +396,9 @@ function useVaultReloads({
 
   const reloadViews = useCallback(async () => {
     const path = vaultPath
-    if (!hasVaultPath(path)) return []
+    if (!hasVaultPath({ vaultPath: path })) return []
     try {
-      const nextViews = await loadVaultViews(path)
+      const nextViews = await loadVaultViews({ vaultPath: path })
       if (!isCurrentVaultPath(path)) return []
       const resolvedViews = nextViews ?? []
       setViews(resolvedViews)
@@ -462,7 +439,7 @@ function useGitignoredVisibilityReloads(
 export function useVaultLoader(vaultPath: string) {
   const [entries, setEntries] = useState<VaultEntry[]>([])
   const [folders, setFolders] = useState<FolderNode[]>([])
-  const [isLoading, setIsLoading] = useState(() => hasVaultPath(vaultPath))
+  const [isLoading, setIsLoading] = useState(() => hasVaultPath({ vaultPath }))
   const [views, setViews] = useState<ViewFile[]>([])
   const tracker = useNewNoteTracker()
   const pendingSave = usePendingSaveTracker()

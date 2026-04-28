@@ -314,6 +314,8 @@ struct StreamState {
     tool_inputs: HashMap<String, String>,
     /// The tool_use id of the block currently being streamed.
     current_tool_id: Option<String>,
+    /// Tracks whether response text has already been emitted for this run.
+    emitted_text: bool,
 }
 
 /// Core subprocess runner shared by chat and agent modes.
@@ -339,6 +341,7 @@ where
         session_id: String::new(),
         tool_inputs: HashMap::new(),
         current_tool_id: None,
+        emitted_text: false,
     };
 
     for line in reader.lines() {
@@ -473,7 +476,15 @@ where
             if !sid.is_empty() {
                 state.session_id = sid.clone();
             }
-            let text = json["result"].as_str().unwrap_or("").to_string();
+            let text = if state.emitted_text {
+                String::new()
+            } else {
+                let text = json["result"].as_str().unwrap_or("").to_string();
+                if !text.is_empty() {
+                    state.emitted_text = true;
+                }
+                text
+            };
             emit(ClaudeStreamEvent::Result {
                 text,
                 session_id: sid,
@@ -483,19 +494,9 @@ where
         // --- Complete assistant message (fallback for text when no partials) ---
         "assistant" => {
             if let Some(content) = json["message"]["content"].as_array() {
+                let emit_text = !state.emitted_text;
                 for block in content {
-                    if block["type"].as_str() == Some("tool_use") {
-                        if let (Some(id), Some(name)) =
-                            (block["id"].as_str(), block["name"].as_str())
-                        {
-                            let input = format_tool_input(&block["input"], state, id);
-                            emit(ClaudeStreamEvent::ToolStart {
-                                tool_name: name.to_string(),
-                                tool_id: id.to_string(),
-                                input,
-                            });
-                        }
-                    }
+                    dispatch_assistant_content_block(block, emit_text, state, emit);
                 }
             }
         }
@@ -518,9 +519,7 @@ where
             match delta["type"].as_str() {
                 Some("text_delta") => {
                     if let Some(text) = delta["text"].as_str() {
-                        emit(ClaudeStreamEvent::TextDelta {
-                            text: text.to_string(),
-                        });
+                        emit_text_delta(text, state, emit);
                     }
                 }
                 Some("thinking_delta") => {
@@ -563,6 +562,48 @@ where
         }
         _ => {}
     }
+}
+
+fn dispatch_assistant_content_block<F>(
+    block: &serde_json::Value,
+    emit_text: bool,
+    state: &mut StreamState,
+    emit: &mut F,
+) where
+    F: FnMut(ClaudeStreamEvent),
+{
+    match block["type"].as_str() {
+        Some("text") => {
+            if emit_text {
+                if let Some(text) = block["text"].as_str() {
+                    emit_text_delta(text, state, emit);
+                }
+            }
+        }
+        Some("tool_use") => {
+            if let (Some(id), Some(name)) = (block["id"].as_str(), block["name"].as_str()) {
+                let input = format_tool_input(&block["input"], state, id);
+                emit(ClaudeStreamEvent::ToolStart {
+                    tool_name: name.to_string(),
+                    tool_id: id.to_string(),
+                    input,
+                });
+            }
+        }
+        _ => {}
+    }
+}
+
+fn emit_text_delta<F>(text: &str, state: &mut StreamState, emit: &mut F)
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    if !text.is_empty() {
+        state.emitted_text = true;
+    }
+    emit(ClaudeStreamEvent::TextDelta {
+        text: text.to_string(),
+    });
 }
 
 /// Build the tool input string, preferring accumulated delta chunks over the
@@ -636,6 +677,7 @@ mod tests {
             session_id: String::new(),
             tool_inputs: HashMap::new(),
             current_tool_id: None,
+            emitted_text: false,
         }
     }
 
@@ -765,10 +807,35 @@ mod tests {
                 { "type": "tool_use", "id": "tu_1", "name": "search_notes", "input": {} }
             ] }
         }));
-        assert_eq!(events.len(), 1);
+        assert_eq!(events.len(), 2);
         assert!(
-            matches!(&events[0], ClaudeStreamEvent::ToolStart { tool_name, tool_id, .. } if tool_name == "search_notes" && tool_id == "tu_1")
+            matches!(&events[0], ClaudeStreamEvent::TextDelta { text } if text == "Let me search.")
         );
+        assert!(
+            matches!(&events[1], ClaudeStreamEvent::ToolStart { tool_name, tool_id, .. } if tool_name == "search_notes" && tool_id == "tu_1")
+        );
+    }
+
+    #[test]
+    fn dispatch_event_result_after_text_delta_does_not_duplicate_response_text() {
+        let (state, events) = run_dispatch_sequence(vec![
+            serde_json::json!({
+                "type": "stream_event",
+                "event": { "type": "content_block_delta", "delta": { "type": "text_delta", "text": "Visible reply" } }
+            }),
+            serde_json::json!({
+                "type": "result",
+                "session_id": "session-1",
+                "result": "Visible reply"
+            }),
+        ]);
+
+        assert_eq!(state.session_id, "session-1");
+        assert!(matches!(&events[..],
+                [
+                    ClaudeStreamEvent::TextDelta { text },
+                    ClaudeStreamEvent::Result { text: result_text, session_id },
+                ] if text == "Visible reply" && result_text.is_empty() && session_id == "session-1"));
     }
 
     #[test]
