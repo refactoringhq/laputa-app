@@ -229,7 +229,13 @@ function makeMockEditor(docRef: { current: unknown[] }) {
     blocksToMarkdownLossy: vi.fn(() => ''),
     blocksToHTMLLossy: vi.fn(() => ''),
     tryParseMarkdownToBlocks: vi.fn(() => blocksA),
-    _tiptapEditor: { commands: { setContent: vi.fn() } },
+    _tiptapEditor: {
+      state: { doc: { content: { size: 8 } } },
+      commands: {
+        setContent: vi.fn(),
+        setTextSelection: vi.fn(),
+      },
+    },
     _docRef: docRef,
   }
   Object.defineProperty(editor, 'document', { get: () => docRef.current })
@@ -452,6 +458,24 @@ describe('useEditorTabSwap raw mode sync', () => {
     } finally {
       container.remove()
     }
+  })
+
+  it('resets stale TipTap selection before applying a switched note', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = makeTab('b.md', 'Note B')
+
+    const { mockEditor, rerenderWith } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+      setupEditor: (editor) => {
+        editor._tiptapEditor.state.doc.content.size = 3
+      },
+    })
+    mockEditor._tiptapEditor.commands.setTextSelection.mockClear()
+
+    await rerenderWith({ tabs: [tabB], activeTabPath: 'b.md' })
+
+    expect(mockEditor._tiptapEditor.commands.setTextSelection).toHaveBeenCalledWith(1)
+    expect(mockEditor.replaceBlocks).toHaveBeenCalled()
   })
 
   it('re-parses when the active tab content changes without a path change', async () => {
