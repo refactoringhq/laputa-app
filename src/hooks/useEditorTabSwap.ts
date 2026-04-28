@@ -7,6 +7,7 @@ import { injectMathInBlocks, preProcessMathMarkdown } from '../utils/mathMarkdow
 import { injectMermaidInBlocks, preProcessMermaidMarkdown, serializeMermaidAwareBlocks } from '../utils/mermaidMarkdown'
 import { failNoteOpenTrace, finishNoteOpenTrace } from '../utils/noteOpenPerformance'
 import { resolveImageUrls, portableImageUrls } from '../utils/vaultImages'
+import { repairMalformedEditorBlocks } from './editorBlockRepair'
 import {
   extractEditorBody,
   getH1TextFromBlocks,
@@ -165,13 +166,21 @@ async function resolveBlocksForTarget(
   const preprocessed = preProcessEditorMarkdown(body, vaultPath)
   const fastPathBlocks = buildFastPathBlocks({ preprocessed })
   if (fastPathBlocks) {
-    const nextState = { blocks: fastPathBlocks, scrollTop: 0, sourceContent: content }
+    const nextState = {
+      blocks: repairMalformedEditorBlocks(fastPathBlocks) as EditorBlocks,
+      scrollTop: 0,
+      sourceContent: content,
+    }
     cacheEditorState(cache, targetPath, nextState)
     return nextState
   }
 
   const parsed = normalizeParsedImageBlocks(await parseMarkdownBlocks(editor, preprocessed)) as EditorBlocks
-  const nextState = { blocks: injectEditorMarkdownBlocks(parsed), scrollTop: 0, sourceContent: content }
+  const nextState = {
+    blocks: repairMalformedEditorBlocks(injectEditorMarkdownBlocks(parsed)) as EditorBlocks,
+    scrollTop: 0,
+    sourceContent: content,
+  }
   cacheEditorState(cache, targetPath, nextState)
   return nextState
 }
@@ -182,18 +191,19 @@ function applyBlocksToEditor(
   scrollTop: number,
   suppressChangeRef: MutableRefObject<boolean>,
 ) {
+  const safeBlocks = repairMalformedEditorBlocks(blocks) as EditorBlocks
   suppressChangeRef.current = true
   try {
     const current = editor.document
-    if (current.length > 0 && blocks.length > 0) {
-      editor.replaceBlocks(current, blocks)
-    } else if (blocks.length > 0) {
-      editor.insertBlocks(blocks, current[0], 'before')
+    if (current.length > 0 && safeBlocks.length > 0) {
+      editor.replaceBlocks(current, safeBlocks)
+    } else if (safeBlocks.length > 0) {
+      editor.insertBlocks(safeBlocks, current[0], 'before')
     }
   } catch (err) {
     console.error('applyBlocks failed, trying fallback:', err)
     try {
-      const html = editor.blocksToHTMLLossy(blocks)
+      const html = editor.blocksToHTMLLossy(safeBlocks)
       editor._tiptapEditor.commands.setContent(html)
     } catch (err2) {
       console.error('Fallback also failed:', err2)
