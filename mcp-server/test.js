@@ -6,6 +6,7 @@ import os from 'node:os'
 import {
   findMarkdownFiles, getNote, searchNotes, vaultContext,
 } from './vault.js'
+import { requireVaultPath } from './vault-path.js'
 import { evaluateBridgeRequest } from './ws-bridge.js'
 
 let tmpDir
@@ -187,6 +188,22 @@ describe('evaluateBridgeRequest', () => {
         remoteAddress: '192.168.1.10',
       }),
       { ok: false, reason: 'non-local client' },
+    )
+  })
+})
+
+describe('requireVaultPath', () => {
+  it('returns the explicit configured vault path', () => {
+    assert.equal(
+      requireVaultPath({ VAULT_PATH: '/tmp/Selected Vault' }),
+      '/tmp/Selected Vault',
+    )
+  })
+
+  it('rejects missing vault paths instead of falling back to ~/Laputa', () => {
+    assert.throws(
+      () => requireVaultPath({}),
+      /VAULT_PATH is required/,
     )
   })
 })

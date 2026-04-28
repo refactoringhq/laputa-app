@@ -21,8 +21,9 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import WebSocket from 'ws'
 import { searchNotes, getNote, vaultContext } from './vault.js'
+import { requireVaultPath } from './vault-path.js'
 
-const VAULT_PATH = process.env.VAULT_PATH || process.env.HOME + '/Laputa'
+const VAULT_PATH = requireVaultPath()
 const WS_UI_PORT = parseInt(process.env.WS_UI_PORT || '9711', 10)
 const WS_UI_URL = `ws://localhost:${WS_UI_PORT}`
 

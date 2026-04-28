@@ -486,6 +486,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   },
   register_mcp_tools: () => 'registered',
   check_mcp_status: () => 'installed',
+  sync_mcp_bridge_vault: (args: { vaultPath?: string | null }) => args.vaultPath ? 'started' : 'stopped',
   repair_vault: (): string => {
     mockVaultAiGuidanceStatus = {
       agents_state: 'managed',

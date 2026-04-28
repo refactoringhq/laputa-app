@@ -15,6 +15,7 @@ const mockInvokeFn = vi.fn((cmd: string, args?: Record<string, unknown>): Promis
     return Promise.resolve(null)
   }
   if (cmd === 'get_default_vault_path') return Promise.resolve(mockDefaultVaultPath)
+  if (cmd === 'sync_mcp_bridge_vault') return Promise.resolve(args?.vaultPath ? 'started' : 'stopped')
   if (cmd === 'check_vault_exists') return Promise.resolve(true)
   return Promise.resolve(null)
 })
@@ -56,6 +57,7 @@ describe('useVaultSwitcher', () => {
         return Promise.resolve(null)
       }
       if (cmd === 'get_default_vault_path') return Promise.resolve(mockDefaultVaultPath)
+      if (cmd === 'sync_mcp_bridge_vault') return Promise.resolve(args?.vaultPath ? 'started' : 'stopped')
       if (cmd === 'check_vault_exists') {
         const checkVaultExists = overrides.checkVaultExists
         return Promise.resolve(typeof checkVaultExists === 'function'
@@ -226,6 +228,46 @@ describe('useVaultSwitcher', () => {
     expect(result.current.vaultPath).toBe(expectedDefaultVaultPath)
     expect(result.current.selectedVaultPath).toBeNull()
     expect(mockVaultListStore.active_vault).toBeNull()
+  })
+
+  it('stops the MCP bridge when there is no selected active vault', async () => {
+    await renderLoadedVaultSwitcher()
+
+    await waitFor(() => {
+      expect(mockInvokeFn).toHaveBeenCalledWith('sync_mcp_bridge_vault', { vaultPath: null })
+    })
+  })
+
+  it('syncs the MCP bridge to a persisted active vault', async () => {
+    mockVaultListStore = {
+      vaults: [{ label: 'Work', path: '/work/vault' }],
+      active_vault: '/work/vault',
+      hidden_defaults: [],
+    }
+
+    await renderLoadedVaultSwitcher()
+
+    await waitFor(() => {
+      expect(mockInvokeFn).toHaveBeenCalledWith('sync_mcp_bridge_vault', { vaultPath: '/work/vault' })
+    })
+  })
+
+  it('syncs the MCP bridge after switching vaults', async () => {
+    mockVaultListStore = {
+      vaults: [{ label: 'Work', path: '/work/vault' }],
+      active_vault: null,
+      hidden_defaults: [],
+    }
+
+    const { result } = await renderLoadedVaultSwitcher()
+
+    act(() => {
+      result.current.switchVault('/work/vault')
+    })
+
+    await waitFor(() => {
+      expect(mockInvokeFn).toHaveBeenCalledWith('sync_mcp_bridge_vault', { vaultPath: '/work/vault' })
+    })
   })
 
   it('keeps the implicit default vault out of the list when its path is missing', async () => {

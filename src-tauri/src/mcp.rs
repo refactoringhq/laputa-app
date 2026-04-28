@@ -215,10 +215,11 @@ fn mcp_server_dir_has_files(path: &Path) -> bool {
 }
 
 /// Spawn the WebSocket bridge as a child process.
-pub fn spawn_ws_bridge(vault_path: &str) -> Result<Child, String> {
+pub fn spawn_ws_bridge(vault_path: impl AsRef<Path>) -> Result<Child, String> {
     let node = find_node()?;
     let server_dir = mcp_server_dir()?;
     let script = server_dir.join("ws-bridge.js");
+    let vault_path = vault_path.as_ref();
 
     let child = crate::hidden_command(node)
         .arg(&script)
@@ -231,7 +232,11 @@ pub fn spawn_ws_bridge(vault_path: &str) -> Result<Child, String> {
         .spawn()
         .map_err(|e| format!("Failed to spawn ws-bridge: {e}"))?;
 
-    log::info!("ws-bridge spawned (pid: {})", child.id());
+    log::info!(
+        "ws-bridge spawned (pid: {}, vault: {})",
+        child.id(),
+        vault_path.display()
+    );
     Ok(child)
 }
 

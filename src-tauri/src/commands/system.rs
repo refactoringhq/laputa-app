@@ -131,6 +131,22 @@ pub async fn check_mcp_status(vault_path: String) -> Result<crate::mcp::McpStatu
         .map_err(|e| format!("MCP status check failed: {e}"))
 }
 
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn sync_mcp_bridge_vault(
+    app: tauri::AppHandle,
+    vault_path: Option<String>,
+) -> Result<String, String> {
+    let expanded_vault_path = vault_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(|path| super::expand_tilde(path).into_owned());
+    let vault_path = expanded_vault_path.as_deref().map(std::path::Path::new);
+
+    crate::sync_ws_bridge_for_vault(&app, vault_path).map(str::to_string)
+}
+
 // ── MCP commands (mobile stubs) ─────────────────────────────────────────────
 
 #[cfg(mobile)]
@@ -149,6 +165,12 @@ pub async fn remove_mcp_tools() -> Result<String, String> {
 #[tauri::command]
 pub async fn check_mcp_status(_vault_path: String) -> Result<crate::mcp::McpStatus, String> {
     Ok(crate::mcp::McpStatus::NotInstalled)
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn sync_mcp_bridge_vault(_vault_path: Option<String>) -> Result<String, String> {
+    Err("MCP is not available on mobile".into())
 }
 
 // ── Menu commands ───────────────────────────────────────────────────────────

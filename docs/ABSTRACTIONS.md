@@ -342,6 +342,8 @@ Command-layer path access is fenced to the active vault before file operations r
 
 UI-only file actions operate on paths that are already selected or indexed in React state. Reveal-in-Finder and external-open calls route through the Tauri opener plugin, while copy-path uses the browser clipboard API; none of those actions mutate vault contents or bypass the backend write boundary.
 
+The local MCP WebSocket bridge follows the same active-vault boundary. `useVaultSwitcher` calls `sync_mcp_bridge_vault` after the persisted selection loads and after each vault switch; the desktop command starts/restarts the bridge with that vault's canonical path, or stops it when there is no selected vault. MCP Node entrypoints require `VAULT_PATH` and fail clearly instead of falling back to `~/Laputa`.
+
 ### Vault Caching
 
 `vault::scan_vault_cached(path)` wraps scanning with git-based caching:
