@@ -68,6 +68,10 @@ export function isUntitledPath(path: FilePath): boolean {
   return pathStem(path).startsWith('untitled-')
 }
 
+export function blankParagraphBlocks(): unknown[] {
+  return [{ type: 'paragraph', content: [], children: [] }]
+}
+
 function isParsedBlock(value: unknown): value is ParsedBlock {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

@@ -9,6 +9,7 @@ import { failNoteOpenTrace, finishNoteOpenTrace } from '../utils/noteOpenPerform
 import { resolveImageUrls, portableImageUrls } from '../utils/vaultImages'
 import { repairMalformedEditorBlocks } from './editorBlockRepair'
 import {
+  blankParagraphBlocks,
   extractEditorBody,
   getH1TextFromBlocks,
   isUntitledPath,
@@ -17,6 +18,7 @@ import {
   slugifyPathStem,
 } from './editorTabContent'
 import { clearEditorDomSelection, EDITOR_CONTAINER_SELECTOR } from './editorDomSelection'
+import { resetTextSelectionBeforeContentSwap } from './editorTiptapSelection'
 export { extractEditorBody, getH1TextFromBlocks, replaceTitleInFrontmatter } from './editorTabContent'
 
 interface Tab {
@@ -120,10 +122,6 @@ function extractBodyRemainderAfterEmptyH1(options: { content: string }): string 
   return [secondLine, ...rest].join('\n').trimStart()
 }
 
-function blankParagraphBlocks(): EditorBlocks {
-  return [{ type: 'paragraph', content: [], children: [] }]
-}
-
 async function parseMarkdownBlocks(
   editor: ReturnType<typeof useCreateBlockNote>,
   preprocessed: string,
@@ -194,6 +192,7 @@ function applyBlocksToEditor(
   const safeBlocks = repairMalformedEditorBlocks(blocks) as EditorBlocks
   suppressChangeRef.current = true
   try {
+    resetTextSelectionBeforeContentSwap(editor)
     const current = editor.document
     if (current.length > 0 && safeBlocks.length > 0) {
       editor.replaceBlocks(current, safeBlocks)
@@ -224,6 +223,7 @@ function applyBlankStateToEditor(
 ) {
   suppressChangeRef.current = true
   try {
+    resetTextSelectionBeforeContentSwap(editor)
     editor._tiptapEditor.commands.setContent('<p></p>')
   } catch (err) {
     console.error('applyBlankStateToEditor failed, falling back to replaceBlocks:', err)
@@ -245,6 +245,7 @@ function applyHtmlStateToEditor(
 ) {
   suppressChangeRef.current = true
   try {
+    resetTextSelectionBeforeContentSwap(editor)
     editor._tiptapEditor.commands.setContent(html)
   } catch (err) {
     console.error('applyHtmlStateToEditor failed:', err)
