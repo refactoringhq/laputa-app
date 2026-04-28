@@ -54,6 +54,8 @@ describe('SettingsPanel', () => {
     vi.clearAllMocks()
     Object.defineProperty(window, 'localStorage', { value: localStorageMock, configurable: true })
     window.localStorage.clear()
+    document.documentElement.removeAttribute('data-theme')
+    document.documentElement.classList.remove('dark')
     installPointerCapturePolyfill()
   })
 
@@ -196,6 +198,21 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Dark' }))
     fireEvent.click(screen.getByTestId('settings-save'))
 
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      theme_mode: 'dark',
+    }))
+  })
+
+  it('applies the selected dark color mode immediately while settings stays open', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Dark' }))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('dark')
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       theme_mode: 'dark',
     }))

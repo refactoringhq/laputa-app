@@ -28,9 +28,11 @@ import {
   type UiLanguagePreference,
 } from '../lib/i18n'
 import {
+  applyThemeModeToDocument,
   DEFAULT_THEME_MODE,
   readStoredThemeMode,
   type ThemeMode,
+  writeStoredThemeMode,
 } from '../lib/themeMode'
 import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel } from '../lib/releaseChannel'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
@@ -203,6 +205,11 @@ function sanitizePositiveInteger(value: number | null | undefined, fallback: num
   return Math.round(value)
 }
 
+function applyThemeModeSelection(value: ThemeMode): void {
+  if (typeof document !== 'undefined') applyThemeModeToDocument(document, value)
+  if (typeof window !== 'undefined') writeStoredThemeMode(window.localStorage, value)
+}
+
 export function SettingsPanel({
   open,
   settings,
@@ -279,6 +286,12 @@ function SettingsPanelInner({
     onSave({ ...settings, hide_gitignored_files: value })
   }, [onSave, settings, updateDraft])
 
+  const handleThemeModeChange = useCallback((value: ThemeMode) => {
+    updateDraft('themeMode', value)
+    applyThemeModeSelection(value)
+    onSave({ ...settings, theme_mode: value })
+  }, [onSave, settings, updateDraft])
+
   const handleSave = useCallback(() => {
     trackTelemetryConsentChange(settings.analytics_enabled === true, draft.analytics)
     onSave(buildSettingsFromDraft(settings, draft))
@@ -344,7 +357,7 @@ function SettingsPanelInner({
           releaseChannel={draft.releaseChannel}
           setReleaseChannel={(value) => updateDraft('releaseChannel', value)}
           themeMode={draft.themeMode}
-          setThemeMode={(value) => updateDraft('themeMode', value)}
+          setThemeMode={handleThemeModeChange}
           uiLanguage={draft.uiLanguage}
           setUiLanguage={(value) => updateDraft('uiLanguage', value)}
           initialH1AutoRename={draft.initialH1AutoRename}
