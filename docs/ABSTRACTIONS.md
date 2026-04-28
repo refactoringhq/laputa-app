@@ -175,6 +175,7 @@ Type is determined **purely** from the `type:` frontmatter field — it is never
 ├── some-topic.md          ← type: Topic
 ├── AGENTS.md              ← canonical Tolaria AI guidance
 ├── CLAUDE.md              ← compatibility shim pointing at AGENTS.md
+├── GEMINI.md              ← optional Gemini CLI shim pointing at AGENTS.md
 ├── ...
 └── type/                  ← type definition documents
 ```
@@ -677,8 +678,9 @@ Per-vault settings stored locally and scoped by vault path:
 Tolaria tracks managed vault-level AI guidance separately from normal note content:
 - `AGENTS.md` is the canonical managed guidance file for Tolaria-aware coding agents
 - `CLAUDE.md` is a compatibility shim that points Claude Code back to `AGENTS.md`
+- `GEMINI.md` is an optional Gemini CLI compatibility shim that points Gemini back to `AGENTS.md`
 - `useVaultAiGuidanceStatus` reads `get_vault_ai_guidance_status` and normalizes the backend state into four UI cases: `managed`, `missing`, `broken`, and `custom`
-- `restore_vault_ai_guidance` repairs only Tolaria-managed files; user-authored custom `AGENTS.md` / `CLAUDE.md` files are surfaced as custom and left untouched
+- `restore_vault_ai_guidance` repairs only Tolaria-managed files and creates the optional Gemini shim on explicit request; user-authored custom `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` files are surfaced as custom and left untouched
 - The status bar AI badge and command palette consume that abstraction to expose restore actions only when the managed guidance is missing or broken
 
 ### Getting Started / Onboarding
