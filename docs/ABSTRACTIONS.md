@@ -323,20 +323,21 @@ type SidebarSelection =
 `vault::scan_vault(path)` in `src-tauri/src/vault/mod.rs`:
 
 1. Validates the path exists and is a directory
-2. Scans root-level `.md` files (non-recursive)
-3. Recursively scans protected folders: `type/`, legacy `config/`, `attachments/`
-4. Files in non-protected subfolders are **not indexed** (flat vault enforcement)
-5. For each `.md` file, calls `parse_md_file()`:
+2. Recursively scans non-hidden files while skipping hidden directories such as `.git/`
+3. For each `.md` file, calls `parse_md_file()`:
    - Reads content with `fs::read_to_string()`
    - Parses frontmatter with `gray_matter::Matter::<YAML>`
    - Extracts title from first `#` heading
    - Reads entity type from `type:` frontmatter field (`Is A:` accepted as legacy alias); type is never inferred from folder
    - Parses dates as ISO 8601 to Unix timestamps
    - Extracts relationships, outgoing links, custom properties, word count, snippet
+4. For recognized non-markdown text and binary files, emits a minimal `VaultEntry` with `fileKind`
+5. Sorts by `modified_at` descending
+6. Skips unparseable files with a warning log
 
 The folder tree hides only the dedicated `type/` directory, since note types already have their own sidebar section. Default vault folders such as `attachments/` and `views/` remain visible alongside user-created folders.
-6. Sorts by `modified_at` descending
-7. Skips unparseable files with a warning log
+
+Command-facing vault content is filtered through `vault::filter_gitignored_entries`, `vault::filter_gitignored_folders`, and `vault::filter_gitignored_paths` when the app setting `hide_gitignored_files` is enabled. The cache still stores the complete scan; `list_vault`, `reload_vault`, `list_vault_folders`, and search apply the visibility filter at the boundary before React consumes entries. The filter batches paths through `git check-ignore --no-index --stdin`, so negated and specific `.gitignore` patterns follow Git semantics as closely as the app can reasonably support.
 
 A `vault_health_check` command detects stray files in non-protected subfolders and filename-title mismatches. On vault load, a migration banner offers to flatten stray files to the root via `flatten_vault`.
 
@@ -344,7 +345,7 @@ Command-layer path access is fenced to the active vault before file operations r
 
 UI-only file actions operate on paths that are already selected or indexed in React state. Reveal-in-Finder and external-open calls route through the Tauri opener plugin, while copy-path uses the browser clipboard API; none of those actions mutate vault contents or bypass the backend write boundary.
 
-The local MCP WebSocket bridge follows the same active-vault boundary. `useVaultSwitcher` calls `sync_mcp_bridge_vault` after the persisted selection loads and after each vault switch; the desktop command starts/restarts the bridge with that vault's canonical path, or stops it when there is no selected vault. MCP Node entrypoints require `VAULT_PATH` and fail clearly instead of falling back to `~/Laputa`.
+The local MCP WebSocket bridge follows the same active-vault boundary. `useVaultSwitcher` calls `sync_mcp_bridge_vault` after the persisted selection loads and after each vault switch; the desktop command starts/restarts the bridge with that vault's canonical path, or stops it when there is no selected vault. MCP Node entrypoints require `VAULT_PATH` and fail clearly instead of falling back to `~/Laputa`. Manual MCP config export uses the same generated stdio entry as registration, so the copied snippet remains scoped to the active vault without writing third-party config files.
 
 ### Vault Caching
 
@@ -634,7 +635,7 @@ The Inspector panel (`src/components/Inspector.tsx`) is composed of sub-panels:
 
 ### Search
 
-Keyword-based search scans all vault `.md` files using `walkdir`:
+Keyword-based search scans all vault `.md` files using `walkdir` and applies the same Gitignored-content visibility filter as vault loading:
 
 ```typescript
 interface SearchResult {
@@ -726,10 +727,11 @@ interface Settings {
   theme_mode: 'light' | 'dark' | null
   ui_language: AppLocale | null
   default_ai_agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | null
+  hide_gitignored_files: boolean | null // null = default true
 }
 ```
 
-Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is installation-local because it controls device comfort rather than vault structure. `ui_language` is also installation-local: `null` follows the supported system language with English fallback, while explicit values pin the UI language for this installation. Stored legacy aliases such as `zh-Hans` are normalized to canonical locale codes before the setting reaches React state. `default_ai_agent` is an installation-local preference that selects which supported CLI agent the AI panel, command palette AI mode, and status bar should target by default. The AutoGit fields are also installation-local: `useAutoGit` consumes them to schedule automatic checkpoints, while `useCommitFlow` and the status bar quick action reuse the same checkpoint runner and deterministic automatic commit message generation.
+Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is installation-local because it controls device comfort rather than vault structure. `ui_language` is also installation-local: `null` follows the supported system language with English fallback, while explicit values pin the UI language for this installation. Stored legacy aliases such as `zh-Hans` are normalized to canonical locale codes before the setting reaches React state. `default_ai_agent` is an installation-local preference that selects which supported CLI agent the AI panel, command palette AI mode, and status bar should target by default. `hide_gitignored_files` is also installation-local and defaults to `true`; changing it reloads entries, search, saved views, and folders without restarting. The AutoGit fields are also installation-local: `useAutoGit` consumes them to schedule automatic checkpoints, while `useCommitFlow` and the status bar quick action reuse the same checkpoint runner and deterministic automatic commit message generation.
 
 ## Telemetry
 
@@ -741,9 +743,9 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 - **`useTelemetry(settings, loaded)`** — Reactively initializes/tears down Sentry and PostHog based on settings. Called once in `App`.
 
 ### Libraries
-- **`src/lib/telemetry.ts`** — `initSentry()`, `teardownSentry()`, `initPostHog()`, `teardownPostHog()`, `trackEvent()`. Path scrubber via `beforeSend` hook. DSN/release/key from `VITE_SENTRY_DSN`, `VITE_SENTRY_RELEASE`, and `VITE_POSTHOG_KEY` env vars.
+- **`src/lib/telemetry.ts`** — `initSentry()`, `teardownSentry()`, `initPostHog()`, `teardownPostHog()`, `trackEvent()`. Path scrubber via `beforeSend` hook. DSN/key from `VITE_SENTRY_DSN` and `VITE_POSTHOG_KEY`; `VITE_SENTRY_RELEASE` is treated as the build version and only becomes Sentry's `release` for stable calendar builds (`YYYY.M.D`). Alpha/prerelease/internal builds tag `tolaria.build_version` and `tolaria.release_kind` without creating normal Sentry Releases entries.
 - **`src/main.tsx`** — React root error callbacks (`onCaughtError`, `onUncaughtError`, `onRecoverableError`) forward component-stack context to `Sentry.reactErrorHandler()` for debuggable production React errors.
-- **`src-tauri/src/telemetry.rs`** — Rust-side Sentry init with `beforeSend` path scrubber. `init_sentry_from_settings()` reads settings and conditionally initializes. `reinit_sentry()` for runtime toggle.
+- **`src-tauri/src/telemetry.rs`** — Rust-side Sentry init with `beforeSend` path scrubber. `init_sentry_from_settings()` reads settings and conditionally initializes; stable calendar `CARGO_PKG_VERSION` values become Sentry releases, while alpha/prerelease/internal versions are kept as diagnostic tags only. `reinit_sentry()` for runtime toggle.
 
 ### Tauri Commands
 - **`reinit_telemetry`** — Re-reads settings and toggles Rust Sentry on/off. Called from frontend when user changes crash reporting setting.
@@ -769,6 +771,6 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 - **`download_and_install_app_update`** — Channel-aware download/install with streamed progress events.
 
 ### CI/CD
-- **`.github/workflows/release.yml`** — Alpha prereleases from every push to `main` using calendar-semver technical versions (`YYYY.M.D-alpha.N`) and clean `Alpha YYYY.M.D.N` release names. GitHub alpha tags zero-pad the prerelease sequence (`alpha-vYYYY.M.D-alpha.NNNN`) so GitHub release ordering stays chronological while the shipped app version remains `YYYY.M.D-alpha.N`. Publishes `alpha/latest.json` with macOS Apple Silicon/Intel, Linux x64, and Windows x64 updater entries, then refreshes the legacy `latest.json` / `latest-canary.json` aliases to the alpha feed. macOS release assets use `Tolaria_<version>_macOS_Silicon` and `Tolaria_<version>_macOS_Intel` base names. Packaged builds pass the computed version as `VITE_SENTRY_RELEASE`.
-- **`.github/workflows/release-stable.yml`** — Stable releases from `stable-vYYYY.M.D` tags. Publishes `stable/latest.json`, macOS Apple Silicon and Intel DMG/updater artifacts, Windows x64 installers/updater bundles, and Linux x86_64 `.deb` / AppImage artifacts. Stable macOS DMG/updater assets use the same `Tolaria_<version>_macOS_Silicon` and `Tolaria_<version>_macOS_Intel` base names. Packaged builds pass the computed version as `VITE_SENTRY_RELEASE`.
+- **`.github/workflows/release.yml`** — Alpha prereleases from every push to `main` using calendar-semver technical versions (`YYYY.M.D-alpha.N`) and clean `Alpha YYYY.M.D.N` release names. GitHub alpha tags zero-pad the prerelease sequence (`alpha-vYYYY.M.D-alpha.NNNN`) so GitHub release ordering stays chronological while the shipped app version remains `YYYY.M.D-alpha.N`. Publishes `alpha/latest.json` with macOS Apple Silicon/Intel, Linux x64, and Windows x64 updater entries, then refreshes the legacy `latest.json` / `latest-canary.json` aliases to the alpha feed. macOS release assets use `Tolaria_<version>_macOS_Silicon` and `Tolaria_<version>_macOS_Intel` base names. Packaged builds pass the computed version as `VITE_SENTRY_RELEASE`, which is retained as a diagnostic build-version tag but not registered as a normal Sentry release for alpha builds.
+- **`.github/workflows/release-stable.yml`** — Stable releases from `stable-vYYYY.M.D` tags. Publishes `stable/latest.json`, macOS Apple Silicon and Intel DMG/updater artifacts, Windows x64 installers/updater bundles, and Linux x86_64 `.deb` / AppImage artifacts. Stable macOS DMG/updater assets use the same `Tolaria_<version>_macOS_Silicon` and `Tolaria_<version>_macOS_Intel` base names. Packaged builds pass the computed stable version as `VITE_SENTRY_RELEASE`, which is registered as Sentry's release.
 - **Beta cohorts** are handled in PostHog targeting only. There is no beta updater feed.

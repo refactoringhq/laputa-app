@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use walkdir::WalkDir;
 
@@ -18,6 +18,14 @@ pub struct SearchResponse {
     pub elapsed_ms: u64,
     pub query: String,
     pub mode: String,
+}
+
+pub struct SearchOptions<'a> {
+    pub vault_path: &'a str,
+    pub query: &'a str,
+    pub mode: &'a str,
+    pub limit: usize,
+    pub hide_gitignored_files: bool,
 }
 
 fn extract_snippet(content: &str, query_lower: &str) -> String {
@@ -63,26 +71,45 @@ pub fn search_vault(
     _mode: &str,
     limit: usize,
 ) -> Result<SearchResponse, String> {
+    search_vault_with_options(SearchOptions {
+        vault_path,
+        query,
+        mode: _mode,
+        limit,
+        hide_gitignored_files: crate::settings::hide_gitignored_files_enabled(),
+    })
+}
+
+fn is_markdown_search_candidate(path: &Path) -> bool {
+    if !path.extension().is_some_and(|ext| ext == "md") {
+        return false;
+    }
+
+    !path
+        .components()
+        .any(|component| component.as_os_str().to_string_lossy().starts_with('.'))
+}
+
+fn collect_markdown_paths(vault_dir: &Path, hide_gitignored_files: bool) -> Vec<PathBuf> {
+    let paths = WalkDir::new(vault_dir)
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.into_path())
+        .filter(|path| is_markdown_search_candidate(path))
+        .collect::<Vec<_>>();
+
+    crate::vault::filter_gitignored_paths(vault_dir, paths, hide_gitignored_files)
+}
+
+pub fn search_vault_with_options(options: SearchOptions<'_>) -> Result<SearchResponse, String> {
     let start = Instant::now();
-    let query_lower = query.to_lowercase();
-    let vault_dir = Path::new(vault_path);
+    let query_lower = options.query.to_lowercase();
+    let vault_dir = Path::new(options.vault_path);
 
     let mut results: Vec<SearchResult> = Vec::new();
 
-    for entry in WalkDir::new(vault_dir).into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if !path.extension().is_some_and(|ext| ext == "md") {
-            continue;
-        }
-        // Skip hidden dirs and .laputa config
-        if path
-            .components()
-            .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
-        {
-            continue;
-        }
-
-        let content = match std::fs::read_to_string(path) {
+    for path in collect_markdown_paths(vault_dir, options.hide_gitignored_files) {
+        let content = match std::fs::read_to_string(&path) {
             Ok(c) => c,
             Err(_) => continue,
         };
@@ -117,15 +144,15 @@ pub fn search_vault(
             .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    results.truncate(limit);
+    results.truncate(options.limit);
 
     let elapsed_ms = start.elapsed().as_millis() as u64;
 
     Ok(SearchResponse {
         results,
         elapsed_ms,
-        query: query.to_string(),
-        mode: "keyword".to_string(),
+        query: options.query.to_string(),
+        mode: options.mode.to_string(),
     })
 }
 
@@ -134,6 +161,14 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::Builder;
+
+    fn init_git_repo(root: &Path) {
+        crate::hidden_command("git")
+            .args(["init"])
+            .current_dir(root)
+            .output()
+            .unwrap();
+    }
 
     #[test]
     fn test_extract_snippet_basic() {
@@ -187,5 +222,39 @@ mod tests {
 
         assert_eq!(response.results.len(), 1);
         assert_eq!(response.results[0].title, "Updated Display Title");
+    }
+
+    #[test]
+    fn test_search_vault_hides_gitignored_notes_when_enabled() {
+        let dir = Builder::new()
+            .prefix("search-gitignored-")
+            .tempdir_in(std::env::current_dir().unwrap())
+            .unwrap();
+        init_git_repo(dir.path());
+        fs::create_dir_all(dir.path().join("ignored")).unwrap();
+        fs::write(dir.path().join(".gitignore"), "ignored/\n").unwrap();
+        fs::write(dir.path().join("visible.md"), "# Visible\n\nneedle").unwrap();
+        fs::write(dir.path().join("ignored/hidden.md"), "# Hidden\n\nneedle").unwrap();
+
+        let hidden = search_vault_with_options(SearchOptions {
+            vault_path: dir.path().to_str().unwrap(),
+            query: "needle",
+            mode: "keyword",
+            limit: 10,
+            hide_gitignored_files: true,
+        })
+        .unwrap();
+        let shown = search_vault_with_options(SearchOptions {
+            vault_path: dir.path().to_str().unwrap(),
+            query: "needle",
+            mode: "keyword",
+            limit: 10,
+            hide_gitignored_files: false,
+        })
+        .unwrap();
+
+        assert_eq!(hidden.results.len(), 1);
+        assert_eq!(hidden.results[0].title, "Visible");
+        assert_eq!(shown.results.len(), 2);
     }
 }

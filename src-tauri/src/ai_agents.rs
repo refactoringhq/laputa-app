@@ -489,6 +489,9 @@ fn map_claude_event(event: crate::claude_cli::ClaudeStreamEvent) -> Option<AiAge
             Some(AiAgentStreamEvent::Error { message })
         }
         crate::claude_cli::ClaudeStreamEvent::Done => Some(AiAgentStreamEvent::Done),
+        crate::claude_cli::ClaudeStreamEvent::Result { text, .. } if !text.is_empty() => {
+            Some(AiAgentStreamEvent::TextDelta { text })
+        }
         crate::claude_cli::ClaudeStreamEvent::Result { .. } => None,
     }
 }
@@ -690,5 +693,18 @@ mod tests {
         let mapped = map_claude_event(crate::claude_cli::ClaudeStreamEvent::Done);
 
         assert!(matches!(mapped, Some(AiAgentStreamEvent::Done)));
+    }
+
+    #[test]
+    fn map_claude_result_event_preserves_final_text() {
+        let mapped = map_claude_event(crate::claude_cli::ClaudeStreamEvent::Result {
+            text: "Final answer from Claude".into(),
+            session_id: "session-1".into(),
+        });
+
+        assert!(matches!(
+            mapped,
+            Some(AiAgentStreamEvent::TextDelta { text }) if text == "Final answer from Claude"
+        ));
     }
 }

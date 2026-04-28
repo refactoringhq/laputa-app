@@ -19,11 +19,32 @@ interface InlineItem {
 
 interface BlockLike {
   type?: string
-  content?: InlineItem[]
+  content?: BlockContent
   props?: Record<string, string>
   children?: BlockLike[]
   [key: string]: unknown
 }
+
+type BlockContent = InlineItem[] | TableContentLike | unknown
+
+interface TableContentLike {
+  type?: string
+  rows?: TableRowLike[]
+  [key: string]: unknown
+}
+
+interface TableRowLike {
+  cells?: TableCellValue[]
+  [key: string]: unknown
+}
+
+interface TableCellLike {
+  content?: InlineItem[]
+  [key: string]: unknown
+}
+
+type TableCellValue = TableCellLike | string
+type InlineContentTransform = (content: InlineItem[]) => InlineItem[]
 
 interface MarkdownSerializer {
   blocksToMarkdownLossy: (blocks: unknown[]) => string
@@ -111,7 +132,7 @@ function isCodeFence({ text: line }: { text: string }): boolean {
 }
 
 function isSingleDollar({ text, index }: TextPosition): boolean {
-  return text[index] === '$' && text[index + 1] !== '$'
+  return text[index] === '$' && text[index - 1] !== '$' && text[index + 1] !== '$'
 }
 
 function isInlineMathEnd(position: TextPosition): boolean {
@@ -274,10 +295,47 @@ function restoreInlineMath(content: InlineItem[]): InlineItem[] {
   })
 }
 
+function isTableContent(content: BlockContent): content is TableContentLike {
+  return Boolean(
+    content
+      && typeof content === 'object'
+      && !Array.isArray(content)
+      && (content as TableContentLike).type === 'tableContent'
+      && Array.isArray((content as TableContentLike).rows),
+  )
+}
+
+function transformTableCell(cell: TableCellValue, transform: InlineContentTransform): TableCellValue {
+  if (typeof cell === 'string' || !Array.isArray(cell.content)) return cell
+  return { ...cell, content: transform(cell.content) }
+}
+
+function transformTableContent(
+  content: TableContentLike,
+  transform: InlineContentTransform,
+): TableContentLike {
+  return {
+    ...content,
+    rows: content.rows?.map((row) => ({
+      ...row,
+      cells: row.cells?.map((cell) => transformTableCell(cell, transform)),
+    })),
+  }
+}
+
+function transformBlockContent(
+  content: BlockContent,
+  transform: InlineContentTransform,
+): BlockContent {
+  if (Array.isArray(content)) return transform(content)
+  if (isTableContent(content)) return transformTableContent(content, transform)
+  return content
+}
+
 function injectMathInBlock(block: BlockLike): BlockLike {
-  const content = Array.isArray(block.content) ? expandInlineMath(block.content) : block.content
+  const content = transformBlockContent(block.content, expandInlineMath)
   const children = Array.isArray(block.children) ? block.children.map(injectMathInBlock) : block.children
-  const latex = readDisplayMathToken(content)
+  const latex = Array.isArray(content) ? readDisplayMathToken(content) : null
 
   if (latex !== null) {
     return buildMathBlock({ block, latex })
@@ -303,7 +361,7 @@ function buildMathBlock({ block, latex }: { block: BlockLike } & LatexPayload): 
 }
 
 function restoreInlineMathInBlock(block: BlockLike): BlockLike {
-  const content = Array.isArray(block.content) ? restoreInlineMath(block.content) : block.content
+  const content = transformBlockContent(block.content, restoreInlineMath)
   const children = Array.isArray(block.children) ? block.children.map(restoreInlineMathInBlock) : block.children
   return { ...block, content, children }
 }

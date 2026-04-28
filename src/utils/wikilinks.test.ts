@@ -34,6 +34,23 @@ describe('preProcessWikilinks', () => {
     expect(preProcessWikilinks(input)).toBe(input)
   })
 
+  it('preserves wikilinks and inline formatting inside markdown tables', () => {
+    const input = [
+      '| Topic | Reference |',
+      '| --- | --- |',
+      '| [[Project Alpha]] | **bold** and [[Project Beta]] |',
+      '',
+      'Outside [[Project Gamma]]',
+    ].join('\n')
+
+    const result = preProcessWikilinks(input)
+
+    expect(result).toContain('| [[Project Alpha]] | **bold** and [[Project Beta]] |')
+    expect(result).toContain('WIKILINK:Project Gamma')
+    expect(result).not.toContain('WIKILINK:Project Alpha')
+    expect(result).not.toContain('WIKILINK:Project Beta')
+  })
+
   it('handles empty string', () => {
     expect(preProcessWikilinks('')).toBe('')
   })

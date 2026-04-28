@@ -1,6 +1,7 @@
 export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi'
 
 export type AiAgentStatus = 'checking' | 'installed' | 'missing'
+export type AiAgentReadiness = 'checking' | 'ready' | 'missing'
 
 export interface AiAgentAvailability {
   status: AiAgentStatus

@@ -72,6 +72,7 @@ import { useConflictFlow } from './hooks/useConflictFlow'
 import { useAppSave } from './hooks/useAppSave'
 import { useNoteRetargetingUi } from './hooks/useNoteRetargetingUi'
 import { useVaultBridge } from './hooks/useVaultBridge'
+import { createViewFilename } from './utils/viewFilename'
 import type { CommitDiffRequest } from './hooks/useDiffMode'
 import { ConflictResolverModal } from './components/ConflictResolverModal'
 import { ConfirmDeleteDialog } from './components/ConfirmDeleteDialog'
@@ -438,6 +439,7 @@ function App() {
   }, [saveSettings, settings])
   const aiAgentPreferences = useAiAgentPreferences({
     settings,
+    settingsLoaded,
     saveSettings,
     aiAgentsStatus,
     onToast: setToastMessage,
@@ -451,7 +453,16 @@ function App() {
       trackEvent('vault_opened', { has_git: gitRepoState === 'ready' ? 1 : 0, note_count: vault.entries.length })
     }
   }, [vault.entries.length, gitRepoState, resolvedPath])
-  const { mcpStatus, connectMcp, disconnectMcp } = useMcpStatus(resolvedPath, setToastMessage)
+  const {
+    mcpStatus,
+    connectMcp,
+    disconnectMcp,
+    mcpConfigSnippet,
+    mcpConfigLoading,
+    mcpConfigError,
+    loadMcpConfigSnippet,
+    copyMcpConfig,
+  } = useMcpStatus(resolvedPath, setToastMessage)
   const gitRemoteStatus = useGitRemoteStatus(resolvedPath)
   const loadVaultModifiedFiles = vault.loadModifiedFiles
   const refreshGitRemoteStatus = gitRemoteStatus.refreshRemoteStatus
@@ -490,6 +501,14 @@ function App() {
       setMcpDialogAction(null)
     }
   }, [disconnectMcp])
+
+  const handleCopyMcpConfig = useCallback(() => {
+    void copyMcpConfig()
+  }, [copyMcpConfig])
+
+  const handleLoadMcpConfigSnippet = useCallback(() => {
+    void loadMcpConfigSnippet().catch(() => undefined)
+  }, [loadMcpConfigSnippet])
 
   // Detect external file renames on window focus
   const [detectedRenames, setDetectedRenames] = useState<DetectedRename[]>([])
@@ -540,8 +559,7 @@ function App() {
     removeEntry: vault.removeEntry,
     entries: vault.entries,
     flushBeforeNoteSwitch: flushEditorStateBeforeAction,
-    flushBeforeFrontmatterChange: flushEditorStateBeforeAction,
-    flushBeforePathRename: flushEditorStateBeforeAction,
+    flushBeforeNoteMutation: flushEditorStateBeforeAction,
     reloadVault: vault.reloadVault,
     setToastMessage,
     updateEntry: vault.updateEntry,
@@ -1057,17 +1075,24 @@ function App() {
     const editing = dialogs.editingView
     const filename = editing
       ? editing.filename
-      : definition.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '.yml'
+      : createViewFilename(definition.name, vault.views.map((view) => view.filename))
     const nextDefinition = editing ? { ...editing.definition, ...definition } : definition
     const target = isTauri() ? invoke : mockInvoke
-    await target('save_view_cmd', { vaultPath: resolvedPath, filename, definition: nextDefinition })
-    trackEvent(editing ? 'view_updated' : 'view_created')
-    await vault.reloadViews()
-    await vault.reloadVault()
-    vault.reloadFolders()
-    setToastMessage(editing ? `View "${nextDefinition.name}" updated` : `View "${nextDefinition.name}" created`)
-    handleSetSelection({ kind: 'view', filename })
-  }, [resolvedPath, vault, handleSetSelection, dialogs.editingView])
+    try {
+      await target('save_view_cmd', { vaultPath: resolvedPath, filename, definition: nextDefinition })
+      trackEvent(editing ? 'view_updated' : 'view_created')
+      await vault.reloadViews()
+      await vault.reloadVault()
+      vault.reloadFolders()
+      setToastMessage(editing ? `View "${nextDefinition.name}" updated` : `View "${nextDefinition.name}" created`)
+      handleSetSelection({ kind: 'view', filename })
+      return true
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setToastMessage(`Could not save view: ${message}`)
+      return false
+    }
+  }, [resolvedPath, vault, handleSetSelection, dialogs.editingView, setToastMessage])
 
   const handleUpdateViewDefinition = useCallback(async (filename: string, patch: Partial<ViewDefinition>) => {
     const existing = vault.views.find((view) => view.filename === filename)
@@ -1578,6 +1603,7 @@ function App() {
               onToggleInspector={handleToggleInspector}
               inspectorWidth={layout.inspectorWidth}
               defaultAiAgent={aiAgentPreferences.defaultAiAgent}
+              defaultAiAgentReadiness={aiAgentPreferences.defaultAiAgentReadiness}
               defaultAiAgentReady={aiAgentPreferences.defaultAiAgentReady}
               onUnsupportedAiPaste={setToastMessage}
               onInspectorResize={layout.handleInspectorResize}
@@ -1592,6 +1618,7 @@ function App() {
               onInitializeProperties={handleInitializeProperties}
               showAIChat={dialogs.showAIChat}
               onToggleAIChat={dialogs.toggleAIChat}
+              onCopyMcpConfig={handleCopyMcpConfig}
               vaultPath={resolvedPath}
               noteList={aiNoteList}
               noteListFilter={aiNoteListFilter}
@@ -1676,7 +1703,7 @@ function App() {
         />
         <SettingsPanel open={dialogs.showSettings} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} isGitVault={isGitVault} onSave={saveSettings} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} onClose={dialogs.closeSettings} />
         <FeedbackDialog open={showFeedback} onClose={closeFeedback} />
-        <McpSetupDialog open={showMcpSetupDialog} status={mcpStatus} busyAction={mcpDialogAction} onClose={closeMcpSetupDialog} onConnect={handleConnectMcp} onDisconnect={handleDisconnectMcp} />
+        <McpSetupDialog open={showMcpSetupDialog} status={mcpStatus} busyAction={mcpDialogAction} manualConfigSnippet={mcpConfigSnippet} manualConfigLoading={mcpConfigLoading} manualConfigError={mcpConfigError} onClose={closeMcpSetupDialog} onConnect={handleConnectMcp} onCopyManualConfig={handleCopyMcpConfig} onDisconnect={handleDisconnectMcp} onLoadManualConfig={handleLoadMcpConfigSnippet} />
         <CloneVaultModal key={dialogs.showCloneVault ? 'clone-open' : 'clone-closed'} open={dialogs.showCloneVault} onClose={dialogs.closeCloneVault} onVaultCloned={vaultSwitcher.handleVaultCloned} />
         {deleteActions.confirmDelete && (
           <ConfirmDeleteDialog

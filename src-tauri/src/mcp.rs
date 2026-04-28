@@ -313,6 +313,28 @@ fn build_mcp_entry(node_command: &str, index_js: &str, vault_path: &str) -> serd
     })
 }
 
+fn build_mcp_config_snippet(entry: &serde_json::Value) -> Result<String, String> {
+    let mut servers = serde_json::Map::new();
+    servers.insert(MCP_SERVER_NAME.to_string(), entry.clone());
+    let config = serde_json::json!({ "mcpServers": servers });
+
+    serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize MCP config snippet: {e}"))
+}
+
+/// Build the exact MCP config JSON users can copy into compatible tools.
+pub fn mcp_config_snippet(vault_path: &str) -> Result<String, String> {
+    let node = find_node().map_err(|e| {
+        format!("Node.js 18+ is required on PATH before Tolaria can build MCP config: {e}")
+    })?;
+    let server_dir = mcp_server_dir()?;
+    let index_js = server_dir.join("index.js").to_string_lossy().into_owned();
+    let node_command = node.to_string_lossy().into_owned();
+    let entry = build_mcp_entry(&node_command, &index_js, vault_path);
+
+    build_mcp_config_snippet(&entry)
+}
+
 /// Write MCP registration to a list of config file paths.
 /// Returns "registered" on first registration, "updated" if already present.
 fn register_mcp_to_configs(entry: &serde_json::Value, config_paths: &[PathBuf]) -> String {
@@ -516,6 +538,22 @@ mod tests {
         assert_eq!(entry["args"][0], "/path/to/index.js");
         assert_eq!(entry["env"]["VAULT_PATH"], "/my/vault");
         assert_eq!(entry["env"]["WS_UI_PORT"], "9711");
+    }
+
+    #[test]
+    fn build_mcp_config_snippet_wraps_tolaria_server_entry() {
+        let entry = test_mcp_entry("/path/to/index.js", "/my/vault");
+        let snippet = build_mcp_config_snippet(&entry).unwrap();
+        let config: serde_json::Value = serde_json::from_str(&snippet).unwrap();
+
+        assert_eq!(
+            config["mcpServers"][MCP_SERVER_NAME]["args"][0],
+            "/path/to/index.js"
+        );
+        assert_eq!(
+            config["mcpServers"][MCP_SERVER_NAME]["env"]["VAULT_PATH"],
+            "/my/vault"
+        );
     }
 
     #[test]

@@ -1,22 +1,29 @@
 import { describe, expect, it, vi } from 'vitest'
 import { formatShortcutDisplay } from '../appCommandCatalog'
+import { TOGGLE_GITIGNORED_VISIBILITY_EVENT } from '../../lib/gitignoredVisibilityEvents'
 import { buildSettingsCommands } from './settingsCommands'
+
+function findCommand(id: string, commands = buildSettingsCommands({ onOpenSettings: vi.fn() })) {
+  return commands.find((item) => item.id === id)
+}
+
+function expectOpenSettingsCommand(id: string, label: string) {
+  const onOpenSettings = vi.fn()
+  const command = findCommand(id, buildSettingsCommands({ onOpenSettings }))
+
+  expect(command).toMatchObject({
+    label,
+    enabled: true,
+    group: 'Settings',
+  })
+
+  command?.execute()
+  expect(onOpenSettings).toHaveBeenCalledTimes(1)
+}
 
 describe('buildSettingsCommands', () => {
   it('adds a discoverable H1 auto-rename settings command', () => {
-    const onOpenSettings = vi.fn()
-
-    const commands = buildSettingsCommands({ onOpenSettings })
-    const command = commands.find((item) => item.id === 'open-h1-auto-rename-setting')
-
-    expect(command).toMatchObject({
-      label: 'Open H1 Auto-Rename Setting',
-      enabled: true,
-      group: 'Settings',
-    })
-
-    command?.execute()
-    expect(onOpenSettings).toHaveBeenCalledTimes(1)
+    expectOpenSettingsCommand('open-h1-auto-rename-setting', 'Open H1 Auto-Rename Setting')
   })
 
   it('keeps the general settings command available', () => {
@@ -32,19 +39,7 @@ describe('buildSettingsCommands', () => {
   })
 
   it('adds a discoverable language settings command', () => {
-    const onOpenSettings = vi.fn()
-
-    const commands = buildSettingsCommands({ onOpenSettings })
-    const command = commands.find((item) => item.id === 'open-language-settings')
-
-    expect(command).toMatchObject({
-      label: 'Open Language Settings',
-      enabled: true,
-      group: 'Settings',
-    })
-
-    command?.execute()
-    expect(onOpenSettings).toHaveBeenCalledTimes(1)
+    expectOpenSettingsCommand('open-language-settings', 'Open Language Settings')
   })
 
   it('adds language switch commands when a setter is available', () => {
@@ -100,5 +95,35 @@ describe('buildSettingsCommands', () => {
 
     command?.execute()
     expect(onCreateEmptyVault).toHaveBeenCalledTimes(1)
+  })
+
+  it('adds a command palette toggle for Gitignored file visibility', () => {
+    const onOpenSettings = vi.fn()
+    const onToggleGitignoredFilesVisibility = vi.fn()
+
+    const commands = buildSettingsCommands({
+      onOpenSettings,
+      onToggleGitignoredFilesVisibility,
+    })
+    const command = commands.find((item) => item.id === 'toggle-gitignored-files-visibility')
+
+    expect(command).toMatchObject({
+      label: 'Toggle Gitignored Files Visibility',
+      enabled: true,
+      group: 'Settings',
+    })
+
+    command?.execute()
+    expect(onToggleGitignoredFilesVisibility).toHaveBeenCalledTimes(1)
+  })
+
+  it('dispatches the Gitignored visibility event when no direct handler is provided', () => {
+    const listener = vi.fn()
+    window.addEventListener(TOGGLE_GITIGNORED_VISIBILITY_EVENT, listener)
+
+    findCommand('toggle-gitignored-files-visibility')?.execute()
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener(TOGGLE_GITIGNORED_VISIBILITY_EVENT, listener)
   })
 })

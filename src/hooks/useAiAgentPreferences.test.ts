@@ -27,13 +27,27 @@ describe('useAiAgentPreferences', () => {
   it('resolves the selected label and readiness', () => {
     const { result } = renderHook(() => useAiAgentPreferences({
       settings,
+      settingsLoaded: true,
       saveSettings: vi.fn(),
       aiAgentsStatus,
     }))
 
     expect(result.current.defaultAiAgent).toBe('claude_code')
     expect(result.current.defaultAiAgentLabel).toBe('Claude Code')
+    expect(result.current.defaultAiAgentReadiness).toBe('ready')
     expect(result.current.defaultAiAgentReady).toBe(true)
+  })
+
+  it('keeps the selected agent unavailable while settings are loading', () => {
+    const { result } = renderHook(() => useAiAgentPreferences({
+      settings,
+      settingsLoaded: false,
+      saveSettings: vi.fn(),
+      aiAgentsStatus,
+    }))
+
+    expect(result.current.defaultAiAgentReadiness).toBe('checking')
+    expect(result.current.defaultAiAgentReady).toBe(false)
   })
 
   it('cycles to the next agent and persists the selection', () => {
@@ -42,6 +56,7 @@ describe('useAiAgentPreferences', () => {
 
     const { result } = renderHook(() => useAiAgentPreferences({
       settings,
+      settingsLoaded: true,
       saveSettings,
       aiAgentsStatus,
       onToast,
@@ -61,6 +76,7 @@ describe('useAiAgentPreferences', () => {
   it('keeps the browser mock agent composer enabled when no CLI is installed', () => {
     const { result } = renderHook(() => useAiAgentPreferences({
       settings,
+      settingsLoaded: true,
       saveSettings: vi.fn(),
       aiAgentsStatus: {
         claude_code: { status: 'missing', version: null },

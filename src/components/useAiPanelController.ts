@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import type { AiAgentId } from '../lib/aiAgents'
+import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import { useCliAiAgent, type AgentFileCallbacks } from '../hooks/useCliAiAgent'
 import type { VaultEntry } from '../types'
 import {
@@ -12,6 +12,7 @@ interface UseAiPanelControllerArgs {
   vaultPath: string
   defaultAiAgent: AiAgentId
   defaultAiAgentReady: boolean
+  defaultAiAgentReadiness?: AiAgentReadiness
   activeEntry?: VaultEntry | null
   activeNoteContent?: string | null
   entries?: VaultEntry[]
@@ -36,10 +37,18 @@ export interface AiPanelController {
   handleNewChat: () => void
 }
 
+function resolveAgentReady(
+  readiness: AiAgentReadiness | undefined,
+  ready: boolean,
+): boolean {
+  return (readiness ?? (ready ? 'ready' : 'missing')) === 'ready'
+}
+
 export function useAiPanelController({
   vaultPath,
   defaultAiAgent,
   defaultAiAgentReady,
+  defaultAiAgentReadiness,
   activeEntry,
   activeNoteContent,
   entries,
@@ -70,7 +79,7 @@ export function useAiPanelController({
 
   const agent = useCliAiAgent(vaultPath, contextPrompt, fileCallbacks, {
     agent: defaultAiAgent,
-    agentReady: defaultAiAgentReady,
+    agentReady: resolveAgentReady(defaultAiAgentReadiness, defaultAiAgentReady),
   })
   const hasContext = !!activeEntry
   const isActive = agent.status === 'thinking' || agent.status === 'tool-executing'

@@ -85,6 +85,15 @@ describe('AiPanel', () => {
     expect(mockClearConversation).toHaveBeenCalledOnce()
   })
 
+  it('copies the MCP config from the AI panel header action', () => {
+    const onCopyMcpConfig = vi.fn()
+    render(<AiPanel onClose={vi.fn()} onCopyMcpConfig={onCopyMcpConfig} vaultPath="/tmp/vault" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy MCP config' }))
+
+    expect(onCopyMcpConfig).toHaveBeenCalledOnce()
+  })
+
   it('renders empty state without context', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
     expect(screen.getByText('Open a note, then ask Claude Code about it')).toBeTruthy()
@@ -162,6 +171,21 @@ describe('AiPanel', () => {
       />,
     )
     expect(screen.getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Codex')
+  })
+
+  it('disables sending while the selected AI agent is still loading', () => {
+    render(
+      <AiPanel
+        onClose={vi.fn()}
+        vaultPath="/tmp/vault"
+        defaultAiAgent="codex"
+        defaultAiAgentReadiness="checking"
+      />,
+    )
+
+    expect(screen.getByText('Checking availability')).toBeTruthy()
+    expect(screen.getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Checking AI agent availability...')
+    expect(screen.getByTestId('agent-send')).toBeDisabled()
   })
 
   it('auto-focuses input on mount', async () => {

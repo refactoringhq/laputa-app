@@ -17,6 +17,8 @@ const emptySettings: Settings = {
   release_channel: null,
   theme_mode: null,
   ui_language: null,
+  default_ai_agent: null,
+  hide_gitignored_files: null,
 }
 
 function installPointerCapturePolyfill() {
@@ -102,6 +104,21 @@ describe('SettingsPanel', () => {
       autogit_inactive_threshold_seconds: 30,
       release_channel: null,
       theme_mode: 'light',
+      hide_gitignored_files: true,
+    }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('saves Gitignored content visibility immediately for keyboard close', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    fireEvent.click(screen.getByTestId('settings-hide-gitignored-files'))
+    fireEvent.keyDown(screen.getByTestId('settings-panel'), { key: 'Escape' })
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      hide_gitignored_files: false,
     }))
     expect(onClose).toHaveBeenCalled()
   })

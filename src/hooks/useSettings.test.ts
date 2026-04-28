@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Settings } from '../types'
+import {
+  GITIGNORED_VISIBILITY_CHANGED_EVENT,
+  TOGGLE_GITIGNORED_VISIBILITY_EVENT,
+} from '../lib/gitignoredVisibilityEvents'
 import { useSettings } from './useSettings'
 
 const defaultSettings: Settings = {
@@ -18,6 +22,7 @@ const defaultSettings: Settings = {
   theme_mode: null,
   ui_language: null,
   default_ai_agent: null,
+  hide_gitignored_files: null,
 }
 
 const savedSettings: Settings = {
@@ -34,6 +39,7 @@ const savedSettings: Settings = {
   theme_mode: null,
   ui_language: null,
   default_ai_agent: null,
+  hide_gitignored_files: null,
 }
 
 let mockSettingsStore: Settings = { ...defaultSettings }
@@ -83,6 +89,7 @@ function changedSettings(): Settings {
     theme_mode: null,
     ui_language: 'zh-CN',
     default_ai_agent: null,
+    hide_gitignored_files: false,
   }
 }
 
@@ -158,6 +165,37 @@ describe('useSettings', () => {
 
     expect(mockInvokeFn).toHaveBeenCalledWith('save_settings', { settings: newSettings })
     expect(result.current.settings).toEqual(newSettings)
+  })
+
+  it('preserves the Gitignored files visibility preference', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      hide_gitignored_files: false,
+    }
+
+    const settings = await renderLoadedSettings()
+
+    expect(settings.hide_gitignored_files).toBe(false)
+  })
+
+  it('toggles Gitignored file visibility from the command event', async () => {
+    const listener = vi.fn()
+    window.addEventListener(GITIGNORED_VISIBILITY_CHANGED_EVENT, listener)
+    const { result } = renderHook(() => useSettings())
+
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(TOGGLE_GITIGNORED_VISIBILITY_EVENT))
+    })
+
+    await waitFor(() => {
+      expect(result.current.settings.hide_gitignored_files).toBe(false)
+    })
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener(GITIGNORED_VISIBILITY_CHANGED_EVENT, listener)
   })
 
   it('saves settings through native invoke when Tauri globals are not detectable', async () => {

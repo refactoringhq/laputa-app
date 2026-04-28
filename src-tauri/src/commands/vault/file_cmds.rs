@@ -165,6 +165,24 @@ fn ensure_missing_folder(folder_path: &Path, folder_name: &str) -> Result<(), St
     Ok(())
 }
 
+fn scan_visible_vault_entries(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
+    let entries = vault::scan_vault_cached(vault_path)?;
+    Ok(vault::filter_gitignored_entries(
+        vault_path,
+        entries,
+        crate::settings::hide_gitignored_files_enabled(),
+    ))
+}
+
+fn scan_visible_vault_folders(vault_path: &Path) -> Result<Vec<FolderNode>, String> {
+    let folders = vault::scan_vault_folders(vault_path)?;
+    Ok(vault::filter_gitignored_folders(
+        vault_path,
+        folders,
+        crate::settings::hide_gitignored_files_enabled(),
+    ))
+}
+
 /// Sync the `title` frontmatter field with the filename on note open.
 /// Returns `true` if the file was modified (title was absent or desynced).
 #[tauri::command]
@@ -207,12 +225,12 @@ pub fn copy_image_to_vault(
 
 #[tauri::command]
 pub fn list_vault(path: PathBuf) -> Result<Vec<VaultEntry>, String> {
-    with_expanded_vault_root(path.as_path(), vault::scan_vault_cached)
+    with_expanded_vault_root(path.as_path(), scan_visible_vault_entries)
 }
 
 #[tauri::command]
 pub fn list_vault_folders(path: PathBuf) -> Result<Vec<FolderNode>, String> {
-    with_expanded_vault_root(path.as_path(), vault::scan_vault_folders)
+    with_expanded_vault_root(path.as_path(), scan_visible_vault_folders)
 }
 
 #[cfg(test)]

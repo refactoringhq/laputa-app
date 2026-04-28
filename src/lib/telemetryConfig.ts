@@ -17,6 +17,7 @@ type TelemetryEnv = {
 
 export type FrontendTelemetryConfig = {
   sentryDsn: string
+  sentryBuildVersion: string
   sentryRelease: string
   posthogKey: string
   posthogHost: string | null
@@ -87,8 +88,18 @@ function normalizeSentryDsn(value: string): string {
 }
 
 function normalizeSentryRelease(value: string): string {
-  if (!value) return ''
-  return DISALLOWED_TELEMETRY_VALUES.has(value.toLowerCase()) ? '' : value
+  const match = /^(\d{4})\.(\d{1,2})\.(\d{1,2})$/.exec(value)
+  if (!match) return ''
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  const validDate = date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day
+
+  return validDate ? value : ''
 }
 
 function normalizePostHogHost(value: string): string | null {
@@ -103,15 +114,17 @@ export function resolveFrontendTelemetryConfig(
   const sentryDsn = normalizeSentryDsn(
     sanitizeTelemetryEnvValue(env.VITE_SENTRY_DSN),
   )
-  const sentryRelease = normalizeSentryRelease(
-    sanitizeTelemetryEnvValue(env.VITE_SENTRY_RELEASE),
-  )
+  const sanitizedSentryVersion = sanitizeTelemetryEnvValue(env.VITE_SENTRY_RELEASE)
+  const sentryBuildVersion = DISALLOWED_TELEMETRY_VALUES.has(sanitizedSentryVersion.toLowerCase())
+    ? ''
+    : sanitizedSentryVersion
+  const sentryRelease = normalizeSentryRelease(sentryBuildVersion)
   const posthogKey = sanitizeTelemetryEnvValue(env.VITE_POSTHOG_KEY)
   const posthogHost = normalizePostHogHost(
     sanitizeTelemetryEnvValue(env.VITE_POSTHOG_HOST),
   )
 
-  return { sentryDsn, sentryRelease, posthogKey, posthogHost }
+  return { sentryDsn, sentryBuildVersion, sentryRelease, posthogKey, posthogHost }
 }
 
 export { DEFAULT_POSTHOG_HOST as _defaultPostHogHostForTest }
