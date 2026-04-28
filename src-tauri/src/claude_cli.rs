@@ -1,3 +1,4 @@
+use crate::ai_agents::AiAgentPermissionMode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::BufRead;
@@ -56,6 +57,7 @@ pub struct AgentStreamRequest {
     pub message: String,
     pub system_prompt: Option<String>,
     pub vault_path: String,
+    pub permission_mode: AiAgentPermissionMode,
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +292,7 @@ fn build_agent_args(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
         "--permission-mode".into(),
         "acceptEdits".into(),
         "--tools".into(),
-        "Read,Edit,MultiEdit,Write,Glob,Grep,LS".into(),
+        agent_tools(req.permission_mode).into(),
         "--no-session-persistence".into(),
     ];
 
@@ -302,6 +304,13 @@ fn build_agent_args(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
     }
 
     Ok(args)
+}
+
+fn agent_tools(permission_mode: AiAgentPermissionMode) -> &'static str {
+    match permission_mode {
+        AiAgentPermissionMode::Safe => "Read,Edit,MultiEdit,Write,Glob,Grep,LS",
+        AiAgentPermissionMode::PowerUser => "Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash",
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -663,6 +672,82 @@ mod tests {
     use std::ffi::OsString;
     use std::process::Command;
 
+    macro_rules! chat_request {
+        ($message:expr, None, None $(,)?) => {
+            ChatStreamRequest {
+                message: $message.into(),
+                system_prompt: None,
+                session_id: None,
+            }
+        };
+        ($message:expr, Some($system_prompt:expr), None $(,)?) => {
+            ChatStreamRequest {
+                message: $message.into(),
+                system_prompt: Some($system_prompt.to_string()),
+                session_id: None,
+            }
+        };
+        ($message:expr, None, Some($session_id:expr) $(,)?) => {
+            ChatStreamRequest {
+                message: $message.into(),
+                system_prompt: None,
+                session_id: Some($session_id.to_string()),
+            }
+        };
+    }
+
+    macro_rules! agent_request {
+        ($message:expr, None, $permission_mode:expr $(,)?) => {
+            AgentStreamRequest {
+                message: $message.into(),
+                system_prompt: None,
+                vault_path: "/tmp/vault".into(),
+                permission_mode: $permission_mode,
+            }
+        };
+        ($message:expr, Some($system_prompt:expr), $permission_mode:expr $(,)?) => {
+            AgentStreamRequest {
+                message: $message.into(),
+                system_prompt: Some($system_prompt.to_string()),
+                vault_path: "/tmp/vault".into(),
+                permission_mode: $permission_mode,
+            }
+        };
+    }
+
+    macro_rules! assert_args_contain {
+        ($args:expr, [$($value:expr),+ $(,)?] $(,)?) => {
+            $(
+                assert!($args.contains(&$value.to_string()), "missing {}", $value);
+            )+
+        };
+    }
+
+    macro_rules! assert_args_lack {
+        ($args:expr, [$($value:expr),+ $(,)?] $(,)?) => {
+            $(
+                assert!(!$args.contains(&$value.to_string()), "unexpected {}", $value);
+            )+
+        };
+    }
+
+    macro_rules! assert_no_arg_contains {
+        ($args:expr, $fragment:expr $(,)?) => {
+            assert!(!$args.iter().any(|arg| arg.contains($fragment)));
+        };
+    }
+
+    fn assert_binary_candidates_include(home: &Path, expected: &[PathBuf]) {
+        let candidates = claude_binary_candidates_for_home(home);
+        for candidate in expected {
+            assert!(
+                candidates.contains(candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
     #[test]
     fn check_cli_returns_status() {
         let status = check_cli();
@@ -683,6 +768,38 @@ mod tests {
         let candidates = claude_binary_candidates_for_home(home.path());
 
         assert!(candidates.contains(&claude), "missing {}", claude.display());
+    }
+
+    #[test]
+    fn agent_args_use_safe_mode_without_bash_by_default() {
+        let args = build_agent_args(&agent_request!(
+            "Rename the note",
+            None,
+            AiAgentPermissionMode::Safe,
+        ))
+        .unwrap();
+
+        assert_args_contain!(
+            args,
+            ["--strict-mcp-config", "--permission-mode", "acceptEdits"]
+        );
+        assert_args_contain!(args, ["Read,Edit,MultiEdit,Write,Glob,Grep,LS"]);
+        assert_no_arg_contains!(args, "Bash");
+        assert_args_lack!(args, ["--dangerously-skip-permissions"]);
+    }
+
+    #[test]
+    fn agent_args_allow_bash_in_power_user_mode_without_dangerous_bypass() {
+        let args = build_agent_args(&agent_request!(
+            "Rename the note",
+            None,
+            AiAgentPermissionMode::PowerUser,
+        ))
+        .unwrap();
+
+        assert_args_contain!(args, ["--strict-mcp-config"]);
+        assert_args_contain!(args, ["Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash"]);
+        assert_args_lack!(args, ["--dangerously-skip-permissions"]);
     }
 
     #[test]
@@ -1236,52 +1353,31 @@ mod tests {
 
     #[test]
     fn build_chat_args_basic() {
-        let req = ChatStreamRequest {
-            message: "hello".into(),
-            system_prompt: None,
-            session_id: None,
-        };
-        let args = build_chat_args(&req);
-        assert!(args.contains(&"-p".to_string()));
-        assert!(args.contains(&"hello".to_string()));
-        assert!(args.contains(&"stream-json".to_string()));
-        assert!(!args.contains(&"--system-prompt".to_string()));
-        assert!(!args.contains(&"--resume".to_string()));
+        let args = build_chat_args(&chat_request!("hello", None, None));
+
+        assert_args_contain!(args, ["-p", "hello", "stream-json"]);
+        assert_args_lack!(args, ["--system-prompt", "--resume"]);
     }
 
     #[test]
     fn build_chat_args_with_system_prompt() {
-        let req = ChatStreamRequest {
-            message: "hi".into(),
-            system_prompt: Some("You are helpful.".into()),
-            session_id: None,
-        };
-        let args = build_chat_args(&req);
-        assert!(args.contains(&"--system-prompt".to_string()));
-        assert!(args.contains(&"You are helpful.".to_string()));
+        let args = build_chat_args(&chat_request!("hi", Some("You are helpful."), None));
+
+        assert_args_contain!(args, ["--system-prompt", "You are helpful."]);
     }
 
     #[test]
     fn build_chat_args_empty_system_prompt_is_skipped() {
-        let req = ChatStreamRequest {
-            message: "hi".into(),
-            system_prompt: Some(String::new()),
-            session_id: None,
-        };
-        let args = build_chat_args(&req);
+        let args = build_chat_args(&chat_request!("hi", Some(""), None));
+
         assert!(!args.contains(&"--system-prompt".to_string()));
     }
 
     #[test]
     fn build_chat_args_with_session_id() {
-        let req = ChatStreamRequest {
-            message: "continue".into(),
-            system_prompt: None,
-            session_id: Some("sess-abc".into()),
-        };
-        let args = build_chat_args(&req);
-        assert!(args.contains(&"--resume".to_string()));
-        assert!(args.contains(&"sess-abc".to_string()));
+        let args = build_chat_args(&chat_request!("continue", None, Some("sess-abc")));
+
+        assert_args_contain!(args, ["--resume", "sess-abc"]);
     }
 
     // --- build_agent_args ---
@@ -1289,46 +1385,44 @@ mod tests {
     #[test]
     fn build_agent_args_basic() {
         // build_agent_args calls build_mcp_config which needs mcp_server_dir
-        if let Ok(args) = build_agent_args(&AgentStreamRequest {
-            message: "create note".into(),
-            system_prompt: None,
-            vault_path: "/tmp/vault".into(),
-        }) {
-            assert!(args.contains(&"-p".to_string()));
-            assert!(args.contains(&"create note".to_string()));
-            assert!(args.contains(&"--mcp-config".to_string()));
-            assert!(args.contains(&"--strict-mcp-config".to_string()));
-            assert!(args.contains(&"--permission-mode".to_string()));
-            assert!(args.contains(&"acceptEdits".to_string()));
-            assert!(args.contains(&"--tools".to_string()));
-            assert!(args.contains(&"Read,Edit,MultiEdit,Write,Glob,Grep,LS".to_string()));
-            assert!(!args.contains(&"--dangerously-skip-permissions".to_string()));
-            assert!(!args.contains(&"bypassPermissions".to_string()));
-            assert!(!args.contains(&"Bash".to_string()));
-            assert!(args.contains(&"--no-session-persistence".to_string()));
-            assert!(!args.contains(&"--append-system-prompt".to_string()));
+        if let Ok(args) = build_agent_args(&agent_request!(
+            "create note",
+            None,
+            AiAgentPermissionMode::Safe,
+        )) {
+            assert_args_contain!(args, ["-p", "create note", "--mcp-config"]);
+            assert_args_contain!(args, ["--strict-mcp-config", "--permission-mode"]);
+            assert_args_contain!(args, ["acceptEdits", "--tools"]);
+            assert_args_contain!(args, ["Read,Edit,MultiEdit,Write,Glob,Grep,LS"]);
+            assert_args_contain!(args, ["--no-session-persistence"]);
+            assert_args_lack!(
+                args,
+                [
+                    "--dangerously-skip-permissions",
+                    "bypassPermissions",
+                    "--append-system-prompt",
+                ],
+            );
+            assert_no_arg_contains!(args, "Bash");
         }
     }
 
     #[test]
     fn build_agent_args_with_system_prompt() {
-        if let Ok(args) = build_agent_args(&AgentStreamRequest {
-            message: "do it".into(),
-            system_prompt: Some("Act as expert.".into()),
-            vault_path: "/tmp/v".into(),
-        }) {
-            assert!(args.contains(&"--append-system-prompt".to_string()));
-            assert!(args.contains(&"Act as expert.".to_string()));
+        if let Ok(args) = build_agent_args(&agent_request!(
+            "do it",
+            Some("Act as expert."),
+            AiAgentPermissionMode::Safe,
+        )) {
+            assert_args_contain!(args, ["--append-system-prompt", "Act as expert."]);
         }
     }
 
     #[test]
     fn build_agent_args_empty_system_prompt_is_skipped() {
-        if let Ok(args) = build_agent_args(&AgentStreamRequest {
-            message: "x".into(),
-            system_prompt: Some(String::new()),
-            vault_path: "/tmp/v".into(),
-        }) {
+        if let Ok(args) =
+            build_agent_args(&agent_request!("x", Some(""), AiAgentPermissionMode::Safe))
+        {
             assert!(!args.contains(&"--append-system-prompt".to_string()));
         }
     }
@@ -1338,7 +1432,6 @@ mod tests {
     #[test]
     fn claude_binary_candidates_include_supported_local_and_toolchain_installs() {
         let home = PathBuf::from("/Users/alex");
-        let candidates = claude_binary_candidates_for_home(&home);
         let expected = [
             home.join(".local/bin/claude"),
             home.join(".claude/local/claude"),
@@ -1346,32 +1439,19 @@ mod tests {
             home.join(".npm-global/bin/claude"),
         ];
 
-        for candidate in expected {
-            assert!(
-                candidates.contains(&candidate),
-                "missing {}",
-                candidate.display()
-            );
-        }
+        assert_binary_candidates_include(&home, &expected);
     }
 
     #[test]
     fn claude_binary_candidates_include_windows_exe_installs() {
         let home = PathBuf::from(r"C:\Users\alex");
-        let candidates = claude_binary_candidates_for_home(&home);
         let expected = [
             home.join(".local/bin/claude.exe"),
             home.join(".claude/local/claude.exe"),
             home.join("AppData/Roaming/npm/claude.cmd"),
         ];
 
-        for candidate in expected {
-            assert!(
-                candidates.contains(&candidate),
-                "missing {}",
-                candidate.display()
-            );
-        }
+        assert_binary_candidates_include(&home, &expected);
     }
 
     #[test]
@@ -1427,6 +1507,7 @@ mod tests {
             message: "test".into(),
             system_prompt: Some("sys".into()),
             vault_path: "/tmp/nonexistent".into(),
+            permission_mode: AiAgentPermissionMode::Safe,
         };
         let mut events = vec![];
         let result = run_agent_stream(req, |e| events.push(e));

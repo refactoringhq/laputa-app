@@ -79,7 +79,7 @@ tolaria/
 │   │   ├── RawEditorView.tsx     # CodeMirror raw editor
 │   │   ├── Inspector.tsx         # Fourth panel: metadata + relationships
 │   │   ├── DynamicPropertiesPanel.tsx  # Editable frontmatter properties
-│   │   ├── AiPanel.tsx           # AI agent panel (selected CLI agent)
+│   │   ├── AiPanel.tsx           # AI agent panel (selected CLI agent + per-vault permission mode)
 │   │   ├── AiMessage.tsx         # Agent message display
 │   │   ├── AiActionCard.tsx      # Agent tool action cards
 │   │   ├── AiAgentsOnboardingPrompt.tsx # First-launch AI agent installer prompt
@@ -114,6 +114,7 @@ tolaria/
 │   │   ├── useNoteCreation.ts    # Note/type creation
 │   │   ├── useNoteRename.ts     # Note renaming + wikilink updates
 │   │   ├── useCliAiAgent.ts      # Selected AI agent state + normalized session pipeline
+│   │   ├── aiAgentPermissionMode.ts # Safe/Power User mode normalization + labels
 │   │   ├── useAiAgentsStatus.ts  # Claude/Codex/OpenCode/Pi availability polling
 │   │   ├── useAiAgentPreferences.ts # Default-agent persistence + cycling
 │   │   ├── useAiActivity.ts      # MCP UI bridge listener
@@ -261,8 +262,8 @@ tolaria/
 | `src-tauri/src/frontmatter/ops.rs` | YAML manipulation — how properties are updated/deleted in files. |
 | `src-tauri/src/git/` | All git operations (clone, commit, pull, push, conflicts, pulse, add-remote). |
 | `src-tauri/src/search.rs` | Keyword search — scans vault files with walkdir. |
-| `src-tauri/src/ai_agents.rs` | Shared CLI-agent availability checks, adapter dispatch, and stream normalization. |
-| `src-tauri/src/claude_cli.rs` | Claude CLI subprocess spawning + NDJSON stream parsing. |
+| `src-tauri/src/ai_agents.rs` | Shared CLI-agent availability checks, adapter dispatch, stream normalization, and permission-mode request normalization. |
+| `src-tauri/src/claude_cli.rs` | Claude CLI subprocess spawning, permission-mode tool mapping, and NDJSON stream parsing. |
 | `src-tauri/src/pi_cli.rs` | Pi subprocess spawning through JSON mode and transient MCP adapter config. |
 | `src-tauri/src/app_updater.rs` | Desktop updater bridge — selects alpha/stable manifests and streams install progress. |
 
@@ -282,9 +283,10 @@ tolaria/
 
 | File | Why it matters |
 |------|---------------|
-| `src/components/AiPanel.tsx` | AI agent panel — selected CLI agent with tool execution, reasoning, and actions. |
+| `src/components/AiPanel.tsx` | AI agent panel — selected CLI agent with tool execution, reasoning, actions, and per-vault permission mode. |
 | `src/hooks/useCliAiAgent.ts` | Thin React owner for the selected CLI agent session state. |
 | `src/lib/aiAgentSession.ts` | Single message/session lifecycle for prompt normalization, history, streaming, and reset behavior. |
+| `src/lib/aiAgentPermissionMode.ts` | Safe/Power User mode normalization, display labels, and local transcript marker text. |
 | `src/lib/aiAgentFileOperations.ts` | Detects agent-created or modified vault files from normalized tool inputs. |
 | `src/lib/aiAgents.ts` | Supported agent definitions, status normalization, and default-agent helpers. |
 | `src/utils/ai-context.ts` | Context snapshot builder for AI conversations. |
@@ -304,7 +306,7 @@ tolaria/
 | `src/lib/releaseChannel.ts` | Normalizes persisted updater-channel values (`stable` default, optional `alpha`). |
 | `src/lib/appUpdater.ts` | Frontend wrapper for channel-aware updater commands. |
 | `src/hooks/useMainWindowSizeConstraints.ts` | Derives the main-window minimum width from the visible panes and asks Tauri to grow back to fit wider layouts. |
-| `src/hooks/useVaultConfig.ts` | Per-vault local UI preferences (zoom, view mode, colors, Inbox columns, explicit organization workflow). |
+| `src/hooks/useVaultConfig.ts` | Per-vault local UI preferences (zoom, view mode, colors, Inbox columns, explicit organization workflow, AI permission mode). |
 | `src/components/SettingsPanel.tsx` | Settings UI for telemetry, release channel, sync interval, UI language, default AI agent, and the vault-level explicit organization toggle. |
 | `src/hooks/useUpdater.ts` | In-app updates using the selected alpha/stable feed. |
 
@@ -420,8 +422,9 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 1. **Agent system prompt**: Edit `src/utils/ai-agent.ts` (inline system prompt string)
 2. **Context building**: Edit `src/utils/ai-context.ts` for what data is sent to the agent
 3. **Tool action display**: Edit `src/components/AiActionCard.tsx`
-4. **Claude CLI arguments**: Edit `src-tauri/src/claude_cli.rs` (`run_agent_stream()`; keep app-managed launches on strict Tolaria MCP config, `acceptEdits`, and the scoped file/search tool list)
-5. **Shared agent adapters / Codex/Pi args**: Edit `src-tauri/src/ai_agents.rs` plus the per-agent adapter modules (keep Codex sandboxed with active-vault `workspace-write`, keep Pi on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode)
+4. **Permission-mode UI and request plumbing**: Edit `src/lib/aiAgentPermissionMode.ts`, `src/components/AiPanel*.tsx`, `src/hooks/useCliAiAgent.ts`, and `src/utils/streamAiAgent.ts`
+5. **Claude CLI arguments**: Edit `src-tauri/src/claude_cli.rs` (`run_agent_stream()`; keep app-managed launches on strict Tolaria MCP config, `acceptEdits`, and the scoped file/search tool list unless the permission mode explicitly broadens it)
+6. **Shared agent adapters / Codex/Pi args**: Edit `src-tauri/src/ai_agents.rs` plus the per-agent adapter modules (keep Codex sandboxed with active-vault `workspace-write`, keep Pi on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode)
 
 ### Work with external MCP setup
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { AiAgentId } from '../lib/aiAgents'
+import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
 import type { NoteReference } from '../utils/ai-context'
 import {
   type AgentStatus,
@@ -7,6 +8,7 @@ import {
 } from '../lib/aiAgentConversation'
 import type { AgentFileCallbacks } from '../lib/aiAgentFileOperations'
 import {
+  addAgentLocalMarker,
   clearAgentConversation,
   sendAgentMessage,
   type AiAgentSessionRuntime,
@@ -20,6 +22,7 @@ export type { AiAgentMessage } from '../lib/aiAgentConversation'
 interface UseCliAiAgentOptions {
   agent: AiAgentId
   agentReady: boolean
+  permissionMode: AiAgentPermissionMode
 }
 
 interface UseCliAiAgentRuntime extends AiAgentSessionRuntime {
@@ -66,6 +69,7 @@ export function useCliAiAgent(
   options: UseCliAiAgentOptions,
 ) {
   const { agent, agentReady } = options
+  const { permissionMode } = options
   const runtime = useCliAiAgentRuntime(fileCallbacks)
   const { messages, status } = runtime
 
@@ -76,6 +80,7 @@ export function useCliAiAgent(
         agent,
         ready: agentReady,
         vaultPath,
+        permissionMode,
         systemPromptOverride: contextPrompt,
       },
       prompt: { text, references },
@@ -86,5 +91,9 @@ export function useCliAiAgent(
     clearAgentConversation(runtime)
   }
 
-  return { messages, status, sendMessage, clearConversation }
+  function addLocalMarker(text: string): void {
+    addAgentLocalMarker(runtime, text)
+  }
+
+  return { messages, status, sendMessage, clearConversation, addLocalMarker }
 }

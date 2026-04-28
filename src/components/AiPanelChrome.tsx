@@ -5,6 +5,10 @@ import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
 import { WikilinkChatInput } from './WikilinkChatInput'
 import { extractInlineWikilinkReferences } from './inlineWikilinkText'
+import {
+  AI_AGENT_PERMISSION_MODE_LABELS,
+  type AiAgentPermissionMode,
+} from '../lib/aiAgentPermissionMode'
 import type { AiAgentMessage } from '../hooks/useCliAiAgent'
 import type { AiAgentReadiness } from '../lib/aiAgents'
 import type { NoteReference } from '../utils/ai-context'
@@ -13,6 +17,9 @@ import type { VaultEntry } from '../types'
 interface AiPanelHeaderProps {
   agentLabel: string
   agentReadiness: AiAgentReadiness
+  permissionMode: AiAgentPermissionMode
+  permissionModeDisabled: boolean
+  onPermissionModeChange: (mode: AiAgentPermissionMode) => void
   onClose: () => void
   onCopyMcpConfig?: () => void
   onNewChat: () => void
@@ -124,59 +131,108 @@ function AiPanelEmptyState({
 export function AiPanelHeader({
   agentLabel,
   agentReadiness,
+  permissionMode,
+  permissionModeDisabled,
+  onPermissionModeChange,
   onClose,
   onCopyMcpConfig,
   onNewChat,
 }: AiPanelHeaderProps) {
+  const modeLabel = AI_AGENT_PERMISSION_MODE_LABELS[permissionMode].short
+
   return (
     <div
-      className="flex shrink-0 items-center border-b border-border"
-      style={{ height: 52, padding: '0 12px', gap: 8 }}
+      className="flex shrink-0 flex-col border-b border-border"
+      style={{ padding: '8px 12px', gap: 8 }}
     >
-      <Robot size={16} className="shrink-0 text-muted-foreground" />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <span className="text-muted-foreground" style={{ fontSize: 13, fontWeight: 600 }}>
-          AI Agent
-        </span>
-        <span className="truncate text-[11px] text-muted-foreground">
-          {agentReadiness === 'checking'
-            ? 'Checking availability'
-            : `${agentLabel}${agentReadiness === 'missing' ? ' · not installed' : ''}`}
-        </span>
-      </div>
-      {onCopyMcpConfig ? (
+      <div className="flex items-center" style={{ gap: 8 }}>
+        <Robot size={16} className="shrink-0 text-muted-foreground" />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <span className="text-muted-foreground" style={{ fontSize: 13, fontWeight: 600 }}>
+            AI Agent
+          </span>
+          <span className="truncate text-[11px] text-muted-foreground">
+            {agentReadiness === 'checking'
+              ? 'Checking availability'
+              : `${agentLabel}${agentReadiness === 'missing' ? ' · not installed' : ` · ${modeLabel}`}`}
+          </span>
+        </div>
+        {onCopyMcpConfig ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={onCopyMcpConfig}
+            aria-label="Copy MCP config"
+            title="Copy MCP config"
+            data-testid="ai-copy-mcp-config"
+          >
+            <Copy size={15} />
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
-          onClick={onCopyMcpConfig}
-          aria-label="Copy MCP config"
-          title="Copy MCP config"
-          data-testid="ai-copy-mcp-config"
+          onClick={onNewChat}
+          aria-label="New AI chat"
+          title="New AI chat"
         >
-          <Copy size={15} />
+          <Plus size={16} />
         </Button>
-      ) : null}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        onClick={onNewChat}
-        aria-label="New AI chat"
-        title="New AI chat"
-      >
-        <Plus size={16} />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        onClick={onClose}
-        aria-label="Close AI panel"
-        title="Close AI panel"
-      >
-        <X size={16} />
-      </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          onClick={onClose}
+          aria-label="Close AI panel"
+          title="Close AI panel"
+        >
+          <X size={16} />
+        </Button>
+      </div>
+      <AiPermissionModeToggle
+        value={permissionMode}
+        disabled={permissionModeDisabled}
+        onChange={onPermissionModeChange}
+      />
+    </div>
+  )
+}
+
+function AiPermissionModeToggle({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: AiAgentPermissionMode
+  disabled: boolean
+  onChange: (mode: AiAgentPermissionMode) => void
+}) {
+  return (
+    <div
+      className="grid rounded-md bg-muted"
+      style={{ gridTemplateColumns: '1fr 1fr', gap: 2, padding: 2 }}
+      role="group"
+      aria-label="AI agent permission mode"
+      data-testid="ai-permission-mode-toggle"
+    >
+      {(['safe', 'power_user'] as const).map((mode) => {
+        const selected = value === mode
+        return (
+          <Button
+            key={mode}
+            type="button"
+            size="xs"
+            variant={selected ? 'secondary' : 'ghost'}
+            disabled={disabled}
+            aria-pressed={selected}
+            onClick={() => onChange(mode)}
+          >
+            {AI_AGENT_PERMISSION_MODE_LABELS[mode].control}
+          </Button>
+        )
+      })}
     </div>
   )
 }
@@ -275,16 +331,20 @@ export function AiPanelComposer({
             inputRef={inputRef}
           />
         </div>
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
           className="shrink-0 flex items-center justify-center border-none cursor-pointer transition-colors"
           style={sendButtonStyle}
           onClick={() => onSend(input, extractInlineWikilinkReferences(input, entries))}
           disabled={!canSend}
+          aria-label="Send message"
           title="Send message"
           data-testid="agent-send"
         >
           <PaperPlaneRight size={16} />
-        </button>
+        </Button>
       </div>
     </div>
   )

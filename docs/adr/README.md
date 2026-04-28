@@ -144,3 +144,4 @@ proposed → active → superseded
 | [0089](0089-active-vault-filesystem-watcher.md) | Active vault filesystem watcher | active |
 | [0090](0090-pi-cli-agent-adapter.md) | Pi CLI agent adapter | active |
 | [0091](0091-gemini-cli-external-ai-setup.md) | Gemini CLI external AI setup | active |
+| [0092](0092-vault-ai-agent-permission-modes.md) | Vault-scoped AI agent permission modes | active |

@@ -12,6 +12,14 @@ pub enum AiAgentId {
     Pi,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AiAgentPermissionMode {
+    #[default]
+    Safe,
+    PowerUser,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct AiAgentAvailability {
     pub installed: bool,
@@ -61,6 +69,13 @@ pub struct AiAgentStreamRequest {
     pub message: String,
     pub system_prompt: Option<String>,
     pub vault_path: String,
+    pub permission_mode: Option<AiAgentPermissionMode>,
+}
+
+impl AiAgentStreamRequest {
+    fn permission_mode(&self) -> AiAgentPermissionMode {
+        self.permission_mode.unwrap_or_default()
+    }
 }
 
 pub fn get_ai_agents_status() -> AiAgentsStatus {
@@ -76,12 +91,14 @@ pub fn run_ai_agent_stream<F>(request: AiAgentStreamRequest, mut emit: F) -> Res
 where
     F: FnMut(AiAgentStreamEvent),
 {
+    let permission_mode = request.permission_mode();
     match request.agent {
         AiAgentId::ClaudeCode => {
             let mapped = crate::claude_cli::AgentStreamRequest {
                 message: request.message,
                 system_prompt: request.system_prompt,
                 vault_path: request.vault_path,
+                permission_mode,
             };
             crate::claude_cli::run_agent_stream(mapped, |event| {
                 if let Some(mapped_event) = map_claude_event(event) {
@@ -95,6 +112,7 @@ where
                 message: request.message,
                 system_prompt: request.system_prompt,
                 vault_path: request.vault_path,
+                permission_mode,
             };
             crate::opencode_cli::run_agent_stream(mapped, emit)
         }
@@ -103,6 +121,7 @@ where
                 message: request.message,
                 system_prompt: request.system_prompt,
                 vault_path: request.vault_path,
+                permission_mode,
             };
             crate::pi_cli::run_agent_stream(mapped, emit)
         }
@@ -264,15 +283,26 @@ fn find_existing_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
     candidates.into_iter().find(|candidate| candidate.exists())
 }
 
-fn run_codex_agent_stream<F>(request: AiAgentStreamRequest, mut emit: F) -> Result<String, String>
+fn run_codex_agent_stream<F>(request: AiAgentStreamRequest, emit: F) -> Result<String, String>
 where
     F: FnMut(AiAgentStreamEvent),
 {
     let binary = find_codex_binary()?;
+    run_codex_agent_stream_with_binary(&binary, request, emit)
+}
+
+fn run_codex_agent_stream_with_binary<F>(
+    binary: &Path,
+    request: AiAgentStreamRequest,
+    mut emit: F,
+) -> Result<String, String>
+where
+    F: FnMut(AiAgentStreamEvent),
+{
     let args = build_codex_args(&request)?;
     let prompt = build_codex_prompt(&request);
 
-    let mut command = build_codex_command(&binary, args, prompt, &request.vault_path);
+    let mut command = build_codex_command(binary, args, prompt, &request.vault_path);
 
     let mut child = command
         .spawn()
@@ -518,13 +548,85 @@ mod tests {
     use super::*;
     use std::ffi::OsStr;
 
+    #[cfg(unix)]
+    fn executable_script(dir: &Path, name: &str, body: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+
+        let script = dir.join(name);
+        std::fs::write(&script, format!("#!/bin/sh\n{body}")).unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        script
+    }
+
+    fn codex_request(
+        vault_path: &Path,
+        permission_mode: Option<AiAgentPermissionMode>,
+    ) -> AiAgentStreamRequest {
+        AiAgentStreamRequest {
+            agent: AiAgentId::Codex,
+            message: "Summarize".into(),
+            system_prompt: None,
+            vault_path: vault_path.to_string_lossy().into_owned(),
+            permission_mode,
+        }
+    }
+
+    fn assert_codex_workspace_write_contract(args: &[String]) {
+        let prefix = [
+            "--sandbox",
+            "workspace-write",
+            "--ask-for-approval",
+            "never",
+        ];
+
+        assert_eq!(&args[..prefix.len()], prefix);
+        assert!(!args.iter().any(|arg| arg == "danger-full-access"));
+        assert!(!args
+            .iter()
+            .any(|arg| arg == "--dangerously-bypass-approvals-and-sandbox"));
+    }
+
+    #[cfg(unix)]
+    fn run_codex_script(body: &str) -> (String, Vec<AiAgentStreamEvent>) {
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        let binary = executable_script(dir.path(), "codex", body);
+        let mut events = Vec::new();
+        let thread_id = run_codex_agent_stream_with_binary(
+            &binary,
+            codex_request(vault.path(), Some(AiAgentPermissionMode::Safe)),
+            |event| events.push(event),
+        )
+        .unwrap();
+
+        (thread_id, events)
+    }
+
+    fn assert_codex_text_flow(events: &[AiAgentStreamEvent], session: &str, text_delta: &str) {
+        assert!(matches!(
+            &events[0],
+            AiAgentStreamEvent::Init { session_id } if session_id == session
+        ));
+        assert!(matches!(
+            &events[1],
+            AiAgentStreamEvent::TextDelta { text } if text == text_delta
+        ));
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+    }
+
     #[test]
     fn normalize_status_contains_all_agents() {
         let status = get_ai_agents_status();
-        assert!(matches!(status.claude_code.installed, true | false));
-        assert!(matches!(status.codex.installed, true | false));
-        assert!(matches!(status.opencode.installed, true | false));
-        assert!(matches!(status.pi.installed, true | false));
+        let install_flags = [
+            status.claude_code.installed,
+            status.codex.installed,
+            status.opencode.installed,
+            status.pi.installed,
+        ];
+
+        assert!(install_flags
+            .iter()
+            .all(|installed| matches!(installed, true | false)));
     }
 
     #[test]
@@ -534,6 +636,7 @@ mod tests {
             message: "Rename the note".into(),
             system_prompt: Some("Be concise".into()),
             vault_path: "/tmp/vault".into(),
+            permission_mode: Some(AiAgentPermissionMode::Safe),
         });
 
         assert!(prompt.starts_with("System instructions:\nBe concise"));
@@ -547,16 +650,30 @@ mod tests {
             message: "Rename the note".into(),
             system_prompt: None,
             vault_path: "/tmp/vault".into(),
+            permission_mode: None,
         }) {
-            assert_eq!(args[0], "--sandbox");
-            assert_eq!(args[1], "workspace-write");
-            assert_eq!(args[2], "--ask-for-approval");
-            assert_eq!(args[3], "never");
             assert_eq!(args[4], "exec");
-            assert!(!args.contains(&"--dangerously-bypass-approvals-and-sandbox".to_string()));
-            assert!(!args.contains(&"danger-full-access".to_string()));
+            assert_codex_workspace_write_contract(&args);
             assert!(args.contains(&"--json".to_string()));
             assert!(args.contains(&"-C".to_string()));
+        }
+    }
+
+    #[test]
+    fn codex_permission_modes_keep_workspace_write_without_dangerous_bypass() {
+        for permission_mode in [
+            AiAgentPermissionMode::Safe,
+            AiAgentPermissionMode::PowerUser,
+        ] {
+            if let Ok(args) = build_codex_args(&AiAgentStreamRequest {
+                agent: AiAgentId::Codex,
+                message: "Rename the note".into(),
+                system_prompt: None,
+                vault_path: "/tmp/vault".into(),
+                permission_mode: Some(permission_mode),
+            }) {
+                assert_codex_workspace_write_contract(&args);
+            }
         }
     }
 
@@ -577,6 +694,37 @@ mod tests {
             ]
         );
         assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/vault")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_codex_agent_stream_reads_ndjson_and_returns_thread_id() {
+        let (thread_id, events) = run_codex_script(
+            r#"printf '%s\n' '{"type":"thread.started","thread_id":"thread_1"}'
+printf '%s\n' '{"type":"item.completed","item":{"id":"msg_1","type":"agent_message","text":"Done"}}'
+"#,
+        );
+
+        assert_eq!(thread_id, "thread_1");
+        assert_codex_text_flow(&events, "thread_1", "Done");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_codex_agent_stream_reports_nonzero_exit_errors() {
+        let (thread_id, events) = run_codex_script(
+            r#"printf '%s\n' '{"type":"thread.started","thread_id":"thread_1"}'
+printf '%s\n' 'login required' >&2
+exit 2
+"#,
+        );
+
+        assert_eq!(thread_id, "thread_1");
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AiAgentStreamEvent::Error { message } if message.contains("not authenticated")
+        )));
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
     }
 
     #[test]
