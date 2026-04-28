@@ -401,7 +401,6 @@ macro_rules! app_invoke_handler {
             commands::get_vault_ai_guidance_status,
             commands::restore_vault_ai_guidance,
             commands::stream_claude_chat,
-            commands::stream_claude_agent,
             commands::stream_ai_agent,
             commands::reload_vault,
             commands::reload_vault_entry,

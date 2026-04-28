@@ -222,7 +222,7 @@ Notes can be opened in separate Tauri windows for focused editing. Secondary win
 
 Full agent mode — spawns the selected local CLI agent as a subprocess with tool access and MCP vault integration.
 
-1. **Frontend** (`AiPanel` + `useCliAiAgent` + `aiAgents.ts`) — streaming UI with reasoning blocks, tool action cards, response display, onboarding, and default-agent selection
+1. **Frontend** (`AiPanel` + `useCliAiAgent` + `aiAgentSession.ts` + `aiAgents.ts`) — one normalized session lifecycle for message state, reasoning blocks, tool action cards, response display, onboarding, and default-agent selection
 2. **Backend** (`ai_agents.rs`) — normalizes agent availability and streaming, dispatching to per-agent adapters
 3. **Agent adapters** — Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, a file/search-only built-in tool list, hidden Windows subprocess launches, and closed stdin for print-mode subprocesses so Windows launches receive EOF; Codex runs through `codex --sandbox workspace-write --ask-for-approval never exec --json`; OpenCode runs through `opencode run --format json`; Pi runs through `pi --mode json --no-session` with `npm:pi-mcp-adapter`. OpenCode and Pi both launch from the active vault cwd with closed stdin and transient MCP config. All app-launched paths use hidden Windows launches and avoid dangerous permission-bypass flags.
 4. **MCP Integration** — Claude receives the generated MCP config file path, Codex receives the same Tolaria MCP server via transient `-c mcp_servers.tolaria.*` config overrides, OpenCode receives it through `OPENCODE_CONFIG_CONTENT`, and Pi receives it through a temporary `PI_CODING_AGENT_DIR/mcp.json` consumed by `pi-mcp-adapter`
@@ -268,7 +268,7 @@ sequenceDiagram
 
 #### File Operation Detection
 
-When the agent writes or edits vault files, `useCliAiAgent` detects this from normalized tool inputs and calls `onFileCreated` or `onFileModified` callbacks to trigger vault reload.
+When the agent writes or edits vault files, `aiAgentFileOperations.ts` detects this from normalized tool inputs and calls `onFileCreated` or `onFileModified` callbacks to trigger vault reload. Unrecognized write-like operations fall back to a full vault refresh.
 
 ### Context Building
 
@@ -718,10 +718,9 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | Command | Description |
 |---------|-------------|
 | `stream_claude_chat` | Claude CLI chat mode (streaming) |
-| `stream_claude_agent` | Claude CLI agent mode (streaming + tools) |
 | `check_claude_cli` | Check if Claude CLI is available |
 | `get_ai_agents_status` | Check Claude Code + Codex + OpenCode + Pi availability |
-| `stream_ai_agent` | Stream the selected CLI agent through the normalized event layer |
+| `stream_ai_agent` | Stream Claude Code, Codex, OpenCode, or Pi through the normalized agent event layer |
 | `register_mcp_tools` | Register MCP in Claude/Cursor/generic config for the active vault |
 | `remove_mcp_tools` | Remove Tolaria's MCP entry from Claude/Cursor/generic config |
 | `check_mcp_status` | Check whether the active vault is explicitly registered in Claude/Cursor/generic config |
@@ -783,7 +782,7 @@ No Redux or global context. State lives in the root `App.tsx` and custom hooks:
 | `useTabManagement` | Navigation history, note switching | Note navigation lifecycle |
 | `useVaultSwitcher` | `vaultPath`, `extraVaults` | Vault switching |
 | `useTheme` | Editor theme CSS vars and theme-mode bridge | Editor typography and app theme runtime |
-| `useCliAiAgent` | `messages`, `status`, tool actions | Selected AI agent conversation |
+| `useCliAiAgent` | `messages`, `status`, tool actions | Selected AI agent conversation backed by the shared session pipeline |
 | `useAutoSync` | Sync interval, pull/push state | Git auto-sync |
 | `useAutoGit` | Last activity timestamp, idle/inactive checkpoint triggers | Automatic commit/push checkpoints |
 | `useCommitFlow` | Commit dialog state, shared manual/automatic checkpoint runner | Git commit/push orchestration |

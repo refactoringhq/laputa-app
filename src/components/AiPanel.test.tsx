@@ -57,9 +57,10 @@ describe('AiPanel', () => {
     mockClearConversation.mockReset()
   })
 
-  it('renders panel with AI Chat header', () => {
+  it('renders panel with the default CLI agent header', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getByText('AI Chat')).toBeTruthy()
+    expect(screen.getByText('AI Agent')).toBeTruthy()
+    expect(screen.getByText('Claude Code')).toBeTruthy()
   })
 
   it('renders data-testid ai-panel', () => {
@@ -86,7 +87,7 @@ describe('AiPanel', () => {
 
   it('renders empty state without context', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getByText('Open a note, then ask the AI about it')).toBeTruthy()
+    expect(screen.getByText('Open a note, then ask Claude Code about it')).toBeTruthy()
   })
 
   it('renders contextual empty state when active entry is provided', () => {
@@ -94,7 +95,7 @@ describe('AiPanel', () => {
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByText('Ask about this note and its linked context')).toBeTruthy()
+    expect(screen.getByText('Ask Claude Code about this note and its linked context')).toBeTruthy()
   })
 
   it('shows context bar with active entry title', () => {

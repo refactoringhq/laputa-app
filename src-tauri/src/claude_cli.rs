@@ -50,7 +50,7 @@ pub struct ChatStreamRequest {
     pub session_id: Option<String>,
 }
 
-/// Parameters accepted by `stream_claude_agent`.
+/// Parameters accepted by Claude Code agent streams.
 #[derive(Debug, Deserialize)]
 pub struct AgentStreamRequest {
     pub message: String,

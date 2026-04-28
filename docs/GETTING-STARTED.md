@@ -106,15 +106,14 @@ tolaria/
 │   │   └── ui/                   # shadcn/ui primitives
 │   │       ├── button.tsx, dialog.tsx, input.tsx, ...
 │   │
-│   ├── hooks/                    # Custom React hooks (~87 files)
+│   ├── hooks/                    # Custom React hooks (~86 files)
 │   │   ├── useVaultLoader.ts     # Loads vault entries + content
 │   │   ├── useVaultSwitcher.ts   # Multi-vault management
 │   │   ├── useVaultConfig.ts     # Per-vault UI settings
 │   │   ├── useNoteActions.ts     # Composes creation + rename + frontmatter
 │   │   ├── useNoteCreation.ts    # Note/type creation
 │   │   ├── useNoteRename.ts     # Note renaming + wikilink updates
-│   │   ├── useAiAgent.ts         # Legacy Claude-specific stream helpers reused by the shared agent hook
-│   │   ├── useCliAiAgent.ts      # Selected AI agent state + normalized tool tracking
+│   │   ├── useCliAiAgent.ts      # Selected AI agent state + normalized session pipeline
 │   │   ├── useAiAgentsStatus.ts  # Claude/Codex/OpenCode/Pi availability polling
 │   │   ├── useAiAgentPreferences.ts # Default-agent persistence + cycling
 │   │   ├── useAiActivity.ts      # MCP UI bridge listener
@@ -284,7 +283,9 @@ tolaria/
 | File | Why it matters |
 |------|---------------|
 | `src/components/AiPanel.tsx` | AI agent panel — selected CLI agent with tool execution, reasoning, and actions. |
-| `src/hooks/useCliAiAgent.ts` | Agent state: messages, streaming, tool tracking, file detection. |
+| `src/hooks/useCliAiAgent.ts` | Thin React owner for the selected CLI agent session state. |
+| `src/lib/aiAgentSession.ts` | Single message/session lifecycle for prompt normalization, history, streaming, and reset behavior. |
+| `src/lib/aiAgentFileOperations.ts` | Detects agent-created or modified vault files from normalized tool inputs. |
 | `src/lib/aiAgents.ts` | Supported agent definitions, status normalization, and default-agent helpers. |
 | `src/utils/ai-context.ts` | Context snapshot builder for AI conversations. |
 

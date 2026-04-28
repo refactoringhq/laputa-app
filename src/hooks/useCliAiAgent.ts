@@ -2,20 +2,19 @@ import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type
 import type { AiAgentId } from '../lib/aiAgents'
 import type { NoteReference } from '../utils/ai-context'
 import {
+  type AgentStatus,
   type AiAgentMessage,
 } from '../lib/aiAgentConversation'
+import type { AgentFileCallbacks } from '../lib/aiAgentFileOperations'
 import {
   clearAgentConversation,
   sendAgentMessage,
   type AiAgentSessionRuntime,
 } from '../lib/aiAgentSession'
 import type { ToolInvocation } from '../lib/aiAgentMessageState'
-import {
-  type AgentFileCallbacks,
-  type AgentStatus,
-} from './useAiAgent'
 
-export type { AgentFileCallbacks, AgentStatus } from './useAiAgent'
+export type { AgentFileCallbacks } from '../lib/aiAgentFileOperations'
+export type { AgentStatus } from '../lib/aiAgentConversation'
 export type { AiAgentMessage } from '../lib/aiAgentConversation'
 
 interface UseCliAiAgentOptions {

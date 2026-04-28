@@ -391,7 +391,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     return { ...mockVaultAiGuidanceStatus }
   },
   stream_claude_chat: () => 'mock-session',
-  stream_claude_agent: () => null,
   stream_ai_agent: () => null,
   save_note_content: (args: { path: string; content: string }) => {
     MOCK_CONTENT[args.path] = args.content

@@ -10,7 +10,6 @@ import type { VaultEntry } from '../types'
 interface AiPanelHeaderProps {
   agentLabel: string
   agentReady: boolean
-  legacyCopy: boolean
   onClose: () => void
   onNewChat: () => void
 }
@@ -23,7 +22,6 @@ interface AiPanelContextBarProps {
 interface AiPanelMessageHistoryProps {
   agentLabel: string
   agentReady: boolean
-  legacyCopy: boolean
   messages: AiAgentMessage[]
   isActive: boolean
   onOpenNote?: (path: string) => void
@@ -58,8 +56,7 @@ function AiPanelEmptyState({
   agentLabel,
   agentReady,
   hasContext,
-  legacyCopy,
-}: Pick<AiPanelMessageHistoryProps, 'agentLabel' | 'agentReady' | 'hasContext' | 'legacyCopy'>) {
+}: Pick<AiPanelMessageHistoryProps, 'agentLabel' | 'agentReady' | 'hasContext'>) {
   if (!agentReady) {
     return (
       <div
@@ -85,8 +82,8 @@ function AiPanelEmptyState({
       <Robot size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
       <p style={{ fontSize: 13, margin: '0 0 4px' }}>
         {hasContext
-          ? legacyCopy ? 'Ask about this note and its linked context' : `Ask ${agentLabel} about this note and its linked context`
-          : legacyCopy ? 'Open a note, then ask the AI about it' : `Open a note, then ask ${agentLabel} about it`
+          ? `Ask ${agentLabel} about this note and its linked context`
+          : `Open a note, then ask ${agentLabel} about it`
         }
       </p>
       <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
@@ -102,7 +99,6 @@ function AiPanelEmptyState({
 export function AiPanelHeader({
   agentLabel,
   agentReady,
-  legacyCopy,
   onClose,
   onNewChat,
 }: AiPanelHeaderProps) {
@@ -114,14 +110,12 @@ export function AiPanelHeader({
       <Robot size={16} className="shrink-0 text-muted-foreground" />
       <div className="flex flex-1 flex-col overflow-hidden">
         <span className="text-muted-foreground" style={{ fontSize: 13, fontWeight: 600 }}>
-          {legacyCopy ? 'AI Chat' : 'AI Agent'}
+          AI Agent
         </span>
-        {!legacyCopy && (
-          <span className="truncate text-[11px] text-muted-foreground">
-            {agentLabel}
-            {!agentReady ? ' · not installed' : ''}
-          </span>
-        )}
+        <span className="truncate text-[11px] text-muted-foreground">
+          {agentLabel}
+          {!agentReady ? ' · not installed' : ''}
+        </span>
       </div>
       <button
         className="shrink-0 border-none bg-transparent p-1 text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
@@ -161,7 +155,6 @@ export function AiPanelContextBar({ activeEntry, linkedCount }: AiPanelContextBa
 export function AiPanelMessageHistory({
   agentLabel,
   agentReady,
-  legacyCopy,
   messages,
   isActive,
   onOpenNote,
@@ -180,7 +173,6 @@ export function AiPanelMessageHistory({
         <AiPanelEmptyState
           agentLabel={agentLabel}
           agentReady={agentReady}
-          legacyCopy={legacyCopy}
           hasContext={hasContext}
         />
       )}
