@@ -198,6 +198,81 @@ describe('useAppSave', () => {
     consoleSpy.mockRestore()
   })
 
+  it('pauses manual saves when a stale editor has no active vault', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    const path = 'C:\\Users\\Luca\\Notes\\draft.md'
+    const entry = makeEntry(path, 'Draft', 'draft.md')
+
+    const { result } = renderSave({
+      resolvedPath: '',
+      tabs: [{ entry, content: '# Draft\n\nBody' }],
+      activeTabPath: path,
+      unsavedPaths: new Set([path]),
+    })
+
+    let saved = true
+    await act(async () => {
+      saved = await result.current.handleSave()
+    })
+
+    expect(saved).toBe(false)
+    expect(vi.mocked(invoke)).not.toHaveBeenCalledWith('save_note_content', expect.anything())
+    expect(deps.setToastMessage).toHaveBeenCalledWith('Select or restore a vault before saving.')
+    expect(deps.clearUnsaved).not.toHaveBeenCalled()
+  })
+
+  it('pauses stale auto-save timers when the active vault disappears before debounce fires', async () => {
+    vi.useFakeTimers()
+    vi.mocked(isTauri).mockReturnValue(true)
+    const entry = makeEntry('/vault/draft.md', 'Draft', 'draft.md')
+    const tabs = [{ entry, content: '# Draft' }]
+
+    const { result, rerender } = renderHook(
+      ({ vaultPath }: { vaultPath: string }) => useAppSave({
+        ...deps,
+        resolvedPath: vaultPath,
+        tabs,
+        activeTabPath: entry.path,
+        unsavedPaths: new Set([entry.path]),
+      }),
+      { initialProps: { vaultPath: '/vault' } },
+    )
+
+    act(() => {
+      result.current.handleContentChange(entry.path, '# Draft\n\nUnsaved')
+    })
+
+    rerender({ vaultPath: '' })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500)
+    })
+
+    expect(vi.mocked(invoke)).not.toHaveBeenCalledWith('save_note_content', expect.anything())
+    expect(deps.clearUnsaved).not.toHaveBeenCalled()
+  })
+
+  it('does not flush unsaved tab content to disk without an active vault', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    const path = 'C:\\Users\\Luca\\Notes\\draft.md'
+    const entry = makeEntry(path, 'Draft', 'draft.md')
+
+    const { result } = renderSave({
+      resolvedPath: '',
+      tabs: [{ entry, content: '# Draft\n\nBody' }],
+      activeTabPath: path,
+      unsavedPaths: new Set([path]),
+    })
+
+    await act(async () => {
+      await result.current.flushBeforeAction(path)
+    })
+
+    expect(vi.mocked(invoke)).not.toHaveBeenCalledWith('save_note_content', expect.anything())
+    expect(deps.setToastMessage).toHaveBeenCalledWith('Select or restore a vault before saving.')
+    expect(deps.clearUnsaved).not.toHaveBeenCalled()
+  })
+
   it('handleContentChange is a function', () => {
     const { result } = renderSave()
     expect(typeof result.current.handleContentChange).toBe('function')

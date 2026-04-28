@@ -22,6 +22,8 @@ export function useEditorSaveWithLinks(config: {
   onNotePersisted?: (path: string, content: string) => void
   resolvePath?: (path: string) => string
   resolvePathBeforeSave?: (path: string) => Promise<string>
+  canPersist?: boolean
+  disabledSaveMessage?: string
 }) {
   const { updateEntry } = config
   const saveContent = useCallback((path: string, content: string) => {
@@ -32,15 +34,7 @@ export function useEditorSaveWithLinks(config: {
       modifiedAt: Math.floor(Date.now() / 1000),
     })
   }, [updateEntry])
-  const editor = useEditorSave({
-    updateVaultContent: saveContent,
-    setTabs: config.setTabs,
-    setToastMessage: config.setToastMessage,
-    onAfterSave: config.onAfterSave,
-    onNotePersisted: config.onNotePersisted,
-    resolvePath: config.resolvePath,
-    resolvePathBeforeSave: config.resolvePathBeforeSave,
-  })
+  const editor = useEditorSave({ ...config, updateVaultContent: saveContent })
   const { handleContentChange: rawOnChange } = editor
   const prevLinksKeyRef = useRef('')
   const prevFmKeyRef = useRef(EMPTY_DERIVED_ENTRY_STATE_KEY)
