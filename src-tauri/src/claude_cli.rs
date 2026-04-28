@@ -142,9 +142,25 @@ fn first_existing_path(stdout: &str) -> Option<PathBuf> {
 }
 
 fn claude_binary_candidates() -> Vec<PathBuf> {
-    dirs::home_dir()
-        .map(|home| claude_binary_candidates_for_home(&home))
-        .unwrap_or_default()
+    let mut candidates = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        candidates.extend(claude_binary_candidates_for_home(&home));
+        candidates.extend(nvm_claude_candidates(&home));
+    }
+    candidates
+}
+
+fn nvm_claude_candidates(home: &Path) -> Vec<PathBuf> {
+    let nvm_versions = home.join(".nvm/versions/node");
+    let mut paths = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(nvm_versions) {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                paths.push(entry.path().join("bin/claude"));
+            }
+        }
+    }
+    paths
 }
 
 fn claude_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {

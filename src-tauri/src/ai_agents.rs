@@ -223,9 +223,25 @@ fn first_existing_path(stdout: &str) -> Option<PathBuf> {
 }
 
 fn codex_binary_candidates() -> Vec<PathBuf> {
-    dirs::home_dir()
-        .map(|home| codex_binary_candidates_for_home(&home))
-        .unwrap_or_default()
+    let mut candidates = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        candidates.extend(codex_binary_candidates_for_home(&home));
+        candidates.extend(nvm_codex_candidates(&home));
+    }
+    candidates
+}
+
+fn nvm_codex_candidates(home: &Path) -> Vec<PathBuf> {
+    let nvm_versions = home.join(".nvm/versions/node");
+    let mut paths = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(nvm_versions) {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                paths.push(entry.path().join("bin/codex"));
+            }
+        }
+    }
+    paths
 }
 
 fn codex_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
