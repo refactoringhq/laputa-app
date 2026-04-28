@@ -53,6 +53,7 @@ mod tests {
             name: "Inbox".to_string(),
             icon: None,
             color: None,
+            order: None,
             sort: None,
             list_properties_display: vec![],
             filters: crate::vault::FilterGroup::All(vec![]),

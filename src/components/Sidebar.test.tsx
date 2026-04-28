@@ -1384,6 +1384,33 @@ describe('Sidebar', () => {
       },
     ]
 
+    it('renders keyboard-accessible move buttons for saved views', () => {
+      const onMoveView = vi.fn()
+      render(
+        <Sidebar
+          entries={mockEntries}
+          selection={defaultSelection}
+          onSelect={() => {}}
+          views={mockViews}
+          onMoveView={onMoveView}
+        />
+      )
+
+      const moveUpButtons = screen.getAllByTitle('Move view up')
+      const moveDownButtons = screen.getAllByTitle('Move view down')
+
+      expect(moveUpButtons[0]).toBeDisabled()
+      expect(moveUpButtons[1]).not.toBeDisabled()
+      expect(moveDownButtons[0]).not.toBeDisabled()
+      expect(moveDownButtons[1]).toBeDisabled()
+
+      fireEvent.click(moveUpButtons[1])
+      expect(onMoveView).toHaveBeenCalledWith('all-topics.yml', 'up')
+
+      fireEvent.click(moveDownButtons[0])
+      expect(onMoveView).toHaveBeenCalledWith('active-projects.yml', 'down')
+    })
+
     it('shows note count chip for each view matching the filter results', () => {
       render(
         <Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} views={mockViews} />
