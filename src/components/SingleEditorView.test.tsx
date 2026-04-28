@@ -14,7 +14,9 @@ const state = vi.hoisted(() => ({
   hoverGuardMock: vi.fn(),
   imageDropState: { isDragOver: false },
   linkActivationMock: vi.fn(),
+  personMentionCandidates: [] as Record<string, unknown>[],
   wikilinkEntriesRef: { current: [] as VaultEntry[] },
+  wikilinkCandidates: [] as Record<string, unknown>[],
 }))
 
 vi.mock('@blocknote/react', () => ({
@@ -145,12 +147,12 @@ vi.mock('../utils/typeColors', () => ({
 vi.mock('../utils/wikilinkSuggestions', () => ({
   MIN_QUERY_LENGTH: 2,
   deduplicateByPath: <T,>(items: T[]) => items,
-  preFilterWikilinks: () => [],
+  preFilterWikilinks: () => state.wikilinkCandidates,
 }))
 
 vi.mock('../utils/personMentionSuggestions', () => ({
   PERSON_MENTION_MIN_QUERY: 1,
-  filterPersonMentions: () => [],
+  filterPersonMentions: () => state.personMentionCandidates,
 }))
 
 vi.mock('../utils/suggestionEnrichment', () => ({
@@ -241,6 +243,7 @@ function createEditor() {
       { id: 'heading-block', type: 'heading', content: [], children: [] },
       cursorBlock,
     ],
+    domElement: undefined as HTMLElement | undefined,
     tryParseMarkdownToBlocks: vi.fn(async () => [
       { type: 'table', content: { type: 'tableContent' } },
     ]),
@@ -308,7 +311,9 @@ describe('SingleEditorView', () => {
     state.capturedBlockNoteOnChange = null
     state.capturedMantineGetStyleNonce = null
     state.imageDropState.isDragOver = false
+    state.personMentionCandidates = []
     state.wikilinkEntriesRef.current = []
+    state.wikilinkCandidates = []
     mockOpenExternalUrl.mockClear()
     document.documentElement.removeAttribute('data-theme')
     document.documentElement.classList.remove('dark')
@@ -433,6 +438,60 @@ describe('SingleEditorView', () => {
 
     expect(onWikiItemClick).toHaveBeenCalledOnce()
     expect(onMentionItemClick).toHaveBeenCalledOnce()
+  })
+
+  it('ignores stale suggestion item clicks after the editor DOM disconnects', () => {
+    const editor = createEditor()
+    editor.domElement = document.createElement('div')
+
+    render(
+      <SingleEditorView
+        editor={editor as never}
+        entries={[makeEntry()]}
+        onNavigateWikilink={vi.fn()}
+      />,
+    )
+
+    const staleItemClick = vi.fn(() => {
+      throw new TypeError('Cannot read properties of undefined (reading isConnected)')
+    })
+
+    expect(() => {
+      ;(state.capturedSuggestionProps['[['].onItemClick as (item: { onItemClick: () => void }) => void)({
+        onItemClick: staleItemClick,
+      })
+    }).not.toThrow()
+    expect(staleItemClick).not.toHaveBeenCalled()
+  })
+
+  it('guards stale click handlers stored on wikilink suggestion items', async () => {
+    const editor = createEditor()
+    editor.domElement = document.createElement('div')
+    const staleItemClick = vi.fn(() => {
+      throw new TypeError('Cannot read properties of undefined (reading isConnected)')
+    })
+    state.wikilinkCandidates = [{
+      title: 'Alpha',
+      path: '/vault/project/alpha.md',
+      onItemClick: staleItemClick,
+    }]
+
+    render(
+      <SingleEditorView
+        editor={editor as never}
+        entries={[makeEntry()]}
+        onNavigateWikilink={vi.fn()}
+      />,
+    )
+
+    const getItems = state.capturedSuggestionProps['[['].getItems as (
+      query: string
+    ) => Promise<Array<{ onItemClick: () => void }>>
+    const items = await getItems('al')
+
+    expect(items).toHaveLength(1)
+    expect(() => items[0].onItemClick()).not.toThrow()
+    expect(staleItemClick).not.toHaveBeenCalled()
   })
 
   it('passes the active document theme to BlockNote', () => {
