@@ -133,6 +133,15 @@ pub async fn check_mcp_status(vault_path: String) -> Result<crate::mcp::McpStatu
 
 #[cfg(desktop)]
 #[tauri::command]
+pub async fn get_mcp_config_snippet(vault_path: String) -> Result<String, String> {
+    let vault_path = super::expand_tilde(&vault_path).into_owned();
+    tokio::task::spawn_blocking(move || crate::mcp::mcp_config_snippet(&vault_path))
+        .await
+        .map_err(|e| format!("MCP config task failed: {e}"))?
+}
+
+#[cfg(desktop)]
+#[tauri::command]
 pub async fn sync_mcp_bridge_vault(
     app: tauri::AppHandle,
     vault_path: Option<String>,
@@ -165,6 +174,12 @@ pub async fn remove_mcp_tools() -> Result<String, String> {
 #[tauri::command]
 pub async fn check_mcp_status(_vault_path: String) -> Result<crate::mcp::McpStatus, String> {
     Ok(crate::mcp::McpStatus::NotInstalled)
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn get_mcp_config_snippet(_vault_path: String) -> Result<String, String> {
+    Err("MCP is not available on mobile".into())
 }
 
 #[cfg(mobile)]

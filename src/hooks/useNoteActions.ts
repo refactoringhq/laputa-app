@@ -1,7 +1,11 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import type { VaultEntry } from '../types'
 import type { FrontmatterValue } from '../components/Inspector'
 import { useTabManagement } from './useTabManagement'
+import {
+  GITIGNORED_VISIBILITY_APPLIED_EVENT,
+  type GitignoredVisibilityAppliedEvent,
+} from '../lib/gitignoredVisibilityEvents'
 import { resolveEntry } from '../utils/wikilink'
 import { useNoteCreation } from './useNoteCreation'
 import {
@@ -15,8 +19,7 @@ export interface NoteActionsConfig {
   removeEntry: (path: string) => void
   entries: VaultEntry[]
   flushBeforeNoteSwitch?: (path: string) => Promise<void>
-  flushBeforeFrontmatterChange?: (path: string) => Promise<void>
-  flushBeforePathRename?: (path: string) => Promise<void>
+  flushBeforeNoteMutation?: (path: string) => Promise<void>
   reloadVault?: () => Promise<unknown>
   setToastMessage: (msg: string | null) => void
   updateEntry: (path: string, patch: Partial<VaultEntry>) => void
@@ -127,30 +130,14 @@ interface MaybeRenameAfterFrontmatterUpdateParams {
   deps: TitleRenameDeps
 }
 
-async function flushBeforeTitleRename(
+async function flushBeforeNoteMutation(
   path: string,
-  key: string,
-  value: FrontmatterValue,
-  flushBeforePathRename?: (path: string) => Promise<void>,
+  flushBeforeMutation?: (path: string) => Promise<void>,
 ): Promise<boolean> {
-  if (!shouldRenameOnTitleUpdate(key, value) || !flushBeforePathRename) return true
+  if (!flushBeforeMutation) return true
 
   try {
-    await flushBeforePathRename(path)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function flushBeforeFrontmatterMutation(
-  path: string,
-  flushBeforeFrontmatterChange?: (path: string) => Promise<void>,
-): Promise<boolean> {
-  if (!flushBeforeFrontmatterChange) return true
-
-  try {
-    await flushBeforeFrontmatterChange(path)
+    await flushBeforeMutation(path)
     return true
   } catch {
     return false
@@ -196,11 +183,8 @@ async function updateFrontmatterAndMaybeRename({
   runFrontmatterOp,
   value,
 }: UpdateFrontmatterAndMaybeRenameParams): Promise<void> {
-  const canFlush = await flushBeforeFrontmatterMutation(path, config.flushBeforeFrontmatterChange)
+  const canFlush = await flushBeforeNoteMutation(path, config.flushBeforeNoteMutation)
   if (!canFlush) return
-
-  const canRename = await flushBeforeTitleRename(path, key, value, config.flushBeforePathRename)
-  if (!canRename) return
 
   const newContent = await runFrontmatterOp('update', path, key, value, options)
   if (!applyFrontmatterCallbacks({ config, path, newContent })) return
@@ -233,6 +217,33 @@ function buildTabManagementOptions(
   }
 
   return options
+}
+
+function useGitignoredVisibilityTabCleanup({
+  activeTabPathRef,
+  closeAllTabs,
+  setToastMessage,
+}: {
+  activeTabPathRef: React.MutableRefObject<string | null>
+  closeAllTabs: () => void
+  setToastMessage: (msg: string | null) => void
+}) {
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleVisibilityApplied = (event: Event) => {
+      const { hide, visiblePaths } = (event as GitignoredVisibilityAppliedEvent).detail
+      const activePath = activeTabPathRef.current
+      if (!hide || !activePath || visiblePaths.includes(activePath)) return
+      closeAllTabs()
+      setToastMessage('Closed hidden Gitignored file')
+    }
+
+    window.addEventListener(GITIGNORED_VISIBILITY_APPLIED_EVENT, handleVisibilityApplied)
+    return () => {
+      window.removeEventListener(GITIGNORED_VISIBILITY_APPLIED_EVENT, handleVisibilityApplied)
+    }
+  }, [activeTabPathRef, closeAllTabs, setToastMessage])
 }
 
 function useFrontmatterActionHandlers({
@@ -289,7 +300,7 @@ function useFrontmatterActionHandlers({
   }, [activeTabPathRef, config, handleSwitchTab, renameTabsRef, runFrontmatterOp, setTabs, setToastMessage, updateTabContent])
 
   const handleDeleteProperty = useCallback(async (path: string, key: string, options?: FrontmatterOpOptions) => {
-    const canFlush = await flushBeforeFrontmatterMutation(path, config.flushBeforeFrontmatterChange)
+    const canFlush = await flushBeforeNoteMutation(path, config.flushBeforeNoteMutation)
     if (!canFlush) return
 
     const newContent = await runFrontmatterOp('delete', path, key, undefined, options)
@@ -298,7 +309,7 @@ function useFrontmatterActionHandlers({
   }, [config, runFrontmatterOp])
 
   const handleAddProperty = useCallback(async (path: string, key: string, value: FrontmatterValue) => {
-    const canFlush = await flushBeforeFrontmatterMutation(path, config.flushBeforeFrontmatterChange)
+    const canFlush = await flushBeforeNoteMutation(path, config.flushBeforeNoteMutation)
     if (!canFlush) return
 
     const newContent = await runFrontmatterOp('update', path, key, value)
@@ -317,6 +328,11 @@ export function useNoteActions(config: NoteActionsConfig) {
   const { entries, setToastMessage, updateEntry } = config
   const tabMgmt = useTabManagement(buildTabManagementOptions(config))
   const { setTabs, handleSelectNote, openTabWithContent, activeTabPathRef, handleSwitchTab } = tabMgmt
+  useGitignoredVisibilityTabCleanup({
+    activeTabPathRef,
+    closeAllTabs: tabMgmt.closeAllTabs,
+    setToastMessage,
+  })
 
   const updateTabContent = useCallback((path: string, newContent: string) => {
     setTabs((prev) => prev.map((t) => t.entry.path === path ? { ...t, content: newContent } : t))

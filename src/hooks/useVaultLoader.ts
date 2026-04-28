@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import type { VaultEntry, FolderNode, GitCommit, ModifiedFile, NoteStatus, GitPushResult, ViewFile } from '../types'
+import {
+  GITIGNORED_VISIBILITY_CHANGED_EVENT,
+  notifyGitignoredVisibilityApplied,
+  type GitignoredVisibilityChangedEvent,
+} from '../lib/gitignoredVisibilityEvents'
 import { clearPrefetchCache } from './useTabManagement'
 
 function tauriCall<T>(command: string, tauriArgs: Record<string, unknown>, mockArgs?: Record<string, unknown>): Promise<T> {
@@ -168,6 +173,23 @@ interface ResolveNoteStatusOptions {
   unsavedPaths?: Set<string>
 }
 
+function resolveTransientNoteStatus({
+  path,
+  pendingSavePaths,
+  unsavedPaths,
+}: Pick<ResolveNoteStatusOptions, 'path' | 'pendingSavePaths' | 'unsavedPaths'>): NoteStatus | null {
+  if (unsavedPaths?.has(path)) return 'unsaved'
+  if (pendingSavePaths?.has(path)) return 'pendingSave'
+  return null
+}
+
+function resolveGitBackedNoteStatus(file: ModifiedFile | undefined): NoteStatus {
+  if (!file) return 'clean'
+  if (file.status === 'untracked' || file.status === 'added') return 'new'
+  if (file.status === 'modified' || file.status === 'deleted') return 'modified'
+  return 'clean'
+}
+
 export function resolveNoteStatus({
   path,
   newPaths,
@@ -175,14 +197,10 @@ export function resolveNoteStatus({
   pendingSavePaths,
   unsavedPaths,
 }: ResolveNoteStatusOptions): NoteStatus {
-  if (unsavedPaths?.has(path)) return 'unsaved'
-  if (pendingSavePaths?.has(path)) return 'pendingSave'
+  const transientStatus = resolveTransientNoteStatus({ path, pendingSavePaths, unsavedPaths })
+  if (transientStatus) return transientStatus
   if (newPaths.has(path)) return 'new'
-  const gitEntry = modifiedFiles.find((f) => f.path === path)
-  if (!gitEntry) return 'clean'
-  if (gitEntry.status === 'untracked' || gitEntry.status === 'added') return 'new'
-  if (gitEntry.status === 'modified' || gitEntry.status === 'deleted') return 'modified'
-  return 'clean'
+  return resolveGitBackedNoteStatus(modifiedFiles.find((file) => file.path === path))
 }
 
 function useInitialVaultLoad({
@@ -415,6 +433,32 @@ function useVaultReloads({
   return { isReloading, reloadFolders, reloadVault, reloadViews, resetReloading }
 }
 
+function useGitignoredVisibilityReloads(
+  reloads: Pick<ReturnType<typeof useVaultReloads>, 'reloadFolders' | 'reloadVault' | 'reloadViews'>,
+) {
+  const { reloadFolders, reloadVault, reloadViews } = reloads
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleVisibilityChanged = (event: Event) => {
+      const { hide } = (event as GitignoredVisibilityChangedEvent).detail
+      void Promise.all([
+        reloadVault(),
+        reloadFolders(),
+        reloadViews(),
+      ]).then(([entries]) => {
+        notifyGitignoredVisibilityApplied(hide, entries)
+      })
+    }
+
+    window.addEventListener(GITIGNORED_VISIBILITY_CHANGED_EVENT, handleVisibilityChanged)
+    return () => {
+      window.removeEventListener(GITIGNORED_VISIBILITY_CHANGED_EVENT, handleVisibilityChanged)
+    }
+  }, [reloadFolders, reloadVault, reloadViews])
+}
+
 export function useVaultLoader(vaultPath: string) {
   const [entries, setEntries] = useState<VaultEntry[]>([])
   const [folders, setFolders] = useState<FolderNode[]>([])
@@ -441,6 +485,7 @@ export function useVaultLoader(vaultPath: string) {
     setFolders,
     setViews,
   })
+  useGitignoredVisibilityReloads(vaultReloads)
 
   useInitialVaultLoad({
     vaultPath,

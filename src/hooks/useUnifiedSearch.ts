@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import type { SearchResult } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
+import { GITIGNORED_VISIBILITY_CHANGED_EVENT } from '../lib/gitignoredVisibilityEvents'
 
 interface SearchResultData {
   title: string
@@ -40,6 +41,29 @@ function mapResults(raw: SearchResultData[]): SearchResult[] {
       seen.add(r.path)
       return true
     })
+}
+
+function useGitignoredVisibilitySearchRefresh({
+  active,
+  performSearch,
+  query,
+}: {
+  active: boolean
+  performSearch: (query: string) => void
+  query: string
+}) {
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleGitignoredVisibilityChanged = () => {
+      if (active && query.trim()) performSearch(query)
+    }
+
+    window.addEventListener(GITIGNORED_VISIBILITY_CHANGED_EVENT, handleGitignoredVisibilityChanged)
+    return () => {
+      window.removeEventListener(GITIGNORED_VISIBILITY_CHANGED_EVENT, handleGitignoredVisibilityChanged)
+    }
+  }, [active, performSearch, query])
 }
 
 export function useUnifiedSearch(vaultPath: string, active: boolean) {
@@ -102,6 +126,12 @@ export function useUnifiedSearch(vaultPath: string, active: boolean) {
       debounceRef.current = null
     }
   }, [query, performSearch])
+
+  useGitignoredVisibilitySearchRefresh({
+    active,
+    performSearch: (nextQuery) => { void performSearch(nextQuery) },
+    query,
+  })
 
   return { query, setQuery, results, selectedIndex, setSelectedIndex, loading, elapsedMs }
 }

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { CreateViewDialog } from './CreateViewDialog'
 import type { ViewDefinition } from '../types'
@@ -43,7 +43,7 @@ describe('CreateViewDialog', () => {
     expect(input).toHaveValue('Active Projects')
   })
 
-  it('preserves emoji icon when editing a view', () => {
+  it('preserves emoji icon when editing a view', async () => {
     const onCreate = vi.fn()
     const editingView: ViewDefinition = {
       name: 'Monday',
@@ -55,12 +55,14 @@ describe('CreateViewDialog', () => {
     render(<CreateViewDialog {...defaultProps} onCreate={onCreate} editingView={editingView} />)
     // Submit the form without changing anything
     fireEvent.submit(screen.getByText('Save').closest('form')!)
-    expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ icon: '🗂️' })
-    )
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ icon: '🗂️' })
+      )
+    })
   })
 
-  it('passes selected emoji icon when creating a view', () => {
+  it('passes selected emoji icon when creating a view', async () => {
     const onCreate = vi.fn()
     render(<CreateViewDialog {...defaultProps} onCreate={onCreate} />)
     const input = screen.getByPlaceholderText(/Active Projects|Reading List/i)
@@ -72,21 +74,37 @@ describe('CreateViewDialog', () => {
     fireEvent.click(emojiButtons[0])
     // Submit the form
     fireEvent.click(screen.getByText('Create'))
-    expect(onCreate).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
     const definition = onCreate.mock.calls[0][0] as ViewDefinition
     expect(definition.icon).not.toBeNull()
     expect(typeof definition.icon).toBe('string')
     expect(definition.icon!.length).toBeGreaterThan(0)
   })
 
-  it('passes null icon when no emoji is selected', () => {
+  it('passes null icon when no emoji is selected', async () => {
     const onCreate = vi.fn()
     render(<CreateViewDialog {...defaultProps} onCreate={onCreate} />)
     const input = screen.getByPlaceholderText(/Active Projects|Reading List/i)
     fireEvent.change(input, { target: { value: 'No Icon View' } })
     fireEvent.submit(screen.getByText('Create').closest('form')!)
-    expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ icon: null })
-    )
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ icon: null })
+      )
+    })
+  })
+
+  it('keeps the dialog open when async save reports failure', async () => {
+    const onClose = vi.fn()
+    const onCreate = vi.fn(async () => false)
+    render(<CreateViewDialog {...defaultProps} onClose={onClose} onCreate={onCreate} />)
+    const input = screen.getByPlaceholderText(/Active Projects|Reading List/i)
+    fireEvent.change(input, { target: { value: 'Unsaveable View' } })
+
+    fireEvent.click(screen.getByText('Create'))
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByText('Create View')).toBeInTheDocument()
   })
 })

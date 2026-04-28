@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MermaidDiagram } from './MermaidDiagram'
 
@@ -31,6 +31,23 @@ describe('MermaidDiagram', () => {
       expect(screen.getByTestId('mermaid-diagram-viewport').querySelector('svg')).not.toBeNull()
     })
     expect(mermaidMock.render).toHaveBeenCalledWith(expect.stringMatching(/^tolaria-mermaid-/), 'flowchart LR\nA --> B')
+    expect(mermaidMock.initialize).toHaveBeenCalledWith(expect.objectContaining({ theme: 'default' }))
+  })
+
+  it('opens the rendered SVG in a lightbox', async () => {
+    render(
+      <MermaidDiagram
+        diagram={'flowchart LR\nA --> B'}
+        source={'```mermaid\nflowchart LR\nA --> B\n```'}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram-viewport').querySelector('svg')).not.toBeNull()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Mermaid diagram' }))
+    expect(screen.getByTestId('mermaid-diagram-dialog-viewport').querySelector('svg')).not.toBeNull()
   })
 
   it('falls back to the original source when Mermaid cannot render', async () => {

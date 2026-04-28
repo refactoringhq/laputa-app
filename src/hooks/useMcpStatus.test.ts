@@ -24,6 +24,14 @@ function renderSubject(onToast = vi.fn()) {
   return renderHook(() => useMcpStatus('/vault', onToast))
 }
 
+function mockClipboard(writeText = vi.fn(() => Promise.resolve())) {
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  })
+  return writeText
+}
+
 function mockStatusFlow(
   initialStatus: 'installed' | 'not_installed',
   overrides: Partial<Record<'register_mcp_tools' | 'remove_mcp_tools', unknown>> = {},
@@ -76,6 +84,7 @@ async function runMutationScenario({
 describe('useMcpStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockClipboard()
   })
 
   it('checks the active vault status without auto-registering on mount', async () => {
@@ -159,5 +168,48 @@ describe('useMcpStatus', () => {
     expect(result.current.mcpStatus).toBe(expectedStatus)
     expect(mockInvoke).toHaveBeenCalledWith(overrideKey, commandArgs)
     expect(onToast).toHaveBeenCalledWith(expect.stringContaining(toastFragment))
+  })
+
+  it('loads the exact manual MCP config snippet for the active vault', async () => {
+    const snippet = JSON.stringify({ mcpServers: { tolaria: { type: 'stdio' } } })
+    mockCommands({
+      check_mcp_status: 'installed',
+      get_mcp_config_snippet: snippet,
+    })
+    const { result } = renderSubject()
+
+    await waitFor(() => {
+      expect(result.current.mcpStatus).toBe('installed')
+    })
+
+    await act(async () => {
+      await result.current.loadMcpConfigSnippet()
+    })
+
+    expect(result.current.mcpConfigSnippet).toBe(snippet)
+    expect(result.current.mcpConfigError).toBeNull()
+    expect(mockInvoke).toHaveBeenCalledWith('get_mcp_config_snippet', { vaultPath: '/vault' })
+  })
+
+  it('copies the manual MCP config snippet to the clipboard', async () => {
+    const writeText = mockClipboard()
+    const onToast = vi.fn()
+    const snippet = JSON.stringify({ mcpServers: { tolaria: { type: 'stdio' } } })
+    mockCommands({
+      check_mcp_status: 'not_installed',
+      get_mcp_config_snippet: snippet,
+    })
+    const { result } = renderSubject(onToast)
+
+    await waitFor(() => {
+      expect(result.current.mcpStatus).toBe('not_installed')
+    })
+
+    await act(async () => {
+      await expect(result.current.copyMcpConfig()).resolves.toBe(true)
+    })
+
+    expect(writeText).toHaveBeenCalledWith(snippet)
+    expect(onToast).toHaveBeenCalledWith('Tolaria MCP config copied to clipboard')
   })
 })

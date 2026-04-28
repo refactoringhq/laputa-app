@@ -1,5 +1,7 @@
 import {
+  AddBlockButton,
   DragHandleMenu,
+  DragHandleButton,
   RemoveBlockItem,
   SideMenu,
   TableColumnHeaderItem,
@@ -21,5 +23,10 @@ function TolariaDragHandleMenu() {
 }
 
 export function TolariaSideMenu(props: SideMenuProps) {
-  return <SideMenu {...props} dragHandleMenu={TolariaDragHandleMenu} />
+  return (
+    <SideMenu {...props}>
+      <DragHandleButton dragHandleMenu={TolariaDragHandleMenu} />
+      <AddBlockButton />
+    </SideMenu>
+  )
 }

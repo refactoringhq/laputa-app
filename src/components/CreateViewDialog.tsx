@@ -6,10 +6,13 @@ import { FilterBuilder } from './FilterBuilder'
 import { EmojiPicker } from './EmojiPicker'
 import type { FilterGroup, ViewDefinition } from '../types'
 
+type SaveViewResult = boolean | void
+type SaveViewHandler = (definition: ViewDefinition) => SaveViewResult | Promise<SaveViewResult>
+
 interface CreateViewDialogProps {
   open: boolean
   onClose: () => void
-  onCreate: (definition: ViewDefinition) => void
+  onCreate: SaveViewHandler
   availableFields: string[]
   /** When provided, the dialog operates in edit mode with pre-populated fields. */
   editingView?: ViewDefinition | null
@@ -22,7 +25,7 @@ interface CreateViewDialogFormProps {
   initialFilters: FilterGroup
   isEditing: boolean
   onClose: () => void
-  onCreate: (definition: ViewDefinition) => void
+  onCreate: SaveViewHandler
 }
 
 function CreateViewDialogForm({
@@ -38,6 +41,8 @@ function CreateViewDialogForm({
   const [icon, setIcon] = useState(initialIcon)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [filters, setFilters] = useState<FilterGroup>(initialFilters)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -45,8 +50,9 @@ function CreateViewDialogForm({
     return () => window.clearTimeout(timeoutId)
   }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSaving) return
     const trimmed = name.trim()
     if (!trimmed) return
     const definition: ViewDefinition = {
@@ -56,8 +62,23 @@ function CreateViewDialogForm({
       sort: null,
       filters,
     }
-    onCreate(definition)
-    onClose()
+    setSaveError(null)
+    setIsSaving(true)
+
+    let shouldClose = false
+    try {
+      const result = await onCreate(definition)
+      if (result === false) {
+        setSaveError('Could not save view.')
+      } else {
+        shouldClose = true
+      }
+    } catch {
+      setSaveError('Could not save view.')
+    }
+
+    setIsSaving(false)
+    if (shouldClose) onClose()
   }
 
   const handleSelectEmoji = useCallback((emoji: string) => {
@@ -76,14 +97,15 @@ function CreateViewDialogForm({
       <div className="flex gap-2">
         <div className="w-16 space-y-1.5 relative">
           <label className="text-xs font-medium text-muted-foreground">Icon</label>
-          <button
+          <Button
             type="button"
-            className="flex h-9 w-full items-center justify-center rounded-md border border-input bg-background text-xl cursor-pointer hover:bg-accent transition-colors"
+            variant="outline"
+            className="flex h-9 w-full p-0 text-xl hover:bg-accent"
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             title="Pick icon"
           >
             {icon || <span className="text-sm text-muted-foreground">📋</span>}
-          </button>
+          </Button>
           {showEmojiPicker && (
             <EmojiPicker onSelect={handleSelectEmoji} onClose={handleCloseEmojiPicker} />
           )}
@@ -94,10 +116,16 @@ function CreateViewDialogForm({
             ref={inputRef}
             placeholder="e.g. Active Projects, Reading List..."
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (saveError) setSaveError(null)
+            }}
           />
         </div>
       </div>
+      {saveError && (
+        <p role="alert" className="text-xs text-destructive">{saveError}</p>
+      )}
       <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
         <label className="text-xs font-medium text-muted-foreground">Filters</label>
         <FilterBuilder
@@ -107,8 +135,8 @@ function CreateViewDialogForm({
         />
       </div>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit" disabled={isCreateDisabled}>{isEditing ? 'Save' : 'Create'}</Button>
+        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
+        <Button type="submit" disabled={isCreateDisabled || isSaving}>{isEditing ? 'Save' : 'Create'}</Button>
       </DialogFooter>
     </form>
   )

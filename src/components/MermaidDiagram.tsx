@@ -1,10 +1,26 @@
 import { useEffect, useId, useMemo, useState } from 'react'
+import { Maximize2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 type MermaidApi = typeof import('mermaid')['default']
 
 interface MermaidDiagramProps {
   diagram: string
   source: string
+}
+
+interface MermaidSvgViewportProps {
+  ariaLabel: string
+  className: string
+  svg: string
+  testId: string
 }
 
 interface RenderState {
@@ -27,15 +43,8 @@ function initializeMermaid(mermaid: MermaidApi) {
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
-    theme: 'base',
+    theme: 'default',
     themeVariables: {
-      background: '#ffffff',
-      primaryColor: '#f8fafc',
-      primaryTextColor: '#111827',
-      primaryBorderColor: '#94a3b8',
-      lineColor: '#64748b',
-      secondaryColor: '#f1f5f9',
-      tertiaryColor: '#e0f2fe',
       fontFamily: 'ui-sans-serif, system-ui, sans-serif',
     },
   })
@@ -58,6 +67,50 @@ async function renderMermaidDiagram({
   const nextRender = renderQueue.then(render, render)
   renderQueue = nextRender.then(() => undefined, () => undefined)
   return nextRender
+}
+
+function MermaidSvgViewport({ ariaLabel, className, svg, testId }: MermaidSvgViewportProps) {
+  return (
+    <div
+      aria-label={ariaLabel}
+      className={className}
+      data-testid={testId}
+      role="img"
+      tabIndex={0}
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  )
+}
+
+function MermaidLightbox({ svg }: { svg: string }) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          aria-label="Open Mermaid diagram"
+          className="mermaid-diagram__expand-button"
+          size="icon-sm"
+          title="Open diagram"
+          type="button"
+          variant="outline"
+        >
+          <Maximize2 aria-hidden="true" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="mermaid-diagram__dialog" showCloseButton>
+        <DialogTitle className="sr-only">Mermaid diagram</DialogTitle>
+        <DialogDescription className="sr-only">
+          Expanded view of the rendered Mermaid diagram.
+        </DialogDescription>
+        <MermaidSvgViewport
+          ariaLabel="Expanded Mermaid diagram"
+          className="mermaid-diagram__dialog-viewport"
+          svg={svg}
+          testId="mermaid-diagram-dialog-viewport"
+        />
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 export function MermaidDiagram({ diagram, source }: MermaidDiagramProps) {
@@ -92,13 +145,12 @@ export function MermaidDiagram({ diagram, source }: MermaidDiagramProps) {
 
   return (
     <figure className="mermaid-diagram" data-testid="mermaid-diagram">
-      <div
-        aria-label="Mermaid diagram"
+      <MermaidLightbox svg={currentState.svg} />
+      <MermaidSvgViewport
+        ariaLabel="Mermaid diagram"
         className="mermaid-diagram__viewport"
-        data-testid="mermaid-diagram-viewport"
-        role="img"
-        tabIndex={0}
-        dangerouslySetInnerHTML={{ __html: currentState.svg }}
+        svg={currentState.svg}
+        testId="mermaid-diagram-viewport"
       />
     </figure>
   )

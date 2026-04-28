@@ -83,8 +83,14 @@ pub async fn reload_vault(
     let path = expand_tilde(&path).into_owned();
     crate::sync_vault_asset_scope(&app_handle, Path::new(&path))?;
     tokio::task::spawn_blocking(move || {
-        vault::invalidate_cache(Path::new(&path));
-        vault::scan_vault_cached(Path::new(&path))
+        let vault_path = Path::new(&path);
+        vault::invalidate_cache(vault_path);
+        let entries = vault::scan_vault_cached(vault_path)?;
+        Ok(vault::filter_gitignored_entries(
+            vault_path,
+            entries,
+            crate::settings::hide_gitignored_files_enabled(),
+        ))
     })
     .await
     .map_err(|e| format!("Task panicked: {e}"))?

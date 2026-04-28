@@ -33,6 +33,7 @@ import {
   type ThemeMode,
 } from '../lib/themeMode'
 import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel } from '../lib/releaseChannel'
+import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
 import { trackEvent } from '../lib/telemetry'
 import { Button } from './ui/button'
 import { Checkbox, type CheckedState } from './ui/checkbox'
@@ -70,6 +71,7 @@ interface SettingsDraft {
   themeMode: ThemeMode
   uiLanguage: UiLanguagePreference
   initialH1AutoRename: boolean
+  hideGitignoredFiles: boolean
   crashReporting: boolean
   analytics: boolean
   explicitOrganization: boolean
@@ -101,6 +103,8 @@ interface SettingsBodyProps {
   systemLocale: AppLocale
   initialH1AutoRename: boolean
   setInitialH1AutoRename: (value: boolean) => void
+  hideGitignoredFiles: boolean
+  setHideGitignoredFiles: (value: boolean) => void
   explicitOrganization: boolean
   setExplicitOrganization: (value: boolean) => void
   crashReporting: boolean
@@ -139,6 +143,7 @@ function createSettingsDraft(
     themeMode: resolveSettingsDraftThemeMode(settings.theme_mode),
     uiLanguage: settings.ui_language ?? SYSTEM_UI_LANGUAGE,
     initialH1AutoRename: settings.initial_h1_auto_rename_enabled ?? true,
+    hideGitignoredFiles: shouldHideGitignoredFiles(settings),
     crashReporting: settings.crash_reporting_enabled ?? false,
     analytics: settings.analytics_enabled ?? false,
     explicitOrganization: explicitOrganizationEnabled,
@@ -180,6 +185,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     ui_language: serializeUiLanguagePreference(draft.uiLanguage),
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
     default_ai_agent: draft.defaultAiAgent,
+    hide_gitignored_files: draft.hideGitignoredFiles,
   }
 }
 
@@ -268,6 +274,11 @@ function SettingsPanelInner({
     [],
   )
 
+  const handleGitignoredVisibilityChange = useCallback((value: boolean) => {
+    updateDraft('hideGitignoredFiles', value)
+    onSave({ ...settings, hide_gitignored_files: value })
+  }, [onSave, settings, updateDraft])
+
   const handleSave = useCallback(() => {
     trackTelemetryConsentChange(settings.analytics_enabled === true, draft.analytics)
     onSave(buildSettingsFromDraft(settings, draft))
@@ -338,6 +349,8 @@ function SettingsPanelInner({
           setUiLanguage={(value) => updateDraft('uiLanguage', value)}
           initialH1AutoRename={draft.initialH1AutoRename}
           setInitialH1AutoRename={(value) => updateDraft('initialH1AutoRename', value)}
+          hideGitignoredFiles={draft.hideGitignoredFiles}
+          setHideGitignoredFiles={handleGitignoredVisibilityChange}
           explicitOrganization={draft.explicitOrganization}
           setExplicitOrganization={(value) => updateDraft('explicitOrganization', value)}
           crashReporting={draft.crashReporting}
@@ -397,6 +410,8 @@ function SettingsBody({
   setUiLanguage,
   initialH1AutoRename,
   setInitialH1AutoRename,
+  hideGitignoredFiles,
+  setHideGitignoredFiles,
   explicitOrganization,
   setExplicitOrganization,
   crashReporting,
@@ -452,6 +467,14 @@ function SettingsBody({
           t={t}
           initialH1AutoRename={initialH1AutoRename}
           setInitialH1AutoRename={setInitialH1AutoRename}
+        />
+      </SettingsSection>
+
+      <SettingsSection>
+        <VaultContentSettingsSection
+          t={t}
+          hideGitignoredFiles={hideGitignoredFiles}
+          setHideGitignoredFiles={setHideGitignoredFiles}
         />
       </SettingsSection>
 
@@ -728,6 +751,29 @@ function TitleSettingsSection({
         checked={initialH1AutoRename}
         onChange={setInitialH1AutoRename}
         testId="settings-initial-h1-auto-rename"
+      />
+    </>
+  )
+}
+
+function VaultContentSettingsSection({
+  t,
+  hideGitignoredFiles,
+  setHideGitignoredFiles,
+}: Pick<SettingsBodyProps, 't' | 'hideGitignoredFiles' | 'setHideGitignoredFiles'>) {
+  return (
+    <>
+      <SectionHeading
+        title={t('settings.vaultContent.title')}
+        description={t('settings.vaultContent.description')}
+      />
+
+      <SettingsSwitchRow
+        label={t('settings.vaultContent.hideGitignored')}
+        description={t('settings.vaultContent.hideGitignoredDescription')}
+        checked={hideGitignoredFiles}
+        onChange={setHideGitignoredFiles}
+        testId="settings-hide-gitignored-files"
       />
     </>
   )
