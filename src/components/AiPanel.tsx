@@ -21,6 +21,7 @@ export type { AiAgentMessage } from '../hooks/useCliAiAgent'
 
 interface AiPanelProps {
   onClose: () => void
+  onCopyMcpConfig?: () => void
   onOpenNote?: (path: string) => void
   onUnsupportedAiPaste?: (message: string) => void
   defaultAiAgent?: AiAgentId
@@ -42,6 +43,7 @@ interface AiPanelProps {
 interface AiPanelViewProps {
   controller: AiPanelController
   onClose: () => void
+  onCopyMcpConfig?: () => void
   onOpenNote?: (path: string) => void
   onUnsupportedAiPaste?: (message: string) => void
   defaultAiAgent?: AiAgentId
@@ -58,6 +60,7 @@ function readinessFromReadyFlag(ready: boolean | undefined): AiAgentReadiness {
 export function AiPanelView({
   controller,
   onClose,
+  onCopyMcpConfig,
   onOpenNote,
   onUnsupportedAiPaste,
   defaultAiAgent: providedDefaultAiAgent,
@@ -113,6 +116,7 @@ export function AiPanelView({
         agentLabel={agentLabel}
         agentReadiness={defaultAiAgentReadiness}
         onClose={onClose}
+        onCopyMcpConfig={onCopyMcpConfig}
         onNewChat={handleNewChat}
       />
       {activeEntry && (
@@ -144,6 +148,7 @@ export function AiPanelView({
 
 export function AiPanel({
   onClose,
+  onCopyMcpConfig,
   onOpenNote,
   onUnsupportedAiPaste,
   defaultAiAgent: providedDefaultAiAgent,
@@ -183,6 +188,7 @@ export function AiPanel({
     <AiPanelView
       controller={controller}
       onClose={onClose}
+      onCopyMcpConfig={onCopyMcpConfig}
       onOpenNote={onOpenNote}
       onUnsupportedAiPaste={onUnsupportedAiPaste}
       defaultAiAgent={providedDefaultAiAgent}

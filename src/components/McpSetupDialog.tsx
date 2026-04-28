@@ -1,4 +1,5 @@
-import { ShieldCheck } from 'lucide-react'
+import { useEffect } from 'react'
+import { Copy, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -14,6 +15,29 @@ interface McpSetupDialogProps {
   open: boolean
   status: McpStatus
   busyAction: 'connect' | 'disconnect' | null
+  manualConfigError?: string | null
+  manualConfigLoading?: boolean
+  manualConfigSnippet?: string | null
+  onClose: () => void
+  onConnect: () => void
+  onCopyManualConfig?: () => void
+  onDisconnect: () => void
+  onLoadManualConfig?: () => void
+}
+
+interface ManualMcpConfigSectionProps {
+  error?: string | null
+  loading: boolean
+  onCopy?: () => void
+  snippet?: string | null
+}
+
+interface McpSetupActionsProps {
+  buttonsDisabled: boolean
+  connectBusy: boolean
+  disconnectBusy: boolean
+  primaryLabel: string
+  secondaryLabel: string | null
   onClose: () => void
   onConnect: () => void
   onDisconnect: () => void
@@ -41,18 +65,99 @@ function actionCopy(status: McpStatus) {
   }
 }
 
+function manualConfigText({ error, loading, snippet }: ManualMcpConfigSectionProps): string {
+  if (loading) return 'Loading exact MCP config...'
+  return error ?? snippet ?? 'Exact config is available after a vault is open.'
+}
+
+function ManualMcpConfigSection(props: ManualMcpConfigSectionProps) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="m-0 text-sm font-medium text-foreground">Manual MCP config</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={props.onCopy}
+          disabled={!props.onCopy || props.loading}
+          data-testid="mcp-copy-config"
+        >
+          <Copy size={14} />
+          Copy MCP config
+        </Button>
+      </div>
+      <pre
+        tabIndex={0}
+        className="max-h-48 overflow-auto rounded-md border border-border bg-background px-3 py-3 font-mono text-xs leading-5 text-foreground"
+        data-testid="mcp-config-snippet"
+      >
+        {manualConfigText(props)}
+      </pre>
+    </div>
+  )
+}
+
+function McpSetupActions({
+  buttonsDisabled,
+  connectBusy,
+  disconnectBusy,
+  primaryLabel,
+  secondaryLabel,
+  onClose,
+  onConnect,
+  onDisconnect,
+}: McpSetupActionsProps) {
+  return (
+    <DialogFooter className="flex-row items-center justify-end gap-2 sm:justify-end">
+      <Button type="button" variant="outline" onClick={onClose} disabled={buttonsDisabled}>
+        Cancel
+      </Button>
+      {secondaryLabel ? (
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={onDisconnect}
+          disabled={buttonsDisabled}
+          data-testid="mcp-setup-disconnect"
+        >
+          {disconnectBusy ? 'Disconnecting…' : secondaryLabel}
+        </Button>
+      ) : null}
+      <Button
+        type="button"
+        autoFocus
+        onClick={onConnect}
+        disabled={buttonsDisabled}
+        data-testid="mcp-setup-connect"
+      >
+        {connectBusy ? 'Connecting…' : primaryLabel}
+      </Button>
+    </DialogFooter>
+  )
+}
+
 export function McpSetupDialog({
   open,
   status,
   busyAction,
+  manualConfigError,
+  manualConfigLoading = false,
+  manualConfigSnippet,
   onClose,
   onConnect,
+  onCopyManualConfig,
   onDisconnect,
+  onLoadManualConfig,
 }: McpSetupDialogProps) {
   const copy = actionCopy(status)
   const connectBusy = busyAction === 'connect'
   const disconnectBusy = busyAction === 'disconnect'
   const buttonsDisabled = busyAction !== null || status === 'checking'
+
+  useEffect(() => {
+    if (open) onLoadManualConfig?.()
+  }, [open, onLoadManualConfig])
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}>
@@ -78,43 +183,27 @@ export function McpSetupDialog({
             <div>~/.cursor/mcp.json</div>
             <div>~/.config/mcp/mcp.json</div>
           </div>
-          <div className="rounded-md border border-border bg-background px-3 py-3 font-mono text-xs leading-5 text-foreground">
-            <div>type: stdio</div>
-            <div>command: node</div>
-            <div>args: &lt;Tolaria resources&gt;/mcp-server/index.js</div>
-            <div>VAULT_PATH: active vault</div>
-            <div>WS_UI_PORT: 9711</div>
-          </div>
+          <ManualMcpConfigSection
+            error={manualConfigError}
+            loading={manualConfigLoading}
+            onCopy={onCopyManualConfig}
+            snippet={manualConfigSnippet}
+          />
           <p>
             Claude Code CLI reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.claude.json</code>, Cursor reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.cursor/mcp.json</code>, and the generic <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.config/mcp/mcp.json</code> path is picked up by other MCP-compatible tools. Cancel leaves all files untouched, reconnect is idempotent, and disconnect removes Tolaria&apos;s entry again.
           </p>
         </div>
 
-        <DialogFooter className="flex-row items-center justify-end gap-2 sm:justify-end">
-          <Button type="button" variant="outline" onClick={onClose} disabled={buttonsDisabled}>
-            Cancel
-          </Button>
-          {copy.secondaryLabel ? (
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={onDisconnect}
-              disabled={buttonsDisabled}
-              data-testid="mcp-setup-disconnect"
-            >
-              {disconnectBusy ? 'Disconnecting…' : copy.secondaryLabel}
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            autoFocus
-            onClick={onConnect}
-            disabled={buttonsDisabled}
-            data-testid="mcp-setup-connect"
-          >
-            {connectBusy ? 'Connecting…' : copy.primaryLabel}
-          </Button>
-        </DialogFooter>
+        <McpSetupActions
+          buttonsDisabled={buttonsDisabled}
+          connectBusy={connectBusy}
+          disconnectBusy={disconnectBusy}
+          primaryLabel={copy.primaryLabel}
+          secondaryLabel={copy.secondaryLabel}
+          onClose={onClose}
+          onConnect={onConnect}
+          onDisconnect={onDisconnect}
+        />
       </DialogContent>
     </Dialog>
   )

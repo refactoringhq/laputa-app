@@ -425,6 +425,6 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 
 ### Work with external MCP setup
 
-1. **Backend registration/status**: Edit `src-tauri/src/mcp.rs`; registration must verify Node.js first, resolve the packaged `mcp-server/` for macOS, Windows, Linux, and AppImage installs, and write an explicit stdio entry with `VAULT_PATH` plus `WS_UI_PORT=9711`
-2. **Setup dialog copy/actions**: Edit `src/components/McpSetupDialog.tsx`; users should see the Node.js prerequisite and the manual config shape before Tolaria writes third-party config files
+1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs`; registration and manual config generation must verify Node.js first, resolve the packaged `mcp-server/` for macOS, Windows, Linux, and AppImage installs, and use an explicit stdio entry with `VAULT_PATH` plus `WS_UI_PORT=9711`
+2. **Setup dialog copy/actions**: Edit `src/components/McpSetupDialog.tsx` and `src/hooks/useMcpStatus.ts`; users should see the Node.js prerequisite, the exact generated manual config, and a copy action before Tolaria writes third-party config files
 3. **Status hook/toasts**: Edit `src/hooks/useMcpStatus.ts` when setup, reconnect, disconnect, or failure messaging changes

@@ -453,7 +453,16 @@ function App() {
       trackEvent('vault_opened', { has_git: gitRepoState === 'ready' ? 1 : 0, note_count: vault.entries.length })
     }
   }, [vault.entries.length, gitRepoState, resolvedPath])
-  const { mcpStatus, connectMcp, disconnectMcp } = useMcpStatus(resolvedPath, setToastMessage)
+  const {
+    mcpStatus,
+    connectMcp,
+    disconnectMcp,
+    mcpConfigSnippet,
+    mcpConfigLoading,
+    mcpConfigError,
+    loadMcpConfigSnippet,
+    copyMcpConfig,
+  } = useMcpStatus(resolvedPath, setToastMessage)
   const gitRemoteStatus = useGitRemoteStatus(resolvedPath)
   const loadVaultModifiedFiles = vault.loadModifiedFiles
   const refreshGitRemoteStatus = gitRemoteStatus.refreshRemoteStatus
@@ -492,6 +501,14 @@ function App() {
       setMcpDialogAction(null)
     }
   }, [disconnectMcp])
+
+  const handleCopyMcpConfig = useCallback(() => {
+    void copyMcpConfig()
+  }, [copyMcpConfig])
+
+  const handleLoadMcpConfigSnippet = useCallback(() => {
+    void loadMcpConfigSnippet().catch(() => undefined)
+  }, [loadMcpConfigSnippet])
 
   // Detect external file renames on window focus
   const [detectedRenames, setDetectedRenames] = useState<DetectedRename[]>([])
@@ -1601,6 +1618,7 @@ function App() {
               onInitializeProperties={handleInitializeProperties}
               showAIChat={dialogs.showAIChat}
               onToggleAIChat={dialogs.toggleAIChat}
+              onCopyMcpConfig={handleCopyMcpConfig}
               vaultPath={resolvedPath}
               noteList={aiNoteList}
               noteListFilter={aiNoteListFilter}
@@ -1685,7 +1703,7 @@ function App() {
         />
         <SettingsPanel open={dialogs.showSettings} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} isGitVault={isGitVault} onSave={saveSettings} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} onClose={dialogs.closeSettings} />
         <FeedbackDialog open={showFeedback} onClose={closeFeedback} />
-        <McpSetupDialog open={showMcpSetupDialog} status={mcpStatus} busyAction={mcpDialogAction} onClose={closeMcpSetupDialog} onConnect={handleConnectMcp} onDisconnect={handleDisconnectMcp} />
+        <McpSetupDialog open={showMcpSetupDialog} status={mcpStatus} busyAction={mcpDialogAction} manualConfigSnippet={mcpConfigSnippet} manualConfigLoading={mcpConfigLoading} manualConfigError={mcpConfigError} onClose={closeMcpSetupDialog} onConnect={handleConnectMcp} onCopyManualConfig={handleCopyMcpConfig} onDisconnect={handleDisconnectMcp} onLoadManualConfig={handleLoadMcpConfigSnippet} />
         <CloneVaultModal key={dialogs.showCloneVault ? 'clone-open' : 'clone-closed'} open={dialogs.showCloneVault} onClose={dialogs.closeCloneVault} onVaultCloned={vaultSwitcher.handleVaultCloned} />
         {deleteActions.confirmDelete && (
           <ConfirmDeleteDialog

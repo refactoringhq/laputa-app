@@ -67,6 +67,7 @@ interface EditorProps {
   onInitializeProperties?: (path: string) => void
   showAIChat?: boolean
   onToggleAIChat?: () => void
+  onCopyMcpConfig?: () => void
   vaultPath?: string
   noteList?: NoteListItem[]
   noteListFilter?: { type: string | null; query: string }
@@ -338,6 +339,7 @@ function EditorLayout({
   showDiffToggle,
   showAIChat,
   onToggleAIChat,
+  onCopyMcpConfig,
   inspectorCollapsed,
   onToggleInspector,
   onNavigateWikilink,
@@ -400,6 +402,7 @@ function EditorLayout({
   showDiffToggle: boolean
   showAIChat?: boolean
   onToggleAIChat?: () => void
+  onCopyMcpConfig?: () => void
   inspectorCollapsed: boolean
   onToggleInspector: () => void
   onNavigateWikilink: (target: string) => void
@@ -520,6 +523,7 @@ function EditorLayout({
           noteListFilter={noteListFilter}
           onToggleInspector={onToggleInspector}
           onToggleAIChat={onToggleAIChat}
+          onCopyMcpConfig={onCopyMcpConfig}
           onNavigateWikilink={onNavigateWikilink}
           onViewCommitDiff={handleViewCommitDiff}
           onUpdateFrontmatter={onUpdateFrontmatter}
@@ -551,6 +555,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
     inspectorEntry, inspectorContent, gitHistory,
     onUpdateFrontmatter, onDeleteProperty, onAddProperty, onCreateMissingType, onCreateAndOpenNote, onInitializeProperties,
     showAIChat, onToggleAIChat,
+    onCopyMcpConfig,
     vaultPath, noteList, noteListFilter,
     onToggleFavorite, onToggleOrganized, onRevealFile, onCopyFilePath, onOpenExternalFile,
     onDeleteNote, onArchiveNote, onUnarchiveNote,
@@ -611,6 +616,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
       showDiffToggle={showDiffToggle}
       showAIChat={showAIChat}
       onToggleAIChat={onToggleAIChat}
+      onCopyMcpConfig={onCopyMcpConfig}
       inspectorCollapsed={inspectorCollapsed}
       onToggleInspector={onToggleInspector}
       onNavigateWikilink={onNavigateWikilink}

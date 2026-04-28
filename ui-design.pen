@@ -14098,6 +14098,113 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "mcp_config_copy_design",
+      "x": 0,
+      "y": 12580,
+      "name": "MCP Config Copy — Light",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 1440,
+      "fill": "$--background",
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 40,
+      "children": [
+        {
+          "type": "text",
+          "id": "mcp_config_copy_title",
+          "fill": "$--foreground",
+          "content": "MCP Config Copy",
+          "fontFamily": "Inter",
+          "fontSize": 24,
+          "fontWeight": "700",
+          "letterSpacing": 0
+        },
+        {
+          "type": "text",
+          "id": "mcp_config_copy_description",
+          "fill": "$--muted-foreground",
+          "content": "AI panel exposes a compact Copy MCP config action; setup dialog shows the exact generated JSON with a keyboard-focusable code block and copy button.",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "normal",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "mcp_config_copy_ai_header",
+          "name": "AI panel header action",
+          "width": 520,
+          "height": 52,
+          "fill": "$--background",
+          "stroke": {
+            "align": "inside",
+            "thickness": 1,
+            "fill": "$--border"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "mcp_config_copy_ai_label",
+              "fill": "$--muted-foreground",
+              "content": "AI Agent · Claude Code",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            },
+            {
+              "type": "rectangle",
+              "id": "mcp_config_copy_icon_button",
+              "name": "Copy MCP config icon button",
+              "x": 440,
+              "y": 14,
+              "width": 24,
+              "height": 24,
+              "cornerRadius": 6,
+              "fill": "$--muted"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "mcp_config_copy_manual_block",
+          "name": "Manual MCP config block",
+          "width": 520,
+          "fill": "$--background",
+          "layout": "vertical",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "mcp_config_copy_manual_title",
+              "fill": "$--foreground",
+              "content": "Manual MCP config",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            },
+            {
+              "type": "rectangle",
+              "id": "mcp_config_copy_code_block",
+              "width": 520,
+              "height": 148,
+              "cornerRadius": 8,
+              "fill": "$--background",
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "$--border"
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "themes": {

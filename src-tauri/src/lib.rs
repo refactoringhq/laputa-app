@@ -435,6 +435,7 @@ macro_rules! app_invoke_handler {
             commands::register_mcp_tools,
             commands::remove_mcp_tools,
             commands::check_mcp_status,
+            commands::get_mcp_config_snippet,
             commands::sync_mcp_bridge_vault,
             commands::repair_vault,
             commands::reinit_telemetry,

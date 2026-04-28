@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { Robot, X, PaperPlaneRight, Plus, Link } from '@phosphor-icons/react'
+import { Copy } from 'lucide-react'
 import { AiMessage } from './AiMessage'
+import { Button } from '@/components/ui/button'
 import { WikilinkChatInput } from './WikilinkChatInput'
 import { extractInlineWikilinkReferences } from './inlineWikilinkText'
 import type { AiAgentMessage } from '../hooks/useCliAiAgent'
@@ -12,6 +14,7 @@ interface AiPanelHeaderProps {
   agentLabel: string
   agentReadiness: AiAgentReadiness
   onClose: () => void
+  onCopyMcpConfig?: () => void
   onNewChat: () => void
 }
 
@@ -122,6 +125,7 @@ export function AiPanelHeader({
   agentLabel,
   agentReadiness,
   onClose,
+  onCopyMcpConfig,
   onNewChat,
 }: AiPanelHeaderProps) {
   return (
@@ -140,21 +144,39 @@ export function AiPanelHeader({
             : `${agentLabel}${agentReadiness === 'missing' ? ' · not installed' : ''}`}
         </span>
       </div>
-      <button
-        className="shrink-0 border-none bg-transparent p-1 text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+      {onCopyMcpConfig ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          onClick={onCopyMcpConfig}
+          aria-label="Copy MCP config"
+          title="Copy MCP config"
+          data-testid="ai-copy-mcp-config"
+        >
+          <Copy size={15} />
+        </Button>
+      ) : null}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
         onClick={onNewChat}
         aria-label="New AI chat"
         title="New AI chat"
       >
         <Plus size={16} />
-      </button>
-      <button
-        className="shrink-0 border-none bg-transparent p-1 text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
         onClick={onClose}
+        aria-label="Close AI panel"
         title="Close AI panel"
       >
         <X size={16} />
-      </button>
+      </Button>
     </div>
   )
 }
