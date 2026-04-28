@@ -130,10 +130,7 @@ fn git_command_label<'a>(args: &'a [&'a str]) -> &'a str {
 
 /// Set local user.name and user.email if not already configured.
 pub(crate) fn ensure_author_config(dir: &Path) -> Result<(), String> {
-    for (key, fallback) in [
-        ("user.name", "Tolaria"),
-        ("user.email", "vault@tolaria.app"),
-    ] {
+    for (key, fallback) in [("user.name", "Tolaria"), ("user.email", "vault@tolaria.md")] {
         let local = git_command()
             .args(["config", "--local", key])
             .current_dir(dir)
