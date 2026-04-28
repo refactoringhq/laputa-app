@@ -4,20 +4,27 @@ import { AiPanel } from './AiPanel'
 import { UNSUPPORTED_INLINE_PASTE_MESSAGE } from './InlineWikilinkInput'
 import type { VaultEntry } from '../types'
 import { queueAiPrompt } from '../utils/aiPromptBridge'
+import { bindVaultConfigStore, getVaultConfig, resetVaultConfigStore } from '../utils/vaultConfigStore'
 
 // Mock the hooks and utils to isolate component tests
 let mockMessages: ReturnType<typeof import('../hooks/useCliAiAgent').useCliAiAgent>['messages'] = []
 let mockStatus: ReturnType<typeof import('../hooks/useCliAiAgent').useCliAiAgent>['status'] = 'idle'
 const mockSendMessage = vi.fn()
 const mockClearConversation = vi.fn()
+const mockAddLocalMarker = vi.fn()
+const mockUseCliAiAgent = vi.fn()
 
 vi.mock('../hooks/useCliAiAgent', () => ({
-  useCliAiAgent: () => ({
-    messages: mockMessages,
-    status: mockStatus,
-    sendMessage: mockSendMessage,
-    clearConversation: mockClearConversation,
-  }),
+  useCliAiAgent: (...args: unknown[]) => {
+    mockUseCliAiAgent(...args)
+    return {
+      messages: mockMessages,
+      status: mockStatus,
+      sendMessage: mockSendMessage,
+      clearConversation: mockClearConversation,
+      addLocalMarker: mockAddLocalMarker,
+    }
+  },
 }))
 
 vi.mock('../utils/ai-chat', () => ({
@@ -45,7 +52,18 @@ const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   icon: null,
   color: null,
   order: null,
+  sidebarLabel: null,
+  template: null,
+  sort: null,
+  view: null,
+  visible: null,
+  organized: false,
+  favorite: false,
+  favoriteIndex: null,
+  listPropertiesDisplay: [],
   outgoingLinks: [],
+  properties: {},
+  hasH1: false,
   ...overrides,
 })
 
@@ -55,12 +73,78 @@ describe('AiPanel', () => {
     mockStatus = 'idle'
     mockSendMessage.mockReset()
     mockClearConversation.mockReset()
+    mockAddLocalMarker.mockReset()
+    mockUseCliAiAgent.mockReset()
+    resetVaultConfigStore()
+    bindVaultConfigStore({
+      zoom: null,
+      view_mode: null,
+      editor_mode: null,
+      note_layout: null,
+      tag_colors: null,
+      status_colors: null,
+      property_display_modes: null,
+      inbox: null,
+      allNotes: null,
+      ai_agent_permission_mode: 'safe',
+    }, vi.fn())
   })
 
   it('renders panel with the default CLI agent header', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
     expect(screen.getByText('AI Agent')).toBeTruthy()
-    expect(screen.getByText('Claude Code')).toBeTruthy()
+    expect(screen.getByText('Claude Code · Safe')).toBeTruthy()
+  })
+
+  it('passes the vault permission mode to the AI agent session', () => {
+    bindVaultConfigStore({
+      ...getVaultConfig(),
+      ai_agent_permission_mode: 'power_user',
+    }, vi.fn())
+
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+
+    expect(screen.getByText('Claude Code · Power User')).toBeTruthy()
+    expect(mockUseCliAiAgent).toHaveBeenCalledWith(
+      '/tmp/vault',
+      undefined,
+      expect.any(Object),
+      expect.objectContaining({ permissionMode: 'power_user' }),
+    )
+  })
+
+  it('persists permission mode changes and records a local transcript marker', () => {
+    const save = vi.fn()
+    bindVaultConfigStore({
+      ...getVaultConfig(),
+      ai_agent_permission_mode: 'safe',
+    }, save)
+    mockMessages = [{
+      userMessage: 'Existing question',
+      actions: [],
+      response: 'Existing answer.',
+      id: 'msg-existing',
+    }]
+
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Power User' }))
+
+    expect(getVaultConfig().ai_agent_permission_mode).toBe('power_user')
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({
+      ai_agent_permission_mode: 'power_user',
+    }))
+    expect(mockAddLocalMarker).toHaveBeenCalledWith(
+      'AI permission mode changed to Power User. It will apply to the next message.',
+    )
+  })
+
+  it('disables permission mode changes while the AI agent is running', () => {
+    mockStatus = 'thinking'
+
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+
+    expect(screen.getByRole('button', { name: 'Vault Safe' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Power User' })).toBeDisabled()
   })
 
   it('renders data-testid ai-panel', () => {

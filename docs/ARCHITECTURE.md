@@ -224,9 +224,9 @@ Notes can be opened in separate Tauri windows for focused editing. Secondary win
 
 Full agent mode — spawns the selected local CLI agent as a subprocess with tool access and MCP vault integration.
 
-1. **Frontend** (`AiPanel` + `useCliAiAgent` + `aiAgentSession.ts` + `aiAgents.ts`) — one normalized session lifecycle for message state, reasoning blocks, tool action cards, response display, onboarding, and default-agent selection
-2. **Backend** (`ai_agents.rs`) — normalizes agent availability and streaming, dispatching to per-agent adapters
-3. **Agent adapters** — Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, a file/search-only built-in tool list, hidden Windows subprocess launches, and closed stdin for print-mode subprocesses so Windows launches receive EOF; Codex runs through `codex --sandbox workspace-write --ask-for-approval never exec --json`; OpenCode runs through `opencode run --format json`; Pi runs through `pi --mode json --no-session` with `npm:pi-mcp-adapter`. OpenCode and Pi both launch from the active vault cwd with closed stdin and transient MCP config. All app-launched paths use hidden Windows launches and avoid dangerous permission-bypass flags.
+1. **Frontend** (`AiPanel` + `useCliAiAgent` + `aiAgentSession.ts` + `aiAgents.ts`) — one normalized session lifecycle for message state, reasoning blocks, tool action cards, response display, onboarding, default-agent selection, and the per-vault Safe / Power User permission mode shown in the panel header
+2. **Backend** (`ai_agents.rs`) — normalizes agent availability, streaming, and the request permission mode before dispatching to per-agent adapters
+3. **Agent adapters** — Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, and a scoped tool list: Safe enables file/search/edit tools, while Power User adds Bash without using dangerous bypass flags. Codex runs through `codex --sandbox workspace-write --ask-for-approval never exec --json` in both modes. OpenCode runs through `opencode run --format json` with transient permissions: Safe denies bash and external directories, while Power User allows bash but still denies external directories. Pi runs through `pi --mode json --no-session` with `npm:pi-mcp-adapter`; both modes currently share the same transient MCP config. OpenCode and Pi both launch from the active vault cwd with closed stdin and transient MCP config. All app-launched paths use hidden Windows launches and avoid dangerous permission-bypass flags.
 4. **MCP Integration** — Claude receives the generated MCP config file path, Codex receives the same Tolaria MCP server via transient `-c mcp_servers.tolaria.*` config overrides, OpenCode receives it through `OPENCODE_CONFIG_CONTENT`, and Pi receives it through a temporary `PI_CODING_AGENT_DIR/mcp.json` consumed by `pi-mcp-adapter`
 
 CLI-agent availability intentionally does not depend only on the desktop app's inherited `PATH`. The detectors check the current process path, the user's login shell, and supported local/toolchain install locations such as native `~/.local/bin`, local `~/.claude/local`, Mise/asdf shims, nvm-managed Node installs, npm-global, Homebrew, Windows `%APPDATA%\npm`/pnpm/Scoop shims, Windows `.exe` launchers, and the macOS Codex app resource path so first-run onboarding works on fresh macOS and Windows installs.
@@ -243,7 +243,7 @@ sequenceDiagram
 
     U->>FE: sendMessage(text, references)
     FE->>FE: buildContextSnapshot(activeNote, linkedNotes, openTabs)
-    FE->>R: invoke('stream_ai_agent', {agent, message, systemPrompt, vaultPath})
+    FE->>R: invoke('stream_ai_agent', {agent, message, systemPrompt, vaultPath, permissionMode})
     R->>R: pick adapter for claude_code, codex, opencode, or pi
     R->>C: spawn agent with MCP-enabled config
 
@@ -788,14 +788,14 @@ No Redux or global context. State lives in the root `App.tsx` and custom hooks:
 | `useTabManagement` | Navigation history, note switching | Note navigation lifecycle |
 | `useVaultSwitcher` | `vaultPath`, `extraVaults` | Vault switching |
 | `useTheme` | Editor theme CSS vars and theme-mode bridge | Editor typography and app theme runtime |
-| `useCliAiAgent` | `messages`, `status`, tool actions | Selected AI agent conversation backed by the shared session pipeline |
+| `useCliAiAgent` | `messages`, `status`, tool actions | Selected AI agent conversation backed by the shared session pipeline and vault permission mode |
 | `useAutoSync` | Sync interval, pull/push state | Git auto-sync |
 | `useAutoGit` | Last activity timestamp, idle/inactive checkpoint triggers | Automatic commit/push checkpoints |
 | `useCommitFlow` | Commit dialog state, shared manual/automatic checkpoint runner | Git commit/push orchestration |
 | `useGitRemoteStatus` | `remoteStatus`, `refreshRemoteStatus()` | On-demand remote detection for commit UI |
 | `useUnifiedSearch` | Query, results, loading state | Keyword search |
 | `useSettings` | App settings (telemetry, release channel, theme mode, UI language, auto-sync interval, AutoGit thresholds, default AI agent, Gitignored-content visibility) | Persistent settings |
-| `useVaultConfig` | Per-vault UI preferences | Vault-specific config |
+| `useVaultConfig` | Per-vault UI preferences, AI permission mode | Vault-specific config |
 | `appCommandDispatcher` | Canonical shortcut/menu command IDs | Shared execution path for renderer and native menu commands |
 
 Data flows unidirectionally: `App` passes data and callbacks as props to child components. No child-to-child communication — everything goes through `App`.

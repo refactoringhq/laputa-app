@@ -1,3 +1,4 @@
+use crate::ai_agents::AiAgentPermissionMode;
 use crate::pi_cli::AgentStreamRequest;
 use std::path::Path;
 use std::process::Stdio;
@@ -7,7 +8,7 @@ pub(crate) fn build_command(
     request: &AgentStreamRequest,
     agent_dir: &Path,
 ) -> Result<std::process::Command, String> {
-    write_mcp_config(agent_dir, &request.vault_path)?;
+    write_mcp_config(agent_dir, &request.vault_path, request.permission_mode)?;
 
     let mut command = crate::hidden_command(binary);
     command
@@ -46,15 +47,22 @@ fn build_prompt(request: &AgentStreamRequest) -> String {
     }
 }
 
-fn write_mcp_config(agent_dir: &Path, vault_path: &str) -> Result<(), String> {
+fn write_mcp_config(
+    agent_dir: &Path,
+    vault_path: &str,
+    permission_mode: AiAgentPermissionMode,
+) -> Result<(), String> {
     std::fs::create_dir_all(agent_dir)
         .map_err(|error| format!("Failed to create Pi agent directory: {error}"))?;
-    let config = build_mcp_config(vault_path)?;
+    let config = build_mcp_config(vault_path, permission_mode)?;
     std::fs::write(agent_dir.join("mcp.json"), config)
         .map_err(|error| format!("Failed to write Pi MCP config: {error}"))
 }
 
-fn build_mcp_config(vault_path: &str) -> Result<String, String> {
+fn build_mcp_config(
+    vault_path: &str,
+    _permission_mode: AiAgentPermissionMode,
+) -> Result<String, String> {
     let mcp_server = crate::mcp::mcp_server_dir()?.join("index.js");
     let mcp_server_path = mcp_server
         .to_str()
@@ -93,6 +101,7 @@ mod tests {
             message: "Rename the note".into(),
             system_prompt: None,
             vault_path: "/tmp/vault".into(),
+            permission_mode: crate::ai_agents::AiAgentPermissionMode::Safe,
         }
     }
 
@@ -129,7 +138,9 @@ mod tests {
 
     #[test]
     fn mcp_config_includes_tolaria_server_for_active_vault() {
-        if let Ok(config) = build_mcp_config("/tmp/vault") {
+        if let Ok(config) =
+            build_mcp_config("/tmp/vault", crate::ai_agents::AiAgentPermissionMode::Safe)
+        {
             let json: serde_json::Value = serde_json::from_str(&config).unwrap();
             assert_eq!(json["settings"]["toolPrefix"], "none");
             assert_eq!(json["mcpServers"]["tolaria"]["command"], "node");
@@ -145,6 +156,19 @@ mod tests {
                 .unwrap()
                 .ends_with("index.js"));
         }
+    }
+
+    #[test]
+    fn power_user_mode_uses_the_same_pi_mcp_config_as_safe_mode() {
+        let safe =
+            build_mcp_config("/tmp/vault", crate::ai_agents::AiAgentPermissionMode::Safe).unwrap();
+        let power = build_mcp_config(
+            "/tmp/vault",
+            crate::ai_agents::AiAgentPermissionMode::PowerUser,
+        )
+        .unwrap();
+
+        assert_eq!(safe, power);
     }
 
     #[test]

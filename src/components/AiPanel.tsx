@@ -82,8 +82,10 @@ export function AiPanelView({
     linkedEntries,
     hasContext,
     isActive,
+    permissionMode,
     handleSend,
     handleNavigateWikilink,
+    handlePermissionModeChange,
     handleNewChat,
   } = controller
 
@@ -115,6 +117,9 @@ export function AiPanelView({
       <AiPanelHeader
         agentLabel={agentLabel}
         agentReadiness={defaultAiAgentReadiness}
+        permissionMode={permissionMode}
+        permissionModeDisabled={isActive}
+        onPermissionModeChange={handlePermissionModeChange}
         onClose={onClose}
         onCopyMcpConfig={onCopyMcpConfig}
         onNewChat={handleNewChat}

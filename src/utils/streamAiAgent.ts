@@ -1,5 +1,9 @@
 import { isTauri } from '../mock-tauri'
 import { getAiAgentDefinition, type AiAgentId } from '../lib/aiAgents'
+import {
+  normalizeAiAgentPermissionMode,
+  type AiAgentPermissionMode,
+} from '../lib/aiAgentPermissionMode'
 
 type AiAgentStreamEvent =
   | { kind: 'Init'; session_id: string }
@@ -24,6 +28,7 @@ export interface StreamAiAgentRequest {
   message: string
   systemPrompt?: string
   vaultPath: string
+  permissionMode?: AiAgentPermissionMode
   callbacks: AgentStreamCallbacks
 }
 
@@ -70,6 +75,7 @@ export async function streamAiAgent(
     message,
     systemPrompt,
     vaultPath,
+    permissionMode,
     callbacks,
   } = request
 
@@ -107,6 +113,7 @@ export async function streamAiAgent(
         message,
         system_prompt: systemPrompt || null,
         vault_path: vaultPath,
+        permission_mode: normalizeAiAgentPermissionMode(permissionMode),
       },
     })
     closeStream()

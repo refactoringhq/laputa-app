@@ -14346,6 +14346,115 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "ai_agent_permission_mode_header",
+      "x": 560,
+      "y": 13980,
+      "name": "AI agent permission mode - panel header",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 360,
+      "height": 96,
+      "fill": "$--background",
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "$--border"
+      },
+      "layout": "vertical",
+      "padding": 12,
+      "gap": 10,
+      "children": [
+        {
+          "type": "frame",
+          "id": "ai_agent_permission_mode_title_row",
+          "width": "fill_container",
+          "height": 28,
+          "alignItems": "center",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "ai_agent_permission_mode_icon",
+              "fill": "$--muted-foreground",
+              "content": "robot",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            },
+            {
+              "type": "frame",
+              "id": "ai_agent_permission_mode_title_stack",
+              "width": "fill_container",
+              "height": 28,
+              "layout": "vertical",
+              "gap": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ai_agent_permission_mode_title",
+                  "fill": "$--muted-foreground",
+                  "content": "AI Agent",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "600",
+                  "letterSpacing": 0
+                },
+                {
+                  "type": "text",
+                  "id": "ai_agent_permission_mode_agent",
+                  "fill": "$--muted-foreground",
+                  "content": "Claude Code · Safe",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "400",
+                  "letterSpacing": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ai_agent_permission_mode_toggle",
+          "width": "fill_container",
+          "height": 28,
+          "fill": "$--muted",
+          "cornerRadius": 6,
+          "padding": 2,
+          "gap": 2,
+          "children": [
+            {
+              "type": "text",
+              "id": "ai_agent_permission_mode_safe",
+              "width": "fill_container",
+              "height": 24,
+              "fill": "$--foreground",
+              "content": "Vault Safe",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "ai_agent_permission_mode_power",
+              "width": "fill_container",
+              "height": 24,
+              "fill": "$--muted-foreground",
+              "content": "Power User",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "500",
+              "letterSpacing": 0
+            }
+          ]
+        }
+      ]
     }
   ],
   "themes": {
