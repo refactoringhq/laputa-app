@@ -459,6 +459,59 @@ describe('WikilinkChatInput', () => {
     expect(onSend).not.toHaveBeenCalled()
   })
 
+  it('inserts one controlled newline on Shift+Enter without duplicating the draft', () => {
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+
+    updateEditorText('first line')
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter', shiftKey: true })
+
+    expect(onDraftChange).toHaveBeenLastCalledWith('first line\n')
+    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n')
+
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter', shiftKey: true })
+
+    expect(onDraftChange).toHaveBeenLastCalledWith('first line\n\n')
+    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n\n')
+  })
+
+  it('inserts one controlled newline from native insertLineBreak beforeinput', () => {
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+
+    updateEditorText('first line')
+    const editor = screen.getByTestId('agent-input')
+    const beforeInputEvent = new Event('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperty(beforeInputEvent, 'inputType', {
+      value: 'insertLineBreak',
+    })
+
+    fireEvent(editor, beforeInputEvent)
+
+    expect(beforeInputEvent.defaultPrevented).toBe(true)
+    expect(onDraftChange).toHaveBeenLastCalledWith('first line\n')
+    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n')
+  })
+
+  it('submits a multi-line draft with normal Enter after Shift+Enter', () => {
+    const onSend = vi.fn()
+    render(<Controlled onSend={onSend} />)
+
+    updateEditorText('first line')
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter', shiftKey: true })
+
+    const editor = screen.getByTestId('agent-input')
+    editor.textContent = 'first line\nsecond line'
+    setSelection(editor, 'first line\nsecond line'.length)
+    fireEvent.input(editor)
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter' })
+
+    expect(onSend).toHaveBeenCalledWith('first line\nsecond line', [])
+  })
+
   it('marks the editor disabled when disabled is true', () => {
     render(<Controlled disabled />)
 
