@@ -21,8 +21,10 @@ import { TypeCustomizePopover } from '../TypeCustomizePopover'
 import { useDragRegion } from '../../hooks/useDragRegion'
 import { SidebarGroupHeader } from './SidebarGroupHeader'
 import { SidebarViewItem } from './SidebarViewItem'
+import { computeReorder } from './sidebarHooks'
 import { countByFilter } from '../../utils/noteListHelpers'
 import { translate, type AppLocale } from '../../lib/i18n'
+import { canMoveView, type ViewMoveDirection } from '../../utils/viewOrdering'
 
 export { SidebarTopNav } from './SidebarTopNav'
 export { FavoritesSection } from './FavoritesSection'
@@ -48,6 +50,9 @@ export function ViewsSection({
   onCreateView,
   onEditView,
   onDeleteView,
+  onReorderViews,
+  onMoveView,
+  sensors,
   entries,
   locale = 'en',
 }: {
@@ -59,9 +64,35 @@ export function ViewsSection({
   onCreateView?: () => void
   onEditView?: (filename: string) => void
   onDeleteView?: (filename: string) => void
+  onReorderViews?: (orderedFilenames: string[]) => void
+  onMoveView?: (filename: string, direction: ViewMoveDirection) => void
+  sensors: ReturnType<typeof useSensors>
   entries: VaultEntry[]
   locale?: AppLocale
 }) {
+  const viewIds = views.map((view) => view.filename)
+  const handleViewDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const reordered = computeReorder(viewIds, active.id as string, over.id as string)
+    if (reordered) onReorderViews?.(reordered)
+  }
+  const renderViewItem = (view: ViewFile) => (
+    <SidebarViewItem
+      key={view.filename}
+      view={view}
+      isActive={isSelectionActive(selection, { kind: 'view', filename: view.filename })}
+      onSelect={() => onSelect({ kind: 'view', filename: view.filename })}
+      onEditView={onEditView}
+      onDeleteView={onDeleteView}
+      onMoveView={onMoveView}
+      canMoveUp={canMoveView(views, view.filename, 'up')}
+      canMoveDown={canMoveView(views, view.filename, 'down')}
+      entries={entries}
+      locale={locale}
+    />
+  )
+
   return (
     <div className="border-b border-border" style={{ padding: '0 6px' }}>
       <SidebarGroupHeader label={translate(locale, 'sidebar.group.views')} collapsed={collapsed} onToggle={onToggle}>
@@ -81,20 +112,77 @@ export function ViewsSection({
       </SidebarGroupHeader>
       {!collapsed && (
         <div style={{ paddingBottom: 4 }}>
-          {views.map((view) => (
-            <SidebarViewItem
-              key={view.filename}
-              view={view}
-              isActive={isSelectionActive(selection, { kind: 'view', filename: view.filename })}
-              onSelect={() => onSelect({ kind: 'view', filename: view.filename })}
-              onEditView={onEditView}
-              onDeleteView={onDeleteView}
-              entries={entries}
-              locale={locale}
-            />
-          ))}
+          {onReorderViews ? (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleViewDragEnd}>
+              <SortableContext items={viewIds} strategy={verticalListSortingStrategy}>
+                {views.map((view) => (
+                  <SortableViewItem
+                    key={view.filename}
+                    view={view}
+                    views={views}
+                    selection={selection}
+                    onSelect={onSelect}
+                    onEditView={onEditView}
+                    onDeleteView={onDeleteView}
+                    onMoveView={onMoveView}
+                    entries={entries}
+                    locale={locale}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          ) : views.map(renderViewItem)}
         </div>
       )}
+    </div>
+  )
+}
+
+function SortableViewItem({
+  view,
+  views,
+  selection,
+  onSelect,
+  onEditView,
+  onDeleteView,
+  onMoveView,
+  entries,
+  locale,
+}: {
+  view: ViewFile
+  views: ViewFile[]
+  selection: SidebarSelection
+  onSelect: (selection: SidebarSelection) => void
+  onEditView?: (filename: string) => void
+  onDeleteView?: (filename: string) => void
+  onMoveView?: (filename: string, direction: ViewMoveDirection) => void
+  entries: VaultEntry[]
+  locale?: AppLocale
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: view.filename })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+    >
+      <SidebarViewItem
+        view={view}
+        isActive={isSelectionActive(selection, { kind: 'view', filename: view.filename })}
+        onSelect={() => onSelect({ kind: 'view', filename: view.filename })}
+        onEditView={onEditView}
+        onDeleteView={onDeleteView}
+        onMoveView={onMoveView}
+        canMoveUp={canMoveView(views, view.filename, 'up')}
+        canMoveDown={canMoveView(views, view.filename, 'down')}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        entries={entries}
+        locale={locale}
+      />
     </div>
   )
 }

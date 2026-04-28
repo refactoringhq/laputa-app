@@ -72,7 +72,9 @@ import { useConflictFlow } from './hooks/useConflictFlow'
 import { useAppSave } from './hooks/useAppSave'
 import { useNoteRetargetingUi } from './hooks/useNoteRetargetingUi'
 import { useVaultBridge } from './hooks/useVaultBridge'
+import { useSavedViewOrdering } from './hooks/useSavedViewOrdering'
 import { createViewFilename } from './utils/viewFilename'
+import { nextViewOrder } from './utils/viewOrdering'
 import type { CommitDiffRequest } from './hooks/useDiffMode'
 import { ConflictResolverModal } from './components/ConflictResolverModal'
 import { ConfirmDeleteDialog } from './components/ConfirmDeleteDialog'
@@ -1076,7 +1078,9 @@ function App() {
     const filename = editing
       ? editing.filename
       : createViewFilename(definition.name, vault.views.map((view) => view.filename))
-    const nextDefinition = editing ? { ...editing.definition, ...definition } : definition
+    const nextDefinition = editing
+      ? { ...editing.definition, ...definition }
+      : { ...definition, order: nextViewOrder(vault.views) }
     const target = isTauri() ? invoke : mockInvoke
     try {
       await target('save_view_cmd', { vaultPath: resolvedPath, filename, definition: nextDefinition })
@@ -1319,6 +1323,14 @@ function App() {
       ? 'Customize All Notes columns'
       : 'Customize Inbox columns'
   }, [effectiveSelection, vault.views])
+  const viewOrdering = useSavedViewOrdering({
+    views: vault.views,
+    selection: effectiveSelection,
+    vaultPath: resolvedPath,
+    reloadViews: vault.reloadViews,
+    loadModifiedFiles: vault.loadModifiedFiles,
+    onToast: setToastMessage,
+  })
   const activeNoteModified = useMemo(
     () => vault.modifiedFiles.some((file) => file.path === notes.activeTabPath),
     [notes.activeTabPath, vault.modifiedFiles],
@@ -1420,6 +1432,11 @@ function App() {
     onToggleRawEditor: toggleRawEditorCommand,
     noteLayout,
     onToggleNoteLayout: toggleNoteLayout,
+    selectedViewName: viewOrdering.selectedViewName,
+    onMoveSelectedViewUp: viewOrdering.onMoveSelectedViewUp,
+    onMoveSelectedViewDown: viewOrdering.onMoveSelectedViewDown,
+    canMoveSelectedViewUp: viewOrdering.canMoveSelectedViewUp,
+    canMoveSelectedViewDown: viewOrdering.canMoveSelectedViewDown,
     onZoomIn: zoom.zoomIn, onZoomOut: zoom.zoomOut, onZoomReset: zoom.zoomReset,
     zoomLevel: zoom.zoomLevel,
     onSelect: handleSetSelection,
@@ -1570,7 +1587,7 @@ function App() {
           {sidebarVisible && (
             <>
               <div className="app__sidebar" style={{ width: layout.sidebarWidth }}>
-                <Sidebar entries={vault.entries} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} locale={appLocale} />
+                <Sidebar entries={vault.entries} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onReorderViews={viewOrdering.onReorderViews} onMoveView={viewOrdering.onMoveView} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} locale={appLocale} />
               </div>
               <ResizeHandle onResize={layout.handleSidebarResize} />
             </>

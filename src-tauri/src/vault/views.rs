@@ -1,7 +1,8 @@
 use chrono::{DateTime, Duration, Months, NaiveDate, NaiveDateTime, Utc};
-use regex::RegexBuilder;
+use regex::{Regex, RegexBuilder};
 use serde::de::{self, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::cmp::Ordering;
 use std::fmt;
 use std::fs;
 use std::path::Path;
@@ -15,6 +16,8 @@ pub struct ViewDefinition {
     pub icon: Option<String>,
     #[serde(default)]
     pub color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order: Option<i64>,
     #[serde(default)]
     pub sort: Option<String>,
     #[serde(
@@ -254,8 +257,17 @@ pub fn scan_views(vault_path: &Path) -> Vec<ViewFile> {
         }
     }
 
-    views.sort_by(|a, b| a.filename.cmp(&b.filename));
+    views.sort_by(compare_views);
     views
+}
+
+fn compare_views(left: &ViewFile, right: &ViewFile) -> Ordering {
+    let order = left
+        .definition
+        .order
+        .unwrap_or(i64::MAX)
+        .cmp(&right.definition.order.unwrap_or(i64::MAX));
+    order.then_with(|| left.filename.cmp(&right.filename))
 }
 
 /// Save a view definition as YAML to `vault_path/views/{filename}`.
@@ -422,120 +434,157 @@ fn supports_regex(op: &FilterOp) -> bool {
     )
 }
 
+enum ConditionField<'a> {
+    Scalar(Option<String>),
+    Relationship(&'a [String]),
+}
+
 fn evaluate_condition(cond: &FilterCondition, entry: &VaultEntry) -> bool {
     let field = cond.field.as_str();
-    let mut relationship_values: Option<&[String]> = None;
-
-    // Boolean fields
-    match field {
-        "archived" => return evaluate_bool_field(entry.archived, &cond.op, &cond.value),
-        "favorite" => return evaluate_bool_field(entry.favorite, &cond.op, &cond.value),
-        _ => {}
+    if let Some(result) = evaluate_condition_bool_field(field, entry, &cond.op, &cond.value) {
+        return result;
     }
 
-    // String/option fields
-    let field_value: Option<String> = match field {
-        "type" | "isA" => entry.is_a.clone(),
-        "status" => entry.status.clone(),
-        "title" => Some(entry.title.clone()),
-        "body" => Some(entry.snippet.clone()),
-        _ => {
-            // Check properties first, then relationships
-            if let Some(prop) = entry.properties.get(field) {
-                match prop {
-                    serde_json::Value::String(s) => Some(s.clone()),
-                    serde_json::Value::Number(n) => Some(n.to_string()),
-                    serde_json::Value::Bool(b) => Some(b.to_string()),
-                    _ => None,
-                }
-            } else if let Some(rels) = entry.relationships.get(field) {
-                relationship_values = Some(rels);
-                None
-            } else {
-                None
-            }
-        }
-    };
-
+    let field_value = resolve_condition_field(field, entry);
     let cond_value = cond.value.as_ref().and_then(yaml_value_to_string);
-    let regex = if cond.regex && supports_regex(&cond.op) {
-        cond_value.as_deref().and_then(build_regex)
-    } else {
-        None
-    };
+    let regex = condition_regex(cond, cond_value.as_deref());
 
     if cond.regex && supports_regex(&cond.op) && regex.is_none() {
         return false;
     }
 
     if let Some(re) = regex.as_ref() {
-        let matched = if let Some(prop) = field_value.as_deref() {
-            re.is_match(prop)
-        } else if let Some(rels) = relationship_values {
-            rels.iter().any(|item| {
-                relationship_candidates(item)
-                    .into_iter()
-                    .any(|candidate| re.is_match(&candidate))
-            })
-        } else {
-            false
-        };
-        return match cond.op {
-            FilterOp::Contains | FilterOp::Equals => matched,
-            FilterOp::NotContains | FilterOp::NotEquals => !matched,
-            _ => false,
-        };
+        return evaluate_regex_condition(&cond.op, &field_value, re);
     }
 
-    if let Some(rels) = relationship_values {
-        return evaluate_relationship_op(&cond.op, rels, &cond.value);
+    match field_value {
+        ConditionField::Relationship(rels) => evaluate_relationship_op(&cond.op, rels, &cond.value),
+        ConditionField::Scalar(value) => evaluate_scalar_op(
+            &cond.op,
+            value.as_deref(),
+            cond_value.as_deref(),
+            &cond.value,
+        ),
     }
+}
 
-    match cond.op {
-        FilterOp::Equals => match (&field_value, &cond_value) {
+fn evaluate_condition_bool_field(
+    field: &str,
+    entry: &VaultEntry,
+    op: &FilterOp,
+    value: &Option<serde_yaml::Value>,
+) -> Option<bool> {
+    match field {
+        "archived" => Some(evaluate_bool_field(entry.archived, op, value)),
+        "favorite" => Some(evaluate_bool_field(entry.favorite, op, value)),
+        _ => None,
+    }
+}
+
+fn resolve_condition_field<'a>(field: &str, entry: &'a VaultEntry) -> ConditionField<'a> {
+    match field {
+        "type" | "isA" => ConditionField::Scalar(entry.is_a.clone()),
+        "status" => ConditionField::Scalar(entry.status.clone()),
+        "title" => ConditionField::Scalar(Some(entry.title.clone())),
+        "body" => ConditionField::Scalar(Some(entry.snippet.clone())),
+        _ => resolve_dynamic_condition_field(field, entry),
+    }
+}
+
+fn resolve_dynamic_condition_field<'a>(field: &str, entry: &'a VaultEntry) -> ConditionField<'a> {
+    if let Some(prop) = entry.properties.get(field) {
+        return ConditionField::Scalar(json_scalar_to_string(prop));
+    }
+    if let Some(relationships) = entry.relationships.get(field) {
+        return ConditionField::Relationship(relationships);
+    }
+    ConditionField::Scalar(None)
+}
+
+fn json_scalar_to_string(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(value) => Some(value.clone()),
+        serde_json::Value::Number(value) => Some(value.to_string()),
+        serde_json::Value::Bool(value) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+fn condition_regex(cond: &FilterCondition, cond_value: Option<&str>) -> Option<Regex> {
+    if cond.regex && supports_regex(&cond.op) {
+        cond_value.and_then(build_regex)
+    } else {
+        None
+    }
+}
+
+fn evaluate_regex_condition(op: &FilterOp, field: &ConditionField<'_>, regex: &Regex) -> bool {
+    let matched = match field {
+        ConditionField::Scalar(Some(value)) => regex.is_match(value),
+        ConditionField::Relationship(values) => values.iter().any(|item| {
+            relationship_candidates(item)
+                .into_iter()
+                .any(|candidate| regex.is_match(&candidate))
+        }),
+        ConditionField::Scalar(None) => false,
+    };
+
+    match op {
+        FilterOp::Contains | FilterOp::Equals => matched,
+        FilterOp::NotContains | FilterOp::NotEquals => !matched,
+        _ => false,
+    }
+}
+
+fn evaluate_scalar_op(
+    op: &FilterOp,
+    field_value: Option<&str>,
+    cond_value: Option<&str>,
+    raw_value: &Option<serde_yaml::Value>,
+) -> bool {
+    match op {
+        FilterOp::Equals => match (field_value, cond_value) {
             (Some(f), Some(v)) => f.eq_ignore_ascii_case(v),
             (None, None) => true,
             _ => false,
         },
-        FilterOp::NotEquals => match (&field_value, &cond_value) {
+        FilterOp::NotEquals => match (field_value, cond_value) {
             (Some(f), Some(v)) => !f.eq_ignore_ascii_case(v),
             (None, None) => false,
             _ => true,
         },
-        FilterOp::Contains => match (&field_value, &cond_value) {
+        FilterOp::Contains => match (field_value, cond_value) {
             (Some(f), Some(v)) => f.to_lowercase().contains(&v.to_lowercase()),
             _ => false,
         },
-        FilterOp::NotContains => match (&field_value, &cond_value) {
+        FilterOp::NotContains => match (field_value, cond_value) {
             (Some(f), Some(v)) => !f.to_lowercase().contains(&v.to_lowercase()),
             (None, _) => true,
             _ => true,
         },
         FilterOp::AnyOf => {
-            let values = cond
-                .value
+            let values = raw_value
                 .as_ref()
                 .and_then(yaml_value_to_string_vec)
                 .unwrap_or_default();
-            match &field_value {
+            match field_value {
                 Some(f) => values.iter().any(|v| f.eq_ignore_ascii_case(v)),
                 None => false,
             }
         }
         FilterOp::NoneOf => {
-            let values = cond
-                .value
+            let values = raw_value
                 .as_ref()
                 .and_then(yaml_value_to_string_vec)
                 .unwrap_or_default();
-            match &field_value {
+            match field_value {
                 Some(f) => !values.iter().any(|v| f.eq_ignore_ascii_case(v)),
                 None => true,
             }
         }
-        FilterOp::IsEmpty => field_value.as_deref().map_or(true, |s| s.is_empty()),
-        FilterOp::IsNotEmpty => field_value.as_deref().is_some_and(|s| !s.is_empty()),
-        FilterOp::Before => match (&field_value, &cond_value) {
+        FilterOp::IsEmpty => field_value.map_or(true, str::is_empty),
+        FilterOp::IsNotEmpty => field_value.is_some_and(|s| !s.is_empty()),
+        FilterOp::Before => match (field_value, cond_value) {
             (Some(f), Some(v)) => match (
                 parse_date_filter_timestamp(f, Utc::now()),
                 parse_date_filter_timestamp(v, Utc::now()),
@@ -545,7 +594,7 @@ fn evaluate_condition(cond: &FilterCondition, entry: &VaultEntry) -> bool {
             },
             _ => false,
         },
-        FilterOp::After => match (&field_value, &cond_value) {
+        FilterOp::After => match (field_value, cond_value) {
             (Some(f), Some(v)) => match (
                 parse_date_filter_timestamp(f, Utc::now()),
                 parse_date_filter_timestamp(v, Utc::now()),
@@ -581,78 +630,59 @@ fn evaluate_relationship_op(
 ) -> bool {
     match op {
         FilterOp::Contains => {
-            let target = value.as_ref().and_then(yaml_value_to_string);
-            match target {
-                Some(t) => {
-                    let t_stem = wikilink_stem(&t).to_lowercase();
-                    rels.iter()
-                        .any(|r| wikilink_stem(r).to_lowercase() == t_stem)
-                }
-                None => false,
-            }
+            relationship_target(value).is_some_and(|target| relationship_contains(rels, &target))
         }
         FilterOp::NotContains => {
-            let target = value.as_ref().and_then(yaml_value_to_string);
-            match target {
-                Some(t) => {
-                    let t_stem = wikilink_stem(&t).to_lowercase();
-                    !rels
-                        .iter()
-                        .any(|r| wikilink_stem(r).to_lowercase() == t_stem)
-                }
-                None => true,
-            }
+            relationship_target(value).map_or(true, |target| !relationship_contains(rels, &target))
         }
-        FilterOp::AnyOf => {
-            let values = value
-                .as_ref()
-                .and_then(yaml_value_to_string_vec)
-                .unwrap_or_default();
-            rels.iter().any(|r| {
-                let r_stem = wikilink_stem(r).to_lowercase();
-                values
-                    .iter()
-                    .any(|v| wikilink_stem(v).to_lowercase() == r_stem)
-            })
-        }
-        FilterOp::NoneOf => {
-            let values = value
-                .as_ref()
-                .and_then(yaml_value_to_string_vec)
-                .unwrap_or_default();
-            !rels.iter().any(|r| {
-                let r_stem = wikilink_stem(r).to_lowercase();
-                values
-                    .iter()
-                    .any(|v| wikilink_stem(v).to_lowercase() == r_stem)
-            })
-        }
+        FilterOp::AnyOf => relationship_any_of(rels, &relationship_values(value)),
+        FilterOp::NoneOf => !relationship_any_of(rels, &relationship_values(value)),
         FilterOp::IsEmpty => rels.is_empty(),
         FilterOp::IsNotEmpty => !rels.is_empty(),
-        FilterOp::Equals => {
-            let target = value.as_ref().and_then(yaml_value_to_string);
-            match target {
-                Some(t) => {
-                    rels.len() == 1
-                        && wikilink_stem(&rels[0]).to_lowercase()
-                            == wikilink_stem(&t).to_lowercase()
-                }
-                None => rels.is_empty(),
-            }
-        }
-        FilterOp::NotEquals => {
-            let target = value.as_ref().and_then(yaml_value_to_string);
-            match target {
-                Some(t) => {
-                    rels.len() != 1
-                        || wikilink_stem(&rels[0]).to_lowercase()
-                            != wikilink_stem(&t).to_lowercase()
-                }
-                None => !rels.is_empty(),
-            }
-        }
+        FilterOp::Equals => relationship_target(value).map_or_else(
+            || rels.is_empty(),
+            |target| relationship_equals(rels, &target),
+        ),
+        FilterOp::NotEquals => relationship_target(value).map_or_else(
+            || !rels.is_empty(),
+            |target| !relationship_equals(rels, &target),
+        ),
         _ => false,
     }
+}
+
+fn relationship_target(value: &Option<serde_yaml::Value>) -> Option<String> {
+    value.as_ref().and_then(yaml_value_to_string)
+}
+
+fn relationship_values(value: &Option<serde_yaml::Value>) -> Vec<String> {
+    value
+        .as_ref()
+        .and_then(yaml_value_to_string_vec)
+        .unwrap_or_default()
+}
+
+fn normalized_wikilink_stem(value: &str) -> String {
+    wikilink_stem(value).to_lowercase()
+}
+
+fn relationship_contains(rels: &[String], target: &str) -> bool {
+    let target_stem = normalized_wikilink_stem(target);
+    rels.iter()
+        .any(|relationship| normalized_wikilink_stem(relationship) == target_stem)
+}
+
+fn relationship_any_of(rels: &[String], values: &[String]) -> bool {
+    rels.iter().any(|relationship| {
+        let relationship_stem = normalized_wikilink_stem(relationship);
+        values
+            .iter()
+            .any(|value| normalized_wikilink_stem(value) == relationship_stem)
+    })
+}
+
+fn relationship_equals(rels: &[String], target: &str) -> bool {
+    rels.len() == 1 && relationship_contains(rels, target)
 }
 
 fn yaml_value_to_string(v: &serde_yaml::Value) -> Option<String> {
@@ -686,6 +716,7 @@ mod tests {
             name: name.to_string(),
             icon: None,
             color: None,
+            order: None,
             sort: None,
             list_properties_display: Vec::new(),
             filters: FilterGroup::All(vec![FilterNode::Condition(FilterCondition {
@@ -961,6 +992,34 @@ filters:
         assert_eq!(views[0].definition.name, "Alpha");
         assert_eq!(views[1].filename, "b-view.yml");
         assert_eq!(views[1].definition.name, "Beta");
+    }
+
+    #[test]
+    fn test_scan_views_sorts_by_persisted_order_then_filename() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let views_dir = dir.path().join("views");
+        fs::create_dir_all(&views_dir).unwrap();
+
+        let alpha = "name: Alpha\norder: 20\nfilters:\n  all:\n    - field: type\n      op: equals\n      value: Note\n";
+        let beta = "name: Beta\norder: 10\nfilters:\n  all:\n    - field: type\n      op: equals\n      value: Note\n";
+        let gamma = "name: Gamma\nfilters:\n  all:\n    - field: type\n      op: equals\n      value: Note\n";
+        fs::write(views_dir.join("alpha.yml"), alpha).unwrap();
+        fs::write(views_dir.join("beta.yml"), beta).unwrap();
+        fs::write(views_dir.join("gamma.yml"), gamma).unwrap();
+
+        let views = scan_views(dir.path());
+
+        assert_eq!(
+            views
+                .iter()
+                .map(|view| (view.filename.as_str(), view.definition.order))
+                .collect::<Vec<_>>(),
+            vec![
+                ("beta.yml", Some(10)),
+                ("alpha.yml", Some(20)),
+                ("gamma.yml", None),
+            ]
+        );
     }
 
     #[test]

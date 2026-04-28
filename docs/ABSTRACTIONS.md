@@ -304,6 +304,12 @@ type SidebarSelection =
 - A successful folder rename reloads the folder tree plus vault entries, rewrites any affected folder-scoped tabs, and updates `SidebarSelection` to the new relative path when the renamed folder stays selected.
 - Folder deletion clears pending rename state, confirms destructive intent, drops affected folder-scoped tabs, reloads vault data, and resets folder selection if the deleted subtree owned the current selection.
 
+### Saved Views
+
+Saved Views live as YAML files under `views/`. Their definition includes user-visible fields (`name`, `icon`, `color`), note-list preferences (`sort`, `listPropertiesDisplay`), filters, and an optional top-level `order` number. The `order` value is stored directly in the YAML document, not in Markdown frontmatter, and lower values render earlier in every saved-View list. Views without an explicit order sort after ordered views by filename for stable fallback behavior.
+
+The renderer uses `viewOrdering` helpers to convert drag or move-button intent into dense order updates before saving each affected view file through `save_view_cmd`. The sidebar exposes both a drag handle and explicit move-up/move-down controls, and the command palette mirrors those move actions for the currently selected saved View.
+
 ### Neighborhood Mode
 
 `SidebarSelection.kind === 'entity'` is Tolaria's Neighborhood mode for note-list browsing.
