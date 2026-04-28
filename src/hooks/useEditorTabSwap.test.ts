@@ -476,6 +476,48 @@ describe('useEditorTabSwap raw mode sync', () => {
     expect(mockEditor.replaceBlocks).toHaveBeenCalled()
   })
 
+  it('repairs parsed blocks with missing ids before applying them to the editor', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const malformedTab = {
+      ...makeTab('malformed.md', 'Malformed'),
+      content: '---\ntitle: Malformed\n---\n\n# Malformed\n\n- Parent\n  - Child',
+    }
+
+    const { mockEditor, rerenderWith } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+      setupEditor: (editor) => {
+        editor.tryParseMarkdownToBlocks.mockReturnValue([
+          {
+            type: 'bulletListItem',
+            content: [{ type: 'text', text: 'Parent', styles: {} }],
+            children: [
+              {
+                type: 'bulletListItem',
+                content: [{ type: 'text', text: 'Child', styles: {} }],
+                children: [],
+              },
+            ],
+          },
+        ])
+      },
+    })
+    mockEditor.replaceBlocks.mockClear()
+
+    await rerenderWith({ tabs: [malformedTab], activeTabPath: 'malformed.md' })
+
+    const appliedBlocks = mockEditor.replaceBlocks.mock.calls[0][1]
+    expect(appliedBlocks).toEqual([
+      expect.objectContaining({
+        id: expect.any(String),
+        children: [
+          expect.objectContaining({
+            id: expect.any(String),
+          }),
+        ],
+      }),
+    ])
+  })
+
   it('ignores editor change events before the pending tab swap applies a new untitled note', async () => {
     vi.spyOn(document, 'querySelector').mockReturnValue({ scrollTop: 0 } as unknown as Element)
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
