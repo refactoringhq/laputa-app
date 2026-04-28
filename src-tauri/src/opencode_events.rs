@@ -101,12 +101,8 @@ where
     F: FnMut(AiAgentStreamEvent),
 {
     let tool_id = tool_id(json).unwrap_or("tool").to_string();
-    let tool_name = json["name"]
-        .as_str()
-        .or_else(|| json["tool"].as_str())
-        .unwrap_or("tool")
-        .to_string();
-    let input = json.get("input").map(|input| input.to_string());
+    let tool_name = tool_name(json).unwrap_or("tool").to_string();
+    let input = tool_input(json);
 
     emit(AiAgentStreamEvent::ToolStart {
         tool_name,
@@ -120,10 +116,7 @@ where
     F: FnMut(AiAgentStreamEvent),
 {
     let tool_id = tool_id(json).unwrap_or("tool").to_string();
-    let output = json["output"]
-        .as_str()
-        .map(|output| output.to_string())
-        .or_else(|| json.get("result").map(|result| result.to_string()));
+    let output = tool_output(json);
 
     emit(AiAgentStreamEvent::ToolDone { tool_id, output });
 }
@@ -140,24 +133,50 @@ where
 }
 
 fn tool_id(json: &serde_json::Value) -> Option<&str> {
-    json["id"]
-        .as_str()
-        .or_else(|| json["toolID"].as_str())
-        .or_else(|| json["tool_id"].as_str())
+    first_string_field(
+        json,
+        &["id", "toolID", "tool_id", "toolCallID", "toolCallId"],
+    )
 }
 
 fn text_value(json: &serde_json::Value) -> Option<&str> {
-    json["text"]
-        .as_str()
-        .or_else(|| json["content"].as_str())
-        .or_else(|| json["message"].as_str())
+    first_string_field(json, &["text", "content", "message"])
 }
 
 fn message_value(json: &serde_json::Value) -> Option<&str> {
-    json["message"]
+    first_string_field(json, &["message", "error", "text"])
+}
+
+fn tool_name(json: &serde_json::Value) -> Option<&str> {
+    first_string_field(json, &["name", "tool", "toolName"])
+}
+
+fn tool_input(json: &serde_json::Value) -> Option<String> {
+    first_json_field(json, &["input", "args"]).map(|input| input.to_string())
+}
+
+fn tool_output(json: &serde_json::Value) -> Option<String> {
+    first_json_field(json, &["output", "result"]).map(display_json_value)
+}
+
+fn first_string_field<'a>(json: &'a serde_json::Value, keys: &[&str]) -> Option<&'a str> {
+    keys.iter()
+        .find_map(|key| json[*key].as_str().or_else(|| json["part"][*key].as_str()))
+}
+
+fn first_json_field<'a>(
+    json: &'a serde_json::Value,
+    keys: &[&str],
+) -> Option<&'a serde_json::Value> {
+    keys.iter()
+        .find_map(|key| json.get(*key).or_else(|| json["part"].get(*key)))
+}
+
+fn display_json_value(value: &serde_json::Value) -> String {
+    value
         .as_str()
-        .or_else(|| json["error"].as_str())
-        .or_else(|| json["text"].as_str())
+        .map(|output| output.to_string())
+        .unwrap_or_else(|| value.to_string())
 }
 
 fn is_auth_error(lower: &str) -> bool {

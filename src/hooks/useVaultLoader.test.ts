@@ -11,6 +11,8 @@ const mockEntries: VaultEntry[] = [
     archived: false,
     modifiedAt: 1700000000, createdAt: 1700000000, fileSize: 100,
     snippet: '', wordCount: 0, relationships: {}, icon: null, color: null, order: null, template: null, sort: null, outgoingLinks: [],
+    sidebarLabel: null, view: null, visible: null, organized: false, favorite: false, favoriteIndex: null,
+    listPropertiesDisplay: [], properties: {}, hasH1: false,
   },
 ]
 
@@ -150,6 +152,55 @@ describe('useVaultLoader', () => {
     const { result } = await renderVaultLoader()
 
     expect(result.current.entries[0].title).toBe('Hello')
+  })
+
+  it('normalizes missing entry and view string metadata from vault load', async () => {
+    backendInvokeFn.mockImplementation(((cmd: string) => {
+      if (isVaultLoadCommand(cmd)) {
+        return Promise.resolve([
+          {
+            path: '/vault/note/missing-title.md',
+            filename: undefined,
+            title: undefined,
+            aliases: undefined,
+            outgoingLinks: undefined,
+            relationships: undefined,
+            properties: undefined,
+          },
+        ])
+      }
+      if (cmd === 'list_views') return Promise.resolve([{ filename: undefined, definition: {} }])
+      if (cmd === 'get_modified_files') return Promise.resolve([])
+      if (cmd === 'list_vault_folders') return Promise.resolve([])
+      return Promise.resolve(null)
+    }) as typeof defaultMockInvoke)
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+
+    await waitForEntries(result)
+    await waitFor(() => {
+      expect(result.current.views).toHaveLength(1)
+    })
+
+    expect(result.current.entries[0]).toMatchObject({
+      path: '/vault/note/missing-title.md',
+      filename: 'missing-title.md',
+      title: 'missing-title',
+      aliases: [],
+      outgoingLinks: [],
+      relationships: {},
+      properties: {},
+    })
+    expect(result.current.views[0]).toMatchObject({
+      filename: 'view-1.yml',
+      definition: {
+        name: 'View 1',
+        icon: null,
+        color: null,
+        sort: null,
+        filters: { all: [] },
+      },
+    })
   })
 
   it('reports initial vault loading until the note scan resolves', async () => {
