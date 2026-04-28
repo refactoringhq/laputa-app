@@ -80,6 +80,7 @@ export async function sendAgentMessage({
     systemPrompt,
     vaultPath: context.vaultPath,
     callbacks: createStreamCallbacks({
+      agent: context.agent,
       messageId,
       vaultPath: context.vaultPath,
       setMessages: runtime.setMessages,

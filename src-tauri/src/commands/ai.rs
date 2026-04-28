@@ -124,6 +124,10 @@ pub fn get_ai_agents_status() -> AiAgentsStatus {
             installed: false,
             version: None,
         },
+        pi: crate::ai_agents::AiAgentAvailability {
+            installed: false,
+            version: None,
+        },
     }
 }
 

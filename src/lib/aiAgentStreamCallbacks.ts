@@ -8,8 +8,10 @@ import {
   updateToolAction,
   type ToolInvocation,
 } from './aiAgentMessageState'
+import { getAiAgentDefinition, type AiAgentId } from './aiAgents'
 
 export interface StreamMutationContext {
+  agent: AiAgentId
   messageId: string
   vaultPath: string
   setMessages: Dispatch<SetStateAction<AiAgentMessage[]>>
@@ -20,15 +22,16 @@ export interface StreamMutationContext {
   fileCallbacksRef: MutableRefObject<AgentFileCallbacks | undefined>
 }
 
-const EMPTY_CLAUDE_RESPONSE = 'Claude Code finished without returning a reply.'
-
-function finalResponseText(response: string): string {
-  return response.trim() ? response : EMPTY_CLAUDE_RESPONSE
+function finalResponseText(response: string, agent: AiAgentId): string {
+  return response.trim()
+    ? response
+    : `${getAiAgentDefinition(agent).label} finished without returning a reply.`
 }
 
 export function createStreamCallbacks(context: StreamMutationContext) {
   const {
     messageId,
+    agent,
     vaultPath,
     setMessages,
     setStatus,
@@ -101,7 +104,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       if (abortRef.current.aborted) return
 
       setStatus('done')
-      const finalResponse = finalResponseText(responseAccRef.current)
+      const finalResponse = finalResponseText(responseAccRef.current, agent)
       updateMessage(setMessages, messageId, (message) => ({
         ...message,
         isStreaming: false,

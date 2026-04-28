@@ -1,4 +1,4 @@
-export type AiAgentId = 'claude_code' | 'codex' | 'opencode'
+export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi'
 
 export type AiAgentStatus = 'checking' | 'installed' | 'missing'
 
@@ -37,6 +37,12 @@ export const AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] = [
     shortLabel: 'OpenCode',
     installUrl: 'https://opencode.ai/docs/',
   },
+  {
+    id: 'pi',
+    label: 'Pi',
+    shortLabel: 'Pi',
+    installUrl: 'https://pi.dev',
+  },
 ] as const
 
 export function createAiAgentAvailability(status: AiAgentStatus = 'checking', version: string | null = null): AiAgentAvailability {
@@ -48,6 +54,7 @@ export function createCheckingAiAgentsStatus(): AiAgentsStatus {
     claude_code: createAiAgentAvailability(),
     codex: createAiAgentAvailability(),
     opencode: createAiAgentAvailability(),
+    pi: createAiAgentAvailability(),
   }
 }
 
@@ -56,6 +63,7 @@ export function createMissingAiAgentsStatus(): AiAgentsStatus {
     claude_code: createAiAgentAvailability('missing'),
     codex: createAiAgentAvailability('missing'),
     opencode: createAiAgentAvailability('missing'),
+    pi: createAiAgentAvailability('missing'),
   }
 }
 
@@ -85,6 +93,7 @@ export function normalizeAiAgentsStatus(payload: Partial<Record<AiAgentId, { ins
     claude_code: normalizeAvailability(payload?.claude_code),
     codex: normalizeAvailability(payload?.codex),
     opencode: normalizeAvailability(payload?.opencode),
+    pi: normalizeAvailability(payload?.pi),
   }
 }
 

@@ -54,6 +54,7 @@ describe('aiAgentStreamCallbacks', () => {
     const toolInputMapRef = { current: new Map<string, { tool: string; input?: string }>() }
 
     const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
       messageId: 'msg-1',
       vaultPath: '/vault',
       setMessages: messages.setMessages,
@@ -122,6 +123,7 @@ describe('aiAgentStreamCallbacks', () => {
     const responseAccRef = { current: 'Partial reply' }
 
     const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
       messageId: 'msg-1',
       vaultPath: '/vault',
       setMessages: messages.setMessages,
@@ -152,7 +154,10 @@ describe('aiAgentStreamCallbacks', () => {
     ])
   })
 
-  it('finishes with a readable empty state when Claude exits without assistant text', () => {
+  it.each([
+    ['claude_code', 'Claude Code finished without returning a reply.'],
+    ['pi', 'Pi finished without returning a reply.'],
+  ] as const)('uses the %s label for empty stream responses', (agent, response) => {
     const messages = createMessageStore([
       {
         id: 'msg-1',
@@ -164,6 +169,7 @@ describe('aiAgentStreamCallbacks', () => {
     const status = createStatusStore('thinking')
 
     const callbacks = createStreamCallbacks({
+      agent,
       messageId: 'msg-1',
       vaultPath: '/vault',
       setMessages: messages.setMessages,
@@ -184,7 +190,7 @@ describe('aiAgentStreamCallbacks', () => {
         actions: [],
         isStreaming: false,
         reasoningDone: true,
-        response: 'Claude Code finished without returning a reply.',
+        response,
       },
     ])
   })
@@ -202,6 +208,7 @@ describe('aiAgentStreamCallbacks', () => {
     const fileCallbacks = { onVaultChanged: vi.fn() }
 
     const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
       messageId: 'msg-1',
       vaultPath: '/vault',
       setMessages: messages.setMessages,

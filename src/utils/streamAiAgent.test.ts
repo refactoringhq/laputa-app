@@ -7,7 +7,7 @@ const {
   listenMock,
 } = vi.hoisted(() => ({
   getAiAgentDefinitionMock: vi.fn((agent: string) => ({
-    label: agent === 'codex' ? 'Codex' : 'Claude Code',
+    label: agent === 'codex' ? 'Codex' : agent === 'pi' ? 'Pi' : 'Claude Code',
   })),
   invokeMock: vi.fn(),
   isTauriState: { value: false },

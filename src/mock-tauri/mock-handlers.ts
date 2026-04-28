@@ -379,6 +379,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     claude_code: { installed: false, version: null },
     codex: { installed: false, version: null },
     opencode: { installed: false, version: null },
+    pi: { installed: false, version: null },
   }),
   get_vault_ai_guidance_status: () => ({ ...mockVaultAiGuidanceStatus }),
   restore_vault_ai_guidance: () => {
