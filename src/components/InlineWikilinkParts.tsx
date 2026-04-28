@@ -203,7 +203,7 @@ export function InlineWikilinkEditorField({
         contentEditable={!disabled}
         suppressContentEditableWarning={true}
         role="textbox"
-        aria-multiline="false"
+        aria-multiline="true"
         aria-disabled={disabled || undefined}
         aria-placeholder={placeholder}
         data-testid={dataTestId}
