@@ -23,6 +23,7 @@ interface FixturePageArgs {
 
 interface FixtureVaultOptions {
   isGitRepo?: boolean
+  expectedReadyTitle?: string
 }
 
 interface CopyDirArgs {
@@ -406,14 +407,18 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: Fix
         return applyFixtureVaultOverrides(ref) ?? ref
       },
     })
-  }, { dismissedKey: CLAUDE_CODE_ONBOARDING_DISMISSED_KEY, initialIsGitRepo: isGitRepo, resolvedVaultPath: vaultPath })
+  }, {
+    dismissedKey: CLAUDE_CODE_ONBOARDING_DISMISSED_KEY,
+    initialIsGitRepo: isGitRepo,
+    resolvedVaultPath: vaultPath,
+  })
 }
 
-async function waitForFixtureVaultReady({ page }: FixturePageArgs): Promise<void> {
+async function waitForFixtureVaultReady({ page, expectedTitle }: FixturePageArgs & { expectedTitle: string }): Promise<void> {
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(window.__mockHandlers?.list_vault))
   await page.locator('[data-testid="note-list-container"]').waitFor({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
-  await expect(page.getByText('Alpha Project', { exact: true }).first()).toBeVisible({
+  await expect(page.getByText(expectedTitle, { exact: true }).first()).toBeVisible({
     timeout: FIXTURE_VAULT_READY_TIMEOUT,
   })
 }
@@ -423,8 +428,15 @@ export async function openFixtureVault(
   vaultPath: string,
   options: FixtureVaultOptions = {},
 ): Promise<void> {
-  await installFixtureVaultInitScript({ page, vaultPath, isGitRepo: options.isGitRepo ?? true })
-  await waitForFixtureVaultReady({ page })
+  await installFixtureVaultInitScript({
+    page,
+    vaultPath,
+    isGitRepo: options.isGitRepo ?? true,
+  })
+  await waitForFixtureVaultReady({
+    page,
+    expectedTitle: options.expectedReadyTitle ?? 'Alpha Project',
+  })
 }
 
 async function installFixtureVaultDesktopBridge({ page }: FixturePageArgs): Promise<void> {
