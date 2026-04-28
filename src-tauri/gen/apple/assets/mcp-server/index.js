@@ -28019,7 +28019,7 @@ function extractSnippet(content, query) {
 }
 
 // mcp-server/index.js
-var VAULT_PATH = process.env.VAULT_PATH || process.env.HOME + "/Laputa";
+var VAULT_PATH = process.env.VAULT_PATH; if (!VAULT_PATH) throw new Error("VAULT_PATH is required");
 var WS_UI_PORT = parseInt(process.env.WS_UI_PORT || "9711", 10);
 var WS_UI_URL = `ws://localhost:${WS_UI_PORT}`;
 var uiSocket = null;

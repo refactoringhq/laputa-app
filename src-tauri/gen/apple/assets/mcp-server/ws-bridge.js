@@ -7250,7 +7250,7 @@ function extractSnippet(content, query) {
 }
 
 // mcp-server/ws-bridge.js
-var VAULT_PATH = process.env.VAULT_PATH || process.env.HOME + "/Laputa";
+var VAULT_PATH = process.env.VAULT_PATH; if (!VAULT_PATH) throw new Error("VAULT_PATH is required");
 var WS_PORT = parseInt(process.env.WS_PORT || "9710", 10);
 var WS_UI_PORT = parseInt(process.env.WS_UI_PORT || "9711", 10);
 var uiBridge = null;
