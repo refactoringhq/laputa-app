@@ -68,6 +68,8 @@ Git is a per-vault capability, not a prerequisite for the document model. A vaul
 
 Plain folders become Git-backed only when the user explicitly runs Git initialization from the setup dialog, status bar, or command palette. Features that depend on Git must check this capability instead of assuming every vault has `.git`.
 
+Git initialization is intentionally scoped to dedicated vault folders. When the current non-git folder looks like a broad personal root such as Documents, Desktop, or Downloads and does not already carry Tolaria-managed vault markers, `init_git_repo` refuses to run Git and asks the user to select or create a dedicated subfolder instead.
+
 ### VaultEntry
 
 The core data type representing a single note, defined in Rust (`src-tauri/src/vault/mod.rs`) and TypeScript (`src/types.ts`).
