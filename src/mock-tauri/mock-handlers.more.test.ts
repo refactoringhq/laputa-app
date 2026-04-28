@@ -142,11 +142,13 @@ describe('mockHandlers additional coverage', () => {
     expect(mockHandlers.get_vault_ai_guidance_status()).toEqual({
       agents_state: 'managed',
       claude_state: 'managed',
+      gemini_state: 'managed',
       can_restore: false,
     })
     expect(mockHandlers.restore_vault_ai_guidance()).toEqual({
       agents_state: 'managed',
       claude_state: 'managed',
+      gemini_state: 'managed',
       can_restore: false,
     })
     expect(mockHandlers.repair_vault()).toBe('Vault repaired')

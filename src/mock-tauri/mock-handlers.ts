@@ -135,6 +135,7 @@ let mockVaultList: { vaults: Array<{ label: string; path: string }>; active_vaul
 let mockVaultAiGuidanceStatus = {
   agents_state: 'managed',
   claude_state: 'managed',
+  gemini_state: 'managed',
   can_restore: false,
 } as const
 
@@ -386,6 +387,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     mockVaultAiGuidanceStatus = {
       agents_state: 'managed',
       claude_state: 'managed',
+      gemini_state: 'managed',
       can_restore: false,
     }
     return { ...mockVaultAiGuidanceStatus }
@@ -504,6 +506,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     mockVaultAiGuidanceStatus = {
       agents_state: 'managed',
       claude_state: 'managed',
+      gemini_state: 'managed',
       can_restore: false,
     }
     return 'Vault repaired'

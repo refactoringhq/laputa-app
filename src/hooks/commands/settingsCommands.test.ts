@@ -126,4 +126,16 @@ describe('buildSettingsCommands', () => {
     expect(listener).toHaveBeenCalledTimes(1)
     window.removeEventListener(TOGGLE_GITIGNORED_VISIBILITY_EVENT, listener)
   })
+
+  it('makes external AI setup discoverable for Gemini CLI', () => {
+    const onInstallMcp = vi.fn()
+    const command = findCommand('install-mcp', buildSettingsCommands({
+      onOpenSettings: vi.fn(),
+      onInstallMcp,
+    }))
+
+    expect(command?.keywords).toContain('gemini')
+    command?.execute()
+    expect(onInstallMcp).toHaveBeenCalledOnce()
+  })
 })
