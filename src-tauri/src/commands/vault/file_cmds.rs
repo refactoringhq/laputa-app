@@ -1,7 +1,7 @@
 use crate::commands::expand_tilde;
 use crate::vault::filename_rules::validate_folder_name;
 use crate::vault::{self, FolderNode, VaultEntry};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use super::boundary::{
     with_boundary, with_existing_paths, with_requested_root, with_validated_path, ValidatedPathMode,
@@ -150,12 +150,31 @@ pub fn create_vault_folder(vault_path: PathBuf, folder_name: PathBuf) -> Result<
     with_boundary(Some(raw_vault_path.as_ref()), |boundary| {
         let folder_name = folder_name.to_string_lossy();
         let folder_path = boundary.child_path(folder_name.as_ref())?;
-        validate_folder_name(folder_name.as_ref())?;
+        validate_folder_relative_path(folder_name.as_ref())?;
         ensure_missing_folder(&folder_path, folder_name.as_ref())?;
         std::fs::create_dir_all(&folder_path)
             .map_err(|e| format!("Failed to create folder: {}", e))?;
         Ok(folder_name.into_owned())
     })
+}
+
+fn validate_folder_relative_path(folder_name: &str) -> Result<(), String> {
+    let mut has_segment = false;
+    for component in Path::new(folder_name).components() {
+        match component {
+            Component::Normal(segment) => {
+                has_segment = true;
+                validate_folder_name(&segment.to_string_lossy())?;
+            }
+            _ => return Err("Invalid folder path".to_string()),
+        }
+    }
+
+    if has_segment {
+        Ok(())
+    } else {
+        Err("Invalid folder path".to_string())
+    }
 }
 
 fn ensure_missing_folder(folder_path: &Path, folder_name: &str) -> Result<(), String> {
@@ -324,6 +343,18 @@ mod tests {
 
         let folders = list_vault_folders(root).unwrap();
         assert!(folders.iter().any(|folder| folder.name == "Projects"));
+    }
+
+    #[test]
+    fn create_vault_folder_accepts_nested_relative_paths() {
+        let dir = TempDir::new().unwrap();
+
+        assert_eq!(
+            create_vault_folder(dir.path().to_path_buf(), PathBuf::from("Projects/backend"))
+                .unwrap(),
+            "Projects/backend"
+        );
+        assert!(dir.path().join("Projects/backend").is_dir());
     }
 
     #[test]

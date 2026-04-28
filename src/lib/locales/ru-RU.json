@@ -158,6 +158,7 @@
   "sidebar.action.deleteFolder": "Удалить папку",
   "sidebar.action.revealFolderMenu": "Показать в Finder",
   "sidebar.action.copyFolderPathMenu": "Копировать путь к папке",
+  "sidebar.action.createSubfolderMenu": "Создать подпапку",
   "sidebar.action.renameFolderMenu": "Переименовать папку...",
   "sidebar.action.deleteFolderMenu": "Удалить папку...",
   "sidebar.folder.name": "Имя папки",

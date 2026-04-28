@@ -315,6 +315,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   list_views: () => [],
   save_view_cmd: () => {},
   delete_view_cmd: () => {},
+  create_vault_folder: (args: { folderName?: string; folder_name?: string }) => args.folderName ?? args.folder_name ?? '',
   reload_vault: () => MOCK_ENTRIES,
   reload_vault_entry: (args: { path: string }) => MOCK_ENTRIES.find(e => e.path === args.path) ?? { path: args.path, title: 'Unknown', filename: 'unknown.md', aliases: [], belongsTo: [], relatedTo: [], archived: false, snippet: '', wordCount: 0, fileSize: 0, relationships: {}, outgoingLinks: [], properties: {} },
   sync_note_title: () => false,

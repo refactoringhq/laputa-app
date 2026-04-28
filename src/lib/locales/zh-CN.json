@@ -158,6 +158,7 @@
   "sidebar.action.deleteFolder": "删除文件夹",
   "sidebar.action.revealFolderMenu": "在访达中显示",
   "sidebar.action.copyFolderPathMenu": "复制文件夹路径",
+  "sidebar.action.createSubfolderMenu": "创建子文件夹",
   "sidebar.action.renameFolderMenu": "重命名文件夹...",
   "sidebar.action.deleteFolderMenu": "删除文件夹...",
   "sidebar.folder.name": "文件夹名称",

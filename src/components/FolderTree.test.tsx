@@ -224,6 +224,29 @@ describe('FolderTree', () => {
     expect(onDeleteFolder).toHaveBeenCalledWith('projects')
   })
 
+  it('creates a subfolder from the folder context menu', async () => {
+    const onCreateFolder = vi.fn().mockResolvedValue(true)
+    render(
+      <FolderTree
+        folders={mockFolders}
+        selection={defaultSelection}
+        onSelect={vi.fn()}
+        onCreateFolder={onCreateFolder}
+      />,
+    )
+
+    fireEvent.contextMenu(screen.getByText('projects'))
+    fireEvent.click(screen.getByTestId('create-subfolder-menu-item'))
+
+    const input = await screen.findByTestId('new-child-folder-input:projects')
+    fireEvent.change(input, { target: { value: 'backend' } })
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' })
+    })
+
+    expect(onCreateFolder).toHaveBeenCalledWith('backend', 'projects')
+  })
+
   it('opens folder file actions from the context menu', () => {
     const onRevealFolder = vi.fn()
     const onCopyFolderPath = vi.fn()

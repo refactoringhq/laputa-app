@@ -158,6 +158,7 @@
   "sidebar.action.deleteFolder": "폴더 삭제",
   "sidebar.action.revealFolderMenu": "Finder에서 표시",
   "sidebar.action.copyFolderPathMenu": "폴더 경로 복사",
+  "sidebar.action.createSubfolderMenu": "하위 폴더 만들기",
   "sidebar.action.renameFolderMenu": "폴더 이름 변경...",
   "sidebar.action.deleteFolderMenu": "폴더 삭제...",
   "sidebar.folder.name": "폴더 이름",

@@ -158,6 +158,7 @@
   "sidebar.action.deleteFolder": "Excluir pasta",
   "sidebar.action.revealFolderMenu": "Exibir no Finder",
   "sidebar.action.copyFolderPathMenu": "Copiar caminho da pasta",
+  "sidebar.action.createSubfolderMenu": "Criar subpasta",
   "sidebar.action.renameFolderMenu": "Renomear pasta...",
   "sidebar.action.deleteFolderMenu": "Excluir pasta...",
   "sidebar.folder.name": "Nome da pasta",

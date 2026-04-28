@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import { ClipboardText, FolderOpen, PencilSimple, Trash } from '@phosphor-icons/react'
+import { ClipboardText, FolderOpen, FolderPlus, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { translate, type AppLocale } from '../../lib/i18n'
 
@@ -15,6 +15,7 @@ interface FolderContextMenuProps {
   onDelete?: (folderPath: string) => void
   onReveal?: (folderPath: string) => void
   onCopyPath?: (folderPath: string) => void
+  onCreateSubfolder?: (folderPath: string) => void
   onRename: (folderPath: string) => void
   locale?: AppLocale
 }
@@ -25,6 +26,7 @@ export function FolderContextMenu({
   onDelete,
   onReveal,
   onCopyPath,
+  onCreateSubfolder,
   onRename,
   locale = 'en',
 }: FolderContextMenuProps) {
@@ -59,6 +61,18 @@ export function FolderContextMenu({
         >
           <ClipboardText size={14} />
           {translate(locale, 'sidebar.action.copyFolderPathMenu')}
+        </Button>
+      )}
+      {onCreateSubfolder && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm"
+          onClick={() => onCreateSubfolder(menu.path)}
+          data-testid="create-subfolder-menu-item"
+        >
+          <FolderPlus size={14} />
+          {translate(locale, 'sidebar.action.createSubfolderMenu')}
         </Button>
       )}
       <Button

@@ -158,6 +158,7 @@
   "sidebar.action.deleteFolder": "Elimina cartella",
   "sidebar.action.revealFolderMenu": "Mostra in Finder",
   "sidebar.action.copyFolderPathMenu": "Copia percorso della cartella",
+  "sidebar.action.createSubfolderMenu": "Crea sottocartella",
   "sidebar.action.renameFolderMenu": "Rinomina cartella...",
   "sidebar.action.deleteFolderMenu": "Elimina cartella...",
   "sidebar.folder.name": "Nome della cartella",

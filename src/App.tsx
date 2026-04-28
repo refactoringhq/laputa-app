@@ -806,12 +806,15 @@ function App() {
     })
   }, [updateConfig, vaultConfig.inbox])
 
-  const handleCreateFolder = useCallback(async (name: string) => {
+  const handleCreateFolder = useCallback(async (name: string, parentPath?: string | null) => {
+    const folderName = parentPath
+      ? `${parentPath.replace(/^\/+|\/+$/g, '')}/${name}`
+      : name
     try {
       if (isTauri()) {
-        await invoke('create_vault_folder', { vaultPath: resolvedPath, folderName: name })
+        await invoke('create_vault_folder', { vaultPath: resolvedPath, folderName })
       } else {
-        await mockInvoke('create_vault_folder', { vaultPath: resolvedPath, folderName: name })
+        await mockInvoke('create_vault_folder', { vaultPath: resolvedPath, folderName })
       }
       await vault.reloadFolders()
       setToastMessage(`Created folder "${name}"`)

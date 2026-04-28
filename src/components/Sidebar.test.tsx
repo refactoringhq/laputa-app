@@ -1360,6 +1360,73 @@ describe('Sidebar', () => {
     })
   })
 
+  describe('blank sidebar context menu', () => {
+    function openBlankSidebarMenu() {
+      const navigation = screen.getByTestId('sidebar-navigation')
+      fireEvent.contextMenu(navigation, { clientX: 48, clientY: 120 })
+    }
+
+    it('opens localized creation actions from empty sidebar space', () => {
+      render(
+        <Sidebar
+          entries={mockEntries}
+          selection={defaultSelection}
+          onSelect={() => {}}
+          onCreateFolder={() => true}
+          onCreateView={() => {}}
+          onCreateNewType={() => {}}
+          locale="zh-CN"
+        />
+      )
+
+      openBlankSidebarMenu()
+
+      expect(screen.getByTestId('sidebar-background-context-menu')).toHaveStyle({ left: '48px', top: '120px' })
+      expect(screen.getByText('创建文件夹')).toBeInTheDocument()
+      expect(screen.getByText('创建视图')).toBeInTheDocument()
+      expect(screen.getByText('新建类型')).toBeInTheDocument()
+    })
+
+    it('runs view and type creation callbacks from the blank-space menu', () => {
+      const onCreateView = vi.fn()
+      const onCreateNewType = vi.fn()
+      render(
+        <Sidebar
+          entries={mockEntries}
+          selection={defaultSelection}
+          onSelect={() => {}}
+          onCreateView={onCreateView}
+          onCreateNewType={onCreateNewType}
+        />
+      )
+
+      openBlankSidebarMenu()
+      fireEvent.click(screen.getByText('Create view'))
+      expect(onCreateView).toHaveBeenCalledOnce()
+
+      openBlankSidebarMenu()
+      fireEvent.click(screen.getByText('Create new type'))
+      expect(onCreateNewType).toHaveBeenCalledOnce()
+    })
+
+    it('opens the folder creation input from the blank-space menu', async () => {
+      render(
+        <Sidebar
+          entries={mockEntries}
+          selection={defaultSelection}
+          onSelect={() => {}}
+          folders={[]}
+          onCreateFolder={() => true}
+        />
+      )
+
+      openBlankSidebarMenu()
+      fireEvent.click(screen.getByText('Create folder'))
+
+      expect(await screen.findByTestId('new-folder-input')).toBeInTheDocument()
+    })
+  })
+
   describe('view note count chips', () => {
     const mockViews = [
       {

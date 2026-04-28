@@ -14098,6 +14098,152 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "sidebar_empty_context_menu",
+      "x": 560,
+      "y": 4800,
+      "name": "Sidebar Empty Context Menu",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 320,
+      "height": 260,
+      "fill": "$--sidebar",
+      "padding": 24,
+      "layout": "vertical",
+      "gap": 12,
+      "children": [
+        {
+          "type": "text",
+          "id": "sidebar_empty_context_menu_title",
+          "fill": "$--foreground",
+          "content": "Right-click empty sidebar space",
+          "fontFamily": "Inter",
+          "fontSize": 16,
+          "fontWeight": "600",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "sidebar_empty_context_menu_popover",
+          "name": "Floating menu",
+          "width": 180,
+          "fill": "$--popover",
+          "stroke": {
+            "align": "inside",
+            "thickness": 1,
+            "fill": "$--border"
+          },
+          "cornerRadius": 6,
+          "padding": 4,
+          "layout": "vertical",
+          "gap": 2,
+          "children": [
+            {
+              "type": "text",
+              "id": "sidebar_empty_context_menu_folder",
+              "fill": "$--popover-foreground",
+              "content": "New folder",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "sidebar_empty_context_menu_view",
+              "fill": "$--popover-foreground",
+              "content": "New view",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "sidebar_empty_context_menu_type",
+              "fill": "$--popover-foreground",
+              "content": "New type",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "letterSpacing": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "folder_context_menu_create_child",
+      "x": 920,
+      "y": 4800,
+      "name": "Folder Context Menu — Create Subfolder",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 320,
+      "height": 260,
+      "fill": "$--sidebar",
+      "padding": 24,
+      "layout": "vertical",
+      "gap": 12,
+      "children": [
+        {
+          "type": "text",
+          "id": "folder_context_menu_create_child_title",
+          "fill": "$--foreground",
+          "content": "Right-click a folder",
+          "fontFamily": "Inter",
+          "fontSize": 16,
+          "fontWeight": "600",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "folder_context_menu_create_child_popover",
+          "name": "Floating menu",
+          "width": 190,
+          "fill": "$--popover",
+          "stroke": {
+            "align": "inside",
+            "thickness": 1,
+            "fill": "$--border"
+          },
+          "cornerRadius": 6,
+          "padding": 4,
+          "layout": "vertical",
+          "gap": 2,
+          "children": [
+            {
+              "type": "text",
+              "id": "folder_context_menu_create_child_copy",
+              "fill": "$--popover-foreground",
+              "content": "Copy folder path",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "folder_context_menu_create_child_action",
+              "fill": "$--popover-foreground",
+              "content": "Create subfolder",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "folder_context_menu_create_child_rename",
+              "fill": "$--popover-foreground",
+              "content": "Rename folder",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "letterSpacing": 0
+            }
+          ]
+        }
+      ]
     }
   ],
   "themes": {

@@ -158,6 +158,7 @@
   "sidebar.action.deleteFolder": "Ordner löschen",
   "sidebar.action.revealFolderMenu": "Im Finder anzeigen",
   "sidebar.action.copyFolderPathMenu": "Ordnerpfad kopieren",
+  "sidebar.action.createSubfolderMenu": "Unterordner erstellen",
   "sidebar.action.renameFolderMenu": "Ordner umbenennen …",
   "sidebar.action.deleteFolderMenu": "Ordner löschen …",
   "sidebar.folder.name": "Ordnername",

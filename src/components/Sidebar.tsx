@@ -1,4 +1,4 @@
-import { useCallback, memo } from 'react'
+import { useCallback, memo, useRef, useState } from 'react'
 import type { VaultEntry, FolderNode, SidebarSelection, ViewFile } from '../types'
 import {
   KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent,
@@ -8,10 +8,12 @@ import { FolderTree } from './FolderTree'
 import {
   computeReorder,
   useEntryCounts,
+  useOutsideClick,
   useSidebarCollapsed,
   useSidebarSections,
 } from './sidebar/sidebarHooks'
 import {
+  BackgroundContextMenuOverlay,
   ContextMenuOverlay,
   CustomizeOverlay,
   FavoritesSection,
@@ -44,7 +46,7 @@ interface SidebarProps {
   onEditView?: (filename: string) => void
   onDeleteView?: (filename: string) => void
   folders?: FolderNode[]
-  onCreateFolder?: (name: string) => Promise<boolean> | boolean
+  onCreateFolder?: (name: string, parentPath?: string | null) => Promise<boolean> | boolean
   onRenameFolder?: (folderPath: string, nextName: string) => Promise<boolean> | boolean
   onDeleteFolder?: (folderPath: string) => void
   folderFileActions?: FolderFileActions
@@ -94,6 +96,9 @@ interface SidebarNavigationProps extends Pick<
   typeInteractions: ReturnType<typeof useSidebarTypeInteractions>
   isSectionVisible: (type: string) => boolean
   toggleVisibility: (type: string) => void
+  folderCreateRequestKey: number
+  onSidebarBlankContextMenu: (event: React.MouseEvent) => void
+  onSidebarContextMenuCapture: (event: React.MouseEvent) => void
 }
 
 function SidebarNavigation({
@@ -131,12 +136,20 @@ function SidebarNavigation({
   typeInteractions,
   isSectionVisible,
   toggleVisibility,
+  folderCreateRequestKey,
+  onSidebarBlankContextMenu,
+  onSidebarContextMenuCapture,
 }: SidebarNavigationProps) {
   const hasFavorites = entries.some((entry) => entry.favorite && !entry.archived)
   const hasViews = views.length > 0 || !!onCreateView
 
   return (
-    <nav className="flex-1 overflow-y-auto">
+    <nav
+      className="flex-1 overflow-y-auto"
+      data-testid="sidebar-navigation"
+      onContextMenu={onSidebarBlankContextMenu}
+      onContextMenuCapture={onSidebarContextMenuCapture}
+    >
       <SidebarTopNav
         selection={selection}
         onSelect={onSelect}
@@ -202,6 +215,7 @@ function SidebarNavigation({
         renamingFolderPath={renamingFolderPath}
         onStartRenameFolder={onStartRenameFolder}
         onCancelRenameFolder={onCancelRenameFolder}
+        createRequestKey={folderCreateRequestKey}
         collapsed={groupCollapsed.folders}
         locale={locale}
         onToggle={() => toggleGroup('folders')}
@@ -249,6 +263,9 @@ export const Sidebar = memo(function Sidebar({
   const { typeEntryMap, allSectionGroups, visibleSections, sectionIds } = useSidebarSections(entries)
   const { activeCount, archivedCount } = useEntryCounts(entries)
   const { collapsed: groupCollapsed, toggle: toggleGroup } = useSidebarCollapsed()
+  const [backgroundMenuPos, setBackgroundMenuPos] = useState<{ x: number; y: number } | null>(null)
+  const [folderCreateRequestKey, setFolderCreateRequestKey] = useState(0)
+  const backgroundMenuRef = useRef<HTMLDivElement>(null)
   const typeInteractions = useSidebarTypeInteractions({
     allSectionGroups,
     typeEntryMap,
@@ -261,6 +278,34 @@ export const Sidebar = memo(function Sidebar({
   const toggleVisibility = useCallback((type: string) => onToggleTypeVisibility?.(type), [onToggleTypeVisibility])
 
   const sensors = useSidebarDndSensors()
+  const closeBackgroundMenu = useCallback(() => setBackgroundMenuPos(null), [])
+  useOutsideClick(backgroundMenuRef, !!backgroundMenuPos, closeBackgroundMenu)
+
+  const handleSidebarBlankContextMenu = useCallback((event: React.MouseEvent) => {
+    if (event.target !== event.currentTarget) return
+    if (!onCreateFolder && !onCreateView && !onCreateNewType) return
+    event.preventDefault()
+    setBackgroundMenuPos({ x: event.clientX, y: event.clientY })
+  }, [onCreateFolder, onCreateNewType, onCreateView])
+
+  const handleSidebarContextMenuCapture = useCallback((event: React.MouseEvent) => {
+    if (event.target !== event.currentTarget) closeBackgroundMenu()
+  }, [closeBackgroundMenu])
+
+  const handleCreateFolderFromMenu = useCallback(() => {
+    closeBackgroundMenu()
+    setFolderCreateRequestKey((value) => value + 1)
+  }, [closeBackgroundMenu])
+
+  const handleCreateViewFromMenu = useCallback(() => {
+    closeBackgroundMenu()
+    onCreateView?.()
+  }, [closeBackgroundMenu, onCreateView])
+
+  const handleCreateTypeFromMenu = useCallback(() => {
+    closeBackgroundMenu()
+    onCreateNewType?.()
+  }, [closeBackgroundMenu, onCreateNewType])
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
@@ -319,6 +364,20 @@ export const Sidebar = memo(function Sidebar({
         typeInteractions={typeInteractions}
         isSectionVisible={isSectionVisible}
         toggleVisibility={toggleVisibility}
+        folderCreateRequestKey={folderCreateRequestKey}
+        onSidebarBlankContextMenu={handleSidebarBlankContextMenu}
+        onSidebarContextMenuCapture={handleSidebarContextMenuCapture}
+      />
+      <BackgroundContextMenuOverlay
+        pos={backgroundMenuPos}
+        innerRef={backgroundMenuRef}
+        canCreateFolder={!!onCreateFolder}
+        canCreateView={!!onCreateView}
+        canCreateType={!!onCreateNewType}
+        onCreateFolder={handleCreateFolderFromMenu}
+        onCreateView={handleCreateViewFromMenu}
+        onCreateType={handleCreateTypeFromMenu}
+        locale={locale}
       />
       <ContextMenuOverlay
         pos={typeInteractions.contextMenuPos}

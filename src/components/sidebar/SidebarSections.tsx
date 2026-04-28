@@ -9,7 +9,7 @@ import {
   SortableContext, useSortable, verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { SlidersHorizontal } from 'lucide-react'
+import { FolderPlus, ListPlus, SlidersHorizontal, Tags } from 'lucide-react'
 import {
   CaretLeft, Plus,
 } from '@phosphor-icons/react'
@@ -283,6 +283,60 @@ export function ContextMenuOverlay({
       <button className={buttonClass} onClick={() => onOpenCustomize(type)}>
         {translate(locale, 'sidebar.action.customizeIconColor')}
       </button>
+    </div>
+  )
+}
+
+export function BackgroundContextMenuOverlay({
+  pos,
+  innerRef,
+  canCreateFolder,
+  canCreateView,
+  canCreateType,
+  onCreateFolder,
+  onCreateView,
+  onCreateType,
+  locale = 'en',
+}: {
+  pos: { x: number; y: number } | null
+  innerRef: Ref<HTMLDivElement>
+  canCreateFolder: boolean
+  canCreateView: boolean
+  canCreateType: boolean
+  onCreateFolder: () => void
+  onCreateView: () => void
+  onCreateType: () => void
+  locale?: AppLocale
+}) {
+  if (!pos) return null
+
+  const buttonClass = 'h-auto w-full justify-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm font-normal'
+
+  return (
+    <div
+      ref={innerRef}
+      className="fixed z-50 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+      style={{ left: pos.x, top: pos.y, minWidth: 180 }}
+      data-testid="sidebar-background-context-menu"
+    >
+      {canCreateFolder && (
+        <Button type="button" variant="ghost" className={buttonClass} onClick={onCreateFolder}>
+          <FolderPlus size={15} />
+          {translate(locale, 'sidebar.action.createFolder')}
+        </Button>
+      )}
+      {canCreateView && (
+        <Button type="button" variant="ghost" className={buttonClass} onClick={onCreateView}>
+          <ListPlus size={15} />
+          {translate(locale, 'sidebar.action.createView')}
+        </Button>
+      )}
+      {canCreateType && (
+        <Button type="button" variant="ghost" className={buttonClass} onClick={onCreateType}>
+          <Tags size={15} />
+          {translate(locale, 'sidebar.action.createType')}
+        </Button>
+      )}
     </div>
   )
 }

@@ -9,6 +9,9 @@ interface FolderTreeRowProps {
   expanded: Record<string, boolean>
   node: FolderNode
   onDeleteFolder?: (folderPath: string) => void
+  creatingChildParentPath?: string | null
+  onCancelCreateChildFolder?: () => void
+  onCreateChildFolder?: (parentPath: string, value: string) => Promise<boolean> | boolean
   onOpenMenu: (node: FolderNode, event: ReactMouseEvent<HTMLDivElement>) => void
   onRenameFolder?: (folderPath: string, nextName: string) => Promise<boolean> | boolean
   onSelect: (selection: SidebarSelection) => void
@@ -56,6 +59,9 @@ function FolderChildren({
   expanded,
   node,
   onDeleteFolder,
+  creatingChildParentPath,
+  onCancelCreateChildFolder,
+  onCreateChildFolder,
   onOpenMenu,
   onRenameFolder,
   onSelect,
@@ -83,6 +89,9 @@ function FolderChildren({
           expanded={expanded}
           node={child}
           onDeleteFolder={onDeleteFolder}
+          creatingChildParentPath={creatingChildParentPath}
+          onCancelCreateChildFolder={onCancelCreateChildFolder}
+          onCreateChildFolder={onCreateChildFolder}
           onOpenMenu={onOpenMenu}
           onRenameFolder={onRenameFolder}
           onSelect={onSelect}
@@ -103,6 +112,9 @@ export const FolderTreeRow = memo(function FolderTreeRow({
   expanded,
   node,
   onDeleteFolder,
+  creatingChildParentPath,
+  onCancelCreateChildFolder,
+  onCreateChildFolder,
   onOpenMenu,
   onRenameFolder,
   onSelect,
@@ -118,6 +130,7 @@ export const FolderTreeRow = memo(function FolderTreeRow({
   const isSelected = selection.kind === 'folder' && selection.path === node.path
   const depthIndent = depth * 16
   const contentInset = 16
+  const isCreatingChild = creatingChildParentPath === node.path
   const selectFolder = useCallback(() => {
     onSelect({ kind: 'folder', path: node.path })
   }, [node.path, onSelect])
@@ -149,11 +162,27 @@ export const FolderTreeRow = memo(function FolderTreeRow({
           onRenameFolder={onRenameFolder}
         />
       ) : row}
+      {isCreatingChild && onCreateChildFolder && onCancelCreateChildFolder && (
+        <div style={{ paddingLeft: (depth + 1) * 16 + 15 }}>
+          <FolderNameInput
+            ariaLabel={translate(locale, 'sidebar.folder.newName')}
+            initialValue=""
+            placeholder={translate(locale, 'sidebar.folder.name')}
+            submitOnBlur={true}
+            testId={`new-child-folder-input:${node.path}`}
+            onCancel={onCancelCreateChildFolder}
+            onSubmit={(value) => onCreateChildFolder(node.path, value)}
+          />
+        </div>
+      )}
       <FolderChildren
         depth={depth}
         expanded={expanded}
         node={node}
         onDeleteFolder={onDeleteFolder}
+        creatingChildParentPath={creatingChildParentPath}
+        onCancelCreateChildFolder={onCancelCreateChildFolder}
+        onCreateChildFolder={onCreateChildFolder}
         onOpenMenu={onOpenMenu}
         onRenameFolder={onRenameFolder}
         onSelect={onSelect}

@@ -164,6 +164,7 @@
   "sidebar.action.deleteFolder": "Delete folder",
   "sidebar.action.revealFolderMenu": "Reveal in Finder",
   "sidebar.action.copyFolderPathMenu": "Copy folder path",
+  "sidebar.action.createSubfolderMenu": "Create subfolder",
   "sidebar.action.renameFolderMenu": "Rename folder...",
   "sidebar.action.deleteFolderMenu": "Delete folder...",
   "sidebar.folder.name": "Folder name",

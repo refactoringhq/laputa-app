@@ -158,6 +158,7 @@
   "sidebar.action.deleteFolder": "フォルダーを削除",
   "sidebar.action.revealFolderMenu": "Finder で表示",
   "sidebar.action.copyFolderPathMenu": "フォルダパスをコピー",
+  "sidebar.action.createSubfolderMenu": "サブフォルダーを作成",
   "sidebar.action.renameFolderMenu": "フォルダー名を変更...",
   "sidebar.action.deleteFolderMenu": "フォルダーを削除...",
   "sidebar.folder.name": "フォルダー名",

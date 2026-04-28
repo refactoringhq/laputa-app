@@ -158,6 +158,7 @@
   "sidebar.action.deleteFolder": "Eliminar carpeta",
   "sidebar.action.revealFolderMenu": "Mostrar en el Finder",
   "sidebar.action.copyFolderPathMenu": "Copiar ruta de la carpeta",
+  "sidebar.action.createSubfolderMenu": "Crear subcarpeta",
   "sidebar.action.renameFolderMenu": "Cambiar el nombre de la carpeta...",
   "sidebar.action.deleteFolderMenu": "Eliminar carpeta...",
   "sidebar.folder.name": "Nombre de la carpeta",

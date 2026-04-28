@@ -1,6 +1,9 @@
 import {
   memo,
   useCallback,
+  useEffect,
+  useRef,
+  useState,
 } from 'react'
 import {
   Plus,
@@ -16,11 +19,13 @@ import { SidebarGroupHeader } from './sidebar/SidebarGroupHeader'
 import { translate, type AppLocale } from '../lib/i18n'
 import type { FolderFileActions } from '../hooks/useFileActions'
 
+type CreateFolderHandler = (name: string, parentPath?: string | null) => Promise<boolean> | boolean
+
 interface FolderTreeProps {
   folders: FolderNode[]
   selection: SidebarSelection
   onSelect: (selection: SidebarSelection) => void
-  onCreateFolder?: (name: string) => Promise<boolean> | boolean
+  onCreateFolder?: CreateFolderHandler
   onRenameFolder?: (folderPath: string, nextName: string) => Promise<boolean> | boolean
   onDeleteFolder?: (folderPath: string) => void
   folderFileActions?: FolderFileActions
@@ -28,6 +33,7 @@ interface FolderTreeProps {
   onStartRenameFolder?: (folderPath: string) => void
   onCancelRenameFolder?: () => void
   collapsed?: boolean
+  createRequestKey?: number
   locale?: AppLocale
   onToggle?: () => void
 }
@@ -44,6 +50,7 @@ export const FolderTree = memo(function FolderTree({
   onStartRenameFolder,
   onCancelRenameFolder,
   collapsed: externalCollapsed,
+  createRequestKey = 0,
   locale = 'en',
   onToggle,
 }: FolderTreeProps) {
@@ -61,6 +68,7 @@ export const FolderTree = memo(function FolderTree({
     renamingFolderPath,
     selection,
   })
+  const [creatingChildParentPath, setCreatingChildParentPath] = useState<string | null>(null)
   const {
     closeContextMenu,
     contextMenu,
@@ -88,10 +96,37 @@ export const FolderTree = memo(function FolderTree({
     return created
   }, [closeCreateForm, onCreateFolder])
 
+  const handleCreateChildFolderSubmit = useCallback(async (parentPath: string, value: string) => {
+    const nextName = value.trim()
+    if (!nextName || !onCreateFolder) {
+      setCreatingChildParentPath(null)
+      return true
+    }
+
+    const created = await onCreateFolder(nextName, parentPath)
+    if (created) setCreatingChildParentPath(null)
+    return created
+  }, [onCreateFolder])
+
+  const handleCreateChildFolderFromMenu = useCallback((folderPath: string) => {
+    closeContextMenu()
+    setCreatingChildParentPath(folderPath)
+    if (!expanded[folderPath]) toggleFolder(folderPath)
+  }, [closeContextMenu, expanded, toggleFolder])
+
   const handleCreateFolderClick = useCallback(() => {
     closeContextMenu()
+    setCreatingChildParentPath(null)
     openCreateForm()
   }, [closeContextMenu, openCreateForm])
+  const lastCreateRequestKey = useRef(createRequestKey)
+
+  useEffect(() => {
+    if (createRequestKey === lastCreateRequestKey.current) return
+    lastCreateRequestKey.current = createRequestKey
+    const timeoutId = window.setTimeout(handleCreateFolderClick, 0)
+    return () => window.clearTimeout(timeoutId)
+  }, [createRequestKey, handleCreateFolderClick])
 
   if (folders.length === 0 && !isCreating) return null
 
@@ -117,6 +152,9 @@ export const FolderTree = memo(function FolderTree({
               onStartRenameFolder={onStartRenameFolder}
               onToggle={toggleFolder}
               onCancelRenameFolder={onCancelRenameFolder}
+              creatingChildParentPath={creatingChildParentPath}
+              onCancelCreateChildFolder={() => setCreatingChildParentPath(null)}
+              onCreateChildFolder={handleCreateChildFolderSubmit}
               locale={locale}
               renamingFolderPath={renamingFolderPath}
               selection={selection}
@@ -143,6 +181,7 @@ export const FolderTree = memo(function FolderTree({
         onDelete={handleDeleteFromMenu}
         onReveal={handleRevealFromMenu}
         onCopyPath={handleCopyPathFromMenu}
+        onCreateSubfolder={onCreateFolder ? handleCreateChildFolderFromMenu : undefined}
         onRename={handleRenameFromMenu}
         locale={locale}
       />

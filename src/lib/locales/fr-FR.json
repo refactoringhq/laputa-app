@@ -158,6 +158,7 @@
   "sidebar.action.deleteFolder": "Supprimer le dossier",
   "sidebar.action.revealFolderMenu": "Afficher dans le Finder",
   "sidebar.action.copyFolderPathMenu": "Copier le chemin du dossier",
+  "sidebar.action.createSubfolderMenu": "Créer un sous-dossier",
   "sidebar.action.renameFolderMenu": "Renommer le dossier…",
   "sidebar.action.deleteFolderMenu": "Supprimer le dossier…",
   "sidebar.folder.name": "Nom du dossier",
