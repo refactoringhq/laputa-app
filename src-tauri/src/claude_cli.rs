@@ -148,7 +148,7 @@ fn claude_binary_candidates() -> Vec<PathBuf> {
 }
 
 fn claude_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
-    vec![
+    let mut candidates = vec![
         home.join(".local/bin/claude"),
         home.join(".local/bin/claude.exe"),
         home.join(".claude/local/claude"),
@@ -170,7 +170,24 @@ fn claude_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join("scoop/shims/claude.exe"),
         PathBuf::from("/opt/homebrew/bin/claude"),
         PathBuf::from("/usr/local/bin/claude"),
-    ]
+    ];
+    candidates.extend(nvm_node_binary_candidates_for_home(home, "claude"));
+    candidates
+}
+
+fn nvm_node_binary_candidates_for_home(home: &Path, binary_name: &str) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) else {
+        return Vec::new();
+    };
+
+    let mut candidates = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .map(|path| path.join("bin").join(binary_name))
+        .collect::<Vec<_>>();
+    candidates.sort();
+    candidates
 }
 
 fn find_existing_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
@@ -656,6 +673,18 @@ mod tests {
         } else {
             assert!(status.version.is_none());
         }
+    }
+
+    #[test]
+    fn claude_binary_candidates_include_nvm_managed_node_installs() {
+        let home = tempfile::tempdir().unwrap();
+        let claude = home.path().join(".nvm/versions/node/v22.12.0/bin/claude");
+        std::fs::create_dir_all(claude.parent().unwrap()).unwrap();
+        std::fs::write(&claude, "#!/bin/sh\n").unwrap();
+
+        let candidates = claude_binary_candidates_for_home(home.path());
+
+        assert!(candidates.contains(&claude), "missing {}", claude.display());
     }
 
     #[test]
