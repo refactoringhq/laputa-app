@@ -11,6 +11,7 @@ import {
   subscribeVaultConfig,
 } from '../utils/vaultConfigStore'
 import { migrateLocalStorageToVaultConfig } from '../utils/configMigration'
+import { DEFAULT_AI_AGENT_PERMISSION_MODE } from '../lib/aiAgentPermissionMode'
 
 const STORAGE_PREFIX = 'laputa:vault-config:'
 
@@ -20,9 +21,10 @@ function storageKey(vaultPath: string): string {
 
 function loadFromStorage(vaultPath: string): VaultConfig {
   const DEFAULT: VaultConfig = {
-    zoom: null, view_mode: null, editor_mode: null,
+    zoom: null, view_mode: null, editor_mode: null, note_layout: null,
+    ai_agent_permission_mode: DEFAULT_AI_AGENT_PERMISSION_MODE,
     tag_colors: null, status_colors: null, property_display_modes: null,
-    inbox: null,
+    inbox: null, allNotes: null,
   }
   try {
     const raw = localStorage.getItem(storageKey(vaultPath))

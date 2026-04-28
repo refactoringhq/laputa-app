@@ -1,6 +1,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import {
   appendLocalResponse,
+  appendLocalMarker,
   appendStreamingMessage,
   buildFormattedMessage,
   createMissingAgentResponse,
@@ -80,6 +81,7 @@ export async function sendAgentMessage({
     message: formattedMessage,
     systemPrompt,
     vaultPath: context.vaultPath,
+    permissionMode: context.permissionMode,
     callbacks: createStreamCallbacks({
       agent: context.agent,
       messageId,
@@ -92,6 +94,13 @@ export async function sendAgentMessage({
       fileCallbacksRef: runtime.fileCallbacksRef,
     }),
   })
+}
+
+export function addAgentLocalMarker(
+  runtime: Pick<AiAgentSessionRuntime, 'setMessages'>,
+  text: string,
+): void {
+  appendLocalMarker(runtime.setMessages, text)
 }
 
 export function clearAgentConversation(runtime: Pick<AiAgentSessionRuntime, 'abortRef' | 'responseAccRef' | 'toolInputMapRef' | 'setMessages' | 'setStatus'>): void {

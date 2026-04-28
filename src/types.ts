@@ -1,4 +1,5 @@
 import type { AiAgentId } from './lib/aiAgents'
+import type { AiAgentPermissionMode } from './lib/aiAgentPermissionMode'
 import type { ThemeMode } from './lib/themeMode'
 import type { AppLocale } from './lib/i18n'
 
@@ -161,6 +162,7 @@ export interface VaultConfig {
   view_mode: string | null
   editor_mode: string | null
   note_layout?: NoteLayout | null
+  ai_agent_permission_mode?: AiAgentPermissionMode | null
   tag_colors: Record<string, string> | null
   status_colors: Record<string, string> | null
   property_display_modes: Record<string, string> | null
