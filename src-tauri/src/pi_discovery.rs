@@ -99,13 +99,19 @@ fn find_existing_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
 }
 
 fn pi_binary_candidates() -> Vec<PathBuf> {
-    dirs::home_dir()
-        .map(|home| pi_binary_candidates_for_home(&home))
-        .unwrap_or_default()
+    let mut candidates = pi_binary_candidates_from_env();
+
+    if let Some(home) = dirs::home_dir() {
+        candidates.extend(pi_binary_candidates_for_home(&home));
+    }
+
+    candidates.extend(pi_global_binary_candidates());
+    candidates
 }
 
 fn pi_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
-    vec![
+    let mut candidates = pi_nvm_binary_candidates_for_home(home);
+    candidates.extend([
         home.join(".local/bin/pi"),
         home.join(".pi/bin/pi"),
         home.join(".local/share/mise/shims/pi"),
@@ -113,9 +119,61 @@ fn pi_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".npm-global/bin/pi"),
         home.join(".npm/bin/pi"),
         home.join(".bun/bin/pi"),
+    ]);
+    candidates
+}
+
+fn pi_global_binary_candidates() -> Vec<PathBuf> {
+    vec![
         PathBuf::from("/usr/local/bin/pi"),
         PathBuf::from("/opt/homebrew/bin/pi"),
     ]
+}
+
+fn pi_binary_candidates_from_env() -> Vec<PathBuf> {
+    let nvm_bin = std::env::var_os("NVM_BIN").map(PathBuf::from);
+    let npm_config_prefix = std::env::var_os("npm_config_prefix").map(PathBuf::from);
+    let npm_config_prefix_upper = std::env::var_os("NPM_CONFIG_PREFIX").map(PathBuf::from);
+
+    pi_binary_candidates_from_prefixes(nvm_bin, npm_config_prefix, npm_config_prefix_upper)
+}
+
+fn pi_binary_candidates_from_prefixes(
+    nvm_bin: Option<PathBuf>,
+    npm_config_prefix: Option<PathBuf>,
+    npm_config_prefix_upper: Option<PathBuf>,
+) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Some(path) = nvm_bin.filter(|path| !path.as_os_str().is_empty()) {
+        candidates.push(path.join("pi"));
+    }
+    if let Some(path) = npm_config_prefix.filter(|path| !path.as_os_str().is_empty()) {
+        candidates.push(path.join("bin/pi"));
+    }
+    if let Some(path) = npm_config_prefix_upper.filter(|path| !path.as_os_str().is_empty()) {
+        candidates.push(path.join("bin/pi"));
+    }
+
+    candidates
+}
+
+fn pi_nvm_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
+    let versions_dir = home.join(".nvm/versions/node");
+    let mut version_dirs = match std::fs::read_dir(versions_dir) {
+        Ok(entries) => entries
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.is_dir())
+            .collect::<Vec<_>>(),
+        Err(_) => return Vec::new(),
+    };
+
+    version_dirs.sort_by(|left, right| right.file_name().cmp(&left.file_name()));
+    version_dirs
+        .into_iter()
+        .map(|version_dir| version_dir.join("bin/pi"))
+        .collect()
 }
 
 #[cfg(test)]
@@ -133,7 +191,6 @@ mod tests {
             home.join(".asdf/shims/pi"),
             home.join(".npm-global/bin/pi"),
             home.join(".bun/bin/pi"),
-            PathBuf::from("/opt/homebrew/bin/pi"),
         ];
 
         for candidate in expected {
@@ -143,6 +200,53 @@ mod tests {
                 candidate.display()
             );
         }
+    }
+
+    #[test]
+    fn binary_candidates_include_nvm_node_version_installs() {
+        let home = tempfile::tempdir().unwrap();
+        let pi = home.path().join(".nvm/versions/node/v22.20.0/bin/pi");
+
+        std::fs::create_dir_all(pi.parent().unwrap()).unwrap();
+        std::fs::write(&pi, "#!/bin/sh\n").unwrap();
+
+        let candidates = pi_binary_candidates_for_home(home.path());
+
+        assert!(
+            candidates.contains(&pi),
+            "missing nvm candidate {}",
+            pi.display()
+        );
+    }
+
+    #[test]
+    fn binary_candidates_include_static_global_fallbacks() {
+        let candidates = pi_global_binary_candidates();
+
+        assert!(candidates.contains(&PathBuf::from("/usr/local/bin/pi")));
+        assert!(candidates.contains(&PathBuf::from("/opt/homebrew/bin/pi")));
+    }
+
+    #[test]
+    fn binary_candidates_include_env_provided_npm_and_nvm_prefixes() {
+        let nvm_bin = PathBuf::from("/Users/alex/.nvm/versions/node/v22.20.0/bin");
+        let npm_config_prefix = PathBuf::from("/Users/alex/.npm-global");
+        let npm_config_prefix_upper = PathBuf::from("/Users/alex/.npm");
+
+        let candidates = pi_binary_candidates_from_prefixes(
+            Some(nvm_bin.clone()),
+            Some(npm_config_prefix.clone()),
+            Some(npm_config_prefix_upper.clone()),
+        );
+
+        assert_eq!(
+            candidates,
+            vec![
+                nvm_bin.join("pi"),
+                npm_config_prefix.join("bin/pi"),
+                npm_config_prefix_upper.join("bin/pi"),
+            ]
+        );
     }
 
     #[test]
