@@ -17,30 +17,88 @@ pub enum McpStatus {
 
 /// Find the `node` binary path at runtime.
 pub(crate) fn find_node() -> Result<PathBuf, String> {
-    let output = node_lookup_command()
-        .output()
-        .map_err(|e| format!("Failed to locate node on PATH: {e}"))?;
-    if output.status.success() {
-        if let Some(path) = first_node_lookup_path(&output.stdout) {
-            verify_node_version(&path)?;
-            return Ok(path);
+    let mut last_error = None;
+    for path in node_binary_candidates() {
+        match verify_node_version(&path) {
+            Ok(()) => return Ok(path),
+            Err(error) => last_error = Some(error),
         }
     }
 
-    if let Some(path) = fallback_node_path() {
-        verify_node_version(&path)?;
-        return Ok(path);
-    }
-
-    Err("node not found in PATH or common install locations".into())
+    Err(last_error.unwrap_or_else(|| "node not found in PATH or common install locations".into()))
 }
 
-fn first_node_lookup_path(stdout: &[u8]) -> Option<PathBuf> {
+fn node_binary_candidates() -> Vec<PathBuf> {
+    let mut candidates = find_node_on_path();
+    candidates.extend(find_node_in_user_shell());
+    candidates.extend(fallback_node_paths());
+    candidates
+}
+
+fn find_node_on_path() -> Vec<PathBuf> {
+    node_lookup_command()
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| node_lookup_paths(&output.stdout))
+        .unwrap_or_default()
+}
+
+fn find_node_in_user_shell() -> Vec<PathBuf> {
+    user_shell_candidates()
+        .into_iter()
+        .filter(|shell| shell.exists())
+        .filter_map(|shell| command_path_from_shell(&shell, "node"))
+        .collect()
+}
+
+fn node_lookup_paths(stdout: &[u8]) -> Vec<PathBuf> {
     String::from_utf8_lossy(stdout)
         .lines()
         .map(str::trim)
-        .find(|line| !line.is_empty())
+        .filter(|line| !line.is_empty())
         .map(PathBuf::from)
+        .collect()
+}
+
+fn user_shell_candidates() -> Vec<PathBuf> {
+    let mut shells = Vec::new();
+    if let Some(shell) = std::env::var_os("SHELL") {
+        if !shell.is_empty() {
+            shells.push(PathBuf::from(shell));
+        }
+    }
+    shells.push(PathBuf::from("/bin/zsh"));
+    shells.push(PathBuf::from("/bin/bash"));
+    shells
+}
+
+fn command_path_from_shell(shell: &Path, command: &str) -> Option<PathBuf> {
+    crate::hidden_command(shell)
+        .arg("-lc")
+        .arg(format!("command -v {command}"))
+        .output()
+        .ok()
+        .and_then(|output| path_from_successful_output(&output))
+}
+
+fn path_from_successful_output(output: &std::process::Output) -> Option<PathBuf> {
+    if output.status.success() {
+        first_existing_path(&String::from_utf8_lossy(&output.stdout))
+    } else {
+        None
+    }
+}
+
+fn first_existing_path(stdout: &str) -> Option<PathBuf> {
+    stdout.lines().find_map(|line| {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let candidate = PathBuf::from(trimmed);
+        candidate.exists().then_some(candidate)
+    })
 }
 
 fn verify_node_version(node: &Path) -> Result<(), String> {
@@ -91,7 +149,7 @@ fn node_lookup_command() -> Command {
     command
 }
 
-fn fallback_node_path() -> Option<PathBuf> {
+fn fallback_node_paths() -> Vec<PathBuf> {
     let mut candidates = vec![
         PathBuf::from("/opt/homebrew/bin/node"),
         PathBuf::from("/usr/local/bin/node"),
@@ -120,24 +178,39 @@ fn fallback_node_path() -> Option<PathBuf> {
     }
 
     if let Some(home) = dirs::home_dir() {
-        candidates.push(home.join(".volta").join("bin").join(node_binary_name()));
-
-        let nvm_dir = home.join(".nvm").join("versions").join("node");
-        if let Ok(entries) = std::fs::read_dir(nvm_dir) {
-            let mut versions = entries
-                .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-                .collect::<Vec<_>>();
-            versions.sort();
-            versions.reverse();
-            candidates.extend(
-                versions
-                    .into_iter()
-                    .map(|version| version.join("bin").join("node")),
-            );
-        }
+        candidates.extend(node_binary_candidates_for_home(&home));
     }
 
-    candidates.into_iter().find(|path| path.is_file())
+    candidates
+        .into_iter()
+        .filter(|path| path.is_file())
+        .collect()
+}
+
+fn node_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
+    let mut candidates = vec![
+        home.join(".local/share/mise/shims")
+            .join(node_binary_name()),
+        home.join(".mise").join("shims").join(node_binary_name()),
+        home.join(".asdf").join("shims").join(node_binary_name()),
+        home.join(".volta").join("bin").join(node_binary_name()),
+    ];
+
+    let nvm_dir = home.join(".nvm").join("versions").join("node");
+    if let Ok(entries) = std::fs::read_dir(nvm_dir) {
+        let mut versions = entries
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .collect::<Vec<_>>();
+        versions.sort();
+        versions.reverse();
+        candidates.extend(
+            versions
+                .into_iter()
+                .map(|version| version.join("bin").join("node")),
+        );
+    }
+
+    candidates
 }
 
 fn node_binary_name() -> &'static str {
@@ -572,12 +645,51 @@ mod tests {
     }
 
     #[test]
-    fn first_node_lookup_path_uses_first_non_empty_line() {
+    fn node_lookup_paths_keep_non_empty_lines_in_order() {
         let stdout = b"\nC:\\Program Files\\nodejs\\node.exe\r\nC:\\Other\\node.exe\r\n";
         assert_eq!(
-            first_node_lookup_path(stdout).unwrap(),
-            PathBuf::from("C:\\Program Files\\nodejs\\node.exe")
+            node_lookup_paths(stdout),
+            vec![
+                PathBuf::from("C:\\Program Files\\nodejs\\node.exe"),
+                PathBuf::from("C:\\Other\\node.exe"),
+            ]
         );
+    }
+
+    #[test]
+    fn first_existing_path_skips_empty_and_missing_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("missing-node");
+        let node = dir.path().join("node");
+        std::fs::write(&node, "#!/bin/sh\n").unwrap();
+
+        let stdout = format!("\n{}\n{}\n", missing.display(), node.display());
+
+        assert_eq!(first_existing_path(&stdout), Some(node));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn command_path_from_shell_finds_node_from_login_shell() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let node = dir.path().join("node");
+        std::fs::write(&node, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&node, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let shell = dir.path().join("shell");
+        std::fs::write(
+            &shell,
+            format!(
+                "#!/bin/sh\nif [ \"$1\" = \"-lc\" ]; then echo '{}'; fi\n",
+                node.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert_eq!(command_path_from_shell(&shell, "node"), Some(node));
     }
 
     #[test]
@@ -585,6 +697,25 @@ mod tests {
         assert_eq!(node_major_version("v24.13.1\n"), Some(24));
         assert_eq!(node_major_version("18.19.0"), Some(18));
         assert_eq!(node_major_version("not-node"), None);
+    }
+
+    #[test]
+    fn node_binary_candidates_include_shell_managed_installs() {
+        let home = PathBuf::from("/Users/alex");
+        let candidates = node_binary_candidates_for_home(&home);
+        let expected = [
+            home.join(".local/share/mise/shims/node"),
+            home.join(".asdf/shims/node"),
+            home.join(".volta/bin/node"),
+        ];
+
+        for candidate in expected {
+            assert!(
+                candidates.contains(&candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
     }
 
     #[test]
