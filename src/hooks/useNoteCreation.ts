@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, addMockEntry, mockInvoke } from '../mock-tauri'
 import type { VaultEntry } from '../types'
 import { slugifyNoteStem as slugify } from '../utils/noteSlug'
 import { resolveEntry } from '../utils/wikilink'
 import { trackEvent } from '../lib/telemetry'
+import { cacheNoteContent } from './useTabManagement'
 
 export interface NewEntryParams {
   path: string
@@ -370,13 +371,15 @@ async function createTypeSilently({
 }
 
 interface ImmediateCreateDeps {
+  addPendingSave?: (path: string) => void
   entries: VaultEntry[]
   vaultPath: string
   pendingSlugs: Set<string>
   openTabWithContent: (entry: VaultEntry, content: string) => void
   addEntry: (entry: VaultEntry) => void
-  trackUnsaved?: (path: string) => void
-  markContentPending?: (path: string, content: string) => void
+  onNewNotePersisted?: () => void
+  removePendingSave?: (path: string) => void
+  setToastMessage: (msg: string | null) => void
 }
 
 interface ImmediateCreateRequest {
@@ -384,12 +387,14 @@ interface ImmediateCreateRequest {
 }
 
 interface ImmediateCreateQueueConfig {
+  addPendingSave?: (path: string) => void
   entries: VaultEntry[]
   vaultPath: string
   addEntry: (entry: VaultEntry) => void
   openTabWithContent: (entry: VaultEntry, content: string) => void
-  trackUnsaved?: (path: string) => void
-  markContentPending?: (path: string, content: string) => void
+  onNewNotePersisted?: () => void
+  removePendingSave?: (path: string) => void
+  setToastMessage: (msg: string | null) => void
 }
 
 /** Generate a unique untitled filename using a timestamp. */
@@ -410,8 +415,26 @@ function generateUntitledFilename(entries: VaultEntry[], type: string, pendingSl
   return candidate
 }
 
-/** Create an untitled note without persisting to disk (deferred save). */
-function createNoteImmediate(deps: ImmediateCreateDeps, type?: string): void {
+async function persistImmediateEntry(
+  deps: ImmediateCreateDeps,
+  entry: VaultEntry,
+  content: string,
+): Promise<boolean> {
+  try {
+    await persistOptimistic(entry.path, content, {
+      onStart: deps.addPendingSave,
+      onEnd: deps.removePendingSave,
+      onPersisted: deps.onNewNotePersisted,
+    })
+    return true
+  } catch (error) {
+    deps.setToastMessage(createPersistFailureMessage(entry, error))
+    return false
+  }
+}
+
+/** Create an untitled note and write its backing file before opening it. */
+async function createNoteImmediate(deps: ImmediateCreateDeps, type?: string): Promise<boolean> {
   const noteType = type || 'Note'
   const slug = generateUntitledFilename(deps.entries, noteType, deps.pendingSlugs)
   const title = slug_to_title(slug)
@@ -419,11 +442,68 @@ function createNoteImmediate(deps: ImmediateCreateDeps, type?: string): void {
   const status = null
   const entry = buildNewEntry({ path: `${deps.vaultPath}/${slug}.md`, slug, title, type: noteType, status })
   const content = buildNoteContent({ title: null, type: noteType, status, template, initialEmptyHeading: true })
+  const didPersist = await persistImmediateEntry(deps, entry, content)
+  if (!didPersist) return false
+
+  cacheNoteContent(entry.path, content)
   deps.openTabWithContent(entry, content)
   addEntryWithMock(entry, content, deps.addEntry)
-  deps.trackUnsaved?.(entry.path)
-  deps.markContentPending?.(entry.path, content)
   signalFocusEditor({ path: entry.path, selectTitle: true })
+  return true
+}
+
+function trackImmediateCreate(request: ImmediateCreateRequest, didCreate: boolean): void {
+  if (!didCreate) return
+  trackEvent('note_created', {
+    has_type: request.type ? 1 : 0,
+    creation_path: request.type ? 'type_section' : 'cmd_n',
+  })
+}
+
+function useLatestImmediateCreateDeps(
+  config: ImmediateCreateQueueConfig,
+  pendingSlugsRef: MutableRefObject<Set<string>>,
+) {
+  const {
+    entries,
+    vaultPath,
+    openTabWithContent,
+    addEntry,
+    addPendingSave,
+    onNewNotePersisted,
+    removePendingSave,
+    setToastMessage,
+  } = config
+  const latestDepsRef = useRef<ImmediateCreateDeps | null>(null)
+  const syncDeps = useCallback(() => {
+    latestDepsRef.current = {
+      entries,
+      vaultPath,
+      pendingSlugs: pendingSlugsRef.current,
+      openTabWithContent,
+      addEntry,
+      addPendingSave,
+      onNewNotePersisted,
+      removePendingSave,
+      setToastMessage,
+    }
+  }, [
+    entries,
+    vaultPath,
+    openTabWithContent,
+    addEntry,
+    addPendingSave,
+    onNewNotePersisted,
+    removePendingSave,
+    setToastMessage,
+    pendingSlugsRef,
+  ])
+
+  useEffect(() => {
+    syncDeps()
+  }, [syncDeps])
+
+  return { latestDepsRef, syncDeps }
 }
 
 function useImmediateCreateQueue(config: ImmediateCreateQueueConfig): (type?: string) => void {
@@ -431,40 +511,13 @@ function useImmediateCreateQueue(config: ImmediateCreateQueueConfig): (type?: st
   const queuedImmediateCreatesRef = useRef<ImmediateCreateRequest[]>([])
   const immediateCreateLockedRef = useRef(false)
   const immediateCreateTimerRef = useRef<number | null>(null)
-  const latestDepsRef = useRef<ImmediateCreateDeps | null>(null)
-
-  const syncDeps = useCallback(() => {
-    latestDepsRef.current = {
-      entries: config.entries,
-      vaultPath: config.vaultPath,
-      pendingSlugs: pendingSlugsRef.current,
-      openTabWithContent: config.openTabWithContent,
-      addEntry: config.addEntry,
-      trackUnsaved: config.trackUnsaved,
-      markContentPending: config.markContentPending,
-    }
-  }, [
-    config.entries,
-    config.vaultPath,
-    config.openTabWithContent,
-    config.addEntry,
-    config.trackUnsaved,
-    config.markContentPending,
-  ])
-
-  useEffect(() => {
-    syncDeps()
-  }, [syncDeps])
+  const { latestDepsRef, syncDeps } = useLatestImmediateCreateDeps(config, pendingSlugsRef)
 
   const executeRequest = useCallback((request: ImmediateCreateRequest) => {
     const deps = latestDepsRef.current
     if (!deps) return
-    createNoteImmediate(deps, request.type)
-    trackEvent('note_created', {
-      has_type: request.type ? 1 : 0,
-      creation_path: request.type ? 'type_section' : 'cmd_n',
-    })
-  }, [])
+    void createNoteImmediate(deps, request.type).then((didCreate) => trackImmediateCreate(request, didCreate))
+  }, [latestDepsRef])
 
   const scheduleQueuedBurst = useCallback(function scheduleQueuedBurst() {
     if (immediateCreateTimerRef.current !== null) return
@@ -577,9 +630,11 @@ export function useNoteCreation(config: NoteCreationConfig, tabDeps: CreationTab
     entries,
     vaultPath,
     addEntry,
+    addPendingSave,
     openTabWithContent,
-    trackUnsaved: config.trackUnsaved,
-    markContentPending: config.markContentPending,
+    onNewNotePersisted,
+    removePendingSave,
+    setToastMessage,
   })
 
   return {
