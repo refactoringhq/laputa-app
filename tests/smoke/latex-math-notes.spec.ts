@@ -9,6 +9,8 @@ let tempVaultDir: string
 const INLINE_LATEX = 'E=mc^2'
 const DISPLAY_LATEX = '\\int_0^1 x^2 \\, dx = \\frac{1}{3}'
 const MALFORMED_LATEX = '\\frac{'
+const TABLE_INLINE_LATEX = '\\frac{a}{b}+c'
+const TABLE_DISPLAY_STYLE_LATEX = '\\sum_{i=1}^{n} i'
 
 test.beforeEach(async ({ page }, testInfo) => {
   testInfo.setTimeout(90_000)
@@ -107,6 +109,11 @@ ${DISPLAY_LATEX}
 $$
 
 Malformed math $${MALFORMED_LATEX}$ stays visible.
+
+| Kind | Formula |
+| --- | --- |
+| inline | $${TABLE_INLINE_LATEX}$ |
+| display-style | $$${TABLE_DISPLAY_STYLE_LATEX}$$ |
 `
 
   await setRawEditorContent(page, nextContent)
@@ -117,15 +124,20 @@ Malformed math $${MALFORMED_LATEX}$ stays visible.
   await toggleRawMode(page, '.bn-editor')
 
   await expectMathNode(page, '.math--inline', INLINE_LATEX)
+  await expectMathNode(page, '.math--inline', TABLE_INLINE_LATEX)
   await expectMathNode(page, '.math--block', DISPLAY_LATEX)
   await expectMathNode(page, '.math--inline', MALFORMED_LATEX)
-  await expect(page.locator('.math .katex, .math .katex-error')).toHaveCount(3)
+  await expect(page.locator('table')).toHaveCount(1)
+  await expect(page.locator('.math .katex, .math .katex-error')).toHaveCount(4)
 
   await toggleRawMode(page, '.cm-content')
   const rawAfterRichMode = await getRawEditorContent(page)
   expect(rawAfterRichMode).toContain(`$${INLINE_LATEX}$`)
   expect(rawAfterRichMode).toContain(`$$\n${DISPLAY_LATEX}\n$$`)
   expect(rawAfterRichMode).toContain(`$${MALFORMED_LATEX}$`)
+  expect(rawAfterRichMode).toContain(`$${TABLE_INLINE_LATEX}$`)
+  expect(rawAfterRichMode).toContain(`$$${TABLE_DISPLAY_STYLE_LATEX}$$`)
+  expect(rawAfterRichMode).not.toContain('@@TOLARIA_MATH')
 
   await toggleRawMode(page, '.bn-editor')
   await openNote(page, 'Note C')
@@ -136,4 +148,7 @@ Malformed math $${MALFORMED_LATEX}$ stays visible.
   expect(reopenedRaw).toContain(`$${INLINE_LATEX}$`)
   expect(reopenedRaw).toContain(`$$\n${DISPLAY_LATEX}\n$$`)
   expect(reopenedRaw).toContain(`$${MALFORMED_LATEX}$`)
+  expect(reopenedRaw).toContain(`$${TABLE_INLINE_LATEX}$`)
+  expect(reopenedRaw).toContain(`$$${TABLE_DISPLAY_STYLE_LATEX}$$`)
+  expect(reopenedRaw).not.toContain('@@TOLARIA_MATH')
 })
