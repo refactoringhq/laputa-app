@@ -67,7 +67,7 @@ function restoreGuidanceCommands({
       id: 'restore-vault-ai-guidance',
       label: 'Restore Tolaria AI Guidance',
       group: 'Settings',
-      keywords: aiAgentKeywords('ai', 'agent', 'guidance', 'restore', 'repair', 'agents'),
+      keywords: aiAgentKeywords('ai', 'agent', 'guidance', 'restore', 'repair', 'agents', 'gemini'),
       enabled: true,
       execute: () => onRestoreVaultAiGuidance(),
     },

@@ -180,6 +180,7 @@ export function McpSetupDialog({
           <div className="rounded-md border border-border bg-muted/30 px-3 py-3 font-mono text-xs text-foreground">
             <div>~/.claude.json</div>
             <div>~/.claude/mcp.json</div>
+            <div>~/.gemini/settings.json</div>
             <div>~/.cursor/mcp.json</div>
             <div>~/.config/mcp/mcp.json</div>
           </div>
@@ -190,7 +191,10 @@ export function McpSetupDialog({
             snippet={manualConfigSnippet}
           />
           <p>
-            Claude Code CLI reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.claude.json</code>, Cursor reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.cursor/mcp.json</code>, and the generic <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.config/mcp/mcp.json</code> path is picked up by other MCP-compatible tools. Cancel leaves all files untouched, reconnect is idempotent, and disconnect removes Tolaria&apos;s entry again.
+            Claude Code CLI reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.claude.json</code>, Gemini CLI reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.gemini/settings.json</code>, Cursor reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.cursor/mcp.json</code>, and the generic <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.config/mcp/mcp.json</code> path is picked up by other MCP-compatible tools. Cancel leaves all files untouched, reconnect is idempotent, and disconnect removes Tolaria&apos;s entry again.
+          </p>
+          <p>
+            Gemini CLI needs its own install and sign-in. Use Restore Tolaria AI Guidance when you want a vault-root <code className="rounded bg-muted px-1 py-0.5 text-xs">GEMINI.md</code> compatibility shim that points Gemini back to the shared <code className="rounded bg-muted px-1 py-0.5 text-xs">AGENTS.md</code> instructions without overwriting custom guidance.
           </p>
         </div>
 

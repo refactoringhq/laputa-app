@@ -9,6 +9,7 @@ describe('buildAiAgentCommands', () => {
       vaultAiGuidanceStatus: {
         agentsState: 'missing',
         claudeState: 'managed',
+        geminiState: 'managed',
         canRestore: true,
       },
       onRestoreVaultAiGuidance,
@@ -16,6 +17,7 @@ describe('buildAiAgentCommands', () => {
 
     const command = commands.find((item) => item.id === 'restore-vault-ai-guidance')
     expect(command).toBeDefined()
+    expect(command?.keywords).toContain('gemini')
     command?.execute()
     expect(onRestoreVaultAiGuidance).toHaveBeenCalledOnce()
   })
@@ -25,6 +27,7 @@ describe('buildAiAgentCommands', () => {
       vaultAiGuidanceStatus: {
         agentsState: 'managed',
         claudeState: 'managed',
+        geminiState: 'managed',
         canRestore: false,
       },
       onRestoreVaultAiGuidance: vi.fn(),

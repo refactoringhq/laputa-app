@@ -58,6 +58,7 @@ describe('AiAgentsBadge', () => {
         guidanceStatus={{
           agentsState: 'missing',
           claudeState: 'managed',
+          geminiState: 'managed',
           canRestore: true,
         }}
         defaultAgent="claude_code"
@@ -88,6 +89,7 @@ describe('AiAgentsBadge', () => {
         guidanceStatus={{
           agentsState: 'managed',
           claudeState: 'broken',
+          geminiState: 'managed',
           canRestore: true,
         }}
         defaultAgent="claude_code"

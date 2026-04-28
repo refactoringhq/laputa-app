@@ -250,6 +250,7 @@ fn mcp_config_paths_for_home(home: &Path) -> Vec<PathBuf> {
     vec![
         home.join(".claude.json"),
         home.join(".claude").join("mcp.json"),
+        home.join(".gemini").join("settings.json"),
         home.join(".cursor").join("mcp.json"),
         home.join(".config").join("mcp").join("mcp.json"),
     ]
@@ -524,6 +525,20 @@ mod tests {
         write_config_json(config_path, serde_json::json!({ "mcpServers": servers }));
     }
 
+    struct ExpectedMcpServer<'a> {
+        index_js: &'a str,
+        vault_path: &'a str,
+    }
+
+    fn assert_registered_tolaria_server(
+        config: &serde_json::Value,
+        expected: ExpectedMcpServer<'_>,
+    ) {
+        let server = &config["mcpServers"][MCP_SERVER_NAME];
+        assert_eq!(server["args"][0], expected.index_js);
+        assert_eq!(server["env"]["VAULT_PATH"], expected.vault_path);
+    }
+
     fn write_index_js(dir: &Path) -> PathBuf {
         let index_js = dir.join("index.js");
         std::fs::write(&index_js, "console.log('ok');").unwrap();
@@ -603,13 +618,12 @@ mod tests {
         assert!(!was_update);
 
         let config = read_config(&config_path);
-        assert_eq!(
-            config["mcpServers"][MCP_SERVER_NAME]["args"][0],
-            "/test/index.js"
-        );
-        assert_eq!(
-            config["mcpServers"][MCP_SERVER_NAME]["env"]["VAULT_PATH"],
-            "/test/vault"
+        assert_registered_tolaria_server(
+            &config,
+            ExpectedMcpServer {
+                index_js: "/test/index.js",
+                vault_path: "/test/vault",
+            },
         );
     }
 
@@ -705,6 +719,35 @@ mod tests {
     }
 
     #[test]
+    fn upsert_preserves_gemini_settings_json_fields() {
+        let (_tmp, config_path) = temp_config_path("settings.json");
+        write_config_json(
+            &config_path,
+            serde_json::json!({
+                "theme": "GitHub",
+                "mcpServers": {
+                    "other": { "command": "example" }
+                }
+            }),
+        );
+        let entry = test_mcp_entry("/gemini/index.js", "/gemini-vault");
+
+        let was_update = upsert_mcp_config(&config_path, &entry).unwrap();
+        let config = read_config(&config_path);
+
+        assert!(!was_update);
+        assert_eq!(config["theme"], "GitHub");
+        assert_eq!(config["mcpServers"]["other"]["command"], "example");
+        assert_registered_tolaria_server(
+            &config,
+            ExpectedMcpServer {
+                index_js: "/gemini/index.js",
+                vault_path: "/gemini-vault",
+            },
+        );
+    }
+
+    #[test]
     fn upsert_creates_parent_dirs() {
         let tmp = tempfile::tempdir().unwrap();
         let config_path = tmp.path().join("nested").join("dir").join("mcp.json");
@@ -774,6 +817,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let claude_user_cfg = tmp.path().join(".claude.json");
         let claude_cfg = tmp.path().join("claude").join("mcp.json");
+        let gemini_cfg = tmp.path().join(".gemini").join("settings.json");
         let cursor_cfg = tmp.path().join("cursor").join("mcp.json");
         let generic_cfg = tmp.path().join(".config").join("mcp").join("mcp.json");
         let entry = test_mcp_entry("/test/index.js", "/vault");
@@ -783,6 +827,7 @@ mod tests {
             &[
                 claude_user_cfg.clone(),
                 claude_cfg.clone(),
+                gemini_cfg.clone(),
                 cursor_cfg.clone(),
                 generic_cfg.clone(),
             ],
@@ -790,14 +835,18 @@ mod tests {
 
         assert!(claude_user_cfg.exists());
         assert!(claude_cfg.exists());
+        assert!(gemini_cfg.exists());
         assert!(cursor_cfg.exists());
         assert!(generic_cfg.exists());
 
         let raw = std::fs::read_to_string(&claude_user_cfg).unwrap();
         let config: serde_json::Value = serde_json::from_str(&raw).unwrap();
-        assert_eq!(
-            config["mcpServers"][MCP_SERVER_NAME]["args"][0],
-            "/test/index.js"
+        assert_registered_tolaria_server(
+            &config,
+            ExpectedMcpServer {
+                index_js: "/test/index.js",
+                vault_path: "/vault",
+            },
         );
     }
 
@@ -811,6 +860,7 @@ mod tests {
             vec![
                 home.join(".claude.json"),
                 home.join(".claude").join("mcp.json"),
+                home.join(".gemini").join("settings.json"),
                 home.join(".cursor").join("mcp.json"),
                 home.join(".config").join("mcp").join("mcp.json"),
             ]

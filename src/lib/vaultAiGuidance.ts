@@ -5,21 +5,24 @@ export type VaultAiGuidanceFileState = 'checking' | 'managed' | 'missing' | 'bro
 export interface VaultAiGuidanceStatus {
   agentsState: VaultAiGuidanceFileState
   claudeState: VaultAiGuidanceFileState
+  geminiState: VaultAiGuidanceFileState
   canRestore: boolean
 }
 
 type RawVaultAiGuidanceStatus = Partial<{
   agents_state: VaultAiGuidanceFileState | null
   claude_state: VaultAiGuidanceFileState | null
+  gemini_state: VaultAiGuidanceFileState | null
   can_restore: boolean | null
 }>
 
-const GUIDANCE_FILENAMES = new Set(['AGENTS.md', 'CLAUDE.md'])
+const GUIDANCE_FILENAMES = new Set(['AGENTS.md', 'CLAUDE.md', 'GEMINI.md'])
 
 export function createCheckingVaultAiGuidanceStatus(): VaultAiGuidanceStatus {
   return {
     agentsState: 'checking',
     claudeState: 'checking',
+    geminiState: 'checking',
     canRestore: false,
   }
 }
@@ -42,12 +45,15 @@ export function normalizeVaultAiGuidanceStatus(
   return {
     agentsState: normalizeFileState(payload?.agents_state),
     claudeState: normalizeFileState(payload?.claude_state),
+    geminiState: normalizeFileState(payload?.gemini_state),
     canRestore: payload?.can_restore === true,
   }
 }
 
 export function isVaultAiGuidanceStatusChecking(status: VaultAiGuidanceStatus): boolean {
-  return status.agentsState === 'checking' || status.claudeState === 'checking'
+  return status.agentsState === 'checking'
+    || status.claudeState === 'checking'
+    || status.geminiState === 'checking'
 }
 
 export function vaultAiGuidanceNeedsRestore(status: VaultAiGuidanceStatus): boolean {
@@ -56,14 +62,24 @@ export function vaultAiGuidanceNeedsRestore(status: VaultAiGuidanceStatus): bool
     || status.agentsState === 'broken'
     || status.claudeState === 'missing'
     || status.claudeState === 'broken'
+    || status.geminiState === 'missing'
+    || status.geminiState === 'broken'
 }
 
 export function vaultAiGuidanceUsesCustomFiles(status: VaultAiGuidanceStatus): boolean {
-  return status.agentsState === 'custom' || status.claudeState === 'custom'
+  return status.agentsState === 'custom'
+    || status.claudeState === 'custom'
+    || status.geminiState === 'custom'
 }
 
 function isMissingOrBroken(state: VaultAiGuidanceFileState): boolean {
   return state === 'missing' || state === 'broken'
+}
+
+function formatGuidanceFileList(names: string[]): string {
+  if (names.length < 2) return names.join('')
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`
 }
 
 function getBrokenGuidanceSummary(status: VaultAiGuidanceStatus): string | null {
@@ -73,15 +89,27 @@ function getBrokenGuidanceSummary(status: VaultAiGuidanceStatus): string | null 
   if (isMissingOrBroken(status.claudeState)) {
     return 'Claude compatibility shim missing or broken'
   }
+  if (status.geminiState === 'missing') {
+    return 'Gemini guidance can be created'
+  }
+  if (status.geminiState === 'broken') {
+    return 'Gemini guidance missing or broken'
+  }
   return null
 }
 
 function getCustomGuidanceSummary(status: VaultAiGuidanceStatus): string | null {
-  if (status.agentsState === 'custom' && status.claudeState === 'custom') {
-    return 'Custom AGENTS.md and CLAUDE.md active'
+  const customNames = [
+    status.agentsState === 'custom' ? 'AGENTS.md' : null,
+    status.claudeState === 'custom' ? 'CLAUDE.md' : null,
+    status.geminiState === 'custom' ? 'GEMINI.md' : null,
+  ].filter((name): name is string => name !== null)
+  if (customNames.length > 1) {
+    return `Custom ${formatGuidanceFileList(customNames)} active`
   }
   if (status.agentsState === 'custom') return 'Using custom AGENTS.md'
   if (status.claudeState === 'custom') return 'Using custom CLAUDE.md'
+  if (status.geminiState === 'custom') return 'Using custom GEMINI.md'
   return null
 }
 

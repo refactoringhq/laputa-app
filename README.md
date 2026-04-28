@@ -27,7 +27,7 @@ You can find some Loom walkthroughs below — they are short and to the point:
 - 🔬 **Open source** — Tolaria is free and open source. I built this for [myself](https://x.com/lucaronin) and for sharing it with others.
 - 📋 **Standards-based** — Notes are markdown files with YAML frontmatter. No proprietary formats, no locked-in data. Everything works with standard tools if you decide to move away from Tolaria.
 - 🔍 **Types as lenses, not schemas** — Types in Tolaria are navigation aids, not enforcement mechanisms. There's no required fields, no validation, just helpful categories for finding notes.
-- 🪄**AI-first but not AI-only** — A vault of files works very well with AI agents, but you are free to use whatever you want. We support Claude Code and Codex CLI (for now), but you can edit the vault with any AI you want. We provide an AGENTS file for your agents to figure out.
+- 🪄**AI-first but not AI-only** — A vault of files works very well with AI agents, but you are free to use whatever you want. We support Claude Code, Codex CLI, and Gemini CLI setup paths, but you can edit the vault with any AI you want. We provide an AGENTS file for your agents to figure out.
 - ⌨️ **Keyboard-first** — Tolaria is designed for power-users who want to use keyboard as much as possible. A lot of how we designed the Editor and the Command Palette is based on this.
 - 💪 **Built from real use** — Tolaria was created for manage my personal vault of 10,000+ notes, and I use it every day. Every feature exists because it solved a real problem.
 
@@ -70,6 +70,12 @@ Tauri 2 on Linux requires WebKit2GTK 4.1 and GTK 3:
   ```
 
 The bundled MCP server still spawns the system `node` binary at runtime on Linux, so install Node from your distro package manager if you want the external AI tooling flow.
+
+### Gemini CLI setup
+
+Tolaria can register the active vault's MCP server in `~/.gemini/settings.json` from the status bar or command palette action "Set Up External AI Tools". The generated entry is scoped to the selected vault with `VAULT_PATH` and requires Node.js 18+ plus a separately installed and signed-in Gemini CLI.
+
+Use "Restore Tolaria AI Guidance" if you also want Tolaria to create a non-destructive `GEMINI.md` compatibility shim in the vault root. The shim points Gemini back to the shared `AGENTS.md` instructions and is not written over custom `GEMINI.md` content.
 
 ### Quick start
 
