@@ -145,6 +145,8 @@ pub async fn stream_ai_agent(
 mod tests {
     use super::*;
     use crate::vault::AiGuidanceFileState;
+    use serde_json::Value;
+    use std::{fs, path::Path};
 
     #[test]
     fn guidance_commands_report_and_restore_vault_guidance_files() {
@@ -166,5 +168,25 @@ mod tests {
         assert!(dir.path().join("AGENTS.md").exists());
         assert!(dir.path().join("CLAUDE.md").exists());
         assert!(dir.path().join("GEMINI.md").exists());
+    }
+
+    #[test]
+    fn desktop_capability_allows_opening_restored_guidance_files() {
+        let capability_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("capabilities")
+            .join("default.json");
+        let capability_json = fs::read_to_string(capability_path).unwrap();
+        let capability: Value = serde_json::from_str(&capability_json).unwrap();
+        let permissions = capability
+            .get("permissions")
+            .and_then(Value::as_array)
+            .unwrap();
+
+        assert!(
+            permissions
+                .iter()
+                .any(|permission| permission.as_str() == Some("opener:allow-open-path")),
+            "desktop capabilities must allow opener open_path so restored guidance files can be opened"
+        );
     }
 }
