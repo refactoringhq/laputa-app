@@ -305,6 +305,30 @@ describe('tolariaEditorFormatting behavior', () => {
     expect(formattingToolbarStore.setState).toHaveBeenCalledWith(false)
   })
 
+  it('deduplicates floating toolbar store writes during close races', () => {
+    const editor = createMockEditor('paragraph')
+    useBlockNoteEditorMock.mockReturnValue(editor)
+
+    render(
+      <TolariaFormattingToolbarController
+        formattingToolbar={() => <button data-testid="toolbar-action" type="button">Toolbar</button>}
+      />,
+    )
+
+    const toolbarWrapper = screen.getByTestId('toolbar-action').parentElement as HTMLElement
+    const floatingOptions = positionPopoverState.lastProps?.useFloatingOptions as {
+      onOpenChange: (open: boolean, event: unknown, reason?: string) => void
+    }
+
+    floatingOptions.onOpenChange(true, undefined)
+    floatingOptions.onOpenChange(false, undefined)
+    floatingOptions.onOpenChange(false, undefined)
+    fireEvent.blur(toolbarWrapper, { relatedTarget: document.body })
+
+    expect(formattingToolbarStore.setState).toHaveBeenCalledTimes(1)
+    expect(formattingToolbarStore.setState).toHaveBeenCalledWith(false)
+  })
+
   it('does not open the floating toolbar when the editor anchor element is unavailable', () => {
     const editor = createMockEditor()
     editor.domElement = document.createElement('div')

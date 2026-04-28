@@ -130,6 +130,27 @@ function useFormattingToolbarCloseGrace({
   return { closeGraceActive, clearCloseGrace }
 }
 
+type FormattingToolbarStore = {
+  setState(open: boolean): void
+}
+
+function useDeduplicatedFormattingToolbarStore(
+  store: FormattingToolbarStore,
+  show: boolean,
+) {
+  const openRef = useRef(show)
+
+  useEffect(() => {
+    openRef.current = show
+  }, [show])
+
+  return useCallback((open: boolean) => {
+    if (openRef.current === open) return
+    openRef.current = open
+    store.setState(open)
+  }, [store])
+}
+
 const TOLARIA_BASIC_TEXT_STYLE_TOOLTIPS = {
   bold: {
     label: 'Bold',
@@ -503,6 +524,10 @@ export function TolariaFormattingToolbarController(props: {
     toolbarHasFocus,
     toolbarHovered,
   })
+  const setFormattingToolbarOpen = useDeduplicatedFormattingToolbarStore(
+    formattingToolbar.store,
+    show,
+  )
 
   const isOpen = show || toolbarHasFocus || toolbarHovered || closeGraceActive
   const hasFloatingToolbarAnchor = getFormattingToolbarAnchorElement(editor) !== null
@@ -556,7 +581,7 @@ export function TolariaFormattingToolbarController(props: {
       useFloatingOptions: {
         open: shouldRenderFloatingToolbar,
         onOpenChange: (open, _event, reason) => {
-          formattingToolbar.store.setState(open)
+          setFormattingToolbarOpen(open)
           if (!open) {
             setToolbarHasFocus(false)
             setToolbarHovered(false)
@@ -579,9 +604,9 @@ export function TolariaFormattingToolbarController(props: {
     [
       clearCloseGrace,
       editor,
-      formattingToolbar.store,
       placement,
       props.floatingUIOptions,
+      setFormattingToolbarOpen,
       shouldRenderFloatingToolbar,
     ],
   )
@@ -611,7 +636,7 @@ export function TolariaFormattingToolbarController(props: {
             }
 
             setToolbarHasFocus(false)
-            formattingToolbar.store.setState(false)
+            setFormattingToolbarOpen(false)
           }}
         >
           <Component />
