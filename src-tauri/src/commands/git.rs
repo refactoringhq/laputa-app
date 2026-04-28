@@ -159,9 +159,61 @@ pub fn is_git_repo(vault_path: VaultPathArg) -> bool {
 }
 
 #[cfg(desktop)]
+fn validate_git_init_target(vault_path: &str) -> Result<(), String> {
+    let path = std::path::Path::new(vault_path);
+    if !path.exists() {
+        return Err("Choose an existing vault folder before initializing Git".to_string());
+    }
+    if !path.is_dir() {
+        return Err("Choose a folder before initializing Git".to_string());
+    }
+
+    if is_broad_personal_folder(path) && !has_tolaria_vault_marker(path) {
+        return Err(format!(
+            "Choose a dedicated vault folder before initializing Git. '{}' looks like a broad personal folder; create or select a subfolder such as '{}' instead.",
+            path.display(),
+            path.join("Tolaria").display()
+        ));
+    }
+
+    Ok(())
+}
+
+#[cfg(desktop)]
+fn is_broad_personal_folder(path: &std::path::Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "desktop"
+            | "documents"
+            | "downloads"
+            | "movies"
+            | "music"
+            | "pictures"
+            | "public"
+            | "templates"
+            | "videos"
+    )
+}
+
+#[cfg(desktop)]
+fn has_tolaria_vault_marker(path: &std::path::Path) -> bool {
+    ["AGENTS.md", "CLAUDE.md", "type.md", "note.md"]
+        .iter()
+        .any(|file| path.join(file).is_file())
+        || ["attachments", "type", "views"]
+            .iter()
+            .any(|dir| path.join(dir).is_dir())
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub fn init_git_repo(vault_path: VaultPathArg) -> Result<(), String> {
     let vault_path = expand_tilde(&vault_path);
+    validate_git_init_target(&vault_path)?;
     crate::git::init_repo(&vault_path)
 }
 
@@ -372,6 +424,33 @@ mod tests {
             git_resolve_conflict(vault.clone(), "note.md".to_string(), "invalid".to_string(),)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn init_git_repo_rejects_broad_personal_folders() {
+        let dir = TempDir::new().unwrap();
+        let documents = dir.path().join("Documents");
+        fs::create_dir_all(&documents).unwrap();
+        fs::write(documents.join("unrelated.txt"), "not a vault").unwrap();
+
+        let err = init_git_repo(documents.to_string_lossy().into_owned())
+            .expect_err("expected Documents itself to be rejected before git init");
+
+        assert!(err.contains("dedicated vault folder"));
+        assert!(!documents.join(".git").exists());
+    }
+
+    #[test]
+    fn init_git_repo_allows_named_vault_subfolder_under_documents() {
+        let dir = TempDir::new().unwrap();
+        let vault = dir.path().join("Documents").join("Tolaria");
+        fs::create_dir_all(&vault).unwrap();
+        fs::write(vault.join("note.md"), "# Note\n").unwrap();
+        let vault = vault.to_string_lossy().into_owned();
+
+        init_git_repo(vault.clone()).unwrap();
+
+        assert!(is_git_repo(vault));
     }
 
     #[tokio::test]
