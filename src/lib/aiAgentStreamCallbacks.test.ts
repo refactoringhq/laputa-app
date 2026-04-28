@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentStatus } from '../hooks/useAiAgent'
-import type { AiAgentMessage } from './aiAgentConversation'
+import type { AgentStatus, AiAgentMessage } from './aiAgentConversation'
 
 const { detectFileOperationMock } = vi.hoisted(() => ({
   detectFileOperationMock: vi.fn(),
 }))
 
-vi.mock('../hooks/useAiAgent', () => ({
+vi.mock('./aiAgentFileOperations', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./aiAgentFileOperations')>(),
   detectFileOperation: detectFileOperationMock,
 }))
 
@@ -78,12 +78,12 @@ describe('aiAgentStreamCallbacks', () => {
       tool: 'Write',
       input: '{"path":"/vault/note.md"}',
     })
-    expect(detectFileOperationMock).toHaveBeenCalledWith(
-      'Write',
-      '{"path":"/vault/note.md"}',
-      '/vault',
-      fileCallbacks,
-    )
+    expect(detectFileOperationMock).toHaveBeenCalledWith({
+      toolName: 'Write',
+      input: '{"path":"/vault/note.md"}',
+      vaultPath: '/vault',
+      callbacks: fileCallbacks,
+    })
     expect(fileCallbacks.onVaultChanged).toHaveBeenCalledTimes(1)
     expect(messages.getMessages()).toEqual([
       {

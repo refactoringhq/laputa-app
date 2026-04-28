@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentStatus } from '../hooks/useAiAgent'
-import type { AiAgentMessage } from './aiAgentConversation'
+import type { AgentStatus, AiAgentMessage } from './aiAgentConversation'
 
 const {
   buildAgentSystemPromptMock,
