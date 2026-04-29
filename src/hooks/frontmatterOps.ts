@@ -1,11 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
-import { isTauri } from '../mock-tauri'
+import { isTauri, mockInvoke } from '../mock-tauri'
 import type { VaultEntry } from '../types'
 import type { FrontmatterValue } from '../components/Inspector'
 import { updateMockFrontmatter, deleteMockFrontmatterProperty } from './mockFrontmatterHelpers'
 import { updateMockContent, trackMockChange } from '../mock-tauri'
 import { parseFrontmatter } from '../utils/frontmatter'
 import { canonicalSystemMetadataKey, isSystemMetadataKey } from '../utils/systemMetadata'
+import { normalizeNoteWidthMode } from '../utils/noteWidth'
 
 type FrontmatterCommand = 'update_frontmatter' | 'delete_frontmatter_property'
 type FrontmatterKey = string
@@ -23,7 +24,8 @@ const ENTRY_DELETE_MAP: Record<string, Partial<VaultEntry>> = {
   aliases: { aliases: [] }, belongs_to: { belongsTo: [] }, related_to: { relatedTo: [] },
   _archived: { archived: false }, archived: { archived: false },
   _order: { order: null },
-  template: { template: null }, _sort: { sort: null }, visible: { visible: null },
+  template: { template: null }, _sort: { sort: null }, view: { view: null },
+  _width: { noteWidth: null }, visible: { visible: null },
   _organized: { organized: false },
   _favorite: { favorite: false }, _favorite_index: { favoriteIndex: null },
   _list_properties_display: { listPropertiesDisplay: [] },
@@ -110,6 +112,7 @@ function knownFrontmatterUpdates(value: FrontmatterValue | undefined): Record<Fr
     template: { template: str },
     _sort: { sort: str },
     view: { view: str },
+    _width: { noteWidth: normalizeNoteWidthMode(value) },
     visible: { visible: visibleValue(value) },
     _organized: { organized: Boolean(value) },
     _favorite: { favorite: Boolean(value) },
@@ -181,17 +184,48 @@ async function invokeFrontmatter(command: FrontmatterCommand, args: Record<strin
   return invoke<string>(command, args)
 }
 
+function seedMockContent(path: VaultPath, content: MarkdownContent): void {
+  updateMockContent(path, content)
+}
+
+async function loadMockContent(path: VaultPath): Promise<MarkdownContent> {
+  try {
+    return await mockInvoke<MarkdownContent>('get_note_content', { path })
+  } catch {
+    return typeof window === 'undefined' ? '' : window.__mockContent?.[path] ?? ''
+  }
+}
+
+async function persistMockContent(path: VaultPath, content: MarkdownContent): Promise<void> {
+  try {
+    await mockInvoke('save_note_content', { path, content })
+  } finally {
+    updateMockContent(path, content)
+    trackMockChange(path)
+  }
+}
+
 function applyMockFrontmatterUpdate(path: VaultPath, key: FrontmatterKey, value: FrontmatterValue): MarkdownContent {
   const content = updateMockFrontmatter(path, key, value)
-  updateMockContent(path, content)
-  trackMockChange(path)
   return content
 }
 
 function applyMockFrontmatterDelete(path: VaultPath, key: FrontmatterKey): MarkdownContent {
   const content = deleteMockFrontmatterProperty(path, key)
-  updateMockContent(path, content)
-  trackMockChange(path)
+  return content
+}
+
+async function executeMockFrontmatterOp(
+  op: FrontmatterOp,
+  path: VaultPath,
+  key: FrontmatterKey,
+  value?: FrontmatterValue,
+): Promise<MarkdownContent> {
+  seedMockContent(path, await loadMockContent(path))
+  const content = op === 'update'
+    ? applyMockFrontmatterUpdate(path, key, value!)
+    : applyMockFrontmatterDelete(path, key)
+  await persistMockContent(path, content)
   return content
 }
 
@@ -202,9 +236,13 @@ async function executeFrontmatterOp(
   value?: FrontmatterValue,
 ): Promise<MarkdownContent> {
   if (op === 'update') {
-    return isTauri() ? invokeFrontmatter('update_frontmatter', { path, key, value }) : applyMockFrontmatterUpdate(path, key, value!)
+    return isTauri()
+      ? invokeFrontmatter('update_frontmatter', { path, key, value })
+      : executeMockFrontmatterOp(op, path, key, value)
   }
-  return isTauri() ? invokeFrontmatter('delete_frontmatter_property', { path, key }) : applyMockFrontmatterDelete(path, key)
+  return isTauri()
+    ? invokeFrontmatter('delete_frontmatter_property', { path, key })
+    : executeMockFrontmatterOp(op, path, key)
 }
 
 export interface FrontmatterOpOptions {

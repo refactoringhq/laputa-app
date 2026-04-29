@@ -41,7 +41,7 @@ pub use views::{
 };
 
 use file::read_file_metadata;
-use frontmatter::{extract_fm_and_rels, resolve_is_a};
+use frontmatter::{extract_fm_and_rels, resolve_is_a, resolve_note_width};
 use parsing::{count_body_words, extract_outgoing_links, extract_snippet, extract_title};
 
 use gray_matter::engine::YAML;
@@ -151,6 +151,7 @@ pub fn parse_md_file(path: &Path, git_dates: Option<(u64, u64)>) -> Result<Vault
         template: frontmatter.template.and_then(|v| v.into_scalar()),
         sort: frontmatter.sort.and_then(|v| v.into_scalar()),
         view: frontmatter.view.and_then(|v| v.into_scalar()),
+        note_width: resolve_note_width(frontmatter.note_width),
         visible: frontmatter.visible,
         organized: frontmatter.organized.unwrap_or(false),
         favorite: frontmatter.favorite.unwrap_or(false),

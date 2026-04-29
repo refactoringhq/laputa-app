@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
-import type { NoteLayout, VaultEntry } from '../types'
+import type { NoteWidthMode, VaultEntry } from '../types'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../lib/i18n'
 import { formatShortcutDisplay } from '../hooks/appCommandCatalog'
@@ -20,8 +20,8 @@ import {
   Star,
   CheckCircle,
   ArrowsClockwise,
-  TextAlignCenter,
-  TextAlignLeft,
+  ArrowsInLineHorizontal,
+  ArrowsOutLineHorizontal,
 } from '@phosphor-icons/react'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { slugify } from '../hooks/useNoteCreation'
@@ -50,8 +50,8 @@ interface BreadcrumbBarProps {
   onArchive?: () => void
   onUnarchive?: () => void
   onRenameFilename?: (path: string, newFilenameStem: string) => void
-  noteLayout?: NoteLayout
-  onToggleNoteLayout?: () => void
+  noteWidth?: NoteWidthMode
+  onToggleNoteWidth?: () => void
   /** Ref for direct DOM manipulation — avoids re-render on scroll. */
   barRef?: React.Ref<HTMLDivElement>
   locale?: AppLocale
@@ -257,27 +257,27 @@ function RawToggleButton({ rawMode, locale = 'en', onToggleRaw }: { rawMode?: bo
   return <ConfiguredToggleAction active={!!rawMode} config={TOGGLE_ACTION_CONFIGS.raw} locale={locale} onClick={onToggleRaw} />
 }
 
-function NoteLayoutAction({
-  noteLayout = 'centered',
+function NoteWidthAction({
+  noteWidth = 'normal',
   locale = 'en',
-  onToggleNoteLayout,
+  onToggleNoteWidth,
 }: {
-  noteLayout?: NoteLayout
+  noteWidth?: NoteWidthMode
   locale?: AppLocale
-  onToggleNoteLayout?: () => void
+  onToggleNoteWidth?: () => void
 }) {
-  if (!onToggleNoteLayout) return null
+  if (!onToggleNoteWidth) return null
 
-  const isLeftAligned = noteLayout === 'left'
+  const isWide = noteWidth === 'wide'
   return (
     <IconActionButton
-      copy={{ label: translate(locale, isLeftAligned ? 'editor.toolbar.centerLayout' : 'editor.toolbar.leftLayout') }}
-      onClick={onToggleNoteLayout}
-      className={cn(isLeftAligned ? 'text-foreground' : 'hover:text-foreground')}
+      copy={{ label: translate(locale, isWide ? 'editor.toolbar.noteWidthNormal' : 'editor.toolbar.noteWidthWide') }}
+      onClick={onToggleNoteWidth}
+      className={cn(isWide ? 'text-foreground' : 'hover:text-foreground')}
     >
-      {isLeftAligned
-        ? <TextAlignLeft size={16} className={BREADCRUMB_ICON_CLASS} />
-        : <TextAlignCenter size={16} className={BREADCRUMB_ICON_CLASS} />}
+      {isWide
+        ? <ArrowsInLineHorizontal size={16} className={BREADCRUMB_ICON_CLASS} />
+        : <ArrowsOutLineHorizontal size={16} className={BREADCRUMB_ICON_CLASS} />}
     </IconActionButton>
   )
 }
@@ -624,8 +624,8 @@ function BreadcrumbActions({
   rawMode,
   onToggleRaw,
   forceRawMode,
-  noteLayout,
-  onToggleNoteLayout,
+  noteWidth,
+  onToggleNoteWidth,
   showAIChat,
   onToggleAIChat,
   inspectorCollapsed,
@@ -651,7 +651,7 @@ function BreadcrumbActions({
         locale={locale}
       />
       {!forceRawMode && <RawToggleButton rawMode={rawMode} locale={locale} onToggleRaw={onToggleRaw} />}
-      <NoteLayoutAction noteLayout={noteLayout} locale={locale} onToggleNoteLayout={onToggleNoteLayout} />
+      <NoteWidthAction noteWidth={noteWidth} locale={locale} onToggleNoteWidth={onToggleNoteWidth} />
       <AIChatAction showAIChat={showAIChat} locale={locale} onToggleAIChat={onToggleAIChat} />
       <FilePathActions entry={entry} locale={locale} onRevealFile={onRevealFile} onCopyFilePath={onCopyFilePath} />
       <ArchiveAction archived={entry.archived} locale={locale} onArchive={onArchive} onUnarchive={onUnarchive} />

@@ -36,6 +36,8 @@ export interface VaultEntry {
   sort: string | null
   /** Default view mode for the note list of this Type: "all", "editor-list", or "editor-only". */
   view: string | null
+  /** Rich-editor note width mode from `_width` frontmatter. null means use the default. */
+  noteWidth?: NoteWidthMode | null
   /** Whether this Type is visible in the sidebar. Defaults to true when absent. */
   visible: boolean | null
   /** Whether this note has been explicitly organized (removed from Inbox). */
@@ -94,6 +96,7 @@ export interface Settings {
   release_channel: string | null
   theme_mode?: ThemeMode | null
   ui_language?: AppLocale | null
+  note_width_mode?: NoteWidthMode | null
   initial_h1_auto_rename_enabled?: boolean | null
   default_ai_agent?: AiAgentId | null
   hide_gitignored_files?: boolean | null
@@ -155,6 +158,8 @@ export interface AllNotesConfig {
 
 /** Vault-scoped UI configuration stored locally per vault path. */
 export type NoteLayout = 'centered' | 'left'
+
+export type NoteWidthMode = 'normal' | 'wide'
 
 /** Vault-scoped UI configuration stored locally per vault path. */
 export interface VaultConfig {

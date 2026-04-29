@@ -3,7 +3,7 @@ import type { AiAgentId, AiAgentsStatus } from '../lib/aiAgents'
 import type { AppLocale, UiLanguagePreference } from '../lib/i18n'
 import type { ThemeMode } from '../lib/themeMode'
 import type { VaultAiGuidanceStatus } from '../lib/vaultAiGuidance'
-import type { NoteLayout, SidebarSelection, VaultEntry } from '../types'
+import type { NoteWidthMode, SidebarSelection, VaultEntry } from '../types'
 import type { NoteListFilter } from '../utils/noteListHelpers'
 import type { ViewMode } from './useViewMode'
 import { buildNavigationCommands } from './commands/navigationCommands'
@@ -92,8 +92,10 @@ interface CommandRegistryConfig {
   canMoveSelectedViewDown?: boolean
   onFindInNote?: () => void
   onReplaceInNote?: () => void
-  noteLayout?: NoteLayout
-  onToggleNoteLayout?: () => void
+  noteWidth?: NoteWidthMode
+  defaultNoteWidth?: NoteWidthMode
+  onSetNoteWidth?: (mode: NoteWidthMode) => void
+  onSetDefaultNoteWidth?: (mode: NoteWidthMode) => void
   onToggleAIChat?: () => void
   activeNoteModified: boolean
   onCheckForUpdates?: () => void
@@ -125,7 +127,8 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     activeTabPath, entries, modifiedCount,
     onQuickOpen, onCreateNote, onCreateNoteOfType, onSave, onOpenSettings, onOpenFeedback,
     onDeleteNote, onArchiveNote, onUnarchiveNote,
-    onCommitPush, onPull, onResolveConflicts, onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor, onFindInNote, onReplaceInNote, noteLayout, onToggleNoteLayout, onToggleAIChat, onOpenVault, onCreateEmptyVault,
+    onCommitPush, onPull, onResolveConflicts, onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor, onFindInNote, onReplaceInNote,
+    noteWidth, defaultNoteWidth, onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, onOpenVault, onCreateEmptyVault,
     selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown, canMoveSelectedViewUp, canMoveSelectedViewDown,
     activeNoteModified,
     onZoomIn, onZoomOut, onZoomReset, zoomLevel,
@@ -220,12 +223,12 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
 
   const viewCommands = useMemo(() => buildViewCommands({
     hasActiveNote, activeNoteModified, onSetViewMode, onToggleInspector,
-    onToggleDiff, onToggleRawEditor, noteLayout, onToggleNoteLayout, onToggleAIChat, zoomLevel, onZoomIn, onZoomOut, onZoomReset,
+    onToggleDiff, onToggleRawEditor, noteWidth, defaultNoteWidth, onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, zoomLevel, onZoomIn, onZoomOut, onZoomReset,
     onCustomizeNoteListColumns, canCustomizeNoteListColumns, noteListColumnsLabel,
     selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown, canMoveSelectedViewUp, canMoveSelectedViewDown,
   }), [
     hasActiveNote, activeNoteModified, onSetViewMode, onToggleInspector,
-    onToggleDiff, onToggleRawEditor, noteLayout, onToggleNoteLayout, onToggleAIChat,
+    onToggleDiff, onToggleRawEditor, noteWidth, defaultNoteWidth, onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat,
     zoomLevel, onZoomIn, onZoomOut, onZoomReset,
     onCustomizeNoteListColumns, canCustomizeNoteListColumns, noteListColumnsLabel,
     selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown, canMoveSelectedViewUp, canMoveSelectedViewDown,
