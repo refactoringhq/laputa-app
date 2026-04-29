@@ -542,6 +542,55 @@ describe('useEditorTabSwap raw mode sync', () => {
     ])
   })
 
+  it('replaces non-object malformed parsed blocks before applying them to the editor', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const malformedTab = {
+      ...makeTab('malformed.md', 'Malformed'),
+      content: '---\ntitle: Malformed\n---\n\n# Malformed\n\nRecovered body.',
+    }
+
+    const { mockEditor, rerenderWith } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+      setupEditor: (editor) => {
+        editor.tryParseMarkdownToBlocks.mockReturnValue([
+          null,
+          'dangling content',
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Parent', styles: {} }],
+            children: [
+              undefined,
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Child', styles: {} }],
+                children: [],
+              },
+            ],
+          },
+        ])
+      },
+    })
+    mockEditor.replaceBlocks.mockClear()
+
+    await rerenderWith({ tabs: [malformedTab], activeTabPath: 'malformed.md' })
+
+    const appliedBlocks = mockEditor.replaceBlocks.mock.calls[0][1]
+    expect(appliedBlocks).toEqual([
+      expect.objectContaining({ id: expect.any(String), type: 'paragraph', content: [], children: [] }),
+      expect.objectContaining({ id: expect.any(String), type: 'paragraph', content: [], children: [] }),
+      expect.objectContaining({
+        id: expect.any(String),
+        children: [
+          expect.objectContaining({ id: expect.any(String), type: 'paragraph', content: [], children: [] }),
+          expect.objectContaining({
+            id: expect.any(String),
+            content: [{ type: 'text', text: 'Child', styles: {} }],
+          }),
+        ],
+      }),
+    ])
+  })
+
   it('ignores editor change events before the pending tab swap applies a new untitled note', async () => {
     vi.spyOn(document, 'querySelector').mockReturnValue({ scrollTop: 0 } as unknown as Element)
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
