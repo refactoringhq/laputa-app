@@ -34,8 +34,8 @@ type BreadcrumbActions = Pick<
   | 'onArchiveNote'
   | 'onUnarchiveNote'
   | 'onRenameFilename'
-  | 'noteLayout'
-  | 'onToggleNoteLayout'
+  | 'noteWidth'
+  | 'onToggleNoteWidth'
 >
 
 function EditorLoadingSkeleton() {
@@ -149,8 +149,8 @@ function ActiveTabBreadcrumb({
       onArchive={bindPath(actions.onArchiveNote, path)}
       onUnarchive={bindPath(actions.onUnarchiveNote, path)}
       onRenameFilename={actions.onRenameFilename}
-      noteLayout={actions.noteLayout}
-      onToggleNoteLayout={actions.onToggleNoteLayout}
+      noteWidth={actions.noteWidth}
+      onToggleNoteWidth={actions.onToggleNoteWidth}
       locale={locale}
     />
   )
@@ -287,13 +287,13 @@ export function EditorContentLayout(model: EditorContentModel) {
     isDeletedPreview,
     rawLatestContentRef,
     rawModeContent,
-    noteLayout,
+    noteWidth,
     findRequest,
     locale,
   } = model
   const rootClassName = cn(
     'flex flex-1 flex-col min-w-0 min-h-0',
-    noteLayout === 'left' ? 'editor-content-layout--left' : 'editor-content-layout--centered',
+    noteWidth === 'wide' ? 'editor-content-width--wide' : 'editor-content-width--normal',
   )
 
   if (!activeTab) {
@@ -332,8 +332,8 @@ export function EditorContentLayout(model: EditorContentModel) {
           onArchiveNote: model.onArchiveNote,
           onUnarchiveNote: model.onUnarchiveNote,
           onRenameFilename: model.onRenameFilename,
-          noteLayout: model.noteLayout,
-          onToggleNoteLayout: model.onToggleNoteLayout,
+          noteWidth: model.noteWidth,
+          onToggleNoteWidth: model.onToggleNoteWidth,
         }}
       />
       <EditorChrome

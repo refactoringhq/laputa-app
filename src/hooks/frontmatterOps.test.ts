@@ -14,6 +14,8 @@ describe('frontmatterToEntryPatch', () => {
     ['archived', true, { archived: true }],
     ['order', 5, { order: 5 }],
     ['template', '## Heading\n\n', { template: '## Heading\n\n' }],
+    ['_width', 'wide', { noteWidth: 'wide' }],
+    ['width', 'normal', { noteWidth: 'normal' }],
     ['visible', false, { visible: false }],
     ['visible', true, { visible: null }],
   ] as [string, unknown, Partial<VaultEntry>][])(
@@ -68,6 +70,7 @@ describe('frontmatterToEntryPatch', () => {
     ['archived', { archived: false }],
     ['order', { order: null }],
     ['template', { template: null }],
+    ['_width', { noteWidth: null }],
     ['visible', { visible: null }],
   ] as [string, Partial<VaultEntry>][])(
     'maps delete of %s to null/default',
@@ -163,6 +166,11 @@ describe('contentToEntryPatch', () => {
   it('includes custom frontmatter keys in properties patch', () => {
     const content = '---\ntype: Note\ncustom: value\n---\n'
     expect(contentToEntryPatch(content)).toEqual({ isA: 'Note', properties: { custom: 'value' } })
+  })
+
+  it('extracts note width without leaking it into properties', () => {
+    const content = '---\ntype: Note\n_width: wide\n---\n'
+    expect(contentToEntryPatch(content)).toEqual({ isA: 'Note', noteWidth: 'wide' })
   })
 
   it('preserves _favorite_index as a number (not null)', () => {
