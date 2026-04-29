@@ -17,7 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "playwright:smoke": "playwright test --config playwright.smoke.config.ts tests/smoke/create-note-backing-file.spec.ts tests/smoke/delete-note-nonblocking.spec.ts tests/smoke/example.spec.ts tests/smoke/fix-ai-chat-empty-body-v3.spec.ts tests/smoke/fix-crash-create-note.spec.ts tests/smoke/fresh-start-telemetry-onboarding.spec.ts tests/smoke/getting-started-template.spec.ts tests/smoke/h1-title-decoupled.spec.ts tests/smoke/h1-untitled-auto-rename.spec.ts tests/smoke/keyboard-command-routing.spec.ts tests/smoke/linkify-init-warnings.spec.ts tests/smoke/multi-selection-shortcuts.spec.ts tests/smoke/wikilink-path-fix.spec.ts",
+    "playwright:smoke": "playwright test --config playwright.smoke.config.ts tests/smoke/create-note-backing-file.spec.ts tests/smoke/delete-note-nonblocking.spec.ts tests/smoke/example.spec.ts tests/smoke/fix-ai-chat-empty-body-v3.spec.ts tests/smoke/fix-crash-create-note.spec.ts tests/smoke/fresh-start-telemetry-onboarding.spec.ts tests/smoke/frontmatter-date-picker.spec.ts tests/smoke/getting-started-template.spec.ts tests/smoke/h1-title-decoupled.spec.ts tests/smoke/h1-untitled-auto-rename.spec.ts tests/smoke/keyboard-command-routing.spec.ts tests/smoke/linkify-init-warnings.spec.ts tests/smoke/multi-selection-shortcuts.spec.ts tests/smoke/wikilink-path-fix.spec.ts",
     "playwright:regression": "playwright test tests/smoke/",
     "playwright:integration": "playwright test --config playwright.integration.config.ts",
     "test:coverage": "node scripts/run-vitest-coverage.mjs",

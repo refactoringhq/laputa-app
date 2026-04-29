@@ -40,11 +40,19 @@ fn version_for_binary(binary: &PathBuf) -> Option<String> {
 }
 
 fn find_binary_on_path() -> Option<PathBuf> {
-    crate::hidden_command("which")
+    crate::hidden_command(path_lookup_command())
         .arg("pi")
         .output()
         .ok()
         .and_then(|output| path_from_successful_output(&output))
+}
+
+fn path_lookup_command() -> &'static str {
+    if cfg!(windows) {
+        "where"
+    } else {
+        "which"
+    }
 }
 
 fn find_binary_in_user_shell() -> Option<PathBuf> {
@@ -113,12 +121,26 @@ fn pi_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
     let mut candidates = pi_nvm_binary_candidates_for_home(home);
     candidates.extend([
         home.join(".local/bin/pi"),
+        home.join(".local/bin/pi.exe"),
         home.join(".pi/bin/pi"),
+        home.join(".pi/bin/pi.exe"),
         home.join(".local/share/mise/shims/pi"),
+        home.join(".local/share/mise/shims/pi.exe"),
         home.join(".asdf/shims/pi"),
+        home.join(".asdf/shims/pi.exe"),
         home.join(".npm-global/bin/pi"),
+        home.join(".npm-global/bin/pi.cmd"),
+        home.join(".npm-global/bin/pi.exe"),
         home.join(".npm/bin/pi"),
+        home.join(".npm/bin/pi.cmd"),
+        home.join(".npm/bin/pi.exe"),
         home.join(".bun/bin/pi"),
+        home.join(".bun/bin/pi.exe"),
+        home.join("AppData/Roaming/npm/pi.cmd"),
+        home.join("AppData/Roaming/npm/pi.exe"),
+        home.join("AppData/Local/pnpm/pi.cmd"),
+        home.join("AppData/Local/pnpm/pi.exe"),
+        home.join("scoop/shims/pi.exe"),
     ]);
     candidates
 }
@@ -200,6 +222,38 @@ mod tests {
                 candidate.display()
             );
         }
+    }
+
+    #[test]
+    fn binary_candidates_include_windows_npm_and_toolchain_shims() {
+        let home = PathBuf::from(r"C:\Users\alex");
+        let candidates = pi_binary_candidates_for_home(&home);
+        let expected = [
+            home.join(".npm-global/bin/pi.cmd"),
+            home.join(".npm-global/bin/pi.exe"),
+            home.join(".npm/bin/pi.cmd"),
+            home.join(".npm/bin/pi.exe"),
+            home.join("AppData/Roaming/npm/pi.cmd"),
+            home.join("AppData/Roaming/npm/pi.exe"),
+            home.join("AppData/Local/pnpm/pi.cmd"),
+            home.join("AppData/Local/pnpm/pi.exe"),
+            home.join("scoop/shims/pi.exe"),
+        ];
+
+        for candidate in expected {
+            assert!(
+                candidates.contains(&candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    #[test]
+    fn path_lookup_command_matches_current_platform() {
+        let expected = if cfg!(windows) { "where" } else { "which" };
+
+        assert_eq!(path_lookup_command(), expected);
     }
 
     #[test]
