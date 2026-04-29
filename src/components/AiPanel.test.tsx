@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react'
 import { AiPanel } from './AiPanel'
 import { UNSUPPORTED_INLINE_PASTE_MESSAGE } from './InlineWikilinkInput'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import type { VaultEntry } from '../types'
 import { queueAiPrompt } from '../utils/aiPromptBridge'
 import { bindVaultConfigStore, getVaultConfig, resetVaultConfigStore } from '../utils/vaultConfigStore'
@@ -67,6 +68,10 @@ const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   ...overrides,
 })
 
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  return rtlRender(ui, { wrapper: TooltipProvider })
+}
+
 describe('AiPanel', () => {
   beforeEach(() => {
     mockMessages = []
@@ -127,7 +132,7 @@ describe('AiPanel', () => {
     }]
 
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Power User' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Power User' }))
 
     expect(getVaultConfig().ai_agent_permission_mode).toBe('power_user')
     expect(save).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -143,8 +148,26 @@ describe('AiPanel', () => {
 
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
-    expect(screen.getByRole('button', { name: 'Vault Safe' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Power User' })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'Vault Safe' })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'Power User' })).toBeDisabled()
+  })
+
+  it('renders the permission mode toggle with high contrast selected state and explanatory tooltip', async () => {
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+
+    expect(screen.getByTestId('ai-permission-mode-toggle')).toHaveClass('border', 'bg-muted')
+
+    const safeMode = screen.getByRole('radio', { name: 'Vault Safe' })
+    const powerUserMode = screen.getByRole('radio', { name: 'Power User' })
+    expect(safeMode).toHaveAttribute('aria-checked', 'true')
+    expect(safeMode).toHaveClass('bg-background', 'text-foreground', 'shadow-xs')
+    expect(powerUserMode).toHaveClass('text-muted-foreground')
+
+    fireEvent.focus(safeMode)
+
+    expect(await screen.findByTestId('ai-permission-mode-tooltip')).toHaveTextContent(
+      'Vault Safe keeps agents to file, search, and edit tools. Power User also allows local shell commands for this vault.',
+    )
   })
 
   it('renders data-testid ai-panel', () => {
