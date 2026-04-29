@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { isTauri } from '../mock-tauri'
 import {
   APP_COMMAND_EVENT_NAME,
@@ -184,6 +184,23 @@ export function useMenuEvents(handlers: MenuEventHandlers) {
   const hasConflicts = handlers.conflictCount != null ? handlers.conflictCount > 0 : undefined
   const hasRestorableDeletedNote = handlers.hasRestorableDeletedNote
   const hasNoRemote = handlers.hasNoRemote
+  const menuState = useMemo(() => ({
+    hasActiveNote,
+    hasModifiedFiles,
+    hasConflicts,
+    hasRestorableDeletedNote,
+    hasNoRemote,
+    noteListSearchEnabled,
+    editorFindEnabled,
+  }), [
+    hasActiveNote,
+    hasModifiedFiles,
+    hasConflicts,
+    hasRestorableDeletedNote,
+    hasNoRemote,
+    noteListSearchEnabled,
+    editorFindEnabled,
+  ])
 
   useEffect(() => {
     ref.current = handlers
@@ -192,13 +209,5 @@ export function useMenuEvents(handlers: MenuEventHandlers) {
   useNativeMenuEventListener(ref)
   useWindowAppCommandListener(ref)
   useTestMenuCommandBridge(ref)
-  useNativeMenuStateSync({
-    hasActiveNote,
-    hasModifiedFiles,
-    hasConflicts,
-    hasRestorableDeletedNote,
-    hasNoRemote,
-    noteListSearchEnabled,
-    editorFindEnabled,
-  })
+  useNativeMenuStateSync(menuState)
 }

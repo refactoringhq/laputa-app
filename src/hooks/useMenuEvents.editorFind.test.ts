@@ -70,4 +70,21 @@ describe('useMenuEvents editor find state', () => {
       }))
     })
   })
+
+  it('does not resync native menu state for equivalent rerenders', async () => {
+    const { rerender } = renderHook(
+      ({ handlers }: { handlers: MenuEventHandlers }) => useMenuEvents(handlers),
+      { initialProps: { handlers: makeHandlers() } },
+    )
+    await vi.dynamicImportSettled()
+
+    expect(invokeMock).toHaveBeenCalledTimes(1)
+    invokeMock.mockClear()
+
+    rerender({ handlers: makeHandlers() })
+    rerender({ handlers: makeHandlers() })
+    await vi.dynamicImportSettled()
+
+    expect(invokeMock).not.toHaveBeenCalled()
+  })
 })
