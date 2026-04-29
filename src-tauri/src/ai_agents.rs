@@ -7,6 +7,7 @@ pub enum AiAgentId {
     Codex,
     Opencode,
     Pi,
+    Gemini,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -29,6 +30,7 @@ pub struct AiAgentsStatus {
     pub codex: AiAgentAvailability,
     pub opencode: AiAgentAvailability,
     pub pi: AiAgentAvailability,
+    pub gemini: AiAgentAvailability,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -81,6 +83,7 @@ pub fn get_ai_agents_status() -> AiAgentsStatus {
         codex: crate::codex_cli::check_cli(),
         opencode: crate::opencode_cli::check_cli(),
         pi: crate::pi_cli::check_cli(),
+        gemini: crate::gemini_cli::check_cli(),
     }
 }
 
@@ -129,6 +132,15 @@ where
                 permission_mode,
             };
             crate::pi_cli::run_agent_stream(mapped, emit)
+        }
+        AiAgentId::Gemini => {
+            let mapped = crate::gemini_cli::AgentStreamRequest {
+                message: request.message,
+                system_prompt: request.system_prompt,
+                vault_path: request.vault_path,
+                permission_mode,
+            };
+            crate::gemini_cli::run_agent_stream(mapped, emit)
         }
     }
 }
@@ -187,6 +199,7 @@ mod tests {
             status.codex.installed,
             status.opencode.installed,
             status.pi.installed,
+            status.gemini.installed,
         ];
 
         assert!(install_flags

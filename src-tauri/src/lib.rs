@@ -5,6 +5,9 @@ mod cli_agent_runtime;
 pub mod codex_cli;
 mod commands;
 pub mod frontmatter;
+pub mod gemini_cli;
+mod gemini_config;
+mod gemini_discovery;
 pub mod git;
 pub mod mcp;
 #[cfg(desktop)]
