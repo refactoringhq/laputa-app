@@ -374,7 +374,10 @@ function App() {
   }, [resolvedPath, setToastMessage])
 
   const vault = useVaultLoader(noteWindowParams ? '' : resolvedPath)
-  const recentVaultWrites = useRecentVaultWrites({ vaultPath: noteWindowParams ? '' : resolvedPath })
+  const {
+    markInternalWrite: markRecentVaultWrite,
+    filterExternalPaths: filterExternalVaultPaths,
+  } = useRecentVaultWrites({ vaultPath: noteWindowParams ? '' : resolvedPath })
   const {
     status: vaultAiGuidanceStatus,
     refresh: refreshVaultAiGuidance,
@@ -562,6 +565,14 @@ function App() {
     flushPendingRawContentRef.current?.(path)
     await appSave.flushBeforeAction(path)
   }
+  const handleCreatedVaultEntryPersisting = useCallback((path: string) => {
+    markRecentVaultWrite(path)
+    vault.addPendingSave(path)
+  }, [markRecentVaultWrite, vault])
+  const handleCreatedVaultEntryPersisted = useCallback((path: string) => {
+    markRecentVaultWrite(path)
+    vault.loadModifiedFiles()
+  }, [markRecentVaultWrite, vault])
 
   const notes = useNoteActions({
     addEntry: vault.addEntry,
@@ -573,13 +584,13 @@ function App() {
     setToastMessage,
     updateEntry: vault.updateEntry,
     vaultPath: resolvedPath,
-    addPendingSave: vault.addPendingSave,
+    addPendingSave: handleCreatedVaultEntryPersisting,
     removePendingSave: vault.removePendingSave,
     trackUnsaved: vault.trackUnsaved,
     clearUnsaved: vault.clearUnsaved,
     unsavedPaths: vault.unsavedPaths,
     markContentPending: (path, content) => appSave.contentChangeRef.current(path, content),
-    onNewNotePersisted: vault.loadModifiedFiles,
+    onNewNotePersisted: handleCreatedVaultEntryPersisted,
     onTypeStateChanged: async () => { await vault.reloadVault() },
     replaceEntry: vault.replaceEntry,
     onFrontmatterPersisted: vault.loadModifiedFiles,
@@ -620,7 +631,7 @@ function App() {
   useVaultWatcher({
     vaultPath: noteWindowParams ? '' : resolvedPath,
     onVaultChanged: handlePulledVaultUpdate,
-    filterChangedPaths: recentVaultWrites.filterExternalPaths,
+    filterChangedPaths: filterExternalVaultPaths,
   })
   const autoSync = useAutoSync({
     enabled: gitRepoState === 'ready',
@@ -773,7 +784,7 @@ function App() {
     handleRenameNote: notes.handleRenameNote, handleRenameFilename: notes.handleRenameFilename,
     replaceEntry: vault.replaceEntry, resolvedPath,
     initialH1AutoRenameEnabled: settings.initial_h1_auto_rename_enabled !== false,
-    onInternalVaultWrite: recentVaultWrites.markInternalWrite,
+    onInternalVaultWrite: markRecentVaultWrite,
     locale: appLocale,
   })
 
