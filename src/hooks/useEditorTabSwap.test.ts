@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { extractEditorBody, getH1TextFromBlocks, replaceTitleInFrontmatter, useEditorTabSwap } from './useEditorTabSwap'
 import { normalizeParsedImageBlocks } from './editorTabContent'
+import { cacheNoteContent, clearPrefetchCache } from './useTabManagement'
 
 describe('extractEditorBody', () => {
   it('strips frontmatter and preserves H1 heading for new note content', () => {
@@ -422,6 +423,33 @@ describe('useEditorTabSwap raw mode sync', () => {
 
     expect(mockEditor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
     expect(mockEditor.replaceBlocks).toHaveBeenCalled()
+  })
+
+  it('prepares prefetched note blocks before the note is opened', async () => {
+    clearPrefetchCache()
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = {
+      ...makeTab('b.md', 'Likely Next'),
+      content: '---\ntitle: Likely Next\n---\n\n# Likely Next\n\nPrepared body.',
+    }
+
+    const { mockEditor, rerenderWith } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+    })
+    mockEditor.tryParseMarkdownToBlocks.mockClear()
+
+    cacheNoteContent('b.md', tabB.content)
+    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 100)))
+
+    expect(mockEditor.tryParseMarkdownToBlocks).toHaveBeenCalledWith(
+      expect.stringContaining('Prepared body.'),
+    )
+
+    mockEditor.tryParseMarkdownToBlocks.mockClear()
+    await rerenderWith({ tabs: [tabB], activeTabPath: 'b.md' })
+
+    expect(mockEditor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
+    clearPrefetchCache()
   })
 
   it('clears stale editor DOM selection before switching notes', async () => {

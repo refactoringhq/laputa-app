@@ -46,6 +46,8 @@ const VAULT_API_COMMANDS: Record<string, (args: Record<string, unknown>) => Vaul
     args.path ? { url: `/api/vault/entry?path=${encodeURIComponent(args.path as string)}` } : null,
   get_note_content: (args) =>
     args.path ? { url: `/api/vault/content?path=${encodeURIComponent(args.path as string)}` } : null,
+  validate_note_content: (args) =>
+    args.path ? { url: `/api/vault/content?path=${encodeURIComponent(args.path as string)}` } : null,
   get_all_content: (args) =>
     args.path ? { url: `/api/vault/all-content?path=${encodeURIComponent(args.path as string)}` } : null,
   save_note_content: (args) =>
@@ -113,7 +115,9 @@ export async function tryVaultApi<T>(cmd: string, args?: Record<string, unknown>
   try {
     const data = await fetchVaultApiResponse(request)
     if (data === undefined) return undefined
-    return (cmd === 'get_note_content' ? data.content : data) as T
+    if (cmd === 'get_note_content') return data.content as T
+    if (cmd === 'validate_note_content') return (data.content === args?.content) as T
+    return data as T
   } catch (err) {
     console.warn(`[mock-tauri] Vault API call failed for ${cmd}, falling back to mock:`, err)
     return undefined

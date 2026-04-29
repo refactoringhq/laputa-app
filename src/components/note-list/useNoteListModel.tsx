@@ -31,6 +31,8 @@ import { useChangesContextMenu } from './NoteListChangesMenu'
 import { addNoteListSearchToggleListener, dispatchNoteListSearchAvailability } from '../../utils/noteListSearchEvents'
 
 type EntitySelection = Extract<SidebarSelection, { kind: 'entity' }>
+const LIKELY_NEXT_PRELOAD_LIMIT = 8
+const ADJACENT_PRELOAD_RADIUS = 2
 
 function useViewFlags(selection: SidebarSelection) {
   const isSectionGroup = selection.kind === 'sectionGroup'
@@ -40,6 +42,36 @@ function useViewFlags(selection: SidebarSelection) {
   const isChangesView = selection.kind === 'filter' && selection.filter === 'changes'
   const showFilterPills = isSectionGroup || isFolderView
   return { isSectionGroup, isFolderView, isInboxView, isAllNotesView, isChangesView, showFilterPills }
+}
+
+function likelyNextPreloadEntries(entries: VaultEntry[], selectedNotePath: string | null): VaultEntry[] {
+  if (entries.length === 0) return []
+  const selectedIndex = selectedNotePath
+    ? entries.findIndex((entry) => entry.path === selectedNotePath)
+    : -1
+  const start = selectedIndex >= 0
+    ? Math.max(0, selectedIndex - ADJACENT_PRELOAD_RADIUS)
+    : 0
+  const end = selectedIndex >= 0
+    ? Math.min(entries.length, selectedIndex + ADJACENT_PRELOAD_RADIUS + 1)
+    : Math.min(entries.length, LIKELY_NEXT_PRELOAD_LIMIT)
+  return entries
+    .slice(start, end)
+    .filter((entry) => !isDeletedNoteEntry(entry) && entry.fileKind !== 'binary')
+    .slice(0, LIKELY_NEXT_PRELOAD_LIMIT)
+}
+
+function useLikelyNextPreload(entries: VaultEntry[], selectedNotePath: string | null) {
+  useEffect(() => {
+    const candidates = likelyNextPreloadEntries(entries, selectedNotePath)
+    if (candidates.length === 0) return
+
+    const timer = window.setTimeout(() => {
+      for (const entry of candidates) prefetchNoteContent(entry.path)
+    }, 100)
+
+    return () => window.clearTimeout(timer)
+  }, [entries, selectedNotePath])
 }
 
 function useBulkActions(
@@ -94,6 +126,7 @@ interface UseNoteListContentParams {
   modifiedSuffixes: string[]
   modifiedPathSet: Set<string>
   isInboxView: boolean
+  selectedNotePath: string | null
   allNotesNoteListProperties?: string[] | null
   onUpdateAllNotesNoteListProperties?: (value: string[] | null) => void
   inboxNoteListProperties?: string[] | null
@@ -114,6 +147,7 @@ function useNoteListContent({
   modifiedSuffixes,
   modifiedPathSet,
   isInboxView,
+  selectedNotePath,
   allNotesNoteListProperties,
   onUpdateAllNotesNoteListProperties,
   inboxNoteListProperties,
@@ -195,6 +229,7 @@ function useNoteListContent({
     displayPropsOverride,
   }), [displayPropsOverride, entries, query, sortedGroups, typeEntryMap])
   useVisibleNotesSync({ visibleNotesRef, isEntityView, entityEntry, searched, searchedGroups })
+  useLikelyNextPreload(searched, selectedNotePath)
 
   return {
     customProperties,
@@ -550,6 +585,7 @@ export function useNoteListModel({
     modifiedSuffixes,
     modifiedPathSet,
     isInboxView,
+    selectedNotePath,
     allNotesNoteListProperties,
     onUpdateAllNotesNoteListProperties,
     inboxNoteListProperties,

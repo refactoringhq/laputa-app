@@ -455,6 +455,7 @@ macro_rules! app_invoke_handler {
             commands::list_vault,
             commands::list_vault_folders,
             commands::get_note_content,
+            commands::validate_note_content,
             commands::create_note_content,
             commands::save_note_content,
             commands::update_frontmatter,
