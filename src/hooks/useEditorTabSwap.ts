@@ -10,6 +10,12 @@ import { resolveImageUrls, portableImageUrls } from '../utils/vaultImages'
 import { getResolvedCachedNoteContent, NOTE_CONTENT_CACHE_RESOLVED_EVENT } from './useTabManagement'
 import { useEditorMountState, useLatestRef } from './editorTabSwapLifecycle'
 import { usePreparedNotePreload } from './usePreparedNotePreload'
+import {
+  consumeRawModeTransition,
+  flushBeforePathChange,
+  flushBeforeRawMode,
+  useDebouncedEditorChange,
+} from './editorChangeDebounce'
 import { repairMalformedEditorBlocks } from './editorBlockRepair'
 import {
   blankParagraphBlocks,
@@ -23,6 +29,7 @@ import {
 import { clearEditorDomSelection, EDITOR_CONTAINER_SELECTOR } from './editorDomSelection'
 import { resetTextSelectionBeforeContentSwap } from './editorTiptapSelection'
 export { extractEditorBody, getH1TextFromBlocks, replaceTitleInFrontmatter } from './editorTabContent'
+export { RICH_EDITOR_CHANGE_DEBOUNCE_MS } from './editorChangeDebounce'
 
 interface Tab {
   entry: VaultEntry
@@ -365,8 +372,7 @@ function useEditorChangeHandler(options: {
     vaultPathRef,
   } = options
 
-  return useCallback(() => {
-    if (suppressChangeRef.current) return
+  const propagateEditorChange = useCallback(() => {
     const path = prevActivePathRef.current
     if (!path) return
 
@@ -387,16 +393,9 @@ function useEditorChangeHandler(options: {
       sourceContent: nextContent,
     })
     onContentChangeRef.current?.(path, nextContent)
-  }, [editor, onContentChangeRef, pendingLocalContentRef, prevActivePathRef, suppressChangeRef, tabCacheRef, tabsRef, vaultPathRef])
-}
+  }, [editor, onContentChangeRef, pendingLocalContentRef, prevActivePathRef, tabCacheRef, tabsRef, vaultPathRef])
 
-function consumeRawModeTransition(
-  prevRawModeRef: MutableRefObject<boolean>,
-  rawMode: boolean | undefined,
-) {
-  const rawModeJustEnded = prevRawModeRef.current && !rawMode
-  prevRawModeRef.current = !!rawMode
-  return rawModeJustEnded
+  return useDebouncedEditorChange({ onFlush: propagateEditorChange, suppressChangeRef })
 }
 
 function cachePreviousTabOnPathChange(options: {
@@ -983,6 +982,7 @@ function runTabSwapEffect(options: {
   rawSwapPendingRef: MutableRefObject<boolean>
   suppressChangeRef: MutableRefObject<boolean>
   pendingLocalContentRef: MutableRefObject<PendingLocalContent | null>
+  flushPendingEditorChange: () => boolean
   vaultPath?: string
 }) {
   const {
@@ -998,11 +998,12 @@ function runTabSwapEffect(options: {
     rawSwapPendingRef,
     suppressChangeRef,
     pendingLocalContentRef,
+    flushPendingEditorChange,
     vaultPath,
   } = options
 
   const rawModeJustEnded = consumeRawModeTransition(prevRawModeRef, rawMode)
-  if (rawMode) return
+  if (flushBeforeRawMode({ rawMode, flushPendingEditorChange })) return
   const state = resolveTabSwapState({
     tabs,
     activeTabPath,
@@ -1010,6 +1011,7 @@ function runTabSwapEffect(options: {
     prevActivePathRef,
     rawModeJustEnded,
   })
+  flushBeforePathChange({ pathChanged: state.pathChanged, flushPendingEditorChange })
 
   if (shouldSkipScheduledTabSwap({
     state,
@@ -1053,6 +1055,7 @@ function useTabSwapEffect(options: {
   suppressChangeRef: MutableRefObject<boolean>
   pendingLocalContentRef: MutableRefObject<PendingLocalContent | null>
   vaultPathRef: MutableRefObject<string | undefined>
+  flushPendingEditorChange: () => boolean
 }) {
   const {
     tabs,
@@ -1068,6 +1071,7 @@ function useTabSwapEffect(options: {
     suppressChangeRef,
     pendingLocalContentRef,
     vaultPathRef,
+    flushPendingEditorChange,
   } = options
 
   useEffect(() => {
@@ -1084,6 +1088,7 @@ function useTabSwapEffect(options: {
       rawSwapPendingRef,
       suppressChangeRef,
       pendingLocalContentRef,
+      flushPendingEditorChange,
       vaultPath: vaultPathRef.current,
     })
   }, [
@@ -1100,6 +1105,7 @@ function useTabSwapEffect(options: {
     tabs,
     pendingLocalContentRef,
     vaultPathRef,
+    flushPendingEditorChange,
   ])
 }
 
@@ -1112,7 +1118,8 @@ function useTabSwapEffect(options: {
  * - Cleaning up the block cache when tabs are closed
  * - Serializing editor blocks → markdown on change (suppressChangeRef)
  *
- * Returns `handleEditorChange`, the onChange callback for SingleEditorView.
+ * Returns the onChange callback for SingleEditorView and a flush hook for
+ * save/navigation paths that need the latest rich-editor content immediately.
  */
 export function useEditorTabSwap({ tabs, activeTabPath, editor, onContentChange, rawMode, vaultPath }: UseEditorTabSwapOptions) {
   const tabCacheRef = useRef<Map<string, CachedTabState>>(new Map())
@@ -1126,7 +1133,7 @@ export function useEditorTabSwap({ tabs, activeTabPath, editor, onContentChange,
   const onContentChangeRef = useLatestRef(onContentChange)
   const tabsRef = useLatestRef(tabs)
   const vaultPathRef = useLatestRef(vaultPath)
-  const handleEditorChange = useEditorChangeHandler({
+  const { handleEditorChange, flushPendingEditorChange } = useEditorChangeHandler({
     editor,
     tabsRef,
     onContentChangeRef,
@@ -1153,6 +1160,7 @@ export function useEditorTabSwap({ tabs, activeTabPath, editor, onContentChange,
     suppressChangeRef,
     pendingLocalContentRef,
     vaultPathRef,
+    flushPendingEditorChange,
   })
   usePreparedNotePreload({
     eventName: NOTE_CONTENT_CACHE_RESOLVED_EVENT,
@@ -1161,5 +1169,5 @@ export function useEditorTabSwap({ tabs, activeTabPath, editor, onContentChange,
     preparePath: preparePreloadedPath,
   })
 
-  return { handleEditorChange, editorMountedRef }
+  return { handleEditorChange, flushPendingEditorChange, editorMountedRef }
 }
