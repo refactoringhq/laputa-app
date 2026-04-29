@@ -80,6 +80,8 @@
   "command.settings.setupExternalAi": "Set Up External AI Tools…",
   "command.settings.reloadVault": "Reload Vault",
   "command.settings.repairVault": "Repair Vault",
+  "command.settings.useLightMode": "Use Light Mode",
+  "command.settings.useDarkMode": "Use Dark Mode",
   "command.settings.toggleGitignoredFilesVisibility": "Toggle Gitignored Files Visibility",
   "command.ai.openAgents": "Open AI Agents",
   "command.ai.restoreGuidance": "Restore Tolaria AI Guidance",

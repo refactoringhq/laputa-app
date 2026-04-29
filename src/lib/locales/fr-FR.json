@@ -79,6 +79,8 @@
   "command.settings.setupExternalAi": "Configurer des outils d'IA externes…",
   "command.settings.reloadVault": "Recharger le coffre-fort",
   "command.settings.repairVault": "Réparer le coffre-fort",
+  "command.settings.useLightMode": "Utiliser le mode clair",
+  "command.settings.useDarkMode": "Utiliser le mode sombre",
   "command.ai.openAgents": "Ouvrir les agents d'IA",
   "command.ai.restoreGuidance": "Restaurer les conseils de l'IA Tolaria",
   "command.ai.switchToAgent": "Basculer l'agent d'IA sur {agent}",

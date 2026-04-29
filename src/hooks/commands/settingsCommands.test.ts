@@ -62,6 +62,50 @@ describe('buildSettingsCommands', () => {
     expect(onSetUiLanguage).toHaveBeenCalledWith('zh-CN')
   })
 
+  it('adds direct theme mode commands when a setter is available', () => {
+    const onSetThemeMode = vi.fn()
+
+    const commands = buildSettingsCommands({
+      onOpenSettings: vi.fn(),
+      onSetThemeMode,
+    })
+
+    const lightMode = commands.find((item) => item.id === 'use-light-mode')
+    const darkMode = commands.find((item) => item.id === 'use-dark-mode')
+
+    expect(lightMode).toMatchObject({
+      label: 'Use Light Mode',
+      enabled: true,
+      group: 'Settings',
+    })
+    expect(lightMode?.keywords).toEqual(expect.arrayContaining(['theme', 'light mode']))
+    expect(darkMode).toMatchObject({
+      label: 'Use Dark Mode',
+      enabled: true,
+      group: 'Settings',
+    })
+    expect(darkMode?.keywords).toEqual(expect.arrayContaining(['theme', 'dark mode']))
+
+    lightMode?.execute()
+    darkMode?.execute()
+
+    expect(onSetThemeMode).toHaveBeenNthCalledWith(1, 'light')
+    expect(onSetThemeMode).toHaveBeenNthCalledWith(2, 'dark')
+  })
+
+  it('keeps theme mode commands visible but disabled until settings can be saved', () => {
+    const commands = buildSettingsCommands({ onOpenSettings: vi.fn() })
+
+    expect(commands.find((item) => item.id === 'use-light-mode')).toMatchObject({
+      label: 'Use Light Mode',
+      enabled: false,
+    })
+    expect(commands.find((item) => item.id === 'use-dark-mode')).toMatchObject({
+      label: 'Use Dark Mode',
+      enabled: false,
+    })
+  })
+
   it('localizes language commands', () => {
     const commands = buildSettingsCommands({
       onOpenSettings: vi.fn(),
@@ -77,6 +121,9 @@ describe('buildSettingsCommands', () => {
     expect(commands.find((item) => item.id === 'use-system-language')).toMatchObject({
       label: '使用系统语言 (简体中文)',
       enabled: false,
+    })
+    expect(commands.find((item) => item.id === 'use-light-mode')).toMatchObject({
+      label: '使用浅色模式',
     })
   })
 

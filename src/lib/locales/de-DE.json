@@ -79,6 +79,8 @@
   "command.settings.setupExternalAi": "Externe KI-Tools einrichten …",
   "command.settings.reloadVault": "Vault neu laden",
   "command.settings.repairVault": "Vault reparieren",
+  "command.settings.useLightMode": "Hellen Modus verwenden",
+  "command.settings.useDarkMode": "Dunklen Modus verwenden",
   "command.ai.openAgents": "KI-Agents öffnen",
   "command.ai.restoreGuidance": "Tolaria-KI-Anleitung wiederherstellen",
   "command.ai.switchToAgent": "KI-Agent auf {agent} umstellen",

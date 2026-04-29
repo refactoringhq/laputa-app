@@ -79,6 +79,8 @@
   "command.settings.setupExternalAi": "Настроить внешние инструменты ИИ…",
   "command.settings.reloadVault": "Перезагрузить хранилище",
   "command.settings.repairVault": "Восстановить хранилище",
+  "command.settings.useLightMode": "Использовать светлый режим",
+  "command.settings.useDarkMode": "Использовать темный режим",
   "command.ai.openAgents": "Открыть AI Agents",
   "command.ai.restoreGuidance": "Восстановить руководство Tolaria AI",
   "command.ai.switchToAgent": "Переключить AI-агента на {agent}",
