@@ -39,7 +39,7 @@ export function formatSubtitle(entry: VaultEntry): string {
   const date = getDisplayDate(entry)
   if (date) parts.push(relativeDate(date))
   if (entry.wordCount > 0) {
-    parts.push(`${entry.wordCount.toLocaleString()} words`)
+    parts.push(`${entry.wordCount.toLocaleString('en-US')} words`)
   } else {
     parts.push('Empty')
   }
@@ -61,7 +61,7 @@ export function formatSearchSubtitle(entry: VaultEntry): string {
     parts.push(`Created ${relativeDate(entry.createdAt!)}`)
   }
   if (entry.wordCount > 0) {
-    parts.push(`${entry.wordCount.toLocaleString()} words`)
+    parts.push(`${entry.wordCount.toLocaleString('en-US')} words`)
   } else {
     parts.push('Empty')
   }
