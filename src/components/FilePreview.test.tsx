@@ -40,6 +40,12 @@ const imageEntry: VaultEntry = {
   hasH1: false,
   fileKind: 'binary',
 }
+const pdfEntry: VaultEntry = {
+  ...imageEntry,
+  path: '/vault/Attachments/report.pdf',
+  filename: 'report.pdf',
+  title: 'report.pdf',
+}
 
 describe('FilePreview', () => {
   it('routes header file actions to the active file path', () => {
@@ -63,5 +69,25 @@ describe('FilePreview', () => {
     expect(onRevealFile).toHaveBeenCalledWith('/vault/Attachments/photo.png')
     expect(onCopyFilePath).toHaveBeenCalledWith('/vault/Attachments/photo.png')
     expect(onOpenExternalFile).toHaveBeenCalledWith('/vault/Attachments/photo.png')
+  })
+
+  it('renders supported PDF files through the asset preview path', () => {
+    render(<FilePreview entry={pdfEntry} />)
+
+    expect(screen.getByTestId('pdf-file-preview')).toHaveAttribute('data', 'asset:///vault/Attachments/report.pdf')
+    expect(screen.getByText('PDF file')).toBeInTheDocument()
+  })
+
+  it('renders supported PDFs when binary metadata is unavailable', () => {
+    render(<FilePreview entry={{ ...pdfEntry, fileKind: undefined }} />)
+
+    expect(screen.getByTestId('pdf-file-preview')).toHaveAttribute('data', 'asset:///vault/Attachments/report.pdf')
+  })
+
+  it('provides a graceful fallback when a PDF preview cannot render', () => {
+    render(<FilePreview entry={pdfEntry} />)
+
+    expect(screen.getByTestId('file-preview-fallback')).toHaveTextContent('PDF preview failed')
+    expect(screen.getByRole('button', { name: 'Open in default app' })).toBeInTheDocument()
   })
 })

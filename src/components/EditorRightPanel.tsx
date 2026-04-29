@@ -64,6 +64,7 @@ export function EditorRightPanel({
     entries,
     noteList,
     noteListFilter,
+    locale,
     onOpenNote,
     onFileCreated,
     onFileModified,
@@ -95,6 +96,7 @@ export function EditorRightPanel({
           defaultAiAgent={defaultAiAgent}
           defaultAiAgentReadiness={defaultAiAgentReadiness}
           defaultAiAgentReady={defaultAiAgentReady}
+          locale={locale}
           activeEntry={inspectorEntry}
           entries={entries}
         />

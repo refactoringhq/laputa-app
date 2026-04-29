@@ -14,6 +14,7 @@ files:
     command.openLanguageSettings.keywords: 68efcb7e847b1a9d472baa609824be80
     command.useSystemLanguage: b7f0315c47d4a59faa2a49571fcf1fca
     command.openH1Setting: 05b4f6edc0e98b29670e8ee902cdb9bf
+    command.toggleGitignoredFilesVisibility: 0a2d3ea4e8ff8b00a801183caeb97a03
     command.contribute: 9887a4451812854f0f1b6f669a874307
     command.checkUpdates: f77f38f684c8b974dd4a56bb321cfd5f
     command.group.navigation: 846495f9ceed11accf8879f555936a7d
@@ -70,6 +71,10 @@ files:
     command.view.toggleAiPanel: 4279cbf31767465f25feff6e7bdd336e
     command.view.newAiChat: 1b0a886d6e77f628ec96c2d71cdb0a9b
     command.view.toggleBacklinks: b3c4be2d2c07bb8df181355a2c3658a7
+    command.view.moveViewUp: 76f92d3250e028609349d825c672f13e
+    command.view.moveViewDown: 9deea30162b8d3234f8d52795ad7393f
+    command.view.moveNamedViewUp: b4ac634d13a09eacb680ef12c69dd1f7
+    command.view.moveNamedViewDown: 15302c02df26fe52def77636e9141711
     command.view.zoomIn: ae4a8e406b707636392b6673fca0e6a6
     command.view.zoomOut: 97326f8cd9df886a6b19af180fb7dcc9
     command.view.resetZoom: 193ee8c32391fc5cc303a51617cfd046
@@ -81,6 +86,9 @@ files:
     command.settings.setupExternalAi: 24eea679eb699763daa2e3f2a67fcf9a
     command.settings.reloadVault: f6e506dad6b6cf2be24d9438d458ae54
     command.settings.repairVault: cee560b1fd5ad9d1ff1c19a0a2afe77a
+    command.settings.useLightMode: a76d5b1c076983bc113d247f0520c166
+    command.settings.useDarkMode: ba7873c42ae00542ba71db9be3b6761f
+    command.settings.toggleGitignoredFilesVisibility: 0a2d3ea4e8ff8b00a801183caeb97a03
     command.ai.openAgents: 612abe804edd0f5ae228a534f77f3d23
     command.ai.restoreGuidance: 23331fecc692d11d85cf24838ed273f2
     command.ai.switchToAgent: 5bb02187e653b360ab7ed661403271f2
@@ -115,6 +123,10 @@ files:
     settings.titles.description: b94aeeca78dd376cc19b9aa019e53f6c
     settings.titles.autoRename: 5383db8e790ebf5f956d9c59cb4c4f67
     settings.titles.autoRenameDescription: cc28c28d8817736e658082a2261d9a6e
+    settings.vaultContent.title: 78b883ce9acb9c25e611158a518d9185
+    settings.vaultContent.description: a53487bf1c7898a1459dc1510e216f7d
+    settings.vaultContent.hideGitignored: 2c07ee6c8bfe746d356f44275d42f90e
+    settings.vaultContent.hideGitignoredDescription: e8b1ddfa416610f9d6eb299fa123a1d6
     settings.aiAgents.title: 27f08387b26e1ceeb1b60bd9c97e7a47
     settings.aiAgents.description: a13222e67eb121676ff6dfc7b085f02d
     settings.aiAgents.default: 6af573559fd05d8c35bc57b41cc78e24
@@ -138,6 +150,68 @@ files:
     settings.cancel: ea4788705e6873b424c65e91c2846b19
     settings.save: c9cc8cce247e49bae79f15173ce97354
     common.cancel: ea4788705e6873b424c65e91c2846b19
+    ai.permission.safe.short: c6eea0560cd6f377e78dff2c85cc9122
+    ai.permission.safe.control: 386cc66605d50e5bf1fb726f97e55b55
+    ai.permission.safe.tooltip: 3bd635e2b2223da302994d77bfd7edfd
+    ai.permission.powerUser.short: d4a47db271fc1ef3cd17f7396326b057
+    ai.permission.powerUser.control: d4a47db271fc1ef3cd17f7396326b057
+    ai.permission.powerUser.tooltip: 2585ecdb79ca02a3ee779bb61552de03
+    ai.permission.modeAria: 3ff6346566a4c44fd5c7395907125d3e
+    ai.permission.changed: b5d06ad47e6053fe5a73f4571a40e00c
+    ai.panel.title: 4412225fe5b326643b8c2e1d9b7b10ae
+    ai.panel.status.checking: 118740af1c4521b917e29791d661db82
+    ai.panel.status.missing: fe07f8eac233c229d81cbe9aa25668a0
+    ai.panel.status.ready: 296a0ac791eab2df130789f55fdc109b
+    ai.panel.copyMcpConfig: 6a8c9fe401557c870e3a90bbfab01b25
+    ai.panel.mcpConfig: 53bac93d0314941c8d2c1163026f3ad9
+    ai.panel.newChat: 1b0a886d6e77f628ec96c2d71cdb0a9b
+    ai.panel.close: d00ba22b83762f5a6e66db0be9e916d7
+    ai.panel.linkedCount: 5292fda189a357c9597b1cb0e1b0900b
+    ai.panel.empty.checkingTitle: 0dde2076cb53fe497d05d231296d50bb
+    ai.panel.empty.checkingDescription: 31e41510d851c366860377ba0c956f0b
+    ai.panel.empty.missingTitle: a2b764da52cb43b191bb4ecfd8ea4d26
+    ai.panel.empty.missingDescription: 91825c7d86b1d588d44a33e1d94af950
+    ai.panel.empty.withContextTitle: 66f02985937083e4ef62b98cc9f25aee
+    ai.panel.empty.noContextTitle: e919aeb0a49b58e494e43e5f6f6597c9
+    ai.panel.empty.withContextDescription: dd8faefcc8160a2db800a41d6628facb
+    ai.panel.empty.noContextDescription: 6a6e610835808016d1f2790c3f991a54
+    ai.panel.placeholder.checking: 08fec77719c37d3d6279b2641b37b4d3
+    ai.panel.placeholder.missing: 547c492026d115608067988b7cfbb9a9
+    ai.panel.placeholder.ready: 31f5265c2e0432a7ca10d08e5c6f3114
+    ai.panel.send: 747c6a3564774149c989884e0c581d53
+    mcp.setup.manageTitle: d786c7b9ab9b2406258648931bca0e01
+    mcp.setup.setupTitle: b4b373f690c8a0008885b31e78e93a5c
+    mcp.setup.connectedDescription: a2a3be70c0ac9fa7ef112df5252249fa
+    mcp.setup.setupDescription: 8bf199ffbcf303a99abac078c0c5e094
+    mcp.setup.reconnect: 813ba447b5e64c17ff9b68c693358ca3
+    mcp.setup.connect: fb95777dbc9f7b22014dc360a2957652
+    mcp.setup.disconnect: 42ae25231906c83927831e0ef7c317ac
+    mcp.setup.connecting: 182e7eda4e721ad00737460b88701dee
+    mcp.setup.disconnecting: 11de134aefe51cb4a5c545b5a057a871
+    mcp.setup.nodeRequirement: ac58a35cf21d2204fed548c227f77594
+    mcp.setup.writeEntryDescription: 370aa4403d2ffc37f574503bc3cd00e6
+    mcp.setup.clientPathsDescription: 94565852412051c799e78d2f4525ff53
+    mcp.setup.geminiGuidanceDescription: 182cf5b84b2f56cb1cf41dcdb5e093d8
+    mcp.setup.manual.title: 2188ca52346158cbd103ca7ce7c12dd9
+    mcp.setup.manual.copy: 6a8c9fe401557c870e3a90bbfab01b25
+    mcp.setup.manual.loading: 11ee201c121c8e2015c065952474a3ea
+    mcp.setup.manual.unavailable: 8b4330b839c41bad378c86c91ee0b5cd
+    mcp.toast.connected: 7716c0f9dad41a7fdbef592074459239
+    mcp.toast.refreshed: 227d8721ebec3077792b1223c1f30e54
+    mcp.toast.disconnected: 9b5254079561087d679e35aa10c80638
+    mcp.toast.alreadyDisconnected: 645bec2e33bd9de2b334b704d9fa84cf
+    mcp.toast.configCopied: 458b50444b9a1cb069b00475c0951b8a
+    mcp.toast.configCopyFailed: b451cfb95f87458d142d026a8aca74cf
+    mcp.toast.setupFailed: 51f290962c08d8ba76bfc6c19552eaed
+    mcp.toast.disconnectFailed: ddc3387ab6e996ce15bc4950a3548e1e
+    mcp.error.clipboardUnavailable: 3b9ed3fe7dba627edb74e1cdaa02b2ee
+    save.toast.saved: 248336101b461380a4b2391a7625493d
+    save.toast.nothingToSave: 86ae8cef7371e639f3c007449a2f7d1f
+    save.toast.missingActiveVault: 49cf5064a7dce757f895950d8beeed68
+    save.error.failed: b55b9fefe93fabae3c277e4e7956a534
+    save.error.autoFailed: 09b2b131f07baddb5ba8f5a3ee6234c5
+    save.error.invalidPath: c96fb669715e86508f4c5e73da9f6995
+    savedViews.reordered: 531081a566b826eed2e714ce70a0de08
     locale.en: 78463a384a5aa4fad5fa73e2f506ecfc
     sidebar.nav.inbox: 3882d32c66e7e768145ecd8f104b0c08
     sidebar.nav.allNotes: cd76cf851b08a9d2feafaf255bc1f4d5
@@ -149,6 +223,9 @@ files:
     sidebar.action.createView: ba019414ea8c7fcdb4a83a70ec1bb639
     sidebar.action.editView: acdf34bd08b0692b906d446e590b1eb9
     sidebar.action.deleteView: c8f4f9cd8ff820f955474e5c9f70ff39
+    sidebar.action.reorderView: ca2f42548fd57160d22fd0809bf8ed6e
+    sidebar.action.moveViewUp: e601b7f0901f12efb71f7821c0fdb79e
+    sidebar.action.moveViewDown: 6f86951085367864e3e4eb13f5c8688e
     sidebar.action.customizeSections: 050a134cad1e9c6f04abe5d635592703
     sidebar.action.renameSection: 8936914051df04e7550d0eeb4a31e0e0
     sidebar.action.customizeIconColor: 9a2f685c74d261ab483ef00dee5314fe
@@ -318,6 +395,8 @@ files:
     status.vault.cloneGit: a7d0aef7c6237a36e54fd5a26e9c23fe
     status.vault.cloneGettingStarted: 9953a11a477b441976a626a9acf5d7df
     status.vault.notFound: 3119b7fa94c96209bca571b7c7ed0b7e
+    status.vault.reloading: 893da50ef3a9e01d8a99ff5d3ceb55e9
+    status.vault.reloadingTooltip: 4a884bd7d113797ad16f905f70742da8
     status.vault.remove: 7f3b4f76df23626170940dbc55c70728
     status.remote.noneConfigured: 18a4edd4e8d862ccb343937f45585fb1
     status.remote.inSync: a56f571b4df55d88fb06e61e343b3c91

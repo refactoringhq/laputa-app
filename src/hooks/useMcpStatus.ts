@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
+import { createTranslator, type AppLocale } from '../lib/i18n'
 
 export type McpStatus = 'checking' | 'installed' | 'not_installed'
 type ManualConfigSnippet = string
@@ -14,6 +15,7 @@ type McpStatusResponse = string
 type ToastHandler = (msg: ToastMessage) => void
 type ToastMessage = string
 type VaultPath = string
+type Translator = ReturnType<typeof createTranslator>
 
 interface ManualMcpConfigState {
   error: ToastMessage | null
@@ -46,16 +48,16 @@ async function fetchMcpStatus(vaultPath: VaultPath): Promise<McpStatus> {
   }
 }
 
-function connectSuccessToast(result: McpCommandResult): ToastMessage {
+function connectSuccessToast(result: McpCommandResult, t: Translator): ToastMessage {
   return result === 'registered'
-    ? 'Tolaria external AI tools connected successfully'
-    : 'Tolaria external AI tools setup refreshed successfully'
+    ? t('mcp.toast.connected')
+    : t('mcp.toast.refreshed')
 }
 
-function disconnectSuccessToast(result: McpCommandResult): ToastMessage {
+function disconnectSuccessToast(result: McpCommandResult, t: Translator): ToastMessage {
   return result === 'removed'
-    ? 'Tolaria external AI tools disconnected successfully'
-    : 'Tolaria external AI tools were already disconnected'
+    ? t('mcp.toast.disconnected')
+    : t('mcp.toast.alreadyDisconnected')
 }
 
 function errorMessage(error: unknown): ToastMessage {
@@ -69,9 +71,9 @@ function visibleManualConfig(
   return state.vaultPath === vaultPath ? state : EMPTY_MANUAL_CONFIG
 }
 
-async function writeClipboardText(value: ManualConfigSnippet): Promise<void> {
+async function writeClipboardText(value: ManualConfigSnippet, t: Translator): Promise<void> {
   if (!navigator.clipboard?.writeText) {
-    throw new Error('Clipboard API is unavailable')
+    throw new Error(t('mcp.error.clipboardUnavailable'))
   }
 
   await navigator.clipboard.writeText(value)
@@ -80,6 +82,7 @@ async function writeClipboardText(value: ManualConfigSnippet): Promise<void> {
 function useManualMcpConfig(
   vaultPath: VaultPath,
   onToastRef: MutableRefObject<ToastHandler>,
+  t: Translator,
 ) {
   const [manualConfig, setManualConfig] = useState<ManualMcpConfigState>(EMPTY_MANUAL_CONFIG)
 
@@ -99,14 +102,14 @@ function useManualMcpConfig(
   const copyMcpConfig = useCallback(async () => {
     try {
       const snippet = await loadMcpConfigSnippet()
-      await writeClipboardText(snippet)
-      onToastRef.current('Tolaria MCP config copied to clipboard')
+      await writeClipboardText(snippet, t)
+      onToastRef.current(t('mcp.toast.configCopied'))
       return true
     } catch (error) {
-      onToastRef.current(`Copy MCP config failed: ${errorMessage(error)}`)
+      onToastRef.current(t('mcp.toast.configCopyFailed', { error: errorMessage(error) }))
       return false
     }
-  }, [loadMcpConfigSnippet, onToastRef])
+  }, [loadMcpConfigSnippet, onToastRef, t])
 
   const currentManualConfig = visibleManualConfig(manualConfig, vaultPath)
 
@@ -126,11 +129,13 @@ function useManualMcpConfig(
 export function useMcpStatus(
   vaultPath: VaultPath,
   onToast: ToastHandler,
+  locale: AppLocale = 'en',
 ) {
   const [status, setStatus] = useState<McpStatus>('checking')
+  const t = useMemo(() => createTranslator(locale), [locale])
   const onToastRef = useRef(onToast)
   useEffect(() => { onToastRef.current = onToast })
-  const manualConfigActions = useManualMcpConfig(vaultPath, onToastRef)
+  const manualConfigActions = useManualMcpConfig(vaultPath, onToastRef, t)
 
   const refreshMcpStatus = useCallback(async () => {
     const nextStatus = await fetchMcpStatus(vaultPath)
@@ -154,29 +159,29 @@ export function useMcpStatus(
     try {
       const result = await tauriCall<string>('register_mcp_tools', { vaultPath })
       setStatus('installed')
-      onToastRef.current(connectSuccessToast(result))
+      onToastRef.current(connectSuccessToast(result, t))
       return true
     } catch (e) {
       setStatus('not_installed')
-      onToastRef.current(`External AI tool setup failed: ${e}`)
+      onToastRef.current(t('mcp.toast.setupFailed', { error: errorMessage(e) }))
       return false
     }
-  }, [vaultPath])
+  }, [t, vaultPath])
 
   const disconnectMcp = useCallback(async () => {
     setStatus('checking')
     try {
       const result = await tauriCall<string>('remove_mcp_tools')
       setStatus('not_installed')
-      onToastRef.current(disconnectSuccessToast(result))
+      onToastRef.current(disconnectSuccessToast(result, t))
       return true
     } catch (e) {
       const nextStatus = await refreshMcpStatus()
       setStatus(nextStatus)
-      onToastRef.current(`External AI tool disconnect failed: ${e}`)
+      onToastRef.current(t('mcp.toast.disconnectFailed', { error: errorMessage(e) }))
       return false
     }
-  }, [refreshMcpStatus])
+  }, [refreshMcpStatus, t])
 
   return {
     mcpStatus: status,

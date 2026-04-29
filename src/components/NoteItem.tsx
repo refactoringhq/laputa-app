@@ -4,12 +4,12 @@ import { cn } from '@/lib/utils'
 import {
   Wrench, Flask, Target, ArrowsClockwise,
   Users, CalendarBlank, Tag, FileText, StackSimple,
-  File, FileDashed, ImageSquare,
+  File, FileDashed, FilePdf, ImageSquare,
 } from '@phosphor-icons/react'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { resolveIcon } from '../utils/iconRegistry'
 import { relativeDate, getDisplayDate } from '../utils/noteListHelpers'
-import { isImagePreviewEntry } from '../utils/filePreview'
+import { filePreviewKind, type FilePreviewKind } from '../utils/filePreview'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { PropertyChips } from './note-item/PropertyChips'
 import { ChangeNoteContent } from './note-item/ChangeNoteContent'
@@ -109,7 +109,7 @@ function NoteTypeIndicator({
 }: {
   TypeIcon: ComponentType<SVGAttributes<SVGSVGElement>>
   typeColor: string
-  filePreviewKind?: 'image'
+  filePreviewKind?: FilePreviewKind
 }) {
   return (
     <TypeIcon
@@ -202,7 +202,9 @@ function InteractiveNoteDetails({
 }
 
 function resolveNoteTypeIcon(entry: VaultEntry, customIcon?: string | null): ComponentType<SVGAttributes<SVGSVGElement>> {
-  if (isImagePreviewEntry(entry)) return ImageSquare
+  const previewKind = filePreviewKind(entry)
+  if (previewKind === 'image') return ImageSquare
+  if (previewKind === 'pdf') return FilePdf
   if (entry.fileKind && entry.fileKind !== 'markdown') return getFileKindIcon(entry.fileKind)
   return getTypeIcon(entry.isA, customIcon)
 }
@@ -232,11 +234,11 @@ function StandardNoteContent({
 }) {
   const te = typeEntryMap[entry.isA ?? '']
   const TypeIcon = resolveNoteTypeIcon(entry, te?.icon)
-  const filePreviewKind = isImagePreviewEntry(entry) ? 'image' : undefined
+  const previewKind = filePreviewKind(entry) ?? undefined
 
   return (
     <>
-      <NoteTypeIndicator TypeIcon={TypeIcon} typeColor={typeColor} filePreviewKind={filePreviewKind} />
+      <NoteTypeIndicator TypeIcon={TypeIcon} typeColor={typeColor} filePreviewKind={previewKind} />
       <div className="space-y-2" data-testid="note-content-stack">
         {isBinary ? (
           <NoteTitleRow
@@ -360,30 +362,31 @@ function resolveNoteItemSurfaceStyle({
 
 function resolveNoteItemTestId({
   isMultiSelected,
-  isImagePreview,
+  previewKind,
   isUnavailableBinary,
 }: Pick<NoteItemVisualState, 'isMultiSelected' | 'isUnavailableBinary'> & {
-  isImagePreview: boolean
+  previewKind: FilePreviewKind | null
 }) {
   if (isMultiSelected) return 'multi-selected-item'
-  if (isImagePreview) return 'image-file-item'
+  if (previewKind) return `${previewKind}-file-item`
   return isUnavailableBinary ? 'binary-file-item' : undefined
 }
 
 function resolveNoteItemTitle({
-  isImagePreview,
+  previewKind,
   isUnavailableBinary,
 }: Pick<NoteItemVisualState, 'isUnavailableBinary'> & {
-  isImagePreview: boolean
+  previewKind: FilePreviewKind | null
 }) {
-  if (isImagePreview) return 'Open image preview'
+  if (previewKind === 'image') return 'Open image preview'
+  if (previewKind === 'pdf') return 'Open PDF preview'
   return isUnavailableBinary ? 'Cannot open this file type' : undefined
 }
 
 function resolveNoteItemSurfaceProps({
   entry,
   isUnavailableBinary,
-  isImagePreview,
+  previewKind,
   isSelected,
   isMultiSelected,
   isHighlighted,
@@ -394,7 +397,7 @@ function resolveNoteItemSurfaceProps({
   typeLightColor,
 }: NoteItemVisualState & {
   entry: VaultEntry
-  isImagePreview: boolean
+  previewKind: FilePreviewKind | null
   onClickNote: NoteItemProps['onClickNote']
   onPrefetch?: NoteItemProps['onPrefetch']
   onContextMenu?: NoteItemProps['onContextMenu']
@@ -407,8 +410,8 @@ function resolveNoteItemSurfaceProps({
     onClick: createNoteItemClickHandler(entry, isUnavailableBinary, onClickNote),
     onContextMenu: onContextMenu ? (event) => onContextMenu(entry, event) : undefined,
     onMouseEnter: entry.fileKind !== 'binary' && onPrefetch ? () => onPrefetch(entry.path) : undefined,
-    testId: resolveNoteItemTestId({ isMultiSelected, isImagePreview, isUnavailableBinary }),
-    title: resolveNoteItemTitle({ isImagePreview, isUnavailableBinary }),
+    testId: resolveNoteItemTestId({ isMultiSelected, previewKind, isUnavailableBinary }),
+    title: resolveNoteItemTitle({ previewKind, isUnavailableBinary }),
   }
 }
 
@@ -497,16 +500,17 @@ function NoteItemContent({
 
 export function NoteItem({ entry, isSelected, isMultiSelected = false, isHighlighted = false, noteStatus = 'clean', changeStatus, typeEntryMap, allEntries, displayPropsOverride, onClickNote, onPrefetch, onContextMenu }: NoteItemProps) {
   const isBinary = entry.fileKind === 'binary'
-  const isImagePreview = isImagePreviewEntry(entry)
-  const isUnavailableBinary = isBinary && !isImagePreview
+  const previewKind = filePreviewKind(entry)
+  const isPreviewableFile = previewKind !== null
+  const isUnavailableBinary = isBinary && !isPreviewableFile
   const te = typeEntryMap[entry.isA ?? '']
   const displayProps = resolveDisplayProps(entry, typeEntryMap, displayPropsOverride)
-  const typeColor = isImagePreview ? 'var(--accent-blue)' : isBinary ? 'var(--muted-foreground)' : getTypeColor(entry.isA ?? 'Note', te?.color)
+  const typeColor = isPreviewableFile ? 'var(--accent-blue)' : isBinary ? 'var(--muted-foreground)' : getTypeColor(entry.isA ?? 'Note', te?.color)
   const typeLightColor = getTypeLightColor(entry.isA ?? 'Note', te?.color)
   const surfaceProps = resolveNoteItemSurfaceProps({
     entry,
     isUnavailableBinary,
-    isImagePreview,
+    previewKind,
     isSelected,
     isMultiSelected,
     isHighlighted,

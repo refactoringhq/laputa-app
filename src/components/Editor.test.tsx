@@ -284,6 +284,28 @@ describe('Editor', () => {
     expect(screen.queryByTestId('blocknote-view')).not.toBeInTheDocument()
   })
 
+  it('renders an in-app PDF preview for binary PDF tabs', () => {
+    const pdfEntry: VaultEntry = {
+      ...mockEntry,
+      path: '/vault/assets/report.pdf',
+      filename: 'report.pdf',
+      title: 'report.pdf',
+      fileKind: 'binary',
+    }
+
+    renderEditor({
+      tabs: [{ entry: pdfEntry, content: '' }],
+      activeTabPath: pdfEntry.path,
+      entries: [pdfEntry],
+    })
+
+    expect(screen.getByTestId('pdf-file-preview')).toHaveAttribute(
+      'data',
+      'asset://localhost/%2Fvault%2Fassets%2Freport.pdf',
+    )
+    expect(screen.queryByTestId('blocknote-view')).not.toBeInTheDocument()
+  })
+
   it('shows a graceful fallback when an image preview fails to render', () => {
     const imageEntry: VaultEntry = {
       ...mockEntry,
