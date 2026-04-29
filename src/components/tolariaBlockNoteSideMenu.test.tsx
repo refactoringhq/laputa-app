@@ -6,20 +6,14 @@ import { TolariaSideMenu } from './tolariaBlockNoteSideMenu'
 let capturedDragHandleMenu: ComponentType | null = null
 
 vi.mock('@blocknote/react', () => ({
-  AddBlockButton: () => <button type="button">Add block</button>,
   DragHandleMenu: ({ children }: PropsWithChildren) => (
     <div data-testid="drag-handle-menu">{children}</div>
   ),
-  DragHandleButton: ({ dragHandleMenu }: { dragHandleMenu?: ComponentType }) => {
-    capturedDragHandleMenu = dragHandleMenu ?? null
-    return (
-      <button type="button" draggable>
-        Open block menu
-      </button>
-    )
-  },
   RemoveBlockItem: ({ children }: PropsWithChildren) => <div>{children}</div>,
-  SideMenu: ({ children }: PropsWithChildren) => <div data-testid="side-menu">{children}</div>,
+  SideMenu: ({ dragHandleMenu }: { dragHandleMenu?: ComponentType }) => {
+    capturedDragHandleMenu = dragHandleMenu ?? null
+    return <div data-testid="side-menu" />
+  },
   TableColumnHeaderItem: ({ children }: PropsWithChildren) => <div>{children}</div>,
   TableRowHeaderItem: ({ children }: PropsWithChildren) => <div>{children}</div>,
   useDictionary: () => ({
@@ -38,10 +32,6 @@ describe('TolariaSideMenu', () => {
 
     expect(screen.getByTestId('side-menu')).toBeInTheDocument()
     expect(capturedDragHandleMenu).not.toBeNull()
-    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
-      'Open block menu',
-      'Add block',
-    ])
 
     const DragHandleMenuComponent = capturedDragHandleMenu!
     render(<DragHandleMenuComponent />)
