@@ -174,8 +174,9 @@ async function resolveBlocksForTarget(
   }
 
   const parsed = normalizeParsedImageBlocks(await parseMarkdownBlocks(editor, preprocessed)) as EditorBlocks
+  const parseSafeBlocks = repairMalformedEditorBlocks(parsed) as EditorBlocks
   const nextState = {
-    blocks: repairMalformedEditorBlocks(injectEditorMarkdownBlocks(parsed)) as EditorBlocks,
+    blocks: repairMalformedEditorBlocks(injectEditorMarkdownBlocks(parseSafeBlocks)) as EditorBlocks,
     scrollTop: 0,
     sourceContent: content,
   }
