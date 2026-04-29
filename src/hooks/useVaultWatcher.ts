@@ -200,6 +200,12 @@ function handleWatcherEvent({
   }
 }
 
+function cleanupNativeWatcherListener(unlisten: UnlistenFn): void {
+  void Promise.resolve()
+    .then(unlisten)
+    .catch(() => {})
+}
+
 function usePendingVaultRefresh({
   vaultPathRef,
   onVaultChanged,
@@ -263,7 +269,6 @@ function useNativeVaultWatcher({
   enqueueChangedPaths: (paths: WatchPath[]) => void
   clearPendingRefresh: () => void
 }) {
-
   useEffect(() => {
     const root = normalizeWatchPath(vaultPath)
     if (!root || !isTauri()) return
@@ -275,7 +280,7 @@ function useNativeVaultWatcher({
       handleWatcherEvent({ event, root, enqueueChangedPaths })
     }).then((nextUnlisten) => {
       if (cancelled) {
-        nextUnlisten()
+        cleanupNativeWatcherListener(nextUnlisten)
       } else {
         unlisten = nextUnlisten
       }
@@ -290,7 +295,7 @@ function useNativeVaultWatcher({
     return () => {
       cancelled = true
       clearPendingRefresh()
-      unlisten?.()
+      if (unlisten) cleanupNativeWatcherListener(unlisten)
       void invoke('stop_vault_watcher').catch(() => {})
     }
   }, [vaultPath, enqueueChangedPaths, clearPendingRefresh])
