@@ -25,8 +25,10 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     onToggleInspector: vi.fn(),
     onToggleDiff: vi.fn(),
     onToggleRawEditor: vi.fn(),
-    noteLayout: 'centered',
-    onToggleNoteLayout: vi.fn(),
+    noteWidth: 'normal',
+    defaultNoteWidth: 'normal',
+    onSetNoteWidth: vi.fn(),
+    onSetDefaultNoteWidth: vi.fn(),
     onToggleAIChat: vi.fn(),
     onOpenVault: vi.fn(),
     activeNoteModified: false,
@@ -343,20 +345,20 @@ describe('useCommandRegistry', () => {
     expect(findCommand(result.current, 'toggle-raw-editor')?.enabled).toBe(false)
   })
 
-  it('exposes a command palette action for the note layout preference', () => {
-    const onToggleNoteLayout = vi.fn()
-    const config = makeConfig({ noteLayout: 'centered', onToggleNoteLayout })
+  it('exposes command palette actions for note width modes', () => {
+    const onSetNoteWidth = vi.fn()
+    const config = makeConfig({ noteWidth: 'normal', onSetNoteWidth })
     const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'toggle-note-layout')
+    const cmd = findCommand(result.current, 'set-note-width-wide')
 
     expect(cmd).toBeDefined()
     expect(cmd!.group).toBe('View')
-    expect(cmd!.label).toBe('Use Left-Aligned Note Layout')
+    expect(cmd!.label).toBe('Use Wide Note Width')
     expect(cmd!.keywords).toContain('wide')
 
     cmd!.execute()
 
-    expect(onToggleNoteLayout).toHaveBeenCalledOnce()
+    expect(onSetNoteWidth).toHaveBeenCalledWith('wide')
   })
 
   it('exposes command palette actions for moving the selected saved view', () => {
@@ -406,11 +408,28 @@ describe('useCommandRegistry', () => {
     expect(findCommand(result.current, 'move-view-down')?.enabled).toBe(true)
   })
 
-  it('updates note layout command copy when left alignment is active', () => {
-    const config = makeConfig({ noteLayout: 'left' })
+  it('disables the command for the active note width mode', () => {
+    const config = makeConfig({ noteWidth: 'wide' })
     const { result } = renderHook(() => useCommandRegistry(config))
 
-    expect(findCommand(result.current, 'toggle-note-layout')?.label).toBe('Use Centered Note Layout')
+    expect(findCommand(result.current, 'set-note-width-wide')?.enabled).toBe(false)
+    expect(findCommand(result.current, 'set-note-width-normal')?.enabled).toBe(true)
+  })
+
+  it('exposes command palette actions for the default note width', () => {
+    const onSetDefaultNoteWidth = vi.fn()
+    const config = makeConfig({ defaultNoteWidth: 'normal', onSetDefaultNoteWidth })
+    const { result } = renderHook(() => useCommandRegistry(config))
+    const cmd = findCommand(result.current, 'set-default-note-width-wide')
+
+    expect(cmd).toMatchObject({
+      label: 'Use Wide Note Width by Default',
+      group: 'View',
+      enabled: true,
+    })
+
+    cmd!.execute()
+    expect(onSetDefaultNoteWidth).toHaveBeenCalledWith('wide')
   })
 
   it('exposes command palette actions for light and dark mode', () => {

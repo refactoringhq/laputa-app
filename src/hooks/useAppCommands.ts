@@ -8,7 +8,7 @@ import { useCommandRegistry } from './useCommandRegistry'
 import type { CommandAction } from './useCommandRegistry'
 import { useKeyboardNavigation } from './useKeyboardNavigation'
 import { useMenuEvents } from './useMenuEvents'
-import type { NoteLayout, SidebarSelection, SidebarFilter, VaultEntry } from '../types'
+import type { NoteWidthMode, SidebarSelection, SidebarFilter, VaultEntry } from '../types'
 import { requestAddRemote } from '../utils/addRemoteEvents'
 import type { NoteListFilter } from '../utils/noteListHelpers'
 import type { ViewMode } from './useViewMode'
@@ -47,8 +47,10 @@ interface AppCommandsConfig {
   onMoveSelectedViewDown?: () => void
   canMoveSelectedViewUp?: boolean
   canMoveSelectedViewDown?: boolean
-  noteLayout?: NoteLayout
-  onToggleNoteLayout?: () => void
+  noteWidth?: NoteWidthMode
+  defaultNoteWidth?: NoteWidthMode
+  onSetNoteWidth?: (mode: NoteWidthMode) => void
+  onSetDefaultNoteWidth?: (mode: NoteWidthMode) => void
   activeNoteModified: boolean
   onZoomIn: () => void
   onZoomOut: () => void
@@ -167,8 +169,10 @@ type CommandRegistryCoreActions = Pick<
   | 'onMoveSelectedViewDown'
   | 'canMoveSelectedViewUp'
   | 'canMoveSelectedViewDown'
-  | 'noteLayout'
-  | 'onToggleNoteLayout'
+  | 'noteWidth'
+  | 'defaultNoteWidth'
+  | 'onSetNoteWidth'
+  | 'onSetDefaultNoteWidth'
   | 'onToggleAIChat'
 >
 type CommandRegistryVaultActions = Pick<
@@ -437,8 +441,10 @@ function createCommandRegistryCoreConfig(
     canMoveSelectedViewDown: config.canMoveSelectedViewDown,
     onFindInNote: config.onFindInNote,
     onReplaceInNote: config.onReplaceInNote,
-    noteLayout: config.noteLayout,
-    onToggleNoteLayout: config.onToggleNoteLayout,
+    noteWidth: config.noteWidth,
+    defaultNoteWidth: config.defaultNoteWidth,
+    onSetNoteWidth: config.onSetNoteWidth,
+    onSetDefaultNoteWidth: config.onSetDefaultNoteWidth,
     onToggleAIChat: config.onToggleAIChat,
   }
 }

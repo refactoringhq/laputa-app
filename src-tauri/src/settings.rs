@@ -6,6 +6,7 @@ const APP_CONFIG_DIR: &str = "com.tolaria.app";
 const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
 const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &["claude_code", "codex", "opencode", "pi", "gemini"];
 pub const DEFAULT_HIDE_GITIGNORED_FILES: bool = true;
+const SUPPORTED_NOTE_WIDTH_MODES: &[&str] = &["normal", "wide"];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Settings {
@@ -21,6 +22,7 @@ pub struct Settings {
     pub release_channel: Option<String>,
     pub theme_mode: Option<String>,
     pub ui_language: Option<String>,
+    pub note_width_mode: Option<String>,
     pub initial_h1_auto_rename_enabled: Option<bool>,
     pub default_ai_agent: Option<String>,
     pub hide_gitignored_files: Option<bool>,
@@ -61,6 +63,13 @@ pub fn normalize_default_ai_agent(value: Option<&str>) -> Option<String> {
 pub fn normalize_theme_mode(value: Option<&str>) -> Option<String> {
     match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
         Some(mode) if mode == "light" || mode == "dark" => Some(mode),
+        _ => None,
+    }
+}
+
+pub fn normalize_note_width_mode(value: Option<&str>) -> Option<String> {
+    match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
+        Some(mode) if SUPPORTED_NOTE_WIDTH_MODES.contains(&mode.as_str()) => Some(mode),
         _ => None,
     }
 }
@@ -123,6 +132,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         release_channel: normalize_release_channel(settings.release_channel.as_deref()),
         theme_mode: normalize_theme_mode(settings.theme_mode.as_deref()),
         ui_language: normalize_ui_language(settings.ui_language.as_deref()),
+        note_width_mode: normalize_note_width_mode(settings.note_width_mode.as_deref()),
         initial_h1_auto_rename_enabled: settings.initial_h1_auto_rename_enabled,
         default_ai_agent: normalize_default_ai_agent(settings.default_ai_agent.as_deref()),
         hide_gitignored_files: settings.hide_gitignored_files,
@@ -266,6 +276,7 @@ mod tests {
             release_channel: Some("alpha".to_string()),
             theme_mode: Some("dark".to_string()),
             ui_language: Some("zh-Hans".to_string()),
+            note_width_mode: Some("wide".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
             hide_gitignored_files: Some(false),
@@ -294,6 +305,7 @@ mod tests {
             release_channel: Some("alpha".to_string()),
             theme_mode: Some("dark".to_string()),
             ui_language: Some("zh-Hans".to_string()),
+            note_width_mode: Some("wide".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
             hide_gitignored_files: Some(false),
@@ -307,6 +319,7 @@ mod tests {
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
         assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
+        assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
         assert_eq!(loaded.initial_h1_auto_rename_enabled, Some(false));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
         assert_eq!(loaded.hide_gitignored_files, Some(false));
@@ -332,6 +345,7 @@ mod tests {
             release_channel: Some("  alpha  ".to_string()),
             theme_mode: Some("  dark  ".to_string()),
             ui_language: Some("  zh-cn  ".to_string()),
+            note_width_mode: Some("  WIDE  ".to_string()),
             default_ai_agent: Some("  codex  ".to_string()),
             ..Default::default()
         });
@@ -339,6 +353,7 @@ mod tests {
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
         assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
+        assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
     }
 
@@ -414,6 +429,15 @@ mod tests {
             ..Default::default()
         });
         assert!(loaded.theme_mode.is_none());
+    }
+
+    #[test]
+    fn test_invalid_note_width_mode_is_filtered() {
+        let loaded = save_and_reload(Settings {
+            note_width_mode: Some("expanded".to_string()),
+            ..Default::default()
+        });
+        assert!(loaded.note_width_mode.is_none());
     }
 
     #[test]

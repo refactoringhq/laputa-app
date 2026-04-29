@@ -54,6 +54,9 @@ pub struct VaultEntry {
     /// Default view mode for the note list when viewing instances of this Type.
     /// Stored as a string: "all", "editor-list", or "editor-only".
     pub view: Option<String>,
+    /// Rich-editor width mode for this note. None means use the app default.
+    #[serde(rename = "noteWidth")]
+    pub note_width: Option<String>,
     /// Whether this Type is visible in the sidebar. Defaults to true when absent.
     pub visible: Option<bool>,
     /// Whether this note has been explicitly organized (removed from Inbox).

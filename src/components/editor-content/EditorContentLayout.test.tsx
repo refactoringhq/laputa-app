@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { EditorContentLayout } from './EditorContentLayout'
 
 vi.mock('../BreadcrumbBar', () => ({
-  BreadcrumbBar: ({ noteLayout }: { noteLayout?: string }) => <div data-testid="breadcrumb-bar" data-note-layout={noteLayout} />,
+  BreadcrumbBar: ({ noteWidth }: { noteWidth?: string }) => <div data-testid="breadcrumb-bar" data-note-width={noteWidth} />,
 }))
 
 vi.mock('../ArchivedNoteBanner', () => ({
@@ -63,8 +63,8 @@ function createModel(overrides: Record<string, unknown> = {}) {
     onEditorChange: vi.fn(),
     isDeletedPreview: false,
     rawLatestContentRef: { current: null },
-    noteLayout: 'centered',
-    onToggleNoteLayout: vi.fn(),
+    noteWidth: 'normal',
+    onToggleNoteWidth: vi.fn(),
     forceRawMode: false,
     showAIChat: false,
     onToggleAIChat: vi.fn(),
@@ -102,18 +102,18 @@ describe('EditorContentLayout', () => {
     expect(screen.queryByTestId('title-field-input')).not.toBeInTheDocument()
   })
 
-  it('marks the editor content root and breadcrumb with the note layout preference', () => {
-    const { container } = render(<EditorContentLayout {...createModel({ noteLayout: 'left' })} />)
+  it('marks the editor content root and breadcrumb with the note width mode', () => {
+    const { container } = render(<EditorContentLayout {...createModel({ noteWidth: 'wide' })} />)
 
-    expect(container.firstElementChild).toHaveClass('editor-content-layout--left')
-    expect(screen.getByTestId('breadcrumb-bar')).toHaveAttribute('data-note-layout', 'left')
+    expect(container.firstElementChild).toHaveClass('editor-content-width--wide')
+    expect(screen.getByTestId('breadcrumb-bar')).toHaveAttribute('data-note-width', 'wide')
   })
 
-  it('keeps raw mode out of the centered rich-editor content wrapper', () => {
+  it('keeps raw mode out of the rich-editor content wrapper', () => {
     render(<EditorContentLayout {...createModel({
       effectiveRawMode: true,
       showEditor: false,
-      noteLayout: 'centered',
+      noteWidth: 'normal',
     })} />)
 
     const rawEditor = screen.getByTestId('raw-editor-view')

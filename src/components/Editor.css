@@ -204,9 +204,10 @@
   width: 100%;
 }
 
-.editor-content-layout--left .editor-content-wrapper {
-  margin-left: clamp(16px, 6%, 96px);
-  margin-right: auto;
+.editor-content-width--wide .editor-content-wrapper {
+  max-width: min(100%, 1280px);
+  padding-left: clamp(24px, 4vw, 72px);
+  padding-right: clamp(24px, 4vw, 72px);
 }
 
 .raw-editor-codemirror {
@@ -330,12 +331,5 @@
   }
   .editor__blocknote-container .bn-editor {
     padding: 12px 0;
-  }
-}
-
-@container editor (max-width: 900px) {
-  .editor-content-layout--left .editor-content-wrapper {
-    margin-left: auto;
-    margin-right: auto;
   }
 }
