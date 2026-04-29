@@ -6,6 +6,9 @@ const HTTP_ASSET_URL_PREFIX = 'http://asset.localhost/'
 const ASSET_URL_PREFIXES = [ASSET_URL_PREFIX, HTTP_ASSET_URL_PREFIX]
 const ATTACHMENTS_SEGMENT = '/attachments/'
 const RELATIVE_ATTACHMENTS_PREFIX = 'attachments/'
+const WINDOWS_EXTENDED_PATH_PREFIX = '\\\\?\\'
+const WINDOWS_EXTENDED_UNC_PREFIX = '\\\\?\\UNC\\'
+const WINDOWS_DRIVE_PATH_PATTERN = /^[A-Za-z]:[\\/]/
 
 type Markdown = string
 type VaultPath = string
@@ -20,15 +23,47 @@ function assetUrl(path: AbsolutePath): MarkdownImageUrl {
   return convertFileSrc(path)
 }
 
+function usesWindowsSeparators(path: string): boolean {
+  return WINDOWS_DRIVE_PATH_PATTERN.test(path) || path.startsWith('\\\\')
+}
+
+function relativePathForVault(vaultPath: VaultPath, attachmentPath: AttachmentPath): AttachmentPath {
+  return usesWindowsSeparators(vaultPath)
+    ? attachmentPath.replace(/\//g, '\\')
+    : attachmentPath.replace(/\\/g, '/')
+}
+
 function vaultAttachmentPath(vaultPath: VaultPath, attachmentPath: AttachmentPath): AbsolutePath {
-  return `${vaultPath}/${attachmentPath}`
+  const separator = usesWindowsSeparators(vaultPath) ? '\\' : '/'
+  const normalizedAttachmentPath = relativePathForVault(vaultPath, attachmentPath)
+  const joiner = vaultPath.endsWith('/') || vaultPath.endsWith('\\') ? '' : separator
+  return `${vaultPath}${joiner}${normalizedAttachmentPath}`
+}
+
+function removeWindowsExtendedPrefix(path: AbsolutePath): AbsolutePath {
+  if (path.startsWith(WINDOWS_EXTENDED_UNC_PREFIX)) {
+    return `\\\\${path.slice(WINDOWS_EXTENDED_UNC_PREFIX.length)}`
+  }
+  if (path.startsWith(WINDOWS_EXTENDED_PATH_PREFIX)) {
+    return path.slice(WINDOWS_EXTENDED_PATH_PREFIX.length)
+  }
+  return path
+}
+
+function normalizedFilesystemPath(path: AbsolutePath): AbsolutePath {
+  return removeWindowsExtendedPrefix(path).replace(/\\/g, '/')
+}
+
+function withoutTrailingSlash(path: AbsolutePath): AbsolutePath {
+  return path.replace(/\/+$/, '')
 }
 
 function extractAttachmentPath(absolutePath: AbsolutePath): AttachmentPath | null {
-  const index = absolutePath.lastIndexOf(ATTACHMENTS_SEGMENT)
+  const normalizedPath = normalizedFilesystemPath(absolutePath)
+  const index = normalizedPath.lastIndexOf(ATTACHMENTS_SEGMENT)
   if (index === -1) return null
 
-  const filename = absolutePath.slice(index + ATTACHMENTS_SEGMENT.length)
+  const filename = normalizedPath.slice(index + ATTACHMENTS_SEGMENT.length)
   return filename ? `${RELATIVE_ATTACHMENTS_PREFIX}${filename}` : null
 }
 
@@ -46,8 +81,19 @@ function isAssetUrl(url: MarkdownImageUrl): boolean {
 }
 
 function isCurrentVaultAsset(url: MarkdownImageUrl, vaultPath: VaultPath): boolean {
-  const absolutePath = decodeAssetPath(url)
-  return absolutePath === vaultPath || absolutePath.startsWith(`${vaultPath}/`)
+  const absolutePath = withoutTrailingSlash(normalizedFilesystemPath(decodeAssetPath(url)))
+  const normalizedVaultPath = withoutTrailingSlash(normalizedFilesystemPath(vaultPath))
+  return absolutePath === normalizedVaultPath || absolutePath.startsWith(`${normalizedVaultPath}/`)
+}
+
+function currentVaultAttachmentPath(url: MarkdownImageUrl, vaultPath: VaultPath): AttachmentPath | null {
+  const absolutePath = normalizedFilesystemPath(decodeAssetPath(url))
+  const normalizedVaultPath = withoutTrailingSlash(normalizedFilesystemPath(vaultPath))
+  const attachmentsPrefix = `${normalizedVaultPath}/${RELATIVE_ATTACHMENTS_PREFIX}`
+  if (!absolutePath.startsWith(attachmentsPrefix)) return null
+
+  const filename = absolutePath.slice(attachmentsPrefix.length)
+  return filename ? `${RELATIVE_ATTACHMENTS_PREFIX}${filename}` : null
 }
 
 function rewriteMarkdownImages(
@@ -80,14 +126,9 @@ export function resolveImageUrls(markdown: Markdown, vaultPath: VaultPath): Mark
 export function portableImageUrls(markdown: Markdown, vaultPath: VaultPath): Markdown {
   if (!vaultPath) return markdown
 
-  const attachmentsPrefix = `${vaultPath}/${RELATIVE_ATTACHMENTS_PREFIX}`
-
   return rewriteMarkdownImages(markdown, (url) => {
     if (!isAssetUrl(url)) return null
 
-    const absolutePath = decodeAssetPath(url)
-    if (!absolutePath.startsWith(attachmentsPrefix)) return null
-
-    return `${RELATIVE_ATTACHMENTS_PREFIX}${absolutePath.slice(attachmentsPrefix.length)}`
+    return currentVaultAttachmentPath(url, vaultPath)
   })
 }
