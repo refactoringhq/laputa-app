@@ -9,7 +9,7 @@ patchedDependencies:
     hash: dc394d11ab419b36b8d306cbbb6ce39f0722e042b63b2b7d254c7d7f90782e94
     path: patches/@blocknote__core@0.46.2.patch
   '@blocknote/react@0.46.2':
-    hash: e3726d75ed65e07adb1fd48262d6a15f8e52b1cc257177aaf632937830170c97
+    hash: e09f7011df33f4ff92c0d3fd8c9060e62f08997d076f3e438e1e82f8c1ab2f76
     path: patches/@blocknote__react@0.46.2.patch
   '@tiptap/extension-link@3.19.0':
     hash: fbe59b1b8b798ba3fefa371c0729b5aa3458e1ea70a4b86cd5267f9f62529284
@@ -36,7 +36,7 @@ importers:
         version: 0.46.2(@floating-ui/dom@1.7.5)(@mantine/core@8.3.14(@mantine/hooks@8.3.14(react@19.2.4))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@mantine/hooks@8.3.14(react@19.2.4))(@mantine/utils@6.0.22(react@19.2.4))(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(highlight.js@11.11.1)(lowlight@3.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@blocknote/react':
         specifier: ^0.46.2
-        version: 0.46.2(patch_hash=e3726d75ed65e07adb1fd48262d6a15f8e52b1cc257177aaf632937830170c97)(@floating-ui/dom@1.7.5)(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(highlight.js@11.11.1)(lowlight@3.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 0.46.2(patch_hash=e09f7011df33f4ff92c0d3fd8c9060e62f08997d076f3e438e1e82f8c1ab2f76)(@floating-ui/dom@1.7.5)(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(highlight.js@11.11.1)(lowlight@3.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@codemirror/commands':
         specifier: ^6.10.2
         version: 6.10.2
@@ -5422,7 +5422,7 @@ snapshots:
   '@blocknote/mantine@0.46.2(@floating-ui/dom@1.7.5)(@mantine/core@8.3.14(@mantine/hooks@8.3.14(react@19.2.4))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@mantine/hooks@8.3.14(react@19.2.4))(@mantine/utils@6.0.22(react@19.2.4))(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(highlight.js@11.11.1)(lowlight@3.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@blocknote/core': 0.46.2(patch_hash=dc394d11ab419b36b8d306cbbb6ce39f0722e042b63b2b7d254c7d7f90782e94)(@types/hast@3.0.4)(highlight.js@11.11.1)(lowlight@3.3.0)
-      '@blocknote/react': 0.46.2(patch_hash=e3726d75ed65e07adb1fd48262d6a15f8e52b1cc257177aaf632937830170c97)(@floating-ui/dom@1.7.5)(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(highlight.js@11.11.1)(lowlight@3.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@blocknote/react': 0.46.2(patch_hash=e09f7011df33f4ff92c0d3fd8c9060e62f08997d076f3e438e1e82f8c1ab2f76)(@floating-ui/dom@1.7.5)(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(highlight.js@11.11.1)(lowlight@3.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@mantine/core': 8.3.14(@mantine/hooks@8.3.14(react@19.2.4))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@mantine/hooks': 8.3.14(react@19.2.4)
       '@mantine/utils': 6.0.22(react@19.2.4)
@@ -5441,7 +5441,7 @@ snapshots:
       - sugar-high
       - supports-color
 
-  '@blocknote/react@0.46.2(patch_hash=e3726d75ed65e07adb1fd48262d6a15f8e52b1cc257177aaf632937830170c97)(@floating-ui/dom@1.7.5)(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(highlight.js@11.11.1)(lowlight@3.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@blocknote/react@0.46.2(patch_hash=e09f7011df33f4ff92c0d3fd8c9060e62f08997d076f3e438e1e82f8c1ab2f76)(@floating-ui/dom@1.7.5)(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(highlight.js@11.11.1)(lowlight@3.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@blocknote/core': 0.46.2(patch_hash=dc394d11ab419b36b8d306cbbb6ce39f0722e042b63b2b7d254c7d7f90782e94)(@types/hast@3.0.4)(highlight.js@11.11.1)(lowlight@3.3.0)
       '@emoji-mart/data': 1.2.1
