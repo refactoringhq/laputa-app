@@ -43,6 +43,16 @@ describe('resolveImageUrls', () => {
     )
   })
 
+  it('converts Windows relative attachment paths without mixed separators', () => {
+    tauriMode = true
+    const vaultPath = 'C:\\Users\\lnq12\\Documents\\tolaria-test\\Getting Started'
+    const markdown = '![BlockNote image](attachments/1776508281809-CleanShot.png)'
+
+    expect(resolveImageUrls(markdown, vaultPath)).toBe(
+      `![BlockNote image](${assetUrl('C:\\Users\\lnq12\\Documents\\tolaria-test\\Getting Started\\attachments\\1776508281809-CleanShot.png')})`,
+    )
+  })
+
   it('leaves already-correct asset URLs unchanged', () => {
     tauriMode = true
     const url = assetUrl('/vault/attachments/file.png')
@@ -58,6 +68,16 @@ describe('resolveImageUrls', () => {
 
     expect(resolveImageUrls(markdown, '/Users/john/Documents/Getting Started')).toBe(
       `![CleanShot](${assetUrl('/Users/john/Documents/Getting Started/attachments/CleanShot.png')})`,
+    )
+  })
+
+  it('rewrites Windows legacy asset URLs from a different vault', () => {
+    tauriMode = true
+    const legacyUrl = httpAssetUrl('C:\\Users\\old\\Workspace\\tolaria-getting-started\\attachments\\CleanShot.png')
+    const markdown = `![CleanShot](${legacyUrl})`
+
+    expect(resolveImageUrls(markdown, 'C:\\Users\\john\\Documents\\Getting Started')).toBe(
+      `![CleanShot](${assetUrl('C:\\Users\\john\\Documents\\Getting Started\\attachments\\CleanShot.png')})`,
     )
   })
 
@@ -122,6 +142,15 @@ describe('portableImageUrls', () => {
 
     expect(portableImageUrls(markdown, '/vault')).toBe(
       '![screenshot](attachments/legacy.png)',
+    )
+  })
+
+  it('converts Windows extended-length asset URLs to relative paths', () => {
+    const url = httpAssetUrl('\\\\?\\C:\\Users\\lnq12\\Documents\\tolaria-test\\Getting Started\\attachments\\1777388840027-shot.png')
+    const markdown = `![screenshot](${url})`
+
+    expect(portableImageUrls(markdown, 'C:\\Users\\lnq12\\Documents\\tolaria-test\\Getting Started')).toBe(
+      '![screenshot](attachments/1777388840027-shot.png)',
     )
   })
 
