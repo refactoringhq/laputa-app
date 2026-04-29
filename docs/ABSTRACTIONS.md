@@ -161,6 +161,12 @@ interface VaultEntry {
 
 Image previewability is inferred in the renderer from the filename extension (`src/utils/filePreview.ts`) rather than stored as a new persisted kind. This keeps the filesystem as source of truth and avoids converting assets into proprietary objects.
 
+### Note Content Freshness
+
+The renderer may cache recently opened or preloaded markdown content, but cached content is only a performance hint. Before showing cached markdown or editor-ready blocks, `useTabManagement` validates the cached string with the `validate_note_content` Tauri command. That command re-enters the same vault path boundary checks as `get_note_content` and compares the cached text against the current on-disk file bytes. A mismatch, missing file, or unreadable file falls back to the normal fresh-read path and existing missing/unreadable recovery.
+
+Prepared BlockNote blocks in `useEditorTabSwap` are keyed by path plus source content. They can be built ahead of time from prefetched markdown, but they are reused only when the validated raw content for that path is identical to the source content that produced the blocks.
+
 ### Entity Types (isA / type)
 
 Entity type is stored in the `type:` frontmatter field (e.g. `type: Quarter`). The legacy field name `Is A:` is still accepted as an alias for backwards compatibility but new notes use `type:`. The `VaultEntry.isA` property in TypeScript/Rust holds the resolved value.

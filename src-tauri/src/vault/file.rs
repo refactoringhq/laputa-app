@@ -29,6 +29,16 @@ fn is_invalid_platform_path_error(error: &Error) -> bool {
     error.kind() == ErrorKind::InvalidInput || error.raw_os_error() == Some(123)
 }
 
+fn read_existing_note_bytes(path: &Path) -> Result<Vec<u8>, String> {
+    if !path.exists() {
+        return Err(format!("File does not exist: {}", path.display()));
+    }
+    if !path.is_file() {
+        return Err(format!("Path is not a file: {}", path.display()));
+    }
+    fs::read(path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))
+}
+
 #[derive(Clone, Copy)]
 enum NoteIoOperation {
     Save,
@@ -70,14 +80,14 @@ fn note_io_error(operation: NoteIoOperation, path: NotePathDisplay<'_>, error: &
 
 /// Read the content of a single note file.
 pub fn get_note_content(path: &Path) -> Result<String, String> {
-    if !path.exists() {
-        return Err(format!("File does not exist: {}", path.display()));
-    }
-    if !path.is_file() {
-        return Err(format!("Path is not a file: {}", path.display()));
-    }
-    let bytes = fs::read(path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+    let bytes = read_existing_note_bytes(path)?;
     String::from_utf8(bytes).map_err(|_| invalid_utf8_text_error(path))
+}
+
+/// Check whether a note still has the exact content the renderer cached.
+pub fn note_content_matches(path: &Path, expected_content: &str) -> Result<bool, String> {
+    let bytes = read_existing_note_bytes(path)?;
+    Ok(bytes == expected_content.as_bytes())
 }
 
 fn validate_save_path(file_path: &Path, display_path: &str) -> Result<(), String> {
@@ -154,5 +164,15 @@ mod tests {
         assert!(message.contains("path is invalid on this platform"));
         assert!(message.contains("Rename the note or move it to a valid folder"));
         assert!(!message.contains("os error 123"));
+    }
+
+    #[test]
+    fn note_content_matches_detects_external_edits() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("note.md");
+        fs::write(&path, "# Fresh\n").unwrap();
+
+        assert!(note_content_matches(&path, "# Fresh\n").unwrap());
+        assert!(!note_content_matches(&path, "# Stale\n").unwrap());
     }
 }

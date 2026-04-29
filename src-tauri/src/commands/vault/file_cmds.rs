@@ -102,6 +102,20 @@ pub fn get_note_content(path: PathBuf, vault_path: Option<PathBuf>) -> Result<St
 }
 
 #[tauri::command]
+pub fn validate_note_content(
+    path: PathBuf,
+    content: String,
+    vault_path: Option<PathBuf>,
+) -> Result<bool, String> {
+    with_note_path(
+        path.as_path(),
+        vault_path.as_deref(),
+        ValidatedPathMode::Existing,
+        |validated_path| vault::note_content_matches(validated_path, &content),
+    )
+}
+
+#[tauri::command]
 pub fn save_note_content(
     path: PathBuf,
     content: String,
@@ -340,5 +354,19 @@ mod tests {
             create_vault_folder(vault.path().to_path_buf(), PathBuf::from("../escape"))
                 .unwrap_err();
         assert!(folder_error.contains("Path must stay inside the active vault"));
+    }
+
+    #[test]
+    fn validate_note_content_compares_against_disk() {
+        let dir = TempDir::new().unwrap();
+        let root = vault_root(&dir);
+        let note = note_path(&dir, "note.md");
+        fs::write(&note, "# Fresh\n").unwrap();
+
+        assert!(
+            validate_note_content(note.clone(), "# Fresh\n".to_string(), Some(root.clone()),)
+                .unwrap()
+        );
+        assert!(!validate_note_content(note, "# Stale\n".to_string(), Some(root)).unwrap());
     }
 }

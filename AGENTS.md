@@ -22,7 +22,7 @@ Run `/laputa-next-task` — fetches next task (To Rework first, then Open), move
 - Work on `main` branch — **no branches, no PRs, ever**. Pre-commit and pre-push block work from any other branch.
 - Commit every 20–30 min: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - **⛔ NEVER use --no-verify**
-- For UI tasks: open `ui-design.pen` first, study visual language, design in light mode
+- For UI tasks: open `ui-design.pen` first, study visual language, design in light mode. You don't need Pencil to use it – you can open it as a JSON file.
 
 ### 1c. When done
 
@@ -47,15 +47,13 @@ bash ~/.openclaw/skills/tolaria-qa/scripts/screenshot.sh /tmp/qa-native.png
 
 Use `osascript` for keyboard interactions. Write result as Todoist comment (✅ or ❌). **⚠️ WKWebView:** `osascript keystroke` blocked inside editor — rely on Playwright for text input features.
 
-After both phases pass, add a **completion comment** to the Todoist task before running `/laputa-done`. The comment must include:
-- What was implemented (1–2 lines)
+After both phases pass, add a **completion comment** to the Todoist task. The comment must include:
+- What was implemented (a few lines covering logic and UX/UI)
 - QA: what was tested and how (Playwright / native screenshot / osascript)
 - Refactoring: any files refactored to meet the CodeScene gate (or "none needed")
 - ADRs: any new/updated ADRs (or "none")
 - Docs: any updated docs (ARCHITECTURE.md, ABSTRACTIONS.md, etc.) (or "none")
 - Code health: final Hotspot and Average scores after push
-
-Then run `/laputa-done <task_id>` → moves to In Review, notifies Brian, self-dispatches next task.
 
 ---
 
@@ -72,6 +70,16 @@ Then run `/laputa-done <task_id>` → moves to In Review, notifies Brian, self-d
 Red → Green → Refactor → Commit. One cycle per commit. For bugs: write failing regression test first, then fix. Exception: pure CSS/layout changes.
 
 **Test quality (Kent Beck's Desiderata):** Isolated · Deterministic · Fast · Behavioral · Structure-insensitive · Specific · Predictive. Fix flaky tests first. Prefer E2E over unit tests for user flows.
+
+### Localization (mandatory for UI copy)
+
+All user-facing UI labels/copy must live in `src/lib/locales/en.json` and be translated into every target listed in `lara.yaml`. When adding or changing interface copy:
+
+```bash
+pnpm l10n:translate
+```
+
+Use `pnpm l10n:translate:force` only when intentionally regenerating existing translations. Commit `src/lib/locales/*.json`, `lara.yaml`/`lara.lock` changes if produced, and verify placeholders/product names stayed intact.
 
 ### Code health (mandatory)
 
@@ -122,10 +130,6 @@ Default to `demo-vault-v2/`. If you must use `~/Laputa/` for testing:
 - **Delete all test notes from disk** when done — do not leave untitled or temporary notes on the filesystem. Run `cd ~/Laputa && git checkout -- . && git clean -fd` to restore the vault to its last committed state.
 - **Rationale:** test notes pollute the local vault over time, making it a collection of nonsensical untitled files. The vault must stay clean on disk, not just on the remote.
 
-### UI design
-
-Open `ui-design.pen` first (light mode). Create `design/<slug>.pen` for the task; on completion merge into `ui-design.pen` and delete it.
-
 ### UI components — mandatory rules
 
 **Always use shadcn/ui components.** Never use raw HTML form elements (`<input>`, `<select>`, `<button>`, native `<input type="date">`, etc.) for user-facing UI. Every interactive element must use the shadcn/ui equivalent:
@@ -155,10 +159,11 @@ Open `ui-design.pen` first (light mode). Create `design/<slug>.pen` for the task
 - Tauri menu accelerators: `MenuItemBuilder::new(label).accelerator("CmdOrCtrl+1")`
 - `app.set_menu()` replaces the ENTIRE menu bar — include all submenus
 - `mock-tauri.ts` silently swallows Tauri calls — not a substitute for native testing
+
 ### QA scripts
 
 ```bash
-bash ~/.openclaw/skills/tolaria-qa/scripts/focus-app.sh laputa
+bash ~/.openclaw/skills/tolaria-qa/scripts/focus-app.sh Tolaria
 bash ~/.openclaw/skills/tolaria-qa/scripts/screenshot.sh /tmp/out.png
 bash ~/.openclaw/skills/tolaria-qa/scripts/shortcut.sh "command" "s"
 ```

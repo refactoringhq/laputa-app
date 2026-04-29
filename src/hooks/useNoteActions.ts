@@ -194,13 +194,15 @@ async function updateFrontmatterAndMaybeRename({
 }
 
 function buildTabManagementOptions(
-  config: Pick<NoteActionsConfig, 'flushBeforeNoteSwitch' | 'reloadVault' | 'setToastMessage'>,
+  config: Pick<NoteActionsConfig, 'flushBeforeNoteSwitch' | 'reloadVault' | 'setToastMessage' | 'unsavedPaths'>,
 ) {
   const options: {
     beforeNavigate?: (fromPath: string, toPath: string) => Promise<void>
+    hasUnsavedChanges: (path: string) => boolean
     onMissingNotePath: (entry: VaultEntry) => void
     onUnreadableNoteContent: (entry: VaultEntry) => void
   } = {
+    hasUnsavedChanges: (path) => config.unsavedPaths?.has(path) ?? false,
     onMissingNotePath: (entry) => {
       const label = entry.title.trim() || entry.filename
       config.setToastMessage(`"${label}" could not be opened because its file is missing or moved.`)
