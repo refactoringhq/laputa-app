@@ -508,7 +508,7 @@ describe('App', () => {
     })
   })
 
-  it('shows the app shell skeleton while the vault note scan is pending', async () => {
+  it('keeps the app shell usable while the vault note scan is pending', async () => {
     let resolveListVault: ((value: typeof mockEntries) => void) | null = null
     const listVaultPromise = new Promise<typeof mockEntries>((resolve) => {
       resolveListVault = resolve
@@ -518,9 +518,15 @@ describe('App', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('vault-loading-skeleton')).toBeInTheDocument()
+      expect(screen.queryByTestId('vault-loading-skeleton')).not.toBeInTheDocument()
     })
-    expect(screen.queryByText('Select a note to start editing')).not.toBeInTheDocument()
+    expect(screen.getByText('Select a note to start editing')).toBeInTheDocument()
+    expect(screen.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'p', code: 'KeyP', metaKey: true })
+      await Promise.resolve()
+    })
+    expect(within(screen.getByTestId('quick-open-palette')).getByText('Reloading vault...')).toBeInTheDocument()
 
     await act(async () => {
       resolveListVault?.(mockEntries)
@@ -529,6 +535,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(screen.queryByTestId('vault-loading-skeleton')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('status-vault-reloading')).not.toBeInTheDocument()
       expect(screen.getAllByText('Test Project').length).toBeGreaterThan(0)
     })
   })

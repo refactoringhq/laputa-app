@@ -1609,8 +1609,8 @@ function App() {
     )
   }
 
-  // Show loading skeleton while checking git status or scanning vault notes.
-  if (!noteWindowParams && onboarding.state.status === 'ready' && (gitRepoState === 'checking' || vault.isLoading)) {
+  // Show the full skeleton only while app-level vault capabilities are unknown.
+  if (!noteWindowParams && onboarding.state.status === 'ready' && gitRepoState === 'checking') {
     return (
       <AppLoadingSkeleton
         noteListWidth={layout.noteListWidth}
@@ -1713,11 +1713,11 @@ function App() {
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
         <RenameDetectedBanner renames={detectedRenames} onUpdate={handleUpdateWikilinks} onDismiss={handleDismissRenames} />
-        <StatusBar noteCount={vault.entries.length} modifiedCount={vault.modifiedFiles.length} vaultPath={resolvedPath} vaults={vaultSwitcher.allVaults} onSwitchVault={vaultSwitcher.switchVault} onOpenSettings={dialogs.openSettings} onOpenFeedback={openFeedback} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onCommitPush={handleCommitPush} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} onTriggerSync={autoSync.triggerSync} onPullAndPush={autoSync.pullAndPush} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} onRemoveVault={vaultSwitcher.removeVault} mcpStatus={mcpStatus} onInstallMcp={openMcpSetupDialog} aiAgentsStatus={aiAgentsStatus} vaultAiGuidanceStatus={vaultAiGuidanceStatus} defaultAiAgent={aiAgentPreferences.defaultAiAgent} onSetDefaultAiAgent={aiAgentPreferences.setDefaultAiAgent} onRestoreVaultAiGuidance={() => { void restoreVaultAiGuidance() }} locale={appLocale} />
+        <StatusBar noteCount={vault.entries.length} modifiedCount={vault.modifiedFiles.length} vaultPath={resolvedPath} vaults={vaultSwitcher.allVaults} onSwitchVault={vaultSwitcher.switchVault} onOpenSettings={dialogs.openSettings} onOpenFeedback={openFeedback} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onCommitPush={handleCommitPush} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || vault.isLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} onTriggerSync={autoSync.triggerSync} onPullAndPush={autoSync.pullAndPush} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} onRemoveVault={vaultSwitcher.removeVault} mcpStatus={mcpStatus} onInstallMcp={openMcpSetupDialog} aiAgentsStatus={aiAgentsStatus} vaultAiGuidanceStatus={vaultAiGuidanceStatus} defaultAiAgent={aiAgentPreferences.defaultAiAgent} onSetDefaultAiAgent={aiAgentPreferences.setDefaultAiAgent} onRestoreVaultAiGuidance={() => { void restoreVaultAiGuidance() }} locale={appLocale} />
         <GitSetupDialog open={shouldShowGitSetupDialog} onInitGit={handleInitGitRepo} onDismiss={dismissGitSetupDialog} />
         <DeleteProgressNotice count={deleteActions.pendingDeleteCount} />
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
-        <QuickOpenPalette open={dialogs.showQuickOpen} entries={vault.entries} onSelect={notes.handleSelectNote} onClose={dialogs.closeQuickOpen} />
+        <QuickOpenPalette open={dialogs.showQuickOpen} entries={vault.entries} isLoading={vault.isLoading} onSelect={notes.handleSelectNote} onClose={dialogs.closeQuickOpen} locale={appLocale} />
         <CommandPalette
           open={dialogs.showCommandPalette}
           commands={commands}

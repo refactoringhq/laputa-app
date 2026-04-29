@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+import { openCommandPalette, sendShortcut } from './helpers'
 
 type MockHandlers = Record<string, (args?: unknown) => unknown>
 type MockWindow = Window & {
@@ -41,7 +42,7 @@ const slowVaultEntries = [
   },
 ]
 
-test('slow vault open shows the app shell skeleton until notes load @smoke', async ({ page }) => {
+async function installSlowVaultMock(page: Page): Promise<void> {
   await page.addInitScript((entries) => {
     localStorage.setItem('tolaria_welcome_dismissed', '1')
     localStorage.setItem('tolaria:ai-agents-onboarding-dismissed', '1')
@@ -95,17 +96,45 @@ test('slow vault open shows the app shell skeleton until notes load @smoke', asy
       },
     })
   }, slowVaultEntries)
+}
 
-  await page.goto('/', { waitUntil: 'domcontentloaded' })
+async function expectResponsiveShellWhileVaultLoads(page: Page): Promise<void> {
+  await expect(page.getByTestId('vault-loading-skeleton')).not.toBeVisible()
+  await expect(page.getByText('Select a note to start editing')).toBeVisible()
+  await expect(page.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
 
-  await expect(page.getByTestId('vault-loading-skeleton')).toBeVisible()
-  await expect(page.getByText('Select a note to start editing')).not.toBeVisible()
+  await sendShortcut(page, 'p', ['Control'])
+  await expect(page.getByTestId('quick-open-palette')).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByTestId('quick-open-palette').getByText('Reloading vault...')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('quick-open-palette')).not.toBeVisible()
 
+  await openCommandPalette(page)
+  await expect(page.locator('input[placeholder="Type a command..."]')).toBeVisible()
+  await page.keyboard.press('Escape')
+}
+
+async function resolveVaultScan(page: Page): Promise<void> {
   await page.evaluate(() => {
     (window as MockWindow).__resolveVaultScan?.()
   })
+}
 
+async function expectLoadedVaultSearch(page: Page): Promise<void> {
   await expect(page.getByTestId('vault-loading-skeleton')).not.toBeVisible()
+  await expect(page.getByTestId('status-vault-reloading')).not.toBeVisible()
   await expect(page.getByTestId('note-list-container')).toBeVisible()
   await expect(page.getByText('Large Vault Note')).toBeVisible()
+
+  await sendShortcut(page, 'p', ['Control'])
+  await expect(page.getByTestId('quick-open-palette')).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByTestId('quick-open-palette').getByText('Large Vault Note')).toBeVisible()
+}
+
+test('slow vault open keeps the app shell usable while notes load @smoke', async ({ page }) => {
+  await installSlowVaultMock(page)
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await expectResponsiveShellWhileVaultLoads(page)
+  await resolveVaultScan(page)
+  await expectLoadedVaultSearch(page)
 })
