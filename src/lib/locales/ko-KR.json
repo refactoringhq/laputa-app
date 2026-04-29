@@ -486,5 +486,6 @@
   "locale.es419": "스페인어(라틴 아메리카)",
   "locale.zhCN": "简体中文",
   "locale.jaJP": "日本語",
-  "locale.koKR": "한국어"
+  "locale.koKR": "한국어",
+  "locale.vi": "베트남어"
 }
