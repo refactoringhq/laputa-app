@@ -413,6 +413,31 @@ describe('useCommandRegistry', () => {
     expect(findCommand(result.current, 'toggle-note-layout')?.label).toBe('Use Centered Note Layout')
   })
 
+  it('exposes command palette actions for light and dark mode', () => {
+    const onSetThemeMode = vi.fn()
+    const config = makeConfig({ onSetThemeMode })
+    const { result } = renderHook(() => useCommandRegistry(config))
+    const lightMode = findCommand(result.current, 'use-light-mode')
+    const darkMode = findCommand(result.current, 'use-dark-mode')
+
+    expect(lightMode).toMatchObject({
+      label: 'Use Light Mode',
+      enabled: true,
+      group: 'Settings',
+    })
+    expect(darkMode).toMatchObject({
+      label: 'Use Dark Mode',
+      enabled: true,
+      group: 'Settings',
+    })
+
+    lightMode?.execute()
+    darkMode?.execute()
+
+    expect(onSetThemeMode).toHaveBeenNthCalledWith(1, 'light')
+    expect(onSetThemeMode).toHaveBeenNthCalledWith(2, 'dark')
+  })
+
   it('includes a New AI chat command that opens and resets the panel session', () => {
     const config = makeConfig()
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')

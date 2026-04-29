@@ -79,6 +79,8 @@
   "command.settings.setupExternalAi": "外部AIツールを設定…",
   "command.settings.reloadVault": "Vault を再読み込み",
   "command.settings.repairVault": "Vault を修復",
+  "command.settings.useLightMode": "ライトモードを使用",
+  "command.settings.useDarkMode": "ダークモードを使用",
   "command.ai.openAgents": "AIエージェントを開く",
   "command.ai.restoreGuidance": "Tolaria AIガイダンスを復元",
   "command.ai.switchToAgent": "AIエージェントを{agent}に切り替える",

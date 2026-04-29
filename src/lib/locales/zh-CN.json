@@ -79,6 +79,8 @@
   "command.settings.setupExternalAi": "设置外部 AI 工具…",
   "command.settings.reloadVault": "重新加载仓库",
   "command.settings.repairVault": "修复仓库",
+  "command.settings.useLightMode": "使用浅色模式",
+  "command.settings.useDarkMode": "使用深色模式",
   "command.ai.openAgents": "打开 AI 代理设置",
   "command.ai.restoreGuidance": "恢复 Tolaria AI 指导文件",
   "command.ai.switchToAgent": "将 AI 代理切换为 {agent}",

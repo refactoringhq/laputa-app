@@ -11,6 +11,7 @@ import {
   type AppLocale,
   type UiLanguagePreference,
 } from '../../lib/i18n'
+import type { ThemeMode } from '../../lib/themeMode'
 
 interface SettingsCommandsConfig {
   mcpStatus?: string
@@ -31,6 +32,7 @@ interface SettingsCommandsConfig {
   systemLocale?: AppLocale
   selectedUiLanguage?: UiLanguagePreference
   onSetUiLanguage?: (language: UiLanguagePreference) => void
+  onSetThemeMode?: (mode: ThemeMode) => void
 }
 
 function commandKeywords(raw: string): string[] {
@@ -121,6 +123,33 @@ function buildLanguageCommands({
   ]
 }
 
+function buildThemeCommands({
+  locale = 'en',
+  onSetThemeMode,
+}: Pick<SettingsCommandsConfig, 'locale' | 'onSetThemeMode'>): CommandAction[] {
+  const t = createTranslator(locale)
+  const canSetThemeMode = !!onSetThemeMode
+
+  return [
+    {
+      id: 'use-light-mode',
+      label: t('command.settings.useLightMode'),
+      group: 'Settings',
+      keywords: ['theme', 'appearance', 'light', 'light mode', 'day'],
+      enabled: canSetThemeMode,
+      execute: () => onSetThemeMode?.('light'),
+    },
+    {
+      id: 'use-dark-mode',
+      label: t('command.settings.useDarkMode'),
+      group: 'Settings',
+      keywords: ['theme', 'appearance', 'dark', 'dark mode', 'night'],
+      enabled: canSetThemeMode,
+      execute: () => onSetThemeMode?.('dark'),
+    },
+  ]
+}
+
 function buildVaultSettingsCommands({
   vaultCount,
   isGettingStartedHidden,
@@ -171,11 +200,12 @@ export function buildSettingsCommands(config: SettingsCommandsConfig): CommandAc
     mcpStatus, vaultCount, isGettingStartedHidden,
     onOpenSettings, onOpenFeedback, onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
     onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault, onToggleGitignoredFilesVisibility,
-    locale = 'en', systemLocale = locale, selectedUiLanguage = SYSTEM_UI_LANGUAGE, onSetUiLanguage,
+    locale = 'en', systemLocale = locale, selectedUiLanguage = SYSTEM_UI_LANGUAGE, onSetUiLanguage, onSetThemeMode,
   } = config
 
   return [
     ...buildPrimarySettingsCommands({ locale, onOpenSettings, onOpenFeedback, onCheckForUpdates }),
+    ...buildThemeCommands({ locale, onSetThemeMode }),
     ...buildLanguageCommands({
       locale,
       systemLocale,

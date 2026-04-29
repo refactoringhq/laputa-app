@@ -2754,6 +2754,107 @@
     },
     {
       "type": "frame",
+      "id": "command_palette_theme_mode_actions",
+      "x": 1040,
+      "y": 4010,
+      "name": "Command palette theme mode actions",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 420,
+      "height": 160,
+      "fill": "$--popover",
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "$--border"
+      },
+      "cornerRadius": "$--radius-lg",
+      "layout": "vertical",
+      "gap": 8,
+      "padding": 12,
+      "children": [
+        {
+          "type": "text",
+          "id": "command_palette_theme_mode_title",
+          "fill": "$--muted-foreground",
+          "content": "COMMAND PALETTE / SETTINGS",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "command_palette_theme_mode_light",
+          "width": "fill_container",
+          "height": 40,
+          "fill": "$--accent",
+          "cornerRadius": "$--radius-md",
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "gap": 10,
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "command_palette_theme_mode_light_icon",
+              "width": 16,
+              "height": 16,
+              "iconFontName": "sun",
+              "iconFontFamily": "lucide",
+              "fill": "$--muted-foreground"
+            },
+            {
+              "type": "text",
+              "id": "command_palette_theme_mode_light_label",
+              "fill": "$--foreground",
+              "content": "Use Light Mode",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "command_palette_theme_mode_dark",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": "$--radius-md",
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "gap": 10,
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "command_palette_theme_mode_dark_icon",
+              "width": 16,
+              "height": 16,
+              "iconFontName": "moon",
+              "iconFontFamily": "lucide",
+              "fill": "$--muted-foreground"
+            },
+            {
+              "type": "text",
+              "id": "command_palette_theme_mode_dark_label",
+              "fill": "$--foreground",
+              "content": "Use Dark Mode",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "500"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
       "id": "HGjqA",
       "x": 0,
       "y": 5100,
