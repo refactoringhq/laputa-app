@@ -38,6 +38,7 @@ describe('useAppSave', () => {
     handleSwitchTab: vi.fn(),
     setToastMessage: vi.fn(),
     loadModifiedFiles: vi.fn(),
+    onInternalVaultWrite: vi.fn(),
     trackUnsaved: vi.fn(),
     clearUnsaved: vi.fn(),
     unsavedPaths: new Set<string>(),
@@ -58,6 +59,7 @@ describe('useAppSave', () => {
     deps.tabs = []
     deps.activeTabPath = null
     deps.trackUnsaved.mockReset()
+    deps.onInternalVaultWrite.mockReset()
     deps.handleRenameNote.mockResolvedValue(undefined)
     deps.handleRenameFilename.mockResolvedValue(undefined)
     deps.initialH1AutoRenameEnabled = true
@@ -579,6 +581,18 @@ describe('useAppSave', () => {
     )
     expect(getTabs()[0].entry.path).toBe(newPath)
     expect(getTabs()[0].content).toBe('# Fresh Title\n\nBody that keeps changing while rename is pending')
+  })
+
+  it('marks untitled auto-rename paths as internal vault writes', async () => {
+    const { result, oldPath, newPath } = setupUntitledRenameHarness()
+
+    await act(async () => {
+      result.current.handleContentChange(oldPath, '# Fresh Title\n\nBody')
+      await vi.advanceTimersByTimeAsync(3_000)
+    })
+
+    expect(deps.onInternalVaultWrite).toHaveBeenCalledWith(oldPath)
+    expect(deps.onInternalVaultWrite).toHaveBeenCalledWith(newPath)
   })
 
   it('does not run markdown title-sync renames for non-markdown text files', async () => {

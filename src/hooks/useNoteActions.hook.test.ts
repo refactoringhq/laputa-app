@@ -380,6 +380,7 @@ describe('useNoteActions hook', () => {
       expect(addPendingSave).toHaveBeenCalledWith(createdPath)
       expect(removePendingSave).toHaveBeenCalledWith(createdPath)
       expect(onNewNotePersisted).toHaveBeenCalledOnce()
+      expect(onNewNotePersisted).toHaveBeenCalledWith(createdPath)
       expect(addEntry).toHaveBeenCalledTimes(1)
       expect(result.current.tabs[0].entry.path).toMatch(/untitled-note-\d+\.md$/)
     })
@@ -397,6 +398,7 @@ describe('useNoteActions hook', () => {
       })
 
       expect(onNewNotePersisted).toHaveBeenCalledTimes(1)
+      expect(onNewNotePersisted).toHaveBeenCalledWith(expect.stringContaining('persist-callback.md'))
     })
 
     it('does not call onNewNotePersisted when disk write fails (Tauri)', async () => {
