@@ -189,6 +189,26 @@ test('@smoke new-note H1 auto-rename keeps the editor usable and leaves no untit
   expect(errors).toEqual([])
 })
 
+test('@smoke new-note typing stays focused through initial save settlement', async ({ page }) => {
+  const title = 'Creation Focus Guard'
+  const bodyText = 'Body keeps accepting text while creation writes and saves settle.'
+
+  await createUntitledNote(page)
+  await page.keyboard.type(title, { delay: 35 })
+  await page.keyboard.press('Enter')
+  await page.keyboard.type(bodyText, { delay: 35 })
+  await page.waitForTimeout(1_000)
+
+  await expectEditorFocused(page)
+  await page.keyboard.type(' Still focused.')
+  await expectActiveFilename(page, slugifyTitle(title))
+  await expectFileContentContains({
+    vaultPath: tempVaultDir,
+    filename: `${slugifyTitle(title)}.md`,
+    text: 'Still focused.',
+  })
+})
+
 test('@smoke new-note H1 auto-rename preserves body typing and cursor while rename lands', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => {

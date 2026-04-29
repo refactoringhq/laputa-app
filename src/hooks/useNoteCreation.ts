@@ -284,7 +284,7 @@ function signalFocusEditor(opts?: { selectTitle?: boolean; path?: string }): voi
 interface PersistCallbacks {
   onStart?: (p: string) => void
   onEnd?: (p: string) => void
-  onPersisted?: () => void
+  onPersisted?: (path: string) => void
 }
 
 /** Persist to disk; track pending state via onStart/onEnd. */
@@ -292,7 +292,7 @@ async function persistOptimistic(path: string, content: string, cbs: PersistCall
   cbs.onStart?.(path)
   try {
     await persistNewNote(path, content)
-    cbs.onPersisted?.()
+    cbs.onPersisted?.(path)
   } finally {
     cbs.onEnd?.(path)
   }
@@ -410,7 +410,7 @@ interface ImmediateCreateDeps {
   pendingSlugs: Set<string>
   openTabWithContent: (entry: VaultEntry, content: string) => void
   addEntry: (entry: VaultEntry) => void
-  onNewNotePersisted?: () => void
+  onNewNotePersisted?: (path: string) => void
   removePendingSave?: (path: string) => void
   setToastMessage: (msg: string | null) => void
 }
@@ -425,7 +425,7 @@ interface ImmediateCreateQueueConfig {
   vaultPath: string
   addEntry: (entry: VaultEntry) => void
   openTabWithContent: (entry: VaultEntry, content: string) => void
-  onNewNotePersisted?: () => void
+  onNewNotePersisted?: (path: string) => void
   removePendingSave?: (path: string) => void
   setToastMessage: (msg: string | null) => void
 }
@@ -600,7 +600,7 @@ export interface NoteCreationConfig {
   clearUnsaved?: (path: string) => void
   unsavedPaths?: Set<string>
   markContentPending?: (path: string, content: string) => void
-  onNewNotePersisted?: () => void
+  onNewNotePersisted?: (path: string) => void
   onTypeStateChanged?: () => void | Promise<void>
 }
 

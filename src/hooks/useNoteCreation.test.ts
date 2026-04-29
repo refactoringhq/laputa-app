@@ -382,6 +382,7 @@ describe('useNoteCreation hook', () => {
     expect(addPendingSave).toHaveBeenCalledWith(createdPath)
     expect(removePendingSave).toHaveBeenCalledWith(createdPath)
     expect(onNewNotePersisted).toHaveBeenCalledOnce()
+    expect(onNewNotePersisted).toHaveBeenCalledWith(createdPath)
     expect(addEntry).toHaveBeenCalledTimes(1)
     expect(openTabWithContent).toHaveBeenCalledTimes(1)
     expect(vi.mocked(invoke).mock.invocationCallOrder[0]).toBeLessThan(
