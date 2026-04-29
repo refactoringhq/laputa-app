@@ -35,10 +35,10 @@ function typeSequence(view: EditorView, inputs: readonly string[]) {
   })
 }
 
-function createView(container: HTMLDivElement) {
+function createView(container: HTMLDivElement, content = '') {
   const ref = { current: container }
   const { result } = renderHook(() =>
-    useCodeMirror(ref, '', noopCallbacks),
+    useCodeMirror(ref, content, noopCallbacks),
   )
   return result.current.current!
 }
@@ -89,5 +89,23 @@ describe('useCodeMirror arrow ligatures', () => {
       redo(view)
     })
     expect(view.state.doc.toString()).toBe('→')
+  })
+
+  it('keeps Mermaid arrows literal while typing inside fenced code', () => {
+    const content = [
+      '```mermaid',
+      'flowchart TD',
+      'A --',
+      '```',
+    ].join('\n')
+    const cursor = content.indexOf('A --') + 'A --'.length
+    const view = createView(container, content)
+
+    act(() => {
+      view.dispatch({ selection: { anchor: cursor } })
+    })
+    typeSequence(view, ['>'])
+
+    expect(view.state.doc.toString()).toContain('A -->')
   })
 })

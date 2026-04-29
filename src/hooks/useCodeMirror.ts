@@ -18,11 +18,51 @@ const RAW_EDITOR_COLORS = {
   gutterBorder: 'var(--border-subtle)',
   gutterText: 'var(--text-muted)',
 }
+interface MarkdownFence {
+  character: '`' | '~'
+  length: number
+}
+
 export interface CodeMirrorCallbacks {
   onDocChange: (doc: string) => void
   onCursorActivity: (view: EditorView) => void
   onSave: () => void
   onEscape: () => boolean
+}
+
+function readMarkdownFence(line: string): MarkdownFence | null {
+  const match = /^( {0,3})(`{3,}|~{3,})/.exec(line)
+  if (!match) return null
+
+  const fence = match[2]
+  return {
+    character: fence[0] as MarkdownFence['character'],
+    length: fence.length,
+  }
+}
+
+function isClosingMarkdownFence(line: string, opening: MarkdownFence): boolean {
+  const match = /^( {0,3})(`{3,}|~{3,})[ \t]*$/.exec(line)
+  if (!match) return false
+
+  const fence = match[2]
+  return fence[0] === opening.character && fence.length >= opening.length
+}
+
+function isInsideMarkdownFence(markdownBeforeCursor: string): boolean {
+  const lines = markdownBeforeCursor.split(/\r?\n/)
+  let opening: MarkdownFence | null = null
+
+  for (const line of lines) {
+    if (opening) {
+      if (isClosingMarkdownFence(line, opening)) opening = null
+      continue
+    }
+
+    opening = readMarkdownFence(line)
+  }
+
+  return opening !== null
 }
 
 function buildBaseTheme() {
@@ -83,6 +123,11 @@ function buildArrowLigaturesExtension() {
   let literalAsciiCursor: number | null = null
 
   return EditorView.inputHandler.of((view, from, _to, text) => {
+    if (isInsideMarkdownFence(view.state.doc.sliceString(0, from))) {
+      literalAsciiCursor = null
+      return false
+    }
+
     const beforeText = view.state.doc.sliceString(Math.max(0, from - 2), from)
     const resolution = resolveArrowLigatureInput({
       beforeText,
