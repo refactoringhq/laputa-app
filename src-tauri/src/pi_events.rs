@@ -1,5 +1,6 @@
 use crate::ai_agents::AiAgentStreamEvent;
 
+#[cfg(test)]
 pub(crate) fn parse_line<F>(
     line: Result<String, std::io::Error>,
     emit: &mut F,
@@ -7,22 +8,7 @@ pub(crate) fn parse_line<F>(
 where
     F: FnMut(AiAgentStreamEvent),
 {
-    let line = match line {
-        Ok(line) => line,
-        Err(error) => {
-            emit(AiAgentStreamEvent::Error {
-                message: format!("Read error: {error}"),
-            });
-            return None;
-        }
-    };
-
-    let trimmed = line.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    serde_json::from_str::<serde_json::Value>(trimmed).ok()
+    crate::cli_agent_runtime::parse_ai_agent_json_line(line, emit)
 }
 
 pub(crate) fn dispatch_event<F>(json: &serde_json::Value, emit: &mut F)
