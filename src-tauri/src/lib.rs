@@ -32,6 +32,8 @@ mod window_state;
 use std::ffi::OsStr;
 use std::process::Command;
 
+#[cfg(all(desktop, target_os = "linux"))]
+use std::os::unix::process::CommandExt;
 #[cfg(desktop)]
 use std::path::{Path, PathBuf};
 #[cfg(desktop)]
@@ -71,14 +73,66 @@ struct StartupEnvOverride {
 }
 
 #[cfg(any(test, all(desktop, target_os = "linux")))]
+const WAYLAND_CLIENT_PRELOAD_CANDIDATES: [&str; 7] = [
+    "/usr/lib/libwayland-client.so",
+    "/usr/lib/libwayland-client.so.0",
+    "/usr/lib64/libwayland-client.so",
+    "/usr/lib64/libwayland-client.so.0",
+    "/lib64/libwayland-client.so.0",
+    "/lib/x86_64-linux-gnu/libwayland-client.so.0",
+    "/usr/lib/x86_64-linux-gnu/libwayland-client.so.0",
+];
+
+#[cfg(any(test, all(desktop, target_os = "linux")))]
+fn is_linux_appimage_launch<F>(mut get_var: F) -> bool
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    ["APPIMAGE", "APPDIR"]
+        .into_iter()
+        .any(|key| get_var(key).is_some_and(|value| !value.trim().is_empty()))
+}
+
+#[cfg(any(test, all(desktop, target_os = "linux")))]
+fn is_wayland_session<F>(mut get_var: F) -> bool
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    get_var("WAYLAND_DISPLAY").is_some_and(|value| !value.trim().is_empty())
+        || get_var("XDG_SESSION_TYPE")
+            .is_some_and(|value| value.trim().eq_ignore_ascii_case("wayland"))
+}
+
+#[cfg(any(test, all(desktop, target_os = "linux")))]
+fn linux_appimage_wayland_client_preload_path_with<F, E>(
+    mut get_var: F,
+    mut file_exists: E,
+) -> Option<&'static str>
+where
+    F: FnMut(&str) -> Option<String>,
+    E: FnMut(&str) -> bool,
+{
+    if !is_linux_appimage_launch(&mut get_var) || !is_wayland_session(&mut get_var) {
+        return None;
+    }
+
+    if get_var("LD_PRELOAD").is_some_and(|value| !value.trim().is_empty())
+        || get_var("TOLARIA_APPIMAGE_WAYLAND_PRELOAD_ATTEMPTED").is_some_and(|value| value == "1")
+    {
+        return None;
+    }
+
+    WAYLAND_CLIENT_PRELOAD_CANDIDATES
+        .into_iter()
+        .find(|path| file_exists(path))
+}
+
+#[cfg(any(test, all(desktop, target_os = "linux")))]
 fn linux_appimage_startup_env_overrides_with<F>(mut get_var: F) -> Vec<StartupEnvOverride>
 where
     F: FnMut(&str) -> Option<String>,
 {
-    let is_appimage = ["APPIMAGE", "APPDIR"]
-        .into_iter()
-        .any(|key| get_var(key).is_some_and(|value| !value.trim().is_empty()));
-    if !is_appimage {
+    if !is_linux_appimage_launch(&mut get_var) {
         return Vec::new();
     }
 
@@ -94,9 +148,38 @@ where
 
 #[cfg(all(desktop, target_os = "linux"))]
 fn apply_linux_appimage_startup_env_overrides() {
+    apply_linux_appimage_wayland_client_preload();
+
     for env_override in linux_appimage_startup_env_overrides_with(|key| std::env::var(key).ok()) {
         std::env::set_var(env_override.key, env_override.value);
     }
+}
+
+#[cfg(all(desktop, target_os = "linux"))]
+fn apply_linux_appimage_wayland_client_preload() {
+    let Some(preload_path) = linux_appimage_wayland_client_preload_path_with(
+        |key| std::env::var(key).ok(),
+        |path| std::path::Path::new(path).is_file(),
+    ) else {
+        return;
+    };
+
+    let exe = match std::env::current_exe() {
+        Ok(exe) => exe,
+        Err(e) => {
+            eprintln!(
+                "Tolaria AppImage Wayland preload skipped: failed to resolve executable ({e})"
+            );
+            return;
+        }
+    };
+
+    let error = Command::new(exe)
+        .args(std::env::args_os().skip(1))
+        .env("LD_PRELOAD", preload_path)
+        .env("TOLARIA_APPIMAGE_WAYLAND_PRELOAD_ATTEMPTED", "1")
+        .exec();
+    eprintln!("Tolaria AppImage Wayland preload skipped: failed to re-exec ({error})");
 }
 
 #[cfg(not(all(desktop, target_os = "linux")))]
@@ -497,6 +580,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::linux_appimage_startup_env_overrides_with;
+    use super::linux_appimage_wayland_client_preload_path_with;
     use super::StartupEnvOverride;
     use super::MACOS_WEBVIEW_RESERVED_COMMAND_KEYS;
     use super::MACOS_WEBVIEW_RESERVED_COMMAND_SHIFT_KEYS;
@@ -547,6 +631,52 @@ mod tests {
         });
 
         assert!(overrides.is_empty());
+    }
+
+    #[test]
+    fn linux_appimage_wayland_preload_uses_first_available_system_library() {
+        let preload_path = linux_appimage_wayland_client_preload_path_with(
+            |key| match key {
+                "APPIMAGE" => Some("/tmp/Tolaria.AppImage".to_string()),
+                "XDG_SESSION_TYPE" => Some("wayland".to_string()),
+                _ => None,
+            },
+            |path| path == "/lib/x86_64-linux-gnu/libwayland-client.so.0",
+        );
+
+        assert_eq!(
+            preload_path,
+            Some("/lib/x86_64-linux-gnu/libwayland-client.so.0")
+        );
+    }
+
+    #[test]
+    fn linux_appimage_wayland_preload_preserves_explicit_ld_preload() {
+        let preload_path = linux_appimage_wayland_client_preload_path_with(
+            |key| match key {
+                "APPDIR" => Some("/tmp/.mount_Tolaria".to_string()),
+                "WAYLAND_DISPLAY" => Some("wayland-0".to_string()),
+                "LD_PRELOAD" => Some("/custom/libwayland-client.so".to_string()),
+                _ => None,
+            },
+            |_| true,
+        );
+
+        assert_eq!(preload_path, None);
+    }
+
+    #[test]
+    fn linux_appimage_wayland_preload_is_empty_for_x11_sessions() {
+        let preload_path = linux_appimage_wayland_client_preload_path_with(
+            |key| match key {
+                "APPIMAGE" => Some("/tmp/Tolaria.AppImage".to_string()),
+                "XDG_SESSION_TYPE" => Some("x11".to_string()),
+                _ => None,
+            },
+            |_| true,
+        );
+
+        assert_eq!(preload_path, None);
     }
 
     #[cfg(desktop)]
