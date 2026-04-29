@@ -1,8 +1,10 @@
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
+import { fileURLToPath } from 'node:url'
 import {
   findMarkdownFiles, getNote, searchNotes, vaultContext,
 } from './vault.js'
@@ -11,6 +13,7 @@ import { evaluateBridgeRequest } from './ws-bridge.js'
 
 let tmpDir
 const ACTIVE_VAULT_ERROR = 'Note path must stay inside the active vault'
+const MCP_SERVER_DIR = path.dirname(fileURLToPath(import.meta.url))
 
 before(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-test-'))
@@ -208,6 +211,34 @@ describe('requireVaultPath', () => {
   })
 })
 
+describe('stdio process lifecycle', () => {
+  it('exits when the MCP client closes stdin', async () => {
+    const child = spawn(process.execPath, ['index.js'], {
+      cwd: MCP_SERVER_DIR,
+      env: { ...process.env, VAULT_PATH: tmpDir, WS_UI_PORT: '65534' },
+      stdio: ['pipe', 'ignore', 'pipe'],
+    })
+    let stderr = ''
+    child.stderr.setEncoding('utf8')
+    child.stderr.on('data', chunk => {
+      stderr += chunk
+    })
+
+    await sleep(200)
+    child.stdin.end()
+
+    const exit = await waitForExit(child, 1_500)
+    if (!exit) {
+      child.kill()
+      await waitForExit(child, 1_000)
+      assert.fail(`MCP server stayed alive after stdin closed.\n${stderr}`)
+    }
+
+    assert.equal(exit.signal, null)
+    assert.equal(exit.code, 0, stderr)
+  })
+})
+
 async function assertRejectsOutsideVault(prefix, resolveNotePath) {
   const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), prefix))
   const outsideNote = path.join(outsideDir, 'outside.md')
@@ -221,4 +252,29 @@ async function assertRejectsOutsideVault(prefix, resolveNotePath) {
   } finally {
     await fs.rm(outsideDir, { recursive: true, force: true })
   }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function waitForExit(child, timeoutMs) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      cleanup()
+      resolve(null)
+    }, timeoutMs)
+
+    child.once('exit', onExit)
+
+    function onExit(code, signal) {
+      cleanup()
+      resolve({ code, signal })
+    }
+
+    function cleanup() {
+      clearTimeout(timer)
+      child.off('exit', onExit)
+    }
+  })
 }
