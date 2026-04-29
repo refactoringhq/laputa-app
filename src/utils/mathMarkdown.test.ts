@@ -4,6 +4,7 @@ import {
   MATH_INLINE_TYPE,
   injectMathInBlocks,
   preProcessMathMarkdown,
+  readCompletedDisplayMathAtEnd,
   readCompletedInlineMathAtEnd,
   serializeMathAwareBlocks,
 } from './mathMarkdown'
@@ -59,6 +60,12 @@ describe('math markdown round-trip', () => {
     expect(block.type).toBe(MATH_BLOCK_TYPE)
     expect(block.props?.latex).toBe('x^2')
     expect(afterBlock.content?.[0]?.text).toBe('Done')
+  })
+
+  it('reads completed display math source at the cursor boundary', () => {
+    expect(readCompletedDisplayMathAtEnd({ text: '$$x^2$$' })).toEqual({ latex: 'x^2' })
+    expect(readCompletedDisplayMathAtEnd({ text: '$$ x^2 $$' })).toEqual({ latex: 'x^2' })
+    expect(readCompletedDisplayMathAtEnd({ text: 'prefix $$x^2$$' })).toBeNull()
   })
 
   it('serializes math nodes back to Markdown-compatible source', () => {

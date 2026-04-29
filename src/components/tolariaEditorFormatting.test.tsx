@@ -58,12 +58,16 @@ describe('tolariaEditorFormatting', () => {
       { key: 'heading', title: 'Heading', onItemClick: () => {} },
       { key: 'bullet_list', title: 'Bullet List', onItemClick: () => {} },
       { key: 'code_block', title: 'Code Block', onItemClick: () => {} },
+      { key: 'math_inline', title: 'Inline math', onItemClick: () => {} },
+      { key: 'math_display', title: 'Display math', onItemClick: () => {} },
     ] satisfies TolariaSlashMenuTestItem[])
 
     expect(items.map((item) => item.key)).toEqual([
       'heading',
       'bullet_list',
       'code_block',
+      'math_inline',
+      'math_display',
     ])
     expect(items.find((item) => item.key === 'heading')?.subtext).toContain(
       'Markdown-safe heading',
@@ -74,5 +78,8 @@ describe('tolariaEditorFormatting', () => {
     expect(items.find((item) => item.key === 'code_block')?.subtext).toContain(
       'Markdown-safe fenced code block',
     )
+    // Math subtexts are set by insertMath*Item constructors, not by the filter
+    expect(items.find((item) => item.key === 'math_inline')?.subtext).toBeUndefined()
+    expect(items.find((item) => item.key === 'math_display')?.subtext).toBeUndefined()
   })
 })

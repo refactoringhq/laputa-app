@@ -73,6 +73,7 @@ vi.mock('@blocknote/core', () => ({
 }))
 
 vi.mock('@blocknote/core/extensions', () => ({
+  filterSuggestionItems: (items: unknown[]) => items,
   FormattingToolbarExtension: Symbol('FormattingToolbarExtension'),
 }))
 

@@ -152,3 +152,45 @@ Malformed math $${MALFORMED_LATEX}$ stays visible.
   expect(reopenedRaw).toContain(`$$${TABLE_DISPLAY_STYLE_LATEX}$$`)
   expect(reopenedRaw).not.toContain('@@TOLARIA_MATH')
 })
+
+test('LaTeX live preview renders while typing from the slash Math command', async ({ page }) => {
+  await openNote(page, 'Note B')
+
+  await page.locator('.bn-editor').click()
+  await page.keyboard.type('/display')
+
+  const slashMenu = page.locator('.bn-suggestion-menu')
+  await expect(slashMenu).toBeVisible({ timeout: 5_000 })
+  await expect(slashMenu).toContainText('Display math')
+
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('x^2')
+
+  const preview = page.locator('.math-live-preview')
+  await expect(preview).toBeVisible({ timeout: 5_000 })
+  await expect(preview.locator('.katex')).toBeVisible()
+  await expect(preview).toContainText('x')
+
+  await page.keyboard.type('$$')
+  await expect(preview).toBeHidden()
+  await expectMathNode(page, '.math--block', 'x^2')
+})
+
+test('inline LaTeX compiles immediately after the closing dollar', async ({ page }) => {
+  await openNote(page, 'Note B')
+
+  await page.locator('.bn-editor').click()
+  await page.keyboard.type('$x^2$')
+
+  await expectMathNode(page, '.math--inline', 'x^2')
+})
+
+test('inline LaTeX compiles before Enter after the closing dollar', async ({ page }) => {
+  await openNote(page, 'Note B')
+
+  await page.locator('.bn-editor').click()
+  await page.keyboard.type('$x$')
+  await page.keyboard.press('Enter')
+
+  await expectMathNode(page, '.math--inline', 'x')
+})

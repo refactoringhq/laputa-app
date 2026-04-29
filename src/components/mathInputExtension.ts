@@ -1,9 +1,16 @@
 import { createExtension } from '@blocknote/core'
 import type { useCreateBlockNote } from '@blocknote/react'
-import { MATH_INLINE_TYPE, readCompletedInlineMathAtEnd } from '../utils/mathMarkdown'
+import { splitBlock } from 'prosemirror-commands'
+import {
+  MATH_BLOCK_TYPE,
+  MATH_INLINE_TYPE,
+  readCompletedDisplayMathAtEnd,
+  readCompletedInlineMathAtEnd,
+} from '../utils/mathMarkdown'
 
 const INLINE_WHITESPACE_RE = /^[^\S\r\n]$/
 const NEWLINE_INPUT_TYPES = new Set(['insertParagraph', 'insertLineBreak'])
+const CURSOR_EXIT_EVENTS = ['keyup', 'mouseup'] as const
 type EditorViewLike = NonNullable<ReturnType<typeof useCreateBlockNote>['prosemirrorView']>
 
 interface CursorText {
@@ -17,20 +24,25 @@ interface InlineMathReplacement {
   to: number
 }
 
+type BlockNoteEditorLike = ReturnType<typeof useCreateBlockNote>
+
 function isInsertedInlineWhitespace(event: InputEvent): event is InputEvent & { data: string } {
   return event.inputType === 'insertText'
     && typeof event.data === 'string'
     && INLINE_WHITESPACE_RE.test(event.data)
 }
 
+function isInsertedDollar(event: InputEvent): event is InputEvent & { data: string } {
+  return event.inputType === 'insertText' && event.data === '$'
+}
+
 function shouldHandleInput(event: InputEvent): boolean {
   return isInsertedInlineWhitespace(event) || NEWLINE_INPUT_TYPES.has(event.inputType)
 }
 
-function shouldSkipInput(event: InputEvent, view: EditorViewLike): boolean {
-  if (event.isComposing) return true
-  if (view.composing) return true
-  return !shouldHandleInput(event)
+function shouldHandleInsertedDollar(event: InputEvent, view: EditorViewLike): boolean {
+  if (event.isComposing || view.composing) return false
+  return isInsertedDollar(event)
 }
 
 function selectionHasCodeMark(view: EditorViewLike): boolean {
@@ -49,27 +61,65 @@ function readCursorText(view: EditorViewLike): CursorText | null {
   }
 }
 
-function readInlineMathReplacement(view: EditorViewLike): InlineMathReplacement | null {
+function readInlineMathReplacement(
+  view: EditorViewLike,
+  insertedText = '',
+): InlineMathReplacement | null {
   if (selectionHasCodeMark(view)) return null
 
   const cursorText = readCursorText(view)
   if (!cursorText) return null
 
-  const math = readCompletedInlineMathAtEnd({ text: cursorText.beforeText })
+  const math = readCompletedInlineMathAtEnd({ text: `${cursorText.beforeText}${insertedText}` })
   if (!math) return null
 
   return {
     from: cursorText.parentStart + math.start,
     latex: math.latex,
-    to: cursorText.parentStart + math.end + 1,
+    to: cursorText.parentStart + Math.min(math.end + 1, cursorText.beforeText.length),
   }
+}
+
+function readDisplayMathLatex(view: EditorViewLike, insertedText = ''): string | null {
+  if (selectionHasCodeMark(view)) return null
+
+  const cursorText = readCursorText(view)
+  if (!cursorText) return null
+
+  return readCompletedDisplayMathAtEnd({
+    text: `${cursorText.beforeText}${insertedText}`,
+  })?.latex ?? null
+}
+
+function replaceCompletedDisplayMath(
+  editor: BlockNoteEditorLike,
+  view: EditorViewLike,
+  trailingText?: string,
+  insertedText = '',
+): boolean {
+  const latex = readDisplayMathLatex(view, insertedText)
+  if (!latex || !view.state.schema.nodes[MATH_BLOCK_TYPE]) return false
+
+  const currentBlock = editor.getTextCursorPosition().block
+  const updatedBlock = editor.updateBlock(currentBlock, {
+    type: MATH_BLOCK_TYPE,
+    props: { latex },
+  })
+
+  if (trailingText === undefined) {
+    const [nextBlock] = editor.insertBlocks([{ type: 'paragraph' }], updatedBlock, 'after')
+    editor.setTextCursorPosition(nextBlock, 'start')
+  }
+
+  return true
 }
 
 function replaceCompletedInlineMath(
   view: EditorViewLike,
   trailingText?: string,
+  insertedText = '',
 ): EditorViewLike['state']['tr'] | null {
-  const replacement = readInlineMathReplacement(view)
+  const replacement = readInlineMathReplacement(view, insertedText)
   const mathNodeType = view.state.schema.nodes[MATH_INLINE_TYPE]
   if (!replacement || !mathNodeType) return null
 
@@ -88,25 +138,69 @@ export const createMathInputExtension = createExtension(({ editor }) => {
 
   return {
     key: 'mathInput',
-    mount: ({ dom, signal }) => {
+    mount: ({ dom, root, signal }) => {
+      const compileCompletedMathAtCursor = (): boolean => {
+        const view = readView()
+        if (!view || view.composing) return false
+        if (replaceCompletedDisplayMath(editor, view)) return true
+
+        const transaction = replaceCompletedInlineMath(view)
+        if (!transaction) return false
+        view.dispatch(transaction)
+        return true
+      }
+
       const handleBeforeInput = (event: InputEvent) => {
         const view = readView()
-        if (!view || shouldSkipInput(event, view)) return
+        if (!view || event.isComposing || view.composing) return
+
+        if (isInsertedDollar(event)) {
+          if (replaceCompletedDisplayMath(editor, view, undefined, event.data)) {
+            event.preventDefault()
+            return
+          }
+
+          const transaction = replaceCompletedInlineMath(view, undefined, event.data)
+          if (!transaction) return
+          view.dispatch(transaction)
+          event.preventDefault()
+          return
+        }
+
+        if (!shouldHandleInput(event)) return
 
         const trailingText = isInsertedInlineWhitespace(event) ? event.data : undefined
+        if (replaceCompletedDisplayMath(editor, view, trailingText)) {
+          event.preventDefault()
+          return
+        }
+
         const transaction = replaceCompletedInlineMath(view, trailingText)
         if (!transaction) return
-
         view.dispatch(transaction)
         if (trailingText !== undefined) {
           event.preventDefault()
+        } else if (NEWLINE_INPUT_TYPES.has(event.inputType)) {
+          event.preventDefault()
+          splitBlock(view.state, view.dispatch)
         }
+      }
+
+      const handleInput = (event: InputEvent) => {
+        const view = readView()
+        if (!view || !shouldHandleInsertedDollar(event, view)) return
+        compileCompletedMathAtCursor()
       }
 
       dom.addEventListener('beforeinput', handleBeforeInput as EventListener, {
         capture: true,
         signal,
       })
+      dom.addEventListener('input', handleInput as EventListener, { signal })
+      for (const eventName of CURSOR_EXIT_EVENTS) {
+        dom.addEventListener(eventName, compileCompletedMathAtCursor, { signal })
+      }
+      root.addEventListener('selectionchange', compileCompletedMathAtCursor, { signal })
     },
   } as const
 })

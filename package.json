@@ -62,6 +62,7 @@
     "lucide-react": "^0.564.0",
     "mermaid": "^11.14.0",
     "posthog-js": "^1.363.5",
+    "prosemirror-commands": "^1.7.1",
     "radix-ui": "^1.4.3",
     "react": "^19.2.0",
     "react-day-picker": "^9.13.2",

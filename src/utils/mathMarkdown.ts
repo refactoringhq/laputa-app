@@ -80,6 +80,8 @@ interface CompletedInlineMathMatch extends InlineMathMatch {
   start: number
 }
 
+type CompletedDisplayMathMatch = LatexPayload
+
 interface MarkdownSource {
   markdown: string
 }
@@ -184,6 +186,12 @@ export function readCompletedInlineMathAtEnd({ text }: { text: string }): Comple
 
   const latex = text.slice(start + 1, end)
   return isValidInlineLatex({ latex }) ? { latex, start, end } : null
+}
+
+export function readCompletedDisplayMathAtEnd({ text }: { text: string }): CompletedDisplayMathMatch | null {
+  const match = text.match(/^\$\$(.+)\$\$$/)
+  const latex = match?.[1]?.trim()
+  return latex ? { latex } : null
 }
 
 function replaceInlineMath({ line }: MarkdownLine): string {

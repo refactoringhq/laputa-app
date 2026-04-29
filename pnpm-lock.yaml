@@ -136,6 +136,9 @@ importers:
       posthog-js:
         specifier: ^1.363.5
         version: 1.363.5
+      prosemirror-commands:
+        specifier: ^1.7.1
+        version: 1.7.1
       radix-ui:
         specifier: ^1.4.3
         version: 1.4.3(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

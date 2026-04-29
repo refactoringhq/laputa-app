@@ -272,6 +272,24 @@
   white-space: pre-wrap;
 }
 
+.editor__blocknote-container .math-live-preview {
+  position: absolute;
+  z-index: 20;
+  max-width: min(560px, calc(100% - 24px));
+  overflow-x: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--surface-editor);
+  color: var(--colors-text);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.12);
+  pointer-events: none;
+}
+
+.editor__blocknote-container .math-live-preview[hidden] {
+  display: none;
+}
+
 .editor__blocknote-container .mermaid-diagram {
   position: relative;
   width: 100%;

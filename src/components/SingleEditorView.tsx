@@ -39,6 +39,7 @@ import {
 import { TolariaSideMenu } from './tolariaBlockNoteSideMenu'
 import { useEditorLinkActivation } from './useEditorLinkActivation'
 import { findNearestTextCursorBlock } from './blockNoteCursorTarget'
+import { bindLatexLivePreview } from './latexLivePreviewExtension'
 
 const TEST_TABLE_MARKDOWN = `| Head 1 | Head 2 | Head 3 |
 | --- | --- | --- |
@@ -573,6 +574,15 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
     if (!container) return
     return observeNativeTextAssistanceDisabled(container)
   }, [])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || !editable) return
+
+    const controller = new AbortController()
+    bindLatexLivePreview(container, controller.signal)
+    return () => controller.abort()
+  }, [editable])
 
   useSeedBlockNoteTableBridge(editor)
 

@@ -524,10 +524,13 @@ Defined in `src/components/editorSchema.tsx` and styled in `src/components/Edito
 
 ### Markdown Math
 
-Defined in `src/utils/mathMarkdown.ts`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
+Defined in `src/utils/mathMarkdown.ts`, `src/components/editorSchema.tsx`, `src/components/latexLivePreviewExtension.ts`, and styled in `src/components/EditorTheme.css`:
 
 - `$...$` becomes a `mathInline` schema node and line-owned `$$...$$` / multiline `$$` blocks become `mathBlock` nodes.
 - The rich editor renders both node types through KaTeX with `throwOnError: false`, so malformed formulas keep their source visible instead of breaking the note.
+- While editing raw delimiters in the rich editor, `bindLatexLivePreview()` shows a transient KaTeX preview above the active `$...` or `$$...` source without changing the editable Markdown text.
+- Completed inline math (`$...$`) and dedicated display math (`$$...$$`) compile into rendered math nodes when the user types a separating whitespace/newline after the closing delimiter.
+- The BlockNote slash menu includes a `Math` command that inserts editable display-math source (`$$`) and leaves the caret inside that source for live preview.
 - `serializeMathAwareBlocks()` converts math nodes back to Markdown delimiters before save, raw-mode entry, and editor-position snapshots.
 - Raw CodeMirror mode always shows the plain Markdown source, so imported technical notes stay editable outside Tolaria.
 

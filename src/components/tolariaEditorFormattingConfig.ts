@@ -3,7 +3,7 @@ import {
   getDefaultReactSlashMenuItems,
   type DefaultReactSuggestionItem,
 } from '@blocknote/react'
-import type { ReactElement } from 'react'
+import { createElement, type ReactElement } from 'react'
 import {
   Code2,
   Heading1,
@@ -17,10 +17,41 @@ import {
   ListOrdered,
   Pilcrow,
   Quote,
+  Sigma,
   type LucideIcon,
 } from 'lucide-react'
 
 type TolariaSlashMenuItem = DefaultReactSuggestionItem & { key: string }
+type TolariaSlashEditor = Parameters<typeof getDefaultReactSlashMenuItems>[0]
+interface ProseMirrorTransactionLike {
+  insertText(text: string, from?: number, to?: number): ProseMirrorTransactionLike
+  scrollIntoView(): ProseMirrorTransactionLike
+}
+
+interface ProseMirrorViewLike {
+  dispatch(transaction: ProseMirrorTransactionLike): void
+  focus?: () => void
+  state: {
+    selection: {
+      from: number
+      to: number
+      $from: {
+        parentOffset: number
+        parent: {
+          isTextblock: boolean
+          textBetween(from: number, to: number, blockSeparator?: string, leafText?: string): string
+        }
+      }
+    }
+    tr: ProseMirrorTransactionLike
+  }
+}
+
+type TolariaSlashEditorWithView = TolariaSlashEditor & {
+  _tiptapEditor?: { view?: ProseMirrorViewLike }
+  prosemirrorView?: ProseMirrorViewLike
+}
+
 type TolariaBlockTypeSelectItem = {
   name: string
   type: string
@@ -73,6 +104,97 @@ const TOLARIA_SLASH_MENU_SUPPORT_SUBTEXT: Partial<Record<string, string>> = {
   code_block: 'Markdown-safe fenced code block (```...```). Persists after save and note switches.',
 }
 
+function replaceSlashQueryWithMath(editor: TolariaSlashEditor, wrapper: string): boolean {
+  const editorWithView = editor as TolariaSlashEditorWithView
+  const view = editorWithView._tiptapEditor?.view ?? editorWithView.prosemirrorView
+  const selection = view?.state.selection
+  if (!view || !selection || selection.from !== selection.to) return false
+  if (!selection.$from.parent.isTextblock) return false
+
+  const beforeText = selection.$from.parent.textBetween(0, selection.$from.parentOffset, '', '')
+  const slashIndex = beforeText.lastIndexOf('/')
+  if (slashIndex === -1) return false
+
+  const from = selection.from - (beforeText.length - slashIndex)
+  view.dispatch(view.state.tr.insertText(wrapper + wrapper, from, selection.from).scrollIntoView())
+  view.focus?.()
+  focusCursorBetweenMathDelimiters(wrapper)
+  return true
+}
+
+function focusCursorBetweenMathDelimiters(wrapper: string): void {
+  const documentRef = globalThis.document
+  if (!documentRef) return
+
+  const inserted = wrapper + wrapper
+  const cursorOffset = wrapper.length
+
+  requestAnimationFrame(() => {
+    const editorRoot = documentRef.querySelector('.bn-editor')
+    if (!editorRoot) return
+
+    const showText = documentRef.defaultView?.NodeFilter.SHOW_TEXT ?? 4
+    const walker = documentRef.createTreeWalker(editorRoot, showText)
+    let target: Text | null = null
+    while (walker.nextNode()) {
+      if (walker.currentNode.textContent === inserted) {
+        target = walker.currentNode as Text
+      }
+    }
+    if (!target) return
+
+    const range = documentRef.createRange()
+    range.setStart(target, cursorOffset)
+    range.collapse(true)
+
+    const domSelection = documentRef.getSelection()
+    domSelection?.removeAllRanges()
+    domSelection?.addRange(range)
+  })
+}
+
+function insertEditableMath(editor: TolariaSlashEditor, wrapper: string): void {
+  if (replaceSlashQueryWithMath(editor, wrapper)) return
+
+  const currentBlock = editor.getTextCursorPosition().block
+  const mathSource = { type: 'paragraph' as const, content: wrapper + wrapper }
+
+  if (Array.isArray(currentBlock.content) && currentBlock.content.length <= 1) {
+    const updatedBlock = editor.updateBlock(currentBlock, mathSource)
+    editor.setTextCursorPosition(updatedBlock, 'end')
+    focusCursorBetweenMathDelimiters(wrapper)
+    return
+  }
+
+  const [insertedBlock] = editor.insertBlocks([mathSource], currentBlock, 'after')
+  editor.setTextCursorPosition(insertedBlock, 'end')
+  focusCursorBetweenMathDelimiters(wrapper)
+}
+
+function insertMathDisplayItem(editor: TolariaSlashEditor): TolariaSlashMenuItem {
+  return {
+    key: 'math_display',
+    title: 'Display math',
+    aliases: ['latex', 'equation', 'formula', 'katex', 'math', 'display'],
+    group: 'Math',
+    icon: createElement(Sigma, { size: 18 }),
+    subtext: 'Markdown-safe display math (`$$...$$`) with live KaTeX preview.',
+    onItemClick: () => insertEditableMath(editor, '$$'),
+  }
+}
+
+function insertMathInlineItem(editor: TolariaSlashEditor): TolariaSlashMenuItem {
+  return {
+    key: 'math_inline',
+    title: 'Inline math',
+    aliases: ['latex', 'equation', 'formula', 'katex', 'math', 'inline'],
+    group: 'Math',
+    icon: createElement(Sigma, { size: 18 }),
+    subtext: 'Markdown-safe inline math (`$...$`) with live KaTeX preview.',
+    onItemClick: () => insertEditableMath(editor, '$'),
+  }
+}
+
 export function getTolariaBlockTypeSelectItems() {
   return TOLARIA_BLOCK_TYPE_SELECT_ITEMS
 }
@@ -106,7 +228,11 @@ export function getTolariaSlashMenuItems(
 ) {
   return filterSuggestionItems(
     filterTolariaSlashMenuItems(
-      getDefaultReactSlashMenuItems(editor) as TolariaSlashMenuItem[],
+      [
+        ...getDefaultReactSlashMenuItems(editor),
+        insertMathInlineItem(editor),
+        insertMathDisplayItem(editor),
+      ] as TolariaSlashMenuItem[],
     ),
     query,
   )
