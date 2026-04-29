@@ -23,6 +23,17 @@ const localStorageMock = (() => {
 })()
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, writable: true })
 
+function withTimezone<T>(timezone: string, fn: () => T): T {
+  const previousTimezone = process.env.TZ
+  process.env.TZ = timezone
+  try {
+    return fn()
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ
+    else process.env.TZ = previousTimezone
+  }
+}
+
 describe('detectPropertyType', () => {
   it('detects boolean from value type', () => {
     expect(detectPropertyType('archived', true)).toBe('boolean')
@@ -154,6 +165,12 @@ describe('toISODate', () => {
 
   it('extracts date from ISO datetime', () => {
     expect(toISODate('2026-02-25T10:00:00')).toBe('2026-02-25')
+  })
+
+  it('keeps local ISO datetime dates stable in positive-offset timezones', () => {
+    withTimezone('Europe/Rome', () => {
+      expect(toISODate('2026-04-29T00:00:00')).toBe('2026-04-29')
+    })
   })
 
   it('returns original value for non-date strings', () => {
