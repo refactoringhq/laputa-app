@@ -1391,7 +1391,7 @@ function App() {
 
     const organized = await entryActions.handleToggleOrganized(path)
 
-    if (organized && nextVisibleInboxEntry) {
+    if (organized && nextVisibleInboxEntry && notes.activeTabPathRef.current === path) {
       void notes.handleSelectNote(nextVisibleInboxEntry)
     }
   }, [effectiveSelection, entryActions, notes, settings.auto_advance_inbox_after_organize, vault.entries])

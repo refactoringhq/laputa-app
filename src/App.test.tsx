@@ -144,6 +144,7 @@ const mockCommandResults: Record<string, unknown> = {
   get_all_content: mockAllContent,
   get_modified_files: [],
   get_note_content: mockAllContent['/vault/project/test.md'] || '',
+  save_note_content: null,
   reload_vault_entry: ({ path }: { path: string }) => mockEntries.find((entry) => entry.path === path) ?? null,
   sync_vault_asset_scope_for_window: null,
   get_file_history: [],
@@ -279,6 +280,7 @@ function resetMockCommandResults() {
     get_all_content: mockAllContent,
     get_modified_files: [],
     get_note_content: mockAllContent['/vault/project/test.md'] || '',
+    save_note_content: null,
     reload_vault_entry: ({ path }: { path: string }) => mockEntries.find((entry) => entry.path === path) ?? null,
     sync_vault_asset_scope_for_window: null,
     get_file_history: [],
@@ -1115,6 +1117,63 @@ describe('App', () => {
     await waitFor(() => {
       expect(window.__laputaTest?.activeTabPath).toBe('/vault/beta.md')
     })
+  })
+
+  it('keeps the manually selected note after organizing finishes later', async () => {
+    configureNeighborhoodVault()
+    mockCommandResults.get_settings = {
+      auto_pull_interval_minutes: null,
+      auto_advance_inbox_after_organize: true,
+      telemetry_consent: true,
+      crash_reporting_enabled: null,
+      analytics_enabled: null,
+      anonymous_id: null,
+      release_channel: null,
+    }
+
+    let resolveOrganizeSave!: () => void
+    const organizeSave = new Promise<void>((resolve) => {
+      resolveOrganizeSave = resolve
+    })
+    mockCommandResults.save_note_content = vi.fn(() => organizeSave)
+
+    render(<App />)
+
+    const noteListContainer = await screen.findByTestId('note-list-container')
+    await waitFor(() => {
+      expect(getHeaderForNoteList(noteListContainer)).toHaveTextContent('Inbox')
+    })
+
+    await act(async () => {
+      fireEvent.click(within(noteListContainer).getByText('Alpha'))
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Set note as organized' })).toBeInTheDocument()
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Set note as organized' }))
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      fireEvent.click(within(noteListContainer).getByText('Gamma'))
+      await Promise.resolve()
+    })
+    await waitFor(() => {
+      expect(window.__laputaTest?.activeTabPath).toBe('/vault/gamma.md')
+    })
+
+    await act(async () => {
+      resolveOrganizeSave()
+      await organizeSave
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(window.__laputaTest?.activeTabPath).toBe('/vault/gamma.md')
   })
 
   it('renders status bar', async () => {
