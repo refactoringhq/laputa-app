@@ -15,6 +15,14 @@
   caret-color: var(--colors-cursor);
 }
 
+.editor-content-width--wide .editor__blocknote-container .bn-editor {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 /* Override BlockNote's default line-height on block-outer so our theme controls it */
 .editor__blocknote-container .bn-block-outer {
   line-height: var(--editor-line-height) !important;

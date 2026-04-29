@@ -328,7 +328,8 @@ jobs:
             wget \
             patchelf \
             build-essential \
-            file
+            file \
+            rpm
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -380,7 +381,7 @@ jobs:
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
         run: |
-          pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,appimage
+          pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
 
       - name: Validate Linux bundles
         run: |
@@ -388,6 +389,7 @@ jobs:
           installers=(
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
           )
           signatures=(
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig
@@ -395,7 +397,7 @@ jobs:
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb.sig
           )
           if [ ${#installers[@]} -eq 0 ]; then
-            echo "::error::Linux build produced no AppImage or deb bundle."
+            echo "::error::Linux build produced no AppImage, deb or rpm bundle."
             exit 1
           fi
           if [ ${#signatures[@]} -eq 0 ]; then
@@ -410,6 +412,7 @@ jobs:
           path: |
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb.sig
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.tar.gz
@@ -715,12 +718,14 @@ jobs:
             updater-x86_64/*.app.tar.gz.sig
             linux-x86_64-bundles/*.deb
             linux-x86_64-bundles/*.deb.sig
+            linux-x86_64-bundles/*.rpm
             linux-x86_64-bundles/*.AppImage
             linux-x86_64-bundles/*.AppImage.sig
             linux-x86_64-bundles/*.AppImage.tar.gz
             linux-x86_64-bundles/*.AppImage.tar.gz.sig
             linux-x86_64-bundles/*/*.deb
             linux-x86_64-bundles/*/*.deb.sig
+            linux-x86_64-bundles/*/*.rpm
             linux-x86_64-bundles/*/*.AppImage
             linux-x86_64-bundles/*/*.AppImage.sig
             linux-x86_64-bundles/*/*.AppImage.tar.gz

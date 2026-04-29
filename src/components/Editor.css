@@ -205,7 +205,7 @@
 }
 
 .editor-content-width--wide .editor-content-wrapper {
-  max-width: min(100%, 1280px);
+  max-width: none;
   padding-left: clamp(24px, 4vw, 72px);
   padding-right: clamp(24px, 4vw, 72px);
 }
