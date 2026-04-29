@@ -138,7 +138,48 @@ describe('useVaultWatcher', () => {
 
     unmount()
 
+    await settleWatcherSubscription()
     expect(mocks.unlisten).toHaveBeenCalledOnce()
+    expect(mocks.invoke).toHaveBeenCalledWith('stop_vault_watcher')
+  })
+
+  it('swallows stale native watcher unlisten failures and still stops the watcher', async () => {
+    mocks.unlisten.mockImplementationOnce(() => {
+      throw new TypeError("undefined is not an object (evaluating 'listeners[eventId].handlerId')")
+    })
+
+    const { unmount } = renderHook(() => useVaultWatcher({
+      vaultPath: '/vault',
+      onVaultChanged: vi.fn(),
+    }))
+
+    await settleWatcherSubscription()
+
+    expect(() => unmount()).not.toThrow()
+    await settleWatcherSubscription()
+    expect(mocks.unlisten).toHaveBeenCalledOnce()
+    expect(mocks.invoke).toHaveBeenCalledWith('stop_vault_watcher')
+  })
+
+  it('keeps listener replacement stable when vault paths churn', async () => {
+    mocks.unlisten.mockImplementationOnce(() => {
+      throw new TypeError("undefined is not an object (evaluating 'listeners[eventId].handlerId')")
+    })
+
+    const { rerender } = renderHook(
+      ({ vaultPath }) => useVaultWatcher({ vaultPath, onVaultChanged: vi.fn() }),
+      { initialProps: { vaultPath: '/vault-a' } },
+    )
+
+    await settleWatcherSubscription()
+
+    expect(() => rerender({ vaultPath: '/vault-b' })).not.toThrow()
+    await settleWatcherSubscription()
+
+    expect(mocks.listen).toHaveBeenCalledTimes(2)
+    expect(mocks.unlisten).toHaveBeenCalledOnce()
+    expect(mocks.invoke).toHaveBeenCalledWith('start_vault_watcher', { path: '/vault-a' })
+    expect(mocks.invoke).toHaveBeenCalledWith('start_vault_watcher', { path: '/vault-b' })
     expect(mocks.invoke).toHaveBeenCalledWith('stop_vault_watcher')
   })
 
