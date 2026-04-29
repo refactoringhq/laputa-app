@@ -56,6 +56,57 @@ describe('mermaid markdown round-trip', () => {
     ].join('\n\n'))
   })
 
+  it('injects parsed Mermaid code blocks into dedicated diagram blocks', () => {
+    const [block] = injectMermaidInBlocks([{
+      type: 'codeBlock',
+      props: { language: 'mermaid' },
+      content: [{ type: 'text', text: 'flowchart LR\n  A --> B', styles: {} }],
+      children: [],
+    }]) as Array<{
+      type: string
+      props: { source: string; diagram: string }
+    }>
+
+    expect(block.type).toBe(MERMAID_BLOCK_TYPE)
+    expect(block.props.source).toBe('```mermaid\nflowchart LR\n  A --> B\n```')
+    expect(block.props.diagram).toBe('flowchart LR\n  A --> B\n')
+  })
+
+  it('injects Mermaid-looking text code blocks when the parser drops the language', () => {
+    const [block] = injectMermaidInBlocks([{
+      type: 'codeBlock',
+      props: { language: 'text' },
+      content: [{
+        type: 'text',
+        text: [
+          "%%{init: {'theme':'base'}}%%",
+          'flowchart TD',
+          '  A --> B',
+        ].join('\n'),
+        styles: {},
+      }],
+      children: [],
+    }]) as Array<{
+      type: string
+      props: { source: string; diagram: string }
+    }>
+
+    expect(block.type).toBe(MERMAID_BLOCK_TYPE)
+    expect(block.props.source).toContain('```mermaid\n')
+    expect(block.props.diagram).toContain('flowchart TD\n  A --> B\n')
+  })
+
+  it('keeps ordinary text code blocks unchanged', () => {
+    const [block] = injectMermaidInBlocks([{
+      type: 'codeBlock',
+      props: { language: 'text' },
+      content: [{ type: 'text', text: 'const chart = "flowchart TD"', styles: {} }],
+      children: [],
+    }]) as Array<{ type: string }>
+
+    expect(block.type).toBe('codeBlock')
+  })
+
   it('leaves non-Mermaid and unclosed fences as normal Markdown', () => {
     const markdown = [
       '```ts',
