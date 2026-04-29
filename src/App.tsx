@@ -32,6 +32,7 @@ import { useVaultLoader } from './hooks/useVaultLoader'
 import { useRecentVaultWrites, useVaultWatcher } from './hooks/useVaultWatcher'
 import { useAiAgentPreferences } from './hooks/useAiAgentPreferences'
 import { useSettings } from './hooks/useSettings'
+import { useNoteWidthMode } from './hooks/useNoteWidthMode'
 import { useDocumentThemeMode } from './hooks/useDocumentThemeMode'
 import { useThemeMode } from './hooks/useThemeMode'
 import type { ThemeMode } from './lib/themeMode'
@@ -40,7 +41,6 @@ import { planNewTypeCreation } from './hooks/useNoteCreation'
 import { useCommitFlow } from './hooks/useCommitFlow'
 import { useGitRemoteStatus } from './hooks/useGitRemoteStatus'
 import { useViewMode, type ViewMode } from './hooks/useViewMode'
-import { useNoteLayout } from './hooks/useNoteLayout'
 import { useEntryActions } from './hooks/useEntryActions'
 import { useAppCommands } from './hooks/useAppCommands'
 import { triggerCommitEntryAction } from './utils/commitEntryAction'
@@ -1164,7 +1164,6 @@ function App() {
   const findInNoteRef = useRef<((options?: { replace?: boolean }) => void) | null>(null)
 
   const { setViewMode, sidebarVisible, noteListVisible } = useViewMode(noteWindowParams ? 'editor-only' : undefined)
-  const { noteLayout, toggleNoteLayout } = useNoteLayout()
   const zoom = useZoom()
   const buildNumber = useBuildNumber()
 
@@ -1415,6 +1414,22 @@ function App() {
     return entries
   }, [reloadVaultForCommand, setToastMessage])
 
+  const {
+    activeTab,
+    defaultNoteWidth,
+    noteWidth: activeNoteWidth,
+    setDefaultNoteWidth: handleSetDefaultNoteWidth,
+    setNoteWidth: handleSetActiveNoteWidth,
+    toggleNoteWidth: handleToggleNoteWidth,
+  } = useNoteWidthMode({
+    tabs: notes.tabs,
+    activeTabPath: notes.activeTabPath,
+    settings,
+    saveSettings,
+    updateFrontmatter: notes.handleUpdateFrontmatter,
+    setToastMessage,
+  })
+
   const commands = useAppCommands({
     activeTabPath: notes.activeTabPath, activeTabPathRef: notes.activeTabPathRef,
     entries: vault.entries,
@@ -1443,8 +1458,10 @@ function App() {
     onToggleInspector: handleToggleInspector,
     onToggleDiff: toggleDiffCommand,
     onToggleRawEditor: toggleRawEditorCommand,
-    noteLayout,
-    onToggleNoteLayout: toggleNoteLayout,
+    noteWidth: activeNoteWidth,
+    defaultNoteWidth,
+    onSetNoteWidth: handleSetActiveNoteWidth,
+    onSetDefaultNoteWidth: handleSetDefaultNoteWidth,
     selectedViewName: viewOrdering.selectedViewName,
     onMoveSelectedViewUp: viewOrdering.onMoveSelectedViewUp,
     onMoveSelectedViewDown: viewOrdering.onMoveSelectedViewDown,
@@ -1508,8 +1525,6 @@ function App() {
     onRestoreDeletedNote: restoreDeletedNoteCommand,
     canRestoreDeletedNote: !!activeDeletedFile,
   })
-
-  const activeTab = notes.tabs.find((t) => t.entry.path === notes.activeTabPath) ?? null
 
   const inboxCount = useMemo(() => filterInboxEntries(vault.entries, inboxPeriod).length, [vault.entries, inboxPeriod])
 
@@ -1663,8 +1678,8 @@ function App() {
               onContentChange={handleTrackedContentChange}
               onSave={handleTrackedSave}
               onRenameFilename={activeDeletedFile ? undefined : appSave.handleFilenameRename}
-              noteLayout={noteLayout}
-              onToggleNoteLayout={toggleNoteLayout}
+              noteWidth={activeNoteWidth}
+              onToggleNoteWidth={handleToggleNoteWidth}
               rawToggleRef={rawToggleRef}
               findInNoteRef={findInNoteRef}
               diffToggleRef={diffToggleRef}

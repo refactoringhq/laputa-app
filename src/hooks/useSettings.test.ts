@@ -21,6 +21,7 @@ const defaultSettings: Settings = {
   release_channel: null,
   theme_mode: null,
   ui_language: null,
+  note_width_mode: null,
   default_ai_agent: null,
   hide_gitignored_files: null,
 }
@@ -38,6 +39,7 @@ const savedSettings: Settings = {
   release_channel: null,
   theme_mode: null,
   ui_language: null,
+  note_width_mode: null,
   default_ai_agent: null,
   hide_gitignored_files: null,
 }
@@ -88,6 +90,7 @@ function changedSettings(): Settings {
     release_channel: null,
     theme_mode: null,
     ui_language: 'zh-CN',
+    note_width_mode: 'wide',
     default_ai_agent: null,
     hide_gitignored_files: false,
   }
@@ -148,6 +151,16 @@ describe('useSettings', () => {
 
     const settings = await renderLoadedSettings()
     expect(settings.ui_language).toBeNull()
+  })
+
+  it('normalizes unsupported note width modes on load', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      note_width_mode: 'expanded' as Settings['note_width_mode'],
+    }
+
+    const settings = await renderLoadedSettings()
+    expect(settings.note_width_mode).toBeNull()
   })
 
   it('saves settings via backend', async () => {

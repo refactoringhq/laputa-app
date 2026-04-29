@@ -66,6 +66,10 @@ files:
     command.view.toggleProperties: 54f12756a363401243d82cbd0466117e
     command.view.toggleDiff: 148a10ef6f04f897e73289f529ecae86
     command.view.toggleRaw: 9b622257cd6345ceaf58e42b1410899b
+    command.view.noteWidthNormal: d29ab88a55ae178bf4b5257201e51801
+    command.view.noteWidthWide: 403f3913ad71451a90787c235f1684de
+    command.view.defaultNoteWidthNormal: b045349e37329df23317db98cccd3263
+    command.view.defaultNoteWidthWide: 41f326763e3e3954912dfd45d04bd87c
     command.view.leftLayout: 5046a7166675e2d0175b9da3befdcaca
     command.view.centerLayout: 3bc6759c005178aae519aa3dd227cb74
     command.view.toggleAiPanel: 4279cbf31767465f25feff6e7bdd336e
@@ -316,6 +320,8 @@ files:
     editor.find.replaceAll: b1c94ca2fbc3e78fc30069c8d0f01680
     editor.toolbar.rawReturn: 5ddcf5e0dc8b933b344bb6ca3d8e131d
     editor.toolbar.rawOpen: 89ad60735a649b60dacd2301cda0c4ec
+    editor.toolbar.noteWidthNormal: 9bb55413ec536c4a8fa41c4c4464ab44
+    editor.toolbar.noteWidthWide: 1a744f406c9150f76739bd167c3e47ec
     editor.toolbar.centerLayout: 3fabf7e9b285eeec90704d271f1049b7
     editor.toolbar.leftLayout: acab6c8612816e012ff9f4220a42e485
     editor.toolbar.removeFavorite: 7188286e36fc6c1892dd53aaa54237fb

@@ -40,6 +40,8 @@ pub(crate) struct Frontmatter {
     pub sort: Option<StringOrList>,
     #[serde(default)]
     pub view: Option<StringOrList>,
+    #[serde(rename = "_width", alias = "width", default)]
+    pub note_width: Option<StringOrList>,
     #[serde(default)]
     pub visible: Option<bool>,
     #[serde(
@@ -203,6 +205,8 @@ fn parse_frontmatter(data: &HashMap<String, serde_json::Value>) -> Frontmatter {
         "_sort",
         "sort",
         "view",
+        "_width",
+        "width",
         "visible",
         "notion_id",
         "Status",
@@ -238,6 +242,8 @@ const SKIP_KEYS: &[&str] = &[
     "template",
     "sort",
     "view",
+    "_width",
+    "width",
     "visible",
     "status",
     "_organized",
@@ -330,6 +336,16 @@ pub(crate) fn extract_properties(
 /// Resolve `is_a` from frontmatter only.
 pub(crate) fn resolve_is_a(fm_is_a: Option<StringOrList>) -> Option<String> {
     fm_is_a.and_then(|a| a.into_vec().into_iter().next())
+}
+
+pub(crate) fn resolve_note_width(note_width: Option<StringOrList>) -> Option<String> {
+    match note_width
+        .and_then(StringOrList::into_scalar)
+        .map(|value| value.trim().to_ascii_lowercase())
+    {
+        Some(mode) if mode == "normal" || mode == "wide" => Some(mode),
+        _ => None,
+    }
 }
 
 /// Convert gray_matter::Pod to serde_json::Value

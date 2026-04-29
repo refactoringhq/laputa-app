@@ -49,6 +49,10 @@ const STATIC_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
   'toggle-inspector': 'command.view.toggleProperties',
   'toggle-diff': 'command.view.toggleDiff',
   'toggle-raw-editor': 'command.view.toggleRaw',
+  'set-note-width-normal': 'command.view.noteWidthNormal',
+  'set-note-width-wide': 'command.view.noteWidthWide',
+  'set-default-note-width-normal': 'command.view.defaultNoteWidthNormal',
+  'set-default-note-width-wide': 'command.view.defaultNoteWidthWide',
   'toggle-ai-panel': 'command.view.toggleAiPanel',
   'new-ai-chat': 'command.view.newAiChat',
   'toggle-backlinks': 'command.view.toggleBacklinks',
@@ -116,7 +120,6 @@ function localizeMoveSavedViewCommand(command: CommandAction, t: Translate, dire
 }
 
 const VIEW_STATE_LABELERS: Partial<Record<string, CommandLabeler>> = {
-  'toggle-note-layout': (command, t) => t(command.label === 'Use Left-Aligned Note Layout' ? 'command.view.leftLayout' : 'command.view.centerLayout'),
   'zoom-in': (command, t) => t('command.view.zoomIn', { zoom: parenthesizedSuffix(command.label)?.replace('%', '') ?? '' }),
   'zoom-out': (command, t) => t('command.view.zoomOut', { zoom: parenthesizedSuffix(command.label)?.replace('%', '') ?? '' }),
   'customize-note-list-columns': localizeColumnsCommand,
