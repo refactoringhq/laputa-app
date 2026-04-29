@@ -18,6 +18,7 @@ interface NavigationCommandsConfig {
 }
 
 interface FolderCommandsConfig {
+  canMutateFolder: boolean
   folderSelected: boolean
   onCopySelectedFolderPath?: () => void
   onDeleteFolder?: () => void
@@ -34,6 +35,7 @@ function runOptionalCommand(action?: () => void) {
 }
 
 function buildFolderCommands({
+  canMutateFolder,
   folderSelected,
   onCopySelectedFolderPath,
   onDeleteFolder,
@@ -62,7 +64,7 @@ function buildFolderCommands({
       label: 'Rename Folder',
       group: 'Navigation',
       keywords: ['folder', 'directory', 'sidebar', 'rename'],
-      enabled: canRunFolderCommand(folderSelected, onRenameFolder),
+      enabled: canRunFolderCommand(canMutateFolder, onRenameFolder),
       execute: () => runOptionalCommand(onRenameFolder),
     },
     {
@@ -70,7 +72,7 @@ function buildFolderCommands({
       label: 'Delete Folder',
       group: 'Navigation',
       keywords: ['folder', 'directory', 'sidebar', 'delete', 'remove'],
-      enabled: canRunFolderCommand(folderSelected, onDeleteFolder),
+      enabled: canRunFolderCommand(canMutateFolder, onDeleteFolder),
       execute: () => runOptionalCommand(onDeleteFolder),
     },
   ]
@@ -122,9 +124,11 @@ export function buildNavigationCommands(config: NavigationCommandsConfig): Comma
     showInbox = true,
   } = config
   const folderSelected = selection?.kind === 'folder'
+  const canMutateFolder = folderSelected && selection.path.length > 0
   const commands = [
     ...buildBaseCommands(config),
     ...buildFolderCommands({
+      canMutateFolder,
       folderSelected,
       onRenameFolder,
       onDeleteFolder,

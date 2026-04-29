@@ -17,6 +17,7 @@ interface FolderTreeRowProps {
   onCancelRenameFolder?: () => void
   locale?: AppLocale
   renamingFolderPath?: string | null
+  rootPath?: string
   selection: SidebarSelection
 }
 
@@ -64,6 +65,7 @@ function FolderChildren({
   onCancelRenameFolder,
   locale,
   renamingFolderPath,
+  rootPath,
   selection,
 }: FolderTreeRowProps) {
   const isExpanded = expanded[node.path] ?? false
@@ -91,6 +93,7 @@ function FolderChildren({
           onCancelRenameFolder={onCancelRenameFolder}
           locale={locale}
           renamingFolderPath={renamingFolderPath}
+          rootPath={rootPath}
           selection={selection}
         />
       ))}
@@ -111,16 +114,18 @@ export const FolderTreeRow = memo(function FolderTreeRow({
   onCancelRenameFolder,
   locale = 'en',
   renamingFolderPath,
+  rootPath,
   selection,
 }: FolderTreeRowProps) {
   const isExpanded = expanded[node.path] ?? false
   const isRenaming = renamingFolderPath === node.path
   const isSelected = selection.kind === 'folder' && selection.path === node.path
+  const canMutateFolder = node.path.length > 0
   const depthIndent = depth * 16
   const contentInset = 16
   const selectFolder = useCallback(() => {
-    onSelect({ kind: 'folder', path: node.path })
-  }, [node.path, onSelect])
+    onSelect(node.path === '' ? { kind: 'folder', path: '', rootPath } : { kind: 'folder', path: node.path })
+  }, [node.path, onSelect, rootPath])
   const row = (
     <FolderItemRow
       contentInset={contentInset}
@@ -128,10 +133,10 @@ export const FolderTreeRow = memo(function FolderTreeRow({
       isExpanded={isExpanded}
       isSelected={isSelected}
       node={node}
-      onDeleteFolder={onDeleteFolder}
+      onDeleteFolder={canMutateFolder ? onDeleteFolder : undefined}
       onOpenMenu={onOpenMenu}
       onSelect={selectFolder}
-      onStartRenameFolder={onStartRenameFolder}
+      onStartRenameFolder={canMutateFolder ? onStartRenameFolder : undefined}
       onToggle={onToggle}
       locale={locale}
     />
@@ -162,6 +167,7 @@ export const FolderTreeRow = memo(function FolderTreeRow({
         onCancelRenameFolder={onCancelRenameFolder}
         locale={locale}
         renamingFolderPath={renamingFolderPath}
+        rootPath={rootPath}
         selection={selection}
       />
     </>

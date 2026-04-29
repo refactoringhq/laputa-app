@@ -215,7 +215,7 @@ function FolderSelectButton({
         paddingLeft: hasChildren ? 0 : contentInset,
         paddingRight: hasActions ? 48 : 16,
       }}
-      title={node.path}
+      title={node.path || node.name}
       onClick={(event) => onClick(event.detail)}
       onDoubleClick={onDoubleClick}
       data-testid={`folder-row:${node.path}`}

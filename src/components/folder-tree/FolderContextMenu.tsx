@@ -29,6 +29,7 @@ export function FolderContextMenu({
   locale = 'en',
 }: FolderContextMenuProps) {
   if (!menu) return null
+  const canMutateFolder = menu.path.length > 0
 
   return (
     <div
@@ -61,25 +62,29 @@ export function FolderContextMenu({
           {translate(locale, 'sidebar.action.copyFolderPathMenu')}
         </Button>
       )}
-      <Button
-        type="button"
-        variant="ghost"
-        className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm"
-        onClick={() => onRename(menu.path)}
-      >
-        <PencilSimple size={14} />
-        {translate(locale, 'sidebar.action.renameFolderMenu')}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm text-destructive hover:text-destructive"
-        onClick={() => onDelete?.(menu.path)}
-        data-testid="delete-folder-menu-item"
-      >
-        <Trash size={14} />
-        {translate(locale, 'sidebar.action.deleteFolderMenu')}
-      </Button>
+      {canMutateFolder && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm"
+          onClick={() => onRename(menu.path)}
+        >
+          <PencilSimple size={14} />
+          {translate(locale, 'sidebar.action.renameFolderMenu')}
+        </Button>
+      )}
+      {canMutateFolder && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm text-destructive hover:text-destructive"
+          onClick={() => onDelete?.(menu.path)}
+          data-testid="delete-folder-menu-item"
+        >
+          <Trash size={14} />
+          {translate(locale, 'sidebar.action.deleteFolderMenu')}
+        </Button>
+      )}
     </div>
   )
 }

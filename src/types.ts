@@ -200,7 +200,7 @@ export type InboxPeriod = 'week' | 'month' | 'quarter' | 'all'
 export type SidebarSelection =
   | { kind: 'filter'; filter: SidebarFilter }
   | { kind: 'sectionGroup'; type: string }
-  | { kind: 'folder'; path: string }
+  | { kind: 'folder'; path: string; rootPath?: string }
   | { kind: 'entity'; entry: VaultEntry }
   | { kind: 'view'; filename: string }
 

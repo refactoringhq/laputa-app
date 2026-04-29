@@ -72,7 +72,7 @@ export function useFolderRename({
   }, [activeTabPathRef, handleSwitchTab, reloadFolders, reloadVault, selection, setSelection, setTabs, setToastMessage, vaultPath])
 
   const renameSelectedFolder = useCallback(() => {
-    if (selection.kind !== 'folder') return
+    if (selection.kind !== 'folder' || !selection.path) return
     startFolderRename(selection.path)
   }, [selection, startFolderRename])
 

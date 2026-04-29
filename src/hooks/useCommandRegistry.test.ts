@@ -52,6 +52,20 @@ function findCommand(commands: CommandAction[], id: string): CommandAction | und
   return commands.find(c => c.id === id)
 }
 
+function expectFolderCommandStates(overrides: Record<string, unknown>, expected: {
+  copy: boolean
+  delete: boolean
+  rename: boolean
+  reveal: boolean
+}) {
+  const { result } = renderHook(() => useCommandRegistry(makeConfig(overrides)))
+
+  expect(findCommand(result.current, 'reveal-selected-folder')?.enabled).toBe(expected.reveal)
+  expect(findCommand(result.current, 'copy-selected-folder-path')?.enabled).toBe(expected.copy)
+  expect(findCommand(result.current, 'rename-folder')?.enabled).toBe(expected.rename)
+  expect(findCommand(result.current, 'delete-folder')?.enabled).toBe(expected.delete)
+}
+
 describe('useCommandRegistry', () => {
   it('includes resolve-conflicts command in Git group', () => {
     const config = makeConfig()
@@ -482,35 +496,33 @@ describe('useCommandRegistry', () => {
   })
 
   it('enables folder commands when a folder is selected', () => {
-    const config = makeConfig({
+    expectFolderCommandStates({
       selection: { kind: 'folder', path: 'projects' },
       onRenameFolder: vi.fn(),
       onDeleteFolder: vi.fn(),
       onRevealSelectedFolder: vi.fn(),
       onCopySelectedFolderPath: vi.fn(),
-    })
-    const { result } = renderHook(() => useCommandRegistry(config))
-
-    expect(findCommand(result.current, 'reveal-selected-folder')?.enabled).toBe(true)
-    expect(findCommand(result.current, 'copy-selected-folder-path')?.enabled).toBe(true)
-    expect(findCommand(result.current, 'rename-folder')?.enabled).toBe(true)
-    expect(findCommand(result.current, 'delete-folder')?.enabled).toBe(true)
+    }, { copy: true, delete: true, rename: true, reveal: true })
   })
 
   it('disables folder commands outside folder selection', () => {
-    const config = makeConfig({
+    expectFolderCommandStates({
       selection: { kind: 'filter', filter: 'all' },
       onRenameFolder: vi.fn(),
       onDeleteFolder: vi.fn(),
       onRevealSelectedFolder: vi.fn(),
       onCopySelectedFolderPath: vi.fn(),
-    })
-    const { result } = renderHook(() => useCommandRegistry(config))
+    }, { copy: false, delete: false, rename: false, reveal: false })
+  })
 
-    expect(findCommand(result.current, 'reveal-selected-folder')?.enabled).toBe(false)
-    expect(findCommand(result.current, 'copy-selected-folder-path')?.enabled).toBe(false)
-    expect(findCommand(result.current, 'rename-folder')?.enabled).toBe(false)
-    expect(findCommand(result.current, 'delete-folder')?.enabled).toBe(false)
+  it('keeps root folder reveal and copy commands enabled without destructive actions', () => {
+    expectFolderCommandStates({
+      selection: { kind: 'folder', path: '', rootPath: '/Users/luca/Laputa' },
+      onRenameFolder: vi.fn(),
+      onDeleteFolder: vi.fn(),
+      onRevealSelectedFolder: vi.fn(),
+      onCopySelectedFolderPath: vi.fn(),
+    }, { copy: true, delete: false, rename: false, reveal: true })
   })
 
   it('executes folder command callbacks', () => {

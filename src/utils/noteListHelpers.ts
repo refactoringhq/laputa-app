@@ -417,9 +417,24 @@ function filterViewEntries(entries: VaultEntry[], filename: string, views?: View
   return evaluateView(view.definition, entries.filter(isMarkdown))
 }
 
-function filterFolderEntries(entries: VaultEntry[], folderPath: string, subFilter?: NoteListFilter): VaultEntry[] {
+function isDirectRootEntry(entryPath: string, rootPath?: string): boolean {
+  const normalizedEntryPath = normalizeFolderPath(entryPath)
+  const normalizedRootPath = rootPath ? normalizeFolderPath(rootPath) : ''
+  if (!normalizedRootPath) return !normalizedEntryPath.includes('/')
+  if (!normalizedEntryPath.startsWith(`${normalizedRootPath}/`)) return false
+  const relativePath = normalizedEntryPath.slice(normalizedRootPath.length + 1)
+  return relativePath.length > 0 && !relativePath.includes('/')
+}
+
+function filterRootEntries(entries: VaultEntry[], rootPath: string | undefined, subFilter?: NoteListFilter): VaultEntry[] {
+  const rootEntries = entries.filter((entry) => isDirectRootEntry(entry.path, rootPath))
+  return subFilter ? applySubFilter(rootEntries, subFilter) : rootEntries.filter(isActive)
+}
+
+function filterFolderEntries(entries: VaultEntry[], selection: Extract<SidebarSelection, { kind: 'folder' }>, subFilter?: NoteListFilter): VaultEntry[] {
+  if (!selection.path) return filterRootEntries(entries, selection.rootPath, subFilter)
   // Folder view shows ALL files (text + binary), not just markdown
-  const folderEntries = entries.filter((entry) => isInFolder(entry.path, folderPath))
+  const folderEntries = entries.filter((entry) => isInFolder(entry.path, selection.path))
   return subFilter ? applySubFilter(folderEntries, subFilter) : folderEntries.filter(isActive)
 }
 
@@ -443,7 +458,7 @@ function filterTopLevelEntries(
 function filterByKind(entries: VaultEntry[], selection: SidebarSelection, subFilter?: NoteListFilter, views?: ViewFile[]): VaultEntry[] {
   if (selection.kind === 'entity') return []
   if (selection.kind === 'view') return filterViewEntries(entries, selection.filename, views)
-  if (selection.kind === 'folder') return filterFolderEntries(entries, selection.path, subFilter)
+  if (selection.kind === 'folder') return filterFolderEntries(entries, selection, subFilter)
   if (selection.kind === 'sectionGroup') return filterSectionGroupEntries(entries, selection.type, subFilter)
   if (selection.kind === 'filter') return filterTopLevelEntries(entries, selection, subFilter)
   return []

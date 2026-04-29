@@ -24,7 +24,10 @@ function useExpandedFolders(selection: SidebarSelection, renamingFolderPath?: st
   )
 
   const toggleFolder = useCallback((path: string) => {
-    setManualExpanded((current) => ({ ...current, [path]: !current[path] }))
+    setManualExpanded((current) => {
+      const defaultExpanded = path === ''
+      return { ...current, [path]: !(current[path] ?? defaultExpanded) }
+    })
   }, [])
 
   return {

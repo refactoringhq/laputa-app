@@ -57,6 +57,7 @@ interface SidebarProps {
   renamingFolderPath?: string | null
   onStartRenameFolder?: (folderPath: string) => void
   onCancelRenameFolder?: () => void
+  vaultRootPath?: string
   showInbox?: boolean
   inboxCount?: number
   locale?: AppLocale
@@ -84,6 +85,7 @@ interface SidebarNavigationProps extends Pick<
   | 'renamingFolderPath'
   | 'onStartRenameFolder'
   | 'onCancelRenameFolder'
+  | 'vaultRootPath'
   | 'showInbox'
   | 'inboxCount'
   | 'onCreateNewType'
@@ -166,6 +168,7 @@ type SidebarFoldersNavigationProps = Pick<
   | 'renamingFolderPath'
   | 'onStartRenameFolder'
   | 'onCancelRenameFolder'
+  | 'vaultRootPath'
   | 'groupCollapsed'
   | 'toggleGroup'
   | 'locale'
@@ -313,6 +316,7 @@ function SidebarFoldersNavigation({
   renamingFolderPath,
   onStartRenameFolder,
   onCancelRenameFolder,
+  vaultRootPath,
   groupCollapsed,
   toggleGroup,
   locale,
@@ -343,6 +347,7 @@ function SidebarFoldersNavigation({
       collapsed={groupCollapsed.folders}
       locale={locale}
       onToggle={() => toggleGroup('folders')}
+      vaultRootPath={vaultRootPath}
     />
   )
 }
@@ -366,6 +371,7 @@ function SidebarNavigation({
   renamingFolderPath,
   onStartRenameFolder,
   onCancelRenameFolder,
+  vaultRootPath,
   showInbox = true,
   inboxCount = 0,
   locale = 'en',
@@ -458,6 +464,7 @@ function SidebarNavigation({
         renamingFolderPath={renamingFolderPath}
         onStartRenameFolder={onStartRenameFolder}
         onCancelRenameFolder={onCancelRenameFolder}
+        vaultRootPath={vaultRootPath}
         groupCollapsed={groupCollapsed}
         toggleGroup={toggleGroup}
         locale={locale}
@@ -473,7 +480,7 @@ function useSidebarDndSensors() {
   )
 }
 
-export const Sidebar = memo(function Sidebar({
+function useSidebarRuntime({
   entries,
   selection,
   onSelect,
@@ -482,27 +489,7 @@ export const Sidebar = memo(function Sidebar({
   onReorderSections,
   onRenameSection,
   onToggleTypeVisibility,
-  onSelectFavorite,
-  onReorderFavorites,
-  views = [],
-  onCreateView,
-  onEditView,
-  onDeleteView,
-  onReorderViews,
-  folders = [],
-  onCreateFolder,
-  onRenameFolder,
-  onDeleteFolder,
-  folderFileActions,
-  renamingFolderPath,
-  onStartRenameFolder,
-  onCancelRenameFolder,
-  showInbox = true,
-  inboxCount = 0,
   locale = 'en',
-  onCollapse,
-  onCreateNewType,
-  loading = false,
 }: SidebarProps) {
   const { typeEntryMap, allSectionGroups, visibleSections, sectionIds } = useSidebarSections(entries)
   const { activeCount, archivedCount } = useEntryCounts(entries)
@@ -526,7 +513,6 @@ export const Sidebar = memo(function Sidebar({
     const reordered = computeReorder(sectionIds, active.id as string, over.id as string)
     if (reordered) onReorderSections?.(reordered.map((typeName, order) => ({ typeName, order })))
   }, [sectionIds, onReorderSections])
-  const viewActions = { onCreateView, onEditView, onDeleteView, onReorderViews }
 
   const sectionProps: SidebarSectionProps = {
     entries,
@@ -540,60 +526,112 @@ export const Sidebar = memo(function Sidebar({
     onRenameCancel: typeInteractions.cancelRename,
   }
 
+  return {
+    activeCount,
+    allSectionGroups,
+    archivedCount,
+    groupCollapsed,
+    handleDragEnd,
+    isSectionVisible,
+    sectionIds,
+    sectionProps,
+    sensors,
+    toggleGroup,
+    toggleVisibility,
+    typeEntryMap,
+    typeInteractions,
+    visibleSections,
+  }
+}
+
+function SidebarRuntimeNavigation({
+  props,
+  runtime,
+}: {
+  props: SidebarProps
+  runtime: ReturnType<typeof useSidebarRuntime>
+}) {
   return (
-    <aside className="flex h-full flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-sidebar text-sidebar-foreground">
-      <SidebarTitleBar locale={locale} onCollapse={onCollapse} />
-      <SidebarNavigation
-        entries={entries}
-        selection={selection}
-        onSelect={onSelect}
-        onSelectFavorite={onSelectFavorite}
-        onReorderFavorites={onReorderFavorites}
-        views={views}
-        {...viewActions}
-        folders={folders}
-        onCreateFolder={onCreateFolder}
-        onRenameFolder={onRenameFolder}
-        onDeleteFolder={onDeleteFolder}
-        folderFileActions={folderFileActions}
-        renamingFolderPath={renamingFolderPath}
-        onStartRenameFolder={onStartRenameFolder}
-        onCancelRenameFolder={onCancelRenameFolder}
-        showInbox={showInbox}
-        inboxCount={inboxCount}
-        locale={locale}
-        loading={loading}
-        onCreateNewType={onCreateNewType}
-        activeCount={activeCount}
-        archivedCount={archivedCount}
-        groupCollapsed={groupCollapsed}
-        toggleGroup={toggleGroup}
-        visibleSections={visibleSections}
-        allSectionGroups={allSectionGroups}
-        sectionIds={sectionIds}
-        sensors={sensors}
-        handleDragEnd={handleDragEnd}
-        sectionProps={sectionProps}
-        typeInteractions={typeInteractions}
-        isSectionVisible={isSectionVisible}
-        toggleVisibility={toggleVisibility}
-      />
+    <SidebarNavigation
+      entries={props.entries}
+      selection={props.selection}
+      onSelect={props.onSelect}
+      onSelectFavorite={props.onSelectFavorite}
+      onReorderFavorites={props.onReorderFavorites}
+      views={props.views}
+      onCreateView={props.onCreateView}
+      onEditView={props.onEditView}
+      onDeleteView={props.onDeleteView}
+      onReorderViews={props.onReorderViews}
+      folders={props.folders}
+      onCreateFolder={props.onCreateFolder}
+      onRenameFolder={props.onRenameFolder}
+      onDeleteFolder={props.onDeleteFolder}
+      folderFileActions={props.folderFileActions}
+      renamingFolderPath={props.renamingFolderPath}
+      onStartRenameFolder={props.onStartRenameFolder}
+      onCancelRenameFolder={props.onCancelRenameFolder}
+      vaultRootPath={props.vaultRootPath}
+      showInbox={props.showInbox}
+      inboxCount={props.inboxCount}
+      locale={props.locale}
+      loading={props.loading}
+      onCreateNewType={props.onCreateNewType}
+      activeCount={runtime.activeCount}
+      archivedCount={runtime.archivedCount}
+      groupCollapsed={runtime.groupCollapsed}
+      toggleGroup={runtime.toggleGroup}
+      visibleSections={runtime.visibleSections}
+      allSectionGroups={runtime.allSectionGroups}
+      sectionIds={runtime.sectionIds}
+      sensors={runtime.sensors}
+      handleDragEnd={runtime.handleDragEnd}
+      sectionProps={runtime.sectionProps}
+      typeInteractions={runtime.typeInteractions}
+      isSectionVisible={runtime.isSectionVisible}
+      toggleVisibility={runtime.toggleVisibility}
+    />
+  )
+}
+
+function SidebarInteractionOverlays({
+  locale,
+  runtime,
+}: {
+  locale: AppLocale
+  runtime: ReturnType<typeof useSidebarRuntime>
+}) {
+  return (
+    <>
       <ContextMenuOverlay
-        pos={typeInteractions.contextMenuPos}
-        type={typeInteractions.contextMenuType}
-        innerRef={typeInteractions.contextMenuRef}
-        onOpenCustomize={typeInteractions.openCustomizeTarget}
-        onStartRename={typeInteractions.handleStartRename}
+        pos={runtime.typeInteractions.contextMenuPos}
+        type={runtime.typeInteractions.contextMenuType}
+        innerRef={runtime.typeInteractions.contextMenuRef}
+        onOpenCustomize={runtime.typeInteractions.openCustomizeTarget}
+        onStartRename={runtime.typeInteractions.handleStartRename}
         locale={locale}
       />
       <CustomizeOverlay
-        target={typeInteractions.customizeTarget}
-        typeEntryMap={typeEntryMap}
-        innerRef={typeInteractions.popoverRef}
-        onCustomize={typeInteractions.handleCustomize}
-        onChangeTemplate={typeInteractions.handleChangeTemplate}
-        onClose={typeInteractions.closeCustomizeTarget}
+        target={runtime.typeInteractions.customizeTarget}
+        typeEntryMap={runtime.typeEntryMap}
+        innerRef={runtime.typeInteractions.popoverRef}
+        onCustomize={runtime.typeInteractions.handleCustomize}
+        onChangeTemplate={runtime.typeInteractions.handleChangeTemplate}
+        onClose={runtime.typeInteractions.closeCustomizeTarget}
       />
+    </>
+  )
+}
+
+export const Sidebar = memo(function Sidebar(props: SidebarProps) {
+  const locale = props.locale ?? 'en'
+  const runtime = useSidebarRuntime(props)
+
+  return (
+    <aside className="flex h-full flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-sidebar text-sidebar-foreground">
+      <SidebarTitleBar locale={locale} onCollapse={props.onCollapse} />
+      <SidebarRuntimeNavigation props={props} runtime={runtime} />
+      <SidebarInteractionOverlays locale={locale} runtime={runtime} />
     </aside>
   )
 })

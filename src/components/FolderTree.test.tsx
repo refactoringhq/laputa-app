@@ -19,6 +19,7 @@ const mockFolders: FolderNode[] = [
 ]
 
 const defaultSelection: SidebarSelection = { kind: 'filter', filter: 'all' }
+const vaultRootPath = '/Users/luca/Laputa'
 
 describe('FolderTree', () => {
   it('renders nothing when folders is empty', () => {
@@ -36,6 +37,53 @@ describe('FolderTree', () => {
     expect(screen.getByText('journal')).toBeInTheDocument()
   })
 
+  it('renders the vault root as the top-level folder when a vault path is available', () => {
+    render(
+      <FolderTree
+        folders={mockFolders}
+        selection={defaultSelection}
+        onSelect={vi.fn()}
+        vaultRootPath={vaultRootPath}
+      />,
+    )
+
+    expect(screen.getByText('Laputa')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Laputa' })).toBeInTheDocument()
+    expect(screen.getByText('projects')).toBeInTheDocument()
+    expect(screen.getByText('areas')).toBeInTheDocument()
+    expect(screen.getByText('journal')).toBeInTheDocument()
+  })
+
+  it('renders the vault root even when the vault has no subfolders', () => {
+    render(
+      <FolderTree
+        folders={[]}
+        selection={defaultSelection}
+        onSelect={vi.fn()}
+        vaultRootPath={vaultRootPath}
+      />,
+    )
+
+    expect(screen.getByText('Laputa')).toBeInTheDocument()
+  })
+
+  it('lets the vault root collapse and expand its nested folders', () => {
+    render(
+      <FolderTree
+        folders={mockFolders}
+        selection={defaultSelection}
+        onSelect={vi.fn()}
+        vaultRootPath={vaultRootPath}
+      />,
+    )
+
+    fireEvent.click(screen.getByLabelText('Collapse Laputa'))
+    expect(screen.queryByText('projects')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Expand Laputa'))
+    expect(screen.getByText('projects')).toBeInTheDocument()
+  })
+
   it('expands children when clicking the folder chevron', () => {
     render(<FolderTree folders={mockFolders} selection={defaultSelection} onSelect={vi.fn()} />)
     expect(screen.queryByText('laputa')).not.toBeInTheDocument()
@@ -49,6 +97,21 @@ describe('FolderTree', () => {
     render(<FolderTree folders={mockFolders} selection={defaultSelection} onSelect={onSelect} />)
     fireEvent.click(screen.getByTestId('folder-row:projects'))
     expect(onSelect).toHaveBeenCalledWith({ kind: 'folder', path: 'projects' })
+  })
+
+  it('selects the vault root with the root path attached', () => {
+    const onSelect = vi.fn()
+    render(
+      <FolderTree
+        folders={mockFolders}
+        selection={defaultSelection}
+        onSelect={onSelect}
+        vaultRootPath={vaultRootPath}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('folder-row:'))
+    expect(onSelect).toHaveBeenCalledWith({ kind: 'folder', path: '', rootPath: vaultRootPath })
   })
 
   it('expands children when single-clicking a folder row with children', () => {
@@ -247,5 +310,34 @@ describe('FolderTree', () => {
     fireEvent.contextMenu(screen.getByText('projects'))
     fireEvent.click(screen.getByTestId('copy-folder-path-menu-item'))
     expect(onCopyFolderPath).toHaveBeenCalledWith('projects')
+  })
+
+  it('keeps destructive folder actions off the vault root row and menu', () => {
+    render(
+      <FolderTree
+        folders={mockFolders}
+        selection={defaultSelection}
+        onSelect={vi.fn()}
+        folderFileActions={{
+          copyFolderPath: vi.fn(),
+          revealFolder: vi.fn(),
+        }}
+        onDeleteFolder={vi.fn()}
+        onRenameFolder={vi.fn().mockResolvedValue(true)}
+        onStartRenameFolder={vi.fn()}
+        onCancelRenameFolder={vi.fn()}
+        vaultRootPath={vaultRootPath}
+      />,
+    )
+
+    expect(screen.queryByTestId('rename-folder-btn:')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('delete-folder-btn:')).not.toBeInTheDocument()
+
+    fireEvent.contextMenu(screen.getByText('Laputa'))
+
+    expect(screen.getByTestId('reveal-folder-menu-item')).toBeInTheDocument()
+    expect(screen.getByTestId('copy-folder-path-menu-item')).toBeInTheDocument()
+    expect(screen.queryByText('Rename folder...')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('delete-folder-menu-item')).not.toBeInTheDocument()
   })
 })

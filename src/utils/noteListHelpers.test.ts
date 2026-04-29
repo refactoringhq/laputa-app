@@ -86,6 +86,19 @@ describe('filterEntries', () => {
     expect(filterEntries(entries, { kind: 'folder', path: 'Client Work' }).map((entry) => entry.title)).toEqual(['Alpha', 'Beta'])
     expect(filterEntries(entries, { kind: 'folder', path: '客户' }).map((entry) => entry.title)).toEqual(['Unicode'])
   })
+
+  it('shows only direct root-level files when selecting the vault root folder', () => {
+    const entries = [
+      makeEntry({ path: '/Users/luca/Laputa/root-note.md', title: 'Root Note', fileKind: 'markdown' }),
+      makeEntry({ path: '/Users/luca/Laputa/config.json', title: 'config.json', fileKind: 'text' }),
+      makeEntry({ path: '/Users/luca/Laputa/projects/nested.md', title: 'Nested Note', fileKind: 'markdown' }),
+      makeEntry({ path: '/Users/luca/Laputa/assets/logo.png', title: 'Logo', fileKind: 'binary' }),
+    ]
+
+    const result = filterEntries(entries, { kind: 'folder', path: '', rootPath: '/Users/luca/Laputa' })
+
+    expect(result.map((entry) => entry.title)).toEqual(['Root Note', 'config.json'])
+  })
 })
 
 describe('countByFilter', () => {
