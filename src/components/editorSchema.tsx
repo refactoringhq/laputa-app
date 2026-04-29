@@ -5,7 +5,7 @@ import { createReactBlockSpec, createReactInlineContentSpec } from '@blocknote/r
 import { resolveWikilinkColor as resolveColor } from '../utils/wikilinkColors'
 import { resolveEntry } from '../utils/wikilink'
 import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/mathMarkdown'
-import { MERMAID_BLOCK_TYPE } from '../utils/mermaidMarkdown'
+import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
 import type { VaultEntry } from '../types'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { MermaidDiagram } from './MermaidDiagram'
@@ -106,6 +106,32 @@ const MathBlock = createReactBlockSpec(
   },
 )
 
+function readCodeElementLanguage(code: Element): string | null {
+  const language = code.getAttribute('data-language')
+    ?? Array.from(code.classList)
+      .find(className => className.startsWith('language-'))
+      ?.replace(/^language-/u, '')
+  if (!language) return null
+
+  return language.trim().split(/\s+/u)[0]?.toLowerCase() ?? null
+}
+
+function readMermaidPreElement(element: HTMLElement): { source: string; diagram: string } | undefined {
+  if (element.tagName !== 'PRE') return undefined
+  if (element.childElementCount !== 1 || element.firstElementChild?.tagName !== 'CODE') return undefined
+
+  const code = element.firstElementChild
+  if (readCodeElementLanguage(code) !== 'mermaid') return undefined
+
+  const diagram = code.textContent?.endsWith('\n')
+    ? code.textContent
+    : `${code.textContent ?? ''}\n`
+  return {
+    diagram,
+    source: mermaidFenceSource({ diagram }),
+  }
+}
+
 const MermaidBlock = createReactBlockSpec(
   {
     type: MERMAID_BLOCK_TYPE,
@@ -116,6 +142,8 @@ const MermaidBlock = createReactBlockSpec(
     content: 'none',
   },
   {
+    runsBefore: ['codeBlock'],
+    parse: readMermaidPreElement,
     render: (props) => (
       <MermaidDiagram
         diagram={props.block.props.diagram}
@@ -140,8 +168,8 @@ export const schema = BlockNoteSchema.create({
   },
 }).extend({
   blockSpecs: {
-    codeBlock,
     mathBlock,
     mermaidBlock,
+    codeBlock,
   },
 })

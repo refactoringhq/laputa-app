@@ -4,6 +4,7 @@ import { createArrowLigaturesExtension } from './arrowLigaturesExtension'
 function createFixture() {
   let beforeInputListener: ((event: InputEvent) => void) | null = null
   const transaction = { insertText: vi.fn(() => transaction) }
+  const paragraphNode = { type: { name: 'paragraph', spec: {} } }
   const view = {
     dispatch: vi.fn(),
     state: {
@@ -13,6 +14,10 @@ function createFixture() {
       selection: {
         from: 2,
         to: 2,
+        $from: {
+          depth: 0,
+          node: vi.fn(() => paragraphNode),
+        },
       },
       tr: transaction,
     },
@@ -113,6 +118,21 @@ describe('createArrowLigaturesExtension', () => {
     fixture.mount()
 
     const event = fixture.fireInput({ inputType: 'insertFromPaste' })
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(fixture.transaction.insertText).not.toHaveBeenCalled()
+    expect(fixture.view.dispatch).not.toHaveBeenCalled()
+  })
+
+  it('does not replace arrows while typing inside code blocks', () => {
+    const fixture = createFixture()
+    fixture.mount()
+    fixture.view.state.doc.textBetween.mockReturnValue('-')
+    fixture.view.state.selection.$from.node.mockReturnValue({
+      type: { name: 'codeBlock', spec: { code: true } },
+    })
+
+    const event = fixture.fireInput()
 
     expect(event.preventDefault).not.toHaveBeenCalled()
     expect(fixture.transaction.insertText).not.toHaveBeenCalled()

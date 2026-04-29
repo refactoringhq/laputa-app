@@ -63,6 +63,10 @@ interface DiagramSource {
   diagram: string
 }
 
+interface CodeBlockSource {
+  block: BlockLike
+}
+
 function lineEnding({ line }: MarkdownLine): string {
   if (line.endsWith('\r\n')) return '\r\n'
   return line.endsWith('\n') ? '\n' : ''
@@ -185,9 +189,68 @@ function buildMermaidBlock({ block, payload }: { block: BlockLike; payload: Merm
   }
 }
 
+export function mermaidFenceSource({ diagram }: DiagramSource): string {
+  const body = diagram.endsWith('\n') ? diagram : `${diagram}\n`
+  return `\`\`\`mermaid\n${body}\`\`\``
+}
+
+function readCodeBlockLanguage({ block }: CodeBlockSource): string | null {
+  const language = block.props?.language
+  if (typeof language !== 'string') return null
+
+  return language.trim().split(/\s+/)[0]?.toLowerCase() ?? null
+}
+
+function readInlineText(content: InlineItem[] | undefined): string | null {
+  if (!Array.isArray(content)) return null
+  return content.map((item) => (
+    item.type === 'text' && typeof item.text === 'string' ? item.text : ''
+  )).join('')
+}
+
+function looksLikeMermaidDiagram(diagram: string): boolean {
+  const firstStatement = diagram
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .find(line => line.length > 0 && !line.startsWith('%%'))
+
+  return typeof firstStatement === 'string'
+    && /^(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|quadrantChart|requirementDiagram|gitGraph|C4Context|C4Container|C4Component|C4Dynamic|sankey-beta|xychart-beta)\b/.test(firstStatement)
+}
+
+function shouldInjectCodeBlockAsMermaid({
+  diagram,
+  language,
+}: {
+  diagram: string
+  language: string | null
+}): boolean {
+  if (language === 'mermaid') return true
+  if (language !== null && language !== 'text' && language !== 'plain' && language !== 'plaintext') return false
+
+  return looksLikeMermaidDiagram(diagram)
+}
+
+function readMermaidCodeBlock({ block }: CodeBlockSource): MermaidPayload | null {
+  if (block.type !== 'codeBlock') return null
+
+  const diagram = readInlineText(block.content)
+  if (diagram === null) return null
+  if (!shouldInjectCodeBlockAsMermaid({ diagram, language: readCodeBlockLanguage({ block }) })) return null
+
+  const normalizedDiagram = diagram.endsWith('\n') ? diagram : `${diagram}\n`
+  return {
+    diagram: normalizedDiagram,
+    source: mermaidFenceSource({ diagram: normalizedDiagram }),
+  }
+}
+
 function injectMermaidInBlock(block: BlockLike): BlockLike {
   const payload = readMermaidPayload(block.content)
   if (payload) return buildMermaidBlock({ block, payload })
+
+  const codeBlockPayload = readMermaidCodeBlock({ block })
+  if (codeBlockPayload) return buildMermaidBlock({ block, payload: codeBlockPayload })
 
   const children = Array.isArray(block.children) ? block.children.map(injectMermaidInBlock) : block.children
   return { ...block, children }
@@ -199,16 +262,11 @@ function isMermaidBlock(block: BlockLike): boolean {
     && typeof block.props?.diagram === 'string'
 }
 
-function fallbackMermaidSource({ diagram }: DiagramSource): string {
-  const body = diagram.endsWith('\n') ? diagram : `${diagram}\n`
-  return `\`\`\`mermaid\n${body}\`\`\``
-}
-
 function mermaidMarkdown(block: BlockLike): string {
   const source = block.props?.source
   if (source) return source
 
-  return fallbackMermaidSource({ diagram: block.props?.diagram ?? '' })
+  return mermaidFenceSource({ diagram: block.props?.diagram ?? '' })
 }
 
 export function injectMermaidInBlocks(blocks: unknown[]): unknown[] {
