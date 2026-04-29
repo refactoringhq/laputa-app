@@ -281,6 +281,18 @@ function installEditorDomSpies(scrollTop = 0) {
   return { scrollEl, frameSpy }
 }
 
+function flushQueuedFrames(frameCallbacks: FrameRequestCallback[]) {
+  act(() => {
+    frameCallbacks.splice(0).forEach((callback) => callback(0))
+  })
+}
+
+function flushQueuedMicrotasks(queued: VoidFunction[]) {
+  act(() => {
+    queued.splice(0).forEach((callback) => callback())
+  })
+}
+
 type SwapHarnessProps = {
   tabs: ReturnType<typeof makeTab>[]
   activeTabPath: string | null
@@ -673,6 +685,72 @@ describe('useEditorTabSwap raw mode sync', () => {
       queued.shift()?.()
       await Promise.resolve()
     })
+  })
+
+  it('ignores delayed programmatic change events until a swapped note frame commits', async () => {
+    vi.spyOn(document, 'querySelector').mockReturnValue({ scrollTop: 0 } as unknown as Element)
+    const frameCallbacks: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      frameCallbacks.push(cb)
+      return frameCallbacks.length
+    })
+
+    const onContentChange = vi.fn()
+    const staleAlphaBlocks = [{
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Stale Alpha body', styles: {} }],
+      children: [],
+    }]
+    const docRef = { current: staleAlphaBlocks as unknown[] }
+    const mockEditor = makeMockEditor(docRef)
+    Object.defineProperty(mockEditor, 'document', { get: () => docRef.current })
+    mockEditor.blocksToMarkdownLossy.mockReturnValue('Stale Alpha body')
+
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = makeTab('b.md', 'Note B')
+
+    const { result, rerender } = renderHook(
+      ({ tabs, activeTabPath }) => useEditorTabSwap({
+        tabs,
+        activeTabPath,
+        editor: mockEditor as never,
+        onContentChange,
+      }),
+      { initialProps: { tabs: [tabA], activeTabPath: 'a.md' } },
+    )
+
+    await act(() => new Promise(r => setTimeout(r, 0)))
+    flushQueuedFrames(frameCallbacks)
+    onContentChange.mockClear()
+
+    mockEditor.replaceBlocks.mockImplementation(() => {
+      // Simulate BlockNote reporting a programmatic change before its document
+      // getter reflects the new note content.
+    })
+    docRef.current = staleAlphaBlocks
+
+    const queued: VoidFunction[] = []
+    vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((cb: VoidFunction) => {
+      queued.push(cb)
+    })
+
+    rerender({ tabs: [tabB], activeTabPath: 'b.md' })
+    act(() => {
+      queued.shift()?.()
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    flushQueuedMicrotasks(queued)
+
+    act(() => {
+      result.current.handleEditorChange()
+      result.current.flushPendingEditorChange()
+    })
+
+    expect(onContentChange).not.toHaveBeenCalled()
+
+    flushQueuedFrames(frameCallbacks)
   })
 
   it('serializes rich inline math nodes back to Markdown on editor changes', async () => {

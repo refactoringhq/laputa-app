@@ -736,6 +736,30 @@ describe('useTabManagement (single-note model)', () => {
       expectSingleActiveTab(result, '/vault/b.md')
     })
 
+    it('records the requested note while the current note is still saving', async () => {
+      const deferred = createDeferred<void>()
+      const beforeNavigate = vi.fn().mockReturnValueOnce(deferred.promise)
+
+      const { result } = renderHook(() => useTabManagement({ beforeNavigate }))
+      await selectNote(result, { path: '/vault/a.md', title: 'A' })
+
+      await act(async () => {
+        void result.current.handleReplaceActiveTab(makeEntry({ path: '/vault/b.md', title: 'B' }))
+        await Promise.resolve()
+      })
+
+      expect(result.current.activeTabPath).toBe('/vault/a.md')
+      expect(result.current.requestedActiveTabPathRef.current).toBe('/vault/b.md')
+
+      await act(async () => {
+        deferred.resolve(undefined)
+        await Promise.resolve()
+      })
+
+      await vi.waitFor(() => expect(result.current.activeTabPath).toBe('/vault/b.md'))
+      expect(result.current.requestedActiveTabPathRef.current).toBe('/vault/b.md')
+    })
+
     it('keeps only the latest target when note switches overlap during beforeNavigate', async () => {
       const first = createDeferred<void>()
       const second = createDeferred<void>()
@@ -787,6 +811,7 @@ describe('useTabManagement (single-note model)', () => {
       })
 
       expect(result.current.activeTabPath).toBe('/vault/a.md')
+      expect(result.current.requestedActiveTabPathRef.current).toBe('/vault/a.md')
       expect(warnSpy).toHaveBeenCalledWith(
         'Failed to persist note before navigation:',
         expect.any(Error),

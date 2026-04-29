@@ -251,6 +251,16 @@ function syncActiveTabPath(
   setActiveTabPath(path)
 }
 
+function resetRequestedPathIfStillPending(
+  requestedActiveTabPathRef: React.MutableRefObject<string | null>,
+  activeTabPathRef: React.MutableRefObject<string | null>,
+  pendingPath: string,
+) {
+  if (requestedActiveTabPathRef.current === pendingPath) {
+    requestedActiveTabPathRef.current = activeTabPathRef.current
+  }
+}
+
 function normalizeComparablePath(path: string): string {
   return path
     .replaceAll('\\', '/')
@@ -615,6 +625,7 @@ export function useTabManagement(options: TabManagementOptions = {}) {
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeTabPath, setActiveTabPath] = useState<string | null>(null)
   const activeTabPathRef = useRef(activeTabPath)
+  const requestedActiveTabPathRef = useRef<string | null>(activeTabPath)
   useEffect(() => { activeTabPathRef.current = activeTabPath })
   const tabsRef = useRef(tabs)
   useEffect(() => { tabsRef.current = tabs })
@@ -641,21 +652,23 @@ export function useTabManagement(options: TabManagementOptions = {}) {
       } catch (err) {
         console.warn('Failed to persist note before navigation:', err)
         failNoteOpenTrace(targetPath, 'before-navigate-failed')
-        return
+        return false
       }
-      if (beforeNavigateSeqRef.current !== seq) return
+      if (beforeNavigateSeqRef.current !== seq) return false
     }
     await navigate()
+    return true
   }, [beforeNavigate])
 
   /** Open a note — replaces the current note (single-note model). */
   const handleSelectNote = useCallback(async (entry: VaultEntry) => {
+    requestedActiveTabPathRef.current = entry.path
     const alreadyViewingDirtyEntry = pathsMatch(entry.path, activeTabPathRef.current)
       && !!hasUnsavedChanges?.(entry.path)
     if (!alreadyViewingDirtyEntry) {
       beginNoteOpenTrace(entry.path, 'select-note')
     }
-    await executeNavigationWithBoundary(entry.path, () => navigateToEntry({
+    const navigated = await executeNavigationWithBoundary(entry.path, () => navigateToEntry({
       entry,
       navSeqRef,
       tabsRef,
@@ -666,25 +679,33 @@ export function useTabManagement(options: TabManagementOptions = {}) {
       onMissingNotePath,
       onUnreadableNoteContent,
     }))
+    if (!navigated) {
+      resetRequestedPathIfStillPending(requestedActiveTabPathRef, activeTabPathRef, entry.path)
+    }
   }, [executeNavigationWithBoundary, hasUnsavedChanges, onMissingNotePath, onUnreadableNoteContent])
 
   const handleSwitchTab = useCallback((path: string) => {
+    requestedActiveTabPathRef.current = path
     syncActiveTabPath(activeTabPathRef, setActiveTabPath, path)
   }, [])
 
   /** Open a tab with known content — no IPC round-trip. Used for newly created notes. */
   const openTabWithContent = useCallback((entry: VaultEntry, content: string) => {
+    requestedActiveTabPathRef.current = entry.path
     void executeNavigationWithBoundary(entry.path, () => {
       setSingleTab(tabsRef, setTabs, { entry, content })
       syncActiveTabPath(activeTabPathRef, setActiveTabPath, entry.path)
+    }).then((navigated) => {
+      if (!navigated) resetRequestedPathIfStillPending(requestedActiveTabPathRef, activeTabPathRef, entry.path)
     })
   }, [executeNavigationWithBoundary])
 
   const handleReplaceActiveTab = useCallback(async (entry: VaultEntry) => {
+    requestedActiveTabPathRef.current = entry.path
     if (!pathsMatch(entry.path, activeTabPathRef.current)) {
       beginNoteOpenTrace(entry.path, 'replace-active-tab')
     }
-    await executeNavigationWithBoundary(entry.path, () => navigateToEntry({
+    const navigated = await executeNavigationWithBoundary(entry.path, () => navigateToEntry({
       entry,
       forceReload: true,
       navSeqRef,
@@ -695,11 +716,15 @@ export function useTabManagement(options: TabManagementOptions = {}) {
       onMissingNotePath,
       onUnreadableNoteContent,
     }))
+    if (!navigated) {
+      resetRequestedPathIfStillPending(requestedActiveTabPathRef, activeTabPathRef, entry.path)
+    }
   }, [executeNavigationWithBoundary, onMissingNotePath, onUnreadableNoteContent])
 
   const closeAllTabs = useCallback(() => {
     tabsRef.current = []
     setTabs([])
+    requestedActiveTabPathRef.current = null
     syncActiveTabPath(activeTabPathRef, setActiveTabPath, null)
   }, [])
 
@@ -708,6 +733,7 @@ export function useTabManagement(options: TabManagementOptions = {}) {
     setTabs,
     activeTabPath,
     activeTabPathRef,
+    requestedActiveTabPathRef,
     handleSelectNote,
     openTabWithContent,
     handleSwitchTab,
