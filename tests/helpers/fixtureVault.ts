@@ -293,6 +293,12 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: Fix
         ) as { content: string }
         return data.content
       },
+      validate_note_content: async (commandArgs?: FixtureCommandArgs) => {
+        const data = await readJson(
+          `/api/vault/content?path=${encodeURIComponent(readCommandString(commandArgs, 'path'))}`,
+        ) as { content: string }
+        return data.content === readCommandString(commandArgs, 'content')
+      },
       get_all_content: (commandArgs?: FixtureCommandArgs) =>
         readJson(
           `/api/vault/all-content?path=${encodeURIComponent(readCommandString(commandArgs, 'path', resolvedVaultPath))}`,

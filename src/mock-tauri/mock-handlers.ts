@@ -320,6 +320,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   reload_vault_entry: (args: { path: string }) => MOCK_ENTRIES.find(e => e.path === args.path) ?? { path: args.path, title: 'Unknown', filename: 'unknown.md', aliases: [], belongsTo: [], relatedTo: [], archived: false, snippet: '', wordCount: 0, fileSize: 0, relationships: {}, outgoingLinks: [], properties: {} },
   sync_note_title: () => false,
   get_note_content: (args: { path: string }) => MOCK_CONTENT[args.path] ?? '',
+  validate_note_content: (args: { path: string; content: string }) => (MOCK_CONTENT[args.path] ?? '') === args.content,
   get_all_content: () => MOCK_CONTENT,
   get_file_history: (args: { path: string }) => mockFileHistory(args.path),
   get_modified_files: () => {

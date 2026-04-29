@@ -89,6 +89,12 @@ flowchart LR
 
 The main window starts a native watcher for the active vault through `start_vault_watcher` / `stop_vault_watcher` (`src-tauri/src/vault_watcher.rs`, backed by Rust `notify`). The watcher emits `vault-changed` events for content paths and ignores churn from `.git/`, `node_modules/`, temp files, and `.tolaria-rename-txn`. `useVaultWatcher` batches those events, suppresses recent app-owned saves, and sends the remaining external paths through `refreshPulledVaultState()` so folders, saved views, note-list state, and the clean active editor all refresh under the ADR-0071 unsaved-edit rules. `useVaultLoader.isReloading` drives the status-bar reload spinner for both manual and watcher-triggered reloads.
 
+#### Note Opening Fast Path
+
+Note opening uses a bounded in-memory fast path split across raw content and editor-ready blocks. `useTabManagement` owns the raw markdown prefetch cache and `useEditorTabSwap` owns the prepared BlockNote block cache. Cached or preloaded markdown is never rendered directly: before reusing it, the renderer calls the `validate_note_content` Tauri command, which compares the cached text with the current file bytes inside the validated vault boundary. If validation fails, Tolaria discards the cached entry and reads fresh disk content before swapping the editor.
+
+The note list opportunistically preloads visible and adjacent markdown/text entries after a short idle delay. Once raw content resolves, the editor prepares BlockNote blocks in the background when it is mounted and not in raw mode. This targets the expensive markdown-to-editor conversion stage while keeping filesystem content authoritative and keeping preload memory bounded by the same cache limits as ordinary note switches.
+
 ## Tech Stack
 
 | Layer | Technology | Version |

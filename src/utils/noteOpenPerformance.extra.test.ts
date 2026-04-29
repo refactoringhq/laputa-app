@@ -33,7 +33,7 @@ describe('noteOpenPerformance additional coverage', () => {
     finishNoteOpenTrace('/vault/missing-stages.md')
 
     expect(debugSpy).toHaveBeenCalledWith(
-      '[perf] noteOpen path=/vault/missing-stages.md source=quick-open total=25.0ms beforeNavigate=n/a contentLoad=n/a editorSwap=25.0ms cache=miss',
+      '[perf] noteOpen path=/vault/missing-stages.md source=quick-open total=25.0ms beforeNavigate=n/a freshnessCheck=n/a contentLoad=n/a editorSwap=25.0ms cache=miss',
     )
   })
 

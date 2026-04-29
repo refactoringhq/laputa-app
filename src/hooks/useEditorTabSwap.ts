@@ -7,6 +7,9 @@ import { injectMathInBlocks, preProcessMathMarkdown } from '../utils/mathMarkdow
 import { injectMermaidInBlocks, preProcessMermaidMarkdown, serializeMermaidAwareBlocks } from '../utils/mermaidMarkdown'
 import { failNoteOpenTrace, finishNoteOpenTrace } from '../utils/noteOpenPerformance'
 import { resolveImageUrls, portableImageUrls } from '../utils/vaultImages'
+import { getResolvedCachedNoteContent, NOTE_CONTENT_CACHE_RESOLVED_EVENT } from './useTabManagement'
+import { useEditorMountState, useLatestRef } from './editorTabSwapLifecycle'
+import { usePreparedNotePreload } from './usePreparedNotePreload'
 import { repairMalformedEditorBlocks } from './editorBlockRepair'
 import {
   blankParagraphBlocks,
@@ -184,6 +187,22 @@ async function resolveBlocksForTarget(
   return nextState
 }
 
+function shouldPrepareCachedContent(cache: Map<string, CachedTabState>, path: string, content: string): boolean {
+  return cache.get(path)?.sourceContent !== content
+}
+
+async function prepareCachedNoteContent(options: {
+  editor: ReturnType<typeof useCreateBlockNote>
+  cache: Map<string, CachedTabState>
+  path: string
+  vaultPath?: string
+}): Promise<void> {
+  const { editor, cache, path, vaultPath } = options
+  const cached = getResolvedCachedNoteContent(path)
+  if (!cached || !shouldPrepareCachedContent(cache, path, cached.content)) return
+  await resolveBlocksForTarget({ editor, cache, targetPath: path, content: cached.content, vaultPath })
+}
+
 function applyBlocksToEditor(
   editor: ReturnType<typeof useCreateBlockNote>,
   blocks: EditorBlocks,
@@ -323,35 +342,6 @@ function isUntitledRenameTransition(
     currentBody: serializeEditorBody(editor),
     nextBody: normalizeTabBody({ content: activeTab.content }),
   })
-}
-
-function useLatestRef<T>(value: T): MutableRefObject<T> {
-  const ref = useRef(value)
-  useEffect(() => {
-    ref.current = value
-  }, [value])
-  return ref
-}
-
-function useEditorMountState(
-  editor: ReturnType<typeof useCreateBlockNote>,
-  editorMountedRef: MutableRefObject<boolean>,
-  pendingSwapRef: MutableRefObject<(() => void) | null>,
-) {
-  useEffect(() => {
-    if (editor.prosemirrorView) {
-      editorMountedRef.current = true
-    }
-    const cleanup = editor.onMount(() => {
-      editorMountedRef.current = true
-      if (pendingSwapRef.current) {
-        const swap = pendingSwapRef.current
-        pendingSwapRef.current = null
-        queueMicrotask(swap)
-      }
-    })
-    return cleanup
-  }, [editor, editorMountedRef, pendingSwapRef])
 }
 
 function useEditorChangeHandler(options: {
@@ -1146,6 +1136,7 @@ export function useEditorTabSwap({ tabs, activeTabPath, editor, onContentChange,
     pendingLocalContentRef,
     vaultPathRef,
   })
+  const preparePreloadedPath = useCallback((path: string) => prepareCachedNoteContent({ editor, cache: tabCacheRef.current, path, vaultPath: vaultPathRef.current }), [editor, tabCacheRef, vaultPathRef])
 
   useEditorMountState(editor, editorMountedRef, pendingSwapRef)
   useTabSwapEffect({
@@ -1162,6 +1153,12 @@ export function useEditorTabSwap({ tabs, activeTabPath, editor, onContentChange,
     suppressChangeRef,
     pendingLocalContentRef,
     vaultPathRef,
+  })
+  usePreparedNotePreload({
+    eventName: NOTE_CONTENT_CACHE_RESOLVED_EVENT,
+    editorMountedRef,
+    rawMode,
+    preparePath: preparePreloadedPath,
   })
 
   return { handleEditorChange, editorMountedRef }
