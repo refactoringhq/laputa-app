@@ -16,8 +16,13 @@ import type { AiAgentReadiness } from '../lib/aiAgents'
 import type { NoteReference } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 
-const AI_PERMISSION_MODE_TOOLTIP = {
-  label: 'Vault Safe keeps agents to file, search, and edit tools. Power User also allows local shell commands for this vault.',
+const AI_PERMISSION_MODE_TOOLTIPS: Record<AiAgentPermissionMode, { label: string }> = {
+  safe: {
+    label: 'Vault Safe keeps agents limited to file, search, and edit tools.',
+  },
+  power_user: {
+    label: 'Power User also allows local shell commands for this vault.',
+  },
 }
 
 interface AiPanelHeaderProps {
@@ -228,7 +233,7 @@ function AiPermissionModeToggle({
           return (
             <ActionTooltip
               key={mode}
-              copy={AI_PERMISSION_MODE_TOOLTIP}
+              copy={AI_PERMISSION_MODE_TOOLTIPS[mode]}
               side="bottom"
               contentTestId="ai-permission-mode-tooltip"
             >
