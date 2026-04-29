@@ -9,7 +9,7 @@
   "command.openSettings": "Open Settings",
   "command.openSettings.keywords": "preferences config",
   "command.openLanguageSettings": "Open Language Settings",
-  "command.openLanguageSettings.keywords": "language locale i18n internationalization localization english italian french german russian spanish portuguese chinese japanese korean 中文",
+  "command.openLanguageSettings.keywords": "language locale i18n internationalization localization english italian french german russian spanish portuguese chinese simplified traditional japanese korean 中文 繁體中文 zh-tw",
   "command.useSystemLanguage": "Use System Language",
   "command.openH1Setting": "Open H1 Auto-Rename Setting",
   "command.toggleGitignoredFilesVisibility": "Toggle Gitignored Files Visibility",
@@ -485,6 +485,7 @@
   "locale.ptPT": "Portuguese (Portugal)",
   "locale.es419": "Spanish (Latin America)",
   "locale.zhCN": "Simplified Chinese",
+  "locale.zhTW": "Traditional Chinese",
   "locale.jaJP": "Japanese",
   "locale.koKR": "Korean"
 }

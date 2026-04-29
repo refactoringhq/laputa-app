@@ -14,6 +14,7 @@ export const APP_LOCALES = [
   'pt-PT',
   'es-419',
   'zh-CN',
+  'zh-TW',
   'ja-JP',
   'ko-KR',
 ] as const
@@ -124,6 +125,13 @@ const LOCALE_DEFINITIONS: Record<AppLocale, LocaleDefinition> = {
     labelKey: 'locale.zhCN',
     aliases: ['zh', 'zh-cn', 'zh-hans', 'zh-sg'],
     searchKeywords: ['chinese', 'simplified', 'zh', 'zh-cn', '中文', '简体中文'],
+  },
+  'zh-TW': {
+    code: 'zh-TW',
+    dateLocale: 'zh-TW',
+    labelKey: 'locale.zhTW',
+    aliases: ['zh-tw', 'zh-hant', 'zh-hk', 'zh-mo'],
+    searchKeywords: ['chinese', 'traditional', 'zh-tw', 'zh-hant', '中文', '繁體中文', '繁体中文'],
   },
   'ja-JP': {
     code: 'ja-JP',
