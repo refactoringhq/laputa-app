@@ -30,7 +30,7 @@ export interface NoteActionsConfig {
   clearUnsaved?: (path: string) => void
   unsavedPaths?: Set<string>
   markContentPending?: (path: string, content: string) => void
-  onNewNotePersisted?: () => void
+  onNewNotePersisted?: (path: string) => void
   replaceEntry?: (oldPath: string, patch: Partial<VaultEntry> & { path: string }) => void
   onPathRenamed?: (oldPath: string, newPath: string) => void
   /** Called after frontmatter is written to disk — used for live-reloading theme CSS vars. */
