@@ -92,6 +92,12 @@ flowchart LR
 
 The main window starts a native watcher for the active vault through `start_vault_watcher` / `stop_vault_watcher` (`src-tauri/src/vault_watcher.rs`, backed by Rust `notify`). The watcher emits `vault-changed` events for content paths and ignores churn from `.git/`, `node_modules/`, temp files, and `.tolaria-rename-txn`. `useVaultWatcher` batches those events, suppresses recent app-owned saves, and sends the remaining external paths through `refreshPulledVaultState()` so folders, saved views, note-list state, and the clean active editor all refresh under the ADR-0071 unsaved-edit rules. `useVaultLoader.isReloading` drives the status-bar reload spinner for both manual and watcher-triggered reloads.
 
+#### Progressive Vault Loading
+
+Vault opening is allowed to render the main app shell while the full entry scan is still in flight. `useVaultLoader` keeps `isLoading` true until entries are ready, but folders and saved views load independently so the sidebar can become useful before the note index completes. The status bar uses the vault activity badge during this initial indexing state, while command-palette and editor-shell interactions remain mounted instead of being hidden behind the full app skeleton. The full skeleton is reserved for app-level capability checks such as the initial Git-state probe.
+
+Large-vault reproduction and keyboard QA steps live in [LARGE-VAULT-LOADING-QA.md](./LARGE-VAULT-LOADING-QA.md).
+
 #### Note Opening Fast Path
 
 Note opening uses a bounded in-memory fast path split across raw content and editor-ready blocks. `useTabManagement` owns the raw markdown prefetch cache and `useEditorTabSwap` owns the prepared BlockNote block cache. Cached or preloaded markdown is never rendered directly: before reusing it, the renderer calls the `validate_note_content` Tauri command, which compares the cached text with the current file bytes inside the validated vault boundary. If validation fails, Tolaria discards the cached entry and reads fresh disk content before swapping the editor.

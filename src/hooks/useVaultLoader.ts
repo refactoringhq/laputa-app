@@ -47,7 +47,11 @@ async function loadInitialVaultState(options: {
   setViews: (views: ViewFile[]) => void
 }) {
   const { path, isCurrentVaultPath, setEntries, setFolders, setIsLoading, setViews } = options
-  const chromeLoad = loadVaultChrome({ vaultPath: path })
+  const chromeLoad = loadVaultChrome({ vaultPath: path }).then(({ folders, views }) => {
+    if (!isCurrentVaultPath(path)) return
+    setFolders(folders)
+    setViews(views)
+  })
 
   setIsLoading(true)
   try {
@@ -59,10 +63,7 @@ async function loadInitialVaultState(options: {
     if (isCurrentVaultPath(path)) setIsLoading(false)
   }
 
-  const { folders, views } = await chromeLoad
-  if (!isCurrentVaultPath(path)) return
-  setFolders(folders)
-  setViews(views)
+  await chromeLoad
 }
 
 function useCurrentVaultPathGuard(vaultPath: string) {

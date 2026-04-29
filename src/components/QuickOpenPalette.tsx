@@ -2,15 +2,19 @@ import { useState, useRef, useEffect } from 'react'
 import type { VaultEntry } from '../types'
 import { NoteSearchList } from './NoteSearchList'
 import { useNoteSearch } from '../hooks/useNoteSearch'
+import { translate, type AppLocale } from '../lib/i18n'
+import { Input } from '@/components/ui/input'
 
 interface QuickOpenPaletteProps {
   open: boolean
   entries: VaultEntry[]
+  isLoading?: boolean
   onSelect: (entry: VaultEntry) => void
   onClose: () => void
+  locale?: AppLocale
 }
 
-export function QuickOpenPalette({ open, entries, onSelect, onClose }: QuickOpenPaletteProps) {
+export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, onClose, locale = 'en' }: QuickOpenPaletteProps) {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const { results, selectedIndex, setSelectedIndex, handleKeyDown } = useNoteSearch(entries, query)
@@ -56,11 +60,11 @@ export function QuickOpenPalette({ open, entries, onSelect, onClose }: QuickOpen
         className="flex w-[500px] max-w-[90vw] max-h-[400px] flex-col self-start overflow-hidden rounded-xl border border-[var(--border-dialog)] bg-popover shadow-[0_8px_32px_var(--shadow-dialog)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <input
+        <Input
           ref={inputRef}
-          className="border-b border-border bg-transparent px-4 py-3 text-[15px] text-foreground outline-none placeholder:text-muted-foreground"
+          className="h-auto rounded-none border-0 border-b border-border px-4 py-3 text-[15px] shadow-none focus-visible:ring-0"
           type="text"
-          placeholder="Search notes..."
+          placeholder={translate(locale, 'noteList.searchPlaceholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -73,7 +77,7 @@ export function QuickOpenPalette({ open, entries, onSelect, onClose }: QuickOpen
             onClose()
           }}
           onItemHover={(i) => setSelectedIndex(i)}
-          emptyMessage="No matching notes"
+          emptyMessage={isLoading ? translate(locale, 'status.vault.reloading') : translate(locale, 'noteList.empty.noMatching')}
           className="flex-1 overflow-y-auto"
         />
       </div>
