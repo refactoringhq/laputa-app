@@ -411,6 +411,7 @@ macro_rules! app_invoke_handler {
             commands::reload_vault,
             commands::reload_vault_entry,
             commands::sync_vault_asset_scope_for_window,
+            commands::open_vault_file_external,
             commands::sync_note_title,
             commands::save_image,
             commands::copy_image_to_vault,

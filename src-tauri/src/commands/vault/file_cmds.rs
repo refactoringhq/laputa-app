@@ -23,6 +23,14 @@ fn with_note_path<T>(
     )
 }
 
+fn with_external_file_path<T>(
+    path: &Path,
+    vault_path: Option<&Path>,
+    action: impl FnOnce(&Path) -> Result<T, String>,
+) -> Result<T, String> {
+    with_note_path(path, vault_path, ValidatedPathMode::Existing, action)
+}
+
 fn with_expanded_vault_root<T>(
     path: &Path,
     action: impl FnOnce(&Path) -> Result<T, String>,
@@ -73,6 +81,26 @@ pub fn sync_vault_asset_scope_for_window(
     with_requested_root_path(vault_path.as_path(), |requested_root| {
         sync_image_asset_scope(&app_handle, requested_root)
     })
+}
+
+#[tauri::command]
+pub fn open_vault_file_external(
+    app_handle: tauri::AppHandle,
+    path: PathBuf,
+    vault_path: Option<PathBuf>,
+) -> Result<(), String> {
+    with_external_file_path(path.as_path(), vault_path.as_deref(), |validated_path| {
+        open_path_with_default_app(&app_handle, validated_path)
+    })
+}
+
+fn open_path_with_default_app(app_handle: &tauri::AppHandle, path: &Path) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+
+    app_handle
+        .opener()
+        .open_path(path.to_string_lossy().into_owned(), None::<String>)
+        .map_err(|error| error.to_string())
 }
 
 fn with_writable_note_path<T>(
@@ -354,6 +382,41 @@ mod tests {
             create_vault_folder(vault.path().to_path_buf(), PathBuf::from("../escape"))
                 .unwrap_err();
         assert!(folder_error.contains("Path must stay inside the active vault"));
+    }
+
+    #[test]
+    fn external_file_paths_accept_files_inside_requested_vault() {
+        let dir = TempDir::new().unwrap();
+        let root = vault_root(&dir);
+        let attachment = note_path(&dir, "attachments/photo.png");
+        fs::create_dir_all(attachment.parent().unwrap()).unwrap();
+        fs::write(&attachment, "image-bytes").unwrap();
+
+        let validated = with_external_file_path(
+            attachment.as_path(),
+            Some(root.as_path()),
+            |validated_path| Ok(validated_path.to_path_buf()),
+        )
+        .unwrap();
+
+        assert_eq!(validated, attachment);
+    }
+
+    #[test]
+    fn external_file_paths_reject_files_outside_requested_vault() {
+        let vault = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+        let outside_file = outside.path().join("photo.png");
+        fs::write(&outside_file, "image-bytes").unwrap();
+
+        let error = with_external_file_path(
+            outside_file.as_path(),
+            Some(vault.path()),
+            |validated_path| Ok(validated_path.to_path_buf()),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("Path must stay inside the active vault"));
     }
 
     #[test]

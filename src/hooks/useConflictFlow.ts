@@ -56,7 +56,7 @@ export function useConflictFlow({
         onSelectNote(entry)
         closeConflictResolver()
       } else {
-        openLocalFile(fullPath)
+        openLocalFile(fullPath, resolvedPath)
       }
     }
   }, [resolvedPath, entries, onSelectNote, closeConflictResolver])
