@@ -124,7 +124,7 @@ function fallbackViewName(filename: string, index: number): string {
   return stem && stem !== `view-${index + 1}` ? stem : `View ${index + 1}`
 }
 
-function normalizeVaultEntry({ rawEntry, vaultPath, index }: EntryNormalizationArgs): VaultEntry {
+function normalizeVaultEntryRecord({ rawEntry, vaultPath, index }: EntryNormalizationArgs): VaultEntry {
   const source = recordFrom(rawEntry)
   const filename = fallbackEntryFilename(source, index)
   const path = resolveEntryPath({
@@ -209,7 +209,11 @@ function normalizeViewFile({ rawView, index }: ViewNormalizationArgs): ViewFile 
 
 export function normalizeVaultEntries(rawEntries: unknown, vaultPath: string): VaultEntry[] {
   if (!Array.isArray(rawEntries)) return []
-  return rawEntries.map((rawEntry, index) => normalizeVaultEntry({ rawEntry, vaultPath, index }))
+  return rawEntries.map((rawEntry, index) => normalizeVaultEntry(rawEntry, vaultPath, index))
+}
+
+export function normalizeVaultEntry(rawEntry: unknown, vaultPath = '', index = 0): VaultEntry {
+  return normalizeVaultEntryRecord({ rawEntry, vaultPath, index })
 }
 
 export function normalizeViewFiles(rawViews: unknown): ViewFile[] {

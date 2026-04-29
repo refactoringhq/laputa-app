@@ -16,6 +16,7 @@ import {
   reloadVaultEntries,
   tauriCall,
 } from './vaultLoaderCommands'
+import { normalizeVaultEntry } from '../utils/vaultMetadataNormalization'
 
 function resetVaultState(options: {
   clearNewPaths: () => void
@@ -273,19 +274,23 @@ function useEntryMutations(
   trackNew: (path: string) => void,
 ) {
   const addEntry = useCallback((entry: VaultEntry) => {
+    const normalizedEntry = normalizeVaultEntry(entry)
     setEntries((prev) => {
-      if (prev.some(e => e.path === entry.path)) return prev
-      return [entry, ...prev]
+      if (prev.some(e => e.path === normalizedEntry.path)) return prev
+      return [normalizedEntry, ...prev]
     })
-    trackNew(entry.path)
+    trackNew(normalizedEntry.path)
   }, [setEntries, trackNew])
 
   const updateEntry = useCallback((path: string, patch: Partial<VaultEntry>) => {
     setEntries((prev) => {
       let changed = false
-      const next = prev.map((e) => {
-        if (e.path === path) { changed = true; return { ...e, ...patch } }
-        return e
+      const next = prev.map((entry, index) => {
+        if (entry.path === path) {
+          changed = true
+          return normalizeVaultEntry({ ...entry, ...patch }, '', index)
+        }
+        return entry
       })
       return changed ? next : prev
     })
@@ -302,7 +307,9 @@ function useEntryMutations(
   }, [setEntries])
 
   const replaceEntry = useCallback((oldPath: string, patch: Partial<VaultEntry> & { path: string }) => {
-    setEntries((prev) => prev.map((e) => e.path === oldPath ? { ...e, ...patch } : e))
+    setEntries((prev) => prev.map((entry, index) =>
+      entry.path === oldPath ? normalizeVaultEntry({ ...entry, ...patch }, '', index) : entry,
+    ))
   }, [setEntries])
 
   return { addEntry, updateEntry, removeEntry, removeEntries, replaceEntry }
