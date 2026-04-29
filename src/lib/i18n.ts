@@ -17,6 +17,7 @@ export const APP_LOCALES = [
   'zh-TW',
   'ja-JP',
   'ko-KR',
+  'vi',
 ] as const
 
 export type AppLocale = typeof APP_LOCALES[number]
@@ -146,6 +147,13 @@ const LOCALE_DEFINITIONS: Record<AppLocale, LocaleDefinition> = {
     labelKey: 'locale.koKR',
     aliases: ['ko', 'ko-kr'],
     searchKeywords: ['korean', 'hangul', '한국어', 'ko', 'ko-kr'],
+  },
+  vi: {
+    code: 'vi',
+    dateLocale: 'vi-VN',
+    labelKey: 'locale.vi',
+    aliases: ['vi', 'vi-vn'],
+    searchKeywords: ['vietnamese', 'vietnam', 'viet nam', 'tiếng việt', 'tieng viet', 'việt nam', 'vi'],
   },
 }
 
