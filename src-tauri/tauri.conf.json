@@ -37,7 +37,7 @@
         "style-src-attr": "'unsafe-inline'",
         "font-src": "'self' data: https://fonts.gstatic.com",
         "media-src": "'self' data: blob: https:",
-        "object-src": "'none'"
+        "object-src": "'self' asset: http://asset.localhost"
       },
       "assetProtocol": {
         "enable": true,
