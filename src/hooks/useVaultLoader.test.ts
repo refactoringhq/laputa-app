@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
-import type { VaultEntry, ModifiedFile, GitCommit } from '../types'
+import type { VaultEntry, ModifiedFile, GitCommit, FolderNode } from '../types'
 import { useVaultLoader, resolveNoteStatus } from './useVaultLoader'
 
 const mockEntries: VaultEntry[] = [
@@ -223,6 +223,35 @@ describe('useVaultLoader', () => {
     })
 
     await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+  })
+
+  it('loads folders while the initial note scan is still pending', async () => {
+    const entriesLoad = createDeferred<VaultEntry[]>()
+    const folders: FolderNode[] = [{ name: 'Projects', path: 'Projects', children: [] }]
+    backendInvokeFn.mockImplementation(((cmd: string) => {
+      if (isVaultLoadCommand(cmd)) return entriesLoad.promise
+      if (cmd === 'get_modified_files') return Promise.resolve([])
+      if (cmd === 'list_vault_folders') return Promise.resolve(folders)
+      if (cmd === 'list_views') return Promise.resolve([])
+      return Promise.resolve(null)
+    }) as typeof defaultMockInvoke)
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+
+    await waitFor(() => {
+      expect(result.current.folders).toEqual(folders)
+    })
+    expect(result.current.isLoading).toBe(true)
+
+    await act(async () => {
+      entriesLoad.resolve(mockEntries)
+      await entriesLoad.promise
+    })
+
+    await waitFor(() => {
+      expect(result.current.entries).toEqual(mockEntries)
       expect(result.current.isLoading).toBe(false)
     })
   })
