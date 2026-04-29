@@ -430,8 +430,9 @@ describe('useNoteCreation hook', () => {
   })
 
   it('handleCreateType blocks when the target type file already exists', async () => {
-    const existing = makeEntry({ path: '/test/vault/type/briefing.md', filename: 'briefing.md', title: 'Briefing', isA: 'Note' })
-    const { result } = renderHook(() => useNoteCreation(makeConfig([existing]), tabDeps))
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockRejectedValueOnce(new Error('File already exists: /test/vault/type/briefing.md'))
+    const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
 
     let created = true
     await act(async () => {
@@ -439,9 +440,42 @@ describe('useNoteCreation hook', () => {
     })
 
     expect(created).toBe(false)
-    expect(addEntry).not.toHaveBeenCalled()
-    expect(openTabWithContent).not.toHaveBeenCalled()
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: '/test/vault/type/briefing.md',
+      content: expect.stringContaining('type: Type'),
+    })
+    expect(removeEntry).toHaveBeenCalledWith('/test/vault/type/briefing.md')
     expect(setToastMessage).toHaveBeenCalledWith('Cannot create type "Briefing" because briefing.md already exists')
+  })
+
+  it('handleCreateType lets disk creation decide when a stale entry collides with the target type path', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValueOnce(undefined)
+    const staleEntry = makeEntry({
+      path: '/test/vault/type/pttep.md',
+      filename: 'pttep.md',
+      title: 'Stale cache entry',
+      isA: 'Note',
+    })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([staleEntry]), tabDeps))
+
+    let created = false
+    await act(async () => {
+      created = await result.current.handleCreateType('PTTEP')
+    })
+
+    expect(created).toBe(true)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: '/test/vault/type/pttep.md',
+      content: expect.stringContaining('type: Type'),
+    })
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/test/vault/type/pttep.md',
+      filename: 'pttep.md',
+      title: 'PTTEP',
+      isA: 'Type',
+    }))
+    expect(setToastMessage).not.toHaveBeenCalled()
   })
 
   it('handleCreateType uses an existing plural types folder convention', async () => {

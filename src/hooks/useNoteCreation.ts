@@ -240,13 +240,6 @@ export function planNewTypeCreation({
 
   const typeDirectory = resolveTypeDefinitionDirectory(entries, vaultPath)
   const resolved = resolveNewType({ typeName, vaultPath, typeDirectory })
-  const collision = findPathCollision(entries, resolved.entry.path)
-  if (collision) {
-    return {
-      status: 'blocked',
-      message: buildCreationCollisionMessage({ noun: 'type', title: typeName, path: resolved.entry.path }),
-    }
-  }
   return { status: 'create', resolved }
 }
 
