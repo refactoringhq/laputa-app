@@ -461,10 +461,7 @@ fn handle_run_event(app_handle: &tauri::AppHandle, event: &tauri::RunEvent) {
     if let tauri::RunEvent::Exit = event {
         let state: tauri::State<'_, WsBridgeChild> = app_handle.state();
         let mut guard = state.0.lock().unwrap();
-        if let Some(ref mut child) = *guard {
-            let _ = child.kill();
-            log::info!("ws-bridge child process killed on exit");
-        }
+        stop_ws_bridge_child(&mut guard);
     }
 }
 
