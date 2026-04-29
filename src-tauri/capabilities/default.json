@@ -17,7 +17,6 @@
     "dialog:default",
     "updater:default",
     "process:default",
-    "opener:default",
-    "opener:allow-open-path"
+    "opener:default"
   ]
 }

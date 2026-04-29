@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener'
+import { invoke } from '@tauri-apps/api/core'
+import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import {
   copyLocalPath,
   normalizeExternalUrl,
@@ -7,6 +8,10 @@ import {
   openLocalFile,
   revealLocalPath,
 } from './url'
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
+}))
 
 const originalClipboard = navigator.clipboard
 
@@ -55,12 +60,15 @@ describe('local file actions', () => {
     vi.clearAllMocks()
   })
 
-  it('opens local paths through the Tauri opener plugin', async () => {
+  it('opens local paths through the vault-scoped backend command', async () => {
     vi.stubGlobal('isTauri', true)
 
-    await openLocalFile('/vault/attachments/report.pdf')
+    await openLocalFile('/vault/attachments/report.pdf', '/vault')
 
-    expect(openPath).toHaveBeenCalledWith('/vault/attachments/report.pdf')
+    expect(invoke).toHaveBeenCalledWith('open_vault_file_external', {
+      path: '/vault/attachments/report.pdf',
+      vaultPath: '/vault',
+    })
   })
 
   it('reveals local paths through the Tauri opener plugin', async () => {
