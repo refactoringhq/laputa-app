@@ -172,17 +172,22 @@ describe('resolveNewNote', () => {
 })
 
 describe('resolveNewType', () => {
-  it('creates a type entry', () => {
+  it('creates a type entry in the canonical type directory', () => {
     const { entry, content } = resolveNewType({ typeName: 'Recipe', vaultPath: '/vault' })
-    expect(entry.path).toBe('/vault/recipe.md')
+    expect(entry.path).toBe('/vault/type/recipe.md')
     expect(entry.isA).toBe('Type')
     expect(content).toContain('type: Type')
   })
 
   it('uses the unicode title when the type name has no ASCII characters', () => {
     const { entry } = resolveNewType({ typeName: '停智慧', vaultPath: '/vault' })
-    expect(entry.path).toBe('/vault/停智慧.md')
+    expect(entry.path).toBe('/vault/type/停智慧.md')
     expect(entry.filename).toBe('停智慧.md')
+  })
+
+  it('can target an existing plural types directory', () => {
+    const { entry } = resolveNewType({ typeName: 'Recipe', vaultPath: '/vault', typeDirectory: 'types' })
+    expect(entry.path).toBe('/vault/types/recipe.md')
   })
 })
 
@@ -424,8 +429,8 @@ describe('useNoteCreation hook', () => {
     expect(addEntry.mock.calls[0][0].title).toBe('Recipe')
   })
 
-  it('handleCreateType blocks when a non-type file already uses the target filename', async () => {
-    const existing = makeEntry({ path: '/test/vault/briefing.md', filename: 'briefing.md', title: 'Briefing', isA: 'Note' })
+  it('handleCreateType blocks when the target type file already exists', async () => {
+    const existing = makeEntry({ path: '/test/vault/type/briefing.md', filename: 'briefing.md', title: 'Briefing', isA: 'Note' })
     const { result } = renderHook(() => useNoteCreation(makeConfig([existing]), tabDeps))
 
     let created = true
@@ -439,6 +444,28 @@ describe('useNoteCreation hook', () => {
     expect(setToastMessage).toHaveBeenCalledWith('Cannot create type "Briefing" because briefing.md already exists')
   })
 
+  it('handleCreateType uses an existing plural types folder convention', async () => {
+    const existingType = makeEntry({
+      path: '/test/vault/types/project.md',
+      filename: 'project.md',
+      title: 'Project',
+      isA: 'Type',
+    })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([existingType]), tabDeps))
+
+    await act(async () => {
+      await result.current.handleCreateType('Hotel')
+    })
+
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/test/vault/types/hotel.md',
+      filename: 'hotel.md',
+      title: 'Hotel',
+      isA: 'Type',
+    }))
+    expect(setToastMessage).not.toHaveBeenCalled()
+  })
+
   it('handleCreateType ignores an existing untitled draft when a unicode filename is unique', async () => {
     const existing = makeEntry({ path: '/test/vault/untitled.md', filename: 'untitled.md', title: 'Untitled', isA: 'Note' })
     const { result } = renderHook(() => useNoteCreation(makeConfig([existing]), tabDeps))
@@ -450,7 +477,7 @@ describe('useNoteCreation hook', () => {
 
     expect(created).toBe(true)
     expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
-      path: '/test/vault/停智慧.md',
+      path: '/test/vault/type/停智慧.md',
       filename: '停智慧.md',
       title: '停智慧',
       isA: 'Type',
