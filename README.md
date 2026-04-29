@@ -31,9 +31,21 @@ You can find some Loom walkthroughs below — they are short and to the point:
 - ⌨️ **Keyboard-first** — Tolaria is designed for power-users who want to use keyboard as much as possible. A lot of how we designed the Editor and the Command Palette is based on this.
 - 💪 **Built from real use** — Tolaria was created for manage my personal vault of 10,000+ notes, and I use it every day. Every feature exists because it solved a real problem.
 
-## Getting started
+## Installation
+
+### Homebrew
+
+Install via Homebrew on macOS:
+
+```batch
+brew install --cask tolaria
+```
+
+### Download from releases
 
 Download the [latest release here](https://refactoringhq.github.io/tolaria/download/).
+
+## Getting started
 
 When you open Tolaria for the first time you get the chance of cloning the [getting started vault](https://github.com/refactoringhq/tolaria-getting-started) — which gives you a walkthrough of the whole app.
 
