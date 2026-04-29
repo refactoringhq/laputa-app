@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 import { createFixtureVaultCopy, openFixtureVaultDesktopHarness, removeFixtureVaultCopy } from '../helpers/fixtureVault'
+import { sendShortcut } from './helpers'
 
 let tempVaultDir: string
 
@@ -26,14 +27,13 @@ test.describe('Missing type warning', () => {
 
   test('lets keyboard users inspect, cancel, and create a missing type from the Properties panel', async ({ page }) => {
     await page.getByText('Hotel Guide', { exact: true }).click()
-    await page.keyboard.press('Control+Shift+i')
+    await sendShortcut(page, 'i', ['Control', 'Shift'])
 
     const warning = page.getByTestId('missing-type-warning')
     await expect(warning).toBeVisible()
+    await expect(warning).toHaveAttribute('aria-label', 'Missing type Hotel. Click to create this type.')
 
     await warning.focus()
-    await expect(page.getByText('There is no type file for this type')).toBeVisible()
-
     await page.keyboard.press('Enter')
     const dialog = page.getByRole('dialog')
     const typeNameInput = dialog.getByPlaceholder('e.g. Recipe, Book, Habit...')
@@ -52,7 +52,7 @@ test.describe('Missing type warning', () => {
 
     await expect(warning).toHaveCount(0)
     await expect(page.getByRole('combobox')).toContainText('Hotel')
-    await expect.poll(() => fs.existsSync(path.join(tempVaultDir, 'hotel.md'))).toBe(true)
+    await expect.poll(() => fs.existsSync(path.join(tempVaultDir, 'type', 'hotel.md'))).toBe(true)
 
     await page.getByText('Alpha Project', { exact: true }).click()
     await page.getByText('Hotel Guide', { exact: true }).click()
