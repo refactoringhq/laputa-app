@@ -3,6 +3,8 @@ import { Robot, X, PaperPlaneRight, Plus, Link } from '@phosphor-icons/react'
 import { Copy } from 'lucide-react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
+import { ActionTooltip } from '@/components/ui/action-tooltip'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { WikilinkChatInput } from './WikilinkChatInput'
 import { extractInlineWikilinkReferences } from './inlineWikilinkText'
 import {
@@ -13,6 +15,10 @@ import type { AiAgentMessage } from '../hooks/useCliAiAgent'
 import type { AiAgentReadiness } from '../lib/aiAgents'
 import type { NoteReference } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
+
+const AI_PERMISSION_MODE_TOOLTIP = {
+  label: 'Vault Safe keeps agents to file, search, and edit tools. Power User also allows local shell commands for this vault.',
+}
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -210,30 +216,43 @@ function AiPermissionModeToggle({
   onChange: (mode: AiAgentPermissionMode) => void
 }) {
   return (
-    <div
-      className="grid rounded-md bg-muted"
-      style={{ gridTemplateColumns: '1fr 1fr', gap: 2, padding: 2 }}
-      role="group"
-      aria-label="AI agent permission mode"
-      data-testid="ai-permission-mode-toggle"
-    >
-      {(['safe', 'power_user'] as const).map((mode) => {
-        const selected = value === mode
-        return (
-          <Button
-            key={mode}
-            type="button"
-            size="xs"
-            variant={selected ? 'secondary' : 'ghost'}
-            disabled={disabled}
-            aria-pressed={selected}
-            onClick={() => onChange(mode)}
-          >
-            {AI_AGENT_PERMISSION_MODE_LABELS[mode].control}
-          </Button>
-        )
-      })}
-    </div>
+    <TooltipProvider>
+      <div
+        className="inline-flex w-full rounded-md border border-border bg-muted p-1"
+        role="radiogroup"
+        aria-label="AI agent permission mode"
+        data-testid="ai-permission-mode-toggle"
+      >
+        {(['safe', 'power_user'] as const).map((mode) => {
+          const selected = value === mode
+          return (
+            <ActionTooltip
+              key={mode}
+              copy={AI_PERMISSION_MODE_TOOLTIP}
+              side="bottom"
+              contentTestId="ai-permission-mode-tooltip"
+            >
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                role="radio"
+                aria-checked={selected}
+                disabled={disabled}
+                className={
+                  selected
+                    ? 'h-7 flex-1 border border-border bg-background text-foreground shadow-xs hover:bg-background'
+                    : 'h-7 flex-1 text-muted-foreground hover:text-foreground'
+                }
+                onClick={() => onChange(mode)}
+              >
+                {AI_AGENT_PERMISSION_MODE_LABELS[mode].control}
+              </Button>
+            </ActionTooltip>
+          )
+        })}
+      </div>
+    </TooltipProvider>
   )
 }
 
