@@ -1,4 +1,4 @@
-export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi'
+export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi' | 'gemini'
 
 export type AiAgentStatus = 'checking' | 'installed' | 'missing'
 export type AiAgentReadiness = 'checking' | 'ready' | 'missing'
@@ -44,6 +44,12 @@ export const AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] = [
     shortLabel: 'Pi',
     installUrl: 'https://pi.dev',
   },
+  {
+    id: 'gemini',
+    label: 'Gemini CLI',
+    shortLabel: 'Gemini',
+    installUrl: 'https://google-gemini.github.io/gemini-cli/',
+  },
 ] as const
 
 export function createAiAgentAvailability(status: AiAgentStatus = 'checking', version: string | null = null): AiAgentAvailability {
@@ -56,6 +62,7 @@ export function createCheckingAiAgentsStatus(): AiAgentsStatus {
     codex: createAiAgentAvailability(),
     opencode: createAiAgentAvailability(),
     pi: createAiAgentAvailability(),
+    gemini: createAiAgentAvailability(),
   }
 }
 
@@ -65,6 +72,7 @@ export function createMissingAiAgentsStatus(): AiAgentsStatus {
     codex: createAiAgentAvailability('missing'),
     opencode: createAiAgentAvailability('missing'),
     pi: createAiAgentAvailability('missing'),
+    gemini: createAiAgentAvailability('missing'),
   }
 }
 
@@ -95,6 +103,7 @@ export function normalizeAiAgentsStatus(payload: Partial<Record<AiAgentId, { ins
     codex: normalizeAvailability(payload?.codex),
     opencode: normalizeAvailability(payload?.opencode),
     pi: normalizeAvailability(payload?.pi),
+    gemini: normalizeAvailability(payload?.gemini),
   }
 }
 

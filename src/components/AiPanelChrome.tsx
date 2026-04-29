@@ -171,14 +171,16 @@ export function AiPanelHeader({
         {onCopyMcpConfig ? (
           <Button
             type="button"
-            variant="ghost"
-            size="icon-xs"
+            variant="outline"
+            size="xs"
             onClick={onCopyMcpConfig}
+            className="h-7 gap-1.5 px-2 text-[11px]"
             aria-label="Copy MCP config"
             title="Copy MCP config"
             data-testid="ai-copy-mcp-config"
           >
             <Copy size={15} />
+            <span>MCP config</span>
           </Button>
         ) : null}
         <Button

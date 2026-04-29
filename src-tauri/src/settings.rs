@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 const APP_CONFIG_DIR: &str = "com.tolaria.app";
 const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
-const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &["claude_code", "codex", "opencode", "pi"];
+const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &["claude_code", "codex", "opencode", "pi", "gemini"];
 pub const DEFAULT_HIDE_GITIGNORED_FILES: bool = true;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -396,6 +396,15 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("pi"));
+    }
+
+    #[test]
+    fn test_gemini_default_ai_agent_is_preserved() {
+        let loaded = save_and_reload(Settings {
+            default_ai_agent: Some("gemini".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("gemini"));
     }
 
     #[test]

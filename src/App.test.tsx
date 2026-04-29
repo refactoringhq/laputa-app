@@ -635,6 +635,7 @@ describe('App', () => {
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
       pi: { installed: false, version: null },
+      gemini: { installed: false, version: null },
     }
     mockCommandResults.check_mcp_status = 'installed'
 
@@ -675,6 +676,7 @@ describe('App', () => {
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
       pi: { installed: false, version: null },
+      gemini: { installed: false, version: null },
     }
 
     render(<App />)
@@ -708,6 +710,7 @@ describe('App', () => {
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
       pi: { installed: false, version: null },
+      gemini: { installed: false, version: null },
     }
 
     render(<App />)

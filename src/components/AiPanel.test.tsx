@@ -205,6 +205,7 @@ describe('AiPanel', () => {
     const onCopyMcpConfig = vi.fn()
     render(<AiPanel onClose={vi.fn()} onCopyMcpConfig={onCopyMcpConfig} vaultPath="/tmp/vault" />)
 
+    expect(screen.getByText('MCP config')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Copy MCP config' }))
 
     expect(onCopyMcpConfig).toHaveBeenCalledOnce()

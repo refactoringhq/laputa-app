@@ -148,3 +148,4 @@ proposed → active → superseded
 | [0093](0093-shared-cli-agent-runtime-adapters.md) | Shared CLI agent runtime adapters | active |
 | [0094](0094-gitignored-content-visibility-boundary-filter.md) | Gitignored content visibility as a command-boundary filter | active |
 | [0095](0095-saved-view-order-field.md) | Saved views use an explicit YAML order field | active |
+| [0097](0097-gemini-cli-agent-adapter.md) | Gemini CLI agent adapter | active |
