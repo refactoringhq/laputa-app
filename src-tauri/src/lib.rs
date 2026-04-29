@@ -63,7 +63,7 @@ fn suppress_windows_console(_command: &mut Command) {}
 struct WsBridgeChild(Mutex<Option<Child>>);
 
 #[cfg(desktop)]
-struct ActiveAssetScopeRoots(Mutex<Vec<PathBuf>>);
+struct AllowedAssetScopeRoots(Mutex<Vec<PathBuf>>);
 
 #[cfg(any(test, all(desktop, target_os = "linux")))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -419,33 +419,40 @@ fn vault_asset_scope_roots(vault_path: &Path) -> Result<Vec<PathBuf>, String> {
 }
 
 #[cfg(desktop)]
+fn missing_asset_scope_roots(
+    allowed_roots: &[PathBuf],
+    requested_roots: &[PathBuf],
+) -> Vec<PathBuf> {
+    requested_roots
+        .iter()
+        .filter(|root| !allowed_roots.contains(root))
+        .cloned()
+        .collect()
+}
+
+#[cfg(desktop)]
 pub(crate) fn sync_vault_asset_scope(
     app_handle: &tauri::AppHandle,
     vault_path: &Path,
 ) -> Result<(), String> {
     use tauri::Manager;
 
-    let next_roots = vault_asset_scope_roots(vault_path)?;
+    let requested_roots = vault_asset_scope_roots(vault_path)?;
     let scope = app_handle.asset_protocol_scope();
-    let state: tauri::State<'_, ActiveAssetScopeRoots> = app_handle.state();
-    let mut active_roots = state
+    let state: tauri::State<'_, AllowedAssetScopeRoots> = app_handle.state();
+    let mut allowed_roots = state
         .0
         .lock()
-        .map_err(|_| "Failed to lock active asset scope state".to_string())?;
+        .map_err(|_| "Failed to lock asset scope state".to_string())?;
+    let roots_to_allow = missing_asset_scope_roots(&allowed_roots, &requested_roots);
 
-    for root in &next_roots {
+    for root in &roots_to_allow {
         scope
             .allow_directory(root, true)
             .map_err(|e| format!("Failed to allow asset access for {}: {e}", root.display()))?;
     }
 
-    for previous_root in active_roots.iter() {
-        if !next_roots.contains(previous_root) {
-            let _ = scope.forbid_directory(previous_root, true);
-        }
-    }
-
-    *active_roots = next_roots;
+    allowed_roots.extend(roots_to_allow);
     Ok(())
 }
 
@@ -563,7 +570,7 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder
         .manage(WsBridgeChild(Mutex::new(None)))
-        .manage(ActiveAssetScopeRoots(Mutex::new(Vec::new())))
+        .manage(AllowedAssetScopeRoots(Mutex::new(Vec::new())))
         .manage(window_state::MainWindowFrameState::default())
         .manage(vault_watcher::VaultWatcherState::new());
 
@@ -586,9 +593,13 @@ mod tests {
     use super::MACOS_WEBVIEW_RESERVED_COMMAND_SHIFT_KEYS;
 
     #[cfg(desktop)]
-    use super::{selected_mcp_bridge_vault_path, validate_mcp_bridge_vault_path};
+    use super::{
+        missing_asset_scope_roots, selected_mcp_bridge_vault_path, validate_mcp_bridge_vault_path,
+    };
     #[cfg(desktop)]
     use crate::vault_list::VaultList;
+    #[cfg(desktop)]
+    use std::path::PathBuf;
 
     #[cfg(all(desktop, unix))]
     use super::vault_asset_scope_roots;
@@ -734,5 +745,19 @@ mod tests {
 
         assert_eq!(roots[0], canonical_vault.canonicalize().unwrap());
         assert!(roots.contains(&symlinked_vault));
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn missing_asset_scope_roots_keeps_previously_allowed_vaults() {
+        let vault_a = PathBuf::from("/vault-a");
+        let vault_b = PathBuf::from("/vault-b");
+        let allowed_roots = vec![vault_a.clone()];
+
+        assert_eq!(
+            missing_asset_scope_roots(&allowed_roots, &[vault_b.clone()]),
+            vec![vault_b]
+        );
+        assert!(missing_asset_scope_roots(&allowed_roots, &[vault_a]).is_empty());
     }
 }

@@ -304,9 +304,9 @@ describe('resolveNewNote', () => {
 })
 
 describe('resolveNewType', () => {
-  it('creates a type entry in the canonical type directory', () => {
+  it('creates a type entry at the vault root', () => {
     const { entry, content } = resolveNewType({ typeName: 'Recipe', vaultPath: '/my/vault' })
-    expect(entry.path).toBe('/my/vault/type/recipe.md')
+    expect(entry.path).toBe('/my/vault/recipe.md')
     expect(entry.isA).toBe('Type')
     expect(entry.status).toBeNull()
     expect(content).toContain('type: Type')
@@ -315,7 +315,7 @@ describe('resolveNewType', () => {
 
   it('uses provided vault path instead of hardcoded path', () => {
     const { entry } = resolveNewType({ typeName: 'Responsibility', vaultPath: '/other/vault' })
-    expect(entry.path).toBe('/other/vault/type/responsibility.md')
+    expect(entry.path).toBe('/other/vault/responsibility.md')
     expect(entry.path).not.toContain('/Users/luca/Laputa')
   })
 })

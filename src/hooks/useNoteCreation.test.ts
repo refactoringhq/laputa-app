@@ -172,22 +172,17 @@ describe('resolveNewNote', () => {
 })
 
 describe('resolveNewType', () => {
-  it('creates a type entry in the canonical type directory', () => {
+  it('creates a type entry at the vault root', () => {
     const { entry, content } = resolveNewType({ typeName: 'Recipe', vaultPath: '/vault' })
-    expect(entry.path).toBe('/vault/type/recipe.md')
+    expect(entry.path).toBe('/vault/recipe.md')
     expect(entry.isA).toBe('Type')
     expect(content).toContain('type: Type')
   })
 
   it('uses the unicode title when the type name has no ASCII characters', () => {
     const { entry } = resolveNewType({ typeName: '停智慧', vaultPath: '/vault' })
-    expect(entry.path).toBe('/vault/type/停智慧.md')
+    expect(entry.path).toBe('/vault/停智慧.md')
     expect(entry.filename).toBe('停智慧.md')
-  })
-
-  it('can target an existing plural types directory', () => {
-    const { entry } = resolveNewType({ typeName: 'Recipe', vaultPath: '/vault', typeDirectory: 'types' })
-    expect(entry.path).toBe('/vault/types/recipe.md')
   })
 })
 
@@ -432,7 +427,7 @@ describe('useNoteCreation hook', () => {
 
   it('handleCreateType blocks when the target type file already exists', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
-    vi.mocked(invoke).mockRejectedValueOnce(new Error('File already exists: /test/vault/type/briefing.md'))
+    vi.mocked(invoke).mockRejectedValueOnce(new Error('File already exists: /test/vault/briefing.md'))
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
 
     let created = true
@@ -442,10 +437,10 @@ describe('useNoteCreation hook', () => {
 
     expect(created).toBe(false)
     expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
-      path: '/test/vault/type/briefing.md',
+      path: '/test/vault/briefing.md',
       content: expect.stringContaining('type: Type'),
     })
-    expect(removeEntry).toHaveBeenCalledWith('/test/vault/type/briefing.md')
+    expect(removeEntry).toHaveBeenCalledWith('/test/vault/briefing.md')
     expect(setToastMessage).toHaveBeenCalledWith('Cannot create type "Briefing" because briefing.md already exists')
   })
 
@@ -453,7 +448,7 @@ describe('useNoteCreation hook', () => {
     vi.mocked(isTauri).mockReturnValue(true)
     vi.mocked(invoke).mockResolvedValueOnce(undefined)
     const staleEntry = makeEntry({
-      path: '/test/vault/type/pttep.md',
+      path: '/test/vault/pttep.md',
       filename: 'pttep.md',
       title: 'Stale cache entry',
       isA: 'Note',
@@ -467,11 +462,11 @@ describe('useNoteCreation hook', () => {
 
     expect(created).toBe(true)
     expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
-      path: '/test/vault/type/pttep.md',
+      path: '/test/vault/pttep.md',
       content: expect.stringContaining('type: Type'),
     })
     expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
-      path: '/test/vault/type/pttep.md',
+      path: '/test/vault/pttep.md',
       filename: 'pttep.md',
       title: 'PTTEP',
       isA: 'Type',
@@ -479,7 +474,7 @@ describe('useNoteCreation hook', () => {
     expect(setToastMessage).not.toHaveBeenCalled()
   })
 
-  it('handleCreateType uses an existing plural types folder convention', async () => {
+  it('handleCreateType writes new type entries to the vault root even when older type entries live in a folder', async () => {
     const existingType = makeEntry({
       path: '/test/vault/types/project.md',
       filename: 'project.md',
@@ -493,7 +488,7 @@ describe('useNoteCreation hook', () => {
     })
 
     expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
-      path: '/test/vault/types/hotel.md',
+      path: '/test/vault/hotel.md',
       filename: 'hotel.md',
       title: 'Hotel',
       isA: 'Type',
@@ -512,7 +507,7 @@ describe('useNoteCreation hook', () => {
 
     expect(created).toBe(true)
     expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
-      path: '/test/vault/type/停智慧.md',
+      path: '/test/vault/停智慧.md',
       filename: '停智慧.md',
       title: '停智慧',
       isA: 'Type',

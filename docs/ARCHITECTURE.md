@@ -195,7 +195,7 @@ flowchart TD
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- **Sidebar** (150-400px, resizable): Top-level filters (All Notes, Changes, Pulse), saved Views, collapsible type-based section groups, and a dedicated folder tree. The folder tree shows user-created folders plus default vault folders such as `attachments/` and `views/`; only the dedicated `type/` directory stays hidden because note types already have their own sidebar section. Saved Views persist a top-level YAML `order` field in each view file and use the same ordered-list mental model as Types: pointer users can drag the existing view row, while keyboard users can use command-palette move actions. The folder tree supports inline folder creation and rename, exposes a right-click menu for rename/delete plus filesystem reveal/copy-path actions, and auto-expands ancestor folders when the current selection or rename target is nested. Type sections and folder rows also act as note drop targets: dropping a note on a type updates its `type:` frontmatter, while dropping it on a folder runs the same crash-safe move path as the command palette flow. Each type can have a custom icon, color, sort, and visibility set via its type document in `type/`.
+- **Sidebar** (150-400px, resizable): Top-level filters (All Notes, Changes, Pulse), saved Views, collapsible type-based section groups, and a dedicated folder tree. The folder tree shows user-created folders plus default vault folders such as `attachments/` and `views/`; only the dedicated `type/` directory stays hidden because note types already have their own sidebar section. Saved Views persist a top-level YAML `order` field in each view file and use the same ordered-list mental model as Types: pointer users can drag the existing view row, while keyboard users can use command-palette move actions. The folder tree supports inline folder creation and rename, exposes a right-click menu for rename/delete plus filesystem reveal/copy-path actions, and auto-expands ancestor folders when the current selection or rename target is nested. Type sections and folder rows also act as note drop targets: dropping a note on a type updates its `type:` frontmatter, while dropping it on a folder runs the same crash-safe move path as the command palette flow. Each type can have a custom icon, color, sort, and visibility set via its `type: Type` document; new type documents created by Tolaria are written at the vault root.
 - **Note List / Pulse View** (200-500px, resizable): When a section group, filter, or saved view is selected, shows filtered notes with snippets, modified dates, status indicators, and per-context note-list controls. When `selection.kind === 'entity'`, the same pane enters **Neighborhood** mode: the source note is pinned at the top as a normal active row, outgoing relationship groups render first, inverse/backlink groups follow, empty groups stay visible with `0`, and duplicates across groups are allowed when multiple relationships are true. Plain click / `Enter` open the focused note without replacing the current Neighborhood, while Cmd/Ctrl-click and Cmd/Ctrl-`Enter` pivot the pane into the clicked note's Neighborhood. Folder-backed lists also show non-Markdown files: previewable image and PDF binaries get file indicators and open in the editor pane, while unsupported binaries remain muted instead of auto-launching an external app. Saved views reuse the same sort and visible-column controls as the built-in lists, and those changes persist back into the view `.yml` definition (`sort`, `listPropertiesDisplay`). When Pulse filter is active, shows `PulseView` — a chronological git activity feed grouped by day.
 - **Editor** (flex, fills remaining space): Single note open at a time (no tabs — see ADR-0003). Breadcrumb bar with word count and rich-editor width toggle, BlockNote rich text editor with wikilink support, Markdown-compatible inline/display math rendering, first-class Mermaid diagram blocks, markdown-safe formatting controls, and schema-backed fenced code block highlighting via `@blocknote/code-block`. Can toggle to diff view (modified files), raw CodeMirror view, or a wide rich-editor reading surface with preserved side margins; raw CodeMirror remains full-width and unaffected by note width mode. Binary image and PDF files render through `FilePreview` as ordinary vault files using Tauri asset URLs; external-open actions call `open_vault_file_external` so the target is validated against the active vault before the native default app opens it. Unsupported/broken binaries show explicit fallback states and keyboard focus returns to the note list on `Escape`. Decomposed into `Editor` (orchestrator), `EditorContent`, `FilePreview`, `EditorRightPanel`, `SingleEditorView`, with hooks `useDiffMode`, `useEditorFocus`, and `useEditorSave`, plus the `useRawMode`/`RawEditorView` pair for markdown source editing. Rich BlockNote input and raw CodeMirror input both route typed `->`, `<-`, and `<->` through the shared `src/utils/arrowLigatures.ts` resolver so arrow ligatures stay consistent across mode switches while escaped ASCII sequences remain literal. Navigation history (Cmd+[/]) replaces tabs.
 - **Inspector / AI Agent** (200-500px or 40px collapsed): Toggles between Inspector (frontmatter, relationships, instances, backlinks, git history) and AI Agent panel (the selected CLI agent with tool execution). The Sparkle icon in the breadcrumb bar toggles between them. Per-note `icon` is a suggested Inspector property and the command palette's "Set Note Icon" action opens that field directly. When viewing a Type note, the Inspector shows an **Instances** section listing all notes of that type (sorted by modified_at desc, capped at 50).
@@ -392,7 +392,7 @@ flowchart LR
 | `remove_mcp()` | Removes Tolaria's MCP entry from Claude Code, Gemini CLI, Cursor, and generic MCP configs |
 | `upsert_mcp_config(path, entry)` | Atomic config file update (create/merge, preserves others) |
 
-The `WsBridgeChild` state wrapper in `lib.rs` ensures the bridge process is replaced on vault switches, stopped when no active vault is selected, and killed plus waited on app exit via the `RunEvent::Exit` handler. The same desktop layer now keeps the Tauri asset protocol scoped to the active vault instead of every filesystem path.
+The `WsBridgeChild` state wrapper in `lib.rs` ensures the bridge process is replaced on vault switches, stopped when no active vault is selected, and killed plus waited on app exit via the `RunEvent::Exit` handler. The same desktop layer keeps Tauri asset protocol access limited to vault roots loaded during the current app session; command calls remain active-vault scoped for reads, writes, and external opens.
 
 ## Search
 
@@ -542,7 +542,7 @@ sequenceDiagram
         A-->>U: WelcomeScreen
     else Vault found
         A->>VL: useVaultLoader fires
-        VL->>T: invoke('reload_vault') → sync active vault asset scope + scan_vault_cached()
+        VL->>T: invoke('reload_vault') → allow requested vault roots in asset scope + scan_vault_cached()
         T-->>VL: VaultEntry[]
         VL->>T: invoke('get_modified_files')
         A->>T: useMcpStatus — check explicit MCP setup state
@@ -677,7 +677,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `sync_note_title` | Legacy helper: rewrite `title` frontmatter from filename → `bool` (modified); not used by the normal note-open flow |
 | `batch_archive_notes` | Archive multiple notes |
 | `batch_delete_notes` | Permanently delete notes from disk |
-| `reload_vault` | Sync the active vault asset scope, invalidate cache, full rescan from filesystem, then apply Gitignored-content visibility → `Vec<VaultEntry>` |
+| `reload_vault` | Allow the requested vault roots in the runtime asset scope, invalidate cache, full rescan from filesystem, then apply Gitignored-content visibility → `Vec<VaultEntry>` |
 | `reload_vault_entry` | Re-read a single file from disk → `VaultEntry` |
 | `open_vault_file_external` | Validate an existing file against the active vault boundary, then open it with the system default app |
 | `start_vault_watcher` / `stop_vault_watcher` | Start or stop native active-vault filesystem change events |
@@ -758,8 +758,8 @@ The desktop MCP WebSocket bridge is intentionally local-only. `mcp-server/ws-bri
 | `save_vault_config` | Save per-vault UI config |
 | `get_default_vault_path` | Get default vault path |
 | `get_build_number` | Get app build number |
-| `save_image` | Save base64 image to `attachments/` and refresh the active vault asset scope |
-| `copy_image_to_vault` | Copy image file to `attachments/` and refresh the active vault asset scope |
+| `save_image` | Save base64 image to `attachments/` and ensure the vault root is in the runtime asset scope |
+| `copy_image_to_vault` | Copy image file to `attachments/` and ensure the vault root is in the runtime asset scope |
 | `update_menu_state` | Update native menu checkmarks and enabled/disabled state for selection-dependent actions |
 | `trigger_menu_command` | Emit a native menu command ID for deterministic shortcut QA |
 | `update_current_window_min_size` | Update the active Tauri window's minimum size and optionally grow it to fit restored panes |
