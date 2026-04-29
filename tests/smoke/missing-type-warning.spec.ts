@@ -52,7 +52,7 @@ test.describe('Missing type warning', () => {
 
     await expect(warning).toHaveCount(0)
     await expect(page.getByRole('combobox')).toContainText('Hotel')
-    await expect.poll(() => fs.existsSync(path.join(tempVaultDir, 'type', 'hotel.md'))).toBe(true)
+    await expect.poll(() => fs.existsSync(path.join(tempVaultDir, 'hotel.md'))).toBe(true)
 
     await page.getByText('Alpha Project', { exact: true }).click()
     await page.getByText('Hotel Guide', { exact: true }).click()

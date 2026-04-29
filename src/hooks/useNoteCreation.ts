@@ -123,50 +123,11 @@ export function resolveNewNote({ title, type, vaultPath, template }: NewNotePara
 export interface NewTypeParams {
   typeName: string
   vaultPath: string
-  typeDirectory?: string
 }
 
-const DEFAULT_TYPE_DEFINITION_DIR = 'type'
-const TYPE_DEFINITION_DIRS = new Set([DEFAULT_TYPE_DEFINITION_DIR, 'types'])
-
-interface RelativePathParams {
-  entryPath: string
-  vaultPath: string
-}
-
-interface TypeDirectoryParams {
-  entry: VaultEntry
-  vaultPath: string
-}
-
-function relativePathFromVault({ entryPath, vaultPath }: RelativePathParams): string | null {
-  const normalizedPath = entryPath.replace(/\\/g, '/')
-  const normalizedVaultPath = vaultPath.replace(/\\/g, '/').replace(/\/+$/, '')
-  const prefix = `${normalizedVaultPath}/`
-  if (normalizedPath.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase())) {
-    return normalizedPath.slice(prefix.length)
-  }
-  return null
-}
-
-function typeDirectoryFromEntry({ entry, vaultPath }: TypeDirectoryParams): string | null {
-  const relativePath = relativePathFromVault({ entryPath: entry.path, vaultPath })
-  const directory = relativePath?.replace(/\\/g, '/').split('/').filter(Boolean)[0] ?? null
-  return directory && TYPE_DEFINITION_DIRS.has(directory.toLocaleLowerCase()) ? directory : null
-}
-
-function resolveTypeDefinitionDirectory(entries: VaultEntry[], vaultPath: string): string {
-  for (const entry of entries) {
-    if (entry.isA !== 'Type') continue
-    const directory = typeDirectoryFromEntry({ entry, vaultPath })
-    if (directory?.toLocaleLowerCase() === 'types') return directory
-  }
-  return DEFAULT_TYPE_DEFINITION_DIR
-}
-
-export function resolveNewType({ typeName, vaultPath, typeDirectory = DEFAULT_TYPE_DEFINITION_DIR }: NewTypeParams): { entry: VaultEntry; content: string } {
+export function resolveNewType({ typeName, vaultPath }: NewTypeParams): { entry: VaultEntry; content: string } {
   const slug = slugify(typeName)
-  const entry = buildNewEntry({ path: `${vaultPath}/${typeDirectory}/${slug}.md`, slug, title: typeName, type: 'Type', status: null })
+  const entry = buildNewEntry({ path: `${vaultPath}/${slug}.md`, slug, title: typeName, type: 'Type', status: null })
   return { entry, content: `---\ntype: Type\n---\n\n# ${typeName}\n` }
 }
 
@@ -238,8 +199,7 @@ export function planNewTypeCreation({
   const existingType = findEquivalentTypeEntry(entries, typeName)
   if (existingType) return { status: 'existing', entry: existingType }
 
-  const typeDirectory = resolveTypeDefinitionDirectory(entries, vaultPath)
-  const resolved = resolveNewType({ typeName, vaultPath, typeDirectory })
+  const resolved = resolveNewType({ typeName, vaultPath })
   return { status: 'create', resolved }
 }
 

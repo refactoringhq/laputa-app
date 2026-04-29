@@ -40,7 +40,7 @@ test.describe('Collision-safe create flows', () => {
     removeFixtureVaultCopy(tempVaultDir)
   })
 
-  test('missing-type creation ignores a root filename collision and writes the type document under type/', async ({ page }) => {
+  test('missing-type creation keeps the dialog open when a root filename already exists', async ({ page }) => {
     const collidingPath = writeFixtureNote(
       tempVaultDir,
       'hotel.md',
@@ -66,8 +66,8 @@ test.describe('Collision-safe create flows', () => {
     await expect(dialog.getByPlaceholder('e.g. Recipe, Book, Habit...')).toHaveValue('Hotel')
     await page.keyboard.press('Enter')
 
-    await expect(dialog).toHaveCount(0)
-    await expect.poll(() => fs.existsSync(path.join(tempVaultDir, 'type', 'hotel.md'))).toBe(true)
+    await expect(dialog).toBeVisible()
+    await expect(toast(page)).toContainText('Cannot create type "Hotel" because hotel.md already exists')
     expect(fs.readFileSync(collidingPath, 'utf8')).toContain('# Existing Hotel Note')
   })
 
@@ -103,7 +103,7 @@ test.describe('Collision-safe create flows', () => {
       'untitled.md',
       '---\ntype: Note\n---\n# Existing Untitled Note\n',
     )
-    const createdTypePath = path.join(tempVaultDir, 'type', '停智慧.md')
+    const createdTypePath = path.join(tempVaultDir, '停智慧.md')
 
     await openFixtureVaultDesktopHarness(page, tempVaultDir)
     await createTypeFromCommandPalette(page, '停智慧')
