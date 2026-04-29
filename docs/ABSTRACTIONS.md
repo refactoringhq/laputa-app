@@ -584,6 +584,8 @@ flowchart LR
     style E fill:#d4edda,stroke:#28a745,color:#000
 ```
 
+Rich-editor change events are coalesced before this serialization runs. `useEditorTabSwap` keeps the latest BlockNote state in the editor, schedules one Markdown serialization for a short idle window, and exposes an explicit flush hook for save, note switch, raw-mode entry, and destructive note actions. This keeps long notes from paying full-document Markdown serialization on every keystroke while preserving the disk-first save path.
+
 ### Wikilink Navigation
 
 Two navigation mechanisms:

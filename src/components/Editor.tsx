@@ -25,6 +25,7 @@ import {
   resolvePendingRawExitContent,
   resolveRawModeContent,
 } from './editorRawModeSync'
+import { useRegisterEditorContentFlushes } from './editorContentFlushRegistration'
 import { useRawModeWithFlush } from './useRawModeWithFlush'
 import { createArrowLigaturesExtension } from './arrowLigaturesExtension'
 import { createMathInputExtension } from './mathInputExtension'
@@ -104,6 +105,8 @@ interface EditorProps {
   onKeepMine?: (path: string) => void
   /** Resolve conflict by keeping the remote version. */
   onKeepTheirs?: (path: string) => void
+  /** Registers a hook that flushes pending rich-editor changes into app state before external actions. */
+  flushPendingEditorContentRef?: React.MutableRefObject<((path: string) => void) | null>
   /** Registers a hook that flushes the raw editor buffer into app state before external actions. */
   flushPendingRawContentRef?: React.MutableRefObject<((path: string) => void) | null>
   locale?: AppLocale
@@ -219,7 +222,7 @@ function useEditorSetup({
     }))
   }, [activeTabPath, setPendingRawExitContent, tabs])
 
-  const { handleEditorChange, editorMountedRef } = useEditorTabSwap({
+  const { handleEditorChange, flushPendingEditorChange, editorMountedRef } = useEditorTabSwap({
     tabs: tabsForEditorSwap, activeTabPath, editor, onContentChange, rawMode, vaultPath,
   })
   useEditorFocus(editor, editorMountedRef)
@@ -244,43 +247,9 @@ function useEditorSetup({
     editor, activeTab, rawLatestContentRef, rawModeContent,
     rawMode, diffMode, diffContent, diffLoading,
     handleToggleDiffExclusive, handleToggleRawExclusive,
-    handleEditorChange, handleViewCommitDiff,
+    handleEditorChange, flushPendingEditorChange, handleViewCommitDiff,
     isLoadingNewTab, activeStatus, showDiffToggle,
   }
-}
-
-function useRegisterRawContentFlush({
-  activeTab,
-  rawLatestContentRef,
-  rawMode,
-  onContentChange,
-  flushPendingRawContentRef,
-}: {
-  activeTab: Tab | null
-  rawLatestContentRef: React.MutableRefObject<string | null>
-  rawMode: boolean
-  onContentChange?: (path: string, content: string) => void
-  flushPendingRawContentRef?: React.MutableRefObject<((path: string) => void) | null>
-}) {
-  const flushPendingRawContent = useCallback((path: string) => {
-    if (!rawMode || !activeTab || activeTab.entry.path !== path) return
-
-    const latestContent = rawLatestContentRef.current
-    if (latestContent === null || latestContent === activeTab.content) return
-
-    onContentChange?.(path, latestContent)
-  }, [activeTab, onContentChange, rawLatestContentRef, rawMode])
-
-  useEffect(() => {
-    if (!flushPendingRawContentRef) return
-
-    flushPendingRawContentRef.current = flushPendingRawContent
-    return () => {
-      if (flushPendingRawContentRef.current === flushPendingRawContent) {
-        flushPendingRawContentRef.current = null
-      }
-    }
-  }, [flushPendingRawContent, flushPendingRawContentRef])
 }
 
 function useEditorFindCommand({
@@ -558,7 +527,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
     noteLayout, onToggleNoteLayout,
     onFileCreated, onFileModified, onVaultChanged,
     isConflicted, onKeepMine, onKeepTheirs,
-    flushPendingRawContentRef, findInNoteRef,
+    flushPendingEditorContentRef, flushPendingRawContentRef, findInNoteRef,
     locale,
   } = props
 
@@ -566,7 +535,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
     editor, activeTab, rawLatestContentRef, rawModeContent,
     rawMode, diffMode, diffContent, diffLoading,
     handleToggleDiffExclusive, handleToggleRawExclusive,
-    handleEditorChange, handleViewCommitDiff,
+    handleEditorChange, flushPendingEditorChange, handleViewCommitDiff,
     isLoadingNewTab, activeStatus, showDiffToggle,
   } = useEditorSetup({
     tabs, activeTabPath, vaultPath, onContentChange,
@@ -584,8 +553,10 @@ export const Editor = memo(function Editor(props: EditorProps) {
     rawMode,
   })
 
-  useRegisterRawContentFlush({
+  useRegisterEditorContentFlushes({
     activeTab,
+    flushPendingEditorChange,
+    flushPendingEditorContentRef,
     rawLatestContentRef,
     rawMode,
     onContentChange,
