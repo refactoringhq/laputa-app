@@ -2,13 +2,11 @@ import { useMemo, type HTMLAttributes } from 'react'
 import type { VaultEntry, ViewFile } from '../../types'
 import { evaluateView } from '../../utils/viewFilters'
 import { Funnel, PencilSimple, Trash } from '@phosphor-icons/react'
-import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { NoteTitleIcon } from '../NoteTitleIcon'
 import { SidebarCountPill } from '../SidebarParts'
 import { SIDEBAR_ITEM_PADDING } from './sidebarStyles'
 import { translate, type AppLocale } from '../../lib/i18n'
-import type { ViewMoveDirection } from '../../utils/viewOrdering'
 import { ACCENT_COLORS } from '../../utils/typeColors'
 
 interface ViewAccent {
@@ -22,10 +20,7 @@ interface SidebarViewItemProps {
   onSelect: () => void
   onEditView?: (filename: string) => void
   onDeleteView?: (filename: string) => void
-  onMoveView?: (filename: string, direction: ViewMoveDirection) => void
-  canMoveUp?: boolean
-  canMoveDown?: boolean
-  dragHandleProps?: HTMLAttributes<HTMLButtonElement>
+  dragHandleProps?: HTMLAttributes<HTMLDivElement>
   entries: VaultEntry[]
   locale?: AppLocale
 }
@@ -88,9 +83,6 @@ export function SidebarViewItem({
   onSelect,
   onEditView,
   onDeleteView,
-  onMoveView,
-  canMoveUp = false,
-  canMoveDown = false,
   dragHandleProps,
   entries,
   locale = 'en',
@@ -105,54 +97,13 @@ export function SidebarViewItem({
         className={`flex cursor-pointer select-none items-center gap-2 rounded transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-accent'}`}
         style={getViewRowStyle(showCount, isActive, accent)}
         onClick={onSelect}
+        {...dragHandleProps}
       >
-        {dragHandleProps && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="-ml-1 h-5 w-4 min-w-0 cursor-grab rounded p-0 text-muted-foreground hover:bg-transparent hover:text-foreground active:cursor-grabbing"
-            title={translate(locale, 'sidebar.action.reorderView')}
-            aria-label={translate(locale, 'sidebar.action.reorderView')}
-            onClick={(event) => event.stopPropagation()}
-            {...dragHandleProps}
-          >
-            <GripVertical size={12} />
-          </Button>
-        )}
         <ViewIcon icon={view.definition.icon} isActive={isActive} accent={accent} />
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{view.definition.name}</span>
         <ViewCountChip count={count} isActive={isActive} accent={accent} />
       </div>
       <div className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-        {onMoveView && (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="h-5 w-5 min-w-0 rounded p-0 text-muted-foreground hover:bg-transparent hover:text-foreground disabled:opacity-30"
-              disabled={!canMoveUp}
-              onClick={(event) => { event.stopPropagation(); onMoveView(view.filename, 'up') }}
-              title={translate(locale, 'sidebar.action.moveViewUp')}
-              aria-label={translate(locale, 'sidebar.action.moveViewUp')}
-            >
-              <ArrowUp size={12} />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="h-5 w-5 min-w-0 rounded p-0 text-muted-foreground hover:bg-transparent hover:text-foreground disabled:opacity-30"
-              disabled={!canMoveDown}
-              onClick={(event) => { event.stopPropagation(); onMoveView(view.filename, 'down') }}
-              title={translate(locale, 'sidebar.action.moveViewDown')}
-              aria-label={translate(locale, 'sidebar.action.moveViewDown')}
-            >
-              <ArrowDown size={12} />
-            </Button>
-          </>
-        )}
         {onEditView && (
           <Button
             type="button"

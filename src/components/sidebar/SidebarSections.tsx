@@ -24,7 +24,6 @@ import { SidebarViewItem } from './SidebarViewItem'
 import { computeReorder } from './sidebarHooks'
 import { countByFilter } from '../../utils/noteListHelpers'
 import { translate, type AppLocale } from '../../lib/i18n'
-import { canMoveView, type ViewMoveDirection } from '../../utils/viewOrdering'
 
 export { SidebarTopNav } from './SidebarTopNav'
 export { FavoritesSection } from './FavoritesSection'
@@ -51,7 +50,6 @@ export function ViewsSection({
   onEditView,
   onDeleteView,
   onReorderViews,
-  onMoveView,
   sensors,
   entries,
   locale = 'en',
@@ -65,7 +63,6 @@ export function ViewsSection({
   onEditView?: (filename: string) => void
   onDeleteView?: (filename: string) => void
   onReorderViews?: (orderedFilenames: string[]) => void
-  onMoveView?: (filename: string, direction: ViewMoveDirection) => void
   sensors: ReturnType<typeof useSensors>
   entries: VaultEntry[]
   locale?: AppLocale
@@ -85,9 +82,6 @@ export function ViewsSection({
       onSelect={() => onSelect({ kind: 'view', filename: view.filename })}
       onEditView={onEditView}
       onDeleteView={onDeleteView}
-      onMoveView={onMoveView}
-      canMoveUp={canMoveView(views, view.filename, 'up')}
-      canMoveDown={canMoveView(views, view.filename, 'down')}
       entries={entries}
       locale={locale}
     />
@@ -119,12 +113,10 @@ export function ViewsSection({
                   <SortableViewItem
                     key={view.filename}
                     view={view}
-                    views={views}
                     selection={selection}
                     onSelect={onSelect}
                     onEditView={onEditView}
                     onDeleteView={onDeleteView}
-                    onMoveView={onMoveView}
                     entries={entries}
                     locale={locale}
                   />
@@ -140,22 +132,18 @@ export function ViewsSection({
 
 function SortableViewItem({
   view,
-  views,
   selection,
   onSelect,
   onEditView,
   onDeleteView,
-  onMoveView,
   entries,
   locale,
 }: {
   view: ViewFile
-  views: ViewFile[]
   selection: SidebarSelection
   onSelect: (selection: SidebarSelection) => void
   onEditView?: (filename: string) => void
   onDeleteView?: (filename: string) => void
-  onMoveView?: (filename: string, direction: ViewMoveDirection) => void
   entries: VaultEntry[]
   locale?: AppLocale
 }) {
@@ -164,6 +152,7 @@ function SortableViewItem({
   return (
     <div
       ref={setNodeRef}
+      {...attributes}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -176,10 +165,7 @@ function SortableViewItem({
         onSelect={() => onSelect({ kind: 'view', filename: view.filename })}
         onEditView={onEditView}
         onDeleteView={onDeleteView}
-        onMoveView={onMoveView}
-        canMoveUp={canMoveView(views, view.filename, 'up')}
-        canMoveDown={canMoveView(views, view.filename, 'down')}
-        dragHandleProps={{ ...attributes, ...listeners }}
+        dragHandleProps={listeners}
         entries={entries}
         locale={locale}
       />

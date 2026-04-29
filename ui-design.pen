@@ -80,16 +80,6 @@
           "children": [
             {
               "type": "text",
-              "id": "manual_view_ordering_grip",
-              "fill": "$--muted-foreground",
-              "content": "grip",
-              "fontFamily": "Inter",
-              "fontSize": 12,
-              "fontWeight": "500",
-              "letterSpacing": 0
-            },
-            {
-              "type": "text",
               "id": "manual_view_ordering_name",
               "fill": "$--foreground",
               "width": "fill_container",
@@ -103,7 +93,7 @@
               "type": "text",
               "id": "manual_view_ordering_actions",
               "fill": "$--muted-foreground",
-              "content": "up down edit delete",
+              "content": "edit delete",
               "fontFamily": "Inter",
               "fontSize": 12,
               "fontWeight": "500",
@@ -117,7 +107,7 @@
           "fill": "$--muted-foreground",
           "textGrowth": "fixed-width",
           "width": "fill_container",
-          "content": "Saved Views follow the ordered Types mental model: drag handle for pointer users, explicit up/down icon buttons for keyboard and command-palette flows.",
+          "content": "Saved Views keep the same row UI as before: pointer users drag the row itself to reorder, while keyboard users use command-palette move actions.",
           "lineHeight": 1.45,
           "fontFamily": "Inter",
           "fontSize": 12,
