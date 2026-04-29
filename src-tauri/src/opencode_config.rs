@@ -27,29 +27,14 @@ fn build_args() -> Vec<String> {
 }
 
 fn build_prompt(request: &AgentStreamRequest) -> String {
-    match request
-        .system_prompt
-        .as_ref()
-        .map(|prompt| prompt.trim())
-        .filter(|prompt| !prompt.is_empty())
-    {
-        Some(system_prompt) => format!(
-            "System instructions:\n{system_prompt}\n\nUser request:\n{}",
-            request.message
-        ),
-        None => request.message.clone(),
-    }
+    crate::cli_agent_runtime::build_prompt(&request.message, request.system_prompt.as_deref())
 }
 
 fn build_config(
     vault_path: &str,
     permission_mode: AiAgentPermissionMode,
 ) -> Result<String, String> {
-    let mcp_server = crate::mcp::mcp_server_dir()?.join("index.js");
-    let mcp_server_path = mcp_server
-        .to_str()
-        .ok_or("Invalid MCP server path")?
-        .to_string();
+    let mcp_server_path = crate::cli_agent_runtime::mcp_server_path_string()?;
 
     serde_json::to_string(&serde_json::json!({
         "$schema": "https://opencode.ai/config.json",

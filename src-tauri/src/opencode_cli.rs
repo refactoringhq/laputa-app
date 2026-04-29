@@ -1,14 +1,6 @@
-use crate::ai_agents::{AiAgentAvailability, AiAgentPermissionMode, AiAgentStreamEvent};
-use std::io::BufRead;
+use crate::ai_agents::{AiAgentAvailability, AiAgentStreamEvent};
+pub use crate::cli_agent_runtime::AgentStreamRequest;
 use std::path::Path;
-
-#[derive(Debug, Clone)]
-pub struct AgentStreamRequest {
-    pub message: String,
-    pub system_prompt: Option<String>,
-    pub vault_path: String,
-    pub permission_mode: AiAgentPermissionMode,
-}
 
 pub fn check_cli() -> AiAgentAvailability {
     crate::opencode_discovery::check_cli()
@@ -25,54 +17,26 @@ where
 fn run_agent_stream_with_binary<F>(
     binary: &Path,
     request: AgentStreamRequest,
-    mut emit: F,
+    emit: F,
 ) -> Result<String, String>
 where
     F: FnMut(AiAgentStreamEvent),
 {
-    let mut command = crate::opencode_config::build_command(binary, &request)?;
-    let mut child = command
-        .spawn()
-        .map_err(|error| format!("Failed to spawn opencode: {error}"))?;
-
-    let stdout = child.stdout.take().ok_or("No stdout handle")?;
-    let reader = std::io::BufReader::new(stdout);
-    let mut session_id = String::new();
-
-    for line in reader.lines() {
-        let json = match crate::opencode_events::parse_line(line, &mut emit) {
-            Some(json) => json,
-            None => continue,
-        };
-
-        if let Some(id) = crate::opencode_events::session_id(&json) {
-            session_id = id.to_string();
-        }
-
-        crate::opencode_events::dispatch_event(&json, &mut emit);
-    }
-
-    let stderr_output = child
-        .stderr
-        .take()
-        .and_then(|stderr| std::io::read_to_string(stderr).ok())
-        .unwrap_or_default();
-    let status = child
-        .wait()
-        .map_err(|error| format!("Wait failed: {error}"))?;
-    if !status.success() {
-        emit(AiAgentStreamEvent::Error {
-            message: crate::opencode_events::format_error(stderr_output, status.to_string()),
-        });
-    }
-
-    emit(AiAgentStreamEvent::Done);
-    Ok(session_id)
+    let command = crate::opencode_config::build_command(binary, &request)?;
+    crate::cli_agent_runtime::run_ai_agent_json_stream(
+        command,
+        "opencode",
+        emit,
+        crate::opencode_events::session_id,
+        crate::opencode_events::dispatch_event,
+        crate::opencode_events::format_error,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai_agents::AiAgentPermissionMode;
 
     #[cfg(unix)]
     fn executable_script(dir: &Path, body: &str) -> std::path::PathBuf {

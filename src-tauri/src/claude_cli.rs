@@ -1,7 +1,7 @@
 use crate::ai_agents::AiAgentPermissionMode;
+pub use crate::cli_agent_runtime::AgentStreamRequest;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
 
@@ -49,15 +49,6 @@ pub struct ChatStreamRequest {
     pub message: String,
     pub system_prompt: Option<String>,
     pub session_id: Option<String>,
-}
-
-/// Parameters accepted by Claude Code agent streams.
-#[derive(Debug, Deserialize)]
-pub struct AgentStreamRequest {
-    pub message: String,
-    pub system_prompt: Option<String>,
-    pub vault_path: String,
-    pub permission_mode: AiAgentPermissionMode,
 }
 
 // ---------------------------------------------------------------------------
@@ -212,16 +203,9 @@ pub fn check_cli() -> ClaudeCliStatus {
         }
     };
 
-    let version = crate::hidden_command(&bin)
-        .arg("--version")
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
-
     ClaudeCliStatus {
         installed: true,
-        version,
+        version: crate::cli_agent_runtime::version_for_binary(&bin),
     }
 }
 
@@ -319,13 +303,12 @@ fn agent_tools(permission_mode: AiAgentPermissionMode) -> &'static str {
 
 /// Build a temporary MCP config JSON string pointing to the vault MCP server.
 fn build_mcp_config(vault_path: &str) -> Result<String, String> {
-    let server_dir = crate::mcp::mcp_server_dir()?;
-    let index_js = server_dir.join("index.js");
+    let mcp_server_path = crate::cli_agent_runtime::mcp_server_path_string()?;
     let config = serde_json::json!({
         "mcpServers": {
             "tolaria": {
                 "command": "node",
-                "args": [index_js.to_string_lossy()],
+                "args": [mcp_server_path],
                 "env": { "VAULT_PATH": vault_path }
             }
         }
@@ -355,14 +338,6 @@ fn run_claude_subprocess<F>(
 where
     F: FnMut(ClaudeStreamEvent),
 {
-    let mut cmd = build_claude_command(bin, args, cwd);
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("Failed to spawn claude: {e}"))?;
-
-    let stdout = child.stdout.take().ok_or("No stdout handle")?;
-    let reader = std::io::BufReader::new(stdout);
-
     let mut state = StreamState {
         session_id: String::new(),
         tool_inputs: HashMap::new(),
@@ -370,41 +345,21 @@ where
         emitted_text: false,
     };
 
-    for line in reader.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(e) => {
-                emit(ClaudeStreamEvent::Error {
-                    message: format!("Read error: {e}"),
-                });
-                break;
-            }
-        };
+    let cmd = build_claude_command(bin, args, cwd);
+    let run = crate::cli_agent_runtime::run_json_line_process(
+        cmd,
+        "claude",
+        emit,
+        |message| ClaudeStreamEvent::Error { message },
+        |json, emit, session_id| {
+            dispatch_event(json, &mut state, emit);
+            *session_id = state.session_id.clone();
+        },
+    )?;
 
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let json: serde_json::Value = match serde_json::from_str(&line) {
-            Ok(v) => v,
-            Err(_) => continue, // skip non-JSON lines
-        };
-
-        dispatch_event(&json, &mut state, emit);
-    }
-
-    // Read stderr for potential error messages.
-    let stderr_output = child
-        .stderr
-        .take()
-        .and_then(|s| std::io::read_to_string(s).ok())
-        .unwrap_or_default();
-
-    let status = child.wait().map_err(|e| format!("Wait failed: {e}"))?;
-
-    if !status.success() && state.session_id.is_empty() {
+    if !run.status.success() && state.session_id.is_empty() {
         emit(ClaudeStreamEvent::Error {
-            message: format_failed_claude_exit(&stderr_output, status),
+            message: format_failed_claude_exit(&run.stderr_output, run.status),
         });
     }
 

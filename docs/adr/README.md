@@ -145,3 +145,4 @@ proposed → active → superseded
 | [0090](0090-pi-cli-agent-adapter.md) | Pi CLI agent adapter | active |
 | [0091](0091-gemini-cli-external-ai-setup.md) | Gemini CLI external AI setup | active |
 | [0092](0092-vault-ai-agent-permission-modes.md) | Vault-scoped AI agent permission modes | active |
+| [0093](0093-shared-cli-agent-runtime-adapters.md) | Shared CLI agent runtime adapters | active |

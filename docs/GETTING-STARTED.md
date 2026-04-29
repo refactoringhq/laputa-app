@@ -189,9 +189,11 @@ tolaria/
 │   │   │   ├── conflict.rs, remote.rs, pulse.rs
 │   │   ├── telemetry.rs          # Sentry init + path scrubber
 │   │   ├── search.rs             # Keyword search (walkdir-based)
-│   │   ├── ai_agents.rs          # Shared CLI-agent detection + stream adapters
-│   │   ├── claude_cli.rs         # Claude CLI subprocess management
-│   │   ├── pi_cli.rs             # Pi CLI subprocess management
+│   │   ├── ai_agents.rs          # CLI-agent request normalization + adapter dispatch
+│   │   ├── cli_agent_runtime.rs  # Shared CLI-agent runtime process/prompt/MCP helpers
+│   │   ├── claude_cli.rs         # Claude CLI adapter
+│   │   ├── codex_cli.rs          # Codex CLI adapter
+│   │   ├── pi_cli.rs             # Pi CLI adapter
 │   │   ├── mcp.rs                # MCP server lifecycle + explicit config registration/removal
 │   │   ├── app_updater.rs        # Alpha/stable updater endpoint selection
 │   │   ├── settings.rs           # App settings persistence
@@ -262,9 +264,9 @@ tolaria/
 | `src-tauri/src/frontmatter/ops.rs` | YAML manipulation — how properties are updated/deleted in files. |
 | `src-tauri/src/git/` | All git operations (clone, commit, pull, push, conflicts, pulse, add-remote). |
 | `src-tauri/src/search.rs` | Keyword search — scans vault files with walkdir. |
-| `src-tauri/src/ai_agents.rs` | Shared CLI-agent availability checks, adapter dispatch, stream normalization, and permission-mode request normalization. |
-| `src-tauri/src/claude_cli.rs` | Claude CLI subprocess spawning, permission-mode tool mapping, and NDJSON stream parsing. |
-| `src-tauri/src/pi_cli.rs` | Pi subprocess spawning through JSON mode and transient MCP adapter config. |
+| `src-tauri/src/ai_agents.rs` | CLI-agent request normalization, availability aggregation, adapter dispatch, and Claude event mapping. |
+| `src-tauri/src/cli_agent_runtime.rs` | Shared CLI-agent request shape, prompt wrapping, JSON subprocess lifecycle, version probing, and MCP path helpers. |
+| `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/pi_cli.rs` | Per-agent command, config, discovery, and JSON event adapters. |
 | `src-tauri/src/app_updater.rs` | Desktop updater bridge — selects alpha/stable manifests and streams install progress. |
 
 ### Editor
@@ -423,8 +425,8 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 2. **Context building**: Edit `src/utils/ai-context.ts` for what data is sent to the agent
 3. **Tool action display**: Edit `src/components/AiActionCard.tsx`
 4. **Permission-mode UI and request plumbing**: Edit `src/lib/aiAgentPermissionMode.ts`, `src/components/AiPanel*.tsx`, `src/hooks/useCliAiAgent.ts`, and `src/utils/streamAiAgent.ts`
-5. **Claude CLI arguments**: Edit `src-tauri/src/claude_cli.rs` (`run_agent_stream()`; keep app-managed launches on strict Tolaria MCP config, `acceptEdits`, and the scoped file/search tool list unless the permission mode explicitly broadens it)
-6. **Shared agent adapters / Codex/Pi args**: Edit `src-tauri/src/ai_agents.rs` plus the per-agent adapter modules (keep Codex sandboxed with active-vault `workspace-write`, keep Pi on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode)
+5. **Shared CLI runtime behavior**: Edit `src-tauri/src/cli_agent_runtime.rs` for process lifecycle, prompt wrapping, version probing, and common Tolaria MCP path handling.
+6. **Agent-specific arguments/events**: Edit the per-agent adapter modules (`claude_cli.rs`, `codex_cli.rs`, `opencode_*`, `pi_*`). Keep Codex sandboxed with active-vault `workspace-write`, keep Pi on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode.
 
 ### Work with external MCP setup
 

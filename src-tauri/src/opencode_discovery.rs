@@ -5,7 +5,7 @@ pub(crate) fn check_cli() -> AiAgentAvailability {
     match find_binary() {
         Ok(binary) => AiAgentAvailability {
             installed: true,
-            version: version_for_binary(&binary),
+            version: crate::cli_agent_runtime::version_for_binary(&binary),
         },
         Err(_) => AiAgentAvailability {
             installed: false,
@@ -28,15 +28,6 @@ pub(crate) fn find_binary() -> Result<PathBuf, String> {
     }
 
     Err("OpenCode CLI not found. Install it: https://opencode.ai/docs/".into())
-}
-
-fn version_for_binary(binary: &PathBuf) -> Option<String> {
-    crate::hidden_command(binary)
-        .arg("--version")
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 fn find_binary_on_path() -> Option<PathBuf> {
