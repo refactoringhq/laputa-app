@@ -458,6 +458,23 @@ describe('SettingsPanel', () => {
     expect(screen.getByText(/to open settings/)).toBeInTheDocument()
   })
 
+  it('copies the MCP config from the AI Agents section', () => {
+    const onCopyMcpConfig = vi.fn()
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        onSave={onSave}
+        onCopyMcpConfig={onCopyMcpConfig}
+        onClose={onClose}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy MCP config' }))
+
+    expect(onCopyMcpConfig).toHaveBeenCalledOnce()
+  })
+
   describe('Privacy & Telemetry section', () => {
     it('renders crash reporting and analytics toggles', () => {
       render(

@@ -16,6 +16,7 @@ import {
   type ReactNode,
 } from 'react'
 import { Moon, Sun, X } from '@phosphor-icons/react'
+import { Copy } from 'lucide-react'
 import type { Settings } from '../types'
 import {
   APP_LOCALES,
@@ -56,6 +57,7 @@ interface SettingsPanelProps {
   locale?: AppLocale
   systemLocale?: AppLocale
   onSave: (settings: Settings) => void
+  onCopyMcpConfig?: () => void
   isGitVault?: boolean
   explicitOrganizationEnabled?: boolean
   onSaveExplicitOrganization?: (enabled: boolean) => void
@@ -95,6 +97,7 @@ interface SettingsBodyProps {
   aiAgentsStatus: AiAgentsStatus
   defaultAiAgent: AiAgentId
   setDefaultAiAgent: (value: AiAgentId) => void
+  onCopyMcpConfig?: () => void
   releaseChannel: ReleaseChannel
   setReleaseChannel: (value: ReleaseChannel) => void
   themeMode: ThemeMode
@@ -217,6 +220,7 @@ export function SettingsPanel({
   locale = 'en',
   systemLocale = locale,
   onSave,
+  onCopyMcpConfig,
   isGitVault = true,
   explicitOrganizationEnabled = true,
   onSaveExplicitOrganization,
@@ -231,6 +235,7 @@ export function SettingsPanel({
       locale={locale}
       systemLocale={systemLocale}
       onSave={onSave}
+      onCopyMcpConfig={onCopyMcpConfig}
       isGitVault={isGitVault}
       explicitOrganizationEnabled={explicitOrganizationEnabled}
       onSaveExplicitOrganization={onSaveExplicitOrganization}
@@ -252,6 +257,7 @@ function SettingsPanelInner({
   aiAgentsStatus,
   systemLocale,
   onSave,
+  onCopyMcpConfig,
   isGitVault,
   explicitOrganizationEnabled,
   onSaveExplicitOrganization,
@@ -299,12 +305,9 @@ function SettingsPanelInner({
     onClose()
   }, [draft, onClose, onSave, onSaveExplicitOrganization, settings])
 
-  const handleBackdropClick = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>) => {
-      if (event.target === event.currentTarget) onClose()
-    },
-    [onClose],
-  )
+  const handleBackdropClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) onClose()
+  }, [onClose])
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent) => {
@@ -354,6 +357,7 @@ function SettingsPanelInner({
           aiAgentsStatus={aiAgentsStatus}
           defaultAiAgent={draft.defaultAiAgent}
           setDefaultAiAgent={(value) => updateDraft('defaultAiAgent', value)}
+          onCopyMcpConfig={onCopyMcpConfig}
           releaseChannel={draft.releaseChannel}
           setReleaseChannel={(value) => updateDraft('releaseChannel', value)}
           themeMode={draft.themeMode}
@@ -415,6 +419,7 @@ function SettingsBody({
   aiAgentsStatus,
   defaultAiAgent,
   setDefaultAiAgent,
+  onCopyMcpConfig,
   releaseChannel,
   setReleaseChannel,
   themeMode,
@@ -497,6 +502,7 @@ function SettingsBody({
           aiAgentsStatus={aiAgentsStatus}
           defaultAiAgent={defaultAiAgent}
           setDefaultAiAgent={setDefaultAiAgent}
+          onCopyMcpConfig={onCopyMcpConfig}
         />
       </SettingsSection>
 
@@ -810,7 +816,8 @@ function AiAgentSettingsSection({
   aiAgentsStatus,
   defaultAiAgent,
   setDefaultAiAgent,
-}: Pick<SettingsBodyProps, 't' | 'aiAgentsStatus' | 'defaultAiAgent' | 'setDefaultAiAgent'>) {
+  onCopyMcpConfig,
+}: Pick<SettingsBodyProps, 't' | 'aiAgentsStatus' | 'defaultAiAgent' | 'setDefaultAiAgent' | 'onCopyMcpConfig'>) {
   return (
     <>
       <SectionHeading
@@ -829,6 +836,21 @@ function AiAgentSettingsSection({
       <div style={{ fontSize: 11, color: 'var(--muted-foreground)', lineHeight: 1.5 }}>
         {renderDefaultAiAgentSummary(defaultAiAgent, aiAgentsStatus, t)}
       </div>
+
+      {onCopyMcpConfig ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onCopyMcpConfig}
+          className="w-fit gap-2"
+          aria-label={t('ai.panel.copyMcpConfig')}
+          data-testid="settings-copy-mcp-config"
+        >
+          <Copy size={15} />
+          {t('ai.panel.copyMcpConfig')}
+        </Button>
+      ) : null}
     </>
   )
 }

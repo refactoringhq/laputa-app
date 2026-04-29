@@ -8,21 +8,12 @@ test.describe('MCP config copy', () => {
     await expect(page.getByTestId('note-list-container')).toBeVisible({ timeout: 5_000 })
   })
 
-  test('copies the active-vault MCP config from the AI panel using only the keyboard', async ({ context, page }) => {
+  test('copies the active-vault MCP config from the Settings AI section', async ({ context, page }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
 
-    await page.locator('.app__note-list .cursor-pointer').first().click()
-    await page.locator('.bn-editor').click()
-    await sendShortcut(page, 'L', ['Meta', 'Shift'])
-    await expect(page.getByTestId('ai-panel')).toBeVisible({ timeout: 3_000 })
-
-    await page.getByTestId('agent-input').focus()
-    await page.keyboard.press('Shift+Tab')
-    await page.keyboard.press('Shift+Tab')
-    await page.keyboard.press('Shift+Tab')
-    const copyButton = page.getByRole('button', { name: 'Copy MCP config' })
-    await expect(copyButton).toBeFocused()
-    await copyButton.press('Enter')
+    await sendShortcut(page, ',', ['Control'])
+    await expect(page.getByTestId('settings-panel')).toBeVisible({ timeout: 3_000 })
+    await page.getByTestId('settings-copy-mcp-config').click()
 
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('"mcpServers"')
     const copiedConfig = await page.evaluate(() => navigator.clipboard.readText())
