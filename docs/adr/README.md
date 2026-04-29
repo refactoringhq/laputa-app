@@ -146,3 +146,5 @@ proposed → active → superseded
 | [0091](0091-gemini-cli-external-ai-setup.md) | Gemini CLI external AI setup | active |
 | [0092](0092-vault-ai-agent-permission-modes.md) | Vault-scoped AI agent permission modes | active |
 | [0093](0093-shared-cli-agent-runtime-adapters.md) | Shared CLI agent runtime adapters | active |
+| [0094](0094-gitignored-content-visibility-boundary-filter.md) | Gitignored content visibility as a command-boundary filter | active |
+| [0095](0095-saved-view-order-field.md) | Saved views use an explicit YAML order field | active |
