@@ -13,7 +13,6 @@ import { usePreparedNotePreload } from './usePreparedNotePreload'
 import {
   applyBlankStateToEditor,
   applyBlocksToEditor,
-  applyHtmlStateToEditor,
   type EditorContentPathRef,
 } from './editorContentSwapApply'
 import {
@@ -138,6 +137,15 @@ function buildFastPathBlocks(options: { preprocessed: string }): EditorBlocks | 
   ]
 }
 
+function emptyHeadingBlock(): Record<string, unknown> {
+  return {
+    type: 'heading',
+    props: { level: 1, textColor: 'default', backgroundColor: 'default', textAlignment: 'left' },
+    content: [],
+    children: [],
+  }
+}
+
 function isBlankBodyContent(options: { content: string }): boolean {
   const { content } = options
   return extractEditorBody(content).trim() === ''
@@ -237,19 +245,24 @@ async function prepareCachedNoteContent(options: {
   await resolveBlocksForTarget({ editor, cache, targetPath: path, content: cached.content, vaultPath })
 }
 
-async function resolveEmptyHeadingHtml(
+function repairInjectedBlocks(blocks: EditorBlocks): EditorBlocks {
+  const parseSafeBlocks = repairMalformedEditorBlocks(blocks) as EditorBlocks
+  return repairMalformedEditorBlocks(injectEditorMarkdownBlocks(parseSafeBlocks)) as EditorBlocks
+}
+
+async function resolveEmptyHeadingBlocks(
   editor: ReturnType<typeof useCreateBlockNote>,
   content: string,
   vaultPath?: string,
-): Promise<string | null> {
+): Promise<EditorBlocks | null> {
   const remainder = extractBodyRemainderAfterEmptyH1({ content })
   if (remainder === null) return null
-  if (!remainder.trim()) return '<h1></h1><p></p>'
+  if (!remainder.trim()) return [emptyHeadingBlock(), ...blankParagraphBlocks()] as EditorBlocks
 
   const parsed = normalizeParsedImageBlocks(
     await parseMarkdownBlocks(editor, preProcessEditorMarkdown(remainder, vaultPath)),
   ) as EditorBlocks
-  return `<h1></h1>${editor.blocksToHTMLLossy(injectEditorMarkdownBlocks(parsed) as typeof parsed)}`
+  return [emptyHeadingBlock(), ...repairInjectedBlocks(parsed)] as EditorBlocks
 }
 
 function findActiveTab(options: {
@@ -754,10 +767,10 @@ function scheduleEmptyHeadingSwap(options: {
 
   if (extractBodyRemainderAfterEmptyH1({ content }) === null) return false
 
-  void resolveEmptyHeadingHtml(editor, content, vaultPath)
-    .then((html) => {
-      if (prevActivePathRef.current !== targetPath || !html) return
-      applyHtmlStateToEditor({ editor, html, suppressChangeRef, editorContentPathRef, targetPath })
+  void resolveEmptyHeadingBlocks(editor, content, vaultPath)
+    .then((blocks) => {
+      if (prevActivePathRef.current !== targetPath || !blocks) return
+      applyBlocksToEditor({ editor, blocks, scrollTop: 0, suppressChangeRef, editorContentPathRef, targetPath })
       signalTabSwap({ path: targetPath })
     })
     .catch((err: unknown) => {

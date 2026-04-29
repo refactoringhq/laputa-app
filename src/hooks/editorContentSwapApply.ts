@@ -60,21 +60,7 @@ export function applyBlocksToEditor(options: ApplyBlocksToEditorOptions) {
 }
 
 export function applyBlankStateToEditor(options: ApplyBlankStateToEditorOptions) {
-  const {
-    editor,
-    suppressChangeRef,
-  } = options
-  suppressChangeRef.current = true
-  try {
-    resetTextSelectionBeforeContentSwap(editor)
-    editor._tiptapEditor.commands.setContent('<p></p>')
-  } catch (err) {
-    console.error('applyBlankStateToEditor failed, falling back to replaceBlocks:', err)
-    applyBlocksToEditor({ ...options, blocks: blankParagraphBlocks(), scrollTop: 0 })
-    return
-  }
-
-  commitAppliedEditorContent({ ...options, scrollTop: 0 })
+  applyBlocksToEditor({ ...options, blocks: blankParagraphBlocks(), scrollTop: 0 })
 }
 
 export function applyHtmlStateToEditor(options: ApplyHtmlStateToEditorOptions) {

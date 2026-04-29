@@ -391,11 +391,14 @@ describe('useEditorTabSwap raw mode sync', () => {
 
     await rerenderWith({ tabs: [untitledTab], activeTabPath: 'untitled.md' })
 
-    expect(mockEditor._tiptapEditor.commands.setContent).toHaveBeenCalledWith('<p></p>')
-    expect(mockEditor.replaceBlocks).not.toHaveBeenCalled()
+    expect(mockEditor._tiptapEditor.commands.setContent).not.toHaveBeenCalled()
+    expect(mockEditor.replaceBlocks).toHaveBeenCalledWith(
+      expect.any(Array),
+      [expect.objectContaining({ id: expect.any(String), type: 'paragraph' })],
+    )
   })
 
-  it('renders empty H1 untitled notes via TipTap HTML content', async () => {
+  it('renders empty H1 untitled notes via repaired BlockNote blocks', async () => {
     const populatedTab = makeTab('a.md', 'Note A')
     const untitledTab = makeUntitledTab('untitled.md')
 
@@ -409,18 +412,31 @@ describe('useEditorTabSwap raw mode sync', () => {
     await rerenderWith({ tabs: [untitledTab], activeTabPath: 'untitled.md' })
 
     expect(mockEditor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
-    expect(mockEditor.replaceBlocks).not.toHaveBeenCalled()
-    expect(mockEditor._tiptapEditor.commands.setContent).toHaveBeenCalledWith('<h1></h1><p></p>')
+    expect(mockEditor._tiptapEditor.commands.setContent).not.toHaveBeenCalled()
+    expect(mockEditor.replaceBlocks).toHaveBeenCalledWith(
+      expect.any(Array),
+      [
+        expect.objectContaining({ id: expect.any(String), type: 'heading' }),
+        expect.objectContaining({ id: expect.any(String), type: 'paragraph' }),
+      ],
+    )
   })
 
-  it('renders empty H1 typed notes with template content under the title', async () => {
+  it('renders empty H1 typed notes with template content under the title as repaired blocks', async () => {
     const populatedTab = makeTab('a.md', 'Note A')
     const typedUntitledTab = makeUntitledTab('untitled.md', 'Untitled Project 1', '## Objective\n\n')
 
     const { mockEditor, rerenderWith } = await createSwapHarness({
       initialProps: { tabs: [populatedTab], activeTabPath: 'a.md', rawMode: false },
       setupEditor: (editor) => {
-        editor.blocksToHTMLLossy.mockReturnValue('<h2>Objective</h2><p></p>')
+        editor.tryParseMarkdownToBlocks.mockReturnValue([
+          {
+            type: 'heading',
+            props: { level: 2 },
+            content: [{ type: 'text', text: 'Objective', styles: {} }],
+            children: [],
+          },
+        ])
       },
     })
     mockEditor.tryParseMarkdownToBlocks.mockClear()
@@ -429,7 +445,14 @@ describe('useEditorTabSwap raw mode sync', () => {
     await rerenderWith({ tabs: [typedUntitledTab], activeTabPath: 'untitled.md' })
 
     expect(mockEditor.tryParseMarkdownToBlocks).toHaveBeenCalledWith('## Objective\n\n')
-    expect(mockEditor._tiptapEditor.commands.setContent).toHaveBeenCalledWith('<h1></h1><h2>Objective</h2><p></p>')
+    expect(mockEditor._tiptapEditor.commands.setContent).not.toHaveBeenCalled()
+    expect(mockEditor.replaceBlocks).toHaveBeenCalledWith(
+      expect.any(Array),
+      [
+        expect.objectContaining({ id: expect.any(String), type: 'heading' }),
+        expect.objectContaining({ id: expect.any(String), type: 'heading' }),
+      ],
+    )
   })
 
   it('reuses cached editor blocks when reopening a recently visited note', async () => {
