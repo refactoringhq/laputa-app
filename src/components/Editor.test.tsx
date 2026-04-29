@@ -43,6 +43,9 @@ const mockEditor = vi.hoisted(() => ({
 const blockNoteCreation = vi.hoisted(() => ({
   options: [] as unknown[],
 }))
+const blockNoteViewState = vi.hoisted(() => ({
+  onChange: null as (() => void) | null,
+}))
 
 // Mock BlockNote components
 vi.mock('@blocknote/core', () => ({
@@ -81,16 +84,23 @@ vi.mock('@blocknote/react', () => ({
   ComponentsContext: {
     Provider: ({ children }: PropsWithChildren) => <>{children}</>,
   },
-  BlockNoteViewRaw: ({ children, editable }: PropsWithChildren<{ editable?: boolean }>) => (
-    <div data-testid="blocknote-view" data-editable={editable !== false ? 'true' : 'false'}>
-      <div
-        contentEditable={editable !== false}
-        data-testid="blocknote-editable"
-        suppressContentEditableWarning
-      />
-      {children}
-    </div>
-  ),
+  BlockNoteViewRaw: ({
+    children,
+    editable,
+    onChange,
+  }: PropsWithChildren<{ editable?: boolean; onChange?: () => void }>) => {
+    blockNoteViewState.onChange = onChange ?? null
+    return (
+      <div data-testid="blocknote-view" data-editable={editable !== false ? 'true' : 'false'}>
+        <div
+          contentEditable={editable !== false}
+          data-testid="blocknote-editable"
+          suppressContentEditableWarning
+        />
+        {children}
+      </div>
+    )
+  },
   FormattingToolbarController: () => null,
   LinkToolbarController: () => null,
   EditLinkButton: () => null,
@@ -224,6 +234,7 @@ function renderEditor(overrides: Partial<EditorComponentProps> = {}) {
 describe('Editor', () => {
   beforeEach(() => {
     blockNoteCreation.options = []
+    blockNoteViewState.onChange = null
   })
 
   it('shows empty state when no tabs are open', () => {
@@ -385,6 +396,46 @@ describe('Editor', () => {
         injectNonce: RUNTIME_STYLE_NONCE,
       },
     })
+  })
+
+  it('registers a rich-editor flush hook for pending BlockNote changes', async () => {
+    const onContentChange = vi.fn()
+    const flushPendingEditorContentRef = { current: null as ((path: string) => void) | null }
+    const originalMarkdownSerializer = mockEditor.blocksToMarkdownLossy.getMockImplementation()
+    mockEditor.replaceBlocks.mockClear()
+
+    try {
+      renderEditor({
+        tabs: [mockTab],
+        activeTabPath: mockEntry.path,
+        onContentChange,
+        flushPendingEditorContentRef,
+      })
+
+      await vi.waitFor(() => {
+        expect(blockNoteViewState.onChange).toEqual(expect.any(Function))
+        expect(flushPendingEditorContentRef.current).toEqual(expect.any(Function))
+      })
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+
+      mockEditor.blocksToMarkdownLossy.mockReturnValueOnce('# Test Project\n\nEdited rich body.\n')
+
+      act(() => {
+        blockNoteViewState.onChange?.()
+      })
+      expect(onContentChange).not.toHaveBeenCalled()
+
+      act(() => {
+        flushPendingEditorContentRef.current?.(mockEntry.path)
+      })
+
+      expect(onContentChange).toHaveBeenCalledWith(
+        mockEntry.path,
+        expect.stringContaining('Edited rich body.'),
+      )
+    } finally {
+      mockEditor.blocksToMarkdownLossy.mockImplementation(originalMarkdownSerializer)
+    }
   })
 
   it('disables native text assistance on the rich editor editable surface', () => {

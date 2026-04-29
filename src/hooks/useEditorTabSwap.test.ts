@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { extractEditorBody, getH1TextFromBlocks, replaceTitleInFrontmatter, useEditorTabSwap } from './useEditorTabSwap'
+import { extractEditorBody, getH1TextFromBlocks, replaceTitleInFrontmatter, RICH_EDITOR_CHANGE_DEBOUNCE_MS, useEditorTabSwap } from './useEditorTabSwap'
 import { normalizeParsedImageBlocks } from './editorTabContent'
 import { cacheNoteContent, clearPrefetchCache } from './useTabManagement'
 
@@ -254,6 +254,19 @@ function makeHeadingBlocks(
   }]
 }
 
+function makeLongNoteBlocks(wordCount: number) {
+  const words = Array.from({ length: wordCount }, (_, index) => `word${index}`)
+  const paragraphs: unknown[] = []
+  for (let index = 0; index < words.length; index += 20) {
+    paragraphs.push({
+      type: 'paragraph',
+      content: [{ type: 'text', text: words.slice(index, index + 20).join(' '), styles: {} }],
+      children: [],
+    })
+  }
+  return paragraphs
+}
+
 async function flushEditorTick() {
   await act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)))
 }
@@ -299,6 +312,7 @@ async function createSwapHarness(options: {
 
   return {
     ...rendered,
+    docRef,
     mockEditor,
     async rerenderWith(nextProps: Partial<SwapHarnessProps>) {
       currentProps = { ...currentProps, ...nextProps }
@@ -701,10 +715,96 @@ describe('useEditorTabSwap raw mode sync', () => {
       result.current.handleEditorChange()
     })
 
+    expect(onContentChange).not.toHaveBeenCalled()
+
+    act(() => {
+      result.current.flushPendingEditorChange()
+    })
+
     expect(onContentChange).toHaveBeenCalledWith(
       'a.md',
       '---\ntitle: Note A\n---\nInline $x^2$\n',
     )
+  })
+
+  it('coalesces rich-editor serialization for a 4000-word note', async () => {
+    const tabA = makeTab('long.md', 'Long Note')
+    const onContentChange = vi.fn()
+    const { docRef, mockEditor, result } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'long.md', rawMode: false },
+      onContentChange,
+    })
+    const longBlocks = makeLongNoteBlocks(4200)
+    docRef.current = longBlocks
+    mockEditor.blocksToMarkdownLossy.mockImplementation((blocks: unknown[]) => (
+      (blocks as Array<{ content?: Array<{ text?: string }> }>)
+        .map((block) => block.content?.map((item) => item.text ?? '').join('') ?? '')
+        .join('\n\n')
+    ))
+    mockEditor.blocksToMarkdownLossy.mockClear()
+
+    vi.useFakeTimers()
+    try {
+      act(() => {
+        result.current.handleEditorChange()
+        result.current.handleEditorChange()
+        result.current.handleEditorChange()
+      })
+      expect(mockEditor.blocksToMarkdownLossy).not.toHaveBeenCalled()
+      expect(onContentChange).not.toHaveBeenCalled()
+
+      act(() => {
+        vi.advanceTimersByTime(RICH_EDITOR_CHANGE_DEBOUNCE_MS - 1)
+      })
+      expect(mockEditor.blocksToMarkdownLossy).not.toHaveBeenCalled()
+
+      act(() => {
+        vi.advanceTimersByTime(1)
+      })
+
+      expect(mockEditor.blocksToMarkdownLossy).toHaveBeenCalledTimes(1)
+      expect(onContentChange).toHaveBeenCalledTimes(1)
+      expect(onContentChange.mock.calls[0][1].split(/\s+/).length).toBeGreaterThan(4000)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('flushes pending rich-editor content before switching notes', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = makeTab('b.md', 'Note B')
+    const onContentChange = vi.fn()
+    const { docRef, mockEditor, rerender, result } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+      onContentChange,
+    })
+    docRef.current = [{
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Changed before switch', styles: {} }],
+      children: [],
+    }]
+    mockEditor.blocksToMarkdownLossy.mockReturnValue('Changed before switch\n')
+
+    vi.useFakeTimers()
+    try {
+      act(() => {
+        result.current.handleEditorChange()
+      })
+
+      expect(onContentChange).not.toHaveBeenCalled()
+
+      act(() => {
+        rerender({ tabs: [tabA, tabB], activeTabPath: 'b.md', rawMode: false })
+      })
+      await act(async () => { await Promise.resolve() })
+
+      expect(onContentChange).toHaveBeenCalledWith(
+        'a.md',
+        '---\ntitle: Note A\n---\nChanged before switch\n',
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('re-parses from tab.content when rawMode transitions from true to false', async () => {

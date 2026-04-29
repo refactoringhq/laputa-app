@@ -555,8 +555,10 @@ function App() {
     onToast: (msg) => setToastMessage(msg),
     onOpenFile: (relativePath) => conflictFlow.openConflictFileRef.current(relativePath),
   })
+  const flushPendingEditorContentRef = useRef<((path: string) => void) | null>(null)
   const flushPendingRawContentRef = useRef<((path: string) => void) | null>(null)
   const flushEditorStateBeforeAction = async (path: string) => {
+    flushPendingEditorContentRef.current?.(path)
     flushPendingRawContentRef.current?.(path)
     await appSave.flushBeforeAction(path)
   }
@@ -980,10 +982,14 @@ function App() {
   }, [handleAppContentChange, recordAutoGitActivity])
 
   const handleTrackedSave = useCallback(async (...args: Parameters<typeof handleAppSave>) => {
+    if (notes.activeTabPath) {
+      flushPendingEditorContentRef.current?.(notes.activeTabPath)
+      flushPendingRawContentRef.current?.(notes.activeTabPath)
+    }
     const result = await handleAppSave(...args)
     recordAutoGitActivity()
     return result
-  }, [handleAppSave, recordAutoGitActivity])
+  }, [handleAppSave, notes.activeTabPath, recordAutoGitActivity])
 
   const seedAutoGitSavedChange = useCallback(async () => {
     if (isTauri()) {
@@ -1029,7 +1035,7 @@ function App() {
     handleUpdateFrontmatter: notes.handleUpdateFrontmatter,
     handleDeleteProperty: notes.handleDeleteProperty, setToastMessage,
     createTypeEntry: notes.createTypeEntrySilent,
-    onBeforeAction: appSave.flushBeforeAction,
+    onBeforeAction: flushEditorStateBeforeAction,
   })
 
   const deleteActions = useDeleteActions({
@@ -1673,6 +1679,7 @@ function App() {
               isConflicted={conflictFlow.isConflicted}
               onKeepMine={conflictFlow.handleKeepMine}
               onKeepTheirs={conflictFlow.handleKeepTheirs}
+              flushPendingEditorContentRef={flushPendingEditorContentRef}
               flushPendingRawContentRef={flushPendingRawContentRef}
               locale={appLocale}
             />
