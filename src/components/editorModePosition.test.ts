@@ -130,6 +130,40 @@ describe('editorModePosition', () => {
     expect(focus).toHaveBeenCalled()
   })
 
+  it('clamps stale raw-editor restore selections to the current document', () => {
+    const shortContent = '# Short'
+    const dispatch = vi.fn((spec: { selection: { anchor: number; head: number } }) => {
+      if (spec.selection.anchor > shortContent.length || spec.selection.head > shortContent.length) {
+        throw new RangeError('Selection points outside of document')
+      }
+    })
+    const view: CodeMirrorViewLike = {
+      state: {
+        doc: { toString: () => shortContent },
+        selection: { main: { anchor: 0, head: 0 } },
+      },
+      scrollDOM: { scrollTop: 0 },
+      dispatch,
+      focus: vi.fn(),
+    }
+    installRawView(view)
+
+    const restored = restoreCodeMirrorView(document, {
+      anchor: 500,
+      head: 800,
+      scrollTop: 12,
+    })
+
+    expect(restored).toBe(true)
+    expect(dispatch).toHaveBeenCalledWith({
+      selection: {
+        anchor: shortContent.length,
+        head: shortContent.length,
+      },
+    })
+    expect(view.scrollDOM.scrollTop).toBe(12)
+  })
+
   it('maps a raw-editor cursor back to the nearest BlockNote block', () => {
     const paragraphOffset = content.indexOf('Paragraph one') + 5
     const { editor, restored } = captureAndRestoreRawSelection({
