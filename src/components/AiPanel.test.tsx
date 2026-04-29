@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { AiPanel } from './AiPanel'
 import { UNSUPPORTED_INLINE_PASTE_MESSAGE } from './InlineWikilinkInput'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -152,7 +152,7 @@ describe('AiPanel', () => {
     expect(screen.getByRole('radio', { name: 'Power User' })).toBeDisabled()
   })
 
-  it('renders the permission mode toggle with high contrast selected state and explanatory tooltip', async () => {
+  it('renders the permission mode toggle with high contrast selected state and per-mode tooltips', async () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
     expect(screen.getByTestId('ai-permission-mode-toggle')).toHaveClass('border', 'bg-muted')
@@ -166,8 +166,17 @@ describe('AiPanel', () => {
     fireEvent.focus(safeMode)
 
     expect(await screen.findByTestId('ai-permission-mode-tooltip')).toHaveTextContent(
-      'Vault Safe keeps agents to file, search, and edit tools. Power User also allows local shell commands for this vault.',
+      'Vault Safe keeps agents limited to file, search, and edit tools.',
     )
+
+    fireEvent.blur(safeMode)
+    fireEvent.focus(powerUserMode)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-permission-mode-tooltip')).toHaveTextContent(
+        'Power User also allows local shell commands for this vault.',
+      )
+    })
   })
 
   it('renders data-testid ai-panel', () => {
