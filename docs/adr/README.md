@@ -148,5 +148,7 @@ proposed → active → superseded
 | [0093](0093-shared-cli-agent-runtime-adapters.md) | Shared CLI agent runtime adapters | active |
 | [0094](0094-gitignored-content-visibility-boundary-filter.md) | Gitignored content visibility as a command-boundary filter | active |
 | [0095](0095-saved-view-order-field.md) | Saved views use an explicit YAML order field | active |
+| [0096](0096-root-created-type-documents.md) | Root-created type documents | active |
 | [0097](0097-gemini-cli-agent-adapter.md) | Gemini CLI agent adapter | active |
 | [0098](0098-in-app-image-and-pdf-file-previews.md) | In-app image and PDF previews for binary vault files | active |
+| [0099](0099-cumulative-vault-asset-scope.md) | Cumulative vault asset scope for previews | active |

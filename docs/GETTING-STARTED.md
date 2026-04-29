@@ -29,6 +29,22 @@ If you run the desktop app on Linux, install Tauri's WebKit2GTK 4.1 dependencies
     libappindicator-gtk3-devel librsvg2-devel
   ```
 
+### Linux AppImage Wayland troubleshooting
+
+On some Wayland systems, the Linux AppImage may fail to launch with:
+
+```text
+Could not create default EGL display: EGL_BAD_PARAMETER. Aborting...
+```
+
+Recent Tolaria AppImages automatically retry startup with the system Wayland client library when they detect this class of AppImage + Wayland environment. If you are running an older build, use this workaround:
+
+```bash
+LD_PRELOAD=/usr/lib/libwayland-client.so ./Tolaria*.AppImage
+```
+
+If your distribution stores the library elsewhere, use that path instead, for example `/usr/lib64/libwayland-client.so.0` or `/usr/lib/x86_64-linux-gnu/libwayland-client.so.0`.
+
 ## Quick Start
 
 ```bash
@@ -402,7 +418,7 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 
 ### Add a new entity type
 
-1. Create a type document: `type/mytype.md` with `type: Type` frontmatter (icon, color, order, etc.)
+1. Create a type document at the vault root: `mytype.md` with `type: Type` frontmatter (icon, color, order, etc.)
 2. The sidebar section groups are auto-generated from type documents — no code change needed if `visible: true`
 3. Update `CreateNoteDialog.tsx` type options if users should be able to create it from the dialog
 4. Notes of this type are created at the vault root with `type: MyType` in frontmatter — no dedicated folder needed
