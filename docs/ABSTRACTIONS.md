@@ -308,7 +308,7 @@ type SidebarSelection =
 
 Saved Views live as YAML files under `views/`. Their definition includes user-visible fields (`name`, `icon`, `color`), note-list preferences (`sort`, `listPropertiesDisplay`), filters, and an optional top-level `order` number. The `order` value is stored directly in the YAML document, not in Markdown frontmatter, and lower values render earlier in every saved-View list. Views without an explicit order sort after ordered views by filename for stable fallback behavior.
 
-The renderer uses `viewOrdering` helpers to convert drag or move-button intent into dense order updates before saving each affected view file through `save_view_cmd`. The sidebar exposes both a drag handle and explicit move-up/move-down controls, and the command palette mirrors those move actions for the currently selected saved View.
+The renderer uses `viewOrdering` helpers to convert drag or command-palette move intent into dense order updates before saving each affected view file through `save_view_cmd`. The sidebar keeps the saved View row visually unchanged: pointer users drag the row itself, and keyboard users use the command palette actions for the currently selected saved View.
 
 ### Neighborhood Mode
 

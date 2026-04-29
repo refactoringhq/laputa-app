@@ -1384,31 +1384,20 @@ describe('Sidebar', () => {
       },
     ]
 
-    it('renders keyboard-accessible move buttons for saved views', () => {
-      const onMoveView = vi.fn()
+    it('does not add visible reorder controls to saved view rows', () => {
       render(
         <Sidebar
           entries={mockEntries}
           selection={defaultSelection}
           onSelect={() => {}}
           views={mockViews}
-          onMoveView={onMoveView}
+          onReorderViews={vi.fn()}
         />
       )
 
-      const moveUpButtons = screen.getAllByTitle('Move view up')
-      const moveDownButtons = screen.getAllByTitle('Move view down')
-
-      expect(moveUpButtons[0]).toBeDisabled()
-      expect(moveUpButtons[1]).not.toBeDisabled()
-      expect(moveDownButtons[0]).not.toBeDisabled()
-      expect(moveDownButtons[1]).toBeDisabled()
-
-      fireEvent.click(moveUpButtons[1])
-      expect(onMoveView).toHaveBeenCalledWith('all-topics.yml', 'up')
-
-      fireEvent.click(moveDownButtons[0])
-      expect(onMoveView).toHaveBeenCalledWith('active-projects.yml', 'down')
+      expect(screen.queryByTitle('Move view up')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('Move view down')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('Reorder view')).not.toBeInTheDocument()
     })
 
     it('shows note count chip for each view matching the filter results', () => {
