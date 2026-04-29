@@ -395,6 +395,32 @@ describe('useVaultLoader', () => {
 
       expect(result.current.entries).toBe(entriesBefore)
     })
+
+    it('keeps entry metadata safe when a stale reload patch has undefined fields', async () => {
+      const { result } = await renderVaultLoader()
+
+      act(() => {
+        result.current.updateEntry('/vault/note/hello.md', {
+          title: undefined,
+          filename: undefined,
+          aliases: undefined,
+          outgoingLinks: undefined,
+          relationships: undefined,
+          properties: undefined,
+          snippet: undefined,
+        } as unknown as Partial<VaultEntry>)
+      })
+
+      expect(result.current.entries[0]).toEqual(expect.objectContaining({
+        title: 'hello',
+        filename: 'hello.md',
+        aliases: [],
+        outgoingLinks: [],
+        relationships: {},
+        properties: {},
+        snippet: '',
+      }))
+    })
   })
 
   describe('getNoteStatus', () => {
@@ -752,6 +778,34 @@ describe('useVaultLoader', () => {
         path: '/vault/note/renamed.md',
         filename: 'renamed.md',
         title: 'Renamed',
+      }))
+    })
+
+    it('normalizes stale replacement metadata during reload-heavy note switching', async () => {
+      const { result } = await renderVaultLoader()
+
+      act(() => {
+        result.current.replaceEntry('/vault/note/hello.md', {
+          path: '/vault/note/reloaded.md',
+          title: undefined,
+          filename: undefined,
+          aliases: undefined,
+          outgoingLinks: undefined,
+          relationships: undefined,
+          properties: undefined,
+          snippet: undefined,
+        } as unknown as Partial<VaultEntry> & { path: string })
+      })
+
+      expect(result.current.entries[0]).toEqual(expect.objectContaining({
+        path: '/vault/note/reloaded.md',
+        filename: 'reloaded.md',
+        title: 'reloaded',
+        aliases: [],
+        outgoingLinks: [],
+        relationships: {},
+        properties: {},
+        snippet: '',
       }))
     })
   })
