@@ -33,7 +33,7 @@ You can find some Loom walkthroughs below — they are short and to the point:
 
 ## Getting started
 
-Download the [latest release here](https://github.com/refactoringhq/tolaria/releases/latest/download/Tolaria.app.tar.gz).
+Download the [latest release here](https://refactoringhq.github.io/tolaria/download/).
 
 When you open Tolaria for the first time you get the chance of cloning the [getting started vault](https://github.com/refactoringhq/tolaria-getting-started) — which gives you a walkthrough of the whole app.
 
