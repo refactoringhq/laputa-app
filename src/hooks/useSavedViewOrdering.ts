@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import type { SidebarSelection, ViewFile } from '../types'
+import { createTranslator, type AppLocale } from '../lib/i18n'
 import {
   buildViewOrderUpdates,
   canMoveView,
@@ -19,6 +20,7 @@ interface SavedViewOrderingConfig {
   reloadViews: () => Promise<unknown>
   loadModifiedFiles: () => Promise<void>
   onToast: (message: string) => void
+  locale?: AppLocale
 }
 
 interface SavedViewOrdering {
@@ -54,7 +56,10 @@ export function useSavedViewOrdering({
   reloadViews,
   loadModifiedFiles,
   onToast,
+  locale = 'en',
 }: SavedViewOrderingConfig): SavedViewOrdering {
+  const t = useMemo(() => createTranslator(locale), [locale])
+
   const persistViewOrder = useCallback(async (orderedViews: ViewFile[]) => {
     const target = isTauri() ? invoke : mockInvoke
     await Promise.all(buildViewOrderUpdates(orderedViews).map(({ filename, definition }) => (
@@ -62,8 +67,8 @@ export function useSavedViewOrdering({
     )))
     await reloadViews()
     await loadModifiedFiles()
-    onToast('Views reordered')
-  }, [loadModifiedFiles, onToast, reloadViews, vaultPath])
+    onToast(t('savedViews.reordered'))
+  }, [loadModifiedFiles, onToast, reloadViews, t, vaultPath])
 
   const onReorderViews = useCallback<ViewReorderHandler>(async (orderedFilenames) => {
     const orderedViews = orderViewsByFilename(views, orderedFilenames)

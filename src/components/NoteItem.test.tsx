@@ -58,6 +58,26 @@ describe('NoteItem', () => {
     expect(screen.getByTestId('type-icon')).toHaveAttribute('data-file-preview-kind', 'image')
   })
 
+  it('renders PDF files as clickable rows with a PDF file indicator', () => {
+    const pdfEntry = makeEntry({
+      path: '/vault/reports/brief.pdf',
+      filename: 'brief.pdf',
+      title: 'brief.pdf',
+      fileKind: 'binary',
+    })
+    const onClickNote = vi.fn()
+
+    render(<NoteItem entry={pdfEntry} isSelected={false} typeEntryMap={{}} onClickNote={onClickNote} />)
+
+    const item = screen.getByTestId('pdf-file-item')
+    expect(item.className).not.toContain('opacity-50')
+    expect(item).toHaveAttribute('title', 'Open PDF preview')
+
+    fireEvent.click(item)
+    expect(onClickNote).toHaveBeenCalledWith(pdfEntry, expect.any(Object))
+    expect(screen.getByTestId('type-icon')).toHaveAttribute('data-file-preview-kind', 'pdf')
+  })
+
   it('renders text files as clickable rows', () => {
     const textEntry = makeEntry({
       path: '/vault/config.yml',

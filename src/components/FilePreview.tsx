@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState, type KeyboardEvent } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { ArrowSquareOut, ClipboardText, FileDashed, FolderOpen, ImageSquare, WarningCircle } from '@phosphor-icons/react'
+import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, WarningCircle } from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
-import { isImagePreviewEntry, previewFileTypeLabel } from '../utils/filePreview'
+import { filePreviewKind, previewFileTypeLabel, type FilePreviewKind } from '../utils/filePreview'
 import { focusNoteListContainer } from '../utils/neighborhoodHistory'
 import { openLocalFile } from '../utils/url'
 import { Button } from './ui/button'
@@ -19,6 +19,42 @@ interface FilePreviewFallbackProps {
   title: string
   description: string
   onOpenExternal: () => void
+}
+
+function fallbackContentForPreviewKind(previewKind: FilePreviewKind | null): Omit<FilePreviewFallbackProps, 'onOpenExternal'> {
+  if (previewKind === 'image') {
+    return {
+      icon: 'warning',
+      title: 'Image preview failed',
+      description: 'Tolaria could not render this image file in the preview.',
+    }
+  }
+
+  if (previewKind === 'pdf') {
+    return {
+      icon: 'warning',
+      title: 'PDF preview failed',
+      description: 'Tolaria could not render this PDF file in the preview.',
+    }
+  }
+
+  return {
+    icon: 'file',
+    title: 'Preview unavailable',
+    description: 'Tolaria does not have an in-app preview for this file type.',
+  }
+}
+
+function FilePreviewHeaderIcon({ previewKind }: { previewKind: FilePreviewKind | null }) {
+  if (previewKind === 'image') {
+    return <ImageSquare size={17} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+  }
+
+  if (previewKind === 'pdf') {
+    return <FilePdf size={17} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+  }
+
+  return <FileDashed size={17} className="shrink-0 text-muted-foreground" aria-hidden="true" />
 }
 
 function FilePreviewFallback({ icon, title, description, onOpenExternal }: FilePreviewFallbackProps) {
@@ -44,28 +80,26 @@ function FilePreviewFallback({ icon, title, description, onOpenExternal }: FileP
 
 function FilePreviewHeader({
   entry,
-  isImage,
+  previewKind,
   fileTypeLabel,
   onOpenExternal,
   onRevealFile,
   onCopyFilePath,
 }: {
   entry: VaultEntry
-  isImage: boolean
+  previewKind: FilePreviewKind | null
   fileTypeLabel: string
   onOpenExternal: () => void
   onRevealFile?: () => void
   onCopyFilePath?: () => void
 }) {
-  const HeaderIcon = isImage ? ImageSquare : FileDashed
-
   return (
     <div
       className="flex h-[52px] shrink-0 items-center justify-between border-b border-border px-4"
       data-tauri-drag-region
     >
       <div className="flex min-w-0 items-center gap-2">
-        <HeaderIcon size={17} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+        <FilePreviewHeaderIcon previewKind={previewKind} />
         <div className="min-w-0">
           <h1 className="m-0 truncate text-[14px] font-semibold text-foreground">{entry.title}</h1>
           <p className="m-0 text-[11px] text-muted-foreground">{fileTypeLabel}</p>
@@ -90,6 +124,35 @@ function FilePreviewHeader({
         </Button>
       </div>
     </div>
+  )
+}
+
+function FilePreviewPdf({
+  entry,
+  pdfSrc,
+  onOpenExternal,
+}: {
+  entry: VaultEntry
+  pdfSrc: string
+  onOpenExternal: () => void
+}) {
+  const fallback = fallbackContentForPreviewKind('pdf')
+
+  return (
+    <object
+      data={pdfSrc}
+      type="application/pdf"
+      title={entry.title}
+      className="h-full min-h-[320px] w-full bg-background"
+      data-testid="pdf-file-preview"
+    >
+      <FilePreviewFallback
+        icon={fallback.icon}
+        title={fallback.title}
+        description={fallback.description}
+        onOpenExternal={onOpenExternal}
+      />
+    </object>
   )
 }
 
@@ -121,32 +184,34 @@ function shouldRenderImagePreview(isImage: boolean, imageSrc: string | null, ima
 
 function FilePreviewBody({
   entry,
-  isImage,
-  imageSrc,
+  previewKind,
+  assetSrc,
   imageFailed,
   onImageError,
   onOpenExternal,
 }: {
   entry: VaultEntry
-  isImage: boolean
-  imageSrc: string | null
+  previewKind: FilePreviewKind | null
+  assetSrc: string | null
   imageFailed: boolean
   onImageError: () => void
   onOpenExternal: () => void
 }) {
-  if (shouldRenderImagePreview(isImage, imageSrc, imageFailed)) {
-    return <FilePreviewImage entry={entry} imageSrc={imageSrc} onImageError={onImageError} />
+  if (shouldRenderImagePreview(previewKind === 'image', assetSrc, imageFailed)) {
+    return <FilePreviewImage entry={entry} imageSrc={assetSrc} onImageError={onImageError} />
   }
+
+  if (previewKind === 'pdf' && assetSrc !== null) {
+    return <FilePreviewPdf entry={entry} pdfSrc={assetSrc} onOpenExternal={onOpenExternal} />
+  }
+
+  const fallback = fallbackContentForPreviewKind(previewKind)
 
   return (
     <FilePreviewFallback
-      icon={isImage ? 'warning' : 'file'}
-      title={isImage ? 'Image preview failed' : 'Preview unavailable'}
-      description={
-        isImage
-          ? 'Tolaria could not render this image file in the preview.'
-          : 'Tolaria does not have an in-app preview for this file type.'
-      }
+      icon={fallback.icon}
+      title={fallback.title}
+      description={fallback.description}
       onOpenExternal={onOpenExternal}
     />
   )
@@ -158,11 +223,12 @@ export function FilePreview({
   onOpenExternalFile,
   onRevealFile,
 }: FilePreviewProps) {
-  const [imageFailed, setImageFailed] = useState(false)
-  const isImage = isImagePreviewEntry(entry)
-  const imageSrc = useMemo(() => (isImage ? convertFileSrc(entry.path) : null), [entry.path, isImage])
+  const [failedImagePath, setFailedImagePath] = useState<string | null>(null)
+  const previewKind = filePreviewKind(entry)
+  const assetSrc = useMemo(() => (previewKind ? convertFileSrc(entry.path) : null), [entry.path, previewKind])
   const fileTypeLabel = previewFileTypeLabel(entry)
-  const handleImageError = useCallback(() => setImageFailed(true), [])
+  const imageFailed = failedImagePath === entry.path
+  const handleImageError = useCallback(() => setFailedImagePath(entry.path), [entry.path])
 
   const handleOpenExternal = useCallback(() => {
     if (onOpenExternalFile) {
@@ -200,7 +266,7 @@ export function FilePreview({
     >
       <FilePreviewHeader
         entry={entry}
-        isImage={isImage}
+        previewKind={previewKind}
         fileTypeLabel={fileTypeLabel}
         onOpenExternal={handleOpenExternal}
         onRevealFile={onRevealFile ? handleRevealFile : undefined}
@@ -209,8 +275,8 @@ export function FilePreview({
       <div className="min-h-0 flex-1 overflow-auto bg-background">
         <FilePreviewBody
           entry={entry}
-          isImage={isImage}
-          imageSrc={imageSrc}
+          previewKind={previewKind}
+          assetSrc={assetSrc}
           imageFailed={imageFailed}
           onImageError={handleImageError}
           onOpenExternal={handleOpenExternal}

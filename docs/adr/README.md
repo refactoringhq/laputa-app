@@ -149,3 +149,4 @@ proposed → active → superseded
 | [0094](0094-gitignored-content-visibility-boundary-filter.md) | Gitignored content visibility as a command-boundary filter | active |
 | [0095](0095-saved-view-order-field.md) | Saved views use an explicit YAML order field | active |
 | [0097](0097-gemini-cli-agent-adapter.md) | Gemini CLI agent adapter | active |
+| [0098](0098-in-app-image-and-pdf-file-previews.md) | In-app image and PDF previews for binary vault files | active |
