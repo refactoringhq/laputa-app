@@ -79,6 +79,8 @@
   "command.settings.setupExternalAi": "Configura strumenti di IA esterni…",
   "command.settings.reloadVault": "Ricarica Vault",
   "command.settings.repairVault": "Ripara Vault",
+  "command.settings.useLightMode": "Usa modalità chiara",
+  "command.settings.useDarkMode": "Usa modalità scura",
   "command.ai.openAgents": "Apri agenti IA",
   "command.ai.restoreGuidance": "Ripristina la guida IA di Tolaria",
   "command.ai.switchToAgent": "Passa ad agente IA {agent}",
