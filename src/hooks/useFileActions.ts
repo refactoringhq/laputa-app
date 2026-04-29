@@ -39,10 +39,10 @@ export function useFileActions({
   }, [setToastMessage])
 
   const openExternalFile = useCallback((path: string) => {
-    void openLocalFile(path).catch((error) => {
+    void openLocalFile(path, vaultPath).catch((error) => {
       setToastMessage(fileActionErrorMessage('open file', error))
     })
-  }, [setToastMessage])
+  }, [setToastMessage, vaultPath])
 
   const resolveFolderPath = useCallback((folderPath: string) => (
     folderAbsolutePath({ vaultPath, folderPath })
