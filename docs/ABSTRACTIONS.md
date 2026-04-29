@@ -157,9 +157,9 @@ interface VaultEntry {
 |---|---|---|
 | `markdown` or absent | `.md`, `.markdown` | Full Tolaria note model: frontmatter, BlockNote, raw editor, relationships, title sync |
 | `text` | UTF-8 editable formats such as `.yml`, `.json`, `.ts`, `.py`, `.sh` | Opens through the raw editor without Markdown note semantics |
-| `binary` | Images, PDFs, archives, other non-text files | Stays a normal vault file; previewable images open in `FilePreview`, unsupported or broken binaries show an explicit fallback |
+| `binary` | Images, PDFs, archives, other non-text files | Stays a normal vault file; previewable images and PDFs open in `FilePreview`, unsupported or broken binaries show an explicit fallback |
 
-Image previewability is inferred in the renderer from the filename extension (`src/utils/filePreview.ts`) rather than stored as a new persisted kind. This keeps the filesystem as source of truth and avoids converting assets into proprietary objects.
+Asset previewability is inferred in the renderer from the filename extension (`src/utils/filePreview.ts`) rather than stored as a new persisted kind. Supported images render through `<img>` and supported PDFs render through the webview's PDF object renderer, both backed by Tauri asset URLs. This keeps the filesystem as source of truth and avoids converting assets into proprietary objects.
 
 ### Note Content Freshness
 

@@ -8,26 +8,19 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { WikilinkChatInput } from './WikilinkChatInput'
 import { extractInlineWikilinkReferences } from './inlineWikilinkText'
 import {
-  AI_AGENT_PERMISSION_MODE_LABELS,
+  aiAgentPermissionModeLabels,
   type AiAgentPermissionMode,
 } from '../lib/aiAgentPermissionMode'
+import { createTranslator, type AppLocale } from '../lib/i18n'
 import type { AiAgentMessage } from '../hooks/useCliAiAgent'
 import type { AiAgentReadiness } from '../lib/aiAgents'
 import type { NoteReference } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 
-const AI_PERMISSION_MODE_TOOLTIPS: Record<AiAgentPermissionMode, { label: string }> = {
-  safe: {
-    label: 'Vault Safe keeps agents limited to file, search, and edit tools.',
-  },
-  power_user: {
-    label: 'Power User also allows local shell commands for this vault.',
-  },
-}
-
 interface AiPanelHeaderProps {
   agentLabel: string
   agentReadiness: AiAgentReadiness
+  locale?: AppLocale
   permissionMode: AiAgentPermissionMode
   permissionModeDisabled: boolean
   onPermissionModeChange: (mode: AiAgentPermissionMode) => void
@@ -38,12 +31,14 @@ interface AiPanelHeaderProps {
 
 interface AiPanelContextBarProps {
   activeEntry: VaultEntry
+  locale?: AppLocale
   linkedCount: number
 }
 
 interface AiPanelMessageHistoryProps {
   agentLabel: string
   agentReadiness: AiAgentReadiness
+  locale?: AppLocale
   messages: AiAgentMessage[]
   isActive: boolean
   onOpenNote?: (path: string) => void
@@ -55,6 +50,7 @@ interface AiPanelComposerProps {
   entries: VaultEntry[]
   agentLabel: string
   agentReadiness: AiAgentReadiness
+  locale?: AppLocale
   input: string
   inputRef: React.RefObject<HTMLDivElement | null>
   isActive: boolean
@@ -66,23 +62,54 @@ interface AiPanelComposerProps {
 function getComposerPlaceholder(
   agentLabel: string,
   agentReadiness: AiAgentReadiness,
+  t: ReturnType<typeof createTranslator>,
 ): string {
   if (agentReadiness === 'checking') {
-    return 'Checking AI agent availability...'
+    return t('ai.panel.placeholder.checking')
   }
 
   if (agentReadiness === 'missing') {
-    return `${agentLabel} is not installed. Open AI Agents in Settings.`
+    return t('ai.panel.placeholder.missing', { agent: agentLabel })
   }
 
-  return `Ask ${agentLabel}`
+  return t('ai.panel.placeholder.ready', { agent: agentLabel })
+}
+
+function permissionModeTooltip(
+  mode: AiAgentPermissionMode,
+  t: ReturnType<typeof createTranslator>,
+): { label: string } {
+  return {
+    label: t(mode === 'power_user'
+      ? 'ai.permission.powerUser.tooltip'
+      : 'ai.permission.safe.tooltip'),
+  }
+}
+
+function headerStatusText({
+  agentLabel,
+  agentReadiness,
+  modeLabel,
+  t,
+}: {
+  agentLabel: string
+  agentReadiness: AiAgentReadiness
+  modeLabel: string
+  t: ReturnType<typeof createTranslator>
+}): string {
+  if (agentReadiness === 'checking') return t('ai.panel.status.checking')
+  if (agentReadiness === 'missing') return t('ai.panel.status.missing', { agent: agentLabel })
+  return t('ai.panel.status.ready', { agent: agentLabel, mode: modeLabel })
 }
 
 function AiPanelEmptyState({
   agentLabel,
   agentReadiness,
   hasContext,
-}: Pick<AiPanelMessageHistoryProps, 'agentLabel' | 'agentReadiness' | 'hasContext'>) {
+  locale = 'en',
+}: Pick<AiPanelMessageHistoryProps, 'agentLabel' | 'agentReadiness' | 'hasContext' | 'locale'>) {
+  const t = createTranslator(locale)
+
   if (agentReadiness === 'checking') {
     return (
       <div
@@ -91,10 +118,10 @@ function AiPanelEmptyState({
       >
         <Robot size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
-          Checking AI agent availability
+          {t('ai.panel.empty.checkingTitle')}
         </p>
         <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
-          Messages can be sent when the selected agent is ready
+          {t('ai.panel.empty.checkingDescription')}
         </p>
       </div>
     )
@@ -108,10 +135,10 @@ function AiPanelEmptyState({
       >
         <Robot size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
-          {agentLabel} is not available on this machine
+          {t('ai.panel.empty.missingTitle', { agent: agentLabel })}
         </p>
         <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
-          Install it or switch the default AI agent in Settings
+          {t('ai.panel.empty.missingDescription')}
         </p>
       </div>
     )
@@ -125,14 +152,14 @@ function AiPanelEmptyState({
       <Robot size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
       <p style={{ fontSize: 13, margin: '0 0 4px' }}>
         {hasContext
-          ? `Ask ${agentLabel} about this note and its linked context`
-          : `Open a note, then ask ${agentLabel} about it`
+          ? t('ai.panel.empty.withContextTitle', { agent: agentLabel })
+          : t('ai.panel.empty.noContextTitle', { agent: agentLabel })
         }
       </p>
       <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
         {hasContext
-          ? 'Summarize, find connections, expand ideas'
-          : 'The AI will use the active note as context'
+          ? t('ai.panel.empty.withContextDescription')
+          : t('ai.panel.empty.noContextDescription')
         }
       </p>
     </div>
@@ -142,6 +169,7 @@ function AiPanelEmptyState({
 export function AiPanelHeader({
   agentLabel,
   agentReadiness,
+  locale = 'en',
   permissionMode,
   permissionModeDisabled,
   onPermissionModeChange,
@@ -149,7 +177,8 @@ export function AiPanelHeader({
   onCopyMcpConfig,
   onNewChat,
 }: AiPanelHeaderProps) {
-  const modeLabel = AI_AGENT_PERMISSION_MODE_LABELS[permissionMode].short
+  const t = createTranslator(locale)
+  const modeLabel = aiAgentPermissionModeLabels(permissionMode, locale).short
 
   return (
     <div
@@ -160,12 +189,10 @@ export function AiPanelHeader({
         <Robot size={16} className="shrink-0 text-muted-foreground" />
         <div className="flex flex-1 flex-col overflow-hidden">
           <span className="text-muted-foreground" style={{ fontSize: 13, fontWeight: 600 }}>
-            AI Agent
+            {t('ai.panel.title')}
           </span>
           <span className="truncate text-[11px] text-muted-foreground">
-            {agentReadiness === 'checking'
-              ? 'Checking availability'
-              : `${agentLabel}${agentReadiness === 'missing' ? ' · not installed' : ` · ${modeLabel}`}`}
+            {headerStatusText({ agentLabel, agentReadiness, modeLabel, t })}
           </span>
         </div>
         {onCopyMcpConfig ? (
@@ -175,12 +202,12 @@ export function AiPanelHeader({
             size="xs"
             onClick={onCopyMcpConfig}
             className="h-7 gap-1.5 px-2 text-[11px]"
-            aria-label="Copy MCP config"
-            title="Copy MCP config"
+            aria-label={t('ai.panel.copyMcpConfig')}
+            title={t('ai.panel.copyMcpConfig')}
             data-testid="ai-copy-mcp-config"
           >
             <Copy size={15} />
-            <span>MCP config</span>
+            <span>{t('ai.panel.mcpConfig')}</span>
           </Button>
         ) : null}
         <Button
@@ -188,8 +215,8 @@ export function AiPanelHeader({
           variant="ghost"
           size="icon-xs"
           onClick={onNewChat}
-          aria-label="New AI chat"
-          title="New AI chat"
+          aria-label={t('ai.panel.newChat')}
+          title={t('ai.panel.newChat')}
         >
           <Plus size={16} />
         </Button>
@@ -198,14 +225,15 @@ export function AiPanelHeader({
           variant="ghost"
           size="icon-xs"
           onClick={onClose}
-          aria-label="Close AI panel"
-          title="Close AI panel"
+          aria-label={t('ai.panel.close')}
+          title={t('ai.panel.close')}
         >
           <X size={16} />
         </Button>
       </div>
       <AiPermissionModeToggle
         value={permissionMode}
+        locale={locale}
         disabled={permissionModeDisabled}
         onChange={onPermissionModeChange}
       />
@@ -215,19 +243,23 @@ export function AiPanelHeader({
 
 function AiPermissionModeToggle({
   value,
+  locale = 'en',
   disabled,
   onChange,
 }: {
   value: AiAgentPermissionMode
+  locale?: AppLocale
   disabled: boolean
   onChange: (mode: AiAgentPermissionMode) => void
 }) {
+  const t = createTranslator(locale)
+
   return (
     <TooltipProvider>
       <div
         className="inline-flex w-full rounded-md border border-border bg-muted p-1"
         role="radiogroup"
-        aria-label="AI agent permission mode"
+        aria-label={t('ai.permission.modeAria')}
         data-testid="ai-permission-mode-toggle"
       >
         {(['safe', 'power_user'] as const).map((mode) => {
@@ -235,7 +267,7 @@ function AiPermissionModeToggle({
           return (
             <ActionTooltip
               key={mode}
-              copy={AI_PERMISSION_MODE_TOOLTIPS[mode]}
+              copy={permissionModeTooltip(mode, t)}
               side="bottom"
               contentTestId="ai-permission-mode-tooltip"
             >
@@ -253,7 +285,7 @@ function AiPermissionModeToggle({
                 }
                 onClick={() => onChange(mode)}
               >
-                {AI_AGENT_PERMISSION_MODE_LABELS[mode].control}
+                {aiAgentPermissionModeLabels(mode, locale).control}
               </Button>
             </ActionTooltip>
           )
@@ -263,7 +295,9 @@ function AiPermissionModeToggle({
   )
 }
 
-export function AiPanelContextBar({ activeEntry, linkedCount }: AiPanelContextBarProps) {
+export function AiPanelContextBar({ activeEntry, linkedCount, locale = 'en' }: AiPanelContextBarProps) {
+  const t = createTranslator(locale)
+
   return (
     <div
       className="flex shrink-0 items-center border-b border-border text-muted-foreground"
@@ -273,7 +307,7 @@ export function AiPanelContextBar({ activeEntry, linkedCount }: AiPanelContextBa
       <Link size={12} className="shrink-0" />
       <span className="truncate" style={{ fontWeight: 500 }}>{activeEntry.title}</span>
       {linkedCount > 0 && (
-        <span style={{ opacity: 0.6 }}>+ {linkedCount} linked</span>
+        <span style={{ opacity: 0.6 }}>{t('ai.panel.linkedCount', { count: linkedCount })}</span>
       )}
     </div>
   )
@@ -282,6 +316,7 @@ export function AiPanelContextBar({ activeEntry, linkedCount }: AiPanelContextBa
 export function AiPanelMessageHistory({
   agentLabel,
   agentReadiness,
+  locale = 'en',
   messages,
   isActive,
   onOpenNote,
@@ -300,6 +335,7 @@ export function AiPanelMessageHistory({
         <AiPanelEmptyState
           agentLabel={agentLabel}
           agentReadiness={agentReadiness}
+          locale={locale}
           hasContext={hasContext}
         />
       )}
@@ -320,6 +356,7 @@ export function AiPanelComposer({
   entries,
   agentLabel,
   agentReadiness,
+  locale = 'en',
   input,
   inputRef,
   isActive,
@@ -327,9 +364,10 @@ export function AiPanelComposer({
   onSend,
   onUnsupportedAiPaste,
 }: AiPanelComposerProps) {
+  const t = createTranslator(locale)
   const composerDisabled = isActive || agentReadiness !== 'ready'
   const canSend = !composerDisabled && input.trim().length > 0
-  const placeholder = getComposerPlaceholder(agentLabel, agentReadiness)
+  const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
   const sendButtonStyle = {
     background: canSend ? 'var(--primary)' : 'var(--muted)',
     color: canSend ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
@@ -365,8 +403,8 @@ export function AiPanelComposer({
           style={sendButtonStyle}
           onClick={() => onSend(input, extractInlineWikilinkReferences(input, entries))}
           disabled={!canSend}
-          aria-label="Send message"
-          title="Send message"
+          aria-label={t('ai.panel.send')}
+          title={t('ai.panel.send')}
           data-testid="agent-send"
         >
           <PaperPlaneRight size={16} />

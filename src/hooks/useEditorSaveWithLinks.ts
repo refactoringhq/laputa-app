@@ -5,6 +5,7 @@ import { deriveRawEditorEntryState } from './rawEditorEntryState'
 import { deriveDisplayTitleState } from '../utils/noteTitle'
 import { detectFrontmatterState } from '../utils/frontmatter'
 import type { VaultEntry } from '../types'
+import type { AppLocale } from '../lib/i18n'
 
 const EMPTY_DERIVED_ENTRY_STATE_KEY = JSON.stringify(deriveRawEditorEntryState(''))
 
@@ -24,6 +25,7 @@ export function useEditorSaveWithLinks(config: {
   resolvePathBeforeSave?: (path: string) => Promise<string>
   canPersist?: boolean
   disabledSaveMessage?: string
+  locale?: AppLocale
 }) {
   const { updateEntry } = config
   const saveContent = useCallback((path: string, content: string) => {

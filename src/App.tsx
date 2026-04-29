@@ -469,7 +469,7 @@ function App() {
     mcpConfigError,
     loadMcpConfigSnippet,
     copyMcpConfig,
-  } = useMcpStatus(resolvedPath, setToastMessage)
+  } = useMcpStatus(resolvedPath, setToastMessage, appLocale)
   const gitRemoteStatus = useGitRemoteStatus(resolvedPath)
   const loadVaultModifiedFiles = vault.loadModifiedFiles
   const refreshGitRemoteStatus = gitRemoteStatus.refreshRemoteStatus
@@ -772,6 +772,7 @@ function App() {
     replaceEntry: vault.replaceEntry, resolvedPath,
     initialH1AutoRenameEnabled: settings.initial_h1_auto_rename_enabled !== false,
     onInternalVaultWrite: recentVaultWrites.markInternalWrite,
+    locale: appLocale,
   })
 
   const aiActivity = useAiActivity({
@@ -1335,6 +1336,7 @@ function App() {
     reloadViews: vault.reloadViews,
     loadModifiedFiles: vault.loadModifiedFiles,
     onToast: setToastMessage,
+    locale: appLocale,
   })
   const activeNoteModified = useMemo(
     () => vault.modifiedFiles.some((file) => file.path === notes.activeTabPath),
@@ -1726,7 +1728,7 @@ function App() {
         />
         <SettingsPanel open={dialogs.showSettings} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} isGitVault={isGitVault} onSave={saveSettings} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} onClose={dialogs.closeSettings} />
         <FeedbackDialog open={showFeedback} onClose={closeFeedback} />
-        <McpSetupDialog open={showMcpSetupDialog} status={mcpStatus} busyAction={mcpDialogAction} manualConfigSnippet={mcpConfigSnippet} manualConfigLoading={mcpConfigLoading} manualConfigError={mcpConfigError} onClose={closeMcpSetupDialog} onConnect={handleConnectMcp} onCopyManualConfig={handleCopyMcpConfig} onDisconnect={handleDisconnectMcp} onLoadManualConfig={handleLoadMcpConfigSnippet} />
+        <McpSetupDialog open={showMcpSetupDialog} status={mcpStatus} busyAction={mcpDialogAction} manualConfigSnippet={mcpConfigSnippet} manualConfigLoading={mcpConfigLoading} manualConfigError={mcpConfigError} locale={appLocale} onClose={closeMcpSetupDialog} onConnect={handleConnectMcp} onCopyManualConfig={handleCopyMcpConfig} onDisconnect={handleDisconnectMcp} onLoadManualConfig={handleLoadMcpConfigSnippet} />
         <CloneVaultModal key={dialogs.showCloneVault ? 'clone-open' : 'clone-closed'} open={dialogs.showCloneVault} onClose={dialogs.closeCloneVault} onVaultCloned={vaultSwitcher.handleVaultCloned} />
         {deleteActions.confirmDelete && (
           <ConfirmDeleteDialog

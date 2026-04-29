@@ -1,5 +1,7 @@
 import type { VaultEntry } from '../types'
 
+export type FilePreviewKind = 'image' | 'pdf'
+
 const IMAGE_PREVIEW_EXTENSIONS = new Set([
   'apng',
   'avif',
@@ -14,6 +16,7 @@ const IMAGE_PREVIEW_EXTENSIONS = new Set([
   'tiff',
   'webp',
 ])
+const PDF_PREVIEW_EXTENSIONS = new Set(['pdf'])
 
 function extensionFromFilename(filename: string): string | null {
   const lastSegment = filename.split(/[\\/]/u).pop() ?? filename
@@ -27,9 +30,25 @@ export function previewExtension(entry: Pick<VaultEntry, 'filename' | 'path'>): 
 }
 
 export function isImagePreviewEntry(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): boolean {
-  if (entry.fileKind !== 'binary') return false
+  return filePreviewKind(entry) === 'image'
+}
+
+export function isPdfPreviewEntry(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): boolean {
+  return filePreviewKind(entry) === 'pdf'
+}
+
+export function filePreviewKind(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): FilePreviewKind | null {
+  if (entry.fileKind && entry.fileKind !== 'binary') return null
+
   const extension = previewExtension(entry)
-  return extension ? IMAGE_PREVIEW_EXTENSIONS.has(extension) : false
+  if (!extension) return null
+  if (IMAGE_PREVIEW_EXTENSIONS.has(extension)) return 'image'
+  if (PDF_PREVIEW_EXTENSIONS.has(extension)) return 'pdf'
+  return null
+}
+
+export function isFilePreviewEntry(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): boolean {
+  return filePreviewKind(entry) !== null
 }
 
 export function previewFileTypeLabel(entry: Pick<VaultEntry, 'filename' | 'path'>): string {

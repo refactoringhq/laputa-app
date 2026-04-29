@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type { McpStatus } from '../hooks/useMcpStatus'
+import { createTranslator, type AppLocale } from '../lib/i18n'
 
 interface McpSetupDialogProps {
   open: boolean
@@ -18,6 +19,7 @@ interface McpSetupDialogProps {
   manualConfigError?: string | null
   manualConfigLoading?: boolean
   manualConfigSnippet?: string | null
+  locale?: AppLocale
   onClose: () => void
   onConnect: () => void
   onCopyManualConfig?: () => void
@@ -28,6 +30,7 @@ interface McpSetupDialogProps {
 interface ManualMcpConfigSectionProps {
   error?: string | null
   loading: boolean
+  locale?: AppLocale
   onCopy?: () => void
   snippet?: string | null
 }
@@ -36,6 +39,7 @@ interface McpSetupActionsProps {
   buttonsDisabled: boolean
   connectBusy: boolean
   disconnectBusy: boolean
+  locale?: AppLocale
   primaryLabel: string
   secondaryLabel: string | null
   onClose: () => void
@@ -47,34 +51,39 @@ function isConnected(status: McpStatus): boolean {
   return status === 'installed'
 }
 
-function actionCopy(status: McpStatus) {
+function actionCopy(status: McpStatus, t: ReturnType<typeof createTranslator>) {
   if (isConnected(status)) {
     return {
-      description: 'Tolaria is already connected to external AI tools for this vault. Reconnect to refresh the configuration, or disconnect to remove Tolaria from those third-party config files.',
-      primaryLabel: 'Reconnect External AI Tools',
-      secondaryLabel: 'Disconnect',
-      title: 'Manage External AI Tools',
+      description: t('mcp.setup.connectedDescription'),
+      primaryLabel: t('mcp.setup.reconnect'),
+      secondaryLabel: t('mcp.setup.disconnect'),
+      title: t('mcp.setup.manageTitle'),
     }
   }
 
   return {
-    description: 'Tolaria can add its MCP server to external AI tools for this vault, but it will not touch third-party config files until you confirm here.',
-    primaryLabel: 'Connect External AI Tools',
+    description: t('mcp.setup.setupDescription'),
+    primaryLabel: t('mcp.setup.connect'),
     secondaryLabel: null,
-    title: 'Set Up External AI Tools',
+    title: t('mcp.setup.setupTitle'),
   }
 }
 
-function manualConfigText({ error, loading, snippet }: ManualMcpConfigSectionProps): string {
-  if (loading) return 'Loading exact MCP config...'
-  return error ?? snippet ?? 'Exact config is available after a vault is open.'
+function manualConfigText(
+  { error, loading, snippet }: ManualMcpConfigSectionProps,
+  t: ReturnType<typeof createTranslator>,
+): string {
+  if (loading) return t('mcp.setup.manual.loading')
+  return error ?? snippet ?? t('mcp.setup.manual.unavailable')
 }
 
 function ManualMcpConfigSection(props: ManualMcpConfigSectionProps) {
+  const t = createTranslator(props.locale)
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="m-0 text-sm font-medium text-foreground">Manual MCP config</p>
+        <p className="m-0 text-sm font-medium text-foreground">{t('mcp.setup.manual.title')}</p>
         <Button
           type="button"
           variant="outline"
@@ -84,7 +93,7 @@ function ManualMcpConfigSection(props: ManualMcpConfigSectionProps) {
           data-testid="mcp-copy-config"
         >
           <Copy size={14} />
-          Copy MCP config
+          {t('mcp.setup.manual.copy')}
         </Button>
       </div>
       <pre
@@ -92,7 +101,7 @@ function ManualMcpConfigSection(props: ManualMcpConfigSectionProps) {
         className="max-h-48 overflow-auto rounded-md border border-border bg-background px-3 py-3 font-mono text-xs leading-5 text-foreground"
         data-testid="mcp-config-snippet"
       >
-        {manualConfigText(props)}
+        {manualConfigText(props, t)}
       </pre>
     </div>
   )
@@ -102,16 +111,19 @@ function McpSetupActions({
   buttonsDisabled,
   connectBusy,
   disconnectBusy,
+  locale = 'en',
   primaryLabel,
   secondaryLabel,
   onClose,
   onConnect,
   onDisconnect,
 }: McpSetupActionsProps) {
+  const t = createTranslator(locale)
+
   return (
     <DialogFooter className="flex-row items-center justify-end gap-2 sm:justify-end">
       <Button type="button" variant="outline" onClick={onClose} disabled={buttonsDisabled}>
-        Cancel
+        {t('common.cancel')}
       </Button>
       {secondaryLabel ? (
         <Button
@@ -121,7 +133,7 @@ function McpSetupActions({
           disabled={buttonsDisabled}
           data-testid="mcp-setup-disconnect"
         >
-          {disconnectBusy ? 'Disconnecting…' : secondaryLabel}
+          {disconnectBusy ? t('mcp.setup.disconnecting') : secondaryLabel}
         </Button>
       ) : null}
       <Button
@@ -131,7 +143,7 @@ function McpSetupActions({
         disabled={buttonsDisabled}
         data-testid="mcp-setup-connect"
       >
-        {connectBusy ? 'Connecting…' : primaryLabel}
+        {connectBusy ? t('mcp.setup.connecting') : primaryLabel}
       </Button>
     </DialogFooter>
   )
@@ -144,13 +156,15 @@ export function McpSetupDialog({
   manualConfigError,
   manualConfigLoading = false,
   manualConfigSnippet,
+  locale = 'en',
   onClose,
   onConnect,
   onCopyManualConfig,
   onDisconnect,
   onLoadManualConfig,
 }: McpSetupDialogProps) {
-  const copy = actionCopy(status)
+  const t = createTranslator(locale)
+  const copy = actionCopy(status, t)
   const connectBusy = busyAction === 'connect'
   const disconnectBusy = busyAction === 'disconnect'
   const buttonsDisabled = busyAction !== null || status === 'checking'
@@ -172,10 +186,10 @@ export function McpSetupDialog({
 
         <div className="space-y-3 text-sm leading-6 text-muted-foreground">
           <p>
-            This setup requires Node.js 18+ on PATH and an MCP-compatible desktop tool. Tolaria checks Node.js before writing config so the tool is not left pointing at a broken command.
+            {t('mcp.setup.nodeRequirement')}
           </p>
           <p>
-            Confirming this action will write or update Tolaria&apos;s single <code className="rounded bg-muted px-1 py-0.5 text-xs">tolaria</code> MCP entry in:
+            {t('mcp.setup.writeEntryDescription', { entry: 'tolaria' })}
           </p>
           <div className="rounded-md border border-border bg-muted/30 px-3 py-3 font-mono text-xs text-foreground">
             <div>~/.claude.json</div>
@@ -187,14 +201,15 @@ export function McpSetupDialog({
           <ManualMcpConfigSection
             error={manualConfigError}
             loading={manualConfigLoading}
+            locale={locale}
             onCopy={onCopyManualConfig}
             snippet={manualConfigSnippet}
           />
           <p>
-            Claude Code CLI reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.claude.json</code>, Gemini CLI reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.gemini/settings.json</code>, Cursor reads <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.cursor/mcp.json</code>, and the generic <code className="rounded bg-muted px-1 py-0.5 text-xs">~/.config/mcp/mcp.json</code> path is picked up by other MCP-compatible tools. Cancel leaves all files untouched, reconnect is idempotent, and disconnect removes Tolaria&apos;s entry again.
+            {t('mcp.setup.clientPathsDescription')}
           </p>
           <p>
-            Gemini CLI needs its own install and sign-in. Use Restore Tolaria AI Guidance when you want a vault-root <code className="rounded bg-muted px-1 py-0.5 text-xs">GEMINI.md</code> compatibility shim that points Gemini back to the shared <code className="rounded bg-muted px-1 py-0.5 text-xs">AGENTS.md</code> instructions without overwriting custom guidance.
+            {t('mcp.setup.geminiGuidanceDescription')}
           </p>
         </div>
 
@@ -202,6 +217,7 @@ export function McpSetupDialog({
           buttonsDisabled={buttonsDisabled}
           connectBusy={connectBusy}
           disconnectBusy={disconnectBusy}
+          locale={locale}
           primaryLabel={copy.primaryLabel}
           secondaryLabel={copy.secondaryLabel}
           onClose={onClose}
