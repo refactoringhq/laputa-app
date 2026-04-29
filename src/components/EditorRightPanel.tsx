@@ -25,7 +25,6 @@ interface EditorRightPanelProps {
   noteListFilter?: { type: string | null; query: string }
   onToggleInspector: () => void
   onToggleAIChat?: () => void
-  onCopyMcpConfig?: () => void
   onNavigateWikilink: (target: string) => void
   onViewCommitDiff: (commitHash: string) => Promise<void>
   onUpdateFrontmatter?: (path: string, key: string, value: FrontmatterValue) => Promise<void>
@@ -49,7 +48,6 @@ export function EditorRightPanel({
   inspectorEntry, inspectorContent, entries, gitHistory, vaultPath,
   noteList, noteListFilter,
   onToggleInspector, onToggleAIChat, onNavigateWikilink, onViewCommitDiff,
-  onCopyMcpConfig,
   onUpdateFrontmatter, onDeleteProperty, onAddProperty, onCreateMissingType, onCreateAndOpenNote, onInitializeProperties, onToggleRawEditor, onOpenNote,
   onFileCreated, onFileModified, onVaultChanged,
   locale,
@@ -90,7 +88,6 @@ export function EditorRightPanel({
         <AiPanelView
           controller={aiPanelController}
           onClose={() => onToggleAIChat?.()}
-          onCopyMcpConfig={onCopyMcpConfig}
           onOpenNote={onOpenNote}
           onUnsupportedAiPaste={onUnsupportedAiPaste}
           defaultAiAgent={defaultAiAgent}

@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { Robot, X, PaperPlaneRight, Plus, Link } from '@phosphor-icons/react'
-import { Copy } from 'lucide-react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
@@ -25,7 +24,6 @@ interface AiPanelHeaderProps {
   permissionModeDisabled: boolean
   onPermissionModeChange: (mode: AiAgentPermissionMode) => void
   onClose: () => void
-  onCopyMcpConfig?: () => void
   onNewChat: () => void
 }
 
@@ -174,7 +172,6 @@ export function AiPanelHeader({
   permissionModeDisabled,
   onPermissionModeChange,
   onClose,
-  onCopyMcpConfig,
   onNewChat,
 }: AiPanelHeaderProps) {
   const t = createTranslator(locale)
@@ -195,21 +192,6 @@ export function AiPanelHeader({
             {headerStatusText({ agentLabel, agentReadiness, modeLabel, t })}
           </span>
         </div>
-        {onCopyMcpConfig ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            onClick={onCopyMcpConfig}
-            className="h-7 gap-1.5 px-2 text-[11px]"
-            aria-label={t('ai.panel.copyMcpConfig')}
-            title={t('ai.panel.copyMcpConfig')}
-            data-testid="ai-copy-mcp-config"
-          >
-            <Copy size={15} />
-            <span>{t('ai.panel.mcpConfig')}</span>
-          </Button>
-        ) : null}
         <Button
           type="button"
           variant="ghost"

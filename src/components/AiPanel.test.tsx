@@ -201,14 +201,10 @@ describe('AiPanel', () => {
     expect(mockClearConversation).toHaveBeenCalledOnce()
   })
 
-  it('copies the MCP config from the AI panel header action', () => {
-    const onCopyMcpConfig = vi.fn()
-    render(<AiPanel onClose={vi.fn()} onCopyMcpConfig={onCopyMcpConfig} vaultPath="/tmp/vault" />)
+  it('keeps the MCP config action out of the AI panel header', () => {
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
-    expect(screen.getByText('MCP config')).toBeVisible()
-    fireEvent.click(screen.getByRole('button', { name: 'Copy MCP config' }))
-
-    expect(onCopyMcpConfig).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'Copy MCP config' })).toBeNull()
   })
 
   it('renders empty state without context', () => {
