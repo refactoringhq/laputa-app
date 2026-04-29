@@ -14,7 +14,9 @@ export interface Tab {
 
 export interface EditorContentProps {
   activeTab: Tab | null
+  activeTabPath: string | null
   isLoadingNewTab: boolean
+  isVaultLoading?: boolean
   entries: VaultEntry[]
   editor: ReturnType<typeof useCreateBlockNote>
   diffMode: boolean
@@ -56,6 +58,7 @@ export interface EditorContentProps {
 export function useEditorContentModel(props: EditorContentProps) {
   const {
     activeTab,
+    activeTabPath,
     entries,
     rawMode,
     diffMode,
@@ -77,6 +80,10 @@ export function useEditorContentModel(props: EditorContentProps) {
     activeStatus: props.activeStatus,
   })
   const showEditor = !diffMode && showContentEditor
+  const loadingEntry = !activeTab && activeTabPath
+    ? entries.find((entry) => entry.path === activeTabPath) ?? null
+    : null
+  const loadingTab = loadingEntry ? { entry: loadingEntry, content: '' } : null
 
   const breadcrumbBarRef = useRef<HTMLDivElement | null>(null)
 
@@ -88,6 +95,7 @@ export function useEditorContentModel(props: EditorContentProps) {
     effectiveRawMode,
     forceRawMode: isNonMarkdownText || isDeletedPreview,
     showEditor,
+    loadingTab,
     path,
     breadcrumbBarRef,
     wordCount,

@@ -21,6 +21,11 @@ import {
   TypesSection,
   ViewsSection,
 } from './sidebar/SidebarSections'
+import {
+  SidebarCreatableLoadingSection,
+  SidebarFavoritesLoadingSection,
+  SidebarTypesLoadingSection,
+} from './sidebar/SidebarLoadingSections'
 import { useSidebarTypeInteractions } from './sidebar/useSidebarTypeInteractions'
 import type { AppLocale } from '../lib/i18n'
 import type { FolderFileActions } from '../hooks/useFileActions'
@@ -56,6 +61,7 @@ interface SidebarProps {
   inboxCount?: number
   locale?: AppLocale
   onCollapse?: () => void
+  loading?: boolean
 }
 
 interface SidebarNavigationProps extends Pick<
@@ -82,6 +88,7 @@ interface SidebarNavigationProps extends Pick<
   | 'inboxCount'
   | 'onCreateNewType'
   | 'locale'
+  | 'loading'
 > {
   activeCount: number
   archivedCount: number
@@ -96,6 +103,248 @@ interface SidebarNavigationProps extends Pick<
   typeInteractions: ReturnType<typeof useSidebarTypeInteractions>
   isSectionVisible: (type: string) => boolean
   toggleVisibility: (type: string) => void
+}
+
+type SidebarFavoritesNavigationProps = Pick<
+  SidebarNavigationProps,
+  | 'loading'
+  | 'entries'
+  | 'selection'
+  | 'onSelect'
+  | 'onSelectFavorite'
+  | 'onReorderFavorites'
+  | 'groupCollapsed'
+  | 'toggleGroup'
+  | 'locale'
+>
+
+type SidebarViewsNavigationProps = Pick<
+  SidebarNavigationProps,
+  | 'loading'
+  | 'views'
+  | 'selection'
+  | 'onSelect'
+  | 'onCreateView'
+  | 'onEditView'
+  | 'onDeleteView'
+  | 'onReorderViews'
+  | 'groupCollapsed'
+  | 'toggleGroup'
+  | 'sensors'
+  | 'entries'
+  | 'locale'
+>
+
+type SidebarTypesNavigationProps = Pick<
+  SidebarNavigationProps,
+  | 'loading'
+  | 'visibleSections'
+  | 'allSectionGroups'
+  | 'sectionIds'
+  | 'sensors'
+  | 'handleDragEnd'
+  | 'sectionProps'
+  | 'groupCollapsed'
+  | 'toggleGroup'
+  | 'typeInteractions'
+  | 'isSectionVisible'
+  | 'toggleVisibility'
+  | 'onCreateNewType'
+  | 'locale'
+>
+
+type SidebarFoldersNavigationProps = Pick<
+  SidebarNavigationProps,
+  | 'loading'
+  | 'folders'
+  | 'selection'
+  | 'onSelect'
+  | 'onCreateFolder'
+  | 'onRenameFolder'
+  | 'onDeleteFolder'
+  | 'folderFileActions'
+  | 'renamingFolderPath'
+  | 'onStartRenameFolder'
+  | 'onCancelRenameFolder'
+  | 'groupCollapsed'
+  | 'toggleGroup'
+  | 'locale'
+>
+
+function SidebarFavoritesNavigation({
+  loading,
+  entries,
+  selection,
+  onSelect,
+  onSelectFavorite,
+  onReorderFavorites,
+  groupCollapsed,
+  toggleGroup,
+  locale,
+}: SidebarFavoritesNavigationProps) {
+  if (loading) {
+    return (
+      <SidebarFavoritesLoadingSection
+        collapsed={groupCollapsed.favorites}
+        locale={locale}
+        onToggle={() => toggleGroup('favorites')}
+      />
+    )
+  }
+
+  return (
+    <div className="border-b border-border">
+      <FavoritesSection
+        entries={entries}
+        selection={selection}
+        onSelect={onSelect}
+        onSelectNote={onSelectFavorite}
+        onReorder={onReorderFavorites}
+        collapsed={groupCollapsed.favorites}
+        locale={locale}
+        onToggle={() => toggleGroup('favorites')}
+      />
+    </div>
+  )
+}
+
+function SidebarViewsNavigation({
+  loading,
+  views,
+  selection,
+  onSelect,
+  onCreateView,
+  onEditView,
+  onDeleteView,
+  onReorderViews,
+  groupCollapsed,
+  toggleGroup,
+  sensors,
+  entries,
+  locale,
+}: SidebarViewsNavigationProps) {
+  if (loading) {
+    return (
+      <SidebarCreatableLoadingSection
+        collapsed={groupCollapsed.views}
+        kind="views"
+        locale={locale}
+        onCreate={onCreateView}
+        onToggle={() => toggleGroup('views')}
+      />
+    )
+  }
+
+  return (
+    <ViewsSection
+      views={views ?? []}
+      selection={selection}
+      onSelect={onSelect}
+      collapsed={groupCollapsed.views}
+      onToggle={() => toggleGroup('views')}
+      onCreateView={onCreateView}
+      onEditView={onEditView}
+      onDeleteView={onDeleteView}
+      onReorderViews={onReorderViews}
+      sensors={sensors}
+      entries={entries}
+      locale={locale}
+    />
+  )
+}
+
+function SidebarTypesNavigation({
+  loading,
+  visibleSections,
+  allSectionGroups,
+  sectionIds,
+  sensors,
+  handleDragEnd,
+  sectionProps,
+  groupCollapsed,
+  toggleGroup,
+  typeInteractions,
+  isSectionVisible,
+  toggleVisibility,
+  onCreateNewType,
+  locale,
+}: SidebarTypesNavigationProps) {
+  if (loading) {
+    return (
+      <SidebarTypesLoadingSection
+        collapsed={groupCollapsed.sections}
+        locale={locale}
+        onCreateNewType={onCreateNewType}
+        onToggle={() => toggleGroup('sections')}
+      />
+    )
+  }
+
+  return (
+    <TypesSection
+      visibleSections={visibleSections}
+      allSectionGroups={allSectionGroups}
+      sectionIds={sectionIds}
+      sensors={sensors}
+      handleDragEnd={handleDragEnd}
+      sectionProps={sectionProps}
+      collapsed={groupCollapsed.sections}
+      onToggle={() => toggleGroup('sections')}
+      showCustomize={typeInteractions.showCustomize}
+      setShowCustomize={typeInteractions.setShowCustomize}
+      isSectionVisible={isSectionVisible}
+      toggleVisibility={toggleVisibility}
+      onCreateNewType={onCreateNewType}
+      customizeRef={typeInteractions.customizeRef}
+      locale={locale}
+    />
+  )
+}
+
+function SidebarFoldersNavigation({
+  loading,
+  folders,
+  selection,
+  onSelect,
+  onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  folderFileActions,
+  renamingFolderPath,
+  onStartRenameFolder,
+  onCancelRenameFolder,
+  groupCollapsed,
+  toggleGroup,
+  locale,
+}: SidebarFoldersNavigationProps) {
+  if (loading) {
+    return (
+      <SidebarCreatableLoadingSection
+        collapsed={groupCollapsed.folders}
+        kind="folders"
+        locale={locale}
+        onToggle={() => toggleGroup('folders')}
+      />
+    )
+  }
+
+  return (
+    <FolderTree
+      folders={folders ?? []}
+      selection={selection}
+      onSelect={onSelect}
+      onCreateFolder={onCreateFolder}
+      onRenameFolder={onRenameFolder}
+      onDeleteFolder={onDeleteFolder}
+      folderFileActions={folderFileActions}
+      renamingFolderPath={renamingFolderPath}
+      onStartRenameFolder={onStartRenameFolder}
+      onCancelRenameFolder={onCancelRenameFolder}
+      collapsed={groupCollapsed.folders}
+      locale={locale}
+      onToggle={() => toggleGroup('folders')}
+    />
+  )
 }
 
 function SidebarNavigation({
@@ -120,6 +369,7 @@ function SidebarNavigation({
   showInbox = true,
   inboxCount = 0,
   locale = 'en',
+  loading = false,
   onCreateNewType,
   activeCount,
   archivedCount,
@@ -135,8 +385,8 @@ function SidebarNavigation({
   isSectionVisible,
   toggleVisibility,
 }: SidebarNavigationProps) {
-  const hasFavorites = entries.some((entry) => entry.favorite && !entry.archived)
-  const hasViews = views.length > 0 || !!onCreateView
+  const hasFavorites = loading || entries.some((entry) => entry.favorite && !entry.archived)
+  const hasViews = loading || views.length > 0 || !!onCreateView
 
   return (
     <nav className="flex-1 overflow-y-auto">
@@ -148,55 +398,56 @@ function SidebarNavigation({
         activeCount={activeCount}
         archivedCount={archivedCount}
         locale={locale}
+        loading={loading}
       />
       {hasFavorites && (
-        <div className="border-b border-border">
-          <FavoritesSection
-            entries={entries}
-            selection={selection}
-            onSelect={onSelect}
-            onSelectNote={onSelectFavorite}
-            onReorder={onReorderFavorites}
-            collapsed={groupCollapsed.favorites}
-            locale={locale}
-            onToggle={() => toggleGroup('favorites')}
-          />
-        </div>
+        <SidebarFavoritesNavigation
+          loading={loading}
+          entries={entries}
+          selection={selection}
+          onSelect={onSelect}
+          onSelectFavorite={onSelectFavorite}
+          onReorderFavorites={onReorderFavorites}
+          groupCollapsed={groupCollapsed}
+          toggleGroup={toggleGroup}
+          locale={locale}
+        />
       )}
       {hasViews && (
-        <ViewsSection
+        <SidebarViewsNavigation
+          loading={loading}
           views={views}
           selection={selection}
           onSelect={onSelect}
-          collapsed={groupCollapsed.views}
-          onToggle={() => toggleGroup('views')}
           onCreateView={onCreateView}
           onEditView={onEditView}
           onDeleteView={onDeleteView}
           onReorderViews={onReorderViews}
+          groupCollapsed={groupCollapsed}
+          toggleGroup={toggleGroup}
           sensors={sensors}
           entries={entries}
           locale={locale}
         />
       )}
-      <TypesSection
+      <SidebarTypesNavigation
+        loading={loading}
         visibleSections={visibleSections}
         allSectionGroups={allSectionGroups}
         sectionIds={sectionIds}
         sensors={sensors}
         handleDragEnd={handleDragEnd}
         sectionProps={sectionProps}
-        collapsed={groupCollapsed.sections}
-        onToggle={() => toggleGroup('sections')}
-        showCustomize={typeInteractions.showCustomize}
-        setShowCustomize={typeInteractions.setShowCustomize}
+        groupCollapsed={groupCollapsed}
+        toggleGroup={toggleGroup}
+        typeInteractions={typeInteractions}
         isSectionVisible={isSectionVisible}
         toggleVisibility={toggleVisibility}
         onCreateNewType={onCreateNewType}
-        customizeRef={typeInteractions.customizeRef}
         locale={locale}
       />
-      <FolderTree
+      <SidebarFoldersNavigation
+        loading={loading}
         folders={folders}
         selection={selection}
         onSelect={onSelect}
@@ -207,9 +458,9 @@ function SidebarNavigation({
         renamingFolderPath={renamingFolderPath}
         onStartRenameFolder={onStartRenameFolder}
         onCancelRenameFolder={onCancelRenameFolder}
-        collapsed={groupCollapsed.folders}
+        groupCollapsed={groupCollapsed}
+        toggleGroup={toggleGroup}
         locale={locale}
-        onToggle={() => toggleGroup('folders')}
       />
     </nav>
   )
@@ -251,6 +502,7 @@ export const Sidebar = memo(function Sidebar({
   locale = 'en',
   onCollapse,
   onCreateNewType,
+  loading = false,
 }: SidebarProps) {
   const { typeEntryMap, allSectionGroups, visibleSections, sectionIds } = useSidebarSections(entries)
   const { activeCount, archivedCount } = useEntryCounts(entries)
@@ -310,6 +562,7 @@ export const Sidebar = memo(function Sidebar({
         showInbox={showInbox}
         inboxCount={inboxCount}
         locale={locale}
+        loading={loading}
         onCreateNewType={onCreateNewType}
         activeCount={activeCount}
         archivedCount={archivedCount}

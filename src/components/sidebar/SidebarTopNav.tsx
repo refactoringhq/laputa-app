@@ -11,6 +11,7 @@ interface SidebarTopNavProps {
   activeCount: number
   archivedCount: number
   locale?: AppLocale
+  loading?: boolean
 }
 
 export function SidebarTopNav({
@@ -21,6 +22,7 @@ export function SidebarTopNav({
   activeCount,
   archivedCount,
   locale = 'en',
+  loading = false,
 }: SidebarTopNavProps) {
   return (
     <div className="border-b border-border" data-testid="sidebar-top-nav" style={{ padding: '4px 6px' }}>
@@ -29,6 +31,7 @@ export function SidebarTopNav({
           icon={Tray}
           label={translate(locale, 'sidebar.nav.inbox')}
           count={inboxCount}
+          countLoading={loading}
           isActive={isSelectionActive(selection, { kind: 'filter', filter: 'inbox' })}
           badgeClassName="text-muted-foreground"
           badgeStyle={{ background: 'var(--muted)' }}
@@ -40,6 +43,7 @@ export function SidebarTopNav({
         icon={FileText}
         label={translate(locale, 'sidebar.nav.allNotes')}
         count={activeCount}
+        countLoading={loading}
         isActive={isSelectionActive(selection, { kind: 'filter', filter: 'all' })}
         badgeClassName="text-muted-foreground"
         badgeStyle={{ background: 'var(--muted)' }}
@@ -50,6 +54,7 @@ export function SidebarTopNav({
         icon={Archive}
         label={translate(locale, 'sidebar.nav.archive')}
         count={archivedCount}
+        countLoading={loading}
         isActive={isSelectionActive(selection, { kind: 'filter', filter: 'archived' })}
         badgeClassName="text-muted-foreground"
         badgeStyle={{ background: 'var(--muted)' }}

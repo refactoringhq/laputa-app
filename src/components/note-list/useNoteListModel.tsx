@@ -437,6 +437,7 @@ export interface NoteListProps {
   entries: VaultEntry[]
   selection: SidebarSelection
   selectedNote: VaultEntry | null
+  loading?: boolean
   noteListFilter: NoteListFilter
   onNoteListFilterChange: (filter: NoteListFilter) => void
   inboxPeriod?: InboxPeriod
@@ -471,6 +472,7 @@ function buildNoteListLayoutModel(params: {
   selection: SidebarSelection
   views?: ViewFile[]
   sidebarCollapsed?: boolean
+  loading: boolean
   modifiedFilesError?: string | null
   noteListFilter: NoteListFilter
   filterCounts: ReturnType<typeof useFilterCounts>
@@ -487,6 +489,7 @@ function buildNoteListLayoutModel(params: {
 }) {
   return {
     title: resolveHeaderTitle(params.selection, params.content.typeDocument, params.views, params.locale),
+    loading: params.loading,
     locale: params.locale,
     typeDocument: params.content.typeDocument,
     isEntityView: params.content.isEntityView,
@@ -545,6 +548,7 @@ export function useNoteListModel({
   entries,
   selection,
   selectedNote,
+  loading = false,
   noteListFilter,
   onNoteListFilterChange,
   inboxPeriod = 'all',
@@ -663,6 +667,7 @@ export function useNoteListModel({
     selection,
     views,
     sidebarCollapsed,
+    loading,
     onOpenType: onReplaceActiveTab,
     modifiedFilesError,
     noteListFilter,

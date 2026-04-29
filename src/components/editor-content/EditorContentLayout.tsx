@@ -2,6 +2,7 @@ import type React from 'react'
 import { useCallback, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../../lib/i18n'
+import type { VaultEntry } from '../../types'
 import { dispatchEditorFindAvailability } from '../../utils/editorFindEvents'
 import { DiffView } from '../DiffView'
 import { BreadcrumbBar } from '../BreadcrumbBar'
@@ -38,14 +39,58 @@ type BreadcrumbActions = Pick<
   | 'onToggleNoteWidth'
 >
 
+const LOADING_BREADCRUMB_ENTRY: VaultEntry = {
+  path: '',
+  filename: 'loading.md',
+  title: '',
+  isA: 'Note',
+  aliases: [],
+  belongsTo: [],
+  relatedTo: [],
+  status: null,
+  archived: false,
+  modifiedAt: null,
+  createdAt: null,
+  fileSize: 0,
+  snippet: '',
+  wordCount: 0,
+  relationships: {},
+  icon: null,
+  color: null,
+  order: null,
+  sidebarLabel: null,
+  template: null,
+  sort: null,
+  view: null,
+  visible: true,
+  organized: false,
+  favorite: false,
+  favoriteIndex: null,
+  listPropertiesDisplay: [],
+  outgoingLinks: [],
+  properties: {},
+  hasH1: false,
+  fileKind: 'markdown',
+}
+
 function EditorLoadingSkeleton() {
   return (
-    <div className="flex flex-1 flex-col gap-3 p-8 animate-pulse" style={{ minHeight: 0 }}>
+    <div data-testid="editor-content-skeleton" className="flex flex-1 flex-col gap-3 py-5 animate-pulse" style={{ minHeight: 0 }}>
       <div className="h-6 w-2/5 rounded bg-muted" />
       <div className="h-4 w-4/5 rounded bg-muted" />
       <div className="h-4 w-3/5 rounded bg-muted" />
       <div className="h-4 w-4/5 rounded bg-muted" />
       <div className="h-4 w-2/5 rounded bg-muted" />
+    </div>
+  )
+}
+
+function EditorLoadingCanvas({ cssVars }: Pick<EditorContentModel, 'cssVars'>) {
+  return (
+    <div className="editor-scroll-area" style={cssVars as React.CSSProperties}>
+      <div className="editor-content-wrapper">
+        <EditorLoadingSkeleton />
+      </div>
     </div>
   )
 }
@@ -117,6 +162,7 @@ function ActiveTabBreadcrumb({
   path,
   actions,
   locale,
+  loadingTitle,
 }: {
   activeTab: NonNullable<EditorContentModel['activeTab']>
   barRef: React.RefObject<HTMLDivElement | null>
@@ -124,12 +170,14 @@ function ActiveTabBreadcrumb({
   path: string
   actions: BreadcrumbActions
   locale?: AppLocale
+  loadingTitle?: boolean
 }) {
   return (
     <BreadcrumbBar
       entry={activeTab.entry}
       wordCount={wordCount}
       barRef={barRef}
+      loadingTitle={loadingTitle}
       showDiffToggle={actions.showDiffToggle}
       diffMode={actions.diffMode}
       diffLoading={actions.diffLoading}
@@ -151,6 +199,106 @@ function ActiveTabBreadcrumb({
       onRenameFilename={actions.onRenameFilename}
       noteWidth={actions.noteWidth}
       onToggleNoteWidth={actions.onToggleNoteWidth}
+      locale={locale}
+    />
+  )
+}
+
+function EditorLoadingBreadcrumb({
+  actions,
+  barRef,
+  locale,
+}: {
+  actions: BreadcrumbActions
+  barRef: React.RefObject<HTMLDivElement | null>
+  locale?: AppLocale
+}) {
+  return (
+    <BreadcrumbBar
+      entry={LOADING_BREADCRUMB_ENTRY}
+      wordCount={0}
+      barRef={barRef}
+      loadingTitle
+      showDiffToggle={false}
+      diffMode={false}
+      diffLoading={false}
+      onToggleDiff={actions.onToggleDiff}
+      rawMode={false}
+      forceRawMode={false}
+      showAIChat={actions.showAIChat}
+      onToggleAIChat={actions.onToggleAIChat}
+      inspectorCollapsed={actions.inspectorCollapsed}
+      onToggleInspector={actions.onToggleInspector}
+      noteWidth={actions.noteWidth}
+      onToggleNoteWidth={actions.onToggleNoteWidth}
+      locale={locale}
+    />
+  )
+}
+
+function buildBreadcrumbActions(model: EditorContentModel): BreadcrumbActions {
+  return {
+    diffMode: model.diffMode,
+    diffLoading: model.diffLoading,
+    onToggleDiff: model.onToggleDiff,
+    effectiveRawMode: model.effectiveRawMode,
+    onToggleRaw: model.onToggleRaw,
+    forceRawMode: model.forceRawMode,
+    showAIChat: model.showAIChat,
+    onToggleAIChat: model.onToggleAIChat,
+    inspectorCollapsed: model.inspectorCollapsed,
+    onToggleInspector: model.onToggleInspector,
+    showDiffToggle: model.showDiffToggle,
+    onToggleFavorite: model.onToggleFavorite,
+    onToggleOrganized: model.onToggleOrganized,
+    onRevealFile: model.onRevealFile,
+    onCopyFilePath: model.onCopyFilePath,
+    onDeleteNote: model.onDeleteNote,
+    onArchiveNote: model.onArchiveNote,
+    onUnarchiveNote: model.onUnarchiveNote,
+    onRenameFilename: model.onRenameFilename,
+    noteWidth: model.noteWidth,
+    onToggleNoteWidth: model.onToggleNoteWidth,
+  }
+}
+
+function EditorBreadcrumbArea({
+  actions,
+  barRef,
+  chromePath,
+  chromeTab,
+  chromeWordCount,
+  isVaultLoading,
+  locale,
+}: {
+  actions: BreadcrumbActions
+  barRef: React.RefObject<HTMLDivElement | null>
+  chromePath: string
+  chromeTab: EditorContentModel['activeTab'] | EditorContentModel['loadingTab']
+  chromeWordCount: number
+  isVaultLoading?: boolean
+  locale?: AppLocale
+}) {
+  if (chromeTab) {
+    return (
+      <ActiveTabBreadcrumb
+        activeTab={chromeTab}
+        barRef={barRef}
+        wordCount={chromeWordCount}
+        path={chromePath}
+        locale={locale}
+        loadingTitle={isVaultLoading}
+        actions={actions}
+      />
+    )
+  }
+
+  if (!isVaultLoading) return null
+
+  return (
+    <EditorLoadingBreadcrumb
+      actions={actions}
+      barRef={barRef}
       locale={locale}
     />
   )
@@ -262,6 +410,7 @@ function EditorFindScope({
 export function EditorContentLayout(model: EditorContentModel) {
   const {
     activeTab,
+    loadingTab,
     isLoadingNewTab,
     entries,
     editor,
@@ -290,87 +439,69 @@ export function EditorContentLayout(model: EditorContentModel) {
     noteWidth,
     findRequest,
     locale,
+    isVaultLoading,
   } = model
   const rootClassName = cn(
     'flex flex-1 flex-col min-w-0 min-h-0',
     noteWidth === 'wide' ? 'editor-content-width--wide' : 'editor-content-width--normal',
   )
-
-  if (!activeTab) {
-    return (
-      <div className={rootClassName}>
-        {isLoadingNewTab && showEditor && <EditorLoadingSkeleton />}
-      </div>
-    )
-  }
+  const chromeTab = activeTab ?? loadingTab
+  const chromePath = chromeTab?.entry.path ?? path
+  const chromeWordCount = activeTab ? wordCount : 0
+  const showActiveContent = activeTab && !isVaultLoading
+  const showLoadingContent = isVaultLoading || (isLoadingNewTab && showEditor)
+  const breadcrumbActions = buildBreadcrumbActions(model)
 
   return (
     <div className={rootClassName}>
-      <ActiveTabBreadcrumb
-        activeTab={activeTab}
+      <EditorBreadcrumbArea
+        actions={breadcrumbActions}
         barRef={breadcrumbBarRef}
-        wordCount={wordCount}
-        path={path}
-        locale={locale}
-        actions={{
-          diffMode: model.diffMode,
-          diffLoading: model.diffLoading,
-          onToggleDiff: model.onToggleDiff,
-          effectiveRawMode: model.effectiveRawMode,
-          onToggleRaw: model.onToggleRaw,
-          forceRawMode: model.forceRawMode,
-          showAIChat: model.showAIChat,
-          onToggleAIChat: model.onToggleAIChat,
-          inspectorCollapsed: model.inspectorCollapsed,
-          onToggleInspector: model.onToggleInspector,
-          showDiffToggle: model.showDiffToggle,
-          onToggleFavorite: model.onToggleFavorite,
-          onToggleOrganized: model.onToggleOrganized,
-          onRevealFile: model.onRevealFile,
-          onCopyFilePath: model.onCopyFilePath,
-          onDeleteNote: model.onDeleteNote,
-          onArchiveNote: model.onArchiveNote,
-          onUnarchiveNote: model.onUnarchiveNote,
-          onRenameFilename: model.onRenameFilename,
-          noteWidth: model.noteWidth,
-          onToggleNoteWidth: model.onToggleNoteWidth,
-        }}
-      />
-      <EditorChrome
-        isArchived={isArchived}
-        onUnarchiveNote={onUnarchiveNote}
-        path={path}
-        isConflicted={isConflicted}
-        onKeepMine={onKeepMine}
-        onKeepTheirs={onKeepTheirs}
-        diffMode={diffMode}
-        diffContent={diffContent}
-        onToggleDiff={onToggleDiff}
+        chromePath={chromePath}
+        chromeTab={chromeTab}
+        chromeWordCount={chromeWordCount}
+        isVaultLoading={isVaultLoading}
         locale={locale}
       />
-      <RawModeEditorSection
-        activeTab={activeTab}
-        entries={entries}
-        findRequest={findRequest}
-        rawMode={effectiveRawMode}
-        rawModeContent={rawModeContent}
-        onRawContentChange={onRawContentChange}
-        onSave={onSave}
-        rawLatestContentRef={rawLatestContentRef}
-        vaultPath={vaultPath}
-        locale={locale}
-      />
-      <EditorCanvas
-        showEditor={showEditor}
-        cssVars={cssVars}
-        vaultPath={vaultPath}
-        editor={editor}
-        entries={entries}
-        onNavigateWikilink={onNavigateWikilink}
-        onEditorChange={onEditorChange}
-        isDeletedPreview={isDeletedPreview}
-      />
-      {isLoadingNewTab && showEditor && <EditorLoadingSkeleton />}
+      {showActiveContent && (
+        <>
+          <EditorChrome
+            isArchived={isArchived}
+            onUnarchiveNote={onUnarchiveNote}
+            path={path}
+            isConflicted={isConflicted}
+            onKeepMine={onKeepMine}
+            onKeepTheirs={onKeepTheirs}
+            diffMode={diffMode}
+            diffContent={diffContent}
+            onToggleDiff={onToggleDiff}
+            locale={locale}
+          />
+          <RawModeEditorSection
+            activeTab={activeTab}
+            entries={entries}
+            findRequest={findRequest}
+            rawMode={effectiveRawMode}
+            rawModeContent={rawModeContent}
+            onRawContentChange={onRawContentChange}
+            onSave={onSave}
+            rawLatestContentRef={rawLatestContentRef}
+            vaultPath={vaultPath}
+            locale={locale}
+          />
+          <EditorCanvas
+            showEditor={showEditor}
+            cssVars={cssVars}
+            vaultPath={vaultPath}
+            editor={editor}
+            entries={entries}
+            onNavigateWikilink={onNavigateWikilink}
+            onEditorChange={onEditorChange}
+            isDeletedPreview={isDeletedPreview}
+          />
+        </>
+      )}
+      {showLoadingContent && <EditorLoadingCanvas cssVars={cssVars} />}
     </div>
   )
 }

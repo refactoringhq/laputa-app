@@ -8,6 +8,57 @@ type NoteListLayoutProps = ReturnType<typeof useNoteListModel> & {
   handleBulkOrganize?: () => void
 }
 
+const NOTE_LIST_LOADING_ROWS = [
+  { title: 184, line: 254, selected: false },
+  { title: 142, line: 220, selected: true },
+  { title: 98, line: 242, selected: false },
+  { title: 212, line: 198, selected: false },
+]
+
+function NoteListLoadingBar({ width }: { width: number }) {
+  return <span aria-hidden="true" className="block h-4 rounded bg-muted" style={{ width }} />
+}
+
+function NoteListLoadingRow({
+  title,
+  line,
+  selected,
+}: {
+  title: number
+  line: number
+  selected: boolean
+}) {
+  return (
+    <div
+      className="border-b border-border"
+      style={{ padding: '12px 12px 10px', background: selected ? 'var(--accent-green-light)' : undefined }}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <NoteListLoadingBar width={title} />
+        <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded bg-muted" />
+      </div>
+      <div className="flex flex-col gap-2">
+        <NoteListLoadingBar width={line} />
+        <NoteListLoadingBar width={Math.round(line * 0.72)} />
+      </div>
+      <div className="mt-3 flex items-center justify-between">
+        <NoteListLoadingBar width={44} />
+        <NoteListLoadingBar width={82} />
+      </div>
+    </div>
+  )
+}
+
+function NoteListLoadingSkeleton() {
+  return (
+    <div data-testid="note-list-loading-skeleton" className="animate-pulse">
+      {NOTE_LIST_LOADING_ROWS.map((row, index) => (
+        <NoteListLoadingRow key={index} {...row} />
+      ))}
+    </div>
+  )
+}
+
 function MultiSelectBar({
   multiSelect,
   isArchivedView,
@@ -47,6 +98,7 @@ function NoteListContent({
   searched,
   noteListVirtuosoRef,
   locale,
+  loading,
 }: Pick<
   NoteListLayoutProps,
   | 'entitySelection'
@@ -64,10 +116,13 @@ function NoteListContent({
   | 'searched'
   | 'noteListVirtuosoRef'
   | 'locale'
+  | 'loading'
 >) {
   return (
     <div className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
-      {entitySelection ? (
+      {loading ? (
+        <NoteListLoadingSkeleton />
+      ) : entitySelection ? (
         <EntityView
           entity={entitySelection.entry}
           groups={searchedGroups}
@@ -121,6 +176,7 @@ function NoteListBody({
   noteListFilter,
   filterCounts,
   onNoteListFilterChange,
+  loading,
 }: Pick<
   NoteListLayoutProps,
   | 'handleListKeyDown'
@@ -147,6 +203,7 @@ function NoteListBody({
   | 'noteListFilter'
   | 'filterCounts'
   | 'onNoteListFilterChange'
+  | 'loading'
 >) {
   return (
     <div
@@ -176,6 +233,7 @@ function NoteListBody({
         searched={searched}
         noteListVirtuosoRef={noteListVirtuosoRef}
         locale={locale}
+        loading={loading}
       />
       {showFilterPills && (
         <FilterPills

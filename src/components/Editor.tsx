@@ -41,6 +41,7 @@ interface Tab {
 interface EditorProps {
   tabs: Tab[]
   activeTabPath: string | null
+  isVaultLoading?: boolean
   entries: VaultEntry[]
   onNavigateWikilink: (target: string) => void
   onUnsupportedAiPaste?: (message: string) => void
@@ -291,8 +292,10 @@ function useEditorFindCommand({
 
 function EditorLayout({
   tabs,
+  activeTabPath,
   activeTab,
   isLoadingNewTab,
+  isVaultLoading,
   entries,
   editor,
   diffMode,
@@ -353,8 +356,10 @@ function EditorLayout({
   locale,
 }: {
   tabs: Tab[]
+  activeTabPath: string | null
   activeTab: Tab | null
   isLoadingNewTab: boolean
+  isVaultLoading?: boolean
   entries: VaultEntry[]
   editor: ReturnType<typeof useCreateBlockNote>
   diffMode: boolean
@@ -415,11 +420,12 @@ function EditorLayout({
   locale?: AppLocale
 }) {
   const activeBinaryTab = activeTab?.entry.fileKind === 'binary' ? activeTab : null
+  const showEmptyState = tabs.length === 0 && activeTabPath === null && !isVaultLoading
 
   return (
     <div className="editor flex flex-col min-h-0 overflow-hidden bg-background text-foreground">
       <div className="flex flex-1 min-h-0">
-        {tabs.length === 0
+        {showEmptyState
           ? <EditorEmptyState locale={locale} />
           : activeBinaryTab
             ? (
@@ -432,7 +438,9 @@ function EditorLayout({
               )
             : <EditorContent
               activeTab={activeTab}
+              activeTabPath={activeTabPath}
               isLoadingNewTab={isLoadingNewTab}
+              isVaultLoading={isVaultLoading}
               entries={entries}
               editor={editor}
               diffMode={diffMode}
@@ -512,6 +520,7 @@ function EditorLayout({
 export const Editor = memo(function Editor(props: EditorProps) {
   const {
     tabs, activeTabPath, entries, onNavigateWikilink,
+    isVaultLoading,
     getNoteStatus,
     inspectorCollapsed, onToggleInspector, inspectorWidth,
     defaultAiAgent = DEFAULT_AI_AGENT, defaultAiAgentReadiness, defaultAiAgentReady = true,
@@ -527,8 +536,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
     noteWidth, onToggleNoteWidth,
     onFileCreated, onFileModified, onVaultChanged,
     isConflicted, onKeepMine, onKeepTheirs,
-    flushPendingEditorContentRef, flushPendingRawContentRef, findInNoteRef,
-    locale,
+    flushPendingEditorContentRef, flushPendingRawContentRef, findInNoteRef, locale,
   } = props
 
   const {
@@ -566,8 +574,10 @@ export const Editor = memo(function Editor(props: EditorProps) {
   return (
     <EditorLayout
       tabs={tabs}
+      activeTabPath={props.activeTabPath}
       activeTab={activeTab}
       isLoadingNewTab={isLoadingNewTab}
+      isVaultLoading={isVaultLoading}
       entries={entries}
       editor={editor}
       diffMode={diffMode}

@@ -118,21 +118,35 @@ export function SidebarCountPill({
   )
 }
 
+export function SidebarLoadingCountPill({ compact, testId = 'sidebar-count-skeleton' }: { compact?: boolean; testId?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-testid={testId}
+      className="inline-flex animate-pulse rounded-full bg-muted"
+      style={{ width: compact ? 22 : 28, height: compact ? 18 : 20 }}
+    />
+  )
+}
+
 function NavItemLabel({ label, compact }: { label: string; compact?: boolean }) {
   return <span className={cn("flex-1 font-medium", getNavItemTextClass(compact))}>{label}</span>
 }
 
 function NavItemCount({
   count,
+  countLoading,
   className,
   style,
   compact,
 }: {
   count?: number
+  countLoading?: boolean
   className?: string
   style?: React.CSSProperties
   compact?: boolean
 }) {
+  if (countLoading) return <SidebarLoadingCountPill compact={compact} />
   if (!hasSidebarCount(count)) return null
   return (
     <SidebarCountPill
@@ -172,6 +186,7 @@ function ClickableNavItem({
   emoji,
   label,
   count,
+  countLoading,
   isActive,
   activeClassName,
   badgeClassName,
@@ -186,6 +201,7 @@ function ClickableNavItem({
   emoji?: string | null
   label: string
   count?: number
+  countLoading?: boolean
   isActive?: boolean
   activeClassName: string
   badgeClassName?: string
@@ -206,6 +222,7 @@ function ClickableNavItem({
       <NavItemLabel label={label} compact={compact} />
       <NavItemCount
         count={count}
+        countLoading={countLoading}
         className={resolveBadgeClassName(isActive, activeBadgeClassName, badgeClassName)}
         style={resolveBadgeStyle(isActive, activeBadgeClassName, activeBadgeStyle, badgeStyle)}
         compact={compact}
@@ -214,11 +231,12 @@ function ClickableNavItem({
   )
 }
 
-export function NavItem({ icon: Icon, emoji, label, count, isActive, activeClassName = 'bg-primary/10 text-primary', badgeClassName, badgeStyle, activeBadgeClassName, activeBadgeStyle, onClick, disabled, disabledTooltip, compact }: {
+export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActive, activeClassName = 'bg-primary/10 text-primary', badgeClassName, badgeStyle, activeBadgeClassName, activeBadgeStyle, onClick, disabled, disabledTooltip, compact }: {
   icon: ComponentType<IconProps>
   emoji?: string | null
   label: string
   count?: number
+  countLoading?: boolean
   isActive?: boolean
   activeClassName?: string
   badgeClassName?: string
@@ -230,7 +248,7 @@ export function NavItem({ icon: Icon, emoji, label, count, isActive, activeClass
   disabledTooltip?: string
   compact?: boolean
 }) {
-  const padding = getNavItemPadding(compact, hasSidebarCount(count))
+  const padding = getNavItemPadding(compact, countLoading || hasSidebarCount(count))
   if (disabled) {
     return (
       <DisabledNavItem
@@ -250,6 +268,7 @@ export function NavItem({ icon: Icon, emoji, label, count, isActive, activeClass
       emoji={emoji}
       label={label}
       count={count}
+      countLoading={countLoading}
       isActive={isActive}
       activeClassName={activeClassName}
       badgeClassName={badgeClassName}

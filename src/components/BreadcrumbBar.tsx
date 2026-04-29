@@ -55,6 +55,7 @@ interface BreadcrumbBarProps {
   /** Ref for direct DOM manipulation — avoids re-render on scroll. */
   barRef?: React.Ref<HTMLDivElement>
   locale?: AppLocale
+  loadingTitle?: boolean
 }
 
 const DISABLED_ICON_STYLE = { opacity: 0.4, cursor: 'not-allowed' } as const
@@ -615,6 +616,16 @@ function FilenameCrumb({ entry, locale = 'en', onRenameFilename }: Pick<Breadcru
   )
 }
 
+function BreadcrumbTitleSkeleton() {
+  return (
+    <span
+      aria-hidden="true"
+      data-testid="breadcrumb-title-skeleton"
+      className="h-4 w-36 animate-pulse rounded bg-muted"
+    />
+  )
+}
+
 function BreadcrumbActions({
   entry,
   showDiffToggle,
@@ -664,15 +675,18 @@ function BreadcrumbActions({
 function BreadcrumbTitle({
   entry,
   locale,
+  loadingTitle,
   onRenameFilename,
-}: Pick<BreadcrumbBarProps, 'entry' | 'locale' | 'onRenameFilename'>) {
+}: Pick<BreadcrumbBarProps, 'entry' | 'locale' | 'loadingTitle' | 'onRenameFilename'>) {
   const typeLabel = entry.isA ?? 'Note'
   return (
     <div className="flex items-center gap-1.5 min-w-0 text-sm text-muted-foreground">
       <span className="shrink-0">{typeLabel}</span>
       <span className="shrink-0 text-border">›</span>
       <div className="flex min-w-0 items-center gap-1 truncate">
-        <FilenameCrumb entry={entry} locale={locale} onRenameFilename={onRenameFilename} />
+        {loadingTitle
+          ? <BreadcrumbTitleSkeleton />
+          : <FilenameCrumb entry={entry} locale={locale} onRenameFilename={onRenameFilename} />}
       </div>
     </div>
   )
@@ -682,6 +696,7 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
   entry,
   barRef,
   locale = 'en',
+  loadingTitle = false,
   onRenameFilename,
   ...actionProps
 }: BreadcrumbBarProps) {
@@ -703,7 +718,12 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
         }}
       >
         <div className="breadcrumb-bar__title min-w-0">
-          <BreadcrumbTitle entry={entry} locale={locale} onRenameFilename={onRenameFilename} />
+          <BreadcrumbTitle
+            entry={entry}
+            locale={locale}
+            loadingTitle={loadingTitle}
+            onRenameFilename={onRenameFilename}
+          />
         </div>
         <div
           aria-hidden="true"

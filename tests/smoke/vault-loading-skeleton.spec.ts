@@ -99,8 +99,16 @@ async function installSlowVaultMock(page: Page): Promise<void> {
 }
 
 async function expectResponsiveShellWhileVaultLoads(page: Page): Promise<void> {
+  await expect(page.getByTestId('sidebar-loading-favorites')).toBeVisible({ timeout: 5_000 })
   await expect(page.getByTestId('vault-loading-skeleton')).not.toBeVisible()
-  await expect(page.getByText('Select a note to start editing')).toBeVisible()
+  await expect(page.getByTestId('sidebar-top-nav')).toContainText('Inbox')
+  await expect(page.getByTestId('sidebar-loading-views')).toBeVisible()
+  await expect(page.getByTestId('sidebar-loading-types')).toBeVisible()
+  await expect(page.getByTestId('sidebar-loading-folders')).toBeVisible()
+  await expect(page.getByTestId('note-list-loading-skeleton')).toBeVisible()
+  await expect(page.getByTestId('breadcrumb-title-skeleton')).toBeVisible()
+  await expect(page.getByTestId('editor-content-skeleton')).toBeVisible()
+  await expect(page.getByText('Select a note to start editing')).not.toBeVisible()
   await expect(page.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
 
   await sendShortcut(page, 'p', ['Control'])
