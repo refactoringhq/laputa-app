@@ -6,52 +6,56 @@ import { CalendarIcon, Type, ToggleLeft, Circle, Link, Tag, Palette, Hash } from
 import { canonicalSystemMetadataKey } from './systemMetadata'
 
 export type PropertyDisplayMode = 'text' | 'number' | 'date' | 'boolean' | 'status' | 'url' | 'tags' | 'color'
+type PropertyKey = string
+type PropertyValueText = string
+type PropertyKeyPatterns = readonly PropertyKey[]
+type DisplayModeOverrides = Record<PropertyKey, PropertyDisplayMode>
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?/
-const COMMON_DATE_RE = /^\d{1,2}\/\d{1,2}\/\d{2,4}$/
+const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})(T\d{2}:\d{2}(:\d{2})?)?/
+const COMMON_DATE_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/
 
-const STATUS_VALUES = new Set([
+const STATUS_VALUES = new Set<PropertyValueText>([
   'active', 'done', 'paused', 'archived', 'dropped',
   'open', 'closed', 'not started', 'draft', 'mixed',
   'published', 'in progress', 'blocked', 'cancelled', 'pending',
 ])
 
-const STATUS_KEY_PATTERNS = ['status']
-const DATE_KEY_PATTERNS = ['date', 'deadline', 'due', 'start', 'end', 'scheduled']
-const TAGS_KEY_PATTERNS = ['tags', 'keywords', 'categories', 'labels']
+const STATUS_KEY_PATTERNS: PropertyKeyPatterns = ['status']
+const DATE_KEY_PATTERNS: PropertyKeyPatterns = ['date', 'deadline', 'due', 'start', 'end', 'scheduled']
+const TAGS_KEY_PATTERNS: PropertyKeyPatterns = ['tags', 'keywords', 'categories', 'labels']
 
-function isIconKey(key: string): boolean {
+function isIconKey(key: PropertyKey): boolean {
   return canonicalSystemMetadataKey(key) === '_icon'
 }
 
-function keyMatchesPatterns(key: string, patterns: string[]): boolean {
+function keyMatchesPatterns(key: PropertyKey, patterns: PropertyKeyPatterns): boolean {
   const lower = key.toLowerCase()
   return patterns.some(p => lower === p || lower.includes(p))
 }
 
-function isDateString(value: string): boolean {
+function isDateString(value: PropertyValueText): boolean {
   return ISO_DATE_RE.test(value) || COMMON_DATE_RE.test(value)
 }
 
-function isStatusKey(key: string): boolean {
+function isStatusKey(key: PropertyKey): boolean {
   return keyMatchesPatterns(key, STATUS_KEY_PATTERNS)
 }
 
-function isDateKey(key: string): boolean {
+function isDateKey(key: PropertyKey): boolean {
   return keyMatchesPatterns(key, DATE_KEY_PATTERNS)
 }
 
-function isStatusString(key: string, value: string): boolean {
+function isStatusString(key: PropertyKey, value: PropertyValueText): boolean {
   if (isStatusKey(key)) return true
   if (isDateKey(key)) return false
   return STATUS_VALUES.has(value.toLowerCase())
 }
 
-function isColorString(key: string, value: string): boolean {
+function isColorString(key: PropertyKey, value: PropertyValueText): boolean {
   return isValidCssColor(value) && (value.startsWith('#') || isColorKeyName(key))
 }
 
-function detectStringType(key: string, strValue: string): PropertyDisplayMode {
+function detectStringType(key: PropertyKey, strValue: PropertyValueText): PropertyDisplayMode {
   if (isIconKey(key)) return 'text'
   if (isStatusString(key, strValue)) return 'status'
   if (isDateString(strValue)) return 'date'
@@ -59,7 +63,7 @@ function detectStringType(key: string, strValue: string): PropertyDisplayMode {
   return 'text'
 }
 
-export function detectPropertyType(key: string, value: FrontmatterValue): PropertyDisplayMode {
+export function detectPropertyType(key: PropertyKey, value: FrontmatterValue): PropertyDisplayMode {
   if (value === null || value === undefined) return 'text'
   if (typeof value === 'number') return 'number'
   if (typeof value === 'boolean') return 'boolean'
@@ -69,14 +73,14 @@ export function detectPropertyType(key: string, value: FrontmatterValue): Proper
   return detectStringType(key, String(value))
 }
 
-let vaultOverrides: Record<string, PropertyDisplayMode> | null = null
+let vaultOverrides: DisplayModeOverrides | null = null
 
 /** Initialize display mode overrides from vault config (replaces localStorage). */
-export function initDisplayModeOverrides(overrides: Record<string, string>): void {
-  vaultOverrides = overrides as Record<string, PropertyDisplayMode>
+export function initDisplayModeOverrides(overrides: Record<PropertyKey, PropertyValueText>): void {
+  vaultOverrides = overrides as DisplayModeOverrides
 }
 
-export function loadDisplayModeOverrides(): Record<string, PropertyDisplayMode> {
+export function loadDisplayModeOverrides(): DisplayModeOverrides {
   if (vaultOverrides !== null) return { ...vaultOverrides }
   const raw = getAppStorageItem('propertyModes')
   if (!raw) return {}
@@ -87,60 +91,91 @@ export function loadDisplayModeOverrides(): Record<string, PropertyDisplayMode> 
   }
 }
 
-function persistDisplayModeOverrides(overrides: Record<string, PropertyDisplayMode>): void {
+function persistDisplayModeOverrides(overrides: DisplayModeOverrides): void {
   vaultOverrides = { ...overrides }
   const snapshot = Object.keys(overrides).length > 0 ? { ...overrides } : null
-  updateVaultConfigField('property_display_modes', snapshot as Record<string, string> | null)
+  updateVaultConfigField('property_display_modes', snapshot as Record<PropertyKey, PropertyValueText> | null)
 }
 
-export function saveDisplayModeOverride(propertyName: string, mode: PropertyDisplayMode): void {
+export function saveDisplayModeOverride(propertyName: PropertyKey, mode: PropertyDisplayMode): void {
   const overrides = loadDisplayModeOverrides()
   overrides[propertyName] = mode
   persistDisplayModeOverrides(overrides)
 }
 
-export function removeDisplayModeOverride(propertyName: string): void {
+export function removeDisplayModeOverride(propertyName: PropertyKey): void {
   const overrides = loadDisplayModeOverrides()
   delete overrides[propertyName]
   persistDisplayModeOverrides(overrides)
 }
 
 export function getEffectiveDisplayMode(
-  key: string,
+  key: PropertyKey,
   value: FrontmatterValue,
-  overrides: Record<string, PropertyDisplayMode>,
+  overrides: DisplayModeOverrides,
 ): PropertyDisplayMode {
   return overrides[key] ?? detectPropertyType(key, value)
 }
 
-function resolveDateFromValue(value: string): Date | null {
-  const isoMatch = value.match(ISO_DATE_RE)
-  if (isoMatch) {
-    const date = new Date(isoMatch[0])
-    return Number.isNaN(date.getTime()) ? null : date
-  }
-
-  const parts = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
-  if (!parts) return null
-
-  const date = new Date(Number(parts[3]), Number(parts[1]) - 1, Number(parts[2]))
-  return Number.isNaN(date.getTime()) ? null : date
+interface DateParts {
+  year: number
+  month: number
+  day: number
 }
 
-export function formatDateValue(value: string): string {
+function validDateParts(parts: DateParts): DateParts | null {
+  const date = dateFromParts(parts)
+  return date.getFullYear() === parts.year && date.getMonth() === parts.month - 1 && date.getDate() === parts.day
+    ? parts
+    : null
+}
+
+function parseISODateParts(value: PropertyValueText): DateParts | null {
+  const match = value.match(ISO_DATE_RE)
+  if (!match) return null
+  return validDateParts({
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  })
+}
+
+function parseCommonDateParts(value: PropertyValueText): DateParts | null {
+  const match = value.match(COMMON_DATE_RE)
+  if (!match) return null
+  return validDateParts({
+    year: Number(match[3]),
+    month: Number(match[1]),
+    day: Number(match[2]),
+  })
+}
+
+function dateFromParts(parts: DateParts): Date {
+  return new Date(parts.year, parts.month - 1, parts.day)
+}
+
+function formatISODateParts(parts: DateParts): string {
+  const yyyy = String(parts.year).padStart(4, '0')
+  const mm = String(parts.month).padStart(2, '0')
+  const dd = String(parts.day).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+function resolveDateFromValue(value: PropertyValueText): Date | null {
+  const parts = parseISODateParts(value) ?? parseCommonDateParts(value)
+  return parts ? dateFromParts(parts) : null
+}
+
+export function formatDateValue(value: PropertyValueText): PropertyValueText {
   const date = resolveDateFromValue(value)
   return date
     ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
     : value
 }
 
-export function toISODate(value: string): string {
-  const isoMatch = value.match(ISO_DATE_RE)
-  if (isoMatch) {
-    const d = new Date(isoMatch[0])
-    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0]
-  }
-  return value
+export function toISODate(value: PropertyValueText): PropertyValueText {
+  const parts = parseISODateParts(value)
+  return parts ? formatISODateParts(parts) : value
 }
 
 export const DISPLAY_MODE_ICONS: Record<PropertyDisplayMode, typeof Type> = {

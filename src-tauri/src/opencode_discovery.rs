@@ -40,11 +40,19 @@ fn version_for_binary(binary: &PathBuf) -> Option<String> {
 }
 
 fn find_binary_on_path() -> Option<PathBuf> {
-    crate::hidden_command("which")
+    crate::hidden_command(path_lookup_command())
         .arg("opencode")
         .output()
         .ok()
         .and_then(|output| path_from_successful_output(&output))
+}
+
+fn path_lookup_command() -> &'static str {
+    if cfg!(windows) {
+        "where"
+    } else {
+        "which"
+    }
 }
 
 fn find_binary_in_user_shell() -> Option<PathBuf> {
@@ -107,12 +115,26 @@ fn opencode_binary_candidates() -> Vec<PathBuf> {
 fn opencode_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
     vec![
         home.join(".local/bin/opencode"),
+        home.join(".local/bin/opencode.exe"),
         home.join(".opencode/bin/opencode"),
+        home.join(".opencode/bin/opencode.exe"),
         home.join(".local/share/mise/shims/opencode"),
+        home.join(".local/share/mise/shims/opencode.exe"),
         home.join(".asdf/shims/opencode"),
+        home.join(".asdf/shims/opencode.exe"),
         home.join(".npm-global/bin/opencode"),
+        home.join(".npm-global/bin/opencode.cmd"),
+        home.join(".npm-global/bin/opencode.exe"),
         home.join(".npm/bin/opencode"),
+        home.join(".npm/bin/opencode.cmd"),
+        home.join(".npm/bin/opencode.exe"),
         home.join(".bun/bin/opencode"),
+        home.join(".bun/bin/opencode.exe"),
+        home.join("AppData/Roaming/npm/opencode.cmd"),
+        home.join("AppData/Roaming/npm/opencode.exe"),
+        home.join("AppData/Local/pnpm/opencode.cmd"),
+        home.join("AppData/Local/pnpm/opencode.exe"),
+        home.join("scoop/shims/opencode.exe"),
         PathBuf::from("/usr/local/bin/opencode"),
         PathBuf::from("/opt/homebrew/bin/opencode"),
     ]
@@ -143,6 +165,38 @@ mod tests {
                 candidate.display()
             );
         }
+    }
+
+    #[test]
+    fn binary_candidates_include_windows_npm_and_toolchain_shims() {
+        let home = PathBuf::from(r"C:\Users\alex");
+        let candidates = opencode_binary_candidates_for_home(&home);
+        let expected = [
+            home.join(".npm-global/bin/opencode.cmd"),
+            home.join(".npm-global/bin/opencode.exe"),
+            home.join(".npm/bin/opencode.cmd"),
+            home.join(".npm/bin/opencode.exe"),
+            home.join("AppData/Roaming/npm/opencode.cmd"),
+            home.join("AppData/Roaming/npm/opencode.exe"),
+            home.join("AppData/Local/pnpm/opencode.cmd"),
+            home.join("AppData/Local/pnpm/opencode.exe"),
+            home.join("scoop/shims/opencode.exe"),
+        ];
+
+        for candidate in expected {
+            assert!(
+                candidates.contains(&candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    #[test]
+    fn path_lookup_command_matches_current_platform() {
+        let expected = if cfg!(windows) { "where" } else { "which" };
+
+        assert_eq!(path_lookup_command(), expected);
     }
 
     #[test]
