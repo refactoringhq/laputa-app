@@ -1,6 +1,15 @@
 --- a/dist/defaultBlocks-DE5GNdJH.js
 +++ b/dist/defaultBlocks-DE5GNdJH.js
-@@ -2651,17 +2651,23 @@
+@@ -1120,6 +1120,8 @@
+         ), i.value = t.props.language || e.defaultLanguage || "text", n.isEditable) {
+           const l = (u) => {
+             const d = u.target.value;
++            if (!n.getBlock(t.id))
++              return;
+             n.updateBlock(t.id, { props: { language: d } });
+           };
+           i.addEventListener("change", l), s = () => i.removeEventListener("change", l);
+@@ -2651,17 +2653,23 @@
      if (!a && !(o !== void 0 && r !== void 0) && !s)
        return;
      if (this.pluginState = s ? o : r, s || !this.editor.isEditable) {
@@ -27,7 +36,7 @@
    }
    destroy() {
      var t;
-@@ -2761,7 +2768,7 @@
+@@ -2761,7 +2770,7 @@
              if (a === s) {
                const c = r.state.doc;
                for (const l of t) {
@@ -36,6 +45,21 @@
                  if (l === u)
                    return r.dispatch(r.state.tr.insertText(i)), r.dispatch(
                      r.state.tr.setMeta(B, {
+--- a/src/blocks/Code/block.ts
++++ b/src/blocks/Code/block.ts
+@@ -132,7 +132,11 @@
+         if (editor.isEditable) {
+           const handleLanguageChange = (event: Event) => {
+             const language = (event.target as HTMLSelectElement).value;
+-
++
++            if (!editor.getBlock(block.id)) {
++              return;
++            }
++
+             editor.updateBlock(block.id, { props: { language } });
+           };
+           select.addEventListener("change", handleLanguageChange);
 --- a/src/editor/managers/ExtensionManager/extensions.ts
 +++ b/src/editor/managers/ExtensionManager/extensions.ts
 @@ -84,7 +84,8 @@
