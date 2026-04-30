@@ -28,11 +28,11 @@ interface EditorSaveConfig {
 
 /**
  * Hook that manages editor content persistence with auto-save.
- * Content is auto-saved 500ms after the last edit. Cmd+S flushes immediately.
+ * Content is auto-saved after a short idle window. Cmd+S flushes immediately.
  */
 const noop = () => {}
 
-const AUTO_SAVE_DEBOUNCE_MS = 500
+export const AUTO_SAVE_DEBOUNCE_MS = 1_500
 export const MISSING_ACTIVE_VAULT_SAVE_MESSAGE = 'Select or restore a vault before saving.'
 type Translator = ReturnType<typeof createTranslator>
 
@@ -90,24 +90,31 @@ function matchesPendingPath(
   return resolveBufferedPath(pending.path, resolvePath) === resolveBufferedPath(pathFilter, resolvePath)
 }
 
+function matchesPendingContent(
+  pending: PendingContent | null,
+  path: string,
+  content: string,
+  resolvePath?: EditorSaveConfig['resolvePath'],
+): pending is PendingContent {
+  return matchesPendingPath(pending, path, resolvePath) && pending.content === content
+}
+
 async function persistResolvedContent({
   path,
   content,
   saveNote,
-  onNotePersisted,
   resolvePath,
   resolvePathBeforeSave,
 }: {
   path: string
   content: string
   saveNote: (path: string, content: string) => Promise<void>
-  onNotePersisted?: EditorSaveConfig['onNotePersisted']
   resolvePath?: EditorSaveConfig['resolvePath']
   resolvePathBeforeSave?: EditorSaveConfig['resolvePathBeforeSave']
-}): Promise<void> {
+}): Promise<string> {
   const targetPath = await resolvePersistPath(path, resolvePath, resolvePathBeforeSave)
   await saveNote(targetPath, content)
-  onNotePersisted?.(targetPath, content)
+  return targetPath
 }
 
 function applyTabContent(
@@ -171,15 +178,18 @@ function usePendingContentFlush({
     if (!matchesPendingPath(pending, pathFilter, resolvePath)) return false
     if (!canPersistRef.current) return false
     const { path, content } = pending
-    await persistResolvedContent({
+    const targetPath = await persistResolvedContent({
       path,
       content,
       saveNote,
-      onNotePersisted,
       resolvePath,
       resolvePathBeforeSave,
     })
+    if (!matchesPendingContent(pendingContentRef.current, targetPath, content, resolvePath)) {
+      return false
+    }
     pendingContentRef.current = null
+    onNotePersisted?.(targetPath, content)
     return true
   }, [canPersistRef, onNotePersisted, pendingContentRef, resolvePath, resolvePathBeforeSave, saveNote])
 }
@@ -209,14 +219,14 @@ async function persistUnsavedFallback({
   resolvePathBeforeSave?: EditorSaveConfig['resolvePathBeforeSave']
 }): Promise<boolean> {
   if (!unsavedFallback) return false
-  await persistResolvedContent({
+  const targetPath = await persistResolvedContent({
     path: unsavedFallback.path,
     content: unsavedFallback.content,
     saveNote,
-    onNotePersisted,
     resolvePath,
     resolvePathBeforeSave,
   })
+  onNotePersisted?.(targetPath, unsavedFallback.content)
   return true
 }
 
@@ -464,9 +474,15 @@ export function useEditorSave({
   const disabledSaveText = disabledSaveMessage ?? t('save.toast.missingActiveVault')
 
   const updateTabAndContent = useCallback((path: string, content: string) => {
+    if (
+      pendingContentRef.current
+      && !matchesPendingContent(pendingContentRef.current, path, content, resolvePath)
+    ) {
+      return
+    }
     updateVaultContent(path, content)
     applyTabContent(setTabs, path, content)
-  }, [updateVaultContent, setTabs])
+  }, [pendingContentRef, resolvePath, updateVaultContent, setTabs])
 
   const { saveNote } = useSaveNote(updateTabAndContent)
   const onAfterSaveRef = useOnAfterSaveRef(onAfterSave)
