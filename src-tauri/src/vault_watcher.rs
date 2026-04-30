@@ -162,6 +162,82 @@ mod desktop {
         *active = None;
         Ok(())
     }
+
+    #[cfg(test)]
+    mod tests {
+        use notify::event::{AccessKind, CreateKind, EventAttributes};
+        use notify::{Event, EventKind};
+
+        use super::*;
+
+        fn event(kind: EventKind, paths: &[&str]) -> Event {
+            Event {
+                kind,
+                paths: paths.iter().map(PathBuf::from).collect(),
+                attrs: EventAttributes::default(),
+            }
+        }
+
+        #[test]
+        fn validate_vault_path_accepts_existing_directories_only() {
+            let dir = tempfile::TempDir::new().unwrap();
+
+            assert_eq!(
+                validate_vault_path(dir.path().to_path_buf()).unwrap(),
+                dir.path()
+            );
+            assert_eq!(
+                validate_vault_path(PathBuf::new()).unwrap_err(),
+                "Vault path is required"
+            );
+            assert!(validate_vault_path(dir.path().join("missing"))
+                .unwrap_err()
+                .contains("Vault path is not a directory"));
+        }
+
+        #[test]
+        fn changed_paths_ignores_access_events() {
+            let paths = changed_paths(event(
+                EventKind::Access(AccessKind::Read),
+                &["notes/today.md"],
+            ));
+
+            assert!(paths.is_empty());
+        }
+
+        #[test]
+        fn changed_paths_filters_unwatchable_paths() {
+            let paths = changed_paths(event(
+                EventKind::Create(CreateKind::File),
+                &[
+                    ".git/index.lock",
+                    "node_modules/pkg/index.js",
+                    "notes/today.md",
+                ],
+            ));
+
+            assert_eq!(paths, vec!["notes/today.md"]);
+        }
+
+        #[test]
+        fn changed_paths_filters_editor_temporary_files() {
+            let paths = changed_paths(event(
+                EventKind::Create(CreateKind::File),
+                &[
+                    ".DS_Store",
+                    ".tolaria-rename-txn",
+                    ".#draft.md",
+                    "draft.md~",
+                    "draft.tmp",
+                    "draft.swp",
+                    "draft.swx",
+                    "notes/keep.md",
+                ],
+            ));
+
+            assert_eq!(paths, vec!["notes/keep.md"]);
+        }
+    }
 }
 
 #[cfg(not(desktop))]

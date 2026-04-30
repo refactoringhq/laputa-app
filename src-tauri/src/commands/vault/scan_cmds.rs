@@ -112,8 +112,18 @@ pub async fn search_vault(
 
 #[cfg(test)]
 mod tests {
-    use super::{collect_registered_vault_roots, find_registered_vault_root};
+    use super::{
+        collect_registered_vault_roots, find_registered_vault_root, reload_vault_entry,
+        resolve_reload_vault_path, search_vault,
+    };
     use crate::vault_list::{VaultEntry as VaultListEntry, VaultList};
+    use std::path::{Path, PathBuf};
+
+    fn write_note(root: &Path, name: &str, content: &str) -> std::path::PathBuf {
+        let path = root.join(name);
+        std::fs::write(&path, content).unwrap();
+        path
+    }
 
     #[test]
     fn finds_registered_vault_root_for_an_absolute_note_path() {
@@ -172,5 +182,110 @@ mod tests {
             find_registered_vault_root(canonical_note_path.as_path(), &registered_roots),
             Some(nested_root),
         );
+    }
+
+    #[test]
+    fn find_registered_vault_root_ignores_missing_registered_roots() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let vault_root = dir.path().join("vault");
+        std::fs::create_dir_all(&vault_root).unwrap();
+        let note_path = write_note(&vault_root, "note.md", "# Note\n");
+        let registered_roots = vec![dir.path().join("missing"), vault_root.clone()];
+        let canonical_note_path = note_path.canonicalize().unwrap();
+
+        assert_eq!(
+            find_registered_vault_root(canonical_note_path.as_path(), &registered_roots),
+            Some(vault_root),
+        );
+    }
+
+    #[test]
+    fn collect_registered_vault_roots_includes_active_vault() {
+        let vault_list = VaultList {
+            vaults: vec![VaultListEntry {
+                label: "Listed".to_string(),
+                path: "/listed".to_string(),
+            }],
+            active_vault: Some("/active".to_string()),
+            hidden_defaults: vec![],
+        };
+
+        let roots = collect_registered_vault_roots(&vault_list);
+
+        assert_eq!(
+            roots,
+            vec![PathBuf::from("/listed"), PathBuf::from("/active")]
+        );
+    }
+
+    #[test]
+    fn resolve_reload_vault_path_uses_explicit_vault_path() {
+        let explicit = Path::new("/tmp/vault");
+
+        assert_eq!(
+            resolve_reload_vault_path(Path::new("note.md"), Some(explicit)).unwrap(),
+            Some(explicit.to_path_buf()),
+        );
+    }
+
+    #[test]
+    fn resolve_reload_vault_path_skips_relative_note_paths() {
+        assert_eq!(
+            resolve_reload_vault_path(Path::new("note.md"), None).unwrap(),
+            None,
+        );
+    }
+
+    #[test]
+    fn reload_vault_entry_command_reads_note_inside_vault() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let note_path = write_note(dir.path(), "note.md", "# Reloaded Title\n\nBody");
+
+        let entry = reload_vault_entry(note_path, Some(dir.path().to_path_buf())).unwrap();
+
+        assert_eq!(entry.title, "Reloaded Title");
+    }
+
+    #[tokio::test]
+    async fn search_vault_command_uses_default_limit_and_returns_results() {
+        let dir = tempfile::Builder::new()
+            .prefix("scan-search-")
+            .tempdir_in(std::env::current_dir().unwrap())
+            .unwrap();
+        write_note(dir.path(), "search.md", "# Searchable\n\nneedle");
+
+        let response = search_vault(
+            dir.path().to_string_lossy().into_owned(),
+            "needle".to_string(),
+            "keyword".to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(response.results.len(), 1);
+        assert_eq!(response.results[0].title, "Searchable");
+        assert_eq!(response.mode, "keyword");
+    }
+
+    #[tokio::test]
+    async fn search_vault_command_honors_explicit_limit() {
+        let dir = tempfile::Builder::new()
+            .prefix("scan-search-limit-")
+            .tempdir_in(std::env::current_dir().unwrap())
+            .unwrap();
+        write_note(dir.path(), "first.md", "# First\n\nneedle");
+        write_note(dir.path(), "second.md", "# Second\n\nneedle");
+
+        let response = search_vault(
+            dir.path().to_string_lossy().into_owned(),
+            "needle".to_string(),
+            "keyword".to_string(),
+            Some(1),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(response.results.len(), 1);
     }
 }
