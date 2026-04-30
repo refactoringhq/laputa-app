@@ -173,8 +173,8 @@ files:
     customize.done: f92965e2c8a7afb3c1b9a5c09a263636
     viewDialog.title.create: 01e53f288ebe0b7bdda19c8151aa7710
     viewDialog.title.edit: 6369f1c063cb2c22efa584a19e98d97f
-    viewDialog.description.create: bd77a64c89e304ee2c4ef4abc3636cfe
-    viewDialog.description.edit: 7fa9ed9a54624ea91cdcdfc139090a24
+    viewDialog.description.create: a9600940be61edfcad2b47fb72965406
+    viewDialog.description.edit: d4e6333950d5031c5f4ae766a1f1d886
     viewDialog.nameLabel: 49ee3087348e8d44e1feda1917443987
     viewDialog.namePlaceholder: dbb077d36957a33c4147eb24919192e1
     viewDialog.filtersLabel: f3f43e30c8c7d78c6ac0173515e57a00
@@ -255,6 +255,7 @@ files:
     sidebar.group.folders: d86e2756f698bea5aac3e2276639f042
     sidebar.action.createView: ba019414ea8c7fcdb4a83a70ec1bb639
     sidebar.action.editView: acdf34bd08b0692b906d446e590b1eb9
+    sidebar.action.renameView: 429b903fddf39bb21887282d188c4b62
     sidebar.action.deleteView: c8f4f9cd8ff820f955474e5c9f70ff39
     sidebar.action.reorderView: ca2f42548fd57160d22fd0809bf8ed6e
     sidebar.action.moveViewUp: e601b7f0901f12efb71f7821c0fdb79e
@@ -274,6 +275,7 @@ files:
     sidebar.action.copyFolderPathMenu: 1779ec6018a385912c1a5499a1bbf2b2
     sidebar.action.renameFolderMenu: deb1d8fa030292e7eda2c244b313aca2
     sidebar.action.deleteFolderMenu: c78c889ac7396dc148fc859c9221e545
+    sidebar.view.name: 67b904f75d1872abba088a3442caff40
     sidebar.folder.name: 710417c4e57a6a01500fe4c0c448ce3d
     sidebar.folder.newName: e0ad5b2db20359a85de80c1231323bea
     sidebar.folder.expand: b7545cb143816942ff096d890090fb6f

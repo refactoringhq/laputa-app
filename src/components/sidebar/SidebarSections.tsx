@@ -1,7 +1,9 @@
 import {
   type Dispatch, type Ref, type RefObject, type SetStateAction,
 } from 'react'
-import type { VaultEntry, SidebarSelection, ViewFile } from '../../types'
+import type {
+  VaultEntry, SidebarSelection, ViewDefinition, ViewFile,
+} from '../../types'
 import {
   DndContext, closestCenter, useSensors, type DragEndEvent,
 } from '@dnd-kit/core'
@@ -53,6 +55,7 @@ export function ViewsSection({
   onCreateView,
   onEditView,
   onDeleteView,
+  onUpdateViewDefinition,
   onReorderViews,
   sensors,
   entries,
@@ -66,6 +69,7 @@ export function ViewsSection({
   onCreateView?: () => void
   onEditView?: (filename: string) => void
   onDeleteView?: (filename: string) => void
+  onUpdateViewDefinition?: (filename: string, patch: Partial<ViewDefinition>) => void
   onReorderViews?: (orderedFilenames: string[]) => void
   sensors: ReturnType<typeof useSensors>
   entries: VaultEntry[]
@@ -86,6 +90,7 @@ export function ViewsSection({
       onSelect={() => onSelect({ kind: 'view', filename: view.filename })}
       onEditView={onEditView}
       onDeleteView={onDeleteView}
+      onUpdateViewDefinition={onUpdateViewDefinition}
       entries={entries}
       locale={locale}
     />
@@ -121,6 +126,7 @@ export function ViewsSection({
                     onSelect={onSelect}
                     onEditView={onEditView}
                     onDeleteView={onDeleteView}
+                    onUpdateViewDefinition={onUpdateViewDefinition}
                     entries={entries}
                     locale={locale}
                   />
@@ -140,6 +146,7 @@ function SortableViewItem({
   onSelect,
   onEditView,
   onDeleteView,
+  onUpdateViewDefinition,
   entries,
   locale,
 }: {
@@ -148,6 +155,7 @@ function SortableViewItem({
   onSelect: (selection: SidebarSelection) => void
   onEditView?: (filename: string) => void
   onDeleteView?: (filename: string) => void
+  onUpdateViewDefinition?: (filename: string, patch: Partial<ViewDefinition>) => void
   entries: VaultEntry[]
   locale?: AppLocale
 }) {
@@ -169,6 +177,7 @@ function SortableViewItem({
         onSelect={() => onSelect({ kind: 'view', filename: view.filename })}
         onEditView={onEditView}
         onDeleteView={onDeleteView}
+        onUpdateViewDefinition={onUpdateViewDefinition}
         dragHandleProps={listeners}
         entries={entries}
         locale={locale}

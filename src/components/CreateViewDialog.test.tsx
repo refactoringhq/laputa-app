@@ -45,6 +45,9 @@ describe('CreateViewDialog', () => {
     const editingView = makeEditingView({ name: 'Monday', icon: 'folder', color: 'blue' })
     render(<CreateViewDialog {...defaultProps} onCreate={onCreate} editingView={editingView} />)
 
+    expect(screen.queryByText('Color')).not.toBeInTheDocument()
+    expect(screen.queryByText('Icon')).not.toBeInTheDocument()
+
     // Submit the form without changing anything
     fireEvent.submit(screen.getByText('Save').closest('form')!)
 
@@ -55,21 +58,22 @@ describe('CreateViewDialog', () => {
     })
   })
 
-  it('passes selected icon and color when creating a view', async () => {
+  it('keeps appearance controls out of the create dialog', async () => {
     const onCreate = vi.fn()
     render(<CreateViewDialog {...defaultProps} onCreate={onCreate} />)
     const input = screen.getByPlaceholderText(/Active Projects|Reading List/i)
     fireEvent.change(input, { target: { value: 'Test View' } })
-    fireEvent.change(screen.getByPlaceholderText('Search icons…'), { target: { value: 'book' } })
-    fireEvent.click(screen.getByTitle('book'))
-    fireEvent.click(screen.getByTitle('Blue'))
+
+    expect(screen.queryByPlaceholderText('Search icons…')).not.toBeInTheDocument()
+    expect(screen.queryByText('Color')).not.toBeInTheDocument()
+    expect(screen.queryByText('Icon')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByText('Create'))
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
     const definition = onCreate.mock.calls[0][0] as ViewDefinition
-    expect(definition.icon).toBe('book')
-    expect(definition.color).toBe('blue')
+    expect(definition.icon).toBeNull()
+    expect(definition.color).toBeNull()
   })
 
   it('passes null icon and color when no appearance is selected', async () => {
