@@ -7,6 +7,7 @@ export type McpStatus = 'checking' | 'installed' | 'not_installed'
 type ManualConfigSnippet = string
 type McpCommand =
   | 'check_mcp_status'
+  | 'copy_text_to_clipboard'
   | 'get_mcp_config_snippet'
   | 'register_mcp_tools'
   | 'remove_mcp_tools'
@@ -72,6 +73,11 @@ function visibleManualConfig(
 }
 
 async function writeClipboardText(value: ManualConfigSnippet, t: Translator): Promise<void> {
+  if (isTauri()) {
+    await tauriCall('copy_text_to_clipboard', { text: value })
+    return
+  }
+
   if (!navigator.clipboard?.writeText) {
     throw new Error(t('mcp.error.clipboardUnavailable'))
   }
