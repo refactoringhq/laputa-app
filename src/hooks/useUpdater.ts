@@ -18,6 +18,7 @@ interface UpdateVersionInfo {
 
 export type UpdateStatus =
   | { state: 'idle' }
+  | { state: 'checking' }
   | ({ state: 'available'; notes: string | undefined } & UpdateVersionInfo)
   | ({ state: 'downloading'; progress: number } & UpdateVersionInfo)
   | ({ state: 'ready' } & UpdateVersionInfo)
@@ -111,6 +112,8 @@ export function useUpdater(
   const checkForUpdates = useCallback(async (): Promise<UpdateCheckResult> => {
     if (!isTauri()) return { kind: 'up-to-date' }
 
+    setStatus({ state: 'checking' })
+
     try {
       const update = await checkForAppUpdate(releaseChannel)
       if (!update) {
@@ -125,6 +128,7 @@ export function useUpdater(
       return { kind: 'available', ...versionInfo }
     } catch (error) {
       console.warn('[updater] Failed to check for updates')
+      setStatus({ state: 'error' })
       return { kind: 'error', message: buildUpdateCheckErrorMessage(error) }
     }
   }, [releaseChannel])

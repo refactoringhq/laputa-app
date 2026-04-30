@@ -72,6 +72,14 @@ describe('TypeCustomizePopover', () => {
     expect(screen.getByText('Done')).toBeInTheDocument()
   })
 
+  it('can hide the template and Done controls for inline appearance editing', () => {
+    renderPopover({ showTemplate: false, showDone: false, surface: 'inline' })
+    expect(screen.getByText('Color')).toBeInTheDocument()
+    expect(screen.getByText('Icon')).toBeInTheDocument()
+    expect(screen.queryByText('Template')).not.toBeInTheDocument()
+    expect(screen.queryByText('Done')).not.toBeInTheDocument()
+  })
+
   it('renders search input', () => {
     renderPopover()
     expect(screen.getByPlaceholderText('Search icons…')).toBeInTheDocument()

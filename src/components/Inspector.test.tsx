@@ -634,6 +634,29 @@ Status: Active
       expect(onInit).toHaveBeenCalledWith('/vault/plain-note.md')
     })
 
+    it('does not offer frontmatter initialization for binary attachments', () => {
+      const onInit = vi.fn()
+      const attachmentEntry: VaultEntry = {
+        ...noFrontmatterEntry,
+        path: '/vault/attachments/screenshot.png',
+        filename: 'screenshot.png',
+        title: 'screenshot.png',
+        fileKind: 'binary',
+      }
+
+      render(
+        <Inspector
+          {...defaultProps}
+          entry={attachmentEntry}
+          content=""
+          onInitializeProperties={onInit}
+        />
+      )
+
+      expect(screen.queryByText('Initialize properties')).not.toBeInTheDocument()
+      expect(onInit).not.toHaveBeenCalled()
+    })
+
     it('shows invalid frontmatter notice with fix button', () => {
       render(
         <Inspector

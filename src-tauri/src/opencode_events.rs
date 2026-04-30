@@ -19,13 +19,22 @@ where
         emit_session_event(json, emit);
     }
 
-    match json["type"].as_str().unwrap_or_default() {
+    match event_type(json) {
         "message" | "text" => emit_text(json, emit),
         "reasoning" => emit_reasoning(json, emit),
         "tool_use" | "tool" => emit_tool_start(json, emit),
         "tool_result" | "tool_done" => emit_tool_done(json, emit),
         "error" => emit_error_event(json, emit),
         _ => {}
+    }
+}
+
+fn event_type(json: &serde_json::Value) -> &str {
+    let direct = json["type"].as_str().unwrap_or_default();
+    match direct {
+        "session" | "message" | "text" | "reasoning" | "tool_use" | "tool" | "tool_result"
+        | "tool_done" | "error" => direct,
+        _ => json["part"]["type"].as_str().unwrap_or(direct),
     }
 }
 

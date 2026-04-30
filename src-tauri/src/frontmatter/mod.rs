@@ -9,15 +9,36 @@ use std::path::Path;
 pub use ops::update_frontmatter_content;
 pub use yaml::{format_yaml_key, FrontmatterValue};
 
+fn is_markdown_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("md") || extension.eq_ignore_ascii_case("markdown")
+        })
+}
+
+fn validate_frontmatter_path(path: &str, file_path: &Path) -> Result<(), String> {
+    if !file_path.exists() {
+        return Err(format!("File does not exist: {}", path));
+    }
+
+    if !is_markdown_path(file_path) {
+        return Err(format!(
+            "Frontmatter can only be updated on Markdown notes: {}",
+            path
+        ));
+    }
+
+    Ok(())
+}
+
 /// Helper to read a file, apply a frontmatter transformation, and write back.
 pub fn with_frontmatter<F>(path: &str, transform: F) -> Result<String, String>
 where
     F: FnOnce(&str) -> Result<String, String>,
 {
     let file_path = Path::new(path);
-    if !file_path.exists() {
-        return Err(format!("File does not exist: {}", path));
-    }
+    validate_frontmatter_path(path, file_path)?;
 
     let content =
         fs::read_to_string(file_path).map_err(|e| format!("Failed to read {}: {}", path, e))?;
@@ -56,6 +77,25 @@ mod tests {
         let result = with_frontmatter("/nonexistent/path/file.md", |c| Ok(c.to_string()));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("does not exist"));
+    }
+
+    #[test]
+    fn test_update_frontmatter_rejects_binary_attachment_before_utf8_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let attachment_dir = dir.path().join("attachments");
+        fs::create_dir_all(&attachment_dir).unwrap();
+        let attachment_path = attachment_dir.join("screenshot.png");
+        fs::write(&attachment_path, [0xff, 0xfe, 0xfd]).unwrap();
+
+        let err = update_frontmatter(
+            attachment_path.to_str().unwrap(),
+            "Status",
+            FrontmatterValue::String("Done".to_string()),
+        )
+        .unwrap_err();
+
+        assert!(err.contains("Frontmatter can only be updated on Markdown notes"));
+        assert!(err.contains("screenshot.png"));
     }
 
     #[test]
