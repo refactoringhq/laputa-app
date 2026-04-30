@@ -25,20 +25,21 @@ pub(super) fn slug_to_title(stem: &str) -> String {
 /// Returns `None` if no H1 is found on the first non-empty line.
 pub(super) fn extract_h1_title(content: &str) -> Option<String> {
     let body = strip_frontmatter(content);
-    for line in body.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        if let Some(title) = trimmed.strip_prefix("# ") {
-            let title = strip_markdown_chars(title).trim().to_string();
-            if !title.is_empty() {
-                return Some(title);
-            }
-        }
-        break; // first non-empty line is not H1
-    }
-    None
+    let title = first_non_empty_line(body).and_then(markdown_h1_text)?;
+    non_empty_trimmed(&strip_markdown_chars(title)).map(str::to_string)
+}
+
+fn non_empty_trimmed(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then_some(trimmed)
+}
+
+fn first_non_empty_line(value: &str) -> Option<&str> {
+    value.lines().map(str::trim).find(|line| !line.is_empty())
+}
+
+fn markdown_h1_text(line: &str) -> Option<&str> {
+    line.strip_prefix("# ").and_then(non_empty_trimmed)
 }
 
 /// Extract the display title for a note.
@@ -174,16 +175,17 @@ pub(super) fn extract_snippet(content: &str) -> String {
 }
 
 fn without_h1_line(s: &str) -> Option<&str> {
-    for (i, line) in s.lines().enumerate() {
-        if line.trim().starts_with("# ") {
-            // Return everything after this line
-            let offset: usize = s.lines().take(i + 1).map(|l| l.len() + 1).sum();
-            return Some(&s[offset.min(s.len())..]);
+    let mut offset = 0;
+    for line in s.split_inclusive('\n') {
+        let trimmed = line.trim_end_matches(['\r', '\n']).trim();
+        if trimmed.starts_with("# ") {
+            return Some(&s[offset + line.len()..]);
         }
         // If we hit non-empty non-heading content first, there's no H1 to skip
-        if !line.trim().is_empty() {
+        if !trimmed.is_empty() {
             return None;
         }
+        offset += line.len();
     }
     None
 }
@@ -607,6 +609,16 @@ mod tests {
             "paragraph content should be preferred over headings, got: {}",
             snippet
         );
+    }
+
+    #[test]
+    fn test_extract_snippet_crlf_chinese_h1_table_content() {
+        let content =
+            "\r\n\r\n# 上海复盘\r\n\r\n| 指标 | 值 |\r\n| --- | --- |\r\n| 收入 | 增长 |\r\n\r\n正文包含中文字符。";
+        let snippet = extract_snippet(content);
+
+        assert!(snippet.contains("指标"));
+        assert!(snippet.contains("正文包含中文字符"));
     }
 
     // --- count_body_words tests ---
