@@ -295,6 +295,8 @@ export interface SectionContentProps {
   renameInitialValue?: string
   onRenameSubmit?: (value: string) => void
   onRenameCancel?: () => void
+  onStartRename?: (type: string) => void
+  onSelectTypeNote?: (type: string) => void
   locale?: AppLocale
 }
 
@@ -302,6 +304,7 @@ export function SectionContent({
   group, itemCount, selection, onSelect,
   onContextMenu, dragHandleProps,
   isRenaming, renameInitialValue, onRenameSubmit, onRenameCancel, locale,
+  onStartRename, onSelectTypeNote,
 }: SectionContentProps) {
   const { label, type, Icon, customColor } = group
   const { sectionColor, sectionLightColor } = resolveSectionColors(type, customColor)
@@ -320,6 +323,8 @@ export function SectionContent({
       renameInitialValue={renameInitialValue}
       onRenameSubmit={onRenameSubmit}
       onRenameCancel={onRenameCancel}
+      onStartRename={onStartRename ? () => onStartRename(type) : undefined}
+      onSelectTypeNote={onSelectTypeNote ? () => onSelectTypeNote(type) : undefined}
       locale={locale}
     />
   )
@@ -405,6 +410,7 @@ function SectionHeaderLabel({
   renameInitialValue,
   onRenameSubmit,
   onRenameCancel,
+  onStartRename,
   locale,
 }: {
   type: string
@@ -415,6 +421,7 @@ function SectionHeaderLabel({
   renameInitialValue?: string
   onRenameSubmit?: (value: string) => void
   onRenameCancel?: () => void
+  onStartRename?: () => void
   locale?: AppLocale
 }) {
   const inlineRenameHandlers = resolveInlineRenameHandlers({
@@ -435,7 +442,18 @@ function SectionHeaderLabel({
     )
   }
 
-  return <span className="text-[13px] font-medium" style={{ marginLeft: 4, color: getSectionHeaderTitleColor(isActive, sectionColor) }}>{label}</span>
+  return (
+    <span
+      className="min-w-0 truncate text-[13px] font-medium"
+      style={{ marginLeft: 4, color: getSectionHeaderTitleColor(isActive, sectionColor) }}
+      onDoubleClick={(event) => {
+        event.stopPropagation()
+        onStartRename?.()
+      }}
+    >
+      {label}
+    </span>
+  )
 }
 
 function SectionHeaderCountPill({
@@ -457,13 +475,14 @@ function SectionHeaderCountPill({
   )
 }
 
-function SectionHeader({ label, type, Icon, sectionColor, sectionLightColor, itemCount, isActive, onSelect, onContextMenu, dragHandleProps, isRenaming, renameInitialValue, onRenameSubmit, onRenameCancel, locale }: {
+function SectionHeader({ label, type, Icon, sectionColor, sectionLightColor, itemCount, isActive, onSelect, onContextMenu, dragHandleProps, isRenaming, renameInitialValue, onRenameSubmit, onRenameCancel, onStartRename, onSelectTypeNote, locale }: {
   label: string; type: string; Icon: ComponentType<IconProps>
   sectionColor: string; sectionLightColor: string; itemCount: number; isActive: boolean
   onSelect: () => void; onContextMenu: (e: React.MouseEvent) => void
   dragHandleProps?: Record<string, unknown>
   isRenaming?: boolean; renameInitialValue?: string
   onRenameSubmit?: (value: string) => void; onRenameCancel?: () => void
+  onStartRename?: () => void; onSelectTypeNote?: () => void
   locale?: AppLocale
 }) {
   return (
@@ -473,6 +492,7 @@ function SectionHeader({ label, type, Icon, sectionColor, sectionLightColor, ite
       {...dragHandleProps}
       onClick={getSectionSelectHandler(isRenaming, onSelect)}
       onContextMenu={getSectionContextMenuHandler(isRenaming, onContextMenu)}
+      onDoubleClick={!isRenaming ? onSelectTypeNote : undefined}
     >
       <div className="flex min-w-0 flex-1 items-center" style={{ gap: 4 }}>
         <Icon size={16} weight={getSectionHeaderIconWeight(isActive)} style={{ color: sectionColor, flexShrink: 0 }} />
@@ -485,10 +505,13 @@ function SectionHeader({ label, type, Icon, sectionColor, sectionLightColor, ite
           renameInitialValue={renameInitialValue}
           onRenameSubmit={onRenameSubmit}
           onRenameCancel={onRenameCancel}
+          onStartRename={onStartRename}
           locale={locale}
         />
       </div>
-      <SectionHeaderCountPill itemCount={itemCount} isActive={isActive} sectionColor={sectionColor} />
+      {!isRenaming && (
+        <SectionHeaderCountPill itemCount={itemCount} isActive={isActive} sectionColor={sectionColor} />
+      )}
     </div>
   )
 }

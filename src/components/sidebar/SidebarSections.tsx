@@ -11,7 +11,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { SlidersHorizontal } from 'lucide-react'
 import {
-  CaretLeft, Plus,
+  CaretLeft, Palette, PencilSimple, Plus, Trash,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -39,6 +39,8 @@ export interface SidebarSectionProps {
   renameInitialValue: string
   onRenameSubmit: (value: string) => void
   onRenameCancel: () => void
+  onStartRename: (type: string) => void
+  onSelectTypeNote: (type: string) => void
   locale?: AppLocale
 }
 
@@ -197,6 +199,8 @@ function SortableSection({
       renameInitialValue={isRenaming ? sectionProps.renameInitialValue : undefined}
       onRenameSubmit={sectionProps.onRenameSubmit}
       onRenameCancel={sectionProps.onRenameCancel}
+      onStartRename={sectionProps.onStartRename}
+      onSelectTypeNote={sectionProps.onSelectTypeNote}
       locale={sectionProps.locale}
     />
   )
@@ -362,6 +366,7 @@ export function ContextMenuOverlay({
   innerRef,
   onOpenCustomize,
   onStartRename,
+  onDelete,
   locale = 'en',
 }: {
   pos: { x: number; y: number } | null
@@ -369,11 +374,12 @@ export function ContextMenuOverlay({
   innerRef: Ref<HTMLDivElement>
   onOpenCustomize: (type: string) => void
   onStartRename: (type: string) => void
+  onDelete: (type: string) => void
   locale?: AppLocale
 }) {
   if (!pos || !type) return null
 
-  const buttonClass = 'flex w-full items-center gap-2 rounded-sm border-none bg-transparent px-2 py-1.5 text-left text-sm cursor-default transition-colors hover:bg-accent hover:text-accent-foreground'
+  const buttonClass = 'h-auto w-full justify-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm font-normal'
 
   return (
     <div
@@ -381,12 +387,25 @@ export function ContextMenuOverlay({
       className="fixed z-50 rounded-md border bg-popover p-1 shadow-md"
       style={{ left: pos.x, top: pos.y, minWidth: 180 }}
     >
-      <button className={buttonClass} onClick={() => onStartRename(type)}>
-        {translate(locale, 'sidebar.action.renameSection')}
-      </button>
-      <button className={buttonClass} onClick={() => onOpenCustomize(type)}>
+      <Button type="button" variant="ghost" size="sm" className={buttonClass} onClick={() => onStartRename(type)}>
+        <PencilSimple size={14} />
+        {translate(locale, 'sidebar.action.renameType')}
+      </Button>
+      <Button type="button" variant="ghost" size="sm" className={buttonClass} onClick={() => onOpenCustomize(type)}>
+        <Palette size={14} />
         {translate(locale, 'sidebar.action.customizeIconColor')}
-      </button>
+      </Button>
+      <div className="my-1 h-px bg-border" role="separator" />
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className={`${buttonClass} text-destructive hover:text-destructive`}
+        onClick={() => onDelete(type)}
+      >
+        <Trash size={14} />
+        {translate(locale, 'sidebar.action.deleteType')}
+      </Button>
     </div>
   )
 }

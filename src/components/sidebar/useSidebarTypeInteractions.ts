@@ -13,6 +13,7 @@ interface SidebarTypeInteractionsInput {
   onCustomizeType?: (typeName: string, icon: string, color: string) => void
   onUpdateTypeTemplate?: (typeName: string, template: string) => void
   onRenameSection?: (typeName: string, label: string) => void
+  onDeleteType?: (typeName: string) => void
 }
 
 function useSidebarTypeState() {
@@ -100,6 +101,7 @@ export function useSidebarTypeInteractions({
   onCustomizeType,
   onUpdateTypeTemplate,
   onRenameSection,
+  onDeleteType,
 }: SidebarTypeInteractionsInput) {
   const state = useSidebarTypeState()
   const renameCallbacks = useSidebarRenameCallbacks({
@@ -131,6 +133,11 @@ export function useSidebarTypeInteractions({
     state.setCustomizeTarget(type)
   }, [state])
 
+  const handleDeleteType = useCallback((type: string) => {
+    state.closeContextMenu()
+    onDeleteType?.(type)
+  }, [onDeleteType, state])
+
   return {
     closeCustomizeTarget: state.closeCustomizeTarget,
     contextMenuPos: state.contextMenuPos,
@@ -141,6 +148,7 @@ export function useSidebarTypeInteractions({
     handleChangeTemplate,
     handleContextMenu,
     handleCustomize,
+    handleDeleteType,
     handleRenameSubmit: renameCallbacks.handleRenameSubmit,
     handleStartRename: renameCallbacks.handleStartRename,
     openCustomizeTarget,
