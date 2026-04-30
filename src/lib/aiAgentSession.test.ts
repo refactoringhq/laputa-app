@@ -133,7 +133,7 @@ function expectStreamingRequest(runtime: RuntimeFixture['runtime']): void {
   expect(streamAiAgentMock).toHaveBeenCalledWith({
     agent: 'codex',
     message: 'formatted:Latest question',
-    systemPrompt: 'OVERRIDE',
+    systemPrompt: 'SYSTEM',
     vaultPath: '/vault',
     permissionMode: 'power_user',
     callbacks: { stream: 'callbacks' },
@@ -256,6 +256,11 @@ describe('aiAgentSession', () => {
 
     expectStreamingRuntimeState(session)
     expectFormattedHistoryUsed()
+    expect(buildAgentSystemPromptMock).toHaveBeenCalledWith({
+      agent: 'codex',
+      permissionMode: 'power_user',
+      vaultContext: 'OVERRIDE',
+    })
     expectStreamingRequest(session.runtime)
     expect(trackEventMock).toHaveBeenCalledWith('ai_agent_message_sent', {
       agent: 'codex',

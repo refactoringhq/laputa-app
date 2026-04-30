@@ -115,12 +115,16 @@ describe('aiAgentConversation', () => {
     ]
 
     const result = buildFormattedMessage(
-      { agent: 'codex', ready: true, vaultPath: '/vault' },
+      { agent: 'codex', ready: true, vaultPath: '/vault', permissionMode: 'safe' },
       messages,
       { text: 'Latest question' },
     )
 
-    expect(buildAgentSystemPromptMock).toHaveBeenCalledTimes(1)
+    expect(buildAgentSystemPromptMock).toHaveBeenCalledWith({
+      agent: 'codex',
+      permissionMode: 'safe',
+      vaultContext: undefined,
+    })
     expect(trimHistoryMock).toHaveBeenCalledWith([
       { role: 'user', content: 'First question', id: 'msg-1' },
       { role: 'assistant', content: 'First answer', id: 'msg-1-resp' },
@@ -135,15 +139,25 @@ describe('aiAgentConversation', () => {
     })
   })
 
-  it('prefers a system prompt override when provided', () => {
+  it('appends context snapshots to the mode-aware system prompt', () => {
     const result = buildFormattedMessage(
-      { agent: 'codex', ready: true, vaultPath: '/vault', systemPromptOverride: 'OVERRIDE' },
+      {
+        agent: 'codex',
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'power_user',
+        systemPromptOverride: 'CONTEXT',
+      },
       [],
       { text: 'Prompt' },
     )
 
-    expect(buildAgentSystemPromptMock).not.toHaveBeenCalled()
-    expect(result.systemPrompt).toBe('OVERRIDE')
+    expect(buildAgentSystemPromptMock).toHaveBeenCalledWith({
+      agent: 'codex',
+      permissionMode: 'power_user',
+      vaultContext: 'CONTEXT',
+    })
+    expect(result.systemPrompt).toBe('SYSTEM')
   })
 })
 

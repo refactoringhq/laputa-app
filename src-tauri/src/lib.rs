@@ -850,9 +850,11 @@ mod tests {
         let allowed_roots = vec![vault_a.clone()];
 
         assert_eq!(
-            missing_asset_scope_roots(&allowed_roots, &[vault_b.clone()]),
+            missing_asset_scope_roots(&allowed_roots, std::slice::from_ref(&vault_b)),
             vec![vault_b]
         );
-        assert!(missing_asset_scope_roots(&allowed_roots, &[vault_a]).is_empty());
+        assert!(
+            missing_asset_scope_roots(&allowed_roots, std::slice::from_ref(&vault_a)).is_empty()
+        );
     }
 }

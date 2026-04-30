@@ -9,7 +9,8 @@ describe('buildAgentSystemPrompt', () => {
     const prompt = buildAgentSystemPrompt()
     expect(prompt).toContain('working inside Tolaria')
     expect(prompt).toContain('active vault')
-    expect(prompt).toContain('Avoid shell commands')
+    expect(prompt).toContain('Vault Safe mode is active')
+    expect(prompt).toContain('not available in Vault Safe')
     expect(prompt).not.toContain('full shell access')
     expect(prompt).not.toContain('Vault context')
   })
@@ -19,6 +20,19 @@ describe('buildAgentSystemPrompt', () => {
     expect(prompt).toContain('working inside Tolaria')
     expect(prompt).toContain('Vault context:')
     expect(prompt).toContain('Recent notes: foo, bar')
+  })
+
+  it('allows shell commands in power user mode where supported', () => {
+    const prompt = buildAgentSystemPrompt({ agent: 'codex', permissionMode: 'power_user' })
+    expect(prompt).toContain('Power User mode is active')
+    expect(prompt).toContain('Local shell commands are available')
+    expect(prompt).not.toContain('not available in Vault Safe')
+  })
+
+  it('does not promise shell execution for Pi power user mode', () => {
+    const prompt = buildAgentSystemPrompt({ agent: 'pi', permissionMode: 'power_user' })
+    expect(prompt).toContain('Pi currently uses the same conservative Tolaria MCP configuration')
+    expect(prompt).not.toContain('Local shell commands are available')
   })
 
   it('instructs AI to use wikilink syntax', () => {

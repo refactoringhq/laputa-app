@@ -29,19 +29,13 @@ where
 }
 
 fn find_codex_binary() -> Result<PathBuf, String> {
-    if let Some(binary) = find_codex_binary_on_path() {
-        return Ok(binary);
-    }
-
-    if let Some(binary) = find_codex_binary_in_user_shell() {
-        return Ok(binary);
-    }
-
-    if let Some(binary) = find_existing_binary(codex_binary_candidates())? {
-        return Ok(binary);
-    }
-
-    Err("Codex CLI not found. Install it: https://developers.openai.com/codex/cli".into())
+    find_codex_binary_on_path()
+        .filter(is_usable_codex_binary)
+        .or_else(|| find_codex_binary_in_user_shell().filter(is_usable_codex_binary))
+        .or_else(|| find_usable_codex_binary(codex_binary_candidates()))
+        .ok_or_else(|| {
+            "Codex CLI not found. Install it: https://developers.openai.com/codex/cli".into()
+        })
 }
 
 fn find_codex_binary_on_path() -> Option<PathBuf> {
@@ -139,8 +133,12 @@ fn nvm_node_binary_candidates_for_home(home: &Path, binary_name: &str) -> Vec<Pa
     candidates
 }
 
-fn find_existing_binary(candidates: Vec<PathBuf>) -> Result<Option<PathBuf>, String> {
-    crate::cli_agent_runtime::find_executable_binary_candidate(candidates, "Codex CLI")
+fn find_usable_codex_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
+    candidates.into_iter().find(is_usable_codex_binary)
+}
+
+fn is_usable_codex_binary(binary: &PathBuf) -> bool {
+    crate::cli_agent_runtime::version_for_binary(binary).is_some()
 }
 
 fn run_agent_stream_with_binary<F>(
@@ -186,9 +184,9 @@ fn build_codex_args(request: &AgentStreamRequest) -> Result<Vec<String>, String>
 
     Ok(vec![
         "--sandbox".into(),
-        "workspace-write".into(),
+        codex_sandbox(request.permission_mode).into(),
         "--ask-for-approval".into(),
-        "never".into(),
+        codex_approval_policy(request.permission_mode).into(),
         "exec".into(),
         "--json".into(),
         "-C".into(),
@@ -203,6 +201,20 @@ fn build_codex_args(request: &AgentStreamRequest) -> Result<Vec<String>, String>
             request.vault_path
         ),
     ])
+}
+
+fn codex_sandbox(permission_mode: crate::ai_agents::AiAgentPermissionMode) -> &'static str {
+    match permission_mode {
+        crate::ai_agents::AiAgentPermissionMode::Safe => "read-only",
+        crate::ai_agents::AiAgentPermissionMode::PowerUser => "workspace-write",
+    }
+}
+
+fn codex_approval_policy(permission_mode: crate::ai_agents::AiAgentPermissionMode) -> &'static str {
+    match permission_mode {
+        crate::ai_agents::AiAgentPermissionMode::Safe => "untrusted",
+        crate::ai_agents::AiAgentPermissionMode::PowerUser => "never",
+    }
 }
 
 fn build_codex_prompt(request: &AgentStreamRequest) -> String {
@@ -276,7 +288,7 @@ fn format_codex_error(stderr_output: String, status: String) -> String {
     }
 
     if is_codex_write_permission_error(&lower) {
-        return "Codex could not write to the active vault. Tolaria starts Codex with a workspace-write sandbox, so verify the selected vault folder is writable and retry; writes outside the active vault remain blocked.".into();
+        return "Codex could not write to the active vault. Vault Safe uses a read-only Codex sandbox; switch to Power User for shell-backed local writes, or verify the selected vault folder is writable and retry. Writes outside the active vault remain blocked.".into();
     }
 
     if stderr_output.trim().is_empty() {
@@ -331,13 +343,10 @@ mod tests {
         }
     }
 
-    fn assert_codex_workspace_write_contract(args: &[String]) {
-        let prefix = [
-            "--sandbox",
-            "workspace-write",
-            "--ask-for-approval",
-            "never",
-        ];
+    fn assert_codex_permission_contract(args: &[String], permission_mode: AiAgentPermissionMode) {
+        let sandbox = codex_sandbox(permission_mode);
+        let approval = codex_approval_policy(permission_mode);
+        let prefix = ["--sandbox", sandbox, "--ask-for-approval", approval];
 
         assert_eq!(&args[..prefix.len()], prefix);
         assert!(!args.iter().any(|arg| arg == "danger-full-access"));
@@ -396,26 +405,21 @@ mod tests {
             permission_mode: AiAgentPermissionMode::Safe,
         }) {
             assert_eq!(args[4], "exec");
-            assert_codex_workspace_write_contract(&args);
+            assert_codex_permission_contract(&args, AiAgentPermissionMode::Safe);
             assert!(args.contains(&"--json".to_string()));
             assert!(args.contains(&"-C".to_string()));
         }
     }
 
     #[test]
-    fn codex_permission_modes_keep_workspace_write_without_dangerous_bypass() {
-        for permission_mode in [
-            AiAgentPermissionMode::Safe,
-            AiAgentPermissionMode::PowerUser,
-        ] {
-            if let Ok(args) = build_codex_args(&AgentStreamRequest {
-                message: "Rename the note".into(),
-                system_prompt: None,
-                vault_path: "/tmp/vault".into(),
-                permission_mode,
-            }) {
-                assert_codex_workspace_write_contract(&args);
-            }
+    fn codex_power_user_keeps_workspace_write_without_dangerous_bypass() {
+        if let Ok(args) = build_codex_args(&AgentStreamRequest {
+            message: "Rename the note".into(),
+            system_prompt: None,
+            vault_path: "/tmp/vault".into(),
+            permission_mode: AiAgentPermissionMode::PowerUser,
+        }) {
+            assert_codex_permission_contract(&args, AiAgentPermissionMode::PowerUser);
         }
     }
 
@@ -520,6 +524,18 @@ exit 2
         let candidates = codex_binary_candidates_for_home(home.path());
 
         assert!(candidates.contains(&codex), "missing {}", codex.display());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn usable_codex_binary_skips_broken_shims() {
+        let dir = tempfile::tempdir().unwrap();
+        let broken = executable_script(dir.path(), "broken-codex", "exit 1\n");
+        let working = executable_script(dir.path(), "codex", "echo codex-cli 0.124.0-alpha.2\n");
+
+        let found = find_usable_codex_binary(vec![broken, working.clone()]);
+
+        assert_eq!(found, Some(working));
     }
 
     #[test]

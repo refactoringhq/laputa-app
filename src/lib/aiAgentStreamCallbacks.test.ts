@@ -146,6 +146,7 @@ describe('aiAgentStreamCallbacks', () => {
     })
 
     callbacks.onError('boom')
+    callbacks.onDone()
 
     expect(status.getStatus()).toBe('error')
     expect(trackEventMock).toHaveBeenCalledWith('ai_agent_response_failed', {
@@ -169,6 +170,7 @@ describe('aiAgentStreamCallbacks', () => {
         response: 'Partial reply\n\nError: boom',
       },
     ])
+    expect(trackEventMock).not.toHaveBeenCalledWith('ai_agent_response_completed', expect.anything())
   })
 
   it.each([

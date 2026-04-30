@@ -144,7 +144,7 @@ proposed → active → superseded
 | [0089](0089-active-vault-filesystem-watcher.md) | Active vault filesystem watcher | active |
 | [0090](0090-pi-cli-agent-adapter.md) | Pi CLI agent adapter | active |
 | [0091](0091-gemini-cli-external-ai-setup.md) | Gemini CLI external AI setup | active |
-| [0092](0092-vault-ai-agent-permission-modes.md) | Vault-scoped AI agent permission modes | active |
+| [0092](0092-vault-ai-agent-permission-modes.md) | Vault-scoped AI agent permission modes | superseded -> [0103](0103-adapter-specific-ai-permission-semantics.md) |
 | [0093](0093-shared-cli-agent-runtime-adapters.md) | Shared CLI agent runtime adapters | active |
 | [0094](0094-gitignored-content-visibility-boundary-filter.md) | Gitignored content visibility as a command-boundary filter | active |
 | [0095](0095-saved-view-order-field.md) | Saved views use an explicit YAML order field | active |
@@ -155,3 +155,4 @@ proposed → active → superseded
 | [0100](0100-synthetic-vault-root-folder-row.md) | Synthetic vault-root row in folder navigation | active |
 | [0101](0101-categorical-product-analytics-events.md) | Categorical product analytics events | active |
 | [0102](0102-low-end-safe-autosave-idle-window.md) | Low-end-safe autosave idle window | active |
+| [0103](0103-adapter-specific-ai-permission-semantics.md) | Adapter-specific AI permission semantics | active |

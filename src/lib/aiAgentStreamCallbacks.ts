@@ -44,6 +44,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
     fileCallbacksRef,
   } = context
   let failureTracked = false
+  let streamFailed = false
 
   return {
     onThinking: (chunk: string) => {
@@ -97,6 +98,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       if (abortRef.current.aborted) return
 
       setStatus('error')
+      streamFailed = true
       const partial = responseAccRef.current
       failureTracked = true
       trackAiAgentResponseFailed(agent, partial, toolInputMapRef.current.size)
@@ -113,6 +115,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
     onDone: () => {
       if (abortRef.current.aborted) return
+      if (streamFailed) return
 
       setStatus('done')
       const finalResponse = finalResponseText(responseAccRef.current, agent)

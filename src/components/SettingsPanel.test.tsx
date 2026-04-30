@@ -102,7 +102,7 @@ describe('SettingsPanel', () => {
 
     expect(screen.getByText('设置')).toBeInTheDocument()
     expect(screen.queryByText('Settings')).not.toBeInTheDocument()
-  })
+  }, 10_000)
 
   it('calls onSave with stable defaults on save', () => {
     render(

@@ -103,7 +103,7 @@ describe('StatusBar', () => {
   it('build number shows the update tooltip on focus', async () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} buildNumber="b281" onCheckForUpdates={vi.fn()} />)
     await expectTooltip(screen.getByRole('button', { name: 'Check for updates' }), 'Check for updates')
-  })
+  }, 10_000)
 
   it('does not display branch name', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} />)

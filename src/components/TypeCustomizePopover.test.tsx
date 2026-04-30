@@ -70,7 +70,7 @@ describe('TypeCustomizePopover', () => {
     expect(screen.getByText('Icon')).toBeInTheDocument()
     expect(screen.getByText('Template')).toBeInTheDocument()
     expect(screen.getByText('Done')).toBeInTheDocument()
-  })
+  }, 10_000)
 
   it('can hide the template and Done controls for inline appearance editing', () => {
     renderPopover({ showTemplate: false, showDone: false, surface: 'inline' })

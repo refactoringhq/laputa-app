@@ -2,9 +2,8 @@
 /**
  * Tolaria MCP Server — lightweight vault tools for AI agents.
  *
- * The agent has full shell access (bash, read, write, edit).
- * These MCP tools provide Tolaria-specific capabilities that
- * native tools cannot replace:
+ * These MCP tools provide Tolaria-specific capabilities alongside each
+ * app-managed agent's own Safe / Power User permission profile:
  *
  *   - search_notes: full-text search across vault notes
  *   - get_vault_context: vault structure overview (types, note count, folders)
