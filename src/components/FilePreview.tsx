@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, WarningCircle } from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
+import { trackFilePreviewAction, trackFilePreviewFailed, trackFilePreviewOpened } from '../lib/productAnalytics'
 import { filePreviewKind, previewFileTypeLabel, type FilePreviewKind } from '../utils/filePreview'
 import { focusNoteListContainer } from '../utils/neighborhoodHistory'
 import { openLocalFile } from '../utils/url'
@@ -228,9 +229,17 @@ export function FilePreview({
   const assetSrc = useMemo(() => (previewKind ? convertFileSrc(entry.path) : null), [entry.path, previewKind])
   const fileTypeLabel = previewFileTypeLabel(entry)
   const imageFailed = failedImagePath === entry.path
-  const handleImageError = useCallback(() => setFailedImagePath(entry.path), [entry.path])
+  const handleImageError = useCallback(() => {
+    setFailedImagePath(entry.path)
+    trackFilePreviewFailed('image')
+  }, [entry.path])
+
+  useEffect(() => {
+    trackFilePreviewOpened(previewKind)
+  }, [entry.path, previewKind])
 
   const handleOpenExternal = useCallback(() => {
+    trackFilePreviewAction('open_external', previewKind)
     if (onOpenExternalFile) {
       onOpenExternalFile(entry.path)
       return
@@ -239,15 +248,17 @@ export function FilePreview({
     void openLocalFile(entry.path).catch((error) => {
       console.warn('Failed to open file with default app:', error)
     })
-  }, [entry.path, onOpenExternalFile])
+  }, [entry.path, onOpenExternalFile, previewKind])
 
   const handleRevealFile = useCallback(() => {
+    trackFilePreviewAction('reveal', previewKind)
     onRevealFile?.(entry.path)
-  }, [entry.path, onRevealFile])
+  }, [entry.path, onRevealFile, previewKind])
 
   const handleCopyFilePath = useCallback(() => {
+    trackFilePreviewAction('copy_path', previewKind)
     onCopyFilePath?.(entry.path)
-  }, [entry.path, onCopyFilePath])
+  }, [entry.path, onCopyFilePath, previewKind])
 
   const handleKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Escape') return

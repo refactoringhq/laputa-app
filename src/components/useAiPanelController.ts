@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import type { AppLocale } from '../lib/i18n'
+import { trackAiAgentPermissionModeChanged } from '../lib/productAnalytics'
 import {
   aiAgentPermissionModeMarker,
   normalizeAiAgentPermissionMode,
@@ -132,8 +133,9 @@ export function useAiPanelController({
     if (isActive || nextMode === permissionMode) return
 
     updateVaultConfigField('ai_agent_permission_mode', nextMode)
+    trackAiAgentPermissionModeChanged(defaultAiAgent, nextMode)
     agent.addLocalMarker(aiAgentPermissionModeMarker(nextMode, locale))
-  }, [agent, isActive, locale, permissionMode])
+  }, [agent, defaultAiAgent, isActive, locale, permissionMode])
 
   const handleNewChat = useCallback(() => {
     agent.clearConversation()

@@ -961,6 +961,7 @@ sequenceDiagram
 - `anonymous_id` is a locally-generated UUID, never tied to identity
 - `send_default_pii: false` on both SDKs
 - PostHog: `autocapture: false`, `persistence: 'memory'`, no cookies
+- Product events use categorical metadata only: file preview kind/action, AI agent id/permission mode/counts/status, and All Notes visibility category/enabled state.
 
 **Architecture:**
 - **Rust:** `sentry` crate initialized in `lib.rs::setup()` via `telemetry::init_sentry_from_settings()`

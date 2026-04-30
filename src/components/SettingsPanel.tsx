@@ -39,6 +39,7 @@ import {
 import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel } from '../lib/releaseChannel'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
 import { trackEvent } from '../lib/telemetry'
+import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import {
   resolveAllNotesFileVisibility,
   settingsWithAllNotesFileVisibility,
@@ -308,9 +309,10 @@ function SettingsPanelInner({
   }, [onSave, settings, updateDraft])
 
   const handleAllNotesFileVisibilityChange = useCallback((value: AllNotesFileVisibility) => {
+    trackAllNotesVisibilityChanged(draft.allNotesFileVisibility, value)
     updateDraft('allNotesFileVisibility', value)
     onSave(settingsWithAllNotesFileVisibility(settings, value))
-  }, [onSave, settings, updateDraft])
+  }, [draft.allNotesFileVisibility, onSave, settings, updateDraft])
 
   const handleThemeModeChange = useCallback((value: ThemeMode) => {
     updateDraft('themeMode', value)

@@ -13,6 +13,7 @@ import {
 import type { AgentFileCallbacks } from './aiAgentFileOperations'
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
 import type { ToolInvocation } from './aiAgentMessageState'
+import { trackAiAgentMessageBlocked, trackAiAgentMessageSent } from './productAnalytics'
 import { streamAiAgent } from '../utils/streamAiAgent'
 
 export interface AiAgentSessionRuntime {
@@ -39,6 +40,10 @@ function normalizePrompt(prompt: PendingUserPrompt): PendingUserPrompt {
   }
 }
 
+function completedMessageCount(messages: AiAgentMessage[]): number {
+  return messages.filter((message) => !message.isStreaming && !message.localMarker).length
+}
+
 export async function sendAgentMessage({
   runtime,
   context,
@@ -50,11 +55,13 @@ export async function sendAgentMessage({
   if (!normalizedPrompt.text || currentStatus === 'thinking' || currentStatus === 'tool-executing') return
 
   if (!context.vaultPath) {
+    trackAiAgentMessageBlocked(context.agent, 'missing_vault')
     appendLocalResponse(runtime.setMessages, normalizedPrompt, 'No vault loaded. Open a vault first.')
     return
   }
 
   if (!context.ready) {
+    trackAiAgentMessageBlocked(context.agent, 'agent_unavailable')
     appendLocalResponse(
       runtime.setMessages,
       normalizedPrompt,
@@ -62,6 +69,14 @@ export async function sendAgentMessage({
     )
     return
   }
+
+  trackAiAgentMessageSent({
+    agent: context.agent,
+    permissionMode: context.permissionMode,
+    hasContext: !!context.systemPromptOverride,
+    referenceCount: normalizedPrompt.references?.length ?? 0,
+    historyMessageCount: completedMessageCount(runtime.messagesRef.current),
+  })
 
   runtime.abortRef.current = { aborted: false }
   runtime.responseAccRef.current = ''

@@ -4,6 +4,14 @@ import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
 
+const { trackEventMock } = vi.hoisted(() => ({
+  trackEventMock: vi.fn(),
+}))
+
+vi.mock('../lib/telemetry', () => ({
+  trackEvent: trackEventMock,
+}))
+
 const emptySettings: Settings = {
   auto_pull_interval_minutes: null,
   autogit_enabled: null,
@@ -55,6 +63,7 @@ describe('SettingsPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    trackEventMock.mockClear()
     Object.defineProperty(window, 'localStorage', { value: localStorageMock, configurable: true })
     window.localStorage.clear()
     document.documentElement.removeAttribute('data-theme')
@@ -179,6 +188,23 @@ describe('SettingsPanel', () => {
       all_notes_show_unsupported: false,
     }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('tracks All Notes visibility toggles with categorical metadata only', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    fireEvent.click(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('checkbox'))
+
+    expect(trackEventMock).toHaveBeenCalledWith('all_notes_visibility_changed', {
+      category: 'images',
+      enabled: 1,
+    })
+    expect(trackEventMock).not.toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ path: expect.any(String) }),
+    )
   })
 
   it('defaults the color mode control to light', () => {

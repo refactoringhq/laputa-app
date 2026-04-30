@@ -7,6 +7,7 @@ const {
   formatMessageWithHistoryMock,
   nextMessageIdMock,
   streamAiAgentMock,
+  trackEventMock,
   trimHistoryMock,
 } = vi.hoisted(() => ({
   buildAgentSystemPromptMock: vi.fn(() => 'SYSTEM'),
@@ -14,6 +15,7 @@ const {
   formatMessageWithHistoryMock: vi.fn((_history: unknown, prompt: string) => `formatted:${prompt}`),
   nextMessageIdMock: vi.fn(),
   streamAiAgentMock: vi.fn(async () => {}),
+  trackEventMock: vi.fn(),
   trimHistoryMock: vi.fn((history: unknown) => history),
 }))
 
@@ -34,6 +36,10 @@ vi.mock('./aiAgentStreamCallbacks', () => ({
 
 vi.mock('../utils/streamAiAgent', () => ({
   streamAiAgent: streamAiAgentMock,
+}))
+
+vi.mock('./telemetry', () => ({
+  trackEvent: trackEventMock,
 }))
 
 import {
@@ -79,6 +85,61 @@ function createRuntime(
   }
 }
 
+type RuntimeFixture = ReturnType<typeof createRuntime>
+
+const completedHistory: AiAgentMessage = {
+  id: 'msg-1',
+  userMessage: 'Previous question',
+  actions: [],
+  response: 'Previous answer',
+}
+const streamingHistory: AiAgentMessage = {
+  id: 'msg-2',
+  userMessage: 'Ignored streaming question',
+  actions: [],
+  isStreaming: true,
+}
+const expectedChatHistory = [
+  { role: 'user', content: 'Previous question', id: 'msg-1' },
+  { role: 'assistant', content: 'Previous answer', id: 'msg-1-resp' },
+]
+
+function expectStreamingRuntimeState(session: RuntimeFixture): void {
+  expect(session.runtime.abortRef.current).toEqual({ aborted: false })
+  expect(session.runtime.responseAccRef.current).toBe('')
+  expect(session.runtime.toolInputMapRef.current.size).toBe(0)
+  expect(session.getStatus()).toBe('thinking')
+  expect(session.getMessages().at(-1)).toEqual({
+    userMessage: 'Latest question',
+    references: [{ path: '/vault/ref.md', title: 'Ref' }],
+    actions: [],
+    isStreaming: true,
+    id: 'msg-stream',
+  })
+}
+
+function expectFormattedHistoryUsed(): void {
+  expect(trimHistoryMock).toHaveBeenCalledWith(expectedChatHistory, 100_000)
+  expect(formatMessageWithHistoryMock).toHaveBeenCalledWith(expectedChatHistory, 'Latest question')
+}
+
+function expectStreamingRequest(runtime: RuntimeFixture['runtime']): void {
+  expect(createStreamCallbacksMock).toHaveBeenCalledWith(expect.objectContaining({
+    messageId: 'msg-stream',
+    vaultPath: '/vault',
+    setMessages: runtime.setMessages,
+    setStatus: runtime.setStatus,
+  }))
+  expect(streamAiAgentMock).toHaveBeenCalledWith({
+    agent: 'codex',
+    message: 'formatted:Latest question',
+    systemPrompt: 'OVERRIDE',
+    vaultPath: '/vault',
+    permissionMode: 'power_user',
+    callbacks: { stream: 'callbacks' },
+  })
+}
+
 describe('aiAgentSession', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -87,12 +148,19 @@ describe('aiAgentSession', () => {
     formatMessageWithHistoryMock.mockImplementation((_history: unknown, prompt: string) => `formatted:${prompt}`)
     trimHistoryMock.mockImplementation((history: unknown) => history)
     streamAiAgentMock.mockResolvedValue(undefined)
+    trackEventMock.mockClear()
   })
 
   async function expectLocalResponse(options: {
     messageId: string
-    context: { agent: string; ready: boolean; vaultPath: string }
+    context: {
+      agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | 'gemini'
+      ready: boolean
+      vaultPath: string
+      permissionMode: 'safe' | 'power_user'
+    }
     prompt: { text: string; references?: [] }
+    reason: 'agent_unavailable' | 'missing_vault'
     response: string
   }) {
     nextMessageIdMock.mockReturnValue(options.messageId)
@@ -114,20 +182,24 @@ describe('aiAgentSession', () => {
       },
     ])
     expect(streamAiAgentMock).not.toHaveBeenCalled()
+    expect(trackEventMock).toHaveBeenCalledWith('ai_agent_message_blocked', {
+      agent: options.context.agent,
+      reason: options.reason,
+    })
   }
 
   it('ignores blank prompts and busy runtimes', async () => {
     const idleRuntime = createRuntime()
     await sendAgentMessage({
       runtime: idleRuntime.runtime,
-      context: { agent: 'codex', ready: true, vaultPath: '/vault' },
+      context: { agent: 'codex', ready: true, vaultPath: '/vault', permissionMode: 'safe' },
       prompt: { text: '   ' },
     })
 
     const busyRuntime = createRuntime([], 'thinking')
     await sendAgentMessage({
       runtime: busyRuntime.runtime,
-      context: { agent: 'codex', ready: true, vaultPath: '/vault' },
+      context: { agent: 'codex', ready: true, vaultPath: '/vault', permissionMode: 'safe' },
       prompt: { text: 'Question' },
     })
 
@@ -140,14 +212,16 @@ describe('aiAgentSession', () => {
     const fallbackCases = [
       {
         messageId: 'msg-local',
-        context: { agent: 'codex', ready: true, vaultPath: '' },
+        context: { agent: 'codex', ready: true, vaultPath: '', permissionMode: 'safe' },
         prompt: { text: 'Open a note' },
+        reason: 'missing_vault',
         response: 'No vault loaded. Open a vault first.',
       },
       {
         messageId: 'msg-missing',
-        context: { agent: 'codex', ready: false, vaultPath: '/vault' },
+        context: { agent: 'codex', ready: false, vaultPath: '/vault', permissionMode: 'safe' },
         prompt: { text: 'Open a note', references: [] },
+        reason: 'agent_unavailable',
         response:
           'Codex is not available on this machine. Install it or switch the default AI agent in Settings.',
       },
@@ -160,29 +234,18 @@ describe('aiAgentSession', () => {
 
   it('starts a streaming session with formatted history and fresh refs', async () => {
     nextMessageIdMock.mockReturnValue('msg-stream')
-    const completedHistory: AiAgentMessage = {
-      id: 'msg-1',
-      userMessage: 'Previous question',
-      actions: [],
-      response: 'Previous answer',
-    }
-    const streamingHistory: AiAgentMessage = {
-      id: 'msg-2',
-      userMessage: 'Ignored streaming question',
-      actions: [],
-      isStreaming: true,
-    }
-    const { runtime, getMessages, getStatus } = createRuntime([
+    const session = createRuntime([
       completedHistory,
       streamingHistory,
     ])
 
     await sendAgentMessage({
-      runtime,
+      runtime: session.runtime,
       context: {
         agent: 'codex',
         ready: true,
         vaultPath: '/vault',
+        permissionMode: 'power_user',
         systemPromptOverride: 'OVERRIDE',
       },
       prompt: {
@@ -191,37 +254,15 @@ describe('aiAgentSession', () => {
       },
     })
 
-    expect(runtime.abortRef.current).toEqual({ aborted: false })
-    expect(runtime.responseAccRef.current).toBe('')
-    expect(runtime.toolInputMapRef.current.size).toBe(0)
-    expect(getStatus()).toBe('thinking')
-    expect(getMessages().at(-1)).toEqual({
-      userMessage: 'Latest question',
-      references: [{ path: '/vault/ref.md', title: 'Ref' }],
-      actions: [],
-      isStreaming: true,
-      id: 'msg-stream',
-    })
-    expect(trimHistoryMock).toHaveBeenCalledWith([
-      { role: 'user', content: 'Previous question', id: 'msg-1' },
-      { role: 'assistant', content: 'Previous answer', id: 'msg-1-resp' },
-    ], 100_000)
-    expect(formatMessageWithHistoryMock).toHaveBeenCalledWith([
-      { role: 'user', content: 'Previous question', id: 'msg-1' },
-      { role: 'assistant', content: 'Previous answer', id: 'msg-1-resp' },
-    ], 'Latest question')
-    expect(createStreamCallbacksMock).toHaveBeenCalledWith(expect.objectContaining({
-      messageId: 'msg-stream',
-      vaultPath: '/vault',
-      setMessages: runtime.setMessages,
-      setStatus: runtime.setStatus,
-    }))
-    expect(streamAiAgentMock).toHaveBeenCalledWith({
+    expectStreamingRuntimeState(session)
+    expectFormattedHistoryUsed()
+    expectStreamingRequest(session.runtime)
+    expect(trackEventMock).toHaveBeenCalledWith('ai_agent_message_sent', {
       agent: 'codex',
-      message: 'formatted:Latest question',
-      systemPrompt: 'OVERRIDE',
-      vaultPath: '/vault',
-      callbacks: { stream: 'callbacks' },
+      permission_mode: 'power_user',
+      has_context: 1,
+      reference_count: 1,
+      history_message_count: 1,
     })
   })
 

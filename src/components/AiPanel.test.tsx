@@ -7,6 +7,14 @@ import type { VaultEntry } from '../types'
 import { queueAiPrompt } from '../utils/aiPromptBridge'
 import { bindVaultConfigStore, getVaultConfig, resetVaultConfigStore } from '../utils/vaultConfigStore'
 
+const { trackEventMock } = vi.hoisted(() => ({
+  trackEventMock: vi.fn(),
+}))
+
+vi.mock('../lib/telemetry', () => ({
+  trackEvent: trackEventMock,
+}))
+
 // Mock the hooks and utils to isolate component tests
 let mockMessages: ReturnType<typeof import('../hooks/useCliAiAgent').useCliAiAgent>['messages'] = []
 let mockStatus: ReturnType<typeof import('../hooks/useCliAiAgent').useCliAiAgent>['status'] = 'idle'
@@ -80,6 +88,7 @@ describe('AiPanel', () => {
     mockClearConversation.mockReset()
     mockAddLocalMarker.mockReset()
     mockUseCliAiAgent.mockReset()
+    trackEventMock.mockClear()
     resetVaultConfigStore()
     bindVaultConfigStore({
       zoom: null,
@@ -141,6 +150,10 @@ describe('AiPanel', () => {
     expect(mockAddLocalMarker).toHaveBeenCalledWith(
       'AI permission mode changed to Power User. It will apply to the next message.',
     )
+    expect(trackEventMock).toHaveBeenCalledWith('ai_agent_permission_mode_changed', {
+      agent: 'claude_code',
+      permission_mode: 'power_user',
+    })
   })
 
   it('disables permission mode changes while the AI agent is running', () => {

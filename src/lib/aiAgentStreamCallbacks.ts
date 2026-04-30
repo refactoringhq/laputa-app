@@ -8,6 +8,10 @@ import {
   type ToolInvocation,
 } from './aiAgentMessageState'
 import { getAiAgentDefinition, type AiAgentId } from './aiAgents'
+import {
+  trackAiAgentResponseCompleted,
+  trackAiAgentResponseFailed,
+} from './productAnalytics'
 
 export interface StreamMutationContext {
   agent: AiAgentId
@@ -39,6 +43,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
     toolInputMapRef,
     fileCallbacksRef,
   } = context
+  let failureTracked = false
 
   return {
     onThinking: (chunk: string) => {
@@ -93,6 +98,8 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
       setStatus('error')
       const partial = responseAccRef.current
+      failureTracked = true
+      trackAiAgentResponseFailed(agent, partial, toolInputMapRef.current.size)
       updateMessage(setMessages, messageId, (message) => ({
         ...message,
         isStreaming: false,
@@ -109,6 +116,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
       setStatus('done')
       const finalResponse = finalResponseText(responseAccRef.current, agent)
+      trackAiAgentResponseCompleted(agent, responseAccRef.current, toolInputMapRef.current.size, failureTracked)
       updateMessage(setMessages, messageId, (message) => ({
         ...message,
         isStreaming: false,
