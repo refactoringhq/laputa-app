@@ -52,6 +52,7 @@ function makeHandlers(): MenuEventHandlers {
     onViewChanges: vi.fn(),
     onInstallMcp: vi.fn(),
     onReloadVault: vi.fn(),
+    onRepairVault: vi.fn(),
     onOpenInNewWindow: vi.fn(),
     onRestoreDeletedNote: vi.fn(),
     activeTabPathRef: { current: '/vault/test.md' } as React.MutableRefObject<string | null>,
@@ -346,6 +347,12 @@ describe('dispatchMenuEvent', () => {
     expect(h.onSelectFilter).toHaveBeenCalledWith('changes')
   })
 
+  it('go-inbox selects inbox filter', () => {
+    const h = makeHandlers()
+    dispatchMenuEvent('go-inbox', h)
+    expect(h.onSelectFilter).toHaveBeenCalledWith('inbox')
+  })
+
   // Vault menu events
   it('vault-open triggers open vault', () => {
     const h = makeHandlers()
@@ -399,6 +406,12 @@ describe('dispatchMenuEvent', () => {
     const h = makeHandlers()
     dispatchMenuEvent('vault-reload', h)
     expect(h.onReloadVault).toHaveBeenCalled()
+  })
+
+  it('vault-repair triggers repair vault', () => {
+    const h = makeHandlers()
+    dispatchMenuEvent('vault-repair', h)
+    expect(h.onRepairVault).toHaveBeenCalled()
   })
 
   // Note: open in new window
