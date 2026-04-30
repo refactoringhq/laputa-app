@@ -280,6 +280,18 @@ function serializeEditorBody(editor: ReturnType<typeof useCreateBlockNote>): str
   return compactMarkdown(serializeMermaidAwareBlocks(editor, restored))
 }
 
+function trySerializeEditorBody(
+  editor: ReturnType<typeof useCreateBlockNote>,
+  reason: string,
+): string | null {
+  try {
+    return serializeEditorBody(editor)
+  } catch (error) {
+    console.warn(`[editor] Skipped ${reason} because BlockNote document could not be serialized:`, error)
+    return null
+  }
+}
+
 function normalizeTabBody(options: { content: string }): string {
   const { content } = options
   return compactMarkdown(extractEditorBody(content))
@@ -307,9 +319,11 @@ function isUntitledRenameTransition(
 
   const currentHeading = getH1TextFromBlocks(editor.document)
   if (!currentHeading || slugifyPathStem(currentHeading) !== pathStem(nextPath)) return false
+  const currentBody = trySerializeEditorBody(editor, 'untitled rename comparison')
+  if (currentBody === null) return false
 
   return renameBodiesOverlap({
-    currentBody: serializeEditorBody(editor),
+    currentBody,
     nextBody: normalizeTabBody({ content: activeTab.content }),
   })
 }
@@ -346,7 +360,8 @@ function useEditorChangeHandler(options: {
     if (!tab) return
 
     const blocks = editor.document
-    const rawBodyMarkdown = serializeEditorBody(editor)
+    const rawBodyMarkdown = trySerializeEditorBody(editor, 'editor change')
+    if (rawBodyMarkdown === null) return
     const bodyMarkdown = vaultPathRef.current
       ? portableImageUrls(rawBodyMarkdown, vaultPathRef.current)
       : rawBodyMarkdown
@@ -470,13 +485,11 @@ function currentEditorMatchesActiveTab(options: {
     editorMountedRef,
   } = options
 
-  return Boolean(
-    activeTabPath
-      && activeTab
-      && editorMountedRef.current
-      && typeof editor.blocksToMarkdownLossy === 'function'
-      && serializeEditorBody(editor) === normalizeTabBody({ content: activeTab.content }),
-  )
+  if (!activeTabPath || !activeTab || !editorMountedRef.current) return false
+  if (typeof editor.blocksToMarkdownLossy !== 'function') return false
+
+  const bodyMarkdown = trySerializeEditorBody(editor, 'active tab comparison')
+  return bodyMarkdown === normalizeTabBody({ content: activeTab.content })
 }
 
 function cacheStableActiveTabAndClearPending(options: {
