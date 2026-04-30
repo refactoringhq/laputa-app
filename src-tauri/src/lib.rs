@@ -276,28 +276,55 @@ pub(crate) fn sync_ws_bridge_for_vault(
     Ok("started")
 }
 
-/// Run startup housekeeping on the default vault (migrate legacy frontmatter, seed configs).
-#[cfg(desktop)]
-fn run_startup_tasks() {
-    let vault_path = dirs::home_dir()
-        .map(|h| h.join("Laputa"))
-        .unwrap_or_default();
-    if !vault_path.is_dir() {
-        return;
+fn spawn_background_task<F>(thread_name: &'static str, task: F)
+where
+    F: FnOnce() + Send + 'static,
+{
+    if let Err(e) = std::thread::Builder::new()
+        .name(thread_name.into())
+        .spawn(task)
+    {
+        log::warn!("Failed to start {thread_name}: {e}");
     }
+}
+
+/// Run startup housekeeping on the legacy default vault (migrate legacy frontmatter, seed configs).
+#[cfg(desktop)]
+fn run_startup_tasks_for_vault(vault_path: &Path) {
     let vp_str = vault_path.to_str().unwrap_or_default();
     log_startup_result(
         "Migrated is_a to type on startup",
         vault::migrate_is_a_to_type(vp_str),
     );
-    // Migrate legacy config/agents.md → root AGENTS.md (one-time, idempotent)
+    // Migrate legacy config/agents.md -> root AGENTS.md (one-time, idempotent)
     vault::migrate_agents_md(vp_str);
     // Seed AGENTS.md and starter type definitions at vault root if missing
     vault::seed_config_files(vp_str);
 }
 
 #[cfg(desktop)]
-fn spawn_ws_bridge(app: &mut tauri::App) {
+fn spawn_startup_tasks_for_vault_with<F>(vault_path: PathBuf, task: F) -> bool
+where
+    F: FnOnce(PathBuf) + Send + 'static,
+{
+    if !vault_path.is_dir() {
+        return false;
+    }
+
+    spawn_background_task("tolaria-startup-tasks", move || task(vault_path));
+    true
+}
+
+#[cfg(desktop)]
+fn spawn_startup_tasks() {
+    let Some(vault_path) = dirs::home_dir().map(|h| h.join("Laputa")) else {
+        return;
+    };
+    spawn_startup_tasks_for_vault_with(vault_path, |path| run_startup_tasks_for_vault(&path));
+}
+
+#[cfg(desktop)]
+fn sync_ws_bridge_for_selected_vault(app_handle: &tauri::AppHandle) {
     let vault_path = match vault_list::load_vault_list() {
         Ok(vault_list) => selected_mcp_bridge_vault_path(&vault_list),
         Err(e) => {
@@ -311,9 +338,17 @@ fn spawn_ws_bridge(app: &mut tauri::App) {
         return;
     };
 
-    if let Err(e) = sync_ws_bridge_for_vault(app.handle(), Some(&vault_path)) {
+    if let Err(e) = sync_ws_bridge_for_vault(app_handle, Some(&vault_path)) {
         log::warn!("Failed to start ws-bridge: {}", e);
     }
+}
+
+#[cfg(desktop)]
+fn spawn_initial_ws_bridge_sync(app: &tauri::App) {
+    let app_handle = app.handle().clone();
+    spawn_background_task("tolaria-ws-bridge-startup", move || {
+        sync_ws_bridge_for_selected_vault(&app_handle);
+    });
 }
 
 fn setup_common_plugins(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -405,8 +440,8 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(desktop)]
     {
-        run_startup_tasks();
-        spawn_ws_bridge(app);
+        spawn_startup_tasks();
+        spawn_initial_ws_bridge_sync(app);
     }
 
     Ok(())
@@ -605,7 +640,8 @@ mod tests {
 
     #[cfg(desktop)]
     use super::{
-        missing_asset_scope_roots, selected_mcp_bridge_vault_path, validate_mcp_bridge_vault_path,
+        missing_asset_scope_roots, selected_mcp_bridge_vault_path,
+        spawn_startup_tasks_for_vault_with, validate_mcp_bridge_vault_path,
     };
     #[cfg(desktop)]
     use crate::vault_list::VaultList;
@@ -738,6 +774,42 @@ mod tests {
         };
 
         assert_eq!(selected_mcp_bridge_vault_path(&list), None);
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn startup_tasks_skip_missing_legacy_vault() {
+        let missing_vault = tempfile::tempdir().unwrap().path().join("missing");
+        let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let called_from_task = called.clone();
+
+        let spawned = spawn_startup_tasks_for_vault_with(missing_vault, move |_| {
+            called_from_task.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+
+        assert!(!spawned);
+        assert!(!called.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn startup_tasks_run_in_background() {
+        let dir = tempfile::tempdir().unwrap();
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+
+        let spawned = spawn_startup_tasks_for_vault_with(dir.path().to_path_buf(), move |_| {
+            entered_tx.send(()).unwrap();
+            release_rx
+                .recv_timeout(std::time::Duration::from_secs(1))
+                .unwrap();
+        });
+
+        assert!(spawned);
+        entered_rx
+            .recv_timeout(std::time::Duration::from_secs(1))
+            .unwrap();
+        release_tx.send(()).unwrap();
     }
 
     #[cfg(desktop)]

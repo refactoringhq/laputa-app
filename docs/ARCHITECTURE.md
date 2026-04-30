@@ -214,6 +214,8 @@ The main Tauri window derives its minimum width from the visible panes instead o
 
 The main Tauri window also persists its last normal size and screen position in the app config directory as `window-state.json`. The state stores logical window points, while `window_state.rs` migrates older physical-pixel state on read so Retina and non-Retina launches restore the same user-facing bounds. On startup, the restored frame applies only to the main window and clamps to the currently available monitor work areas, so stale coordinates from a disconnected display fall back to a visible placement. Maximized, fullscreen, minimized, and detached note-window frames are not written as the restore baseline.
 
+Tauri setup keeps launch-time filesystem and subprocess work off the window creation critical path. Legacy `~/Laputa` housekeeping and the initial persisted-vault MCP bridge sync run on named background threads, so large legacy vaults, stale active-vault paths, or slow process startup cannot beachball the macOS app before React mounts. React still resyncs the bridge from `useVaultSwitcher` after the persisted selection loads, and no selected vault stops the bridge.
+
 Linux uses custom React-rendered window chrome instead of the native Tauri menu bar. `setup_linux_window_chrome()` drops server-side decorations on the main window, `openNoteInNewWindow()` does the same for detached note windows, and `LinuxTitlebar`/`LinuxMenuButton` route both window controls and menu actions back through the same shared command pipeline that the desktop native menus use. The native app menu keeps macOS-only Services/Hide entries off Windows and Linux, while cross-platform custom items such as Check for Updates emit Tolaria command IDs and show visible updater feedback.
 When Tolaria is launched from a Linux AppImage, `run()` also applies AppImage-only WebKitGTK startup safeguards without changing native package installs. It injects `WEBKIT_DISABLE_DMABUF_RENDERER=1` and `WEBKIT_DISABLE_COMPOSITING_MODE=1` independently unless the user already set either variable, and on Wayland sessions it re-execs once with the first available system `libwayland-client.so` in `LD_PRELOAD` when the user has not provided their own preload. The rendering overrides keep AppImage WebViews from blanking after accelerated compositing/DMA-BUF failures, while the re-exec addresses AppImage library-order failures that can surface as `Could not create default EGL display: EGL_BAD_PARAMETER` before GTK/WebKit create the display.
 
@@ -541,8 +543,8 @@ sequenceDiagram
     participant U as User
 
     T->>T: apply Linux AppImage WebKit env/preload safeguards<br/>(AppImage only)
-    T->>T: run_startup_tasks()<br/>(migrate + seed only)
-    T->>MCP: spawn_ws_bridge() — ports 9710 + 9711
+    T->>T: start background legacy vault housekeeping<br/>(does not block setup)
+    T->>MCP: start background initial ws-bridge sync<br/>(if active vault exists)
     T->>A: App mounts
 
     A->>A: useOnboarding — vault exists?
@@ -554,6 +556,7 @@ sequenceDiagram
         T-->>VL: VaultEntry[]
         VL->>T: invoke('get_modified_files')
         A->>T: useMcpStatus — check explicit MCP setup state
+        A->>T: sync_mcp_bridge_vault(selected path)
         VL-->>A: entries ready
     end
 
