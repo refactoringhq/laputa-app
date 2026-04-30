@@ -62,11 +62,13 @@
            select.addEventListener("change", handleLanguageChange);
 --- a/src/editor/managers/ExtensionManager/extensions.ts
 +++ b/src/editor/managers/ExtensionManager/extensions.ts
-@@ -84,7 +84,8 @@
+@@ -84,7 +84,10 @@
      }).configure({
        defaultProtocol: DEFAULT_LINK_PROTOCOL,
        // only call this once if we have multiple editors installed. Or fix https://github.com/ueberdosis/tiptap/issues/5450
 -      protocols: LINKIFY_INITIALIZED ? [] : VALID_LINK_PROTOCOLS,
++      // Tolaria routes editor link clicks through its guarded native opener.
++      openOnClick: false,
 +      // Tolaria pre-registers BlockNote's non-native protocols before linkify initializes.
 +      protocols: [],
      }),
@@ -85,11 +87,13 @@
  function mn(o, e) {
    const t = [
      I.ClipboardTextSerializer,
-@@ -2062,7 +2064,8 @@
+@@ -2062,7 +2064,10 @@
      }).configure({
        defaultProtocol: Ct,
        // only call this once if we have multiple editors installed. Or fix https://github.com/ueberdosis/tiptap/issues/5450
 -      protocols: fe ? [] : Bt
++      // Tolaria routes editor link clicks through its guarded native opener.
++      openOnClick: !1,
 +      // Tolaria pre-registers BlockNote's non-native protocols before linkify initializes.
 +      protocols: []
      }),
