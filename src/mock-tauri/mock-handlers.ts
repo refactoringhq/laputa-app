@@ -503,6 +503,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       },
     },
   }, null, 2),
+  copy_text_to_clipboard: () => null,
   sync_mcp_bridge_vault: (args: { vaultPath?: string | null }) => args.vaultPath ? 'started' : 'stopped',
   repair_vault: (): string => {
     mockVaultAiGuidanceStatus = {

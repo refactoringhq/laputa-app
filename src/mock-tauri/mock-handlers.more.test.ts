@@ -194,6 +194,7 @@ describe('mockHandlers additional coverage', () => {
     expect(mockHandlers.migrate_is_a_to_type()).toBe(0)
     expect(mockHandlers.register_mcp_tools()).toBe('registered')
     expect(mockHandlers.check_mcp_status()).toBe('installed')
+    expect(mockHandlers.copy_text_to_clipboard()).toBeNull()
     expect(mockHandlers.reinit_telemetry()).toBeNull()
     expect(mockHandlers.stream_claude_chat()).toBe('mock-session')
     expect(mockHandlers.stream_ai_agent()).toBeNull()

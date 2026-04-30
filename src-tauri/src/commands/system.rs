@@ -1,5 +1,7 @@
 #[cfg(desktop)]
-use std::process::Command;
+use std::io::Write;
+#[cfg(desktop)]
+use std::process::{Command, Stdio};
 
 #[cfg(desktop)]
 use crate::menu;
@@ -140,6 +142,70 @@ pub async fn get_mcp_config_snippet(vault_path: String) -> Result<String, String
         .map_err(|e| format!("MCP config task failed: {e}"))?
 }
 
+#[cfg(target_os = "macos")]
+fn clipboard_command() -> Command {
+    crate::hidden_command("pbcopy")
+}
+
+#[cfg(target_os = "windows")]
+fn clipboard_command() -> Command {
+    crate::hidden_command("clip.exe")
+}
+
+#[cfg(all(desktop, not(any(target_os = "macos", target_os = "windows"))))]
+fn clipboard_command() -> Command {
+    let mut command = crate::hidden_command("sh");
+    command.args([
+        "-c",
+        "if command -v wl-copy >/dev/null 2>&1; then wl-copy; elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard; elif command -v xsel >/dev/null 2>&1; then xsel --clipboard --input; else exit 127; fi",
+    ]);
+    command
+}
+
+#[cfg(desktop)]
+fn clipboard_failure_message(stderr: &[u8]) -> String {
+    let message = String::from_utf8_lossy(stderr).trim().to_string();
+    if message.is_empty() {
+        "Native clipboard command failed".to_string()
+    } else {
+        format!("Native clipboard command failed: {message}")
+    }
+}
+
+#[cfg(desktop)]
+fn write_native_clipboard(mut command: Command, text: &str) -> Result<(), String> {
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to open native clipboard command: {e}"))?;
+
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| "Native clipboard command did not expose stdin".to_string())?;
+    stdin
+        .write_all(text.as_bytes())
+        .map_err(|e| format!("Failed to write native clipboard text: {e}"))?;
+    drop(stdin);
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Native clipboard command did not finish: {e}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(clipboard_failure_message(&output.stderr))
+    }
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
+    write_native_clipboard(clipboard_command(), &text)
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn sync_mcp_bridge_vault(
@@ -180,6 +246,12 @@ pub async fn check_mcp_status(_vault_path: String) -> Result<crate::mcp::McpStat
 #[tauri::command]
 pub async fn get_mcp_config_snippet(_vault_path: String) -> Result<String, String> {
     Err("MCP is not available on mobile".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn copy_text_to_clipboard(_text: String) -> Result<(), String> {
+    Err("Clipboard is not available on mobile".into())
 }
 
 #[cfg(mobile)]
