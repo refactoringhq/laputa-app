@@ -152,3 +152,5 @@ proposed → active → superseded
 | [0097](0097-gemini-cli-agent-adapter.md) | Gemini CLI agent adapter | active |
 | [0098](0098-in-app-image-and-pdf-file-previews.md) | In-app image and PDF previews for binary vault files | active |
 | [0099](0099-cumulative-vault-asset-scope.md) | Cumulative vault asset scope for previews | active |
+| [0100](0100-synthetic-vault-root-folder-row.md) | Synthetic vault-root row in folder navigation | active |
+| [0101](0101-categorical-product-analytics-events.md) | Categorical product analytics events | active |
