@@ -366,6 +366,7 @@
   "editor.toolbar.revealFile": "Exibir no Finder",
   "editor.toolbar.copyFilePath": "Copiar caminho do arquivo",
   "editor.toolbar.openProperties": "Abrir o painel de propriedades",
+  "editor.imageLightbox.title": "Pré-visualização da imagem",
   "editor.filename.rename": "Renomear nome do arquivo",
   "editor.filename.renameToTitle": "Renomear o arquivo para corresponder ao título",
   "editor.filename.trigger": "Nome do arquivo {filename}. Pressione Enter para renomear",

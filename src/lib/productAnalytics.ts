@@ -57,6 +57,10 @@ export function trackNavigationHistoryButtonClicked(direction: NavigationHistory
   trackEvent('navigation_history_button_clicked', { direction })
 }
 
+export function trackInlineImageLightboxOpened(): void {
+  trackEvent('inline_image_lightbox_opened')
+}
+
 export function trackAiAgentMessageBlocked(agent: AiAgentId, reason: AgentBlockedReason): void {
   trackEvent('ai_agent_message_blocked', { agent, reason })
 }

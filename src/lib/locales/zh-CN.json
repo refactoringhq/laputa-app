@@ -366,6 +366,7 @@
   "editor.toolbar.revealFile": "在访达中显示",
   "editor.toolbar.copyFilePath": "复制文件路径",
   "editor.toolbar.openProperties": "打开属性面板",
+  "editor.imageLightbox.title": "图像预览",
   "editor.filename.rename": "重命名文件名",
   "editor.filename.renameToTitle": "将文件重命名为匹配标题",
   "editor.filename.trigger": "文件名 {filename}。按 Enter 重命名",

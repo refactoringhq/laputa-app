@@ -345,6 +345,7 @@ function EditorCanvas({
   onEditorChange,
   isDeletedPreview,
   vaultPath,
+  locale,
 }: Pick<
   EditorContentModel,
   | 'showEditor'
@@ -355,6 +356,7 @@ function EditorCanvas({
   | 'onEditorChange'
   | 'isDeletedPreview'
   | 'vaultPath'
+  | 'locale'
 >) {
   if (!showEditor) return null
 
@@ -368,6 +370,7 @@ function EditorCanvas({
           onChange={onEditorChange}
           vaultPath={vaultPath}
           editable={!isDeletedPreview}
+          locale={locale}
         />
       </div>
     </EditorFindScope>
@@ -498,6 +501,7 @@ export function EditorContentLayout(model: EditorContentModel) {
             onNavigateWikilink={onNavigateWikilink}
             onEditorChange={onEditorChange}
             isDeletedPreview={isDeletedPreview}
+            locale={locale}
           />
         </>
       )}

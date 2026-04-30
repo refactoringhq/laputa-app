@@ -366,6 +366,7 @@
   "editor.toolbar.revealFile": "Finderで表示",
   "editor.toolbar.copyFilePath": "ファイルパスをコピー",
   "editor.toolbar.openProperties": "プロパティパネルを開く",
+  "editor.imageLightbox.title": "画像プレビュー",
   "editor.filename.rename": "ファイル名を変更",
   "editor.filename.renameToTitle": "タイトルと一致するようにファイル名を変更する",
   "editor.filename.trigger": "ファイル名：{filename}。名前を変更するにはEnterキーを押してください。",
