@@ -23,7 +23,10 @@ pub(crate) fn find_binary() -> Result<PathBuf, String> {
         return Ok(binary);
     }
 
-    if let Some(binary) = find_existing_binary(pi_binary_candidates()) {
+    if let Some(binary) = crate::cli_agent_runtime::find_executable_binary_candidate(
+        pi_binary_candidates(),
+        "Pi CLI",
+    )? {
         return Ok(binary);
     }
 
@@ -93,10 +96,6 @@ fn first_existing_path(stdout: &str) -> Option<PathBuf> {
     })
 }
 
-fn find_existing_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
-    candidates.into_iter().find(|candidate| candidate.exists())
-}
-
 fn pi_binary_candidates() -> Vec<PathBuf> {
     let mut candidates = pi_binary_candidates_from_env();
 
@@ -127,6 +126,7 @@ fn pi_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".npm/bin/pi.exe"),
         home.join(".bun/bin/pi"),
         home.join(".bun/bin/pi.exe"),
+        home.join(".linuxbrew/bin/pi"),
         home.join("AppData/Roaming/npm/pi.cmd"),
         home.join("AppData/Roaming/npm/pi.exe"),
         home.join("AppData/Local/pnpm/pi.cmd"),
@@ -138,6 +138,7 @@ fn pi_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
 
 fn pi_global_binary_candidates() -> Vec<PathBuf> {
     vec![
+        PathBuf::from("/home/linuxbrew/.linuxbrew/bin/pi"),
         PathBuf::from("/usr/local/bin/pi"),
         PathBuf::from("/opt/homebrew/bin/pi"),
     ]
@@ -213,6 +214,26 @@ mod tests {
                 candidate.display()
             );
         }
+    }
+
+    #[test]
+    fn binary_candidates_include_linuxbrew_installs() {
+        let home = PathBuf::from("/home/alex");
+        let home_candidates = pi_binary_candidates_for_home(&home);
+        let global_candidates = pi_global_binary_candidates();
+        let expected_home = home.join(".linuxbrew/bin/pi");
+        let expected_global = PathBuf::from("/home/linuxbrew/.linuxbrew/bin/pi");
+
+        assert!(
+            home_candidates.contains(&expected_home),
+            "missing {}",
+            expected_home.display()
+        );
+        assert!(
+            global_candidates.contains(&expected_global),
+            "missing {}",
+            expected_global.display()
+        );
     }
 
     #[test]

@@ -64,7 +64,10 @@ pub(crate) fn find_claude_binary() -> Result<PathBuf, String> {
         return Ok(binary);
     }
 
-    if let Some(binary) = find_existing_binary(claude_binary_candidates()) {
+    if let Some(binary) = crate::cli_agent_runtime::find_executable_binary_candidate(
+        claude_binary_candidates(),
+        "Claude CLI",
+    )? {
         return Ok(binary);
     }
 
@@ -156,11 +159,13 @@ fn claude_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".npm/bin/claude"),
         home.join(".npm/bin/claude.cmd"),
         home.join(".npm/bin/claude.exe"),
+        home.join(".linuxbrew/bin/claude"),
         home.join("AppData/Roaming/npm/claude.cmd"),
         home.join("AppData/Roaming/npm/claude.exe"),
         home.join("AppData/Local/pnpm/claude.cmd"),
         home.join("AppData/Local/pnpm/claude.exe"),
         home.join("scoop/shims/claude.exe"),
+        PathBuf::from("/home/linuxbrew/.linuxbrew/bin/claude"),
         PathBuf::from("/opt/homebrew/bin/claude"),
         PathBuf::from("/usr/local/bin/claude"),
     ];
@@ -181,10 +186,6 @@ fn nvm_node_binary_candidates_for_home(home: &Path, binary_name: &str) -> Vec<Pa
         .collect::<Vec<_>>();
     candidates.sort();
     candidates
-}
-
-fn find_existing_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
-    candidates.into_iter().find(|candidate| candidate.exists())
 }
 
 // ---------------------------------------------------------------------------
@@ -1398,6 +1399,17 @@ mod tests {
     }
 
     #[test]
+    fn claude_binary_candidates_include_linuxbrew_installs() {
+        let home = PathBuf::from("/home/alex");
+        let expected = [
+            home.join(".linuxbrew/bin/claude"),
+            PathBuf::from("/home/linuxbrew/.linuxbrew/bin/claude"),
+        ];
+
+        assert_binary_candidates_include(&home, &expected);
+    }
+
+    #[test]
     fn claude_binary_candidates_include_windows_exe_installs() {
         let home = PathBuf::from(r"C:\Users\alex");
         let expected = [
@@ -1422,9 +1434,19 @@ mod tests {
         let claude = dir.path().join(".local/bin/claude.exe");
         std::fs::create_dir_all(claude.parent().unwrap()).unwrap();
         std::fs::write(&claude, "").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            std::fs::set_permissions(&claude, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
 
         assert_eq!(
-            find_existing_binary(claude_binary_candidates_for_home(dir.path())),
+            crate::cli_agent_runtime::find_executable_binary_candidate(
+                claude_binary_candidates_for_home(dir.path()),
+                "Claude CLI",
+            )
+            .unwrap(),
             Some(claude)
         );
     }
