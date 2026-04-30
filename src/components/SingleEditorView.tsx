@@ -451,15 +451,42 @@ function handleCodeBlockCopy(event: React.ClipboardEvent<HTMLDivElement>) {
   event.preventDefault()
 }
 
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null
+}
+
+function markdownStem(value: string): string {
+  return value.replace(/\.md$/i, '')
+}
+
+function pathStem(path: string): string {
+  return markdownStem(path.split('/').pop() ?? path)
+}
+
+function safeStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => nonEmptyString(item) !== null)
+    : []
+}
+
 function buildBaseSuggestionItems(entries: VaultEntry[]) {
-  return deduplicateByPath(entries.map(entry => ({
-    title: entry.title,
-    aliases: [...new Set([entry.filename.replace(/\.md$/, ''), ...entry.aliases])],
-    group: entry.isA || 'Note',
-    entryType: entry.isA,
-    entryTitle: entry.title,
-    path: entry.path,
-  })))
+  return deduplicateByPath(entries.flatMap(entry => {
+    const path = nonEmptyString(entry.path)
+    if (!path) return []
+
+    const filename = nonEmptyString(entry.filename)
+    const filenameStem = filename ? markdownStem(filename) : pathStem(path)
+    const title = nonEmptyString(entry.title) ?? filenameStem
+    const entryType = nonEmptyString(entry.isA)
+    return [{
+      title,
+      aliases: [...new Set([filenameStem, ...safeStringArray(entry.aliases)])],
+      group: entryType ?? 'Note',
+      entryType,
+      entryTitle: title,
+      path,
+    }]
+  }))
 }
 
 function useInsertWikilink(

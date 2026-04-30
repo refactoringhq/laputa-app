@@ -131,7 +131,8 @@ pub async fn download_and_install_app_update<R: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use super::ReleaseChannel;
+    use super::{AppUpdateDownloadEvent, AppUpdateMetadata, ReleaseChannel};
+    use serde_json::json;
 
     #[test]
     fn release_channel_defaults_to_stable() {
@@ -175,5 +176,55 @@ mod tests {
             ReleaseChannel::Stable.updater_endpoint().unwrap().as_str(),
             "https://refactoringhq.github.io/tolaria/stable/latest.json"
         );
+    }
+
+    #[test]
+    fn update_metadata_serializes_for_frontend_consumers() {
+        let metadata = AppUpdateMetadata {
+            current_version: "2026.4.1".into(),
+            version: "2026.4.2".into(),
+            date: Some("2026-04-30T12:00:00Z".into()),
+            body: Some("Bug fixes".into()),
+        };
+
+        assert_eq!(
+            serde_json::to_value(metadata).unwrap(),
+            json!({
+                "currentVersion": "2026.4.1",
+                "version": "2026.4.2",
+                "date": "2026-04-30T12:00:00Z",
+                "body": "Bug fixes"
+            })
+        );
+    }
+
+    #[test]
+    fn download_events_serialize_as_tagged_frontend_events() {
+        let events = [
+            (
+                AppUpdateDownloadEvent::Started {
+                    content_length: Some(4096),
+                },
+                json!({
+                    "event": "Started",
+                    "data": { "contentLength": 4096 }
+                }),
+            ),
+            (
+                AppUpdateDownloadEvent::Progress { chunk_length: 512 },
+                json!({
+                    "event": "Progress",
+                    "data": { "chunkLength": 512 }
+                }),
+            ),
+            (
+                AppUpdateDownloadEvent::Finished,
+                json!({ "event": "Finished" }),
+            ),
+        ];
+
+        for (event, expected) in events {
+            assert_eq!(serde_json::to_value(event).unwrap(), expected);
+        }
     }
 }

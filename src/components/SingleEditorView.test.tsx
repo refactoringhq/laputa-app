@@ -440,6 +440,25 @@ describe('SingleEditorView', () => {
     expect(onMentionItemClick).toHaveBeenCalledOnce()
   })
 
+  it('renders when a reload returns an entry with missing suggestion metadata', () => {
+    const reloadedEntry = {
+      ...makeEntry({ path: '/vault/project/reloaded.md', title: 'Reloaded' }),
+      filename: undefined,
+      aliases: undefined,
+      isA: undefined,
+    } as unknown as VaultEntry
+
+    expect(() => {
+      render(
+        <SingleEditorView
+          editor={createEditor() as never}
+          entries={[reloadedEntry]}
+          onNavigateWikilink={vi.fn()}
+        />,
+      )
+    }).not.toThrow()
+  })
+
   it('ignores stale suggestion item clicks after the editor DOM disconnects', () => {
     const editor = createEditor()
     editor.domElement = document.createElement('div')

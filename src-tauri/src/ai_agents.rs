@@ -191,6 +191,30 @@ fn map_claude_event(event: crate::claude_cli::ClaudeStreamEvent) -> Option<AiAge
 mod tests {
     use super::*;
 
+    fn request_with_permission(
+        permission_mode: Option<AiAgentPermissionMode>,
+    ) -> AiAgentStreamRequest {
+        AiAgentStreamRequest {
+            agent: AiAgentId::Codex,
+            message: "Summarize this vault".into(),
+            system_prompt: None,
+            vault_path: "/tmp/vault".into(),
+            permission_mode,
+        }
+    }
+
+    #[test]
+    fn stream_request_uses_default_or_explicit_permission_mode() {
+        assert_eq!(
+            request_with_permission(None).permission_mode(),
+            AiAgentPermissionMode::Safe
+        );
+        assert_eq!(
+            request_with_permission(Some(AiAgentPermissionMode::PowerUser)).permission_mode(),
+            AiAgentPermissionMode::PowerUser
+        );
+    }
+
     #[test]
     fn normalize_status_contains_all_agents() {
         let status = get_ai_agents_status();
@@ -215,6 +239,66 @@ mod tests {
     }
 
     #[test]
+    fn map_claude_text_events_preserve_stream_data() {
+        assert!(matches!(
+            map_claude_event(crate::claude_cli::ClaudeStreamEvent::Init {
+                session_id: "session-1".into(),
+            }),
+            Some(AiAgentStreamEvent::Init { session_id }) if session_id == "session-1"
+        ));
+        assert!(matches!(
+            map_claude_event(crate::claude_cli::ClaudeStreamEvent::TextDelta {
+                text: "visible output".into(),
+            }),
+            Some(AiAgentStreamEvent::TextDelta { text }) if text == "visible output"
+        ));
+        assert!(matches!(
+            map_claude_event(crate::claude_cli::ClaudeStreamEvent::ThinkingDelta {
+                text: "thinking".into(),
+            }),
+            Some(AiAgentStreamEvent::ThinkingDelta { text }) if text == "thinking"
+        ));
+    }
+
+    #[test]
+    fn map_claude_tool_events_preserve_stream_data() {
+        let started = map_claude_event(crate::claude_cli::ClaudeStreamEvent::ToolStart {
+            tool_name: "Read".into(),
+            tool_id: "tool-1".into(),
+            input: Some("{\"file\":\"note.md\"}".into()),
+        });
+        let finished = map_claude_event(crate::claude_cli::ClaudeStreamEvent::ToolDone {
+            tool_id: "tool-1".into(),
+            output: Some("done".into()),
+        });
+
+        assert!(matches!(
+            started,
+            Some(AiAgentStreamEvent::ToolStart { tool_name, tool_id, input })
+                if tool_name == "Read"
+                    && tool_id == "tool-1"
+                    && input.as_deref() == Some("{\"file\":\"note.md\"}")
+        ));
+        assert!(matches!(
+            finished,
+            Some(AiAgentStreamEvent::ToolDone { tool_id, output })
+                if tool_id == "tool-1" && output.as_deref() == Some("done")
+        ));
+    }
+
+    #[test]
+    fn map_claude_error_event_preserves_message() {
+        let mapped = map_claude_event(crate::claude_cli::ClaudeStreamEvent::Error {
+            message: "missing auth".into(),
+        });
+
+        assert!(matches!(
+            mapped,
+            Some(AiAgentStreamEvent::Error { message }) if message == "missing auth"
+        ));
+    }
+
+    #[test]
     fn map_claude_result_event_preserves_final_text() {
         let mapped = map_claude_event(crate::claude_cli::ClaudeStreamEvent::Result {
             text: "Final answer from Claude".into(),
@@ -225,5 +309,15 @@ mod tests {
             mapped,
             Some(AiAgentStreamEvent::TextDelta { text }) if text == "Final answer from Claude"
         ));
+    }
+
+    #[test]
+    fn map_claude_empty_result_event_is_ignored() {
+        let mapped = map_claude_event(crate::claude_cli::ClaudeStreamEvent::Result {
+            text: String::new(),
+            session_id: "session-1".into(),
+        });
+
+        assert!(mapped.is_none());
     }
 }
