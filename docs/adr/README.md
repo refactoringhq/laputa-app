@@ -70,7 +70,7 @@ proposed → active → superseded
 | [0012](0012-claude-cli-for-ai-agent.md) | Claude CLI subprocess for AI agent | active |
 | [0013](0013-remove-theming-system.md) | Remove vault-based theming system | superseded -> [0081](0081-internal-light-dark-theme-runtime.md) |
 | [0014](0014-git-based-vault-cache.md) | Git-based incremental vault cache | active |
-| [0015](0015-auto-save-with-debounce.md) | Auto-save with 500ms debounce | active |
+| [0015](0015-auto-save-with-debounce.md) | Auto-save with 500ms debounce | superseded → [0102](0102-low-end-safe-autosave-idle-window.md) |
 | [0016](0016-sentry-posthog-telemetry.md) | Sentry + PostHog telemetry with consent | active |
 | [0017](canary-release-channel-and-local-feature-flags.md) | Canary release channel and feature flags | superseded → [0057](0057-alpha-stable-release-channels-and-beta-cohorts.md) |
 | [0018](0018-codescene-code-health-gates.md) | CodeScene code health gates in CI | superseded → [0064](0064-ratcheted-codescene-thresholds.md) |
@@ -154,3 +154,4 @@ proposed → active → superseded
 | [0099](0099-cumulative-vault-asset-scope.md) | Cumulative vault asset scope for previews | active |
 | [0100](0100-synthetic-vault-root-folder-row.md) | Synthetic vault-root row in folder navigation | active |
 | [0101](0101-categorical-product-analytics-events.md) | Categorical product analytics events | active |
+| [0102](0102-low-end-safe-autosave-idle-window.md) | Low-end-safe autosave idle window | active |
