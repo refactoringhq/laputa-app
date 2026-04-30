@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{
     App, AppHandle, LogicalPosition, LogicalSize, Manager, Position, RunEvent, Size, WebviewWindow,
@@ -263,7 +263,11 @@ fn window_state_path() -> Result<PathBuf, String> {
 }
 
 fn read_main_window_frame(scale_factor: f64) -> Option<WindowFrame> {
-    let content = fs::read_to_string(window_state_path().ok()?).ok()?;
+    read_main_window_frame_at(&window_state_path().ok()?, scale_factor)
+}
+
+fn read_main_window_frame_at(path: &Path, scale_factor: f64) -> Option<WindowFrame> {
+    let content = fs::read_to_string(path).ok()?;
     let persisted: PersistedWindowState = serde_json::from_str(&content).ok()?;
     persisted
         .main
@@ -276,7 +280,10 @@ fn read_main_window_frame(scale_factor: f64) -> Option<WindowFrame> {
 }
 
 fn write_main_window_frame(frame: WindowFrame) -> Result<(), String> {
-    let path = window_state_path()?;
+    write_main_window_frame_at(&window_state_path()?, frame)
+}
+
+fn write_main_window_frame_at(path: &Path, frame: WindowFrame) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create window state directory: {e}"))?;
@@ -510,5 +517,51 @@ mod tests {
         assert!(!restores_window_frame_after_runtime_ready(
             &RunEvent::Resumed
         ));
+    }
+
+    #[test]
+    fn persists_and_reads_logical_frame_from_disk() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("nested/window-state.json");
+        let saved = frame(80, 120, 1100, 700);
+
+        write_main_window_frame_at(&path, saved).unwrap();
+
+        let json = std::fs::read_to_string(&path).unwrap();
+        assert!(json.contains("\"coordinate_space\": \"logical\""));
+        assert_eq!(read_main_window_frame_at(&path, 2.0), Some(saved));
+    }
+
+    #[test]
+    fn reads_legacy_physical_frame_from_disk_as_logical_points() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("window-state.json");
+        std::fs::write(
+            &path,
+            r#"{
+              "main": { "x": 160, "y": 240, "width": 2200, "height": 1400 },
+              "coordinate_space": "physical"
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            read_main_window_frame_at(&path, 2.0),
+            Some(frame(80, 120, 1100, 700))
+        );
+    }
+
+    #[test]
+    fn ignores_missing_corrupt_or_tiny_window_state_files() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("window-state.json");
+
+        assert_eq!(read_main_window_frame_at(&path, 1.0), None);
+
+        std::fs::write(&path, "not json").unwrap();
+        assert_eq!(read_main_window_frame_at(&path, 1.0), None);
+
+        std::fs::write(&path, r#"{"main":{"x":0,"y":0,"width":100,"height":100}}"#).unwrap();
+        assert_eq!(read_main_window_frame_at(&path, 1.0), None);
     }
 }

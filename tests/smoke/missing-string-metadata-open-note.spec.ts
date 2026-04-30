@@ -1,9 +1,10 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
   createFixtureVaultCopy,
-  openFixtureVault,
+  openFixtureVaultDesktopHarness,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
+import { executeCommand, openCommandPalette } from './helpers'
 
 let tempVaultDir: string
 
@@ -46,6 +47,12 @@ function removeAlphaProjectStringMetadata(entries: Array<Record<string, unknown>
   })
 }
 
+async function reloadVaultFromCommandPalette(page: Page): Promise<void> {
+  await openCommandPalette(page)
+  await executeCommand(page, 'Reload Vault')
+  await expect(page.locator('input[placeholder="Type a command..."]')).not.toBeVisible()
+}
+
 test.beforeEach(async ({ page }, testInfo) => {
   testInfo.setTimeout(60_000)
   tempVaultDir = createFixtureVaultCopy()
@@ -62,7 +69,7 @@ test.beforeEach(async ({ page }, testInfo) => {
       json: removeAlphaProjectStringMetadata(entries),
     })
   })
-  await openFixtureVault(page, tempVaultDir, {
+  await openFixtureVaultDesktopHarness(page, tempVaultDir, {
     expectedReadyTitle: 'alpha-project',
   })
   await page.setViewportSize({ width: 1180, height: 760 })
@@ -78,6 +85,19 @@ test('@smoke note open tolerates missing string metadata from the vault scan', a
 
   await noteList.getByText('alpha-project', { exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Alpha Project', level: 1 })).toBeVisible({ timeout: 5_000 })
+
+  await noteList.getByText('Note B', { exact: true }).click()
+  await noteList.getByText('alpha-project', { exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Alpha Project', level: 1 })).toBeVisible({ timeout: 5_000 })
+
+  expect(errors).toHaveLength(0)
+})
+
+test('note open after vault reload tolerates missing suggestion metadata', async ({ page }) => {
+  const errors = collectMissingMetadataCrashes(page)
+  const noteList = page.getByTestId('note-list-container')
+
+  await reloadVaultFromCommandPalette(page)
 
   await noteList.getByText('Note B', { exact: true }).click()
   await noteList.getByText('alpha-project', { exact: true }).click()
