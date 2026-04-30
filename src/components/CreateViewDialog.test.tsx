@@ -14,7 +14,7 @@ describe('CreateViewDialog', () => {
   function makeEditingView(overrides: Partial<ViewDefinition> = {}): ViewDefinition {
     return {
       name: 'Active Projects',
-      icon: '🚀',
+      icon: 'rocket',
       color: null,
       sort: null,
       filters: { all: [{ field: 'type', op: 'equals', value: 'Project' }] },
@@ -42,7 +42,7 @@ describe('CreateViewDialog', () => {
 
   it('preserves existing icon and markdown-defined color when editing a view', async () => {
     const onCreate = vi.fn()
-    const editingView = makeEditingView({ name: 'Monday', icon: '🗂️', color: 'blue' })
+    const editingView = makeEditingView({ name: 'Monday', icon: 'folder', color: 'blue' })
     render(<CreateViewDialog {...defaultProps} onCreate={onCreate} editingView={editingView} />)
 
     // Submit the form without changing anything
@@ -50,31 +50,29 @@ describe('CreateViewDialog', () => {
 
     await waitFor(() => {
       expect(onCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ icon: '🗂️', color: 'blue' })
+        expect.objectContaining({ icon: 'folder', color: 'blue' })
       )
     })
   })
 
-  it('passes selected emoji icon when creating a view', async () => {
+  it('passes selected icon and color when creating a view', async () => {
     const onCreate = vi.fn()
     render(<CreateViewDialog {...defaultProps} onCreate={onCreate} />)
     const input = screen.getByPlaceholderText(/Active Projects|Reading List/i)
     fireEvent.change(input, { target: { value: 'Test View' } })
-    // Open emoji picker and select an emoji
-    fireEvent.click(screen.getByTitle('Pick icon'))
-    expect(screen.getByTestId('emoji-picker')).toBeInTheDocument()
-    const emojiButtons = screen.getAllByTestId('emoji-option')
-    fireEvent.click(emojiButtons[0])
-    // Submit the form
+    fireEvent.change(screen.getByPlaceholderText('Search icons…'), { target: { value: 'book' } })
+    fireEvent.click(screen.getByTitle('book'))
+    fireEvent.click(screen.getByTitle('Blue'))
+
     fireEvent.click(screen.getByText('Create'))
+
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
     const definition = onCreate.mock.calls[0][0] as ViewDefinition
-    expect(definition.icon).not.toBeNull()
-    expect(typeof definition.icon).toBe('string')
-    expect(definition.icon!.length).toBeGreaterThan(0)
+    expect(definition.icon).toBe('book')
+    expect(definition.color).toBe('blue')
   })
 
-  it('passes null icon when no emoji is selected', async () => {
+  it('passes null icon and color when no appearance is selected', async () => {
     const onCreate = vi.fn()
     render(<CreateViewDialog {...defaultProps} onCreate={onCreate} />)
     const input = screen.getByPlaceholderText(/Active Projects|Reading List/i)
@@ -82,7 +80,7 @@ describe('CreateViewDialog', () => {
     fireEvent.submit(screen.getByText('Create').closest('form')!)
     await waitFor(() => {
       expect(onCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ icon: null })
+        expect.objectContaining({ icon: null, color: null })
       )
     })
   })

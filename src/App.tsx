@@ -1744,7 +1744,7 @@ function App() {
           onSelectType={noteRetargetingUi.selectType}
           onSelectFolder={noteRetargetingUi.selectFolder}
         />
-        <CreateViewDialog open={dialogs.showCreateViewDialog} onClose={dialogs.closeCreateView} onCreate={handleCreateOrUpdateView} availableFields={availableFields} editingView={dialogs.editingView?.definition ?? null} />
+        <CreateViewDialog open={dialogs.showCreateViewDialog} onClose={dialogs.closeCreateView} onCreate={handleCreateOrUpdateView} availableFields={availableFields} locale={appLocale} editingView={dialogs.editingView?.definition ?? null} />
         <CommitDialog
           open={commitFlow.showCommitDialog}
           modifiedCount={vault.modifiedFiles.length}

@@ -162,6 +162,25 @@ files:
     settings.cancel: ea4788705e6873b424c65e91c2846b19
     settings.save: c9cc8cce247e49bae79f15173ce97354
     common.cancel: ea4788705e6873b424c65e91c2846b19
+    common.create: 686e697538050e4664636337cc3b834f
+    common.save: c9cc8cce247e49bae79f15173ce97354
+    customize.color: cb5feb1b7314637725a2e73bdc9f7295
+    customize.icon: 817434295a673aed431435658b65d9a7
+    customize.searchIcons: 0688a8098567785a05cb4cf937cbb880
+    customize.noIconsFound: 89c25bea716a589b11599f2bbcf34054
+    customize.template: 278c491bdd8a53618c149c4ac790da34
+    customize.templatePlaceholder: 44482755791f96f37118f3a3bc66f668
+    customize.done: f92965e2c8a7afb3c1b9a5c09a263636
+    viewDialog.title.create: 01e53f288ebe0b7bdda19c8151aa7710
+    viewDialog.title.edit: 6369f1c063cb2c22efa584a19e98d97f
+    viewDialog.description.create: bd77a64c89e304ee2c4ef4abc3636cfe
+    viewDialog.description.edit: 7fa9ed9a54624ea91cdcdfc139090a24
+    viewDialog.nameLabel: 49ee3087348e8d44e1feda1917443987
+    viewDialog.namePlaceholder: dbb077d36957a33c4147eb24919192e1
+    viewDialog.filtersLabel: f3f43e30c8c7d78c6ac0173515e57a00
+    viewDialog.saveError: 80fe81f3ca09ea03af03fdb9ae809eda
+    viewDialog.selectedIcon: 5f98b507ccec0bbc51ca7e8a5b270250
+    viewDialog.selectedColor: 192ec1a9973f328c3620cd3fa670c745
     ai.permission.safe.short: c6eea0560cd6f377e78dff2c85cc9122
     ai.permission.safe.control: 386cc66605d50e5bf1fb726f97e55b55
     ai.permission.safe.tooltip: 3bd635e2b2223da302994d77bfd7edfd

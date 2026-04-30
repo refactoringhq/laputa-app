@@ -368,6 +368,7 @@ export function CustomizeOverlay({
   onCustomize,
   onChangeTemplate,
   onClose,
+  locale = 'en',
 }: {
   target: string | null
   typeEntryMap: Record<string, VaultEntry>
@@ -375,6 +376,7 @@ export function CustomizeOverlay({
   onCustomize: (prop: 'icon' | 'color', value: string) => void
   onChangeTemplate: (template: string) => void
   onClose: () => void
+  locale?: AppLocale
 }) {
   if (!target) return null
 
@@ -388,6 +390,7 @@ export function CustomizeOverlay({
         onChangeColor={(color) => onCustomize('color', color)}
         onChangeTemplate={onChangeTemplate}
         onClose={onClose}
+        locale={locale}
       />
     </div>
   )

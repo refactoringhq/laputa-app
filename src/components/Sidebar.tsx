@@ -621,6 +621,7 @@ function SidebarInteractionOverlays({
         onCustomize={runtime.typeInteractions.handleCustomize}
         onChangeTemplate={runtime.typeInteractions.handleChangeTemplate}
         onClose={runtime.typeInteractions.closeCustomizeTarget}
+        locale={locale}
       />
     </>
   )
