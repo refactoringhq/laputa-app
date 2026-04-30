@@ -408,6 +408,7 @@
   "inspector.info.words": "Слов",
   "inspector.info.size": "Размер",
   "update.available": "доступно",
+  "update.checking": "Проверка наличия обновлений...",
   "update.releaseNotes": "Примечания к выпуску",
   "update.updateNow": "Обновить сейчас",
   "update.dismiss": "Закрыть",

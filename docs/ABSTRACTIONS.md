@@ -796,7 +796,7 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 ## Updates & Feature Flags
 
 ### Hooks
-- **`useUpdater(releaseChannel)`** — Channel-aware updater state machine. Checks the selected feed, surfaces available/downloading/ready states, and delegates install work to Rust.
+- **`useUpdater(releaseChannel)`** — Channel-aware updater state machine. Checks the selected feed, surfaces checking/available/downloading/ready states, and delegates install work to Rust.
 - **`useFeatureFlag(flag)`** — Returns boolean for a named feature flag. Checks `localStorage` override (`ff_<name>`), then falls back to telemetry-backed evaluation. Type-safe via `FeatureFlagName` union.
 
 ### Frontend helpers

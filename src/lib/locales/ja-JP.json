@@ -408,6 +408,7 @@
   "inspector.info.words": "単語数",
   "inspector.info.size": "サイズ",
   "update.available": "利用可能",
+  "update.checking": "更新を確認しています...",
   "update.releaseNotes": "リリースノート",
   "update.updateNow": "今すぐ更新",
   "update.dismiss": "却下",

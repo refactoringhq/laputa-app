@@ -410,6 +410,7 @@ files:
     inspector.info.words: 6f15b8d4b7287d60a8ea3d1c5cbadc84
     inspector.info.size: 6f6cb72d544962fa333e2e34ce64f719
     update.available: 992477975168b876be8e77ce2975e390
+    update.checking: a07813cc05571f23ce8dd7039583d7da
     update.releaseNotes: 5dd03e8d039863e563e049be198c3fd3
     update.updateNow: 99b1054c0f320be9f109c877a5efd0b2
     update.dismiss: c8a59e7135a20b362f9c768b09454fdb
