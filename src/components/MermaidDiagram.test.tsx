@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 import { MermaidDiagram } from './MermaidDiagram'
 
 const mermaidMock = vi.hoisted(() => ({
@@ -48,6 +49,26 @@ describe('MermaidDiagram', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Mermaid diagram' }))
     expect(screen.getByTestId('mermaid-diagram-dialog-viewport').querySelector('svg')).not.toBeNull()
+  })
+
+  it('tags Mermaid SVG style elements with the runtime CSP nonce', async () => {
+    mermaidMock.render.mockResolvedValueOnce({
+      svg: '<svg aria-label="Rendered Mermaid"><style>.node{fill:#000}</style><g><text>A to B</text></g></svg>',
+    })
+
+    render(
+      <MermaidDiagram
+        diagram={'flowchart LR\nA --> B'}
+        source={'```mermaid\nflowchart LR\nA --> B\n```'}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram-viewport').querySelector('style')).not.toBeNull()
+    })
+
+    const style = screen.getByTestId('mermaid-diagram-viewport').querySelector('style')
+    expect(style?.getAttribute('nonce')).toBe(RUNTIME_STYLE_NONCE)
   })
 
   it('falls back to the original source when Mermaid cannot render', async () => {

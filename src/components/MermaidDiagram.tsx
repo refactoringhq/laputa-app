@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { RUNTIME_STYLE_NONCE } from '@/lib/runtimeStyleNonce'
 
 type MermaidApi = typeof import('mermaid')['default']
 
@@ -51,6 +52,18 @@ function initializeMermaid(mermaid: MermaidApi) {
   initialized = true
 }
 
+function withRuntimeStyleNonce(svg: string): string {
+  if (!svg.includes('<style')) return svg
+  if (typeof document === 'undefined') return svg
+
+  const container = document.createElement('div')
+  container.innerHTML = svg
+  container.querySelectorAll('style').forEach((style) => {
+    style.setAttribute('nonce', RUNTIME_STYLE_NONCE)
+  })
+  return container.innerHTML
+}
+
 async function renderMermaidDiagram({
   diagram,
   renderId,
@@ -62,7 +75,7 @@ async function renderMermaidDiagram({
     const mermaid = (await import('mermaid')).default
     initializeMermaid(mermaid)
     const result = await mermaid.render(renderId, diagram)
-    return result.svg
+    return withRuntimeStyleNonce(result.svg)
   }
   const nextRender = renderQueue.then(render, render)
   renderQueue = nextRender.then(() => undefined, () => undefined)

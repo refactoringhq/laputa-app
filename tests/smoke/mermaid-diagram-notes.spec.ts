@@ -3,6 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from '../helpers/fixtureVault'
 import { executeCommand, openCommandPalette } from './helpers'
+import { RUNTIME_STYLE_NONCE } from '../../src/lib/runtimeStyleNonce'
 
 let tempVaultDir: string
 
@@ -200,6 +201,13 @@ async function computedCss(locator: Locator, property: 'color' | 'fill' | 'strok
   ), property)
 }
 
+async function readStyleNonce(svg: Locator): Promise<string | null> {
+  return svg.locator('style').first().evaluate((style) => {
+    const nonce = (style as HTMLElement).nonce
+    return nonce.length > 0 ? nonce : style.getAttribute('nonce')
+  })
+}
+
 async function labelFitsNode(node: Locator): Promise<boolean> {
   return node.evaluate((element) => {
     const shape = element.querySelector<SVGGraphicsElement>('rect, polygon, circle, ellipse, path')!
@@ -230,6 +238,7 @@ async function readReportedDiagramMetrics(page: Page, diagramIndex: number) {
       await labelFitsNode(mermaidNode(page, diagramIndex, 'Contract path')),
       await labelFitsNode(mermaidNode(page, diagramIndex, 'unscheduled clocking')),
     ].every(Boolean),
+    styleNonce: await readStyleNonce(svg),
     text: await svg.evaluate((element) => element.textContent ?? ''),
   }
 }
@@ -248,6 +257,7 @@ test('Mermaid diagrams render when opening saved notes directly', async ({ page 
     scheduledStroke: 'rgb(122, 91, 0)',
     scheduledTextColor: 'rgb(58, 44, 0)',
     labelsFit: true,
+    styleNonce: RUNTIME_STYLE_NONCE,
     text: expect.stringContaining('Linked to a planned shift?'),
   })
 })
@@ -283,6 +293,7 @@ ${SYSTEM_OVERVIEW_DIAGRAM}
     scheduledStroke: 'rgb(122, 91, 0)',
     scheduledTextColor: 'rgb(58, 44, 0)',
     labelsFit: true,
+    styleNonce: RUNTIME_STYLE_NONCE,
     text: expect.stringContaining('Linked to a planned shift?'),
   })
   await expect(page.locator('[data-testid="mermaid-diagram-error"]')).toHaveCount(1)
