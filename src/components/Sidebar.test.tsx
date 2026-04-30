@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, within } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { Sidebar } from './Sidebar'
 import type { VaultEntry, SidebarSelection } from '../types'
@@ -1240,7 +1241,7 @@ describe('Sidebar', () => {
     })
   })
 
-  describe('view edit button', () => {
+  describe('view row actions', () => {
     const mockViews = [
       {
         filename: 'active-projects.yml',
@@ -1254,27 +1255,88 @@ describe('Sidebar', () => {
       },
     ]
 
-    it('renders edit button for each view item when onEditView is provided', () => {
+    function renderViewActions(overrides: Partial<ComponentProps<typeof Sidebar>> = {}) {
       render(
-        <Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} views={mockViews} onEditView={() => {}} onDeleteView={() => {}} />
+        <Sidebar
+          entries={mockEntries}
+          selection={defaultSelection}
+          onSelect={() => {}}
+          views={mockViews}
+          onEditView={() => {}}
+          onDeleteView={() => {}}
+          onUpdateViewDefinition={() => {}}
+          {...overrides}
+        />
       )
-      expect(screen.getByTitle('Edit view')).toBeInTheDocument()
-    })
+    }
 
-    it('does not render edit button when onEditView is not provided', () => {
-      render(
-        <Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} views={mockViews} onDeleteView={() => {}} />
-      )
+    function openViewContextMenu() {
+      fireEvent.contextMenu(screen.getByText('Active Projects').closest('[class*="cursor-pointer"]')!)
+    }
+
+    it('keeps edit and delete off the hover row controls', () => {
+      renderViewActions()
       expect(screen.queryByTitle('Edit view')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('Delete view')).not.toBeInTheDocument()
     })
 
-    it('calls onEditView with correct filename when clicked', () => {
+    it('shows View-specific context menu labels on right-click', () => {
+      renderViewActions()
+      openViewContextMenu()
+
+      expect(screen.getByText('Edit view')).toBeInTheDocument()
+      expect(screen.getByText('Rename view…')).toBeInTheDocument()
+      expect(screen.getByText('Customize icon & color…')).toBeInTheDocument()
+      expect(screen.getByText('Delete view')).toBeInTheDocument()
+    })
+
+    it('calls onEditView from the context menu', () => {
       const onEditView = vi.fn()
-      render(
-        <Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} views={mockViews} onEditView={onEditView} onDeleteView={() => {}} />
-      )
-      fireEvent.click(screen.getByTitle('Edit view'))
+      renderViewActions({ onEditView })
+      openViewContextMenu()
+      fireEvent.click(screen.getByText('Edit view'))
       expect(onEditView).toHaveBeenCalledWith('active-projects.yml')
+    })
+
+    it('starts inline rename when the view row is double-clicked', () => {
+      renderViewActions()
+      fireEvent.doubleClick(screen.getByText('Active Projects').closest('[class*="cursor-pointer"]')!)
+      expect(screen.getByRole('textbox', { name: 'View name' })).toHaveValue('Active Projects')
+    })
+
+    it('submits the renamed view on Enter', () => {
+      const onUpdateViewDefinition = vi.fn()
+      renderViewActions({ onUpdateViewDefinition })
+      openViewContextMenu()
+      fireEvent.click(screen.getByText('Rename view…'))
+
+      const input = screen.getByRole('textbox', { name: 'View name' })
+      fireEvent.change(input, { target: { value: 'Today Focus' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(onUpdateViewDefinition).toHaveBeenCalledWith('active-projects.yml', { name: 'Today Focus' })
+    })
+
+    it('opens the shared appearance panel from the context menu', () => {
+      const onUpdateViewDefinition = vi.fn()
+      renderViewActions({ onUpdateViewDefinition })
+      openViewContextMenu()
+      fireEvent.click(screen.getByText('Customize icon & color…'))
+
+      fireEvent.click(screen.getByTitle('Blue'))
+      fireEvent.change(screen.getByPlaceholderText('Search icons…'), { target: { value: 'book' } })
+      fireEvent.click(screen.getByTitle('book'))
+
+      expect(onUpdateViewDefinition).toHaveBeenCalledWith('active-projects.yml', { color: 'blue' })
+      expect(onUpdateViewDefinition).toHaveBeenCalledWith('active-projects.yml', { icon: 'book' })
+    })
+
+    it('calls onDeleteView from the context menu', () => {
+      const onDeleteView = vi.fn()
+      renderViewActions({ onDeleteView })
+      openViewContextMenu()
+      fireEvent.click(screen.getByText('Delete view'))
+      expect(onDeleteView).toHaveBeenCalledWith('active-projects.yml')
     })
   })
 
@@ -1507,7 +1569,7 @@ describe('Sidebar', () => {
       expect(viewContainer?.querySelector('span:last-child')?.textContent).not.toBe('0')
     })
 
-    it('adds hover and focus classes that hide the view count chip while showing the action buttons', () => {
+    it('keeps the view count chip visible because row actions live in the context menu', () => {
       render(
         <Sidebar
           entries={mockEntries}
@@ -1520,21 +1582,12 @@ describe('Sidebar', () => {
       )
 
       const label = screen.getByText('Active Projects')
-      const viewItem = label.closest('.group.relative') as HTMLElement
       const navItem = label.closest('[class*="cursor-pointer"]') as HTMLElement
       const countChip = within(navItem).getByTestId('view-count-chip')
       expect(countChip).toBeTruthy()
-      expect(countChip.className).toContain('transition-opacity')
-      expect(countChip.className).toContain('group-hover:opacity-0')
-      expect(countChip.className).toContain('group-focus-within:opacity-0')
-
-      const actionButton = within(viewItem).getByTitle('Edit view')
-      const actionContainer = actionButton.parentElement as HTMLElement
-      expect(actionContainer.className).toContain('pointer-events-none')
-      expect(actionContainer.className).toContain('group-hover:pointer-events-auto')
-      expect(actionContainer.className).toContain('group-focus-within:pointer-events-auto')
-      expect(actionContainer.className).toContain('group-hover:opacity-100')
-      expect(actionContainer.className).toContain('group-focus-within:opacity-100')
+      expect(countChip.className).not.toContain('group-hover:opacity-0')
+      expect(screen.queryByTitle('Edit view')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('Delete view')).not.toBeInTheDocument()
     })
   })
 })

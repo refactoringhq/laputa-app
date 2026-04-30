@@ -1,5 +1,7 @@
 import { useCallback, memo } from 'react'
-import type { VaultEntry, FolderNode, SidebarSelection, ViewFile } from '../types'
+import type {
+  VaultEntry, FolderNode, SidebarSelection, ViewDefinition, ViewFile,
+} from '../types'
 import {
   KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent,
 } from '@dnd-kit/core'
@@ -50,6 +52,7 @@ interface SidebarProps {
   onCreateView?: () => void
   onEditView?: (filename: string) => void
   onDeleteView?: (filename: string) => void
+  onUpdateViewDefinition?: (filename: string, patch: Partial<ViewDefinition>) => void
   onReorderViews?: (orderedFilenames: string[]) => void
   folders?: FolderNode[]
   onCreateFolder?: (name: string) => Promise<boolean> | boolean
@@ -83,6 +86,7 @@ interface SidebarNavigationProps extends Pick<
   | 'onCreateView'
   | 'onEditView'
   | 'onDeleteView'
+  | 'onUpdateViewDefinition'
   | 'onReorderViews'
   | 'folders'
   | 'onCreateFolder'
@@ -136,6 +140,7 @@ type SidebarViewsNavigationProps = Pick<
   | 'onCreateView'
   | 'onEditView'
   | 'onDeleteView'
+  | 'onUpdateViewDefinition'
   | 'onReorderViews'
   | 'groupCollapsed'
   | 'toggleGroup'
@@ -226,6 +231,7 @@ function SidebarViewsNavigation({
   onCreateView,
   onEditView,
   onDeleteView,
+  onUpdateViewDefinition,
   onReorderViews,
   groupCollapsed,
   toggleGroup,
@@ -255,6 +261,7 @@ function SidebarViewsNavigation({
       onCreateView={onCreateView}
       onEditView={onEditView}
       onDeleteView={onDeleteView}
+      onUpdateViewDefinition={onUpdateViewDefinition}
       onReorderViews={onReorderViews}
       sensors={sensors}
       entries={entries}
@@ -359,122 +366,101 @@ function SidebarFoldersNavigation({
   )
 }
 
-function SidebarNavigation({
-  entries,
-  selection,
-  onSelect,
-  onSelectFavorite,
-  onReorderFavorites,
-  views = [],
-  onCreateView,
-  onEditView,
-  onDeleteView,
-  onReorderViews,
-  folders = [],
-  onCreateFolder,
-  onRenameFolder,
-  onDeleteFolder,
-  folderFileActions,
-  renamingFolderPath,
-  onStartRenameFolder,
-  onCancelRenameFolder,
-  vaultRootPath,
-  showInbox = true,
-  inboxCount = 0,
-  locale = 'en',
-  loading = false,
-  onCreateNewType,
-  activeCount,
-  archivedCount,
-  groupCollapsed,
-  toggleGroup,
-  visibleSections,
-  allSectionGroups,
-  sectionIds,
-  sensors,
-  handleDragEnd,
-  sectionProps,
-  typeInteractions,
-  isSectionVisible,
-  toggleVisibility,
-}: SidebarNavigationProps) {
-  const hasFavorites = loading || entries.some((entry) => entry.favorite && !entry.archived)
-  const hasViews = loading || views.length > 0 || !!onCreateView
-
+function SidebarTopNavigation(props: SidebarNavigationProps) {
   return (
-    <nav className="flex-1 overflow-y-auto">
+    <>
       <SidebarTopNav
-        selection={selection}
-        onSelect={onSelect}
-        showInbox={showInbox}
-        inboxCount={inboxCount}
-        activeCount={activeCount}
-        archivedCount={archivedCount}
-        locale={locale}
-        loading={loading}
+        selection={props.selection}
+        onSelect={props.onSelect}
+        showInbox={props.showInbox ?? true}
+        inboxCount={props.inboxCount ?? 0}
+        activeCount={props.activeCount}
+        archivedCount={props.archivedCount}
+        locale={props.locale ?? 'en'}
+        loading={props.loading ?? false}
       />
-      {hasFavorites && (
+      {(props.loading || props.entries.some((entry) => entry.favorite && !entry.archived)) && (
         <SidebarFavoritesNavigation
-          loading={loading}
-          entries={entries}
-          selection={selection}
-          onSelect={onSelect}
-          onSelectFavorite={onSelectFavorite}
-          onReorderFavorites={onReorderFavorites}
-          groupCollapsed={groupCollapsed}
-          toggleGroup={toggleGroup}
-          locale={locale}
+          loading={props.loading}
+          entries={props.entries}
+          selection={props.selection}
+          onSelect={props.onSelect}
+          onSelectFavorite={props.onSelectFavorite}
+          onReorderFavorites={props.onReorderFavorites}
+          groupCollapsed={props.groupCollapsed}
+          toggleGroup={props.toggleGroup}
+          locale={props.locale}
         />
       )}
+    </>
+  )
+}
+
+function SidebarViewAndTypeNavigation(props: SidebarNavigationProps) {
+  const views = props.views ?? []
+  const hasViews = props.loading || views.length > 0 || !!props.onCreateView
+
+  return (
+    <>
       {hasViews && (
         <SidebarViewsNavigation
-          loading={loading}
+          loading={props.loading}
           views={views}
-          selection={selection}
-          onSelect={onSelect}
-          onCreateView={onCreateView}
-          onEditView={onEditView}
-          onDeleteView={onDeleteView}
-          onReorderViews={onReorderViews}
-          groupCollapsed={groupCollapsed}
-          toggleGroup={toggleGroup}
-          sensors={sensors}
-          entries={entries}
-          locale={locale}
+          selection={props.selection}
+          onSelect={props.onSelect}
+          onCreateView={props.onCreateView}
+          onEditView={props.onEditView}
+          onDeleteView={props.onDeleteView}
+          onUpdateViewDefinition={props.onUpdateViewDefinition}
+          onReorderViews={props.onReorderViews}
+          groupCollapsed={props.groupCollapsed}
+          toggleGroup={props.toggleGroup}
+          sensors={props.sensors}
+          entries={props.entries}
+          locale={props.locale}
         />
       )}
       <SidebarTypesNavigation
-        loading={loading}
-        visibleSections={visibleSections}
-        allSectionGroups={allSectionGroups}
-        sectionIds={sectionIds}
-        sensors={sensors}
-        handleDragEnd={handleDragEnd}
-        sectionProps={sectionProps}
-        groupCollapsed={groupCollapsed}
-        toggleGroup={toggleGroup}
-        typeInteractions={typeInteractions}
-        isSectionVisible={isSectionVisible}
-        toggleVisibility={toggleVisibility}
-        onCreateNewType={onCreateNewType}
-        locale={locale}
+        loading={props.loading}
+        visibleSections={props.visibleSections}
+        allSectionGroups={props.allSectionGroups}
+        sectionIds={props.sectionIds}
+        sensors={props.sensors}
+        handleDragEnd={props.handleDragEnd}
+        sectionProps={props.sectionProps}
+        groupCollapsed={props.groupCollapsed}
+        toggleGroup={props.toggleGroup}
+        typeInteractions={props.typeInteractions}
+        isSectionVisible={props.isSectionVisible}
+        toggleVisibility={props.toggleVisibility}
+        onCreateNewType={props.onCreateNewType}
+        locale={props.locale}
       />
+    </>
+  )
+}
+
+function SidebarNavigation(props: SidebarNavigationProps) {
+  return (
+    <nav className="flex-1 overflow-y-auto">
+      <SidebarTopNavigation {...props} />
+      <SidebarViewAndTypeNavigation {...props} />
       <SidebarFoldersNavigation
-        loading={loading}
-        folders={folders}
-        selection={selection}
-        onSelect={onSelect}
-        onCreateFolder={onCreateFolder}
-        onRenameFolder={onRenameFolder}
-        onDeleteFolder={onDeleteFolder}
-        folderFileActions={folderFileActions}
-        renamingFolderPath={renamingFolderPath}
-        onStartRenameFolder={onStartRenameFolder}
-        onCancelRenameFolder={onCancelRenameFolder}
-        vaultRootPath={vaultRootPath}
-        groupCollapsed={groupCollapsed}
-        toggleGroup={toggleGroup}
-        locale={locale}
+        loading={props.loading}
+        folders={props.folders ?? []}
+        selection={props.selection}
+        onSelect={props.onSelect}
+        onCreateFolder={props.onCreateFolder}
+        onRenameFolder={props.onRenameFolder}
+        onDeleteFolder={props.onDeleteFolder}
+        folderFileActions={props.folderFileActions}
+        renamingFolderPath={props.renamingFolderPath}
+        onStartRenameFolder={props.onStartRenameFolder}
+        onCancelRenameFolder={props.onCancelRenameFolder}
+        vaultRootPath={props.vaultRootPath}
+        groupCollapsed={props.groupCollapsed}
+        toggleGroup={props.toggleGroup}
+        locale={props.locale}
       />
     </nav>
   )
@@ -579,6 +565,7 @@ function SidebarRuntimeNavigation({
       onCreateView={props.onCreateView}
       onEditView={props.onEditView}
       onDeleteView={props.onDeleteView}
+      onUpdateViewDefinition={props.onUpdateViewDefinition}
       onReorderViews={props.onReorderViews}
       folders={props.folders}
       onCreateFolder={props.onCreateFolder}

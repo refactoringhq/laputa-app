@@ -1150,6 +1150,18 @@ function App() {
     await vault.reloadViews()
   }, [resolvedPath, vault])
 
+  const handleSidebarUpdateViewDefinition = useCallback((filename: string, patch: Partial<ViewDefinition>) => {
+    void handleUpdateViewDefinition(filename, patch)
+      .then(() => {
+        trackEvent('view_updated', { source: 'sidebar_view_actions' })
+        if (typeof patch.name === 'string') setToastMessage(`View "${patch.name}" renamed`)
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err)
+        setToastMessage(`Could not save view: ${message}`)
+      })
+  }, [handleUpdateViewDefinition, setToastMessage])
+
   const handleEditView = useCallback((filename: string) => {
     const view = vault.views.find((v) => v.filename === filename)
     if (view) dialogs.openEditView(filename, view.definition)
@@ -1643,7 +1655,7 @@ function App() {
           {sidebarVisible && (
             <>
               <div className="app__sidebar" style={{ width: layout.sidebarWidth }}>
-                <Sidebar entries={vault.entries} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onReorderViews={viewOrdering.onReorderViews} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} canGoBack={canGoBack} canGoForward={canGoForward} onGoBack={handleGoBack} onGoForward={handleGoForward} />
+                <Sidebar entries={vault.entries} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={viewOrdering.onReorderViews} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} canGoBack={canGoBack} canGoForward={canGoForward} onGoBack={handleGoBack} onGoForward={handleGoForward} />
               </div>
               <ResizeHandle onResize={layout.handleSidebarResize} />
             </>

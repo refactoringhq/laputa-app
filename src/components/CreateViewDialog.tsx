@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FilterBuilder } from './FilterBuilder'
 import type { FilterGroup, ViewDefinition } from '../types'
-import { TypeCustomizePopover } from './TypeCustomizePopover'
 import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
 
 type SaveViewResult = boolean | void
@@ -45,8 +44,6 @@ function CreateViewDialogForm({
   onCreate,
 }: CreateViewDialogFormProps) {
   const [name, setName] = useState(initialName)
-  const [icon, setIcon] = useState(initialIcon)
-  const [color, setColor] = useState<string | null>(initialColor)
   const [filters, setFilters] = useState<FilterGroup>(initialFilters)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -64,8 +61,8 @@ function CreateViewDialogForm({
     if (!trimmed) return
     const definition: ViewDefinition = {
       name: trimmed,
-      icon: icon || null,
-      color,
+      icon: initialIcon || null,
+      color: initialColor,
       sort: null,
       filters,
     }
@@ -103,23 +100,6 @@ function CreateViewDialogForm({
             if (saveError) setSaveError(null)
           }}
         />
-      </div>
-      <TypeCustomizePopover
-        currentIcon={icon || null}
-        currentColor={color}
-        currentTemplate={null}
-        onChangeIcon={setIcon}
-        onChangeColor={setColor}
-        onChangeTemplate={() => {}}
-        onClose={() => {}}
-        showTemplate={false}
-        showDone={false}
-        surface="inline"
-        locale={locale}
-      />
-      <div className="sr-only" aria-live="polite">
-        {icon ? translate(locale, 'viewDialog.selectedIcon', { icon }) : ''}
-        {color ? translate(locale, 'viewDialog.selectedColor', { color }) : ''}
       </div>
       {saveError && (
         <p role="alert" className="text-xs text-destructive">{saveError}</p>
