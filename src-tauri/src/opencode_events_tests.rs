@@ -108,6 +108,53 @@ fn dispatch_maps_part_backed_reasoning_and_text() {
 }
 
 #[test]
+fn dispatch_maps_final_text_after_tool_part_wrappers() {
+    let events = dispatch_events([
+        serde_json::json!({
+            "type": "part",
+            "part": {
+                "id": "prt_tool_1",
+                "type": "tool",
+                "tool": "webfetch",
+                "input": { "url": "https://example.com" }
+            }
+        }),
+        serde_json::json!({
+            "type": "part",
+            "part": {
+                "id": "prt_text_1",
+                "type": "text",
+                "text": "Final answer after tool output."
+            }
+        }),
+        serde_json::json!({
+            "type": "part",
+            "part": {
+                "id": "prt_finish_1",
+                "type": "step-finish",
+                "reason": "stop"
+            }
+        }),
+    ]);
+
+    assert!(matches!(
+        &events[0],
+        AiAgentStreamEvent::ToolStart {
+            tool_name,
+            tool_id,
+            input,
+        } if tool_name == "webfetch"
+            && tool_id == "prt_tool_1"
+            && input.as_deref() == Some(r#"{"url":"https://example.com"}"#)
+    ));
+    assert!(matches!(
+        &events[1],
+        AiAgentStreamEvent::TextDelta { text } if text == "Final answer after tool output."
+    ));
+    assert_eq!(events.len(), 2);
+}
+
+#[test]
 fn dispatch_maps_tool_events() {
     let direct = dispatch_events([
         serde_json::json!({

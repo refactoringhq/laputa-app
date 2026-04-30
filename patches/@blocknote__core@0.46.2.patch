@@ -1,6 +1,6 @@
 --- a/dist/defaultBlocks-DE5GNdJH.js
 +++ b/dist/defaultBlocks-DE5GNdJH.js
-@@ -2651,17 +2651,24 @@
+@@ -2651,17 +2651,23 @@
      if (!a && !(o !== void 0 && r !== void 0) && !s)
        return;
      if (this.pluginState = s ? o : r, s || !this.editor.isEditable) {
@@ -82,7 +82,7 @@
    const t = [
 --- a/src/extensions/SuggestionMenu/SuggestionMenu.ts
 +++ b/src/extensions/SuggestionMenu/SuggestionMenu.ts
-@@ -83,27 +83,34 @@
+@@ -83,29 +83,38 @@
      this.pluginState = stopped ? prev : next;
  
      if (stopped || !this.editor.isEditable) {
