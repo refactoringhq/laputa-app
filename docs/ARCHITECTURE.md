@@ -123,7 +123,7 @@ The note list opportunistically preloads visible and adjacent markdown/text entr
 | Backend language | Rust (edition 2021) | 1.77.2 |
 | Frontmatter parsing | gray_matter | 0.2 |
 | Filesystem watcher | notify | 6.1 |
-| AI (agent panel) | CLI agent adapters (Claude Code + Codex + OpenCode + Pi) | - |
+| AI (agent panel) | CLI agent adapters (Claude Code + Codex + OpenCode + Pi + Gemini) | - |
 | Search | Keyword (walkdir-based file scan) | - |
 | Localization | App-owned runtime + JSON catalogs (`src/lib/i18n.ts`, `src/lib/locales/*.json`, `lara.yaml`) | English fallback + Lara CLI sync |
 | MCP | @modelcontextprotocol/sdk | 1.0 |
@@ -158,11 +158,11 @@ flowchart TD
             GIT["git/\n(commit, sync, clone)"]
             SETTINGS["settings.rs"]
             SEARCH["search.rs"]
-            CLI["ai_agents.rs\n+ claude_cli.rs"]
+            CLI["ai_agents.rs\n+ CLI adapters"]
         end
 
         subgraph EXT["External Services"]
-            CCLI["Claude / Codex / OpenCode / Pi CLI\n(agent subprocesses)"]
+            CCLI["Claude / Codex / OpenCode / Pi / Gemini CLI\n(agent subprocesses)"]
             MCP["MCP Server\n(ws://9710, 9711)"]
             GCLI["git CLI\n(system executable)"]
             REMOTE["Git remotes\n(GitHub/GitLab/Gitea/etc.)"]
@@ -244,7 +244,7 @@ Full agent mode — spawns the selected local CLI agent as a subprocess with too
 1. **Frontend** (`AiPanel` + `useCliAiAgent` + `aiAgentSession.ts` + `aiAgents.ts`) — one normalized session lifecycle for message state, reasoning blocks, tool action cards, response display, onboarding, default-agent selection, and the per-vault Safe / Power User permission mode shown in the panel header
 2. **Backend orchestration** (`ai_agents.rs`) — normalizes agent availability, streaming, and the request permission mode before dispatching to per-agent adapters
 3. **Shared runtime scaffold** (`cli_agent_runtime.rs`) — owns the common request shape, prompt wrapping, JSON-line subprocess lifecycle, normalized error/done handling, version probing, and Tolaria MCP server path resolution used by app-managed CLI agents
-4. **Agent adapters** — Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, and a scoped tool list: Safe enables file/search/edit tools, while Power User adds Bash without using dangerous bypass flags. Codex runtime specifics live in `codex_cli.rs` and run through `codex --sandbox workspace-write --ask-for-approval never exec --json` in both modes. OpenCode runs through `opencode run --format json` with transient permissions: Safe denies bash and external directories, while Power User allows bash but still denies external directories. Pi runs through `pi --mode json --no-session` with `npm:pi-mcp-adapter`; both modes currently share the same transient MCP config. Gemini runs through `gemini --output-format json --prompt` with Safe using `auto_edit` plus `tools.exclude=["run_shell_command"]` and Power User using `yolo` against a trusted transient Tolaria MCP entry. OpenCode, Pi, and Gemini all launch from the active vault cwd with closed stdin and transient MCP config. All app-launched paths use hidden Windows launches and avoid dangerous permission-bypass flags.
+4. **Agent adapters** — Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, and a scoped tool list: Safe enables file/search/edit tools, while Power User adds Bash without using dangerous bypass flags. Codex runtime specifics live in `codex_cli.rs` and run through `codex --sandbox workspace-write --ask-for-approval never exec --json` in both modes. OpenCode runs through `opencode run --format json` with transient permissions: Safe denies bash and external directories, while Power User allows bash but still denies external directories. Pi runs through `pi --mode json --no-session` with `npm:pi-mcp-adapter`; both modes currently share the same transient MCP config. Gemini runs through `gemini --output-format stream-json --prompt` so assistant message chunks, tool calls, and final errors are mapped from the CLI event stream instead of relying on a buffered `response` field. Gemini Safe uses `auto_edit` plus `tools.exclude=["run_shell_command"]`; Power User uses `yolo` against a trusted transient Tolaria MCP entry. OpenCode, Pi, and Gemini all launch from the active vault cwd with closed stdin and transient MCP config. All app-launched paths use hidden Windows launches and avoid dangerous permission-bypass flags.
 5. **MCP Integration** — Claude receives the generated MCP config file path, Codex receives the same Tolaria MCP server via transient `-c mcp_servers.tolaria.*` config overrides, OpenCode receives it through `OPENCODE_CONFIG_CONTENT`, Pi receives it through a temporary `PI_CODING_AGENT_DIR/mcp.json` consumed by `pi-mcp-adapter`, and Gemini receives it through a temporary settings file pointed at by `GEMINI_CLI_SYSTEM_SETTINGS_PATH`
 
 CLI-agent availability intentionally does not depend only on the desktop app's inherited `PATH`. The detectors check the current process path, the user's login shell, and supported local/toolchain install locations such as native `~/.local/bin`, local `~/.claude/local`, Mise/asdf shims, nvm-managed Node installs, npm-global, Homebrew, Windows `%APPDATA%\npm`/pnpm/Scoop shims, Windows `.exe` launchers, and the macOS Codex app resource path so first-run onboarding works on fresh macOS and Windows installs.
@@ -266,7 +266,7 @@ sequenceDiagram
     R->>C: spawn agent with MCP-enabled config
 
     loop Normalized stream
-        C-->>R: Claude NDJSON, Codex JSONL, OpenCode JSON, or Pi JSON events
+        C-->>R: Claude NDJSON, Codex JSONL, OpenCode JSON, Pi JSON, or Gemini JSONL events
         R-->>FE: emit("ai-agent-stream", event)
         alt TextDelta
             FE->>FE: accumulate response (revealed on Done)
@@ -658,7 +658,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `search.rs` | Keyword search — walkdir-based vault file scan with Gitignored-content visibility filtering |
 | `ai_agents.rs` | CLI-agent request normalization and adapter dispatch |
 | `cli_agent_runtime.rs` | Shared CLI-agent request, prompt, subprocess, version, and MCP path helpers |
-| `claude_cli.rs`, `codex_cli.rs`, `opencode_cli.rs` | Claude Code, Codex, and OpenCode command/config/event adapters |
+| `claude_cli.rs`, `codex_cli.rs`, `opencode_cli.rs`, `pi_cli.rs`, `gemini_cli.rs` | CLI-agent command/config/event adapters |
 | `pi_cli.rs`, `pi_config.rs`, `pi_discovery.rs`, `pi_events.rs` | Pi subprocess launch, transient MCP adapter config, discovery, and JSON stream parsing |
 | `mcp.rs` | MCP server spawning + explicit config registration/removal |
 | `commands/` | Tauri command handlers (split into submodules) |
@@ -744,8 +744,8 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 |---------|-------------|
 | `stream_claude_chat` | Claude CLI chat mode (streaming) |
 | `check_claude_cli` | Check if Claude CLI is available |
-| `get_ai_agents_status` | Check Claude Code + Codex + OpenCode + Pi availability |
-| `stream_ai_agent` | Stream Claude Code, Codex, OpenCode, or Pi through the normalized agent event layer |
+| `get_ai_agents_status` | Check Claude Code + Codex + OpenCode + Pi + Gemini availability |
+| `stream_ai_agent` | Stream Claude Code, Codex, OpenCode, Pi, or Gemini through the normalized agent event layer |
 | `register_mcp_tools` | Register MCP in Claude/Gemini/Cursor/generic config for the active vault |
 | `remove_mcp_tools` | Remove Tolaria's MCP entry from Claude/Gemini/Cursor/generic config |
 | `check_mcp_status` | Check whether the active vault is explicitly registered in Claude/Gemini/Cursor/generic config |
@@ -1021,7 +1021,7 @@ Desktop-only modules gated at the crate level:
 Desktop-only features gated at the function level in `commands/`:
 - Git operations (commit, pull, push, status, history, diff, conflicts)
 - Clone-by-URL via system git (`clone_repo`)
-- CLI AI agent streaming (Claude, Codex, OpenCode, Pi)
+- CLI AI agent streaming (Claude, Codex, OpenCode, Pi, Gemini)
 - MCP registration and status
 - Menu state updates
 
