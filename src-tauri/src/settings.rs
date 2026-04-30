@@ -45,10 +45,10 @@ const SUPPORTED_UI_LANGUAGE_ALIASES: &[(&str, &str)] = &[
     ("es-us", "es-419"),
     ("es-uy", "es-419"),
     ("es-ve", "es-419"),
-    ("zh", "zh-Hans"),
-    ("zh-cn", "zh-Hans"),
-    ("zh-hans", "zh-Hans"),
-    ("zh-sg", "zh-Hans"),
+    ("zh", "zh-CN"),
+    ("zh-cn", "zh-CN"),
+    ("zh-hans", "zh-CN"),
+    ("zh-sg", "zh-CN"),
     ("zh-tw", "zh-TW"),
     ("zh-hant", "zh-TW"),
     ("zh-hk", "zh-TW"),
@@ -371,7 +371,7 @@ mod tests {
         assert_eq!(loaded.auto_advance_inbox_after_organize, Some(true));
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
-        assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
+        assert_eq!(loaded.ui_language.as_deref(), Some("zh-CN"));
         assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
         assert_eq!(loaded.initial_h1_auto_rename_enabled, Some(false));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
@@ -408,7 +408,7 @@ mod tests {
         assert_eq!(loaded.anonymous_id.as_deref(), Some("test-uuid"));
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
-        assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
+        assert_eq!(loaded.ui_language.as_deref(), Some("zh-CN"));
         assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
     }
@@ -516,7 +516,7 @@ mod tests {
             ("pt-BR", "pt-BR"),
             ("pt-PT", "pt-PT"),
             ("es-419", "es-419"),
-            ("zh-CN", "zh-Hans"),
+            ("zh-CN", "zh-CN"),
             ("zh-TW", "zh-TW"),
             ("ja-JP", "ja-JP"),
             ("ko-KR", "ko-KR"),
@@ -537,7 +537,7 @@ mod tests {
         assert_eq!(normalize_ui_language(Some("en-US")).as_deref(), Some("en"));
         assert_eq!(
             normalize_ui_language(Some("zh_CN")).as_deref(),
-            Some("zh-Hans")
+            Some("zh-CN")
         );
         assert_eq!(
             normalize_ui_language(Some("zh-Hant")).as_deref(),
