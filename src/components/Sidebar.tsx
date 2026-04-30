@@ -522,13 +522,11 @@ function useSidebarRuntime({
     onSelect,
     onContextMenu: typeInteractions.handleContextMenu,
     onStartRename: typeInteractions.handleStartRename,
-    onSelectTypeNote: (type: string) => { const entry = typeEntryMap[type]; if (entry) onSelectNote?.(entry) },
+    onSelectTypeNote: selectTypeNote,
     renamingType: typeInteractions.renamingType,
     renameInitialValue: typeInteractions.renameInitialValue,
     onRenameSubmit: typeInteractions.handleRenameSubmit,
     onRenameCancel: typeInteractions.cancelRename,
-    onStartRename: typeInteractions.handleStartRename,
-    onSelectTypeNote: selectTypeNote,
   }
 
   return {
