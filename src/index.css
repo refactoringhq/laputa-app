@@ -384,6 +384,17 @@
     width: 100%;
     height: 100%;
   }
+  /* Interactive controls should advertise clickability unless disabled. */
+  :where(
+    button:not(:disabled):not([aria-disabled="true"]),
+    [role="button"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="menuitem"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="menuitemcheckbox"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="menuitemradio"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="option"]:not([aria-disabled="true"]):not([data-disabled])
+  ) {
+    cursor: pointer;
+  }
 }
 
 /* --- Label typography (Inter, sentence case) --- */
