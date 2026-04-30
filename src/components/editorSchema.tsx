@@ -1,12 +1,16 @@
 /* eslint-disable react-refresh/only-export-components -- module-level schema, not a component file */
-import { createCodeBlockSpec, BlockNoteSchema, defaultInlineContentSpecs } from '@blocknote/core'
-import { codeBlockOptions } from '@blocknote/code-block'
+import {
+  createCodeBlockSpec,
+  BlockNoteSchema,
+  defaultInlineContentSpecs,
+} from '@blocknote/core'
 import { createReactBlockSpec, createReactInlineContentSpec } from '@blocknote/react'
 import { resolveWikilinkColor as resolveColor } from '../utils/wikilinkColors'
 import { resolveEntry } from '../utils/wikilink'
 import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/mathMarkdown'
 import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
 import type { VaultEntry } from '../types'
+import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { MermaidDiagram } from './MermaidDiagram'
 
@@ -153,10 +157,7 @@ const MermaidBlock = createReactBlockSpec(
   },
 )
 
-const codeBlock = createCodeBlockSpec({
-  ...codeBlockOptions,
-  defaultLanguage: 'text',
-})
+const codeBlock = createCodeBlockSpec(createTolariaCodeBlockOptions())
 const mathBlock = MathBlock()
 const mermaidBlock = MermaidBlock()
 
