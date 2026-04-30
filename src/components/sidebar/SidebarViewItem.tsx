@@ -156,7 +156,6 @@ export function SidebarViewItem({
         onCustomize={handleCustomize}
         onDelete={handleDelete}
         onEdit={handleEdit}
-        onRename={startRename}
       />
       <ViewCustomizePanel
         pos={customizePos}

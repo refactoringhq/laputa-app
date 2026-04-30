@@ -1285,7 +1285,7 @@ describe('Sidebar', () => {
       openViewContextMenu()
 
       expect(screen.getByText('Edit view')).toBeInTheDocument()
-      expect(screen.getByText('Rename view…')).toBeInTheDocument()
+      expect(screen.queryByText('Rename view…')).not.toBeInTheDocument()
       expect(screen.getByText('Customize icon & color…')).toBeInTheDocument()
       expect(screen.getByText('Delete view')).toBeInTheDocument()
     })
@@ -1307,8 +1307,7 @@ describe('Sidebar', () => {
     it('submits the renamed view on Enter', () => {
       const onUpdateViewDefinition = vi.fn()
       renderViewActions({ onUpdateViewDefinition })
-      openViewContextMenu()
-      fireEvent.click(screen.getByText('Rename view…'))
+      fireEvent.doubleClick(screen.getByText('Active Projects').closest('[class*="cursor-pointer"]')!)
 
       const input = screen.getByRole('textbox', { name: 'View name' })
       fireEvent.change(input, { target: { value: 'Today Focus' } })
