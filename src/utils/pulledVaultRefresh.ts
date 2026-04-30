@@ -2,6 +2,7 @@ import type { VaultEntry } from '../types'
 
 interface PulledVaultRefreshOptions {
   activeTabPath: string | null
+  getActiveTabPath?: () => string | null
   closeAllTabs: () => void
   hasUnsavedChanges: (path: string) => boolean
   reloadFolders: () => Promise<unknown> | unknown
@@ -29,10 +30,15 @@ function didPullUpdateActiveNote(updatedFiles: string[], vaultPath: string, acti
   return updatedFiles.some((path) => resolveUpdatedFilePath(path, vaultPath) === normalizedActivePath)
 }
 
+function didActivePathChange(initialPath: string, latestPath: string): boolean {
+  return normalizePath(initialPath) !== normalizePath(latestPath)
+}
+
 export async function refreshPulledVaultState(options: PulledVaultRefreshOptions): Promise<VaultEntry[]> {
   const {
     activeTabPath,
     closeAllTabs,
+    getActiveTabPath,
     hasUnsavedChanges,
     reloadFolders,
     reloadVault,
@@ -48,9 +54,12 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
     Promise.resolve(reloadViews()),
   ])
 
-  if (!activeTabPath || hasUnsavedChanges(activeTabPath)) return entries
+  const latestActiveTabPath = getActiveTabPath?.() ?? activeTabPath
+  if (!activeTabPath || !latestActiveTabPath) return entries
+  if (didActivePathChange(activeTabPath, latestActiveTabPath)) return entries
+  if (hasUnsavedChanges(latestActiveTabPath)) return entries
 
-  const refreshedEntry = entries.find(entry => normalizePath(entry.path) === normalizePath(activeTabPath))
+  const refreshedEntry = entries.find(entry => normalizePath(entry.path) === normalizePath(latestActiveTabPath))
   if (!refreshedEntry) {
     closeAllTabs()
     return entries
@@ -59,7 +68,7 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
   // Native BlockNote can keep rendering the previous document after a pull that
   // changes the active file in place. Dropping the tab first forces a full
   // reopen for that specific case without affecting unrelated pull updates.
-  if (didPullUpdateActiveNote(updatedFiles, vaultPath, activeTabPath)) {
+  if (didPullUpdateActiveNote(updatedFiles, vaultPath, latestActiveTabPath)) {
     closeAllTabs()
   }
 

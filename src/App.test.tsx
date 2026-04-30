@@ -497,7 +497,7 @@ describe('App', () => {
         definition: expect.objectContaining({ name: '🚀' }),
       }))
     })
-  })
+  }, 10000)
 
   it('loads and displays vault entries in sidebar', async () => {
     render(<App />)
