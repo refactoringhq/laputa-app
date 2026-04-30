@@ -7,6 +7,59 @@ const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
 const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &["claude_code", "codex", "opencode", "pi", "gemini"];
 pub const DEFAULT_HIDE_GITIGNORED_FILES: bool = true;
 const SUPPORTED_NOTE_WIDTH_MODES: &[&str] = &["normal", "wide"];
+const SUPPORTED_UI_LANGUAGE_ALIASES: &[(&str, &str)] = &[
+    ("en", "en"),
+    ("en-us", "en"),
+    ("en-gb", "en"),
+    ("en-ca", "en"),
+    ("en-au", "en"),
+    ("it", "it-IT"),
+    ("it-it", "it-IT"),
+    ("fr", "fr-FR"),
+    ("fr-fr", "fr-FR"),
+    ("de", "de-DE"),
+    ("de-de", "de-DE"),
+    ("ru", "ru-RU"),
+    ("ru-ru", "ru-RU"),
+    ("es-es", "es-ES"),
+    ("pt-br", "pt-BR"),
+    ("pt-pt", "pt-PT"),
+    ("es-419", "es-419"),
+    ("es-ar", "es-419"),
+    ("es-bo", "es-419"),
+    ("es-cl", "es-419"),
+    ("es-co", "es-419"),
+    ("es-cr", "es-419"),
+    ("es-cu", "es-419"),
+    ("es-do", "es-419"),
+    ("es-ec", "es-419"),
+    ("es-gt", "es-419"),
+    ("es-hn", "es-419"),
+    ("es-mx", "es-419"),
+    ("es-ni", "es-419"),
+    ("es-pa", "es-419"),
+    ("es-pe", "es-419"),
+    ("es-pr", "es-419"),
+    ("es-py", "es-419"),
+    ("es-sv", "es-419"),
+    ("es-us", "es-419"),
+    ("es-uy", "es-419"),
+    ("es-ve", "es-419"),
+    ("zh", "zh-Hans"),
+    ("zh-cn", "zh-Hans"),
+    ("zh-hans", "zh-Hans"),
+    ("zh-sg", "zh-Hans"),
+    ("zh-tw", "zh-TW"),
+    ("zh-hant", "zh-TW"),
+    ("zh-hk", "zh-TW"),
+    ("zh-mo", "zh-TW"),
+    ("ja", "ja-JP"),
+    ("ja-jp", "ja-JP"),
+    ("ko", "ko-KR"),
+    ("ko-kr", "ko-KR"),
+    ("vi", "vi"),
+    ("vi-vn", "vi"),
+];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Settings {
@@ -98,23 +151,11 @@ fn canonical_language_code(value: &str) -> Option<String> {
     }
 }
 
-fn is_english_language(code: &str) -> bool {
-    code == "en" || code.starts_with("en-")
-}
-
-fn is_simplified_chinese_language(code: &str) -> bool {
-    matches!(code, "zh" | "zh-cn" | "zh-hans" | "zh-sg")
-}
-
 pub fn normalize_ui_language(value: Option<&str>) -> Option<String> {
     let language = canonical_language_code(value?)?;
-    if is_english_language(&language) {
-        return Some("en".to_string());
-    }
-    if is_simplified_chinese_language(&language) {
-        return Some("zh-Hans".to_string());
-    }
-    None
+    SUPPORTED_UI_LANGUAGE_ALIASES
+        .iter()
+        .find_map(|(alias, canonical)| (*alias == language).then(|| (*canonical).to_string()))
 }
 
 fn normalize_settings(settings: Settings) -> Settings {
@@ -458,10 +499,37 @@ mod tests {
     #[test]
     fn test_invalid_ui_language_is_filtered() {
         let loaded = save_and_reload(Settings {
-            ui_language: Some("fr-FR".to_string()),
+            ui_language: Some("xx-ZZ".to_string()),
             ..Default::default()
         });
         assert!(loaded.ui_language.is_none());
+    }
+
+    #[test]
+    fn test_supported_ui_languages_are_saved_and_reloaded() {
+        let expected_languages = [
+            ("it-IT", "it-IT"),
+            ("fr-FR", "fr-FR"),
+            ("de-DE", "de-DE"),
+            ("ru-RU", "ru-RU"),
+            ("es-ES", "es-ES"),
+            ("pt-BR", "pt-BR"),
+            ("pt-PT", "pt-PT"),
+            ("es-419", "es-419"),
+            ("zh-CN", "zh-Hans"),
+            ("zh-TW", "zh-TW"),
+            ("ja-JP", "ja-JP"),
+            ("ko-KR", "ko-KR"),
+            ("vi", "vi"),
+        ];
+
+        for (input, expected) in expected_languages {
+            let loaded = save_and_reload(Settings {
+                ui_language: Some(input.to_string()),
+                ..Default::default()
+            });
+            assert_eq!(loaded.ui_language.as_deref(), Some(expected));
+        }
     }
 
     #[test]
@@ -470,6 +538,10 @@ mod tests {
         assert_eq!(
             normalize_ui_language(Some("zh_CN")).as_deref(),
             Some("zh-Hans")
+        );
+        assert_eq!(
+            normalize_ui_language(Some("zh-Hant")).as_deref(),
+            Some("zh-TW")
         );
     }
 
