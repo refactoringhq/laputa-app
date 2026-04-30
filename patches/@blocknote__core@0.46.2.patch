@@ -117,6 +117,61 @@
  }
  function kn(o, e) {
    const t = [
+--- a/src/extensions/SideMenu/SideMenu.ts
++++ b/src/extensions/SideMenu/SideMenu.ts
+@@ -230,38 +230,49 @@
+     // Doesn't update if the menu is already open and the mouse cursor is still hovering the same block.
+     if (
+       this.state?.show &&
+       this.hoveredBlock?.hasAttribute("data-id") &&
+       this.hoveredBlock?.getAttribute("data-id") === block.id
+     ) {
+       return;
+     }
+ 
+     this.hoveredBlock = block.node;
++    const hoveredBlockId = this.hoveredBlock.getAttribute("data-id");
++    const hoveredEditorBlock = hoveredBlockId
++      ? this.editor.getBlock(hoveredBlockId)
++      : undefined;
++
++    if (!hoveredEditorBlock) {
++      if (this.state?.show) {
++        this.state.show = false;
++        this.updateState(this.state);
++      }
++
++      return;
++    }
+ 
+     // Shows or updates elements.
+     if (this.editor.isEditable) {
+       const blockContentBoundingBox = block.node.getBoundingClientRect();
+       const column = block.node.closest("[data-node-type=column]");
+       this.state = {
+         show: true,
+         referencePos: new DOMRect(
+           column
+             ? // We take the first child as column elements have some default
+               // padding. This is a little weird since this child element will
+               // be the first block, but since it's always non-nested and we
+               // only take the x coordinate, it's ok.
+               column.firstElementChild!.getBoundingClientRect().x
+             : (
+                 this.pmView.dom.firstChild as HTMLElement
+               ).getBoundingClientRect().x,
+           blockContentBoundingBox.y,
+           blockContentBoundingBox.width,
+           blockContentBoundingBox.height,
+         ),
+-        block: this.editor.getBlock(
+-          this.hoveredBlock!.getAttribute("data-id")!,
+-        )!,
++        block: hoveredEditorBlock,
+       };
+       this.updateState(this.state);
+     }
+   };
 --- a/src/extensions/SuggestionMenu/SuggestionMenu.ts
 +++ b/src/extensions/SuggestionMenu/SuggestionMenu.ts
 @@ -32,7 +32,7 @@
@@ -202,6 +257,48 @@
      if (
 --- a/dist/TrailingNode-CxM966vN.js
 +++ b/dist/TrailingNode-CxM966vN.js
+@@ -1200,25 +1200,31 @@
+         (r = this.state) != null && r.show && (this.state.show = !1, this.updateState(this.state));
+         return;
+       }
+-      if (!((s = this.state) != null && s.show && ((i = this.hoveredBlock) != null && i.hasAttribute("data-id")) && ((a = this.hoveredBlock) == null ? void 0 : a.getAttribute("data-id")) === t.id) && (this.hoveredBlock = t.node, this.editor.isEditable)) {
+-        const c = t.node.getBoundingClientRect(), l = t.node.closest("[data-node-type=column]");
++      if ((s = this.state) != null && s.show && ((i = this.hoveredBlock) != null && i.hasAttribute("data-id")) && ((a = this.hoveredBlock) == null ? void 0 : a.getAttribute("data-id")) === t.id)
++        return;
++      this.hoveredBlock = t.node;
++      const c = this.hoveredBlock.getAttribute("data-id"), l = c ? this.editor.getBlock(c) : void 0;
++      if (!l) {
++        (i = this.state) != null && i.show && (this.state.show = !1, this.updateState(this.state));
++        return;
++      }
++      if (this.editor.isEditable) {
++        const u = t.node.getBoundingClientRect(), h = t.node.closest("[data-node-type=column]");
+         this.state = {
+           show: !0,
+           referencePos: new DOMRect(
+-            l ? (
++            h ? (
+               // We take the first child as column elements have some default
+               // padding. This is a little weird since this child element will
+               // be the first block, but since it's always non-nested and we
+               // only take the x coordinate, it's ok.
+-              l.firstElementChild.getBoundingClientRect().x
++              h.firstElementChild.getBoundingClientRect().x
+             ) : this.pmView.dom.firstChild.getBoundingClientRect().x,
+-            c.y,
+-            c.width,
+-            c.height
++            u.y,
++            u.width,
++            u.height
+           ),
+-          block: this.editor.getBlock(
+-            this.hoveredBlock.getAttribute("data-id")
+-          )
++          block: l
+         }, this.updateState(this.state);
+       }
+     });
 @@ -1746,10 +1746,10 @@
      );
      this.state.rowIndex !== void 0 && this.state.colIndex !== void 0 && (this.state.rowIndex >= e && (this.state.rowIndex = e - 1), this.state.colIndex >= t && (this.state.colIndex = t - 1));
