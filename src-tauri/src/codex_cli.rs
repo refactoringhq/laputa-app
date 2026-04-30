@@ -37,7 +37,7 @@ fn find_codex_binary() -> Result<PathBuf, String> {
         return Ok(binary);
     }
 
-    if let Some(binary) = find_existing_binary(codex_binary_candidates()) {
+    if let Some(binary) = find_existing_binary(codex_binary_candidates())? {
         return Ok(binary);
     }
 
@@ -114,6 +114,8 @@ fn codex_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".npm-global/bin/codex"),
         home.join(".npm/bin/codex"),
         home.join(".bun/bin/codex"),
+        home.join(".linuxbrew/bin/codex"),
+        PathBuf::from("/home/linuxbrew/.linuxbrew/bin/codex"),
         PathBuf::from("/usr/local/bin/codex"),
         PathBuf::from("/opt/homebrew/bin/codex"),
         PathBuf::from("/Applications/Codex.app/Contents/Resources/codex"),
@@ -137,8 +139,8 @@ fn nvm_node_binary_candidates_for_home(home: &Path, binary_name: &str) -> Vec<Pa
     candidates
 }
 
-fn find_existing_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
-    candidates.into_iter().find(|candidate| candidate.exists())
+fn find_existing_binary(candidates: Vec<PathBuf>) -> Result<Option<PathBuf>, String> {
+    crate::cli_agent_runtime::find_executable_binary_candidate(candidates, "Codex CLI")
 }
 
 fn run_agent_stream_with_binary<F>(
@@ -479,6 +481,24 @@ exit 2
             home.join(".npm-global/bin/codex"),
             home.join(".bun/bin/codex"),
             PathBuf::from("/Applications/Codex.app/Contents/Resources/codex"),
+        ];
+
+        for candidate in expected {
+            assert!(
+                candidates.contains(&candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    #[test]
+    fn codex_binary_candidates_include_linuxbrew_installs() {
+        let home = PathBuf::from("/home/alex");
+        let candidates = codex_binary_candidates_for_home(&home);
+        let expected = [
+            home.join(".linuxbrew/bin/codex"),
+            PathBuf::from("/home/linuxbrew/.linuxbrew/bin/codex"),
         ];
 
         for candidate in expected {

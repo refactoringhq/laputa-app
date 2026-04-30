@@ -21,7 +21,10 @@ pub(crate) fn find_binary() -> Result<PathBuf, String> {
     if let Some(binary) = find_binary_in_user_shell() {
         return Ok(binary);
     }
-    if let Some(binary) = find_existing_binary(gemini_binary_candidates()) {
+    if let Some(binary) = crate::cli_agent_runtime::find_executable_binary_candidate(
+        gemini_binary_candidates(),
+        "Gemini CLI",
+    )? {
         return Ok(binary);
     }
 
@@ -91,10 +94,6 @@ fn first_existing_path(stdout: &str) -> Option<PathBuf> {
     })
 }
 
-fn find_existing_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
-    candidates.into_iter().find(|candidate| candidate.exists())
-}
-
 fn gemini_binary_candidates() -> Vec<PathBuf> {
     dirs::home_dir()
         .map(|home| gemini_binary_candidates_for_home(&home))
@@ -119,11 +118,13 @@ fn gemini_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".npm/bin/gemini.exe"),
         home.join(".bun/bin/gemini"),
         home.join(".bun/bin/gemini.exe"),
+        home.join(".linuxbrew/bin/gemini"),
         home.join("AppData/Roaming/npm/gemini.cmd"),
         home.join("AppData/Roaming/npm/gemini.exe"),
         home.join("AppData/Local/pnpm/gemini.cmd"),
         home.join("AppData/Local/pnpm/gemini.exe"),
         home.join("scoop/shims/gemini.exe"),
+        PathBuf::from("/home/linuxbrew/.linuxbrew/bin/gemini"),
         PathBuf::from("/usr/local/bin/gemini"),
         PathBuf::from("/opt/homebrew/bin/gemini"),
     ];
@@ -162,6 +163,24 @@ mod tests {
             home.join(".npm-global/bin/gemini"),
             home.join(".bun/bin/gemini"),
             PathBuf::from("/opt/homebrew/bin/gemini"),
+        ];
+
+        for candidate in expected {
+            assert!(
+                candidates.contains(&candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    #[test]
+    fn binary_candidates_include_linuxbrew_installs() {
+        let home = PathBuf::from("/home/alex");
+        let candidates = gemini_binary_candidates_for_home(&home);
+        let expected = [
+            home.join(".linuxbrew/bin/gemini"),
+            PathBuf::from("/home/linuxbrew/.linuxbrew/bin/gemini"),
         ];
 
         for candidate in expected {

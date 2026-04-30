@@ -23,7 +23,10 @@ pub(crate) fn find_binary() -> Result<PathBuf, String> {
         return Ok(binary);
     }
 
-    if let Some(binary) = find_existing_binary(opencode_binary_candidates()) {
+    if let Some(binary) = crate::cli_agent_runtime::find_executable_binary_candidate(
+        opencode_binary_candidates(),
+        "OpenCode CLI",
+    )? {
         return Ok(binary);
     }
 
@@ -93,10 +96,6 @@ fn first_existing_path(stdout: &str) -> Option<PathBuf> {
     })
 }
 
-fn find_existing_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
-    candidates.into_iter().find(|candidate| candidate.exists())
-}
-
 fn opencode_binary_candidates() -> Vec<PathBuf> {
     dirs::home_dir()
         .map(|home| opencode_binary_candidates_for_home(&home))
@@ -121,11 +120,13 @@ fn opencode_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".npm/bin/opencode.exe"),
         home.join(".bun/bin/opencode"),
         home.join(".bun/bin/opencode.exe"),
+        home.join(".linuxbrew/bin/opencode"),
         home.join("AppData/Roaming/npm/opencode.cmd"),
         home.join("AppData/Roaming/npm/opencode.exe"),
         home.join("AppData/Local/pnpm/opencode.cmd"),
         home.join("AppData/Local/pnpm/opencode.exe"),
         home.join("scoop/shims/opencode.exe"),
+        PathBuf::from("/home/linuxbrew/.linuxbrew/bin/opencode"),
         PathBuf::from("/usr/local/bin/opencode"),
         PathBuf::from("/opt/homebrew/bin/opencode"),
     ]
@@ -147,6 +148,24 @@ mod tests {
             home.join(".npm-global/bin/opencode"),
             home.join(".bun/bin/opencode"),
             PathBuf::from("/opt/homebrew/bin/opencode"),
+        ];
+
+        for candidate in expected {
+            assert!(
+                candidates.contains(&candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    #[test]
+    fn binary_candidates_include_linuxbrew_installs() {
+        let home = PathBuf::from("/home/alex");
+        let candidates = opencode_binary_candidates_for_home(&home);
+        let expected = [
+            home.join(".linuxbrew/bin/opencode"),
+            PathBuf::from("/home/linuxbrew/.linuxbrew/bin/opencode"),
         ];
 
         for candidate in expected {
