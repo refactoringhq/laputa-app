@@ -37,6 +37,13 @@ export function isSelectionActive(current: SidebarSelection, check: SidebarSelec
     case 'folder': return (current as typeof check).path === check.path
     case 'entity': return (current as typeof check).entry.path === check.entry.path
     case 'view': return (current as typeof check).filename === check.filename
+    case 'graph': {
+      const a = current as typeof check
+      const b = check
+      if (a.mode !== b.mode) return false
+      if (a.mode === 'global' || b.mode === 'global') return a.mode === b.mode
+      return a.focus.path === b.focus.path
+    }
     default: return false
   }
 }

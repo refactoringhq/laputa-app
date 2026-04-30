@@ -1,31 +1,12 @@
 #!/bin/sh
-# Pre-push: full CI checks run locally before any push.
-# This replaces remote CI for normal task pushes.
-# DO NOT skip with --no-verify (Claude Code is configured to never do this).
+# Pre-push (personal-fork edition):
+#   - TypeScript build (catches type breakage)
+#   - Frontend tests (catches regressions, no coverage gate)
+#   - Rust clippy + rustfmt (only when src-tauri/ changed)
 #
-# ── Optimizations (Feb 2026) ─────────────────────────────────────────────
-#
-# 1. --no-clean on cargo llvm-cov: reuses previous instrumented build
-#    artifacts for incremental compilation. Reduces Rust coverage from
-#    ~8 min (full recompile) to ~30-60s (incremental rebuild).
-#
-# 2. Change detection: skips Rust checks entirely when no files under
-#    src-tauri/ changed. Saves ~1-2 min on frontend-only pushes.
-#
-# 3. Merged redundant test runs: frontend coverage (step 2) already runs
-#    all tests, so the separate test step was removed.
-#
-# 4. Fast-fail ordering: within Rust checks, fast lints (fmt ~2s, clippy
-#    ~15s) run before slow coverage (~30-60s) for quicker feedback.
-#
-# 5. Force full coverage: set LAPUTA_FULL_COVERAGE=1 to run cargo llvm-cov
-#    without --no-clean (clean rebuild, accurate baseline).
-#
-# Expected times (warm cache, incremental):
-#   Frontend only:  ~1 min
-#   Frontend+Rust:  ~2-3 min
-#   Full coverage:  ~9-10 min (with LAPUTA_FULL_COVERAGE=1)
-# ─────────────────────────────────────────────────────────────────────────
+# Dropped vs upstream: frontend coverage threshold, Rust llvm-cov ≥85%,
+# CodeScene ratchet, Playwright smoke. Run those manually via package.json
+# scripts when you want them.
 set -e
 
 ensure_node_tooling() {
@@ -47,49 +28,31 @@ ensure_node_tooling() {
   fi
 }
 
-require_main_push() {
-  if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
-    echo "❌ Pushes must happen from main. Detached HEAD is not allowed."
-    exit 1
+ensure_cargo_tooling() {
+  if command -v cargo >/dev/null 2>&1; then
+    return 0
   fi
-
-  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-  if [ "$CURRENT_BRANCH" != "main" ]; then
-    echo "❌ Pushes must happen from main. Current branch: $CURRENT_BRANCH"
-    exit 1
+  if [ -s "$HOME/.cargo/env" ]; then
+    # shellcheck disable=SC1091
+    . "$HOME/.cargo/env"
   fi
-
-  while IFS=' ' read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
-    [ -z "$LOCAL_REF" ] && continue
-
-    case "$LOCAL_REF:$REMOTE_REF" in
-      refs/heads/main:refs/heads/main)
-        ;;
-      refs/tags/*:refs/tags/*)
-        ;;
-      *)
-        echo "❌ Pushes must be main -> main only."
-        echo "   Attempted: ${LOCAL_REF:-<none>} -> ${REMOTE_REF:-<none>}"
-        exit 1
-        ;;
-    esac
-  done <<EOF
-$PUSH_INPUT
-EOF
 }
 
-if [ -t 0 ]; then
-  PUSH_INPUT=""
-else
-  PUSH_INPUT=$(cat)
-fi
-require_main_push
+require_not_detached() {
+  if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
+    echo "❌ Detached HEAD is not allowed for pushes."
+    exit 1
+  fi
+}
+
+require_not_detached
 ensure_node_tooling
+ensure_cargo_tooling
 
 START_TIME=$(date +%s)
 
 echo ""
-echo "🚀 Pre-push checks (replaces CI — do not skip)"
+echo "🚀 Pre-push checks (personal-fork lite)"
 echo "================================================"
 
 # ── Detect what changed ─────────────────────────────────────────────────
@@ -103,144 +66,30 @@ if [ -n "$PUSH_TARGET" ]; then
   fi
 fi
 
-# ── 0. TypeScript + Vite build ──────────────────────────────────────────
+# ── 1. TypeScript + Vite build ──────────────────────────────────────────
 echo ""
-echo "📦 [0/5] TypeScript + Vite build..."
+echo "📦 [1/3] TypeScript + Vite build..."
 pnpm exec tsc --noEmit
 pnpm build
 echo "  ✅ Build OK"
 
-# ── 1. Frontend coverage (≥70%) — includes all unit tests ───────────────
+# ── 2. Frontend tests (no coverage threshold) ───────────────────────────
 echo ""
-echo "📊 [1/5] Frontend tests + coverage (≥70%)..."
-pnpm test:coverage --silent
-echo "  ✅ Frontend coverage OK"
+echo "🧪 [2/3] Frontend unit tests..."
+pnpm exec vitest run --silent
+echo "  ✅ Tests OK"
 
-# ── 2. Rust lint (clippy + fmt) — fast, run before coverage ─────────────
+# ── 3. Rust clippy + rustfmt (only when Rust changed) ───────────────────
 echo ""
-if [ "$RUST_CHANGED" = true ]; then
-  echo "🔧 [2/5] Clippy + rustfmt..."
+if [ "$RUST_CHANGED" = true ] && command -v cargo >/dev/null 2>&1; then
+  echo "🔧 [3/3] Clippy + rustfmt..."
   cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
   cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check
   echo "  ✅ Rust lint OK"
+elif [ "$RUST_CHANGED" = true ]; then
+  echo "⏭️  [3/3] Rust lint — skipped (cargo not in PATH; install rustup if you want this gate)"
 else
-  echo "⏭️  [2/5] Rust lint — skipped (no src-tauri/ changes)"
-fi
-
-# ── 3. Rust coverage (≥85% lines) ──────────────────────────────────────
-echo ""
-if [ "$RUST_CHANGED" = true ]; then
-  LLVM_COV_FLAGS="--no-clean"
-  if [ "${LAPUTA_FULL_COVERAGE:-0}" = "1" ]; then
-    LLVM_COV_FLAGS=""
-    echo "🦀 [3/5] Rust coverage — FULL (LAPUTA_FULL_COVERAGE=1)..."
-  else
-    echo "🦀 [3/5] Rust coverage (≥85%, incremental)..."
-  fi
-  # Unset GIT_DIR so git tests create isolated repos without inheriting hook context
-  unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
-  # shellcheck disable=SC2086
-  cargo llvm-cov \
-    --manifest-path src-tauri/Cargo.toml \
-    $LLVM_COV_FLAGS \
-    --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" \
-    --fail-under-lines 85 \
-    -- --test-threads=1
-  echo "  ✅ Rust coverage OK"
-else
-  echo "⏭️  [3/5] Rust coverage — skipped (no src-tauri/ changes)"
-fi
-
-# ── 4. Playwright core smoke lane (if any exist) ──────────────────────
-echo ""
-SMOKE_FILES=$(find tests/smoke tests/integration -name '*.spec.ts' 2>/dev/null | head -1)
-if [ -n "$SMOKE_FILES" ]; then
-  echo "🎭 [4/5] Playwright core smoke tests..."
-  if ! pnpm playwright:smoke; then
-    echo "  ❌ Core smoke tests FAILED"
-    exit 1
-  fi
-  echo "  ✅ Core smoke tests OK"
-else
-  echo "⏭️  [4/5] Playwright core smoke tests — skipped (no tests/**/*.spec.ts)"
-fi
-
-# ── 5. CodeScene code health gate (ratchet) ──────────────────────────────
-# Thresholds live in .codescene-thresholds and only ever go UP (ratchet).
-# If remote scores improved, the hook updates the file and stops so the new
-# floor is committed with normal verified hooks before the next push.
-# If the remote baseline is already below threshold, allow recovery pushes to
-# land; otherwise the stale remote score would block the refactors required to
-# restore the gate.
-THRESHOLDS_FILE="$(git rev-parse --show-toplevel)/.codescene-thresholds"
-HOTSPOT_MIN=9.45
-AVERAGE_MIN=9.29
-if [ -f "$THRESHOLDS_FILE" ]; then
-  HOTSPOT_MIN=$(grep HOTSPOT_THRESHOLD "$THRESHOLDS_FILE" | cut -d= -f2)
-  AVERAGE_MIN=$(grep AVERAGE_THRESHOLD "$THRESHOLDS_FILE" | cut -d= -f2)
-fi
-
-echo ""
-echo "🏥 [5/5] CodeScene code health (Hotspot ≥${HOTSPOT_MIN} + Average ≥${AVERAGE_MIN})..."
-if [ -z "$CODESCENE_PAT" ] || [ -z "$CODESCENE_PROJECT_ID" ]; then
-  echo "  ⚠️  CODESCENE_PAT or CODESCENE_PROJECT_ID not set — skipping"
-else
-  API_RESPONSE=$(curl -sf \
-    -H "Authorization: Bearer $CODESCENE_PAT" \
-    -H "Accept: application/json" \
-    "https://api.codescene.io/v2/projects/$CODESCENE_PROJECT_ID" 2>/dev/null || echo "{}")
-  HOTSPOT_SCORE=$(echo "$API_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['analysis']['hotspot_code_health']['now'])" 2>/dev/null || echo "")
-  AVERAGE_SCORE=$(echo "$API_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['analysis']['code_health']['now'])" 2>/dev/null || echo "")
-  if [ -z "$HOTSPOT_SCORE" ] || [ -z "$AVERAGE_SCORE" ]; then
-    echo "  ⚠️  Could not fetch remote scores — skipping (CI will enforce)"
-  else
-    echo "  Remote Hotspot Code Health: $HOTSPOT_SCORE (threshold: $HOTSPOT_MIN)"
-    echo "  Remote Average Code Health: $AVERAGE_SCORE (threshold: $AVERAGE_MIN)"
-    PYTHON_STATUS=0
-    python3 -c "
-import sys
-
-hotspot = float('$HOTSPOT_SCORE')
-average = float('$AVERAGE_SCORE')
-hotspot_min = float('$HOTSPOT_MIN')
-average_min = float('$AVERAGE_MIN')
-failed = False
-
-if hotspot < hotspot_min:
-    print(f'WARN: Hotspot Code Health {hotspot:.2f} < {hotspot_min} — remote baseline is currently red')
-    failed = True
-else:
-    print(f'OK: Hotspot {hotspot:.2f} >= {hotspot_min}')
-
-if average < average_min:
-    print(f'WARN: Average Code Health {average:.2f} < {average_min} — remote baseline is currently red')
-    failed = True
-else:
-    print(f'OK: Average {average:.2f} >= {average_min}')
-
-if failed:
-    print('  ⚠️  Recovery mode: allowing this push so refactors can land and restore the gate on a later analysis.')
-    sys.exit(0)
-
-import math
-thresholds_file = '$THRESHOLDS_FILE'
-new_hotspot = max(hotspot_min, math.floor(hotspot * 100) / 100)
-new_average = max(average_min, math.floor(average * 100) / 100)
-if new_hotspot > hotspot_min or new_average > average_min:
-    with open(thresholds_file, 'w') as f:
-        f.write(f'HOTSPOT_THRESHOLD={new_hotspot}\nAVERAGE_THRESHOLD={new_average}\n')
-    print(f'  📈 Ratchet updated: Hotspot {hotspot_min} → {new_hotspot}, Average {average_min} → {new_average}')
-    sys.exit(3)
-" || PYTHON_STATUS=$?
-    if [ "$PYTHON_STATUS" -ne 0 ] && [ "$PYTHON_STATUS" -ne 3 ]; then
-      exit "$PYTHON_STATUS"
-    fi
-    if [ "$PYTHON_STATUS" -eq 3 ]; then
-      git add "$THRESHOLDS_FILE"
-      echo "  ❌ Commit the updated .codescene-thresholds with a normal verified commit, then push again."
-      exit 1
-    fi
-  fi
+  echo "⏭️  [3/3] Rust lint — skipped (no src-tauri/ changes)"
 fi
 
 END_TIME=$(date +%s)

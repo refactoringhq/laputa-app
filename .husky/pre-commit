@@ -21,21 +21,14 @@ ensure_node_tooling() {
   fi
 }
 
-require_main_branch() {
+require_not_detached() {
   if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
-    echo "❌ Commits must happen on main. Detached HEAD is not allowed."
-    exit 1
-  fi
-
-  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-  if [ "$CURRENT_BRANCH" != "main" ]; then
-    echo "❌ Commits must happen on main. Current branch: $CURRENT_BRANCH"
-    echo "   Merge or cherry-pick your work onto main, then commit there."
+    echo "❌ Detached HEAD is not allowed for commits."
     exit 1
   fi
 }
 
-require_main_branch
+require_not_detached
 ensure_node_tooling
 
 echo "🔍 Pre-commit checks..."

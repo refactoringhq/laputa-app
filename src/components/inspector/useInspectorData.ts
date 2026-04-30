@@ -8,7 +8,7 @@ interface InspectorLinkIndex {
   backlinks: Map<string, BacklinkItem[]>
 }
 
-interface EntryLookup {
+export interface EntryLookup {
   exactTargetEntries: Map<string, VaultEntry[]>
   pathSuffixEntries: Map<string, VaultEntry[]>
 }
@@ -45,7 +45,7 @@ function getEntryPathSuffixes(entryPath: string): string[] {
   return suffixes
 }
 
-function buildEntryLookup(entries: VaultEntry[]): EntryLookup {
+export function buildEntryLookup(entries: VaultEntry[]): EntryLookup {
   const exactTargetEntries = new Map<string, VaultEntry[]>()
   const pathSuffixEntries = new Map<string, VaultEntry[]>()
 
@@ -68,7 +68,7 @@ function buildEntryLookup(entries: VaultEntry[]): EntryLookup {
   return { exactTargetEntries, pathSuffixEntries }
 }
 
-function findMatchedEntries(target: string, lookup: EntryLookup): VaultEntry[] {
+export function findMatchedEntries(target: string, lookup: EntryLookup): VaultEntry[] {
   const matches = new Map<string, VaultEntry>()
   const lastSegment = target.split('/').pop() ?? ''
   const pathMatches = target.includes('/') ? lookup.pathSuffixEntries.get(target.toLowerCase()) : undefined
