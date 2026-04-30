@@ -88,7 +88,6 @@ export function ViewContextMenu({
   onCustomize,
   onDelete,
   onEdit,
-  onRename,
 }: {
   pos: MenuPosition | null
   canCustomize: boolean
@@ -99,7 +98,6 @@ export function ViewContextMenu({
   onCustomize: () => void
   onDelete: () => void
   onEdit: () => void
-  onRename: () => void
 }) {
   if (!pos || (!canEdit && !canCustomize && !canDelete)) return null
 
@@ -116,16 +114,10 @@ export function ViewContextMenu({
         </ViewMenuButton>
       )}
       {canCustomize && (
-        <>
-          <ViewMenuButton onClick={onRename}>
-            <PencilSimple size={14} />
-            {translate(locale, 'sidebar.action.renameView')}
-          </ViewMenuButton>
-          <ViewMenuButton onClick={onCustomize}>
-            <Palette size={14} />
-            {translate(locale, 'sidebar.action.customizeIconColor')}
-          </ViewMenuButton>
-        </>
+        <ViewMenuButton onClick={onCustomize}>
+          <Palette size={14} />
+          {translate(locale, 'sidebar.action.customizeIconColor')}
+        </ViewMenuButton>
       )}
       {canDelete && (
         <>
