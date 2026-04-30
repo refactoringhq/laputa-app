@@ -16,7 +16,6 @@ import {
   CaretLeft, Palette, PencilSimple, Plus, Trash,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { TooltipProvider } from '@/components/ui/tooltip'
 import {
   type SectionGroup, isSelectionActive, SectionContent, VisibilityPopover,
 } from '../SidebarParts'
@@ -24,7 +23,6 @@ import { TypeCustomizePopover } from '../TypeCustomizePopover'
 import { useDragRegion } from '../../hooks/useDragRegion'
 import { SidebarGroupHeader } from './SidebarGroupHeader'
 import { SidebarViewItem } from './SidebarViewItem'
-import { SidebarNavArrows } from './SidebarNavArrows'
 import { computeReorder } from './sidebarHooks'
 import { countByFilter } from '../../utils/noteListHelpers'
 import { translate, type AppLocale } from '../../lib/i18n'
@@ -317,55 +315,30 @@ export function TypesSection({
   )
 }
 
-const noopNavigation = () => {}
-
-export function SidebarTitleBar({
-  locale = 'en',
-  onCollapse,
-  canGoBack = false,
-  canGoForward = false,
-  onGoBack = noopNavigation,
-  onGoForward = noopNavigation,
-}: {
-  locale?: AppLocale
-  onCollapse?: () => void
-  canGoBack?: boolean
-  canGoForward?: boolean
-  onGoBack?: () => void
-  onGoForward?: () => void
-}) {
+export function SidebarTitleBar({ locale = 'en', onCollapse }: { locale?: AppLocale; onCollapse?: () => void }) {
   const { onMouseDown } = useDragRegion()
 
   return (
-    <TooltipProvider>
-      <div
-        className="flex shrink-0 items-center justify-between gap-2 border-b border-border"
-        style={{ height: 52, padding: '0 8px', paddingLeft: 80, cursor: 'default' }}
-        onMouseDown={onMouseDown}
-      >
-        <SidebarNavArrows
-          canGoBack={canGoBack}
-          canGoForward={canGoForward}
-          onGoBack={onGoBack}
-          onGoForward={onGoForward}
-          locale={locale}
-        />
-        {onCollapse && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="h-6 w-6 rounded text-muted-foreground hover:text-foreground"
-            onClick={onCollapse}
-            aria-label={translate(locale, 'sidebar.action.collapse')}
-            title={translate(locale, 'sidebar.action.collapse')}
-            data-no-drag
-          >
-            <CaretLeft size={14} weight="bold" />
-          </Button>
-        )}
-      </div>
-    </TooltipProvider>
+    <div
+      className="shrink-0 flex items-center justify-end border-b border-border"
+      style={{ height: 52, padding: '0 8px', paddingLeft: 80, cursor: 'default' }}
+      onMouseDown={onMouseDown}
+    >
+      {onCollapse && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="h-6 w-6 rounded text-muted-foreground hover:text-foreground"
+          onClick={onCollapse}
+          aria-label={translate(locale, 'sidebar.action.collapse')}
+          title={translate(locale, 'sidebar.action.collapse')}
+          data-no-drag
+        >
+          <CaretLeft size={14} weight="bold" />
+        </Button>
+      )}
+    </div>
   )
 }
 

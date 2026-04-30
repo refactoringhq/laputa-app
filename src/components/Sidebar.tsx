@@ -69,10 +69,6 @@ interface SidebarProps {
   locale?: AppLocale
   onCollapse?: () => void
   loading?: boolean
-  canGoBack?: boolean
-  canGoForward?: boolean
-  onGoBack?: () => void
-  onGoForward?: () => void
 }
 
 interface SidebarNavigationProps extends Pick<
@@ -635,14 +631,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
 
   return (
     <aside className="flex h-full flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-sidebar text-sidebar-foreground">
-      <SidebarTitleBar
-        locale={locale}
-        onCollapse={props.onCollapse}
-        canGoBack={props.canGoBack}
-        canGoForward={props.canGoForward}
-        onGoBack={props.onGoBack}
-        onGoForward={props.onGoForward}
-      />
+      <SidebarTitleBar locale={locale} onCollapse={props.onCollapse} />
       <SidebarRuntimeNavigation props={props} runtime={runtime} />
       <SidebarInteractionOverlays locale={locale} runtime={runtime} />
     </aside>
