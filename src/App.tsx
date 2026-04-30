@@ -615,6 +615,7 @@ function App() {
     await refreshPulledVaultState({
       activeTabPath: notes.activeTabPath,
       closeAllTabs,
+      getActiveTabPath: () => notes.activeTabPathRef.current,
       hasUnsavedChanges: (path) => vault.unsavedPaths.has(path),
       reloadFolders: vault.reloadFolders,
       reloadVault: vault.reloadVault,
@@ -627,6 +628,7 @@ function App() {
       closeAllTabs,
       handleReplaceActiveTab,
       notes.activeTabPath,
+      notes.activeTabPathRef,
       resolvedPath,
       vault.reloadFolders,
       vault.reloadVault,
@@ -766,6 +768,7 @@ function App() {
     hasUnsavedChanges: (path) => vault.unsavedPaths.has(path),
     onSelectNote: notes.handleSelectNote,
     activeTabPath: notes.activeTabPath,
+    getActiveTabPath: () => notes.activeTabPathRef.current,
   })
 
   const conflictFlow = useConflictFlow({

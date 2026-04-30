@@ -78,6 +78,27 @@ describe('refreshPulledVaultState', () => {
     expect(options.closeAllTabs).not.toHaveBeenCalled()
   })
 
+  it('skips stale tab replacement when the active note changes during reload', async () => {
+    let resolveReload!: (entries: VaultEntry[]) => void
+    let currentActivePath: string | null = '/vault/active.md'
+    const options = makeOptions({
+      getActiveTabPath: () => currentActivePath,
+      reloadVault: vi.fn(() => new Promise<VaultEntry[]>((resolve) => {
+        resolveReload = resolve
+      })),
+    })
+
+    const refresh = refreshPulledVaultState(options)
+    await Promise.resolve()
+
+    currentActivePath = '/vault/other.md'
+    resolveReload([makeEntry('/vault/active.md', 'Active'), makeEntry('/vault/other.md', 'Other')])
+    await refresh
+
+    expect(options.replaceActiveTab).not.toHaveBeenCalled()
+    expect(options.closeAllTabs).not.toHaveBeenCalled()
+  })
+
   it('closes the tab when the pulled note disappeared from the reloaded vault', async () => {
     const options = makeOptions({
       reloadVault: vi.fn().mockResolvedValue([makeEntry('/vault/other.md', 'Other')]),
