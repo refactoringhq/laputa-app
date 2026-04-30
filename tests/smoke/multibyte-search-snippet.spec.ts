@@ -27,6 +27,11 @@ test.describe('Multibyte note-list search', () => {
       ].join('\n'),
       'utf-8',
     )
+    fs.writeFileSync(
+      path.join(noteDir, 'chinese-crlf-table.md'),
+      '\r\n\r\n# 上海复盘\r\n\r\n| 指标 | 值 |\r\n| --- | --- |\r\n| 收入 | 增长 |\r\n\r\n正文包含中文字符。',
+      'utf-8',
+    )
     await openFixtureVaultDesktopHarness(page, tempVaultDir)
   })
 
@@ -48,5 +53,20 @@ test.describe('Multibyte note-list search', () => {
     await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(
       'multibyte-search-boundary',
     )
+  })
+
+  test('opening CRLF Chinese table content keeps the note searchable @smoke', async ({ page }) => {
+    await showNoteListSearch(page)
+
+    const noteList = page.getByTestId('note-list-container')
+    const searchInput = page.getByPlaceholder('Search notes...')
+    await searchInput.fill('收入')
+
+    await expect(page.getByTestId('note-list-search-loading')).toHaveCount(0)
+    await expect(noteList.getByText('上海复盘', { exact: true })).toBeVisible()
+
+    await noteList.getByText('上海复盘', { exact: true }).click()
+    await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText('chinese-crlf-table')
+    await expect(page.locator('.editor-content-wrapper').getByText('指标')).toBeVisible()
   })
 })
