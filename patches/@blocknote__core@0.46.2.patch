@@ -1,6 +1,33 @@
 --- a/dist/defaultBlocks-DE5GNdJH.js
 +++ b/dist/defaultBlocks-DE5GNdJH.js
-@@ -2761,7 +2761,7 @@
+@@ -2651,17 +2651,24 @@
+     if (!a && !(o !== void 0 && r !== void 0) && !s)
+       return;
+     if (this.pluginState = s ? o : r, s || !this.editor.isEditable) {
+-      this.state && (this.state.show = !1), this.emitUpdate(this.pluginState.triggerCharacter);
++      if (!this.state)
++        return;
++      this.state.show = !1, this.emitUpdate(this.pluginState.triggerCharacter);
+       return;
+     }
+     const c = (l = this.rootEl) == null ? void 0 : l.querySelector(
+       `[data-decoration-id="${this.pluginState.decorationId}"]`
+     );
+-    this.editor.isEditable && c && (this.state = {
++    if (!c) {
++      this.state && (this.state.show = !1, this.emitUpdate(this.pluginState.triggerCharacter));
++      return;
++    }
++    this.state = {
+       show: !0,
+       referencePos: c.getBoundingClientRect().toJSON(),
+       query: this.pluginState.query
+-    }, this.emitUpdate(this.pluginState.triggerCharacter));
++    }, this.emitUpdate(this.pluginState.triggerCharacter);
+   }
+   destroy() {
+     var t;
+@@ -2761,7 +2768,7 @@
              if (a === s) {
                const c = r.state.doc;
                for (const l of t) {
@@ -53,6 +80,60 @@
  }
  function kn(o, e) {
    const t = [
+--- a/src/extensions/SuggestionMenu/SuggestionMenu.ts
++++ b/src/extensions/SuggestionMenu/SuggestionMenu.ts
+@@ -83,27 +83,34 @@
+     this.pluginState = stopped ? prev : next;
+ 
+     if (stopped || !this.editor.isEditable) {
+-      if (this.state) {
+-        this.state.show = false;
+-      }
++      if (!this.state) {
++        return;
++      }
++
++      this.state.show = false;
+       this.emitUpdate(this.pluginState!.triggerCharacter);
+ 
+       return;
+     }
+ 
+     const decorationNode = this.rootEl?.querySelector(
+       `[data-decoration-id="${this.pluginState!.decorationId}"]`,
+     );
+ 
+-    if (this.editor.isEditable && decorationNode) {
+-      this.state = {
+-        show: true,
+-        referencePos: decorationNode
+-          .getBoundingClientRect()
+-          .toJSON() as DOMRect,
+-        query: this.pluginState!.query,
+-      };
+-
+-      this.emitUpdate(this.pluginState!.triggerCharacter!);
++    if (!decorationNode) {
++      if (this.state) {
++        this.state.show = false;
++        this.emitUpdate(this.pluginState!.triggerCharacter!);
++      }
++
++      return;
+     }
++
++    this.state = {
++      show: true,
++      referencePos: decorationNode
++        .getBoundingClientRect()
++        .toJSON() as DOMRect,
++      query: this.pluginState!.query,
++    };
++
++    this.emitUpdate(this.pluginState!.triggerCharacter!);
+   }
+ 
+   destroy() {
 --- a/src/extensions/TableHandles/TableHandles.ts
 +++ b/src/extensions/TableHandles/TableHandles.ts
 @@ -572,9 +572,14 @@
