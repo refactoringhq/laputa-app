@@ -260,7 +260,7 @@ fn mcp_server_dir_candidates(
         candidates.push(exe_dir.join("mcp-server"));
         if let Some(bundle_root) = exe_dir.parent() {
             candidates.push(bundle_root.join("Resources").join("mcp-server"));
-            candidates.push(bundle_root.join("lib").join("tolaria").join("mcp-server"));
+            candidates.extend(linux_package_mcp_server_dirs(bundle_root));
         }
     }
 
@@ -274,13 +274,17 @@ fn mcp_server_dir_candidates(
         );
     }
 
-    candidates.push(
-        PathBuf::from("/usr")
-            .join("lib")
-            .join("tolaria")
-            .join("mcp-server"),
-    );
+    candidates.extend(linux_package_mcp_server_dirs(Path::new("/usr/local")));
+    candidates.extend(linux_package_mcp_server_dirs(Path::new("/usr")));
     candidates
+}
+
+fn linux_package_mcp_server_dirs(root: &Path) -> Vec<PathBuf> {
+    vec![
+        root.join("Tolaria").join("mcp-server"),
+        root.join("Tolaria").join("resources").join("mcp-server"),
+        root.join("lib").join("tolaria").join("mcp-server"),
+    ]
 }
 
 fn mcp_server_dir_has_files(path: &Path) -> bool {
@@ -621,11 +625,18 @@ mod tests {
     #[test]
     fn build_mcp_entry_produces_correct_json() {
         let entry = build_mcp_entry("/usr/local/bin/node", "/path/to/index.js", "/my/vault");
-        assert_eq!(entry["type"], "stdio");
-        assert_eq!(entry["command"], "/usr/local/bin/node");
-        assert_eq!(entry["args"][0], "/path/to/index.js");
-        assert_eq!(entry["env"]["VAULT_PATH"], "/my/vault");
-        assert_eq!(entry["env"]["WS_UI_PORT"], "9711");
+        assert_eq!(
+            entry,
+            serde_json::json!({
+                "type": "stdio",
+                "command": "/usr/local/bin/node",
+                "args": ["/path/to/index.js"],
+                "env": {
+                    "VAULT_PATH": "/my/vault",
+                    "WS_UI_PORT": "9711"
+                }
+            })
+        );
     }
 
     #[test]
@@ -740,6 +751,21 @@ mod tests {
     }
 
     #[test]
+    fn mcp_server_dir_candidates_include_linux_package_resource_roots() {
+        let dev_path = Path::new("/repo/mcp-server");
+        let exe_path = Path::new("/usr/local/tolaria/tolaria");
+        let candidates = mcp_server_dir_candidates(dev_path, exe_path, None);
+        let expected = [
+            PathBuf::from("/usr/local/Tolaria/mcp-server"),
+            PathBuf::from("/usr/local/Tolaria/resources/mcp-server"),
+            PathBuf::from("/usr/local/lib/tolaria/mcp-server"),
+            PathBuf::from("/usr/lib/tolaria/mcp-server"),
+        ];
+
+        assert!(expected.iter().all(|path| candidates.contains(path)));
+    }
+
+    #[test]
     fn upsert_creates_new_config() {
         let tmp = tempfile::tempdir().unwrap();
         let config_path = tmp.path().join("mcp.json");
@@ -843,10 +869,15 @@ mod tests {
         upsert_mcp_config(&config_path, &entry).unwrap();
 
         let config = read_config(&config_path);
-        assert_eq!(config["model"], "sonnet");
-        assert_eq!(config["theme"], "dark");
-        assert!(config["mcpServers"]["other-server"].is_object());
-        assert!(config["mcpServers"][MCP_SERVER_NAME].is_object());
+        assert_eq!(
+            (
+                config["model"].as_str(),
+                config["theme"].as_str(),
+                config["mcpServers"]["other-server"].is_object(),
+                config["mcpServers"][MCP_SERVER_NAME].is_object(),
+            ),
+            (Some("sonnet"), Some("dark"), true, true)
+        );
     }
 
     #[test]
@@ -963,12 +994,15 @@ mod tests {
                 generic_cfg.clone(),
             ],
         );
+        let config_paths = [
+            &claude_user_cfg,
+            &claude_cfg,
+            &gemini_cfg,
+            &cursor_cfg,
+            &generic_cfg,
+        ];
 
-        assert!(claude_user_cfg.exists());
-        assert!(claude_cfg.exists());
-        assert!(gemini_cfg.exists());
-        assert!(cursor_cfg.exists());
-        assert!(generic_cfg.exists());
+        assert!(config_paths.iter().all(|config_path| config_path.exists()));
 
         let raw = std::fs::read_to_string(&claude_user_cfg).unwrap();
         let config: serde_json::Value = serde_json::from_str(&raw).unwrap();
