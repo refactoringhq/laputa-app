@@ -1064,6 +1064,7 @@ function App() {
     refreshModifiedFiles: vault.loadModifiedFiles,
     reloadVault: vault.reloadVault,
     setToastMessage,
+    getEntry: (path: string) => vault.entries.find((e) => e.path === path),
   })
 
   const handleDeleteType = useCallback((typeName: string) => {

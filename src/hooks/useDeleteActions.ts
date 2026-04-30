@@ -2,6 +2,7 @@ import { startTransition, useCallback, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { trackEvent } from '../lib/telemetry'
+import type { VaultEntry } from '../types'
 
 interface ConfirmDeleteState {
   title: string
@@ -18,6 +19,7 @@ interface UseDeleteActionsInput {
   refreshModifiedFiles: () => Promise<unknown> | void
   reloadVault: () => Promise<unknown> | void
   setToastMessage: (msg: string | null) => void
+  getEntry?: (path: string) => VaultEntry | undefined
 }
 
 function describeNotes(count: number): string {
@@ -76,7 +78,7 @@ function useDeleteRunner({
     })
   }, [onDeselectNote, removeEntries, removeEntry])
 
-  const deleteNotesFromDisk = useCallback(async (paths: string[]) => {
+  const deleteNotesFromDisk = useCallback(async (paths: string[], successMessage?: string) => {
     if (paths.length === 0) return 0
 
     setPendingDeleteCount((count) => count + paths.length)
@@ -98,7 +100,7 @@ function useDeleteRunner({
       }
 
       await Promise.resolve(refreshModifiedFiles())
-      setToastMessage(buildDeleteSuccessMessage(deletedCount))
+      setToastMessage(successMessage ?? buildDeleteSuccessMessage(deletedCount))
       return deletedCount
     } catch (e) {
       await reconcileDeleteFailure()
@@ -109,8 +111,8 @@ function useDeleteRunner({
     }
   }, [optimisticallyRemoveEntries, reconcileDeleteFailure, refreshModifiedFiles, setToastMessage])
 
-  const deleteNoteFromDisk = useCallback(async (path: string) => {
-    const deletedCount = await deleteNotesFromDisk([path])
+  const deleteNoteFromDisk = useCallback(async (path: string, successMessage?: string) => {
+    const deletedCount = await deleteNotesFromDisk([path], successMessage)
     return deletedCount === 1
   }, [deleteNotesFromDisk])
 
@@ -128,6 +130,7 @@ export function useDeleteActions({
   refreshModifiedFiles,
   reloadVault,
   setToastMessage,
+  getEntry,
 }: UseDeleteActionsInput) {
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState | null>(null)
   const {
@@ -144,15 +147,16 @@ export function useDeleteActions({
   })
 
   const handleDeleteNote = useCallback(async (path: string) => {
+    const successMessage = getEntry?.(path)?.isA === 'Type' ? 'Type permanently deleted' : undefined
     setConfirmDelete({
       title: 'Delete permanently?',
       message: 'Delete permanently? This cannot be undone. You can recover it from Git history.',
       onConfirm: async () => {
         setConfirmDelete(null)
-        await deleteNoteFromDisk(path)
+        await deleteNoteFromDisk(path, successMessage)
       },
     })
-  }, [deleteNoteFromDisk])
+  }, [deleteNoteFromDisk, getEntry])
 
   const handleBulkDeletePermanently = useCallback((paths: string[]) => {
     const count = paths.length

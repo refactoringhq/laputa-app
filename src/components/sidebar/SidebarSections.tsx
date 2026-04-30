@@ -37,12 +37,12 @@ export interface SidebarSectionProps {
   selection: SidebarSelection
   onSelect: (selection: SidebarSelection) => void
   onContextMenu: (event: React.MouseEvent, type: string) => void
+  onStartRename: (type: string) => void
+  onSelectTypeNote: (type: string) => void
   renamingType: string | null
   renameInitialValue: string
   onRenameSubmit: (value: string) => void
   onRenameCancel: () => void
-  onStartRename: (type: string) => void
-  onSelectTypeNote: (type: string) => void
   locale?: AppLocale
 }
 
@@ -203,13 +203,13 @@ function SortableSection({
       selection={sectionProps.selection}
       onSelect={sectionProps.onSelect}
       onContextMenu={sectionProps.onContextMenu}
+      onStartRename={sectionProps.onStartRename}
+      onSelectTypeNote={sectionProps.onSelectTypeNote}
       dragHandleProps={listeners}
       isRenaming={isRenaming}
       renameInitialValue={isRenaming ? sectionProps.renameInitialValue : undefined}
       onRenameSubmit={sectionProps.onRenameSubmit}
       onRenameCancel={sectionProps.onRenameCancel}
-      onStartRename={sectionProps.onStartRename}
-      onSelectTypeNote={sectionProps.onSelectTypeNote}
       locale={sectionProps.locale}
     />
   )
