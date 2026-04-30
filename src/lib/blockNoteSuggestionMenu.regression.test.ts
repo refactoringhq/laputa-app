@@ -32,6 +32,7 @@ type SuggestionEditorView = {
 }
 
 type SuggestionPluginView = {
+  emitUpdate: (triggerCharacter: string) => void
   update: (view: SuggestionEditorView, prevState: SuggestionEditorState) => void
 }
 
@@ -81,6 +82,14 @@ function createEditorView(state: SuggestionEditorState): SuggestionEditorView {
 }
 
 describe('patched BlockNote suggestion menu lifecycle', () => {
+  it('ignores late updates before the suggestion menu state initializes', () => {
+    const plugin = createSuggestionPlugin()
+    const editorView = createEditorView(createState(plugin))
+    const pluginView = plugin.spec.view(editorView)
+
+    expect(() => pluginView.emitUpdate('/')).not.toThrow()
+  })
+
   it('closes a suggestion menu before its decoration mounts without throwing', () => {
     const plugin = createSuggestionPlugin()
     const inactiveState = createState(plugin)

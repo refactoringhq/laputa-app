@@ -9,6 +9,15 @@
              n.updateBlock(t.id, { props: { language: d } });
            };
            i.addEventListener("change", l), s = () => i.removeEventListener("change", l);
+@@ -2639,7 +2641,7 @@
+     this.editor = t, this.pluginState = void 0, this.emitUpdate = (a) => {
+       var s;
+       if (!this.state)
+-        throw new Error("Attempting to update uninitialized suggestions menu");
++        return;
+       n(a, {
+         ...this.state,
+         ignoreQueryLength: (s = this.pluginState) == null ? void 0 : s.ignoreQueryLength
 @@ -2651,17 +2653,23 @@
      if (!a && !(o !== void 0 && r !== void 0) && !s)
        return;
@@ -110,6 +119,15 @@
    const t = [
 --- a/src/extensions/SuggestionMenu/SuggestionMenu.ts
 +++ b/src/extensions/SuggestionMenu/SuggestionMenu.ts
+@@ -32,7 +32,7 @@
+ 
+     this.emitUpdate = (menuName: string) => {
+       if (!this.state) {
+-        throw new Error("Attempting to update uninitialized suggestions menu");
++        return;
+       }
+ 
+       emitUpdate(menuName, {
 @@ -83,29 +83,38 @@
      this.pluginState = stopped ? prev : next;
  
