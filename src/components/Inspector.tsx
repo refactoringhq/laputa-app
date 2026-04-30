@@ -48,6 +48,10 @@ function buildTypeEntryMap(entries: VaultEntry[]): Record<string, VaultEntry> {
   return map
 }
 
+function supportsFrontmatter(entry: VaultEntry): boolean {
+  return entry.fileKind === undefined || entry.fileKind === 'markdown'
+}
+
 function ValidFrontmatterPanels({
   entry,
   entries,
@@ -212,24 +216,26 @@ function InspectorBody({
 
   return (
     <>
-      <PrimaryInspectorPanel
-        entry={entry}
-        frontmatterState={frontmatterState}
-        frontmatter={frontmatter}
-        entries={entries}
-        typeEntryMap={typeEntryMap}
-        vaultPath={vaultPath}
-        referencedBy={referencedBy}
-        onNavigate={onNavigate}
-        onToggleRawEditor={onToggleRawEditor}
-        onInitializeProperties={onInitializeProperties}
-        onCreateAndOpenNote={onCreateAndOpenNote}
-        onUpdateProperty={onUpdateFrontmatter ? handleUpdateProperty : undefined}
-        onDeleteProperty={onDeleteProperty ? handleDeleteProperty : undefined}
-        onAddProperty={onAddProperty ? handleAddProperty : undefined}
-        onCreateMissingType={onCreateMissingType ? handleCreateMissingType : undefined}
-        locale={locale}
-      />
+      {supportsFrontmatter(entry) && (
+        <PrimaryInspectorPanel
+          entry={entry}
+          frontmatterState={frontmatterState}
+          frontmatter={frontmatter}
+          entries={entries}
+          typeEntryMap={typeEntryMap}
+          vaultPath={vaultPath}
+          referencedBy={referencedBy}
+          onNavigate={onNavigate}
+          onToggleRawEditor={onToggleRawEditor}
+          onInitializeProperties={onInitializeProperties}
+          onCreateAndOpenNote={onCreateAndOpenNote}
+          onUpdateProperty={onUpdateFrontmatter ? handleUpdateProperty : undefined}
+          onDeleteProperty={onDeleteProperty ? handleDeleteProperty : undefined}
+          onAddProperty={onAddProperty ? handleAddProperty : undefined}
+          onCreateMissingType={onCreateMissingType ? handleCreateMissingType : undefined}
+          locale={locale}
+        />
+      )}
       {backlinks.length > 0 && <Separator />}
       <BacklinksPanel backlinks={backlinks} onNavigate={onNavigate} />
       <Separator />

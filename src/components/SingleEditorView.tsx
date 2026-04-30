@@ -20,6 +20,8 @@ import { ExternalLink } from 'lucide-react'
 import { useDocumentThemeMode } from '../hooks/useDocumentThemeMode'
 import { useEditorTheme } from '../hooks/useTheme'
 import { useImageDrop } from '../hooks/useImageDrop'
+import { useImageLightbox } from '../hooks/useImageLightbox'
+import type { AppLocale } from '../lib/i18n'
 import { buildTypeEntryMap } from '../utils/typeColors'
 import { preFilterWikilinks, deduplicateByPath, MIN_QUERY_LENGTH } from '../utils/wikilinkSuggestions'
 import { filterPersonMentions, PERSON_MENTION_MIN_QUERY } from '../utils/personMentionSuggestions'
@@ -39,6 +41,7 @@ import {
 import { TolariaSideMenu } from './tolariaBlockNoteSideMenu'
 import { useEditorLinkActivation } from './useEditorLinkActivation'
 import { findNearestTextCursorBlock } from './blockNoteCursorTarget'
+import { ImageLightbox } from './ImageLightbox'
 
 const TEST_TABLE_MARKDOWN = `| Head 1 | Head 2 | Head 3 |
 | --- | --- | --- |
@@ -546,13 +549,14 @@ function useInsertImageCallback(editor: ReturnType<typeof useCreateBlockNote>) {
 }
 
 /** Single BlockNote editor view — content is swapped via replaceBlocks */
-export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange, vaultPath, editable = true }: {
+export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange, vaultPath, editable = true, locale = 'en' }: {
   editor: ReturnType<typeof useCreateBlockNote>
   entries: VaultEntry[]
   onNavigateWikilink: (target: string) => void
   onChange?: () => void
   vaultPath?: string
   editable?: boolean
+  locale?: AppLocale
 }) {
   const { cssVars } = useEditorTheme()
   const themeMode = useDocumentThemeMode()
@@ -561,6 +565,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
   const handleEditorChange = useCompositionAwareEditorChange({ containerRef, onChange })
   const onImageUrl = useInsertImageCallback(editor)
   const { isDragOver } = useImageDrop({ containerRef, onImageUrl, vaultPath })
+  const lightbox = useImageLightbox({ containerRef })
   useBlockNoteSideMenuHoverGuard(containerRef)
   useEditorLinkActivation(containerRef, onNavigateWikilink)
 
@@ -650,6 +655,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
           onItemClick={(item: WikilinkSuggestionItem) => runEditorAction(item.onItemClick)}
         />
       </SharedContextBlockNoteView>
+      <ImageLightbox image={lightbox.image} locale={locale} onClose={lightbox.close} />
     </div>
   )
 }
