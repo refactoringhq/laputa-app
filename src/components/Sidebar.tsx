@@ -42,6 +42,7 @@ interface SidebarProps {
   onUpdateTypeTemplate?: (typeName: string, template: string) => void
   onReorderSections?: (orderedTypes: { typeName: string; order: number }[]) => void
   onRenameSection?: (typeName: string, label: string) => void
+  onDeleteType?: (typeName: string) => void
   onToggleTypeVisibility?: (typeName: string) => void
   onSelectFavorite?: (entry: VaultEntry) => void
   onReorderFavorites?: (orderedPaths: string[]) => void
@@ -490,10 +491,12 @@ function useSidebarRuntime({
   entries,
   selection,
   onSelect,
+  onSelectNote,
   onCustomizeType,
   onUpdateTypeTemplate,
   onReorderSections,
   onRenameSection,
+  onDeleteType,
   onToggleTypeVisibility,
   allNotesFileVisibility,
   locale = 'en',
@@ -507,10 +510,15 @@ function useSidebarRuntime({
     onCustomizeType,
     onUpdateTypeTemplate,
     onRenameSection,
+    onDeleteType,
   })
 
   const isSectionVisible = useCallback((type: string) => typeEntryMap[type]?.visible !== false, [typeEntryMap])
   const toggleVisibility = useCallback((type: string) => onToggleTypeVisibility?.(type), [onToggleTypeVisibility])
+  const selectTypeNote = useCallback((type: string) => {
+    const typeEntry = typeEntryMap[type] ?? typeEntryMap[type.toLowerCase()]
+    if (typeEntry) onSelectNote?.(typeEntry)
+  }, [onSelectNote, typeEntryMap])
 
   const sensors = useSidebarDndSensors()
 
@@ -531,6 +539,8 @@ function useSidebarRuntime({
     renameInitialValue: typeInteractions.renameInitialValue,
     onRenameSubmit: typeInteractions.handleRenameSubmit,
     onRenameCancel: typeInteractions.cancelRename,
+    onStartRename: typeInteractions.handleStartRename,
+    onSelectTypeNote: selectTypeNote,
   }
 
   return {
@@ -616,6 +626,7 @@ function SidebarInteractionOverlays({
         innerRef={runtime.typeInteractions.contextMenuRef}
         onOpenCustomize={runtime.typeInteractions.openCustomizeTarget}
         onStartRename={runtime.typeInteractions.handleStartRename}
+        onDelete={runtime.typeInteractions.handleDeleteType}
         locale={locale}
       />
       <CustomizeOverlay

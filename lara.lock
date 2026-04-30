@@ -261,7 +261,9 @@ files:
     sidebar.action.moveViewDown: 6f86951085367864e3e4eb13f5c8688e
     sidebar.action.customizeSections: 050a134cad1e9c6f04abe5d635592703
     sidebar.action.renameSection: 8936914051df04e7550d0eeb4a31e0e0
+    sidebar.action.renameType: 327d51d97d4b0e3ddcb7afa39c4bf5fa
     sidebar.action.customizeIconColor: 9a2f685c74d261ab483ef00dee5314fe
+    sidebar.action.deleteType: c52e15c44f6372c6ddb2758254a041ef
     sidebar.action.createType: 6cfb8b8aa3fdce38e675819691b48f5c
     sidebar.action.collapse: 00873bdddd457791609bff1243c40a6b
     sidebar.action.expand: 8f98e9696f6eed958573012f52710faa
