@@ -245,6 +245,8 @@
   "sidebar.nav.inbox": "Caixa de entrada",
   "sidebar.nav.allNotes": "Todas as anotações",
   "sidebar.nav.archive": "Arquivar",
+  "sidebar.nav.back": "Voltar",
+  "sidebar.nav.forward": "Avançar",
   "sidebar.group.favorites": "FAVORITOS",
   "sidebar.group.views": "VISUALIZAÇÕES",
   "sidebar.group.types": "TIPOS",

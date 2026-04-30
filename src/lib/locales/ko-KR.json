@@ -245,6 +245,8 @@
   "sidebar.nav.inbox": "받은 편지함",
   "sidebar.nav.allNotes": "모든 노트",
   "sidebar.nav.archive": "보관",
+  "sidebar.nav.back": "뒤로",
+  "sidebar.nav.forward": "다음",
   "sidebar.group.favorites": "즐겨찾기",
   "sidebar.group.views": "조회수",
   "sidebar.group.types": "유형",

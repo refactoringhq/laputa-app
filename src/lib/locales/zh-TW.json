@@ -245,6 +245,8 @@
   "sidebar.nav.inbox": "收件箱",
   "sidebar.nav.allNotes": "全部筆記",
   "sidebar.nav.archive": "歸檔",
+  "sidebar.nav.back": "返回",
+  "sidebar.nav.forward": "下一頁",
   "sidebar.group.favorites": "收藏",
   "sidebar.group.views": "檢視",
   "sidebar.group.types": "型別",

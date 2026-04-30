@@ -245,6 +245,8 @@
   "sidebar.nav.inbox": "Входящие",
   "sidebar.nav.allNotes": "Все заметки",
   "sidebar.nav.archive": "Архив",
+  "sidebar.nav.back": "Назад",
+  "sidebar.nav.forward": "Вперед",
   "sidebar.group.favorites": "ИЗБРАННОЕ",
   "sidebar.group.views": "ПРОСМОТРЫ",
   "sidebar.group.types": "ТИПЫ",

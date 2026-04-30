@@ -247,6 +247,8 @@ files:
     sidebar.nav.inbox: 3882d32c66e7e768145ecd8f104b0c08
     sidebar.nav.allNotes: cd76cf851b08a9d2feafaf255bc1f4d5
     sidebar.nav.archive: e727b00944f81e1d0a95c12886ac4641
+    sidebar.nav.back: 0557fa923dcee4d0f86b1409f5c2167f
+    sidebar.nav.forward: 67d2f6740a8eaebf4d5c6f79be8da481
     sidebar.group.favorites: 953bf4d5e8a1807c15dec4e255384b1d
     sidebar.group.views: 8f56a72923a6ca8ff53462533d89e567
     sidebar.group.types: 6b20155008db90cf7589c07baa7334e9

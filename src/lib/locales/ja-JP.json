@@ -245,6 +245,8 @@
   "sidebar.nav.inbox": "受信トレイ",
   "sidebar.nav.allNotes": "すべてのノート",
   "sidebar.nav.archive": "アーカイブ",
+  "sidebar.nav.back": "戻る",
+  "sidebar.nav.forward": "進む",
   "sidebar.group.favorites": "お気に入り",
   "sidebar.group.views": "閲覧数",
   "sidebar.group.types": "タイプ",

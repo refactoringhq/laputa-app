@@ -245,6 +245,8 @@
   "sidebar.nav.inbox": "Boîte de réception",
   "sidebar.nav.allNotes": "Toutes les notes",
   "sidebar.nav.archive": "Archiver",
+  "sidebar.nav.back": "Retour",
+  "sidebar.nav.forward": "Suivant",
   "sidebar.group.favorites": "FAVORIS",
   "sidebar.group.views": "VUES",
   "sidebar.group.types": "TYPES",
