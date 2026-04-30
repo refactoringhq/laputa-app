@@ -26,7 +26,7 @@ pub(crate) fn build_command(
 fn build_args(permission_mode: AiAgentPermissionMode) -> Vec<String> {
     vec![
         "--output-format".into(),
-        "json".into(),
+        "stream-json".into(),
         "--approval-mode".into(),
         approval_mode(permission_mode).into(),
     ]
@@ -102,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn command_uses_headless_json_mode_and_temp_settings() {
+    fn command_uses_headless_stream_json_mode_and_temp_settings() {
         let settings_dir = tempfile::tempdir().unwrap();
         let command =
             build_command(&PathBuf::from("gemini"), &request(), settings_dir.path()).unwrap();
@@ -114,7 +114,7 @@ mod tests {
 
         assert_eq!(command.get_program(), OsStr::new("gemini"));
         assert_eq!(actual_args[0], OsStr::new("--output-format"));
-        assert_eq!(actual_args[1], OsStr::new("json"));
+        assert_eq!(actual_args[1], OsStr::new("stream-json"));
         assert!(actual_args.contains(&OsStr::new("--prompt")));
         assert_eq!(actual_args.last(), Some(&OsStr::new("Rename the note")));
         assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/vault")));

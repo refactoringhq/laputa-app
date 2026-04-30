@@ -1,7 +1,6 @@
 use crate::ai_agents::{AiAgentAvailability, AiAgentStreamEvent};
 pub use crate::cli_agent_runtime::AgentStreamRequest;
 use std::path::Path;
-use std::process::Output;
 
 pub fn check_cli() -> AiAgentAvailability {
     crate::gemini_discovery::check_cli()
@@ -18,7 +17,7 @@ where
 fn run_agent_stream_with_binary<F>(
     binary: &Path,
     request: AgentStreamRequest,
-    mut emit: F,
+    emit: F,
 ) -> Result<String, String>
 where
     F: FnMut(AiAgentStreamEvent),
@@ -27,72 +26,120 @@ where
         .prefix("tolaria-gemini-agent-")
         .tempdir()
         .map_err(|error| format!("Failed to create Gemini settings directory: {error}"))?;
-    let mut command = crate::gemini_config::build_command(binary, &request, settings_dir.path())?;
-    let output = command
-        .output()
-        .map_err(|error| format!("Failed to spawn gemini: {error}"))?;
-
-    emit(AiAgentStreamEvent::Init {
-        session_id: "gemini-headless".into(),
-    });
-
-    if output.status.success() {
-        emit_gemini_success(&output, &mut emit);
-    } else {
-        emit(AiAgentStreamEvent::Error {
-            message: format_gemini_error(output_stderr(&output), output.status.to_string()),
-        });
-    }
-
-    emit(AiAgentStreamEvent::Done);
-    Ok("gemini-headless".into())
+    let command = crate::gemini_config::build_command(binary, &request, settings_dir.path())?;
+    crate::cli_agent_runtime::run_ai_agent_json_stream(
+        command,
+        "gemini",
+        emit,
+        gemini_session_id,
+        dispatch_gemini_event,
+        format_gemini_error,
+    )
 }
 
-fn emit_gemini_success<F>(output: &Output, emit: &mut F)
+fn gemini_session_id(json: &serde_json::Value) -> Option<&str> {
+    json["session_id"].as_str()
+}
+
+fn dispatch_gemini_event<F>(json: &serde_json::Value, emit: &mut F)
 where
     F: FnMut(AiAgentStreamEvent),
 {
-    match gemini_response_text(&output_stdout(output)) {
-        GeminiOutput::Response(text) => emit(AiAgentStreamEvent::TextDelta { text }),
-        GeminiOutput::Error(message) => emit(AiAgentStreamEvent::Error { message }),
-        GeminiOutput::Empty => {}
+    match json["type"].as_str().unwrap_or_default() {
+        "init" => emit_gemini_init(json, emit),
+        "message" => emit_gemini_message(json, emit),
+        "tool_use" => emit_gemini_tool_start(json, emit),
+        "tool_result" => emit_gemini_tool_done(json, emit),
+        "error" => emit_gemini_error(json, emit),
+        "result" => emit_gemini_result(json, emit),
+        _ => {}
     }
 }
 
-enum GeminiOutput {
-    Response(String),
-    Error(String),
-    Empty,
-}
-
-fn gemini_response_text(stdout: &str) -> GeminiOutput {
-    let trimmed = stdout.trim();
-    if trimmed.is_empty() {
-        return GeminiOutput::Empty;
-    }
-
-    match serde_json::from_str::<serde_json::Value>(trimmed) {
-        Ok(json) => response_from_json(&json),
-        Err(_) => GeminiOutput::Response(trimmed.to_string()),
+fn emit_gemini_init<F>(json: &serde_json::Value, emit: &mut F)
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    if let Some(session_id) = json["session_id"].as_str() {
+        emit(AiAgentStreamEvent::Init {
+            session_id: session_id.to_string(),
+        });
     }
 }
 
-fn response_from_json(json: &serde_json::Value) -> GeminiOutput {
+fn emit_gemini_message<F>(json: &serde_json::Value, emit: &mut F)
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    if json["role"].as_str() != Some("assistant") {
+        return;
+    }
+
+    if let Some(content) = json["content"]
+        .as_str()
+        .filter(|content| !content.is_empty())
+    {
+        emit(AiAgentStreamEvent::TextDelta {
+            text: content.to_string(),
+        });
+    }
+}
+
+fn emit_gemini_tool_start<F>(json: &serde_json::Value, emit: &mut F)
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    let tool_name = json["tool_name"].as_str().unwrap_or("Gemini tool");
+    let tool_id = json["tool_id"].as_str().unwrap_or(tool_name);
+    let input = (!json["parameters"].is_null()).then(|| json["parameters"].to_string());
+
+    emit(AiAgentStreamEvent::ToolStart {
+        tool_name: tool_name.to_string(),
+        tool_id: tool_id.to_string(),
+        input,
+    });
+}
+
+fn emit_gemini_tool_done<F>(json: &serde_json::Value, emit: &mut F)
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    let tool_id = json["tool_id"].as_str().unwrap_or("gemini-tool");
+    let output = json["output"]
+        .as_str()
+        .or_else(|| json["error"]["message"].as_str())
+        .map(str::to_string);
+
+    emit(AiAgentStreamEvent::ToolDone {
+        tool_id: tool_id.to_string(),
+        output,
+    });
+}
+
+fn emit_gemini_error<F>(json: &serde_json::Value, emit: &mut F)
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    if let Some(message) = json["message"].as_str() {
+        emit(AiAgentStreamEvent::Error {
+            message: message.to_string(),
+        });
+    }
+}
+
+fn emit_gemini_result<F>(json: &serde_json::Value, emit: &mut F)
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    if json["status"].as_str() != Some("error") {
+        return;
+    }
+
     if let Some(message) = json["error"]["message"].as_str() {
-        return GeminiOutput::Error(message.to_string());
+        emit(AiAgentStreamEvent::Error {
+            message: message.to_string(),
+        });
     }
-    if let Some(response) = json["response"].as_str() {
-        return GeminiOutput::Response(response.to_string());
-    }
-    GeminiOutput::Empty
-}
-
-fn output_stdout(output: &Output) -> String {
-    String::from_utf8_lossy(&output.stdout).to_string()
-}
-
-fn output_stderr(output: &Output) -> String {
-    String::from_utf8_lossy(&output.stderr).to_string()
 }
 
 fn format_gemini_error(stderr_output: String, status: String) -> String {
@@ -149,12 +196,15 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn run_agent_stream_maps_gemini_json_response() {
+    fn run_agent_stream_maps_gemini_stream_json_response() {
         let dir = tempfile::tempdir().unwrap();
         let vault = tempfile::tempdir().unwrap();
         let binary = executable_script(
             dir.path(),
-            r#"printf '%s\n' '{"response":"Done","stats":{"tools":{"totalCalls":0}}}'"#,
+            r#"printf '%s\n' '{"type":"init","session_id":"gemini_1","model":"gemini-2.5-pro"}'
+printf '%s\n' '{"type":"message","role":"assistant","content":"Done","delta":true}'
+printf '%s\n' '{"type":"result","status":"success","stats":{"tool_calls":0}}'
+"#,
         );
 
         let mut events = Vec::new();
@@ -165,15 +215,58 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(session_id, "gemini-headless");
+        assert_eq!(session_id, "gemini_1");
         assert!(matches!(
             &events[0],
-            AiAgentStreamEvent::Init { session_id } if session_id == "gemini-headless"
+            AiAgentStreamEvent::Init { session_id } if session_id == "gemini_1"
         ));
         assert!(matches!(
             &events[1],
             AiAgentStreamEvent::TextDelta { text } if text == "Done"
         ));
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_agent_stream_maps_gemini_tool_events_before_final_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        let binary = executable_script(
+            dir.path(),
+            r#"printf '%s\n' '{"type":"init","session_id":"gemini_2","model":"gemini-2.5-pro"}'
+printf '%s\n' '{"type":"tool_use","tool_name":"tolaria__search_notes","tool_id":"tool_1","parameters":{"query":"meeting"}}'
+printf '%s\n' '{"type":"tool_result","tool_id":"tool_1","status":"success","output":"2 notes"}'
+printf '%s\n' '{"type":"message","role":"assistant","content":"I found 2 notes.","delta":true}'
+printf '%s\n' '{"type":"result","status":"success","stats":{"tool_calls":1}}'
+"#,
+        );
+
+        let mut events = Vec::new();
+        let session_id = run_agent_stream_with_binary(
+            &binary,
+            request(vault.path().to_string_lossy().into_owned()),
+            |event| events.push(event),
+        )
+        .unwrap();
+
+        assert_eq!(session_id, "gemini_2");
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AiAgentStreamEvent::ToolStart { tool_name, tool_id, input }
+                if tool_name == "tolaria__search_notes"
+                    && tool_id == "tool_1"
+                    && input.as_deref() == Some(r#"{"query":"meeting"}"#)
+        )));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AiAgentStreamEvent::ToolDone { tool_id, output }
+                if tool_id == "tool_1" && output.as_deref() == Some("2 notes")
+        )));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AiAgentStreamEvent::TextDelta { text } if text == "I found 2 notes."
+        )));
         assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
     }
 
@@ -197,24 +290,11 @@ exit 3
         )
         .unwrap();
 
-        assert_eq!(session_id, "gemini-headless");
+        assert!(session_id.is_empty());
         assert!(events.iter().any(|event| matches!(
             event,
             AiAgentStreamEvent::Error { message } if message.contains("not authenticated")
         )));
         assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
-    }
-
-    #[test]
-    fn gemini_response_text_reads_json_response_or_plain_text() {
-        match gemini_response_text(r#"{"response":"Structured"}"#) {
-            GeminiOutput::Response(text) => assert_eq!(text, "Structured"),
-            _ => panic!("expected response"),
-        }
-
-        match gemini_response_text("Plain answer") {
-            GeminiOutput::Response(text) => assert_eq!(text, "Plain answer"),
-            _ => panic!("expected response"),
-        }
     }
 }
