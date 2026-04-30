@@ -281,6 +281,11 @@ fn build_agent_args(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
         "--no-session-persistence".into(),
     ];
 
+    if let Some(allowed_tools) = preapproved_agent_tools(req.permission_mode) {
+        args.push("--allowedTools".into());
+        args.push(allowed_tools.into());
+    }
+
     if let Some(ref sp) = req.system_prompt {
         if !sp.is_empty() {
             args.push("--append-system-prompt".into());
@@ -295,6 +300,13 @@ fn agent_tools(permission_mode: AiAgentPermissionMode) -> &'static str {
     match permission_mode {
         AiAgentPermissionMode::Safe => "Read,Edit,MultiEdit,Write,Glob,Grep,LS",
         AiAgentPermissionMode::PowerUser => "Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash",
+    }
+}
+
+fn preapproved_agent_tools(permission_mode: AiAgentPermissionMode) -> Option<&'static str> {
+    match permission_mode {
+        AiAgentPermissionMode::Safe => None,
+        AiAgentPermissionMode::PowerUser => Some("Bash"),
     }
 }
 
@@ -693,6 +705,11 @@ mod tests {
         };
     }
 
+    fn arg_value_after<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
+        let index = args.iter().position(|arg| arg == name)?;
+        args.get(index + 1).map(String::as_str)
+    }
+
     fn assert_binary_candidates_include(home: &Path, expected: &[PathBuf]) {
         let candidates = claude_binary_candidates_for_home(home);
         for candidate in expected {
@@ -741,6 +758,7 @@ mod tests {
         );
         assert_args_contain!(args, ["Read,Edit,MultiEdit,Write,Glob,Grep,LS"]);
         assert_no_arg_contains!(args, "Bash");
+        assert_args_lack!(args, ["--allowedTools"]);
         assert_args_lack!(args, ["--dangerously-skip-permissions"]);
     }
 
@@ -756,6 +774,18 @@ mod tests {
         assert_args_contain!(args, ["--strict-mcp-config"]);
         assert_args_contain!(args, ["Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash"]);
         assert_args_lack!(args, ["--dangerously-skip-permissions"]);
+    }
+
+    #[test]
+    fn agent_args_preapprove_bash_for_power_user_runs() {
+        let args = build_agent_args(&agent_request!(
+            "Run a local script",
+            None,
+            AiAgentPermissionMode::PowerUser,
+        ))
+        .unwrap();
+
+        assert_eq!(arg_value_after(&args, "--allowedTools"), Some("Bash"));
     }
 
     #[test]
