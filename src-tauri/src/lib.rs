@@ -73,6 +73,18 @@ struct StartupEnvOverride {
 }
 
 #[cfg(any(test, all(desktop, target_os = "linux")))]
+const LINUX_APPIMAGE_WEBKIT_OVERRIDES: [StartupEnvOverride; 2] = [
+    StartupEnvOverride {
+        key: "WEBKIT_DISABLE_DMABUF_RENDERER",
+        value: "1",
+    },
+    StartupEnvOverride {
+        key: "WEBKIT_DISABLE_COMPOSITING_MODE",
+        value: "1",
+    },
+];
+
+#[cfg(any(test, all(desktop, target_os = "linux")))]
 const WAYLAND_CLIENT_PRELOAD_CANDIDATES: [&str; 7] = [
     "/usr/lib/libwayland-client.so",
     "/usr/lib/libwayland-client.so.0",
@@ -136,14 +148,12 @@ where
         return Vec::new();
     }
 
-    if get_var("WEBKIT_DISABLE_DMABUF_RENDERER").is_some_and(|value| !value.trim().is_empty()) {
-        return Vec::new();
-    }
-
-    vec![StartupEnvOverride {
-        key: "WEBKIT_DISABLE_DMABUF_RENDERER",
-        value: "1",
-    }]
+    LINUX_APPIMAGE_WEBKIT_OVERRIDES
+        .into_iter()
+        .filter(|env_override| {
+            !get_var(env_override.key).is_some_and(|value| !value.trim().is_empty())
+        })
+        .collect()
 }
 
 #[cfg(all(desktop, target_os = "linux"))]
@@ -618,7 +628,7 @@ mod tests {
     }
 
     #[test]
-    fn linux_appimage_startup_env_overrides_disable_dmabuf_for_appimages() {
+    fn linux_appimage_startup_env_overrides_disable_unstable_webkit_rendering_for_appimages() {
         let overrides = linux_appimage_startup_env_overrides_with(|key| match key {
             "APPIMAGE" => Some("/tmp/Tolaria.AppImage".to_string()),
             _ => None,
@@ -626,22 +636,34 @@ mod tests {
 
         assert_eq!(
             overrides,
-            vec![StartupEnvOverride {
-                key: "WEBKIT_DISABLE_DMABUF_RENDERER",
-                value: "1",
-            }]
+            vec![
+                StartupEnvOverride {
+                    key: "WEBKIT_DISABLE_DMABUF_RENDERER",
+                    value: "1",
+                },
+                StartupEnvOverride {
+                    key: "WEBKIT_DISABLE_COMPOSITING_MODE",
+                    value: "1",
+                }
+            ]
         );
     }
 
     #[test]
-    fn linux_appimage_startup_env_overrides_preserve_explicit_user_setting() {
+    fn linux_appimage_startup_env_overrides_preserve_explicit_user_setting_per_variable() {
         let overrides = linux_appimage_startup_env_overrides_with(|key| match key {
             "APPDIR" => Some("/tmp/.mount_Tolaria".to_string()),
             "WEBKIT_DISABLE_DMABUF_RENDERER" => Some("0".to_string()),
             _ => None,
         });
 
-        assert!(overrides.is_empty());
+        assert_eq!(
+            overrides,
+            vec![StartupEnvOverride {
+                key: "WEBKIT_DISABLE_COMPOSITING_MODE",
+                value: "1",
+            }]
+        );
     }
 
     #[test]

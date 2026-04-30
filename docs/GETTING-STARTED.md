@@ -37,10 +37,10 @@ On some Wayland systems, the Linux AppImage may fail to launch with:
 Could not create default EGL display: EGL_BAD_PARAMETER. Aborting...
 ```
 
-Recent Tolaria AppImages automatically retry startup with the system Wayland client library when they detect this class of AppImage + Wayland environment. If you are running an older build, use this workaround:
+Recent Tolaria AppImages automatically disable unstable WebKitGTK AppImage rendering paths and retry startup with the system Wayland client library when they detect this class of AppImage + Wayland environment. If you are running an older build, use this workaround:
 
 ```bash
-LD_PRELOAD=/usr/lib/libwayland-client.so ./Tolaria*.AppImage
+WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LD_PRELOAD=/usr/lib/libwayland-client.so ./Tolaria*.AppImage
 ```
 
 If your distribution stores the library elsewhere, use that path instead, for example `/usr/lib64/libwayland-client.so.0` or `/usr/lib/x86_64-linux-gnu/libwayland-client.so.0`.
