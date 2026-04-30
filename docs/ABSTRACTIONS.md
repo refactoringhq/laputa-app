@@ -702,6 +702,8 @@ Per-vault settings stored locally and scoped by vault path:
 - Missing, null, and unknown AI agent permission modes normalize to `safe`; the AI panel can switch modes per vault, preserving the transcript and applying the new mode only to the next agent run
 - One-time migration from localStorage (`configMigration.ts`)
 
+Installation-local layout state that should not sync through a vault stays in localStorage. `useLayoutPanels` stores the clamped sidebar, note-list, and inspector widths under `tolaria:layout-panels` so pane sizing survives app relaunches on the same machine.
+
 ### AI Guidance Files
 
 Tolaria tracks managed vault-level AI guidance separately from normal note content:
