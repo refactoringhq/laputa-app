@@ -7,7 +7,6 @@ import type { FilePreviewKind } from '../utils/filePreview'
 type TrackedPreviewKind = FilePreviewKind | 'unsupported'
 type FilePreviewAction = 'copy_path' | 'open_external' | 'reveal'
 type AgentBlockedReason = 'agent_unavailable' | 'missing_vault'
-type NavigationHistoryDirection = 'back' | 'forward'
 
 const ALL_NOTES_VISIBILITY_CATEGORIES: ReadonlyArray<keyof AllNotesFileVisibility> = [
   'pdfs',
@@ -51,10 +50,6 @@ export function trackAllNotesVisibilityChanged(
       enabled: numericFlag(next[category]),
     })
   }
-}
-
-export function trackNavigationHistoryButtonClicked(direction: NavigationHistoryDirection): void {
-  trackEvent('navigation_history_button_clicked', { direction })
 }
 
 export function trackInlineImageLightboxOpened(): void {
