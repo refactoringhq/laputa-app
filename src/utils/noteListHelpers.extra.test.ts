@@ -183,7 +183,7 @@ describe('noteListHelpers extra coverage', () => {
       },
     }]
 
-    expect(filterEntries(entries, { kind: 'view', filename: 'work.view' }, undefined, views).map((entry) => entry.title)).toEqual(['Alpha'])
+    expect(filterEntries(entries, { kind: 'view', filename: 'work.view' }, { views }).map((entry) => entry.title)).toEqual(['Alpha'])
     expect(filterEntries(entries, { kind: 'folder', path: 'projects' }).map((entry) => entry.title)).toEqual(['Beta'])
     expect(filterEntries(entries, { kind: 'filter', filter: 'favorites' }).map((entry) => entry.title)).toEqual(['Alpha'])
     expect(filterEntries(entries, { kind: 'filter', filter: 'pulse' })).toEqual([])

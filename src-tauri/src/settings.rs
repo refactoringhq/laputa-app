@@ -26,6 +26,9 @@ pub struct Settings {
     pub initial_h1_auto_rename_enabled: Option<bool>,
     pub default_ai_agent: Option<String>,
     pub hide_gitignored_files: Option<bool>,
+    pub all_notes_show_pdfs: Option<bool>,
+    pub all_notes_show_images: Option<bool>,
+    pub all_notes_show_unsupported: Option<bool>,
 }
 
 fn normalize_optional_string(value: Option<String>) -> Option<String> {
@@ -136,6 +139,9 @@ fn normalize_settings(settings: Settings) -> Settings {
         initial_h1_auto_rename_enabled: settings.initial_h1_auto_rename_enabled,
         default_ai_agent: normalize_default_ai_agent(settings.default_ai_agent.as_deref()),
         hide_gitignored_files: settings.hide_gitignored_files,
+        all_notes_show_pdfs: settings.all_notes_show_pdfs,
+        all_notes_show_images: settings.all_notes_show_images,
+        all_notes_show_unsupported: settings.all_notes_show_unsupported,
     }
 }
 
@@ -280,6 +286,9 @@ mod tests {
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
             hide_gitignored_files: Some(false),
+            all_notes_show_pdfs: Some(true),
+            all_notes_show_images: Some(true),
+            all_notes_show_unsupported: Some(false),
         };
         let json = serde_json::to_string(&settings).unwrap();
         let parsed: Settings = serde_json::from_str(&json).unwrap();
@@ -309,6 +318,9 @@ mod tests {
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
             hide_gitignored_files: Some(false),
+            all_notes_show_pdfs: Some(true),
+            all_notes_show_images: Some(false),
+            all_notes_show_unsupported: Some(true),
             ..Default::default()
         });
         assert_eq!(loaded.auto_pull_interval_minutes, Some(10));
@@ -323,6 +335,9 @@ mod tests {
         assert_eq!(loaded.initial_h1_auto_rename_enabled, Some(false));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
         assert_eq!(loaded.hide_gitignored_files, Some(false));
+        assert_eq!(loaded.all_notes_show_pdfs, Some(true));
+        assert_eq!(loaded.all_notes_show_images, Some(false));
+        assert_eq!(loaded.all_notes_show_unsupported, Some(true));
     }
 
     #[test]

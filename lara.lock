@@ -11,7 +11,7 @@ files:
     command.openSettings: 638c05f4f159a403e04aebe94b46a2a8
     command.openSettings.keywords: ab6b5e03395f4db955ed9cbfd4de33b7
     command.openLanguageSettings: e5a425aa6222fab3df66c0e1e0ca4183
-    command.openLanguageSettings.keywords: 68efcb7e847b1a9d472baa609824be80
+    command.openLanguageSettings.keywords: 639afefdd1c238b381bc1f963288f389
     command.useSystemLanguage: b7f0315c47d4a59faa2a49571fcf1fca
     command.openH1Setting: 05b4f6edc0e98b29670e8ee902cdb9bf
     command.toggleGitignoredFilesVisibility: 0a2d3ea4e8ff8b00a801183caeb97a03
@@ -131,6 +131,14 @@ files:
     settings.vaultContent.description: a53487bf1c7898a1459dc1510e216f7d
     settings.vaultContent.hideGitignored: 2c07ee6c8bfe746d356f44275d42f90e
     settings.vaultContent.hideGitignoredDescription: e8b1ddfa416610f9d6eb299fa123a1d6
+    settings.allNotesVisibility.title: 0e07c3d48b91e1a4c42c1ff3e5751ec3
+    settings.allNotesVisibility.description: bc9caa48296281401aad694fed65a2d9
+    settings.allNotesVisibility.pdfs: 76663c34a88bd4225613a1a947127bcf
+    settings.allNotesVisibility.pdfsDescription: 33bfa167c125ddd713f40af11d233121
+    settings.allNotesVisibility.images: fff0d600f8a0b5e19e88bfb821dd1157
+    settings.allNotesVisibility.imagesDescription: 54e1fe8f20b426de2fe457322862fb4b
+    settings.allNotesVisibility.unsupported: 91de79ad2f20abd62e445f20584d3b8e
+    settings.allNotesVisibility.unsupportedDescription: c1ecaa108af2de4680ab535585c475e8
     settings.aiAgents.title: 27f08387b26e1ceeb1b60bd9c97e7a47
     settings.aiAgents.description: a13222e67eb121676ff6dfc7b085f02d
     settings.aiAgents.default: 6af573559fd05d8c35bc57b41cc78e24
@@ -487,5 +495,7 @@ files:
     locale.ptPT: 71bfc0d79772120b52c1c0782450ff84
     locale.es419: edbf64ac382b82a54795fb409beb54be
     locale.zhCN: 1e81fc32fea0e9f3a978661e4b5e484d
+    locale.zhTW: d0bb8c23f6e4f8c8037b6774ba912036
     locale.jaJP: f32ced6a9ba164c4b3c047fd1d7c882e
     locale.koKR: d0bdb3cde477d82e766da05ebda50ccb
+    locale.vi: 7b80fae85640c16cdb0261bef0c27636

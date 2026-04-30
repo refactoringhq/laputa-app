@@ -100,6 +100,9 @@ export interface Settings {
   initial_h1_auto_rename_enabled?: boolean | null
   default_ai_agent?: AiAgentId | null
   hide_gitignored_files?: boolean | null
+  all_notes_show_pdfs?: boolean | null
+  all_notes_show_images?: boolean | null
+  all_notes_show_unsupported?: boolean | null
 }
 
 export interface GitPullResult {

@@ -4,6 +4,7 @@ import { APP_STORAGE_KEYS, LEGACY_APP_STORAGE_KEYS, getAppStorageItem } from '..
 import { buildTypeEntryMap } from '../../utils/typeColors'
 import { countAllNotesByFilter } from '../../utils/noteListHelpers'
 import { buildDynamicSections, sortSections } from '../../utils/sidebarSections'
+import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
 
 export type SidebarGroupKey = 'favorites' | 'views' | 'sections' | 'folders'
 
@@ -57,11 +58,14 @@ export function useSidebarCollapsed() {
   return { collapsed, toggle }
 }
 
-export function useEntryCounts(entries: VaultEntry[]) {
+export function useEntryCounts(
+  entries: VaultEntry[],
+  allNotesFileVisibility?: AllNotesFileVisibility,
+) {
   return useMemo(() => {
-    const counts = countAllNotesByFilter(entries)
+    const counts = countAllNotesByFilter(entries, allNotesFileVisibility)
     return { activeCount: counts.open, archivedCount: counts.archived }
-  }, [entries])
+  }, [allNotesFileVisibility, entries])
 }
 
 export function computeReorder(sectionIds: string[], activeId: string, overId: string): string[] | null {

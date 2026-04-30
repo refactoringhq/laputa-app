@@ -19,6 +19,9 @@ const emptySettings: Settings = {
   ui_language: null,
   default_ai_agent: null,
   hide_gitignored_files: null,
+  all_notes_show_pdfs: null,
+  all_notes_show_images: null,
+  all_notes_show_unsupported: null,
 }
 
 function installPointerCapturePolyfill() {
@@ -107,6 +110,9 @@ describe('SettingsPanel', () => {
       release_channel: null,
       theme_mode: 'light',
       hide_gitignored_files: true,
+      all_notes_show_pdfs: false,
+      all_notes_show_images: false,
+      all_notes_show_unsupported: false,
     }))
     expect(onClose).toHaveBeenCalled()
   })
@@ -121,6 +127,56 @@ describe('SettingsPanel', () => {
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       hide_gitignored_files: false,
+    }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('renders All Notes file visibility checkboxes off by default', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    expect(screen.getByText('All Notes visibility')).toBeInTheDocument()
+    expect(within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+    expect(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+    expect(within(screen.getByTestId('settings-all-notes-show-unsupported')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('preserves saved All Notes file visibility checkboxes', () => {
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{
+          ...emptySettings,
+          all_notes_show_pdfs: true,
+          all_notes_show_images: true,
+          all_notes_show_unsupported: false,
+        }}
+        onSave={onSave}
+        onClose={onClose}
+      />
+    )
+
+    expect(within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'true')
+    expect(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'true')
+    expect(within(screen.getByTestId('settings-all-notes-show-unsupported')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('saves All Notes file visibility from keyboard toggles before Escape close', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    const pdfCheckbox = within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('checkbox')
+    pdfCheckbox.focus()
+    fireEvent.keyDown(pdfCheckbox, { key: ' ', code: 'Space' })
+    fireEvent.keyUp(pdfCheckbox, { key: ' ', code: 'Space' })
+    fireEvent.keyDown(screen.getByTestId('settings-panel'), { key: 'Escape' })
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      all_notes_show_pdfs: true,
+      all_notes_show_images: false,
+      all_notes_show_unsupported: false,
     }))
     expect(onClose).toHaveBeenCalled()
   })

@@ -24,6 +24,9 @@ const defaultSettings: Settings = {
   note_width_mode: null,
   default_ai_agent: null,
   hide_gitignored_files: null,
+  all_notes_show_pdfs: null,
+  all_notes_show_images: null,
+  all_notes_show_unsupported: null,
 }
 
 const savedSettings: Settings = {
@@ -42,6 +45,9 @@ const savedSettings: Settings = {
   note_width_mode: null,
   default_ai_agent: null,
   hide_gitignored_files: null,
+  all_notes_show_pdfs: null,
+  all_notes_show_images: null,
+  all_notes_show_unsupported: null,
 }
 
 let mockSettingsStore: Settings = { ...defaultSettings }
@@ -93,6 +99,9 @@ function changedSettings(): Settings {
     note_width_mode: 'wide',
     default_ai_agent: null,
     hide_gitignored_files: false,
+    all_notes_show_pdfs: true,
+    all_notes_show_images: false,
+    all_notes_show_unsupported: true,
   }
 }
 
@@ -189,6 +198,21 @@ describe('useSettings', () => {
     const settings = await renderLoadedSettings()
 
     expect(settings.hide_gitignored_files).toBe(false)
+  })
+
+  it('preserves All Notes file visibility preferences', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      all_notes_show_pdfs: true,
+      all_notes_show_images: false,
+      all_notes_show_unsupported: true,
+    }
+
+    const settings = await renderLoadedSettings()
+
+    expect(settings.all_notes_show_pdfs).toBe(true)
+    expect(settings.all_notes_show_images).toBe(false)
+    expect(settings.all_notes_show_unsupported).toBe(true)
   })
 
   it('toggles Gitignored file visibility from the command event', async () => {

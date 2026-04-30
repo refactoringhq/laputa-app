@@ -15,7 +15,7 @@ describe('filterEntries', () => {
       makeEntry({ path: '/4.md', title: 'Other', isA: 'Note' }),
     ]
 
-    const result = filterEntries(entries, { kind: 'sectionGroup', type: 'Project' }, 'open')
+    const result = filterEntries(entries, { kind: 'sectionGroup', type: 'Project' }, { subFilter: 'open' })
     expect(result.map((entry) => entry.title)).toEqual(['Active'])
   })
 
@@ -26,7 +26,7 @@ describe('filterEntries', () => {
       makeEntry({ path: '/4.md', title: 'Other', isA: 'Note' }),
     ]
 
-    const result = filterEntries(entries, { kind: 'sectionGroup', type: 'Project' }, 'archived')
+    const result = filterEntries(entries, { kind: 'sectionGroup', type: 'Project' }, { subFilter: 'archived' })
     expect(result.map((entry) => entry.title)).toEqual(['Archived'])
   })
 
@@ -48,7 +48,7 @@ describe('filterEntries', () => {
       makeEntry({ path: '/4.md', title: 'Other', isA: 'Note' }),
     ]
 
-    const result = filterEntries(entries, allSelection, 'open')
+    const result = filterEntries(entries, allSelection, { subFilter: 'open' })
     expect(result.map((entry) => entry.title)).toEqual(['Active', 'Other'])
   })
 
@@ -59,7 +59,7 @@ describe('filterEntries', () => {
       makeEntry({ path: '/4.md', title: 'Other', isA: 'Note' }),
     ]
 
-    const result = filterEntries(entries, allSelection, 'archived')
+    const result = filterEntries(entries, allSelection, { subFilter: 'archived' })
     expect(result.map((entry) => entry.title)).toEqual(['Archived'])
   })
 
@@ -71,8 +71,63 @@ describe('filterEntries', () => {
       makeEntry({ path: 'C:\\Users\\luca\\Vault\\attachments\\windows.md', title: 'Windows Attachment Markdown', isA: 'Note' }),
     ]
 
-    const result = filterEntries(entries, allSelection, 'open')
+    const result = filterEntries(entries, allSelection, { subFilter: 'open' })
     expect(result.map((entry) => entry.title)).toEqual(['Real Note'])
+  })
+
+  it('hides PDFs, images, and unsupported files from All Notes by default', () => {
+    const entries = [
+      makeEntry({ path: '/vault/note.md', filename: 'note.md', title: 'Note', fileKind: 'markdown' }),
+      makeEntry({ path: '/vault/Guide.PDF', filename: 'Guide.PDF', title: 'PDF', fileKind: 'binary' }),
+      makeEntry({ path: '/vault/Cover.JpG', filename: 'Cover.JpG', title: 'Image', fileKind: 'binary' }),
+      makeEntry({ path: '/vault/config.yml', filename: 'config.yml', title: 'Text', fileKind: 'text' }),
+      makeEntry({ path: '/vault/archive.zip', filename: 'archive.zip', title: 'Archive', fileKind: 'binary' }),
+    ]
+
+    const result = filterEntries(entries, allSelection, { subFilter: 'open' })
+
+    expect(result.map((entry) => entry.title)).toEqual(['Note'])
+  })
+
+  it('shows selected non-Markdown categories in All Notes without swallowing PDFs or images into unsupported files', () => {
+    const entries = [
+      makeEntry({ path: '/vault/note.md', filename: 'note.md', title: 'Note', fileKind: 'markdown' }),
+      makeEntry({ path: '/vault/Guide.PDF', filename: 'Guide.PDF', title: 'PDF', fileKind: 'binary' }),
+      makeEntry({ path: '/vault/Cover.JpG', filename: 'Cover.JpG', title: 'Image', fileKind: 'binary' }),
+      makeEntry({ path: '/vault/config.yml', filename: 'config.yml', title: 'Text', fileKind: 'text' }),
+      makeEntry({ path: '/vault/archive.zip', filename: 'archive.zip', title: 'Archive', fileKind: 'binary' }),
+    ]
+
+    expect(
+      filterEntries(entries, allSelection, {
+        subFilter: 'open',
+        allNotesFileVisibility: {
+          pdfs: true,
+          images: false,
+          unsupported: false,
+        },
+      }).map((entry) => entry.title),
+    ).toEqual(['Note', 'PDF'])
+    expect(
+      filterEntries(entries, allSelection, {
+        subFilter: 'open',
+        allNotesFileVisibility: {
+          pdfs: false,
+          images: true,
+          unsupported: false,
+        },
+      }).map((entry) => entry.title),
+    ).toEqual(['Note', 'Image'])
+    expect(
+      filterEntries(entries, allSelection, {
+        subFilter: 'open',
+        allNotesFileVisibility: {
+          pdfs: false,
+          images: false,
+          unsupported: true,
+        },
+      }).map((entry) => entry.title),
+    ).toEqual(['Note', 'Text', 'Archive'])
   })
 
   it('matches slash-based folder selections against Windows entry paths', () => {
@@ -98,6 +153,18 @@ describe('filterEntries', () => {
     const result = filterEntries(entries, { kind: 'folder', path: '', rootPath: '/Users/luca/Laputa' })
 
     expect(result.map((entry) => entry.title)).toEqual(['Root Note', 'config.json'])
+  })
+
+  it('keeps folder browsing independent from All Notes file visibility', () => {
+    const entries = [
+      makeEntry({ path: '/vault/assets/spec.PDF', filename: 'spec.PDF', title: 'Spec', fileKind: 'binary' }),
+      makeEntry({ path: '/vault/assets/logo.PNG', filename: 'logo.PNG', title: 'Logo', fileKind: 'binary' }),
+      makeEntry({ path: '/vault/assets/data.sqlite', filename: 'data.sqlite', title: 'Data', fileKind: 'binary' }),
+    ]
+
+    const result = filterEntries(entries, { kind: 'folder', path: 'assets' })
+
+    expect(result.map((entry) => entry.title)).toEqual(['Spec', 'Logo', 'Data'])
   })
 })
 
@@ -151,6 +218,21 @@ describe('countAllNotesByFilter', () => {
     ]
 
     expect(countAllNotesByFilter(entries)).toEqual({ open: 1, archived: 1 })
+  })
+
+  it('counts enabled All Notes file categories by archive status', () => {
+    const entries = [
+      makeEntry({ path: '/vault/note.md', filename: 'note.md', fileKind: 'markdown' }),
+      makeEntry({ path: '/vault/spec.pdf', filename: 'spec.pdf', fileKind: 'binary' }),
+      makeEntry({ path: '/vault/photo.PNG', filename: 'photo.PNG', fileKind: 'binary', archived: true }),
+      makeEntry({ path: '/vault/data.bin', filename: 'data.bin', fileKind: 'binary', archived: true }),
+    ]
+
+    expect(countAllNotesByFilter(entries, {
+      pdfs: true,
+      images: true,
+      unsupported: false,
+    })).toEqual({ open: 2, archived: 1 })
   })
 })
 

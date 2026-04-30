@@ -26,6 +26,7 @@ When deciding where to persist a piece of data, ask: **"Would the user want this
 | Property display order | Window size / position |
 | Per-note `_width` rich-editor width override | Default rich-editor note width |
 | Vault-authored `.gitignore` patterns | Whether this installation hides Gitignored files |
+| Per-vault All Notes note-list column overrides | All Notes PDF/image/unsupported file visibility |
 | Any user-visible customization of how content is organized or displayed | Any machine-specific or credential-type setting |
 
 **Rule:** If the information is about *how the content is structured or presented* and the user would expect it to be consistent wherever they open their vault, store it in the vault (frontmatter of the relevant note, using the `_field` underscore convention for system properties). If it's about *this specific installation of the app*, store it in `~/.config/com.tolaria.app/settings.json` or localStorage.
@@ -37,6 +38,7 @@ Examples:
 - ✅ App settings: `zoom: 1.3` (machine-specific preference)
 - ✅ App settings: `ui_language: "zh-CN"` (installation-specific UI language)
 - ✅ App settings: `note_width_mode: "wide"` (installation-specific default for notes without an override)
+- ✅ App settings: `all_notes_show_images: true` (installation-specific All Notes file-category visibility)
 
 ### No hardcoded exceptions
 
@@ -812,7 +814,7 @@ No Redux or global context. State lives in the root `App.tsx` and custom hooks:
 | `useCommitFlow` | Commit dialog state, shared manual/automatic checkpoint runner | Git commit/push orchestration |
 | `useGitRemoteStatus` | `remoteStatus`, `refreshRemoteStatus()` | On-demand remote detection for commit UI |
 | `useUnifiedSearch` | Query, results, loading state | Keyword search |
-| `useSettings` | App settings (telemetry, release channel, theme mode, UI language, auto-sync interval, AutoGit thresholds, default AI agent, Gitignored-content visibility) | Persistent settings |
+| `useSettings` | App settings (telemetry, release channel, theme mode, UI language, auto-sync interval, AutoGit thresholds, default AI agent, Gitignored-content visibility, All Notes file visibility) | Persistent settings |
 | `useVaultConfig` | Per-vault UI preferences, AI permission mode | Vault-specific config |
 | `appCommandDispatcher` | Canonical shortcut/menu command IDs | Shared execution path for renderer and native menu commands |
 

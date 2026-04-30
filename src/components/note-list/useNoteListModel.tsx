@@ -11,6 +11,7 @@ import type {
 import type { AppLocale } from '../../lib/i18n'
 import type { NoteListFilter } from '../../utils/noteListHelpers'
 import { countByFilter, countAllByFilter, countAllNotesByFilter } from '../../utils/noteListHelpers'
+import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
 import { NoteItem } from '../NoteItem'
 import { prefetchNoteContent } from '../../hooks/useTabManagement'
 import type { MultiSelectState } from '../../hooks/useMultiSelect'
@@ -108,13 +109,19 @@ function useBulkActions(
   }
 }
 
-function useFilterCounts(entries: VaultEntry[], selection: SidebarSelection) {
+function useFilterCounts(
+  entries: VaultEntry[],
+  selection: SidebarSelection,
+  allNotesFileVisibility?: AllNotesFileVisibility,
+) {
   return useMemo(() => {
     if (selection.kind === 'sectionGroup') return countByFilter(entries, selection.type)
     if (selection.kind === 'folder') return countAllByFilter(entries)
-    if (selection.kind === 'filter' && selection.filter === 'all') return countAllNotesByFilter(entries)
+    if (selection.kind === 'filter' && selection.filter === 'all') {
+      return countAllNotesByFilter(entries, allNotesFileVisibility)
+    }
     return { open: 0, archived: 0 }
-  }, [entries, selection])
+  }, [allNotesFileVisibility, entries, selection])
 }
 
 interface UseNoteListContentParams {
@@ -136,6 +143,7 @@ interface UseNoteListContentParams {
   updateEntry?: (path: string, patch: Partial<VaultEntry>) => void
   views?: ViewFile[]
   visibleNotesRef?: React.MutableRefObject<VaultEntry[]>
+  allNotesFileVisibility?: AllNotesFileVisibility
 }
 
 function useNoteListContent({
@@ -157,6 +165,7 @@ function useNoteListContent({
   updateEntry,
   views,
   visibleNotesRef,
+  allNotesFileVisibility,
 }: UseNoteListContentParams) {
   const subFilter = (selection.kind === 'sectionGroup' || selection.kind === 'folder')
     ? noteListFilter
@@ -217,6 +226,7 @@ function useNoteListContent({
     subFilter,
     inboxPeriod: effectiveInboxPeriod,
     views,
+    allNotesFileVisibility,
   })
   const searched = useMemo(() => filterEntriesByNoteListQuery(sortedEntries, query, {
     allEntries: entries,
@@ -465,6 +475,7 @@ export interface NoteListProps {
   onUpdateViewDefinition?: (filename: string, patch: Partial<ViewDefinition>) => void
   views?: ViewFile[]
   visibleNotesRef?: React.MutableRefObject<VaultEntry[]>
+  allNotesFileVisibility?: AllNotesFileVisibility
   locale?: AppLocale
 }
 
@@ -574,12 +585,13 @@ export function useNoteListModel({
   onUpdateViewDefinition,
   views,
   visibleNotesRef,
+  allNotesFileVisibility,
   locale = 'en',
 }: NoteListProps) {
   const selectedNotePath = selectedNote?.path ?? null
   const { modifiedPathSet, modifiedSuffixes, resolvedGetNoteStatus } = useModifiedFilesState(modifiedFiles, getNoteStatus)
   const { isInboxView } = useViewFlags(selection)
-  const filterCounts = useFilterCounts(entries, selection)
+  const filterCounts = useFilterCounts(entries, selection, allNotesFileVisibility)
   const content = useNoteListContent({
     entries,
     selection,
@@ -599,6 +611,7 @@ export function useNoteListModel({
     updateEntry,
     views,
     visibleNotesRef,
+    allNotesFileVisibility,
   })
   const interaction = useNoteListInteractionState({
     searched: content.searched,

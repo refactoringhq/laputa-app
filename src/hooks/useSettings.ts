@@ -47,6 +47,9 @@ const EMPTY_SETTINGS: Settings = {
   note_width_mode: null,
   default_ai_agent: null,
   hide_gitignored_files: null,
+  all_notes_show_pdfs: null,
+  all_notes_show_images: null,
+  all_notes_show_unsupported: null,
 }
 
 function normalizeSettings(settings: Settings): Settings {
@@ -60,6 +63,9 @@ function normalizeSettings(settings: Settings): Settings {
     note_width_mode: normalizeNoteWidthMode(settings.note_width_mode),
     default_ai_agent: normalizeStoredAiAgent(settings.default_ai_agent),
     hide_gitignored_files: settings.hide_gitignored_files ?? null,
+    all_notes_show_pdfs: settings.all_notes_show_pdfs ?? null,
+    all_notes_show_images: settings.all_notes_show_images ?? null,
+    all_notes_show_unsupported: settings.all_notes_show_unsupported ?? null,
   }
 }
 

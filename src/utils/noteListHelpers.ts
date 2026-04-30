@@ -4,10 +4,21 @@ import {
   orderInverseRelationshipLabels as sortInverseRelationshipLabels,
   resolveInverseRelationshipLabel,
 } from './inverseRelationshipLabels'
+import {
+  DEFAULT_ALL_NOTES_FILE_VISIBILITY,
+  isOptionalAllNotesFileVisible,
+  type AllNotesFileVisibility,
+} from './allNotesFileVisibility'
 import { evaluateView } from './viewFilters'
 import { wikilinkTarget, resolveEntry } from './wikilink'
 
 export type NoteListFilter = 'open' | 'archived'
+
+export interface FilterEntriesOptions {
+  subFilter?: NoteListFilter
+  views?: ViewFile[]
+  allNotesFileVisibility?: AllNotesFileVisibility
+}
 
 export interface RelationshipGroup {
   label: string
@@ -407,8 +418,12 @@ function normalizeFolderPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
 }
 
-export function isAllNotesEntry(entry: VaultEntry): boolean {
-  return isMarkdown(entry) && !isInFolder(entry.path, ATTACHMENTS_FOLDER)
+export function isAllNotesEntry(
+  entry: VaultEntry,
+  allNotesFileVisibility: AllNotesFileVisibility = DEFAULT_ALL_NOTES_FILE_VISIBILITY,
+): boolean {
+  if (isMarkdown(entry)) return !isInFolder(entry.path, ATTACHMENTS_FOLDER)
+  return isOptionalAllNotesFileVisible(entry, allNotesFileVisibility)
 }
 
 function filterViewEntries(entries: VaultEntry[], filename: string, views?: ViewFile[]): VaultEntry[] {
@@ -446,21 +461,25 @@ function filterSectionGroupEntries(entries: VaultEntry[], type: string, subFilte
 function filterTopLevelEntries(
   entries: VaultEntry[],
   selection: Extract<SidebarSelection, { kind: 'filter' }>,
-  subFilter?: NoteListFilter,
+  options: FilterEntriesOptions,
 ): VaultEntry[] {
   const filterableEntries = selection.filter === 'all'
-    ? entries.filter(isAllNotesEntry)
+    ? entries.filter((entry) => isAllNotesEntry(entry, options.allNotesFileVisibility))
     : entries.filter(isMarkdown)
-  if (selection.filter === 'all' && subFilter) return applySubFilter(filterableEntries, subFilter)
+  if (selection.filter === 'all' && options.subFilter) return applySubFilter(filterableEntries, options.subFilter)
   return filterByFilterType(filterableEntries, selection.filter)
 }
 
-function filterByKind(entries: VaultEntry[], selection: SidebarSelection, subFilter?: NoteListFilter, views?: ViewFile[]): VaultEntry[] {
+function filterByKind(
+  entries: VaultEntry[],
+  selection: SidebarSelection,
+  options: FilterEntriesOptions,
+): VaultEntry[] {
   if (selection.kind === 'entity') return []
-  if (selection.kind === 'view') return filterViewEntries(entries, selection.filename, views)
-  if (selection.kind === 'folder') return filterFolderEntries(entries, selection, subFilter)
-  if (selection.kind === 'sectionGroup') return filterSectionGroupEntries(entries, selection.type, subFilter)
-  if (selection.kind === 'filter') return filterTopLevelEntries(entries, selection, subFilter)
+  if (selection.kind === 'view') return filterViewEntries(entries, selection.filename, options.views)
+  if (selection.kind === 'folder') return filterFolderEntries(entries, selection, options.subFilter)
+  if (selection.kind === 'sectionGroup') return filterSectionGroupEntries(entries, selection.type, options.subFilter)
+  if (selection.kind === 'filter') return filterTopLevelEntries(entries, selection, options)
   return []
 }
 
@@ -472,8 +491,12 @@ function filterByFilterType(entries: VaultEntry[], filter: string): VaultEntry[]
   return []
 }
 
-export function filterEntries(entries: VaultEntry[], selection: SidebarSelection, subFilter?: NoteListFilter, views?: ViewFile[]): VaultEntry[] {
-  return filterByKind(entries, selection, subFilter, views)
+export function filterEntries(
+  entries: VaultEntry[],
+  selection: SidebarSelection,
+  options: FilterEntriesOptions = {},
+): VaultEntry[] {
+  return filterByKind(entries, selection, options)
 }
 
 /** Count notes per sub-filter for a given type. */
@@ -501,9 +524,14 @@ export function countAllByFilter(entries: VaultEntry[]): Record<NoteListFilter, 
   return countEntriesByArchiveStatus(entries.filter(isMarkdown))
 }
 
-/** Count All Notes-eligible documents per sub-filter, excluding files under attachments/. */
-export function countAllNotesByFilter(entries: VaultEntry[]): Record<NoteListFilter, number> {
-  return countEntriesByArchiveStatus(entries.filter(isAllNotesEntry))
+/** Count All Notes-eligible documents per sub-filter using the current file visibility policy. */
+export function countAllNotesByFilter(
+  entries: VaultEntry[],
+  allNotesFileVisibility?: AllNotesFileVisibility,
+): Record<NoteListFilter, number> {
+  return countEntriesByArchiveStatus(
+    entries.filter((entry) => isAllNotesEntry(entry, allNotesFileVisibility)),
+  )
 }
 
 // --- Inbox ---

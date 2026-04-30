@@ -18,6 +18,7 @@ import { useMultiSelect, type MultiSelectState } from '../../hooks/useMultiSelec
 import { useNoteListKeyboard } from '../../hooks/useNoteListKeyboard'
 import { prefetchNoteContent } from '../../hooks/useTabManagement'
 import type { NoteListPropertiesScope } from './noteListPropertiesEvents'
+import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
 
 // --- useTypeEntryMap ---
 
@@ -36,6 +37,7 @@ interface FilteredEntriesParams {
   subFilter?: NoteListFilter
   inboxPeriod?: InboxPeriod
   views?: ViewFile[]
+  allNotesFileVisibility?: AllNotesFileVisibility
 }
 
 function buildFilteredEntries({
@@ -50,6 +52,7 @@ function buildFilteredEntries({
   subFilter,
   inboxPeriod,
   views,
+  allNotesFileVisibility,
 }: FilteredEntriesParams & {
   isEntityView: boolean
   isChangesView: boolean
@@ -61,7 +64,11 @@ function buildFilteredEntries({
     return entries.filter((entry) => isModifiedEntry(entry.path, modifiedPathSet, modifiedSuffixes))
   }
   if (isInboxView) return filterInboxEntries(entries, inboxPeriod ?? 'month')
-  return filterEntries(entries, selection, subFilter, views)
+  return filterEntries(entries, selection, {
+    subFilter,
+    views,
+    allNotesFileVisibility,
+  })
 }
 
 export function useFilteredEntries({
@@ -73,6 +80,7 @@ export function useFilteredEntries({
   subFilter,
   inboxPeriod,
   views,
+  allNotesFileVisibility,
 }: FilteredEntriesParams) {
   const isEntityView = selection.kind === 'entity'
   const isChangesView = selection.kind === 'filter' && selection.filter === 'changes'
@@ -90,8 +98,9 @@ export function useFilteredEntries({
       subFilter,
       inboxPeriod,
       views,
+      allNotesFileVisibility,
     })
-  }, [entries, inboxPeriod, isChangesView, isEntityView, isInboxView, modifiedFiles, modifiedPathSet, modifiedSuffixes, selection, subFilter, views])
+  }, [allNotesFileVisibility, entries, inboxPeriod, isChangesView, isEntityView, isInboxView, modifiedFiles, modifiedPathSet, modifiedSuffixes, selection, subFilter, views])
 }
 
 // --- useNoteListData ---
@@ -104,9 +113,23 @@ interface NoteListDataParams {
   subFilter?: NoteListFilter
   inboxPeriod?: InboxPeriod
   views?: ViewFile[]
+  allNotesFileVisibility?: AllNotesFileVisibility
 }
 
-export function useNoteListData({ entries, selection, query, listSort, listDirection, modifiedPathSet, modifiedSuffixes, modifiedFiles, subFilter, inboxPeriod, views }: NoteListDataParams) {
+export function useNoteListData({
+  entries,
+  selection,
+  query,
+  listSort,
+  listDirection,
+  modifiedPathSet,
+  modifiedSuffixes,
+  modifiedFiles,
+  subFilter,
+  inboxPeriod,
+  views,
+  allNotesFileVisibility,
+}: NoteListDataParams) {
   const isEntityView = selection.kind === 'entity'
   const isArchivedView = (selection.kind === 'filter' && selection.filter === 'archived') || subFilter === 'archived'
   const entityEntry = useMemo(() => {
@@ -123,6 +146,7 @@ export function useNoteListData({ entries, selection, query, listSort, listDirec
     subFilter,
     inboxPeriod,
     views,
+    allNotesFileVisibility,
   })
 
   const searched = useMemo(() => {
@@ -530,8 +554,8 @@ function useAllNotesPropertyPickerState(
   const allNotesEntries = useMemo(
     () => isAllNotesView
       ? [
-          ...filterEntries(entries, selection, 'open'),
-          ...filterEntries(entries, selection, 'archived'),
+          ...filterEntries(entries, selection, { subFilter: 'open' }),
+          ...filterEntries(entries, selection, { subFilter: 'archived' }),
         ]
       : [],
     [entries, isAllNotesView, selection],
@@ -588,7 +612,7 @@ function useViewPropertyPickerState(
     [selection, views],
   )
   const viewEntries = useMemo(
-    () => selectedView ? filterEntries(entries, selection, undefined, views) : [],
+    () => selectedView ? filterEntries(entries, selection, { views }) : [],
     [entries, selection, selectedView, views],
   )
 

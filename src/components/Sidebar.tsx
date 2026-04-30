@@ -29,6 +29,7 @@ import {
 import { useSidebarTypeInteractions } from './sidebar/useSidebarTypeInteractions'
 import type { AppLocale } from '../lib/i18n'
 import type { FolderFileActions } from '../hooks/useFileActions'
+import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 
 interface SidebarProps {
   entries: VaultEntry[]
@@ -60,6 +61,7 @@ interface SidebarProps {
   vaultRootPath?: string
   showInbox?: boolean
   inboxCount?: number
+  allNotesFileVisibility?: AllNotesFileVisibility
   locale?: AppLocale
   onCollapse?: () => void
   loading?: boolean
@@ -489,10 +491,11 @@ function useSidebarRuntime({
   onReorderSections,
   onRenameSection,
   onToggleTypeVisibility,
+  allNotesFileVisibility,
   locale = 'en',
 }: SidebarProps) {
   const { typeEntryMap, allSectionGroups, visibleSections, sectionIds } = useSidebarSections(entries)
-  const { activeCount, archivedCount } = useEntryCounts(entries)
+  const { activeCount, archivedCount } = useEntryCounts(entries, allNotesFileVisibility)
   const { collapsed: groupCollapsed, toggle: toggleGroup } = useSidebarCollapsed()
   const typeInteractions = useSidebarTypeInteractions({
     allSectionGroups,
