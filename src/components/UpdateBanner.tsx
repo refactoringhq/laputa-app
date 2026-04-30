@@ -105,6 +105,15 @@ function renderAvailableContent(status: Extract<VisibleUpdateStatus, { state: 'a
   )
 }
 
+function renderCheckingContent(locale: AppLocale) {
+  return (
+    <>
+      <RefreshCw size={14} style={{ ...iconStyle, animation: 'spin 1s linear infinite' }} />
+      <span>{translate(locale, 'update.checking')}</span>
+    </>
+  )
+}
+
 function renderDownloadingContent(status: Extract<VisibleUpdateStatus, { state: 'downloading' }>, locale: AppLocale) {
   return (
     <>
@@ -153,6 +162,8 @@ function renderReadyContent(status: Extract<VisibleUpdateStatus, { state: 'ready
 
 function renderBannerContent(status: VisibleUpdateStatus, actions: UpdateActions, locale: AppLocale) {
   switch (status.state) {
+    case 'checking':
+      return renderCheckingContent(locale)
     case 'available':
       return renderAvailableContent(status, actions, locale)
     case 'downloading':

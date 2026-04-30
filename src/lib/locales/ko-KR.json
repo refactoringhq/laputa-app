@@ -408,6 +408,7 @@
   "inspector.info.words": "단어 수",
   "inspector.info.size": "크기",
   "update.available": "사용 가능",
+  "update.checking": "업데이트 확인 중...",
   "update.releaseNotes": "릴리스 노트",
   "update.updateNow": "지금 업데이트",
   "update.dismiss": "닫기",

@@ -136,6 +136,10 @@ const GIT_NO_REMOTE_DEPENDENT_IDS: &[&str] = &[VAULT_ADD_REMOTE];
 
 type MenuResult = Result<Submenu<tauri::Wry>, Box<dyn std::error::Error>>;
 
+fn app_menu_includes_services(target_os: &str) -> bool {
+    target_os == "macos"
+}
+
 fn build_app_menu(app: &App) -> MenuResult {
     let settings_item = MenuItemBuilder::new("Settings...")
         .id(APP_SETTINGS)
@@ -145,21 +149,25 @@ fn build_app_menu(app: &App) -> MenuResult {
         .id(APP_CHECK_FOR_UPDATES)
         .build(app)?;
 
-    Ok(SubmenuBuilder::new(app, "Tolaria")
+    let mut builder = SubmenuBuilder::new(app, "Tolaria")
         .about(None)
         .separator()
         .item(&check_updates_item)
         .separator()
         .item(&settings_item)
-        .separator()
-        .services()
-        .separator()
-        .hide()
-        .hide_others()
-        .show_all()
-        .separator()
-        .quit()
-        .build()?)
+        .separator();
+
+    if app_menu_includes_services(std::env::consts::OS) {
+        builder = builder
+            .services()
+            .separator()
+            .hide()
+            .hide_others()
+            .show_all()
+            .separator();
+    }
+
+    Ok(builder.quit().build()?)
 }
 
 fn build_file_menu(app: &App) -> MenuResult {
@@ -627,5 +635,12 @@ mod tests {
         for id in CUSTOM_IDS {
             assert!(seen.insert(id), "duplicate custom ID: {id}");
         }
+    }
+
+    #[test]
+    fn app_services_menu_is_macos_only() {
+        assert!(app_menu_includes_services("macos"));
+        assert!(!app_menu_includes_services("windows"));
+        assert!(!app_menu_includes_services("linux"));
     }
 }

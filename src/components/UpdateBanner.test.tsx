@@ -68,6 +68,12 @@ describe('UpdateBanner', () => {
     expect(container.innerHTML).toBe('')
   })
 
+  it('shows immediate feedback while checking for updates', () => {
+    renderBanner({ state: 'checking' })
+
+    expect(screen.getByTestId('update-banner')).toHaveTextContent('Checking for updates')
+  })
+
   it('shows version and action buttons when update is available', () => {
     renderBanner(makeAvailableStatus({
       version: '2026.4.16-alpha.3',

@@ -408,6 +408,7 @@
   "inspector.info.words": "Parole",
   "inspector.info.size": "Dimensione",
   "update.available": "è disponibile",
+  "update.checking": "Verifica degli aggiornamenti in corso...",
   "update.releaseNotes": "Note sulla versione",
   "update.updateNow": "Aggiorna ora",
   "update.dismiss": "Ignora",
