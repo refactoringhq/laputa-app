@@ -67,6 +67,7 @@ function useSidebarRenameCallbacks(params: {
   allSectionGroups: SidebarTypeGroup[]
   closeContextMenu: () => void
   onRenameSection?: (typeName: string, label: string) => void
+  renameInitialValue: string
   renamingType: string | null
   setRenameInitialValue: React.Dispatch<React.SetStateAction<string>>
   setRenamingType: React.Dispatch<React.SetStateAction<string | null>>
@@ -75,6 +76,7 @@ function useSidebarRenameCallbacks(params: {
     allSectionGroups,
     closeContextMenu,
     onRenameSection,
+    renameInitialValue,
     renamingType,
     setRenameInitialValue,
     setRenamingType,
@@ -88,9 +90,9 @@ function useSidebarRenameCallbacks(params: {
   }, [allSectionGroups, closeContextMenu, setRenameInitialValue, setRenamingType])
 
   const handleRenameSubmit = useCallback((value: string) => {
-    if (renamingType) onRenameSection?.(renamingType, value)
+    if (renamingType && value.trim() !== renameInitialValue) onRenameSection?.(renamingType, value)
     setRenamingType(null)
-  }, [onRenameSection, renamingType, setRenamingType])
+  }, [onRenameSection, renameInitialValue, renamingType, setRenamingType])
 
   return { handleRenameSubmit, handleStartRename }
 }
@@ -108,6 +110,7 @@ export function useSidebarTypeInteractions({
     allSectionGroups,
     closeContextMenu: state.closeContextMenu,
     onRenameSection,
+    renameInitialValue: state.renameInitialValue,
     renamingType: state.renamingType,
     setRenameInitialValue: state.setRenameInitialValue,
     setRenamingType: state.setRenamingType,

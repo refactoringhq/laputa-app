@@ -76,7 +76,7 @@ describe('Sidebar Type row actions', () => {
   it('shows Type-specific context menu labels on right-click', () => {
     openProjectsContextMenu()
     expect(screen.getByText('Rename type…')).toBeInTheDocument()
-    expect(screen.getByText('Customize icon & color…')).toBeInTheDocument()
+    expect(screen.getByText('Change icon & color…')).toBeInTheDocument()
     expect(screen.getByText('Delete type')).toBeInTheDocument()
   })
 
@@ -111,6 +111,15 @@ describe('Sidebar Type row actions', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
 
     expect(onRenameSection).toHaveBeenCalledWith('Project', 'My Projects')
+  })
+
+  it('does not call onRenameSection when submitting without changing the value', () => {
+    const onRenameSection = vi.fn()
+    renderSidebar({ onRenameSection })
+    fireEvent.doubleClick(screen.getByText('Projects'))
+    const input = screen.getByRole('textbox', { name: 'Section name' })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onRenameSection).not.toHaveBeenCalled()
   })
 
   it('cancels inline rename on Escape', () => {
