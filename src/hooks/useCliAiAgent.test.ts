@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCliAiAgent } from './useCliAiAgent'
 import { streamAiAgent } from '../utils/streamAiAgent'
+import { buildAgentSystemPrompt } from '../utils/ai-agent'
 
 vi.mock('../utils/streamAiAgent', () => ({
   streamAiAgent: vi.fn(),
@@ -12,6 +13,7 @@ vi.mock('../utils/ai-agent', () => ({
 }))
 
 const mockStreamAiAgent = vi.mocked(streamAiAgent)
+const mockBuildAgentSystemPrompt = vi.mocked(buildAgentSystemPrompt)
 const VAULT = '/Users/luca/Laputa'
 
 function renderAgent(
@@ -48,8 +50,13 @@ describe('useCliAiAgent', () => {
     })
 
     expect(result.current.sendMessage).not.toBe(firstSendMessage)
+    expect(mockBuildAgentSystemPrompt).toHaveBeenCalledWith({
+      agent: 'codex',
+      permissionMode: 'safe',
+      vaultContext: 'You are viewing note with body: Hello world',
+    })
     expect(mockStreamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
-      systemPrompt: 'You are viewing note with body: Hello world',
+      systemPrompt: 'default-system-prompt',
     }))
   })
 

@@ -110,7 +110,11 @@ export function buildFormattedMessage(
   messages: AiAgentMessage[],
   prompt: PendingUserPrompt,
 ): { formattedMessage: string; systemPrompt: string } {
-  const systemPrompt = context.systemPromptOverride ?? buildAgentSystemPrompt()
+  const systemPrompt = buildAgentSystemPrompt({
+    agent: context.agent,
+    permissionMode: context.permissionMode,
+    vaultContext: context.systemPromptOverride,
+  })
   const chatHistory = toChatHistory(messages.filter((message) => !message.isStreaming))
   const trimmedHistory = trimHistory(chatHistory, MAX_HISTORY_TOKENS)
 

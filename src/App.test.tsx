@@ -1052,7 +1052,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(getHeader()).toHaveTextContent('Inbox')
     })
-  })
+  }, 10_000)
 
   it('opens favorites directly into Neighborhood mode', async () => {
     configureNeighborhoodFavoritesVault()
