@@ -1328,7 +1328,7 @@ describe('App', () => {
     fireEvent.keyDown(window, { key: '3', metaKey: true })
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', {
-        minWidth: 880,
+        minWidth: 1030,
         minHeight: 400,
         growToFit: true,
       })

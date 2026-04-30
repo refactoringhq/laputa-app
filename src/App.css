@@ -16,8 +16,8 @@
 }
 
 .app__sidebar {
-  flex-shrink: 1;
-  min-width: 180px;
+  flex: 0 0 auto;
+  min-width: 220px;
   display: flex;
   flex-direction: column;
 }
@@ -27,7 +27,7 @@
 }
 
 .app__note-list {
-  flex-shrink: 10;
+  flex: 0 0 auto;
   min-width: 220px;
   display: flex;
   flex-direction: column;
@@ -39,7 +39,7 @@
 
 .app__editor {
   flex: 1;
-  min-width: 400px;
+  min-width: 480px;
   min-height: 0;
   overflow: hidden;
   display: flex;

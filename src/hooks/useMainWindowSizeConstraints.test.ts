@@ -23,7 +23,7 @@ describe('getMainWindowMinWidth', () => {
         noteListVisible: true,
         inspectorCollapsed: true,
       },
-      expectedWidth: 880,
+      expectedWidth: 920,
     },
     {
       name: 'drops to the narrower editor-only floor when only the editor is visible',
@@ -51,6 +51,18 @@ describe('getMainWindowMinWidth', () => {
         inspectorCollapsed: false,
       },
       expectedWidth: 720,
+    },
+    {
+      name: 'uses restored pane widths when they exceed the minimum allowances',
+      visibility: {
+        sidebarVisible: true,
+        noteListVisible: true,
+        inspectorCollapsed: false,
+        sidebarWidth: 360,
+        noteListWidth: 340,
+        inspectorWidth: 320,
+      },
+      expectedWidth: 1500,
     },
   ] as const
 
@@ -82,7 +94,7 @@ describe('useMainWindowSizeConstraints', () => {
         noteListVisible: true,
         inspectorCollapsed: false,
       },
-      expectedWidth: 1120,
+      expectedWidth: 1160,
     },
   ] as const
 

@@ -1217,10 +1217,13 @@ function App() {
       sidebarVisible: nextSidebarVisible,
       noteListVisible: nextNoteListVisible,
       inspectorCollapsed: nextInspectorCollapsed,
+      sidebarWidth: layout.sidebarWidth,
+      noteListWidth: layout.noteListWidth,
+      inspectorWidth: layout.inspectorWidth,
     })
 
     void applyMainWindowSizeConstraints(minWidth).catch((err) => console.warn('[window] Size constraints failed:', err))
-  }, [layout.inspectorCollapsed, noteWindowParams])
+  }, [layout.inspectorCollapsed, layout.inspectorWidth, layout.noteListWidth, layout.sidebarWidth, noteWindowParams])
 
   const handleSetViewMode = useCallback((mode: ViewMode) => {
     setViewMode(mode)
@@ -1243,6 +1246,9 @@ function App() {
     sidebarVisible,
     noteListVisible,
     inspectorCollapsed: layout.inspectorCollapsed,
+    sidebarWidth: layout.sidebarWidth,
+    noteListWidth: layout.noteListWidth,
+    inspectorWidth: layout.inspectorWidth,
   })
 
   const { status: updateStatus, actions: updateActions } = useUpdater(settings.release_channel)
