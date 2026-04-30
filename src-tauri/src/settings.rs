@@ -106,15 +106,23 @@ fn is_simplified_chinese_language(code: &str) -> bool {
     matches!(code, "zh" | "zh-cn" | "zh-hans" | "zh-sg")
 }
 
+const SUPPORTED_UI_LANGUAGE_CODES: &[&str] = &[
+    "it-IT", "fr-FR", "de-DE", "ru-RU", "es-ES", "pt-BR", "pt-PT",
+    "es-419", "zh-CN", "zh-TW", "ja-JP", "ko-KR", "vi",
+];
+
 pub fn normalize_ui_language(value: Option<&str>) -> Option<String> {
     let language = canonical_language_code(value?)?;
     if is_english_language(&language) {
         return Some("en".to_string());
     }
     if is_simplified_chinese_language(&language) {
-        return Some("zh-Hans".to_string());
+        return Some("zh-CN".to_string());
     }
-    None
+    SUPPORTED_UI_LANGUAGE_CODES
+        .iter()
+        .find(|&&code| code.to_ascii_lowercase() == language)
+        .map(|&code| code.to_string())
 }
 
 fn normalize_settings(settings: Settings) -> Settings {
@@ -281,7 +289,7 @@ mod tests {
             anonymous_id: Some("abc-123-uuid".to_string()),
             release_channel: Some("alpha".to_string()),
             theme_mode: Some("dark".to_string()),
-            ui_language: Some("zh-Hans".to_string()),
+            ui_language: Some("zh-CN".to_string()),
             note_width_mode: Some("wide".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
@@ -313,7 +321,7 @@ mod tests {
             auto_advance_inbox_after_organize: Some(true),
             release_channel: Some("alpha".to_string()),
             theme_mode: Some("dark".to_string()),
-            ui_language: Some("zh-Hans".to_string()),
+            ui_language: Some("zh-CN".to_string()),
             note_width_mode: Some("wide".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
@@ -330,7 +338,7 @@ mod tests {
         assert_eq!(loaded.auto_advance_inbox_after_organize, Some(true));
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
-        assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
+        assert_eq!(loaded.ui_language.as_deref(), Some("zh-CN"));
         assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
         assert_eq!(loaded.initial_h1_auto_rename_enabled, Some(false));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
@@ -367,7 +375,7 @@ mod tests {
         assert_eq!(loaded.anonymous_id.as_deref(), Some("test-uuid"));
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
-        assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
+        assert_eq!(loaded.ui_language.as_deref(), Some("zh-CN"));
         assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
     }
@@ -456,12 +464,23 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_ui_language_is_filtered() {
+    fn test_unsupported_ui_language_is_filtered() {
         let loaded = save_and_reload(Settings {
-            ui_language: Some("fr-FR".to_string()),
+            ui_language: Some("ar-SA".to_string()),
             ..Default::default()
         });
         assert!(loaded.ui_language.is_none());
+    }
+
+    #[test]
+    fn test_supported_ui_languages_are_preserved() {
+        for &locale in &["it-IT", "fr-FR", "de-DE", "ru-RU", "es-ES", "pt-BR", "pt-PT", "es-419", "zh-TW", "ja-JP", "ko-KR", "vi"] {
+            let loaded = save_and_reload(Settings {
+                ui_language: Some(locale.to_string()),
+                ..Default::default()
+            });
+            assert_eq!(loaded.ui_language.as_deref(), Some(locale), "locale {locale} should be preserved");
+        }
     }
 
     #[test]
@@ -469,7 +488,7 @@ mod tests {
         assert_eq!(normalize_ui_language(Some("en-US")).as_deref(), Some("en"));
         assert_eq!(
             normalize_ui_language(Some("zh_CN")).as_deref(),
-            Some("zh-Hans")
+            Some("zh-CN")
         );
     }
 
