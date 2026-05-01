@@ -1,3 +1,5 @@
+import { markdownBodyText } from '../lib/snippetMarkdownBody'
+
 // Wikilink placeholder tokens for markdown round-trip
 const WL_START = '\u2039WIKILINK:'
 const WL_END = '\u203A'
@@ -208,25 +210,6 @@ export function extractBacklinkContext(
   return null
 }
 
-/** Check if a line is useful for snippet extraction (not blank, heading, code fence, or rule). */
-function isSnippetLine(line: string): boolean {
-  const t = line.trim()
-  return t !== '' && !t.startsWith('#') && !t.startsWith('```') && !t.startsWith('---')
-}
-
-/** Strip leading list markers (*, -, +, 1.) from a line. */
-function stripListMarker(line: string): string {
-  const t = line.trimStart()
-  for (const prefix of ['* ', '- ', '+ ']) {
-    if (t.startsWith(prefix)) return t.slice(prefix.length)
-  }
-  const dotPos = t.indexOf('. ')
-  if (dotPos >= 1 && dotPos <= 3 && /^\d+$/.test(t.slice(0, dotPos))) {
-    return t.slice(dotPos + 2)
-  }
-  return t
-}
-
 /** Remove the first H1 heading line, allowing leading blank lines. */
 function removeH1Line(body: string): string {
   const lines = body.split('\n')
@@ -296,12 +279,13 @@ function extractSubheadingText(line: string): string | null {
 }
 
 /** Extract a snippet: first ~160 chars of body content, stripped of markdown.
- *  Mirrors the Rust extract_snippet() logic for frontend use. */
+ *  Mirrors the Rust extract_snippet() logic for frontend use. Table blocks
+ *  collapse to a `📊 col1 · col2 · …` marker so sidebar previews stay readable. */
 export function extractSnippet(content: string): string {
   const [, body] = splitFrontmatter(content)
   const withoutH1 = removeH1Line(body)
-  const clean = withoutH1.split('\n').filter(isSnippetLine).map(stripListMarker).join(' ')
-  const stripped = stripMarkdownChars(clean).trim()
+  const tableAware = markdownBodyText(withoutH1)
+  const stripped = stripMarkdownChars(tableAware).trim()
   if (stripped) {
     if (stripped.length <= 160) return stripped
     return stripped.slice(0, 160) + '...'

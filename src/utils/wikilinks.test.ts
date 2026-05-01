@@ -623,4 +623,25 @@ describe('extractSnippet', () => {
     expect(snippet).toContain('fn main()')
     expect(snippet).toContain('Some text.')
   })
+
+  it('renders a GFM pipe table in the snippet as a 📊 header preview, not raw pipes', () => {
+    const content = '# Title\n\n| Bezeichnung | M/K |\n| --- | --- |\n| Doc | M |'
+    const snippet = extractSnippet(content)
+    expect(snippet).toBe('📊 Bezeichnung · M/K')
+    expect(snippet).not.toContain('|')
+    expect(snippet).not.toContain('---')
+  })
+
+  it('renders an HTML <table> in the snippet as a 📊 header preview', () => {
+    const content = '# Title\n\n<table><thead><tr><th>x</th><th>y</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>'
+    const snippet = extractSnippet(content)
+    expect(snippet).toBe('📊 x · y')
+    expect(snippet).not.toContain('<table>')
+  })
+
+  it('separates the 📊 marker from surrounding paragraphs with newlines', () => {
+    const content = '# Title\n\nIntro line.\n\n| col |\n| --- |\n| val |\n\nOutro line.'
+    const snippet = extractSnippet(content)
+    expect(snippet).toBe('Intro line.\n📊 col\nOutro line.')
+  })
 })

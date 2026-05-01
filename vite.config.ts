@@ -7,6 +7,7 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import matter from 'gray-matter'
+import { markdownBodyText } from './src/lib/snippetMarkdownBody'
 
 // --- Vault API middleware (dev only) ---
 
@@ -118,10 +119,6 @@ function markdownTitle(content: string, frontmatter: Record<string, unknown>, fa
 
   const h1Match = content.match(/^#\s+(.+)$/m)
   return h1Match ? h1Match[1].trim() : fallback
-}
-
-function markdownBodyText(content: string): string {
-  return content.replace(/^#+\s+.+$/gm, '').replace(/[\n\r]+/g, ' ').trim()
 }
 
 function frontmatterWikiLinks(frontmatter: Record<string, unknown>, ...keys: string[]): string[] {

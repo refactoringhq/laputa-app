@@ -77,10 +77,277 @@ fn strip_frontmatter(content: &str) -> &str {
     }
 }
 
-/// Check if a line is useful for snippet extraction (not blank, heading, code fence, or rule).
+/// Check if a line is useful for snippet extraction (not blank, heading, code fence, rule, or table separator).
 fn is_snippet_line(line: &str) -> bool {
     let t = line.trim();
-    !t.is_empty() && !t.starts_with('#') && !t.starts_with("```") && !t.starts_with("---")
+    if t.is_empty() || t.starts_with('#') || t.starts_with("```") || t.starts_with("---") {
+        return false;
+    }
+    !is_pipe_table_separator(t)
+}
+
+/// Detect a GFM pipe-table separator row, e.g. `| --- | :---: | ---: |`.
+/// Requires at least one `|` so plain horizontal rules (`---`) are not classified as table separators.
+fn is_pipe_table_separator(line: &str) -> bool {
+    if !line.contains('|') {
+        return false;
+    }
+    let trimmed = line.trim_matches('|').trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    trimmed
+        .split('|')
+        .map(str::trim)
+        .all(is_pipe_table_separator_cell)
+}
+
+fn is_pipe_table_separator_cell(cell: &str) -> bool {
+    let stripped = cell.trim_matches(':');
+    !stripped.is_empty() && stripped.chars().all(|c| c == '-')
+}
+
+fn looks_like_pipe_table_row(line: &str) -> bool {
+    line.starts_with('|') && line.ends_with('|') && line.len() >= 2
+}
+
+fn line_starts_html_table(line: &str) -> bool {
+    let lower = line.trim_start().to_ascii_lowercase();
+    lower.starts_with("<table") && (lower.as_bytes().get(6).is_some_and(|c| !c.is_ascii_alphanumeric()))
+}
+
+fn line_ends_html_table(line: &str) -> bool {
+    line.to_ascii_lowercase().contains("</table>")
+}
+
+/// Walk the body line-by-line. Drop heading/code-fence/rule/empty lines. Replace any
+/// table block (HTML or GFM pipe) with a `📊 col1 · col2 · …` marker built from the
+/// header row (≤ 80 chars). Preserve surrounding prose verbatim.
+fn collapse_table_blocks_in_body(body: &str) -> String {
+    let mut walker = SnippetWalker::default();
+    for line in body.lines() {
+        walker.visit(line);
+    }
+    walker.finish()
+}
+
+#[derive(Default)]
+struct SnippetWalker {
+    parts: Vec<String>,
+    inside_html_table: bool,
+    html_table_buffer: Vec<String>,
+    inside_pipe_table: bool,
+}
+
+impl SnippetWalker {
+    fn visit(&mut self, line: &str) {
+        if self.inside_html_table {
+            self.visit_html_continuation(line);
+            return;
+        }
+        let trimmed = line.trim();
+        if line_starts_html_table(trimmed) {
+            self.start_html_table(trimmed);
+            return;
+        }
+        if looks_like_pipe_table_row(trimmed) || is_pipe_table_separator(trimmed) {
+            self.visit_pipe_table_line(trimmed);
+            return;
+        }
+        self.visit_prose_line(line, trimmed);
+    }
+
+    fn visit_html_continuation(&mut self, line: &str) {
+        self.html_table_buffer.push(line.to_string());
+        if !line_ends_html_table(line) {
+            return;
+        }
+        self.flush_html_table();
+    }
+
+    fn start_html_table(&mut self, trimmed: &str) {
+        self.inside_pipe_table = false;
+        self.html_table_buffer.clear();
+        self.html_table_buffer.push(trimmed.to_string());
+        if line_ends_html_table(trimmed) {
+            self.flush_html_table();
+            return;
+        }
+        self.inside_html_table = true;
+    }
+
+    fn flush_html_table(&mut self) {
+        let html = self.html_table_buffer.join("\n");
+        let cells = html_table_header_cells(&html);
+        self.parts.push(format_table_marker(&cells));
+        self.html_table_buffer.clear();
+        self.inside_html_table = false;
+    }
+
+    fn visit_pipe_table_line(&mut self, trimmed: &str) {
+        if self.inside_pipe_table {
+            return;
+        }
+        if is_pipe_table_separator(trimmed) {
+            self.parts.push(TABLE_SNIPPET_FALLBACK.to_string());
+            self.inside_pipe_table = true;
+            return;
+        }
+        let cells = pipe_table_cells(trimmed);
+        self.parts.push(format_table_marker(&cells));
+        self.inside_pipe_table = true;
+    }
+
+    fn visit_prose_line(&mut self, line: &str, trimmed: &str) {
+        self.inside_pipe_table = false;
+        if !is_snippet_line(line) || trimmed.is_empty() {
+            return;
+        }
+        let stripped = strip_list_marker(line);
+        let html_stripped = strip_html_tags(stripped);
+        let clean = html_stripped.trim();
+        if !clean.is_empty() {
+            self.parts.push(clean.to_string());
+        }
+    }
+
+    fn finish(self) -> String {
+        join_snippet_parts(&self.parts)
+    }
+}
+
+fn join_snippet_parts(parts: &[String]) -> String {
+    let mut out = String::new();
+    let mut prev_was_table = false;
+    for part in parts {
+        let is_table = part.starts_with(TABLE_MARKER_PREFIX) || part == TABLE_SNIPPET_FALLBACK;
+        if out.is_empty() {
+            out.push_str(part);
+        } else if is_table || prev_was_table {
+            out.push('\n');
+            out.push_str(part);
+        } else {
+            out.push(' ');
+            out.push_str(part);
+        }
+        prev_was_table = is_table;
+    }
+    out
+}
+
+fn pipe_table_cells(row: &str) -> Vec<String> {
+    row.trim_matches('|')
+        .split('|')
+        .map(|cell| cell.trim().to_string())
+        .filter(|cell| !cell.is_empty())
+        .collect()
+}
+
+fn html_table_header_cells(html: &str) -> Vec<String> {
+    let scope = extract_thead_or_html(html);
+    let first_row = extract_first_tr(scope);
+    extract_th_or_td_text(first_row)
+}
+
+fn extract_thead_or_html(html: &str) -> &str {
+    let lower = html.to_ascii_lowercase();
+    let Some(open) = lower.find("<thead") else {
+        return html;
+    };
+    let Some(open_end) = lower[open..].find('>').map(|i| open + i + 1) else {
+        return html;
+    };
+    let Some(close) = lower[open_end..].find("</thead>").map(|i| open_end + i) else {
+        return html;
+    };
+    &html[open_end..close]
+}
+
+fn extract_first_tr(scope: &str) -> &str {
+    let lower = scope.to_ascii_lowercase();
+    let Some(open) = lower.find("<tr") else {
+        return "";
+    };
+    let Some(open_end) = lower[open..].find('>').map(|i| open + i + 1) else {
+        return "";
+    };
+    let Some(close) = lower[open_end..].find("</tr>").map(|i| open_end + i) else {
+        return "";
+    };
+    &scope[open_end..close]
+}
+
+fn extract_th_or_td_text(row: &str) -> Vec<String> {
+    let mut cells = Vec::new();
+    let mut cursor = 0;
+    let lower = row.to_ascii_lowercase();
+    while cursor < row.len() {
+        let Some(open_idx) = next_cell_open(&lower, cursor) else {
+            break;
+        };
+        let Some(open_end) = lower[open_idx..].find('>').map(|i| open_idx + i + 1) else {
+            break;
+        };
+        let Some(close_idx) = next_cell_close(&lower, open_end) else {
+            break;
+        };
+        let raw = &row[open_end..close_idx];
+        let cleaned = strip_html_tags(raw);
+        let trimmed = cleaned.trim();
+        if !trimmed.is_empty() {
+            cells.push(trimmed.to_string());
+        }
+        cursor = close_idx + 1;
+    }
+    cells
+}
+
+fn next_cell_open(lower: &str, from: usize) -> Option<usize> {
+    let th = lower[from..].find("<th").map(|i| from + i);
+    let td = lower[from..].find("<td").map(|i| from + i);
+    match (th, td) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (Some(a), None) | (None, Some(a)) => Some(a),
+        (None, None) => None,
+    }
+}
+
+fn next_cell_close(lower: &str, from: usize) -> Option<usize> {
+    let th = lower[from..].find("</th>").map(|i| from + i);
+    let td = lower[from..].find("</td>").map(|i| from + i);
+    match (th, td) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (Some(a), None) | (None, Some(a)) => Some(a),
+        (None, None) => None,
+    }
+}
+
+fn format_table_marker(cells: &[String]) -> String {
+    let cleaned: Vec<String> = cells
+        .iter()
+        .map(|cell| strip_html_tags(cell).trim().to_string())
+        .filter(|cell| !cell.is_empty())
+        .collect();
+    if cleaned.is_empty() {
+        return TABLE_SNIPPET_FALLBACK.to_string();
+    }
+    let joined = cleaned.join(TABLE_CELL_SEPARATOR);
+    let truncated = truncate_header_text(&joined);
+    format!("{}{}", TABLE_MARKER_PREFIX, truncated)
+}
+
+fn truncate_header_text(text: &str) -> String {
+    if text.chars().count() <= TABLE_HEADER_PREVIEW_MAX {
+        return text.to_string();
+    }
+    let mut buf = String::new();
+    for (i, ch) in text.chars().enumerate() {
+        if i >= TABLE_HEADER_PREVIEW_MAX - 1 {
+            break;
+        }
+        buf.push(ch);
+    }
+    format!("{}…", buf.trim_end())
 }
 
 /// Extract sub-heading text (## , ### , etc.) stripped of the `#` prefix.
@@ -145,16 +412,18 @@ pub(super) fn count_body_words(content: &str) -> u32 {
         .count() as u32
 }
 
-/// Extract a snippet: first ~160 chars of content after frontmatter/title, stripped of markdown.
+/// Placeholder emitted when a table block has no recoverable header cells.
+pub(super) const TABLE_SNIPPET_FALLBACK: &str = "📊 Table";
+const TABLE_HEADER_PREVIEW_MAX: usize = 80;
+const TABLE_CELL_SEPARATOR: &str = " · ";
+const TABLE_MARKER_PREFIX: &str = "📊 ";
+
+/// Extract a snippet: first ~160 chars of content after frontmatter/title, stripped of markdown and inline HTML.
+/// Table blocks (HTML `<table>` or GFM pipe) are replaced with a single `[Table]` placeholder.
 pub(super) fn extract_snippet(content: &str) -> String {
     let without_fm = strip_frontmatter(content);
     let body = without_h1_line(without_fm).unwrap_or(without_fm);
-    let clean: String = body
-        .lines()
-        .filter(|line| is_snippet_line(line))
-        .map(strip_list_marker)
-        .collect::<Vec<&str>>()
-        .join(" ");
+    let clean = collapse_table_blocks_in_body(body);
     let stripped = strip_markdown_chars(&clean);
     let trimmed = stripped.trim();
     if !trimmed.is_empty() {
@@ -214,6 +483,76 @@ fn skip_until(chars: &mut impl Iterator<Item = char>, delimiter: char) {
 /// Check if a char is markdown formatting that should be stripped.
 fn is_markdown_formatting(ch: char) -> bool {
     matches!(ch, '*' | '_' | '`' | '~')
+}
+
+/// Strip inline HTML tags from a snippet candidate.
+/// Drops anything between `<` and the next `>` when the `<` is followed by
+/// an ASCII letter or `/letter` (so legit text like `if x < y` is preserved).
+/// Collapses runs of whitespace introduced by removed tags so the snippet
+/// stays readable.
+fn strip_html_tags(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'<' {
+            if let Some(tag_len) = match_html_tag_len(bytes, i) {
+                i += tag_len;
+                continue;
+            }
+        }
+        let ch_len = utf8_char_len(bytes[i]);
+        result.push_str(&s[i..i + ch_len]);
+        i += ch_len;
+    }
+    collapse_whitespace(&result)
+}
+
+/// Return the byte length of an HTML tag starting at `start` (which must point
+/// to `<`), or `None` if the chars don't look like a tag. A tag must start with
+/// `<[A-Za-z]` or `</[A-Za-z]` and end at `>` on the same line.
+fn match_html_tag_len(bytes: &[u8], start: usize) -> Option<usize> {
+    let mut cursor = start + 1;
+    if bytes.get(cursor) == Some(&b'/') {
+        cursor += 1;
+    }
+    if !bytes.get(cursor).is_some_and(u8::is_ascii_alphabetic) {
+        return None;
+    }
+    while cursor < bytes.len() {
+        match bytes[cursor] {
+            b'>' => return Some(cursor - start + 1),
+            b'\n' => return None,
+            _ => cursor += 1,
+        }
+    }
+    None
+}
+
+fn utf8_char_len(leading_byte: u8) -> usize {
+    match leading_byte {
+        0..=0x7F => 1,
+        0xC2..=0xDF => 2,
+        0xE0..=0xEF => 3,
+        _ => 4,
+    }
+}
+
+fn collapse_whitespace(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut last_was_space = false;
+    for ch in s.chars() {
+        if ch.is_whitespace() {
+            if !last_was_space {
+                out.push(' ');
+                last_was_space = true;
+            }
+        } else {
+            out.push(ch);
+            last_was_space = false;
+        }
+    }
+    out
 }
 
 fn strip_markdown_chars(s: &str) -> String {
@@ -612,13 +951,133 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_snippet_crlf_chinese_h1_table_content() {
+    fn test_extract_snippet_chinese_pipe_table_with_outro_uses_header_preview() {
         let content =
             "\r\n\r\n# 上海复盘\r\n\r\n| 指标 | 值 |\r\n| --- | --- |\r\n| 收入 | 增长 |\r\n\r\n正文包含中文字符。";
         let snippet = extract_snippet(content);
 
-        assert!(snippet.contains("指标"));
+        assert!(snippet.contains("📊 指标 · 值"));
         assert!(snippet.contains("正文包含中文字符"));
+        assert!(!snippet.contains('|'));
+        assert!(snippet.contains('\n'));
+    }
+
+    // --- HTML table snippet tests (issue #452 follow-up) ---
+
+    #[test]
+    fn test_extract_snippet_replaces_html_table_with_thead_marker() {
+        let content = "# Test\n\n<table>\n  <thead><tr><th>Bezeichnung</th><th>Format</th></tr></thead>\n  <tbody><tr><td>Dokumentennummer</td><td>an..35</td></tr></tbody>\n</table>";
+        let snippet = extract_snippet(content);
+
+        assert_eq!(snippet, "📊 Bezeichnung · Format");
+    }
+
+    #[test]
+    fn test_extract_snippet_html_table_without_thead_uses_first_tr() {
+        let content = "# T\n\n<table><tr><td>Alpha</td><td>Beta</td></tr><tr><td>1</td><td>2</td></tr></table>";
+        let snippet = extract_snippet(content);
+
+        assert_eq!(snippet, "📊 Alpha · Beta");
+    }
+
+    #[test]
+    fn test_extract_snippet_html_table_with_surrounding_prose() {
+        let content = "# Test\n\nIntro paragraph.\n\n<table><tr><th>x</th><th>y</th></tr></table>\n\nOutro paragraph.";
+        let snippet = extract_snippet(content);
+
+        assert_eq!(snippet, "Intro paragraph.\n📊 x · y\nOutro paragraph.");
+    }
+
+    #[test]
+    fn test_extract_snippet_empty_html_table_falls_back_to_static_marker() {
+        let content = "# T\n\n<table></table>";
+        let snippet = extract_snippet(content);
+
+        assert_eq!(snippet, TABLE_SNIPPET_FALLBACK);
+    }
+
+    #[test]
+    fn test_extract_snippet_strips_inline_html_tags() {
+        let content = "# Title\n\nHello <span class=\"x\">world</span> and <em>everyone</em>.";
+        let snippet = extract_snippet(content);
+
+        assert!(!snippet.contains("<span"), "snippet retains <span>: {}", snippet);
+        assert!(!snippet.contains("</span>"));
+        assert!(!snippet.contains("<em>"));
+        assert!(snippet.contains("Hello"));
+        assert!(snippet.contains("world"));
+        assert!(snippet.contains("everyone"));
+    }
+
+    #[test]
+    fn test_extract_snippet_preserves_less_than_in_text() {
+        let content = "# Title\n\nNote: when x < y the alarm triggers.";
+        let snippet = extract_snippet(content);
+
+        assert!(snippet.contains("x < y"), "literal `x < y` should survive: {}", snippet);
+    }
+
+    #[test]
+    fn test_extract_snippet_handles_unclosed_html_tag_gracefully() {
+        let content = "# Title\n\nText before <table without close, more text.";
+        let snippet = extract_snippet(content);
+
+        assert!(snippet.contains("Text before"));
+        assert!(snippet.contains("more text"));
+    }
+
+    // --- GFM pipe-table snippet tests ---
+
+    #[test]
+    fn test_extract_snippet_pipe_table_uses_header_row_preview() {
+        let content = "# Title\n\n| Bezeichnung | M/K | Format |\n| --- | --- | --- |\n| Doc | M | an..35 |";
+        let snippet = extract_snippet(content);
+
+        assert_eq!(snippet, "📊 Bezeichnung · M/K · Format");
+        assert!(!snippet.contains('|'));
+        assert!(!snippet.contains("---"));
+    }
+
+    #[test]
+    fn test_extract_snippet_pipe_table_with_alignment_separator() {
+        let content = "# Title\n\n| Name | Status |\n| :--- | ---: |\n| Alpha | Active |";
+        let snippet = extract_snippet(content);
+
+        assert_eq!(snippet, "📊 Name · Status");
+    }
+
+    #[test]
+    fn test_extract_snippet_pipe_table_keeps_surrounding_prose_with_newline_separator() {
+        let content = "# Title\n\nIntro text.\n\n| col |\n| --- |\n| val |\n\nOutro text.";
+        let snippet = extract_snippet(content);
+
+        assert_eq!(snippet, "Intro text.\n📊 col\nOutro text.");
+    }
+
+    #[test]
+    fn test_extract_snippet_emits_only_one_marker_per_pipe_table() {
+        let content = "# Title\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |";
+        let snippet = extract_snippet(content);
+
+        assert_eq!(snippet.matches(TABLE_MARKER_PREFIX).count(), 1);
+    }
+
+    #[test]
+    fn test_truncate_header_text_caps_at_max_length() {
+        let long = "abcdefghij".repeat(10); // 100 chars
+        let truncated = truncate_header_text(&long);
+        assert!(truncated.chars().count() <= TABLE_HEADER_PREVIEW_MAX);
+        assert!(truncated.ends_with('…'));
+    }
+
+    #[test]
+    fn test_is_pipe_table_separator_recognises_dashed_rows() {
+        assert!(is_pipe_table_separator("| --- | --- |"));
+        assert!(is_pipe_table_separator("|---|---|"));
+        assert!(is_pipe_table_separator("| :--- | ---: | :---: |"));
+        assert!(!is_pipe_table_separator("| col1 | col2 |"));
+        assert!(!is_pipe_table_separator("---"));
+        assert!(!is_pipe_table_separator(""));
     }
 
     // --- count_body_words tests ---
