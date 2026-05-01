@@ -98,7 +98,7 @@ function ManualMcpConfigSection(props: ManualMcpConfigSectionProps) {
       </div>
       <pre
         tabIndex={0}
-        className="max-h-48 overflow-auto rounded-md border border-border bg-background px-3 py-3 font-mono text-xs leading-5 text-foreground"
+        className="max-h-48 w-full min-w-0 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border bg-background px-3 py-3 font-mono text-xs leading-5 text-foreground"
         data-testid="mcp-config-snippet"
       >
         {manualConfigText(props, t)}
@@ -121,7 +121,7 @@ function McpSetupActions({
   const t = createTranslator(locale)
 
   return (
-    <DialogFooter className="flex-row items-center justify-end gap-2 sm:justify-end">
+    <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
       <Button type="button" variant="outline" onClick={onClose} disabled={buttonsDisabled}>
         {t('common.cancel')}
       </Button>
@@ -175,8 +175,12 @@ export function McpSetupDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}>
-      <DialogContent showCloseButton={false} className="sm:max-w-[520px]" data-testid="mcp-setup-dialog">
-        <DialogHeader>
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden p-0"
+        data-testid="mcp-setup-dialog"
+      >
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle className="flex items-center gap-2">
             <ShieldCheck size={18} />
             {copy.title}
@@ -184,11 +188,12 @@ export function McpSetupDialog({
           <DialogDescription>{copy.description}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 text-sm leading-6 text-muted-foreground">
-          <p>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-4">
+          <div className="min-w-0 space-y-3 text-sm leading-6 text-muted-foreground">
+          <p className="break-words">
             {t('mcp.setup.nodeRequirement')}
           </p>
-          <p>
+          <p className="break-words">
             {t('mcp.setup.writeEntryDescription', { entry: 'tolaria' })}
           </p>
           <div className="rounded-md border border-border bg-muted/30 px-3 py-3 font-mono text-xs text-foreground">
@@ -205,25 +210,28 @@ export function McpSetupDialog({
             onCopy={onCopyManualConfig}
             snippet={manualConfigSnippet}
           />
-          <p>
+          <p className="break-words">
             {t('mcp.setup.clientPathsDescription')}
           </p>
-          <p>
+          <p className="break-words">
             {t('mcp.setup.geminiGuidanceDescription')}
           </p>
+          </div>
         </div>
 
-        <McpSetupActions
-          buttonsDisabled={buttonsDisabled}
-          connectBusy={connectBusy}
-          disconnectBusy={disconnectBusy}
-          locale={locale}
-          primaryLabel={copy.primaryLabel}
-          secondaryLabel={copy.secondaryLabel}
-          onClose={onClose}
-          onConnect={onConnect}
-          onDisconnect={onDisconnect}
-        />
+        <div className="border-t border-border px-6 py-4">
+          <McpSetupActions
+            buttonsDisabled={buttonsDisabled}
+            connectBusy={connectBusy}
+            disconnectBusy={disconnectBusy}
+            locale={locale}
+            primaryLabel={copy.primaryLabel}
+            secondaryLabel={copy.secondaryLabel}
+            onClose={onClose}
+            onConnect={onConnect}
+            onDisconnect={onDisconnect}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   )
