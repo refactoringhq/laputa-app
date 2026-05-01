@@ -1,4 +1,4 @@
-import { filterSuggestionItems } from '@blocknote/core/extensions'
+import { filterSuggestionItems, insertOrUpdateBlockForSlashMenu } from '@blocknote/core/extensions'
 import {
   getDefaultReactSlashMenuItems,
   type DefaultReactSuggestionItem,
@@ -100,14 +100,50 @@ export function filterTolariaSlashMenuItems<T extends TolariaSlashMenuItem>(
     }) as T[]
 }
 
+const DEFAULT_TABLE_COLUMNS = 3
+const DEFAULT_TABLE_BODY_ROWS = 1
+
+type SlashMenuEditor = Parameters<typeof getDefaultReactSlashMenuItems>[0]
+
+function buildHeaderTable() {
+  const emptyRow = () => ({
+    cells: Array.from({ length: DEFAULT_TABLE_COLUMNS }, () => [] as never[]),
+  })
+  return {
+    type: 'table' as const,
+    content: {
+      type: 'tableContent' as const,
+      headerRows: 1,
+      rows: Array.from({ length: DEFAULT_TABLE_BODY_ROWS + 1 }, emptyRow),
+    },
+  }
+}
+
+/** Replace the default `Table` slash item so insertion already marks the first row as a header. */
+export function applyHeaderRowDefaultToTableItem<T extends TolariaSlashMenuItem>(
+  items: T[],
+  editor: SlashMenuEditor,
+): T[] {
+  return items.map((item) => {
+    if (item.key !== 'table') return item
+    return {
+      ...item,
+      onItemClick: () => {
+        insertOrUpdateBlockForSlashMenu(editor, buildHeaderTable() as never)
+      },
+    }
+  })
+}
+
 export function getTolariaSlashMenuItems(
-  editor: Parameters<typeof getDefaultReactSlashMenuItems>[0],
+  editor: SlashMenuEditor,
   query: string,
 ) {
+  const filtered = filterTolariaSlashMenuItems(
+    getDefaultReactSlashMenuItems(editor) as TolariaSlashMenuItem[],
+  )
   return filterSuggestionItems(
-    filterTolariaSlashMenuItems(
-      getDefaultReactSlashMenuItems(editor) as TolariaSlashMenuItem[],
-    ),
+    applyHeaderRowDefaultToTableItem(filtered, editor),
     query,
   )
 }

@@ -192,6 +192,7 @@ function useEditorSetup({
 
   const editor = useCreateBlockNote({
     schema,
+    tables: { headers: true, splitCells: true, cellBackgroundColor: true, cellTextColor: true },
     uploadFile: (file: File) => uploadImageFile(file, vaultPathRef.current),
     _tiptapOptions: { injectNonce: RUNTIME_STYLE_NONCE },
     extensions: [createArrowLigaturesExtension(), createMathInputExtension()],
