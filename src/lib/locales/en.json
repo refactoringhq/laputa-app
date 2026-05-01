@@ -383,6 +383,8 @@
   "inspector.title.properties": "Properties",
   "inspector.title.propertiesShortcut": "Properties (⌘⇧I)",
   "inspector.title.closePropertiesShortcut": "Close Properties (⌘⇧I)",
+  "inspector.title.collidingProperties": "Colliding properties",
+  "inspector.title.collidingPropertiesAria": "Colliding properties. Open raw editor.",
   "inspector.empty.noNoteSelected": "No note selected",
   "inspector.empty.noProperties": "This note has no properties yet",
   "inspector.empty.initializeProperties": "Initialize properties",

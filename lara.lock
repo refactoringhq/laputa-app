@@ -11,7 +11,7 @@ files:
     command.openSettings: 638c05f4f159a403e04aebe94b46a2a8
     command.openSettings.keywords: ab6b5e03395f4db955ed9cbfd4de33b7
     command.openLanguageSettings: e5a425aa6222fab3df66c0e1e0ca4183
-    command.openLanguageSettings.keywords: 639afefdd1c238b381bc1f963288f389
+    command.openLanguageSettings.keywords: 6a910000cbf23eac3c7078e518cae66a
     command.useSystemLanguage: b7f0315c47d4a59faa2a49571fcf1fca
     command.openH1Setting: 05b4f6edc0e98b29670e8ee902cdb9bf
     command.toggleGitignoredFilesVisibility: 0a2d3ea4e8ff8b00a801183caeb97a03
@@ -385,6 +385,8 @@ files:
     inspector.title.properties: 9fc2d28c05ed9eb1d75ba4465abf15a9
     inspector.title.propertiesShortcut: 427d1cbdc813cf54c5fac2508d38d407
     inspector.title.closePropertiesShortcut: 97b953e45042d4143dd19624dc345d29
+    inspector.title.collidingProperties: bf71358d0af34696e88bea278eac046a
+    inspector.title.collidingPropertiesAria: ce5c3569f304cd69b0f33a6fc185f49b
     inspector.empty.noNoteSelected: 046d95682b747a30ed8a7b0b1d581629
     inspector.empty.noProperties: 6864166e0f65d81b1eb474e41fde8822
     inspector.empty.initializeProperties: edf249d214b68f5afe8634c577b709c4
@@ -525,3 +527,4 @@ files:
     locale.jaJP: f32ced6a9ba164c4b3c047fd1d7c882e
     locale.koKR: d0bdb3cde477d82e766da05ebda50ccb
     locale.vi: 7b80fae85640c16cdb0261bef0c27636
+    locale.plPL: c730389bc8d99e59c867766babdd48b5

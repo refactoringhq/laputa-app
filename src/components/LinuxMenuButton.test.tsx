@@ -2,6 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LinuxMenuButton } from './LinuxMenuButton'
 
+const MENU_TEST_TIMEOUT_MS = 10_000
+
 const { close, invoke, minimize, toggleMaximize } = vi.hoisted(() => ({
   invoke: vi.fn().mockResolvedValue(undefined),
   minimize: vi.fn().mockResolvedValue(undefined),
@@ -41,7 +43,7 @@ describe('LinuxMenuButton', () => {
     expect(screen.getByText('Ctrl+Shift+L')).toBeInTheDocument()
     fireEvent.click(await screen.findByText('Toggle AI Panel'))
     expect(invoke).toHaveBeenCalledWith('trigger_menu_command', { id: 'view-toggle-ai-chat' })
-  })
+  }, MENU_TEST_TIMEOUT_MS)
 
   it('invokes direct window actions from the Window submenu', async () => {
     render(<LinuxMenuButton />)

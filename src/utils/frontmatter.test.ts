@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseFrontmatter, detectFrontmatterState } from './frontmatter'
+import { parseFrontmatter, detectFrontmatterState, detectFrontmatterWarnings } from './frontmatter'
 
 describe('parseFrontmatter', () => {
   describe('numeric values', () => {
@@ -82,6 +82,13 @@ describe('parseFrontmatter', () => {
     expect(fm['type']).toBe('Note')
     expect(fm['status']).toBe('Active')
   })
+
+  it('keeps the last value when frontmatter properties collide', () => {
+    const fm = parseFrontmatter('---\ntype: Note\nstatus: Active\nStatus: Evergreened\n---\n# Title')
+
+    expect(fm['status']).toBeUndefined()
+    expect(fm['Status']).toBe('Evergreened')
+  })
 })
 
 describe('detectFrontmatterState', () => {
@@ -119,5 +126,15 @@ describe('detectFrontmatterState', () => {
 
   it('returns "invalid" for frontmatter with only garbage text', () => {
     expect(detectFrontmatterState('---\n{broken: [yaml\n---\nBody')).toBe('invalid')
+  })
+})
+
+describe('detectFrontmatterWarnings', () => {
+  it('reports colliding frontmatter properties', () => {
+    const warnings = detectFrontmatterWarnings('---\ntype: Note\nstatus: Active\nStatus: Evergreened\n---\n# Title')
+
+    expect(warnings.collidingProperties).toEqual([
+      { key: 'status', labels: ['status', 'Status'] },
+    ])
   })
 })

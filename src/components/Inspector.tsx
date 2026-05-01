@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { VaultEntry, GitCommit } from '../types'
 import { cn } from '@/lib/utils'
 import { Separator } from './ui/separator'
-import { parseFrontmatter, detectFrontmatterState } from '../utils/frontmatter'
+import { parseFrontmatter, detectFrontmatterState, detectFrontmatterWarnings } from '../utils/frontmatter'
 import { DynamicPropertiesPanel } from './DynamicPropertiesPanel'
 import {
   DynamicRelationshipsPanel,
@@ -247,9 +247,20 @@ function InspectorBody({
 }
 
 export function Inspector({ collapsed, onToggle, ...bodyProps }: InspectorProps) {
+  const frontmatterWarnings = useMemo(
+    () => detectFrontmatterWarnings(bodyProps.content),
+    [bodyProps.content],
+  )
+
   return (
     <aside className={cn('flex flex-1 flex-col overflow-hidden border-l border-border bg-background text-foreground transition-[width] duration-200', collapsed && '!w-10 !min-w-10')}>
-      <InspectorHeader collapsed={collapsed} locale={bodyProps.locale} onToggle={onToggle} />
+      <InspectorHeader
+        collapsed={collapsed}
+        frontmatterWarnings={frontmatterWarnings}
+        locale={bodyProps.locale}
+        onToggle={onToggle}
+        onOpenRawEditor={bodyProps.onToggleRawEditor}
+      />
       {!collapsed && (
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-3">
           <InspectorBody {...bodyProps} />

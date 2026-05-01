@@ -278,6 +278,8 @@
   "inspector.title.properties": "Thuộc tính",
   "inspector.title.propertiesShortcut": "Thuộc tính (⌘⇧I)",
   "inspector.title.closePropertiesShortcut": "Đóng thuộc tính (⌘⇧I)",
+  "inspector.title.collidingProperties": "Thuộc tính xung đột",
+  "inspector.title.collidingPropertiesAria": "Thuộc tính xung đột. Mở trình soạn thảo thô.",
   "inspector.empty.noNoteSelected": "Chưa chọn ghi chú nào",
   "inspector.empty.noProperties": "Ghi chú này vẫn chưa có thuộc tính",
   "inspector.empty.initializeProperties": "Khởi tạo thuộc tính",

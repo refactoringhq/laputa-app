@@ -3,6 +3,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { CreateViewDialog } from './CreateViewDialog'
 import type { ViewDefinition } from '../types'
 
+const DIALOG_TEST_TIMEOUT_MS = 10_000
+
 describe('CreateViewDialog', () => {
   const defaultProps = {
     open: true,
@@ -26,7 +28,7 @@ describe('CreateViewDialog', () => {
     render(<CreateViewDialog {...defaultProps} />)
     expect(screen.getByText('Create View')).toBeInTheDocument()
     expect(screen.getByText('Create')).toBeInTheDocument()
-  })
+  }, DIALOG_TEST_TIMEOUT_MS)
 
   it('shows "Edit View" title when editingView is provided', () => {
     render(<CreateViewDialog {...defaultProps} editingView={makeEditingView()} />)

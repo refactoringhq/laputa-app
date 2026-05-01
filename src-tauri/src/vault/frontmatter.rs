@@ -182,69 +182,78 @@ fn sanitize_value(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-fn type_key_priority(key: &str) -> u8 {
-    match key {
-        "type" => 0,
-        "Type" => 1,
-        "TYPE" => 2,
-        _ => 3,
+fn canonical_known_key(key: &str) -> Option<&'static str> {
+    let trimmed = key.trim();
+    if trimmed.eq_ignore_ascii_case("type") {
+        return Some("type");
+    }
+    match trimmed {
+        "title" => Some("title"),
+        "Is A" | "is_a" => Some("type"),
+        "aliases" => Some("aliases"),
+        "_archived" | "Archived" | "archived" => Some("_archived"),
+        "_icon" | "icon" => Some("_icon"),
+        "color" => Some("color"),
+        "_order" | "order" => Some("_order"),
+        "_sidebar_label" | "sidebar_label" | "sidebar label" => Some("_sidebar_label"),
+        "template" => Some("template"),
+        "_sort" | "sort" => Some("_sort"),
+        "view" => Some("view"),
+        "_width" | "width" => Some("_width"),
+        "visible" => Some("visible"),
+        "Status" | "status" => Some("Status"),
+        "_organized" => Some("_organized"),
+        "_favorite" => Some("_favorite"),
+        "_favorite_index" => Some("_favorite_index"),
+        "_list_properties_display" => Some("_list_properties_display"),
+        _ => None,
     }
 }
 
-fn find_type_value(data: &HashMap<String, serde_json::Value>) -> Option<&serde_json::Value> {
-    data.iter()
-        .filter(|(key, _)| key.eq_ignore_ascii_case("type"))
-        .min_by_key(|(key, _)| type_key_priority(key))
-        .map(|(_, value)| value)
+fn insert_known_frontmatter_value(
+    target: &mut serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    value: &serde_json::Value,
+    overwrite: bool,
+) {
+    let Some(canonical_key) = canonical_known_key(key) else {
+        return;
+    };
+    if overwrite || !target.contains_key(canonical_key) {
+        target.insert(canonical_key.to_string(), sanitize_value(value));
+    }
+}
+
+fn raw_frontmatter_keys(raw_content: &str) -> Vec<String> {
+    RawFrontmatter(raw_content)
+        .extract_block()
+        .map(|raw| {
+            raw.lines()
+                .filter_map(|line| YamlLine(line).key().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn known_frontmatter_map(
+    data: &HashMap<String, serde_json::Value>,
+    raw_content: &str,
+) -> serde_json::Map<String, serde_json::Value> {
+    let mut filtered = serde_json::Map::new();
+    for key in raw_frontmatter_keys(raw_content) {
+        if let Some(value) = data.get(&key) {
+            insert_known_frontmatter_value(&mut filtered, &key, value, true);
+        }
+    }
+    for (key, value) in data {
+        insert_known_frontmatter_value(&mut filtered, key, value, false);
+    }
+    filtered
 }
 
 /// Parse frontmatter from raw YAML data extracted by gray_matter.
-fn parse_frontmatter(data: &HashMap<String, serde_json::Value>) -> Frontmatter {
-    static KNOWN_KEYS: &[&str] = &[
-        "title",
-        "type",
-        "Is A",
-        "is_a",
-        "aliases",
-        "_archived",
-        "Archived",
-        "archived",
-        "_icon",
-        "icon",
-        "color",
-        "_order",
-        "order",
-        "_sidebar_label",
-        "sidebar_label",
-        "sidebar label",
-        "template",
-        "_sort",
-        "sort",
-        "view",
-        "_width",
-        "width",
-        "visible",
-        "notion_id",
-        "Status",
-        "status",
-        "_organized",
-        "_favorite",
-        "_favorite_index",
-        "_list_properties_display",
-    ];
-    let mut filtered = serde_json::Map::new();
-
-    if let Some(value) = find_type_value(data) {
-        filtered.insert("type".to_string(), sanitize_value(value));
-    }
-
-    for (key, value) in data {
-        if key.eq_ignore_ascii_case("type") || !KNOWN_KEYS.contains(&key.as_str()) {
-            continue;
-        }
-        filtered.insert(key.clone(), sanitize_value(value));
-    }
-
+fn parse_frontmatter(data: &HashMap<String, serde_json::Value>, raw_content: &str) -> Frontmatter {
+    let filtered = known_frontmatter_map(data, raw_content);
     let value = serde_json::Value::Object(filtered);
     serde_json::from_value(value).unwrap_or_default()
 }
@@ -443,7 +452,7 @@ impl<'a> YamlLine<'a> {
             return None;
         }
         let (key, _) = self.0.split_once(':')?;
-        Some(key.trim().trim_matches('"'))
+        Some(key.trim().trim_matches('"').trim_matches('\''))
     }
 
     fn list_item(self) -> Option<&'a str> {
@@ -543,7 +552,7 @@ pub(crate) fn extract_fm_and_rels(
         }
     };
     (
-        parse_frontmatter(&json_map),
+        parse_frontmatter(&json_map, raw_content),
         extract_relationships(&json_map),
         extract_properties(&json_map),
     )

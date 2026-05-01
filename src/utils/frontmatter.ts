@@ -1,4 +1,5 @@
 import type { FrontmatterValue } from '../components/Inspector'
+import { canonicalSystemMetadataKey, normalizePropertyKey } from './systemMetadata'
 
 export interface ParsedFrontmatter {
   [key: string]: FrontmatterValue
@@ -9,6 +10,15 @@ type FrontmatterBody = string
 type FrontmatterLine = string
 type FrontmatterKey = string
 type FrontmatterText = string
+
+export interface FrontmatterCollisionWarning {
+  key: string
+  labels: string[]
+}
+
+export interface FrontmatterWarnings {
+  collidingProperties: FrontmatterCollisionWarning[]
+}
 
 const FRONTMATTER_CLOSE_DELIMITER = /(?:^|\r?\n)---(?:\r?\n|$)/
 
@@ -86,6 +96,45 @@ function parseKeyValueLine(line: FrontmatterLine): { key: FrontmatterKey, value:
   }
 }
 
+function parseTopLevelKey(line: FrontmatterLine): FrontmatterKey | null {
+  if (line.trim() === '' || line.startsWith(' ') || line.startsWith('\t')) return null
+  return parseKeyValueLine(line)?.key ?? null
+}
+
+const FRONTMATTER_COLLISION_ALIASES: Record<string, string> = {
+  is_a: 'type',
+  archived: '_archived',
+}
+
+function frontmatterCollisionKey(key: FrontmatterKey): FrontmatterKey {
+  const normalized = normalizePropertyKey(canonicalSystemMetadataKey(key))
+  return FRONTMATTER_COLLISION_ALIASES[normalized] ?? normalized
+}
+
+function addCollisionCandidate(
+  groups: Map<FrontmatterKey, { labels: FrontmatterKey[]; count: number }>,
+  key: FrontmatterKey,
+) {
+  const collisionKey = frontmatterCollisionKey(key)
+  const group = groups.get(collisionKey) ?? { labels: [], count: 0 }
+  group.count += 1
+  if (!group.labels.includes(key)) group.labels.push(key)
+  groups.set(collisionKey, group)
+}
+
+function assignFrontmatterValue(
+  result: ParsedFrontmatter,
+  collisionKeys: Map<FrontmatterKey, FrontmatterKey>,
+  key: FrontmatterKey,
+  value: FrontmatterValue,
+) {
+  const collisionKey = frontmatterCollisionKey(key)
+  const previousKey = collisionKeys.get(collisionKey)
+  if (previousKey && previousKey !== key) delete result[previousKey]
+  collisionKeys.set(collisionKey, key)
+  result[key] = value
+}
+
 function parseFrontmatterValue(value: FrontmatterText): FrontmatterValue | undefined {
   if (isBlockScalar(value)) return undefined
   if (isInlineArrayLiteral(value)) return parseInlineArray(value)
@@ -94,11 +143,12 @@ function parseFrontmatterValue(value: FrontmatterText): FrontmatterValue | undef
 
 function flushList(
   result: ParsedFrontmatter,
+  collisionKeys: Map<FrontmatterKey, FrontmatterKey>,
   currentKey: FrontmatterKey | null,
   currentList: FrontmatterText[],
 ): FrontmatterText[] {
   if (currentKey && currentList.length > 0) {
-    result[currentKey] = collapseList(currentList)
+    assignFrontmatterValue(result, collisionKeys, currentKey, collapseList(currentList))
   }
   return []
 }
@@ -109,6 +159,7 @@ export function parseFrontmatter(content: MarkdownContent | null): ParsedFrontma
   if (frontmatterBody === null) return {}
 
   const result: ParsedFrontmatter = {}
+  const collisionKeys = new Map<FrontmatterKey, FrontmatterKey>()
   let currentKey: FrontmatterKey | null = null
   let currentList: FrontmatterText[] = []
 
@@ -119,7 +170,7 @@ export function parseFrontmatter(content: MarkdownContent | null): ParsedFrontma
       continue
     }
 
-    currentList = flushList(result, currentKey, currentList)
+    currentList = flushList(result, collisionKeys, currentKey, currentList)
 
     const keyValue = parseKeyValueLine(line)
     if (!keyValue) continue
@@ -127,10 +178,31 @@ export function parseFrontmatter(content: MarkdownContent | null): ParsedFrontma
 
     const parsedValue = parseFrontmatterValue(keyValue.value)
     if (parsedValue !== undefined) {
-      result[currentKey] = parsedValue
+      assignFrontmatterValue(result, collisionKeys, currentKey, parsedValue)
     }
   }
 
-  flushList(result, currentKey, currentList)
+  flushList(result, collisionKeys, currentKey, currentList)
   return result
+}
+
+export function detectFrontmatterWarnings(content: MarkdownContent | null): FrontmatterWarnings {
+  const frontmatterBody = extractFrontmatterBody(content)
+  if (frontmatterBody === null) return { collidingProperties: [] }
+
+  const groups = new Map<FrontmatterKey, { labels: FrontmatterKey[]; count: number }>()
+  for (const line of frontmatterBody.split(/\r?\n/)) {
+    const key = parseTopLevelKey(line)
+    if (key) addCollisionCandidate(groups, key)
+  }
+
+  const collidingProperties = Array.from(groups.entries())
+    .filter(([, group]) => group.count > 1)
+    .map(([key, group]) => ({ key, labels: group.labels }))
+
+  return { collidingProperties }
+}
+
+export function hasFrontmatterWarnings(warnings: FrontmatterWarnings): boolean {
+  return warnings.collidingProperties.length > 0
 }

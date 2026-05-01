@@ -129,6 +129,26 @@ describe('Inspector', () => {
     expect(onToggle).toHaveBeenCalledOnce()
   })
 
+  it('shows a colliding-properties warning that opens the raw editor', async () => {
+    const onToggleRawEditor = vi.fn()
+    const content = `---
+type: Note
+status: Active
+Status: Evergreened
+---
+# Test Project
+`
+
+    renderSelectedInspector({ content, onToggleRawEditor })
+
+    const warning = screen.getByRole('button', { name: 'Colliding properties. Open raw editor.' })
+    fireEvent.focus(warning)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Colliding properties')
+
+    fireEvent.click(warning)
+    expect(onToggleRawEditor).toHaveBeenCalledOnce()
+  })
+
   it('shows properties when a note is selected', () => {
     render(<Inspector {...defaultProps} entry={mockEntry} content={mockContent} />)
     expect(screen.getAllByText('Project').length).toBeGreaterThan(0)
