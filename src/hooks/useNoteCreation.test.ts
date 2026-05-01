@@ -447,16 +447,23 @@ describe('useNoteCreation hook', () => {
     window.removeEventListener('laputa:focus-editor', focusListener)
   })
 
-  it('handleCreateType creates type entry', () => {
+  it('handleCreateType creates type entry', async () => {
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
-    act(() => { result.current.handleCreateType('Recipe') })
+    let created = false
+    await act(async () => {
+      created = await result.current.handleCreateType('Recipe')
+    })
+
+    expect(created).toBe(true)
     expect(addEntry.mock.calls[0][0].isA).toBe('Type')
     expect(addEntry.mock.calls[0][0].title).toBe('Recipe')
   })
 
   it('handleCreateType persists type files under Windows verbatim vault roots', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
-    vi.mocked(invoke).mockResolvedValueOnce(undefined)
+    vi.mocked(invoke)
+      .mockRejectedValueOnce(new Error('not found'))
+      .mockResolvedValueOnce(undefined)
     const onTypeStateChanged = vi.fn()
     const windowsVaultPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria`
     const createdPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria/recipe.md`
@@ -472,6 +479,9 @@ describe('useNoteCreation hook', () => {
     })
 
     expect(created).toBe(true)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_note_content', {
+      path: createdPath,
+    })
     expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
       path: createdPath,
       content: '---\ntype: Type\n---\n\n# Recipe\n',
@@ -488,7 +498,7 @@ describe('useNoteCreation hook', () => {
 
   it('handleCreateType blocks when the target type file already exists', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
-    vi.mocked(invoke).mockRejectedValueOnce(new Error('File already exists: /test/vault/briefing.md'))
+    vi.mocked(invoke).mockResolvedValueOnce('---\ntype: Note\n---\n# Existing Briefing\n')
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
 
     let created = true
@@ -497,17 +507,41 @@ describe('useNoteCreation hook', () => {
     })
 
     expect(created).toBe(false)
-    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_note_content', {
       path: '/test/vault/briefing.md',
-      content: expect.stringContaining('type: Type'),
     })
-    expect(removeEntry).toHaveBeenCalledWith('/test/vault/briefing.md')
+    expect(vi.mocked(invoke).mock.calls.some(([command]) => command === 'create_note_content')).toBe(false)
+    expect(addEntry).not.toHaveBeenCalled()
+    expect(openTabWithContent).not.toHaveBeenCalled()
+    expect(removeEntry).not.toHaveBeenCalled()
     expect(setToastMessage).toHaveBeenCalledWith('Cannot create type "Briefing" because briefing.md already exists')
+  })
+
+  it('handleCreateType blocks the built-in Note type when stale entries omit existing note.md', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValueOnce('---\ntype: Type\n---\n# Note\n')
+    const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
+
+    let created = true
+    await act(async () => {
+      created = await result.current.handleCreateType('Note')
+    })
+
+    expect(created).toBe(false)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_note_content', {
+      path: '/test/vault/note.md',
+    })
+    expect(vi.mocked(invoke).mock.calls.some(([command]) => command === 'create_note_content')).toBe(false)
+    expect(addEntry).not.toHaveBeenCalled()
+    expect(openTabWithContent).not.toHaveBeenCalled()
+    expect(setToastMessage).toHaveBeenCalledWith('Cannot create type "Note" because note.md already exists')
   })
 
   it('handleCreateType lets disk creation decide when a stale entry collides with the target type path', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
-    vi.mocked(invoke).mockResolvedValueOnce(undefined)
+    vi.mocked(invoke)
+      .mockRejectedValueOnce(new Error('not found'))
+      .mockResolvedValueOnce(undefined)
     const staleEntry = makeEntry({
       path: '/test/vault/pttep.md',
       filename: 'pttep.md',
@@ -522,6 +556,9 @@ describe('useNoteCreation hook', () => {
     })
 
     expect(created).toBe(true)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_note_content', {
+      path: '/test/vault/pttep.md',
+    })
     expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
       path: '/test/vault/pttep.md',
       content: expect.stringContaining('type: Type'),

@@ -97,6 +97,29 @@ test.describe('Collision-safe create flows', () => {
     expect(fs.readFileSync(collidingPath, 'utf8')).toContain('# Weekly Sync')
   })
 
+  test('command palette type creation handles the built-in Note type without an unhandled write', async ({ page }) => {
+    const defaultNoteTypePath = writeFixtureNote(
+      tempVaultDir,
+      'note.md',
+      '---\ntype: Type\n---\n# Note\n',
+    )
+
+    await openFixtureVaultDesktopHarness(page, tempVaultDir)
+    await openCommandPalette(page)
+    await page.locator('input[placeholder="Type a command..."]').fill('new type')
+    await page.keyboard.press('Enter')
+
+    const dialog = page.getByRole('dialog', { name: 'Create New Type' })
+    const typeInput = dialog.getByPlaceholder('e.g. Recipe, Book, Habit...')
+    await expect(dialog.getByText('Create New Type', { exact: true })).toBeVisible()
+    await typeInput.fill('Note')
+    await dialog.getByRole('button', { name: 'Create' }).click()
+
+    await expect(dialog).toBeVisible()
+    await expect(toast(page)).toContainText('Type "Note" already exists')
+    expect(fs.readFileSync(defaultNoteTypePath, 'utf8')).toContain('# Note')
+  })
+
   test('unicode type creation ignores an unrelated untitled draft filename', async ({ page }) => {
     const untitledPath = writeFixtureNote(
       tempVaultDir,

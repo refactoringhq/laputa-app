@@ -224,6 +224,26 @@ export function persistNewNote(path: string, content: string): Promise<void> {
   return invoke<void>('create_note_content', { path, content }).then(() => {})
 }
 
+async function typeTargetExistsOnDisk(path: string): Promise<boolean> {
+  if (!isTauri()) return false
+
+  try {
+    await invoke<string>('get_note_content', { path })
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function findTypeTargetCollision(resolved: ResolvedEntry): Promise<string | null> {
+  if (!await typeTargetExistsOnDisk(resolved.entry.path)) return null
+  return buildCreationCollisionMessage({
+    noun: 'type',
+    title: resolved.entry.title,
+    path: resolved.entry.path,
+  })
+}
+
 // Rapid Cmd+N bursts can outpace the note-list render path on desktop. Keep
 // the first create immediate, then serialize the rest so each new note settles
 // before the next one is opened.
@@ -329,6 +349,12 @@ async function createTypeFromName({
     return false
   }
 
+  const collisionMessage = await findTypeTargetCollision(plan.resolved)
+  if (collisionMessage) {
+    setToastMessage(collisionMessage)
+    return false
+  }
+
   try {
     await persistResolvedEntry(plan.resolved)
     trackEvent('type_created')
@@ -351,6 +377,12 @@ async function createTypeSilently({
   if (plan.status === 'blocked') {
     setToastMessage(plan.message)
     throw new Error(plan.message)
+  }
+
+  const collisionMessage = await findTypeTargetCollision(plan.resolved)
+  if (collisionMessage) {
+    setToastMessage(collisionMessage)
+    throw new Error(collisionMessage)
   }
 
   try {

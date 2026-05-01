@@ -106,11 +106,11 @@ describe('useNoteActions hook', () => {
       expectedType: 'Type',
       expectedPathFragment: 'recipe.md',
     },
-  ])('$name creates the expected entry', ({ run, expectedTitle, expectedType, expectedPathFragment }) => {
+  ])('$name creates the expected entry', async ({ run, expectedTitle, expectedType, expectedPathFragment }) => {
     const { result } = renderActions()
 
-    act(() => {
-      run(result)
+    await act(async () => {
+      await run(result)
     })
 
     expect(addEntry).toHaveBeenCalledTimes(1)
