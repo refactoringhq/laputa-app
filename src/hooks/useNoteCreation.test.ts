@@ -454,6 +454,38 @@ describe('useNoteCreation hook', () => {
     expect(addEntry.mock.calls[0][0].title).toBe('Recipe')
   })
 
+  it('handleCreateType persists type files under Windows verbatim vault roots', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValueOnce(undefined)
+    const onTypeStateChanged = vi.fn()
+    const windowsVaultPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria`
+    const createdPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria/recipe.md`
+    const { result } = renderHook(() => useNoteCreation({
+      ...makeConfig(),
+      vaultPath: windowsVaultPath,
+      onTypeStateChanged,
+    }, tabDeps))
+
+    let created = false
+    await act(async () => {
+      created = await result.current.handleCreateType('Recipe')
+    })
+
+    expect(created).toBe(true)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: createdPath,
+      content: '---\ntype: Type\n---\n\n# Recipe\n',
+    })
+    expect(openTabWithContent).toHaveBeenCalledWith(expect.objectContaining({
+      path: createdPath,
+      filename: 'recipe.md',
+      title: 'Recipe',
+      isA: 'Type',
+    }), expect.stringContaining('type: Type'))
+    expect(onTypeStateChanged).toHaveBeenCalledOnce()
+    expect(setToastMessage).not.toHaveBeenCalled()
+  })
+
   it('handleCreateType blocks when the target type file already exists', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
     vi.mocked(invoke).mockRejectedValueOnce(new Error('File already exists: /test/vault/briefing.md'))

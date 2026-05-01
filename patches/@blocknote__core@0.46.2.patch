@@ -9,7 +9,17 @@
              n.updateBlock(t.id, { props: { language: d } });
            };
            i.addEventListener("change", l), s = () => i.removeEventListener("change", l);
-@@ -2639,7 +2641,7 @@
+@@ -2621,6 +2623,9 @@
+         this.state.referencePos = o.getBoundingClientRect().toJSON(), this.emitUpdate(this.pluginState.triggerCharacter);
+       }
+     });
++    M(this, "hideMenu", (t) => {
++      this.state && (this.state.show = !1, this.emitUpdate(t));
++    });
+     M(this, "closeMenu", () => {
+       this.editor.transact((t) => t.setMeta(B, null));
+     });
+@@ -2634,7 +2639,7 @@
      this.editor = t, this.pluginState = void 0, this.emitUpdate = (a) => {
        var s;
        if (!this.state)
@@ -18,14 +28,12 @@
        n(a, {
          ...this.state,
          ignoreQueryLength: (s = this.pluginState) == null ? void 0 : s.ignoreQueryLength
-@@ -2651,17 +2653,23 @@
+@@ -2649,17 +2654,21 @@
      if (!a && !(o !== void 0 && r !== void 0) && !s)
        return;
      if (this.pluginState = s ? o : r, s || !this.editor.isEditable) {
 -      this.state && (this.state.show = !1), this.emitUpdate(this.pluginState.triggerCharacter);
-+      if (!this.state)
-+        return;
-+      this.state.show = !1, this.emitUpdate(this.pluginState.triggerCharacter);
++      this.hideMenu(this.pluginState.triggerCharacter);
        return;
      }
      const c = (l = this.rootEl) == null ? void 0 : l.querySelector(
@@ -33,7 +41,7 @@
      );
 -    this.editor.isEditable && c && (this.state = {
 +    if (!c) {
-+      this.state && (this.state.show = !1, this.emitUpdate(this.pluginState.triggerCharacter));
++      this.hideMenu(this.pluginState.triggerCharacter);
 +      return;
 +    }
 +    this.state = {
@@ -56,19 +64,17 @@
                      r.state.tr.setMeta(B, {
 --- a/src/blocks/Code/block.ts
 +++ b/src/blocks/Code/block.ts
-@@ -132,7 +132,11 @@
+@@ -133,6 +133,10 @@
          if (editor.isEditable) {
            const handleLanguageChange = (event: Event) => {
              const language = (event.target as HTMLSelectElement).value;
--
 +
 +            if (!editor.getBlock(block.id)) {
 +              return;
 +            }
-+
+ 
              editor.updateBlock(block.id, { props: { language } });
            };
-           select.addEventListener("change", handleLanguageChange);
 --- a/src/editor/managers/ExtensionManager/extensions.ts
 +++ b/src/editor/managers/ExtensionManager/extensions.ts
 @@ -84,7 +84,10 @@
@@ -108,7 +114,7 @@
      }),
      ...Object.values(o.schema.styleSpecs).map((n) => n.implementation.mark.configure({
        editor: o
-@@ -2112,7 +2115,7 @@
+@@ -2112,7 +2117,7 @@
      ),
      Do(o)
    ];
@@ -119,14 +125,48 @@
    const t = [
 --- a/src/extensions/SideMenu/SideMenu.ts
 +++ b/src/extensions/SideMenu/SideMenu.ts
-@@ -230,38 +230,49 @@
-     // Doesn't update if the menu is already open and the mouse cursor is still hovering the same block.
-     if (
-       this.state?.show &&
-       this.hoveredBlock?.hasAttribute("data-id") &&
-       this.hoveredBlock?.getAttribute("data-id") === block.id
-     ) {
+@@ -194,6 +194,15 @@
+     this.emitUpdate(this.state);
+   };
+ 
++  private hideMenu = () => {
++    if (!this.state?.show) {
++      return;
++    }
++
++    this.state.show = false;
++    this.updateState(this.state);
++  };
++
+   updateStateFromMousePos = () => {
+     if (this.menuFrozen || !this.mousePos) {
        return;
+@@ -208,10 +217,7 @@
+       closestEditor?.element !== this.pmView.dom ||
+       closestEditor.distance > DISTANCE_TO_CONSIDER_EDITOR_BOUNDS
+     ) {
+-      if (this.state?.show) {
+-        this.state.show = false;
+-        this.updateState(this.state);
+-      }
++      this.hideMenu();
+       return;
+     }
+ 
+@@ -219,11 +225,7 @@
+ 
+     // Closes the menu if the mouse cursor is beyond the editor vertically.
+     if (!block || !this.editor.isEditable) {
+-      if (this.state?.show) {
+-        this.state.show = false;
+-        this.updateState(this.state);
+-      }
+-
++      this.hideMenu();
+       return;
+     }
+ 
+@@ -237,6 +239,15 @@
      }
  
      this.hoveredBlock = block.node;
@@ -136,31 +176,13 @@
 +      : undefined;
 +
 +    if (!hoveredEditorBlock) {
-+      if (this.state?.show) {
-+        this.state.show = false;
-+        this.updateState(this.state);
-+      }
-+
++      this.hideMenu();
 +      return;
 +    }
  
      // Shows or updates elements.
      if (this.editor.isEditable) {
-       const blockContentBoundingBox = block.node.getBoundingClientRect();
-       const column = block.node.closest("[data-node-type=column]");
-       this.state = {
-         show: true,
-         referencePos: new DOMRect(
-           column
-             ? // We take the first child as column elements have some default
-               // padding. This is a little weird since this child element will
-               // be the first block, but since it's always non-nested and we
-               // only take the x coordinate, it's ok.
-               column.firstElementChild!.getBoundingClientRect().x
-             : (
-                 this.pmView.dom.firstChild as HTMLElement
-               ).getBoundingClientRect().x,
-           blockContentBoundingBox.y,
+@@ -258,9 +269,7 @@
            blockContentBoundingBox.width,
            blockContentBoundingBox.height,
          ),
@@ -171,7 +193,6 @@
        };
        this.updateState(this.state);
      }
-   };
 --- a/src/extensions/SuggestionMenu/SuggestionMenu.ts
 +++ b/src/extensions/SuggestionMenu/SuggestionMenu.ts
 @@ -32,7 +32,7 @@
@@ -183,24 +204,36 @@
        }
  
        emitUpdate(menuName, {
-@@ -83,29 +83,38 @@
+@@ -64,6 +64,15 @@
+     }
+   };
+ 
++  private hideMenu = (menuName: string) => {
++    if (!this.state) {
++      return;
++    }
++
++    this.state.show = false;
++    this.emitUpdate(menuName);
++  };
++
+   update(view: EditorView, prevState: EditorState) {
+     const prev: SuggestionPluginState =
+       suggestionMenuPluginKey.getState(prevState);
+@@ -84,11 +93,7 @@
      this.pluginState = stopped ? prev : next;
  
      if (stopped || !this.editor.isEditable) {
 -      if (this.state) {
 -        this.state.show = false;
 -      }
-+      if (!this.state) {
-+        return;
-+      }
-+
-+      this.state.show = false;
-       this.emitUpdate(this.pluginState!.triggerCharacter);
- 
+-      this.emitUpdate(this.pluginState!.triggerCharacter);
+-
++      this.hideMenu(this.pluginState!.triggerCharacter);
        return;
      }
  
-     const decorationNode = this.rootEl?.querySelector(
+@@ -96,17 +101,20 @@
        `[data-decoration-id="${this.pluginState!.decorationId}"]`,
      );
  
@@ -215,11 +248,7 @@
 -
 -      this.emitUpdate(this.pluginState!.triggerCharacter!);
 +    if (!decorationNode) {
-+      if (this.state) {
-+        this.state.show = false;
-+        this.emitUpdate(this.pluginState!.triggerCharacter!);
-+      }
-+
++      this.hideMenu(this.pluginState!.triggerCharacter!);
 +      return;
      }
 +
@@ -237,28 +266,104 @@
    destroy() {
 --- a/src/extensions/TableHandles/TableHandles.ts
 +++ b/src/extensions/TableHandles/TableHandles.ts
-@@ -572,9 +572,14 @@
+@@ -187,6 +187,22 @@
+     );
+   }
+ 
++  private hideHandles = ({ resetCell = false } = {}) => {
++    if (!this.state?.show) {
++      return;
++    }
++
++    this.state.show = false;
++    this.state.showAddOrRemoveRowsButton = false;
++    this.state.showAddOrRemoveColumnsButton = false;
++    if (resetCell) {
++      this.state.rowIndex = undefined;
++      this.state.colIndex = undefined;
++      this.state.referencePosCell = undefined;
++    }
++    this.emitUpdate();
++  };
++
+   viewMousedownHandler = () => {
+     this.mouseState = "down";
+   };
+@@ -222,22 +238,12 @@
+       // hide draghandles when selecting text as they could be in the way of the user
+       this.mouseState = "selecting";
+ 
+-      if (this.state?.show) {
+-        this.state.show = false;
+-        this.state.showAddOrRemoveRowsButton = false;
+-        this.state.showAddOrRemoveColumnsButton = false;
+-        this.emitUpdate();
+-      }
++      this.hideHandles();
+       return;
+     }
+ 
+     if (!target || !this.editor.isEditable) {
+-      if (this.state?.show) {
+-        this.state.show = false;
+-        this.state.showAddOrRemoveRowsButton = false;
+-        this.state.showAddOrRemoveColumnsButton = false;
+-        this.emitUpdate();
+-      }
++      this.hideHandles();
+       return;
+     }
+ 
+@@ -541,11 +547,7 @@
+       // because yjs replaces the element when for example you change the color via the side menu
+       !this.tableElement?.isConnected
+     ) {
+-      this.state.show = false;
+-      this.state.showAddOrRemoveRowsButton = false;
+-      this.state.showAddOrRemoveColumnsButton = false;
+-      this.emitUpdate();
+-
++      this.hideHandles();
+       return;
+     }
+ 
+@@ -572,9 +574,8 @@
      const tableBody = this.tableElement!.querySelector("tbody");
  
      if (!tableBody) {
 -      throw new Error(
 -        "Table block does not contain a 'tbody' HTML element. This should never happen.",
 -      );
-+      this.state.show = false;
-+      this.state.showAddOrRemoveRowsButton = false;
-+      this.state.showAddOrRemoveColumnsButton = false;
-+      this.state.rowIndex = undefined;
-+      this.state.colIndex = undefined;
-+      this.state.referencePosCell = undefined;
-+      this.emitUpdate();
++      this.hideHandles({ resetCell: true });
 +      return;
      }
  
      if (
 --- a/dist/TrailingNode-CxM966vN.js
 +++ b/dist/TrailingNode-CxM966vN.js
-@@ -1200,25 +1200,31 @@
-         (r = this.state) != null && r.show && (this.state.show = !1, this.updateState(this.state));
+@@ -1182,6 +1182,10 @@
+     b(this, "isDragOrigin", !1);
+     b(this, "updateState", (e) => {
+       this.state = e, this.emitUpdate(this.state);
++    });
++    b(this, "hideMenu", () => {
++      var e;
++      (e = this.state) != null && e.show && (this.state.show = !1, this.updateState(this.state));
+     });
+     b(this, "updateStateFromMousePos", () => {
+       var o, r, s, i, a;
+@@ -1192,33 +1196,39 @@
+         clientY: this.mousePos.y
+       });
+       if ((e == null ? void 0 : e.element) !== this.pmView.dom || e.distance > se) {
+-        (o = this.state) != null && o.show && (this.state.show = !1, this.updateState(this.state));
++        this.hideMenu();
+         return;
+       }
+       const t = Ht(this.mousePos, this.pmView);
+       if (!t || !this.editor.isEditable) {
+-        (r = this.state) != null && r.show && (this.state.show = !1, this.updateState(this.state));
++        this.hideMenu();
          return;
        }
 -      if (!((s = this.state) != null && s.show && ((i = this.hoveredBlock) != null && i.hasAttribute("data-id")) && ((a = this.hoveredBlock) == null ? void 0 : a.getAttribute("data-id")) === t.id) && (this.hoveredBlock = t.node, this.editor.isEditable)) {
@@ -268,7 +373,7 @@
 +      this.hoveredBlock = t.node;
 +      const c = this.hoveredBlock.getAttribute("data-id"), l = c ? this.editor.getBlock(c) : void 0;
 +      if (!l) {
-+        (i = this.state) != null && i.show && (this.state.show = !1, this.updateState(this.state));
++        this.hideMenu();
 +        return;
 +      }
 +      if (this.editor.isEditable) {
@@ -299,7 +404,44 @@
          }, this.updateState(this.state);
        }
      });
-@@ -1746,10 +1746,10 @@
+@@ -1557,6 +1567,13 @@
+     b(this, "menuFrozen", !1);
+     b(this, "mouseState", "up");
+     b(this, "prevWasEditable", null);
++    b(this, "hideHandles", (e = {}) => {
++      var t;
++      const { resetCell: o = !1 } = e;
++      if (!((t = this.state) != null && t.show))
++        return;
++      this.state.show = !1, this.state.showAddOrRemoveRowsButton = !1, this.state.showAddOrRemoveColumnsButton = !1, o && (this.state.rowIndex = void 0, this.state.colIndex = void 0, this.state.referencePosCell = void 0), this.emitUpdate();
++    });
+     b(this, "viewMousedownHandler", () => {
+       this.mouseState = "down";
+     });
+@@ -1569,11 +1586,11 @@
+         return;
+       const t = _t(e.target);
+       if ((t == null ? void 0 : t.type) === "cell" && this.mouseState === "down" && !((l = this.state) != null && l.draggingState)) {
+-        this.mouseState = "selecting", (u = this.state) != null && u.show && (this.state.show = !1, this.state.showAddOrRemoveRowsButton = !1, this.state.showAddOrRemoveColumnsButton = !1, this.emitUpdate());
++        this.mouseState = "selecting", this.hideHandles();
+         return;
+       }
+       if (!t || !this.editor.isEditable) {
+-        (h = this.state) != null && h.show && (this.state.show = !1, this.state.showAddOrRemoveRowsButton = !1, this.state.showAddOrRemoveColumnsButton = !1, this.emitUpdate());
++        this.hideHandles();
+         return;
+       }
+       if (!t.tbodyNode)
+@@ -1738,7 +1755,7 @@
+     if (this.state.block = this.editor.getBlock(this.state.block.id), !this.state.block || this.state.block.type !== "table" || // when collaborating, the table element might be replaced and out of date
+     // because yjs replaces the element when for example you change the color via the side menu
+     !((r = this.tableElement) != null && r.isConnected)) {
+-      this.state.show = !1, this.state.showAddOrRemoveRowsButton = !1, this.state.showAddOrRemoveColumnsButton = !1, this.emitUpdate();
++      this.hideHandles();
+       return;
+     }
+     const { height: e, width: t } = Ve(
+@@ -1746,10 +1763,10 @@
      );
      this.state.rowIndex !== void 0 && this.state.colIndex !== void 0 && (this.state.rowIndex >= e && (this.state.rowIndex = e - 1), this.state.colIndex >= t && (this.state.colIndex = t - 1));
      const o = this.tableElement.querySelector("tbody");
@@ -308,7 +450,7 @@
 -        "Table block does not contain a 'tbody' HTML element. This should never happen."
 -      );
 +    if (!o) {
-+      this.state.show = !1, this.state.showAddOrRemoveRowsButton = !1, this.state.showAddOrRemoveColumnsButton = !1, this.state.rowIndex = void 0, this.state.colIndex = void 0, this.state.referencePosCell = void 0, this.emitUpdate();
++      this.hideHandles({ resetCell: !0 });
 +      return;
 +    }
      if (this.state.rowIndex !== void 0 && this.state.colIndex !== void 0) {
