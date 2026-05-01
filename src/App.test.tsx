@@ -372,9 +372,9 @@ vi.mock('@blocknote/core/extensions', () => ({
 vi.mock('@blocknote/react', () => ({
   createReactBlockSpec: () => () => ({}),
   createReactInlineContentSpec: () => ({ render: () => null }),
-  BlockNoteViewRaw: ({ children }: { children?: ReactNode }) => (
-    <div data-testid="blocknote-view">
-      <div contentEditable suppressContentEditableWarning data-testid="mock-editor">
+  BlockNoteViewRaw: ({ children, editable }: { children?: ReactNode; editable?: boolean }) => (
+    <div data-testid="blocknote-view" data-editable={editable !== false ? 'true' : 'false'}>
+      <div contentEditable={editable !== false} suppressContentEditableWarning data-testid="mock-editor">
         mock editor
       </div>
       {children}
@@ -578,6 +578,7 @@ describe('App', () => {
     await waitFor(() => expect(getNoteContent).toHaveBeenCalled())
     expect(getNoteContent).toHaveBeenCalledWith({ path: '/vault/project/test.md', vaultPath: '/vault' })
     await waitFor(() => expect(window.__laputaTest?.activeTabPath).toBe('/vault/project/test.md'))
+    expect(screen.getByTestId('blocknote-view')).toHaveAttribute('data-editable', 'true')
     expect(listVault).not.toHaveBeenCalled()
   })
 
