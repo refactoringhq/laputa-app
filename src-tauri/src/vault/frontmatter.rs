@@ -182,6 +182,22 @@ fn sanitize_value(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
+fn type_key_priority(key: &str) -> u8 {
+    match key {
+        "type" => 0,
+        "Type" => 1,
+        "TYPE" => 2,
+        _ => 3,
+    }
+}
+
+fn find_type_value(data: &HashMap<String, serde_json::Value>) -> Option<&serde_json::Value> {
+    data.iter()
+        .filter(|(key, _)| key.eq_ignore_ascii_case("type"))
+        .min_by_key(|(key, _)| type_key_priority(key))
+        .map(|(_, value)| value)
+}
+
 /// Parse frontmatter from raw YAML data extracted by gray_matter.
 fn parse_frontmatter(data: &HashMap<String, serde_json::Value>) -> Frontmatter {
     static KNOWN_KEYS: &[&str] = &[
@@ -216,11 +232,19 @@ fn parse_frontmatter(data: &HashMap<String, serde_json::Value>) -> Frontmatter {
         "_favorite_index",
         "_list_properties_display",
     ];
-    let filtered: serde_json::Map<String, serde_json::Value> = data
-        .iter()
-        .filter(|(k, _)| KNOWN_KEYS.contains(&k.as_str()))
-        .map(|(k, v)| (k.clone(), sanitize_value(v)))
-        .collect();
+    let mut filtered = serde_json::Map::new();
+
+    if let Some(value) = find_type_value(data) {
+        filtered.insert("type".to_string(), sanitize_value(value));
+    }
+
+    for (key, value) in data {
+        if key.eq_ignore_ascii_case("type") || !KNOWN_KEYS.contains(&key.as_str()) {
+            continue;
+        }
+        filtered.insert(key.clone(), sanitize_value(value));
+    }
+
     let value = serde_json::Value::Object(filtered);
     serde_json::from_value(value).unwrap_or_default()
 }

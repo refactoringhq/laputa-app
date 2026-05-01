@@ -119,6 +119,16 @@ describe('mockFrontmatterHelpers', () => {
       const result = updateMockFrontmatter('/test.md', 'status', null)
       expect(result).toContain('status: null')
     })
+
+    it('canonicalizes Type to lowercase type', () => {
+      window.__mockContent = {
+        '/test.md': '---\nType: Note\n---\n\n# Hello\n',
+      }
+
+      const result = updateMockFrontmatter('/test.md', 'type', 'Project')
+      expect(result).toContain('type: Project')
+      expect(result).not.toContain('Type: Note')
+    })
   })
 
   describe('deleteMockFrontmatterProperty', () => {
@@ -166,6 +176,16 @@ describe('mockFrontmatterHelpers', () => {
 
       const result = deleteMockFrontmatterProperty('/test.md', 'status')
       expect(result).toBe('')
+    })
+
+    it('deletes Type through lowercase type', () => {
+      window.__mockContent = {
+        '/test.md': '---\nType: Note\nstatus: Active\n---\n\n# Hello\n',
+      }
+
+      const result = deleteMockFrontmatterProperty('/test.md', 'type')
+      expect(result).not.toContain('Type: Note')
+      expect(result).toContain('status: Active')
     })
   })
 })

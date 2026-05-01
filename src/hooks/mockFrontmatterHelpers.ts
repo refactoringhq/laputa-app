@@ -1,33 +1,50 @@
 import type { FrontmatterValue } from '../components/Inspector'
 
-function formatYamlValue(value: FrontmatterValue): string {
+type VaultPath = string
+type MarkdownContent = string
+type FrontmatterKey = string
+type YamlKey = string
+type YamlValue = string
+type YamlLine = string
+type ReplacementLine = string | null
+
+function isTypeKey(key: FrontmatterKey): boolean {
+  return key.trim().toLowerCase() === 'type'
+}
+
+function canonicalWriteKey(key: FrontmatterKey): FrontmatterKey {
+  return isTypeKey(key) ? 'type' : key
+}
+
+function formatYamlValue(value: FrontmatterValue): YamlValue {
   if (Array.isArray(value)) return '\n' + value.map(v => `  - "${v}"`).join('\n')
   if (typeof value === 'boolean') return value ? 'true' : 'false'
   if (value === null) return 'null'
   return String(value)
 }
 
-function formatYamlKey(key: string): string {
+function formatYamlKey(key: FrontmatterKey): YamlKey {
   return key.includes(' ') ? `"${key}"` : key
 }
 
-function buildKeyPattern(key: string): RegExp {
-  return new RegExp(`^["']?${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?\\s*:`, 'm')
+function buildKeyPattern(key: FrontmatterKey): RegExp {
+  const flags = isTypeKey(key) ? 'im' : 'm'
+  return new RegExp(`^["']?${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?\\s*:`, flags)
 }
 
-function parseFrontmatter(content: string): { fm: string; rest: string } | null {
+function parseFrontmatter(content: MarkdownContent): { fm: MarkdownContent; rest: MarkdownContent } | null {
   if (!content.startsWith('---\n')) return null
   const fmEnd = content.indexOf('\n---', 4)
   if (fmEnd === -1) return null
   return { fm: content.slice(4, fmEnd), rest: content.slice(fmEnd + 4) }
 }
 
-function formatKeyValue(yamlKey: string, yamlValue: string, isArray: boolean): string {
+function formatKeyValue(yamlKey: YamlKey, yamlValue: YamlValue, isArray: boolean): YamlLine {
   return isArray ? `${yamlKey}:${yamlValue}` : `${yamlKey}: ${yamlValue}`
 }
 
-function processKeyInLines(lines: string[], keyPattern: RegExp, replacement: string | null): string[] {
-  const newLines: string[] = []
+function processKeyInLines(lines: YamlLine[], keyPattern: RegExp, replacement: ReplacementLine): YamlLine[] {
+  const newLines: YamlLine[] = []
   let i = 0
   while (i < lines.length) {
     if (keyPattern.test(lines[i])) {
@@ -42,9 +59,10 @@ function processKeyInLines(lines: string[], keyPattern: RegExp, replacement: str
   return newLines
 }
 
-export function updateMockFrontmatter(path: string, key: string, value: FrontmatterValue): string {
+export function updateMockFrontmatter(path: VaultPath, key: FrontmatterKey, value: FrontmatterValue): MarkdownContent {
   const content = window.__mockContent?.[path] || ''
-  const yamlKey = formatYamlKey(key)
+  const writeKey = canonicalWriteKey(key)
+  const yamlKey = formatYamlKey(writeKey)
   const yamlValue = formatYamlValue(value)
   const isArray = Array.isArray(value)
 
@@ -64,7 +82,7 @@ export function updateMockFrontmatter(path: string, key: string, value: Frontmat
   return `---\n${fm}\n${formatKeyValue(yamlKey, yamlValue, isArray)}\n---${rest}`
 }
 
-export function deleteMockFrontmatterProperty(path: string, key: string): string {
+export function deleteMockFrontmatterProperty(path: VaultPath, key: FrontmatterKey): MarkdownContent {
   const content = window.__mockContent?.[path] || ''
   const parsed = parseFrontmatter(content)
   if (!parsed) return content

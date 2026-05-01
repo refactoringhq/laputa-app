@@ -190,3 +190,34 @@ fn test_update_frontmatter_canonicalizes_system_metadata_keys() {
         assert_updated_content(case);
     }
 }
+
+#[test]
+fn test_update_frontmatter_canonicalizes_type_key_case() {
+    let cases = [
+        UpdateCase {
+            content: "---\nType: Note\n---\n# Test\n",
+            key: "type",
+            value: Some(FrontmatterValue::String("Project".to_string())),
+            expected_present: &["type: Project"],
+            expected_absent: &["Type: Note"],
+        },
+        UpdateCase {
+            content: "---\nTYPE: Note\n---\n# Test\n",
+            key: "Type",
+            value: Some(FrontmatterValue::String("Person".to_string())),
+            expected_present: &["type: Person"],
+            expected_absent: &["TYPE: Note"],
+        },
+        UpdateCase {
+            content: "---\nType: Note\nstatus: Active\n---\n# Test\n",
+            key: "type",
+            value: None,
+            expected_present: &["status: Active", "# Test"],
+            expected_absent: &["Type: Note", "\ntype:"],
+        },
+    ];
+
+    for case in cases {
+        assert_updated_content(case);
+    }
+}
