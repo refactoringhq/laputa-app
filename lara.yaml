@@ -21,6 +21,7 @@ locales:
     - zh-TW
     - ja-JP
     - ko-KR
+    - pl-PL
 
 files:
   json:

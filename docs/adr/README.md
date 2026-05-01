@@ -156,3 +156,4 @@ proposed → active → superseded
 | [0101](0101-categorical-product-analytics-events.md) | Categorical product analytics events | active |
 | [0102](0102-low-end-safe-autosave-idle-window.md) | Low-end-safe autosave idle window | active |
 | [0103](0103-adapter-specific-ai-permission-semantics.md) | Adapter-specific AI permission semantics | active |
+| [0104](0104-tauri-frontend-readiness-watchdog.md) | Tauri frontend readiness watchdog | active |

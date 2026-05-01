@@ -19,10 +19,25 @@ async function blockOuterForText(page: Page, text: string): Promise<Locator> {
   return textNode.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " bn-block-outer ")][1]')
 }
 
-async function visibleDragHandle(page: Page, block: Locator): Promise<Locator> {
+async function visibleLeftBlockHandle(page: Page, block: Locator): Promise<Locator> {
   await block.hover()
-  const handle = page.locator('.bn-side-menu [draggable="true"]').first()
+
+  const buttons = await page.locator('.bn-side-menu button').all()
+  expect(buttons.length).toBeGreaterThan(0)
+
+  let handle = buttons[0]
+  let leftEdge = Number.POSITIVE_INFINITY
+  for (const button of buttons) {
+    const box = await button.boundingBox()
+    expect(box).not.toBeNull()
+    if (box!.x < leftEdge) {
+      leftEdge = box!.x
+      handle = button
+    }
+  }
+
   await expect(handle).toBeVisible({ timeout: 5_000 })
+  await expect(handle).toHaveAttribute('draggable', 'true')
   return handle
 }
 
@@ -59,7 +74,7 @@ test('dragging the left block handle reorders editor blocks', async ({ page }) =
 
   await expect.poll(async () => editor.textContent()).toMatch(/Alpha Project[\s\S]*This is a test project[\s\S]*Notes/)
 
-  const handle = await visibleDragHandle(page, notesHeading)
+  const handle = await visibleLeftBlockHandle(page, notesHeading)
   await dragHandleToBlock(page, handle, paragraph)
 
   await expect.poll(async () => editor.textContent()).toMatch(/Alpha Project[\s\S]*Notes[\s\S]*This is a test project/)

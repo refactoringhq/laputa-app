@@ -131,7 +131,7 @@ describe('useVaultBridge', () => {
     expect(replaceActiveTab).toHaveBeenCalledWith(fresh)
   })
 
-  it('handleAgentFileModified still refreshes vault-derived UI for other notes', async () => {
+  it('handleAgentFileModified keeps the active tab mounted for other notes', async () => {
     const active = makeEntry('/vault/other.md', 'Other')
     reloadVault.mockResolvedValue([active])
     const { result } = renderBridge([], '/vault/other.md')
@@ -140,7 +140,7 @@ describe('useVaultBridge', () => {
 
     expectVaultDerivedStateReloaded({ reloadVault, reloadFolders, reloadViews })
     expect(closeAllTabs).not.toHaveBeenCalled()
-    expect(replaceActiveTab).toHaveBeenCalledWith(active)
+    expect(replaceActiveTab).not.toHaveBeenCalled()
   })
 
   it('keeps unsaved active note content intact while reloading agent changes', async () => {
@@ -156,7 +156,7 @@ describe('useVaultBridge', () => {
     expect(replaceActiveTab).not.toHaveBeenCalled()
   })
 
-  it('handleAgentVaultChanged reloads vault-derived state and refreshes the active note when safe', async () => {
+  it('handleAgentVaultChanged reloads vault-derived state without remounting the active note', async () => {
     const fresh = makeEntry('/vault/active.md', 'Fresh active')
     reloadVault.mockResolvedValue([fresh])
     const { result } = renderBridge([], '/vault/active.md')
@@ -165,6 +165,6 @@ describe('useVaultBridge', () => {
 
     expectVaultDerivedStateReloaded({ reloadVault, reloadFolders, reloadViews })
     expect(closeAllTabs).not.toHaveBeenCalled()
-    expect(replaceActiveTab).toHaveBeenCalledWith(fresh)
+    expect(replaceActiveTab).not.toHaveBeenCalled()
   })
 })

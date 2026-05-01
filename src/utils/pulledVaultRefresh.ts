@@ -64,14 +64,12 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
     closeAllTabs()
     return entries
   }
+  if (!didPullUpdateActiveNote(updatedFiles, vaultPath, latestActiveTabPath)) return entries
 
   // Native BlockNote can keep rendering the previous document after a pull that
   // changes the active file in place. Dropping the tab first forces a full
   // reopen for that specific case without affecting unrelated pull updates.
-  if (didPullUpdateActiveNote(updatedFiles, vaultPath, latestActiveTabPath)) {
-    closeAllTabs()
-  }
-
+  closeAllTabs()
   await replaceActiveTab(refreshedEntry)
   return entries
 }

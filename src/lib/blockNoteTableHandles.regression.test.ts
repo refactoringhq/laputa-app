@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { TableHandlesView } from '../../node_modules/@blocknote/core/src/extensions/TableHandles/TableHandles'
+import {
+  TableHandlesExtension,
+  TableHandlesView,
+} from '../../node_modules/@blocknote/core/src/extensions/TableHandles/TableHandles'
 
 function createTableBlock() {
   return {
@@ -13,6 +16,34 @@ function createTableBlock() {
       ],
     },
   }
+}
+
+function mountTableHandlesExtension() {
+  const editorRoot = document.createElement('div')
+  document.body.appendChild(editorRoot)
+
+  const editor = {
+    headless: true,
+    isEditable: true,
+    prosemirrorView: {
+      root: document,
+    },
+    transact: vi.fn(),
+  }
+
+  const extension = TableHandlesExtension()({ editor: editor as never })
+  const plugin = extension.prosemirrorPlugins?.[0]
+
+  if (!plugin?.spec.view) {
+    throw new Error('TableHandlesExtension did not register a plugin view')
+  }
+
+  const view = plugin.spec.view({
+    dom: editorRoot,
+    root: document,
+  } as never) as TableHandlesView
+
+  return { editor, extension, view }
 }
 
 describe('BlockNote table handles regression', () => {
@@ -56,6 +87,83 @@ describe('BlockNote table handles regression', () => {
     expect(view.state?.show).toBe(false)
     expect(view.state?.showAddOrRemoveRowsButton).toBe(false)
     expect(view.state?.showAddOrRemoveColumnsButton).toBe(false)
+    expect(emitUpdate).toHaveBeenCalled()
+
+    view.destroy()
+  })
+
+  it('ignores stale table drag starts instead of throwing when hover state is unavailable', () => {
+    const { editor, extension, view } = mountTableHandlesExtension()
+
+    expect(() =>
+      extension.colDragStart({ dataTransfer: null, clientX: 10 }),
+    ).not.toThrow()
+    expect(() =>
+      extension.rowDragStart({ dataTransfer: null, clientY: 10 }),
+    ).not.toThrow()
+    expect(editor.transact).not.toHaveBeenCalled()
+
+    view.destroy()
+  })
+
+  it('ignores stale table drag end events instead of throwing after state disappears', () => {
+    const { extension, view } = mountTableHandlesExtension()
+
+    expect(() => extension.dragEnd()).not.toThrow()
+
+    view.destroy()
+  })
+
+  it('cancels stale table drops instead of throwing when no hovered row or column is available', () => {
+    const block = createTableBlock()
+    const editorRoot = document.createElement('div')
+    document.body.appendChild(editorRoot)
+
+    const editor = {
+      getBlock: vi.fn(() => block),
+    }
+    const emitUpdate = vi.fn()
+
+    const view = new TableHandlesView(
+      editor as never,
+      {
+        dom: editorRoot,
+        root: document,
+      } as never,
+      emitUpdate,
+    )
+
+    view.state = {
+      block,
+      show: true,
+      showAddOrRemoveRowsButton: true,
+      showAddOrRemoveColumnsButton: true,
+      referencePosTable: {
+        left: 0,
+        top: 0,
+        right: 100,
+        bottom: 100,
+      },
+      rowIndex: undefined,
+      colIndex: undefined,
+      draggingState: {
+        draggedCellOrientation: 'row',
+        originalIndex: 0,
+        mousePos: 10,
+      },
+      widgetContainer: undefined,
+    } as never
+
+    const dropEvent = {
+      preventDefault: vi.fn(),
+    }
+
+    expect(() => view.dropHandler(dropEvent as never)).not.toThrow()
+    expect(dropEvent.preventDefault).toHaveBeenCalled()
+    expect(view.state?.draggingState).toBeUndefined()
+    expect(view.state?.show).toBe(false)
+    expect(view.state?.rowIndex).toBeUndefined()
+    expect(view.state?.colIndex).toBeUndefined()
     expect(emitUpdate).toHaveBeenCalled()
 
     view.destroy()

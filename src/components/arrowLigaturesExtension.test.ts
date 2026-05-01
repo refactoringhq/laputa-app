@@ -6,6 +6,9 @@ function createFixture() {
   const transaction = { insertText: vi.fn(() => transaction) }
   const paragraphNode = { type: { name: 'paragraph', spec: {} } }
   const view = {
+    dom: {
+      isConnected: true,
+    },
     dispatch: vi.fn(),
     state: {
       doc: {
@@ -148,5 +151,18 @@ describe('createArrowLigaturesExtension', () => {
     expect(event.preventDefault).not.toHaveBeenCalled()
     expect(fixture.transaction.insertText).not.toHaveBeenCalled()
     expect(fixture.view.dispatch).not.toHaveBeenCalled()
+  })
+
+  it('falls through when a reload leaves the ProseMirror view stale during beforeinput', () => {
+    const fixture = createFixture()
+    fixture.mount()
+    Object.defineProperty(fixture.view, 'state', {
+      configurable: true,
+      get: () => {
+        throw new Error('stale editor view')
+      },
+    })
+
+    expect(() => fixture.fireInput()).not.toThrow()
   })
 })

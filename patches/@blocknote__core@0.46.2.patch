@@ -1,358 +1,19 @@
---- a/dist/defaultBlocks-DE5GNdJH.js
-+++ b/dist/defaultBlocks-DE5GNdJH.js
-@@ -1120,6 +1120,8 @@
-         ), i.value = t.props.language || e.defaultLanguage || "text", n.isEditable) {
-           const l = (u) => {
-             const d = u.target.value;
-+            if (!n.getBlock(t.id))
-+              return;
-             n.updateBlock(t.id, { props: { language: d } });
-           };
-           i.addEventListener("change", l), s = () => i.removeEventListener("change", l);
-@@ -2621,6 +2623,9 @@
-         this.state.referencePos = o.getBoundingClientRect().toJSON(), this.emitUpdate(this.pluginState.triggerCharacter);
-       }
-     });
-+    M(this, "hideMenu", (t) => {
-+      this.state && (this.state.show = !1, this.emitUpdate(t));
-+    });
-     M(this, "closeMenu", () => {
-       this.editor.transact((t) => t.setMeta(B, null));
-     });
-@@ -2634,7 +2639,7 @@
-     this.editor = t, this.pluginState = void 0, this.emitUpdate = (a) => {
-       var s;
-       if (!this.state)
--        throw new Error("Attempting to update uninitialized suggestions menu");
-+        return;
-       n(a, {
-         ...this.state,
-         ignoreQueryLength: (s = this.pluginState) == null ? void 0 : s.ignoreQueryLength
-@@ -2649,17 +2654,21 @@
-     if (!a && !(o !== void 0 && r !== void 0) && !s)
-       return;
-     if (this.pluginState = s ? o : r, s || !this.editor.isEditable) {
--      this.state && (this.state.show = !1), this.emitUpdate(this.pluginState.triggerCharacter);
-+      this.hideMenu(this.pluginState.triggerCharacter);
-       return;
-     }
-     const c = (l = this.rootEl) == null ? void 0 : l.querySelector(
-       `[data-decoration-id="${this.pluginState.decorationId}"]`
-     );
--    this.editor.isEditable && c && (this.state = {
-+    if (!c) {
-+      this.hideMenu(this.pluginState.triggerCharacter);
-+      return;
-+    }
-+    this.state = {
-       show: !0,
-       referencePos: c.getBoundingClientRect().toJSON(),
-       query: this.pluginState.query
--    }, this.emitUpdate(this.pluginState.triggerCharacter));
-+    }, this.emitUpdate(this.pluginState.triggerCharacter);
-   }
-   destroy() {
-     var t;
-@@ -2761,7 +2770,7 @@
-             if (a === s) {
-               const c = r.state.doc;
-               for (const l of t) {
--                const u = l.length > 1 ? c.textBetween(a - l.length, a) + i : i;
-+                const u = l.length > 1 ? c.textBetween(a - (l.length - 1), a) + i : i;
-                 if (l === u)
-                   return r.dispatch(r.state.tr.insertText(i)), r.dispatch(
-                     r.state.tr.setMeta(B, {
---- a/src/blocks/Code/block.ts
-+++ b/src/blocks/Code/block.ts
-@@ -133,6 +133,10 @@
-         if (editor.isEditable) {
-           const handleLanguageChange = (event: Event) => {
-             const language = (event.target as HTMLSelectElement).value;
-+
-+            if (!editor.getBlock(block.id)) {
-+              return;
-+            }
- 
-             editor.updateBlock(block.id, { props: { language } });
-           };
---- a/src/editor/managers/ExtensionManager/extensions.ts
-+++ b/src/editor/managers/ExtensionManager/extensions.ts
-@@ -84,7 +84,10 @@
-     }).configure({
-       defaultProtocol: DEFAULT_LINK_PROTOCOL,
-       // only call this once if we have multiple editors installed. Or fix https://github.com/ueberdosis/tiptap/issues/5450
--      protocols: LINKIFY_INITIALIZED ? [] : VALID_LINK_PROTOCOLS,
-+      // Tolaria routes editor link clicks through its guarded native opener.
-+      openOnClick: false,
-+      // Tolaria pre-registers BlockNote's non-native protocols before linkify initializes.
-+      protocols: [],
-     }),
-     ...(Object.values(editor.schema.styleSpecs).map((styleSpec) => {
-       return styleSpec.implementation.mark.configure({
---- a/dist/blocknote.js
-+++ b/dist/blocknote.js
-@@ -2037,7 +2037,9 @@
-     ]
-   })
- );
--let fe = !1;
-+const bnLinkifyProtocolFlag = "__tolariaBlockNoteLinkifyProtocolsRegistered";
-+const bnGlobalObject = typeof globalThis > "u" ? void 0 : globalThis;
-+let fe = Boolean(bnGlobalObject && bnGlobalObject[bnLinkifyProtocolFlag]);
- function mn(o, e) {
-   const t = [
-     I.ClipboardTextSerializer,
-@@ -2062,7 +2064,10 @@
-     }).configure({
-       defaultProtocol: Ct,
-       // only call this once if we have multiple editors installed. Or fix https://github.com/ueberdosis/tiptap/issues/5450
--      protocols: fe ? [] : Bt
-+      // Tolaria routes editor link clicks through its guarded native opener.
-+      openOnClick: !1,
-+      // Tolaria pre-registers BlockNote's non-native protocols before linkify initializes.
-+      protocols: []
-     }),
-     ...Object.values(o.schema.styleSpecs).map((n) => n.implementation.mark.configure({
-       editor: o
-@@ -2112,7 +2117,7 @@
-     ),
-     Do(o)
-   ];
--  return fe = !0, t;
-+  return fe = !0, bnGlobalObject && (bnGlobalObject[bnLinkifyProtocolFlag] = !0), t;
- }
- function kn(o, e) {
-   const t = [
---- a/src/extensions/SideMenu/SideMenu.ts
-+++ b/src/extensions/SideMenu/SideMenu.ts
-@@ -194,6 +194,15 @@
-     this.emitUpdate(this.state);
-   };
- 
-+  private hideMenu = () => {
-+    if (!this.state?.show) {
-+      return;
-+    }
-+
-+    this.state.show = false;
-+    this.updateState(this.state);
-+  };
-+
-   updateStateFromMousePos = () => {
-     if (this.menuFrozen || !this.mousePos) {
-       return;
-@@ -208,10 +217,7 @@
-       closestEditor?.element !== this.pmView.dom ||
-       closestEditor.distance > DISTANCE_TO_CONSIDER_EDITOR_BOUNDS
-     ) {
--      if (this.state?.show) {
--        this.state.show = false;
--        this.updateState(this.state);
--      }
-+      this.hideMenu();
-       return;
-     }
- 
-@@ -219,11 +225,7 @@
- 
-     // Closes the menu if the mouse cursor is beyond the editor vertically.
-     if (!block || !this.editor.isEditable) {
--      if (this.state?.show) {
--        this.state.show = false;
--        this.updateState(this.state);
--      }
--
-+      this.hideMenu();
-       return;
-     }
- 
-@@ -237,6 +239,15 @@
-     }
- 
-     this.hoveredBlock = block.node;
-+    const hoveredBlockId = this.hoveredBlock.getAttribute("data-id");
-+    const hoveredEditorBlock = hoveredBlockId
-+      ? this.editor.getBlock(hoveredBlockId)
-+      : undefined;
-+
-+    if (!hoveredEditorBlock) {
-+      this.hideMenu();
-+      return;
-+    }
- 
-     // Shows or updates elements.
-     if (this.editor.isEditable) {
-@@ -258,9 +269,7 @@
-           blockContentBoundingBox.width,
-           blockContentBoundingBox.height,
-         ),
--        block: this.editor.getBlock(
--          this.hoveredBlock!.getAttribute("data-id")!,
--        )!,
-+        block: hoveredEditorBlock,
-       };
-       this.updateState(this.state);
-     }
---- a/src/extensions/SuggestionMenu/SuggestionMenu.ts
-+++ b/src/extensions/SuggestionMenu/SuggestionMenu.ts
-@@ -32,7 +32,7 @@
- 
-     this.emitUpdate = (menuName: string) => {
-       if (!this.state) {
--        throw new Error("Attempting to update uninitialized suggestions menu");
-+        return;
-       }
- 
-       emitUpdate(menuName, {
-@@ -64,6 +64,15 @@
-     }
-   };
- 
-+  private hideMenu = (menuName: string) => {
-+    if (!this.state) {
-+      return;
-+    }
-+
-+    this.state.show = false;
-+    this.emitUpdate(menuName);
-+  };
-+
-   update(view: EditorView, prevState: EditorState) {
-     const prev: SuggestionPluginState =
-       suggestionMenuPluginKey.getState(prevState);
-@@ -84,11 +93,7 @@
-     this.pluginState = stopped ? prev : next;
- 
-     if (stopped || !this.editor.isEditable) {
--      if (this.state) {
--        this.state.show = false;
--      }
--      this.emitUpdate(this.pluginState!.triggerCharacter);
--
-+      this.hideMenu(this.pluginState!.triggerCharacter);
-       return;
-     }
- 
-@@ -96,17 +101,20 @@
-       `[data-decoration-id="${this.pluginState!.decorationId}"]`,
-     );
- 
--    if (this.editor.isEditable && decorationNode) {
--      this.state = {
--        show: true,
--        referencePos: decorationNode
--          .getBoundingClientRect()
--          .toJSON() as DOMRect,
--        query: this.pluginState!.query,
--      };
--
--      this.emitUpdate(this.pluginState!.triggerCharacter!);
-+    if (!decorationNode) {
-+      this.hideMenu(this.pluginState!.triggerCharacter!);
-+      return;
-     }
-+
-+    this.state = {
-+      show: true,
-+      referencePos: decorationNode
-+        .getBoundingClientRect()
-+        .toJSON() as DOMRect,
-+      query: this.pluginState!.query,
-+    };
-+
-+    this.emitUpdate(this.pluginState!.triggerCharacter!);
-   }
- 
-   destroy() {
---- a/src/extensions/TableHandles/TableHandles.ts
-+++ b/src/extensions/TableHandles/TableHandles.ts
-@@ -187,6 +187,22 @@
-     );
-   }
- 
-+  private hideHandles = ({ resetCell = false } = {}) => {
-+    if (!this.state?.show) {
-+      return;
-+    }
-+
-+    this.state.show = false;
-+    this.state.showAddOrRemoveRowsButton = false;
-+    this.state.showAddOrRemoveColumnsButton = false;
-+    if (resetCell) {
-+      this.state.rowIndex = undefined;
-+      this.state.colIndex = undefined;
-+      this.state.referencePosCell = undefined;
-+    }
-+    this.emitUpdate();
-+  };
-+
-   viewMousedownHandler = () => {
-     this.mouseState = "down";
-   };
-@@ -222,22 +238,12 @@
-       // hide draghandles when selecting text as they could be in the way of the user
-       this.mouseState = "selecting";
- 
--      if (this.state?.show) {
--        this.state.show = false;
--        this.state.showAddOrRemoveRowsButton = false;
--        this.state.showAddOrRemoveColumnsButton = false;
--        this.emitUpdate();
--      }
-+      this.hideHandles();
-       return;
-     }
- 
-     if (!target || !this.editor.isEditable) {
--      if (this.state?.show) {
--        this.state.show = false;
--        this.state.showAddOrRemoveRowsButton = false;
--        this.state.showAddOrRemoveColumnsButton = false;
--        this.emitUpdate();
--      }
-+      this.hideHandles();
-       return;
-     }
- 
-@@ -541,11 +547,7 @@
-       // because yjs replaces the element when for example you change the color via the side menu
-       !this.tableElement?.isConnected
-     ) {
--      this.state.show = false;
--      this.state.showAddOrRemoveRowsButton = false;
--      this.state.showAddOrRemoveColumnsButton = false;
--      this.emitUpdate();
--
-+      this.hideHandles();
-       return;
-     }
- 
-@@ -572,9 +574,8 @@
-     const tableBody = this.tableElement!.querySelector("tbody");
- 
-     if (!tableBody) {
--      throw new Error(
--        "Table block does not contain a 'tbody' HTML element. This should never happen.",
--      );
-+      this.hideHandles({ resetCell: true });
-+      return;
-     }
- 
-     if (
+diff --git a/dist/TrailingNode-CxM966vN.js b/dist/TrailingNode-CxM966vN.js
+index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab1729752bc05 100644
 --- a/dist/TrailingNode-CxM966vN.js
 +++ b/dist/TrailingNode-CxM966vN.js
-@@ -1182,6 +1182,10 @@
-     b(this, "isDragOrigin", !1);
+@@ -1183,6 +1183,10 @@ class Ft {
      b(this, "updateState", (e) => {
        this.state = e, this.emitUpdate(this.state);
-+    });
+     });
 +    b(this, "hideMenu", () => {
 +      var e;
 +      (e = this.state) != null && e.show && (this.state.show = !1, this.updateState(this.state));
-     });
++    });
      b(this, "updateStateFromMousePos", () => {
        var o, r, s, i, a;
-@@ -1192,33 +1196,39 @@
+       if (this.menuFrozen || !this.mousePos)
+@@ -1192,33 +1196,39 @@ class Ft {
          clientY: this.mousePos.y
        });
        if ((e == null ? void 0 : e.element) !== this.pmView.dom || e.distance > se) {
@@ -404,21 +65,20 @@
          }, this.updateState(this.state);
        }
      });
-@@ -1557,6 +1567,13 @@
+@@ -1557,6 +1567,12 @@ class Kt {
      b(this, "menuFrozen", !1);
      b(this, "mouseState", "up");
      b(this, "prevWasEditable", null);
 +    b(this, "hideHandles", (e = {}) => {
-+      var t;
-+      const { resetCell: o = !1 } = e;
-+      if (!((t = this.state) != null && t.show))
++      const { resetCell: t = !1, resetDragging: o = !1 } = e;
++      if (!this.state || !this.state.show && !t && !o)
 +        return;
-+      this.state.show = !1, this.state.showAddOrRemoveRowsButton = !1, this.state.showAddOrRemoveColumnsButton = !1, o && (this.state.rowIndex = void 0, this.state.colIndex = void 0, this.state.referencePosCell = void 0), this.emitUpdate();
++      this.state.show = !1, this.state.showAddOrRemoveRowsButton = !1, this.state.showAddOrRemoveColumnsButton = !1, o && (this.state.draggingState = void 0), t && (this.state.rowIndex = void 0, this.state.colIndex = void 0, this.state.referencePosCell = void 0), this.emitUpdate();
 +    });
      b(this, "viewMousedownHandler", () => {
        this.mouseState = "down";
      });
-@@ -1569,11 +1586,11 @@
+@@ -1569,11 +1585,11 @@ class Kt {
          return;
        const t = _t(e.target);
        if ((t == null ? void 0 : t.type) === "cell" && this.mouseState === "down" && !((l = this.state) != null && l.draggingState)) {
@@ -432,7 +92,18 @@
          return;
        }
        if (!t.tbodyNode)
-@@ -1738,7 +1755,7 @@
+@@ -1671,9 +1687,7 @@ class Kt {
+       if (this.mouseState = "up", this.state === void 0 || this.state.draggingState === void 0)
+         return !1;
+       if (this.state.rowIndex === void 0 || this.state.colIndex === void 0)
+-        throw new Error(
+-          "Attempted to drop table row or column, but no table block was hovered prior."
+-        );
++        return e.preventDefault(), this.hideHandles({ resetCell: !0, resetDragging: !0 }), !1;
+       e.preventDefault();
+       const { draggingState: t, colIndex: o, rowIndex: r } = this.state, s = this.state.block.content.columnWidths;
+       if (t.draggedCellOrientation === "row") {
+@@ -1738,7 +1752,7 @@ class Kt {
      if (this.state.block = this.editor.getBlock(this.state.block.id), !this.state.block || this.state.block.type !== "table" || // when collaborating, the table element might be replaced and out of date
      // because yjs replaces the element when for example you change the color via the side menu
      !((r = this.tableElement) != null && r.isConnected)) {
@@ -441,7 +112,7 @@
        return;
      }
      const { height: e, width: t } = Ve(
-@@ -1746,10 +1763,10 @@
+@@ -1746,10 +1760,10 @@ class Kt {
      );
      this.state.rowIndex !== void 0 && this.state.colIndex !== void 0 && (this.state.rowIndex >= e && (this.state.rowIndex = e - 1), this.state.colIndex >= t && (this.state.colIndex = t - 1));
      const o = this.tableElement.querySelector("tbody");
@@ -456,3 +127,532 @@
      if (this.state.rowIndex !== void 0 && this.state.colIndex !== void 0) {
        const i = o.children[this.state.rowIndex].children[this.state.colIndex];
        i ? this.state.referencePosCell = i.getBoundingClientRect() : (this.state.rowIndex = void 0, this.state.colIndex = void 0);
+@@ -1838,10 +1852,10 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
+      * is used as the column drag handle.
+      */
+     colDragStart(o) {
+-      if (e === void 0 || e.state === void 0 || e.state.colIndex === void 0)
+-        throw new Error(
+-          "Attempted to drag table column, but no table block was hovered prior."
+-        );
++      if (e === void 0 || e.state === void 0 || e.state.colIndex === void 0 || e.tablePos === void 0) {
++        e == null || e.hideHandles({ resetCell: !0, resetDragging: !0 });
++        return;
++      }
+       e.state.draggingState = {
+         draggedCellOrientation: "col",
+         originalIndex: e.state.colIndex,
+@@ -1860,10 +1874,10 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
+      * is used as the row drag handle.
+      */
+     rowDragStart(o) {
+-      if (e.state === void 0 || e.state.rowIndex === void 0)
+-        throw new Error(
+-          "Attempted to drag table row, but no table block was hovered prior."
+-        );
++      if (e === void 0 || e.state === void 0 || e.state.rowIndex === void 0 || e.tablePos === void 0) {
++        e == null || e.hideHandles({ resetCell: !0, resetDragging: !0 });
++        return;
++      }
+       e.state.draggingState = {
+         draggedCellOrientation: "row",
+         originalIndex: e.state.rowIndex,
+@@ -1882,10 +1896,10 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
+      * used as the row drag handle, and the one used as the column drag handle.
+      */
+     dragEnd() {
+-      if (e.state === void 0)
+-        throw new Error(
+-          "Attempted to drag table row, but no table block was hovered prior."
+-        );
++      if (e === void 0 || e.state === void 0) {
++        n.headless || Ut(n.prosemirrorView.root);
++        return;
++      }
+       e.state.draggingState = void 0, e.emitUpdate(), n.transact((o) => o.setMeta(D, null)), !n.headless && Ut(n.prosemirrorView.root);
+     },
+     /**
+diff --git a/dist/blocknote.js b/dist/blocknote.js
+index 0f97dc48ddedfb9661b81c7469ce504dc974e284..66600e91f871ed86e4942b794d2bce8f96882ae0 100644
+--- a/dist/blocknote.js
++++ b/dist/blocknote.js
+@@ -2037,7 +2037,9 @@ const de = () => {
+     ]
+   })
+ );
+-let fe = !1;
++const bnLinkifyProtocolFlag = "__tolariaBlockNoteLinkifyProtocolsRegistered";
++const bnGlobalObject = typeof globalThis > "u" ? void 0 : globalThis;
++let fe = Boolean(bnGlobalObject && bnGlobalObject[bnLinkifyProtocolFlag]);
+ function mn(o, e) {
+   const t = [
+     I.ClipboardTextSerializer,
+@@ -2062,7 +2064,10 @@ function mn(o, e) {
+     }).configure({
+       defaultProtocol: Ct,
+       // only call this once if we have multiple editors installed. Or fix https://github.com/ueberdosis/tiptap/issues/5450
+-      protocols: fe ? [] : Bt
++      // Tolaria routes editor link clicks through its guarded native opener.
++      openOnClick: !1,
++      // Tolaria pre-registers BlockNote's non-native protocols before linkify initializes.
++      protocols: []
+     }),
+     ...Object.values(o.schema.styleSpecs).map((n) => n.implementation.mark.configure({
+       editor: o
+@@ -2112,7 +2117,7 @@ function mn(o, e) {
+     ),
+     Do(o)
+   ];
+-  return fe = !0, t;
++  return fe = !0, bnGlobalObject && (bnGlobalObject[bnLinkifyProtocolFlag] = !0), t;
+ }
+ function kn(o, e) {
+   const t = [
+diff --git a/dist/defaultBlocks-DE5GNdJH.js b/dist/defaultBlocks-DE5GNdJH.js
+index b2761001278486a8b2ac1d10c82420b4994e96d9..c44e9c09100c6d1803bd71b2a338c43e34b74886 100644
+--- a/dist/defaultBlocks-DE5GNdJH.js
++++ b/dist/defaultBlocks-DE5GNdJH.js
+@@ -1120,6 +1120,8 @@ const Ut = ({ defaultLanguage: e = "text" }) => ({
+         ), i.value = t.props.language || e.defaultLanguage || "text", n.isEditable) {
+           const l = (u) => {
+             const d = u.target.value;
++            if (!n.getBlock(t.id))
++              return;
+             n.updateBlock(t.id, { props: { language: d } });
+           };
+           i.addEventListener("change", l), s = () => i.removeEventListener("change", l);
+@@ -2621,6 +2623,9 @@ class On {
+         this.state.referencePos = o.getBoundingClientRect().toJSON(), this.emitUpdate(this.pluginState.triggerCharacter);
+       }
+     });
++    M(this, "hideMenu", (t) => {
++      this.state && (this.state.show = !1, this.emitUpdate(t));
++    });
+     M(this, "closeMenu", () => {
+       this.editor.transact((t) => t.setMeta(B, null));
+     });
+@@ -2634,7 +2639,7 @@ class On {
+     this.editor = t, this.pluginState = void 0, this.emitUpdate = (a) => {
+       var s;
+       if (!this.state)
+-        throw new Error("Attempting to update uninitialized suggestions menu");
++        return;
+       n(a, {
+         ...this.state,
+         ignoreQueryLength: (s = this.pluginState) == null ? void 0 : s.ignoreQueryLength
+@@ -2649,17 +2654,21 @@ class On {
+     if (!a && !(o !== void 0 && r !== void 0) && !s)
+       return;
+     if (this.pluginState = s ? o : r, s || !this.editor.isEditable) {
+-      this.state && (this.state.show = !1), this.emitUpdate(this.pluginState.triggerCharacter);
++      this.hideMenu(this.pluginState.triggerCharacter);
+       return;
+     }
+     const c = (l = this.rootEl) == null ? void 0 : l.querySelector(
+       `[data-decoration-id="${this.pluginState.decorationId}"]`
+     );
+-    this.editor.isEditable && c && (this.state = {
++    if (!c) {
++      this.hideMenu(this.pluginState.triggerCharacter);
++      return;
++    }
++    this.state = {
+       show: !0,
+       referencePos: c.getBoundingClientRect().toJSON(),
+       query: this.pluginState.query
+-    }, this.emitUpdate(this.pluginState.triggerCharacter));
++    }, this.emitUpdate(this.pluginState.triggerCharacter);
+   }
+   destroy() {
+     var t;
+@@ -2761,7 +2770,7 @@ const B = new Ze("SuggestionMenuPlugin"), _n = k(({ editor: e }) => {
+             if (a === s) {
+               const c = r.state.doc;
+               for (const l of t) {
+-                const u = l.length > 1 ? c.textBetween(a - l.length, a) + i : i;
++                const u = l.length > 1 ? c.textBetween(a - (l.length - 1), a) + i : i;
+                 if (l === u)
+                   return r.dispatch(r.state.tr.insertText(i)), r.dispatch(
+                     r.state.tr.setMeta(B, {
+diff --git a/node_modules/.bin/uuid b/node_modules/.bin/uuid
+new file mode 100755
+index 0000000000000000000000000000000000000000..2bc12aee9f172fb55715572a6597f2e4b2e5b4ec
+--- /dev/null
++++ b/node_modules/.bin/uuid
+@@ -0,0 +1,21 @@
++#!/bin/sh
++basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
++
++case `uname` in
++    *CYGWIN*|*MINGW*|*MSYS*)
++        if command -v cygpath > /dev/null 2>&1; then
++            basedir=`cygpath -w "$basedir"`
++        fi
++    ;;
++esac
++
++if [ -z "$NODE_PATH" ]; then
++  export NODE_PATH="/Volumes/Jupiter/Workspace/laputa-app/node_modules/.pnpm/uuid@8.3.2/node_modules/uuid/node_modules:/Volumes/Jupiter/Workspace/laputa-app/node_modules/.pnpm/uuid@8.3.2/node_modules:/Volumes/Jupiter/Workspace/laputa-app/node_modules/.pnpm/node_modules"
++else
++  export NODE_PATH="/Volumes/Jupiter/Workspace/laputa-app/node_modules/.pnpm/uuid@8.3.2/node_modules/uuid/node_modules:/Volumes/Jupiter/Workspace/laputa-app/node_modules/.pnpm/uuid@8.3.2/node_modules:/Volumes/Jupiter/Workspace/laputa-app/node_modules/.pnpm/node_modules:$NODE_PATH"
++fi
++if [ -x "$basedir/node" ]; then
++  exec "$basedir/node"  "$basedir/../../../../uuid/dist/bin/uuid" "$@"
++else
++  exec node  "$basedir/../../../../uuid/dist/bin/uuid" "$@"
++fi
+diff --git a/src/blocks/Code/block.ts b/src/blocks/Code/block.ts
+index dbb7fc33a9add7a96488349876bc56ad60111a3f..58c3cf181f25467d85cd8c3788b5b73dec88175a 100644
+--- a/src/blocks/Code/block.ts
++++ b/src/blocks/Code/block.ts
+@@ -134,6 +134,10 @@ export const createCodeBlockSpec = createBlockSpec(
+           const handleLanguageChange = (event: Event) => {
+             const language = (event.target as HTMLSelectElement).value;
+
++            if (!editor.getBlock(block.id)) {
++              return;
++            }
++
+             editor.updateBlock(block.id, { props: { language } });
+           };
+           select.addEventListener("change", handleLanguageChange);
+diff --git a/src/editor/managers/ExtensionManager/extensions.ts b/src/editor/managers/ExtensionManager/extensions.ts
+index 45f0acf8e5d869eb13a3c3d70e6f67059f86c598..2a4d15c8e8465181cc009ed9912cd284e0930251 100644
+--- a/src/editor/managers/ExtensionManager/extensions.ts
++++ b/src/editor/managers/ExtensionManager/extensions.ts
+@@ -84,7 +84,10 @@ export function getDefaultTiptapExtensions(
+     }).configure({
+       defaultProtocol: DEFAULT_LINK_PROTOCOL,
+       // only call this once if we have multiple editors installed. Or fix https://github.com/ueberdosis/tiptap/issues/5450
+-      protocols: LINKIFY_INITIALIZED ? [] : VALID_LINK_PROTOCOLS,
++      // Tolaria routes editor link clicks through its guarded native opener.
++      openOnClick: false,
++      // Tolaria pre-registers BlockNote's non-native protocols before linkify initializes.
++      protocols: [],
+     }),
+     ...(Object.values(editor.schema.styleSpecs).map((styleSpec) => {
+       return styleSpec.implementation.mark.configure({
+diff --git a/src/extensions/SideMenu/SideMenu.ts b/src/extensions/SideMenu/SideMenu.ts
+index 769e4a17154db2d88472696638db96e20131dfdb..a6c7f1a76eaa4db7b58774ae71ef47ab62805f66 100644
+--- a/src/extensions/SideMenu/SideMenu.ts
++++ b/src/extensions/SideMenu/SideMenu.ts
+@@ -194,6 +194,15 @@ export class SideMenuView<
+     this.emitUpdate(this.state);
+   };
+
++  private hideMenu = () => {
++    if (!this.state?.show) {
++      return;
++    }
++
++    this.state.show = false;
++    this.updateState(this.state);
++  };
++
+   updateStateFromMousePos = () => {
+     if (this.menuFrozen || !this.mousePos) {
+       return;
+@@ -208,10 +217,7 @@ export class SideMenuView<
+       closestEditor?.element !== this.pmView.dom ||
+       closestEditor.distance > DISTANCE_TO_CONSIDER_EDITOR_BOUNDS
+     ) {
+-      if (this.state?.show) {
+-        this.state.show = false;
+-        this.updateState(this.state);
+-      }
++      this.hideMenu();
+       return;
+     }
+
+@@ -219,11 +225,7 @@ export class SideMenuView<
+
+     // Closes the menu if the mouse cursor is beyond the editor vertically.
+     if (!block || !this.editor.isEditable) {
+-      if (this.state?.show) {
+-        this.state.show = false;
+-        this.updateState(this.state);
+-      }
+-
++      this.hideMenu();
+       return;
+     }
+
+@@ -237,6 +239,15 @@ export class SideMenuView<
+     }
+
+     this.hoveredBlock = block.node;
++    const hoveredBlockId = this.hoveredBlock.getAttribute("data-id");
++    const hoveredEditorBlock = hoveredBlockId
++      ? this.editor.getBlock(hoveredBlockId)
++      : undefined;
++
++    if (!hoveredEditorBlock) {
++      this.hideMenu();
++      return;
++    }
+
+     // Shows or updates elements.
+     if (this.editor.isEditable) {
+@@ -258,9 +269,7 @@ export class SideMenuView<
+           blockContentBoundingBox.width,
+           blockContentBoundingBox.height,
+         ),
+-        block: this.editor.getBlock(
+-          this.hoveredBlock!.getAttribute("data-id")!,
+-        )!,
++        block: hoveredEditorBlock,
+       };
+       this.updateState(this.state);
+     }
+diff --git a/src/extensions/SuggestionMenu/SuggestionMenu.ts b/src/extensions/SuggestionMenu/SuggestionMenu.ts
+index 029103600a98bf8ccd3054a5c43ffa2fd9115c06..d1678ed4761baca0b3495dafc8d751525d528b4e 100644
+--- a/src/extensions/SuggestionMenu/SuggestionMenu.ts
++++ b/src/extensions/SuggestionMenu/SuggestionMenu.ts
+@@ -32,7 +32,7 @@ class SuggestionMenuView {
+
+     this.emitUpdate = (menuName: string) => {
+       if (!this.state) {
+-        throw new Error("Attempting to update uninitialized suggestions menu");
++        return;
+       }
+
+       emitUpdate(menuName, {
+@@ -64,6 +64,15 @@ class SuggestionMenuView {
+     }
+   };
+
++  private hideMenu = (menuName: string) => {
++    if (!this.state) {
++      return;
++    }
++
++    this.state.show = false;
++    this.emitUpdate(menuName);
++  };
++
+   update(view: EditorView, prevState: EditorState) {
+     const prev: SuggestionPluginState =
+       suggestionMenuPluginKey.getState(prevState);
+@@ -84,11 +93,7 @@ class SuggestionMenuView {
+     this.pluginState = stopped ? prev : next;
+
+     if (stopped || !this.editor.isEditable) {
+-      if (this.state) {
+-        this.state.show = false;
+-      }
+-      this.emitUpdate(this.pluginState!.triggerCharacter);
+-
++      this.hideMenu(this.pluginState!.triggerCharacter);
+       return;
+     }
+
+@@ -96,17 +101,20 @@ class SuggestionMenuView {
+       `[data-decoration-id="${this.pluginState!.decorationId}"]`,
+     );
+
+-    if (this.editor.isEditable && decorationNode) {
+-      this.state = {
+-        show: true,
+-        referencePos: decorationNode
+-          .getBoundingClientRect()
+-          .toJSON() as DOMRect,
+-        query: this.pluginState!.query,
+-      };
+-
+-      this.emitUpdate(this.pluginState!.triggerCharacter!);
++    if (!decorationNode) {
++      this.hideMenu(this.pluginState!.triggerCharacter!);
++      return;
+     }
++
++    this.state = {
++      show: true,
++      referencePos: decorationNode
++        .getBoundingClientRect()
++        .toJSON() as DOMRect,
++      query: this.pluginState!.query,
++    };
++
++    this.emitUpdate(this.pluginState!.triggerCharacter!);
+   }
+
+   destroy() {
+diff --git a/src/extensions/TableHandles/TableHandles.ts b/src/extensions/TableHandles/TableHandles.ts
+index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49c47fd266 100644
+--- a/src/extensions/TableHandles/TableHandles.ts
++++ b/src/extensions/TableHandles/TableHandles.ts
+@@ -187,6 +187,32 @@ export class TableHandlesView implements PluginView {
+     );
+   }
+
++  hideHandles = ({
++    resetCell = false,
++    resetDragging = false,
++  } = {}) => {
++    if (!this.state) {
++      return;
++    }
++
++    if (!this.state.show && !resetCell && !resetDragging) {
++      return;
++    }
++
++    this.state.show = false;
++    this.state.showAddOrRemoveRowsButton = false;
++    this.state.showAddOrRemoveColumnsButton = false;
++    if (resetDragging) {
++      this.state.draggingState = undefined;
++    }
++    if (resetCell) {
++      this.state.rowIndex = undefined;
++      this.state.colIndex = undefined;
++      this.state.referencePosCell = undefined;
++    }
++    this.emitUpdate();
++  };
++
+   viewMousedownHandler = () => {
+     this.mouseState = "down";
+   };
+@@ -222,22 +248,12 @@ export class TableHandlesView implements PluginView {
+       // hide draghandles when selecting text as they could be in the way of the user
+       this.mouseState = "selecting";
+
+-      if (this.state?.show) {
+-        this.state.show = false;
+-        this.state.showAddOrRemoveRowsButton = false;
+-        this.state.showAddOrRemoveColumnsButton = false;
+-        this.emitUpdate();
+-      }
++      this.hideHandles();
+       return;
+     }
+
+     if (!target || !this.editor.isEditable) {
+-      if (this.state?.show) {
+-        this.state.show = false;
+-        this.state.showAddOrRemoveRowsButton = false;
+-        this.state.showAddOrRemoveColumnsButton = false;
+-        this.emitUpdate();
+-      }
++      this.hideHandles();
+       return;
+     }
+
+@@ -458,9 +474,9 @@ export class TableHandlesView implements PluginView {
+       this.state.rowIndex === undefined ||
+       this.state.colIndex === undefined
+     ) {
+-      throw new Error(
+-        "Attempted to drop table row or column, but no table block was hovered prior.",
+-      );
++      event.preventDefault();
++      this.hideHandles({ resetCell: true, resetDragging: true });
++      return false;
+     }
+
+     event.preventDefault();
+@@ -541,11 +557,7 @@ export class TableHandlesView implements PluginView {
+       // because yjs replaces the element when for example you change the color via the side menu
+       !this.tableElement?.isConnected
+     ) {
+-      this.state.show = false;
+-      this.state.showAddOrRemoveRowsButton = false;
+-      this.state.showAddOrRemoveColumnsButton = false;
+-      this.emitUpdate();
+-
++      this.hideHandles();
+       return;
+     }
+
+@@ -572,9 +584,8 @@ export class TableHandlesView implements PluginView {
+     const tableBody = this.tableElement!.querySelector("tbody");
+
+     if (!tableBody) {
+-      throw new Error(
+-        "Table block does not contain a 'tbody' HTML element. This should never happen.",
+-      );
++      this.hideHandles({ resetCell: true });
++      return;
+     }
+
+     if (
+@@ -796,11 +807,11 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+       if (
+         view === undefined ||
+         view.state === undefined ||
+-        view.state.colIndex === undefined
++        view.state.colIndex === undefined ||
++        view.tablePos === undefined
+       ) {
+-        throw new Error(
+-          "Attempted to drag table column, but no table block was hovered prior.",
+-        );
++        view?.hideHandles({ resetCell: true, resetDragging: true });
++        return;
+       }
+
+       view.state.draggingState = {
+@@ -837,26 +848,30 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+       dataTransfer: DataTransfer | null;
+       clientY: number;
+     }) {
+-      if (view!.state === undefined || view!.state.rowIndex === undefined) {
+-        throw new Error(
+-          "Attempted to drag table row, but no table block was hovered prior.",
+-        );
++      if (
++        view === undefined ||
++        view.state === undefined ||
++        view.state.rowIndex === undefined ||
++        view.tablePos === undefined
++      ) {
++        view?.hideHandles({ resetCell: true, resetDragging: true });
++        return;
+       }
+
+-      view!.state.draggingState = {
++      view.state.draggingState = {
+         draggedCellOrientation: "row",
+-        originalIndex: view!.state.rowIndex,
++        originalIndex: view.state.rowIndex,
+         mousePos: event.clientY,
+       };
+-      view!.emitUpdate();
++      view.emitUpdate();
+
+       editor.transact((tr) =>
+         tr.setMeta(tableHandlesPluginKey, {
+           draggedCellOrientation:
+-            view!.state!.draggingState!.draggedCellOrientation,
+-          originalIndex: view!.state!.rowIndex,
+-          newIndex: view!.state!.rowIndex,
+-          tablePos: view!.tablePos,
++            view.state!.draggingState!.draggedCellOrientation,
++          originalIndex: view.state!.rowIndex,
++          newIndex: view.state!.rowIndex,
++          tablePos: view.tablePos,
+         }),
+       );
+
+@@ -874,14 +889,15 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+      * used as the row drag handle, and the one used as the column drag handle.
+      */
+     dragEnd() {
+-      if (view!.state === undefined) {
+-        throw new Error(
+-          "Attempted to drag table row, but no table block was hovered prior.",
+-        );
++      if (view === undefined || view.state === undefined) {
++        if (!editor.headless) {
++          unsetHiddenDragImage(editor.prosemirrorView.root);
++        }
++        return;
+       }
+
+-      view!.state.draggingState = undefined;
+-      view!.emitUpdate();
++      view.state.draggingState = undefined;
++      view.emitUpdate();
+
+       editor.transact((tr) => tr.setMeta(tableHandlesPluginKey, null));
