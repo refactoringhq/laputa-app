@@ -3,6 +3,12 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MarkdownContent } from './MarkdownContent'
 import { preprocessWikilinks } from '../utils/chatWikilinks'
 
+vi.mock('./MermaidDiagram', () => ({
+  MermaidDiagram: ({ source }: { source: string }) => (
+    <div data-testid="mermaid-diagram-stub" data-source={source} />
+  ),
+}))
+
 describe('MarkdownContent', () => {
   it('renders bold text', () => {
     render(<MarkdownContent content="Hello **world**" />)
@@ -72,6 +78,21 @@ describe('MarkdownContent', () => {
     const bq = container.querySelector('blockquote')
     expect(bq).toBeTruthy()
     expect(bq!.textContent).toContain('A quote')
+  })
+
+  describe('mermaid code blocks', () => {
+    it('renders a mermaid fenced block as a MermaidDiagram', () => {
+      const source = 'graph TD;\n  A-->B'
+      render(<MarkdownContent content={'```mermaid\n' + source + '\n```'} />)
+      const diagram = screen.getByTestId('mermaid-diagram-stub')
+      expect(diagram.getAttribute('data-source')).toBe(source)
+    })
+
+    it('leaves non-mermaid fenced blocks as <code>', () => {
+      const { container } = render(<MarkdownContent content={'```js\nconst x = 1\n```'} />)
+      expect(container.querySelector('[data-testid="mermaid-diagram-stub"]')).toBeNull()
+      expect(container.querySelector('pre code')).toBeTruthy()
+    })
   })
 
   describe('wikilinks', () => {
