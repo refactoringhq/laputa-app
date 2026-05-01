@@ -337,6 +337,35 @@ describe('useNoteCreation hook', () => {
     expect(openTabWithContent.mock.calls[0][1]).toBe('---\ntype: Project\n---\n\n# \n\n## Objective\n\n\n\n## Key Results\n\n\n\n## Notes\n\n')
   })
 
+  it('handleCreateNoteImmediate persists typed notes under Windows verbatim vault roots', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValueOnce(undefined)
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
+    const windowsVaultPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria`
+    const createdPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria/untitled-project-1700000000.md`
+    const { result } = renderHook(() => useNoteCreation({
+      ...makeConfig(),
+      vaultPath: windowsVaultPath,
+    }, tabDeps))
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate('Project')
+      await flushImmediateCreate()
+    })
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: createdPath,
+      content: expect.stringContaining('type: Project'),
+    })
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
+      path: createdPath,
+      filename: 'untitled-project-1700000000.md',
+      isA: 'Project',
+    }))
+    expect(setToastMessage).not.toHaveBeenCalled()
+    vi.restoreAllMocks()
+  })
+
   it('handleCreateNoteImmediate slugifies custom type names for filenames', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
