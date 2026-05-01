@@ -711,7 +711,7 @@ describe('Sidebar', () => {
           wordCount: 0,
           relationships: {},
           icon: null,
-          color: 'orange',
+          color: 'cyan',
           order: null,
           sidebarLabel: null,
           template: null, sort: null,
@@ -750,7 +750,7 @@ describe('Sidebar', () => {
       fireEvent.click(screen.getByTitle('Customize sections'))
 
       expect(screen.getByLabelText('Toggle Projects').querySelector('svg')).toHaveStyle({ color: 'var(--accent-green)' })
-      expect(screen.getByLabelText('Toggle Recipes').querySelector('svg')).toHaveStyle({ color: 'var(--accent-orange)' })
+      expect(screen.getByLabelText('Toggle Recipes').querySelector('svg')).toHaveStyle({ color: 'rgb(0, 255, 255)' })
     })
 
     it('calls onToggleTypeVisibility when toggling a section in the popover', () => {

@@ -32,6 +32,11 @@ describe('getTypeColor', () => {
   it('uses gray custom color key', () => {
     expect(getTypeColor('Config', 'gray')).toBe('var(--accent-gray)')
   })
+
+  it('uses valid CSS color values that are not palette keys', () => {
+    expect(getTypeColor('Idea', 'cyan')).toBe('cyan')
+    expect(getTypeColor('Idea', '#22d3ee')).toBe('#22d3ee')
+  })
 })
 
 describe('getTypeLightColor', () => {
@@ -54,6 +59,11 @@ describe('getTypeLightColor', () => {
 
   it('uses gray custom color key for light variant', () => {
     expect(getTypeLightColor('Config', 'gray')).toBe('var(--accent-gray-light)')
+  })
+
+  it('derives a light background for valid CSS color values that are not palette keys', () => {
+    expect(getTypeLightColor('Idea', 'cyan')).toBe('color-mix(in srgb, cyan 14%, transparent)')
+    expect(getTypeLightColor('Idea', '#22d3ee')).toBe('color-mix(in srgb, #22d3ee 14%, transparent)')
   })
 })
 

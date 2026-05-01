@@ -4,6 +4,7 @@
  */
 
 import type { VaultEntry } from '../types'
+import { isValidCssColor } from './colorUtils'
 
 /** Builds a map from type name → Type document entry (for custom color/icon lookup).
  *  Stores both original title and lowercase version so lookups work regardless
@@ -65,14 +66,35 @@ const COLOR_KEY_TO_CSS_LIGHT: Record<string, string> = Object.fromEntries(
   ACCENT_COLORS.map((c) => [c.key, c.cssLight]),
 )
 
+const CSS_COLOR_LIGHT_MIX = 14
+
+function resolveCustomColor(customColorKey?: string | null): string | null {
+  const color = customColorKey?.trim()
+  if (!color) return null
+
+  const paletteKey = color.toLowerCase()
+  return COLOR_KEY_TO_CSS[paletteKey] ?? (isValidCssColor(color) ? color : null)
+}
+
+function resolveCustomLightColor(customColorKey?: string | null): string | null {
+  const color = customColorKey?.trim()
+  if (!color) return null
+
+  const paletteKey = color.toLowerCase()
+  return COLOR_KEY_TO_CSS_LIGHT[paletteKey]
+    ?? (isValidCssColor(color) ? `color-mix(in srgb, ${color} ${CSS_COLOR_LIGHT_MIX}%, transparent)` : null)
+}
+
 /** Returns the CSS variable for the accent color of a given note type, with optional custom override */
 export function getTypeColor(isA: string | null, customColorKey?: string | null): string {
-  if (customColorKey && COLOR_KEY_TO_CSS[customColorKey]) return COLOR_KEY_TO_CSS[customColorKey]
+  const customColor = resolveCustomColor(customColorKey)
+  if (customColor) return customColor
   return (isA && TYPE_COLOR_MAP[isA]) ?? DEFAULT_COLOR
 }
 
 /** Returns the CSS variable for the light/background variant of a given note type's color */
 export function getTypeLightColor(isA: string | null, customColorKey?: string | null): string {
-  if (customColorKey && COLOR_KEY_TO_CSS_LIGHT[customColorKey]) return COLOR_KEY_TO_CSS_LIGHT[customColorKey]
+  const customLightColor = resolveCustomLightColor(customColorKey)
+  if (customLightColor) return customLightColor
   return (isA && TYPE_LIGHT_COLOR_MAP[isA]) ?? DEFAULT_LIGHT_COLOR
 }
