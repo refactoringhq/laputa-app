@@ -3,6 +3,7 @@ import type { useCreateBlockNote } from '@blocknote/react'
 import type { VaultEntry } from '../types'
 import { splitFrontmatter, preProcessWikilinks, injectWikilinks, restoreWikilinksInBlocks } from '../utils/wikilinks'
 import { compactMarkdown } from '../utils/compact-markdown'
+import { preProcessHtmlTables } from '../utils/htmlTableMarkdown'
 import { injectMathInBlocks, preProcessMathMarkdown } from '../utils/mathMarkdown'
 import { injectMermaidInBlocks, preProcessMermaidMarkdown, serializeMermaidAwareBlocks } from '../utils/mermaidMarkdown'
 import { failNoteOpenTrace, finishNoteOpenTrace } from '../utils/noteOpenPerformance'
@@ -183,7 +184,8 @@ async function parseMarkdownBlocks(
 }
 
 function preProcessEditorMarkdown(markdown: string, vaultPath?: string): string {
-  const withMermaid = preProcessMermaidMarkdown({ markdown })
+  const withTables = preProcessHtmlTables(markdown)
+  const withMermaid = preProcessMermaidMarkdown({ markdown: withTables })
   const withImages = vaultPath ? resolveImageUrls(withMermaid, vaultPath) : withMermaid
   const withWikilinks = preProcessWikilinks(withImages)
   return preProcessMathMarkdown({ markdown: withWikilinks })
