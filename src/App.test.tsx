@@ -835,7 +835,7 @@ describe('App', () => {
     expect(screen.getByTestId('welcome-open-folder')).toHaveTextContent('Open existing vault')
   })
 
-  it('keeps startup on a neutral loading state while the last vault is still resolving', async () => {
+  it('uses the app shell loading state while the last vault is still resolving', async () => {
     localStorage.setItem('tolaria_welcome_dismissed', '1')
 
     let resolveVaultList: ((value: typeof mockVaultList) => void) | null = null
@@ -854,7 +854,12 @@ describe('App', () => {
       await Promise.resolve()
     })
 
-    expect(screen.getByTestId('vault-loading-skeleton')).toBeInTheDocument()
+    expect(screen.queryByTestId('vault-loading-skeleton')).not.toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-loading-favorites')).toBeInTheDocument()
+    expect(screen.getByTestId('note-list-loading-skeleton')).toBeInTheDocument()
+    expect(screen.getByTestId('breadcrumb-title-skeleton')).toBeInTheDocument()
+    expect(screen.getByTestId('editor-content-skeleton')).toBeInTheDocument()
+    expect(screen.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
     expect(screen.queryByText('Vault not found')).not.toBeInTheDocument()
 
     await act(async () => {
@@ -1060,8 +1065,14 @@ describe('App', () => {
 
     render(<App />)
 
-    const sidebar = await screen.findByText('FAVORITES')
-    fireEvent.click(within(sidebar.closest('div')?.parentElement as HTMLElement).getByText('Alpha'))
+    let favoritesSection: HTMLElement | undefined
+    await waitFor(() => {
+      const sidebar = screen.getByText('FAVORITES')
+      const currentFavoritesSection = sidebar.closest('div')?.parentElement as HTMLElement
+      expect(within(currentFavoritesSection).getByText('Alpha')).toBeInTheDocument()
+      favoritesSection = currentFavoritesSection
+    })
+    fireEvent.click(within(favoritesSection!).getByText('Alpha'))
 
     const noteListContainer = await screen.findByTestId('note-list-container')
     await waitFor(() => {
