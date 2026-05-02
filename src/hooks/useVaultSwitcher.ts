@@ -783,6 +783,8 @@ function removeVaultFromState({
   })
   if (remainingVaults.length === 0) {
     setSelectedVaultPath(null)
+    setVaultPath('')
+    onSwitchRef.current()
     return
   }
 
