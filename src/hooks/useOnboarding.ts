@@ -9,11 +9,7 @@ import {
 } from '../utils/gettingStartedVault'
 import { formatFolderPickerActionError, pickFolder } from '../utils/vault-dialog'
 
-function getIcloudDriveRoot(): string | undefined {
-  if (typeof process !== 'undefined' && process.env?.HOME) {
-    return `${process.env.HOME}/Library/Mobile Documents/com~apple~CloudDocs`
-  }
-  // Tauri WebView: use a well-known macOS path with ~ expansion
+function getIcloudDriveRoot(): string {
   return '~/Library/Mobile Documents/com~apple~CloudDocs'
 }
 

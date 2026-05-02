@@ -72,6 +72,7 @@ interface AppCommandsConfig {
   onAddRemote?: () => void
   canAddRemote?: boolean
   isGitVault?: boolean
+  isIcloudOnlyVault?: boolean
   onInitializeGit?: () => void
   onCreateType?: () => void
   onToggleAIChat?: () => void

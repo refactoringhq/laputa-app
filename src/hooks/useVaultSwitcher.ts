@@ -608,9 +608,15 @@ function addVaultToList({
   providerType?: VaultProviderType | null
   providerRoot?: string | null
 }) {
+  const resolvedType = (providerType === 'icloud-drive' ? 'icloud-drive' : providerType === 'local-folder' ? 'local-folder' : undefined) as VaultProviderType | undefined
+  const resolvedRoot = providerRoot ?? undefined
   setExtraVaults(previousVaults => {
     const exists = previousVaults.some(vault => vault.path === path)
-    return exists ? previousVaults : [...previousVaults, { label, path, providerType, providerRoot, available: true }]
+    return exists ? previousVaults : [...previousVaults, {
+      label, path, available: true,
+      ...(resolvedType ? { providerType: resolvedType } : {}),
+      ...(resolvedRoot ? { providerRoot: resolvedRoot } : {}),
+    }]
   })
 }
 
@@ -618,15 +624,18 @@ function upsertAvailableVaultOption(
   extraVaults: VaultOption[],
   path: string,
   label: string,
-  providerType?: string,
-  providerRoot?: string,
+  providerType?: string | null,
+  providerRoot?: string | null,
 ): VaultOption[] {
+  const resolvedType = (providerType === 'icloud-drive' ? 'icloud-drive' : providerType === 'local-folder' ? 'local-folder' : undefined) as VaultProviderType | undefined
+  const resolvedRoot = providerRoot ?? undefined
+
   const existingVault = extraVaults.find((vault) => vault.path === path)
   if (!existingVault) {
     return [...extraVaults, {
       label, path, available: true,
-      ...(providerType ? { providerType: providerType as VaultProviderType } : {}),
-      ...(providerRoot ? { providerRoot } : {}),
+      ...(resolvedType ? { providerType: resolvedType } : {}),
+      ...(resolvedRoot ? { providerRoot: resolvedRoot } : {}),
     }]
   }
 
@@ -636,8 +645,8 @@ function upsertAvailableVaultOption(
           ...vault,
           label: vault.label || label,
           available: true,
-          ...(providerType ? { providerType: providerType as VaultProviderType } : {}),
-          ...(providerRoot ? { providerRoot } : {}),
+          ...(resolvedType ? { providerType: resolvedType } : {}),
+          ...(resolvedRoot ? { providerRoot: resolvedRoot } : {}),
         }
       : vault
   ))
@@ -971,7 +980,7 @@ function useSyncVaultSelectionAction({
 }
 
 function useOpenLocalFolderAction(
-  addAndSwitch: (path: string, label: string, providerType?: string, providerRoot?: string) => void,
+  addAndSwitch: (path: string, label: string, providerType?: VaultProviderType | null, providerRoot?: string | null) => void,
   onToastRef: MutableRefObject<(msg: string) => void>,
   onProviderSelectionRef?: MutableRefObject<UseVaultSwitcherOptions['onProviderSelection']>
 ) {

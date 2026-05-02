@@ -57,6 +57,9 @@ interface StatusBarPrimarySectionProps {
   isVaultReloading?: boolean
   isGitVault?: boolean
   isIcloudOnlyVault?: boolean
+  isIcloudVault?: boolean
+  providerAvailability?: string
+  providerSyncState?: string
   syncStatus: SyncStatus
   lastSyncTime: number | null
   conflictCount: number
