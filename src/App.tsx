@@ -46,7 +46,8 @@ import { triggerCommitEntryAction } from './utils/commitEntryAction'
 import { generateCommitMessage } from './utils/commitMessage'
 import { useDialogs } from './hooks/useDialogs'
 import { useVaultSwitcher } from './hooks/useVaultSwitcher'
-import { useVaultProviderState } from './hooks/useVaultProviderState'
+import { useVaultProviderState, useProviderStatus } from './hooks/useVaultProviderState'
+import { isWriteBlocked } from './lib/vaultProviderRuntime'
 import { OpenVaultProviderDialog } from './components/status-bar/OpenVaultProviderDialog'
 import { useGitHistory } from './hooks/useGitHistory'
 import { useUpdater, restartApp } from './hooks/useUpdater'
@@ -967,6 +968,19 @@ function App() {
   const isGitVault = gitRepoState !== 'missing'
   const activeVaultProvider = vaultSwitcher.allVaults.find((v) => v.path === resolvedPath)?.providerType ?? 'local-folder'
   const isIcloudOnlyVault = activeVaultProvider === 'icloud-drive' && !isGitVault
+  const providerStatus = useProviderStatus(activeVaultProvider === 'icloud-drive' ? 'icloud-drive' : 'local-folder')
+  const providerWriteBlocked = isWriteBlocked(providerStatus)
+
+  // Bounded reconciliation for iCloud-backed vaults on app foreground
+  useEffect(() => {
+    if (activeVaultProvider !== 'icloud-drive' || !resolvedPath) return
+    const handleForeground = () => {
+      vault.reloadVault()
+    }
+    window.addEventListener('focus', handleForeground)
+    return () => window.removeEventListener('focus', handleForeground)
+  }, [activeVaultProvider, resolvedPath, vault])
+
   const shouldShowGitSetupDialog = !noteWindowParams && gitRepoState === 'missing' && showGitSetupDialog && !isIcloudOnlyVault
   const modifiedFilesSignature = useMemo(
     () => vault.modifiedFiles.map((file) => `${file.relativePath}:${file.status}`).sort().join('|'),
@@ -1008,6 +1022,10 @@ function App() {
   }, [handleAppContentChange, recordAutoGitActivity])
 
   const handleTrackedSave = useCallback(async (...args: Parameters<typeof handleAppSave>) => {
+    if (providerWriteBlocked) {
+      setToastMessage('Vault storage is currently unavailable. Your edits are preserved in memory.')
+      return undefined
+    }
     if (notes.activeTabPath) {
       flushPendingEditorContentRef.current?.(notes.activeTabPath)
       flushPendingRawContentRef.current?.(notes.activeTabPath)
@@ -1015,7 +1033,7 @@ function App() {
     const result = await handleAppSave(...args)
     recordAutoGitActivity()
     return result
-  }, [handleAppSave, notes.activeTabPath, recordAutoGitActivity])
+  }, [handleAppSave, notes.activeTabPath, providerWriteBlocked, recordAutoGitActivity])
 
   const seedAutoGitSavedChange = useCallback(async () => {
     if (isTauri()) {

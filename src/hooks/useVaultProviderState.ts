@@ -1,8 +1,9 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { normalizeValidatedVaultProviderSelection } from '../lib/vaultProviders'
 import type { VaultProviderType, ValidatedVaultProviderSelection } from '../lib/vaultProviders'
+import { currentStatus, subscribeStatus, type ProviderStatus } from '../lib/vaultProviderRuntime'
 
 export interface VaultProviderState {
   isSelectingProvider: boolean
@@ -121,4 +122,21 @@ export function useVaultProviderState() {
     confirmProvider,
     cancelProviderSelection,
   }
+}
+
+export function useProviderStatus(providerType: VaultProviderType | undefined): ProviderStatus {
+  const effectiveType = providerType ?? 'local-folder'
+  const [statusState, setStatusState] = useState({ type: effectiveType, status: currentStatus(effectiveType) })
+
+  // When the provider type changes, derive fresh initial status synchronously
+  const status = statusState.type === effectiveType ? statusState.status : currentStatus(effectiveType)
+
+  useEffect(() => {
+    const unsubscribe = subscribeStatus(effectiveType, (updated) => {
+      setStatusState({ type: effectiveType, status: updated })
+    })
+    return unsubscribe
+  }, [effectiveType])
+
+  return status
 }
