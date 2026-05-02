@@ -52,6 +52,9 @@ test('Getting Started template shows inline retry on clone failure and opens aft
 
   await page.getByTestId('welcome-create-vault').click()
 
+  // Provider selection dialog appears first — select Local Folder
+  await page.getByTestId('select-provider-local').click()
+
   await expect(page.getByTestId('welcome-error')).toContainText(
     'Could not download Getting Started vault: git clone failed: fatal: unable to access',
   )
