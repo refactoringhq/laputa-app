@@ -878,20 +878,8 @@ export function IcloudStatusBadge({
   const isSyncing = syncState === 'syncing_or_delayed'
 
   const icon = isUnavailable
-    ? <CloudOff size={12} />
-    : <Cloud size={12} />
-
-  const color = isUnavailable
-    ? 'var(--destructive)'
-    : isDegraded || isSyncing
-      ? 'var(--warning, #f59e0b)'
-      : 'var(--accent-blue, #3b82f6)'
-
-  const bg = isUnavailable
-    ? 'var(--feedback-error-bg)'
-    : isDegraded || isSyncing
-      ? 'rgba(245, 158, 11, 0.1)'
-      : 'rgba(59, 130, 246, 0.1)'
+    ? <CloudOff size={13} />
+    : <Cloud size={13} />
 
   const label = isUnavailable
     ? 'iCloud Unavailable'
@@ -909,25 +897,25 @@ export function IcloudStatusBadge({
         ? 'iCloud Drive is syncing files. Some files may not be up to date yet.'
         : 'This vault is synced via iCloud Drive across your Apple devices.'
 
+  const color = isUnavailable
+    ? 'var(--destructive)'
+    : isDegraded || isSyncing
+      ? 'var(--warning, #f59e0b)'
+      : 'var(--accent-blue, #3b82f6)'
+
   return (
     <>
       <StatusBarSeparator show={showSeparator} />
-      <span
-        style={{
-          ...ICON_STYLE,
-          color,
-          background: bg,
-          borderRadius: 999,
-          padding: '2px 6px',
-          fontWeight: 500,
-          gap: 4,
-        }}
-        title={tooltip}
-        data-testid="status-icloud"
+      <StatusBarAction
+        copy={{ label: tooltip }}
+        testId="status-icloud"
+        compact={compact}
       >
-        {icon}
-        {compact ? null : <span style={{ fontSize: 11 }}>{label}</span>}
-      </span>
+        <span style={{ ...ICON_STYLE, color }}>
+          {icon}
+        </span>
+        {compact ? null : label}
+      </StatusBarAction>
     </>
   )
 }
