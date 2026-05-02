@@ -311,7 +311,7 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let vault_path = dir.path().join("fresh-vault");
 
-        let result = create_empty_vault(vault_path.to_string_lossy().to_string());
+        let result = create_empty_vault(vault_path.to_string_lossy().to_string(), None);
         assert!(result.is_ok());
         assert_paths_exist(
             &vault_path,
@@ -329,7 +329,7 @@ mod tests {
         std::fs::create_dir_all(&vault_path).unwrap();
         std::fs::write(vault_path.join("keep.txt"), "keep").unwrap();
 
-        let result = create_empty_vault(vault_path.to_string_lossy().to_string());
+        let result = create_empty_vault(vault_path.to_string_lossy().to_string(), None);
         let err = result.expect_err("expected non-empty folder to be rejected");
 
         assert_eq!(err, "Choose an empty folder to create a new vault");

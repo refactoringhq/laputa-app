@@ -6,12 +6,13 @@ const APP_CONFIG_DIR: &str = "com.tolaria.app";
 const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct VaultEntry {
     pub label: String,
     pub path: String,
-    #[serde(default = "default_provider_type")]
+    #[serde(default = "default_provider_type", alias = "provider_type")]
     pub provider_type: String,
-    #[serde(default)]
+    #[serde(default, alias = "provider_root")]
     pub provider_root: String,
 }
 
