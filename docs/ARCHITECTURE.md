@@ -90,6 +90,16 @@ flowchart LR
 5. **Cache is disposable**: The `reload_vault` command deletes the cache file before rescanning, guaranteeing fresh data. The cache never contains data that doesn't exist on the filesystem.
 6. **Visibility filters are command-boundary concerns**: Gitignored-content visibility is applied after scanning/caching, before entries, folders, or search results reach React. The cache remains complete so toggling the setting can show ignored content again without rebuilding a different cache shape. Large folder filtering runs on the blocking Tokio pool and drains `git check-ignore` output while feeding stdin so broad ignore matches cannot freeze the native UI thread.
 
+#### Vault Storage Providers
+
+Storage is a boundary below the vault engine. The vault engine owns note semantics (parsing, mutation, indexing, search), while the storage provider owns where files live and how sync state is reported. This separation enables future cross-platform clients (iPhone/iPad) to open the same vault files through different providers.
+
+Each vault persists `providerType` and `providerRoot` in `vaults.json`. The Rust backend (`src-tauri/src/vault_provider.rs`) validates and canonicalizes provider selections, detects iCloud Drive paths on macOS, and exposes a `validate_vault_provider_selection` Tauri command. The frontend adapter (`src/lib/vaultProviderRuntime.ts`) provides `currentStatus()` and `subscribeStatus()` for runtime provider state.
+
+For iCloud-backed vaults, bounded reconciliation triggers a vault reload on window focus (`App.tsx`), and stale-save detection (`src/lib/staleSaveDetection.ts`) captures file identity at open time and checks it before saving. The `StaleSaveDialog` component offers recovery when a conflict is detected.
+
+The iCloud status badge (`IcloudStatusBadge` in `StatusBarBadges.tsx`) shows provider availability alongside existing Git controls using the same `StatusBarAction` pattern for consistent hover/tooltip behavior.
+
 #### External Change Detection
 
 The main window starts a native watcher for the active vault through `start_vault_watcher` / `stop_vault_watcher` (`src-tauri/src/vault_watcher.rs`, backed by Rust `notify`). The watcher emits `vault-changed` events for content paths and ignores churn from `.git/`, `node_modules/`, temp files, and `.tolaria-rename-txn`. `useVaultWatcher` batches those events, suppresses recent app-owned saves, and sends the remaining external paths through `refreshPulledVaultState()` so folders, saved views, note-list state, and the clean active editor all refresh under the ADR-0071 unsaved-edit rules. `useVaultLoader.isReloading` drives the status-bar reload spinner for both manual and watcher-triggered reloads.

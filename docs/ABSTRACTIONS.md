@@ -58,9 +58,26 @@ The frontmatter parser (Rust: `vault/mod.rs`, TS: `utils/frontmatter.ts`) must f
 
 All data lives in markdown files with YAML frontmatter. There is no database — the filesystem is the source of truth.
 
+### Vault Storage Provider
+
+Each vault has a **storage provider** that determines where its files live and how cross-device sync works. The provider is persisted alongside the vault entry in `vaults.json` as `providerType` and `providerRoot`.
+
+| Provider | Where files live | Sync mechanism | Git support |
+|---|---|---|---|
+| `local-folder` | Standard local directory | None (manual or Git-based) | Full |
+| `icloud-drive` | `~/Library/Mobile Documents/com~apple~CloudDocs/` | iCloud Drive (automatic across Apple devices) | Full (Git and iCloud coexist independently) |
+
+**Provider selection** happens when creating or opening a vault. A "Choose Vault Storage" dialog lets the user explicitly pick a provider. For iCloud, the folder picker defaults to the iCloud Drive root. The Rust backend validates and canonicalizes the chosen path, detecting iCloud paths automatically when no explicit choice is made.
+
+**Provider status** is tracked at runtime via `currentStatus()` and `subscribeStatus()` in `src/lib/vaultProviderRuntime.ts`. The status bar shows an iCloud badge with availability and sync state for iCloud-backed vaults. When the provider is unavailable, writes are blocked with a user-visible toast.
+
+**Stale-save detection** protects iCloud vaults from silent overwrites when another device edits the same file. File identity (path + mtime + size) is captured when a note opens and rechecked before saving. A mismatch surfaces a blocking recovery dialog with "Reload from disk" and "Save as recovered copy" options.
+
+**Legacy migration**: existing vault entries without provider fields automatically default to `local-folder` on load. The Rust `VaultEntry` struct uses `#[serde(rename_all = "camelCase")]` with `alias` attributes to accept both camelCase (frontend) and snake_case (legacy on-disk) field names.
+
 ### Vault Git Capability
 
-Git is a per-vault capability, not a prerequisite for the document model. A vault can be:
+Git is a per-vault capability, not a prerequisite for the document model. Git and the storage provider are independent — an iCloud-backed vault can also be Git-backed. A vault can be:
 
 | State | Meaning | UI behavior |
 |---|---|---|
