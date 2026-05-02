@@ -5,6 +5,7 @@ interface GitCommandsConfig {
   modifiedCount: number
   canAddRemote: boolean
   isGitVault?: boolean
+  isIcloudOnlyVault?: boolean
   onAddRemote?: () => void
   onCommitPush: () => void
   onInitializeGit?: () => void
@@ -18,6 +19,7 @@ export function buildGitCommands(config: GitCommandsConfig): CommandAction[] {
     modifiedCount,
     canAddRemote,
     isGitVault = true,
+    isIcloudOnlyVault = false,
     onAddRemote,
     onCommitPush,
     onInitializeGit,
@@ -25,6 +27,10 @@ export function buildGitCommands(config: GitCommandsConfig): CommandAction[] {
     onResolveConflicts,
     onSelect,
   } = config
+
+  if (isIcloudOnlyVault) {
+    return []
+  }
 
   if (!isGitVault) {
     return [

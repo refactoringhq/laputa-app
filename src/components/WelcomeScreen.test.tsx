@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { WelcomeScreen } from './WelcomeScreen'
 import tolariaIcon from '@/assets/tolaria-icon.svg'
@@ -67,14 +67,27 @@ describe('WelcomeScreen', () => {
       expect(screen.getByText(/Requires internet — clone later/)).toBeInTheDocument()
     })
 
-    it('calls onCreateEmptyVault when create empty button is clicked', () => {
+    it('calls onCreateEmptyVault after provider selection when create empty button is clicked', () => {
       const onCreateEmptyVault = vi.fn()
       render(<WelcomeScreen {...defaultProps} onCreateEmptyVault={onCreateEmptyVault} />)
-      fireEvent.click(screen.getByTestId('welcome-create-new'))
-      expect(onCreateEmptyVault).toHaveBeenCalledOnce()
+      const button = screen.getByTestId('welcome-create-new')
+      button.focus()
+      fireEvent.keyDown(button, { key: 'Enter' })
+      fireEvent.click(screen.getByTestId('select-provider-local'))
+      expect(onCreateEmptyVault).toHaveBeenCalledWith('local-folder')
     })
 
-    it('calls onCreateEmptyVault when create empty button is activated with Enter', () => {
+    it('calls onCreateEmptyVault with icloud-drive after provider selection', () => {
+      const onCreateEmptyVault = vi.fn()
+      render(<WelcomeScreen {...defaultProps} onCreateEmptyVault={onCreateEmptyVault} />)
+      const button = screen.getByTestId('welcome-create-new')
+      button.focus()
+      fireEvent.keyDown(button, { key: 'Enter' })
+      fireEvent.click(screen.getByTestId('select-provider-icloud'))
+      expect(onCreateEmptyVault).toHaveBeenCalledWith('icloud-drive')
+    })
+
+    it('calls onCreateEmptyVault when create empty button is activated with Enter then provider selected', async () => {
       const onCreateEmptyVault = vi.fn()
       render(<WelcomeScreen {...defaultProps} onCreateEmptyVault={onCreateEmptyVault} />)
       const button = screen.getByTestId('welcome-create-new')
@@ -82,10 +95,12 @@ describe('WelcomeScreen', () => {
       button.focus()
       fireEvent.keyDown(button, { key: 'Enter' })
 
-      expect(onCreateEmptyVault).toHaveBeenCalledOnce()
+      await waitFor(() => expect(screen.getByTestId('select-provider-local')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('select-provider-local'))
+      expect(onCreateEmptyVault).toHaveBeenCalledWith('local-folder')
     })
 
-    it('calls onCreateEmptyVault when create empty button is activated with Space', () => {
+    it('calls onCreateEmptyVault when create empty button is activated with Space then provider selected', async () => {
       const onCreateEmptyVault = vi.fn()
       render(<WelcomeScreen {...defaultProps} onCreateEmptyVault={onCreateEmptyVault} />)
       const button = screen.getByTestId('welcome-create-new')
@@ -93,14 +108,19 @@ describe('WelcomeScreen', () => {
       button.focus()
       fireEvent.keyDown(button, { key: ' ' })
 
-      expect(onCreateEmptyVault).toHaveBeenCalledOnce()
+      await waitFor(() => expect(screen.getByTestId('select-provider-local')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('select-provider-local'))
+      expect(onCreateEmptyVault).toHaveBeenCalledWith('local-folder')
     })
 
-    it('calls onCreateVault when template button is clicked', () => {
+    it('calls onCreateVault after provider selection when template button is activated', () => {
       const onCreateVault = vi.fn()
       render(<WelcomeScreen {...defaultProps} onCreateVault={onCreateVault} />)
-      fireEvent.click(screen.getByTestId('welcome-create-vault'))
-      expect(onCreateVault).toHaveBeenCalledOnce()
+      const button = screen.getByTestId('welcome-create-vault')
+      button.focus()
+      fireEvent.keyDown(button, { key: 'Enter' })
+      fireEvent.click(screen.getByTestId('select-provider-local'))
+      expect(onCreateVault).toHaveBeenCalledWith('local-folder')
     })
 
     it('calls onOpenFolder when open folder button is clicked', () => {
@@ -110,14 +130,16 @@ describe('WelcomeScreen', () => {
       expect(onOpenFolder).toHaveBeenCalledOnce()
     })
 
-    it('cycles onboarding actions with Tab and activates the selected action with Enter', () => {
+    it('cycles onboarding actions with Tab and activates the selected action with Enter then provider', async () => {
       const onCreateEmptyVault = vi.fn()
       render(<WelcomeScreen {...defaultProps} onCreateEmptyVault={onCreateEmptyVault} />)
 
       fireEvent.keyDown(window, { key: 'Tab' })
       fireEvent.keyDown(window, { key: 'Enter' })
 
-      expect(onCreateEmptyVault).toHaveBeenCalledOnce()
+      await waitFor(() => expect(screen.getByTestId('select-provider-local')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('select-provider-local'))
+      expect(onCreateEmptyVault).toHaveBeenCalledWith('local-folder')
     })
 
     it('disables all buttons while creating', () => {

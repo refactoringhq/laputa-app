@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { FolderOpen, Plus, AlertTriangle, Loader2, Rocket } from 'lucide-react'
+import { Cloud, FolderOpen, Plus, AlertTriangle, Loader2, Rocket } from 'lucide-react'
 import { OnboardingShell } from './OnboardingShell'
 import { Button } from '@/components/ui/button'
 import tolariaIcon from '@/assets/tolaria-icon.svg'
+
+import type { VaultProviderType } from '../lib/vaultProviders'
 
 interface WelcomeScreenProps {
   mode: 'welcome' | 'vault-missing'
   missingPath?: string
   defaultVaultPath: string
-  onCreateVault: () => void
+  onCreateVault: (providerType?: VaultProviderType) => void
   onRetryCreateVault: () => void
-  onCreateEmptyVault: () => void
+  onCreateEmptyVault: (providerType?: VaultProviderType) => void
   onOpenFolder: () => void
   isOffline: boolean
   creatingAction: 'template' | 'empty' | null
@@ -382,13 +384,24 @@ export function WelcomeScreen({
 }: WelcomeScreenProps) {
   const busy = creatingAction !== null
   const presentation = getWelcomeScreenPresentation(mode, defaultVaultPath, isOffline)
+  const [providerDialogAction, setProviderDialogAction] = useState<'template' | 'empty' | null>(null)
+
+  const handleCreateVaultWithProvider = () => setProviderDialogAction('template')
+  const handleCreateEmptyWithProvider = () => setProviderDialogAction('empty')
+  const handleProviderSelected = (provider: VaultProviderType) => {
+    const action = providerDialogAction
+    setProviderDialogAction(null)
+    if (action === 'template') onCreateVault(provider)
+    else if (action === 'empty') onCreateEmptyVault(provider)
+  }
+
   const { templateActionRef, createEmptyActionRef, openFolderActionRef } = useWelcomeActionButtons({
     mode,
     busy,
     isOffline,
-    onCreateEmptyVault,
+    onCreateEmptyVault: handleCreateEmptyWithProvider,
     onOpenFolder,
-    onCreateVault,
+    onCreateVault: handleCreateVaultWithProvider,
   })
 
   return (
@@ -484,6 +497,73 @@ export function WelcomeScreen({
           </div>
         )}
       </>
+
+      {providerDialogAction !== null && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.4)',
+          }}
+          onClick={() => setProviderDialogAction(null)}
+          data-testid="provider-overlay"
+        >
+          <div
+            style={{
+              background: 'var(--background)',
+              borderRadius: 12,
+              border: '1px solid var(--border)',
+              padding: 24,
+              maxWidth: 460,
+              width: '90%',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Choose Vault Storage</h2>
+            <p style={{ fontSize: 12, color: 'var(--muted-foreground)', marginBottom: 16 }}>
+              How do you want to manage this vault?
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => handleProviderSelected('local-folder')}
+                data-testid="select-provider-local"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
+                  border: '1px solid var(--border)', borderRadius: 8, background: 'transparent',
+                  cursor: 'pointer', textAlign: 'left', width: '100%',
+                }}
+              >
+                <FolderOpen size={22} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>Local Folder</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Standard folder on your Mac. Recommended for Git-backed vaults.</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleProviderSelected('icloud-drive')}
+                data-testid="select-provider-icloud"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
+                  border: '1px solid var(--border)', borderRadius: 8, background: 'transparent',
+                  cursor: 'pointer', textAlign: 'left', width: '100%',
+                }}
+              >
+                <Cloud size={22} style={{ color: 'var(--accent-blue)' }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>iCloud Drive</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Automatically synced across your Apple devices via iCloud.</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </OnboardingShell>
   )
 }

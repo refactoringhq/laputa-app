@@ -55,6 +55,7 @@ interface StatusBarPrimarySectionProps {
   isOffline?: boolean
   isVaultReloading?: boolean
   isGitVault?: boolean
+  isIcloudOnlyVault?: boolean
   syncStatus: SyncStatus
   lastSyncTime: number | null
   conflictCount: number
@@ -184,6 +185,7 @@ function StatusBarPrimaryBadges({
   conflictCount,
   onClickPulse,
   isGitVault,
+  isIcloudOnlyVault,
   mcpStatus,
   onInstallMcp,
   aiAgentsStatus,
@@ -212,6 +214,7 @@ function StatusBarPrimaryBadges({
   conflictCount: number
   onClickPulse?: () => void
   isGitVault: boolean
+  isIcloudOnlyVault?: boolean
   mcpStatus?: McpStatus
   onInstallMcp?: () => void
   aiAgentsStatus?: AiAgentsStatus
@@ -230,7 +233,7 @@ function StatusBarPrimaryBadges({
     <>
       <OfflineBadge isOffline={isOffline} showSeparator={!compact} compact={compact} locale={locale} />
       <VaultReloadingBadge isReloading={isVaultReloading} showSeparator={!compact} compact={compact} locale={locale} />
-      {isGitVault ? (
+      {isIcloudOnlyVault ? null : isGitVault ? (
         <>
           <NoRemoteBadge remoteStatus={visibleRemoteStatus} onAddRemote={onAddRemote} showSeparator={!compact} compact={compact} locale={locale} />
           <ChangesBadge count={modifiedCount} onClick={onClickPending} showSeparator={!compact} compact={compact} locale={locale} />
@@ -318,6 +321,7 @@ export function StatusBarPrimarySection({
   isOffline = false,
   isVaultReloading = false,
   isGitVault = true,
+  isIcloudOnlyVault = false,
   syncStatus,
   lastSyncTime,
   conflictCount,
@@ -399,6 +403,7 @@ export function StatusBarPrimarySection({
         conflictCount={conflictCount}
         onClickPulse={onClickPulse}
         isGitVault={isGitVault}
+        isIcloudOnlyVault={isIcloudOnlyVault}
         mcpStatus={mcpStatus}
         onInstallMcp={onInstallMcp}
         aiAgentsStatus={aiAgentsStatus}

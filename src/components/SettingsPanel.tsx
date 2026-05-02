@@ -66,6 +66,7 @@ interface SettingsPanelProps {
   onSave: (settings: Settings) => void
   onCopyMcpConfig?: () => void
   isGitVault?: boolean
+  isIcloudOnlyVault?: boolean
   explicitOrganizationEnabled?: boolean
   onSaveExplicitOrganization?: (enabled: boolean) => void
   onClose: () => void
@@ -94,6 +95,7 @@ interface SettingsBodyProps {
   pullInterval: number
   setPullInterval: (value: number) => void
   isGitVault: boolean
+  isIcloudOnlyVault: boolean
   autoGitEnabled: boolean
   setAutoGitEnabled: (value: boolean) => void
   autoGitIdleThresholdSeconds: number
@@ -244,6 +246,7 @@ export function SettingsPanel({
   onSave,
   onCopyMcpConfig,
   isGitVault = true,
+  isIcloudOnlyVault = false,
   explicitOrganizationEnabled = true,
   onSaveExplicitOrganization,
   onClose,
@@ -259,6 +262,7 @@ export function SettingsPanel({
       onSave={onSave}
       onCopyMcpConfig={onCopyMcpConfig}
       isGitVault={isGitVault}
+      isIcloudOnlyVault={isIcloudOnlyVault}
       explicitOrganizationEnabled={explicitOrganizationEnabled}
       onSaveExplicitOrganization={onSaveExplicitOrganization}
       onClose={onClose}
@@ -266,11 +270,12 @@ export function SettingsPanel({
   )
 }
 
-type SettingsPanelInnerProps = Omit<SettingsPanelProps, 'open' | 'explicitOrganizationEnabled' | 'aiAgentsStatus' | 'isGitVault'> & {
+type SettingsPanelInnerProps = Omit<SettingsPanelProps, 'open' | 'explicitOrganizationEnabled' | 'aiAgentsStatus' | 'isGitVault' | 'isIcloudOnlyVault'> & {
   aiAgentsStatus: AiAgentsStatus
   locale: AppLocale
   systemLocale: AppLocale
   isGitVault: boolean
+  isIcloudOnlyVault: boolean
   explicitOrganizationEnabled: boolean
 }
 
@@ -281,6 +286,7 @@ function SettingsPanelInner({
   onSave,
   onCopyMcpConfig,
   isGitVault,
+  isIcloudOnlyVault,
   explicitOrganizationEnabled,
   onSaveExplicitOrganization,
   onClose,
@@ -368,6 +374,7 @@ function SettingsPanelInner({
           pullInterval={draft.pullInterval}
           setPullInterval={(value) => updateDraft('pullInterval', value)}
           isGitVault={isGitVault}
+          isIcloudOnlyVault={isIcloudOnlyVault}
           autoGitEnabled={draft.autoGitEnabled}
           setAutoGitEnabled={(value) => updateDraft('autoGitEnabled', value)}
           autoGitIdleThresholdSeconds={draft.autoGitIdleThresholdSeconds}
@@ -442,6 +449,7 @@ function SettingsSyncAndAppearanceSections({
   pullInterval,
   setPullInterval,
   isGitVault,
+  isIcloudOnlyVault,
   autoGitEnabled,
   setAutoGitEnabled,
   autoGitIdleThresholdSeconds,
@@ -466,18 +474,20 @@ function SettingsSyncAndAppearanceSections({
           setReleaseChannel={setReleaseChannel}
         />
       </SettingsSection>
-      <SettingsSection>
-        <AutoGitSettingsSection
-          t={t}
-          isGitVault={isGitVault}
-          autoGitEnabled={autoGitEnabled}
-          setAutoGitEnabled={setAutoGitEnabled}
-          autoGitIdleThresholdSeconds={autoGitIdleThresholdSeconds}
-          setAutoGitIdleThresholdSeconds={setAutoGitIdleThresholdSeconds}
-          autoGitInactiveThresholdSeconds={autoGitInactiveThresholdSeconds}
-          setAutoGitInactiveThresholdSeconds={setAutoGitInactiveThresholdSeconds}
-        />
-      </SettingsSection>
+      {!isIcloudOnlyVault && (
+        <SettingsSection>
+          <AutoGitSettingsSection
+            t={t}
+            isGitVault={isGitVault}
+            autoGitEnabled={autoGitEnabled}
+            setAutoGitEnabled={setAutoGitEnabled}
+            autoGitIdleThresholdSeconds={autoGitIdleThresholdSeconds}
+            setAutoGitIdleThresholdSeconds={setAutoGitIdleThresholdSeconds}
+            autoGitInactiveThresholdSeconds={autoGitInactiveThresholdSeconds}
+            setAutoGitInactiveThresholdSeconds={setAutoGitInactiveThresholdSeconds}
+          />
+        </SettingsSection>
+      )}
 
       <SettingsSection>
         <AppearanceSettingsSection

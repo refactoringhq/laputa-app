@@ -72,6 +72,7 @@ interface StatusBarProps {
   isOffline?: boolean
   isVaultReloading?: boolean
   isGitVault?: boolean
+  isIcloudOnlyVault?: boolean
   syncStatus?: SyncStatus
   lastSyncTime?: number | null
   conflictCount?: number
@@ -120,6 +121,7 @@ function StatusBarPrimaryFromFooter({
   isOffline = false,
   isVaultReloading = false,
   isGitVault = true,
+  isIcloudOnlyVault = false,
   syncStatus = 'idle',
   lastSyncTime = null,
   conflictCount = 0,
@@ -160,6 +162,7 @@ function StatusBarPrimaryFromFooter({
       isOffline={isOffline}
       isVaultReloading={isVaultReloading}
       isGitVault={isGitVault}
+      isIcloudOnlyVault={isIcloudOnlyVault}
       syncStatus={syncStatus}
       lastSyncTime={lastSyncTime}
       conflictCount={conflictCount}

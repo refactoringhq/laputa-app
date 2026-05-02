@@ -206,17 +206,18 @@ function useCreateVaultHandler(
 function useCreateEmptyVaultHandler(
   options: CreateEmptyVaultHandlerOptions,
 ) {
-  return useCallback(async () => {
+  return useCallback(async (providerType?: string) => {
+    const isIcloud = providerType === 'icloud-drive'
     const path = await pickFolderWithOnboardingError({
       action: 'Could not choose where to create your vault',
       setError: options.setError,
-      title: 'Choose where to create your vault',
+      title: isIcloud ? 'Choose where to create your iCloud vault' : 'Choose where to create your vault',
     })
     if (!path) return
 
     try {
       options.setCreatingAction('empty')
-      const vaultPath = await tauriCall<string>('create_empty_vault', { targetPath: path })
+      const vaultPath = await tauriCall<string>('create_empty_vault', { targetPath: path, skipGit: isIcloud })
       try {
         await registerVaultSelection(options.registerVault, vaultPath, { verifyAvailability: false })
       } catch (err) {
