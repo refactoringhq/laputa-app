@@ -10,6 +10,9 @@ cd "$PROJECT_DIR"
 APP_NAME="Tolaria"
 BUNDLE_DIR="src-tauri/target/release/bundle"
 
+# PATH 설정 (Volta, Cargo)
+export PATH="$HOME/.cargo/bin:$HOME/.volta/bin:$PATH"
+
 echo "[1/4] 의존성 확인..."
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "pnpm이 설치되어 있지 않습니다."
