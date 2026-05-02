@@ -9,17 +9,18 @@ pub fn migrate_is_a_to_type(vault_path: String) -> Result<usize, String> {
 }
 
 #[tauri::command]
-pub fn create_empty_vault(
-    target_path: String,
-    skip_git: Option<bool>,
-) -> Result<String, String> {
+pub fn create_empty_vault(target_path: String, skip_git: Option<bool>) -> Result<String, String> {
     let path = expand_tilde(&target_path).into_owned();
     let vault_dir = Path::new(&path);
     initialize_empty_vault(vault_dir, &path, skip_git.unwrap_or(false))?;
     Ok(canonical_vault_path_string(vault_dir))
 }
 
-fn initialize_empty_vault(vault_dir: &Path, vault_path: &str, skip_git: bool) -> Result<(), String> {
+fn initialize_empty_vault(
+    vault_dir: &Path,
+    vault_path: &str,
+    skip_git: bool,
+) -> Result<(), String> {
     ensure_directory_is_missing_or_empty(vault_dir)?;
     std::fs::create_dir_all(vault_dir)
         .map_err(|e| format!("Failed to create vault directory: {}", e))?;

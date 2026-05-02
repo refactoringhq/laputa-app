@@ -117,7 +117,9 @@ mod tests {
         let result = validate_vault_provider_selection_with(
             Path::new("/tmp/vault"),
             Some("icloud-drive"),
-            Some(Path::new("/Users/me/Library/Mobile Documents/com~apple~CloudDocs")),
+            Some(Path::new(
+                "/Users/me/Library/Mobile Documents/com~apple~CloudDocs",
+            )),
         );
 
         assert_eq!(result.validation_result, ValidationResult::Invalid);

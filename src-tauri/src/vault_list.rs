@@ -76,7 +76,11 @@ fn load_at(path: &PathBuf) -> Result<VaultList, String> {
         fs::read_to_string(path).map_err(|e| format!("Failed to read vault list: {}", e))?;
     let mut list: VaultList =
         serde_json::from_str(&content).map_err(|e| format!("Failed to parse vault list: {}", e))?;
-    list.vaults = list.vaults.into_iter().map(VaultEntry::normalized).collect();
+    list.vaults = list
+        .vaults
+        .into_iter()
+        .map(VaultEntry::normalized)
+        .collect();
     Ok(list)
 }
 
@@ -86,7 +90,12 @@ fn save_at(path: &PathBuf, list: &VaultList) -> Result<(), String> {
             .map_err(|e| format!("Failed to create config directory: {}", e))?;
     }
     let normalized = VaultList {
-        vaults: list.vaults.clone().into_iter().map(VaultEntry::normalized).collect(),
+        vaults: list
+            .vaults
+            .clone()
+            .into_iter()
+            .map(VaultEntry::normalized)
+            .collect(),
         active_vault: list.active_vault.clone(),
         hidden_defaults: list.hidden_defaults.clone(),
     };

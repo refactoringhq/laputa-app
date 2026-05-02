@@ -521,7 +521,10 @@ pub fn validate_vault_provider_selection(
     path: String,
     explicit_provider_type: Option<String>,
 ) -> Result<ValidatedVaultProviderSelection, String> {
-    crate::vault_provider::validate_vault_provider_selection(&path, explicit_provider_type.as_deref())
+    crate::vault_provider::validate_vault_provider_selection(
+        &path,
+        explicit_provider_type.as_deref(),
+    )
 }
 
 #[cfg(test)]
