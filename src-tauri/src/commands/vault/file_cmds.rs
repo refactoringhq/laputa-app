@@ -120,6 +120,19 @@ fn with_writable_note_path<T>(
 }
 
 #[tauri::command]
+pub fn get_note_file_identity(
+    path: PathBuf,
+    vault_path: Option<PathBuf>,
+) -> Result<vault::file::NoteFileIdentity, String> {
+    with_note_path(
+        path.as_path(),
+        vault_path.as_deref(),
+        ValidatedPathMode::Existing,
+        vault::file::get_note_file_identity,
+    )
+}
+
+#[tauri::command]
 pub fn get_note_content(path: PathBuf, vault_path: Option<PathBuf>) -> Result<String, String> {
     with_note_path(
         path.as_path(),

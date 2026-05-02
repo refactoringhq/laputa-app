@@ -377,6 +377,7 @@ macro_rules! app_invoke_handler {
         tauri::generate_handler![
             commands::list_vault,
             commands::list_vault_folders,
+            commands::get_note_file_identity,
             commands::get_note_content,
             commands::validate_note_content,
             commands::create_note_content,

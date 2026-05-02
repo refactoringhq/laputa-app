@@ -1,7 +1,7 @@
 mod cache;
 mod config_seed;
 mod entry;
-mod file;
+pub mod file;
 pub(crate) mod filename_rules;
 mod folders;
 mod frontmatter;

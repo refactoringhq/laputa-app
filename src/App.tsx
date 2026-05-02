@@ -49,6 +49,8 @@ import { useVaultSwitcher } from './hooks/useVaultSwitcher'
 import { useVaultProviderState, useProviderStatus } from './hooks/useVaultProviderState'
 import { isWriteBlocked } from './lib/vaultProviderRuntime'
 import { OpenVaultProviderDialog } from './components/status-bar/OpenVaultProviderDialog'
+import { StaleSaveDialog } from './components/editor/StaleSaveDialog'
+import { captureFileIdentity, hasFileIdentityChanged, buildRecoveryFilename, type NoteFileIdentity } from './lib/staleSaveDetection'
 import { useGitHistory } from './hooks/useGitHistory'
 import { useUpdater, restartApp } from './hooks/useUpdater'
 import { useAutoSync } from './hooks/useAutoSync'
@@ -1021,19 +1023,87 @@ function App() {
     handleAppContentChange(path, content)
   }, [handleAppContentChange, recordAutoGitActivity])
 
+  // Stale-save detection state
+  const fileIdentityMapRef = useRef<Map<string, NoteFileIdentity>>(new Map())
+  const [staleSaveState, setStaleSaveState] = useState<{
+    notePath: string
+    unsavedContent: string
+  } | null>(null)
+
+  // Capture file identity when a note tab becomes active
+  useEffect(() => {
+    const path = notes.activeTabPath
+    if (!path || !resolvedPath) return
+    void captureFileIdentity(path, resolvedPath).then((identity) => {
+      fileIdentityMapRef.current.set(path, identity)
+    })
+  }, [notes.activeTabPath, resolvedPath])
+
   const handleTrackedSave = useCallback(async (...args: Parameters<typeof handleAppSave>) => {
     if (providerWriteBlocked) {
       setToastMessage('Vault storage is currently unavailable. Your edits are preserved in memory.')
       return undefined
     }
+
+    // Stale-save check for provider-backed vaults
+    const activePath = notes.activeTabPath
+    if (activePath && resolvedPath && activeVaultProvider === 'icloud-drive') {
+      const openIdentity = fileIdentityMapRef.current.get(activePath)
+      if (openIdentity) {
+        try {
+          const currentIdentity = await captureFileIdentity(activePath, resolvedPath)
+          if (hasFileIdentityChanged(openIdentity, currentIdentity)) {
+            const activeTab = notes.tabs.find((tab) => tab.entry.path === activePath)
+            setStaleSaveState({
+              notePath: activePath,
+              unsavedContent: activeTab?.content ?? '',
+            })
+            return undefined // Block the save
+          }
+        } catch {
+          // If we can't check identity, allow save to proceed
+        }
+      }
+    }
+
     if (notes.activeTabPath) {
       flushPendingEditorContentRef.current?.(notes.activeTabPath)
       flushPendingRawContentRef.current?.(notes.activeTabPath)
     }
     const result = await handleAppSave(...args)
     recordAutoGitActivity()
+    // Update file identity after successful save
+    if (activePath && resolvedPath) {
+      void captureFileIdentity(activePath, resolvedPath).then((identity) => {
+        fileIdentityMapRef.current.set(activePath, identity)
+      })
+    }
     return result
-  }, [handleAppSave, notes.activeTabPath, providerWriteBlocked, recordAutoGitActivity])
+  }, [activeVaultProvider, handleAppSave, notes.activeTabPath, notes.tabs, providerWriteBlocked, recordAutoGitActivity, resolvedPath])
+
+  const handleStaleSaveReload = useCallback(() => {
+    if (!staleSaveState) return
+    setStaleSaveState(null)
+    vault.reloadVault()
+    setToastMessage('Reloaded from disk')
+  }, [staleSaveState, vault])
+
+  const handleStaleSaveDuplicate = useCallback(async () => {
+    if (!staleSaveState || !resolvedPath) return
+    const recoveryPath = buildRecoveryFilename(staleSaveState.notePath)
+    try {
+      if (isTauri()) {
+        await invoke('create_note_content', { path: recoveryPath, content: staleSaveState.unsavedContent, vaultPath: resolvedPath })
+      } else {
+        await mockInvoke('create_note_content', { path: recoveryPath, content: staleSaveState.unsavedContent, vaultPath: resolvedPath })
+      }
+      setStaleSaveState(null)
+      vault.reloadVault()
+      setToastMessage(`Saved recovered copy: ${recoveryPath.split('/').pop()}`)
+    } catch (err) {
+      setToastMessage(`Failed to save recovered copy: ${err}`)
+    }
+  }, [staleSaveState, resolvedPath, vault])
 
   const seedAutoGitSavedChange = useCallback(async () => {
     if (isTauri()) {
@@ -1838,6 +1908,13 @@ function App() {
           onSelect={providerState.confirmProvider}
           onCancel={providerState.cancelProviderSelection}
           locale={appLocale}
+        />
+        <StaleSaveDialog
+          open={staleSaveState !== null}
+          notePath={staleSaveState?.notePath ?? null}
+          onReloadFromDisk={handleStaleSaveReload}
+          onDuplicateLocalDraft={() => { void handleStaleSaveDuplicate() }}
+          onCancel={() => setStaleSaveState(null)}
         />
         <CloneVaultModal key={dialogs.showCloneVault ? 'clone-open' : 'clone-closed'} open={dialogs.showCloneVault} onClose={dialogs.closeCloneVault} onVaultCloned={vaultSwitcher.handleVaultCloned} />
         {deleteActions.confirmDelete && (

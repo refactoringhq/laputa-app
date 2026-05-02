@@ -97,6 +97,32 @@ fn note_io_error(operation: NoteIoOperation, path: NotePathDisplay<'_>, error: &
     }
 }
 
+/// File identity for stale-save detection.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteFileIdentity {
+    pub path: String,
+    pub modified_at: Option<f64>,
+    pub file_size: Option<u64>,
+}
+
+/// Get the file identity (mtime + size) for stale-save detection.
+pub fn get_note_file_identity(path: &Path) -> Result<NoteFileIdentity, String> {
+    let metadata = path
+        .metadata()
+        .map_err(|e| format!("Failed to read file metadata: {e}"))?;
+    let modified_at = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs_f64());
+    Ok(NoteFileIdentity {
+        path: path.to_string_lossy().to_string(),
+        modified_at,
+        file_size: Some(metadata.len()),
+    })
+}
+
 /// Read the content of a single note file.
 pub fn get_note_content(path: &Path) -> Result<String, String> {
     let bytes = read_existing_note_bytes(path)?;
