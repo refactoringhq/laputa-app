@@ -9,6 +9,14 @@ import {
 } from '../utils/gettingStartedVault'
 import { formatFolderPickerActionError, pickFolder } from '../utils/vault-dialog'
 
+function getIcloudDriveRoot(): string | undefined {
+  if (typeof process !== 'undefined' && process.env?.HOME) {
+    return `${process.env.HOME}/Library/Mobile Documents/com~apple~CloudDocs`
+  }
+  // Tauri WebView: use a well-known macOS path with ~ expansion
+  return '~/Library/Mobile Documents/com~apple~CloudDocs'
+}
+
 type OnboardingState =
   | { status: 'loading' }
   | { status: 'welcome'; defaultPath: string }
@@ -143,15 +151,17 @@ async function pickFolderWithOnboardingError({
   action,
   setError,
   title,
+  defaultPath,
 }: {
   action: string
   setError: SetError
   title: string
+  defaultPath?: string
 }): Promise<string | null> {
   setError(null)
 
   try {
-    return await pickFolder(title)
+    return await pickFolder(title, defaultPath)
   } catch (err) {
     setError(formatFolderPickerActionError(action, err))
     return null
@@ -191,11 +201,14 @@ function useCreateVaultHandler(
   createTemplateVault: (targetPath: string) => Promise<void>,
   setError: SetError,
 ) {
-  return useCallback(async () => {
+  return useCallback(async (providerType?: string) => {
+    const isIcloud = providerType === 'icloud-drive'
+    const icloudRoot = isIcloud ? getIcloudDriveRoot() : undefined
     const parentPath = await pickFolderWithOnboardingError({
       action: 'Could not choose a parent folder',
       setError,
-      title: 'Choose a parent folder for the Getting Started vault',
+      title: isIcloud ? 'Choose a parent folder in iCloud Drive' : 'Choose a parent folder for the Getting Started vault',
+      defaultPath: icloudRoot,
     })
     if (!parentPath) return
 
@@ -208,10 +221,12 @@ function useCreateEmptyVaultHandler(
 ) {
   return useCallback(async (providerType?: string) => {
     const isIcloud = providerType === 'icloud-drive'
+    const icloudRoot = isIcloud ? getIcloudDriveRoot() : undefined
     const path = await pickFolderWithOnboardingError({
       action: 'Could not choose where to create your vault',
       setError: options.setError,
       title: isIcloud ? 'Choose where to create your iCloud vault' : 'Choose where to create your vault',
+      defaultPath: icloudRoot,
     })
     if (!path) return
 

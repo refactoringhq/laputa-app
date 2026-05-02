@@ -79,7 +79,7 @@ function normalizePickedFolderPath(selected: string | string[] | null): string |
  * Opens a native folder picker dialog (Tauri) or falls back to prompt (browser).
  * Returns the selected folder path, or null if the user cancelled.
  */
-export async function pickFolder(title?: string): Promise<string | null> {
+export async function pickFolder(title?: string, defaultPath?: string): Promise<string | null> {
   if (isTauri()) {
     if (isRestartRequiredAfterUpdate()) {
       throw new NativeFolderPickerBlockedError()
@@ -90,6 +90,7 @@ export async function pickFolder(title?: string): Promise<string | null> {
       directory: true,
       multiple: false,
       title: title ?? 'Select folder',
+      ...(defaultPath ? { defaultPath } : {}),
     })
     return normalizePickedFolderPath(selected)
   }
