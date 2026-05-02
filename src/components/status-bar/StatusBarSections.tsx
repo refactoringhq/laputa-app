@@ -186,7 +186,7 @@ function StatusBarPrimaryBadges({
   conflictCount,
   onClickPulse,
   isGitVault,
-  isIcloudOnlyVault,
+  isIcloudVault,
   providerAvailability,
   providerSyncState,
   mcpStatus,
@@ -218,6 +218,7 @@ function StatusBarPrimaryBadges({
   onClickPulse?: () => void
   isGitVault: boolean
   isIcloudOnlyVault?: boolean
+  isIcloudVault?: boolean
   providerAvailability?: string
   providerSyncState?: string
   mcpStatus?: McpStatus
@@ -238,14 +239,15 @@ function StatusBarPrimaryBadges({
     <>
       <OfflineBadge isOffline={isOffline} showSeparator={!compact} compact={compact} locale={locale} />
       <VaultReloadingBadge isReloading={isVaultReloading} showSeparator={!compact} compact={compact} locale={locale} />
-      {isIcloudOnlyVault ? (
+      {isIcloudVault && (
         <IcloudStatusBadge
           availability={providerAvailability ?? 'available'}
           syncState={providerSyncState ?? 'unknown'}
           showSeparator={!compact}
           compact={compact}
         />
-      ) : isGitVault ? (
+      )}
+      {isGitVault ? (
         <>
           <NoRemoteBadge remoteStatus={visibleRemoteStatus} onAddRemote={onAddRemote} showSeparator={!compact} compact={compact} locale={locale} />
           <ChangesBadge count={modifiedCount} onClick={onClickPending} showSeparator={!compact} compact={compact} locale={locale} />
@@ -334,6 +336,9 @@ export function StatusBarPrimarySection({
   isVaultReloading = false,
   isGitVault = true,
   isIcloudOnlyVault = false,
+  isIcloudVault = false,
+  providerAvailability,
+  providerSyncState,
   syncStatus,
   lastSyncTime,
   conflictCount,
@@ -416,6 +421,9 @@ export function StatusBarPrimarySection({
         onClickPulse={onClickPulse}
         isGitVault={isGitVault}
         isIcloudOnlyVault={isIcloudOnlyVault}
+        isIcloudVault={isIcloudVault}
+        providerAvailability={providerAvailability}
+        providerSyncState={providerSyncState}
         mcpStatus={mcpStatus}
         onInstallMcp={onInstallMcp}
         aiAgentsStatus={aiAgentsStatus}

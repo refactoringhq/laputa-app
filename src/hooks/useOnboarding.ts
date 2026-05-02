@@ -21,7 +21,7 @@ type OnVaultReady = (vaultPath: string, source: ReadyVaultSource) => void
 type RegisterVault = (
   vaultPath: string,
   label: string,
-  options?: { verifyAvailability?: boolean },
+  options?: { verifyAvailability?: boolean; providerType?: string; providerRoot?: string },
 ) => Promise<void>
 type SetError = Dispatch<SetStateAction<string | null>>
 type SetCreatingAction = Dispatch<SetStateAction<CreatingAction>>
@@ -124,7 +124,7 @@ function formatOnboardingRegistrationError({
 async function registerVaultSelection(
   registerVault: RegisterVault | undefined,
   vaultPath: string,
-  options?: { verifyAvailability?: boolean },
+  options?: { verifyAvailability?: boolean; providerType?: string; providerRoot?: string },
 ): Promise<void> {
   if (!registerVault) {
     return
@@ -217,9 +217,13 @@ function useCreateEmptyVaultHandler(
 
     try {
       options.setCreatingAction('empty')
-      const vaultPath = await tauriCall<string>('create_empty_vault', { targetPath: path, skipGit: isIcloud })
+      const vaultPath = await tauriCall<string>('create_empty_vault', { targetPath: path })
       try {
-        await registerVaultSelection(options.registerVault, vaultPath, { verifyAvailability: false })
+        await registerVaultSelection(options.registerVault, vaultPath, {
+          verifyAvailability: false,
+          providerType: providerType ?? 'local-folder',
+          providerRoot: vaultPath,
+        })
       } catch (err) {
         options.setError(formatOnboardingRegistrationError({
           action: 'Could not register the new vault',

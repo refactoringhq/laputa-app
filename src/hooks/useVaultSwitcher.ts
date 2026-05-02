@@ -86,6 +86,8 @@ interface RegisteredVaultSelection {
 
 interface RegisterVaultSelectionOptions {
   verifyAvailability?: boolean
+  providerType?: string
+  providerRoot?: string
 }
 
 interface RestoreGettingStartedOptions {
@@ -616,15 +618,27 @@ function upsertAvailableVaultOption(
   extraVaults: VaultOption[],
   path: string,
   label: string,
+  providerType?: string,
+  providerRoot?: string,
 ): VaultOption[] {
   const existingVault = extraVaults.find((vault) => vault.path === path)
   if (!existingVault) {
-    return [...extraVaults, { label, path, available: true }]
+    return [...extraVaults, {
+      label, path, available: true,
+      ...(providerType ? { providerType: providerType as VaultProviderType } : {}),
+      ...(providerRoot ? { providerRoot } : {}),
+    }]
   }
 
   return extraVaults.map((vault) => (
     vault.path === path
-      ? { ...vault, label: vault.label || label, available: true }
+      ? {
+          ...vault,
+          label: vault.label || label,
+          available: true,
+          ...(providerType ? { providerType: providerType as VaultProviderType } : {}),
+          ...(providerRoot ? { providerRoot } : {}),
+        }
       : vault
   ))
 }
@@ -636,6 +650,8 @@ function buildRegisteredVaultSelection({
   hiddenDefaults,
   label,
   path,
+  providerType,
+  providerRoot,
 }: {
   defaultAvailable: boolean
   defaultPath: string
@@ -643,6 +659,8 @@ function buildRegisteredVaultSelection({
   hiddenDefaults: string[]
   label: string
   path: string
+  providerType?: string
+  providerRoot?: string
 }): RegisteredVaultSelection {
   const isCanonicalDefaultVault = path === defaultPath && defaultPath.length > 0
 
@@ -650,7 +668,7 @@ function buildRegisteredVaultSelection({
     nextDefaultAvailable: isCanonicalDefaultVault ? true : defaultAvailable,
     nextExtraVaults: isCanonicalDefaultVault
       ? extraVaults.filter((vault) => vault.path !== path)
-      : upsertAvailableVaultOption(extraVaults, path, label),
+      : upsertAvailableVaultOption(extraVaults, path, label, providerType, providerRoot),
     nextHiddenDefaults: isCanonicalDefaultVault
       ? hiddenDefaults.filter((hiddenPath) => hiddenPath !== path)
       : hiddenDefaults,
@@ -864,6 +882,8 @@ function useRegisterVaultSelectionAction({
       hiddenDefaults,
       label,
       path,
+      providerType: options.providerType,
+      providerRoot: options.providerRoot,
     })
     await persistRegisteredVaultSelection({
       hiddenDefaults: nextSelection.nextHiddenDefaults,
