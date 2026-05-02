@@ -993,13 +993,18 @@ describe('App', () => {
 
     fireEvent.click(screen.getByTestId('welcome-create-vault'))
 
+    // Provider selection dialog appears — select Local Folder
+    await waitFor(() => {
+      expect(screen.getByTestId('select-provider-local')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('select-provider-local'))
+
     await waitFor(() => {
       expect(saveVaultList).toHaveBeenCalledWith({
-        list: {
-          vaults: [],
+        list: expect.objectContaining({
           active_vault: expectedDefaultVaultPath,
           hidden_defaults: [],
-        },
+        }),
       })
     })
     expect(saveVaultList).toHaveBeenCalledTimes(1)

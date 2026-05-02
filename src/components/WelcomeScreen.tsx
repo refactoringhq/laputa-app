@@ -437,7 +437,7 @@ export function WelcomeScreen({
             description={presentation.templateDescription}
             loadingLabel="Downloading template…"
             loadingDescription="Cloning the Getting Started vault template"
-            onClick={onCreateVault}
+            onClick={handleCreateVaultWithProvider}
             disabled={busy || isOffline}
             loading={creatingAction === 'template'}
             testId="welcome-create-vault"
@@ -452,7 +452,7 @@ export function WelcomeScreen({
             description="Start fresh in an empty folder with Tolaria defaults"
             loadingLabel="Creating vault…"
             loadingDescription="Preparing Tolaria defaults in the selected folder"
-            onClick={onCreateEmptyVault}
+            onClick={handleCreateEmptyWithProvider}
             disabled={busy}
             loading={creatingAction === 'empty'}
             testId="welcome-create-new"
