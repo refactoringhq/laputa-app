@@ -25,6 +25,7 @@ pub mod settings;
 pub mod telemetry;
 pub mod vault;
 pub mod vault_list;
+pub mod vault_provider;
 pub mod vault_watcher;
 #[cfg(desktop)]
 mod window_state;
@@ -568,6 +569,7 @@ macro_rules! app_invoke_handler {
             commands::download_and_install_app_update,
             commands::load_vault_list,
             commands::save_vault_list,
+            commands::validate_vault_provider_selection,
             commands::git_clone::clone_git_repo,
             commands::search_vault,
             commands::create_empty_vault,

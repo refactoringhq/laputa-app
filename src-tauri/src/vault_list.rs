@@ -9,6 +9,26 @@ const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
 pub struct VaultEntry {
     pub label: String,
     pub path: String,
+    #[serde(default = "default_provider_type")]
+    pub provider_type: String,
+    #[serde(default)]
+    pub provider_root: String,
+}
+
+fn default_provider_type() -> String {
+    "local-folder".to_string()
+}
+
+impl VaultEntry {
+    fn normalized(mut self) -> Self {
+        if self.provider_type != "local-folder" && self.provider_type != "icloud-drive" {
+            self.provider_type = default_provider_type();
+        }
+        if self.provider_root.trim().is_empty() {
+            self.provider_root = self.path.clone();
+        }
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -53,7 +73,10 @@ fn load_at(path: &PathBuf) -> Result<VaultList, String> {
     }
     let content =
         fs::read_to_string(path).map_err(|e| format!("Failed to read vault list: {}", e))?;
-    serde_json::from_str(&content).map_err(|e| format!("Failed to parse vault list: {}", e))
+    let mut list: VaultList =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse vault list: {}", e))?;
+    list.vaults = list.vaults.into_iter().map(VaultEntry::normalized).collect();
+    Ok(list)
 }
 
 fn save_at(path: &PathBuf, list: &VaultList) -> Result<(), String> {
@@ -61,7 +84,12 @@ fn save_at(path: &PathBuf, list: &VaultList) -> Result<(), String> {
         fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create config directory: {}", e))?;
     }
-    let json = serde_json::to_string_pretty(list)
+    let normalized = VaultList {
+        vaults: list.vaults.clone().into_iter().map(VaultEntry::normalized).collect(),
+        active_vault: list.active_vault.clone(),
+        hidden_defaults: list.hidden_defaults.clone(),
+    };
+    let json = serde_json::to_string_pretty(&normalized)
         .map_err(|e| format!("Failed to serialize vault list: {}", e))?;
     fs::write(path, json).map_err(|e| format!("Failed to write vault list: {}", e))
 }
@@ -99,10 +127,14 @@ mod tests {
                 VaultEntry {
                     label: "My Vault".to_string(),
                     path: "/Users/luca/Laputa".to_string(),
+                    provider_type: "local-folder".to_string(),
+                    provider_root: "/Users/luca/Laputa".to_string(),
                 },
                 VaultEntry {
                     label: "Work".to_string(),
                     path: "/Users/luca/Work".to_string(),
+                    provider_type: "local-folder".to_string(),
+                    provider_root: "/Users/luca/Work".to_string(),
                 },
             ],
             active_vault: Some("/Users/luca/Laputa".to_string()),
@@ -112,6 +144,8 @@ mod tests {
         assert_eq!(loaded.vaults.len(), 2);
         assert_eq!(loaded.vaults[0].label, "My Vault");
         assert_eq!(loaded.vaults[0].path, "/Users/luca/Laputa");
+        assert_eq!(loaded.vaults[0].provider_type, "local-folder");
+        assert_eq!(loaded.vaults[0].provider_root, "/Users/luca/Laputa");
         assert_eq!(loaded.vaults[1].label, "Work");
         assert_eq!(loaded.active_vault.as_deref(), Some("/Users/luca/Laputa"));
     }
@@ -142,6 +176,8 @@ mod tests {
             vaults: vec![VaultEntry {
                 label: "Test".to_string(),
                 path: "/tmp/test".to_string(),
+                provider_type: "local-folder".to_string(),
+                provider_root: "/tmp/test".to_string(),
             }],
             active_vault: None,
             hidden_defaults: vec![],
@@ -204,5 +240,35 @@ mod tests {
         fs::write(&path, r#"{"vaults":[],"active_vault":null}"#).unwrap();
         let loaded = load_at(&path).unwrap();
         assert!(loaded.hidden_defaults.is_empty());
+    }
+
+    #[test]
+    fn load_legacy_entry_defaults_provider_metadata() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("legacy-vaults.json");
+        fs::write(
+            &path,
+            r#"{"vaults":[{"label":"Legacy","path":"/vault"}],"active_vault":"/vault"}"#,
+        )
+        .unwrap();
+
+        let loaded = load_at(&path).unwrap();
+        assert_eq!(loaded.vaults[0].provider_type, "local-folder");
+        assert_eq!(loaded.vaults[0].provider_root, "/vault");
+    }
+
+    #[test]
+    fn malformed_provider_values_fall_back_safely() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("bad-provider.json");
+        fs::write(
+            &path,
+            r#"{"vaults":[{"label":"Bad","path":"/vault","provider_type":"weird","provider_root":""}],"active_vault":null,"hidden_defaults":[]}"#,
+        )
+        .unwrap();
+
+        let loaded = load_at(&path).unwrap();
+        assert_eq!(loaded.vaults[0].provider_type, "local-folder");
+        assert_eq!(loaded.vaults[0].provider_root, "/vault");
     }
 }

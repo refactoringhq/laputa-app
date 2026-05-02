@@ -8,6 +8,7 @@ use crate::menu;
 use crate::settings::Settings;
 use crate::vault_list;
 use crate::vault_list::VaultList;
+use crate::vault_provider::ValidatedVaultProviderSelection;
 use serde::Deserialize;
 #[cfg(desktop)]
 use tauri::ipc::Channel;
@@ -513,6 +514,14 @@ pub fn load_vault_list() -> Result<VaultList, String> {
 #[tauri::command]
 pub fn save_vault_list(list: VaultList) -> Result<(), String> {
     vault_list::save_vault_list(&list)
+}
+
+#[tauri::command]
+pub fn validate_vault_provider_selection(
+    path: String,
+    explicit_provider_type: Option<String>,
+) -> Result<ValidatedVaultProviderSelection, String> {
+    crate::vault_provider::validate_vault_provider_selection(&path, explicit_provider_type.as_deref())
 }
 
 #[cfg(test)]

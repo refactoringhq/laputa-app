@@ -137,6 +137,8 @@ mod tests {
             vaults: vec![VaultListEntry {
                 label: "Test".to_string(),
                 path: vault_root.to_string_lossy().into_owned(),
+                provider_type: "local-folder".to_string(),
+                provider_root: vault_root.to_string_lossy().into_owned(),
             }],
             active_vault: None,
             hidden_defaults: vec![],
@@ -165,10 +167,14 @@ mod tests {
                 VaultListEntry {
                     label: "Parent".to_string(),
                     path: parent_root.to_string_lossy().into_owned(),
+                    provider_type: "local-folder".to_string(),
+                    provider_root: parent_root.to_string_lossy().into_owned(),
                 },
                 VaultListEntry {
                     label: "Nested".to_string(),
                     path: nested_root.to_string_lossy().into_owned(),
+                    provider_type: "local-folder".to_string(),
+                    provider_root: nested_root.to_string_lossy().into_owned(),
                 },
             ],
             active_vault: None,
@@ -205,6 +211,8 @@ mod tests {
             vaults: vec![VaultListEntry {
                 label: "Listed".to_string(),
                 path: "/listed".to_string(),
+                provider_type: "local-folder".to_string(),
+                provider_root: "/listed".to_string(),
             }],
             active_vault: Some("/active".to_string()),
             hidden_defaults: vec![],

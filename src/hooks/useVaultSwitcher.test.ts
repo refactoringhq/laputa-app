@@ -118,9 +118,32 @@ describe('useVaultSwitcher', () => {
     expect(result.current.allVaults).toHaveLength(2) // default + persisted
     expect(result.current.allVaults[1].label).toBe('My Vault')
     expect(result.current.allVaults[1].path).toBe('/Users/luca/Laputa')
+    expect(result.current.allVaults[1].providerType).toBe('local-folder')
+    expect(result.current.allVaults[1].providerRoot).toBe('/Users/luca/Laputa')
     expect(result.current.allVaults[1].available).toBe(true)
     expect(result.current.vaultPath).toBe('/Users/luca/Laputa')
     expect(mockInvokeFn).toHaveBeenCalledWith('load_vault_list', {})
+  })
+
+  it('preserves explicit provider metadata from persisted vaults', async () => {
+    mockVaultListStore = {
+      vaults: [{
+        label: 'iCloud Vault',
+        path: '/Users/luca/Library/Mobile Documents/com~apple~CloudDocs/Tolaria',
+        providerType: 'icloud-drive',
+        providerRoot: '/resolved/icloud/tolaria',
+      }],
+      active_vault: '/Users/luca/Library/Mobile Documents/com~apple~CloudDocs/Tolaria',
+      hidden_defaults: [],
+    }
+
+    const { result } = await renderLoadedVaultSwitcher()
+
+    expect(result.current.allVaults[1]).toMatchObject({
+      label: 'iCloud Vault',
+      providerType: 'icloud-drive',
+      providerRoot: '/resolved/icloud/tolaria',
+    })
   })
 
   it('marks unavailable vaults when check_vault_exists returns false', async () => {
@@ -295,12 +318,23 @@ describe('useVaultSwitcher', () => {
 
     const { result } = await renderLoadedVaultSwitcher()
 
-    expect(result.current.allVaults).toEqual([{ label: 'Work', path: '/work/vault', available: true }])
+    expect(result.current.allVaults).toEqual([{
+      label: 'Work',
+      path: '/work/vault',
+      providerType: 'local-folder',
+      providerRoot: '/work/vault',
+      available: true,
+    }])
     expect(result.current.vaultPath).toBe('/work/vault')
 
     await waitFor(() => {
       expect(mockVaultListStore).toEqual({
-        vaults: [{ label: 'Work', path: '/work/vault' }],
+        vaults: [{
+          label: 'Work',
+          path: '/work/vault',
+          providerType: 'local-folder',
+          providerRoot: '/work/vault',
+        }],
         active_vault: '/work/vault',
         hidden_defaults: [],
       })
