@@ -122,22 +122,100 @@
      matches our vault theme instead of BlockNote's hardcoded light/dark defaults. */
   --bn-colors-editor-background: var(--bg-primary);
   --bn-colors-editor-text: var(--text-primary);
-  --bn-colors-menu-background: var(--bg-card);
+  --bn-colors-menu-background: var(--surface-popover);
   --bn-colors-menu-text: var(--text-primary);
-  --bn-colors-tooltip-background: var(--bg-hover);
+  --bn-colors-tooltip-background: var(--state-hover-subtle);
   --bn-colors-tooltip-text: var(--text-primary);
-  --bn-colors-hovered-background: var(--bg-hover);
+  --bn-colors-hovered-background: var(--state-hover);
   --bn-colors-hovered-text: var(--text-primary);
   --bn-colors-selected-background: var(--bg-selected);
   --bn-colors-selected-text: var(--text-primary);
-  --bn-colors-border: var(--border-primary);
-  --bn-colors-shadow: var(--border-primary);
+  --bn-colors-border: var(--border-dialog);
+  --bn-colors-shadow: var(--shadow-dialog);
   --bn-colors-side-menu: var(--text-muted);
 }
 
 .editor__blocknote-container .bn-editor {
   width: 100%;
   padding: 20px 0;
+}
+
+.editor__blocknote-container .bn-suggestion-menu {
+  border: 1px solid var(--border-dialog) !important;
+  background: var(--surface-popover) !important;
+  box-shadow: 0 8px 32px var(--shadow-dialog) !important;
+}
+
+.editor__blocknote-container .bn-suggestion-menu-label {
+  color: var(--text-secondary) !important;
+}
+
+.editor__blocknote-container .bn-suggestion-menu-item {
+  color: var(--text-primary) !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 3px 8px !important;
+}
+
+.editor__blocknote-container .bn-mt-suggestion-menu-item-section[data-position="left"] {
+  width: 28px;
+  min-width: 28px;
+  margin-inline-end: 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  color: var(--text-primary) !important;
+}
+
+.editor__blocknote-container .bn-mt-suggestion-menu-item-section[data-position="right"] {
+  margin-inline-start: 12px !important;
+  color: var(--text-muted) !important;
+}
+
+.editor__blocknote-container .bn-mt-suggestion-menu-item-section[data-position="right"] .mantine-Badge-root {
+  min-width: 0 !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  text-transform: none !important;
+}
+
+.editor__blocknote-container .bn-mt-suggestion-menu-item-body {
+  justify-content: center !important;
+  padding-right: 0 !important;
+}
+
+.editor__blocknote-container .bn-mt-suggestion-menu-item-subtitle {
+  display: none !important;
+}
+
+.editor__blocknote-container .tolaria-slash-menu-icon {
+  position: relative;
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor__blocknote-container .tolaria-slash-menu-icon__fill {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.editor__blocknote-container .bn-suggestion-menu-item:is(:hover, [aria-selected="true"]) .tolaria-slash-menu-icon__regular {
+  opacity: 0;
+}
+
+.editor__blocknote-container .bn-suggestion-menu-item:is(:hover, [aria-selected="true"]) .tolaria-slash-menu-icon__fill {
+  opacity: 1;
 }
 
 /* =============================================

@@ -1,3 +1,4 @@
+import { Children, isValidElement, type ReactElement } from 'react'
 import { describe, expect, it } from 'vitest'
 import { getFormattingToolbarItems } from '@blocknote/react'
 import {
@@ -44,20 +45,24 @@ describe('tolariaEditorFormatting', () => {
     ])
   })
 
-  it('filters unsupported toggle slash-menu variants and annotates supported markdown commands', () => {
+  it('filters unsupported toggle slash-menu variants and removes command descriptions', () => {
     type TolariaSlashMenuTestItem = {
       key: string
       title: string
       onItemClick: () => void
       subtext?: string
+      icon?: ReactElement
     }
 
     const items = filterTolariaSlashMenuItems([
       { key: 'toggle_heading', title: 'Toggle heading', onItemClick: () => {} },
       { key: 'toggle_list', title: 'Toggle list', onItemClick: () => {} },
-      { key: 'heading', title: 'Heading', onItemClick: () => {} },
-      { key: 'bullet_list', title: 'Bullet List', onItemClick: () => {} },
-      { key: 'code_block', title: 'Code Block', onItemClick: () => {} },
+      { key: 'heading', title: 'Heading', subtext: 'Default heading copy', onItemClick: () => {} },
+      { key: 'bullet_list', title: 'Bullet List', subtext: 'Default list copy', onItemClick: () => {} },
+      { key: 'code_block', title: 'Code Block', subtext: 'Default code copy', onItemClick: () => {} },
+      { key: 'heading_4', title: 'Heading 4', onItemClick: () => {} },
+      { key: 'heading_5', title: 'Heading 5', onItemClick: () => {} },
+      { key: 'heading_6', title: 'Heading 6', onItemClick: () => {} },
     ] satisfies TolariaSlashMenuTestItem[])
 
     expect(items.map((item) => item.key)).toEqual([
@@ -65,14 +70,40 @@ describe('tolariaEditorFormatting', () => {
       'bullet_list',
       'code_block',
     ])
-    expect(items.find((item) => item.key === 'heading')?.subtext).toContain(
-      'Markdown-safe heading',
-    )
-    expect(items.find((item) => item.key === 'bullet_list')?.subtext).toContain(
-      'Markdown-safe bullet list',
-    )
-    expect(items.find((item) => item.key === 'code_block')?.subtext).toContain(
-      'Markdown-safe fenced code block',
-    )
+    expect(items.map((item) => item.subtext)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ])
+  })
+
+  it('wraps slash-menu icons so hover can swap Phosphor weights', () => {
+    type TolariaSlashMenuTestItem = {
+      key: string
+      title: string
+      onItemClick: () => void
+      icon?: ReactElement
+    }
+
+    const items = filterTolariaSlashMenuItems([
+      { key: 'heading', title: 'Heading', onItemClick: () => {} },
+    ] satisfies TolariaSlashMenuTestItem[])
+    const icon = items[0]?.icon
+
+    expect(isValidElement(icon)).toBe(true)
+    if (!isValidElement<{ className?: string; children?: ReactElement[] }>(icon)) return
+
+    const iconChildren = Children.toArray(icon.props.children) as Array<
+      ReactElement<{ className?: string; weight?: string }>
+    >
+    expect(icon.props.className).toBe('tolaria-slash-menu-icon')
+    expect(iconChildren.map((child) => child.props.className)).toEqual([
+      'tolaria-slash-menu-icon__regular',
+      'tolaria-slash-menu-icon__fill',
+    ])
+    expect(iconChildren.map((child) => child.props.weight)).toEqual([
+      'regular',
+      'fill',
+    ])
   })
 })

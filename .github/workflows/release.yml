@@ -455,6 +455,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-release-cargo-x86_64-pc-windows-msvc-${{ env.RUST_TARGET_CACHE_VERSION }}-
 
+      - name: Cache Tauri Windows tools
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\tauri
+          key: ${{ runner.os }}-tauri-tools-nsis-3.11-nsis-tauri-utils-0.5.3
+
+      - name: Prefetch Tauri NSIS toolchain
+        shell: pwsh
+        run: ./.github/scripts/prefetch-tauri-nsis.ps1
+
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
