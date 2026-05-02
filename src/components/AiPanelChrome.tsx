@@ -369,7 +369,7 @@ export function AiPanelComposer({
       style={{ padding: '8px 12px' }}
     >
       <div className="flex items-end gap-2">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <WikilinkChatInput
             entries={entries}
             value={input}
@@ -379,6 +379,8 @@ export function AiPanelComposer({
             disabled={composerDisabled}
             placeholder={placeholder}
             inputRef={inputRef}
+            editorClassName="max-h-[160px] overflow-y-auto overscroll-contain"
+            editorStyle={{ maxHeight: 160, overflowY: 'auto', overscrollBehavior: 'contain' }}
           />
         </div>
         <Button

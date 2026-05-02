@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react'
 import type { VaultEntry } from '../types'
@@ -57,6 +58,7 @@ interface InlineWikilinkInputProps {
   inputRef?: React.RefObject<HTMLDivElement | null>
   dataTestId?: string
   editorClassName?: string
+  editorStyle?: CSSProperties
   suggestionListVariant?: 'floating' | 'palette'
   suggestionEmptyLabel?: string
   paletteHeader?: ReactNode
@@ -168,6 +170,7 @@ export function InlineWikilinkInput({
   inputRef,
   dataTestId = 'agent-input',
   editorClassName,
+  editorStyle,
   suggestionListVariant = 'floating',
   suggestionEmptyLabel = 'No matching notes',
   paletteHeader,
@@ -472,6 +475,7 @@ export function InlineWikilinkInput({
       inputRef={setCombinedRef}
       dataTestId={dataTestId}
       editorClassName={editorClassName}
+      editorStyle={editorStyle}
       onCompositionEnd={handleCompositionEnd}
       onCompositionStart={handleCompositionStart}
       onInput={handleInput}

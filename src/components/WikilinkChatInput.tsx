@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { VaultEntry } from '../types'
 import type { NoteReference } from '../utils/ai-context'
 import { InlineWikilinkInput } from './InlineWikilinkInput'
@@ -11,6 +12,8 @@ interface WikilinkChatInputProps {
   disabled?: boolean
   placeholder?: string
   inputRef?: React.RefObject<HTMLDivElement | null>
+  editorClassName?: string
+  editorStyle?: CSSProperties
 }
 
 export function WikilinkChatInput({
@@ -22,6 +25,8 @@ export function WikilinkChatInput({
   disabled,
   placeholder,
   inputRef,
+  editorClassName,
+  editorStyle,
 }: WikilinkChatInputProps) {
   return (
     <InlineWikilinkInput
@@ -33,6 +38,8 @@ export function WikilinkChatInput({
       disabled={disabled}
       placeholder={placeholder}
       inputRef={inputRef}
+      editorClassName={editorClassName}
+      editorStyle={editorStyle}
     />
   )
 }
