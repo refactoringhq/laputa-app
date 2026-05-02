@@ -18,6 +18,7 @@ import {
   CommitButton,
   ConflictBadge,
   ChangesBadge,
+  IcloudStatusBadge,
   McpBadge,
   MissingGitBadge,
   NoRemoteBadge,
@@ -186,6 +187,8 @@ function StatusBarPrimaryBadges({
   onClickPulse,
   isGitVault,
   isIcloudOnlyVault,
+  providerAvailability,
+  providerSyncState,
   mcpStatus,
   onInstallMcp,
   aiAgentsStatus,
@@ -215,6 +218,8 @@ function StatusBarPrimaryBadges({
   onClickPulse?: () => void
   isGitVault: boolean
   isIcloudOnlyVault?: boolean
+  providerAvailability?: string
+  providerSyncState?: string
   mcpStatus?: McpStatus
   onInstallMcp?: () => void
   aiAgentsStatus?: AiAgentsStatus
@@ -233,7 +238,14 @@ function StatusBarPrimaryBadges({
     <>
       <OfflineBadge isOffline={isOffline} showSeparator={!compact} compact={compact} locale={locale} />
       <VaultReloadingBadge isReloading={isVaultReloading} showSeparator={!compact} compact={compact} locale={locale} />
-      {isIcloudOnlyVault ? null : isGitVault ? (
+      {isIcloudOnlyVault ? (
+        <IcloudStatusBadge
+          availability={providerAvailability ?? 'available'}
+          syncState={providerSyncState ?? 'unknown'}
+          showSeparator={!compact}
+          compact={compact}
+        />
+      ) : isGitVault ? (
         <>
           <NoRemoteBadge remoteStatus={visibleRemoteStatus} onAddRemote={onAddRemote} showSeparator={!compact} compact={compact} locale={locale} />
           <ChangesBadge count={modifiedCount} onClick={onClickPending} showSeparator={!compact} compact={compact} locale={locale} />

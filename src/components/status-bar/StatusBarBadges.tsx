@@ -2,6 +2,8 @@ import { useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboa
 import {
   AlertTriangle,
   ArrowDown,
+  Cloud,
+  CloudOff,
   Cpu,
   GitBranch,
   GitCommitHorizontal,
@@ -857,5 +859,75 @@ export function ClaudeCodeBadge({
       version={version}
       {...withStatusBadgeDefaults(displayOptions)}
     />
+  )
+}
+
+export function IcloudStatusBadge({
+  availability,
+  syncState,
+  showSeparator = true,
+  compact = false,
+}: {
+  availability: string
+  syncState: string
+  showSeparator?: boolean
+  compact?: boolean
+}) {
+  const isUnavailable = availability === 'unavailable'
+  const isDegraded = availability === 'degraded'
+  const isSyncing = syncState === 'syncing_or_delayed'
+
+  const icon = isUnavailable
+    ? <CloudOff size={12} />
+    : <Cloud size={12} />
+
+  const color = isUnavailable
+    ? 'var(--destructive)'
+    : isDegraded || isSyncing
+      ? 'var(--warning, #f59e0b)'
+      : 'var(--accent-blue, #3b82f6)'
+
+  const bg = isUnavailable
+    ? 'var(--feedback-error-bg)'
+    : isDegraded || isSyncing
+      ? 'rgba(245, 158, 11, 0.1)'
+      : 'rgba(59, 130, 246, 0.1)'
+
+  const label = isUnavailable
+    ? 'iCloud Unavailable'
+    : isDegraded
+      ? 'iCloud Degraded'
+      : isSyncing
+        ? 'iCloud Syncing'
+        : 'iCloud'
+
+  const tooltip = isUnavailable
+    ? 'iCloud Drive is not accessible. Saves are blocked until connectivity is restored.'
+    : isDegraded
+      ? 'iCloud Drive sync may be delayed. Your edits are saved locally.'
+      : isSyncing
+        ? 'iCloud Drive is syncing files. Some files may not be up to date yet.'
+        : 'This vault is synced via iCloud Drive across your Apple devices.'
+
+  return (
+    <>
+      <StatusBarSeparator show={showSeparator} />
+      <span
+        style={{
+          ...ICON_STYLE,
+          color,
+          background: bg,
+          borderRadius: 999,
+          padding: '2px 6px',
+          fontWeight: 500,
+          gap: 4,
+        }}
+        title={tooltip}
+        data-testid="status-icloud"
+      >
+        {icon}
+        {compact ? null : <span style={{ fontSize: 11 }}>{label}</span>}
+      </span>
+    </>
   )
 }
