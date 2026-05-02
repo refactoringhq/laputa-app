@@ -39,11 +39,19 @@ fn find_codex_binary() -> Result<PathBuf, String> {
 }
 
 fn find_codex_binary_on_path() -> Option<PathBuf> {
-    crate::hidden_command("which")
+    crate::hidden_command(codex_path_lookup_command())
         .arg("codex")
         .output()
         .ok()
         .and_then(|output| path_from_successful_output(&output))
+}
+
+fn codex_path_lookup_command() -> &'static str {
+    if cfg!(windows) {
+        "where"
+    } else {
+        "which"
+    }
 }
 
 fn find_codex_binary_in_user_shell() -> Option<PathBuf> {
@@ -102,13 +110,27 @@ fn codex_binary_candidates() -> Vec<PathBuf> {
 fn codex_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
     let mut candidates = vec![
         home.join(".local/bin/codex"),
+        home.join(".local/bin/codex.exe"),
         home.join(".codex/bin/codex"),
+        home.join(".codex/bin/codex.exe"),
         home.join(".local/share/mise/shims/codex"),
+        home.join(".local/share/mise/shims/codex.exe"),
         home.join(".asdf/shims/codex"),
+        home.join(".asdf/shims/codex.exe"),
         home.join(".npm-global/bin/codex"),
+        home.join(".npm-global/bin/codex.cmd"),
+        home.join(".npm-global/bin/codex.exe"),
         home.join(".npm/bin/codex"),
+        home.join(".npm/bin/codex.cmd"),
+        home.join(".npm/bin/codex.exe"),
         home.join(".bun/bin/codex"),
+        home.join(".bun/bin/codex.exe"),
         home.join(".linuxbrew/bin/codex"),
+        home.join("AppData/Roaming/npm/codex.cmd"),
+        home.join("AppData/Roaming/npm/codex.exe"),
+        home.join("AppData/Local/pnpm/codex.cmd"),
+        home.join("AppData/Local/pnpm/codex.exe"),
+        home.join("scoop/shims/codex.exe"),
         PathBuf::from("/home/linuxbrew/.linuxbrew/bin/codex"),
         PathBuf::from("/usr/local/bin/codex"),
         PathBuf::from("/opt/homebrew/bin/codex"),
@@ -694,6 +716,34 @@ exit 2
         let expected = [
             home.join(".linuxbrew/bin/codex"),
             PathBuf::from("/home/linuxbrew/.linuxbrew/bin/codex"),
+        ];
+
+        for candidate in expected {
+            assert!(
+                candidates.contains(&candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    #[test]
+    fn codex_binary_candidates_include_windows_npm_and_toolchain_shims() {
+        let home = PathBuf::from("C:/Users/alex");
+        let candidates = codex_binary_candidates_for_home(&home);
+        let expected = [
+            home.join(".local/bin/codex.exe"),
+            home.join(".local/share/mise/shims/codex.exe"),
+            home.join(".asdf/shims/codex.exe"),
+            home.join(".npm-global/bin/codex.cmd"),
+            home.join(".npm-global/bin/codex.exe"),
+            home.join(".npm/bin/codex.cmd"),
+            home.join(".npm/bin/codex.exe"),
+            home.join("AppData/Roaming/npm/codex.cmd"),
+            home.join("AppData/Roaming/npm/codex.exe"),
+            home.join("AppData/Local/pnpm/codex.cmd"),
+            home.join("AppData/Local/pnpm/codex.exe"),
+            home.join("scoop/shims/codex.exe"),
         ];
 
         for candidate in expected {

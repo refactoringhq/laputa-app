@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { Robot, X, PaperPlaneRight, Plus, Link } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
@@ -164,7 +164,7 @@ function AiPanelEmptyState({
   )
 }
 
-export function AiPanelHeader({
+export const AiPanelHeader = memo(function AiPanelHeader({
   agentLabel,
   agentReadiness,
   locale = 'en',
@@ -221,7 +221,7 @@ export function AiPanelHeader({
       />
     </div>
   )
-}
+})
 
 function AiPermissionModeToggle({
   value,
@@ -277,7 +277,11 @@ function AiPermissionModeToggle({
   )
 }
 
-export function AiPanelContextBar({ activeEntry, linkedCount, locale = 'en' }: AiPanelContextBarProps) {
+export const AiPanelContextBar = memo(function AiPanelContextBar({
+  activeEntry,
+  linkedCount,
+  locale = 'en',
+}: AiPanelContextBarProps) {
   const t = createTranslator(locale)
 
   return (
@@ -293,9 +297,9 @@ export function AiPanelContextBar({ activeEntry, linkedCount, locale = 'en' }: A
       )}
     </div>
   )
-}
+})
 
-export function AiPanelMessageHistory({
+export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   agentLabel,
   agentReadiness,
   locale = 'en',
@@ -332,7 +336,7 @@ export function AiPanelMessageHistory({
       <div ref={endRef} />
     </div>
   )
-}
+})
 
 export function AiPanelComposer({
   entries,
