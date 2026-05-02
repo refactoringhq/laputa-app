@@ -4,6 +4,7 @@ import { SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate, type AppLocale } from '../../lib/i18n'
 import { SidebarGroupHeader } from './SidebarGroupHeader'
+import { SIDEBAR_ITEM_PADDING } from './sidebarStyles'
 
 interface SidebarLoadingSectionsProps {
   collapsed: boolean
@@ -157,7 +158,7 @@ function SidebarLoadingRow({
   return (
     <div
       className="flex select-none items-center gap-2 rounded"
-      style={{ padding: '6px 8px 6px 16px', borderRadius: 4 }}
+      style={{ padding: SIDEBAR_ITEM_PADDING.withCount, borderRadius: 4 }}
     >
       <SidebarLoadingIcon icon={icon} iconColor={iconColor} />
       <div className="flex min-w-0 flex-1 items-center">

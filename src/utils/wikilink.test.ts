@@ -129,6 +129,24 @@ describe('relativePathStem', () => {
     expect(relativePathStem('/Users/luca/Vault/docs/adr/0031.md', '/Users/luca/Vault')).toBe('docs/adr/0031')
   })
 
+  it('normalizes Windows extended-length paths before extracting the vault-relative stem', () => {
+    expect(
+      relativePathStem(
+        '\\\\?\\C:\\Users\\lrfno\\Documents\\tolaria-vault\\application-design-and-build.md',
+        'C:\\Users\\lrfno\\Documents\\tolaria-vault',
+      ),
+    ).toBe('application-design-and-build')
+  })
+
+  it('keeps nested Windows note paths vault-relative with slash separators', () => {
+    expect(
+      relativePathStem(
+        'C:\\Users\\lrfno\\Documents\\Tolaria Vault\\projects\\application-design-and-build.md',
+        'c:/users/lrfno/documents/tolaria vault',
+      ),
+    ).toBe('projects/application-design-and-build')
+  })
+
   it('falls back to filename stem when vault path does not match', () => {
     expect(relativePathStem('/other/path/note.md', '/Users/luca/Vault')).toBe('note')
   })

@@ -219,6 +219,37 @@ describe('aiAgentStreamCallbacks', () => {
     ])
   })
 
+  it('gives OpenCode an actionable empty-response message', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Summarize the current note',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const status = createStatusStore('thinking')
+
+    const callbacks = createStreamCallbacks({
+      agent: 'opencode',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: status.setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onDone()
+
+    expect(status.getStatus()).toBe('done')
+    expect(messages.getMessages()[0].response).toContain('OpenCode returned no assistant text')
+    expect(messages.getMessages()[0].response).toContain('provider/model context limit')
+    expect(messages.getMessages()[0].response).not.toContain('finished without returning a reply')
+  })
+
   it('ignores stream events after the request has been aborted', () => {
     const messages = createMessageStore([
       {

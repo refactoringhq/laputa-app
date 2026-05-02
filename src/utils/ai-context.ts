@@ -81,92 +81,177 @@ export interface ContextSnapshotParams {
   references?: NoteReference[]
 }
 
+const MAX_ACTIVE_NOTE_BODY_CHARS = 24_000
+const ACTIVE_NOTE_BODY_HEAD_CHARS = 16_000
+const ACTIVE_NOTE_BODY_TAIL_CHARS = 4_000
+const MAX_NOTE_LIST_ITEMS = 100
+
+interface ActiveNoteBody {
+  body: string
+  bodyTruncated?: {
+    shownChars: number
+    totalChars: number
+    strategy: 'head-tail'
+  }
+}
+
+function isPresentValue(value: unknown): boolean {
+  if (value === null) return false
+  if (value === undefined) return false
+  if (value === '') return false
+  return true
+}
+
+function assignIfPresent(target: Record<string, unknown>, key: string, value: unknown): void {
+  if (isPresentValue(value)) target[key] = value
+}
+
+function assignIfNonEmpty(target: Record<string, unknown>, key: string, values: unknown[]): void {
+  if (values.length > 0) {
+    target[key] = values
+  }
+}
+
+function propertyString(value: unknown): string | undefined {
+  if (!isPresentValue(value)) return undefined
+  return typeof value === 'string' ? value : String(value)
+}
+
 function entryFrontmatter(e: VaultEntry): Record<string, unknown> {
   const fm: Record<string, unknown> = {}
-  if (e.isA) fm.type = e.isA
-  if (e.status) fm.status = e.status
-  // Owner and cadence are now stored in properties, not first-class fields
-  const owner = e.properties?.Owner ?? e.properties?.owner
-  const cadence = e.properties?.Cadence ?? e.properties?.cadence
-  if (owner) fm.owner = typeof owner === 'string' ? owner : String(owner)
-  if (cadence) fm.cadence = typeof cadence === 'string' ? cadence : String(cadence)
-  if (e.belongsTo.length > 0) fm.belongsTo = e.belongsTo
-  if (e.relatedTo.length > 0) fm.relatedTo = e.relatedTo
-  if (Object.keys(e.relationships).length > 0) fm.relationships = e.relationships
+  assignIfPresent(fm, 'type', e.isA)
+  assignIfPresent(fm, 'status', e.status)
+  assignIfPresent(fm, 'owner', propertyString(e.properties?.Owner ?? e.properties?.owner))
+  assignIfPresent(fm, 'cadence', propertyString(e.properties?.Cadence ?? e.properties?.cadence))
+  assignIfNonEmpty(fm, 'belongsTo', e.belongsTo)
+  assignIfNonEmpty(fm, 'relatedTo', e.relatedTo)
+  assignIfNonEmpty(fm, 'relationships', Object.keys(e.relationships))
+  if (fm.relationships) fm.relationships = e.relationships
   return fm
 }
 
-const MAX_NOTE_LIST_ITEMS = 100
+function unavailableBodyInstruction(activeEntry: VaultEntry): string {
+  return `[Content not available in editor context — use get_note("${activeEntry.path}") to read the full note (${activeEntry.wordCount} words)]`
+}
 
-/** Build a structured context snapshot as a system prompt for Claude. */
-export function buildContextSnapshot(params: ContextSnapshotParams): string {
-  const { activeEntry, activeNoteContent, openTabs, noteList, noteListFilter, entries, references } = params
+function truncatedBodyInstruction(path: string, omittedChars: number): string {
+  return [
+    '[Active note body truncated by Tolaria to keep CLI agent context within provider limits.',
+    `Omitted approximately ${omittedChars} characters from the middle.`,
+    `Use get_note("${path}") to read the full note before making content-sensitive edits or summaries.]`,
+  ].join(' ')
+}
 
-  const rawContent = activeNoteContent || ''
-  let body = extractBody(rawContent)
-
-  // Defence-in-depth: when body is empty but the note has content on disk,
-  // include an explicit instruction in the body field itself (more reliable
-  // than a preamble instruction that Claude might skip).
-  if (!body && activeEntry.wordCount > 0) {
-    body = `[Content not available in editor context — use get_note("${activeEntry.path}") to read the full note (${activeEntry.wordCount} words)]`
+function compactActiveNoteBody(body: string, path: string): ActiveNoteBody {
+  if (body.length <= MAX_ACTIVE_NOTE_BODY_CHARS) {
+    return { body }
   }
 
-  const snapshot: Record<string, unknown> = {
-    activeNote: {
-      path: activeEntry.path,
-      title: activeEntry.title,
-      type: activeEntry.isA ?? 'Note',
-      frontmatter: entryFrontmatter(activeEntry),
-      body,
-      wordCount: activeEntry.wordCount,
+  const head = body.slice(0, ACTIVE_NOTE_BODY_HEAD_CHARS).trimEnd()
+  const tail = body.slice(-ACTIVE_NOTE_BODY_TAIL_CHARS).trimStart()
+  const omittedChars = Math.max(0, body.length - ACTIVE_NOTE_BODY_HEAD_CHARS - ACTIVE_NOTE_BODY_TAIL_CHARS)
+
+  return {
+    body: `${head}\n\n${truncatedBodyInstruction(path, omittedChars)}\n\n${tail}`,
+    bodyTruncated: {
+      shownChars: ACTIVE_NOTE_BODY_HEAD_CHARS + ACTIVE_NOTE_BODY_TAIL_CHARS,
+      totalChars: body.length,
+      strategy: 'head-tail',
     },
   }
+}
 
+function activeNoteBody(activeEntry: VaultEntry, activeNoteContent?: string): ActiveNoteBody {
+  const body = extractBody(activeNoteContent || '')
+  if (!body && activeEntry.wordCount > 0) {
+    return { body: unavailableBodyInstruction(activeEntry) }
+  }
+  return compactActiveNoteBody(body, activeEntry.path)
+}
+
+function activeNoteSnapshot(activeEntry: VaultEntry, activeNoteContent?: string): Record<string, unknown> {
+  const bodySnapshot = activeNoteBody(activeEntry, activeNoteContent)
+  const note: Record<string, unknown> = {
+    path: activeEntry.path,
+    title: activeEntry.title,
+    type: activeEntry.isA ?? 'Note',
+    frontmatter: entryFrontmatter(activeEntry),
+    body: bodySnapshot.body,
+    wordCount: activeEntry.wordCount,
+  }
+  assignIfPresent(note, 'bodyTruncated', bodySnapshot.bodyTruncated)
+  return note
+}
+
+function appendOpenTabs(snapshot: Record<string, unknown>, activeEntry: VaultEntry, openTabs?: VaultEntry[]): void {
   const otherTabs = openTabs?.filter(t => t.path !== activeEntry.path)
-  if (otherTabs && otherTabs.length > 0) {
-    snapshot.openTabs = otherTabs.map(t => ({
-      path: t.path,
-      title: t.title,
-      type: t.isA ?? 'Note',
-      frontmatter: entryFrontmatter(t),
-    }))
-  }
+  if (!otherTabs?.length) return
 
-  if (noteList && noteList.length > 0) {
-    const items = noteList.slice(0, MAX_NOTE_LIST_ITEMS)
-    snapshot.noteList = items
-    if (noteList.length > MAX_NOTE_LIST_ITEMS) {
-      snapshot.noteListTruncated = { shown: MAX_NOTE_LIST_ITEMS, total: noteList.length }
-    }
-  }
+  snapshot.openTabs = otherTabs.map(t => ({
+    path: t.path,
+    title: t.title,
+    type: t.isA ?? 'Note',
+    frontmatter: entryFrontmatter(t),
+  }))
+}
 
-  if (noteListFilter && (noteListFilter.type || noteListFilter.query)) {
-    snapshot.noteListFilter = noteListFilter
-  }
+function appendNoteList(snapshot: Record<string, unknown>, noteList?: NoteListItem[]): void {
+  if (!noteList?.length) return
 
+  snapshot.noteList = noteList.slice(0, MAX_NOTE_LIST_ITEMS)
+  if (noteList.length > MAX_NOTE_LIST_ITEMS) {
+    snapshot.noteListTruncated = { shown: MAX_NOTE_LIST_ITEMS, total: noteList.length }
+  }
+}
+
+function hasNoteListFilter(noteListFilter?: { type: string | null; query: string }): boolean {
+  return Boolean(noteListFilter?.type || noteListFilter?.query)
+}
+
+function appendReferencedNotes(snapshot: Record<string, unknown>, references?: NoteReference[]): void {
+  if (!references?.length) return
+
+  snapshot.referencedNotes = references.map(ref => ({
+    path: ref.path,
+    title: ref.title,
+    type: ref.type ?? 'Note',
+  }))
+}
+
+function vaultSummary(entries: VaultEntry[]): Record<string, unknown> {
   const types = new Set<string>()
   for (const e of entries) {
     if (e.isA) types.add(e.isA)
   }
-  snapshot.vault = {
+  return {
     types: [...types].sort(),
     totalNotes: entries.length,
   }
+}
 
-  if (references && references.length > 0) {
-    snapshot.referencedNotes = references.map(ref => ({
-      path: ref.path,
-      title: ref.title,
-      type: ref.type ?? 'Note',
-    }))
+function contextSnapshot(params: ContextSnapshotParams): Record<string, unknown> {
+  const { activeEntry, activeNoteContent, openTabs, noteList, noteListFilter, entries, references } = params
+  const snapshot: Record<string, unknown> = {
+    activeNote: activeNoteSnapshot(activeEntry, activeNoteContent),
   }
+
+  appendOpenTabs(snapshot, activeEntry, openTabs)
+  appendNoteList(snapshot, noteList)
+  if (hasNoteListFilter(noteListFilter)) snapshot.noteListFilter = noteListFilter
+  snapshot.vault = vaultSummary(entries)
+  appendReferencedNotes(snapshot, references)
+  return snapshot
+}
+
+/** Build a structured context snapshot as a system prompt for Claude. */
+export function buildContextSnapshot(params: ContextSnapshotParams): string {
+  const snapshot = contextSnapshot(params)
 
   const preamble = [
     'You are an AI assistant integrated into Tolaria, a personal knowledge management app.',
     'The user is viewing a specific note. Use the structured context below to answer questions accurately.',
     'You can also use MCP tools to search, read, create, or edit notes in the vault.',
-    'If the body field is empty but wordCount is > 0, the content may be stale — use get_note to read the full note from disk.',
+    'If the body field is empty or truncated, use get_note to read the full note from disk before content-sensitive edits or summaries.',
     'When you mention or reference a note by name, always use [[Note Title]] wikilink syntax so the user can click to open it.',
   ].join('\n')
 

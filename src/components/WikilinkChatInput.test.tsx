@@ -437,6 +437,26 @@ describe('WikilinkChatInput', () => {
     expect(screen.queryByTestId('inline-wikilink-chip')).toBeNull()
   })
 
+  it('lets native modified delete shortcuts reach the browser editor pipeline', () => {
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+    updateEditorText('delete the previous words')
+    onDraftChange.mockClear()
+
+    const editor = screen.getByTestId('agent-input')
+    const optionBackspace = createEvent.keyDown(editor, { key: 'Backspace', altKey: true })
+    fireEvent(editor, optionBackspace)
+    const commandBackspace = createEvent.keyDown(editor, { key: 'Backspace', metaKey: true })
+    fireEvent(editor, commandBackspace)
+    const controlDelete = createEvent.keyDown(editor, { key: 'Delete', ctrlKey: true })
+    fireEvent(editor, controlDelete)
+
+    expect(optionBackspace.defaultPrevented).toBe(false)
+    expect(commandBackspace.defaultPrevented).toBe(false)
+    expect(controlDelete.defaultPrevented).toBe(false)
+    expect(onDraftChange).not.toHaveBeenCalled()
+  })
+
   it('submits serialized wikilink text and resolved references', () => {
     const onSend = vi.fn()
     render(<Controlled onSend={onSend} />)

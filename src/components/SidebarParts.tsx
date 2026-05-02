@@ -491,7 +491,7 @@ function SectionHeader({ label, type, Icon, sectionColor, sectionLightColor, ite
   return (
     <div
       className={cn("group/section flex cursor-pointer select-none items-center justify-between rounded transition-colors", !isActive && "hover:bg-accent")}
-      style={{ padding: '6px 8px 6px 16px', borderRadius: 4, gap: 4, ...getSectionHeaderBackground(isActive, sectionLightColor) }}
+      style={{ padding: SIDEBAR_ITEM_PADDING.withCount, borderRadius: 4, gap: 4, ...getSectionHeaderBackground(isActive, sectionLightColor) }}
       {...dragHandleProps}
       onClick={getSectionSelectHandler(isRenaming, onSelect)}
       onContextMenu={getSectionContextMenuHandler(isRenaming, onContextMenu)}

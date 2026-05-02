@@ -1,17 +1,12 @@
-import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import {
-  CaretDown,
-  CaretRight,
   Folder,
   FolderOpen,
-  PencilSimple,
-  Trash,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { FolderNode } from '../../types'
 import { useFolderRowInteractions } from './useFolderRowInteractions'
-import { translate, type AppLocale } from '../../lib/i18n'
 
 interface FolderItemRowProps {
   contentInset: number
@@ -19,12 +14,10 @@ interface FolderItemRowProps {
   isExpanded: boolean
   isSelected: boolean
   node: FolderNode
-  onDeleteFolder?: (folderPath: string) => void
   onOpenMenu: (node: FolderNode, event: ReactMouseEvent<HTMLDivElement>) => void
   onSelect: () => void
   onStartRenameFolder?: (folderPath: string) => void
   onToggle: (path: string) => void
-  locale?: AppLocale
 }
 
 export function FolderItemRow({
@@ -33,16 +26,12 @@ export function FolderItemRow({
   isExpanded,
   isSelected,
   node,
-  onDeleteFolder,
   onOpenMenu,
   onSelect,
   onStartRenameFolder,
   onToggle,
-  locale = 'en',
 }: FolderItemRowProps) {
   const hasChildren = node.children.length > 0
-  const expandLabel = translate(locale, isExpanded ? 'sidebar.folder.collapse' : 'sidebar.folder.expand', { name: node.name })
-  const hasActions = !!onStartRenameFolder || !!onDeleteFolder
   const { handleRenameDoubleClick, handleSelectClick } = useFolderRowInteractions({
     hasChildren,
     onRenameFolder: onStartRenameFolder ? () => onStartRenameFolder(node.path) : undefined,
@@ -64,15 +53,8 @@ export function FolderItemRow({
         onOpenMenu(node, event)
       }}
     >
-      <FolderToggleButton
-        expandLabel={expandLabel}
-        hasChildren={hasChildren}
-        isExpanded={isExpanded}
-        onToggle={() => onToggle(node.path)}
-      />
       <FolderSelectButton
         contentInset={contentInset}
-        hasActions={hasActions}
         hasChildren={hasChildren}
         isExpanded={isExpanded}
         isSelected={isSelected}
@@ -80,111 +62,12 @@ export function FolderItemRow({
         onClick={handleSelectClick}
         onDoubleClick={handleRenameDoubleClick}
       />
-      {hasActions && (
-        <div className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-          {onStartRenameFolder && (
-            <FolderActionButton
-              ariaLabel={translate(locale, 'sidebar.action.renameFolder')}
-              testId={`rename-folder-btn:${node.path}`}
-              title={translate(locale, 'sidebar.action.renameFolder')}
-              onClick={() => {
-                onSelect()
-                onStartRenameFolder(node.path)
-              }}
-            >
-              <PencilSimple size={12} />
-            </FolderActionButton>
-          )}
-          {onDeleteFolder && (
-            <FolderActionButton
-              ariaLabel={translate(locale, 'sidebar.action.deleteFolder')}
-              testId={`delete-folder-btn:${node.path}`}
-              title={translate(locale, 'sidebar.action.deleteFolder')}
-              destructive
-              onClick={() => {
-                onSelect()
-                onDeleteFolder(node.path)
-              }}
-            >
-              <Trash size={12} />
-            </FolderActionButton>
-          )}
-        </div>
-      )}
     </div>
-  )
-}
-
-function FolderToggleButton({
-  expandLabel,
-  hasChildren,
-  isExpanded,
-  onToggle,
-}: {
-  expandLabel: string
-  hasChildren: boolean
-  isExpanded: boolean
-  onToggle: () => void
-}) {
-  if (!hasChildren) return null
-
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      className="h-6 w-4 shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-      onClick={(event) => {
-        event.stopPropagation()
-        onToggle()
-      }}
-      aria-label={expandLabel}
-    >
-      {isExpanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
-    </Button>
-  )
-}
-
-function FolderActionButton({
-  ariaLabel,
-  children,
-  destructive = false,
-  onClick,
-  testId,
-  title,
-}: {
-  ariaLabel: string
-  children: ReactNode
-  destructive?: boolean
-  onClick: () => void
-  testId: string
-  title: string
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      aria-label={ariaLabel}
-      title={title}
-      className={cn(
-        'h-5 w-5 rounded p-0 text-muted-foreground',
-        destructive ? 'hover:text-destructive' : 'hover:text-foreground',
-      )}
-      data-testid={testId}
-      onClick={(event) => {
-        event.stopPropagation()
-        onClick()
-      }}
-    >
-      {children}
-    </Button>
   )
 }
 
 function FolderSelectButton({
   contentInset,
-  hasActions,
   hasChildren,
   isExpanded,
   isSelected,
@@ -193,7 +76,6 @@ function FolderSelectButton({
   onDoubleClick,
 }: {
   contentInset: number
-  hasActions: boolean
   hasChildren: boolean
   isExpanded: boolean
   isSelected: boolean
@@ -212,10 +94,11 @@ function FolderSelectButton({
       style={{
         paddingTop: 6,
         paddingBottom: 6,
-        paddingLeft: hasChildren ? 0 : contentInset,
-        paddingRight: hasActions ? 48 : 16,
+        paddingLeft: contentInset,
+        paddingRight: 16,
       }}
       title={node.path || node.name}
+      aria-expanded={hasChildren ? isExpanded : undefined}
       onClick={(event) => onClick(event.detail)}
       onDoubleClick={onDoubleClick}
       data-testid={`folder-row:${node.path}`}

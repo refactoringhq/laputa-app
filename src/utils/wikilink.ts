@@ -3,15 +3,21 @@
 import type { VaultEntry } from '../types'
 import { slugifyNoteStem } from './noteSlug'
 
+export type AbsoluteNotePath = string
+export type NoteTitleOrTarget = string
+export type VaultPath = string
+export type WikilinkReference = string
+export type WikilinkTarget = string
+
 /** Extracts the target path from a wikilink reference (strips [[ ]] and display text). */
-export function wikilinkTarget(ref: string): string {
+export function wikilinkTarget(ref: WikilinkReference): WikilinkTarget {
   const inner = ref.replace(/^\[\[|\]\]$/g, '')
   const pipeIdx = inner.indexOf('|')
   return pipeIdx !== -1 ? inner.slice(0, pipeIdx) : inner
 }
 
 /** Extracts the display label from a wikilink reference. Falls back to humanised path stem. */
-export function wikilinkDisplay(ref: string): string {
+export function wikilinkDisplay(ref: WikilinkReference): string {
   const inner = ref.replace(/^\[\[|\]\]$/g, '')
   const pipeIdx = inner.indexOf('|')
   if (pipeIdx !== -1) return inner.slice(pipeIdx + 1)
@@ -19,29 +25,49 @@ export function wikilinkDisplay(ref: string): string {
   return last.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+function stripWindowsExtendedPathPrefix(path: AbsoluteNotePath | VaultPath): string {
+  return path
+    .replace(/^\\\\\?\\UNC\\/i, '//')
+    .replace(/^\\\\\?\\/, '')
+}
+
+function normalizeFilesystemPath(path: AbsoluteNotePath | VaultPath): string {
+  return stripWindowsExtendedPathPrefix(path)
+    .replace(/\\/g, '/')
+    .replace(/\/+$/g, '')
+}
+
+function withoutMarkdownExtension(pathStem: WikilinkTarget): WikilinkTarget {
+  return pathStem.replace(/\.md$/i, '')
+}
+
 /** Extract the vault-relative path stem (no leading slash, no .md extension). */
-export function relativePathStem(absolutePath: string, vaultPath: string): string {
-  const prefix = vaultPath.endsWith('/') ? vaultPath : vaultPath + '/'
-  if (absolutePath.startsWith(prefix)) return absolutePath.slice(prefix.length).replace(/\.md$/, '')
+export function relativePathStem(absolutePath: AbsoluteNotePath, vaultPath: VaultPath): WikilinkTarget {
+  const normalizedAbsolutePath = normalizeFilesystemPath(absolutePath)
+  const normalizedVaultPath = normalizeFilesystemPath(vaultPath)
+  const prefix = normalizedVaultPath.endsWith('/') ? normalizedVaultPath : normalizedVaultPath + '/'
+  if (normalizedAbsolutePath.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return withoutMarkdownExtension(normalizedAbsolutePath.slice(prefix.length))
+  }
   // Fallback: just the filename stem
-  const filename = absolutePath.split('/').pop() ?? absolutePath
-  return filename.replace(/\.md$/, '')
+  const filename = normalizedAbsolutePath.split('/').pop() ?? normalizedAbsolutePath
+  return withoutMarkdownExtension(filename)
 }
 
 /** Slugify a human-readable title into the canonical wikilink filename stem. */
 export const slugifyWikilinkTarget = slugifyNoteStem
 
 /** Build the canonical wikilink target for a vault entry. */
-export function canonicalWikilinkTargetForEntry(entry: VaultEntry, vaultPath: string): string {
+export function canonicalWikilinkTargetForEntry(entry: VaultEntry, vaultPath: VaultPath): WikilinkTarget {
   return relativePathStem(entry.path, vaultPath)
 }
 
 /** Resolve a user-facing title/path input to the canonical wikilink target. */
 export function canonicalWikilinkTargetForTitle(
-  titleOrTarget: string,
+  titleOrTarget: NoteTitleOrTarget,
   entries: VaultEntry[],
-  vaultPath: string,
-): string {
+  vaultPath: VaultPath,
+): WikilinkTarget {
   const trimmed = titleOrTarget.trim()
   const resolved = resolveEntry(entries, trimmed)
   return resolved
@@ -52,7 +78,7 @@ export function canonicalWikilinkTargetForTitle(
 }
 
 /** Wrap a target in wikilink syntax. */
-export function formatWikilinkRef(target: string): string {
+export function formatWikilinkRef(target: WikilinkTarget): WikilinkReference {
   return `[[${target}]]`
 }
 
@@ -63,7 +89,7 @@ interface ResolutionKey {
   humanizedTarget: string | null
 }
 
-function buildResolutionKey(rawTarget: string): ResolutionKey {
+function buildResolutionKey(rawTarget: WikilinkTarget): ResolutionKey {
   const exactTarget = rawTarget.includes('|') ? rawTarget.split('|')[0] : rawTarget
   const normalizedTarget = exactTarget.toLowerCase()
   const lastSegment = exactTarget.includes('/') ? (exactTarget.split('/').pop() ?? exactTarget).toLowerCase() : normalizedTarget
@@ -116,7 +142,7 @@ function findEntryByHumanizedTitle(entries: VaultEntry[], resolutionKey: Resolut
  *   4. Exact title match
  *   5. Humanized title match (kebab-case → words)
  */
-export function resolveEntry(entries: VaultEntry[], rawTarget: string): VaultEntry | undefined {
+export function resolveEntry(entries: VaultEntry[], rawTarget: WikilinkTarget): VaultEntry | undefined {
   const resolutionKey = buildResolutionKey(rawTarget)
   return (
     findEntryByPathSuffix(entries, resolutionKey)

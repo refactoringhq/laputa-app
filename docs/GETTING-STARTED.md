@@ -449,7 +449,7 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 
 ### Work with external MCP setup
 
-1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs`; registration and manual config generation must verify Node.js first, resolve the packaged `mcp-server/` for macOS, Windows, Linux package roots (`/usr/local/Tolaria`, `/usr/local/lib/tolaria`, `/usr/lib/tolaria`), and AppImage installs, and use an explicit stdio entry with `VAULT_PATH` plus `WS_UI_PORT=9711`
+1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs`; registration and manual config generation must verify Node.js first, resolve the packaged `mcp-server/` for macOS, Windows, Linux package roots (`/usr/local/Tolaria`, `/usr/local/lib/tolaria`, `/usr/lib/tolaria`, `/usr/lib/tolaria/resources`), and AppImage installs, and use an explicit stdio entry with `VAULT_PATH` plus `WS_UI_PORT=9711`
 2. **Setup dialog copy/actions**: Edit `src/components/McpSetupDialog.tsx` and `src/hooks/useMcpStatus.ts`; users should see the Node.js prerequisite, the exact generated manual config, and a copy action before Tolaria writes third-party config files
 3. **Status hook/toasts**: Edit `src/hooks/useMcpStatus.ts` when setup, reconnect, disconnect, or failure messaging changes
 4. **Gemini CLI compatibility**: Keep `~/.gemini/settings.json` in the registration path list and keep optional `GEMINI.md` generation behind `restore_vault_ai_guidance`; app-managed Gemini sessions still require the user to install and sign in to Gemini CLI, but Tolaria supplies transient MCP settings when Gemini is selected as the default AI agent

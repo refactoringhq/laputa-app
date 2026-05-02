@@ -7,6 +7,7 @@ import {
 } from '../lib/gitignoredVisibilityEvents'
 import { clearPrefetchCache } from './useTabManagement'
 import {
+  checkVaultPathAvailability,
   commitWithPush,
   hasVaultPath,
   loadVaultChrome,
@@ -17,53 +18,89 @@ import {
   tauriCall,
 } from './vaultLoaderCommands'
 import { normalizeVaultEntry } from '../utils/vaultMetadataNormalization'
+import { useUnavailableVaultState } from './useUnavailableVaultState'
+import { resetVaultState } from './vaultStateReset'
 
-function resetVaultState(options: {
-  clearNewPaths: () => void
-  clearUnsaved: () => void
-  setEntries: (entries: VaultEntry[]) => void
-  setFolders: (folders: FolderNode[]) => void
-  setIsLoading: (isLoading: boolean) => void
-  setModifiedFiles: (files: ModifiedFile[]) => void
-  setModifiedFilesError: (message: string | null) => void
-  setViews: (views: ViewFile[]) => void
-}) {
-  options.setEntries([])
-  options.setFolders([])
-  options.setViews([])
-  options.setModifiedFiles([])
-  options.setModifiedFilesError(null)
-  options.setIsLoading(false)
-  options.clearNewPaths()
-  options.clearUnsaved()
-}
-
-async function loadInitialVaultState(options: {
+interface InitialVaultLoadStateOptions {
+  handleVaultAvailable: (path: string) => void
   path: string
+  handleVaultUnavailable: (path: string) => void
   isCurrentVaultPath: (path: string) => boolean
   setEntries: (entries: VaultEntry[]) => void
   setFolders: (folders: FolderNode[]) => void
   setIsLoading: (isLoading: boolean) => void
   setViews: (views: ViewFile[]) => void
-}) {
-  const { path, isCurrentVaultPath, setEntries, setFolders, setIsLoading, setViews } = options
-  const chromeLoad = loadVaultChrome({ vaultPath: path }).then(({ folders, views }) => {
-    if (!isCurrentVaultPath(path)) return
-    setFolders(folders)
-    setViews(views)
+}
+
+interface InitialVaultChromeOptions extends Pick<
+  InitialVaultLoadStateOptions,
+  'handleVaultUnavailable' | 'isCurrentVaultPath' | 'path' | 'setFolders' | 'setViews'
+> {
+  shouldApplyChrome: () => boolean
+}
+
+async function loadInitialVaultChromeState(options: InitialVaultChromeOptions): Promise<boolean> {
+  const { handleVaultUnavailable, isCurrentVaultPath, path, setFolders, setViews, shouldApplyChrome } = options
+  try {
+    const { folders, views } = await loadVaultChrome({ vaultPath: path })
+    if (shouldApplyChrome()) {
+      setFolders(folders)
+      setViews(views)
+    }
+  } catch (err) {
+    const unavailable = await handleUnavailableVaultPath({ handleVaultUnavailable, isCurrentVaultPath, path })
+    if (unavailable) return true
+    console.warn('Vault chrome load failed:', err)
+  }
+  return false
+}
+
+async function loadInitialVaultEntriesState(options: Pick<
+  InitialVaultLoadStateOptions,
+  'handleVaultAvailable' | 'handleVaultUnavailable' | 'isCurrentVaultPath' | 'path' | 'setEntries'
+>): Promise<boolean> {
+  const { handleVaultAvailable, handleVaultUnavailable, isCurrentVaultPath, path, setEntries } = options
+
+  try {
+    const { entries } = await loadVaultData({ vaultPath: path })
+    if (isCurrentVaultPath(path)) {
+      handleVaultAvailable(path)
+      setEntries(entries)
+    }
+  } catch (err) {
+    const unavailable = await handleUnavailableVaultPath({ handleVaultUnavailable, isCurrentVaultPath, path })
+    if (unavailable) return true
+    console.warn('Vault scan failed:', err)
+  }
+  return false
+}
+
+async function loadInitialVaultState(options: InitialVaultLoadStateOptions) {
+  const { path, isCurrentVaultPath, setIsLoading } = options
+  let vaultUnavailable = false
+  const chromeLoad = loadInitialVaultChromeState({
+    ...options,
+    shouldApplyChrome: () => !vaultUnavailable && isCurrentVaultPath(path),
   })
 
   setIsLoading(true)
-  try {
-    const { entries } = await loadVaultData({ vaultPath: path })
-    if (isCurrentVaultPath(path)) setEntries(entries)
-  } catch (err) {
-    console.warn('Vault scan failed:', err)
-  } finally {
-    if (isCurrentVaultPath(path)) setIsLoading(false)
-  }
-
+  vaultUnavailable = await loadInitialVaultEntriesState(options)
+  if (isCurrentVaultPath(path)) setIsLoading(false)
   await chromeLoad
+}
+
+async function handleUnavailableVaultPath(options: {
+  handleVaultUnavailable: (path: string) => void
+  isCurrentVaultPath: (path: string) => boolean
+  path: string
+}): Promise<boolean> {
+  const { handleVaultUnavailable, isCurrentVaultPath, path } = options
+  if (!isCurrentVaultPath(path)) return true
+
+  const available = await checkVaultPathAvailability({ vaultPath: path })
+  if (available !== false) return false
+  if (isCurrentVaultPath(path)) handleVaultUnavailable(path)
+  return true
 }
 
 function useCurrentVaultPathGuard(vaultPath: string) {
@@ -164,19 +201,9 @@ export function resolveNoteStatus({
   return resolveGitBackedNoteStatus(modifiedFiles.find((file) => file.path === path))
 }
 
-function useInitialVaultLoad({
-  vaultPath,
-  tracker,
-  unsaved,
-  isCurrentVaultPath,
-  resetReloading,
-  setEntries,
-  setFolders,
-  setIsLoading,
-  setModifiedFiles,
-  setModifiedFilesError,
-  setViews,
-}: {
+interface InitialVaultLoadOptions {
+  handleVaultAvailable: (path: string) => void
+  handleVaultUnavailable: (path: string) => void
   vaultPath: string
   tracker: ReturnType<typeof useNewNoteTracker>
   unsaved: ReturnType<typeof useUnsavedTracker>
@@ -188,7 +215,25 @@ function useInitialVaultLoad({
   setModifiedFiles: (files: ModifiedFile[]) => void
   setModifiedFilesError: (message: string | null) => void
   setViews: (views: ViewFile[]) => void
-}) {
+}
+
+function useInitialVaultLoad(options: InitialVaultLoadOptions) {
+  const {
+    handleVaultAvailable,
+    handleVaultUnavailable,
+    vaultPath,
+    tracker,
+    unsaved,
+    isCurrentVaultPath,
+    resetReloading,
+    setEntries,
+    setFolders,
+    setIsLoading,
+    setModifiedFiles,
+    setModifiedFilesError,
+    setViews,
+  } = options
+
   useEffect(() => {
     const path = vaultPath
     clearPrefetchCache()
@@ -208,7 +253,9 @@ function useInitialVaultLoad({
 
     let cancelled = false
     void loadInitialVaultState({
+      handleVaultAvailable,
       path,
+      handleVaultUnavailable,
       isCurrentVaultPath: (candidate) => !cancelled && isCurrentVaultPath(candidate),
       setEntries,
       setFolders,
@@ -217,6 +264,8 @@ function useInitialVaultLoad({
     })
     return () => { cancelled = true }
   }, [
+    handleVaultAvailable,
+    handleVaultUnavailable,
     vaultPath,
     tracker.clear,
     unsaved.clearAll,
@@ -349,42 +398,71 @@ function useGitLoaders(vaultPath: string) {
   return { loadGitHistory, loadDiffAtCommit, loadDiff, commitAndPush }
 }
 
-function useVaultReloads({
-  vaultPath,
-  isCurrentVaultPath,
-  loadModifiedFiles,
-  setEntries,
-  setFolders,
-  setViews,
-}: {
+interface VaultReloadOptions {
+  handleVaultAvailable: (path: string) => void
+  handleVaultUnavailable: (path: string) => void
   vaultPath: string
   isCurrentVaultPath: (path: string) => boolean
   loadModifiedFiles: () => Promise<void>
   setEntries: (entries: VaultEntry[]) => void
   setFolders: (folders: FolderNode[]) => void
   setViews: (views: ViewFile[]) => void
-}) {
-  const [activeReloads, setActiveReloads] = useState(0)
-  const isReloading = activeReloads > 0
-  const beginReload = useCallback(() => setActiveReloads((count) => count + 1), [])
-  const finishReload = useCallback(() => setActiveReloads((count) => Math.max(0, count - 1)), [])
-  const resetReloading = useCallback(() => setActiveReloads(0), [])
+}
 
-  const reloadFolders = useCallback(async () => {
-    const path = vaultPath
-    if (!hasVaultPath({ vaultPath: path })) return [] as FolderNode[]
-    try {
-      const folders = await loadVaultFolders({ vaultPath: path })
-      if (!isCurrentVaultPath(path)) return [] as FolderNode[]
-      const nextFolders = folders ?? []
-      setFolders(nextFolders)
-      return nextFolders
-    } catch {
-      return [] as FolderNode[]
-    }
-  }, [vaultPath, isCurrentVaultPath, setFolders])
+interface EntryReloadOptions extends VaultReloadOptions {
+  beginReload: () => void
+  finishReload: () => void
+}
 
-  const reloadVault = useCallback(async () => {
+interface CollectionReloadOptions<T> {
+  handleVaultUnavailable: (path: string) => void
+  isCurrentVaultPath: (path: string) => boolean
+  loadCollection: (options: { vaultPath: string }) => Promise<T[]>
+  path: string
+  setCollection: (items: T[]) => void
+}
+
+async function reloadVaultCollection<T>(options: CollectionReloadOptions<T>): Promise<T[]> {
+  const { handleVaultUnavailable, isCurrentVaultPath, loadCollection, path, setCollection } = options
+  if (!hasVaultPath({ vaultPath: path })) return []
+  try {
+    const items = await loadCollection({ vaultPath: path })
+    if (!isCurrentVaultPath(path)) return []
+    const nextItems = items ?? []
+    setCollection(nextItems)
+    return nextItems
+  } catch {
+    await handleUnavailableVaultPath({ handleVaultUnavailable, isCurrentVaultPath, path })
+    return []
+  }
+}
+
+function useFolderReload({
+  handleVaultUnavailable,
+  isCurrentVaultPath,
+  setFolders,
+  vaultPath,
+}: Pick<VaultReloadOptions, 'handleVaultUnavailable' | 'isCurrentVaultPath' | 'setFolders' | 'vaultPath'>) {
+  return useCallback(() => reloadVaultCollection({
+    handleVaultUnavailable,
+    isCurrentVaultPath,
+    loadCollection: loadVaultFolders,
+    path: vaultPath,
+    setCollection: setFolders,
+  }), [handleVaultUnavailable, vaultPath, isCurrentVaultPath, setFolders])
+}
+
+function useEntryReload({
+  beginReload,
+  finishReload,
+  handleVaultAvailable,
+  handleVaultUnavailable,
+  isCurrentVaultPath,
+  loadModifiedFiles,
+  setEntries,
+  vaultPath,
+}: EntryReloadOptions) {
+  return useCallback(async () => {
     const path = vaultPath
     if (!hasVaultPath({ vaultPath: path })) return [] as VaultEntry[]
     clearPrefetchCache()
@@ -392,29 +470,44 @@ function useVaultReloads({
     try {
       const entries = await reloadVaultEntries({ vaultPath: path })
       if (!isCurrentVaultPath(path)) return [] as VaultEntry[]
+      handleVaultAvailable(path)
       setEntries(entries)
       void loadModifiedFiles()
       return entries
     } catch (err) {
+      if (await handleUnavailableVaultPath({ handleVaultUnavailable, isCurrentVaultPath, path })) return [] as VaultEntry[]
       console.warn('Vault reload failed:', err)
       return [] as VaultEntry[]
     } finally {
       finishReload()
     }
-  }, [vaultPath, beginReload, finishReload, loadModifiedFiles, isCurrentVaultPath, setEntries])
+  }, [handleVaultAvailable, handleVaultUnavailable, vaultPath, beginReload, finishReload, loadModifiedFiles, isCurrentVaultPath, setEntries])
+}
 
-  const reloadViews = useCallback(async () => {
-    const path = vaultPath
-    if (!hasVaultPath({ vaultPath: path })) return []
-    try {
-      const nextViews = await loadVaultViews({ vaultPath: path })
-      if (!isCurrentVaultPath(path)) return []
-      const resolvedViews = nextViews ?? []
-      setViews(resolvedViews)
-      return resolvedViews
-    } catch { /* views are optional */ }
-    return []
-  }, [vaultPath, isCurrentVaultPath, setViews])
+function useViewReload({
+  handleVaultUnavailable,
+  isCurrentVaultPath,
+  setViews,
+  vaultPath,
+}: Pick<VaultReloadOptions, 'handleVaultUnavailable' | 'isCurrentVaultPath' | 'setViews' | 'vaultPath'>) {
+  return useCallback(() => reloadVaultCollection({
+    handleVaultUnavailable,
+    isCurrentVaultPath,
+    loadCollection: loadVaultViews,
+    path: vaultPath,
+    setCollection: setViews,
+  }), [handleVaultUnavailable, vaultPath, isCurrentVaultPath, setViews])
+}
+
+function useVaultReloads(options: VaultReloadOptions) {
+  const [activeReloads, setActiveReloads] = useState(0)
+  const isReloading = activeReloads > 0
+  const beginReload = useCallback(() => setActiveReloads((count) => count + 1), [])
+  const finishReload = useCallback(() => setActiveReloads((count) => Math.max(0, count - 1)), [])
+  const resetReloading = useCallback(() => setActiveReloads(0), [])
+  const reloadFolders = useFolderReload(options)
+  const reloadVault = useEntryReload({ ...options, beginReload, finishReload })
+  const reloadViews = useViewReload(options)
 
   return { isReloading, reloadFolders, reloadVault, reloadViews, resetReloading }
 }
@@ -445,7 +538,7 @@ function useGitignoredVisibilityReloads(
   }, [reloadFolders, reloadVault, reloadViews])
 }
 
-export function useVaultLoader(vaultPath: string) {
+function useVaultState(vaultPath: string) {
   const [entries, setEntries] = useState<VaultEntry[]>([])
   const [folders, setFolders] = useState<FolderNode[]>([])
   const [isLoading, setIsLoading] = useState(() => hasVaultPath({ vaultPath }))
@@ -454,16 +547,67 @@ export function useVaultLoader(vaultPath: string) {
   const pendingSave = usePendingSaveTracker()
   const unsaved = useUnsavedTracker()
   const isCurrentVaultPath = useCurrentVaultPathGuard(vaultPath)
+  const modified = useModifiedFilesLoader(vaultPath, isCurrentVaultPath)
+
+  return {
+    entries,
+    folders,
+    isCurrentVaultPath,
+    isLoading,
+    modified,
+    pendingSave,
+    setEntries,
+    setFolders,
+    setIsLoading,
+    setViews,
+    tracker,
+    unsaved,
+    views,
+  }
+}
+
+function useVaultUnavailable(vaultPath: string, state: ReturnType<typeof useVaultState>) {
+  const {
+    isCurrentVaultPath,
+    modified,
+    setEntries,
+    setFolders,
+    setIsLoading,
+    setViews,
+    tracker,
+    unsaved,
+  } = state
+
+  return useUnavailableVaultState({
+    clearNewPaths: tracker.clear,
+    clearUnsaved: unsaved.clearAll,
+    isCurrentVaultPath,
+    setEntries,
+    setFolders,
+    setIsLoading,
+    setModifiedFiles: modified.setModifiedFiles,
+    setModifiedFilesError: modified.setModifiedFilesError,
+    setViews,
+    vaultPath,
+  })
+}
+
+export function useVaultLoader(vaultPath: string) {
+  const state = useVaultState(vaultPath)
+  const { entries, folders, isCurrentVaultPath, isLoading, modified, pendingSave, setEntries, setFolders, setIsLoading, setViews, tracker, unsaved, views } = state
   const {
     modifiedFiles,
     modifiedFilesError,
     setModifiedFiles,
     setModifiedFilesError,
     loadModifiedFiles,
-  } = useModifiedFilesLoader(vaultPath, isCurrentVaultPath)
+  } = modified
   const entryMutations = useEntryMutations(setEntries, tracker.trackNew)
   const gitLoaders = useGitLoaders(vaultPath)
+  const unavailableVault = useVaultUnavailable(vaultPath, state)
   const vaultReloads = useVaultReloads({
+    handleVaultAvailable: unavailableVault.markVaultAvailable,
+    handleVaultUnavailable: unavailableVault.markVaultUnavailable,
     vaultPath,
     isCurrentVaultPath,
     loadModifiedFiles,
@@ -474,6 +618,8 @@ export function useVaultLoader(vaultPath: string) {
   useGitignoredVisibilityReloads(vaultReloads)
 
   useInitialVaultLoad({
+    handleVaultAvailable: unavailableVault.markVaultAvailable,
+    handleVaultUnavailable: unavailableVault.markVaultUnavailable,
     vaultPath,
     tracker,
     unsaved,
@@ -498,6 +644,7 @@ export function useVaultLoader(vaultPath: string) {
 
   return {
     entries, folders, isLoading, isReloading: vaultReloads.isReloading, views, modifiedFiles, modifiedFilesError,
+    unavailableVaultPath: unavailableVault.unavailableVaultPath,
     ...entryMutations,
     loadModifiedFiles,
     ...gitLoaders,
@@ -505,6 +652,7 @@ export function useVaultLoader(vaultPath: string) {
     reloadVault: vaultReloads.reloadVault,
     reloadFolders: vaultReloads.reloadFolders,
     reloadViews: vaultReloads.reloadViews,
+    markVaultUnavailable: unavailableVault.markVaultUnavailable,
     addPendingSave: pendingSave.addPendingSave,
     removePendingSave: pendingSave.removePendingSave,
     unsavedPaths: unsaved.unsavedPaths,

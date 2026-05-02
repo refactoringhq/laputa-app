@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { FolderTree } from './FolderTree'
 import { FOLDER_ROW_SINGLE_CLICK_DELAY_MS } from './folder-tree/useFolderRowInteractions'
+import { FOLDER_ROW_NESTING_INDENT, getFolderConnectorLeft } from './folder-tree/folderTreeLayout'
 import type { FolderNode, SidebarSelection } from '../types'
 
 const mockFolders: FolderNode[] = [
@@ -67,7 +68,8 @@ describe('FolderTree', () => {
     expect(screen.getByText('Laputa')).toBeInTheDocument()
   })
 
-  it('lets the vault root collapse and expand its nested folders', () => {
+  it('lets the vault root collapse and expand from the row', () => {
+    vi.useFakeTimers()
     render(
       <FolderTree
         folders={mockFolders}
@@ -77,19 +79,31 @@ describe('FolderTree', () => {
       />,
     )
 
-    fireEvent.click(screen.getByLabelText('Collapse Laputa'))
+    fireEvent.click(screen.getByTestId('folder-row:'))
+    act(() => {
+      vi.advanceTimersByTime(FOLDER_ROW_SINGLE_CLICK_DELAY_MS)
+    })
     expect(screen.queryByText('projects')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByLabelText('Expand Laputa'))
+    fireEvent.click(screen.getByTestId('folder-row:'))
+    act(() => {
+      vi.advanceTimersByTime(FOLDER_ROW_SINGLE_CLICK_DELAY_MS)
+    })
     expect(screen.getByText('projects')).toBeInTheDocument()
+    vi.useRealTimers()
   })
 
-  it('expands children when clicking the folder chevron', () => {
+  it('expands children when clicking a folder row', () => {
+    vi.useFakeTimers()
     render(<FolderTree folders={mockFolders} selection={defaultSelection} onSelect={vi.fn()} />)
     expect(screen.queryByText('laputa')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Expand projects'))
+    fireEvent.click(screen.getByTestId('folder-row:projects'))
+    act(() => {
+      vi.advanceTimersByTime(FOLDER_ROW_SINGLE_CLICK_DELAY_MS)
+    })
     expect(screen.getByText('laputa')).toBeInTheDocument()
     expect(screen.getByText('portfolio')).toBeInTheDocument()
+    vi.useRealTimers()
   })
 
   it('calls onSelect with folder kind when clicking a folder row', () => {
@@ -182,32 +196,24 @@ describe('FolderTree', () => {
     expect(onStartRenameFolder).toHaveBeenCalledWith('projects')
   })
 
-  it('shows inline rename and delete actions for folders', () => {
-    const onDeleteFolder = vi.fn()
-    const onStartRenameFolder = vi.fn()
-    const onSelect = vi.fn()
+  it('keeps rename and delete out of row hover actions', () => {
     render(
       <FolderTree
         folders={mockFolders}
         selection={defaultSelection}
-        onSelect={onSelect}
-        onDeleteFolder={onDeleteFolder}
+        onSelect={vi.fn()}
+        onDeleteFolder={vi.fn()}
         onRenameFolder={vi.fn().mockResolvedValue(true)}
-        onStartRenameFolder={onStartRenameFolder}
+        onStartRenameFolder={vi.fn()}
         onCancelRenameFolder={vi.fn()}
       />,
     )
 
-    fireEvent.click(screen.getByTestId('rename-folder-btn:projects'))
-    fireEvent.click(screen.getByTestId('delete-folder-btn:projects'))
-
-    expect(onSelect).toHaveBeenNthCalledWith(1, { kind: 'folder', path: 'projects' })
-    expect(onStartRenameFolder).toHaveBeenCalledWith('projects')
-    expect(onSelect).toHaveBeenNthCalledWith(2, { kind: 'folder', path: 'projects' })
-    expect(onDeleteFolder).toHaveBeenCalledWith('projects')
+    expect(screen.queryByTestId('rename-folder-btn:projects')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('delete-folder-btn:projects')).not.toBeInTheDocument()
   })
 
-  it('does not reserve a disclosure slot for leaf folders', () => {
+  it('does not render folder-level disclosure buttons', () => {
     render(<FolderTree folders={mockFolders} selection={defaultSelection} onSelect={vi.fn()} />)
 
     const leafRowContainer = screen.getByTestId('folder-row:areas').parentElement
@@ -216,7 +222,23 @@ describe('FolderTree', () => {
     expect(leafRowContainer).not.toBeNull()
     expect(parentRowContainer).not.toBeNull()
     expect(within(leafRowContainer as HTMLElement).queryAllByRole('button')).toHaveLength(1)
-    expect(within(parentRowContainer as HTMLElement).queryAllByRole('button')).toHaveLength(2)
+    expect(within(parentRowContainer as HTMLElement).queryAllByRole('button')).toHaveLength(1)
+    expect(screen.queryByLabelText('Expand projects')).not.toBeInTheDocument()
+  })
+
+  it('aligns nested folders with the parent folder name and centers connectors on parent icons', () => {
+    render(
+      <FolderTree
+        folders={mockFolders}
+        selection={defaultSelection}
+        onSelect={vi.fn()}
+        vaultRootPath={vaultRootPath}
+      />,
+    )
+
+    expect(screen.getByTestId('folder-row:').parentElement).toHaveStyle({ paddingLeft: '0px' })
+    expect(screen.getByTestId('folder-row:projects').parentElement).toHaveStyle({ paddingLeft: `${FOLDER_ROW_NESTING_INDENT}px` })
+    expect(screen.getByTestId('folder-connector:')).toHaveStyle({ left: `${getFolderConnectorLeft(0)}px` })
   })
 
   it('shows the rename input when a folder is being renamed', () => {
