@@ -298,15 +298,15 @@ The agent panel (`ai-context.ts`) builds a structured JSON snapshot from the act
 
 ```json
 {
-  "activeNote": { "path", "title", "type", "frontmatter", "content" },
-  "linkedNotes": [{ "path", "title", "content" }],
-  "openTabs": [{ "title", "snippet" }],
-  "vaultMetadata": { "noteTypes", "stats", "filter" },
-  "references": [{ "title", "path", "type" }]
+  "activeNote": { "path", "title", "type", "frontmatter", "body", "wordCount", "bodyTruncated?" },
+  "openTabs": [{ "path", "title", "type", "frontmatter" }],
+  "noteList": [{ "path", "title", "type" }],
+  "vault": { "types", "totalNotes" },
+  "referencedNotes": [{ "title", "path", "type" }]
 }
 ```
 
-Token budget: 60% of 180k context limit (~108k tokens max). Active note gets priority, then linked notes, then truncation.
+Large active notes are compacted into a head/tail body snapshot before they enter the CLI prompt. The snapshot records `bodyTruncated` metadata and instructs agents to call `get_note(path)` before content-sensitive edits or summaries, keeping lower-context OpenCode providers from failing on oversized active-note context while preserving access to the full note through MCP.
 
 ### Authentication
 
