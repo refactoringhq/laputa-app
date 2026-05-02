@@ -49,13 +49,13 @@ ensure_node_tooling() {
 
 require_main_push() {
   if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
-    echo "❌ Pushes must happen from main. Detached HEAD is not allowed."
+    echo "❌ Pushes must happen from main or woonyong. Detached HEAD is not allowed."
     exit 1
   fi
 
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-  if [ "$CURRENT_BRANCH" != "main" ]; then
-    echo "❌ Pushes must happen from main. Current branch: $CURRENT_BRANCH"
+  if [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "woonyong" ]; then
+    echo "❌ Pushes must happen from main or woonyong. Current branch: $CURRENT_BRANCH"
     exit 1
   fi
 
@@ -65,10 +65,12 @@ require_main_push() {
     case "$LOCAL_REF:$REMOTE_REF" in
       refs/heads/main:refs/heads/main)
         ;;
+      refs/heads/woonyong:refs/heads/woonyong)
+        ;;
       refs/tags/*:refs/tags/*)
         ;;
       *)
-        echo "❌ Pushes must be main -> main only."
+        echo "Pushes must be main -> main or woonyong -> woonyong only."
         echo "   Attempted: ${LOCAL_REF:-<none>} -> ${REMOTE_REF:-<none>}"
         exit 1
         ;;

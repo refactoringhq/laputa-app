@@ -23,13 +23,13 @@ ensure_node_tooling() {
 
 require_main_branch() {
   if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
-    echo "❌ Commits must happen on main. Detached HEAD is not allowed."
+    echo "❌ Commits must happen on main or woonyong. Detached HEAD is not allowed."
     exit 1
   fi
 
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-  if [ "$CURRENT_BRANCH" != "main" ]; then
-    echo "❌ Commits must happen on main. Current branch: $CURRENT_BRANCH"
+  if [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "woonyong" ]; then
+    echo "❌ Commits must happen on main or woonyong. Current branch: $CURRENT_BRANCH"
     echo "   Merge or cherry-pick your work onto main, then commit there."
     exit 1
   fi
