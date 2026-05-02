@@ -46,6 +46,8 @@ import { triggerCommitEntryAction } from './utils/commitEntryAction'
 import { generateCommitMessage } from './utils/commitMessage'
 import { useDialogs } from './hooks/useDialogs'
 import { useVaultSwitcher } from './hooks/useVaultSwitcher'
+import { useVaultProviderState } from './hooks/useVaultProviderState'
+import { OpenVaultProviderDialog } from './components/status-bar/OpenVaultProviderDialog'
 import { useGitHistory } from './hooks/useGitHistory'
 import { useUpdater, restartApp } from './hooks/useUpdater'
 import { useAutoSync } from './hooks/useAutoSync'
@@ -265,6 +267,8 @@ function App() {
     return () => window.removeEventListener(OPEN_AI_CHAT_EVENT, handleOpenAiChat)
   }, [showAIChat, toggleAIChat])
 
+  const providerState = useVaultProviderState()
+
   // onSwitch closure captures `notes` declared below — safe because it's only
   // called on user interaction, never during render (refs inside the hook
   // guarantee the latest closure is always used).
@@ -275,6 +279,7 @@ function App() {
       notes.closeAllTabs()
     },
     onToast: (msg) => setToastMessage(msg),
+    onProviderSelection: providerState.startProviderSelection,
   })
   const {
     allVaults,
@@ -1803,6 +1808,16 @@ function App() {
         <SettingsPanel open={dialogs.showSettings} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} isGitVault={isGitVault} onSave={saveSettings} onCopyMcpConfig={handleCopyMcpConfig} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} onClose={dialogs.closeSettings} />
         <FeedbackDialog open={showFeedback} onClose={closeFeedback} />
         <McpSetupDialog open={showMcpSetupDialog} status={mcpStatus} busyAction={mcpDialogAction} manualConfigSnippet={mcpConfigSnippet} manualConfigLoading={mcpConfigLoading} manualConfigError={mcpConfigError} locale={appLocale} onClose={closeMcpSetupDialog} onConnect={handleConnectMcp} onCopyManualConfig={handleCopyMcpConfig} onDisconnect={handleDisconnectMcp} onLoadManualConfig={handleLoadMcpConfigSnippet} />
+
+        <OpenVaultProviderDialog
+          open={providerState.isSelectingProvider}
+          validationResult={providerState.validationResult?.validationResult || null}
+          validationMessage={providerState.validationMessage}
+          inferredProvider={providerState.inferredProvider}
+          onSelect={providerState.confirmProvider}
+          onCancel={providerState.cancelProviderSelection}
+          locale={appLocale}
+        />
         <CloneVaultModal key={dialogs.showCloneVault ? 'clone-open' : 'clone-closed'} open={dialogs.showCloneVault} onClose={dialogs.closeCloneVault} onVaultCloned={vaultSwitcher.handleVaultCloned} />
         {deleteActions.confirmDelete && (
           <ConfirmDeleteDialog

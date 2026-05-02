@@ -6,6 +6,7 @@ import { formatFolderPickerActionError, pickFolder } from '../utils/vault-dialog
 import { loadVaultList, saveVaultList } from '../utils/vaultListStore'
 import type { VaultOption } from '../components/StatusBar'
 import { trackEvent } from '../lib/telemetry'
+import type { VaultProviderType, ValidatedVaultProviderSelection } from '../lib/vaultProviders'
 
 export type { PersistedVaultList } from '../utils/vaultListStore'
 
@@ -24,6 +25,11 @@ export const DEFAULT_VAULTS: VaultOption[] = [
 interface UseVaultSwitcherOptions {
   onSwitch: () => void
   onToast: (msg: string) => void
+  onProviderSelection?: (
+    path: string, 
+    explicitType: VaultProviderType | null, 
+    onComplete: (result: ValidatedVaultProviderSelection) => void
+  ) => Promise<{ needsConfirmation: boolean; result: ValidatedVaultProviderSelection | null }>
 }
 
 interface PersistedVaultState {
@@ -591,14 +597,18 @@ function addVaultToList({
   setExtraVaults,
   path,
   label,
+  providerType,
+  providerRoot,
 }: {
   setExtraVaults: Dispatch<SetStateAction<VaultOption[]>>
   path: string
   label: string
+  providerType?: VaultProviderType | null
+  providerRoot?: string | null
 }) {
   setExtraVaults(previousVaults => {
     const exists = previousVaults.some(vault => vault.path === path)
-    return exists ? previousVaults : [...previousVaults, { label, path, available: true }]
+    return exists ? previousVaults : [...previousVaults, { label, path, providerType, providerRoot, available: true }]
   })
 }
 
@@ -939,8 +949,9 @@ function useSyncVaultSelectionAction({
 }
 
 function useOpenLocalFolderAction(
-  addAndSwitch: (path: string, label: string) => void,
+  addAndSwitch: (path: string, label: string, providerType?: string, providerRoot?: string) => void,
   onToastRef: MutableRefObject<(msg: string) => void>,
+  onProviderSelectionRef?: MutableRefObject<UseVaultSwitcherOptions['onProviderSelection']>
 ) {
   return useCallback(async () => {
     let path: string | null
@@ -954,9 +965,17 @@ function useOpenLocalFolderAction(
     if (!path) return
 
     const label = labelFromPath({ path })
-    addAndSwitch(path, label)
-    onToastRef.current(`Vault "${label}" opened`)
-  }, [addAndSwitch, onToastRef])
+    
+    if (onProviderSelectionRef?.current) {
+      await onProviderSelectionRef.current(path, null, (result) => {
+        addAndSwitch(path!, label, result.providerType, result.providerRoot)
+        onToastRef.current(`Vault "${label}" opened`)
+      })
+    } else {
+      addAndSwitch(path, label)
+      onToastRef.current(`Vault "${label}" opened`)
+    }
+  }, [addAndSwitch, onToastRef, onProviderSelectionRef])
 }
 
 function useCreateEmptyVaultAction(
@@ -1061,10 +1080,6 @@ function useVaultActions({
   setVaultPath,
   vaultPath,
 }: VaultActionOptions) {
-  const addVault = useCallback((path: string, label: string) => {
-    addVaultToList({ setExtraVaults, path, label })
-  }, [setExtraVaults])
-
   const switchVault = useSwitchVaultAction(onSwitchRef, setSelectedVaultPath, setVaultPath)
   const registerVaultSelection = useRegisterVaultSelectionAction({
     defaultAvailable,
@@ -1091,10 +1106,10 @@ function useVaultActions({
     setSelectedVaultPath,
     setVaultPath,
   })
-  const addAndSwitch = useCallback((path: string, label: string) => {
-    addVault(path, label)
+  const addAndSwitch = useCallback((path: string, label: string, providerType?: VaultProviderType | null, providerRoot?: string | null) => {
+    addVaultToList({ setExtraVaults, path, label, providerType, providerRoot })
     switchVault(path)
-  }, [addVault, switchVault])
+  }, [setExtraVaults, switchVault])
 
   return {
     handleCreateEmptyVault: useCreateEmptyVaultAction(addAndSwitch, onToastRef),

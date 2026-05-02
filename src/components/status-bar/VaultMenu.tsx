@@ -146,9 +146,16 @@ function VaultMenuItem({ vault, isActive, canRemove, locale, onSelect, onRemove 
           opacity: unavailable ? 0.45 : 1,
         }}
       >
-        <span className="flex min-w-0 items-center gap-1.5">
-          <VaultMenuIcon isActive={isActive} unavailable={unavailable} />
-          <span className="truncate">{vault.label}</span>
+        <span className="flex min-w-0 items-center gap-1.5 flex-1 justify-between">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <VaultMenuIcon isActive={isActive} unavailable={unavailable} />
+            <span className="truncate">{vault.label}</span>
+          </span>
+          {vault.providerType === 'icloud-drive' && (
+            <span className="shrink-0 rounded bg-blue-500/10 px-1 py-0.5 text-[9px] font-medium text-blue-500 dark:bg-blue-500/20 dark:text-blue-400">
+              iCloud
+            </span>
+          )}
         </span>
       </Button>
       {canRemove && onRemove && (
