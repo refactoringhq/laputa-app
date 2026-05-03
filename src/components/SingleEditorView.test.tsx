@@ -304,6 +304,25 @@ function appendToolbarButton(container: Element, className: string, text: string
   return button
 }
 
+function createTitleHeadingFixture(container: Element) {
+  const titleHeading = document.createElement('div')
+  titleHeading.setAttribute('data-content-type', 'heading')
+  titleHeading.setAttribute('data-level', '1')
+
+  const inlineHeading = document.createElement('div')
+  inlineHeading.className = 'bn-inline-content'
+  titleHeading.appendChild(inlineHeading)
+  container.appendChild(titleHeading)
+
+  return inlineHeading
+}
+
+function clipboardDataFor(formats: Record<string, string>) {
+  return {
+    getData: vi.fn((format: string) => formats[format] ?? ''),
+  }
+}
+
 describe('SingleEditorView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -643,6 +662,34 @@ describe('SingleEditorView', () => {
     expect(editor.insertInlineContent).toHaveBeenCalledWith('Plain\nText', {
       updateSelection: true,
     })
+  })
+
+  it('routes rich title-heading paste through safe plain-text inline insertion', () => {
+    const { container, editor } = renderEditorHarness()
+    const inlineHeading = createTitleHeadingFixture(container)
+    const clipboardData = clipboardDataFor({
+      'text/html': '<h1>Pasted <em>Title</em></h1><table><tr><td>Cell</td></tr></table>',
+      'text/plain': 'Pasted Title\nCell',
+    })
+
+    const didBubble = fireEvent.paste(inlineHeading, { clipboardData })
+
+    expect(didBubble).toBe(false)
+    expect(editor.focus).toHaveBeenCalled()
+    expect(editor.insertInlineContent).toHaveBeenCalledWith('Pasted Title\nCell', {
+      updateSelection: true,
+    })
+  })
+
+  it('leaves plain title-heading paste on BlockNote native handling', () => {
+    const { container, editor } = renderEditorHarness()
+    const inlineHeading = createTitleHeadingFixture(container)
+    const clipboardData = clipboardDataFor({ 'text/plain': 'Plain Title' })
+
+    const didBubble = fireEvent.paste(inlineHeading, { clipboardData })
+
+    expect(didBubble).toBe(true)
+    expect(editor.insertInlineContent).not.toHaveBeenCalled()
   })
 
   it('routes clicks on the empty title wrapper back into the H1 block', async () => {

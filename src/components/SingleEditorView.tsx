@@ -496,6 +496,45 @@ function findTitleHeadingElement(target: HTMLElement): HTMLElement | null {
   return titleWrapper?.querySelector<HTMLElement>(TITLE_HEADING_SELECTOR) ?? null
 }
 
+function richClipboardPlainText(clipboardData: DataTransfer): string | null {
+  const text = clipboardData.getData('text/plain')
+  const html = clipboardData.getData('text/html')
+
+  return text.length > 0 && html.length > 0 ? text : null
+}
+
+function eventTargetElement(target: EventTarget | null): HTMLElement | null {
+  if (!(target instanceof Node)) return null
+  return nodeElement(target)
+}
+
+function useTitleHeadingRichPasteHandler(options: {
+  editable: boolean
+  editor: ReturnType<typeof useCreateBlockNote>
+  runEditorAction: (action: SuggestionAction) => void
+}) {
+  const { editable, editor, runEditorAction } = options
+
+  return useCallback((event: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!editable) return
+
+    const target = eventTargetElement(event.target)
+    if (!target) return
+
+    const titleHeading = findTitleHeadingElement(target)
+    if (!titleHeading || !event.currentTarget.contains(titleHeading)) return
+
+    const text = richClipboardPlainText(event.clipboardData)
+    if (!text) return
+
+    event.preventDefault()
+    runEditorAction(() => {
+      editor.focus()
+      editor.insertInlineContent(text, { updateSelection: true })
+    })
+  }, [editable, editor, runEditorAction])
+}
+
 function queueTitleHeadingCursorRepair(
   target: HTMLElement,
   editor: ReturnType<typeof useCreateBlockNote>,
@@ -879,6 +918,11 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
     editor,
     runEditorAction,
   })
+  const handleTitleHeadingRichPaste = useTitleHeadingRichPasteHandler({
+    editable,
+    editor,
+    runEditorAction,
+  })
   const handleFocusCapture = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
     activatePlainTextPaste()
     handleCodeBlockCopyFocus(event)
@@ -904,6 +948,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
       onMouseLeave={clearCopyTarget}
       onMouseDownCapture={activatePlainTextPaste}
       onMouseMove={handleCodeBlockCopyMouseMove}
+      onPasteCapture={handleTitleHeadingRichPaste}
     >
       {isDragOver && (
         <div className="editor__drop-overlay">
