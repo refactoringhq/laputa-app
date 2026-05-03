@@ -247,7 +247,7 @@
   "sidebar.nav.allNotes": "모든 노트",
   "sidebar.nav.archive": "보관",
   "sidebar.group.favorites": "즐겨찾기",
-  "sidebar.group.views": "조회수",
+  "sidebar.group.views": "보기",
   "sidebar.group.types": "유형",
   "sidebar.group.folders": "폴더",
   "sidebar.action.createView": "보기 생성",
