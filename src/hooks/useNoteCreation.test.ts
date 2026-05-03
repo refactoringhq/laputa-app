@@ -584,11 +584,8 @@ describe('useNoteCreation hook', () => {
     expect(setToastMessage).toHaveBeenCalledWith('Cannot create type "Note" because note.md already exists')
   })
 
-  it('handleCreateType lets disk creation decide when a stale entry collides with the target type path', async () => {
+  it('handleCreateType blocks when a loaded non-Type entry collides with the target type path', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
-    vi.mocked(invoke)
-      .mockRejectedValueOnce(new Error('not found'))
-      .mockResolvedValueOnce(undefined)
     const staleEntry = makeEntry({
       path: '/test/vault/pttep.md',
       filename: 'pttep.md',
@@ -597,26 +594,16 @@ describe('useNoteCreation hook', () => {
     })
     const { result } = renderHook(() => useNoteCreation(makeConfig([staleEntry]), tabDeps))
 
-    let created = false
+    let created = true
     await act(async () => {
       created = await result.current.handleCreateType('PTTEP')
     })
 
-    expect(created).toBe(true)
-    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_note_content', {
-      path: '/test/vault/pttep.md',
-    })
-    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
-      path: '/test/vault/pttep.md',
-      content: expect.stringContaining('type: Type'),
-    })
-    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
-      path: '/test/vault/pttep.md',
-      filename: 'pttep.md',
-      title: 'PTTEP',
-      isA: 'Type',
-    }))
-    expect(setToastMessage).not.toHaveBeenCalled()
+    expect(created).toBe(false)
+    expect(vi.mocked(invoke)).not.toHaveBeenCalled()
+    expect(addEntry).not.toHaveBeenCalled()
+    expect(openTabWithContent).not.toHaveBeenCalled()
+    expect(setToastMessage).toHaveBeenCalledWith('Cannot create type "PTTEP" because pttep.md already exists')
   })
 
   it('handleCreateType writes new type entries to the vault root even when older type entries live in a folder', async () => {

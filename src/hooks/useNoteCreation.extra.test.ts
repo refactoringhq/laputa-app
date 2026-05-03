@@ -8,6 +8,7 @@ import {
   buildNoteContent,
   resolveNewNote,
   resolveNewType,
+  planNewTypeCreation,
   DEFAULT_TEMPLATES,
   resolveTemplate,
 } from './useNoteCreation'
@@ -317,5 +318,30 @@ describe('resolveNewType', () => {
     const { entry } = resolveNewType({ typeName: 'Responsibility', vaultPath: '/other/vault' })
     expect(entry.path).toBe('/other/vault/responsibility.md')
     expect(entry.path).not.toContain('/Users/luca/Laputa')
+  })
+})
+
+describe('planNewTypeCreation', () => {
+  it('blocks creating a type when a same-slug non-Type note already exists', () => {
+    const plan = planNewTypeCreation({
+      entries: [makeEntry({ path: '/my/vault/tasks.md', filename: 'tasks.md', title: 'Tasks', isA: 'Note' })],
+      typeName: 'Tasks',
+      vaultPath: '/my/vault',
+    })
+
+    expect(plan).toEqual({
+      status: 'blocked',
+      message: 'Cannot create type "Tasks" because tasks.md already exists',
+    })
+  })
+
+  it('blocks type collisions case-insensitively for cross-platform vaults', () => {
+    const plan = planNewTypeCreation({
+      entries: [makeEntry({ path: '/my/vault/TASKS.md', filename: 'TASKS.md', title: 'Tasks', isA: 'Note' })],
+      typeName: 'tasks',
+      vaultPath: '/my/vault',
+    })
+
+    expect(plan.status).toBe('blocked')
   })
 })
