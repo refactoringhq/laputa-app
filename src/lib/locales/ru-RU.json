@@ -370,6 +370,7 @@
   "editor.toolbar.copyFilePath": "Копировать путь к файлу",
   "editor.toolbar.moreActions": "Другие действия с заметкой",
   "editor.toolbar.openProperties": "Открыть панель свойств",
+  "editor.codeBlock.copy": "Скопировать код в буфер обмена",
   "editor.imageLightbox.title": "Предварительный просмотр изображения",
   "editor.filename.rename": "Переименовать файл",
   "editor.filename.renameToTitle": "Переименовать файл в соответствии с заголовком",

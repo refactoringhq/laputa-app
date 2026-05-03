@@ -370,6 +370,7 @@
   "editor.toolbar.copyFilePath": "Kopiuj ścieżkę pliku",
   "editor.toolbar.moreActions": "Więcej działań notatki",
   "editor.toolbar.openProperties": "Otwórz panel właściwości",
+  "editor.codeBlock.copy": "Skopiuj kod do schowka",
   "editor.imageLightbox.title": "Podgląd obrazu",
   "editor.filename.rename": "Zmień nazwę pliku",
   "editor.filename.renameToTitle": "Zmień nazwę pliku na zgodną z tytułem",

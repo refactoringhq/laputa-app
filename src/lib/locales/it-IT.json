@@ -370,6 +370,7 @@
   "editor.toolbar.copyFilePath": "Copia il percorso del file",
   "editor.toolbar.moreActions": "Altre azioni della nota",
   "editor.toolbar.openProperties": "Apri il pannello delle proprietà",
+  "editor.codeBlock.copy": "Copia il codice negli appunti",
   "editor.imageLightbox.title": "Anteprima immagine",
   "editor.filename.rename": "Rinomina nome file",
   "editor.filename.renameToTitle": "Rinomina il file in modo che corrisponda al titolo",

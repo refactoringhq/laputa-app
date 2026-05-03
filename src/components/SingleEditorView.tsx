@@ -1,4 +1,5 @@
-import { useEffect, useCallback, useMemo, useRef, useContext } from 'react'
+import { useEffect, useCallback, useMemo, useRef, useContext, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { trackEvent } from '../lib/telemetry'
 import {
   useCreateBlockNote,
@@ -16,12 +17,14 @@ import {
 } from '@blocknote/react'
 import { components } from '@blocknote/mantine'
 import { MantineContext, MantineProvider } from '@mantine/core'
+import { Copy } from '@phosphor-icons/react'
 import { ExternalLink } from 'lucide-react'
 import { useDocumentThemeMode } from '../hooks/useDocumentThemeMode'
 import { useEditorTheme } from '../hooks/useTheme'
 import { useImageDrop } from '../hooks/useImageDrop'
 import { useImageLightbox } from '../hooks/useImageLightbox'
-import type { AppLocale } from '../lib/i18n'
+import { createTranslator, type AppLocale } from '../lib/i18n'
+import { isTauri } from '../mock-tauri'
 import { buildTypeEntryMap } from '../utils/typeColors'
 import { preFilterWikilinks, deduplicateByPath, MIN_QUERY_LENGTH } from '../utils/wikilinkSuggestions'
 import { filterPersonMentions, PERSON_MENTION_MIN_QUERY } from '../utils/personMentionSuggestions'
@@ -42,6 +45,8 @@ import { TolariaSideMenu } from './tolariaBlockNoteSideMenu'
 import { useEditorLinkActivation } from './useEditorLinkActivation'
 import { findNearestTextCursorBlock } from './blockNoteCursorTarget'
 import { ImageLightbox } from './ImageLightbox'
+import { ActionTooltip } from './ui/action-tooltip'
+import { Button } from './ui/button'
 import {
   activatePlainTextPasteTarget,
   registerPlainTextPasteTarget,
@@ -59,6 +64,7 @@ const CONTAINER_CLICK_IGNORE_SELECTOR = [
   '.bn-link-toolbar',
   '.bn-side-menu',
   '.bn-form-popover',
+  '[data-editor-code-copy]',
   '[role="menu"]',
   '[role="dialog"]',
 ].join(', ')
@@ -280,6 +286,7 @@ function isSelectionInsideElement(element: HTMLElement): boolean {
 const TITLE_HEADING_SELECTOR = 'h1, [data-content-type="heading"][data-level="1"], [data-content-type="heading"]:not([data-level])'
 const TITLE_HEADING_WRAPPER_SELECTOR = '.bn-block-outer, .bn-block'
 const CODE_BLOCK_SELECTOR = '[data-content-type="codeBlock"]'
+const CODE_BLOCK_COPY_RESET_MS = 1200
 
 function nodeElement(node: Node | null): HTMLElement | null {
   if (!node) return null
@@ -334,6 +341,151 @@ function selectedCodeBlockText(options: {
   if (!range) return null
 
   return options.selection?.toString() || range.cloneContents().textContent || ''
+}
+
+function codeBlockText(codeBlock: HTMLElement): string {
+  const codeElement = codeBlock.querySelector<HTMLElement>('pre code')
+  return codeElement?.textContent ?? ''
+}
+
+async function writeClipboardText(text: string): Promise<void> {
+  if (isTauri()) {
+    await invoke('copy_text_to_clipboard', { text })
+    return
+  }
+
+  if (!navigator.clipboard?.writeText) {
+    throw new Error('Clipboard API is unavailable')
+  }
+
+  await navigator.clipboard.writeText(text)
+}
+
+type CodeBlockCopyTarget = {
+  codeBlock: HTMLElement
+  left: number
+  top: number
+}
+
+function codeBlockCopyTarget(codeBlock: HTMLElement, container: HTMLElement): CodeBlockCopyTarget {
+  const codeBlockRect = codeBlock.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+
+  return {
+    codeBlock,
+    left: codeBlockRect.right - containerRect.left + container.scrollLeft - 30,
+    top: codeBlockRect.top - containerRect.top + container.scrollTop + 6,
+  }
+}
+
+function sameCopyTarget(left: CodeBlockCopyTarget | null, right: CodeBlockCopyTarget): boolean {
+  return Boolean(
+    left
+      && left.codeBlock === right.codeBlock
+      && left.left === right.left
+      && left.top === right.top,
+  )
+}
+
+function useCodeBlockCopyTarget(containerRef: React.RefObject<HTMLDivElement | null>) {
+  const [copyTarget, setCopyTarget] = useState<CodeBlockCopyTarget | null>(null)
+
+  const showCopyTarget = useCallback((codeBlock: HTMLElement) => {
+    const container = containerRef.current
+    if (!container || !container.contains(codeBlock)) return
+
+    const nextTarget = codeBlockCopyTarget(codeBlock, container)
+    setCopyTarget((previous) => sameCopyTarget(previous, nextTarget) ? previous : nextTarget)
+  }, [containerRef])
+
+  const updateFromEventTarget = useCallback((target: EventTarget | null) => {
+    const container = containerRef.current
+    if (!(target instanceof HTMLElement) || !container) return
+    if (target.closest('[data-editor-code-copy]')) return
+
+    const codeBlock = target.closest<HTMLElement>(CODE_BLOCK_SELECTOR)
+    if (codeBlock && container.contains(codeBlock)) {
+      showCopyTarget(codeBlock)
+      return
+    }
+
+    setCopyTarget(null)
+  }, [containerRef, showCopyTarget])
+
+  const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    updateFromEventTarget(event.target)
+  }, [updateFromEventTarget])
+
+  const handleFocus = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+    updateFromEventTarget(event.target)
+  }, [updateFromEventTarget])
+
+  const clearCopyTarget = useCallback(() => setCopyTarget(null), [])
+
+  return { clearCopyTarget, copyTarget, handleFocus, handleMouseMove }
+}
+
+function CodeBlockCopyButton({ copyTarget, locale }: { copyTarget: CodeBlockCopyTarget; locale: AppLocale }) {
+  const [active, setActive] = useState(false)
+  const resetTimerRef = useRef<number | null>(null)
+  const t = useMemo(() => createTranslator(locale), [locale])
+  const label = t('editor.codeBlock.copy')
+
+  useEffect(() => () => {
+    if (resetTimerRef.current !== null) window.clearTimeout(resetTimerRef.current)
+  }, [])
+
+  const handleCopy = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    void writeClipboardText(codeBlockText(copyTarget.codeBlock))
+      .then(() => {
+        trackEvent('code_block_copied')
+        setActive(true)
+        if (resetTimerRef.current !== null) window.clearTimeout(resetTimerRef.current)
+        resetTimerRef.current = window.setTimeout(() => {
+          setActive(false)
+          resetTimerRef.current = null
+        }, CODE_BLOCK_COPY_RESET_MS)
+      })
+      .catch((error) => {
+        console.warn('[editor] Failed to copy code block:', error)
+      })
+  }, [copyTarget])
+
+  const stopEditorMouseDown = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+  }, [])
+
+  return (
+    <div
+      className="editor__code-block-copy"
+      contentEditable={false}
+      data-editor-code-copy
+      style={{ left: copyTarget.left, top: copyTarget.top }}
+    >
+      <ActionTooltip copy={{ label }} side="left" align="center">
+        <Button
+          aria-label={label}
+          className="border border-border/70 bg-background/90 text-muted-foreground shadow-sm backdrop-blur hover:bg-background hover:text-foreground focus-visible:bg-background focus-visible:text-foreground"
+          data-editor-code-copy-button
+          onBlur={() => setActive(false)}
+          onClick={handleCopy}
+          onFocus={() => setActive(true)}
+          onMouseDown={stopEditorMouseDown}
+          onMouseEnter={() => setActive(true)}
+          onMouseLeave={() => setActive(false)}
+          size="icon-xs"
+          type="button"
+          variant="ghost"
+        >
+          <Copy aria-hidden="true" size={14} weight={active ? 'fill' : 'regular'} />
+        </Button>
+      </ActionTooltip>
+    </div>
+  )
 }
 
 function findTitleHeadingElement(target: HTMLElement): HTMLElement | null {
@@ -569,6 +721,55 @@ function useSuggestionMenuItems(options: {
   }
 }
 
+type EditorInteractionControllersProps = ReturnType<typeof useSuggestionMenuItems> & {
+  runEditorAction: (action: SuggestionAction) => void
+}
+
+function EditorInteractionControllers({
+  getPersonMentionItems,
+  getSlashMenuItems,
+  getWikilinkItems,
+  runEditorAction,
+}: EditorInteractionControllersProps) {
+  return (
+    <>
+      <SideMenuController sideMenu={TolariaSideMenu} />
+      <TolariaFormattingToolbarController
+        formattingToolbar={TolariaFormattingToolbar}
+        floatingUIOptions={{
+          elementProps: {
+            onMouseDownCapture: handleToolbarMouseDownCapture,
+          },
+        }}
+      />
+      <LinkToolbarController
+        linkToolbar={TolariaLinkToolbar}
+        floatingUIOptions={{
+          elementProps: {
+            onMouseDownCapture: handleToolbarMouseDownCapture,
+          },
+        }}
+      />
+      <SuggestionMenuController
+        triggerCharacter="/"
+        getItems={getSlashMenuItems}
+      />
+      <SuggestionMenuController
+        triggerCharacter="[["
+        getItems={getWikilinkItems}
+        suggestionMenuComponent={WikilinkSuggestionMenu}
+        onItemClick={(item: WikilinkSuggestionItem) => runEditorAction(item.onItemClick)}
+      />
+      <SuggestionMenuController
+        triggerCharacter="@"
+        getItems={getPersonMentionItems}
+        suggestionMenuComponent={WikilinkSuggestionMenu}
+        onItemClick={(item: WikilinkSuggestionItem) => runEditorAction(item.onItemClick)}
+      />
+    </>
+  )
+}
+
 /** Insert an image block after the current cursor position. */
 function useInsertImageCallback(editor: ReturnType<typeof useCreateBlockNote>) {
   const editorRef = useRef(editor)
@@ -642,6 +843,12 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
   const onImageUrl = useInsertImageCallback(editor)
   const { isDragOver } = useImageDrop({ containerRef, onImageUrl, vaultPath })
   const lightbox = useImageLightbox({ containerRef })
+  const {
+    clearCopyTarget,
+    copyTarget,
+    handleFocus: handleCodeBlockCopyFocus,
+    handleMouseMove: handleCodeBlockCopyMouseMove,
+  } = useCodeBlockCopyTarget(containerRef)
   useBlockNoteSideMenuHoverGuard(containerRef)
   useEditorLinkActivation(containerRef, onNavigateWikilink)
 
@@ -672,12 +879,12 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
     editor,
     runEditorAction,
   })
+  const handleFocusCapture = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+    activatePlainTextPaste()
+    handleCodeBlockCopyFocus(event)
+  }, [activatePlainTextPaste, handleCodeBlockCopyFocus])
   const insertWikilink = useInsertWikilink(editor, runEditorAction)
-  const {
-    getWikilinkItems,
-    getPersonMentionItems,
-    getSlashMenuItems,
-  } = useSuggestionMenuItems({
+  const suggestionMenuItems = useSuggestionMenuItems({
     baseItems,
     editor,
     insertWikilink,
@@ -693,8 +900,10 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
       style={cssVars as React.CSSProperties}
       onClick={handleContainerClick}
       onCopyCapture={handleCodeBlockCopy}
-      onFocusCapture={activatePlainTextPaste}
+      onFocusCapture={handleFocusCapture}
+      onMouseLeave={clearCopyTarget}
       onMouseDownCapture={activatePlainTextPaste}
+      onMouseMove={handleCodeBlockCopyMouseMove}
     >
       {isDragOver && (
         <div className="editor__drop-overlay">
@@ -711,40 +920,12 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
         slashMenu={false}
         sideMenu={false}
       >
-        <SideMenuController sideMenu={TolariaSideMenu} />
-        <TolariaFormattingToolbarController
-          formattingToolbar={TolariaFormattingToolbar}
-          floatingUIOptions={{
-            elementProps: {
-              onMouseDownCapture: handleToolbarMouseDownCapture,
-            },
-          }}
-        />
-        <LinkToolbarController
-          linkToolbar={TolariaLinkToolbar}
-          floatingUIOptions={{
-            elementProps: {
-              onMouseDownCapture: handleToolbarMouseDownCapture,
-            },
-          }}
-        />
-        <SuggestionMenuController
-          triggerCharacter="/"
-          getItems={getSlashMenuItems}
-        />
-        <SuggestionMenuController
-          triggerCharacter="[["
-          getItems={getWikilinkItems}
-          suggestionMenuComponent={WikilinkSuggestionMenu}
-          onItemClick={(item: WikilinkSuggestionItem) => runEditorAction(item.onItemClick)}
-        />
-        <SuggestionMenuController
-          triggerCharacter="@"
-          getItems={getPersonMentionItems}
-          suggestionMenuComponent={WikilinkSuggestionMenu}
-          onItemClick={(item: WikilinkSuggestionItem) => runEditorAction(item.onItemClick)}
+        <EditorInteractionControllers
+          {...suggestionMenuItems}
+          runEditorAction={runEditorAction}
         />
       </SharedContextBlockNoteView>
+      {copyTarget && <CodeBlockCopyButton copyTarget={copyTarget} locale={locale} />}
       <ImageLightbox image={lightbox.image} locale={locale} onClose={lightbox.close} />
     </div>
   )
