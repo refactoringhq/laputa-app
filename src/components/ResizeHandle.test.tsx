@@ -28,6 +28,12 @@ describe('ResizeHandle', () => {
     expect(handle.style.cursor || handle.className).toBeTruthy()
   })
 
+  it('stacks above z-indexed panel surfaces', () => {
+    const { container } = render(<ResizeHandle onResize={vi.fn()} />)
+    const handle = container.firstChild as HTMLElement
+    expect(handle.className).toContain('z-30')
+  })
+
   it('calls onResize with delta during drag', () => {
     const onResize = vi.fn()
     const { container } = render(<ResizeHandle onResize={onResize} />)
