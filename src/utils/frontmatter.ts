@@ -31,7 +31,7 @@ function collapseList(items: FrontmatterText[]): FrontmatterValue {
 }
 
 function isBlockScalar(value: FrontmatterText): boolean {
-  return value === '' || value === '|' || value === '>'
+  return value === '|' || value === '>'
 }
 
 function isInlineArrayLiteral(value: FrontmatterText): boolean {

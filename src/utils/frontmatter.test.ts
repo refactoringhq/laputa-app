@@ -89,6 +89,13 @@ describe('parseFrontmatter', () => {
     expect(fm['status']).toBeUndefined()
     expect(fm['Status']).toBe('Evergreened')
   })
+
+  it('keeps top-level keys with blank scalar values', () => {
+    const fm = parseFrontmatter('---\ntype: Book\nstart date:\nrating: \n---\n# New Book')
+
+    expect(fm['start date']).toBe('')
+    expect(fm['rating']).toBe('')
+  })
 })
 
 describe('detectFrontmatterState', () => {
