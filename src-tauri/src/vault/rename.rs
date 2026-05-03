@@ -501,7 +501,7 @@ pub struct DetectedRename {
 
 /// Detect renamed files by comparing working tree against HEAD using git diff.
 pub fn detect_renames(vault: &Path) -> Result<Vec<DetectedRename>, String> {
-    let output = crate::hidden_command("git")
+    let output = crate::git::git_command()
         .args(["diff", "HEAD", "--name-status", "--diff-filter=R", "-M"])
         .current_dir(vault)
         .output()
@@ -599,6 +599,27 @@ mod tests {
         let relative_path = relative_path.as_ref();
         create_test_file(vault, relative_path, "# Current\n");
         vault.join(relative_path)
+    }
+
+    fn run_git(vault: &Path, args: &[&str]) {
+        let output = crate::hidden_command("git")
+            .args(args)
+            .current_dir(vault)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    fn init_git_repo_with_quoted_paths(vault: &Path) {
+        run_git(vault, &["init"]);
+        run_git(vault, &["config", "user.email", "test@test.com"]);
+        run_git(vault, &["config", "user.name", "Test"]);
+        run_git(vault, &["config", "core.quotePath", "true"]);
     }
 
     fn assert_rename_note_filename_error<P>(
@@ -708,6 +729,25 @@ mod tests {
         assert_unicode_rename_path(&result);
         assert_unicode_rename_filesystem(vault, &old_path, &result);
         assert_unicode_rename_frontmatter(&result);
+    }
+
+    #[test]
+    fn test_detect_renames_preserves_chinese_markdown_paths() {
+        let dir = TempDir::new().unwrap();
+        let vault = dir.path();
+
+        init_git_repo_with_quoted_paths(vault);
+        create_test_file(vault, "旧名.md", "# 旧名\n");
+        run_git(vault, &["add", "旧名.md"]);
+        run_git(vault, &["commit", "-m", "add chinese note"]);
+        fs::rename(vault.join("旧名.md"), vault.join("新名.md")).unwrap();
+        run_git(vault, &["add", "-A"]);
+
+        let renames = detect_renames(vault).unwrap();
+
+        assert_eq!(renames.len(), 1);
+        assert_eq!(renames[0].old_path, "旧名.md");
+        assert_eq!(renames[0].new_path, "新名.md");
     }
 
     #[test]

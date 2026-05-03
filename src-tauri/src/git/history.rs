@@ -187,37 +187,53 @@ mod tests {
     use super::git_command;
     use super::*;
     use crate::git::tests::setup_git_repo;
-    use std::fs;
+    use std::{fs, path::PathBuf};
+
+    fn force_quoted_git_paths(vault: &Path) {
+        git_command()
+            .args(["config", "core.quotePath", "true"])
+            .current_dir(vault)
+            .output()
+            .unwrap();
+    }
+
+    fn write_and_commit_file(
+        vault: &Path,
+        relative_path: &str,
+        content: &str,
+        message: &str,
+    ) -> PathBuf {
+        let file = vault.join(relative_path);
+        fs::write(&file, content).unwrap();
+        git_command()
+            .args(["add", relative_path])
+            .current_dir(vault)
+            .output()
+            .unwrap();
+        git_command()
+            .args(["commit", "-m", message])
+            .current_dir(vault)
+            .output()
+            .unwrap();
+        file
+    }
+
+    fn head_hash(vault: &Path) -> String {
+        let log = git_command()
+            .args(["log", "--format=%H", "-1"])
+            .current_dir(vault)
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&log.stdout).trim().to_string()
+    }
 
     #[test]
     fn test_get_file_history_with_commits() {
         let dir = setup_git_repo();
         let vault = dir.path();
-        let file = vault.join("test.md");
 
-        fs::write(&file, "# Initial\n").unwrap();
-        git_command()
-            .args(["add", "test.md"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-        git_command()
-            .args(["commit", "-m", "Initial commit"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-
-        fs::write(&file, "# Updated\n\nNew content.").unwrap();
-        git_command()
-            .args(["add", "test.md"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-        git_command()
-            .args(["commit", "-m", "Update test"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
+        let file = write_and_commit_file(vault, "test.md", "# Initial\n", "Initial commit");
+        write_and_commit_file(vault, "test.md", "# Updated\n\nNew content.", "Update test");
 
         let history = get_file_history(vault.to_str().unwrap(), file.to_str().unwrap()).unwrap();
 
@@ -245,19 +261,13 @@ mod tests {
     fn test_get_file_diff() {
         let dir = setup_git_repo();
         let vault = dir.path();
-        let file = vault.join("diff-test.md");
 
-        fs::write(&file, "# Test\n\nOriginal content.").unwrap();
-        git_command()
-            .args(["add", "diff-test.md"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-        git_command()
-            .args(["commit", "-m", "Add diff-test"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
+        let file = write_and_commit_file(
+            vault,
+            "diff-test.md",
+            "# Test\n\nOriginal content.",
+            "Add diff-test",
+        );
 
         fs::write(&file, "# Test\n\nModified content.").unwrap();
 
@@ -272,39 +282,21 @@ mod tests {
     fn test_get_file_diff_at_commit() {
         let dir = setup_git_repo();
         let vault = dir.path();
-        let file = vault.join("diff-at-commit.md");
 
-        fs::write(&file, "# First\n\nOriginal content.").unwrap();
-        git_command()
-            .args(["add", "diff-at-commit.md"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-        git_command()
-            .args(["commit", "-m", "First commit"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
+        let file = write_and_commit_file(
+            vault,
+            "diff-at-commit.md",
+            "# First\n\nOriginal content.",
+            "First commit",
+        );
+        write_and_commit_file(
+            vault,
+            "diff-at-commit.md",
+            "# First\n\nModified content.",
+            "Second commit",
+        );
 
-        fs::write(&file, "# First\n\nModified content.").unwrap();
-        git_command()
-            .args(["add", "diff-at-commit.md"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-        git_command()
-            .args(["commit", "-m", "Second commit"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-
-        // Get hash of second commit
-        let log = git_command()
-            .args(["log", "--format=%H", "-1"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-        let hash = String::from_utf8_lossy(&log.stdout).trim().to_string();
+        let hash = head_hash(vault);
 
         let diff = get_file_diff_at_commit(vault.to_str().unwrap(), file.to_str().unwrap(), &hash)
             .unwrap();
@@ -318,26 +310,15 @@ mod tests {
     fn test_get_file_diff_at_initial_commit() {
         let dir = setup_git_repo();
         let vault = dir.path();
-        let file = vault.join("initial.md");
 
-        fs::write(&file, "# Initial\n\nHello world.").unwrap();
-        git_command()
-            .args(["add", "initial.md"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-        git_command()
-            .args(["commit", "-m", "Initial commit"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
+        let file = write_and_commit_file(
+            vault,
+            "initial.md",
+            "# Initial\n\nHello world.",
+            "Initial commit",
+        );
 
-        let log = git_command()
-            .args(["log", "--format=%H", "-1"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-        let hash = String::from_utf8_lossy(&log.stdout).trim().to_string();
+        let hash = head_hash(vault);
 
         let diff = get_file_diff_at_commit(vault.to_str().unwrap(), file.to_str().unwrap(), &hash)
             .unwrap();
@@ -345,5 +326,36 @@ mod tests {
         assert!(!diff.is_empty());
         assert!(diff.contains("+# Initial"));
         assert!(diff.contains("+Hello world."));
+    }
+
+    #[test]
+    fn test_get_file_diff_at_commit_preserves_chinese_filename_and_content() {
+        let dir = setup_git_repo();
+        let vault = dir.path();
+        let relative_path = "中文笔记.md";
+        let file = vault.join(relative_path);
+
+        force_quoted_git_paths(vault);
+        write_and_commit_file(
+            vault,
+            relative_path,
+            "# 初始\n\n第一行\n",
+            "Add Chinese note",
+        );
+        write_and_commit_file(
+            vault,
+            relative_path,
+            "# 初始\n\n第二行\n",
+            "Update Chinese note",
+        );
+        let hash = head_hash(vault);
+
+        let diff = get_file_diff_at_commit(vault.to_str().unwrap(), file.to_str().unwrap(), &hash)
+            .unwrap();
+
+        assert!(diff.contains("diff --git a/中文笔记.md b/中文笔记.md"));
+        assert!(diff.contains("-第一行"));
+        assert!(diff.contains("+第二行"));
+        assert!(!diff.contains("\\344"));
     }
 }

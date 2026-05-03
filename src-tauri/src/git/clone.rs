@@ -244,6 +244,8 @@ mod tests {
         assert_eq!(
             args,
             vec![
+                "-c".to_string(),
+                "core.quotePath=false".to_string(),
                 "clone".to_string(),
                 "--quiet".to_string(),
                 "https://example.com/repo.git".to_string(),

@@ -125,7 +125,7 @@ fn git_head_hash(vault: &Path) -> Option<String> {
 
 /// Run a git command in the given directory and return stdout if successful.
 fn run_git(vault: &Path, args: &[&str]) -> Option<String> {
-    let output = crate::hidden_command("git")
+    let output = crate::git::git_command()
         .args(args)
         .current_dir(vault)
         .output()
@@ -768,6 +768,14 @@ mod tests {
             .unwrap();
     }
 
+    fn force_quoted_git_paths(vault: &Path) {
+        crate::hidden_command("git")
+            .args(["config", "core.quotePath", "true"])
+            .current_dir(vault)
+            .output()
+            .unwrap();
+    }
+
     #[test]
     fn test_cache_path_is_outside_vault() {
         let _lock = ENV_LOCK.lock().unwrap();
@@ -1005,6 +1013,22 @@ mod tests {
             Some("News".to_string()),
             "sidebarLabel must reflect the uncommitted edit"
         );
+    }
+
+    #[test]
+    fn test_git_uncommitted_files_preserves_chinese_markdown_path() {
+        let (_lock, _cache_tmp, dir) = setup_git_vault();
+        let vault = dir.path();
+        let relative_path = "中文笔记.md";
+
+        force_quoted_git_paths(vault);
+        create_test_file(vault, relative_path, "# 初始\n");
+        git_add_commit(vault, "init");
+        create_test_file(vault, relative_path, "# 初始\n\n更新\n");
+
+        let changed = git_uncommitted_files(vault);
+
+        assert_eq!(changed, vec![relative_path.to_string()]);
     }
 
     #[test]

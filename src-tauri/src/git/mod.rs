@@ -56,9 +56,10 @@ const DEFAULT_GITIGNORE: &str = "# Tolaria app files (machine-specific, never co
 *.swp\n\
 *.swo\n";
 
-fn git_command() -> Command {
+pub(crate) fn git_command() -> Command {
     let mut command = crate::hidden_command("git");
     sanitize_linux_appimage_git_env(&mut command);
+    command.args(["-c", "core.quotePath=false"]);
     command
 }
 
