@@ -49,7 +49,7 @@ test.describe('Editor code block theme', () => {
     removeFixtureVaultCopy(tempVaultDir)
   })
 
-  test('fenced code blocks keep the dark BlockNote surface while inline code stays muted', async ({ page }) => {
+  test('fenced code blocks follow the active theme while inline code stays muted', async ({ page }) => {
     await openFixtureVault(page, tempVaultDir)
     const noteList = page.locator('[data-testid="note-list-container"]')
     const noteItem = noteList.getByText(CODE_NOTE_TITLE, { exact: true })
@@ -68,9 +68,18 @@ test.describe('Editor code block theme', () => {
     await expect(fencedCode).toBeVisible()
 
     await expect.poll(() => backgroundColor(inlineCode)).toBe('rgb(240, 240, 239)')
-    await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(22, 22, 22)')
+    await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(245, 248, 255)')
     await expect.poll(() => backgroundColor(fencedCode)).toBe('rgba(0, 0, 0, 0)')
+    await expect.poll(() => textColor(fencedCode)).toBe('rgb(55, 53, 47)')
+    await expect.poll(() => textColor(highlightedToken)).toBe('rgb(55, 53, 47)')
+
+    await page.getByTestId('status-theme-mode').click()
+    await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(22, 22, 22)')
     await expect.poll(() => textColor(fencedCode)).toBe('rgb(255, 255, 255)')
+
+    await page.getByTestId('status-theme-mode').click()
+    await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(245, 248, 255)')
+    await expect.poll(() => textColor(fencedCode)).toBe('rgb(55, 53, 47)')
     await expect(highlightedToken).toBeVisible()
   })
 })

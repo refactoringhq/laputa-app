@@ -49,6 +49,20 @@ interface TemplateSectionProps {
   onTemplateChange: (value: string) => void
 }
 
+const ICON_PICKER_ICON_SIZE = 18
+const ICON_PICKER_ICON_CLASS_NAME = 'size-[18px]'
+const COLOR_PICKER_ACCENT_COLORS = [
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'blue',
+  'purple',
+  'pink',
+  'gray',
+].map((key) => ACCENT_COLORS.find((color) => color.key === key) ?? null)
+  .filter((color): color is typeof ACCENT_COLORS[number] => color !== null)
+
 /** Debounce a callback by `delay` ms. Returns a stable ref-based wrapper. */
 function useDebouncedCallback(fn: (v: string) => void, delay: number): (v: string) => void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -68,7 +82,7 @@ function ColorSection({ selectedColor, locale, onSelectColor }: ColorSectionProp
     <>
       <div className="font-mono-overline mb-2 text-muted-foreground">{translate(locale, 'customize.color')}</div>
       <div className="flex gap-2 mb-3 flex-wrap">
-        {ACCENT_COLORS.map((color) => (
+        {COLOR_PICKER_ACCENT_COLORS.map((color) => (
           <Button
             key={color.key}
             type="button"
@@ -118,7 +132,10 @@ function IconSection({
           className="h-7 pl-7 pr-2 py-1 text-[12px]"
         />
       </div>
-      <div className="flex flex-wrap gap-1 overflow-y-auto" style={{ maxHeight: 160 }}>
+      <div
+        className="grid gap-1 overflow-y-auto"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(30px, 1fr))', maxHeight: 160 }}
+      >
         {filteredIcons.length === 0 ? (
           <div className="w-full py-6 text-center text-[12px] text-muted-foreground">
             {translate(locale, 'customize.noIconsFound')}
@@ -131,7 +148,7 @@ function IconSection({
               variant="ghost"
               size="icon-xs"
               className={cn(
-                'h-[30px] w-[30px] rounded p-0 transition-colors',
+                'h-[30px] w-[30px] justify-self-center rounded p-0 transition-colors',
                 selectedIcon === name
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -140,7 +157,7 @@ function IconSection({
               title={name}
               aria-label={name}
             >
-              <Icon size={16} />
+              <Icon size={ICON_PICKER_ICON_SIZE} className={ICON_PICKER_ICON_CLASS_NAME} />
             </Button>
           ))
         )}

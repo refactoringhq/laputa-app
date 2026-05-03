@@ -68,6 +68,10 @@ interface SidebarProps {
   allNotesFileVisibility?: AllNotesFileVisibility
   locale?: AppLocale
   onCollapse?: () => void
+  onGoBack?: () => void
+  onGoForward?: () => void
+  canGoBack?: boolean
+  canGoForward?: boolean
   loading?: boolean
 }
 
@@ -631,7 +635,14 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
 
   return (
     <aside className="flex h-full flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-sidebar text-sidebar-foreground">
-      <SidebarTitleBar locale={locale} onCollapse={props.onCollapse} />
+      <SidebarTitleBar
+        locale={locale}
+        onCollapse={props.onCollapse}
+        onGoBack={props.onGoBack}
+        onGoForward={props.onGoForward}
+        canGoBack={props.canGoBack}
+        canGoForward={props.canGoForward}
+      />
       <SidebarRuntimeNavigation props={props} runtime={runtime} />
       <SidebarInteractionOverlays locale={locale} runtime={runtime} />
     </aside>

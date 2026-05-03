@@ -261,7 +261,11 @@ describe('useNoteCreation hook', () => {
       await flushImmediateCreate()
     })
     await act(async () => {
-      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS * 2)
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
+      await flushImmediateCreate()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
       await flushImmediateCreate()
     })
     const filenames = addEntry.mock.calls.map(([e]: [VaultEntry]) => e.filename)
@@ -323,6 +327,49 @@ describe('useNoteCreation hook', () => {
     })
     expect(addEntry).toHaveBeenCalledTimes(3)
 
+    vi.restoreAllMocks()
+  })
+
+  it('waits for slow immediate note persistence before starting the queued create', async () => {
+    vi.useFakeTimers()
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
+    let resolveFirstWrite: () => void
+    const firstWrite = new Promise<void>((resolve) => {
+      resolveFirstWrite = resolve
+    })
+    vi.mocked(invoke)
+      .mockImplementationOnce(() => firstWrite)
+      .mockResolvedValue(undefined)
+    const createCalls = () => vi.mocked(invoke).mock.calls.filter(([command]) => command === 'create_note_content')
+    const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate()
+      result.current.handleCreateNoteImmediate()
+      await flushImmediateCreate()
+    })
+
+    expect(createCalls()).toHaveLength(1)
+
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS * 3)
+      await flushImmediateCreate()
+    })
+
+    expect(createCalls()).toHaveLength(1)
+
+    await act(async () => {
+      resolveFirstWrite()
+      await flushImmediateCreate()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
+      await flushImmediateCreate()
+    })
+
+    expect(createCalls()).toHaveLength(2)
+    expect(addEntry).toHaveBeenCalledTimes(2)
     vi.restoreAllMocks()
   })
 

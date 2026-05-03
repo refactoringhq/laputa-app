@@ -370,7 +370,9 @@ files:
     editor.toolbar.delete: f48134a07b016a1de05d4ba6d2fbfb41
     editor.toolbar.revealFile: 76f4ed52da9937ae432dcf5a108fabb4
     editor.toolbar.copyFilePath: 64c6cec5ca57efbb8c9c93ae5fbccd27
+    editor.toolbar.moreActions: 89e19353176b94068dec4c768c25e70b
     editor.toolbar.openProperties: 948b90b60b8ce827f179e8c5b85b112e
+    editor.codeBlock.copy: 8e477020fb3f7ab844b91ff1d7de8347
     editor.imageLightbox.title: 2c5a15c875bcdc2478c4a5cad044e10c
     editor.filename.rename: c31c2b468229232ad6287e734fe67d96
     editor.filename.renameToTitle: bff34a6a2dd1eb87c59403946679237f

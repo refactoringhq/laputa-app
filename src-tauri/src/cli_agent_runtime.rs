@@ -1,5 +1,6 @@
 use crate::ai_agents::{AiAgentPermissionMode, AiAgentStreamEvent};
 use serde::Deserialize;
+use std::ffi::OsString;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
@@ -39,12 +40,76 @@ pub(crate) fn mcp_server_path_string() -> Result<String, String> {
 }
 
 pub(crate) fn version_for_binary(binary: &PathBuf) -> Option<String> {
-    crate::hidden_command(binary)
+    let mut command = crate::hidden_command(binary);
+    configure_agent_command_environment(&mut command, binary);
+    command
         .arg("--version")
         .output()
         .ok()
         .filter(|output| output.status.success())
         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+pub(crate) fn configure_agent_command_environment(command: &mut Command, binary: &Path) {
+    if let Some(path) = expanded_agent_path(binary) {
+        command.env("PATH", path);
+    }
+}
+
+fn expanded_agent_path(binary: &Path) -> Option<OsString> {
+    let mut paths = std::env::var_os("PATH")
+        .map(|path| std::env::split_paths(&path).collect::<Vec<_>>())
+        .unwrap_or_default();
+
+    for candidate in agent_path_candidates(binary) {
+        push_unique_path(&mut paths, candidate);
+    }
+
+    std::env::join_paths(paths).ok()
+}
+
+fn agent_path_candidates(binary: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Some(parent) = binary
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        candidates.push(parent.to_path_buf());
+    }
+
+    if let Some(home) = dirs::home_dir() {
+        candidates.extend([
+            home.join(".local/bin"),
+            home.join(".local/share/mise/shims"),
+            home.join(".asdf/shims"),
+            home.join(".npm-global/bin"),
+            home.join(".npm/bin"),
+            home.join(".bun/bin"),
+            home.join(".linuxbrew/bin"),
+            home.join("AppData/Roaming/npm"),
+            home.join("AppData/Local/pnpm"),
+            home.join("scoop/shims"),
+        ]);
+    }
+
+    candidates.extend([
+        PathBuf::from("/opt/homebrew/bin"),
+        PathBuf::from("/usr/local/bin"),
+        PathBuf::from("/home/linuxbrew/.linuxbrew/bin"),
+    ]);
+
+    candidates
+}
+
+fn push_unique_path(paths: &mut Vec<PathBuf>, candidate: PathBuf) {
+    if candidate.as_os_str().is_empty() {
+        return;
+    }
+    if paths.iter().any(|path| path == &candidate) {
+        return;
+    }
+    paths.push(candidate);
 }
 
 pub(crate) fn find_executable_binary_candidate(
@@ -134,7 +199,7 @@ where
 {
     let mut child = command
         .spawn()
-        .map_err(|error| format!("Failed to spawn {process_name}: {error}"))?;
+        .map_err(|error| format_spawn_error(process_name, &error))?;
     let stdout = child.stdout.take().ok_or("No stdout handle")?;
     let reader = std::io::BufReader::new(stdout);
     let mut session_id = String::new();
@@ -164,6 +229,16 @@ where
         stderr_output,
         status,
     })
+}
+
+fn format_spawn_error(process_name: &str, error: &std::io::Error) -> String {
+    if error.kind() == std::io::ErrorKind::NotFound {
+        return format!(
+            "Failed to start {process_name}: the CLI or one of its runtime dependencies was not found. If it was installed with Homebrew, make sure /opt/homebrew/bin or /usr/local/bin contains the CLI and Node.js, then restart Tolaria. Details: {error}"
+        );
+    }
+
+    format!("Failed to spawn {process_name}: {error}")
 }
 
 pub(crate) fn run_ai_agent_json_stream<F>(
@@ -227,6 +302,31 @@ mod tests {
 
         let error = parse_json_line(Err(std::io::Error::other("broken pipe"))).unwrap_err();
         assert!(error.contains("broken pipe"));
+    }
+
+    #[test]
+    fn agent_command_environment_keeps_homebrew_shims_available() {
+        let mut command = Command::new("/opt/homebrew/bin/codex");
+        configure_agent_command_environment(&mut command, Path::new("/opt/homebrew/bin/codex"));
+        let path = command
+            .get_envs()
+            .find(|(key, _)| *key == std::ffi::OsStr::new("PATH"))
+            .and_then(|(_, value)| value)
+            .expect("PATH should be set");
+        let paths = std::env::split_paths(path).collect::<Vec<_>>();
+
+        assert!(paths.contains(&PathBuf::from("/opt/homebrew/bin")));
+        assert!(paths.contains(&PathBuf::from("/usr/local/bin")));
+    }
+
+    #[test]
+    fn spawn_not_found_errors_explain_gui_path_runtime_dependencies() {
+        let error = std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory");
+        let message = format_spawn_error("codex", &error);
+
+        assert!(message.contains("Failed to start codex"));
+        assert!(message.contains("/opt/homebrew/bin"));
+        assert!(message.contains("Node.js"));
     }
 
     #[cfg(unix)]

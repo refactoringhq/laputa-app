@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cmp::Ordering;
 use std::fmt;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::Path;
 
 use super::VaultEntry;
@@ -291,7 +292,11 @@ pub fn save_view(
 /// Delete a view file at `vault_path/views/{filename}`.
 pub fn delete_view(vault_path: &Path, filename: &str) -> Result<(), String> {
     let path = vault_path.join("views").join(filename);
-    fs::remove_file(&path).map_err(|e| format!("Failed to delete view: {}", e))
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("Failed to delete view: {}", error)),
+    }
 }
 
 /// Evaluate a view definition against vault entries, returning indices of matching entries.
@@ -543,67 +548,65 @@ fn evaluate_scalar_op(
     raw_value: &Option<serde_yaml::Value>,
 ) -> bool {
     match op {
-        FilterOp::Equals => match (field_value, cond_value) {
-            (Some(f), Some(v)) => f.eq_ignore_ascii_case(v),
-            (None, None) => true,
-            _ => false,
-        },
-        FilterOp::NotEquals => match (field_value, cond_value) {
-            (Some(f), Some(v)) => !f.eq_ignore_ascii_case(v),
-            (None, None) => false,
-            _ => true,
-        },
-        FilterOp::Contains => match (field_value, cond_value) {
-            (Some(f), Some(v)) => f.to_lowercase().contains(&v.to_lowercase()),
-            _ => false,
-        },
-        FilterOp::NotContains => match (field_value, cond_value) {
-            (Some(f), Some(v)) => !f.to_lowercase().contains(&v.to_lowercase()),
-            (None, _) => true,
-            _ => true,
-        },
-        FilterOp::AnyOf => {
-            let values = raw_value
-                .as_ref()
-                .and_then(yaml_value_to_string_vec)
-                .unwrap_or_default();
-            match field_value {
-                Some(f) => values.iter().any(|v| f.eq_ignore_ascii_case(v)),
-                None => false,
-            }
-        }
-        FilterOp::NoneOf => {
-            let values = raw_value
-                .as_ref()
-                .and_then(yaml_value_to_string_vec)
-                .unwrap_or_default();
-            match field_value {
-                Some(f) => !values.iter().any(|v| f.eq_ignore_ascii_case(v)),
-                None => true,
-            }
-        }
+        FilterOp::Equals => scalar_equals(field_value, cond_value),
+        FilterOp::NotEquals => !scalar_equals(field_value, cond_value),
+        FilterOp::Contains => scalar_contains(field_value, cond_value),
+        FilterOp::NotContains => !scalar_contains(field_value, cond_value),
+        FilterOp::AnyOf => scalar_matches_any(field_value, raw_value),
+        FilterOp::NoneOf => !scalar_matches_any(field_value, raw_value),
         FilterOp::IsEmpty => field_value.map_or(true, str::is_empty),
         FilterOp::IsNotEmpty => field_value.is_some_and(|s| !s.is_empty()),
-        FilterOp::Before => match (field_value, cond_value) {
-            (Some(f), Some(v)) => match (
-                parse_date_filter_timestamp(f, Utc::now()),
-                parse_date_filter_timestamp(v, Utc::now()),
-            ) {
-                (Some(field_ts), Some(target_ts)) => field_ts < target_ts,
-                _ => false,
-            },
-            _ => false,
-        },
-        FilterOp::After => match (field_value, cond_value) {
-            (Some(f), Some(v)) => match (
-                parse_date_filter_timestamp(f, Utc::now()),
-                parse_date_filter_timestamp(v, Utc::now()),
-            ) {
-                (Some(field_ts), Some(target_ts)) => field_ts > target_ts,
-                _ => false,
-            },
-            _ => false,
-        },
+        FilterOp::Before => {
+            scalar_date_compare(field_value, cond_value, |field, target| field < target)
+        }
+        FilterOp::After => {
+            scalar_date_compare(field_value, cond_value, |field, target| field > target)
+        }
+    }
+}
+
+fn scalar_equals(field_value: Option<&str>, cond_value: Option<&str>) -> bool {
+    match (field_value, cond_value) {
+        (Some(field), Some(value)) => field.eq_ignore_ascii_case(value),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+fn scalar_contains(field_value: Option<&str>, cond_value: Option<&str>) -> bool {
+    match (field_value, cond_value) {
+        (Some(field), Some(value)) => field.to_lowercase().contains(&value.to_lowercase()),
+        _ => false,
+    }
+}
+
+fn scalar_matches_any(field_value: Option<&str>, raw_value: &Option<serde_yaml::Value>) -> bool {
+    let Some(field) = field_value else {
+        return false;
+    };
+    raw_value
+        .as_ref()
+        .and_then(yaml_value_to_string_vec)
+        .unwrap_or_default()
+        .iter()
+        .any(|value| field.eq_ignore_ascii_case(value))
+}
+
+fn scalar_date_compare(
+    field_value: Option<&str>,
+    cond_value: Option<&str>,
+    predicate: impl FnOnce(i64, i64) -> bool,
+) -> bool {
+    let (Some(field), Some(value)) = (field_value, cond_value) else {
+        return false;
+    };
+    let reference = Utc::now();
+    match (
+        parse_date_filter_timestamp(field, reference),
+        parse_date_filter_timestamp(value, reference),
+    ) {
+        (Some(field_ts), Some(target_ts)) => predicate(field_ts, target_ts),
+        _ => false,
     }
 }
 
@@ -1065,6 +1068,25 @@ filters:
         delete_view(dir.path(), "test.yml").unwrap();
         let views = scan_views(dir.path());
         assert_eq!(views.len(), 0);
+    }
+
+    #[test]
+    fn test_delete_view_treats_missing_file_as_deleted() {
+        let dir = tempfile::TempDir::new().unwrap();
+        fs::create_dir_all(dir.path().join("views")).unwrap();
+
+        delete_view(dir.path(), "missing.yml").unwrap();
+
+        assert!(scan_views(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn test_delete_view_treats_missing_views_directory_as_deleted() {
+        let dir = tempfile::TempDir::new().unwrap();
+
+        delete_view(dir.path(), "missing.yml").unwrap();
+
+        assert!(scan_views(dir.path()).is_empty());
     }
 
     #[test]

@@ -88,7 +88,7 @@ flowchart LR
 3. **No orphan state updates**: Never call `updateEntry()` before the corresponding `handleUpdateFrontmatter()` or `handleDeleteProperty()` has resolved. The three functions in `useEntryActions` (`handleCustomizeType`, `handleRenameSection`, `handleToggleTypeVisibility`) follow this rule — disk write first, then state update.
 4. **Recovery via reload**: If state ever diverges from disk (crash, external edit, race condition), `Reload Vault` (Cmd+K → "Reload Vault") invalidates the cache and does a full filesystem rescan via the `reload_vault` Tauri command, replacing all React state. The `reload_vault_entry` command can re-read a single file.
 5. **Cache is disposable**: The `reload_vault` command deletes the cache file before rescanning, guaranteeing fresh data. The cache never contains data that doesn't exist on the filesystem.
-6. **Visibility filters are command-boundary concerns**: Gitignored-content visibility is applied after scanning/caching, before entries, folders, or search results reach React. The cache remains complete so toggling the setting can show ignored content again without rebuilding a different cache shape.
+6. **Visibility filters are command-boundary concerns**: Gitignored-content visibility is applied after scanning/caching, before entries, folders, or search results reach React. The cache remains complete so toggling the setting can show ignored content again without rebuilding a different cache shape. Large folder filtering runs on the blocking Tokio pool and drains `git check-ignore` output while feeding stdin so broad ignore matches cannot freeze the native UI thread.
 
 #### External Change Detection
 
@@ -102,9 +102,9 @@ Large-vault reproduction and keyboard QA steps live in [LARGE-VAULT-LOADING-QA.m
 
 #### Note Opening Fast Path
 
-Note opening uses a bounded in-memory fast path split across raw content and editor-ready blocks. `useTabManagement` owns the raw markdown prefetch cache and `useEditorTabSwap` owns the prepared BlockNote block cache. Cached or preloaded markdown is never rendered directly: before reusing it, the renderer calls the `validate_note_content` Tauri command, which compares the cached text with the current file bytes inside the validated vault boundary. If validation fails, Tolaria discards the cached entry and reads fresh disk content before swapping the editor.
+Note opening uses bounded in-memory fast paths for raw content and parsed editor blocks. `useTabManagement` owns the markdown/text prefetch cache and treats every cached value as a performance hint only: identity-matched entries (`modifiedAt` + `fileSize`) can be reused immediately, while identity-missing or identity-mismatched cached text is checked with `validate_note_content`, which compares the cached text with the current file bytes inside the validated vault boundary. If validation fails, Tolaria discards the cached entry and reads fresh disk content before swapping the editor.
 
-The note list opportunistically preloads visible and adjacent markdown/text entries after a short idle delay. Once raw content resolves, the editor prepares BlockNote blocks in the background when it is mounted and not in raw mode. This targets the expensive markdown-to-editor conversion stage while keeping filesystem content authoritative and keeping preload memory bounded by the same cache limits as ordinary note switches.
+The note list opportunistically preloads visible and adjacent markdown/text entries after a short delay. When a large warmed Markdown note resolves, `useEditorTabSwap` may parse it into a bounded parsed-block cache only after foreground editor work has been idle and the rich editor is mounted. Parsed blocks are keyed by vault, path, and exact source content; every async swap carries a generation/source-content token so stale conversion results cannot overwrite newer file content or dirty editor state. The editor never renders a preview surface that later morphs into BlockNote. See [ADR-0105](./adr/0105-editor-correctness-and-responsiveness-contract.md).
 
 ## Tech Stack
 
@@ -115,6 +115,7 @@ The note list opportunistically preloads visible and adjacent markdown/text entr
 | Editor | BlockNote | 0.46.2 |
 | Code block highlighting | @blocknote/code-block | 0.46.2 |
 | Diagram rendering | Mermaid | 11.14.0 |
+| Whiteboard rendering | tldraw | 4.5.10 |
 | Raw editor | CodeMirror 6 | - |
 | Styling | Tailwind CSS v4 + CSS variables | 4.1.18 |
 | UI primitives | Radix UI + shadcn/ui | - |
@@ -217,7 +218,7 @@ The main Tauri window also persists its last normal size and screen position in 
 Tauri setup keeps launch-time filesystem and subprocess work off the window creation critical path. Legacy `~/Laputa` housekeeping and the initial persisted-vault MCP bridge sync run on named background threads, so large legacy vaults, stale active-vault paths, or slow process startup cannot beachball the macOS app before React mounts. React still resyncs the bridge from `useVaultSwitcher` after the persisted selection loads, and no selected vault stops the bridge. The HTML bootstrap also installs a Tauri-only one-shot watchdog: React reports readiness from an effect after the root commits, and if that readiness signal never arrives the WebView reloads once instead of leaving macOS users in an inert rendered shell.
 
 Linux uses custom React-rendered window chrome instead of the native Tauri menu bar. `setup_linux_window_chrome()` drops server-side decorations on the main window, `openNoteInNewWindow()` does the same for detached note windows, and `LinuxTitlebar`/`LinuxMenuButton` route both window controls and menu actions back through the same shared command pipeline that the desktop native menus use. The native app menu keeps macOS-only Services/Hide entries off Windows and Linux, while cross-platform custom items such as Check for Updates emit Tolaria command IDs and show visible updater feedback.
-When Tolaria is launched from a Linux AppImage, `run()` also applies AppImage-only WebKitGTK startup safeguards without changing native package installs. It injects `WEBKIT_DISABLE_DMABUF_RENDERER=1` and `WEBKIT_DISABLE_COMPOSITING_MODE=1` independently unless the user already set either variable, and on Wayland sessions it re-execs once with the first available system `libwayland-client.so` in `LD_PRELOAD` when the user has not provided their own preload. The rendering overrides keep AppImage WebViews from blanking after accelerated compositing/DMA-BUF failures, while the re-exec addresses AppImage library-order failures that can surface as `Could not create default EGL display: EGL_BAD_PARAMETER` before GTK/WebKit create the display.
+When Tolaria is launched from a Linux AppImage, `run()` also applies AppImage-only WebKitGTK startup safeguards without changing native package installs. It injects `WEBKIT_DISABLE_DMABUF_RENDERER=1` and `WEBKIT_DISABLE_COMPOSITING_MODE=1` independently unless the user already set either variable, and on Wayland sessions it re-execs once with the first architecture-matching system `libwayland-client.so` in `LD_PRELOAD` when the user has not provided their own preload. The candidate order prefers Fedora-style `lib64` and Debian-style `x86_64-linux-gnu` paths before generic `/usr/lib`, and the ELF header is checked so a 64-bit Tolaria process does not retry with a 32-bit Wayland client library. The rendering overrides keep AppImage WebViews from blanking after accelerated compositing/DMA-BUF failures, while the re-exec addresses AppImage library-order failures that can surface as `Could not create default EGL display: EGL_BAD_PARAMETER` before GTK/WebKit create the display.
 
 ## Multi-Window (Note Windows)
 
@@ -246,10 +247,10 @@ Full agent mode — spawns the selected local CLI agent as a subprocess with too
 1. **Frontend** (`AiPanel` + `useCliAiAgent` + `aiAgentSession.ts` + `aiAgents.ts`) — one normalized session lifecycle for message state, reasoning blocks, tool action cards, response display, onboarding, default-agent selection, and the per-vault Safe / Power User permission mode shown in the panel header
 2. **Backend orchestration** (`ai_agents.rs`) — normalizes agent availability, streaming, and the request permission mode before dispatching to per-agent adapters
 3. **Shared runtime scaffold** (`cli_agent_runtime.rs`) — owns the common request shape, prompt wrapping, JSON-line subprocess lifecycle, normalized error/done handling, version probing, and Tolaria MCP server path resolution used by app-managed CLI agents
-4. **Agent adapters** — Shared prompts are mode-aware on every turn, including turns with note context snapshots: Vault Safe tells agents not to use or advertise shell, while Power User tells shell-capable agents to keep local commands scoped to the active vault. Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, and a scoped tool list: Safe enables file/search/edit tools only, while Power User adds Bash to the available tools and pre-approves Bash with `--allowedTools` without using dangerous bypass flags. Codex runtime specifics live in `codex_cli.rs`; Safe runs `codex --sandbox read-only --ask-for-approval untrusted exec --json`, while Power User runs `codex --sandbox workspace-write --ask-for-approval never exec --json` so shell execution stays enabled across repeated turns. OpenCode runs through `opencode run --format json` with transient permissions: Safe denies bash and external directories, while Power User allows bash but still denies external directories. Pi runs through `pi --mode json --no-session` with `npm:pi-mcp-adapter`; both modes currently share the same transient MCP config and the prompt does not promise shell for Pi Power User. Gemini runs through `gemini --output-format stream-json --prompt` so assistant message chunks, tool calls, and final errors are mapped from the CLI event stream instead of relying on a buffered `response` field. Gemini Safe uses `auto_edit` plus `tools.exclude=["run_shell_command"]`; Power User intentionally uses `yolo` against a trusted transient Tolaria MCP entry. OpenCode, Pi, and Gemini all launch from the active vault cwd with closed stdin and transient MCP config. All app-launched paths use hidden Windows launches and avoid dangerous permission-bypass flags.
-5. **MCP Integration** — Claude receives the generated MCP config file path, Codex receives the same Tolaria MCP server via transient `-c mcp_servers.tolaria.*` config overrides, OpenCode receives it through `OPENCODE_CONFIG_CONTENT`, Pi receives it through a temporary `PI_CODING_AGENT_DIR/mcp.json` consumed by `pi-mcp-adapter`, and Gemini receives it through a temporary settings file pointed at by `GEMINI_CLI_SYSTEM_SETTINGS_PATH`
+4. **Agent adapters** — Shared prompts are mode-aware on every turn, including turns with note context snapshots: Vault Safe tells agents not to use or advertise shell, while Power User tells shell-capable agents to keep local commands scoped to the active vault. Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, and a scoped tool list: Safe enables file/search/edit tools only, while Power User adds Bash to the available tools and pre-approves Bash with `--allowedTools` without using dangerous bypass flags. Codex runtime specifics live in `codex_cli.rs`; Safe runs `codex --sandbox read-only --ask-for-approval untrusted exec --json`, while Power User runs `codex --sandbox workspace-write --ask-for-approval never exec --json` so shell execution stays enabled across repeated turns. OpenCode runs through `opencode run --format json` with transient permissions: Safe denies bash and external directories, while Power User allows bash but still denies external directories. Pi runs through `pi --mode json --no-session` with `npm:pi-mcp-adapter`; both modes currently share the same transient MCP config and the prompt does not promise shell for Pi Power User. Gemini runs through `gemini --output-format stream-json --prompt` so assistant message chunks, tool calls, and final errors are mapped from the CLI event stream instead of relying on a buffered `response` field. Gemini Safe uses `auto_edit` plus `tools.exclude=["run_shell_command"]`; Power User intentionally uses `yolo` against a trusted transient Tolaria MCP entry. Codex, OpenCode, Pi, and Gemini all launch from the active vault cwd with closed stdin and transient MCP config. All app-launched paths use hidden Windows launches and avoid dangerous permission-bypass flags.
+5. **MCP Integration** — Claude receives the generated MCP config file path, Codex receives the same Tolaria MCP server via transient `-c mcp_servers.tolaria.*` config overrides using Tolaria's resolved Node path plus `VAULT_PATH` and `WS_UI_PORT`, OpenCode receives it through `OPENCODE_CONFIG_CONTENT`, Pi receives it through a temporary `PI_CODING_AGENT_DIR/mcp.json` consumed by `pi-mcp-adapter`, and Gemini receives it through a temporary settings file pointed at by `GEMINI_CLI_SYSTEM_SETTINGS_PATH`
 
-CLI-agent availability intentionally does not depend only on the desktop app's inherited `PATH`. The detectors check the current process path, the user's login shell, and supported local/toolchain install locations such as native `~/.local/bin`, local `~/.claude/local`, Mise/asdf shims, nvm-managed Node installs, npm-global, Homebrew, Windows `%APPDATA%\npm`/pnpm/Scoop shims, Windows `.exe` launchers, and the macOS Codex app resource path so first-run onboarding works on fresh macOS and Windows installs.
+CLI-agent availability intentionally does not depend only on the desktop app's inherited `PATH`. The detectors check the current process path, the user's login shell, and supported local/toolchain install locations such as native `~/.local/bin`, local `~/.claude/local`, Mise/asdf shims, nvm-managed Node installs, npm-global, Homebrew, Windows `%APPDATA%\npm`/pnpm/Scoop shims, Windows `.exe` launchers, and the macOS Codex app resource path so first-run onboarding works on fresh macOS and Windows installs. App-managed CLI spawns also expand the active vault path before using it as the subprocess working directory, then extend the child process `PATH` with the resolved binary directory plus those common toolchain directories, which lets GUI-launched macOS sessions run Homebrew/npm shims and their `node`-backed MCP subprocesses even when Finder/Dock did not inherit a terminal shell path.
 
 #### Agent Event Flow
 
@@ -298,15 +299,15 @@ The agent panel (`ai-context.ts`) builds a structured JSON snapshot from the act
 
 ```json
 {
-  "activeNote": { "path", "title", "type", "frontmatter", "content" },
-  "linkedNotes": [{ "path", "title", "content" }],
-  "openTabs": [{ "title", "snippet" }],
-  "vaultMetadata": { "noteTypes", "stats", "filter" },
-  "references": [{ "title", "path", "type" }]
+  "activeNote": { "path", "title", "type", "frontmatter", "body", "wordCount", "bodyTruncated?" },
+  "openTabs": [{ "path", "title", "type", "frontmatter" }],
+  "noteList": [{ "path", "title", "type" }],
+  "vault": { "types", "totalNotes" },
+  "referencedNotes": [{ "title", "path", "type" }]
 }
 ```
 
-Token budget: 60% of 180k context limit (~108k tokens max). Active note gets priority, then linked notes, then truncation.
+Large active notes are compacted into a head/tail body snapshot before they enter the CLI prompt. The snapshot records `bodyTruncated` metadata and instructs agents to call `get_note(path)` before content-sensitive edits or summaries, keeping lower-context OpenCode providers from failing on oversized active-note context while preserving access to the full note through MCP.
 
 ### Authentication
 
@@ -350,7 +351,7 @@ Tolaria can register itself as an MCP server in:
 - `~/.cursor/mcp.json` (Cursor)
 - `~/.config/mcp/mcp.json` (generic MCP-compatible clients)
 
-That setup is user-initiated through the status bar / command palette flow, not a startup side effect. Registration is non-destructive (additive, preserves other servers and Gemini settings), uses `upsert` semantics, and can be reversed by removing Tolaria's entry again. Tolaria verifies Node.js is available before writing config, writes an explicit `type: "stdio"` entry, pins `VAULT_PATH` to the active vault, and sets `WS_UI_PORT=9711` so UI actions route back to the desktop app. The same generated entry is exposed as a manual JSON snippet in the MCP setup dialog and through the AI panel copy action, giving users a transparent fallback for MCP-compatible tools Tolaria does not auto-configure. In the desktop app, `useMcpStatus` copies that snippet through the native `copy_text_to_clipboard` command instead of the Web Clipboard API so macOS WKWebView permission policy cannot block setup. Packaged builds resolve `mcp-server/` from the installed resource directory next to the executable before falling back to macOS `Resources`, Linux package roots such as `/usr/local/Tolaria` and `/usr/lib/tolaria`, and AppImage paths. The `useMcpStatus` hook tracks whether the active vault is explicitly connected (`checking | installed | not_installed`) and owns connect, disconnect, exact-snippet load, and copy-to-clipboard actions. Gemini CLI still owns its own install and sign-in; Tolaria writes the durable external MCP entry only on explicit setup, while app-managed Gemini sessions use transient settings and optional vault guidance. The desktop WebSocket bridge is started only when a persisted active vault exists and is resynced from React state on vault changes; no selected vault stops the bridge instead of falling back to `~/Laputa`. Stdio MCP server processes are owned by the external client that launched them: when that client closes stdin, Tolaria cancels UI-bridge reconnect timers, closes any UI WebSocket, and exits the Node process instead of keeping it alive in the background.
+That setup is user-initiated through the status bar / command palette flow, not a startup side effect. Registration is non-destructive (additive, preserves other servers and Gemini settings), uses `upsert` semantics, and can be reversed by removing Tolaria's entry again. Tolaria verifies Node.js is available before writing config, writes an explicit `type: "stdio"` entry, pins `VAULT_PATH` to the active vault, and sets `WS_UI_PORT=9711` so UI actions route back to the desktop app. The same generated entry is exposed as a manual JSON snippet in the MCP setup dialog and through the AI panel copy action, giving users a transparent fallback for MCP-compatible tools Tolaria does not auto-configure. In the desktop app, `useMcpStatus` copies that snippet through the native `copy_text_to_clipboard` command instead of the Web Clipboard API so macOS WKWebView permission policy cannot block setup. Packaged builds resolve `mcp-server/` from the installed resource directory next to the executable before falling back to macOS `Resources`, Linux package roots such as `/usr/local/Tolaria`, `/usr/lib/tolaria`, and `/usr/lib/tolaria/resources`, and AppImage paths. The `useMcpStatus` hook tracks whether the active vault is explicitly connected (`checking | installed | not_installed`) and owns connect, disconnect, exact-snippet load, and copy-to-clipboard actions. Gemini CLI still owns its own install and sign-in; Tolaria writes the durable external MCP entry only on explicit setup, while app-managed Gemini sessions use transient settings and optional vault guidance. The desktop WebSocket bridge is started only when a persisted active vault exists and is resynced from React state on vault changes; no selected vault stops the bridge instead of falling back to `~/Laputa`. Stdio MCP server processes are owned by the external client that launched them: when that client closes stdin, Tolaria cancels UI-bridge reconnect timers, closes any UI WebSocket, and exits the Node process instead of keeping it alive in the background.
 
 ### Architecture
 
@@ -490,6 +491,8 @@ On first launch, `useOnboarding` checks if the default vault exists. If not, it 
 - **Open an existing folder** → system file picker; plain Markdown folders without `.git` open immediately in supported non-git mode
 - **Get started with a template** → pick a parent folder, then call `create_getting_started_vault()` with the derived `.../Getting Started` child path so the cloned vault opens into the populated repo root immediately
 
+If the selected vault disappears after startup, `useVaultLoader` re-checks `check_vault_exists` when reloads or vault-derived surfaces fail. A confirmed missing path clears cached entries, folders, views, modified-file state, and prefetched note content, then `App` reuses the `vault-missing` `WelcomeScreen` state so note and view actions cannot keep targeting the stale active vault.
+
 When an opened folder is not yet a git repo, Tolaria shows a dismissible Git setup dialog and a persistent `Git disabled` status-bar warning. Markdown scanning, note browsing, note editing, and search continue normally. Git-dependent surfaces (history, changes, commit, sync, conflict resolution, remotes, AutoGit, and auto-sync) stay unavailable until the user explicitly initializes Git from the dialog, the status-bar warning, or the `Initialize Git for Current Vault` command-palette action.
 
 When the user enables Git later, `init_git_repo` runs `git init`, ensures Tolaria's default `.gitignore`, stages the vault, and writes the initial `Initial vault setup` commit. Before app-managed setup and remote-connection commits, Tolaria ensures the vault has local `user.name` / `user.email` values, falling back to `Tolaria <vault@tolaria.md>` when the vault has no local Git identity yet. That app-managed setup commit explicitly disables commit signing for the single command so inherited global or local `commit.gpgsign` preferences cannot strand onboarding when GPG is missing or misconfigured. Later `git_commit` calls honor the user's signing configuration first, then retry the same app-managed commit once with `commit.gpgsign=false` only when Git reports a signing-helper failure, so working GPG/SSH signing setups continue to sign while broken GPG setups do not create repeated opaque commit failures.
@@ -556,6 +559,11 @@ sequenceDiagram
         VL->>T: invoke('reload_vault') → allow requested vault roots in asset scope + scan_vault_cached()
         T-->>VL: VaultEntry[]
         VL->>T: invoke('get_modified_files')
+        alt Runtime vault path disappears
+            VL->>T: invoke('check_vault_exists')
+            VL-->>A: unavailable vault path + cleared stale state
+            A-->>U: WelcomeScreen (vault missing)
+        end
         A->>T: useMcpStatus — check explicit MCP setup state
         A->>T: sync_mcp_bridge_vault(selected path)
         VL-->>A: entries ready
@@ -644,7 +652,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `parsing.rs` | Text processing: snippet extraction, markdown stripping, ISO date parsing, `extract_title` (H1 → legacy frontmatter → filename), `slug_to_title` |
 | `title_sync.rs` | Legacy filename → `title` frontmatter sync helper; no longer used by the normal note-open flow |
 | `cache.rs` | Git-based incremental vault caching (`scan_vault_cached`), git helpers |
-| `ignored.rs` | Gitignored-content visibility filtering via batched `git check-ignore` |
+| `ignored.rs` | Gitignored-content visibility filtering via batched, pipe-safe `git check-ignore` |
 | `filename_rules.rs` | Cross-platform validation for note filenames, folder names, and custom view filenames |
 | `rename.rs` | `rename_note` / `rename_note_filename` / `move_note_to_folder` — stage crash-safe file moves, update `title` frontmatter when needed, recover unfinished rename transactions, and report backlink rewrite failures |
 | `image.rs` | `save_image` / `copy_image_to_vault` — save editor image attachments with sanitized filenames |
@@ -684,6 +692,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `rename_note` | Crash-safe note rename + `title` frontmatter update + cross-vault wikilinks + failed backlink counts |
 | `move_note_to_folder` | Crash-safe folder move that preserves the filename, reloads the moved note, and rewrites path-based wikilinks |
 | `create_vault_folder` | Create a folder relative to the active vault root |
+| `list_vault_folders` | Build the folder tree on the blocking Tokio pool, then apply Gitignored-content visibility → `Vec<FolderNode>` |
 | `rename_vault_folder` | Rename a folder relative to the active vault root and return old/new relative paths |
 | `delete_vault_folder` | Permanently delete a folder subtree relative to the active vault root |
 | `sync_note_title` | Legacy helper: rewrite `title` frontmatter from filename → `bool` (modified); not used by the normal note-open flow |
@@ -822,7 +831,7 @@ No Redux or global context. State lives in the root `App.tsx` and custom hooks:
 | `useUnifiedSearch` | Query, results, loading state | Keyword search |
 | `useSettings` | App settings (telemetry, release channel, theme mode, UI language, auto-sync interval, AutoGit thresholds, default AI agent, Gitignored-content visibility, All Notes file visibility) | Persistent settings |
 | `useVaultConfig` | Per-vault UI preferences, AI permission mode | Vault-specific config |
-| `appCommandDispatcher` | Canonical shortcut/menu command IDs | Shared execution path for renderer and native menu commands |
+| `appCommandDispatcher` | Manifest-backed shortcut/menu command IDs | Shared execution path for renderer and native menu commands |
 
 Data flows unidirectionally: `App` passes data and callbacks as props to child components. No child-to-child communication — everything goes through `App`.
 
@@ -847,13 +856,14 @@ Selection-dependent actions are wired through the command palette and the native
 
 Shortcut routing is explicit:
 
-- `appCommandCatalog.ts` is the shared shortcut manifest for command IDs, modifier rules, and deterministic QA metadata
+- `src/shared/appCommandManifest.json` is the shared command/menu metadata source for command IDs, menu labels, accelerators, native-menu enablement groups, and deterministic QA flags
+- `appCommandCatalog.ts` derives renderer command IDs, shortcut lookup maps, Linux menu sections, and QA metadata from that manifest
 - `formatShortcutDisplay()` derives platform-accurate visible shortcut labels (`⌘` on macOS, `Ctrl` on Windows/Linux) from that same manifest so menus, tooltips, and command-palette copy stay aligned with real accelerators
 - `useAppKeyboard` is the primary execution path for real shortcut keypresses, including Tauri runs
 - macOS browser-reserved chords such as `Cmd+O`, `Cmd+F`, and `Cmd+Shift+L` are unblocked at webview init via `tauri-plugin-prevent-default`, then continue through the same renderer-first command path
 - `Cmd+Shift+V` uses the same command path for "Paste without Formatting"; `plainTextPaste.ts` reads text through the native clipboard command in Tauri and inserts it through the active rich/raw editor target or the focused browser text control
 - `Cmd+F` is surface-aware: editor focus opens current-note find/replace in raw CodeMirror, note-list focus preserves note-list search, and native menu enablement follows focus availability events so only one `Cmd+F` menu item is active
-- `menu.rs`, `useMenuEvents`, and Linux's `LinuxMenuButton` emit the same command IDs for native menu clicks, accelerators, and custom titlebar menu actions
+- `menu.rs`, `useMenuEvents`, and Linux's `LinuxMenuButton` emit the same manifest-derived command IDs for native menu clicks, accelerators, and custom titlebar menu actions
 - `appCommandDispatcher.ts` suppresses the paired native-menu/renderer echo from a single shortcut so the command runs once
 - Deterministic QA uses two explicit proof paths from the shared manifest:
   - renderer shortcut-event proof through `window.__laputaTest.triggerShortcutCommand()`

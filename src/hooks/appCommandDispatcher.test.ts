@@ -13,6 +13,8 @@ import {
 } from './appCommandDispatcher'
 import {
   getDeterministicShortcutQaDefinition,
+  APP_COMMAND_MENU_SECTIONS,
+  APP_COMMAND_MENU_STATE_GROUPS,
   getShortcutEventInit,
 } from './appCommandCatalog'
 
@@ -101,6 +103,31 @@ describe('appCommandDispatcher', () => {
   it('distinguishes native menu ids from keyboard-only ids', () => {
     expect(isNativeMenuCommandId(APP_COMMAND_IDS.fileNewNote)).toBe(true)
     expect(isNativeMenuCommandId(APP_COMMAND_IDS.noteToggleFavorite)).toBe(false)
+  })
+
+  it('derives native menu command IDs from the shared command menu manifest', () => {
+    const menuCommandIds = APP_COMMAND_MENU_SECTIONS.flatMap(section =>
+      section.items.flatMap(item => item.kind === 'command' ? [item.commandId] : []),
+    )
+
+    expect(menuCommandIds).toContain(APP_COMMAND_IDS.fileNewNote)
+    expect(menuCommandIds).toContain(APP_COMMAND_IDS.editPastePlainText)
+    expect(menuCommandIds).toContain(APP_COMMAND_IDS.viewGoBack)
+    expect(menuCommandIds).not.toContain(APP_COMMAND_IDS.noteToggleFavorite)
+  })
+
+  it('keeps native menu state groups inside the shared command menu manifest', () => {
+    const menuCommandIds = new Set(
+      APP_COMMAND_MENU_SECTIONS.flatMap(section =>
+        section.items.flatMap(item => item.kind === 'command' ? [item.menuItemId] : []),
+      ),
+    )
+
+    for (const commandIds of Object.values(APP_COMMAND_MENU_STATE_GROUPS)) {
+      for (const commandId of commandIds) {
+        expect(menuCommandIds.has(commandId)).toBe(true)
+      }
+    }
   })
 
   it('finds raw editor, AI, and plain-text paste shortcuts from the shared catalog', () => {

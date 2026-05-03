@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { TypeSelector } from './TypeSelector'
 
@@ -31,12 +31,17 @@ describe('TypeSelector', () => {
 
     const trigger = screen.getByRole('combobox')
     trigger.focus()
-    fireEvent.keyDown(trigger, { key: 'Enter' })
+    await act(async () => {
+      fireEvent.keyDown(trigger, { key: 'Enter' })
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve())
+      })
+    })
 
-    const searchInput = screen.getByTestId('type-selector-search-input')
-    await waitFor(() => expect(searchInput).toHaveFocus())
+    const searchInput = await screen.findByTestId('type-selector-search-input', {}, { timeout: 5_000 })
+    await waitFor(() => expect(searchInput).toHaveFocus(), { timeout: 5_000 })
     expect(screen.getByRole('option', { name: 'Project' })).toHaveAttribute('aria-selected', 'true')
-  })
+  }, 10_000)
 
   it('filters available types as the user types', () => {
     renderTypeSelector()

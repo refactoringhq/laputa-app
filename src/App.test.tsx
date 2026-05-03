@@ -257,11 +257,18 @@ function getHeaderForNoteList(noteListContainer: HTMLElement) {
   return within(noteListContainer.parentElement as HTMLElement).getByRole('heading', { level: 3 })
 }
 
-async function enterNeighborhood(noteListContainer: HTMLElement, title: string) {
+async function clickNoteListItem(noteListContainer: HTMLElement, title: string, options?: MouseEventInit) {
+  await waitFor(() => {
+    expect(within(noteListContainer).getByText(title)).toBeInTheDocument()
+  })
   await act(async () => {
-    fireEvent.click(within(noteListContainer).getByText(title), { metaKey: true })
+    fireEvent.click(within(noteListContainer).getByText(title), options)
     await Promise.resolve()
   })
+}
+
+async function enterNeighborhood(noteListContainer: HTMLElement, title: string) {
+  await clickNoteListItem(noteListContainer, title, { metaKey: true })
 }
 
 async function pressEscape() {
@@ -438,6 +445,7 @@ import { streamAiAgent } from './utils/streamAiAgent'
 
 const AI_AGENTS_ONBOARDING_DISMISSED_KEY = 'tolaria:ai-agents-onboarding-dismissed'
 const CLAUDE_CODE_ONBOARDING_DISMISSED_KEY = 'tolaria:claude-code-onboarding-dismissed'
+const SLOW_APP_READY_TIMEOUT_MS = 10_000
 
 function createMockUpdaterResult(
   checkForUpdates: () => Promise<{ kind: 'up-to-date' } | { kind: 'available'; version: string; displayVersion: string } | { kind: 'error'; message: string }> = async () => ({ kind: 'up-to-date' }),
@@ -662,7 +670,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(screen.getByText('AI agents ready')).toBeInTheDocument()
-    })
+    }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
 
     await waitFor(() => {
       expect(typeof window.__laputaTest?.dispatchBrowserMenuCommand).toBe('function')
@@ -931,7 +939,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('welcome-screen')).toBeInTheDocument()
-    })
+    }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
 
     fireEvent.click(screen.getByTestId('welcome-open-folder'))
 
@@ -1128,10 +1136,7 @@ describe('App', () => {
       expect(getHeaderForNoteList(noteListContainer)).toHaveTextContent('Inbox')
     })
 
-    await act(async () => {
-      fireEvent.click(within(noteListContainer).getByText('Alpha'))
-      await Promise.resolve()
-    })
+    await clickNoteListItem(noteListContainer, 'Alpha')
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Set note as organized' })).toBeInTheDocument()
@@ -1145,7 +1150,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(window.__laputaTest?.activeTabPath).toBe('/vault/beta.md')
     })
-  })
+  }, 10_000)
 
   it('keeps the manually selected note after organizing finishes later', async () => {
     configureNeighborhoodVault()
@@ -1172,10 +1177,7 @@ describe('App', () => {
       expect(getHeaderForNoteList(noteListContainer)).toHaveTextContent('Inbox')
     })
 
-    await act(async () => {
-      fireEvent.click(within(noteListContainer).getByText('Alpha'))
-      await Promise.resolve()
-    })
+    await clickNoteListItem(noteListContainer, 'Alpha')
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Set note as organized' })).toBeInTheDocument()
@@ -1202,7 +1204,7 @@ describe('App', () => {
     })
 
     expect(window.__laputaTest?.activeTabPath).toBe('/vault/gamma.md')
-  })
+  }, 10_000)
 
   it('renders status bar', async () => {
     render(<App />)

@@ -312,6 +312,34 @@ describe('buildContextSnapshot', () => {
     expect(json.activeNote.body).toBe('Fresh editor content')
   })
 
+  it('compacts large active note bodies and points agents at the full note tool', () => {
+    const largeBody = [
+      'Opening section '.repeat(900),
+      'Middle section that should not be fully embedded '.repeat(900),
+      'Closing section '.repeat(900),
+    ].join('\n')
+    const result = buildContextSnapshot({
+      activeEntry: makeEntry({
+        path: '/vault/large-note.md',
+        title: 'Large Note',
+        wordCount: 2700,
+      }),
+      entries,
+      activeNoteContent: largeBody,
+    })
+    const json = JSON.parse(result.split('```json\n')[1].split('\n```')[0])
+
+    expect(json.activeNote.body.length).toBeLessThan(largeBody.length)
+    expect(json.activeNote.body).toContain('Opening section')
+    expect(json.activeNote.body).toContain('Closing section')
+    expect(json.activeNote.body).toContain('get_note("/vault/large-note.md")')
+    expect(json.activeNote.bodyTruncated).toEqual({
+      shownChars: expect.any(Number),
+      totalChars: largeBody.trim().length,
+      strategy: 'head-tail',
+    })
+  })
+
   it('returns empty body when no activeNoteContent', () => {
     const result = buildContextSnapshot({ activeEntry: active, entries })
     const json = JSON.parse(result.split('```json\n')[1].split('\n```')[0])

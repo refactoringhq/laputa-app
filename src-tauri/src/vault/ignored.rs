@@ -23,6 +23,10 @@ fn should_descend_for_gitignore(entry: &DirEntry) -> bool {
 }
 
 fn has_gitignore_file(vault_path: &Path) -> bool {
+    if vault_path.join(".gitignore").is_file() {
+        return true;
+    }
+
     WalkDir::new(vault_path)
         .follow_links(false)
         .into_iter()
@@ -43,14 +47,17 @@ fn run_git_check_ignore(vault_path: &Path, relative_paths: &[String]) -> Option<
         .spawn()
         .ok()?;
 
-    {
-        let stdin = child.stdin.as_mut()?;
-        for path in relative_paths {
-            writeln!(stdin, "{path}").ok()?;
+    let mut stdin = child.stdin.take()?;
+    let paths = relative_paths.to_vec();
+    let writer = std::thread::spawn(move || -> std::io::Result<()> {
+        for path in paths {
+            writeln!(stdin, "{path}")?;
         }
-    }
+        Ok(())
+    });
 
     let output = child.wait_with_output().ok()?;
+    writer.join().ok()?.ok()?;
     if output.status.success() || output.status.code() == Some(1) {
         return Some(String::from_utf8_lossy(&output.stdout).to_string());
     }
@@ -186,6 +193,8 @@ pub fn filter_gitignored_folders(
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::mpsc;
+    use std::time::Duration;
     use tempfile::TempDir;
 
     fn write_file(root: &Path, relative: &str, content: &str) {
@@ -286,6 +295,34 @@ mod tests {
         let filtered = filter_gitignored_folders(dir.path(), folders, true);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].path, "notes");
+    }
+
+    #[test]
+    fn filters_large_ignored_folder_sets_without_blocking_on_git_stdout() {
+        let dir = TempDir::new().unwrap();
+        init_git_repo(dir.path());
+        write_file(dir.path(), ".gitignore", "generated/\n");
+
+        let folders = (0..6_000)
+            .map(|index| FolderNode {
+                name: format!("package-{index}"),
+                path: format!("generated/package-{index}"),
+                children: vec![],
+            })
+            .collect::<Vec<_>>();
+        let vault_path = dir.path().to_path_buf();
+        let (sender, receiver) = mpsc::channel();
+
+        std::thread::spawn(move || {
+            let filtered = filter_gitignored_folders(vault_path.as_path(), folders, true);
+            let _ = sender.send(filtered);
+            drop(dir);
+        });
+
+        let filtered = receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("large gitignored folder filtering should not block on child stdout");
+        assert!(filtered.is_empty());
     }
 
     #[test]

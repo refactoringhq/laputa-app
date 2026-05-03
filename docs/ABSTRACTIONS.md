@@ -166,9 +166,9 @@ Asset previewability is inferred in the renderer from the filename extension (`s
 
 ### Note Content Freshness
 
-The renderer may cache recently opened or preloaded markdown content, but cached content is only a performance hint. Before showing cached markdown or editor-ready blocks, `useTabManagement` validates the cached string with the `validate_note_content` Tauri command. That command re-enters the same vault path boundary checks as `get_note_content` and compares the cached text against the current on-disk file bytes. A mismatch, missing file, or unreadable file falls back to the normal fresh-read path and existing missing/unreadable recovery.
+The renderer may cache recently opened or preloaded markdown content, but cached content is only a performance hint. `useTabManagement` can reuse cached text immediately when it carries the same `modifiedAt` and `fileSize` identity as the current `VaultEntry`; otherwise it validates the cached string with the `validate_note_content` Tauri command. That command re-enters the same vault path boundary checks as `get_note_content` and compares the cached text against the current on-disk file bytes. A mismatch, missing file, or unreadable file falls back to the normal fresh-read path and existing missing/unreadable recovery.
 
-Prepared BlockNote blocks in `useEditorTabSwap` are keyed by path plus source content. They can be built ahead of time from prefetched markdown, but they are reused only when the validated raw content for that path is identical to the source content that produced the blocks.
+`useEditorTabSwap` may reuse BlockNote blocks that were already opened successfully or warmed from prefetched raw content, keyed by vault, path, and exact source content. Background warming is limited to likely next large Markdown notes and defers while the editor is unmounted, raw mode is active, or recent typing/navigation is still inside the foreground idle window. Every async editor swap carries a generation and source-content token so stale conversion results cannot overwrite newer file content or dirty editor state.
 
 ### Entity Types (isA / type)
 
@@ -334,6 +334,12 @@ The renderer uses `viewOrdering` helpers to convert drag or command-palette move
 - Plain click / `Enter` open the focused note without replacing the current Neighborhood.
 - Cmd/Ctrl-click and Cmd/Ctrl-`Enter` open the note and pivot the note list into that note's Neighborhood.
 
+## Command Surface
+
+`src/shared/appCommandManifest.json` is the cross-runtime source for stable app command IDs, menu structure, display labels, accelerators, deterministic shortcut QA metadata, and native menu enablement groups. The renderer imports it through `src/hooks/appCommandCatalog.ts`, which derives `APP_COMMAND_IDS`, shortcut lookup maps, Linux titlebar menu sections, native-menu command membership, and test helpers. Tauri includes the same JSON in `src-tauri/src/menu.rs` and uses it to build custom menu items, emit overridden menu item IDs such as the quick-open alias as their primary command IDs, and toggle state-dependent menu items from manifest groups.
+
+Domain command builders still own context-sensitive command-palette entries, availability, and execution callbacks. The manifest owns metadata that must stay identical across native menus, renderer shortcuts, deterministic QA bridges, and the Linux fallback menu; OS-native menu items such as Undo, Copy/Paste, Services, Quit, and Window controls remain local to the native menu implementation.
+
 ## File System Integration
 
 ### Vault Scanning (Rust)
@@ -357,11 +363,11 @@ All Notes starts from Markdown notes and excludes Markdown files under `attachme
 
 The folder tree hides the legacy `type/` directory, since those type documents already appear through the Types sidebar section. Default vault folders such as `attachments/` and `views/` remain visible alongside user-created folders under the synthetic vault-root row.
 
-Command-facing vault content is filtered through `vault::filter_gitignored_entries`, `vault::filter_gitignored_folders`, and `vault::filter_gitignored_paths` when the app setting `hide_gitignored_files` is enabled. The cache still stores the complete scan; `list_vault`, `reload_vault`, `list_vault_folders`, and search apply the visibility filter at the boundary before React consumes entries. The filter batches paths through `git check-ignore --no-index --stdin`, so negated and specific `.gitignore` patterns follow Git semantics as closely as the app can reasonably support.
+Command-facing vault content is filtered through `vault::filter_gitignored_entries`, `vault::filter_gitignored_folders`, and `vault::filter_gitignored_paths` when the app setting `hide_gitignored_files` is enabled. The cache still stores the complete scan; `list_vault`, `reload_vault`, `list_vault_folders`, and search apply the visibility filter at the boundary before React consumes entries. The filter batches paths through `git check-ignore --no-index --stdin`, drains stdout while stdin is still being written, and short-circuits root `.gitignore` detection before walking for nested ignore files, so large ignored folder sets cannot deadlock the native UI while preserving Git semantics as closely as the app can reasonably support.
 
 A `vault_health_check` command detects stray files in non-protected subfolders and filename-title mismatches. On vault load, a migration banner offers to flatten stray files to the root via `flatten_vault`.
 
-Command-layer path access is fenced to the active vault before file operations reach the vault backend. `src-tauri/src/commands/vault/boundary.rs` canonicalizes the configured/requested vault root, rejects `..` escapes and absolute paths outside that root, and validates writable targets through the nearest existing ancestor so note reads, saves, deletes, view-file edits, folder mutations, and image attachment writes cannot step outside the active vault. Image attachment commands add the current vault root to the runtime asset scope after saving so files created under a previously missing `attachments/` directory can render immediately.
+Command-layer path access is fenced to the active vault before file operations reach the vault backend. `src-tauri/src/commands/vault/boundary.rs` canonicalizes the configured/requested vault root, rejects `..` escapes and absolute paths outside that root, and validates writable targets through the nearest existing ancestor so note reads, saves, deletes, view-file edits, folder mutations, and image attachment writes cannot step outside the active vault. If the active root itself cannot be canonicalized, the renderer treats `Active vault is not available` the same as no active vault: it clears stale vault state, drops prefetched note content, and shows the missing-vault recovery screen instead of continuing note/view requests against the disappeared path. Image attachment commands add the current vault root to the runtime asset scope after saving so files created under a previously missing `attachments/` directory can render immediately.
 
 UI-only file actions operate on paths that are already selected or indexed in React state. Reveal-in-Finder routes through the Tauri opener plugin, external-open routes through the `open_vault_file_external` command and active-vault boundary before invoking the native opener, and copy-path uses the browser clipboard API. Plain-text paste reads the desktop clipboard through `read_text_from_clipboard` in Tauri so macOS WKWebView clipboard permissions do not block the command; browser/mock mode falls back to the Web Clipboard API or mock handlers. None of those actions mutate vault contents or bypass the backend write boundary.
 
@@ -526,8 +532,8 @@ Defined in `src/components/editorSchema.tsx` and styled in `src/components/Edito
 
 - The schema overrides BlockNote's default `codeBlock` spec with `createCodeBlockSpec({ ...codeBlockOptions, defaultLanguage: "text" })` from `@blocknote/code-block`.
 - Fenced code blocks now use BlockNote's supported Shiki-backed highlighter path, which renders `.shiki` token spans directly inside the editor DOM.
-- Tolaria keeps `defaultLanguage: "text"` so unlabeled code blocks do not silently become JavaScript while still supporting the packaged language aliases such as `ts` → `typescript`.
-- Inline-code chip styling remains scoped to `.bn-inline-content code`, so fenced `pre > code` nodes keep BlockNote's dark shell instead of inheriting the muted inline surface.
+- Tolaria keeps `defaultLanguage: "text"` so unlabeled code blocks do not silently become JavaScript at creation time. Parsed unlabeled code blocks then run through Tolaria's lightweight language inference, while explicit fence languages and user dropdown choices still win.
+- Inline-code chip styling remains scoped to `.bn-inline-content code`, so fenced `pre > code` nodes keep the dedicated code-block shell instead of inheriting the muted inline surface.
 
 ### Markdown Math
 
@@ -546,6 +552,16 @@ Defined in `src/utils/mermaidMarkdown.ts`, `src/components/MermaidDiagram.tsx`, 
 - Each `mermaidBlock` stores the original fenced Markdown plus the diagram body, so raw-mode entry and saves can restore the canonical source instead of serializing generated SVG.
 - The rich editor renders diagrams with the `mermaid` package and uses the original source as an inline fallback when rendering fails.
 - `serializeMermaidAwareBlocks()` wraps the math-aware serializer so math, wikilinks, and diagrams share the same Markdown-first save path.
+- The `/mermaid` slash command inserts a placeholder rectangle diagram using the same schema-backed Markdown storage path, avoiding an invalid empty diagram state.
+
+### Tldraw Whiteboards
+
+Defined in `src/utils/tldrawMarkdown.ts`, `src/components/TldrawWhiteboard.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
+
+- Fenced `tldraw` blocks become `tldrawBlock` schema nodes before BlockNote sees the Markdown body.
+- Each `tldrawBlock` stores a stable `boardId` plus the tldraw document snapshot JSON. Session state such as camera, selected tool, and current selection is not persisted into the note.
+- The rich editor renders the block with the `tldraw` package and saves debounced document snapshot changes back into the block props, so normal Tolaria autosave writes the board into the `.md` file.
+- The `/whiteboard` slash command inserts an empty tldraw block using the same Markdown-durable storage path. Preview images are intentionally omitted; thumbnails can be added later as derived cache artifacts.
 
 ### Formatting Surface Policy
 
@@ -555,9 +571,9 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 - The formatting toolbar only exposes inline controls that persist through `blocksToMarkdownLossy()` in Tolaria's save pipeline: bold, italic, strike, nesting, and link creation. Controls that BlockNote can render temporarily but Tolaria cannot faithfully persist, such as underline, color, alignment, and the block-type dropdown, are hidden instead of appearing to work and later disappearing.
 - Tolaria's formatting-toolbar controller also keeps file/image actions mounted across the tiny hover gap between an image block and the floating toolbar, and while the toolbar itself is hovered, so image controls remain usable instead of collapsing mid-interaction.
 - `useImageLightbox` listens for `dblclick` on the rich-editor container and opens `ImageLightbox` only when the event target resolves to a viewable BlockNote image. The target resolver handles media wrappers, ignores image captions/resize controls, missing sources, and tiny tracking-style images, preserving BlockNote's ordinary single-click image selection path.
-- The `/` slash menu remains the supported path for markdown-safe block transformations such as headings, quotes, and list blocks. Tolaria filters out BlockNote's toggle-heading and toggle-list variants because those do not map cleanly to the markdown note model.
-- The block-handle side menu keeps only actions that survive Tolaria's markdown round-trip. Delete and table-header toggles remain available; BlockNote's `Colors` submenu is removed because block colors are not part of Tolaria's supported markdown surface. Tolaria renders the drag handle before the add-block button so the leftmost block affordance starts a reorder drag on macOS. Block-handle actions re-resolve the current live BlockNote block before mutating or dragging, so note reloads and sync churn cannot leave controls acting on stale block references.
-- BlockNote's table row/column handles are patched so stale or missing hovered-table state cancels the drag and hides handles instead of throwing. Browser and native table-drag regressions should exercise both row and column handles because the state is tracked per orientation.
+- The `/` slash menu remains the supported path for markdown-safe block transformations such as headings, quotes, list blocks, Mermaid diagrams, and whiteboards. Tolaria filters out BlockNote's toggle-heading and toggle-list variants because those do not map cleanly to the markdown note model.
+- The block-handle side menu keeps only actions that survive Tolaria's markdown round-trip. Delete and table-header toggles remain available; BlockNote's `Colors` submenu is removed because block colors are not part of Tolaria's supported markdown surface. Tolaria renders the add-block button outside the drag handle so the handle stays next to the block content. The side menu aligns itself to the first rendered text line for the hovered block, so H1/H2 typography, line-height, wrapping, and theme changes do not need per-heading offsets. Block reordering uses a Tolaria-owned pointer gesture and direct BlockNote block moves instead of HTML5 `DataTransfer`, keeping it independent from Tauri's native file-drop system. Block-handle actions re-resolve the current live BlockNote block before mutating or dragging, so note reloads and sync churn cannot leave controls acting on stale block references.
+- BlockNote's table row/column handles are patched so stale or missing hovered-table state cancels the drag and hides handles instead of throwing. Add/remove row and column actions also validate the table position and cell indexes before resolving a ProseMirror `CellSelection`, so reloads or menu lag cannot turn stale handles into invalid table-selection positions. Browser and native table regressions should exercise row and column dragging plus add-menu actions because the state is tracked per orientation.
 - `useNoteWikilinkDrop()` is the shared editor-drop abstraction for dragging note rows into either editor mode. It reads the existing note-retargeting drag payload, resolves the vault-relative stem, and inserts a canonical `[[wikilink]]` without hijacking unrelated plain-text drags.
 - `plainTextPaste.ts` is the shared plain-text paste target registry. Rich BlockNote and raw CodeMirror surfaces register focused insertion targets, while ordinary focused text controls use DOM selection replacement, so the `Cmd+Shift+V` command can preserve caret/selection behavior without each surface inventing its own clipboard reader.
 - `useTauriDragDropEvent()` owns the shared Tauri window drag/drop subscription and duplicate-unlisten cleanup used by native drop features.
@@ -568,18 +584,19 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 ```mermaid
 flowchart LR
     A["📄 Raw markdown\n(from disk)"] --> B["splitFrontmatter()\n→ yaml + body"]
-    B --> C["preProcessMermaidMarkdown(body)\nmermaid fence → token"]
-    C --> D["preProcessWikilinks(body)\n[[target]] → ‹token›"]
-    D --> E["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
-    E --> F["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
-    F --> G["injectWikilinks + injectMathInBlocks + injectMermaidInBlocks\n tokens → schema nodes"]
-    G --> H["editor.replaceBlocks()\n→ rendered editor"]
+    B --> C["preProcessTldrawMarkdown(body)\ntldraw fence → token"]
+    C --> D["preProcessMermaidMarkdown(body)\nmermaid fence → token"]
+    D --> E["preProcessWikilinks(body)\n[[target]] → ‹token›"]
+    E --> F["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
+    F --> G["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
+    G --> H["injectWikilinks + injectMathInBlocks + injectMermaidInBlocks + injectTldrawInBlocks\n tokens → schema nodes"]
+    H --> I["editor.replaceBlocks()\n→ rendered editor"]
 
     style A fill:#f8f9fa,stroke:#6c757d,color:#000
-    style H fill:#d4edda,stroke:#28a745,color:#000
+    style I fill:#d4edda,stroke:#28a745,color:#000
 ```
 
-> Wikilink placeholder tokens use `\u2039` and `\u203A`; math and Mermaid placeholder tokens use ASCII sentinels with URI-encoded payloads.
+> Wikilink placeholder tokens use `\u2039` and `\u203A`; math, Mermaid, and tldraw placeholder tokens use ASCII sentinels with URI-encoded payloads.
 
 ### BlockNote-to-Markdown Pipeline (Save)
 
@@ -657,6 +674,7 @@ The Inspector panel (`src/components/Inspector.tsx`) is composed of sub-panels:
 1. **DynamicPropertiesPanel** (`src/components/DynamicPropertiesPanel.tsx`): Renders frontmatter as editable key-value pairs:
    - **Editable properties** (top): Type badge, Status pill with dropdown, number fields, boolean toggles, array tag pills, text fields. Click-to-edit interaction.
    - **Property display modes**: `text`, `number`, `date`, `boolean`, `status`, `url`, `tags`, and `color`. Numeric frontmatter values auto-detect as `number`, and custom scalar keys can be explicitly switched to `Number` through the property-type control.
+   - **Present empty properties**: A top-level frontmatter key with a blank scalar value (for example `start date:`) is treated as present and renders as an editable empty row. Only absent keys are omitted.
    - **Info section** (bottom, separated by border): Read-only derived metadata — Modified, Created, Words, File Size. Uses muted styling with no interaction.
    - Keys in `SKIP_KEYS` (`type`, `aliases`, `notion_id`, `workspace`, `is_a`, `Is A`) are hidden from the editable section.
 
@@ -794,6 +812,7 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 ### Product Events
 - **File previews** — `file_preview_opened`, `file_preview_action`, and `file_preview_failed` report only preview/action categories such as `image`, `pdf`, `unsupported`, `open_external`, `copy_path`, and `reveal`.
 - **Inline image lightbox** — `inline_image_lightbox_opened` records that a rich-editor inline image was opened from double-click, without sending note paths, image URLs, alt text, or file names.
+- **Code block copy** — `code_block_copied` records that the rich-editor code-block copy action was used, without sending note paths, languages, or code content.
 - **AI agent sessions** — `ai_agent_message_sent`, `ai_agent_message_blocked`, `ai_agent_response_completed`, `ai_agent_response_failed`, and `ai_agent_permission_mode_changed` use only agent ids, permission modes, counts, and coarse status categories.
 - **All Notes visibility** — `all_notes_visibility_changed` records only the toggled category and enabled state.
 

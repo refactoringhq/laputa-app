@@ -470,7 +470,7 @@ async function createNoteImmediate(deps: ImmediateCreateDeps, type?: string): Pr
   const didPersist = await persistImmediateEntry(deps, entry, content)
   if (!didPersist) return false
 
-  cacheNoteContent(entry.path, content)
+  cacheNoteContent(entry.path, content, entry)
   deps.openTabWithContent(entry, content)
   addEntryWithMock(entry, content, deps.addEntry)
   signalFocusEditor({ path: entry.path, selectTitle: true })
@@ -536,18 +536,26 @@ function useImmediateCreateQueue(config: ImmediateCreateQueueConfig): (type?: st
   const queuedImmediateCreatesRef = useRef<ImmediateCreateRequest[]>([])
   const immediateCreateLockedRef = useRef(false)
   const immediateCreateTimerRef = useRef<number | null>(null)
+  const queueMountedRef = useRef(true)
   const { latestDepsRef, syncDeps } = useLatestImmediateCreateDeps(config, pendingSlugsRef)
 
-  const executeRequest = useCallback((request: ImmediateCreateRequest) => {
+  const executeRequest = useCallback(async (request: ImmediateCreateRequest): Promise<void> => {
     const deps = latestDepsRef.current
     if (!deps) return
-    void createNoteImmediate(deps, request.type).then((didCreate) => trackImmediateCreate(request, didCreate))
+
+    try {
+      const didCreate = await createNoteImmediate(deps, request.type)
+      trackImmediateCreate(request, didCreate)
+    } catch (error) {
+      console.warn('Failed to create immediate note:', error)
+    }
   }, [latestDepsRef])
 
   const scheduleQueuedBurst = useCallback(function scheduleQueuedBurst() {
+    if (!queueMountedRef.current) return
     if (immediateCreateTimerRef.current !== null) return
 
-    immediateCreateTimerRef.current = window.setTimeout(() => {
+    immediateCreateTimerRef.current = window.setTimeout(async () => {
       immediateCreateTimerRef.current = null
       const next = queuedImmediateCreatesRef.current.shift()
       if (!next) {
@@ -555,14 +563,18 @@ function useImmediateCreateQueue(config: ImmediateCreateQueueConfig): (type?: st
         return
       }
 
-      executeRequest(next)
+      await executeRequest(next)
       scheduleQueuedBurst()
     }, RAPID_CREATE_NOTE_SETTLE_MS)
   }, [executeRequest])
 
-  useEffect(() => () => {
-    if (immediateCreateTimerRef.current !== null) {
-      window.clearTimeout(immediateCreateTimerRef.current)
+  useEffect(() => {
+    queueMountedRef.current = true
+    return () => {
+      queueMountedRef.current = false
+      if (immediateCreateTimerRef.current !== null) {
+        window.clearTimeout(immediateCreateTimerRef.current)
+      }
     }
   }, [])
 
@@ -575,8 +587,7 @@ function useImmediateCreateQueue(config: ImmediateCreateQueueConfig): (type?: st
     }
 
     immediateCreateLockedRef.current = true
-    executeRequest(request)
-    scheduleQueuedBurst()
+    void executeRequest(request).then(scheduleQueuedBurst)
   }, [syncDeps, executeRequest, scheduleQueuedBurst])
 }
 

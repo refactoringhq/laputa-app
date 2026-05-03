@@ -328,7 +328,7 @@ type NoteItemProps = {
   allEntries?: VaultEntry[]
   displayPropsOverride?: string[] | null
   onClickNote: (entry: VaultEntry, e: ReactMouseEvent) => void
-  onPrefetch?: (path: string) => void
+  onPrefetch?: (entry: VaultEntry) => void
   onContextMenu?: (entry: VaultEntry, e: ReactMouseEvent) => void
 }
 
@@ -409,7 +409,7 @@ function resolveNoteItemSurfaceProps({
     style: resolveNoteItemSurfaceStyle({ isUnavailableBinary, isSelected, isMultiSelected, typeColor, typeLightColor }),
     onClick: createNoteItemClickHandler(entry, isUnavailableBinary, onClickNote),
     onContextMenu: onContextMenu ? (event) => onContextMenu(entry, event) : undefined,
-    onMouseEnter: entry.fileKind !== 'binary' && onPrefetch ? () => onPrefetch(entry.path) : undefined,
+    onMouseEnter: entry.fileKind !== 'binary' && onPrefetch ? () => onPrefetch(entry) : undefined,
     testId: resolveNoteItemTestId({ isMultiSelected, previewKind, isUnavailableBinary }),
     title: resolveNoteItemTitle({ previewKind, isUnavailableBinary }),
   }

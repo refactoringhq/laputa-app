@@ -153,6 +153,7 @@ import {
 import type { VaultEntry } from '../types'
 import { bindVaultConfigStore, resetVaultConfigStore } from '../utils/vaultConfigStore'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { clearParsedNoteBlockCache } from '../hooks/editorParsedBlockCache'
 
 type EditorComponentProps = ComponentProps<typeof Editor>
 
@@ -235,6 +236,7 @@ describe('Editor', () => {
   beforeEach(() => {
     blockNoteCreation.options = []
     blockNoteViewState.onChange = null
+    clearParsedNoteBlockCache()
   })
 
   it('shows empty state when no tabs are open', () => {
@@ -721,6 +723,57 @@ describe('Editor', () => {
     })
 
     resetVaultConfigStore()
+  })
+
+  it('opens raw mode from unchanged rich content without rewriting pasted markdown source', async () => {
+    resetVaultConfigStore()
+    bindVaultConfigStore(
+      {
+        zoom: null,
+        view_mode: null,
+        editor_mode: null,
+        tag_colors: null,
+        status_colors: null,
+        property_display_modes: null,
+        inbox: null,
+      },
+      vi.fn(),
+    )
+
+    const rawToggleRef = { current: (() => {}) as () => void }
+    const sourceContent = '---\ntitle: Pasted\n---\nFirst pasted line\nSecond pasted line\n'
+    const pastedTab = { entry: mockEntry, content: sourceContent }
+    const originalMarkdownSerializer = mockEditor.blocksToMarkdownLossy.getMockImplementation()
+    mockEditor.blocksToMarkdownLossy.mockReturnValue('First pasted line\\\\\n\\\\\nSecond pasted line\n')
+
+    try {
+      render(
+        <Editor
+          {...defaultProps}
+          tabs={[pastedTab]}
+          activeTabPath={mockEntry.path}
+          entries={[mockEntry]}
+          rawToggleRef={rawToggleRef}
+        />,
+      )
+
+      await vi.waitFor(() => {
+        expect(typeof rawToggleRef.current).toBe('function')
+      })
+
+      await act(async () => {
+        await rawToggleRef.current()
+      })
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('raw-editor-codemirror').textContent).toContain('First pasted line')
+      })
+      expect(screen.getByTestId('raw-editor-codemirror').textContent).toContain('Second pasted line')
+      expect(screen.getByTestId('raw-editor-codemirror').textContent).not.toContain('\\\\')
+    } finally {
+      mockEditor.blocksToMarkdownLossy.mockImplementation(originalMarkdownSerializer)
+      resetVaultConfigStore()
+    }
   })
 })
 

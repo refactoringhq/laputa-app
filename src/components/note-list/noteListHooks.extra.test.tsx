@@ -63,7 +63,7 @@ vi.mock('../../hooks/useNoteListKeyboard', () => ({
 }))
 
 vi.mock('../../hooks/useTabManagement', () => ({
-  prefetchNoteContent: (path: string) => prefetchNoteContentMock(path),
+  prefetchNoteContent: (entry: VaultEntry) => prefetchNoteContentMock(entry),
 }))
 
 vi.mock('./noteListUtils', async () => {
@@ -475,8 +475,8 @@ describe('noteListHooks extra', () => {
     expect(onOpenDeletedNote).toHaveBeenCalledWith(deletedEntry)
     expect(onReplaceActiveTab).toHaveBeenCalledWith(liveEntry)
     expect(onAutoTriggerDiff).toHaveBeenCalledOnce()
-    expect(prefetchNoteContentMock).toHaveBeenCalledWith(liveEntry.path)
-    expect(prefetchNoteContentMock).not.toHaveBeenCalledWith(imageEntry.path)
+    expect(prefetchNoteContentMock).toHaveBeenCalledWith(liveEntry)
+    expect(prefetchNoteContentMock).not.toHaveBeenCalledWith(imageEntry)
 
     vi.useRealTimers()
   })

@@ -102,6 +102,30 @@ async function dragTableHandle(
   await page.mouse.up()
 }
 
+async function openTableHandleMenu(
+  page: Page,
+  orientation: 'row' | 'column',
+  source: { rowIndex: number; cellIndex: number },
+): Promise<void> {
+  await tableCell(page, source.rowIndex, source.cellIndex).hover()
+  const handle = await visibleTableHandle(page, orientation)
+  await handle.click({ force: true })
+}
+
+async function clickTableHandleMenuItem(page: Page, name: string): Promise<void> {
+  await page.getByRole('menuitem', { name }).click()
+}
+
+async function addTableRowBelow(page: Page): Promise<void> {
+  await openTableHandleMenu(page, 'row', { rowIndex: 1, cellIndex: 0 })
+  await clickTableHandleMenuItem(page, 'Add row below')
+}
+
+async function addTableColumnRight(page: Page): Promise<void> {
+  await openTableHandleMenu(page, 'column', { rowIndex: 0, cellIndex: 1 })
+  await clickTableHandleMenuItem(page, 'Add column right')
+}
+
 test.describe('table hover crash regression', () => {
   test.beforeEach(({ page }, testInfo) => {
     void page
@@ -166,6 +190,38 @@ test.describe('table hover crash regression', () => {
 
     const editor = page.getByRole('textbox').last()
     await expect(editor).toContainText('stable after table handle drags')
+    await expect(page.locator('table')).toHaveCount(1)
+    expect(errors).toEqual([])
+  })
+
+  test('adding table rows and columns from handle menus keeps selection valid', async ({ page }) => {
+    const errors = trackUnexpectedErrors(page)
+
+    await openFixtureVaultTauri(page, tempVaultDir)
+    await createUntitledNote(page)
+    await seedBlockNoteTable(page, [180, 120, 120])
+
+    await expect(page.locator('table tr')).toHaveCount(3, { timeout: 5_000 })
+    await expect(page.locator('table tr').first().locator('th,td')).toHaveCount(3)
+
+    await addTableRowBelow(page)
+    await expect(page.locator('table tr')).toHaveCount(4)
+
+    await addTableColumnRight(page)
+    await expect(page.locator('table tr').first().locator('th,td')).toHaveCount(4)
+
+    await addTableRowBelow(page)
+    await expect(page.locator('table tr')).toHaveCount(5)
+
+    await addTableColumnRight(page)
+    await expect(page.locator('table tr').first().locator('th,td')).toHaveCount(5)
+
+    const trailingParagraph = page.locator('.bn-editor [data-content-type="paragraph"]').last()
+    await trailingParagraph.click()
+    await page.keyboard.type('stable after table row and column adds')
+
+    const editor = page.getByRole('textbox').last()
+    await expect(editor).toContainText('stable after table row and column adds')
     await expect(page.locator('table')).toHaveCount(1)
     expect(errors).toEqual([])
   })

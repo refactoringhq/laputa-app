@@ -18,16 +18,44 @@ function createTableBlock() {
   }
 }
 
+function createSelectionStateThatRejectsNaNPositions() {
+  const selectionTransaction = {
+    setSelection: vi.fn(),
+  }
+  const resolvedPosition = {
+    posAtIndex: vi.fn((index: number) => index),
+  }
+
+  return {
+    doc: {
+      resolve: vi.fn((position: number) => {
+        if (!Number.isFinite(position)) {
+          throw new Error(`Position ${position} out of range`)
+        }
+
+        return resolvedPosition
+      }),
+    },
+    tr: selectionTransaction,
+    apply: vi.fn(),
+  }
+}
+
 function mountTableHandlesExtension() {
   const editorRoot = document.createElement('div')
   document.body.appendChild(editorRoot)
 
+  const selectionState = createSelectionStateThatRejectsNaNPositions()
+  const dispatch = vi.fn()
   const editor = {
     headless: true,
     isEditable: true,
     prosemirrorView: {
       root: document,
     },
+    exec: vi.fn((command: (state: never, dispatch: never) => unknown) =>
+      command(selectionState as never, dispatch as never),
+    ),
     transact: vi.fn(),
   }
 
@@ -43,7 +71,31 @@ function mountTableHandlesExtension() {
     root: document,
   } as never) as TableHandlesView
 
-  return { editor, extension, view }
+  return { editor, extension, view, selectionState }
+}
+
+function showTableHandles(view: TableHandlesView) {
+  view.state = {
+    block: createTableBlock(),
+    show: true,
+    showAddOrRemoveRowsButton: true,
+    showAddOrRemoveColumnsButton: true,
+    rowIndex: 0,
+    colIndex: 0,
+    draggingState: undefined,
+  } as never
+}
+
+function expectAddRowAndColumnActionsToStaySafe(
+  extension: ReturnType<typeof mountTableHandlesExtension>['extension'],
+  index: number,
+) {
+  expect(() =>
+    extension.addRowOrColumn(index, { orientation: 'row', side: 'below' }),
+  ).not.toThrow()
+  expect(() =>
+    extension.addRowOrColumn(index, { orientation: 'column', side: 'right' }),
+  ).not.toThrow()
 }
 
 describe('BlockNote table handles regression', () => {
@@ -110,6 +162,23 @@ describe('BlockNote table handles regression', () => {
     const { extension, view } = mountTableHandlesExtension()
 
     expect(() => extension.dragEnd()).not.toThrow()
+
+    view.destroy()
+  })
+
+  it('ignores add row or column actions when the selection target is stale', () => {
+    const { editor, extension, view } = mountTableHandlesExtension()
+
+    showTableHandles(view)
+    view.tablePos = undefined
+
+    expectAddRowAndColumnActionsToStaySafe(extension, 0)
+    expect(editor.exec).not.toHaveBeenCalled()
+
+    view.tablePos = 0
+
+    expectAddRowAndColumnActionsToStaySafe(extension, Number.NaN)
+    expect(editor.exec).not.toHaveBeenCalled()
 
     view.destroy()
   })

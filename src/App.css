@@ -26,15 +26,23 @@
   flex: 1;
 }
 
+.app:has(.app__note-list) .app__sidebar > * {
+  border-right-color: transparent;
+}
+
 .app__note-list {
   flex: 0 0 auto;
   min-width: 220px;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 20;
+  background: var(--surface-sidebar);
 }
 
 .app__note-list > * {
   flex: 1;
+  border-left: 1px solid var(--sidebar-border);
 }
 
 .app__editor {

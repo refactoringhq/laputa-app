@@ -62,6 +62,11 @@ function stringArrayFrom(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
 }
 
+function hasUsablePath(rawEntry: unknown): boolean {
+  const source = recordFrom(rawEntry)
+  return typeof source.path === 'string' && source.path.trim().length > 0
+}
+
 function filenameFromPath(path: string): string {
   const normalizedPath = path.replace(/\\/g, '/')
   return normalizedPath.split('/').filter(Boolean).pop() ?? ''
@@ -209,7 +214,9 @@ function normalizeViewFile({ rawView, index }: ViewNormalizationArgs): ViewFile 
 
 export function normalizeVaultEntries(rawEntries: unknown, vaultPath: string): VaultEntry[] {
   if (!Array.isArray(rawEntries)) return []
-  return rawEntries.map((rawEntry, index) => normalizeVaultEntry(rawEntry, vaultPath, index))
+  return rawEntries
+    .filter(hasUsablePath)
+    .map((rawEntry, index) => normalizeVaultEntry(rawEntry, vaultPath, index))
 }
 
 export function normalizeVaultEntry(rawEntry: unknown, vaultPath = '', index = 0): VaultEntry {

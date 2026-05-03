@@ -1,5 +1,5 @@
 import {
-  type Dispatch, type Ref, type RefObject, type SetStateAction,
+  type CSSProperties, type Dispatch, type ReactNode, type Ref, type RefObject, type SetStateAction,
 } from 'react'
 import type {
   VaultEntry, SidebarSelection, ViewDefinition, ViewFile,
@@ -13,9 +13,12 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { SlidersHorizontal } from 'lucide-react'
 import {
-  CaretLeft, Palette, PencilSimple, Plus, Trash,
+  ArrowLeft, ArrowRight, Palette, PencilSimple, Plus, SidebarSimple, Trash,
 } from '@phosphor-icons/react'
+import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../../hooks/appCommandCatalog'
 import { Button } from '@/components/ui/button'
+import { ActionTooltip } from '@/components/ui/action-tooltip'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import {
   type SectionGroup, isSelectionActive, SectionContent, VisibilityPopover,
 } from '../SidebarParts'
@@ -24,11 +27,19 @@ import { useDragRegion } from '../../hooks/useDragRegion'
 import { SidebarGroupHeader } from './SidebarGroupHeader'
 import { SidebarViewItem } from './SidebarViewItem'
 import { computeReorder } from './sidebarHooks'
+import { SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM } from './sidebarStyles'
 import { countByFilter } from '../../utils/noteListHelpers'
 import { translate, type AppLocale } from '../../lib/i18n'
 
 export { SidebarTopNav } from './SidebarTopNav'
 export { FavoritesSection } from './FavoritesSection'
+
+const SIDEBAR_TITLE_BAR_ACTION_CLASSNAME =
+  '!h-auto !w-auto !min-w-0 !rounded-none !p-0 text-muted-foreground hover:!bg-transparent hover:text-foreground [&_svg]:!size-4'
+
+const SIDEBAR_COLLAPSE_SHORTCUT = getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorList)
+const HISTORY_BACK_SHORTCUT = getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewGoBack)
+const HISTORY_FORWARD_SHORTCUT = getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewGoForward)
 
 export interface SidebarSectionProps {
   entries: VaultEntry[]
@@ -112,7 +123,7 @@ export function ViewsSection({
         )}
       </SidebarGroupHeader>
       {!collapsed && (
-        <div style={{ paddingBottom: 4 }}>
+        <div style={{ paddingBottom: SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM }}>
           {onReorderViews ? (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleViewDragEnd}>
               <SortableContext items={viewIds} strategy={verticalListSortingStrategy}>
@@ -303,42 +314,116 @@ export function TypesSection({
         )}
       </div>
       {!collapsed && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
-            {visibleSections.map((group) => (
-              <SortableSection key={group.type} group={group} sectionProps={sectionProps} />
-            ))}
-          </SortableContext>
-        </DndContext>
+        <div style={{ paddingBottom: SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM }}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
+              {visibleSections.map((group) => (
+                <SortableSection key={group.type} group={group} sectionProps={sectionProps} />
+              ))}
+            </SortableContext>
+          </DndContext>
+        </div>
       )}
     </div>
   )
 }
 
-export function SidebarTitleBar({ locale = 'en', onCollapse }: { locale?: AppLocale; onCollapse?: () => void }) {
-  const { onMouseDown } = useDragRegion()
+function titleWithShortcut(label: string, shortcut?: string): string {
+  return shortcut ? `${label} (${shortcut})` : label
+}
+
+function SidebarTitleBarAction({
+  children,
+  disabled = false,
+  label,
+  onClick,
+  shortcut,
+}: {
+  children: ReactNode
+  disabled?: boolean
+  label: string
+  onClick?: () => void
+  shortcut?: string
+}) {
+  const title = titleWithShortcut(label, shortcut)
 
   return (
-    <div
-      className="shrink-0 flex items-center justify-end border-b border-border"
-      style={{ height: 52, padding: '0 8px', paddingLeft: 80, cursor: 'default' }}
-      onMouseDown={onMouseDown}
-    >
-      {onCollapse && (
+    <ActionTooltip copy={{ label, shortcut }} side="bottom" sideOffset={8}>
+      <span className="inline-flex" title={title} data-no-drag>
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
-          className="h-6 w-6 rounded text-muted-foreground hover:text-foreground"
-          onClick={onCollapse}
-          aria-label={translate(locale, 'sidebar.action.collapse')}
-          title={translate(locale, 'sidebar.action.collapse')}
+          className={SIDEBAR_TITLE_BAR_ACTION_CLASSNAME}
+          onClick={(event) => { event.stopPropagation(); onClick?.() }}
+          disabled={disabled}
+          aria-label={label}
+          title={title}
           data-no-drag
         >
-          <CaretLeft size={14} weight="bold" />
+          {children}
         </Button>
-      )}
-    </div>
+      </span>
+    </ActionTooltip>
+  )
+}
+
+export function SidebarTitleBar({
+  locale = 'en',
+  onCollapse,
+  onGoBack,
+  onGoForward,
+  canGoBack = false,
+  canGoForward = false,
+}: {
+  locale?: AppLocale
+  onCollapse?: () => void
+  onGoBack?: () => void
+  onGoForward?: () => void
+  canGoBack?: boolean
+  canGoForward?: boolean
+}) {
+  const { onMouseDown } = useDragRegion()
+  const collapseLabel = translate(locale, 'sidebar.action.collapse')
+  const backLabel = translate(locale, 'command.navigation.goBack')
+  const forwardLabel = translate(locale, 'command.navigation.goForward')
+
+  return (
+    <TooltipProvider>
+      <div
+        className="shrink-0 flex items-center border-b border-border"
+        style={{ height: 52, padding: '0 8px', paddingLeft: 90, cursor: 'default', justifyContent: 'flex-start' }}
+        onMouseDown={onMouseDown}
+      >
+        <div className="flex items-center gap-5" style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}>
+          {onCollapse && (
+            <SidebarTitleBarAction label={collapseLabel} shortcut={SIDEBAR_COLLAPSE_SHORTCUT} onClick={onCollapse}>
+              <SidebarSimple size={16} weight="regular" />
+            </SidebarTitleBarAction>
+          )}
+          {onGoBack && (
+            <SidebarTitleBarAction
+              label={backLabel}
+              shortcut={HISTORY_BACK_SHORTCUT}
+              onClick={onGoBack}
+              disabled={!canGoBack}
+            >
+              <ArrowLeft size={16} weight="regular" />
+            </SidebarTitleBarAction>
+          )}
+          {onGoForward && (
+            <SidebarTitleBarAction
+              label={forwardLabel}
+              shortcut={HISTORY_FORWARD_SHORTCUT}
+              onClick={onGoForward}
+              disabled={!canGoForward}
+            >
+              <ArrowRight size={16} weight="regular" />
+            </SidebarTitleBarAction>
+          )}
+        </div>
+      </div>
+    </TooltipProvider>
   )
 }
 

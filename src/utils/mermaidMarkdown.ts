@@ -1,4 +1,5 @@
 import { serializeMathAwareBlocks } from './mathMarkdown'
+import { isTldrawBlock, tldrawMarkdown } from './tldrawMarkdown'
 
 export const MERMAID_BLOCK_TYPE = 'mermaidBlock'
 
@@ -289,6 +290,9 @@ export function serializeMermaidAwareBlocks(editor: MarkdownSerializer, blocks: 
     if (isMermaidBlock(block)) {
       flushPending()
       chunks.push(mermaidMarkdown(block))
+    } else if (isTldrawBlock(block)) {
+      flushPending()
+      chunks.push(tldrawMarkdown(block))
     } else {
       pending.push(block)
     }

@@ -56,9 +56,9 @@ async function replaceActiveNote(result: HookState, overrides: Partial<VaultEntr
   })
 }
 
-async function prefetchResolvedContent(path: string, content: string) {
+async function prefetchResolvedContent(path: string, content: string, entry?: VaultEntry) {
   mockNoteContent({ [path]: content })
-  prefetchNoteContent(path)
+  prefetchNoteContent(entry ?? path)
   await vi.waitFor(() => expect(vi.mocked(mockInvoke)).toHaveBeenCalledTimes(1))
   return mockInvoke
 }
@@ -258,6 +258,23 @@ describe('useTabManagement (single-note model)', () => {
       warnSpy.mockRestore()
     })
 
+    it('reports an unavailable active vault instead of opening a blank stale tab', async () => {
+      vi.mocked(mockInvoke).mockRejectedValueOnce(new Error('Active vault is not available'))
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const onMissingActiveVault = vi.fn()
+
+      const { result } = renderHook(() => useTabManagement({ onMissingActiveVault }))
+      await selectNote(result, { path: '/vault/note/orphaned.md', title: 'Orphaned Note' })
+
+      expect(result.current.tabs).toEqual([])
+      expect(result.current.activeTabPath).toBeNull()
+      expect(onMissingActiveVault).toHaveBeenCalledWith(
+        expect.objectContaining({ path: '/vault/note/orphaned.md', title: 'Orphaned Note' }),
+        expect.any(Error),
+      )
+      warnSpy.mockRestore()
+    })
+
     it('uses the note-window vault path when Tauri reloads the selected note', async () => {
       vi.mocked(isTauri).mockReturnValue(true)
       vi.mocked(invoke).mockResolvedValue('# Window content')
@@ -354,6 +371,24 @@ describe('useTabManagement (single-note model)', () => {
       await replaceActiveNote(result, { path: '/vault/a.md' })
       expectSingleActiveTab(result, '/vault/a.md')
     })
+
+    it('validates cached content before replacing with a different active note', async () => {
+      cacheNoteContent('/vault/b.md', '# Stale cached B')
+      vi.mocked(mockInvoke).mockImplementation((cmd: string) => {
+        if (cmd === 'validate_note_content') return Promise.resolve(false)
+        return Promise.resolve('# Fresh disk B')
+      })
+
+      const { result } = renderHook(() => useTabManagement())
+      await selectNote(result, { path: '/vault/a.md', title: 'A' })
+      await replaceActiveNote(result, { path: '/vault/b.md', title: 'B' })
+
+      expect(result.current.tabs[0].content).toBe('# Fresh disk B')
+      expect(vi.mocked(mockInvoke)).toHaveBeenCalledWith('validate_note_content', {
+        path: '/vault/b.md',
+        content: '# Stale cached B',
+      })
+    })
   })
 
   describe('openTabWithContent', () => {
@@ -418,6 +453,21 @@ describe('useTabManagement (single-note model)', () => {
         path: '/vault/note/pre.md',
         content: '# Prefetched content',
       })
+    })
+
+    it('uses identity-matched prefetched content without re-reading the file', async () => {
+      const entry = makeEntry({
+        path: '/vault/note/pre.md',
+        modifiedAt: 1700000001,
+        fileSize: 19,
+      })
+      const mockInvoke = await prefetchResolvedContent(entry.path, '# Prefetched content', entry)
+
+      const { result } = renderHook(() => useTabManagement())
+      await selectNote(result, entry)
+
+      expect(result.current.tabs[0].content).toBe('# Prefetched content')
+      expect(vi.mocked(mockInvoke)).toHaveBeenCalledTimes(1)
     })
 
     it('does not paint cached content until freshness validation passes', async () => {
@@ -611,7 +661,7 @@ describe('useTabManagement (single-note model)', () => {
 
       expect(result.current.tabs[0].entry.path).toBe('/vault/a.md')
       expect(result.current.tabs[0].content).toBe('# A content')
-      expect(vi.mocked(mockInvoke)).toHaveBeenCalledTimes(3)
+      expect(vi.mocked(mockInvoke)).toHaveBeenCalledTimes(2)
     })
 
     it('refreshes an already-open clean note when cached content is stale on disk', async () => {
@@ -621,7 +671,12 @@ describe('useTabManagement (single-note model)', () => {
       await selectNote(result, { path: '/vault/a.md', title: 'A' })
 
       mockNoteContent({ '/vault/a.md': '# External edit' })
-      await selectNote(result, { path: '/vault/a.md', title: 'A' })
+      await selectNote(result, {
+        path: '/vault/a.md',
+        title: 'A',
+        modifiedAt: 1700000001,
+        fileSize: 15,
+      })
 
       expect(result.current.tabs[0].entry.path).toBe('/vault/a.md')
       expect(result.current.tabs[0].content).toBe('# External edit')

@@ -34,6 +34,19 @@ export function tauriCall<T>({ command, tauriArgs, mockArgs }: TauriCallOptions)
   return isTauri() ? invoke<T>(command, tauriArgs) : mockInvoke<T>(command, mockArgs ?? tauriArgs)
 }
 
+export async function checkVaultPathAvailability({ vaultPath }: VaultPathOptions): Promise<boolean | null> {
+  if (!hasVaultPath({ vaultPath })) return false
+
+  try {
+    return await tauriCall<boolean>({
+      command: 'check_vault_exists',
+      tauriArgs: { path: vaultPath },
+    })
+  } catch {
+    return null
+  }
+}
+
 function loadVaultEntriesWithCommand({ vaultPath, command }: VaultPathOptions & { command: string }): Promise<VaultEntry[]> {
   return tauriCall<unknown>({ command, tauriArgs: { path: vaultPath } })
     .then((entries) => normalizeVaultEntries(entries, vaultPath))

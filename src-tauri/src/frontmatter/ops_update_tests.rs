@@ -45,8 +45,8 @@ fn test_update_frontmatter_replaces_or_adds_scalar_fields() {
             content: "---\n\"Is A\": Note\n---\n# Test\n",
             key: "Is A",
             value: Some(FrontmatterValue::String("Project".to_string())),
-            expected_present: &["\"Is A\": Project"],
-            expected_absent: &["\"Is A\": Note"],
+            expected_present: &["type: Project"],
+            expected_absent: &["\"Is A\": Note", "\"Is A\": Project"],
         },
         UpdateCase {
             content: "---\nStatus: Draft\n---\n# Test\n",
@@ -164,6 +164,13 @@ fn test_update_frontmatter_handles_missing_or_malformed_frontmatter() {
 fn test_update_frontmatter_canonicalizes_system_metadata_keys() {
     let cases = [
         UpdateCase {
+            content: "---\narchived: false\n---\n# Test\n",
+            key: "_archived",
+            value: Some(FrontmatterValue::Bool(true)),
+            expected_present: &["_archived: true"],
+            expected_absent: &["archived: false"],
+        },
+        UpdateCase {
             content: "---\nicon: rocket\n---\n# Test\n",
             key: "icon",
             value: Some(FrontmatterValue::String("star".to_string())),
@@ -200,6 +207,13 @@ fn test_update_frontmatter_canonicalizes_type_key_case() {
             value: Some(FrontmatterValue::String("Project".to_string())),
             expected_present: &["type: Project"],
             expected_absent: &["Type: Note"],
+        },
+        UpdateCase {
+            content: "---\n\"Is A\": Note\nis_a: Topic\n---\n# Test\n",
+            key: "type",
+            value: Some(FrontmatterValue::String("Project".to_string())),
+            expected_present: &["type: Project"],
+            expected_absent: &["\"Is A\": Note", "is_a: Topic"],
         },
         UpdateCase {
             content: "---\nTYPE: Note\n---\n# Test\n",

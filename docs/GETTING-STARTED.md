@@ -37,13 +37,13 @@ On some Wayland systems, the Linux AppImage may fail to launch with:
 Could not create default EGL display: EGL_BAD_PARAMETER. Aborting...
 ```
 
-Recent Tolaria AppImages automatically disable unstable WebKitGTK AppImage rendering paths and retry startup with the system Wayland client library when they detect this class of AppImage + Wayland environment. If you are running an older build, use this workaround:
+Recent Tolaria AppImages automatically disable unstable WebKitGTK AppImage rendering paths and retry startup with an architecture-matching system Wayland client library when they detect this class of AppImage + Wayland environment. If you are running an older build, use this workaround:
 
 ```bash
-WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LD_PRELOAD=/usr/lib/libwayland-client.so ./Tolaria*.AppImage
+WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LD_PRELOAD=/usr/lib64/libwayland-client.so.0 ./Tolaria*.AppImage
 ```
 
-If your distribution stores the library elsewhere, use that path instead, for example `/usr/lib64/libwayland-client.so.0` or `/usr/lib/x86_64-linux-gnu/libwayland-client.so.0`.
+If your distribution stores the 64-bit library elsewhere, use that path instead, for example `/usr/lib/x86_64-linux-gnu/libwayland-client.so.0`. On 64-bit Fedora, avoid `/usr/lib/libwayland-client.so.0`; that path can point at a 32-bit library and be ignored by the loader with a wrong ELF class warning.
 
 ## Quick Start
 
@@ -449,7 +449,7 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 
 ### Work with external MCP setup
 
-1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs`; registration and manual config generation must verify Node.js first, resolve the packaged `mcp-server/` for macOS, Windows, Linux package roots (`/usr/local/Tolaria`, `/usr/local/lib/tolaria`, `/usr/lib/tolaria`), and AppImage installs, and use an explicit stdio entry with `VAULT_PATH` plus `WS_UI_PORT=9711`
+1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs`; registration and manual config generation must verify Node.js first, resolve the packaged `mcp-server/` for macOS, Windows, Linux package roots (`/usr/local/Tolaria`, `/usr/local/lib/tolaria`, `/usr/lib/tolaria`, `/usr/lib/tolaria/resources`), and AppImage installs, and use an explicit stdio entry with `VAULT_PATH` plus `WS_UI_PORT=9711`
 2. **Setup dialog copy/actions**: Edit `src/components/McpSetupDialog.tsx` and `src/hooks/useMcpStatus.ts`; users should see the Node.js prerequisite, the exact generated manual config, and a copy action before Tolaria writes third-party config files
 3. **Status hook/toasts**: Edit `src/hooks/useMcpStatus.ts` when setup, reconnect, disconnect, or failure messaging changes
 4. **Gemini CLI compatibility**: Keep `~/.gemini/settings.json` in the registration path list and keep optional `GEMINI.md` generation behind `restore_vault_ai_guidance`; app-managed Gemini sessions still require the user to install and sign in to Gemini CLI, but Tolaria supplies transient MCP settings when Gemini is selected as the default AI agent

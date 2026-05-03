@@ -8,6 +8,7 @@ pub(crate) fn build_command(
     request: &AgentStreamRequest,
 ) -> Result<std::process::Command, String> {
     let mut command = crate::hidden_command(binary);
+    crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
     command
         .args(build_args())
         .arg(build_prompt(request))

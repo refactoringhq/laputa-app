@@ -1170,7 +1170,7 @@ describe('Sidebar', () => {
       const favoritesHeader = screen.getByText('FAVORITES').closest('div') as HTMLElement
       const countChip = within(favoritesHeader).getByTestId('sidebar-count-chip')
 
-      expect(favoritesHeader).toHaveStyle({ padding: '8px 8px 8px 16px' })
+      expect(favoritesHeader).toHaveStyle({ padding: '8px 8px 8px 12px' })
       expect(countChip).toHaveStyle({
         background: 'var(--muted)',
         height: '18px',
@@ -1441,7 +1441,7 @@ describe('Sidebar', () => {
       const navItem = viewLabel.closest('[class*="cursor-pointer"]') as HTMLElement
       const countChip = within(navItem).getByTestId('view-count-chip')
 
-      expect(navItem).toHaveStyle({ padding: '6px 8px 6px 16px' })
+      expect(navItem).toHaveStyle({ padding: '6px 8px 6px 12px' })
       expect(countChip).toHaveStyle({
         background: 'var(--muted)',
         height: '20px',
@@ -1460,8 +1460,8 @@ describe('Sidebar', () => {
       const viewItem = screen.getByText('Active Projects').closest('[class*="cursor-pointer"]') as HTMLElement
       const viewCount = within(viewItem).getByTestId('view-count-chip')
 
-      expect(topNavItem).toHaveStyle({ padding: '6px 8px 6px 16px' })
-      expect(viewItem).toHaveStyle({ padding: '6px 8px 6px 16px' })
+      expect(topNavItem).toHaveStyle({ padding: '6px 8px 6px 12px' })
+      expect(viewItem).toHaveStyle({ padding: '6px 8px 6px 12px' })
       expect(topNavCount).toHaveStyle({
         background: 'var(--muted)',
         height: '20px',

@@ -32,8 +32,10 @@ import { useChangesContextMenu } from './NoteListChangesMenu'
 import { addNoteListSearchToggleListener, dispatchNoteListSearchAvailability } from '../../utils/noteListSearchEvents'
 
 type EntitySelection = Extract<SidebarSelection, { kind: 'entity' }>
-const LIKELY_NEXT_PRELOAD_LIMIT = 8
-const ADJACENT_PRELOAD_RADIUS = 2
+const LIKELY_NEXT_PRELOAD_LIMIT = 6
+const ADJACENT_PRELOAD_RADIUS = 3
+const LIKELY_NEXT_PRELOAD_START_DELAY_MS = 350
+const LIKELY_NEXT_PRELOAD_STEP_DELAY_MS = 180
 
 function useViewFlags(selection: SidebarSelection) {
   const isSectionGroup = selection.kind === 'sectionGroup'
@@ -58,7 +60,13 @@ function likelyNextPreloadEntries(entries: VaultEntry[], selectedNotePath: strin
     : Math.min(entries.length, LIKELY_NEXT_PRELOAD_LIMIT)
   return entries
     .slice(start, end)
-    .filter((entry) => !isDeletedNoteEntry(entry) && entry.fileKind !== 'binary')
+    .map((entry, offset) => ({ entry, index: start + offset }))
+    .sort((left, right) => {
+      if (selectedIndex < 0) return 0
+      return Math.abs(left.index - selectedIndex) - Math.abs(right.index - selectedIndex)
+    })
+    .map(({ entry }) => entry)
+    .filter((entry) => entry.path !== selectedNotePath && !isDeletedNoteEntry(entry) && entry.fileKind !== 'binary')
     .slice(0, LIKELY_NEXT_PRELOAD_LIMIT)
 }
 
@@ -67,11 +75,23 @@ function useLikelyNextPreload(entries: VaultEntry[], selectedNotePath: string | 
     const candidates = likelyNextPreloadEntries(entries, selectedNotePath)
     if (candidates.length === 0) return
 
-    const timer = window.setTimeout(() => {
-      for (const entry of candidates) prefetchNoteContent(entry.path)
-    }, 100)
+    let stepTimer: number | null = null
+    let candidateIndex = 0
+    const startTimer = window.setTimeout(() => {
+      const preloadNext = () => {
+        const entry = candidates[candidateIndex]
+        if (!entry) return
+        candidateIndex += 1
+        prefetchNoteContent(entry)
+        stepTimer = window.setTimeout(preloadNext, LIKELY_NEXT_PRELOAD_STEP_DELAY_MS)
+      }
+      preloadNext()
+    }, LIKELY_NEXT_PRELOAD_START_DELAY_MS)
 
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(startTimer)
+      if (stepTimer !== null) window.clearTimeout(stepTimer)
+    }
   }, [entries, selectedNotePath])
 }
 

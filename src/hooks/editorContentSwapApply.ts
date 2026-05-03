@@ -30,7 +30,7 @@ interface ApplyHtmlStateToEditorOptions extends Omit<AppliedEditorContentCommit,
   html: string
 }
 
-export function applyBlocksToEditor(options: ApplyBlocksToEditorOptions) {
+export function applyBlocksToEditor(options: ApplyBlocksToEditorOptions): boolean {
   const {
     editor,
     blocks,
@@ -53,14 +53,17 @@ export function applyBlocksToEditor(options: ApplyBlocksToEditorOptions) {
       editor._tiptapEditor.commands.setContent(html)
     } catch (err2) {
       console.error('Fallback also failed:', err2)
+      suppressChangeRef.current = false
+      return false
     }
-  } finally {
-    commitAppliedEditorContent(options)
   }
+
+  commitAppliedEditorContent(options)
+  return true
 }
 
-export function applyBlankStateToEditor(options: ApplyBlankStateToEditorOptions) {
-  applyBlocksToEditor({ ...options, blocks: blankParagraphBlocks(), scrollTop: 0 })
+export function applyBlankStateToEditor(options: ApplyBlankStateToEditorOptions): boolean {
+  return applyBlocksToEditor({ ...options, blocks: blankParagraphBlocks(), scrollTop: 0 })
 }
 
 export function applyHtmlStateToEditor(options: ApplyHtmlStateToEditorOptions) {

@@ -11,6 +11,7 @@ pub(crate) fn build_command(
     write_mcp_config(agent_dir, &request.vault_path, request.permission_mode)?;
 
     let mut command = crate::hidden_command(binary);
+    crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
     command
         .args(build_args())
         .arg(build_prompt(request))

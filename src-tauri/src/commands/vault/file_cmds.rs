@@ -271,8 +271,12 @@ pub fn list_vault(path: PathBuf) -> Result<Vec<VaultEntry>, String> {
 }
 
 #[tauri::command]
-pub fn list_vault_folders(path: PathBuf) -> Result<Vec<FolderNode>, String> {
-    with_expanded_vault_root(path.as_path(), scan_visible_vault_folders)
+pub async fn list_vault_folders(path: PathBuf) -> Result<Vec<FolderNode>, String> {
+    tokio::task::spawn_blocking(move || {
+        with_expanded_vault_root(path.as_path(), scan_visible_vault_folders)
+    })
+    .await
+    .map_err(|e| format!("Task panicked: {e}"))?
 }
 
 #[cfg(test)]
@@ -348,8 +352,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn folder_and_listing_commands_use_expanded_vault_root() {
+    #[tokio::test]
+    async fn folder_and_listing_commands_use_expanded_vault_root() {
         let dir = TempDir::new().unwrap();
         let root = vault_root(&dir);
         fs::write(dir.path().join("root.md"), "# Root\n").unwrap();
@@ -364,7 +368,7 @@ mod tests {
         assert!(entries.iter().any(|entry| entry.filename == "root.md"));
         assert!(entries.iter().any(|entry| entry.filename == "project.md"));
 
-        let folders = list_vault_folders(root).unwrap();
+        let folders = list_vault_folders(root).await.unwrap();
         assert!(folders.iter().any(|folder| folder.name == "Projects"));
     }
 

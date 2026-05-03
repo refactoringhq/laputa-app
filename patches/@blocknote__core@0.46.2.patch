@@ -1,5 +1,5 @@
 diff --git a/dist/TrailingNode-CxM966vN.js b/dist/TrailingNode-CxM966vN.js
-index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab1729752bc05 100644
+index 3ac6fe16aa9ae605a59916f8343b8440befda89e..52df094addfedadcf5f7cee412fa637ddcd2604b 100644
 --- a/dist/TrailingNode-CxM966vN.js
 +++ b/dist/TrailingNode-CxM966vN.js
 @@ -1183,6 +1183,10 @@ class Ft {
@@ -25,18 +25,18 @@ index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab172
        if (!t || !this.editor.isEditable) {
 -        (r = this.state) != null && r.show && (this.state.show = !1, this.updateState(this.state));
 +        this.hideMenu();
-         return;
-       }
--      if (!((s = this.state) != null && s.show && ((i = this.hoveredBlock) != null && i.hasAttribute("data-id")) && ((a = this.hoveredBlock) == null ? void 0 : a.getAttribute("data-id")) === t.id) && (this.hoveredBlock = t.node, this.editor.isEditable)) {
--        const c = t.node.getBoundingClientRect(), l = t.node.closest("[data-node-type=column]");
++        return;
++      }
 +      if ((s = this.state) != null && s.show && ((i = this.hoveredBlock) != null && i.hasAttribute("data-id")) && ((a = this.hoveredBlock) == null ? void 0 : a.getAttribute("data-id")) === t.id)
 +        return;
 +      this.hoveredBlock = t.node;
 +      const c = this.hoveredBlock.getAttribute("data-id"), l = c ? this.editor.getBlock(c) : void 0;
 +      if (!l) {
 +        this.hideMenu();
-+        return;
-+      }
+         return;
+       }
+-      if (!((s = this.state) != null && s.show && ((i = this.hoveredBlock) != null && i.hasAttribute("data-id")) && ((a = this.hoveredBlock) == null ? void 0 : a.getAttribute("data-id")) === t.id) && (this.hoveredBlock = t.node, this.editor.isEditable)) {
+-        const c = t.node.getBoundingClientRect(), l = t.node.closest("[data-node-type=column]");
 +      if (this.editor.isEditable) {
 +        const u = t.node.getBoundingClientRect(), h = t.node.closest("[data-node-type=column]");
          this.state = {
@@ -65,7 +65,38 @@ index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab172
          }, this.updateState(this.state);
        }
      });
-@@ -1557,6 +1567,12 @@ class Kt {
+@@ -1522,6 +1532,30 @@ function Ut(n) {
+ function M(n) {
+   return Array.prototype.indexOf.call(n.parentElement.childNodes, n);
+ }
++function isValidTablePosition(n) {
++  return Number.isInteger(n) && n >= 0;
++}
++function isValidCellIndex(n) {
++  return Number.isInteger(n) && n >= 0;
++}
++function isValidRelativeCell(n) {
++  return isValidCellIndex(n.row) && isValidCellIndex(n.col);
++}
++function resolveCellPosition(n, e, t) {
++  if (!isValidTablePosition(e) || !isValidRelativeCell(t))
++    return;
++  try {
++    const o = n.doc.resolve(e + 1);
++    if (t.row >= o.node().childCount)
++      return;
++    const r = n.doc.resolve(
++      o.posAtIndex(t.row) + 1
++    );
++    return t.col >= r.node().childCount ? void 0 : n.doc.resolve(r.posAtIndex(t.col));
++  } catch {
++    return;
++  }
++}
+ function _t(n) {
+   let e = n;
+   for (; e && e.nodeName !== "TD" && e.nodeName !== "TH" && !e.classList.contains("tableWrapper"); ) {
+@@ -1557,6 +1591,12 @@ class Kt {
      b(this, "menuFrozen", !1);
      b(this, "mouseState", "up");
      b(this, "prevWasEditable", null);
@@ -78,7 +109,7 @@ index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab172
      b(this, "viewMousedownHandler", () => {
        this.mouseState = "down";
      });
-@@ -1569,11 +1585,11 @@ class Kt {
+@@ -1569,11 +1609,11 @@ class Kt {
          return;
        const t = _t(e.target);
        if ((t == null ? void 0 : t.type) === "cell" && this.mouseState === "down" && !((l = this.state) != null && l.draggingState)) {
@@ -92,7 +123,7 @@ index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab172
          return;
        }
        if (!t.tbodyNode)
-@@ -1671,9 +1687,7 @@ class Kt {
+@@ -1671,9 +1711,7 @@ class Kt {
        if (this.mouseState = "up", this.state === void 0 || this.state.draggingState === void 0)
          return !1;
        if (this.state.rowIndex === void 0 || this.state.colIndex === void 0)
@@ -103,7 +134,7 @@ index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab172
        e.preventDefault();
        const { draggingState: t, colIndex: o, rowIndex: r } = this.state, s = this.state.block.content.columnWidths;
        if (t.draggedCellOrientation === "row") {
-@@ -1738,7 +1752,7 @@ class Kt {
+@@ -1738,7 +1776,7 @@ class Kt {
      if (this.state.block = this.editor.getBlock(this.state.block.id), !this.state.block || this.state.block.type !== "table" || // when collaborating, the table element might be replaced and out of date
      // because yjs replaces the element when for example you change the color via the side menu
      !((r = this.tableElement) != null && r.isConnected)) {
@@ -112,7 +143,7 @@ index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab172
        return;
      }
      const { height: e, width: t } = Ve(
-@@ -1746,10 +1760,10 @@ class Kt {
+@@ -1746,10 +1784,10 @@ class Kt {
      );
      this.state.rowIndex !== void 0 && this.state.colIndex !== void 0 && (this.state.rowIndex >= e && (this.state.rowIndex = e - 1), this.state.colIndex >= t && (this.state.colIndex = t - 1));
      const o = this.tableElement.querySelector("tbody");
@@ -127,7 +158,7 @@ index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab172
      if (this.state.rowIndex !== void 0 && this.state.colIndex !== void 0) {
        const i = o.children[this.state.rowIndex].children[this.state.colIndex];
        i ? this.state.referencePosCell = i.getBoundingClientRect() : (this.state.rowIndex = void 0, this.state.colIndex = void 0);
-@@ -1838,10 +1852,10 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
+@@ -1838,10 +1876,10 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
       * is used as the column drag handle.
       */
      colDragStart(o) {
@@ -142,7 +173,7 @@ index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab172
        e.state.draggingState = {
          draggedCellOrientation: "col",
          originalIndex: e.state.colIndex,
-@@ -1860,10 +1874,10 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
+@@ -1860,10 +1898,10 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
       * is used as the row drag handle.
       */
      rowDragStart(o) {
@@ -157,7 +188,7 @@ index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab172
        e.state.draggingState = {
          draggedCellOrientation: "row",
          originalIndex: e.state.rowIndex,
-@@ -1882,10 +1896,10 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
+@@ -1882,10 +1920,10 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
       * used as the row drag handle, and the one used as the column drag handle.
       */
      dragEnd() {
@@ -172,6 +203,100 @@ index 3ac6fe16aa9ae605a59916f8343b8440befda89e..b8feb30cf1ddac140e17782a1e3ab172
        e.state.draggingState = void 0, e.emitUpdate(), n.transact((o) => o.setMeta(D, null)), !n.headless && Ut(n.prosemirrorView.root);
      },
      /**
+@@ -1918,30 +1956,37 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
+     setCellSelection(o, r, s = r) {
+       if (!e)
+         throw new Error("Table handles view not initialized");
+-      const i = o.doc.resolve(e.tablePos + 1), a = o.doc.resolve(
+-        i.posAtIndex(r.row) + 1
+-      ), c = o.doc.resolve(
+-        // No need for +1, since CellSelection expects the position before the cell
+-        a.posAtIndex(r.col)
+-      ), l = o.doc.resolve(
+-        i.posAtIndex(s.row) + 1
+-      ), u = o.doc.resolve(
+-        // No need for +1, since CellSelection expects the position before the cell
+-        l.posAtIndex(s.col)
+-      ), h = o.tr;
+-      return h.setSelection(
+-        new yt(c, u)
+-      ), o.apply(h);
++      const i = resolveCellPosition(
++        o,
++        e.tablePos,
++        r
++      ), a = resolveCellPosition(
++        o,
++        e.tablePos,
++        s
++      );
++      if (!i || !a)
++        return;
++      const c = o.tr;
++      return c.setSelection(
++        new yt(i, a)
++      ), o.apply(c);
+     },
+     /**
+      * Adds a row or column to the table using prosemirror-table commands
+      */
+     addRowOrColumn(o, r) {
++      if (!e || !isValidTablePosition(e.tablePos) || !isValidCellIndex(o)) {
++        e == null || e.hideHandles({ resetCell: !0 });
++        return;
++      }
+       n.exec((s, i) => {
+         const a = this.setCellSelection(
+           s,
+           r.orientation === "row" ? { row: o, col: 0 } : { row: 0, col: o }
+         );
++        if (!a)
++          return e == null || e.hideHandles({ resetCell: !0 }), !1;
+         return r.orientation === "row" ? r.side === "above" ? pt(a, i) : ft(a, i) : r.side === "left" ? gt(a, i) : wt(a, i);
+       });
+     },
+@@ -1949,17 +1994,23 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
+      * Removes a row or column from the table using prosemirror-table commands
+      */
+     removeRowOrColumn(o, r) {
++      if (!isValidCellIndex(o))
++        return !1;
+       return r === "row" ? n.exec((s, i) => {
+         const a = this.setCellSelection(s, {
+           row: o,
+           col: 0
+         });
++        if (!a)
++          return !1;
+         return ht(a, i);
+       }) : n.exec((s, i) => {
+         const a = this.setCellSelection(s, {
+           row: 0,
+           col: o
+         });
++        if (!a)
++          return !1;
+         return mt(a, i);
+       });
+     },
+@@ -1973,6 +2024,8 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
+           o.relativeStartCell,
+           o.relativeEndCell
+         ) : r;
++        if (!i)
++          return !1;
+         return ut(i, s);
+       });
+     },
+@@ -1983,6 +2036,8 @@ const D = new P("TableHandlesPlugin"), Po = k(({ editor: n }) => {
+     splitCell(o) {
+       return n.exec((r, s) => {
+         const i = o ? this.setCellSelection(r, o) : r;
++        if (!i)
++          return !1;
+         return dt(i, s);
+       });
+     },
 diff --git a/dist/blocknote.js b/dist/blocknote.js
 index 0f97dc48ddedfb9661b81c7469ce504dc974e284..66600e91f871ed86e4942b794d2bce8f96882ae0 100644
 --- a/dist/blocknote.js
@@ -308,7 +433,7 @@ index dbb7fc33a9add7a96488349876bc56ad60111a3f..58c3cf181f25467d85cd8c3788b5b73d
 @@ -134,6 +134,10 @@ export const createCodeBlockSpec = createBlockSpec(
            const handleLanguageChange = (event: Event) => {
              const language = (event.target as HTMLSelectElement).value;
-
+ 
 +            if (!editor.getBlock(block.id)) {
 +              return;
 +            }
@@ -339,7 +464,7 @@ index 769e4a17154db2d88472696638db96e20131dfdb..a6c7f1a76eaa4db7b58774ae71ef47ab
 @@ -194,6 +194,15 @@ export class SideMenuView<
      this.emitUpdate(this.state);
    };
-
+ 
 +  private hideMenu = () => {
 +    if (!this.state?.show) {
 +      return;
@@ -363,9 +488,9 @@ index 769e4a17154db2d88472696638db96e20131dfdb..a6c7f1a76eaa4db7b58774ae71ef47ab
 +      this.hideMenu();
        return;
      }
-
+ 
 @@ -219,11 +225,7 @@ export class SideMenuView<
-
+ 
      // Closes the menu if the mouse cursor is beyond the editor vertically.
      if (!block || !this.editor.isEditable) {
 -      if (this.state?.show) {
@@ -376,10 +501,10 @@ index 769e4a17154db2d88472696638db96e20131dfdb..a6c7f1a76eaa4db7b58774ae71ef47ab
 +      this.hideMenu();
        return;
      }
-
+ 
 @@ -237,6 +239,15 @@ export class SideMenuView<
      }
-
+ 
      this.hoveredBlock = block.node;
 +    const hoveredBlockId = this.hoveredBlock.getAttribute("data-id");
 +    const hoveredEditorBlock = hoveredBlockId
@@ -390,7 +515,7 @@ index 769e4a17154db2d88472696638db96e20131dfdb..a6c7f1a76eaa4db7b58774ae71ef47ab
 +      this.hideMenu();
 +      return;
 +    }
-
+ 
      // Shows or updates elements.
      if (this.editor.isEditable) {
 @@ -258,9 +269,7 @@ export class SideMenuView<
@@ -409,18 +534,18 @@ index 029103600a98bf8ccd3054a5c43ffa2fd9115c06..d1678ed4761baca0b3495dafc8d75152
 --- a/src/extensions/SuggestionMenu/SuggestionMenu.ts
 +++ b/src/extensions/SuggestionMenu/SuggestionMenu.ts
 @@ -32,7 +32,7 @@ class SuggestionMenuView {
-
+ 
      this.emitUpdate = (menuName: string) => {
        if (!this.state) {
 -        throw new Error("Attempting to update uninitialized suggestions menu");
 +        return;
        }
-
+ 
        emitUpdate(menuName, {
 @@ -64,6 +64,15 @@ class SuggestionMenuView {
      }
    };
-
+ 
 +  private hideMenu = (menuName: string) => {
 +    if (!this.state) {
 +      return;
@@ -435,7 +560,7 @@ index 029103600a98bf8ccd3054a5c43ffa2fd9115c06..d1678ed4761baca0b3495dafc8d75152
        suggestionMenuPluginKey.getState(prevState);
 @@ -84,11 +93,7 @@ class SuggestionMenuView {
      this.pluginState = stopped ? prev : next;
-
+ 
      if (stopped || !this.editor.isEditable) {
 -      if (this.state) {
 -        this.state.show = false;
@@ -445,11 +570,11 @@ index 029103600a98bf8ccd3054a5c43ffa2fd9115c06..d1678ed4761baca0b3495dafc8d75152
 +      this.hideMenu(this.pluginState!.triggerCharacter);
        return;
      }
-
+ 
 @@ -96,17 +101,20 @@ class SuggestionMenuView {
        `[data-decoration-id="${this.pluginState!.decorationId}"]`,
      );
-
+ 
 -    if (this.editor.isEditable && decorationNode) {
 -      this.state = {
 -        show: true,
@@ -475,16 +600,63 @@ index 029103600a98bf8ccd3054a5c43ffa2fd9115c06..d1678ed4761baca0b3495dafc8d75152
 +
 +    this.emitUpdate(this.pluginState!.triggerCharacter!);
    }
-
+ 
    destroy() {
 diff --git a/src/extensions/TableHandles/TableHandles.ts b/src/extensions/TableHandles/TableHandles.ts
-index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49c47fd266 100644
+index 30637742d517bcf136ca562a09a1544d7b03a20d..d8df74b7803efacd42e8cf3a9170e7ec37580f88 100644
 --- a/src/extensions/TableHandles/TableHandles.ts
 +++ b/src/extensions/TableHandles/TableHandles.ts
-@@ -187,6 +187,32 @@ export class TableHandlesView implements PluginView {
+@@ -99,6 +99,46 @@ function getChildIndex(node: Element) {
+   return Array.prototype.indexOf.call(node.parentElement!.childNodes, node);
+ }
+ 
++function isValidTablePosition(tablePos: number | undefined): tablePos is number {
++  return Number.isInteger(tablePos) && tablePos >= 0;
++}
++
++function isValidCellIndex(index: number | undefined): index is number {
++  return Number.isInteger(index) && index >= 0;
++}
++
++function isValidRelativeCell(cell: RelativeCellIndices) {
++  return isValidCellIndex(cell.row) && isValidCellIndex(cell.col);
++}
++
++function resolveCellPosition(
++  state: EditorState,
++  tablePos: number | undefined,
++  relativeCell: RelativeCellIndices,
++) {
++  if (!isValidTablePosition(tablePos) || !isValidRelativeCell(relativeCell)) {
++    return undefined;
++  }
++
++  try {
++    const tableResolvedPos = state.doc.resolve(tablePos + 1);
++    if (relativeCell.row >= tableResolvedPos.node().childCount) {
++      return undefined;
++    }
++
++    const rowResolvedPos = state.doc.resolve(
++      tableResolvedPos.posAtIndex(relativeCell.row) + 1,
++    );
++    if (relativeCell.col >= rowResolvedPos.node().childCount) {
++      return undefined;
++    }
++
++    return state.doc.resolve(rowResolvedPos.posAtIndex(relativeCell.col));
++  } catch {
++    return undefined;
++  }
++}
++
+ // Finds the DOM element corresponding to the table cell that the target element
+ // is currently in. If the target element is not in a table cell, returns null.
+ function domCellAround(target: Element) {
+@@ -187,6 +227,32 @@ export class TableHandlesView implements PluginView {
      );
    }
-
+ 
 +  hideHandles = ({
 +    resetCell = false,
 +    resetDragging = false,
@@ -514,10 +686,10 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
    viewMousedownHandler = () => {
      this.mouseState = "down";
    };
-@@ -222,22 +248,12 @@ export class TableHandlesView implements PluginView {
+@@ -222,22 +288,12 @@ export class TableHandlesView implements PluginView {
        // hide draghandles when selecting text as they could be in the way of the user
        this.mouseState = "selecting";
-
+ 
 -      if (this.state?.show) {
 -        this.state.show = false;
 -        this.state.showAddOrRemoveRowsButton = false;
@@ -527,7 +699,7 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
 +      this.hideHandles();
        return;
      }
-
+ 
      if (!target || !this.editor.isEditable) {
 -      if (this.state?.show) {
 -        this.state.show = false;
@@ -538,8 +710,8 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
 +      this.hideHandles();
        return;
      }
-
-@@ -458,9 +474,9 @@ export class TableHandlesView implements PluginView {
+ 
+@@ -458,9 +514,9 @@ export class TableHandlesView implements PluginView {
        this.state.rowIndex === undefined ||
        this.state.colIndex === undefined
      ) {
@@ -550,9 +722,9 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
 +      this.hideHandles({ resetCell: true, resetDragging: true });
 +      return false;
      }
-
+ 
      event.preventDefault();
-@@ -541,11 +557,7 @@ export class TableHandlesView implements PluginView {
+@@ -541,11 +597,7 @@ export class TableHandlesView implements PluginView {
        // because yjs replaces the element when for example you change the color via the side menu
        !this.tableElement?.isConnected
      ) {
@@ -564,10 +736,10 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
 +      this.hideHandles();
        return;
      }
-
-@@ -572,9 +584,8 @@ export class TableHandlesView implements PluginView {
+ 
+@@ -572,9 +624,8 @@ export class TableHandlesView implements PluginView {
      const tableBody = this.tableElement!.querySelector("tbody");
-
+ 
      if (!tableBody) {
 -      throw new Error(
 -        "Table block does not contain a 'tbody' HTML element. This should never happen.",
@@ -575,9 +747,9 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
 +      this.hideHandles({ resetCell: true });
 +      return;
      }
-
+ 
      if (
-@@ -796,11 +807,11 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+@@ -796,11 +847,11 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
        if (
          view === undefined ||
          view.state === undefined ||
@@ -591,9 +763,9 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
 +        view?.hideHandles({ resetCell: true, resetDragging: true });
 +        return;
        }
-
+ 
        view.state.draggingState = {
-@@ -837,26 +848,30 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+@@ -837,26 +888,30 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
        dataTransfer: DataTransfer | null;
        clientY: number;
      }) {
@@ -610,7 +782,7 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
 +        view?.hideHandles({ resetCell: true, resetDragging: true });
 +        return;
        }
-
+ 
 -      view!.state.draggingState = {
 +      view.state.draggingState = {
          draggedCellOrientation: "row",
@@ -620,7 +792,7 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
        };
 -      view!.emitUpdate();
 +      view.emitUpdate();
-
+ 
        editor.transact((tr) =>
          tr.setMeta(tableHandlesPluginKey, {
            draggedCellOrientation:
@@ -634,8 +806,8 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
 +          tablePos: view.tablePos,
          }),
        );
-
-@@ -874,14 +889,15 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+ 
+@@ -874,14 +929,15 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
       * used as the row drag handle, and the one used as the column drag handle.
       */
      dragEnd() {
@@ -649,10 +821,126 @@ index 30637742d517bcf136ca562a09a1544d7b03a20d..f86cd930aa3834c3e26af2a979a39d49
 +        }
 +        return;
        }
-
+ 
 -      view!.state.draggingState = undefined;
 -      view!.emitUpdate();
 +      view.state.draggingState = undefined;
 +      view.emitUpdate();
-
+ 
        editor.transact((tr) => tr.setMeta(tableHandlesPluginKey, null));
+ 
+@@ -938,22 +994,21 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+         throw new Error("Table handles view not initialized");
+       }
+ 
+-      const tableResolvedPos = state.doc.resolve(view.tablePos! + 1);
+-      const startRowResolvedPos = state.doc.resolve(
+-        tableResolvedPos.posAtIndex(relativeStartCell.row) + 1,
+-      );
+-      const startCellResolvedPos = state.doc.resolve(
+-        // No need for +1, since CellSelection expects the position before the cell
+-        startRowResolvedPos.posAtIndex(relativeStartCell.col),
+-      );
+-      const endRowResolvedPos = state.doc.resolve(
+-        tableResolvedPos.posAtIndex(relativeEndCell.row) + 1,
++      const startCellResolvedPos = resolveCellPosition(
++        state,
++        view.tablePos,
++        relativeStartCell,
+       );
+-      const endCellResolvedPos = state.doc.resolve(
+-        // No need for +1, since CellSelection expects the position before the cell
+-        endRowResolvedPos.posAtIndex(relativeEndCell.col),
++      const endCellResolvedPos = resolveCellPosition(
++        state,
++        view.tablePos,
++        relativeEndCell,
+       );
+ 
++      if (!startCellResolvedPos || !endCellResolvedPos) {
++        return undefined;
++      }
++
+       // Begin a new transaction to set the selection
+       const tr = state.tr;
+ 
+@@ -975,6 +1030,15 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+         | { orientation: "row"; side: "above" | "below" }
+         | { orientation: "column"; side: "left" | "right" },
+     ) {
++      if (
++        !view ||
++        !isValidTablePosition(view.tablePos) ||
++        !isValidCellIndex(index)
++      ) {
++        view?.hideHandles({ resetCell: true });
++        return;
++      }
++
+       editor.exec((beforeState, dispatch) => {
+         const state = this.setCellSelection(
+           beforeState,
+@@ -983,6 +1047,11 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+             : { row: 0, col: index },
+         );
+ 
++        if (!state) {
++          view?.hideHandles({ resetCell: true });
++          return false;
++        }
++
+         if (direction.orientation === "row") {
+           if (direction.side === "above") {
+             return addRowBefore(state, dispatch);
+@@ -1006,12 +1075,19 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+       index: RelativeCellIndices["row"] | RelativeCellIndices["col"],
+       direction: "row" | "column",
+     ) {
++      if (!isValidCellIndex(index)) {
++        return false;
++      }
++
+       if (direction === "row") {
+         return editor.exec((beforeState, dispatch) => {
+           const state = this.setCellSelection(beforeState, {
+             row: index,
+             col: 0,
+           });
++          if (!state) {
++            return false;
++          }
+           return deleteRow(state, dispatch);
+         });
+       } else {
+@@ -1020,6 +1096,9 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+             row: 0,
+             col: index,
+           });
++          if (!state) {
++            return false;
++          }
+           return deleteColumn(state, dispatch);
+         });
+       }
+@@ -1041,6 +1120,10 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+             )
+           : beforeState;
+ 
++        if (!state) {
++          return false;
++        }
++
+         return mergeCells(state, dispatch);
+       });
+     },
+@@ -1055,6 +1138,10 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+           ? this.setCellSelection(beforeState, relativeCellToSplit)
+           : beforeState;
+ 
++        if (!state) {
++          return false;
++        }
++
+         return splitCell(state, dispatch);
+       });
+     },

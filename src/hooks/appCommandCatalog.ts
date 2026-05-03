@@ -1,56 +1,11 @@
+import appCommandManifest from '../shared/appCommandManifest.json' with { type: 'json' }
 import type { SidebarFilter } from '../types'
 import { isMac } from '../utils/platform'
 import type { ViewMode } from './useViewMode'
 
-export const APP_COMMAND_IDS = {
-  appSettings: 'app-settings',
-  appCheckForUpdates: 'app-check-for-updates',
-  fileNewNote: 'file-new-note',
-  fileNewType: 'file-new-type',
-  fileQuickOpen: 'file-quick-open',
-  fileSave: 'file-save',
-  editFindInNote: 'edit-find-in-note',
-  editReplaceInNote: 'edit-replace-in-note',
-  editFindInVault: 'edit-find-in-vault',
-  editPastePlainText: 'edit-paste-plain-text',
-  editToggleRawEditor: 'edit-toggle-raw-editor',
-  editToggleDiff: 'edit-toggle-diff',
-  viewEditorOnly: 'view-editor-only',
-  viewEditorList: 'view-editor-list',
-  viewAll: 'view-all',
-  viewToggleProperties: 'view-toggle-properties',
-  viewToggleAiChat: 'view-toggle-ai-chat',
-  viewToggleBacklinks: 'view-toggle-backlinks',
-  viewCommandPalette: 'view-command-palette',
-  viewZoomIn: 'view-zoom-in',
-  viewZoomOut: 'view-zoom-out',
-  viewZoomReset: 'view-zoom-reset',
-  viewGoBack: 'view-go-back',
-  viewGoForward: 'view-go-forward',
-  goAllNotes: 'go-all-notes',
-  goArchived: 'go-archived',
-  goChanges: 'go-changes',
-  goInbox: 'go-inbox',
-  noteToggleOrganized: 'note-toggle-organized',
-  noteToggleFavorite: 'note-toggle-favorite',
-  noteArchive: 'note-archive',
-  noteDelete: 'note-delete',
-  noteOpenInNewWindow: 'note-open-in-new-window',
-  noteRestoreDeleted: 'note-restore-deleted',
-  vaultOpen: 'vault-open',
-  vaultRemove: 'vault-remove',
-  vaultRestoreGettingStarted: 'vault-restore-getting-started',
-  vaultAddRemote: 'vault-add-remote',
-  vaultCommitPush: 'vault-commit-push',
-  vaultPull: 'vault-pull',
-  vaultResolveConflicts: 'vault-resolve-conflicts',
-  vaultViewChanges: 'vault-view-changes',
-  vaultInstallMcp: 'vault-install-mcp',
-  vaultReload: 'vault-reload',
-  vaultRepair: 'vault-repair',
-} as const
+type AppCommandKey = keyof typeof appCommandManifest.commands
+type ShortcutEventLike = Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'key' | 'code'>
 
-export type AppCommandId = (typeof APP_COMMAND_IDS)[keyof typeof APP_COMMAND_IDS]
 export type AppCommandShortcutCombo =
   | 'command-or-ctrl'
   | 'command-or-ctrl-shift'
@@ -58,7 +13,6 @@ export type AppCommandShortcutCombo =
 export type AppCommandDeterministicQaMode =
   | 'renderer-shortcut-event'
   | 'native-menu-command'
-type ShortcutEventLike = Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'key' | 'code'>
 
 export interface AppCommandDeterministicQaDefinition {
   preferredMode: AppCommandDeterministicQaMode
@@ -131,6 +85,19 @@ interface AppCommandShortcutDefinition {
   display: string
 }
 
+interface AppCommandManifestShortcutDefinition extends AppCommandShortcutDefinition {
+  accelerator: string
+  requiresManualNativeAcceleratorQa?: boolean
+}
+
+interface AppCommandManifestDefinition {
+  id: string
+  route: AppCommandRoute
+  menuOwned: boolean
+  shortcut?: AppCommandManifestShortcutDefinition
+  preferredShortcutQaMode?: AppCommandDeterministicQaMode
+}
+
 export interface AppCommandDefinition {
   route: AppCommandRoute
   menuOwned: boolean
@@ -138,241 +105,183 @@ export interface AppCommandDefinition {
   preferredShortcutQaMode?: AppCommandDeterministicQaMode
 }
 
-export const APP_COMMAND_DEFINITIONS: Record<AppCommandId, AppCommandDefinition> = {
-  [APP_COMMAND_IDS.appSettings]: {
-    route: { kind: 'handler', handler: 'onOpenSettings' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: ',', display: '⌘,' },
-  },
-  [APP_COMMAND_IDS.appCheckForUpdates]: {
-    route: { kind: 'handler', handler: 'onCheckForUpdates' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.fileNewNote]: {
-    route: { kind: 'handler', handler: 'onCreateNote' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: 'n', code: 'KeyN', display: '⌘N' },
-  },
-  [APP_COMMAND_IDS.fileNewType]: {
-    route: { kind: 'handler', handler: 'onCreateType' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.fileQuickOpen]: {
-    route: { kind: 'handler', handler: 'onQuickOpen' },
-    menuOwned: true,
-    shortcut: {
-      combo: 'command-or-ctrl',
-      key: 'p',
-      aliases: ['o'],
-      code: 'KeyP',
-      display: '⌘P / ⌘O',
-    },
-  },
-  [APP_COMMAND_IDS.fileSave]: {
-    route: { kind: 'handler', handler: 'onSave' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: 's', code: 'KeyS', display: '⌘S' },
-  },
-  [APP_COMMAND_IDS.editFindInNote]: {
-    route: { kind: 'handler', handler: 'onFindInNote' },
-    menuOwned: true,
-    preferredShortcutQaMode: 'renderer-shortcut-event',
-    shortcut: { combo: 'command-or-ctrl', key: 'f', code: 'KeyF', display: '⌘F' },
-  },
-  [APP_COMMAND_IDS.editReplaceInNote]: {
-    route: { kind: 'handler', handler: 'onReplaceInNote' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.editFindInVault]: {
-    route: { kind: 'handler', handler: 'onSearch' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl-shift', key: 'f', code: 'KeyF', display: '⌘⇧F' },
-  },
-  [APP_COMMAND_IDS.editPastePlainText]: {
-    route: { kind: 'handler', handler: 'onPastePlainText' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl-shift', key: 'v', code: 'KeyV', display: '⌘⇧V' },
-  },
-  [APP_COMMAND_IDS.editToggleRawEditor]: {
-    route: { kind: 'handler', handler: 'onToggleRawEditor' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: '\\', display: '⌘\\' },
-  },
-  [APP_COMMAND_IDS.editToggleDiff]: {
-    route: { kind: 'handler', handler: 'onToggleDiff' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.viewEditorOnly]: {
-    route: { kind: 'view-mode', value: 'editor-only' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: '1', display: '⌘1' },
-  },
-  [APP_COMMAND_IDS.viewEditorList]: {
-    route: { kind: 'view-mode', value: 'editor-list' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: '2', display: '⌘2' },
-  },
-  [APP_COMMAND_IDS.viewAll]: {
-    route: { kind: 'view-mode', value: 'all' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: '3', display: '⌘3' },
-  },
-  [APP_COMMAND_IDS.viewToggleProperties]: {
-    route: { kind: 'handler', handler: 'onToggleInspector' },
-    menuOwned: true,
-    preferredShortcutQaMode: 'renderer-shortcut-event',
-    shortcut: { combo: 'command-or-ctrl-shift', key: 'i', code: 'KeyI', display: '⌘⇧I' },
-  },
-  [APP_COMMAND_IDS.viewToggleAiChat]: {
-    route: { kind: 'handler', handler: 'onToggleAIChat' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl-shift', key: 'l', code: 'KeyL', display: '⌘⇧L' },
-  },
-  [APP_COMMAND_IDS.viewToggleBacklinks]: {
-    route: { kind: 'handler', handler: 'onToggleInspector' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.viewCommandPalette]: {
-    route: { kind: 'handler', handler: 'onCommandPalette' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: 'k', code: 'KeyK', display: '⌘K' },
-  },
-  [APP_COMMAND_IDS.viewZoomIn]: {
-    route: { kind: 'handler', handler: 'onZoomIn' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: '=', aliases: ['+'], display: '⌘=' },
-  },
-  [APP_COMMAND_IDS.viewZoomOut]: {
-    route: { kind: 'handler', handler: 'onZoomOut' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: '-', display: '⌘-' },
-  },
-  [APP_COMMAND_IDS.viewZoomReset]: {
-    route: { kind: 'handler', handler: 'onZoomReset' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: '0', display: '⌘0' },
-  },
-  [APP_COMMAND_IDS.viewGoBack]: {
-    route: { kind: 'handler', handler: 'onGoBack' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: 'ArrowLeft', code: 'ArrowLeft', display: '⌘←' },
-  },
-  [APP_COMMAND_IDS.viewGoForward]: {
-    route: { kind: 'handler', handler: 'onGoForward' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: 'ArrowRight', code: 'ArrowRight', display: '⌘→' },
-  },
-  [APP_COMMAND_IDS.goAllNotes]: {
-    route: { kind: 'filter', value: 'all' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.goArchived]: {
-    route: { kind: 'filter', value: 'archived' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.goChanges]: {
-    route: { kind: 'filter', value: 'changes' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.goInbox]: {
-    route: { kind: 'filter', value: 'inbox' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.noteToggleOrganized]: {
-    route: { kind: 'active-tab-handler', handler: 'onToggleOrganized' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: 'e', code: 'KeyE', display: '⌘E' },
-  },
-  [APP_COMMAND_IDS.noteToggleFavorite]: {
-    route: { kind: 'active-tab-handler', handler: 'onToggleFavorite' },
-    menuOwned: false,
-    shortcut: { combo: 'command-or-ctrl', key: 'd', code: 'KeyD', display: '⌘D' },
-  },
-  [APP_COMMAND_IDS.noteArchive]: {
-    route: { kind: 'active-tab-handler', handler: 'onArchiveNote' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.noteDelete]: {
-    route: { kind: 'active-tab-handler', handler: 'onDeleteNote' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl', key: 'Backspace', aliases: ['Delete'], display: '⌘⌫' },
-  },
-  [APP_COMMAND_IDS.noteOpenInNewWindow]: {
-    route: { kind: 'handler', handler: 'onOpenInNewWindow' },
-    menuOwned: true,
-    shortcut: { combo: 'command-or-ctrl-shift', key: 'o', code: 'KeyO', display: '⌘⇧O' },
-  },
-  [APP_COMMAND_IDS.noteRestoreDeleted]: {
-    route: { kind: 'handler', handler: 'onRestoreDeletedNote' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultOpen]: {
-    route: { kind: 'handler', handler: 'onOpenVault' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultRemove]: {
-    route: { kind: 'handler', handler: 'onRemoveActiveVault' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultRestoreGettingStarted]: {
-    route: { kind: 'handler', handler: 'onRestoreGettingStarted' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultAddRemote]: {
-    route: { kind: 'handler', handler: 'onAddRemote' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultCommitPush]: {
-    route: { kind: 'handler', handler: 'onCommitPush' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultPull]: {
-    route: { kind: 'handler', handler: 'onPull' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultResolveConflicts]: {
-    route: { kind: 'handler', handler: 'onResolveConflicts' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultViewChanges]: {
-    route: { kind: 'handler', handler: 'onViewChanges' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultInstallMcp]: {
-    route: { kind: 'handler', handler: 'onInstallMcp' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultReload]: {
-    route: { kind: 'handler', handler: 'onReloadVault' },
-    menuOwned: true,
-  },
-  [APP_COMMAND_IDS.vaultRepair]: {
-    route: { kind: 'handler', handler: 'onRepairVault' },
-    menuOwned: true,
-  },
+type PlatformLabel = string | {
+  macos?: string
+  windows?: string
+  linux?: string
+  default: string
 }
+
+type AppCommandMenuManifestItem =
+  | { kind: 'separator' }
+  | {
+      kind: 'command'
+      command: AppCommandKey
+      id?: string
+      label: PlatformLabel
+      accelerator?: string | null
+      enabled?: boolean
+    }
+  | {
+      kind: 'menu-event'
+      id: string
+      label: PlatformLabel
+      accelerator?: string | null
+      enabled?: boolean
+    }
+
+interface AppCommandMenuManifestSection {
+  label: string
+  items: AppCommandMenuManifestItem[]
+}
+
+export type AppCommandMenuItem =
+  | { kind: 'separator' }
+  | {
+      kind: 'command'
+      commandId: string
+      menuItemId: string
+      label: string
+      shortcut?: string
+      enabled?: boolean
+    }
+
+type AppCommandMenuStateGroupReference =
+  | { command: AppCommandKey }
+  | { id: string }
+
+type AppCommandMenuStateGroupName = keyof typeof appCommandManifest.menuStateGroups
+
+const APP_COMMAND_MANIFEST_COMMANDS = appCommandManifest.commands as Record<AppCommandKey, AppCommandManifestDefinition>
+const APP_COMMAND_MANIFEST_MENUS = appCommandManifest.menus as AppCommandMenuManifestSection[]
+const APP_COMMAND_MANIFEST_APP_MENU = appCommandManifest.appMenu as AppCommandMenuManifestItem[]
+const APP_COMMAND_MANIFEST_STATE_GROUPS = appCommandManifest.menuStateGroups as Record<
+  AppCommandMenuStateGroupName,
+  AppCommandMenuStateGroupReference[]
+>
+
+export const APP_COMMAND_IDS = Object.fromEntries(
+  Object.entries(APP_COMMAND_MANIFEST_COMMANDS).map(([key, command]) => [key, command.id]),
+) as { readonly [K in AppCommandKey]: string }
+
+export type AppCommandId = (typeof APP_COMMAND_IDS)[AppCommandKey]
 
 const APP_COMMAND_SET = new Set<string>(Object.values(APP_COMMAND_IDS))
 
+function toShortcutDefinition(
+  shortcut: AppCommandManifestShortcutDefinition | undefined,
+): AppCommandShortcutDefinition | undefined {
+  if (!shortcut) return undefined
+
+  return {
+    combo: shortcut.combo,
+    key: shortcut.key,
+    aliases: shortcut.aliases,
+    code: shortcut.code,
+    display: shortcut.display,
+  }
+}
+
+export const APP_COMMAND_DEFINITIONS = Object.fromEntries(
+  Object.values(APP_COMMAND_MANIFEST_COMMANDS).map((command) => [
+    command.id,
+    {
+      route: command.route,
+      menuOwned: command.menuOwned,
+      shortcut: toShortcutDefinition(command.shortcut),
+      preferredShortcutQaMode: command.preferredShortcutQaMode,
+    },
+  ]),
+) as Record<AppCommandId, AppCommandDefinition>
+
+function resolvePlatformLabel(label: PlatformLabel): string {
+  if (typeof label === 'string') return label
+  if (isMac() && label.macos) return label.macos
+  return label.default
+}
+
+function formatAcceleratorDisplay(accelerator: string): string {
+  const commandPrefix = isMac() ? '⌘' : 'Ctrl+'
+  const commandShiftPrefix = isMac() ? '⌘⇧' : 'Ctrl+Shift+'
+
+  return accelerator
+    .replaceAll('CmdOrCtrl+Shift+', commandShiftPrefix)
+    .replaceAll('CmdOrCtrl+', commandPrefix)
+    .replaceAll('Backspace', isMac() ? '⌫' : 'Backspace')
+    .replaceAll('Delete', isMac() ? '⌦' : 'Delete')
+    .replaceAll('Left', isMac() ? '←' : 'Left')
+    .replaceAll('Right', isMac() ? '→' : 'Right')
+    .replaceAll('Enter', isMac() ? '↵' : 'Enter')
+}
+
+function menuShortcutForCommand(
+  item: Extract<AppCommandMenuManifestItem, { kind: 'command' }>,
+  command: AppCommandManifestDefinition,
+): string | undefined {
+  if (typeof item.accelerator === 'string') return formatAcceleratorDisplay(item.accelerator)
+  if (command.shortcut) return formatShortcutDisplay(command.shortcut)
+  return undefined
+}
+
+function toMenuItem(item: AppCommandMenuManifestItem): AppCommandMenuItem {
+  if (item.kind === 'separator') return { kind: 'separator' }
+
+  if (item.kind === 'menu-event') {
+    return {
+      kind: 'command',
+      commandId: item.id,
+      menuItemId: item.id,
+      label: resolvePlatformLabel(item.label),
+      shortcut: typeof item.accelerator === 'string'
+        ? formatAcceleratorDisplay(item.accelerator)
+        : undefined,
+      enabled: item.enabled,
+    }
+  }
+
+  const command = APP_COMMAND_MANIFEST_COMMANDS[item.command]
+  return {
+    kind: 'command',
+    commandId: command.id,
+    menuItemId: item.id ?? command.id,
+    label: resolvePlatformLabel(item.label),
+    shortcut: menuShortcutForCommand(item, command),
+    enabled: item.enabled,
+  }
+}
+
+function menuCommandIds(items: AppCommandMenuItem[]): string[] {
+  return items.flatMap(item => item.kind === 'command' ? [item.commandId] : [])
+}
+
+export const APP_COMMAND_MENU_SECTIONS = APP_COMMAND_MANIFEST_MENUS.map(section => ({
+  label: section.label,
+  items: section.items.map(toMenuItem),
+}))
+
+const APP_COMMAND_APP_MENU_ITEMS = APP_COMMAND_MANIFEST_APP_MENU.map(toMenuItem)
+
+export const APP_COMMAND_MENU_STATE_GROUPS = Object.fromEntries(
+  Object.entries(APP_COMMAND_MANIFEST_STATE_GROUPS).map(([name, references]) => [
+    name,
+    references.map(reference => 'command' in reference
+      ? APP_COMMAND_MANIFEST_COMMANDS[reference.command].id
+      : reference.id),
+  ]),
+) as Record<AppCommandMenuStateGroupName, string[]>
+
 const NATIVE_MENU_COMMAND_SET = new Set<string>(
-  (Object.entries(APP_COMMAND_DEFINITIONS) as Array<[AppCommandId, AppCommandDefinition]>)
-    .filter(([, definition]) => definition.menuOwned)
-    .map(([id]) => id),
+  [
+    ...APP_COMMAND_MENU_SECTIONS.flatMap(section => menuCommandIds(section.items)),
+    ...menuCommandIds(APP_COMMAND_APP_MENU_ITEMS),
+  ].filter(id => APP_COMMAND_SET.has(id)),
 )
 
-const MANUAL_NATIVE_ACCELERATOR_QA_COMMAND_SET = new Set<AppCommandId>([
-  APP_COMMAND_IDS.appSettings,
-  APP_COMMAND_IDS.fileNewNote,
-  APP_COMMAND_IDS.fileQuickOpen,
-  APP_COMMAND_IDS.fileSave,
-  APP_COMMAND_IDS.editFindInNote,
-  APP_COMMAND_IDS.editFindInVault,
-  APP_COMMAND_IDS.editPastePlainText,
-  APP_COMMAND_IDS.viewToggleAiChat,
-  APP_COMMAND_IDS.viewCommandPalette,
-  APP_COMMAND_IDS.noteToggleOrganized,
-  APP_COMMAND_IDS.noteToggleFavorite,
-])
+const MANUAL_NATIVE_ACCELERATOR_QA_COMMAND_SET = new Set<AppCommandId>(
+  Object.values(APP_COMMAND_MANIFEST_COMMANDS)
+    .filter(command => command.shortcut?.requiresManualNativeAcceleratorQa)
+    .map(command => command.id),
+)
 
 const shortcutKeyMaps = {
   'command-or-ctrl': new Map<string, AppCommandId>(),

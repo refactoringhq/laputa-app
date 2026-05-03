@@ -1,5 +1,5 @@
 import type { FrontmatterValue } from '../components/Inspector'
-import { canonicalSystemMetadataKey, normalizePropertyKey } from './systemMetadata'
+import { canonicalFrontmatterKey } from './systemMetadata'
 
 export interface ParsedFrontmatter {
   [key: string]: FrontmatterValue
@@ -31,7 +31,7 @@ function collapseList(items: FrontmatterText[]): FrontmatterValue {
 }
 
 function isBlockScalar(value: FrontmatterText): boolean {
-  return value === '' || value === '|' || value === '>'
+  return value === '|' || value === '>'
 }
 
 function isInlineArrayLiteral(value: FrontmatterText): boolean {
@@ -101,14 +101,8 @@ function parseTopLevelKey(line: FrontmatterLine): FrontmatterKey | null {
   return parseKeyValueLine(line)?.key ?? null
 }
 
-const FRONTMATTER_COLLISION_ALIASES: Record<string, string> = {
-  is_a: 'type',
-  archived: '_archived',
-}
-
 function frontmatterCollisionKey(key: FrontmatterKey): FrontmatterKey {
-  const normalized = normalizePropertyKey(canonicalSystemMetadataKey(key))
-  return FRONTMATTER_COLLISION_ALIASES[normalized] ?? normalized
+  return canonicalFrontmatterKey(key)
 }
 
 function addCollisionCandidate(

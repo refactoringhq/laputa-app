@@ -1,3 +1,4 @@
+use crate::frontmatter::keys::{canonical_known_frontmatter_key, FrontmatterKey};
 use crate::vault::parsing::contains_wikilink;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -182,41 +183,13 @@ fn sanitize_value(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-fn canonical_known_key(key: &str) -> Option<&'static str> {
-    let trimmed = key.trim();
-    if trimmed.eq_ignore_ascii_case("type") {
-        return Some("type");
-    }
-    match trimmed {
-        "title" => Some("title"),
-        "Is A" | "is_a" => Some("type"),
-        "aliases" => Some("aliases"),
-        "_archived" | "Archived" | "archived" => Some("_archived"),
-        "_icon" | "icon" => Some("_icon"),
-        "color" => Some("color"),
-        "_order" | "order" => Some("_order"),
-        "_sidebar_label" | "sidebar_label" | "sidebar label" => Some("_sidebar_label"),
-        "template" => Some("template"),
-        "_sort" | "sort" => Some("_sort"),
-        "view" => Some("view"),
-        "_width" | "width" => Some("_width"),
-        "visible" => Some("visible"),
-        "Status" | "status" => Some("Status"),
-        "_organized" => Some("_organized"),
-        "_favorite" => Some("_favorite"),
-        "_favorite_index" => Some("_favorite_index"),
-        "_list_properties_display" => Some("_list_properties_display"),
-        _ => None,
-    }
-}
-
 fn insert_known_frontmatter_value(
     target: &mut serde_json::Map<String, serde_json::Value>,
     key: &str,
     value: &serde_json::Value,
     overwrite: bool,
 ) {
-    let Some(canonical_key) = canonical_known_key(key) else {
+    let Some(canonical_key) = canonical_known_frontmatter_key(FrontmatterKey::new(key)) else {
         return;
     };
     if overwrite || !target.contains_key(canonical_key) {
@@ -258,47 +231,6 @@ fn parse_frontmatter(data: &HashMap<String, serde_json::Value>, raw_content: &st
     serde_json::from_value(value).unwrap_or_default()
 }
 
-/// Known non-relationship frontmatter keys to skip (case-insensitive comparison).
-/// Only skip keys that can never contain wikilinks.
-/// Note: owner and cadence are NOT skipped — they should appear in generic properties.
-const SKIP_KEYS: &[&str] = &[
-    "title",
-    "is_a",
-    "type",
-    "aliases",
-    "_archived",
-    "archived",
-    "icon",
-    "color",
-    "order",
-    "sidebar_label",
-    "template",
-    "sort",
-    "view",
-    "_width",
-    "width",
-    "visible",
-    "status",
-    "_organized",
-    "_favorite",
-    "_favorite_index",
-    "_list_properties_display",
-];
-
-#[derive(Clone, Copy)]
-struct FrontmatterKey<'a>(&'a str);
-
-impl FrontmatterKey<'_> {
-    fn normalize(self) -> String {
-        self.0.trim().to_ascii_lowercase().replace(' ', "_")
-    }
-
-    fn should_skip(self) -> bool {
-        let normalized = self.normalize();
-        normalized.starts_with('_') || SKIP_KEYS.contains(&normalized.as_str())
-    }
-}
-
 /// Extract all wikilink-containing fields from raw YAML frontmatter.
 pub(crate) fn extract_relationships(
     data: &HashMap<String, serde_json::Value>,
@@ -306,7 +238,7 @@ pub(crate) fn extract_relationships(
     let mut relationships = HashMap::new();
 
     for (key, value) in data {
-        if FrontmatterKey(key).should_skip() {
+        if FrontmatterKey::new(key).is_reserved() {
             continue;
         }
 
@@ -339,7 +271,7 @@ pub(crate) fn extract_properties(
     let mut properties = HashMap::new();
 
     for (key, value) in data {
-        if FrontmatterKey(key).should_skip() {
+        if FrontmatterKey::new(key).is_reserved() {
             continue;
         }
 

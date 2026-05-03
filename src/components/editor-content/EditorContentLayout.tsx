@@ -361,7 +361,10 @@ function EditorCanvas({
   if (!showEditor) return null
 
   return (
-    <EditorFindScope className="editor-scroll-area" style={cssVars as React.CSSProperties}>
+    <EditorFindScope
+      className="editor-scroll-area"
+      style={cssVars as React.CSSProperties}
+    >
       <div className="editor-content-wrapper">
         <SingleEditorView
           editor={editor}

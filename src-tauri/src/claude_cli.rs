@@ -387,6 +387,7 @@ fn build_claude_command(
     cwd: Option<&str>,
 ) -> std::process::Command {
     let mut cmd = crate::hidden_command(bin);
+    crate::cli_agent_runtime::configure_agent_command_environment(&mut cmd, bin);
     cmd.args(args)
         .env_remove("CLAUDECODE") // prevent "nested session" guard
         .stdin(Stdio::null())
@@ -1527,7 +1528,7 @@ mod tests {
         let mut events = vec![];
         let result = run_claude_subprocess(&fake_bin, &[], None, &mut |e| events.push(e));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Failed to spawn"));
+        assert!(result.unwrap_err().contains("Failed to start claude"));
     }
 
     #[cfg(unix)]

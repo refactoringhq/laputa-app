@@ -5,7 +5,7 @@ import type { FrontmatterValue } from '../components/Inspector'
 import { updateMockFrontmatter, deleteMockFrontmatterProperty } from './mockFrontmatterHelpers'
 import { updateMockContent, trackMockChange } from '../mock-tauri'
 import { parseFrontmatter } from '../utils/frontmatter'
-import { canonicalSystemMetadataKey, isSystemMetadataKey } from '../utils/systemMetadata'
+import { canonicalFrontmatterKey, isSystemMetadataKey } from '../utils/systemMetadata'
 import { normalizeNoteWidthMode } from '../utils/noteWidth'
 
 type FrontmatterCommand = 'update_frontmatter' | 'delete_frontmatter_property'
@@ -19,10 +19,10 @@ type ScalarPropertyValue = string | number | boolean | null
 
 const ENTRY_DELETE_MAP: Record<string, Partial<VaultEntry>> = {
   title: { title: '' },
-  type: { isA: null }, is_a: { isA: null }, status: { status: null }, color: { color: null },
+  type: { isA: null }, status: { status: null }, color: { color: null },
   _icon: { icon: null }, _sidebar_label: { sidebarLabel: null },
   aliases: { aliases: [] }, belongs_to: { belongsTo: [] }, related_to: { relatedTo: [] },
-  _archived: { archived: false }, archived: { archived: false },
+  _archived: { archived: false },
   _order: { order: null },
   template: { template: null }, _sort: { sort: null }, view: { view: null },
   _width: { noteWidth: null }, visible: { visible: null },
@@ -104,10 +104,10 @@ function knownFrontmatterUpdates(value: FrontmatterValue | undefined): Record<Fr
   const arr = frontmatterStringList(value)
   return {
     title: { title: str ?? '' },
-    type: { isA: str }, is_a: { isA: str }, status: { status: str }, color: { color: str },
+    type: { isA: str }, status: { status: str }, color: { color: str },
     _icon: { icon: str }, _sidebar_label: { sidebarLabel: str },
     aliases: { aliases: arr }, belongs_to: { belongsTo: arr }, related_to: { relatedTo: arr },
-    _archived: { archived: Boolean(value) }, archived: { archived: Boolean(value) },
+    _archived: { archived: Boolean(value) },
     _order: { order: frontmatterNumber(value) },
     template: { template: str },
     _sort: { sort: str },
@@ -160,7 +160,7 @@ function updateEntryPatch(input: FrontmatterPatchInput): EntryPatchResult {
 export function frontmatterToEntryPatch(
   op: FrontmatterOp, key: FrontmatterKey, value?: FrontmatterValue,
 ): EntryPatchResult {
-  const lookupKey = canonicalSystemMetadataKey(key)
+  const lookupKey = canonicalFrontmatterKey(key)
   const systemMetadataKey = isSystemMetadataKey(key)
   const input = { key, lookupKey, systemMetadataKey, value }
   return op === 'delete' ? deleteEntryPatch(input) : updateEntryPatch(input)

@@ -11,6 +11,23 @@ const mockEditor = {
 }
 
 describe('editorRawModeSync arrow ligatures', () => {
+  it('preserves source markdown when raw mode opens without pending rich-editor edits', () => {
+    const rawLatestContentRef = { current: null as string | null }
+    const sourceContent = '---\ntitle: Pasted\n---\nFirst pasted line\nSecond pasted line\n'
+
+    const result = syncActiveTabIntoRawBuffer({
+      editor: mockEditor as never,
+      activeTabPath: '/vault/pasted.md',
+      activeTabContent: sourceContent,
+      rawLatestContentRef,
+      serializeRichEditorContent: false,
+    })
+
+    expect(result).toBe(sourceContent)
+    expect(rawLatestContentRef.current).toBe(sourceContent)
+    expect(mockEditor.blocksToMarkdownLossy).not.toHaveBeenCalled()
+  })
+
   it('keeps unicode arrows intact when rich-editor content enters raw mode', () => {
     mockEditor.blocksToMarkdownLossy.mockReturnValueOnce('Flow → left ← both ↔\n')
     const rawLatestContentRef = { current: null as string | null }
@@ -20,6 +37,7 @@ describe('editorRawModeSync arrow ligatures', () => {
       activeTabPath: '/vault/flows.md',
       activeTabContent: '---\ntitle: Flows\n---\n\nFlow -> left <- both <->\n',
       rawLatestContentRef,
+      serializeRichEditorContent: true,
     })
 
     expect(result).toBe('---\ntitle: Flows\n---\nFlow → left ← both ↔\n')

@@ -197,6 +197,18 @@ describe('AiPanel', () => {
     expect(screen.getByTestId('ai-panel')).toBeTruthy()
   })
 
+  it('caps long AI agent drafts inside a scrollable composer while keeping send visible', () => {
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+
+    const editor = screen.getByTestId('agent-input')
+    editor.textContent = Array.from({ length: 40 }, (_, index) => `Line ${index + 1}`).join('\n')
+    fireEvent.input(editor)
+
+    expect(editor).toHaveClass('max-h-[160px]', 'overflow-y-auto', 'overscroll-contain')
+    expect(editor).toHaveStyle({ maxHeight: '160px', overflowY: 'auto' })
+    expect(screen.getByTestId('agent-send')).toBeVisible()
+  })
+
   it('calls onClose when close button is clicked', () => {
     const onClose = vi.fn()
     render(<AiPanel onClose={onClose} vaultPath="/tmp/vault" />)

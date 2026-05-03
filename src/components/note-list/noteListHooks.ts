@@ -1046,7 +1046,7 @@ function useKeyboardInteractionState({
   }, [onOpenDeletedNote, onReplaceActiveTab])
 
   const handleKeyboardPrefetch = useCallback((entry: VaultEntry) => {
-    if (canPrefetchEntryContent(entry)) prefetchNoteContent(entry.path)
+    if (canPrefetchEntryContent(entry)) prefetchNoteContent(entry)
   }, [])
 
   const handleNeighborhoodOpen = useCallback(async (entry: VaultEntry) => {

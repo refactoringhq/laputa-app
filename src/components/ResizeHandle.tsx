@@ -67,7 +67,7 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
 
   return (
     <div
-      className="relative z-10 -ml-1 w-1 shrink-0 self-stretch cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)]"
+      className="relative z-30 -ml-1 w-1 shrink-0 self-stretch cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)]"
       onMouseDown={handleMouseDown}
     />
   )

@@ -81,4 +81,14 @@ mod tests {
 
         assert!(list_views(vault_path).unwrap().is_empty());
     }
+
+    #[test]
+    fn delete_view_command_treats_missing_backing_file_as_deleted() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let vault_path = dir.path().to_string_lossy().to_string();
+
+        delete_view_cmd(vault_path.clone(), "stale-view.yml".to_string()).unwrap();
+
+        assert!(list_views(vault_path).unwrap().is_empty());
+    }
 }

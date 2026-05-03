@@ -108,6 +108,7 @@ import {
   buildVaultAiGuidanceRefreshKey,
 } from './lib/vaultAiGuidance'
 import { extractDeletedContentFromDiff } from './components/note-list/noteListUtils'
+import { isActiveVaultUnavailableError } from './utils/vaultErrors'
 import { hasNoteIconValue } from './utils/noteIcon'
 import { filenameStemToTitle } from './utils/noteTitle'
 import {
@@ -375,6 +376,7 @@ function App() {
   }, [resolvedPath, setToastMessage])
 
   const vault = useVaultLoader(noteWindowParams ? '' : resolvedPath)
+  const runtimeMissingVaultPath = !noteWindowParams ? vault.unavailableVaultPath : null
   const {
     markInternalWrite: markRecentVaultWrite,
     filterExternalPaths: filterExternalVaultPaths,
@@ -578,6 +580,9 @@ function App() {
     markRecentVaultWrite(path)
     vault.loadModifiedFiles()
   }, [markRecentVaultWrite, vault])
+  const handleMissingActiveVault = useCallback(() => {
+    if (!noteWindowParams && resolvedPath) vault.markVaultUnavailable(resolvedPath)
+  }, [noteWindowParams, resolvedPath, vault])
 
   const notes = useNoteActions({
     addEntry: vault.addEntry,
@@ -596,6 +601,7 @@ function App() {
     unsavedPaths: vault.unsavedPaths,
     markContentPending: (path, content) => appSave.contentChangeRef.current(path, content),
     onNewNotePersisted: handleCreatedVaultEntryPersisted,
+    onMissingActiveVault: handleMissingActiveVault,
     onTypeStateChanged: async () => { await vault.reloadVault() },
     replaceEntry: vault.replaceEntry,
     onFrontmatterPersisted: vault.loadModifiedFiles,
@@ -1169,7 +1175,15 @@ function App() {
 
   const handleDeleteView = useCallback(async (filename: string) => {
     const target = isTauri() ? invoke : mockInvoke
-    await target('delete_view_cmd', { vaultPath: resolvedPath, filename })
+    try {
+      await target('delete_view_cmd', { vaultPath: resolvedPath, filename })
+    } catch (err) {
+      if (isActiveVaultUnavailableError(err)) {
+        vault.markVaultUnavailable(resolvedPath)
+        return
+      }
+      throw err
+    }
     await vault.reloadViews()
     await vault.reloadVault()
     vault.reloadFolders()
@@ -1229,6 +1243,10 @@ function App() {
     setViewMode(mode)
     updateMainWindowConstraints(mode === 'all', mode !== 'editor-only')
   }, [setViewMode, updateMainWindowConstraints])
+
+  const handleCollapseSidebar = useCallback(() => {
+    handleSetViewMode('editor-list')
+  }, [handleSetViewMode])
 
   const handleToggleInspector = useCallback(() => {
     const nextInspectorCollapsed = !layout.inspectorCollapsed
@@ -1632,8 +1650,17 @@ function App() {
   }
 
   // Show welcome/onboarding screen when vault doesn't exist (skip for note windows — vault path is known)
-  if (!noteWindowParams && (onboarding.state.status === 'welcome' || onboarding.state.status === 'vault-missing' || shouldResumeFreshStartOnboarding)) {
-    const welcomeOnboarding = shouldResumeFreshStartOnboarding
+  if (!noteWindowParams && (runtimeMissingVaultPath || onboarding.state.status === 'welcome' || onboarding.state.status === 'vault-missing' || shouldResumeFreshStartOnboarding)) {
+    const welcomeOnboarding = runtimeMissingVaultPath
+      ? {
+          ...onboarding,
+          state: {
+            status: 'vault-missing' as const,
+            vaultPath: runtimeMissingVaultPath,
+            defaultPath: vaultSwitcher.defaultPath || runtimeMissingVaultPath,
+          },
+        }
+      : shouldResumeFreshStartOnboarding
       ? { ...onboarding, state: { status: 'welcome' as const, defaultPath: vaultSwitcher.vaultPath } }
       : onboarding
     return <WelcomeView onboarding={welcomeOnboarding} isOffline={networkStatus.isOffline} />
@@ -1664,7 +1691,7 @@ function App() {
           {sidebarVisible && (
             <>
               <div className="app__sidebar" style={{ width: layout.sidebarWidth }}>
-                <Sidebar entries={vault.entries} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={viewOrdering.onReorderViews} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} />
+                <Sidebar entries={vault.entries} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={viewOrdering.onReorderViews} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} onCollapse={handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} />
               </div>
               <ResizeHandle onResize={layout.handleSidebarResize} />
             </>

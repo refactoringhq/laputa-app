@@ -17,6 +17,7 @@ import { useDragRegion } from '../hooks/useDragRegion'
 import { formatShortcutDisplay } from '../hooks/appCommandCatalog'
 import { EditorRightPanel } from './EditorRightPanel'
 import { EditorContent } from './EditorContent'
+import { EditorMemoryProbe } from './EditorMemoryProbe'
 import { FilePreview } from './FilePreview'
 import { schema } from './editorSchema'
 import type { RawEditorFindRequest } from './RawEditorFindBar'
@@ -188,6 +189,7 @@ function useEditorSetup({
   rawToggleRef, diffToggleRef,
 }: EditorSetupParams) {
   const vaultPathRef = useRef(vaultPath)
+  const flushPendingEditorChangeRef = useRef<(() => boolean) | null>(null)
   useEffect(() => { vaultPathRef.current = vaultPath }, [vaultPath])
 
   const editor = useCreateBlockNote({
@@ -212,6 +214,7 @@ function useEditorSetup({
     activeTab?.content ?? null,
     onContentChange,
     vaultPath,
+    flushPendingEditorChangeRef,
   )
   const tabsForEditorSwap = applyPendingRawExitContent(tabs, pendingRawExitContent)
   const rawModeContent = resolveRawModeContent({ activeTab, rawModeContentOverride })
@@ -227,6 +230,14 @@ function useEditorSetup({
   const { handleEditorChange, flushPendingEditorChange, editorMountedRef } = useEditorTabSwap({
     tabs: tabsForEditorSwap, activeTabPath, editor, onContentChange, rawMode, vaultPath,
   })
+  useEffect(() => {
+    flushPendingEditorChangeRef.current = flushPendingEditorChange
+    return () => {
+      if (flushPendingEditorChangeRef.current === flushPendingEditorChange) {
+        flushPendingEditorChangeRef.current = null
+      }
+    }
+  }, [flushPendingEditorChange])
   useEditorFocus(editor, editorMountedRef)
 
   const { diffMode, diffContent, diffLoading, handleToggleDiff, handleViewCommitDiff } = useDiffMode({
@@ -514,6 +525,7 @@ function EditorLayout({
           locale={locale}
         />
       </div>
+      <EditorMemoryProbe entries={entries} vaultPath={vaultPath} locale={locale} />
     </div>
   )
 }
@@ -539,7 +551,6 @@ export const Editor = memo(function Editor(props: EditorProps) {
     isConflicted, onKeepMine, onKeepTheirs,
     flushPendingEditorContentRef, flushPendingRawContentRef, findInNoteRef, locale,
   } = props
-
   const {
     editor, activeTab, rawLatestContentRef, rawModeContent,
     rawMode, diffMode, diffContent, diffLoading,
@@ -561,7 +572,6 @@ export const Editor = memo(function Editor(props: EditorProps) {
     handleToggleRawExclusive,
     rawMode,
   })
-
   useRegisterEditorContentFlushes({
     activeTab,
     flushPendingEditorChange,
@@ -571,7 +581,6 @@ export const Editor = memo(function Editor(props: EditorProps) {
     onContentChange,
     flushPendingRawContentRef,
   })
-
   return (
     <EditorLayout
       tabs={tabs}

@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react'
 import { extractEditorBody, getH1TextFromBlocks, replaceTitleInFrontmatter, RICH_EDITOR_CHANGE_DEBOUNCE_MS, useEditorTabSwap } from './useEditorTabSwap'
 import { normalizeParsedImageBlocks } from './editorTabContent'
 import { cacheNoteContent, clearPrefetchCache } from './useTabManagement'
+import { cacheParsedNoteBlocks, clearParsedNoteBlockCache } from './editorParsedBlockCache'
 
 describe('extractEditorBody', () => {
   it('strips frontmatter and preserves H1 heading for new note content', () => {
@@ -199,6 +200,10 @@ describe('normalizeParsedImageBlocks', () => {
 
 const blocksA = [{ type: 'paragraph', content: [{ type: 'text', text: 'A' }] }]
 
+function makeTextParagraphBlock(text: string) {
+  return { type: 'paragraph', content: [{ type: 'text', text, styles: {} }], children: [] }
+}
+
 function makeTab(path: string, title: string) {
   return {
     entry: { path, title, filename: `${title}.md`, type: 'Note', status: 'Active', aliases: [], isA: '' } as never,
@@ -271,6 +276,14 @@ async function flushEditorTick() {
   await act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)))
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
+
 function installEditorDomSpies(scrollTop = 0) {
   const scrollEl = { scrollTop }
   const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
@@ -297,6 +310,7 @@ type SwapHarnessProps = {
   tabs: ReturnType<typeof makeTab>[]
   activeTabPath: string | null
   rawMode?: boolean
+  vaultPath?: string
 }
 
 async function createSwapHarness(options: {
@@ -335,7 +349,10 @@ async function createSwapHarness(options: {
 }
 
 describe('useEditorTabSwap raw mode sync', () => {
-  afterEach(() => { vi.restoreAllMocks() })
+  afterEach(() => {
+    clearParsedNoteBlockCache()
+    vi.restoreAllMocks()
+  })
 
   it('swaps in the new note when the path updates before tabs catch up', async () => {
     const tabA = makeTab('a.md', 'Note A')
@@ -474,7 +491,34 @@ describe('useEditorTabSwap raw mode sync', () => {
     expect(mockEditor.replaceBlocks).toHaveBeenCalled()
   })
 
-  it('prepares prefetched note blocks before the note is opened', async () => {
+  it('uses parsed block cache for a note that was warmed before opening', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = makeTab('b.md', 'Note B')
+    const warmedBlocks = [makeTextParagraphBlock('Warmed body')]
+    cacheParsedNoteBlocks({
+      path: tabB.entry.path,
+      sourceContent: tabB.content,
+      blocks: warmedBlocks,
+      scrollTop: 0,
+    })
+
+    const { mockEditor, rerenderWith } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+    })
+    mockEditor.tryParseMarkdownToBlocks.mockClear()
+    mockEditor.replaceBlocks.mockClear()
+
+    await rerenderWith({ tabs: [tabB], activeTabPath: 'b.md' })
+
+    expect(mockEditor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
+    expect(mockEditor.replaceBlocks.mock.calls[0][1]).toEqual([
+      expect.objectContaining({
+        content: [{ type: 'text', text: 'Warmed body', styles: {} }],
+      }),
+    ])
+  })
+
+  it('does not preparse prefetched note blocks in the background', async () => {
     clearPrefetchCache()
     const tabA = makeTab('a.md', 'Note A')
     const tabB = {
@@ -488,16 +532,15 @@ describe('useEditorTabSwap raw mode sync', () => {
     mockEditor.tryParseMarkdownToBlocks.mockClear()
 
     cacheNoteContent('b.md', tabB.content)
-    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 100)))
+    await flushEditorTick()
+
+    expect(mockEditor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
+
+    await rerenderWith({ tabs: [tabB], activeTabPath: 'b.md' })
 
     expect(mockEditor.tryParseMarkdownToBlocks).toHaveBeenCalledWith(
       expect.stringContaining('Prepared body.'),
     )
-
-    mockEditor.tryParseMarkdownToBlocks.mockClear()
-    await rerenderWith({ tabs: [tabB], activeTabPath: 'b.md' })
-
-    expect(mockEditor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
     clearPrefetchCache()
   })
 
@@ -553,6 +596,49 @@ describe('useEditorTabSwap raw mode sync', () => {
 
     expect(mockEditor._tiptapEditor.commands.setTextSelection).toHaveBeenCalledWith(1)
     expect(mockEditor.replaceBlocks).toHaveBeenCalled()
+  })
+
+  it('ignores stale same-path parse results when tab content refreshes', async () => {
+    const staleParse = createDeferred<unknown[]>()
+    const freshParse = createDeferred<unknown[]>()
+    const tabA = makeTab('a.md', 'Note A')
+    const refreshedTabA = {
+      ...tabA,
+      content: '---\ntitle: Note A\n---\n\n# Note A\n\nFresh filesystem content.',
+    }
+    const staleBlocks = [makeTextParagraphBlock('Stale content')]
+    const freshBlocks = [makeTextParagraphBlock('Fresh filesystem content')]
+
+    const { mockEditor, rerenderWith } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+      setupEditor: (editor) => {
+        editor.tryParseMarkdownToBlocks
+          .mockReturnValueOnce(staleParse.promise)
+          .mockReturnValueOnce(freshParse.promise)
+      },
+    })
+
+    await rerenderWith({ tabs: [refreshedTabA], activeTabPath: 'a.md' })
+    mockEditor.replaceBlocks.mockClear()
+
+    await act(async () => {
+      staleParse.resolve(staleBlocks)
+      await Promise.resolve()
+    })
+
+    expect(mockEditor.replaceBlocks).not.toHaveBeenCalled()
+
+    await act(async () => {
+      freshParse.resolve(freshBlocks)
+      await Promise.resolve()
+    })
+
+    expect(mockEditor.replaceBlocks).toHaveBeenCalledTimes(1)
+    expect(mockEditor.replaceBlocks.mock.calls[0][1]).toEqual([
+      expect.objectContaining({
+        content: [{ type: 'text', text: 'Fresh filesystem content', styles: {} }],
+      }),
+    ])
   })
 
   it('re-parses when the active tab content changes without a path change', async () => {
@@ -774,6 +860,34 @@ describe('useEditorTabSwap raw mode sync', () => {
     expect(onContentChange).not.toHaveBeenCalled()
 
     flushQueuedFrames(frameCallbacks)
+  })
+
+  it('saves BlockNote image asset URLs as vault-relative attachment links', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const onContentChange = vi.fn()
+    const { docRef, mockEditor, result } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false, vaultPath: '/vault' },
+      onContentChange,
+    })
+
+    docRef.current = [{
+      type: 'image',
+      props: { url: 'asset://localhost/%2Fvault%2Fattachments%2Fshot.png' },
+      children: [],
+    }]
+    mockEditor.blocksToMarkdownLossy.mockReturnValue(
+      '![shot](asset://localhost/%2Fvault%2Fattachments%2Fshot.png)\n',
+    )
+
+    act(() => {
+      result.current.handleEditorChange()
+      result.current.flushPendingEditorChange()
+    })
+
+    expect(onContentChange).toHaveBeenCalledWith(
+      'a.md',
+      '---\ntitle: Note A\n---\n![shot](attachments/shot.png)\n',
+    )
   })
 
   it('serializes rich inline math nodes back to Markdown on editor changes', async () => {

@@ -264,6 +264,7 @@
   "editor.toolbar.delete": "Xóa ghi chú này",
   "editor.toolbar.revealFile": "Hiển thị trong Finder",
   "editor.toolbar.copyFilePath": "Sao chép đường dẫn tệp",
+  "editor.toolbar.moreActions": "Thêm hành động ghi chú",
   "editor.toolbar.openProperties": "Mở bảng thuộc tính",
   "editor.filename.rename": "Đổi tên tệp",
   "editor.filename.renameToTitle": "Đổi tên tệp cho khớp với tiêu đề",

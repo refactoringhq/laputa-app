@@ -220,7 +220,11 @@ describe('useNoteActions hook', () => {
       await flushAsyncWork()
     })
     await act(async () => {
-      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS * 2)
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
+      await flushAsyncWork()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
       await flushAsyncWork()
     })
 
@@ -471,7 +475,11 @@ describe('useNoteActions hook', () => {
         await flushAsyncWork()
       })
       await act(async () => {
-        vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS * 2)
+        vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
+        await flushAsyncWork()
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
         await flushAsyncWork()
       })
 
@@ -499,7 +507,7 @@ describe('useNoteActions hook', () => {
   })
 
   describe('note open is read-only', () => {
-    it('does not sync title or reload entry when opening or freshness-validating a note', async () => {
+    it('does not sync title or reload entry when reopening an identity-matched cached note', async () => {
       vi.mocked(isTauri).mockReturnValue(true)
       const entry = makeEntry({ path: '/test/vault/qa-test.md', filename: 'qa-test.md', title: 'Qa Test' })
       vi.mocked(invoke).mockImplementation(async (command) => {
@@ -516,10 +524,9 @@ describe('useNoteActions hook', () => {
       const desyncedEntry = { ...entry, title: 'Wrong Title Desynced' }
       await act(async () => { await result.current.handleSelectNote(desyncedEntry) })
 
-      expect(vi.mocked(invoke)).toHaveBeenCalledTimes(callCountAfterFirstOpen + 1)
+      expect(vi.mocked(invoke)).toHaveBeenCalledTimes(callCountAfterFirstOpen)
       expect(vi.mocked(invoke).mock.calls).toEqual([
         ['get_note_content', { path: '/test/vault/qa-test.md' }],
-        ['validate_note_content', { path: '/test/vault/qa-test.md', content: '# Qa Test\n' }],
       ])
       expect(result.current.tabs[0].entry.title).toBe('Qa Test')
     })

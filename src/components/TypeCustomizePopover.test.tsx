@@ -110,7 +110,7 @@ describe('TypeCustomizePopover', () => {
   it('calls onChangeColor when a color is clicked', () => {
     renderPopover()
 
-    const colorButtons = screen.getAllByTitle(/red|blue|green|purple|yellow|orange|teal|pink/i)
+    const colorButtons = screen.getAllByTitle(/red|blue|green|purple|yellow|orange|pink/i)
     fireEvent.click(colorButtons[0])
 
     expect(onChangeColor).toHaveBeenCalled()
@@ -123,6 +123,31 @@ describe('TypeCustomizePopover', () => {
     expect(onChangeIcon).toHaveBeenCalledWith('wrench')
   })
 
+  it('renders picker icons slightly larger than the sidebar icon size', () => {
+    renderPopover()
+
+    const icon = screen.getByTitle('wrench').querySelector('svg')
+    expect(icon).toHaveAttribute('width', '18')
+    expect(icon).toHaveAttribute('height', '18')
+    expect(icon).toHaveClass('size-[18px]')
+  })
+
+  it('orders color swatches by hue before neutral gray', () => {
+    renderPopover()
+
+    const colorRow = screen.getByTitle('Red').parentElement
+    expect(Array.from(colorRow?.children ?? []).map((element) => element.getAttribute('title'))).toEqual([
+      'Red',
+      'Orange',
+      'Yellow',
+      'Green',
+      'Blue',
+      'Purple',
+      'Pink',
+      'Gray',
+    ])
+  })
+
   it('calls onClose when Done is clicked', () => {
     renderPopover()
 
@@ -130,10 +155,10 @@ describe('TypeCustomizePopover', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('renders all color options including teal and pink', () => {
+  it('renders curated color options without the teal near-duplicate', () => {
     renderPopover()
 
-    expect(screen.getByTitle('Teal')).toBeInTheDocument()
+    expect(screen.queryByTitle('Teal')).not.toBeInTheDocument()
     expect(screen.getByTitle('Pink')).toBeInTheDocument()
   })
 

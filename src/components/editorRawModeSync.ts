@@ -78,12 +78,22 @@ export function syncActiveTabIntoRawBuffer(options: {
   activeTabPath: string | null
   activeTabContent: string | null
   rawLatestContentRef: React.MutableRefObject<string | null>
+  serializeRichEditorContent?: boolean
   vaultPath?: string
 }) {
-  const { editor, activeTabPath, activeTabContent, rawLatestContentRef, vaultPath } = options
+  const {
+    editor,
+    activeTabPath,
+    activeTabContent,
+    rawLatestContentRef,
+    serializeRichEditorContent = true,
+    vaultPath,
+  } = options
   if (!activeTabPath || activeTabContent === null) return null
 
-  const syncedContent = serializeEditorDocumentToMarkdown(editor, activeTabContent, vaultPath)
+  const syncedContent = serializeRichEditorContent
+    ? serializeEditorDocumentToMarkdown(editor, activeTabContent, vaultPath)
+    : activeTabContent
   rawLatestContentRef.current = syncedContent
   return syncedContent
 }
