@@ -2,10 +2,13 @@ import { Children, isValidElement, type ReactElement } from 'react'
 import { describe, expect, it } from 'vitest'
 import { getFormattingToolbarItems } from '@blocknote/react'
 import {
+  addItemsToMediaGroup,
   filterTolariaFormattingToolbarItems,
   filterTolariaSlashMenuItems,
   getTolariaBlockTypeSelectItems,
+  MERMAID_SLASH_COMMAND_DIAGRAM,
 } from './tolariaEditorFormattingConfig'
+import { mermaidFenceSource } from '../utils/mermaidMarkdown'
 
 describe('tolariaEditorFormatting', () => {
   it('keeps the markdown-safe toolbar controls and block type select', () => {
@@ -104,6 +107,92 @@ describe('tolariaEditorFormatting', () => {
     expect(iconChildren.map((child) => child.props.weight)).toEqual([
       'regular',
       'fill',
+    ])
+  })
+
+  it('keeps custom media slash-menu commands searchable', () => {
+    type TolariaSlashMenuTestItem = {
+      key: string
+      title: string
+      aliases?: string[]
+      onItemClick: () => void
+    }
+
+    const items = filterTolariaSlashMenuItems([
+      {
+        key: 'mermaid',
+        title: 'Mermaid',
+        aliases: ['diagram', 'flowchart', 'graph', 'chart'],
+        onItemClick: () => {},
+      },
+      {
+        key: 'whiteboard',
+        title: 'Whiteboard',
+        aliases: ['tldraw', 'drawing', 'canvas', 'sketch'],
+        onItemClick: () => {},
+      },
+    ] satisfies TolariaSlashMenuTestItem[])
+
+    expect(items[0]).toEqual(expect.objectContaining({
+      key: 'mermaid',
+      title: 'Mermaid',
+      aliases: ['diagram', 'flowchart', 'graph', 'chart'],
+    }))
+    expect(items[1]).toEqual(expect.objectContaining({
+      key: 'whiteboard',
+      title: 'Whiteboard',
+      aliases: ['tldraw', 'drawing', 'canvas', 'sketch'],
+    }))
+    expect(isValidElement(items[0]?.icon)).toBe(true)
+    expect(isValidElement(items[1]?.icon)).toBe(true)
+  })
+
+  it('uses a valid placeholder diagram for new Mermaid blocks', () => {
+    expect(MERMAID_SLASH_COMMAND_DIAGRAM).toBe([
+      'flowchart TD',
+      '    edit["Switch to the raw editor to edit"]',
+    ].join('\n'))
+    expect(mermaidFenceSource({ diagram: MERMAID_SLASH_COMMAND_DIAGRAM })).toBe([
+      '```mermaid',
+      'flowchart TD',
+      '    edit["Switch to the raw editor to edit"]',
+      '```',
+    ].join('\n'))
+  })
+
+  it('places custom media commands before the existing non-media slash-menu group', () => {
+    type TolariaSlashMenuTestItem = {
+      key: string
+      title: string
+      group: string
+      onItemClick: () => void
+    }
+
+    const items = addItemsToMediaGroup([
+      { key: 'image', title: 'Image', group: 'Media', onItemClick: () => {} },
+      { key: 'file', title: 'File', group: 'Media', onItemClick: () => {} },
+      { key: 'emoji', title: 'Emoji', group: 'Others', onItemClick: () => {} },
+    ] satisfies TolariaSlashMenuTestItem[], [
+      {
+        key: 'mermaid',
+        title: 'Mermaid',
+        group: 'Media',
+        onItemClick: () => {},
+      },
+      {
+        key: 'whiteboard',
+        title: 'Whiteboard',
+        group: 'Media',
+        onItemClick: () => {},
+      },
+    ])
+
+    expect(items.map(item => item.key)).toEqual([
+      'image',
+      'file',
+      'mermaid',
+      'whiteboard',
+      'emoji',
     ])
   })
 })

@@ -552,6 +552,16 @@ Defined in `src/utils/mermaidMarkdown.ts`, `src/components/MermaidDiagram.tsx`, 
 - Each `mermaidBlock` stores the original fenced Markdown plus the diagram body, so raw-mode entry and saves can restore the canonical source instead of serializing generated SVG.
 - The rich editor renders diagrams with the `mermaid` package and uses the original source as an inline fallback when rendering fails.
 - `serializeMermaidAwareBlocks()` wraps the math-aware serializer so math, wikilinks, and diagrams share the same Markdown-first save path.
+- The `/mermaid` slash command inserts a placeholder rectangle diagram using the same schema-backed Markdown storage path, avoiding an invalid empty diagram state.
+
+### Tldraw Whiteboards
+
+Defined in `src/utils/tldrawMarkdown.ts`, `src/components/TldrawWhiteboard.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
+
+- Fenced `tldraw` blocks become `tldrawBlock` schema nodes before BlockNote sees the Markdown body.
+- Each `tldrawBlock` stores a stable `boardId` plus the tldraw document snapshot JSON. Session state such as camera, selected tool, and current selection is not persisted into the note.
+- The rich editor renders the block with the `tldraw` package and saves debounced document snapshot changes back into the block props, so normal Tolaria autosave writes the board into the `.md` file.
+- The `/whiteboard` slash command inserts an empty tldraw block using the same Markdown-durable storage path. Preview images are intentionally omitted; thumbnails can be added later as derived cache artifacts.
 
 ### Formatting Surface Policy
 
@@ -561,7 +571,7 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 - The formatting toolbar only exposes inline controls that persist through `blocksToMarkdownLossy()` in Tolaria's save pipeline: bold, italic, strike, nesting, and link creation. Controls that BlockNote can render temporarily but Tolaria cannot faithfully persist, such as underline, color, alignment, and the block-type dropdown, are hidden instead of appearing to work and later disappearing.
 - Tolaria's formatting-toolbar controller also keeps file/image actions mounted across the tiny hover gap between an image block and the floating toolbar, and while the toolbar itself is hovered, so image controls remain usable instead of collapsing mid-interaction.
 - `useImageLightbox` listens for `dblclick` on the rich-editor container and opens `ImageLightbox` only when the event target resolves to a viewable BlockNote image. The target resolver handles media wrappers, ignores image captions/resize controls, missing sources, and tiny tracking-style images, preserving BlockNote's ordinary single-click image selection path.
-- The `/` slash menu remains the supported path for markdown-safe block transformations such as headings, quotes, and list blocks. Tolaria filters out BlockNote's toggle-heading and toggle-list variants because those do not map cleanly to the markdown note model.
+- The `/` slash menu remains the supported path for markdown-safe block transformations such as headings, quotes, list blocks, Mermaid diagrams, and whiteboards. Tolaria filters out BlockNote's toggle-heading and toggle-list variants because those do not map cleanly to the markdown note model.
 - The block-handle side menu keeps only actions that survive Tolaria's markdown round-trip. Delete and table-header toggles remain available; BlockNote's `Colors` submenu is removed because block colors are not part of Tolaria's supported markdown surface. Tolaria renders the add-block button outside the drag handle so the handle stays next to the block content. The side menu aligns itself to the rendered text range for the hovered block, so H1/H2 typography, line-height, and theme changes do not need per-heading offsets. Block reordering uses a Tolaria-owned pointer gesture and direct BlockNote block moves instead of HTML5 `DataTransfer`, keeping it independent from Tauri's native file-drop system. Block-handle actions re-resolve the current live BlockNote block before mutating or dragging, so note reloads and sync churn cannot leave controls acting on stale block references.
 - BlockNote's table row/column handles are patched so stale or missing hovered-table state cancels the drag and hides handles instead of throwing. Add/remove row and column actions also validate the table position and cell indexes before resolving a ProseMirror `CellSelection`, so reloads or menu lag cannot turn stale handles into invalid table-selection positions. Browser and native table regressions should exercise row and column dragging plus add-menu actions because the state is tracked per orientation.
 - `useNoteWikilinkDrop()` is the shared editor-drop abstraction for dragging note rows into either editor mode. It reads the existing note-retargeting drag payload, resolves the vault-relative stem, and inserts a canonical `[[wikilink]]` without hijacking unrelated plain-text drags.
@@ -574,18 +584,19 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 ```mermaid
 flowchart LR
     A["📄 Raw markdown\n(from disk)"] --> B["splitFrontmatter()\n→ yaml + body"]
-    B --> C["preProcessMermaidMarkdown(body)\nmermaid fence → token"]
-    C --> D["preProcessWikilinks(body)\n[[target]] → ‹token›"]
-    D --> E["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
-    E --> F["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
-    F --> G["injectWikilinks + injectMathInBlocks + injectMermaidInBlocks\n tokens → schema nodes"]
-    G --> H["editor.replaceBlocks()\n→ rendered editor"]
+    B --> C["preProcessTldrawMarkdown(body)\ntldraw fence → token"]
+    C --> D["preProcessMermaidMarkdown(body)\nmermaid fence → token"]
+    D --> E["preProcessWikilinks(body)\n[[target]] → ‹token›"]
+    E --> F["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
+    F --> G["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
+    G --> H["injectWikilinks + injectMathInBlocks + injectMermaidInBlocks + injectTldrawInBlocks\n tokens → schema nodes"]
+    H --> I["editor.replaceBlocks()\n→ rendered editor"]
 
     style A fill:#f8f9fa,stroke:#6c757d,color:#000
-    style H fill:#d4edda,stroke:#28a745,color:#000
+    style I fill:#d4edda,stroke:#28a745,color:#000
 ```
 
-> Wikilink placeholder tokens use `\u2039` and `\u203A`; math and Mermaid placeholder tokens use ASCII sentinels with URI-encoded payloads.
+> Wikilink placeholder tokens use `\u2039` and `\u203A`; math, Mermaid, and tldraw placeholder tokens use ASCII sentinels with URI-encoded payloads.
 
 ### BlockNote-to-Markdown Pipeline (Save)
 
