@@ -120,7 +120,7 @@ function IconActionButton({
   style,
   children,
   testId,
-  tooltipAlign,
+  tooltipAlign = 'end',
 }: {
   copy: ActionTooltipCopy
   onClick?: () => void
