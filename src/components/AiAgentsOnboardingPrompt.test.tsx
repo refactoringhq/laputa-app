@@ -58,7 +58,7 @@ describe('AiAgentsOnboardingPrompt', () => {
       claude_code: { status: 'installed', version: '1.0.20' },
     })
 
-    expect(screen.getByText('AI agents ready')).toBeInTheDocument()
+    expect(screen.getByText('AI is ready')).toBeInTheDocument()
     expectMissingAgentInstallLinks()
     expect(screen.getByTestId('ai-agents-onboarding-continue')).toHaveTextContent('Continue')
   })
@@ -66,12 +66,12 @@ describe('AiAgentsOnboardingPrompt', () => {
   it('shows the missing state when no agents are installed', () => {
     renderPrompt()
 
-    expect(screen.getByText('No AI agents detected')).toBeInTheDocument()
+    expect(screen.getByText('Choose how Tolaria should use AI')).toBeInTheDocument()
     expect(screen.getByTestId('claude-onboarding-screen')).toBeInTheDocument()
     expect(screen.getByText('Claude Code not detected')).toBeInTheDocument()
     expect(screen.getByTestId('ai-agents-onboarding-install-claude_code')).toBeInTheDocument()
     expectMissingAgentInstallLinks()
-    expect(screen.getByTestId('ai-agents-onboarding-continue')).toHaveTextContent('Continue without it')
+    expect(screen.getByTestId('ai-agents-onboarding-continue')).toHaveTextContent('Set up later')
   })
 
   it('opens the agent install links', () => {

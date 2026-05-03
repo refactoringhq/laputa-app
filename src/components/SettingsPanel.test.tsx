@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
+import type { AiAgentsStatus } from '../lib/aiAgents'
 
 const { trackEventMock } = vi.hoisted(() => ({
   trackEventMock: vi.fn(),
@@ -83,7 +84,48 @@ describe('SettingsPanel', () => {
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
     expect(screen.getByText('Settings')).toBeInTheDocument()
-    expect(screen.getByText('Sync & Updates')).toBeInTheDocument()
+    expect(screen.getAllByText('Sync & Updates').length).toBeGreaterThan(0)
+  })
+
+  it('separates coding agents, local models, and API models in AI settings', async () => {
+    const aiAgentsStatus: AiAgentsStatus = {
+      claude_code: { status: 'installed', version: '2.1.18' },
+      codex: { status: 'missing', version: null },
+      opencode: { status: 'missing', version: null },
+      pi: { status: 'missing', version: null },
+      gemini: { status: 'missing', version: null },
+    }
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        aiAgentsStatus={aiAgentsStatus}
+        onSave={onSave}
+        onClose={onClose}
+      />
+    )
+
+    expect(screen.getByText('Recognized coding agents')).toBeInTheDocument()
+    expect(screen.getByText('Claude Code')).toBeInTheDocument()
+    expect(screen.getByText('2.1.18')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Local model' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'API model' })).toBeInTheDocument()
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Local model' }), { button: 0, ctrlKey: false })
+    fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'llama3.2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Test model' }))
+    expect(await screen.findByText('Connection works. The model replied successfully.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add local model' })).toBeInTheDocument()
+    expect(screen.queryByText('Recognized coding agents')).not.toBeInTheDocument()
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'API model' }), { button: 0, ctrlKey: false })
+    expect(screen.getByRole('button', { name: 'Add API model' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add local model' })).not.toBeInTheDocument()
+    fireEvent.pointerDown(screen.getByText('OpenAI').closest('button')!, { button: 0, pointerType: 'mouse' })
+    fireEvent.click(screen.getByRole('option', { name: 'Gemini' }))
+    expect(screen.getByDisplayValue('Gemini')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('https://generativelanguage.googleapis.com/v1beta/openai')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('gemini-2.5-flash')).toBeInTheDocument()
   })
 
   it('updates the draft language when stored settings finish loading', () => {
@@ -140,18 +182,18 @@ describe('SettingsPanel', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('renders All Notes file visibility checkboxes off by default', () => {
+  it('renders All Notes file visibility switches off by default', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    expect(screen.getByText('All Notes visibility')).toBeInTheDocument()
-    expect(within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
-    expect(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
-    expect(within(screen.getByTestId('settings-all-notes-show-unsupported')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByText('Show PDFs')).toBeInTheDocument()
+    expect(within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('switch')).toHaveAttribute('aria-checked', 'false')
+    expect(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('switch')).toHaveAttribute('aria-checked', 'false')
+    expect(within(screen.getByTestId('settings-all-notes-show-unsupported')).getByRole('switch')).toHaveAttribute('aria-checked', 'false')
   })
 
-  it('preserves saved All Notes file visibility checkboxes', () => {
+  it('preserves saved All Notes file visibility switches', () => {
     render(
       <SettingsPanel
         open={true}
@@ -166,20 +208,18 @@ describe('SettingsPanel', () => {
       />
     )
 
-    expect(within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'true')
-    expect(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'true')
-    expect(within(screen.getByTestId('settings-all-notes-show-unsupported')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+    expect(within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('switch')).toHaveAttribute('aria-checked', 'true')
+    expect(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('switch')).toHaveAttribute('aria-checked', 'true')
+    expect(within(screen.getByTestId('settings-all-notes-show-unsupported')).getByRole('switch')).toHaveAttribute('aria-checked', 'false')
   })
 
-  it('saves All Notes file visibility from keyboard toggles before Escape close', () => {
+  it('saves All Notes file visibility immediately before Escape close', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    const pdfCheckbox = within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('checkbox')
-    pdfCheckbox.focus()
-    fireEvent.keyDown(pdfCheckbox, { key: ' ', code: 'Space' })
-    fireEvent.keyUp(pdfCheckbox, { key: ' ', code: 'Space' })
+    const pdfSwitch = within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('switch')
+    fireEvent.click(pdfSwitch)
     fireEvent.keyDown(screen.getByTestId('settings-panel'), { key: 'Escape' })
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
@@ -195,7 +235,7 @@ describe('SettingsPanel', () => {
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    fireEvent.click(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('checkbox'))
+    fireEvent.click(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('switch'))
 
     expect(trackEventMock).toHaveBeenCalledWith('all_notes_visibility_changed', {
       category: 'images',

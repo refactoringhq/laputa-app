@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
+import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { trackAiAgentPermissionModeChanged } from '../lib/productAnalytics'
 import {
@@ -23,6 +24,7 @@ import { useAiPanelContextSnapshot } from './useAiPanelContextSnapshot'
 interface UseAiPanelControllerArgs {
   vaultPath: string
   defaultAiAgent: AiAgentId
+  defaultAiTarget?: AiTarget
   defaultAiAgentReady: boolean
   defaultAiAgentReadiness?: AiAgentReadiness
   activeEntry?: VaultEntry | null
@@ -79,9 +81,65 @@ function useAgentFileCallbacks({
   }), [onFileCreated, onFileModified, onVaultChanged])
 }
 
+function useAiPermissionModeHandler({
+  agent,
+  defaultAiAgent,
+  isActive,
+  locale,
+  permissionMode,
+}: {
+  agent: ReturnType<typeof useCliAiAgent>
+  defaultAiAgent: AiAgentId
+  isActive: boolean
+  locale: AppLocale
+  permissionMode: AiAgentPermissionMode
+}) {
+  return useCallback((mode: AiAgentPermissionMode) => {
+    const nextMode = normalizeAiAgentPermissionMode(mode)
+    if (isActive || nextMode === permissionMode) return
+
+    updateVaultConfigField('ai_agent_permission_mode', nextMode)
+    trackAiAgentPermissionModeChanged(defaultAiAgent, nextMode)
+    agent.addLocalMarker(aiAgentPermissionModeMarker(nextMode, locale))
+  }, [agent, defaultAiAgent, isActive, locale, permissionMode])
+}
+
+function usePanelAgent({
+  vaultPath,
+  contextPrompt,
+  defaultAiAgent,
+  defaultAiTarget,
+  defaultAiAgentReady,
+  defaultAiAgentReadiness,
+  onFileCreated,
+  onFileModified,
+  onVaultChanged,
+}: Pick<
+  UseAiPanelControllerArgs,
+  | 'vaultPath'
+  | 'defaultAiAgent'
+  | 'defaultAiTarget'
+  | 'defaultAiAgentReady'
+  | 'defaultAiAgentReadiness'
+  | 'onFileCreated'
+  | 'onFileModified'
+  | 'onVaultChanged'
+> & { contextPrompt?: string }) {
+  const fileCallbacks = useAgentFileCallbacks({ onFileCreated, onFileModified, onVaultChanged })
+  const permissionMode = useVaultAiAgentPermissionMode()
+  const agent = useCliAiAgent(vaultPath, contextPrompt, fileCallbacks, {
+    agent: defaultAiAgent,
+    target: defaultAiTarget,
+    agentReady: resolveAgentReady(defaultAiAgentReadiness, defaultAiAgentReady),
+    permissionMode,
+  })
+  return { agent, permissionMode }
+}
+
 export function useAiPanelController({
   vaultPath,
   defaultAiAgent,
+  defaultAiTarget,
   defaultAiAgentReady,
   defaultAiAgentReadiness,
   activeEntry,
@@ -107,15 +165,7 @@ export function useAiPanelController({
     noteListFilter,
   })
 
-  const fileCallbacks = useAgentFileCallbacks({ onFileCreated, onFileModified, onVaultChanged })
-  const permissionMode = useVaultAiAgentPermissionMode()
-
-  const agent = useCliAiAgent(vaultPath, contextPrompt, fileCallbacks, {
-    agent: defaultAiAgent,
-    agentReady: resolveAgentReady(defaultAiAgentReadiness, defaultAiAgentReady),
-    permissionMode,
-  })
-  const hasContext = !!activeEntry
+  const { agent, permissionMode } = usePanelAgent({ vaultPath, contextPrompt, defaultAiAgent, defaultAiTarget, defaultAiAgentReady, defaultAiAgentReadiness, onFileCreated, onFileModified, onVaultChanged })
   const isActive = agent.status === 'thinking' || agent.status === 'tool-executing'
 
   const handleSend = useCallback((text: string, references: NoteReference[]) => {
@@ -128,14 +178,7 @@ export function useAiPanelController({
     onOpenNote?.(target)
   }, [onOpenNote])
 
-  const handlePermissionModeChange = useCallback((mode: AiAgentPermissionMode) => {
-    const nextMode = normalizeAiAgentPermissionMode(mode)
-    if (isActive || nextMode === permissionMode) return
-
-    updateVaultConfigField('ai_agent_permission_mode', nextMode)
-    trackAiAgentPermissionModeChanged(defaultAiAgent, nextMode)
-    agent.addLocalMarker(aiAgentPermissionModeMarker(nextMode, locale))
-  }, [agent, defaultAiAgent, isActive, locale, permissionMode])
+  const handlePermissionModeChange = useAiPermissionModeHandler({ agent, defaultAiAgent, isActive, locale, permissionMode })
 
   const handleNewChat = useCallback(() => {
     agent.clearConversation()
@@ -147,7 +190,7 @@ export function useAiPanelController({
     input,
     setInput,
     linkedEntries,
-    hasContext,
+    hasContext: !!activeEntry,
     isActive,
     permissionMode,
     handleSend,

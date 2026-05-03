@@ -15,6 +15,7 @@ import { createStreamCallbacks } from './aiAgentStreamCallbacks'
 import type { ToolInvocation } from './aiAgentMessageState'
 import { trackAiAgentMessageBlocked, trackAiAgentMessageSent } from './productAnalytics'
 import { streamAiAgent } from '../utils/streamAiAgent'
+import { streamAiModel } from '../utils/streamAiModel'
 
 export interface AiAgentSessionRuntime {
   setMessages: Dispatch<SetStateAction<AiAgentMessage[]>>
@@ -44,6 +45,51 @@ function completedMessageCount(messages: AiAgentMessage[]): number {
   return messages.filter((message) => !message.isStreaming && !message.localMarker).length
 }
 
+function shouldIgnorePrompt(status: AgentStatus, prompt: PendingUserPrompt): boolean {
+  return !prompt.text || status === 'thinking' || status === 'tool-executing'
+}
+
+function blockMissingVault(runtime: AiAgentSessionRuntime, context: AgentExecutionContext, prompt: PendingUserPrompt): void {
+  trackAiAgentMessageBlocked(context.agent, 'missing_vault')
+  appendLocalResponse(runtime.setMessages, prompt, 'No vault loaded. Open a vault first.')
+}
+
+function blockUnavailableAgent(runtime: AiAgentSessionRuntime, context: AgentExecutionContext, prompt: PendingUserPrompt): void {
+  trackAiAgentMessageBlocked(context.agent, 'agent_unavailable')
+  appendLocalResponse(
+    runtime.setMessages,
+    prompt,
+    createMissingAgentResponse(context.agent),
+  )
+}
+
+async function streamWithSelectedTarget(
+  context: AgentExecutionContext,
+  formattedMessage: string,
+  systemPrompt: string,
+  callbacks: ReturnType<typeof createStreamCallbacks>,
+): Promise<void> {
+  if (context.target?.kind === 'api_model') {
+    await streamAiModel({
+      provider: context.target.provider,
+      model: context.target.model,
+      message: formattedMessage,
+      systemPrompt,
+      callbacks,
+    })
+    return
+  }
+
+  await streamAiAgent({
+    agent: context.agent,
+    message: formattedMessage,
+    systemPrompt,
+    vaultPath: context.vaultPath,
+    permissionMode: context.permissionMode,
+    callbacks,
+  })
+}
+
 export async function sendAgentMessage({
   runtime,
   context,
@@ -52,21 +98,15 @@ export async function sendAgentMessage({
   const currentStatus = runtime.statusRef.current
   const normalizedPrompt = normalizePrompt(prompt)
 
-  if (!normalizedPrompt.text || currentStatus === 'thinking' || currentStatus === 'tool-executing') return
+  if (shouldIgnorePrompt(currentStatus, normalizedPrompt)) return
 
   if (!context.vaultPath) {
-    trackAiAgentMessageBlocked(context.agent, 'missing_vault')
-    appendLocalResponse(runtime.setMessages, normalizedPrompt, 'No vault loaded. Open a vault first.')
+    blockMissingVault(runtime, context, normalizedPrompt)
     return
   }
 
   if (!context.ready) {
-    trackAiAgentMessageBlocked(context.agent, 'agent_unavailable')
-    appendLocalResponse(
-      runtime.setMessages,
-      normalizedPrompt,
-      createMissingAgentResponse(context.agent),
-    )
+    blockUnavailableAgent(runtime, context, normalizedPrompt)
     return
   }
 
@@ -91,24 +131,19 @@ export async function sendAgentMessage({
     normalizedPrompt,
   )
 
-  await streamAiAgent({
+  const callbacks = createStreamCallbacks({
     agent: context.agent,
-    message: formattedMessage,
-    systemPrompt,
+    messageId,
     vaultPath: context.vaultPath,
-    permissionMode: context.permissionMode,
-    callbacks: createStreamCallbacks({
-      agent: context.agent,
-      messageId,
-      vaultPath: context.vaultPath,
-      setMessages: runtime.setMessages,
-      setStatus: runtime.setStatus,
-      abortRef: runtime.abortRef,
-      responseAccRef: runtime.responseAccRef,
-      toolInputMapRef: runtime.toolInputMapRef,
-      fileCallbacksRef: runtime.fileCallbacksRef,
-    }),
+    setMessages: runtime.setMessages,
+    setStatus: runtime.setStatus,
+    abortRef: runtime.abortRef,
+    responseAccRef: runtime.responseAccRef,
+    toolInputMapRef: runtime.toolInputMapRef,
+    fileCallbacksRef: runtime.fileCallbacksRef,
   })
+
+  await streamWithSelectedTarget(context, formattedMessage, systemPrompt, callbacks)
 }
 
 export function addAgentLocalMarker(

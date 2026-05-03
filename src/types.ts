@@ -1,5 +1,6 @@
 import type { AiAgentId } from './lib/aiAgents'
 import type { AiAgentPermissionMode } from './lib/aiAgentPermissionMode'
+import type { AiModelProvider } from './lib/aiTargets'
 import type { ThemeMode } from './lib/themeMode'
 import type { AppLocale } from './lib/i18n'
 
@@ -99,6 +100,8 @@ export interface Settings {
   note_width_mode?: NoteWidthMode | null
   initial_h1_auto_rename_enabled?: boolean | null
   default_ai_agent?: AiAgentId | null
+  default_ai_target?: string | null
+  ai_model_providers?: AiModelProvider[] | null
   hide_gitignored_files?: boolean | null
   all_notes_show_pdfs?: boolean | null
   all_notes_show_images?: boolean | null

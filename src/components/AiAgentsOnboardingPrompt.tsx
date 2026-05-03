@@ -1,4 +1,4 @@
-import { ArrowUpRight, Bot, CheckCircle2, Loader2 } from 'lucide-react'
+import { ArrowUpRight, Bot, CheckCircle2, Cloud, HardDrive, Loader2, Terminal } from 'lucide-react'
 import {
   AI_AGENT_DEFINITIONS,
   getAiAgentDefinition,
@@ -20,7 +20,7 @@ function getPromptCopy(statuses: AiAgentsStatus) {
   if (isAiAgentsStatusChecking(statuses)) {
     return {
       accentClassName: 'bg-muted text-muted-foreground',
-      description: 'Checking which AI agents are available on this machine.',
+      description: 'Checking coding agents. You can also use a local model or API provider.',
       icon: <Loader2 className="size-7 animate-spin" />,
       title: 'Checking AI agents',
     }
@@ -29,18 +29,52 @@ function getPromptCopy(statuses: AiAgentsStatus) {
   if (!hasAnyInstalledAiAgent(statuses)) {
     return {
       accentClassName: 'bg-[var(--feedback-warning-bg)] text-[var(--feedback-warning-text)]',
-      description: 'Tolaria works best with a local CLI AI agent installed.',
+      description: 'Connect a local model, an API provider, or a desktop coding agent.',
       icon: <Bot className="size-7" />,
-      title: 'No AI agents detected',
+      title: 'Choose how Tolaria should use AI',
     }
   }
 
   return {
     accentClassName: 'bg-[var(--feedback-success-bg)] text-[var(--feedback-success-text)]',
-    description: 'Your AI agents are ready to use in Tolaria.',
+    description: 'You can use the detected coding agents, or add local/API models in Settings.',
     icon: <CheckCircle2 className="size-7" />,
-    title: 'AI agents ready',
+    title: 'AI is ready',
   }
+}
+
+function AiModeChoices() {
+  const choices = [
+    {
+      icon: <HardDrive className="size-4" />,
+      title: 'Local model',
+      description: 'Use Ollama, LM Studio, or another local OpenAI-compatible endpoint. API keys are usually not needed.',
+    },
+    {
+      icon: <Cloud className="size-4" />,
+      title: 'API provider',
+      description: 'Use OpenAI, Anthropic, OpenRouter, or a gateway. API keys are read from environment variables, not saved in settings.',
+    },
+    {
+      icon: <Terminal className="size-4" />,
+      title: 'Coding agent',
+      description: 'Use Claude Code, Codex, OpenCode, Gemini CLI, or Pi for tool-capable vault editing on desktop.',
+    },
+  ]
+
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      {choices.map((choice) => (
+        <div key={choice.title} className="rounded-lg border border-border bg-muted/20 p-3 text-left">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+            {choice.icon}
+            {choice.title}
+          </div>
+          <div className="text-xs leading-5 text-muted-foreground">{choice.description}</div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function AgentStatusList({ statuses }: { statuses: AiAgentsStatus }) {
@@ -104,6 +138,7 @@ export function AiAgentsOnboardingPrompt({
         </CardHeader>
 
         <CardContent className="space-y-4">
+          <AiModeChoices />
           {showLegacyClaudeCompatibility ? (
             <div
               className="rounded-lg border border-[var(--feedback-warning-border)] bg-[var(--feedback-warning-bg)] px-4 py-3 text-left"
@@ -138,7 +173,7 @@ export function AiAgentsOnboardingPrompt({
               disabled={isAiAgentsStatusChecking(statuses)}
               data-testid={showLegacyClaudeCompatibility ? 'claude-onboarding-continue' : undefined}
             >
-              {hasAnyInstalledAiAgent(statuses) ? 'Continue' : 'Continue without it'}
+              {hasAnyInstalledAiAgent(statuses) ? 'Continue' : 'Set up later'}
             </Button>
           </div>
         </CardFooter>

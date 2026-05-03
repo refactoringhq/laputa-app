@@ -70,6 +70,7 @@ describe('useAiAgentPreferences', () => {
     expect(saveSettings).toHaveBeenCalledWith({
       ...settings,
       default_ai_agent: 'codex',
+      default_ai_target: 'agent:codex',
     })
     expect(onToast).toHaveBeenCalledWith('Default AI agent: Codex')
   })
