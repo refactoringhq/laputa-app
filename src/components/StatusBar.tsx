@@ -17,6 +17,7 @@ import type { VaultOption } from './status-bar/types'
 export type { VaultOption } from './status-bar/types'
 
 const COMPACT_STATUS_BAR_MAX_WIDTH = 1000
+const STATUS_BAR_STACKING_Z_INDEX = 30
 
 function getWindowWidth() {
   return typeof window === 'undefined' ? Number.POSITIVE_INFINITY : window.innerWidth
@@ -246,7 +247,7 @@ function StatusBarFooter(props: StatusBarFooterProps) {
         fontSize: 12,
         color: 'var(--muted-foreground)',
         position: 'relative',
-        zIndex: 10,
+        zIndex: STATUS_BAR_STACKING_Z_INDEX,
       }}
     >
       <StatusBarPrimaryFromFooter {...props} />
