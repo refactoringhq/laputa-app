@@ -156,7 +156,7 @@ function StatusBarAction({
         variant="ghost"
         size="xs"
         className={cn(
-          'h-auto gap-1 rounded-sm px-1 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground',
+          'h-auto gap-1 rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground',
           compact && 'h-6 gap-0.5 px-0.5',
           disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground',
           className,
@@ -742,7 +742,7 @@ export function ChangesBadge({
               color: 'var(--text-inverse)',
               borderRadius: 9,
               padding: '0 5px',
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 600,
               minWidth: 16,
               lineHeight: '16px',

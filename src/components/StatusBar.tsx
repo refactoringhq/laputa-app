@@ -1,4 +1,5 @@
 import type { AiAgentId, AiAgentsStatus } from '../lib/aiAgents'
+import type { AiModelProvider } from '../lib/aiTargets'
 import type { VaultAiGuidanceStatus } from '../lib/vaultAiGuidance'
 import { useEffect, useState } from 'react'
 import type { ClaudeCodeStatus } from '../hooks/useClaudeCodeStatus'
@@ -92,7 +93,10 @@ interface StatusBarProps {
   aiAgentsStatus?: AiAgentsStatus
   vaultAiGuidanceStatus?: VaultAiGuidanceStatus
   defaultAiAgent?: AiAgentId
+  defaultAiTarget?: string
+  aiModelProviders?: AiModelProvider[]
   onSetDefaultAiAgent?: (agent: AiAgentId) => void
+  onSetDefaultAiTarget?: (target: string) => void
   onRestoreVaultAiGuidance?: () => void
   claudeCodeStatus?: ClaudeCodeStatus
   claudeCodeVersion?: string | null
@@ -135,7 +139,10 @@ function StatusBarPrimaryFromFooter({
   aiAgentsStatus,
   vaultAiGuidanceStatus,
   defaultAiAgent,
+  defaultAiTarget,
+  aiModelProviders,
   onSetDefaultAiAgent,
+  onSetDefaultAiTarget,
   onRestoreVaultAiGuidance,
   claudeCodeStatus,
   claudeCodeVersion,
@@ -175,7 +182,10 @@ function StatusBarPrimaryFromFooter({
       aiAgentsStatus={aiAgentsStatus}
       vaultAiGuidanceStatus={vaultAiGuidanceStatus}
       defaultAiAgent={defaultAiAgent}
+      defaultAiTarget={defaultAiTarget}
+      aiModelProviders={aiModelProviders}
       onSetDefaultAiAgent={onSetDefaultAiAgent}
+      onSetDefaultAiTarget={onSetDefaultAiTarget}
       onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
       claudeCodeStatus={claudeCodeStatus}
       claudeCodeVersion={claudeCodeVersion}
@@ -233,7 +243,7 @@ function StatusBarFooter(props: StatusBarFooterProps) {
         background: 'var(--sidebar)',
         borderTop: '1px solid var(--border)',
         padding: stacked ? '4px 8px' : '0 8px',
-        fontSize: 11,
+        fontSize: 12,
         color: 'var(--muted-foreground)',
         position: 'relative',
         zIndex: 10,

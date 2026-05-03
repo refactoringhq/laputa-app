@@ -5,6 +5,7 @@ import '@blocknote/mantine/style.css'
 import 'katex/dist/katex.min.css'
 import { uploadImageFile } from '../hooks/useImageDrop'
 import { DEFAULT_AI_AGENT, type AiAgentId, type AiAgentReadiness } from '../lib/aiAgents'
+import type { AiTarget } from '../lib/aiTargets'
 import { translate, type AppLocale } from '../lib/i18n'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 import type { VaultEntry, GitCommit, NoteWidthMode, NoteStatus } from '../types'
@@ -56,6 +57,7 @@ interface EditorProps {
   onToggleInspector: () => void
   inspectorWidth: number
   defaultAiAgent?: AiAgentId
+  defaultAiTarget?: AiTarget
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
   onInspectorResize: (delta: number) => void
@@ -346,6 +348,7 @@ function EditorLayout({
   onInspectorResize,
   inspectorWidth,
   defaultAiAgent,
+  defaultAiTarget,
   defaultAiAgentReadiness,
   defaultAiAgentReady,
   inspectorEntry,
@@ -410,6 +413,7 @@ function EditorLayout({
   onInspectorResize: (delta: number) => void
   inspectorWidth: number
   defaultAiAgent: AiAgentId
+  defaultAiTarget?: AiTarget
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady: boolean
   inspectorEntry: VaultEntry | null
@@ -496,6 +500,7 @@ function EditorLayout({
           inspectorCollapsed={inspectorCollapsed}
           inspectorWidth={inspectorWidth}
           defaultAiAgent={defaultAiAgent}
+          defaultAiTarget={defaultAiTarget}
           defaultAiAgentReadiness={defaultAiAgentReadiness}
           defaultAiAgentReady={defaultAiAgentReady}
           onUnsupportedAiPaste={onUnsupportedAiPaste}
@@ -529,122 +534,52 @@ function EditorLayout({
   )
 }
 
+type EditorRuntime = ReturnType<typeof useEditorSetup>
+type EditorLayoutProps = Parameters<typeof EditorLayout>[0]
+
+function buildEditorLayoutProps(
+  props: EditorProps,
+  runtime: EditorRuntime,
+  findRequest: RawEditorFindRequest | null,
+): EditorLayoutProps {
+  return {
+    ...props,
+    ...runtime,
+    activeTabPath: props.activeTabPath,
+    defaultAiAgent: props.defaultAiAgent ?? DEFAULT_AI_AGENT,
+    defaultAiAgentReady: props.defaultAiAgentReady ?? true,
+    findRequest,
+  }
+}
+
 export const Editor = memo(function Editor(props: EditorProps) {
-  const {
-    tabs, activeTabPath, entries, onNavigateWikilink,
-    isVaultLoading,
-    getNoteStatus,
-    inspectorCollapsed, onToggleInspector, inspectorWidth,
-    defaultAiAgent = DEFAULT_AI_AGENT, defaultAiAgentReadiness, defaultAiAgentReady = true,
-    onUnsupportedAiPaste,
-    onInspectorResize,
-    inspectorEntry, inspectorContent, gitHistory,
-    onUpdateFrontmatter, onDeleteProperty, onAddProperty, onCreateMissingType, onCreateAndOpenNote, onInitializeProperties,
-    showAIChat, onToggleAIChat,
-    vaultPath, noteList, noteListFilter,
-    onToggleFavorite, onToggleOrganized, onRevealFile, onCopyFilePath, onOpenExternalFile,
-    onDeleteNote, onArchiveNote, onUnarchiveNote,
-    onContentChange, onSave, onRenameFilename,
-    noteWidth, onToggleNoteWidth,
-    onFileCreated, onFileModified, onVaultChanged,
-    isConflicted, onKeepMine, onKeepTheirs,
-    flushPendingEditorContentRef, flushPendingRawContentRef, findInNoteRef, locale,
-  } = props
-  const {
-    editor, activeTab, rawLatestContentRef, rawModeContent,
-    rawMode, diffMode, diffContent, diffLoading,
-    handleToggleDiffExclusive, handleToggleRawExclusive,
-    handleEditorChange, flushPendingEditorChange, handleViewCommitDiff,
-    isLoadingNewTab, activeStatus, showDiffToggle,
-  } = useEditorSetup({
-    tabs, activeTabPath, vaultPath, onContentChange,
+  const runtime = useEditorSetup({
+    tabs: props.tabs,
+    activeTabPath: props.activeTabPath,
+    vaultPath: props.vaultPath,
+    onContentChange: props.onContentChange,
     onLoadDiff: props.onLoadDiff,
     onLoadDiffAtCommit: props.onLoadDiffAtCommit,
     pendingCommitDiffRequest: props.pendingCommitDiffRequest,
     onPendingCommitDiffHandled: props.onPendingCommitDiffHandled,
-    getNoteStatus,
-    rawToggleRef: props.rawToggleRef, diffToggleRef: props.diffToggleRef,
+    getNoteStatus: props.getNoteStatus,
+    rawToggleRef: props.rawToggleRef,
+    diffToggleRef: props.diffToggleRef,
   })
   const findRequest = useEditorFindCommand({
-    activeTab,
-    findInNoteRef,
-    handleToggleRawExclusive,
-    rawMode,
+    activeTab: runtime.activeTab,
+    findInNoteRef: props.findInNoteRef,
+    handleToggleRawExclusive: runtime.handleToggleRawExclusive,
+    rawMode: runtime.rawMode,
   })
   useRegisterEditorContentFlushes({
-    activeTab,
-    flushPendingEditorChange,
-    flushPendingEditorContentRef,
-    rawLatestContentRef,
-    rawMode,
-    onContentChange,
-    flushPendingRawContentRef,
+    activeTab: runtime.activeTab,
+    flushPendingEditorChange: runtime.flushPendingEditorChange,
+    flushPendingEditorContentRef: props.flushPendingEditorContentRef,
+    rawLatestContentRef: runtime.rawLatestContentRef,
+    rawMode: runtime.rawMode,
+    onContentChange: props.onContentChange,
+    flushPendingRawContentRef: props.flushPendingRawContentRef,
   })
-  return (
-    <EditorLayout
-      tabs={tabs}
-      activeTabPath={props.activeTabPath}
-      activeTab={activeTab}
-      isLoadingNewTab={isLoadingNewTab}
-      isVaultLoading={isVaultLoading}
-      entries={entries}
-      editor={editor}
-      diffMode={diffMode}
-      diffContent={diffContent}
-      diffLoading={diffLoading}
-      handleToggleDiffExclusive={handleToggleDiffExclusive}
-      rawMode={rawMode}
-      handleToggleRawExclusive={handleToggleRawExclusive}
-      onContentChange={onContentChange}
-      onSave={onSave}
-      activeStatus={activeStatus}
-      showDiffToggle={showDiffToggle}
-      showAIChat={showAIChat}
-      onToggleAIChat={onToggleAIChat}
-      inspectorCollapsed={inspectorCollapsed}
-      onToggleInspector={onToggleInspector}
-      onNavigateWikilink={onNavigateWikilink}
-      handleEditorChange={handleEditorChange}
-      onToggleFavorite={onToggleFavorite}
-      onToggleOrganized={onToggleOrganized}
-      onRevealFile={onRevealFile}
-      onCopyFilePath={onCopyFilePath}
-      onOpenExternalFile={onOpenExternalFile}
-      onDeleteNote={onDeleteNote}
-      onArchiveNote={onArchiveNote}
-      onUnarchiveNote={onUnarchiveNote}
-      vaultPath={vaultPath}
-      rawModeContent={rawModeContent}
-      findRequest={findRequest}
-      rawLatestContentRef={rawLatestContentRef}
-      onRenameFilename={onRenameFilename}
-      noteWidth={noteWidth}
-      onToggleNoteWidth={onToggleNoteWidth}
-      isConflicted={isConflicted}
-      onKeepMine={onKeepMine}
-      onKeepTheirs={onKeepTheirs}
-      onInspectorResize={onInspectorResize}
-      inspectorWidth={inspectorWidth}
-      defaultAiAgent={defaultAiAgent}
-      defaultAiAgentReadiness={defaultAiAgentReadiness}
-      defaultAiAgentReady={defaultAiAgentReady}
-      onUnsupportedAiPaste={onUnsupportedAiPaste}
-      inspectorEntry={inspectorEntry}
-      inspectorContent={inspectorContent}
-      gitHistory={gitHistory}
-      noteList={noteList}
-      noteListFilter={noteListFilter}
-      handleViewCommitDiff={handleViewCommitDiff}
-      onUpdateFrontmatter={onUpdateFrontmatter}
-      onDeleteProperty={onDeleteProperty}
-      onAddProperty={onAddProperty}
-      onCreateMissingType={onCreateMissingType}
-      onCreateAndOpenNote={onCreateAndOpenNote}
-      onInitializeProperties={onInitializeProperties}
-      onFileCreated={onFileCreated}
-      onFileModified={onFileModified}
-      onVaultChanged={onVaultChanged}
-      locale={locale}
-    />
-  )
+  return <EditorLayout {...buildEditorLayoutProps(props, runtime, findRequest)} />
 })

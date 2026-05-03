@@ -1,6 +1,7 @@
 import { Moon, Package, Settings, Sun } from 'lucide-react'
 import { Megaphone } from '@phosphor-icons/react'
 import type { AiAgentId, AiAgentsStatus } from '../../lib/aiAgents'
+import type { AiModelProvider } from '../../lib/aiTargets'
 import type { VaultAiGuidanceStatus } from '../../lib/vaultAiGuidance'
 import type { ClaudeCodeStatus } from '../../hooks/useClaudeCodeStatus'
 import type { McpStatus } from '../../hooks/useMcpStatus'
@@ -70,7 +71,10 @@ interface StatusBarPrimarySectionProps {
   aiAgentsStatus?: AiAgentsStatus
   vaultAiGuidanceStatus?: VaultAiGuidanceStatus
   defaultAiAgent?: AiAgentId
+  defaultAiTarget?: string
+  aiModelProviders?: AiModelProvider[]
   onSetDefaultAiAgent?: (agent: AiAgentId) => void
+  onSetDefaultAiTarget?: (target: string) => void
   onRestoreVaultAiGuidance?: () => void
   claudeCodeStatus?: ClaudeCodeStatus
   claudeCodeVersion?: string | null
@@ -104,8 +108,8 @@ function BuildNumberButton({
   locale: AppLocale
 }) {
   const className = compact
-    ? 'h-6 min-w-0 gap-1 rounded-sm px-1 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
-    : 'h-auto gap-1 rounded-sm px-1 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
+    ? 'h-6 min-w-0 gap-1 rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
+    : 'h-auto gap-1 rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
 
   return (
     <ActionTooltip copy={{ label: translate(locale, 'status.update.check') }} side="top">
@@ -132,7 +136,10 @@ function StatusBarAiBadge({
   aiAgentsStatus,
   vaultAiGuidanceStatus,
   defaultAiAgent,
+  defaultAiTarget,
+  aiModelProviders,
   onSetDefaultAiAgent,
+  onSetDefaultAiTarget,
   onRestoreVaultAiGuidance,
   claudeCodeStatus,
   claudeCodeVersion,
@@ -143,7 +150,10 @@ function StatusBarAiBadge({
   | 'aiAgentsStatus'
   | 'vaultAiGuidanceStatus'
   | 'defaultAiAgent'
+  | 'defaultAiTarget'
+  | 'aiModelProviders'
   | 'onSetDefaultAiAgent'
+  | 'onSetDefaultAiTarget'
   | 'onRestoreVaultAiGuidance'
   | 'claudeCodeStatus'
   | 'claudeCodeVersion'
@@ -156,7 +166,10 @@ function StatusBarAiBadge({
         statuses={aiAgentsStatus}
         guidanceStatus={vaultAiGuidanceStatus}
         defaultAgent={defaultAiAgent}
+        defaultTarget={defaultAiTarget}
+        providers={aiModelProviders}
         onSetDefaultAgent={onSetDefaultAiAgent}
+        onSetDefaultTarget={onSetDefaultAiTarget}
         onRestoreGuidance={onRestoreVaultAiGuidance}
         compact={compact}
         locale={locale}
@@ -189,7 +202,10 @@ function StatusBarPrimaryBadges({
   aiAgentsStatus,
   vaultAiGuidanceStatus,
   defaultAiAgent,
+  defaultAiTarget,
+  aiModelProviders,
   onSetDefaultAiAgent,
+  onSetDefaultAiTarget,
   onRestoreVaultAiGuidance,
   claudeCodeStatus,
   claudeCodeVersion,
@@ -217,7 +233,10 @@ function StatusBarPrimaryBadges({
   aiAgentsStatus?: AiAgentsStatus
   vaultAiGuidanceStatus?: VaultAiGuidanceStatus
   defaultAiAgent?: AiAgentId
+  defaultAiTarget?: string
+  aiModelProviders?: AiModelProvider[]
   onSetDefaultAiAgent?: (agent: AiAgentId) => void
+  onSetDefaultAiTarget?: (target: string) => void
   onRestoreVaultAiGuidance?: () => void
   claudeCodeStatus?: ClaudeCodeStatus
   claudeCodeVersion?: string | null
@@ -256,7 +275,10 @@ function StatusBarPrimaryBadges({
         aiAgentsStatus={aiAgentsStatus}
         vaultAiGuidanceStatus={vaultAiGuidanceStatus}
         defaultAiAgent={defaultAiAgent}
+        defaultAiTarget={defaultAiTarget}
+        aiModelProviders={aiModelProviders}
         onSetDefaultAiAgent={onSetDefaultAiAgent}
+        onSetDefaultAiTarget={onSetDefaultAiTarget}
         onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
         claudeCodeStatus={claudeCodeStatus}
         claudeCodeVersion={claudeCodeVersion}
@@ -278,7 +300,7 @@ function FeedbackButton({
 }) {
   const className = compact
     ? 'h-6 w-6 rounded-sm p-0 text-muted-foreground hover:text-foreground'
-    : 'h-6 px-2 text-[11px] font-medium text-muted-foreground hover:text-foreground'
+    : 'h-6 px-2 text-[12px] font-medium text-muted-foreground hover:text-foreground'
 
   return (
     <ActionTooltip copy={{ label: translate(locale, 'status.feedback.contribute') }} side="top">
@@ -299,6 +321,24 @@ function FeedbackButton({
       </Button>
     </ActionTooltip>
   )
+}
+
+function primarySectionStyle(stacked: boolean, compact: boolean) {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: compact ? 8 : 12,
+    rowGap: stacked ? 4 : 0,
+    flex: 1,
+    minWidth: 0,
+    width: stacked ? '100%' : 'auto',
+    flexBasis: stacked ? '100%' : 'auto',
+    flexWrap: stacked ? 'wrap' : 'nowrap',
+  } as const
+}
+
+function PrimarySeparator({ compact }: { compact: boolean }) {
+  return compact ? null : <span style={SEP_STYLE}>|</span>
 }
 
 export function StatusBarPrimarySection({
@@ -333,7 +373,10 @@ export function StatusBarPrimarySection({
   aiAgentsStatus,
   vaultAiGuidanceStatus,
   defaultAiAgent,
+  defaultAiTarget,
+  aiModelProviders,
   onSetDefaultAiAgent,
+  onSetDefaultAiTarget,
   onRestoreVaultAiGuidance,
   claudeCodeStatus,
   claudeCodeVersion,
@@ -356,17 +399,7 @@ export function StatusBarPrimarySection({
 
   return (
     <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: compact ? 8 : 12,
-        rowGap: stacked ? 4 : 0,
-        flex: 1,
-        minWidth: 0,
-        width: stacked ? '100%' : 'auto',
-        flexBasis: stacked ? '100%' : 'auto',
-        flexWrap: stacked ? 'wrap' : 'nowrap',
-      }}
+      style={primarySectionStyle(stacked, compact)}
     >
       <VaultMenu
         vaults={vaults}
@@ -380,7 +413,7 @@ export function StatusBarPrimarySection({
         compact={compact}
         locale={locale}
       />
-      {compact ? null : <span style={SEP_STYLE}>|</span>}
+      <PrimarySeparator compact={compact} />
       <BuildNumberButton buildNumber={buildNumber} onCheckForUpdates={onCheckForUpdates} compact={compact} locale={locale} />
       <StatusBarPrimaryBadges
         modifiedCount={modifiedCount}
@@ -404,7 +437,10 @@ export function StatusBarPrimarySection({
         aiAgentsStatus={aiAgentsStatus}
         vaultAiGuidanceStatus={vaultAiGuidanceStatus}
         defaultAiAgent={defaultAiAgent}
+        defaultAiTarget={defaultAiTarget}
+        aiModelProviders={aiModelProviders}
         onSetDefaultAiAgent={onSetDefaultAiAgent}
+        onSetDefaultAiTarget={onSetDefaultAiTarget}
         onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
         claudeCodeStatus={claudeCodeStatus}
         claudeCodeVersion={claudeCodeVersion}
@@ -457,7 +493,7 @@ export function StatusBarSecondarySection({
             type="button"
             variant="ghost"
             size="xs"
-            className="h-auto rounded-sm px-1 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground"
+            className="h-auto rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground"
             onClick={onZoomReset}
             aria-label={translate(locale, 'status.zoom.reset')}
             data-testid="status-zoom"

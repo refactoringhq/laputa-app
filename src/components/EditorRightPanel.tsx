@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { DEFAULT_AI_AGENT, type AiAgentId, type AiAgentReadiness } from '../lib/aiAgents'
+import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import type { VaultEntry, GitCommit } from '../types'
 import type { NoteListItem } from '../utils/ai-context'
@@ -13,6 +14,7 @@ interface EditorRightPanelProps {
   inspectorCollapsed: boolean
   inspectorWidth: number
   defaultAiAgent?: AiAgentId
+  defaultAiTarget?: AiTarget
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
   onUnsupportedAiPaste?: (message: string) => void
@@ -43,7 +45,7 @@ interface EditorRightPanelProps {
 
 export function EditorRightPanel({
   showAIChat, inspectorCollapsed, inspectorWidth,
-  defaultAiAgent = DEFAULT_AI_AGENT, defaultAiAgentReadiness, defaultAiAgentReady = true,
+  defaultAiAgent = DEFAULT_AI_AGENT, defaultAiTarget, defaultAiAgentReadiness, defaultAiAgentReady = true,
   onUnsupportedAiPaste,
   inspectorEntry, inspectorContent, entries, gitHistory, vaultPath,
   noteList, noteListFilter,
@@ -55,6 +57,7 @@ export function EditorRightPanel({
   const aiPanelController = useAiPanelController({
     vaultPath,
     defaultAiAgent,
+    defaultAiTarget,
     defaultAiAgentReady,
     defaultAiAgentReadiness,
     activeEntry: inspectorEntry,
@@ -91,6 +94,7 @@ export function EditorRightPanel({
           onOpenNote={onOpenNote}
           onUnsupportedAiPaste={onUnsupportedAiPaste}
           defaultAiAgent={defaultAiAgent}
+          defaultAiTarget={defaultAiTarget}
           defaultAiAgentReadiness={defaultAiAgentReadiness}
           defaultAiAgentReady={defaultAiAgentReady}
           locale={locale}

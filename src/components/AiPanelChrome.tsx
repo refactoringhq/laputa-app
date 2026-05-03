@@ -19,6 +19,7 @@ import type { VaultEntry } from '../types'
 interface AiPanelHeaderProps {
   agentLabel: string
   agentReadiness: AiAgentReadiness
+  targetKind?: 'agent' | 'api_model'
   locale?: AppLocale
   permissionMode: AiAgentPermissionMode
   permissionModeDisabled: boolean
@@ -167,6 +168,7 @@ function AiPanelEmptyState({
 export const AiPanelHeader = memo(function AiPanelHeader({
   agentLabel,
   agentReadiness,
+  targetKind = 'agent',
   locale = 'en',
   permissionMode,
   permissionModeDisabled,
@@ -175,7 +177,9 @@ export const AiPanelHeader = memo(function AiPanelHeader({
   onNewChat,
 }: AiPanelHeaderProps) {
   const t = createTranslator(locale)
-  const modeLabel = aiAgentPermissionModeLabels(permissionMode, locale).short
+  const modeLabel = targetKind === 'api_model'
+    ? t('ai.panel.mode.chat')
+    : aiAgentPermissionModeLabels(permissionMode, locale).short
 
   return (
     <div
@@ -213,12 +217,18 @@ export const AiPanelHeader = memo(function AiPanelHeader({
           <X size={16} />
         </Button>
       </div>
-      <AiPermissionModeToggle
-        value={permissionMode}
-        locale={locale}
-        disabled={permissionModeDisabled}
-        onChange={onPermissionModeChange}
-      />
+      {targetKind === 'agent' ? (
+        <AiPermissionModeToggle
+          value={permissionMode}
+          locale={locale}
+          disabled={permissionModeDisabled}
+          onChange={onPermissionModeChange}
+        />
+      ) : (
+        <div className="rounded-md border border-border bg-muted px-3 py-2 text-[11px] leading-5 text-muted-foreground">
+          {t('ai.panel.mode.chatDescription')}
+        </div>
+      )}
     </div>
   )
 })

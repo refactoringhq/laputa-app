@@ -669,7 +669,7 @@ describe('App', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByText('AI agents ready')).toBeInTheDocument()
+      expect(screen.getByText('AI is ready')).toBeInTheDocument()
     }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
 
     await waitFor(() => {
@@ -684,7 +684,7 @@ describe('App', () => {
       expect(screen.getByText('Manage External AI Tools')).toBeInTheDocument()
     })
     expect(screen.getByTestId('mcp-setup-dialog')).toBeInTheDocument()
-    expect(screen.queryByText('AI agents ready')).not.toBeInTheDocument()
+    expect(screen.queryByText('AI is ready')).not.toBeInTheDocument()
   })
 
   it('routes right-panel AI chat messages to the selected default agent', async () => {

@@ -1,5 +1,7 @@
 #[cfg(desktop)]
 use crate::ai_agents::{AiAgentStreamRequest, AiAgentsStatus};
+#[cfg(desktop)]
+use crate::ai_models::{AiModelProviderTestRequest, AiModelStreamRequest};
 use crate::claude_cli::{ChatStreamRequest, ClaudeCliStatus};
 use crate::vault::VaultAiGuidanceStatus;
 
@@ -88,18 +90,45 @@ fn normalize_agent_request(mut request: AiAgentStreamRequest) -> AiAgentStreamRe
 }
 
 #[cfg(desktop)]
-#[tauri::command]
-pub async fn stream_ai_agent(
-    app_handle: tauri::AppHandle,
+fn run_normalized_ai_agent_stream(
     request: AiAgentStreamRequest,
+    emitter: StreamEmitter<crate::ai_agents::AiAgentStreamEvent>,
 ) -> Result<String, String> {
-    run_desktop_stream(
-        app_handle,
-        "ai-agent-stream",
-        normalize_agent_request(request),
-        crate::ai_agents::run_ai_agent_stream,
-    )
-    .await
+    crate::ai_agents::run_ai_agent_stream(normalize_agent_request(request), emitter)
+}
+
+#[cfg(desktop)]
+define_desktop_stream_command!(
+    stream_ai_agent,
+    AiAgentStreamRequest,
+    "ai-agent-stream",
+    run_normalized_ai_agent_stream
+);
+
+#[cfg(desktop)]
+define_desktop_stream_command!(
+    stream_ai_model,
+    AiModelStreamRequest,
+    "ai-model-stream",
+    crate::ai_models::run_ai_model_stream
+);
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn save_ai_model_provider_api_key(provider_id: String, api_key: String) -> Result<(), String> {
+    crate::ai_models::save_provider_api_key(provider_id, api_key)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn delete_ai_model_provider_api_key(provider_id: String) -> Result<(), String> {
+    crate::ai_models::delete_provider_api_key(provider_id)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<String, String> {
+    crate::ai_models::test_ai_model_provider(request)
 }
 
 // ── Claude CLI (mobile stubs) ───────────────────────────────────────────────
@@ -156,6 +185,38 @@ pub async fn stream_ai_agent(
     _request: AiAgentStreamRequest,
 ) -> Result<String, String> {
     Err("CLI AI agents are not available on mobile".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn stream_ai_model(
+    _app_handle: tauri::AppHandle,
+    _request: crate::ai_models::AiModelStreamRequest,
+) -> Result<String, String> {
+    Err("Direct AI model chat is not available in this mobile build yet.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn save_ai_model_provider_api_key(
+    _provider_id: String,
+    _api_key: String,
+) -> Result<(), String> {
+    Err("Local AI provider secret storage is only available in the desktop app.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn delete_ai_model_provider_api_key(_provider_id: String) -> Result<(), String> {
+    Err("Local AI provider secret storage is only available in the desktop app.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn test_ai_model_provider(
+    _request: crate::ai_models::AiModelProviderTestRequest,
+) -> Result<String, String> {
+    Err("Direct AI model tests are not available in this mobile build yet.".into())
 }
 
 #[cfg(test)]

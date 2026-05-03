@@ -39,5 +39,6 @@ tauri-plugin-prevent-default = "4.0.4"
 sentry = "0.37"
 uuid = { version = "1", features = ["v4"] }
 tempfile = "3"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 
 [dev-dependencies]
