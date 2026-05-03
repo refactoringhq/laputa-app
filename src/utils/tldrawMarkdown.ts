@@ -127,8 +127,10 @@ function readTldrawToken({ text }: TokenText): TldrawPayload | null {
 }
 
 function readFenceAttribute({ info, name }: FenceAttributeRequest): string {
-  const match = new RegExp(`\\b${name}=(?:"([^"]+)"|'([^']+)'|([^\\s]+))`, 'u').exec(info)
-  return match?.[1] ?? match?.[2] ?? match?.[3] ?? ''
+  for (const match of info.matchAll(/\b([A-Za-z][\w-]*)=(?:"([^"]+)"|'([^']+)'|([^\s]+))/gu)) {
+    if (match[1] === name) return match[2] ?? match[3] ?? match[4] ?? ''
+  }
+  return ''
 }
 
 function readFenceMetadata({ info }: FenceMetadata): Pick<TldrawPayload, 'boardId' | 'height' | 'width'> {

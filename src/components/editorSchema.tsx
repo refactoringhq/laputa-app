@@ -15,6 +15,7 @@ import type { VaultEntry } from '../types'
 import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { MermaidDiagram } from './MermaidDiagram'
+import { SafeHtmlSpan } from './SafeMarkup'
 
 const TldrawWhiteboard = lazy(() => import('./TldrawWhiteboard').then(module => ({
   default: module.TldrawWhiteboard,
@@ -73,13 +74,13 @@ export const WikiLink = createReactInlineContentSpec(
 function MathRender({ latex, displayMode }: { latex: string; displayMode: boolean }) {
   const source = displayMode ? `$$\n${latex}\n$$` : `$${latex}$`
   return (
-    <span
+    <SafeHtmlSpan
       aria-label={`Math: ${latex}`}
       className={displayMode ? 'math math--block' : 'math math--inline'}
       data-latex={latex}
+      html={renderMathToHtml({ latex, displayMode })}
       role="img"
       title={source}
-      dangerouslySetInnerHTML={{ __html: renderMathToHtml({ latex, displayMode }) }}
     />
   )
 }

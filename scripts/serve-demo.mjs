@@ -5,7 +5,14 @@
  */
 
 import http from 'http'
-import fs from 'fs'
+import {
+  closeSync,
+  createReadStream,
+  fstatSync,
+  openSync,
+  opendirSync,
+  readFileSync,
+} from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import matter from 'gray-matter'
@@ -16,8 +23,71 @@ const REPO_DIR = path.resolve(__dirname, '..')
 const PORT = 5173
 
 function isAllowedPath(p) {
-  const resolved = path.resolve(p)
-  return resolved.startsWith(REPO_DIR)
+  return isInsideRelativePath(path.relative(REPO_DIR, p))
+}
+
+function isInsideRelativePath(relative) {
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
+}
+
+function resolveInside(root, target) {
+  const normalizedTarget = path.normalize(target)
+  if (path.isAbsolute(normalizedTarget)) return null
+  const candidate = path.normalize(`${root}${path.sep}${normalizedTarget}`)
+  return isInsideRelativePath(path.relative(root, candidate)) ? candidate : null
+}
+
+function readUtf8File(filePath) {
+  const fd = openSync(filePath, 'r')
+  try {
+    return readFileSync(fd, 'utf-8')
+  } finally {
+    closeSync(fd)
+  }
+}
+
+function pathStats(filePath) {
+  const fd = openSync(filePath, 'r')
+  try {
+    return fstatSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+}
+
+function pathExists(filePath) {
+  try {
+    pathStats(filePath)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function directoryEntries(dir) {
+  const directory = opendirSync(dir)
+  try {
+    const entries = []
+    let entry = directory.readSync()
+    while (entry) {
+      entries.push(entry)
+      entry = directory.readSync()
+    }
+    return entries
+  } finally {
+    directory.closeSync()
+  }
+}
+
+function streamFile(filePath) {
+  const fd = openSync(filePath, 'r')
+  return createReadStream(null, { fd, autoClose: true })
+}
+
+function staticAssetPath(url) {
+  const pathname = new URL(url, 'http://localhost').pathname
+  const requested = pathname === '/' ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '')
+  return resolveInside(DIST_DIR, requested) ?? path.normalize(`${DIST_DIR}${path.sep}index.html`)
 }
 
 const MIME = {
@@ -34,8 +104,9 @@ const MIME = {
 function findMarkdownFiles(dir) {
   const results = []
   try {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name)
+    for (const entry of directoryEntries(dir)) {
+      const full = resolveInside(dir, entry.name)
+      if (!full) continue
       if (entry.isDirectory()) results.push(...findMarkdownFiles(full))
       else if (entry.name.endsWith('.md')) results.push(full)
     }
@@ -51,9 +122,9 @@ function extractWikiLinks(value) {
 
 function parseMarkdownFile(filePath) {
   try {
-    const raw = fs.readFileSync(filePath, 'utf-8')
+    const raw = readUtf8File(filePath)
     const { data: fm, content } = matter(raw)
-    const stat = fs.statSync(filePath)
+    const stat = pathStats(filePath)
 
     const DEDICATED = new Set(['aliases','Is A','Belongs to','Related to','Status','Owner','Cadence','Created at'])
     const relationships = {}
@@ -98,7 +169,7 @@ function serveVaultApi(url, res) {
 
   if (params.pathname === '/api/vault/list') {
     const dir = params.searchParams.get('path')
-    if (!dir || !isAllowedPath(dir) || !fs.existsSync(dir)) {
+    if (!dir || !isAllowedPath(dir) || !pathExists(dir)) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'bad path' })); return true
     }
     const entries = findMarkdownFiles(dir).map(parseMarkdownFile).filter(Boolean)
@@ -109,22 +180,22 @@ function serveVaultApi(url, res) {
 
   if (params.pathname === '/api/vault/content') {
     const file = params.searchParams.get('path')
-    if (!file || !isAllowedPath(file) || !fs.existsSync(file)) {
+    if (!file || !isAllowedPath(file) || !pathExists(file)) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'bad path' })); return true
     }
     res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ content: fs.readFileSync(file, 'utf-8') }))
+    res.end(JSON.stringify({ content: readUtf8File(file) }))
     return true
   }
 
   if (params.pathname === '/api/vault/all-content') {
     const dir = params.searchParams.get('path')
-    if (!dir || !isAllowedPath(dir) || !fs.existsSync(dir)) {
+    if (!dir || !isAllowedPath(dir) || !pathExists(dir)) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'bad path' })); return true
     }
     const map = {}
     for (const f of findMarkdownFiles(dir)) {
-      try { map[f] = fs.readFileSync(f, 'utf-8') } catch {}
+      try { map[f] = readUtf8File(f) } catch {}
     }
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify(map))
@@ -146,13 +217,13 @@ const server = http.createServer((req, res) => {
   }
 
   // Static files
-  let filePath = path.join(DIST_DIR, url === '/' ? 'index.html' : url)
-  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    filePath = path.join(DIST_DIR, 'index.html') // SPA fallback
+  let filePath = staticAssetPath(url)
+  if (!pathExists(filePath) || pathStats(filePath).isDirectory()) {
+    filePath = path.normalize(`${DIST_DIR}${path.sep}index.html`) // SPA fallback
   }
   const ext = path.extname(filePath)
   res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' })
-  fs.createReadStream(filePath).pipe(res)
+  streamFile(filePath).pipe(res)
 })
 
 server.listen(PORT, '0.0.0.0', () => {

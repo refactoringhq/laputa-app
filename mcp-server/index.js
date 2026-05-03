@@ -162,15 +162,6 @@ const TOOLS = [
   },
 ]
 
-const TOOL_HANDLERS = {
-  search_notes: handleSearchNotes,
-  get_vault_context: handleVaultContext,
-  get_note: handleGetNote,
-  open_note: handleOpenNote,
-  highlight_editor: handleHighlightEditor,
-  refresh_vault: handleRefreshVault,
-}
-
 async function handleSearchNotes(args) {
   const results = await searchNotes(VAULT_PATH, args.query, args.limit)
   const text = results.length === 0
@@ -207,6 +198,25 @@ function handleRefreshVault(args) {
   return { content: [{ type: 'text', text: 'Vault refresh triggered' }] }
 }
 
+function callToolHandler(name, args) {
+  switch (name) {
+    case 'search_notes':
+      return handleSearchNotes(args)
+    case 'get_vault_context':
+      return handleVaultContext()
+    case 'get_note':
+      return handleGetNote(args)
+    case 'open_note':
+      return handleOpenNote(args)
+    case 'highlight_editor':
+      return handleHighlightEditor(args)
+    case 'refresh_vault':
+      return handleRefreshVault(args)
+    default:
+      throw new Error(`Unknown tool: ${name}`)
+  }
+}
+
 // --- Server setup ---
 
 const server = new Server(
@@ -220,12 +230,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params
-  const handler = TOOL_HANDLERS[name]
-  if (!handler) {
-    throw new Error(`Unknown tool: ${name}`)
-  }
   try {
-    return await handler(args)
+    return await callToolHandler(name, args)
   } catch (error) {
     return {
       content: [{ type: 'text', text: `Error: ${error.message}` }],

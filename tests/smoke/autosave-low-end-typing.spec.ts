@@ -50,8 +50,11 @@ async function installAutosaveProbe(page: Page) {
         : input instanceof Request
           ? input.url
           : input.toString()
-      if (requestUrl.endsWith('/api/vault/save') && init?.body) {
-        const body = JSON.parse(String(init.body)) as { path?: unknown; content?: unknown }
+      if (requestUrl.endsWith('/api/vault/save')) {
+        const bodyText = init?.body === undefined && input instanceof Request
+          ? await input.clone().text()
+          : String(init?.body ?? '')
+        const body = JSON.parse(bodyText) as { path?: unknown; content?: unknown }
         calls.push({
           path: String(body.path ?? ''),
           content: String(body.content ?? ''),

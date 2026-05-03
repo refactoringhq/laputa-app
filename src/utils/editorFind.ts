@@ -1,3 +1,5 @@
+import { compileSafeUserRegex } from './safeRegex'
+
 export interface EditorFindOptions {
   caseSensitive: boolean
   regex: boolean
@@ -38,11 +40,9 @@ function compileFindPattern(
   const source = options.regex ? query : escapeRegExp(query)
   const flags = `${global ? 'g' : ''}${options.caseSensitive ? '' : 'i'}`
 
-  try {
-    return { error: null, pattern: new RegExp(source, flags) }
-  } catch {
-    return { error: 'Invalid regex', pattern: null }
-  }
+  const compiled = compileSafeUserRegex(source, flags)
+  if (compiled.ok) return { error: null, pattern: compiled.pattern }
+  return { error: compiled.reason === 'invalid' ? 'Invalid regex' : 'Unsafe regex', pattern: null }
 }
 
 export function findEditorMatches(
