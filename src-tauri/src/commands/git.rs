@@ -153,9 +153,7 @@ pub fn git_discard_file(
 #[tauri::command]
 pub fn is_git_repo(vault_path: VaultPathArg) -> bool {
     let vault_path = expand_tilde(&vault_path);
-    std::path::Path::new(vault_path.as_ref())
-        .join(".git")
-        .is_dir()
+    crate::git::GitRepoContext::discover(std::path::Path::new(vault_path.as_ref())).is_ok()
 }
 
 #[cfg(desktop)]
@@ -214,6 +212,9 @@ fn has_tolaria_vault_marker(path: &std::path::Path) -> bool {
 pub fn init_git_repo(vault_path: VaultPathArg) -> Result<(), String> {
     let vault_path = expand_tilde(&vault_path);
     validate_git_init_target(&vault_path)?;
+    if crate::git::GitRepoContext::discover(std::path::Path::new(vault_path.as_ref())).is_ok() {
+        return Ok(());
+    }
     crate::git::init_repo(std::path::Path::new(vault_path.as_ref()))
 }
 
@@ -451,6 +452,66 @@ mod tests {
         init_git_repo(vault.clone()).unwrap();
 
         assert!(is_git_repo(vault));
+    }
+
+    #[test]
+    fn desktop_git_commands_scope_subfolder_vault_to_opened_folder() {
+        let dir = TempDir::new().unwrap();
+        let repo = dir.path();
+        let vault_dir = repo.join("vaults").join("personal");
+        fs::create_dir_all(&vault_dir).unwrap();
+        fs::write(repo.join("outside.md"), "# Outside\n").unwrap();
+        fs::write(vault_dir.join("note.md"), "# Note\n").unwrap();
+
+        let repo_path = repo.to_string_lossy().into_owned();
+        init_git_repo(repo_path).unwrap();
+
+        let vault = vault_dir.to_string_lossy().into_owned();
+        let note = vault_dir.join("note.md").to_string_lossy().into_owned();
+        assert!(is_git_repo(vault.clone()));
+        init_git_repo(vault.clone()).unwrap();
+        assert!(
+            !vault_dir.join(".git").exists(),
+            "initializing an already Git-backed subfolder must not create nested metadata"
+        );
+
+        fs::write(repo.join("outside.md"), "# Outside\n\nChanged outside.\n").unwrap();
+        fs::write(vault_dir.join("note.md"), "# Note\n\nChanged inside.\n").unwrap();
+        fs::write(vault_dir.join("new.md"), "# New inside\n").unwrap();
+
+        let modified = get_modified_files(vault.clone()).unwrap();
+        let paths: Vec<&str> = modified
+            .iter()
+            .map(|file| file.relative_path.as_str())
+            .collect();
+        assert!(paths.contains(&"note.md"));
+        assert!(paths.contains(&"new.md"));
+        assert!(!paths.contains(&"outside.md"));
+        assert!(modified.iter().all(|file| file.path.starts_with(&vault)));
+
+        let diff = get_file_diff(vault.clone(), note.clone()).unwrap();
+        assert!(diff.contains("Changed inside"));
+
+        git_commit(vault.clone(), "Update subfolder vault".to_string()).unwrap();
+        let history = get_file_history(vault.clone(), note.clone()).unwrap();
+        assert!(history
+            .iter()
+            .any(|commit| commit.message == "Update subfolder vault"));
+
+        let after = get_modified_files(vault.clone()).unwrap();
+        assert!(after.is_empty(), "vault changes should be committed: {after:?}");
+
+        let repo_status = std::process::Command::new("git")
+            .args(["status", "--porcelain", "--", "outside.md"])
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        assert!(
+            String::from_utf8_lossy(&repo_status.stdout).contains("outside.md"),
+            "outside repo change must remain uncommitted"
+        );
+
+        assert_eq!(get_conflict_mode(vault), "none");
     }
 
     #[tokio::test]

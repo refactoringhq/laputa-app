@@ -8,7 +8,7 @@ mod pulse;
 mod remote;
 mod status;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub use clone::clone_repo;
@@ -60,6 +60,138 @@ fn git_command() -> Command {
     let mut command = crate::hidden_command("git");
     sanitize_linux_appimage_git_env(&mut command);
     command
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct GitRepoContext {
+    pub worktree_root: PathBuf,
+    pub git_dir: PathBuf,
+    pub vault_path: PathBuf,
+    pub vault_prefix: PathBuf,
+}
+
+impl GitRepoContext {
+    pub fn discover(vault_path: &Path) -> Result<Self, String> {
+        let vault_path = vault_path
+            .canonicalize()
+            .map_err(|e| format!("Cannot resolve vault path: {e}"))?;
+        let worktree_root = git_rev_parse_path(&vault_path, "--show-toplevel")?
+            .canonicalize()
+            .map_err(|e| format!("Cannot resolve Git worktree root: {e}"))?;
+        let git_dir = resolve_git_dir(&vault_path, &worktree_root)?;
+        let vault_prefix = vault_path
+            .strip_prefix(&worktree_root)
+            .map_err(|_| "Vault path is outside the Git worktree".to_string())?
+            .to_path_buf();
+
+        Ok(Self {
+            worktree_root,
+            git_dir,
+            vault_path,
+            vault_prefix,
+        })
+    }
+
+    pub fn is_repo_root(&self) -> bool {
+        self.vault_prefix.as_os_str().is_empty()
+    }
+
+    pub fn vault_pathspec(&self) -> &Path {
+        if self.is_repo_root() {
+            Path::new(".")
+        } else {
+            &self.vault_prefix
+        }
+    }
+
+    pub fn worktree_relative_for_file(&self, file: &Path) -> Result<PathBuf, String> {
+        let file = if file.exists() {
+            file.canonicalize()
+                .map_err(|e| format!("Cannot resolve file path: {e}"))?
+        } else if file.is_absolute() {
+            file.to_path_buf()
+        } else {
+            self.vault_path.join(file)
+        };
+        if !file.starts_with(&self.vault_path) {
+            return Err(format!(
+                "File {} is not inside vault {}",
+                file.display(),
+                self.vault_path.display()
+            ));
+        }
+        let vault_relative = file
+            .strip_prefix(&self.vault_path)
+            .map_err(|_| "File path is outside the vault".to_string())?;
+        reject_parent_dir(vault_relative)?;
+        file.strip_prefix(&self.worktree_root)
+            .map(Path::to_path_buf)
+            .map_err(|_| "File path is outside the Git worktree".to_string())
+    }
+
+    pub fn worktree_relative_from_vault_relative(&self, relative: &Path) -> Result<PathBuf, String> {
+        reject_parent_dir(relative)?;
+        Ok(if self.is_repo_root() {
+            relative.to_path_buf()
+        } else {
+            self.vault_prefix.join(relative)
+        })
+    }
+
+    pub fn vault_relative_from_worktree_relative(&self, relative: &Path) -> Option<PathBuf> {
+        if self.is_repo_root() {
+            return Some(relative.to_path_buf());
+        }
+        relative
+            .strip_prefix(&self.vault_prefix)
+            .ok()
+            .map(Path::to_path_buf)
+    }
+
+    pub fn worktree_relative_str(path: &Path) -> Result<&str, String> {
+        path.to_str()
+            .ok_or_else(|| "Invalid UTF-8 in Git path".to_string())
+    }
+}
+
+fn reject_parent_dir(path: &Path) -> Result<(), String> {
+    for component in path.components() {
+        if matches!(component, std::path::Component::ParentDir) {
+            return Err("File path is outside the vault".into());
+        }
+    }
+    Ok(())
+}
+
+fn git_rev_parse_path(vault_path: &Path, arg: &str) -> Result<PathBuf, String> {
+    let output = git_command()
+        .args(["rev-parse", arg])
+        .current_dir(vault_path)
+        .output()
+        .map_err(|e| format!("Failed to run git rev-parse {arg}: {e}"))?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if raw.is_empty() {
+        return Err(format!("git rev-parse {arg} returned an empty path"));
+    }
+    Ok(PathBuf::from(raw))
+}
+
+fn resolve_git_dir(vault_path: &Path, worktree_root: &Path) -> Result<PathBuf, String> {
+    let raw = git_rev_parse_path(vault_path, "--git-dir")?;
+    let absolute = if raw.is_absolute() {
+        raw
+    } else {
+        vault_path.join(raw)
+    };
+    absolute
+        .canonicalize()
+        .or_else(|_| Ok::<PathBuf, std::io::Error>(worktree_root.join(".git")))
+        .map_err(|e| format!("Cannot resolve Git directory: {e}"))
 }
 
 #[cfg(any(test, all(desktop, target_os = "linux")))]

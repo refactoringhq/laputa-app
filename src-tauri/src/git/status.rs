@@ -1,4 +1,4 @@
-use super::git_command;
+use super::{git_command, GitRepoContext};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -87,24 +87,25 @@ fn parse_numstat_line(line: &str) -> Option<(String, DiffStats)> {
     ))
 }
 
-fn repo_has_head(vault: &Path) -> Result<bool, String> {
+fn repo_has_head(repo: &GitRepoContext) -> Result<bool, String> {
     let output = git_command()
         .args(["rev-parse", "--verify", "HEAD"])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git rev-parse: {e}"))?;
 
     Ok(output.status.success())
 }
 
-fn load_diff_stats(vault: &Path) -> Result<HashMap<String, DiffStats>, String> {
-    if !repo_has_head(vault)? {
+fn load_diff_stats(repo: &GitRepoContext) -> Result<HashMap<String, DiffStats>, String> {
+    if !repo_has_head(repo)? {
         return Ok(HashMap::new());
     }
 
     let output = git_command()
         .args(["diff", "--numstat", "--find-renames", "HEAD", "--"])
-        .current_dir(vault)
+        .arg(repo.vault_pathspec())
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git diff --numstat: {e}"))?;
 
@@ -120,8 +121,8 @@ fn load_diff_stats(vault: &Path) -> Result<HashMap<String, DiffStats>, String> {
         .collect::<HashMap<_, _>>())
 }
 
-fn count_worktree_lines(vault: &Path, relative_path: &Path) -> DiffStats {
-    let full_path = vault.join(relative_path);
+fn count_worktree_lines(repo: &GitRepoContext, vault_relative_path: &Path) -> DiffStats {
+    let full_path = repo.vault_path.join(vault_relative_path);
     let added_lines = std::fs::read_to_string(full_path)
         .ok()
         .map(|content| content.lines().count());
@@ -134,20 +135,21 @@ fn count_worktree_lines(vault: &Path, relative_path: &Path) -> DiffStats {
 }
 
 fn resolve_diff_stats(
-    vault: &Path,
-    relative_path: &Path,
+    repo: &GitRepoContext,
+    worktree_relative_path: &Path,
+    vault_relative_path: &Path,
     status: FileChangeStatus,
     diff_stats: &HashMap<String, DiffStats>,
 ) -> DiffStats {
     if status == FileChangeStatus::Untracked {
-        return count_worktree_lines(vault, relative_path);
+        return count_worktree_lines(repo, vault_relative_path);
     }
 
-    let key = relative_path.to_string_lossy();
+    let key = worktree_relative_path.to_string_lossy();
     diff_stats.get(key.as_ref()).copied().unwrap_or_default()
 }
 
-fn ensure_path_within_vault(vault: &Path, relative_path: &Path, abs: &Path) -> Result<(), String> {
+fn ensure_path_within_vault(repo: &GitRepoContext, relative_path: &Path, abs: &Path) -> Result<(), String> {
     for component in relative_path.components() {
         if matches!(component, std::path::Component::ParentDir) {
             return Err("File path is outside the vault".into());
@@ -158,25 +160,22 @@ fn ensure_path_within_vault(vault: &Path, relative_path: &Path, abs: &Path) -> R
         return Ok(());
     }
 
-    let canonical_vault = vault
-        .canonicalize()
-        .map_err(|e| format!("Cannot resolve vault path: {e}"))?;
     let canonical_file = abs
         .canonicalize()
         .map_err(|e| format!("Cannot resolve file path: {e}"))?;
 
-    if canonical_file.starts_with(&canonical_vault) {
+    if canonical_file.starts_with(&repo.vault_path) {
         Ok(())
     } else {
         Err("File path is outside the vault".into())
     }
 }
 
-fn load_file_status(vault: &Path, relative_path: &Path) -> Result<String, String> {
+fn load_file_status(repo: &GitRepoContext, worktree_relative_path: &Path) -> Result<String, String> {
     let output = git_command()
         .args(["status", "--porcelain", "--"])
-        .arg(relative_path)
-        .current_dir(vault)
+        .arg(worktree_relative_path)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git status: {e}"))?;
 
@@ -188,17 +187,17 @@ fn load_file_status(vault: &Path, relative_path: &Path) -> Result<String, String
         .unwrap_or_default())
 }
 
-fn restore_tracked_file(vault: &Path, relative_path: &Path) -> Result<(), String> {
+fn restore_tracked_file(repo: &GitRepoContext, worktree_relative_path: &Path) -> Result<(), String> {
     let _ = git_command()
         .args(["reset", "HEAD", "--"])
-        .arg(relative_path)
-        .current_dir(vault)
+        .arg(worktree_relative_path)
+        .current_dir(&repo.worktree_root)
         .output();
 
     let checkout = git_command()
         .args(["checkout", "--"])
-        .arg(relative_path)
-        .current_dir(vault)
+        .arg(worktree_relative_path)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git checkout: {e}"))?;
 
@@ -212,10 +211,12 @@ fn restore_tracked_file(vault: &Path, relative_path: &Path) -> Result<(), String
 
 /// Get list of modified/added/deleted files in the vault (uncommitted changes).
 pub fn get_modified_files(vault_path: &str) -> Result<Vec<ModifiedFile>, String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
     let output = git_command()
         .args(["status", "--porcelain", "--untracked-files=all"])
-        .current_dir(vault)
+        .arg("--")
+        .arg(repo.vault_pathspec())
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git status: {e}"))?;
 
@@ -224,7 +225,7 @@ pub fn get_modified_files(vault_path: &str) -> Result<Vec<ModifiedFile>, String>
         return Err(format!("git status failed: {}", stderr.trim()));
     }
 
-    let diff_stats = load_diff_stats(vault)?;
+    let diff_stats = load_diff_stats(&repo)?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let files = stdout
         .lines()
@@ -234,20 +235,28 @@ pub fn get_modified_files(vault_path: &str) -> Result<Vec<ModifiedFile>, String>
                 return None;
             }
             let status_code = &line[..2];
-            let relative_path = parse_status_path(&line[3..]);
+            let worktree_relative_path = Path::new(&parse_status_path(&line[3..])).to_path_buf();
+            let vault_relative_path = repo.vault_relative_from_worktree_relative(&worktree_relative_path)?;
+            let vault_relative_path_str = vault_relative_path.to_string_lossy().to_string();
 
             // Only include markdown files
-            if !relative_path.ends_with(".md") {
+            if !vault_relative_path_str.ends_with(".md") {
                 return None;
             }
 
             let status = FileChangeStatus::from_code(status_code);
-            let full_path = vault.join(&relative_path).to_string_lossy().to_string();
-            let stats = resolve_diff_stats(vault, Path::new(&relative_path), status, &diff_stats);
+            let full_path = repo.vault_path.join(&vault_relative_path).to_string_lossy().to_string();
+            let stats = resolve_diff_stats(
+                &repo,
+                &worktree_relative_path,
+                &vault_relative_path,
+                status,
+                &diff_stats,
+            );
 
             Some(ModifiedFile {
                 path: full_path,
-                relative_path,
+                relative_path: vault_relative_path_str,
                 status: status.label().to_string(),
                 added_lines: stats.added_lines,
                 deleted_lines: stats.deleted_lines,
@@ -267,12 +276,13 @@ pub fn get_modified_files(vault_path: &str) -> Result<Vec<ModifiedFile>, String>
 /// The `relative_path` must be relative to `vault_path` (the same format
 /// returned by [`get_modified_files`]).
 pub fn discard_file_changes(vault_path: &str, relative_path: &str) -> Result<(), String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
     let relative = Path::new(relative_path);
-    let abs = vault.join(relative);
+    let abs = repo.vault_path.join(relative);
+    let worktree_relative = repo.worktree_relative_from_vault_relative(relative)?;
 
-    ensure_path_within_vault(vault, relative, &abs)?;
-    let status_code = load_file_status(vault, relative)?;
+    ensure_path_within_vault(&repo, relative, &abs)?;
+    let status_code = load_file_status(&repo, &worktree_relative)?;
 
     match status_code.as_str() {
         "??" => {
@@ -280,7 +290,7 @@ pub fn discard_file_changes(vault_path: &str, relative_path: &str) -> Result<(),
                 .map_err(|e| format!("Failed to delete untracked file: {e}"))?;
         }
         _ => {
-            restore_tracked_file(vault, relative)?;
+            restore_tracked_file(&repo, &worktree_relative)?;
         }
     }
 

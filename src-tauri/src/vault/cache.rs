@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use uuid::Uuid;
 
-use crate::git::{get_all_file_dates, GitDates};
+use crate::git::{get_all_file_dates, GitDates, GitRepoContext};
 use std::collections::HashMap;
 
 use super::{is_md_file, parse_md_file, parse_non_md_file, scan_vault, VaultEntry};
@@ -120,7 +120,8 @@ fn legacy_cache_path(vault: &Path) -> PathBuf {
 }
 
 fn git_head_hash(vault: &Path) -> Option<String> {
-    run_git(vault, &["rev-parse", "HEAD"]).map(|s| s.trim().to_string())
+    let repo = GitRepoContext::discover(vault).ok()?;
+    run_git(&repo.worktree_root, &["rev-parse", "HEAD"]).map(|s| s.trim().to_string())
 }
 
 /// Run a git command in the given directory and return stdout if successful.
@@ -173,9 +174,16 @@ fn has_hidden_segment(path: &str) -> bool {
 }
 
 fn git_changed_files(vault: &Path, from_hash: &str, to_hash: &str) -> Vec<String> {
+    let Ok(repo) = GitRepoContext::discover(vault) else {
+        return Vec::new();
+    };
     let diff_arg = format!("{}..{}", from_hash, to_hash);
-    let mut files = run_git(vault, &["diff", &diff_arg, "--name-only"])
-        .map(|s| collect_paths_from_diff(&s))
+    let pathspec = repo.vault_pathspec().to_string_lossy().to_string();
+    let mut files = run_git(
+        &repo.worktree_root,
+        &["diff", &diff_arg, "--name-only", "--", &pathspec],
+    )
+        .map(|s| collect_vault_relative_paths_from_diff(&s, &repo))
         .unwrap_or_default();
 
     // Include uncommitted changes (modified, staged, and untracked files).
@@ -191,19 +199,30 @@ fn git_changed_files(vault: &Path, from_hash: &str, to_hash: &str) -> Vec<String
 }
 
 fn git_uncommitted_files(vault: &Path) -> Vec<String> {
+    let Ok(repo) = GitRepoContext::discover(vault) else {
+        return Vec::new();
+    };
+    let pathspec = repo.vault_pathspec().to_string_lossy().to_string();
     // Modified/staged tracked files from git status --porcelain
-    let mut files: Vec<String> = run_git(vault, &["status", "--porcelain"])
-        .map(|s| collect_paths_from_porcelain(&s))
+    let mut files: Vec<String> = run_git(
+        &repo.worktree_root,
+        &["status", "--porcelain", "--", &pathspec],
+    )
+        .map(|s| collect_vault_relative_paths_from_porcelain(&s, &repo))
         .unwrap_or_default();
 
     // Untracked files via ls-files (lists individual files, not just directories).
     // git status --porcelain shows `?? dir/` for new directories, hiding individual
     // files inside — ls-files resolves them so the cache picks up all new files.
-    let untracked = run_git(vault, &["ls-files", "--others", "--exclude-standard"])
+    let untracked = run_git(
+        &repo.worktree_root,
+        &["ls-files", "--others", "--exclude-standard", "--", &pathspec],
+    )
         .map(|s| {
             s.lines()
                 .filter(|l| !l.is_empty() && !has_hidden_segment(l))
-                .map(|l| l.to_string())
+                .filter_map(|l| repo.vault_relative_from_worktree_relative(Path::new(l)))
+                .map(|path| path.to_string_lossy().to_string())
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
@@ -215,6 +234,22 @@ fn git_uncommitted_files(vault: &Path) -> Vec<String> {
     }
 
     files
+}
+
+fn collect_vault_relative_paths_from_diff(stdout: &str, repo: &GitRepoContext) -> Vec<String> {
+    collect_paths_from_diff(stdout)
+        .into_iter()
+        .filter_map(|path| repo.vault_relative_from_worktree_relative(Path::new(&path)))
+        .map(|path| path.to_string_lossy().to_string())
+        .collect()
+}
+
+fn collect_vault_relative_paths_from_porcelain(stdout: &str, repo: &GitRepoContext) -> Vec<String> {
+    collect_paths_from_porcelain(stdout)
+        .into_iter()
+        .filter_map(|path| repo.vault_relative_from_worktree_relative(Path::new(&path)))
+        .map(|path| path.to_string_lossy().to_string())
+        .collect()
 }
 
 fn cache_fingerprint(bytes: &[u8]) -> CacheFileFingerprint {

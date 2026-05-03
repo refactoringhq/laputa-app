@@ -1,4 +1,4 @@
-use super::git_command;
+use super::{git_command, GitRepoContext};
 use std::path::Path;
 
 struct CommitFailure {
@@ -8,12 +8,13 @@ struct CommitFailure {
 
 /// Commit all changes with a message.
 pub fn git_commit(vault_path: &str, message: &str) -> Result<String, String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
 
     // Stage all changes
     let add = git_command()
-        .args(["add", "-A"])
-        .current_dir(vault)
+        .args(["add", "-A", "--"])
+        .arg(repo.vault_pathspec())
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git add: {}", e))?;
 
@@ -22,10 +23,10 @@ pub fn git_commit(vault_path: &str, message: &str) -> Result<String, String> {
         return Err(format!("git add failed: {}", stderr));
     }
 
-    match run_commit(vault, message, false) {
+    match run_commit(&repo.worktree_root, message, false) {
         Ok(stdout) => Ok(stdout),
         Err(failure) if is_commit_signing_failure(&failure.detail()) => {
-            run_commit(vault, message, true).map_err(|retry_failure| {
+            run_commit(&repo.worktree_root, message, true).map_err(|retry_failure| {
                 format!(
                     "git commit signing failed; retried without signing but git commit still failed: {}",
                     retry_failure.detail()

@@ -1,16 +1,12 @@
-use super::git_command;
+use super::{git_command, GitRepoContext};
 use std::path::Path;
 
 use super::GitCommit;
 
 /// Get git log history for a specific file in the vault.
 pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitCommit>, String> {
-    let vault = Path::new(vault_path);
-    let file = Path::new(file_path);
-
-    let relative = file
-        .strip_prefix(vault)
-        .map_err(|_| format!("File {} is not inside vault {}", file_path, vault_path))?;
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
+    let relative = repo.worktree_relative_for_file(Path::new(file_path))?;
 
     let relative_str = relative
         .to_str()
@@ -25,7 +21,7 @@ pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitComm
             "--",
             relative_str,
         ])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git log: {}", e))?;
 
@@ -68,12 +64,9 @@ pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitComm
 
 /// Get git diff for a specific file.
 pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String> {
-    let vault = Path::new(vault_path);
     let file = Path::new(file_path);
-
-    let relative = file
-        .strip_prefix(vault)
-        .map_err(|_| format!("File {} is not inside vault {}", file_path, vault_path))?;
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
+    let relative = repo.worktree_relative_for_file(file)?;
 
     let relative_str = relative
         .to_str()
@@ -82,7 +75,7 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
     // First try tracked file diff
     let output = git_command()
         .args(["diff", "--", relative_str])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
@@ -92,7 +85,7 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
     if stdout.is_empty() {
         let cached = git_command()
             .args(["diff", "--cached", "--", relative_str])
-            .current_dir(vault)
+            .current_dir(&repo.worktree_root)
             .output()
             .map_err(|e| format!("Failed to run git diff --cached: {}", e))?;
 
@@ -104,7 +97,7 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
         // Try showing untracked file as all-new
         let status = git_command()
             .args(["status", "--porcelain", "--", relative_str])
-            .current_dir(vault)
+            .current_dir(&repo.worktree_root)
             .output()
             .map_err(|e| format!("Failed to run git status: {}", e))?;
 
@@ -132,12 +125,8 @@ pub fn get_file_diff_at_commit(
     file_path: &str,
     commit_hash: &str,
 ) -> Result<String, String> {
-    let vault = Path::new(vault_path);
-    let file = Path::new(file_path);
-
-    let relative = file
-        .strip_prefix(vault)
-        .map_err(|_| format!("File {} is not inside vault {}", file_path, vault_path))?;
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
+    let relative = repo.worktree_relative_for_file(Path::new(file_path))?;
 
     let relative_str = relative
         .to_str()
@@ -152,7 +141,7 @@ pub fn get_file_diff_at_commit(
             "--",
             relative_str,
         ])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
@@ -163,7 +152,7 @@ pub fn get_file_diff_at_commit(
     if stdout.is_empty() {
         let show = git_command()
             .args(["show", &format!("{}:{}", commit_hash, relative_str)])
-            .current_dir(vault)
+            .current_dir(&repo.worktree_root)
             .output()
             .map_err(|e| format!("Failed to run git show: {}", e))?;
 

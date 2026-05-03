@@ -64,10 +64,10 @@ Git is a per-vault capability, not a prerequisite for the document model. A vaul
 
 | State | Meaning | UI behavior |
 |---|---|---|
-| Git-backed | The vault path contains a Git repository | History, changes, commits, sync, conflict resolution, remotes, AutoGit, and auto-sync are available according to remote/config state |
+| Git-backed | The vault path is inside a Git worktree, either at the repo root or in a subfolder | History, changes, commits, sync, conflict resolution, remotes, AutoGit, and auto-sync are available according to remote/config state |
 | Non-git | The vault path is a plain folder | Markdown scanning, editing, search, and navigation work; Git-dependent status-bar controls and command-palette entries are replaced by `Git disabled` + `Initialize Git for Current Vault` |
 
-Plain folders become Git-backed only when the user explicitly runs Git initialization from the setup dialog, status bar, or command palette. Features that depend on Git must check this capability instead of assuming every vault has `.git`.
+Plain folders become Git-backed only when the user explicitly runs Git initialization from the setup dialog, status bar, or command palette. Features that depend on Git must check this capability with Git discovery instead of assuming every vault has `.git`. When a vault is a subfolder of a larger repository, Tolaria uses the parent repository for branch/remotes/pull/push but scopes Changes, diffs, history, Pulse, conflict files, discard, conflict resolution, and app-created commits to the opened vault subtree.
 
 Git initialization is intentionally scoped to dedicated vault folders. When the current non-git folder looks like a broad personal root such as Documents, Desktop, or Downloads and does not already carry Tolaria-managed vault markers, `init_git_repo` refuses to run Git and asks the user to select or create a dedicated subfolder instead.
 
