@@ -307,6 +307,24 @@ describe('BreadcrumbBar — action buttons always right-aligned', () => {
     expect(widthActionGroup).toHaveClass('gap-2')
   })
 
+  it('end-aligns toolbar action tooltips so zoomed windows keep them inside the right edge', async () => {
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        onToggleFavorite={vi.fn()}
+      />,
+    )
+
+    act(() => {
+      fireEvent.focus(screen.getByRole('button', { name: 'Add to favorites' }))
+    })
+
+    const tooltip = await screen.findByRole('tooltip')
+    expect(document.querySelector('[data-slot="tooltip-content"]')).toHaveAttribute('data-align', 'end')
+    expect(tooltip).toHaveTextContent('Add to favorites')
+  })
+
   it('lets the title use the free space before the fixed drag gap', () => {
     const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
 
