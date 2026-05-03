@@ -194,6 +194,11 @@ interface Tab {
   content: string
 }
 
+function findRenameEntry(entries: VaultEntry[], tabs: Tab[], path: string): VaultEntry | undefined {
+  return entries.find((entry) => entry.path === path)
+    ?? tabs.find((tab) => tab.entry.path === path)?.entry
+}
+
 function renameErrorMessage(err: unknown): string {
   const message = typeof err === 'string'
     ? err.trim()
@@ -251,10 +256,11 @@ function useRenameResultApplier(
     onEntryRenamed: (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, newContent: string) => void,
     options?: ApplyRenameOptions,
   ) => {
-    const entry = entries.find((item) => item.path === oldPath)
+    const currentTabs = tabsRef.current
+    const entry = findRenameEntry(entries, currentTabs, oldPath)
     const newContent = await loadNoteContent({ path: result.new_path })
     const newEntry = buildEntry(entry, result.new_path)
-    const otherTabPaths = tabsRef.current.filter((tab) => tab.entry.path !== oldPath).map((tab) => tab.entry.path)
+    const otherTabPaths = currentTabs.filter((tab) => tab.entry.path !== oldPath).map((tab) => tab.entry.path)
     setTabs((prev) => prev.map((tab) => tab.entry.path === oldPath ? { entry: newEntry, content: newContent } : tab))
     if (activeTabPathRef.current === oldPath) handleSwitchTab(result.new_path)
     onEntryRenamed(oldPath, newEntry, newContent)
@@ -322,7 +328,7 @@ export function useNoteRename(config: NoteRenameConfig, tabDeps: RenameTabDeps) 
     path: string, newTitle: string, vaultPath: string,
     onEntryRenamed: (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, newContent: string) => void,
   ) => {
-    const entry = entries.find((e) => e.path === path)
+    const entry = findRenameEntry(entries, tabsRef.current, path)
     await runRenameAction({
       path,
       perform: () => performRename({ path, newTitle, vaultPath, oldTitle: entry?.title }),
@@ -333,7 +339,7 @@ export function useNoteRename(config: NoteRenameConfig, tabDeps: RenameTabDeps) 
       errorMessage: renameErrorMessage,
       logLabel: 'Failed to rename note',
     })
-  }, [entries, applyRenameResult, setToastMessage])
+  }, [entries, tabsRef, applyRenameResult, setToastMessage])
 
   const handleRenameFilename = useCallback(async (
     path: string,
