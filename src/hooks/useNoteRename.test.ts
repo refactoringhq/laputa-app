@@ -230,6 +230,41 @@ describe('useNoteRename hook', () => {
     expect(setToastMessage).toHaveBeenCalledWith('Updated 1 note')
   })
 
+  it('preserves active tab metadata when filename rename lands after a stale vault reload', async () => {
+    const entry = makeEntry({ path: '/vault/untitled-1.md', filename: 'untitled-1.md', title: 'Fresh Title' })
+    let tabs = [{ entry, content: '# Fresh Title\n' }]
+    const setTabs = vi.fn((update: typeof tabs | ((prev: typeof tabs) => typeof tabs)) => {
+      tabs = typeof update === 'function' ? update(tabs) : update
+    })
+    vi.mocked(mockInvoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'rename_note_filename') return { new_path: '/vault/fresh-title.md', updated_files: 0, failed_updates: 0 }
+      if (cmd === 'get_note_content') return '# Fresh Title\n'
+      return ''
+    })
+
+    const { result } = renderHook(() => useNoteRename(
+      { entries: [], setToastMessage },
+      { tabs, setTabs, activeTabPathRef, handleSwitchTab, updateTabContent },
+    ))
+
+    const onEntryRenamed = vi.fn()
+    await act(async () => {
+      await result.current.handleRenameFilename('/vault/untitled-1.md', 'fresh-title', '/vault', onEntryRenamed)
+    })
+
+    expect(tabs[0].entry).toEqual(expect.objectContaining({
+      path: '/vault/fresh-title.md',
+      filename: 'fresh-title.md',
+      title: 'Fresh Title',
+      isA: 'Note',
+    }))
+    expect(onEntryRenamed).toHaveBeenCalledWith(
+      '/vault/untitled-1.md',
+      expect.objectContaining({ title: 'Fresh Title', filename: 'fresh-title.md' }),
+      '# Fresh Title\n',
+    )
+  })
+
   it('warns when rename succeeds but some backlink rewrites fail', async () => {
     const entry = makeEntry({ path: '/vault/old.md', title: 'Old' })
     await runHandleRenameNote({

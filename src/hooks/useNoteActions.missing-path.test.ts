@@ -85,6 +85,31 @@ describe('useNoteActions missing-path recovery', () => {
     warnSpy.mockRestore()
   })
 
+  it('recovers from missing stale sidebar entries with incomplete string metadata', async () => {
+    vi.mocked(mockInvoke).mockRejectedValueOnce(new Error('File does not exist: /test/vault/reloaded.md'))
+    const staleEntry = {
+      ...makeEntry({ path: '/test/vault/reloaded.md' }),
+      filename: undefined,
+      title: undefined,
+    } as unknown as VaultEntry
+    const config = makeConfig()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const { result } = renderHook(() => useNoteActions(config))
+
+    await act(async () => {
+      await result.current.handleSelectNote(staleEntry)
+    })
+
+    expect(result.current.tabs).toEqual([])
+    expect(result.current.activeTabPath).toBeNull()
+    expect(config.reloadVault).toHaveBeenCalledTimes(1)
+    expect(config.setToastMessage).toHaveBeenCalledWith(
+      '"Note" could not be opened because its file is missing or moved.',
+    )
+    warnSpy.mockRestore()
+  })
+
   it('shows a toast without reloading the vault when note content is not valid UTF-8 text', async () => {
     vi.mocked(mockInvoke).mockRejectedValueOnce(new Error('File is not valid UTF-8 text: /test/vault/bad.csv'))
     const config = makeConfig({ entries: [makeEntry({ path: '/test/vault/bad.csv', filename: 'bad.csv', title: 'bad.csv', fileKind: 'text' })] })

@@ -47,6 +47,16 @@ function isTitleKey(key: string): boolean {
   return key.toLowerCase().replace(/\s+/g, '_') === 'title'
 }
 
+function safeString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function entryDisplayLabel(entry: VaultEntry): string {
+  return safeString(entry.title).trim()
+    || safeString(entry.filename).trim()
+    || 'Note'
+}
+
 interface TitleRenameDeps {
   vaultPath: string
   tabsRef: React.MutableRefObject<{ entry: VaultEntry; content: string }[]>
@@ -210,12 +220,12 @@ function buildTabManagementOptions(
       void config.onMissingActiveVault?.(entry, error)
     },
     onMissingNotePath: (entry) => {
-      const label = entry.title.trim() || entry.filename
+      const label = entryDisplayLabel(entry)
       config.setToastMessage(`"${label}" could not be opened because its file is missing or moved.`)
       void config.reloadVault?.()
     },
     onUnreadableNoteContent: (entry) => {
-      const label = entry.title.trim() || entry.filename
+      const label = entryDisplayLabel(entry)
       config.setToastMessage(`"${label}" could not be opened because it is not valid UTF-8 text.`)
     },
   }
