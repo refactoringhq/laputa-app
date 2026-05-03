@@ -2,6 +2,8 @@ type NoteOpenStage =
   | 'beforeNavigateStart'
   | 'beforeNavigateEnd'
   | 'cacheReady'
+  | 'freshnessCheckStart'
+  | 'freshnessCheckEnd'
   | 'contentLoadStart'
   | 'contentLoadEnd'
   | 'editorSwapped'
@@ -70,14 +72,17 @@ export function finishNoteOpenTrace(path: string): void {
   trace.marks.editorSwapped = performance.now()
   const total = trace.marks.editorSwapped - trace.startedAt
   const beforeNavigate = measureDuration(trace, 'beforeNavigateStart', 'beforeNavigateEnd')
+  const freshnessCheck = measureDuration(trace, 'freshnessCheckStart', 'freshnessCheckEnd')
   const contentLoad = measureDuration(trace, 'contentLoadStart', 'contentLoadEnd')
   const editorSwap = measureDuration(trace, 'contentLoadEnd', 'editorSwapped')
+    ?? measureDuration(trace, 'freshnessCheckEnd', 'editorSwapped')
     ?? measureDuration(trace, 'beforeNavigateEnd', 'editorSwapped')
     ?? measureDuration(trace, 'startedAt', 'editorSwapped')
 
   logPerf(
     `noteOpen path=${path} source=${trace.source} total=${formatDuration(total)} `
     + `beforeNavigate=${formatDuration(beforeNavigate)} `
+    + `freshnessCheck=${formatDuration(freshnessCheck)} `
     + `contentLoad=${formatDuration(contentLoad)} `
     + `editorSwap=${formatDuration(editorSwap)} `
     + `cache=${trace.marks.cacheReady !== undefined ? 'hit' : 'miss'}`,

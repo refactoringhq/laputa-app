@@ -62,6 +62,10 @@ describe('detectYamlError', () => {
     expect(detectYamlError('---\ntitle: My Note\n---\n\n# Title')).toBeNull()
   })
 
+  it('returns null for valid CRLF frontmatter', () => {
+    expect(detectYamlError('---\r\ntitle: My Note\r\n---\r\n\r\n# Title')).toBeNull()
+  })
+
   it('returns error for unclosed frontmatter', () => {
     const error = detectYamlError('---\ntitle: My Note\n\n# Title')
     expect(error).toContain('Unclosed frontmatter')

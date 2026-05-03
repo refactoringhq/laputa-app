@@ -1,32 +1,58 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 import type { useCreateBlockNote } from '@blocknote/react'
 import type { VaultEntry } from '../types'
-import { splitFrontmatter, preProcessWikilinks, injectWikilinks, restoreWikilinksInBlocks } from '../utils/wikilinks'
+import { splitFrontmatter, restoreWikilinksInBlocks } from '../utils/wikilinks'
 import { compactMarkdown } from '../utils/compact-markdown'
-import { injectMathInBlocks, preProcessMathMarkdown, serializeMathAwareBlocks } from '../utils/mathMarkdown'
+import { serializeMermaidAwareBlocks } from '../utils/mermaidMarkdown'
 import { failNoteOpenTrace, finishNoteOpenTrace } from '../utils/noteOpenPerformance'
-import { resolveImageUrls, portableImageUrls } from '../utils/vaultImages'
+import { portableImageUrls } from '../utils/vaultImages'
+import { useEditorMountState, useLatestRef } from './editorTabSwapLifecycle'
 import {
+  applyBlankStateToEditor,
+  applyBlocksToEditor,
+  type EditorContentPathRef,
+} from './editorContentSwapApply'
+import {
+  consumeRawModeTransition,
+  flushBeforePathChange,
+  flushBeforeRawMode,
+  useDebouncedEditorChange,
+} from './editorChangeDebounce'
+import {
+  blankParagraphBlocks,
   extractEditorBody,
   getH1TextFromBlocks,
   isUntitledPath,
-  normalizeParsedImageBlocks,
   pathStem,
   slugifyPathStem,
 } from './editorTabContent'
 import { clearEditorDomSelection, EDITOR_CONTAINER_SELECTOR } from './editorDomSelection'
+import {
+  cacheEditorState,
+  cacheParsedEditorState,
+  cacheResolvedEditorState,
+  isBlankBodyContent,
+  resolveBlocksForTarget,
+  resolveEmptyHeadingBlocks,
+  startsWithEmptyHeading,
+  type CachedTabState,
+} from './editorBlockResolution'
+import {
+  createSwapToken,
+  invalidatePendingSwap,
+  shouldAbortSwap,
+  type SwapToken,
+} from './editorSwapToken'
+import { useParsedBlockPreload } from './editorParsedBlockPreload'
 export { extractEditorBody, getH1TextFromBlocks, replaceTitleInFrontmatter } from './editorTabContent'
+export { RICH_EDITOR_CHANGE_DEBOUNCE_MS } from './editorChangeDebounce'
 
 interface Tab {
   entry: VaultEntry
   content: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- BlockNote block arrays
-type EditorBlocks = any[]
-type CachedTabState = { blocks: EditorBlocks; scrollTop: number; sourceContent: string }
 type PendingLocalContent = { path: string; content: string }
-const TAB_STATE_CACHE_LIMIT = 24
 
 interface TabSwapState {
   cache: Map<string, CachedTabState>
@@ -47,6 +73,32 @@ interface UseEditorTabSwapOptions {
   vaultPath?: string
 }
 
+interface RunTabSwapEffectOptions {
+  tabs: Tab[]
+  activeTabPath: string | null
+  editor: ReturnType<typeof useCreateBlockNote>
+  rawMode?: boolean
+  tabCacheRef: MutableRefObject<Map<string, CachedTabState>>
+  tabsRef: MutableRefObject<Tab[]>
+  prevActivePathRef: MutableRefObject<string | null>
+  editorMountedRef: MutableRefObject<boolean>
+  pendingSwapRef: MutableRefObject<(() => void) | null>
+  swapSeqRef: MutableRefObject<number>
+  prevRawModeRef: MutableRefObject<boolean>
+  rawSwapPendingRef: MutableRefObject<boolean>
+  suppressChangeRef: MutableRefObject<boolean>
+  editorContentPathRef: EditorContentPathRef
+  pendingLocalContentRef: MutableRefObject<PendingLocalContent | null>
+  flushPendingEditorChange: () => boolean
+  vaultPath?: string
+}
+
+interface UseTabSwapEffectOptions extends Omit<RunTabSwapEffectOptions, 'vaultPath'> {
+  vaultPathRef: MutableRefObject<string | undefined>
+}
+
+type ParsedBlockPreloadEvent = { path: string; content: string }
+
 function signalEditorTabSwapped(path: string): void {
   window.dispatchEvent(new CustomEvent('laputa:editor-tab-swapped', {
     detail: { path },
@@ -57,203 +109,6 @@ function signalEditorTabSwapped(path: string): void {
 function readEditorScrollTop(): number {
   const scrollEl = document.querySelector(EDITOR_CONTAINER_SELECTOR)
   return scrollEl?.scrollTop ?? 0
-}
-
-function cacheEditorState(
-  cache: Map<string, CachedTabState>,
-  path: string,
-  nextState: CachedTabState,
-) {
-  if (cache.has(path)) cache.delete(path)
-  cache.set(path, nextState)
-  while (cache.size > TAB_STATE_CACHE_LIMIT) {
-    const oldestPath = cache.keys().next().value
-    if (!oldestPath) return
-    cache.delete(oldestPath)
-  }
-}
-
-function buildFastPathBlocks(options: { preprocessed: string }): EditorBlocks | null {
-  const { preprocessed } = options
-  const trimmed = preprocessed.trim()
-
-  if (!trimmed) {
-    return [{ type: 'paragraph', content: [] }]
-  }
-
-  if (trimmed === '#') {
-    return [
-      { type: 'heading', props: { level: 1, textColor: 'default', backgroundColor: 'default', textAlignment: 'left' }, content: [], children: [] },
-      { type: 'paragraph', content: [], children: [] },
-    ]
-  }
-
-  const h1OnlyMatch = trimmed.match(/^# (.+)$/)
-  if (!h1OnlyMatch) return null
-
-  return [
-    { type: 'heading', props: { level: 1, textColor: 'default', backgroundColor: 'default', textAlignment: 'left' }, content: [{ type: 'text', text: h1OnlyMatch[1], styles: {} }], children: [] },
-    { type: 'paragraph', content: [], children: [] },
-  ]
-}
-
-function isBlankBodyContent(options: { content: string }): boolean {
-  const { content } = options
-  return extractEditorBody(content).trim() === ''
-}
-
-function extractBodyRemainderAfterEmptyH1(options: { content: string }): string | null {
-  const { content } = options
-  const body = extractEditorBody(content)
-  const [firstLine, secondLine, ...rest] = body.split('\n')
-  if (!firstLine) return null
-
-  const normalizedFirstLine = firstLine.trimEnd()
-  if (normalizedFirstLine !== '#' && normalizedFirstLine !== '# ') return null
-
-  if (secondLine === '') {
-    return rest.join('\n').trimStart()
-  }
-
-  return [secondLine, ...rest].join('\n').trimStart()
-}
-
-function blankParagraphBlocks(): EditorBlocks {
-  return [{ type: 'paragraph', content: [], children: [] }]
-}
-
-async function parseMarkdownBlocks(
-  editor: ReturnType<typeof useCreateBlockNote>,
-  preprocessed: string,
-): Promise<EditorBlocks> {
-  const result = editor.tryParseMarkdownToBlocks(preprocessed)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- tryParseMarkdownToBlocks returns sync or async BlockNote blocks
-  if (result && typeof (result as any).then === 'function') {
-    return (result as unknown as Promise<EditorBlocks>)
-  }
-  return result as EditorBlocks
-}
-
-async function resolveBlocksForTarget(
-  options: {
-    editor: ReturnType<typeof useCreateBlockNote>
-    cache: Map<string, CachedTabState>
-    targetPath: string
-    content: string
-    vaultPath?: string
-  },
-): Promise<CachedTabState> {
-  const { editor, cache, targetPath, content, vaultPath } = options
-  const cached = cache.get(targetPath)
-  if (cached?.sourceContent === content) return cached
-
-  const body = extractEditorBody(content)
-  const withImages = vaultPath ? resolveImageUrls(body, vaultPath) : body
-  const preprocessed = preProcessMathMarkdown({ markdown: preProcessWikilinks(withImages) })
-  const fastPathBlocks = buildFastPathBlocks({ preprocessed })
-  if (fastPathBlocks) {
-    const nextState = { blocks: fastPathBlocks, scrollTop: 0, sourceContent: content }
-    cacheEditorState(cache, targetPath, nextState)
-    return nextState
-  }
-
-  const parsed = normalizeParsedImageBlocks(await parseMarkdownBlocks(editor, preprocessed)) as EditorBlocks
-  const withWikilinks = injectWikilinks(parsed)
-  const withMath = injectMathInBlocks(withWikilinks)
-  const nextState = { blocks: withMath, scrollTop: 0, sourceContent: content }
-  cacheEditorState(cache, targetPath, nextState)
-  return nextState
-}
-
-function applyBlocksToEditor(
-  editor: ReturnType<typeof useCreateBlockNote>,
-  blocks: EditorBlocks,
-  scrollTop: number,
-  suppressChangeRef: MutableRefObject<boolean>,
-) {
-  suppressChangeRef.current = true
-  try {
-    const current = editor.document
-    if (current.length > 0 && blocks.length > 0) {
-      editor.replaceBlocks(current, blocks)
-    } else if (blocks.length > 0) {
-      editor.insertBlocks(blocks, current[0], 'before')
-    }
-  } catch (err) {
-    console.error('applyBlocks failed, trying fallback:', err)
-    try {
-      const html = editor.blocksToHTMLLossy(blocks)
-      editor._tiptapEditor.commands.setContent(html)
-    } catch (err2) {
-      console.error('Fallback also failed:', err2)
-    }
-  } finally {
-    queueMicrotask(() => { suppressChangeRef.current = false })
-  }
-
-  requestAnimationFrame(() => {
-    const scrollEl = document.querySelector(EDITOR_CONTAINER_SELECTOR)
-    if (scrollEl) scrollEl.scrollTop = scrollTop
-  })
-}
-
-function applyBlankStateToEditor(
-  editor: ReturnType<typeof useCreateBlockNote>,
-  suppressChangeRef: MutableRefObject<boolean>,
-) {
-  suppressChangeRef.current = true
-  try {
-    editor._tiptapEditor.commands.setContent('<p></p>')
-  } catch (err) {
-    console.error('applyBlankStateToEditor failed, falling back to replaceBlocks:', err)
-    applyBlocksToEditor(editor, blankParagraphBlocks(), 0, suppressChangeRef)
-    return
-  }
-
-  queueMicrotask(() => { suppressChangeRef.current = false })
-  requestAnimationFrame(() => {
-    const scrollEl = document.querySelector(EDITOR_CONTAINER_SELECTOR)
-    if (scrollEl) scrollEl.scrollTop = 0
-  })
-}
-
-function applyHtmlStateToEditor(
-  editor: ReturnType<typeof useCreateBlockNote>,
-  html: string,
-  suppressChangeRef: MutableRefObject<boolean>,
-) {
-  suppressChangeRef.current = true
-  try {
-    editor._tiptapEditor.commands.setContent(html)
-  } catch (err) {
-    console.error('applyHtmlStateToEditor failed:', err)
-    suppressChangeRef.current = false
-    throw err
-  }
-
-  queueMicrotask(() => { suppressChangeRef.current = false })
-  requestAnimationFrame(() => {
-    const scrollEl = document.querySelector(EDITOR_CONTAINER_SELECTOR)
-    if (scrollEl) scrollEl.scrollTop = 0
-  })
-}
-
-async function resolveEmptyHeadingHtml(
-  editor: ReturnType<typeof useCreateBlockNote>,
-  content: string,
-  vaultPath?: string,
-): Promise<string | null> {
-  const remainder = extractBodyRemainderAfterEmptyH1({ content })
-  if (remainder === null) return null
-  if (!remainder.trim()) return '<h1></h1><p></p>'
-
-  const withImages = vaultPath ? resolveImageUrls(remainder, vaultPath) : remainder
-  const parsed = normalizeParsedImageBlocks(
-    await parseMarkdownBlocks(editor, preProcessMathMarkdown({ markdown: preProcessWikilinks(withImages) })),
-  ) as EditorBlocks
-  const withWikilinks = injectWikilinks(parsed)
-  const withMath = injectMathInBlocks(withWikilinks)
-  return `<h1></h1>${editor.blocksToHTMLLossy(withMath as typeof parsed)}`
 }
 
 function findActiveTab(options: {
@@ -268,7 +123,19 @@ function findActiveTab(options: {
 
 function serializeEditorBody(editor: ReturnType<typeof useCreateBlockNote>): string {
   const restored = restoreWikilinksInBlocks(editor.document)
-  return compactMarkdown(serializeMathAwareBlocks(editor, restored))
+  return compactMarkdown(serializeMermaidAwareBlocks(editor, restored))
+}
+
+function trySerializeEditorBody(
+  editor: ReturnType<typeof useCreateBlockNote>,
+  reason: string,
+): string | null {
+  try {
+    return serializeEditorBody(editor)
+  } catch (error) {
+    console.warn(`[editor] Skipped ${reason} because BlockNote document could not be serialized:`, error)
+    return null
+  }
 }
 
 function normalizeTabBody(options: { content: string }): string {
@@ -298,40 +165,13 @@ function isUntitledRenameTransition(
 
   const currentHeading = getH1TextFromBlocks(editor.document)
   if (!currentHeading || slugifyPathStem(currentHeading) !== pathStem(nextPath)) return false
+  const currentBody = trySerializeEditorBody(editor, 'untitled rename comparison')
+  if (currentBody === null) return false
 
   return renameBodiesOverlap({
-    currentBody: serializeEditorBody(editor),
+    currentBody,
     nextBody: normalizeTabBody({ content: activeTab.content }),
   })
-}
-
-function useLatestRef<T>(value: T): MutableRefObject<T> {
-  const ref = useRef(value)
-  useEffect(() => {
-    ref.current = value
-  }, [value])
-  return ref
-}
-
-function useEditorMountState(
-  editor: ReturnType<typeof useCreateBlockNote>,
-  editorMountedRef: MutableRefObject<boolean>,
-  pendingSwapRef: MutableRefObject<(() => void) | null>,
-) {
-  useEffect(() => {
-    if (editor.prosemirrorView) {
-      editorMountedRef.current = true
-    }
-    const cleanup = editor.onMount(() => {
-      editorMountedRef.current = true
-      if (pendingSwapRef.current) {
-        const swap = pendingSwapRef.current
-        pendingSwapRef.current = null
-        queueMicrotask(swap)
-      }
-    })
-    return cleanup
-  }, [editor, editorMountedRef, pendingSwapRef])
 }
 
 function useEditorChangeHandler(options: {
@@ -339,6 +179,7 @@ function useEditorChangeHandler(options: {
   tabsRef: MutableRefObject<Tab[]>
   onContentChangeRef: MutableRefObject<((path: string, content: string) => void) | undefined>
   prevActivePathRef: MutableRefObject<string | null>
+  editorContentPathRef: EditorContentPathRef
   suppressChangeRef: MutableRefObject<boolean>
   tabCacheRef: MutableRefObject<Map<string, CachedTabState>>
   pendingLocalContentRef: MutableRefObject<PendingLocalContent | null>
@@ -349,45 +190,39 @@ function useEditorChangeHandler(options: {
     tabsRef,
     onContentChangeRef,
     prevActivePathRef,
+    editorContentPathRef,
     suppressChangeRef,
     tabCacheRef,
     pendingLocalContentRef,
     vaultPathRef,
   } = options
 
-  return useCallback(() => {
-    if (suppressChangeRef.current) return
+  const propagateEditorChange = useCallback(() => {
     const path = prevActivePathRef.current
     if (!path) return
+    if (editorContentPathRef.current !== path) return
 
     const tab = tabsRef.current.find(t => t.entry.path === path)
     if (!tab) return
 
     const blocks = editor.document
-    const restored = restoreWikilinksInBlocks(blocks)
-    const rawBodyMarkdown = compactMarkdown(editor.blocksToMarkdownLossy(restored as typeof blocks))
+    const rawBodyMarkdown = trySerializeEditorBody(editor, 'editor change')
+    if (rawBodyMarkdown === null) return
     const bodyMarkdown = vaultPathRef.current
       ? portableImageUrls(rawBodyMarkdown, vaultPathRef.current)
       : rawBodyMarkdown
     const [frontmatter] = splitFrontmatter(tab.content)
     const nextContent = `${frontmatter}${bodyMarkdown}`
     pendingLocalContentRef.current = { path, content: nextContent }
-    cacheEditorState(tabCacheRef.current, path, {
+    cacheResolvedEditorState(tabCacheRef.current, path, {
       blocks,
       scrollTop: readEditorScrollTop(),
       sourceContent: nextContent,
-    })
+    }, vaultPathRef.current)
     onContentChangeRef.current?.(path, nextContent)
-  }, [editor, onContentChangeRef, pendingLocalContentRef, prevActivePathRef, suppressChangeRef, tabCacheRef, tabsRef, vaultPathRef])
-}
+  }, [editor, editorContentPathRef, onContentChangeRef, pendingLocalContentRef, prevActivePathRef, tabCacheRef, tabsRef, vaultPathRef])
 
-function consumeRawModeTransition(
-  prevRawModeRef: MutableRefObject<boolean>,
-  rawMode: boolean | undefined,
-) {
-  const rawModeJustEnded = prevRawModeRef.current && !rawMode
-  prevRawModeRef.current = !!rawMode
-  return rawModeJustEnded
+  return useDebouncedEditorChange({ onFlush: propagateEditorChange, suppressChangeRef })
 }
 
 function cachePreviousTabOnPathChange(options: {
@@ -397,9 +232,11 @@ function cachePreviousTabOnPathChange(options: {
   editorMountedRef: MutableRefObject<boolean>
   cache: Map<string, CachedTabState>
   editor: ReturnType<typeof useCreateBlockNote>
+  editorContentPathRef: EditorContentPathRef
 }) {
-  const { prevPath, previousTab, pathChanged, editorMountedRef, cache, editor } = options
+  const { prevPath, previousTab, pathChanged, editorMountedRef, cache, editor, editorContentPathRef } = options
   if (!prevPath || !previousTab || !pathChanged || !editorMountedRef.current) return
+  if (editorContentPathRef.current !== prevPath) return
   cacheEditorState(cache, prevPath, {
     blocks: editor.document,
     scrollTop: readEditorScrollTop(),
@@ -426,6 +263,7 @@ function syncActivePathTransition(options: {
   editor: ReturnType<typeof useCreateBlockNote>
   editorMountedRef: MutableRefObject<boolean>
   prevActivePathRef: MutableRefObject<string | null>
+  editorContentPathRef: EditorContentPathRef
 }) {
   const {
     prevPath,
@@ -437,6 +275,7 @@ function syncActivePathTransition(options: {
     editor,
     editorMountedRef,
     prevActivePathRef,
+    editorContentPathRef,
   } = options
 
   cachePreviousTabOnPathChange({
@@ -446,6 +285,7 @@ function syncActivePathTransition(options: {
     editorMountedRef,
     cache,
     editor,
+    editorContentPathRef,
   })
   if (shouldWaitForActiveTab({ pathChanged, activeTabPath, activeTab })) return true
 
@@ -456,6 +296,7 @@ function syncActivePathTransition(options: {
     cache,
     editor,
     editorMountedRef,
+    editorContentPathRef,
   })) {
     prevActivePathRef.current = activeTabPath
     return false
@@ -490,13 +331,11 @@ function currentEditorMatchesActiveTab(options: {
     editorMountedRef,
   } = options
 
-  return Boolean(
-    activeTabPath
-      && activeTab
-      && editorMountedRef.current
-      && typeof editor.blocksToMarkdownLossy === 'function'
-      && serializeEditorBody(editor) === normalizeTabBody({ content: activeTab.content }),
-  )
+  if (!activeTabPath || !activeTab || !editorMountedRef.current) return false
+  if (typeof editor.blocksToMarkdownLossy !== 'function') return false
+
+  const bodyMarkdown = trySerializeEditorBody(editor, 'active tab comparison')
+  return bodyMarkdown === normalizeTabBody({ content: activeTab.content })
 }
 
 function cacheStableActiveTabAndClearPending(options: {
@@ -505,6 +344,7 @@ function cacheStableActiveTabAndClearPending(options: {
   activeTab: Tab | undefined
   editor: ReturnType<typeof useCreateBlockNote>
   editorMountedRef: MutableRefObject<boolean>
+  editorContentPathRef: EditorContentPathRef
   pendingLocalContentRef: MutableRefObject<PendingLocalContent | null>
 }) {
   const {
@@ -513,6 +353,7 @@ function cacheStableActiveTabAndClearPending(options: {
     activeTab,
     editor,
     editorMountedRef,
+    editorContentPathRef,
     pendingLocalContentRef,
   } = options
 
@@ -522,6 +363,7 @@ function cacheStableActiveTabAndClearPending(options: {
     activeTab,
     editor,
     editorMountedRef,
+    editorContentPathRef,
   })
   pendingLocalContentRef.current = null
   return true
@@ -549,6 +391,7 @@ function consumePendingLocalContent(options: {
   activeTab: Tab | undefined
   editor: ReturnType<typeof useCreateBlockNote>
   editorMountedRef: MutableRefObject<boolean>
+  editorContentPathRef: EditorContentPathRef
   pendingLocalContentRef: MutableRefObject<PendingLocalContent | null>
 }) {
   const {
@@ -557,6 +400,7 @@ function consumePendingLocalContent(options: {
     activeTab,
     editor,
     editorMountedRef,
+    editorContentPathRef,
     pendingLocalContentRef,
   } = options
 
@@ -568,6 +412,7 @@ function consumePendingLocalContent(options: {
     activeTab,
     editor,
     editorMountedRef,
+    editorContentPathRef,
     pendingLocalContentRef,
   })
 }
@@ -580,6 +425,7 @@ function handleStableActivePath(options: {
   cache: Map<string, CachedTabState>
   editor: ReturnType<typeof useCreateBlockNote>
   editorMountedRef: MutableRefObject<boolean>
+  editorContentPathRef: EditorContentPathRef
   rawSwapPendingRef: MutableRefObject<boolean>
   pendingLocalContentRef: MutableRefObject<PendingLocalContent | null>
 }) {
@@ -591,6 +437,7 @@ function handleStableActivePath(options: {
     cache,
     editor,
     editorMountedRef,
+    editorContentPathRef,
     rawSwapPendingRef,
     pendingLocalContentRef,
   } = options
@@ -606,6 +453,7 @@ function handleStableActivePath(options: {
       activeTab,
       editor,
       editorMountedRef,
+      editorContentPathRef,
       pendingLocalContentRef,
     })
   }
@@ -616,6 +464,7 @@ function handleStableActivePath(options: {
       activeTab,
       editor,
       editorMountedRef,
+      editorContentPathRef,
       pendingLocalContentRef,
     })
   }
@@ -628,6 +477,7 @@ function handleStableActivePath(options: {
     activeTab,
     editor,
     editorMountedRef,
+    editorContentPathRef,
   })
   return true
 }
@@ -654,6 +504,7 @@ function cacheStableActivePath(options: {
   activeTab: Tab | undefined
   editor: ReturnType<typeof useCreateBlockNote>
   editorMountedRef: MutableRefObject<boolean>
+  editorContentPathRef: EditorContentPathRef
 }) {
   const {
     cache,
@@ -661,9 +512,11 @@ function cacheStableActivePath(options: {
     activeTab,
     editor,
     editorMountedRef,
+    editorContentPathRef,
   } = options
 
   if (!activeTabPath || !activeTab || !editorMountedRef.current) return
+  editorContentPathRef.current = activeTabPath
   cacheEditorState(cache, activeTabPath, {
     blocks: editor.document,
     scrollTop: readEditorScrollTop(),
@@ -678,6 +531,7 @@ function preserveUntitledRenameState(options: {
   cache: Map<string, CachedTabState>
   editor: ReturnType<typeof useCreateBlockNote>
   editorMountedRef: MutableRefObject<boolean>
+  editorContentPathRef: EditorContentPathRef
 }) {
   const {
     prevPath,
@@ -686,6 +540,7 @@ function preserveUntitledRenameState(options: {
     cache,
     editor,
     editorMountedRef,
+    editorContentPathRef,
   } = options
 
   if (!prevPath || !activeTabPath) return false
@@ -698,6 +553,7 @@ function preserveUntitledRenameState(options: {
     activeTab,
     editor,
     editorMountedRef,
+    editorContentPathRef,
   })
   requestAnimationFrame(() => signalEditorTabSwapped(activeTabPath))
   return true
@@ -729,13 +585,15 @@ function applyBlankTabState(options: {
   content: string
   editor: ReturnType<typeof useCreateBlockNote>
   suppressChangeRef: MutableRefObject<boolean>
-}) {
+  editorContentPathRef: EditorContentPathRef
+}): boolean {
   const {
     cache,
     targetPath,
     content,
     editor,
     suppressChangeRef,
+    editorContentPathRef,
   } = options
 
   cacheEditorState(cache, targetPath, {
@@ -743,8 +601,12 @@ function applyBlankTabState(options: {
     scrollTop: 0,
     sourceContent: content,
   })
-  applyBlankStateToEditor(editor, suppressChangeRef)
+  if (!applyBlankStateToEditor({ editor, suppressChangeRef, editorContentPathRef, targetPath })) {
+    return false
+  }
+
   signalTabSwap({ path: targetPath })
+  return true
 }
 
 function scheduleEmptyHeadingSwap(options: {
@@ -753,6 +615,10 @@ function scheduleEmptyHeadingSwap(options: {
   content: string
   prevActivePathRef: MutableRefObject<string | null>
   suppressChangeRef: MutableRefObject<boolean>
+  editorContentPathRef: EditorContentPathRef
+  swapSeqRef: MutableRefObject<number>
+  tabsRef: MutableRefObject<Tab[]>
+  token: SwapToken
   vaultPath?: string
 }) {
   const {
@@ -761,19 +627,24 @@ function scheduleEmptyHeadingSwap(options: {
     content,
     prevActivePathRef,
     suppressChangeRef,
+    editorContentPathRef,
+    swapSeqRef,
+    tabsRef,
+    token,
     vaultPath,
   } = options
 
-  if (extractBodyRemainderAfterEmptyH1({ content }) === null) return false
+  if (!startsWithEmptyHeading({ content })) return false
 
-  void resolveEmptyHeadingHtml(editor, content, vaultPath)
-    .then((html) => {
-      if (prevActivePathRef.current !== targetPath || !html) return
-      applyHtmlStateToEditor(editor, html, suppressChangeRef)
+  void resolveEmptyHeadingBlocks(editor, content, vaultPath, targetPath)
+    .then((blocks) => {
+      if (!blocks || shouldAbortSwap({ prevActivePathRef, suppressChangeRef, swapSeqRef, tabsRef, token })) return
+      cacheParsedEditorState(targetPath, { blocks, scrollTop: 0, sourceContent: content }, vaultPath)
+      if (!applyBlocksToEditor({ editor, blocks, scrollTop: 0, suppressChangeRef, editorContentPathRef, targetPath })) return
       signalTabSwap({ path: targetPath })
     })
     .catch((err: unknown) => {
-      suppressChangeRef.current = false
+      if (swapSeqRef.current === token.seq) suppressChangeRef.current = false
       console.error('Failed to render empty heading state:', err)
       failNoteOpenTrace(targetPath, 'empty-heading-swap-failed')
     })
@@ -788,6 +659,10 @@ function scheduleParsedBlockSwap(options: {
   content: string
   prevActivePathRef: MutableRefObject<string | null>
   suppressChangeRef: MutableRefObject<boolean>
+  editorContentPathRef: EditorContentPathRef
+  swapSeqRef: MutableRefObject<number>
+  tabsRef: MutableRefObject<Tab[]>
+  token: SwapToken
   vaultPath?: string
 }) {
   const {
@@ -797,17 +672,21 @@ function scheduleParsedBlockSwap(options: {
     content,
     prevActivePathRef,
     suppressChangeRef,
+    editorContentPathRef,
+    swapSeqRef,
+    tabsRef,
+    token,
     vaultPath,
   } = options
 
   void resolveBlocksForTarget({ editor, cache, targetPath, content, vaultPath })
     .then(({ blocks, scrollTop }) => {
-      if (prevActivePathRef.current !== targetPath) return
-      applyBlocksToEditor(editor, blocks, scrollTop, suppressChangeRef)
+      if (shouldAbortSwap({ prevActivePathRef, suppressChangeRef, swapSeqRef, tabsRef, token })) return
+      if (!applyBlocksToEditor({ editor, blocks, scrollTop, suppressChangeRef, editorContentPathRef, targetPath })) return
       signalTabSwap({ path: targetPath })
     })
     .catch((err: unknown) => {
-      suppressChangeRef.current = false
+      if (swapSeqRef.current === token.seq) suppressChangeRef.current = false
       console.error('Failed to parse/swap editor content:', err)
       failNoteOpenTrace(targetPath, 'parsed-swap-failed')
     })
@@ -820,9 +699,12 @@ function scheduleTabSwap(options: {
   activeTab: Tab
   clearDomSelection: boolean
   pendingSwapRef: MutableRefObject<(() => void) | null>
+  swapSeqRef: MutableRefObject<number>
+  tabsRef: MutableRefObject<Tab[]>
   prevActivePathRef: MutableRefObject<string | null>
   rawSwapPendingRef: MutableRefObject<boolean>
   suppressChangeRef: MutableRefObject<boolean>
+  editorContentPathRef: EditorContentPathRef
   vaultPath?: string
 }) {
   const {
@@ -832,15 +714,20 @@ function scheduleTabSwap(options: {
     activeTab,
     clearDomSelection,
     pendingSwapRef,
+    swapSeqRef,
+    tabsRef,
     prevActivePathRef,
     rawSwapPendingRef,
     suppressChangeRef,
+    editorContentPathRef,
     vaultPath,
   } = options
 
+  const token = createSwapToken(swapSeqRef, targetPath, activeTab.content)
   suppressChangeRef.current = true
 
   const doSwap = () => {
+    if (shouldAbortSwap({ prevActivePathRef, suppressChangeRef, swapSeqRef, tabsRef, token })) return
     if (clearStaleSwap({ targetPath, prevActivePathRef, suppressChangeRef })) return
     rawSwapPendingRef.current = false
     if (clearDomSelection) clearEditorDomSelection()
@@ -852,6 +739,7 @@ function scheduleTabSwap(options: {
         content: activeTab.content,
         editor,
         suppressChangeRef,
+        editorContentPathRef,
       })
       return
     }
@@ -862,6 +750,10 @@ function scheduleTabSwap(options: {
       content: activeTab.content,
       prevActivePathRef,
       suppressChangeRef,
+      editorContentPathRef,
+      swapSeqRef,
+      tabsRef,
+      token,
       vaultPath,
     })) {
       return
@@ -874,6 +766,10 @@ function scheduleTabSwap(options: {
       content: activeTab.content,
       prevActivePathRef,
       suppressChangeRef,
+      editorContentPathRef,
+      swapSeqRef,
+      tabsRef,
+      token,
       vaultPath,
     })
   }
@@ -917,6 +813,7 @@ function shouldSkipScheduledTabSwap(options: {
   editor: ReturnType<typeof useCreateBlockNote>
   editorMountedRef: MutableRefObject<boolean>
   prevActivePathRef: MutableRefObject<string | null>
+  editorContentPathRef: EditorContentPathRef
   rawSwapPendingRef: MutableRefObject<boolean>
   pendingLocalContentRef: MutableRefObject<PendingLocalContent | null>
 }) {
@@ -926,6 +823,7 @@ function shouldSkipScheduledTabSwap(options: {
     editor,
     editorMountedRef,
     prevActivePathRef,
+    editorContentPathRef,
     rawSwapPendingRef,
     pendingLocalContentRef,
   } = options
@@ -944,6 +842,7 @@ function shouldSkipScheduledTabSwap(options: {
     editor,
     editorMountedRef,
     prevActivePathRef,
+    editorContentPathRef,
   })) {
     return true
   }
@@ -956,44 +855,35 @@ function shouldSkipScheduledTabSwap(options: {
     cache: state.cache,
     editor,
     editorMountedRef,
+    editorContentPathRef,
     rawSwapPendingRef,
     pendingLocalContentRef,
   })
 }
 
-function runTabSwapEffect(options: {
-  tabs: Tab[]
-  activeTabPath: string | null
-  editor: ReturnType<typeof useCreateBlockNote>
-  rawMode?: boolean
-  tabCacheRef: MutableRefObject<Map<string, CachedTabState>>
-  prevActivePathRef: MutableRefObject<string | null>
-  editorMountedRef: MutableRefObject<boolean>
-  pendingSwapRef: MutableRefObject<(() => void) | null>
-  prevRawModeRef: MutableRefObject<boolean>
-  rawSwapPendingRef: MutableRefObject<boolean>
-  suppressChangeRef: MutableRefObject<boolean>
-  pendingLocalContentRef: MutableRefObject<PendingLocalContent | null>
-  vaultPath?: string
-}) {
+function runTabSwapEffect(options: RunTabSwapEffectOptions) {
   const {
     tabs,
     activeTabPath,
     editor,
     rawMode,
     tabCacheRef,
+    tabsRef,
     prevActivePathRef,
     editorMountedRef,
     pendingSwapRef,
+    swapSeqRef,
     prevRawModeRef,
     rawSwapPendingRef,
     suppressChangeRef,
+    editorContentPathRef,
     pendingLocalContentRef,
+    flushPendingEditorChange,
     vaultPath,
   } = options
 
   const rawModeJustEnded = consumeRawModeTransition(prevRawModeRef, rawMode)
-  if (rawMode) return
+  if (flushBeforeRawMode({ rawMode, flushPendingEditorChange })) return
   const state = resolveTabSwapState({
     tabs,
     activeTabPath,
@@ -1001,6 +891,8 @@ function runTabSwapEffect(options: {
     prevActivePathRef,
     rawModeJustEnded,
   })
+  if (state.pathChanged) invalidatePendingSwap({ pendingSwapRef, swapSeqRef })
+  flushBeforePathChange({ pathChanged: state.pathChanged, flushPendingEditorChange })
 
   if (shouldSkipScheduledTabSwap({
     state,
@@ -1008,6 +900,7 @@ function runTabSwapEffect(options: {
     editor,
     editorMountedRef,
     prevActivePathRef,
+    editorContentPathRef,
     rawSwapPendingRef,
     pendingLocalContentRef,
   })) {
@@ -1023,42 +916,35 @@ function runTabSwapEffect(options: {
     activeTab: state.activeTab,
     clearDomSelection: state.pathChanged,
     pendingSwapRef,
+    swapSeqRef,
+    tabsRef,
     prevActivePathRef,
     rawSwapPendingRef,
     suppressChangeRef,
+    editorContentPathRef,
     vaultPath,
   })
 }
 
-function useTabSwapEffect(options: {
-  tabs: Tab[]
-  activeTabPath: string | null
-  editor: ReturnType<typeof useCreateBlockNote>
-  rawMode?: boolean
-  tabCacheRef: MutableRefObject<Map<string, CachedTabState>>
-  prevActivePathRef: MutableRefObject<string | null>
-  editorMountedRef: MutableRefObject<boolean>
-  pendingSwapRef: MutableRefObject<(() => void) | null>
-  prevRawModeRef: MutableRefObject<boolean>
-  rawSwapPendingRef: MutableRefObject<boolean>
-  suppressChangeRef: MutableRefObject<boolean>
-  pendingLocalContentRef: MutableRefObject<PendingLocalContent | null>
-  vaultPathRef: MutableRefObject<string | undefined>
-}) {
+function useTabSwapEffect(options: UseTabSwapEffectOptions) {
   const {
     tabs,
     activeTabPath,
     editor,
     rawMode,
     tabCacheRef,
+    tabsRef,
     prevActivePathRef,
     editorMountedRef,
     pendingSwapRef,
+    swapSeqRef,
     prevRawModeRef,
     rawSwapPendingRef,
     suppressChangeRef,
+    editorContentPathRef,
     pendingLocalContentRef,
     vaultPathRef,
+    flushPendingEditorChange,
   } = options
 
   useEffect(() => {
@@ -1068,13 +954,17 @@ function useTabSwapEffect(options: {
       editor,
       rawMode,
       tabCacheRef,
+      tabsRef,
       editorMountedRef,
       prevActivePathRef,
       pendingSwapRef,
+      swapSeqRef,
       prevRawModeRef,
       rawSwapPendingRef,
       suppressChangeRef,
+      editorContentPathRef,
       pendingLocalContentRef,
+      flushPendingEditorChange,
       vaultPath: vaultPathRef.current,
     })
   }, [
@@ -1082,16 +972,52 @@ function useTabSwapEffect(options: {
     editor,
     editorMountedRef,
     pendingSwapRef,
+    swapSeqRef,
     prevActivePathRef,
     prevRawModeRef,
     rawMode,
     rawSwapPendingRef,
     suppressChangeRef,
+    editorContentPathRef,
     tabCacheRef,
+    tabsRef,
     tabs,
     pendingLocalContentRef,
     vaultPathRef,
+    flushPendingEditorChange,
   ])
+}
+
+function useForegroundWorkTracker(
+  activeTabPath: string | null,
+  handleEditorChange: () => void,
+) {
+  const foregroundWorkAtRef = useRef(0)
+  useEffect(() => {
+    foregroundWorkAtRef.current = Date.now()
+  }, [activeTabPath])
+  const handleForegroundEditorChange = useCallback(() => {
+    foregroundWorkAtRef.current = Date.now()
+    handleEditorChange()
+  }, [handleEditorChange])
+  return { foregroundWorkAtRef, handleForegroundEditorChange }
+}
+
+function usePrepareParsedBlocks(options: {
+  editor: ReturnType<typeof useCreateBlockNote>
+  tabCacheRef: MutableRefObject<Map<string, CachedTabState>>
+  vaultPathRef: MutableRefObject<string | undefined>
+}) {
+  const { editor, tabCacheRef, vaultPathRef } = options
+  return useCallback(async (event: ParsedBlockPreloadEvent) => {
+    await resolveBlocksForTarget({
+      editor,
+      cache: tabCacheRef.current,
+      targetPath: event.path,
+      content: event.content,
+      vaultPath: vaultPathRef.current,
+    })
+  }, [editor, tabCacheRef, vaultPathRef])
 }
 
 /**
@@ -1103,47 +1029,65 @@ function useTabSwapEffect(options: {
  * - Cleaning up the block cache when tabs are closed
  * - Serializing editor blocks → markdown on change (suppressChangeRef)
  *
- * Returns `handleEditorChange`, the onChange callback for SingleEditorView.
+ * Returns the onChange callback for SingleEditorView and a flush hook for
+ * save/navigation paths that need the latest rich-editor content immediately.
  */
 export function useEditorTabSwap({ tabs, activeTabPath, editor, onContentChange, rawMode, vaultPath }: UseEditorTabSwapOptions) {
   const tabCacheRef = useRef<Map<string, CachedTabState>>(new Map())
   const pendingLocalContentRef = useRef<PendingLocalContent | null>(null)
   const prevActivePathRef = useRef<string | null>(null)
+  const activeTabPathLatestRef = useLatestRef(activeTabPath)
+  const editorContentPathRef = useRef<string | null>(null)
   const editorMountedRef = useRef(false)
   const pendingSwapRef = useRef<(() => void) | null>(null)
+  const swapSeqRef = useRef(0)
   const prevRawModeRef = useRef(!!rawMode)
+  const rawModeLatestRef = useLatestRef(!!rawMode)
   const rawSwapPendingRef = useRef(false)
   const suppressChangeRef = useRef(false)
   const onContentChangeRef = useLatestRef(onContentChange)
   const tabsRef = useLatestRef(tabs)
   const vaultPathRef = useLatestRef(vaultPath)
-  const handleEditorChange = useEditorChangeHandler({
+  const { handleEditorChange, flushPendingEditorChange } = useEditorChangeHandler({
     editor,
     tabsRef,
     onContentChangeRef,
     prevActivePathRef,
+    editorContentPathRef,
     suppressChangeRef,
     tabCacheRef,
     pendingLocalContentRef,
     vaultPathRef,
   })
-
+  const { foregroundWorkAtRef, handleForegroundEditorChange } = useForegroundWorkTracker(activeTabPath, handleEditorChange)
+  const prepareParsedBlocks = usePrepareParsedBlocks({ editor, tabCacheRef, vaultPathRef })
   useEditorMountState(editor, editorMountedRef, pendingSwapRef)
+  useParsedBlockPreload({
+    activeTabPathRef: activeTabPathLatestRef,
+    editorMountedRef,
+    foregroundWorkAtRef,
+    prepareParsedBlocks,
+    rawModeRef: rawModeLatestRef,
+  })
   useTabSwapEffect({
     tabs,
     activeTabPath,
     editor,
     rawMode,
     tabCacheRef,
+    tabsRef,
     prevActivePathRef,
     editorMountedRef,
     pendingSwapRef,
+    swapSeqRef,
     prevRawModeRef,
     rawSwapPendingRef,
     suppressChangeRef,
+    editorContentPathRef,
     pendingLocalContentRef,
     vaultPathRef,
+    flushPendingEditorChange,
   })
 
-  return { handleEditorChange, editorMountedRef }
+  return { handleEditorChange: handleForegroundEditorChange, flushPendingEditorChange, editorMountedRef }
 }

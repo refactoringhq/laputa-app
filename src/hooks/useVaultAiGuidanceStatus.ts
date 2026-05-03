@@ -11,6 +11,7 @@ import {
 type RawVaultAiGuidanceStatus = Partial<{
   agents_state: VaultAiGuidanceFileState | null
   claude_state: VaultAiGuidanceFileState | null
+  gemini_state: VaultAiGuidanceFileState | null
   can_restore: boolean | null
 }>
 

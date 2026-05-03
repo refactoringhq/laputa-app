@@ -57,13 +57,45 @@ const DEFAULT_GITIGNORE: &str = "# Tolaria app files (machine-specific, never co
 *.swo\n";
 
 fn git_command() -> Command {
-    crate::hidden_command("git")
+    let mut command = crate::hidden_command("git");
+    sanitize_linux_appimage_git_env(&mut command);
+    command
+}
+
+#[cfg(any(test, all(desktop, target_os = "linux")))]
+const LINUX_APPIMAGE_GIT_ENV_REMOVALS: [&str; 3] =
+    ["LD_LIBRARY_PATH", "LD_PRELOAD", "GIT_EXEC_PATH"];
+
+#[cfg(all(desktop, target_os = "linux"))]
+fn sanitize_linux_appimage_git_env(command: &mut Command) {
+    sanitize_linux_appimage_git_env_for_launch(command, linux_appimage_env_present());
+}
+
+#[cfg(not(all(desktop, target_os = "linux")))]
+fn sanitize_linux_appimage_git_env(_command: &mut Command) {}
+
+#[cfg(any(test, all(desktop, target_os = "linux")))]
+fn sanitize_linux_appimage_git_env_for_launch(command: &mut Command, is_appimage: bool) {
+    if !is_appimage {
+        return;
+    }
+
+    for key in LINUX_APPIMAGE_GIT_ENV_REMOVALS {
+        command.env_remove(key);
+    }
+}
+
+#[cfg(all(desktop, target_os = "linux"))]
+fn linux_appimage_env_present() -> bool {
+    ["APPIMAGE", "APPDIR"]
+        .into_iter()
+        .any(|key| std::env::var(key).is_ok_and(|value| !value.trim().is_empty()))
 }
 
 /// Ensure a `.gitignore` with sensible defaults exists in the vault directory.
 /// Creates the file if missing; leaves existing `.gitignore` files untouched.
-pub fn ensure_gitignore(path: &str) -> Result<(), String> {
-    let gitignore_path = Path::new(path).join(".gitignore");
+pub fn ensure_gitignore(path: impl AsRef<Path>) -> Result<(), String> {
+    let gitignore_path = path.as_ref().join(".gitignore");
     if !gitignore_path.exists() {
         std::fs::write(&gitignore_path, DEFAULT_GITIGNORE)
             .map_err(|e| format!("Failed to write .gitignore: {}", e))?;
@@ -72,15 +104,15 @@ pub fn ensure_gitignore(path: &str) -> Result<(), String> {
 }
 
 /// Initialize a new git repository, stage all files, and create an initial commit.
-pub fn init_repo(path: &str) -> Result<(), String> {
-    let dir = Path::new(path);
+pub fn init_repo(path: impl AsRef<Path>) -> Result<(), String> {
+    let dir = path.as_ref();
 
     run_git(dir, &["init"])?;
     ensure_author_config(dir)?;
 
     // Write .gitignore before the first commit so machine-specific and
     // macOS metadata files are never tracked and don't cause conflicts.
-    ensure_gitignore(path)?;
+    ensure_gitignore(dir)?;
 
     run_git(dir, &["add", "."])?;
     commit_initial_vault_setup(dir)?;
@@ -129,21 +161,20 @@ fn git_command_label<'a>(args: &'a [&'a str]) -> &'a str {
 }
 
 /// Set local user.name and user.email if not already configured.
-fn ensure_author_config(dir: &Path) -> Result<(), String> {
-    for (key, fallback) in [
-        ("user.name", "Tolaria"),
-        ("user.email", "vault@tolaria.app"),
-    ] {
-        let check = git_command()
-            .args(["config", key])
+pub(crate) fn ensure_author_config(dir: &Path) -> Result<(), String> {
+    for (key, fallback) in [("user.name", "Tolaria"), ("user.email", "vault@tolaria.md")] {
+        let local = git_command()
+            .args(["config", "--local", key])
             .current_dir(dir)
             .output()
-            .map_err(|e| format!("Failed to check git config: {}", e))?;
+            .map_err(|e| format!("Failed to check git config {key}: {e}"))?;
 
-        let value = String::from_utf8_lossy(&check.stdout);
-        if !check.status.success() || value.trim().is_empty() {
-            run_git(dir, &["config", key, fallback])?;
+        let value = String::from_utf8_lossy(&local.stdout);
+        if local.status.success() && !value.trim().is_empty() {
+            continue;
         }
+
+        run_git(dir, &["config", "--local", key, fallback])?;
     }
     Ok(())
 }
@@ -177,6 +208,7 @@ fn parse_github_repo_path(url: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
 
@@ -260,6 +292,18 @@ mod tests {
         (bare_dir, clone_a_dir, clone_b_dir)
     }
 
+    fn command_envs(command: &Command) -> HashMap<String, Option<String>> {
+        command
+            .get_envs()
+            .map(|(key, value)| {
+                (
+                    key.to_string_lossy().to_string(),
+                    value.map(|entry| entry.to_string_lossy().to_string()),
+                )
+            })
+            .collect()
+    }
+
     #[test]
     fn test_ensure_gitignore_creates_file() {
         let dir = TempDir::new().unwrap();
@@ -281,6 +325,32 @@ mod tests {
 
         let content = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
         assert_eq!(content, "my-rule\n");
+    }
+
+    #[test]
+    fn test_linux_appimage_git_commands_remove_appimage_loader_env() {
+        let mut command = crate::hidden_command("git");
+
+        sanitize_linux_appimage_git_env_for_launch(&mut command, true);
+
+        let envs = command_envs(&command);
+
+        for key in LINUX_APPIMAGE_GIT_ENV_REMOVALS {
+            assert_eq!(envs.get(key), Some(&None));
+        }
+    }
+
+    #[test]
+    fn test_non_appimage_git_commands_keep_parent_env_unmodified() {
+        let mut command = crate::hidden_command("git");
+
+        sanitize_linux_appimage_git_env_for_launch(&mut command, false);
+
+        let envs = command_envs(&command);
+
+        for key in LINUX_APPIMAGE_GIT_ENV_REMOVALS {
+            assert!(!envs.contains_key(key));
+        }
     }
 
     #[test]

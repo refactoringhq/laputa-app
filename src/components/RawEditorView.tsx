@@ -1,8 +1,6 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { trackEvent } from '../lib/telemetry'
 import type { EditorView } from '@codemirror/view'
-import { useNoteWikilinkDrop } from '../hooks/useNoteWikilinkDrop'
-import { insertWikilinkAtCursor } from '../utils/rawEditorInsertions'
 import { MIN_QUERY_LENGTH } from '../utils/wikilinkSuggestions'
 import { buildTypeEntryMap } from '../utils/typeColors'
 import { NoteSearchList } from './NoteSearchList'
@@ -17,6 +15,13 @@ import {
 } from '../utils/rawEditorUtils'
 import { useCodeMirror } from '../hooks/useCodeMirror'
 import type { VaultEntry } from '../types'
+import { translate, type AppLocale } from '../lib/i18n'
+import { RawEditorFindBar, type RawEditorFindRequest } from './RawEditorFindBar'
+import {
+  activatePlainTextPasteTarget,
+  registerPlainTextPasteTarget,
+  type PlainTextPasteTarget,
+} from '../utils/plainTextPaste'
 
 export interface RawEditorViewProps {
   content: string
@@ -28,6 +33,8 @@ export interface RawEditorViewProps {
   /** Mutable ref updated on every keystroke with the latest doc string.
    *  Allows the parent to flush debounced content before unmount. */
   latestContentRef?: React.MutableRefObject<string | null>
+  locale?: AppLocale
+  findRequest?: RawEditorFindRequest | null
 }
 
 const DEBOUNCE_MS = 500
@@ -329,57 +336,147 @@ function useRawEditorWikilinkInsertion({
     applyWikilinkChange(view, replacement)
   }, [applyWikilinkChange, viewRef])
 
-  const insertDroppedWikilink = useCallback((target: string) => {
-    const view = viewRef.current
-    if (!view) return
-
-    applyWikilinkChange(
-      view,
-      insertWikilinkAtCursor(view.state.doc.toString(), view.state.selection.main.head, target),
-    )
-  }, [applyWikilinkChange, viewRef])
-
   useEffect(() => { insertWikilinkRef.current = insertAutocompleteWikilink }, [insertAutocompleteWikilink, insertWikilinkRef])
-
-  return { insertDroppedWikilink }
 }
 
-export function RawEditorView({ content, path, entries, onContentChange, onSave, latestContentRef, vaultPath }: RawEditorViewProps) {
+function useRawEditorPlainTextPasteTarget({
+  containerRef,
+  setAutocomplete,
+  viewRef,
+}: {
+  containerRef: React.RefObject<HTMLDivElement | null>
+  setAutocomplete: RawEditorSetAutocomplete
+  viewRef: React.MutableRefObject<EditorView | null>
+}) {
+  const targetRef = useRef<PlainTextPasteTarget | null>(null)
+
+  useEffect(() => {
+    const target: PlainTextPasteTarget = {
+      surface: 'raw_editor',
+      contains: (element) => Boolean(element && containerRef.current?.contains(element)),
+      isConnected: () => containerRef.current?.isConnected === true,
+      insert: (text) => {
+        const view = viewRef.current
+        if (!view) return false
+
+        view.dispatch({
+          ...view.state.replaceSelection(text),
+          userEvent: 'input.paste',
+        })
+        setAutocomplete(null)
+        view.focus()
+        return true
+      },
+    }
+    targetRef.current = target
+    const unregister = registerPlainTextPasteTarget(target)
+
+    return () => {
+      unregister()
+      if (targetRef.current === target) {
+        targetRef.current = null
+      }
+    }
+  }, [containerRef, setAutocomplete, viewRef])
+
+  return useCallback(() => {
+    if (targetRef.current) {
+      activatePlainTextPasteTarget(targetRef.current)
+    }
+  }, [])
+}
+
+export function RawEditorView({ content, path, entries, onContentChange, onSave, latestContentRef, vaultPath, locale = 'en', findRequest }: RawEditorViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [rawDoc, setRawDoc] = useState(content)
+  const [findOpen, setFindOpen] = useState(false)
+  const [replaceOpen, setReplaceOpen] = useState(false)
   const pendingChanges = useRawEditorPendingChanges({ content, latestContentRef, onContentChange, onSave, path })
-  const autocompleteController = useRawEditorAutocompleteController({ entries, vaultPath })
+  const {
+    autocomplete,
+    handleAutocompleteKey,
+    handleCursorActivity,
+    handleEscape: handleAutocompleteEscape,
+    handleItemHover,
+    insertWikilinkRef,
+    setAutocomplete,
+  } = useRawEditorAutocompleteController({ entries, vaultPath })
+  const handleDocChange = useCallback((doc: string) => {
+    setRawDoc(doc)
+    pendingChanges.handleDocChange(doc)
+  }, [pendingChanges])
+  const handleEscape = useCallback(() => {
+    if (handleAutocompleteEscape()) return true
+    if (!findOpen) return false
+
+    setFindOpen(false)
+    return true
+  }, [findOpen, handleAutocompleteEscape])
   const viewRef = useCodeMirror(containerRef, content, {
-    onDocChange: pendingChanges.handleDocChange,
-    onCursorActivity: autocompleteController.handleCursorActivity,
+    onDocChange: handleDocChange,
+    onCursorActivity: handleCursorActivity,
     onSave: pendingChanges.handleSave,
-    onEscape: autocompleteController.handleEscape,
+    onEscape: handleEscape,
+  })
+  const activatePlainTextPaste = useRawEditorPlainTextPasteTarget({
+    containerRef,
+    setAutocomplete,
+    viewRef,
   })
 
-  const { insertDroppedWikilink } = useRawEditorWikilinkInsertion({
+  useRawEditorWikilinkInsertion({
     debounceRef: pendingChanges.debounceRef,
-    insertWikilinkRef: autocompleteController.insertWikilinkRef,
+    insertWikilinkRef,
     latestDocRef: pendingChanges.latestDocRef,
     onContentChangeRef: pendingChanges.onContentChangeRef,
     pathRef: pendingChanges.pathRef,
-    setAutocomplete: autocompleteController.setAutocomplete,
+    setAutocomplete,
     viewRef,
   })
-  useNoteWikilinkDrop({ containerRef, onInsertTarget: insertDroppedWikilink, vaultPath })
 
-  const dropdownPosition = getRawEditorDropdownPosition(autocompleteController.autocomplete, DROPDOWN_MAX_HEIGHT, window)
+  useEffect(() => {
+    setRawDoc(content)
+  }, [content])
+
+  useEffect(() => {
+    if (!findRequest || findRequest.path !== path) return
+    setAutocomplete(null)
+    setFindOpen(true)
+    setReplaceOpen(findRequest.replace)
+  }, [findRequest, path, setAutocomplete])
+
+  const dropdownPosition = getRawEditorDropdownPosition(autocomplete, DROPDOWN_MAX_HEIGHT, window)
 
   return (
-    <div className="flex flex-1 flex-col min-h-0 relative" style={{ background: 'var(--background)' }} onKeyDown={autocompleteController.handleAutocompleteKey} role="presentation">
+    <div
+      className="flex flex-1 flex-col min-h-0 relative"
+      style={{ background: 'var(--background)' }}
+      onFocusCapture={activatePlainTextPaste}
+      onKeyDown={handleAutocompleteKey}
+      onMouseDownCapture={activatePlainTextPaste}
+      role="presentation"
+    >
       <RawEditorYamlErrorBanner error={pendingChanges.yamlError} />
+      <RawEditorFindBar
+        doc={rawDoc}
+        locale={locale}
+        onClose={() => setFindOpen(false)}
+        onReplaceOpenChange={setReplaceOpen}
+        open={findOpen}
+        path={path}
+        replaceOpen={replaceOpen}
+        request={findRequest}
+        viewRef={viewRef}
+      />
       <div
         ref={containerRef}
         className="raw-editor-codemirror flex flex-1 min-h-0"
         data-testid="raw-editor-codemirror"
-        aria-label="Raw editor"
+        aria-label={translate(locale, 'editor.raw.label')}
       />
       <RawEditorAutocompleteDropdown
-        autocomplete={autocompleteController.autocomplete}
-        onItemHover={autocompleteController.handleItemHover}
+        autocomplete={autocomplete}
+        onItemHover={handleItemHover}
         position={dropdownPosition}
       />
     </div>

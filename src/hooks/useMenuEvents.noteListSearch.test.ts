@@ -38,6 +38,7 @@ function makeHandlers(): MenuEventHandlers {
     onToggleRawEditor: vi.fn(),
     onToggleDiff: vi.fn(),
     onToggleAIChat: vi.fn(),
+    onPastePlainText: vi.fn(),
     onGoBack: vi.fn(),
     onGoForward: vi.fn(),
     onCheckForUpdates: vi.fn(),

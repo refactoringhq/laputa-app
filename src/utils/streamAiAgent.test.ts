@@ -7,7 +7,7 @@ const {
   listenMock,
 } = vi.hoisted(() => ({
   getAiAgentDefinitionMock: vi.fn((agent: string) => ({
-    label: agent === 'codex' ? 'Codex' : 'Claude Code',
+    label: agent === 'codex' ? 'Codex' : agent === 'pi' ? 'Pi' : 'Claude Code',
   })),
   invokeMock: vi.fn(),
   isTauriState: { value: false },
@@ -104,6 +104,7 @@ describe('streamAiAgent', () => {
       message: 'Explain this',
       systemPrompt: 'SYSTEM',
       vaultPath: '/vault',
+      permissionMode: 'power_user',
       callbacks,
     })
 
@@ -116,6 +117,7 @@ describe('streamAiAgent', () => {
         message: 'Explain this',
         system_prompt: 'SYSTEM',
         vault_path: '/vault',
+        permission_mode: 'power_user',
       },
     })
     expect(callbacks.onThinking).toHaveBeenCalledWith('thinking...')

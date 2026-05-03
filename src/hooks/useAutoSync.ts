@@ -17,6 +17,7 @@ function tauriCall<T>(cmd: string, args: Record<string, unknown>): Promise<T> {
 }
 
 interface UseAutoSyncOptions {
+  enabled?: boolean
   vaultPath: string
   intervalMinutes: number | null
   onVaultUpdated: (updatedFiles: string[]) => MaybePromise
@@ -212,12 +213,14 @@ async function runSyncTask(options: SyncTaskOptions): Promise<void> {
 }
 
 function useAutoSyncLifecycle(options: {
+  enabled: boolean
   checkExistingConflicts: () => Promise<boolean>
   intervalMinutes: number | null
   performPull: () => Promise<void>
   refreshRemoteStatus: () => Promise<GitRemoteStatus | null>
 }) {
   const {
+    enabled,
     checkExistingConflicts,
     intervalMinutes,
     performPull,
@@ -225,14 +228,18 @@ function useAutoSyncLifecycle(options: {
   } = options
 
   useEffect(() => {
+    if (!enabled) return
+
     void checkExistingConflicts().then(hasConflicts => {
       if (!hasConflicts) void performPull()
     })
     void refreshRemoteStatus()
-  }, [checkExistingConflicts, performPull, refreshRemoteStatus])
+  }, [checkExistingConflicts, enabled, performPull, refreshRemoteStatus])
 
   const lastPullTimeRef = useRef(0)
   useEffect(() => {
+    if (!enabled) return
+
     const handleFocus = () => {
       const now = Date.now()
       if (now - lastPullTimeRef.current < FOCUS_COOLDOWN_MS) return
@@ -241,16 +248,19 @@ function useAutoSyncLifecycle(options: {
     }
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [performPull])
+  }, [enabled, performPull])
 
   useEffect(() => {
+    if (!enabled) return
+
     const ms = (intervalMinutes ?? 5) * 60_000 || DEFAULT_INTERVAL_MS
     const id = setInterval(() => { void performPull() }, ms)
     return () => clearInterval(id)
-  }, [performPull, intervalMinutes])
+  }, [enabled, performPull, intervalMinutes])
 }
 
 export function useAutoSync({
+  enabled = true,
   vaultPath,
   intervalMinutes,
   onVaultUpdated,
@@ -269,11 +279,14 @@ export function useAutoSync({
   useEffect(() => {
     callbacksRef.current = { onVaultUpdated, onSyncUpdated, onConflict, onToast }
   }, [onVaultUpdated, onSyncUpdated, onConflict, onToast])
+
   const refreshRemoteStatus = useRemoteStatusRefresher(vaultPath, setRemoteStatus)
   const checkExistingConflicts = useConflictChecker(vaultPath, setSyncStatus, setConflictFiles, callbacksRef)
   const refreshCommitInfo = useCommitInfoRefresher(vaultPath, setLastCommitInfo)
 
   const performPull = useCallback(async () => {
+    if (!enabled) return
+
     await runSyncTask({
       blockWhenPaused: true,
       pauseRef,
@@ -306,10 +319,12 @@ export function useAutoSync({
         void refreshRemoteStatus()
       },
     })
-  }, [vaultPath, refreshCommitInfo, checkExistingConflicts, refreshRemoteStatus])
+  }, [enabled, vaultPath, refreshCommitInfo, checkExistingConflicts, refreshRemoteStatus])
 
   /** Pull from remote, then auto-push if successful. Used for divergence recovery. */
   const pullAndPush = useCallback(async () => {
+    if (!enabled) return
+
     await runSyncTask({
       blockWhenPaused: false,
       pauseRef,
@@ -351,13 +366,14 @@ export function useAutoSync({
         void refreshRemoteStatus()
       },
     })
-  }, [vaultPath, refreshCommitInfo, checkExistingConflicts, refreshRemoteStatus])
+  }, [enabled, vaultPath, refreshCommitInfo, checkExistingConflicts, refreshRemoteStatus])
 
   const handlePushRejected = useCallback(() => {
     setSyncStatus('pull_required')
   }, [])
 
   useAutoSyncLifecycle({
+    enabled,
     checkExistingConflicts,
     intervalMinutes,
     performPull,
@@ -368,9 +384,11 @@ export function useAutoSync({
   const resumePull = useCallback(() => { pauseRef.current = false }, [])
 
   const triggerSync = useCallback(() => {
+    if (!enabled) return
+
     trackEvent('sync_triggered')
     void performPull()
-  }, [performPull])
+  }, [enabled, performPull])
 
   return { syncStatus, lastSyncTime, conflictFiles, lastCommitInfo, remoteStatus, triggerSync, pullAndPush, pausePull, resumePull, handlePushRejected }
 }

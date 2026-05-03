@@ -1,15 +1,20 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import type { AgentFileCallbacks, AgentStatus } from '../hooks/useAiAgent'
-import { detectFileOperation } from '../hooks/useAiAgent'
-import type { AiAgentMessage } from './aiAgentConversation'
+import type { AgentStatus, AiAgentMessage } from './aiAgentConversation'
+import { detectFileOperation, type AgentFileCallbacks } from './aiAgentFileOperations'
 import {
   markReasoningDone,
   updateMessage,
   updateToolAction,
   type ToolInvocation,
 } from './aiAgentMessageState'
+import { getAiAgentDefinition, type AiAgentId } from './aiAgents'
+import {
+  trackAiAgentResponseCompleted,
+  trackAiAgentResponseFailed,
+} from './productAnalytics'
 
 export interface StreamMutationContext {
+  agent: AiAgentId
   messageId: string
   vaultPath: string
   setMessages: Dispatch<SetStateAction<AiAgentMessage[]>>
@@ -20,15 +25,24 @@ export interface StreamMutationContext {
   fileCallbacksRef: MutableRefObject<AgentFileCallbacks | undefined>
 }
 
-const EMPTY_CLAUDE_RESPONSE = 'Claude Code finished without returning a reply.'
+function finalResponseText(response: string, agent: AiAgentId): string {
+  if (response.trim()) return response
 
-function finalResponseText(response: string): string {
-  return response.trim() ? response : EMPTY_CLAUDE_RESPONSE
+  if (agent === 'opencode') {
+    return [
+      'OpenCode returned no assistant text.',
+      'Check the selected provider/model context limit or retry the request.',
+      'For large active notes, Tolaria sends a compact note snapshot and OpenCode can read the full file with get_note(path).',
+    ].join(' ')
+  }
+
+  return `${getAiAgentDefinition(agent).label} finished without returning a reply.`
 }
 
 export function createStreamCallbacks(context: StreamMutationContext) {
   const {
     messageId,
+    agent,
     vaultPath,
     setMessages,
     setStatus,
@@ -37,6 +51,8 @@ export function createStreamCallbacks(context: StreamMutationContext) {
     toolInputMapRef,
     fileCallbacksRef,
   } = context
+  let failureTracked = false
+  let streamFailed = false
 
   return {
     onThinking: (chunk: string) => {
@@ -70,7 +86,12 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
       const info = toolInputMapRef.current.get(toolId)
       if (info) {
-        detectFileOperation(info.tool, info.input, vaultPath, fileCallbacksRef.current)
+        detectFileOperation({
+          toolName: info.tool,
+          input: info.input,
+          vaultPath,
+          callbacks: fileCallbacksRef.current,
+        })
       }
 
       updateMessage(setMessages, messageId, (message) => ({
@@ -85,7 +106,10 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       if (abortRef.current.aborted) return
 
       setStatus('error')
+      streamFailed = true
       const partial = responseAccRef.current
+      failureTracked = true
+      trackAiAgentResponseFailed(agent, partial, toolInputMapRef.current.size)
       updateMessage(setMessages, messageId, (message) => ({
         ...message,
         isStreaming: false,
@@ -99,9 +123,11 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
     onDone: () => {
       if (abortRef.current.aborted) return
+      if (streamFailed) return
 
       setStatus('done')
-      const finalResponse = finalResponseText(responseAccRef.current)
+      const finalResponse = finalResponseText(responseAccRef.current, agent)
+      trackAiAgentResponseCompleted(agent, responseAccRef.current, toolInputMapRef.current.size, failureTracked)
       updateMessage(setMessages, messageId, (message) => ({
         ...message,
         isStreaming: false,

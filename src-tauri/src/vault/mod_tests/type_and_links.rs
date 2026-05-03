@@ -86,6 +86,16 @@ fn test_parse_type_key_lowercase() {
 }
 
 #[test]
+fn test_parse_type_key_case_insensitive() {
+    for (key, expected_type) in [("Type", "Project"), ("TYPE", "Person")] {
+        let dir = TempDir::new().unwrap();
+        let content = format!("---\n{key}: {expected_type}\n---\n# Test\n");
+        let entry = parse_test_entry(&dir, "note/test.md", &content);
+        assert_eq!(entry.is_a, Some(expected_type.to_string()));
+    }
+}
+
+#[test]
 fn test_type_key_generates_type_relationship() {
     let dir = TempDir::new().unwrap();
     let content = "---\ntype: Person\n---\n# Alice\n";

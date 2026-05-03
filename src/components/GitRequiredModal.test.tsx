@@ -1,67 +1,62 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
-import { GitRequiredModal } from './GitRequiredModal'
+import { GitSetupDialog } from './GitRequiredModal'
 
-const dragRegionMouseDown = vi.fn()
-
-vi.mock('../hooks/useDragRegion', () => ({
-  useDragRegion: () => ({ onMouseDown: dragRegionMouseDown }),
-}))
-
-describe('GitRequiredModal', () => {
+describe('GitSetupDialog', () => {
   it('renders title and explanation', () => {
-    render(<GitRequiredModal onCreateRepo={vi.fn()} onChooseVault={vi.fn()} />)
-    expect(screen.getByText('Git repository required')).toBeInTheDocument()
-    expect(screen.getByText(/track changes/)).toBeInTheDocument()
+    render(<GitSetupDialog open onInitGit={vi.fn()} onDismiss={vi.fn()} />)
+    expect(screen.getByText('Enable Git for this vault?')).toBeInTheDocument()
+    expect(screen.getByText(/You can keep using this vault without Git/)).toBeInTheDocument()
   })
 
   it('renders both action buttons', () => {
-    render(<GitRequiredModal onCreateRepo={vi.fn()} onChooseVault={vi.fn()} />)
-    expect(screen.getByText('Create repository')).toBeInTheDocument()
-    expect(screen.getByText('Choose another vault')).toBeInTheDocument()
+    render(<GitSetupDialog open onInitGit={vi.fn()} onDismiss={vi.fn()} />)
+    expect(screen.getByText('Initialize Git')).toBeInTheDocument()
+    expect(screen.getByText('Not now')).toBeInTheDocument()
   })
 
-  it('calls onCreateRepo when primary button clicked', async () => {
-    const onCreateRepo = vi.fn().mockResolvedValue(undefined)
-    render(<GitRequiredModal onCreateRepo={onCreateRepo} onChooseVault={vi.fn()} />)
-    fireEvent.click(screen.getByText('Create repository'))
-    expect(onCreateRepo).toHaveBeenCalledOnce()
+  it('calls onInitGit when primary button clicked', async () => {
+    const onInitGit = vi.fn().mockResolvedValue(undefined)
+    render(<GitSetupDialog open onInitGit={onInitGit} onDismiss={vi.fn()} />)
+    fireEvent.click(screen.getByText('Initialize Git'))
+    expect(onInitGit).toHaveBeenCalledOnce()
   })
 
-  it('calls onChooseVault when secondary button clicked', () => {
-    const onChooseVault = vi.fn()
-    render(<GitRequiredModal onCreateRepo={vi.fn()} onChooseVault={onChooseVault} />)
-    fireEvent.click(screen.getByText('Choose another vault'))
-    expect(onChooseVault).toHaveBeenCalledOnce()
+  it('calls onDismiss when secondary button clicked', () => {
+    const onDismiss = vi.fn()
+    render(<GitSetupDialog open onInitGit={vi.fn()} onDismiss={onDismiss} />)
+    fireEvent.click(screen.getByText('Not now'))
+    expect(onDismiss).toHaveBeenCalledOnce()
   })
 
   it('disables buttons and shows spinner while creating', async () => {
     let resolve: () => void
-    const onCreateRepo = vi.fn().mockReturnValue(new Promise<void>(r => { resolve = r }))
-    render(<GitRequiredModal onCreateRepo={onCreateRepo} onChooseVault={vi.fn()} />)
-    fireEvent.click(screen.getByText('Create repository'))
+    const onInitGit = vi.fn().mockReturnValue(new Promise<void>(r => { resolve = r }))
+    render(<GitSetupDialog open onInitGit={onInitGit} onDismiss={vi.fn()} />)
+    fireEvent.click(screen.getByText('Initialize Git'))
     await waitFor(() => {
-      expect(screen.getByText('Creating…')).toBeInTheDocument()
+      expect(screen.getByText('Initializing…')).toBeInTheDocument()
     })
     resolve!()
   })
 
   it('shows error message when creation fails', async () => {
-    const onCreateRepo = vi.fn().mockRejectedValue(new Error('Permission denied'))
-    render(<GitRequiredModal onCreateRepo={onCreateRepo} onChooseVault={vi.fn()} />)
-    fireEvent.click(screen.getByText('Create repository'))
+    const onInitGit = vi.fn().mockRejectedValue(new Error('Permission denied'))
+    render(<GitSetupDialog open onInitGit={onInitGit} onDismiss={vi.fn()} />)
+    fireEvent.click(screen.getByText('Initialize Git'))
     await waitFor(() => {
       expect(screen.getByText(/Permission denied/)).toBeInTheDocument()
     })
   })
 
-  it('uses the surrounding surface as a drag region and excludes the card', () => {
-    render(<GitRequiredModal onCreateRepo={vi.fn()} onChooseVault={vi.fn()} />)
+  it('closes on Escape without initializing Git', () => {
+    const onDismiss = vi.fn()
+    const onInitGit = vi.fn()
+    render(<GitSetupDialog open onInitGit={onInitGit} onDismiss={onDismiss} />)
 
-    const shell = screen.getByTestId('git-required-shell')
-    fireEvent.mouseDown(shell)
+    fireEvent.keyDown(document, { key: 'Escape' })
 
-    expect(dragRegionMouseDown).toHaveBeenCalledOnce()
-    expect(shell.querySelector('[data-no-drag]')).not.toBeNull()
+    expect(onDismiss).toHaveBeenCalledOnce()
+    expect(onInitGit).not.toHaveBeenCalled()
   })
 })

@@ -288,6 +288,7 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ needs.version.outputs.version }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
@@ -327,7 +328,8 @@ jobs:
             wget \
             patchelf \
             build-essential \
-            file
+            file \
+            rpm
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -374,11 +376,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ needs.version.outputs.version }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
         run: |
-          pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,appimage
+          pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
 
       - name: Validate Linux bundles
         run: |
@@ -386,6 +389,7 @@ jobs:
           installers=(
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
           )
           signatures=(
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig
@@ -393,7 +397,7 @@ jobs:
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb.sig
           )
           if [ ${#installers[@]} -eq 0 ]; then
-            echo "::error::Linux build produced no AppImage or deb bundle."
+            echo "::error::Linux build produced no AppImage, deb or rpm bundle."
             exit 1
           fi
           if [ ${#signatures[@]} -eq 0 ]; then
@@ -408,6 +412,7 @@ jobs:
           path: |
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb.sig
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.tar.gz
@@ -450,6 +455,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-release-cargo-x86_64-pc-windows-msvc-${{ env.RUST_TARGET_CACHE_VERSION }}-
 
+      - name: Cache Tauri Windows tools
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\tauri
+          key: ${{ runner.os }}-tauri-tools-nsis-3.11-nsis-tauri-utils-0.5.3
+
+      - name: Prefetch Tauri NSIS toolchain
+        shell: pwsh
+        run: ./.github/scripts/prefetch-tauri-nsis.ps1
+
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
@@ -485,6 +500,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ needs.version.outputs.version }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
@@ -557,6 +573,7 @@ jobs:
         run: |
           normalize_updater() {
             local arch="$1"
+            local normalized_updater="$2"
             local artifact_dir="updater-${arch}"
             local updater_file
             updater_file=$(find "$artifact_dir" -maxdepth 1 -name "*.app.tar.gz" -print -quit)
@@ -571,7 +588,6 @@ jobs:
               return 1
             fi
 
-            local normalized_updater="${artifact_dir}/Tolaria_${arch}.app.tar.gz"
             local normalized_sig="${normalized_updater}.sig"
             if [ "$updater_file" != "$normalized_updater" ]; then
               mv "$updater_file" "$normalized_updater"
@@ -581,8 +597,8 @@ jobs:
             fi
           }
 
-          normalize_updater aarch64
-          normalize_updater x86_64
+          normalize_updater aarch64 "updater-aarch64/Tolaria_${{ needs.version.outputs.version }}_macOS_Silicon.app.tar.gz"
+          normalize_updater x86_64 "updater-x86_64/Tolaria_${{ needs.version.outputs.version }}_macOS_Intel.app.tar.gz"
 
       - name: Generate release notes
         run: |
@@ -712,12 +728,14 @@ jobs:
             updater-x86_64/*.app.tar.gz.sig
             linux-x86_64-bundles/*.deb
             linux-x86_64-bundles/*.deb.sig
+            linux-x86_64-bundles/*.rpm
             linux-x86_64-bundles/*.AppImage
             linux-x86_64-bundles/*.AppImage.sig
             linux-x86_64-bundles/*.AppImage.tar.gz
             linux-x86_64-bundles/*.AppImage.tar.gz.sig
             linux-x86_64-bundles/*/*.deb
             linux-x86_64-bundles/*/*.deb.sig
+            linux-x86_64-bundles/*/*.rpm
             linux-x86_64-bundles/*/*.AppImage
             linux-x86_64-bundles/*/*.AppImage.sig
             linux-x86_64-bundles/*/*.AppImage.tar.gz

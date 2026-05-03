@@ -81,7 +81,7 @@ describe('mockFrontmatterHelpers', () => {
       }
 
       const result = updateMockFrontmatter('/test.md', 'order', 3)
-      expect(result).toContain('order: 3')
+      expect(result).toContain('_order: 3')
     })
 
     it('creates frontmatter when none exists', () => {
@@ -118,6 +118,43 @@ describe('mockFrontmatterHelpers', () => {
 
       const result = updateMockFrontmatter('/test.md', 'status', null)
       expect(result).toContain('status: null')
+    })
+
+    it('canonicalizes Type to lowercase type', () => {
+      window.__mockContent = {
+        '/test.md': '---\nType: Note\n---\n\n# Hello\n',
+      }
+
+      const result = updateMockFrontmatter('/test.md', 'type', 'Project')
+      expect(result).toContain('type: Project')
+      expect(result).not.toContain('Type: Note')
+    })
+
+    it('canonicalizes legacy type aliases to lowercase type', () => {
+      window.__mockContent = {
+        '/test.md': '---\n"Is A": Note\nis_a: Topic\n---\n\n# Hello\n',
+      }
+
+      const result = updateMockFrontmatter('/test.md', 'type', 'Project')
+      expect(result).toContain('type: Project')
+      expect(result).not.toContain('"Is A": Note')
+      expect(result).not.toContain('is_a: Topic')
+    })
+
+    it('canonicalizes system metadata aliases when updating mock frontmatter', () => {
+      window.__mockContent = {
+        '/test.md': '---\nsidebar label: Projects\nsidebar_label: Legacy\narchived: false\n---\n\n# Hello\n',
+      }
+
+      const withLabel = updateMockFrontmatter('/test.md', '_sidebar_label', 'Programs')
+      window.__mockContent['/test.md'] = withLabel
+      const result = updateMockFrontmatter('/test.md', '_archived', true)
+
+      expect(result).toContain('_sidebar_label: Programs')
+      expect(result).toContain('_archived: true')
+      expect(result).not.toContain('sidebar label: Projects')
+      expect(result).not.toContain('sidebar_label: Legacy')
+      expect(result).not.toContain('archived: false')
     })
   })
 
@@ -166,6 +203,35 @@ describe('mockFrontmatterHelpers', () => {
 
       const result = deleteMockFrontmatterProperty('/test.md', 'status')
       expect(result).toBe('')
+    })
+
+    it('deletes Type through lowercase type', () => {
+      window.__mockContent = {
+        '/test.md': '---\nType: Note\nstatus: Active\n---\n\n# Hello\n',
+      }
+
+      const result = deleteMockFrontmatterProperty('/test.md', 'type')
+      expect(result).not.toContain('Type: Note')
+      expect(result).toContain('status: Active')
+    })
+
+    it('deletes legacy aliases through canonical keys', () => {
+      window.__mockContent = {
+        '/test.md': '---\n"Is A": Note\nis_a: Topic\n_sidebar_label: Projects\nsidebar_label: Legacy\narchived: true\n---\n\n# Hello\n',
+      }
+
+      const withoutType = deleteMockFrontmatterProperty('/test.md', 'type')
+      window.__mockContent['/test.md'] = withoutType
+      const withoutLabel = deleteMockFrontmatterProperty('/test.md', '_sidebar_label')
+      window.__mockContent['/test.md'] = withoutLabel
+      const result = deleteMockFrontmatterProperty('/test.md', '_archived')
+
+      expect(result).not.toContain('"Is A": Note')
+      expect(result).not.toContain('is_a: Topic')
+      expect(result).not.toContain('_sidebar_label: Projects')
+      expect(result).not.toContain('sidebar_label: Legacy')
+      expect(result).not.toContain('archived: true')
+      expect(result).toContain('# Hello')
     })
   })
 })

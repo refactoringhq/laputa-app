@@ -10,9 +10,19 @@ export function useBuildNumber(): string | undefined {
   const [buildNumber, setBuildNumber] = useState<string>()
 
   useEffect(() => {
-    tauriCall<string>('get_build_number').then(setBuildNumber).catch(() => {
-      setBuildNumber('b?')
-    })
+    let mounted = true
+
+    tauriCall<string>('get_build_number')
+      .then((value) => {
+        if (mounted) setBuildNumber(value)
+      })
+      .catch(() => {
+        if (mounted) setBuildNumber('b?')
+      })
+
+    return () => {
+      mounted = false
+    }
   }, [])
 
   return buildNumber

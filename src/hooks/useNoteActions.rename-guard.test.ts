@@ -77,7 +77,7 @@ describe('useNoteActions title rename guard', () => {
   it('flushes pending editor work before renaming through the title property', async () => {
     const entry = makeEntry()
     const events: string[] = []
-    const flushBeforePathRename = vi.fn(async (path: string) => {
+    const flushBeforeNoteMutation = vi.fn(async (path: string) => {
       events.push(`flush:${path}`)
     })
 
@@ -90,7 +90,7 @@ describe('useNoteActions title rename guard', () => {
       return ''
     })
 
-    const { result } = renderHook(() => useNoteActions(makeConfig(entry, { flushBeforePathRename })))
+    const { result } = renderHook(() => useNoteActions(makeConfig(entry, { flushBeforeNoteMutation })))
 
     await act(async () => {
       result.current.handleSelectNote(entry)
@@ -100,17 +100,18 @@ describe('useNoteActions title rename guard', () => {
       await result.current.handleUpdateFrontmatter(entry.path, 'title', 'New Name')
     })
 
-    expect(flushBeforePathRename).toHaveBeenCalledWith(entry.path)
+    expect(flushBeforeNoteMutation).toHaveBeenCalledTimes(1)
+    expect(flushBeforeNoteMutation).toHaveBeenCalledWith(entry.path)
     expect(events).toEqual([`flush:${entry.path}`, 'rename'])
   })
 
   it('stops the title rename flow when pending editor work fails to flush', async () => {
     const entry = makeEntry()
-    const flushBeforePathRename = vi.fn().mockRejectedValue(new Error('disk full'))
+    const flushBeforeNoteMutation = vi.fn().mockRejectedValue(new Error('disk full'))
     const updateEntry = vi.fn()
 
     const { result } = renderHook(() => useNoteActions(makeConfig(entry, {
-      flushBeforePathRename,
+      flushBeforeNoteMutation,
       updateEntry,
     })))
 

@@ -41,6 +41,7 @@ describe('noteListHelpers extra coverage', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.useRealTimers()
   })
 
@@ -74,6 +75,28 @@ describe('noteListHelpers extra coverage', () => {
     expect(formatSubtitle(modifiedEntry)).toBe('1h ago · 1,200 words · 2 links')
     expect(formatSubtitle(emptyEntry)).toBe('Empty')
     expect(formatSearchSubtitle(modifiedEntry)).toBe('1h ago · Created 2d ago · 1,200 words · 2 links')
+  })
+
+  it('keeps note subtitle counts stable under non-English default number formatting', () => {
+    const originalToLocaleString = Number.prototype.toLocaleString
+    vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(function (
+      this: number,
+      locales?: Intl.LocalesArgument,
+      options?: Intl.NumberFormatOptions,
+    ) {
+      return originalToLocaleString.call(this, locales ?? 'de-DE', options)
+    })
+
+    const entry = makeEntry({
+      title: 'Project',
+      modifiedAt: Math.floor(Date.now() / 1000) - 3600,
+      createdAt: Math.floor(Date.now() / 1000) - 86400 * 2,
+      wordCount: 1200,
+      outgoingLinks: ['alpha', 'beta'],
+    })
+
+    expect(formatSubtitle(entry)).toBe('1h ago · 1,200 words · 2 links')
+    expect(formatSearchSubtitle(entry)).toBe('1h ago · Created 2d ago · 1,200 words · 2 links')
   })
 
   it('extracts sortable properties and labels custom property sort keys', () => {
@@ -183,7 +206,7 @@ describe('noteListHelpers extra coverage', () => {
       },
     }]
 
-    expect(filterEntries(entries, { kind: 'view', filename: 'work.view' }, undefined, views).map((entry) => entry.title)).toEqual(['Alpha'])
+    expect(filterEntries(entries, { kind: 'view', filename: 'work.view' }, { views }).map((entry) => entry.title)).toEqual(['Alpha'])
     expect(filterEntries(entries, { kind: 'folder', path: 'projects' }).map((entry) => entry.title)).toEqual(['Beta'])
     expect(filterEntries(entries, { kind: 'filter', filter: 'favorites' }).map((entry) => entry.title)).toEqual(['Alpha'])
     expect(filterEntries(entries, { kind: 'filter', filter: 'pulse' })).toEqual([])

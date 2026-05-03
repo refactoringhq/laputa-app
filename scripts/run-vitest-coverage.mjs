@@ -12,6 +12,9 @@ const forwardedArgs = process.argv.slice(2)
 const hasFileParallelismOverride = forwardedArgs.some((arg) =>
   arg === '--fileParallelism' || arg === '--no-file-parallelism'
 )
+const hasMaxWorkersOverride = forwardedArgs.some((arg) =>
+  arg === '--maxWorkers' || arg.startsWith('--maxWorkers=')
+)
 const maxAttempts = 2
 
 const packageManagerExec = process.env.npm_execpath
@@ -46,10 +49,11 @@ async function runCoverageAttempt(attempt) {
 
   const commandArgs = [
     ...baseCommandArgs,
-    // Vitest 4.0.18 occasionally crashes during coverage worker teardown
-    // after all files pass, so serialize file execution unless a caller
-    // explicitly opts into a different file-parallelism mode.
-    ...(hasFileParallelismOverride ? [] : ['--no-file-parallelism']),
+    // Keep coverage fast enough for CI while avoiding the unbounded worker
+    // contention that makes a few DOM-heavy suites time out under full
+    // file parallelism. Callers can still opt into serial or wider runs.
+    ...(hasFileParallelismOverride ? [] : ['--fileParallelism']),
+    ...(hasMaxWorkersOverride ? [] : ['--maxWorkers=4']),
     `--coverage.reportsDirectory=${runCoverageDir}`,
     ...forwardedArgs,
   ]

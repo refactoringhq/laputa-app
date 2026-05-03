@@ -78,7 +78,7 @@ export function useFolderDelete({
   }, [activeTabPathRef, closeAllTabs, confirmDeleteFolder, reloadFolders, reloadVault, selection, setSelection, setTabs, setToastMessage, vaultPath])
 
   const deleteSelectedFolder = useCallback(() => {
-    if (selection.kind !== 'folder') return
+    if (selection.kind !== 'folder' || !selection.path) return
     requestDeleteFolder(selection.path)
   }, [requestDeleteFolder, selection])
 

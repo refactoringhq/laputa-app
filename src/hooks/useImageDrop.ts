@@ -1,18 +1,14 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
-import type { Event as TauriEvent, UnlistenFn } from '@tauri-apps/api/event'
-import type { DragDropEvent as TauriDragDropPayload } from '@tauri-apps/api/webview'
 import { isTauri } from '../mock-tauri'
+import { useTauriDragDropEvent, type TauriDragDropEvent } from './useTauriDragDropEvent'
 
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff']
 const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska']
 const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v']
-const TAURI_DRAG_DROP_EVENT = 'tauri://drag-drop'
-const TAURI_DRAG_LEAVE_EVENT = 'tauri://drag-leave'
 
 type MediaUrlHandler = (url: string) => void
-type TauriDropEvent = TauriEvent<TauriDragDropPayload>
 type MediaKind = 'image' | 'video'
 
 function hasMediaFiles(dt: DataTransfer): boolean {
@@ -108,31 +104,6 @@ function insertDroppedMedia(paths: string[], ctx: DropContext): void {
   }
 }
 
-function cleanupNativeDropListeners(unlisteners: UnlistenFn[]): void {
-  for (const unlisten of unlisteners) {
-    void Promise.resolve()
-      .then(unlisten)
-      .catch(() => {})
-  }
-}
-
-async function registerNativeDropListeners(
-  handler: (event: TauriDropEvent) => void,
-): Promise<UnlistenFn[]> {
-  const { getCurrentWebview } = await import('@tauri-apps/api/webview')
-  const webview = getCurrentWebview()
-  const unlisteners: UnlistenFn[] = []
-
-  try {
-    unlisteners.push(await webview.listen<TauriDragDropPayload>(TAURI_DRAG_DROP_EVENT, handler))
-    unlisteners.push(await webview.listen<TauriDragDropPayload>(TAURI_DRAG_LEAVE_EVENT, handler))
-    return unlisteners
-  } catch (error) {
-    cleanupNativeDropListeners(unlisteners)
-    throw error
-  }
-}
-
 interface UseImageDropOptions {
   containerRef: RefObject<HTMLDivElement | null>
   /** Called with an asset URL for each media file dropped via Tauri native drag-drop. */
@@ -144,24 +115,29 @@ interface UseImageDropOptions {
   videoFolder?: string | null
 }
 
-export function useImageDrop({
-  containerRef,
-  onImageUrl,
-  vaultPath,
-  imageFolder,
-  videoFolder,
-}: UseImageDropOptions) {
-  const [isDragOver, setIsDragOver] = useState(false)
-  const onMediaUrlRef = useRef(onImageUrl)
-  useEffect(() => { onMediaUrlRef.current = onImageUrl }, [onImageUrl])
+function useLatestImageDropRefs(
+  onImageUrl: MediaUrlHandler | undefined,
+  vaultPath: string | undefined,
+  imageFolder: string | null | undefined,
+  videoFolder: string | null | undefined,
+) {
+  const onImageUrlRef = useRef(onImageUrl)
   const vaultPathRef = useRef(vaultPath)
-  useEffect(() => { vaultPathRef.current = vaultPath }, [vaultPath])
   const imageFolderRef = useRef<string | null>(imageFolder ?? null)
-  useEffect(() => { imageFolderRef.current = imageFolder ?? null }, [imageFolder])
   const videoFolderRef = useRef<string | null>(videoFolder ?? null)
+
+  useEffect(() => { onImageUrlRef.current = onImageUrl }, [onImageUrl])
+  useEffect(() => { vaultPathRef.current = vaultPath }, [vaultPath])
+  useEffect(() => { imageFolderRef.current = imageFolder ?? null }, [imageFolder])
   useEffect(() => { videoFolderRef.current = videoFolder ?? null }, [videoFolder])
 
-  // HTML5 DnD visual feedback (works in browser mode; BlockNote handles the actual upload)
+  return { onImageUrlRef, vaultPathRef, imageFolderRef, videoFolderRef }
+}
+
+function useHtmlImageDropFeedback(
+  containerRef: RefObject<HTMLDivElement | null>,
+  setIsDragOver: (isDragOver: boolean) => void,
+) {
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -174,16 +150,10 @@ export function useImageDrop({
     }
 
     const handleDragLeave = (e: DragEvent) => {
-      if (!container.contains(e.relatedTarget as Node)) {
-        setIsDragOver(false)
-      }
+      if (!container.contains(e.relatedTarget as Node)) setIsDragOver(false)
     }
 
-    const handleDrop = () => {
-      // Only reset visual state; BlockNote's native dropFile plugin handles
-      // the actual upload (via editor.uploadFile) and block insertion.
-      setIsDragOver(false)
-    }
+    const handleDrop = () => setIsDragOver(false)
 
     container.addEventListener('dragover', handleDragOver)
     container.addEventListener('dragleave', handleDragLeave)
@@ -194,46 +164,45 @@ export function useImageDrop({
       container.removeEventListener('dragleave', handleDragLeave)
       container.removeEventListener('drop', handleDrop)
     }
-  }, [containerRef])
+  }, [containerRef, setIsDragOver])
+}
 
-  // Tauri native file drop — intercepts OS file drops that bypass HTML5 DnD
-  useEffect(() => {
-    if (!isTauri()) return
+function handleNativeMediaDrop(
+  event: TauriDragDropEvent,
+  ctx: DropContext,
+): void {
+  if (event.payload.type !== 'drop') return
+  insertDroppedMedia(
+    event.payload.paths.filter((path) => classifyPath(path) !== null),
+    ctx,
+  )
+}
 
-    let unlisteners: UnlistenFn[] = []
-    let mounted = true
+export function useImageDrop({
+  containerRef,
+  onImageUrl,
+  vaultPath,
+  imageFolder,
+  videoFolder,
+}: UseImageDropOptions) {
+  const [isDragOver, setIsDragOver] = useState(false)
+  const { onImageUrlRef, vaultPathRef, imageFolderRef, videoFolderRef } = useLatestImageDropRefs(
+    onImageUrl,
+    vaultPath,
+    imageFolder,
+    videoFolder,
+  )
 
-    void (async () => {
-      try {
-        const nextUnlisteners = await registerNativeDropListeners((event) => {
-          if (event.payload.type === 'drop') {
-            setIsDragOver(false)
-            insertDroppedMedia(
-              event.payload.paths.filter((p) => classifyPath(p) !== null),
-              {
-                vaultPath: vaultPathRef.current,
-                imageFolder: imageFolderRef.current,
-                videoFolder: videoFolderRef.current,
-                onMediaUrl: onMediaUrlRef.current,
-              },
-            )
-            return
-          }
-          setIsDragOver(false)
-        })
-        if (mounted) unlisteners = nextUnlisteners
-        else cleanupNativeDropListeners(nextUnlisteners)
-      } catch {
-        // Tauri webview API not available (e.g. older Tauri version)
-      }
-    })()
-
-    return () => {
-      mounted = false
-      cleanupNativeDropListeners(unlisteners)
-      unlisteners = []
-    }
-  }, [])
+  useHtmlImageDropFeedback(containerRef, setIsDragOver)
+  useTauriDragDropEvent((event) => {
+    setIsDragOver(false)
+    handleNativeMediaDrop(event, {
+      vaultPath: vaultPathRef.current,
+      imageFolder: imageFolderRef.current,
+      videoFolder: videoFolderRef.current,
+      onMediaUrl: onImageUrlRef.current,
+    })
+  })
 
   return { isDragOver }
 }

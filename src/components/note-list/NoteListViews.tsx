@@ -41,7 +41,7 @@ export function EntityView({ entity, groups, query, collapsedGroups, sortPrefs, 
       {groups.length === 0
         ? <EmptyMessage text={query ? translate(locale, 'noteList.empty.noMatchingItems') : translate(locale, 'noteList.empty.noRelatedItems')} />
         : groups.map((group) => (
-          <RelationshipGroupSection key={group.label} group={group} isCollapsed={collapsedGroups.has(group.label)} sortPrefs={sortPrefs} onToggle={() => onToggleGroup(group.label)} handleSortChange={onSortChange} renderItem={renderItem} />
+          <RelationshipGroupSection key={group.label} group={group} isCollapsed={collapsedGroups.has(group.label)} sortPrefs={sortPrefs} locale={locale} onToggle={() => onToggleGroup(group.label)} handleSortChange={onSortChange} renderItem={renderItem} />
         ))
       }
     </div>

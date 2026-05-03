@@ -22,6 +22,7 @@ describe('useVaultAiGuidanceStatus', () => {
     mockInvoke.mockResolvedValue({
       agents_state: 'managed',
       claude_state: 'broken',
+      gemini_state: 'missing',
       can_restore: true,
     })
 
@@ -29,11 +30,13 @@ describe('useVaultAiGuidanceStatus', () => {
 
     expect(result.current.status.agentsState).toBe('checking')
     expect(result.current.status.claudeState).toBe('checking')
+    expect(result.current.status.geminiState).toBe('checking')
 
     await waitFor(() => {
       expect(result.current.status).toEqual({
         agentsState: 'managed',
         claudeState: 'broken',
+        geminiState: 'missing',
         canRestore: true,
       })
     })
@@ -44,11 +47,13 @@ describe('useVaultAiGuidanceStatus', () => {
       .mockResolvedValueOnce({
         agents_state: 'managed',
         claude_state: 'managed',
+        gemini_state: 'managed',
         can_restore: false,
       })
       .mockResolvedValueOnce({
         agents_state: 'managed',
         claude_state: 'broken',
+        gemini_state: 'managed',
         can_restore: true,
       })
 
@@ -65,6 +70,7 @@ describe('useVaultAiGuidanceStatus', () => {
     expect(result.current.status).toEqual({
       agentsState: 'managed',
       claudeState: 'broken',
+      geminiState: 'managed',
       canRestore: true,
     })
   })

@@ -33,18 +33,22 @@ describe('noteOpenPerformance', () => {
       .mockReturnValueOnce(170)
       .mockReturnValueOnce(200)
       .mockReturnValueOnce(245)
+      .mockReturnValueOnce(255)
       .mockReturnValueOnce(290)
+      .mockReturnValueOnce(315)
 
     beginNoteOpenTrace('/vault/note.md', 'sidebar')
     markNoteOpenTrace('/vault/note.md', 'beforeNavigateStart')
     markNoteOpenTrace('/vault/note.md', 'beforeNavigateEnd')
     markNoteOpenTrace('/vault/note.md', 'cacheReady')
+    markNoteOpenTrace('/vault/note.md', 'freshnessCheckStart')
+    markNoteOpenTrace('/vault/note.md', 'freshnessCheckEnd')
     markNoteOpenTrace('/vault/note.md', 'contentLoadStart')
     markNoteOpenTrace('/vault/note.md', 'contentLoadEnd')
     finishNoteOpenTrace('/vault/note.md')
 
     expect(debugSpy).toHaveBeenCalledWith(
-      '[perf] noteOpen path=/vault/note.md source=sidebar total=190.0ms beforeNavigate=30.0ms contentLoad=45.0ms editorSwap=45.0ms cache=hit',
+      '[perf] noteOpen path=/vault/note.md source=sidebar total=215.0ms beforeNavigate=30.0ms freshnessCheck=45.0ms contentLoad=35.0ms editorSwap=25.0ms cache=hit',
     )
   })
 

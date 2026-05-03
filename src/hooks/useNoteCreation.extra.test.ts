@@ -304,13 +304,13 @@ describe('resolveNewNote', () => {
 })
 
 describe('resolveNewType', () => {
-  it('creates a type entry at vault root', () => {
+  it('creates a type entry at the vault root', () => {
     const { entry, content } = resolveNewType({ typeName: 'Recipe', vaultPath: '/my/vault' })
     expect(entry.path).toBe('/my/vault/recipe.md')
     expect(entry.isA).toBe('Type')
     expect(entry.status).toBeNull()
     expect(content).toContain('type: Type')
-    expect(content).not.toContain('# Recipe')
+    expect(content).toContain('# Recipe')
   })
 
   it('uses provided vault path instead of hardcoded path', () => {

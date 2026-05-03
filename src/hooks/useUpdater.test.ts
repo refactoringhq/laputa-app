@@ -175,6 +175,36 @@ describe('useUpdater', () => {
     expect(result.current.status).toEqual({ state: 'idle' })
   })
 
+  it('shows checking state while a manual update check is in flight', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    let resolveCheck: (value: AppUpdateMetadata | null) => void = () => {}
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === 'check_for_app_update') {
+        return new Promise<AppUpdateMetadata | null>((resolve) => {
+          resolveCheck = resolve
+        })
+      }
+      return Promise.resolve(null)
+    })
+
+    const { result } = renderUpdater('stable')
+
+    let checkPromise: Promise<unknown> | null = null
+    await act(async () => {
+      checkPromise = result.current.actions.checkForUpdates()
+      await Promise.resolve()
+    })
+
+    expect(result.current.status).toEqual({ state: 'checking' })
+
+    await act(async () => {
+      resolveCheck(null)
+      expect(await checkPromise).toEqual({ kind: 'up-to-date' })
+    })
+
+    expect(result.current.status).toEqual({ state: 'idle' })
+  })
+
   it('returns available and sets status when an update exists', async () => {
     const { result, outcome } = await performManualCheck(
       'stable',
@@ -219,7 +249,7 @@ describe('useUpdater', () => {
       message: 'Could not check for updates: network error',
     })
     expect(console.warn).toHaveBeenCalledWith('[updater] Failed to check for updates')
-    expect(result.current.status).toEqual({ state: 'idle' })
+    expect(result.current.status).toEqual({ state: 'error' })
   })
 
   it('dismiss resets the banner state', async () => {

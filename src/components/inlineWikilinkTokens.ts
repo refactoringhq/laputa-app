@@ -12,5 +12,5 @@ export function normalizeInlineWikilinkValue(value: string): string {
   return value
     .replace(/\u00A0/g, ' ')
     .replace(/\u200B/g, '')
-    .replace(/\r?\n/g, ' ')
+    .replace(/\r\n?/g, '\n')
 }

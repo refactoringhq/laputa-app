@@ -11,7 +11,8 @@ import { buildTypeEntryMap, getTypeColor, getTypeLightColor } from '../../utils/
 import { NoteTitleIcon } from '../NoteTitleIcon'
 import { isSelectionActive } from '../SidebarParts'
 import { SidebarGroupHeader } from './SidebarGroupHeader'
-import { SIDEBAR_ITEM_PADDING } from './sidebarStyles'
+import { SIDEBAR_ITEM_PADDING, SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM } from './sidebarStyles'
+import { translate, type AppLocale } from '../../lib/i18n'
 
 const FAVORITE_TYPE_ICON_MAP: Record<string, string> = {
   Project: 'wrench',
@@ -68,7 +69,7 @@ function SortableFavoriteItem({
       >
         <div className="flex min-w-0 flex-1 items-center" style={{ gap: 4 }}>
           <NoteTitleIcon icon={icon} size={16} color={typeColor} />
-          <span className="truncate text-[13px] font-medium" style={{ marginLeft: 4, color: isActive ? typeColor : undefined }}>
+          <span className="min-w-0 truncate text-[13px] font-medium" style={{ marginLeft: 4, color: isActive ? typeColor : undefined }}>
             {entry.title}
           </span>
         </div>
@@ -99,6 +100,7 @@ interface FavoritesSectionProps {
   onSelectNote?: (entry: VaultEntry) => void
   onReorder?: (orderedPaths: string[]) => void
   collapsed: boolean
+  locale?: AppLocale
   onToggle: () => void
 }
 
@@ -109,6 +111,7 @@ export function FavoritesSection({
   onSelectNote,
   onReorder,
   collapsed,
+  locale = 'en',
   onToggle,
 }: FavoritesSectionProps) {
   const favorites = useMemo(() => sortFavorites(entries), [entries])
@@ -134,11 +137,11 @@ export function FavoritesSection({
 
   return (
     <div style={{ padding: '0 6px' }}>
-      <SidebarGroupHeader label="FAVORITES" collapsed={collapsed} onToggle={onToggle} count={favorites.length} />
+      <SidebarGroupHeader label={translate(locale, 'sidebar.group.favorites')} collapsed={collapsed} onToggle={onToggle} count={favorites.length} />
       {!collapsed && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={favoriteIds} strategy={verticalListSortingStrategy}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingBottom: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingBottom: SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM }}>
               {favorites.map((entry) => (
                 <SortableFavoriteItem
                   key={entry.path}

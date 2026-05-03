@@ -48,7 +48,7 @@ describe('inlineWikilinkDom', () => {
     nested.textContent = 'Tail'
     root.append(nested)
 
-    expect(serializeInlineNode(root)).toBe('A B [[Project]]Tail')
+    expect(serializeInlineNode(root)).toBe('A B\n[[Project]]Tail')
   })
 
   it('reads selections inside the editor and falls back to the editor end for outside selections', () => {

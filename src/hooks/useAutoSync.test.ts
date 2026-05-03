@@ -40,9 +40,10 @@ describe('useAutoSync', () => {
     })
   })
 
-  function renderSync(intervalMinutes: number | null = 5) {
+  function renderSync(intervalMinutes: number | null = 5, enabled = true) {
     return renderHook(() =>
       useAutoSync({
+        enabled,
         vaultPath: '/Users/luca/Laputa',
         intervalMinutes,
         onVaultUpdated,
@@ -57,6 +58,26 @@ describe('useAutoSync', () => {
     await waitFor(() => {
       expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Laputa' })
     })
+  })
+
+  it('does not call git operations when disabled', async () => {
+    const { result } = renderSync(5, false)
+
+    await waitFor(() => {
+      expect(result.current.syncStatus).toBe('idle')
+    })
+
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Laputa' })
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('git_remote_status', { vaultPath: '/Users/luca/Laputa' })
+
+    act(() => {
+      result.current.triggerSync()
+      result.current.pullAndPush()
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Laputa' })
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('git_push', { vaultPath: '/Users/luca/Laputa' })
   })
 
   it('sets syncStatus to idle after up_to_date pull', async () => {

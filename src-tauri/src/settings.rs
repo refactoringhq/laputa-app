@@ -4,6 +4,62 @@ use std::path::PathBuf;
 
 const APP_CONFIG_DIR: &str = "com.tolaria.app";
 const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
+const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &["claude_code", "codex", "opencode", "pi", "gemini"];
+pub const DEFAULT_HIDE_GITIGNORED_FILES: bool = true;
+const SUPPORTED_NOTE_WIDTH_MODES: &[&str] = &["normal", "wide"];
+const SUPPORTED_UI_LANGUAGE_ALIASES: &[(&str, &str)] = &[
+    ("en", "en"),
+    ("en-us", "en"),
+    ("en-gb", "en"),
+    ("en-ca", "en"),
+    ("en-au", "en"),
+    ("it", "it-IT"),
+    ("it-it", "it-IT"),
+    ("fr", "fr-FR"),
+    ("fr-fr", "fr-FR"),
+    ("de", "de-DE"),
+    ("de-de", "de-DE"),
+    ("ru", "ru-RU"),
+    ("ru-ru", "ru-RU"),
+    ("es-es", "es-ES"),
+    ("pt-br", "pt-BR"),
+    ("pt-pt", "pt-PT"),
+    ("es-419", "es-419"),
+    ("es-ar", "es-419"),
+    ("es-bo", "es-419"),
+    ("es-cl", "es-419"),
+    ("es-co", "es-419"),
+    ("es-cr", "es-419"),
+    ("es-cu", "es-419"),
+    ("es-do", "es-419"),
+    ("es-ec", "es-419"),
+    ("es-gt", "es-419"),
+    ("es-hn", "es-419"),
+    ("es-mx", "es-419"),
+    ("es-ni", "es-419"),
+    ("es-pa", "es-419"),
+    ("es-pe", "es-419"),
+    ("es-pr", "es-419"),
+    ("es-py", "es-419"),
+    ("es-sv", "es-419"),
+    ("es-us", "es-419"),
+    ("es-uy", "es-419"),
+    ("es-ve", "es-419"),
+    ("zh", "zh-CN"),
+    ("zh-cn", "zh-CN"),
+    ("zh-hans", "zh-CN"),
+    ("zh-sg", "zh-CN"),
+    ("zh-tw", "zh-TW"),
+    ("zh-hant", "zh-TW"),
+    ("zh-hk", "zh-TW"),
+    ("zh-mo", "zh-TW"),
+    ("ja", "ja-JP"),
+    ("ja-jp", "ja-JP"),
+    ("ko", "ko-KR"),
+    ("ko-kr", "ko-KR"),
+    ("vi", "vi"),
+    ("vi-vn", "vi"),
+];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Settings {
@@ -19,10 +75,15 @@ pub struct Settings {
     pub release_channel: Option<String>,
     pub theme_mode: Option<String>,
     pub ui_language: Option<String>,
+    pub note_width_mode: Option<String>,
     pub initial_h1_auto_rename_enabled: Option<bool>,
     pub default_ai_agent: Option<String>,
     pub default_image_folder: Option<String>,
     pub default_video_folder: Option<String>,
+    pub hide_gitignored_files: Option<bool>,
+    pub all_notes_show_pdfs: Option<bool>,
+    pub all_notes_show_images: Option<bool>,
+    pub all_notes_show_unsupported: Option<bool>,
 }
 
 fn normalize_optional_string(value: Option<String>) -> Option<String> {
@@ -52,7 +113,7 @@ pub fn effective_release_channel(value: Option<&str>) -> &'static str {
 
 pub fn normalize_default_ai_agent(value: Option<&str>) -> Option<String> {
     match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
-        Some(agent) if agent == "claude_code" || agent == "codex" => Some(agent),
+        Some(agent) if SUPPORTED_DEFAULT_AI_AGENTS.contains(&agent.as_str()) => Some(agent),
         _ => None,
     }
 }
@@ -64,6 +125,25 @@ pub fn normalize_theme_mode(value: Option<&str>) -> Option<String> {
     }
 }
 
+pub fn normalize_note_width_mode(value: Option<&str>) -> Option<String> {
+    match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
+        Some(mode) if SUPPORTED_NOTE_WIDTH_MODES.contains(&mode.as_str()) => Some(mode),
+        _ => None,
+    }
+}
+
+pub fn should_hide_gitignored_files(settings: &Settings) -> bool {
+    settings
+        .hide_gitignored_files
+        .unwrap_or(DEFAULT_HIDE_GITIGNORED_FILES)
+}
+
+pub fn hide_gitignored_files_enabled() -> bool {
+    get_settings()
+        .map(|settings| should_hide_gitignored_files(&settings))
+        .unwrap_or(DEFAULT_HIDE_GITIGNORED_FILES)
+}
+
 fn canonical_language_code(value: &str) -> Option<String> {
     let code = value.trim().replace('_', "-").to_ascii_lowercase();
     if code.is_empty() {
@@ -71,14 +151,6 @@ fn canonical_language_code(value: &str) -> Option<String> {
     } else {
         Some(code)
     }
-}
-
-fn is_english_language(code: &str) -> bool {
-    code == "en" || code.starts_with("en-")
-}
-
-fn is_simplified_chinese_language(code: &str) -> bool {
-    matches!(code, "zh" | "zh-cn" | "zh-hans" | "zh-sg")
 }
 
 /// Normalize a user-supplied folder path that must be relative to the vault root.
@@ -115,13 +187,9 @@ pub fn normalize_vault_relative_folder(value: Option<&str>) -> Option<String> {
 
 pub fn normalize_ui_language(value: Option<&str>) -> Option<String> {
     let language = canonical_language_code(value?)?;
-    if is_english_language(&language) {
-        return Some("en".to_string());
-    }
-    if is_simplified_chinese_language(&language) {
-        return Some("zh-Hans".to_string());
-    }
-    None
+    SUPPORTED_UI_LANGUAGE_ALIASES
+        .iter()
+        .find_map(|(alias, canonical)| (*alias == language).then(|| (*canonical).to_string()))
 }
 
 fn normalize_settings(settings: Settings) -> Settings {
@@ -142,6 +210,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         release_channel: normalize_release_channel(settings.release_channel.as_deref()),
         theme_mode: normalize_theme_mode(settings.theme_mode.as_deref()),
         ui_language: normalize_ui_language(settings.ui_language.as_deref()),
+        note_width_mode: normalize_note_width_mode(settings.note_width_mode.as_deref()),
         initial_h1_auto_rename_enabled: settings.initial_h1_auto_rename_enabled,
         default_ai_agent: normalize_default_ai_agent(settings.default_ai_agent.as_deref()),
         default_image_folder: normalize_vault_relative_folder(
@@ -150,6 +219,10 @@ fn normalize_settings(settings: Settings) -> Settings {
         default_video_folder: normalize_vault_relative_folder(
             settings.default_video_folder.as_deref(),
         ),
+        hide_gitignored_files: settings.hide_gitignored_files,
+        all_notes_show_pdfs: settings.all_notes_show_pdfs,
+        all_notes_show_images: settings.all_notes_show_images,
+        all_notes_show_unsupported: settings.all_notes_show_unsupported,
     }
 }
 
@@ -157,7 +230,7 @@ fn app_config_dir() -> Result<PathBuf, String> {
     dirs::config_dir().ok_or_else(|| "Could not determine config directory".to_string())
 }
 
-fn preferred_app_config_path(file_name: &str) -> Result<PathBuf, String> {
+pub(crate) fn preferred_app_config_path(file_name: &str) -> Result<PathBuf, String> {
     Ok(app_config_dir()?.join(APP_CONFIG_DIR).join(file_name))
 }
 
@@ -290,10 +363,15 @@ mod tests {
             release_channel: Some("alpha".to_string()),
             theme_mode: Some("dark".to_string()),
             ui_language: Some("zh-Hans".to_string()),
+            note_width_mode: Some("wide".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
             default_image_folder: Some("Media/Images".to_string()),
             default_video_folder: Some("Media/Videos".to_string()),
+            hide_gitignored_files: Some(false),
+            all_notes_show_pdfs: Some(true),
+            all_notes_show_images: Some(true),
+            all_notes_show_unsupported: Some(false),
         };
         let json = serde_json::to_string(&settings).unwrap();
         let parsed: Settings = serde_json::from_str(&json).unwrap();
@@ -407,8 +485,13 @@ mod tests {
             release_channel: Some("alpha".to_string()),
             theme_mode: Some("dark".to_string()),
             ui_language: Some("zh-Hans".to_string()),
+            note_width_mode: Some("wide".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
+            hide_gitignored_files: Some(false),
+            all_notes_show_pdfs: Some(true),
+            all_notes_show_images: Some(false),
+            all_notes_show_unsupported: Some(true),
             ..Default::default()
         });
         assert_eq!(loaded.auto_pull_interval_minutes, Some(10));
@@ -418,9 +501,27 @@ mod tests {
         assert_eq!(loaded.auto_advance_inbox_after_organize, Some(true));
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
-        assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
+        assert_eq!(loaded.ui_language.as_deref(), Some("zh-CN"));
+        assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
         assert_eq!(loaded.initial_h1_auto_rename_enabled, Some(false));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
+        assert_eq!(loaded.hide_gitignored_files, Some(false));
+        assert_eq!(loaded.all_notes_show_pdfs, Some(true));
+        assert_eq!(loaded.all_notes_show_images, Some(false));
+        assert_eq!(loaded.all_notes_show_unsupported, Some(true));
+    }
+
+    #[test]
+    fn test_gitignored_files_are_hidden_by_default() {
+        assert!(should_hide_gitignored_files(&Settings::default()));
+        assert!(should_hide_gitignored_files(&Settings {
+            hide_gitignored_files: Some(true),
+            ..Default::default()
+        }));
+        assert!(!should_hide_gitignored_files(&Settings {
+            hide_gitignored_files: Some(false),
+            ..Default::default()
+        }));
     }
 
     #[test]
@@ -430,13 +531,15 @@ mod tests {
             release_channel: Some("  alpha  ".to_string()),
             theme_mode: Some("  dark  ".to_string()),
             ui_language: Some("  zh-cn  ".to_string()),
+            note_width_mode: Some("  WIDE  ".to_string()),
             default_ai_agent: Some("  codex  ".to_string()),
             ..Default::default()
         });
         assert_eq!(loaded.anonymous_id.as_deref(), Some("test-uuid"));
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
-        assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
+        assert_eq!(loaded.ui_language.as_deref(), Some("zh-CN"));
+        assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
     }
 
@@ -479,6 +582,33 @@ mod tests {
     }
 
     #[test]
+    fn test_opencode_default_ai_agent_is_preserved() {
+        let loaded = save_and_reload(Settings {
+            default_ai_agent: Some("opencode".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("opencode"));
+    }
+
+    #[test]
+    fn test_pi_default_ai_agent_is_preserved() {
+        let loaded = save_and_reload(Settings {
+            default_ai_agent: Some("pi".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("pi"));
+    }
+
+    #[test]
+    fn test_gemini_default_ai_agent_is_preserved() {
+        let loaded = save_and_reload(Settings {
+            default_ai_agent: Some("gemini".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("gemini"));
+    }
+
+    #[test]
     fn test_invalid_theme_mode_is_filtered() {
         let loaded = save_and_reload(Settings {
             theme_mode: Some("system".to_string()),
@@ -488,12 +618,48 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_note_width_mode_is_filtered() {
+        let loaded = save_and_reload(Settings {
+            note_width_mode: Some("expanded".to_string()),
+            ..Default::default()
+        });
+        assert!(loaded.note_width_mode.is_none());
+    }
+
+    #[test]
     fn test_invalid_ui_language_is_filtered() {
         let loaded = save_and_reload(Settings {
-            ui_language: Some("fr-FR".to_string()),
+            ui_language: Some("xx-ZZ".to_string()),
             ..Default::default()
         });
         assert!(loaded.ui_language.is_none());
+    }
+
+    #[test]
+    fn test_supported_ui_languages_are_saved_and_reloaded() {
+        let expected_languages = [
+            ("it-IT", "it-IT"),
+            ("fr-FR", "fr-FR"),
+            ("de-DE", "de-DE"),
+            ("ru-RU", "ru-RU"),
+            ("es-ES", "es-ES"),
+            ("pt-BR", "pt-BR"),
+            ("pt-PT", "pt-PT"),
+            ("es-419", "es-419"),
+            ("zh-CN", "zh-CN"),
+            ("zh-TW", "zh-TW"),
+            ("ja-JP", "ja-JP"),
+            ("ko-KR", "ko-KR"),
+            ("vi", "vi"),
+        ];
+
+        for (input, expected) in expected_languages {
+            let loaded = save_and_reload(Settings {
+                ui_language: Some(input.to_string()),
+                ..Default::default()
+            });
+            assert_eq!(loaded.ui_language.as_deref(), Some(expected));
+        }
     }
 
     #[test]
@@ -501,7 +667,11 @@ mod tests {
         assert_eq!(normalize_ui_language(Some("en-US")).as_deref(), Some("en"));
         assert_eq!(
             normalize_ui_language(Some("zh_CN")).as_deref(),
-            Some("zh-Hans")
+            Some("zh-CN")
+        );
+        assert_eq!(
+            normalize_ui_language(Some("zh-Hant")).as_deref(),
+            Some("zh-TW")
         );
     }
 

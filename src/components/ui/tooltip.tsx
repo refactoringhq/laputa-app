@@ -33,7 +33,9 @@ function TooltipTrigger({
 function TooltipContent({
   className,
   sideOffset = 0,
+  collisionPadding = 8,
   children,
+  style,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
   return (
@@ -41,14 +43,23 @@ function TooltipContent({
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         className={cn(
-          "bg-foreground text-background animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md px-3 py-1.5 text-xs text-balance",
-          className
+          "z-50 w-fit max-w-[min(var(--radix-tooltip-content-available-width,22rem),22rem)] origin-(--radix-tooltip-content-transform-origin) [zoom:var(--tolaria-overlay-zoom-inverse,1)]"
         )}
+        style={style}
         {...props}
       >
-        {children}
-        <TooltipPrimitive.Arrow className="bg-foreground fill-foreground z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
+        <div
+          data-slot="tooltip-visual-scale"
+          className={cn(
+            "bg-foreground text-background max-w-[inherit] rounded-md px-3 py-1.5 text-xs text-balance [zoom:var(--tolaria-overlay-zoom-factor,1)]",
+            className
+          )}
+        >
+          {children}
+          <TooltipPrimitive.Arrow className="bg-foreground fill-foreground z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
+        </div>
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )

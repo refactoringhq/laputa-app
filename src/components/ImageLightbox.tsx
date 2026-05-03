@@ -1,27 +1,31 @@
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
+import { translate, type AppLocale } from '../lib/i18n'
+import type { ImageLightboxTarget } from '../utils/imageLightboxTarget'
 
-interface ImageLightboxProps {
-  src: string | null
+type ImageLightboxProps = {
+  image: ImageLightboxTarget | null
+  locale?: AppLocale
   onClose: () => void
 }
 
-/** Full-screen image preview opened on double-click of an inline image.
- *  Closes on Esc, backdrop click, or the close button (Radix Dialog defaults). */
-export function ImageLightbox({ src, onClose }: ImageLightboxProps) {
-  const open = src !== null
+export function ImageLightbox({ image, locale = 'en', onClose }: ImageLightboxProps) {
+  const title = translate(locale, 'editor.imageLightbox.title')
+  const open = image !== null
+
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
       <DialogContent
+        aria-describedby={undefined}
         data-testid="image-lightbox"
-        className="flex max-h-[90vh] max-w-[90vw] items-center justify-center bg-transparent p-0 shadow-none border-none sm:max-w-[90vw]"
-        showCloseButton={false}
+        className="flex max-h-[90vh] max-w-[90vw] items-center justify-center border-none bg-transparent p-0 shadow-none sm:max-w-[90vw]"
       >
-        <DialogTitle className="sr-only">Image preview</DialogTitle>
-        {src && (
+        <DialogTitle className="sr-only">{title}</DialogTitle>
+        {image && (
           <img
-            src={src}
-            alt=""
-            className="max-h-[90vh] max-w-[90vw] rounded-md object-contain"
+            data-testid="image-lightbox-image"
+            src={image.src}
+            alt={image.alt || title}
+            className="max-h-[90vh] max-w-[90vw] rounded-md object-contain shadow-2xl"
           />
         )}
       </DialogContent>

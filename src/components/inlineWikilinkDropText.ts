@@ -20,6 +20,15 @@ function formatDroppedPath(path: string): string {
   return /\s/.test(path) ? JSON.stringify(path) : path
 }
 
+export function formatDroppedPathList(paths: string[]): string | null {
+  const cleanedPaths = paths
+    .map((path) => normalizeDroppedFileUrl(path.trim()))
+    .filter(Boolean)
+
+  if (cleanedPaths.length === 0) return null
+  return cleanedPaths.map(formatDroppedPath).join(' ')
+}
+
 function normalizeDroppedTransferText(rawText: string): string | null {
   const trimmedText = normalizeInlineWikilinkValue(rawText).trim()
   if (!trimmedText) return null
@@ -30,7 +39,7 @@ function normalizeDroppedTransferText(rawText: string): string | null {
     .filter(Boolean)
 
   if (lines.length > 0 && lines.every((line) => line.startsWith('file://'))) {
-    return lines.map((line) => formatDroppedPath(normalizeDroppedFileUrl(line))).join(' ')
+    return formatDroppedPathList(lines)
   }
 
   return trimmedText
@@ -46,9 +55,8 @@ export function extractDroppedPathText(dataTransfer: DataTransfer): string | nul
     .filter((line) => line.length > 0 && !line.startsWith('#'))
     .map(normalizeDroppedFileUrl)
 
-  if (uriPaths.length > 0) {
-    return uriPaths.map(formatDroppedPath).join(' ')
-  }
+  const uriPathText = formatDroppedPathList(uriPaths)
+  if (uriPathText) return uriPathText
 
   const filePaths = Array.from(dataTransfer.files)
     .map((file) => (typeof (file as File & { path?: string }).path === 'string'
@@ -56,9 +64,8 @@ export function extractDroppedPathText(dataTransfer: DataTransfer): string | nul
       : ''))
     .filter(Boolean)
 
-  if (filePaths.length > 0) {
-    return filePaths.map(formatDroppedPath).join(' ')
-  }
+  const filePathText = formatDroppedPathList(filePaths)
+  if (filePathText) return filePathText
 
   return null
 }

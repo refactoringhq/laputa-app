@@ -1,12 +1,24 @@
 /* eslint-disable react-refresh/only-export-components -- module-level schema, not a component file */
-import { createCodeBlockSpec, BlockNoteSchema, defaultInlineContentSpecs } from '@blocknote/core'
-import { codeBlockOptions } from '@blocknote/code-block'
+import {
+  createCodeBlockSpec,
+  BlockNoteSchema,
+  defaultInlineContentSpecs,
+} from '@blocknote/core'
 import { createReactBlockSpec, createReactInlineContentSpec } from '@blocknote/react'
+import { lazy, Suspense } from 'react'
 import { resolveWikilinkColor as resolveColor } from '../utils/wikilinkColors'
 import { resolveEntry } from '../utils/wikilink'
 import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/mathMarkdown'
+import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
+import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
 import type { VaultEntry } from '../types'
+import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { NoteTitleIcon } from './NoteTitleIcon'
+import { MermaidDiagram } from './MermaidDiagram'
+
+const TldrawWhiteboard = lazy(() => import('./TldrawWhiteboard').then(module => ({
+  default: module.TldrawWhiteboard,
+})))
 
 // Module-level cache so the WikiLink renderer (defined outside React) can access entries
 export const _wikilinkEntriesRef: { current: VaultEntry[] } = { current: [] }
@@ -104,11 +116,105 @@ const MathBlock = createReactBlockSpec(
   },
 )
 
-const codeBlock = createCodeBlockSpec({
-  ...codeBlockOptions,
-  defaultLanguage: 'text',
-})
+function readCodeElementLanguage(code: Element): string | null {
+  const language = code.getAttribute('data-language')
+    ?? Array.from(code.classList)
+      .find(className => className.startsWith('language-'))
+      ?.replace(/^language-/u, '')
+  if (!language) return null
+
+  return language.trim().split(/\s+/u)[0]?.toLowerCase() ?? null
+}
+
+function readMermaidPreElement(element: HTMLElement): { source: string; diagram: string } | undefined {
+  if (element.tagName !== 'PRE') return undefined
+  if (element.childElementCount !== 1 || element.firstElementChild?.tagName !== 'CODE') return undefined
+
+  const code = element.firstElementChild
+  if (readCodeElementLanguage(code) !== 'mermaid') return undefined
+
+  const diagram = code.textContent?.endsWith('\n')
+    ? code.textContent
+    : `${code.textContent ?? ''}\n`
+  return {
+    diagram,
+    source: mermaidFenceSource({ diagram }),
+  }
+}
+
+const MermaidBlock = createReactBlockSpec(
+  {
+    type: MERMAID_BLOCK_TYPE,
+    propSchema: {
+      source: { default: '' },
+      diagram: { default: '' },
+    },
+    content: 'none',
+  },
+  {
+    runsBefore: ['codeBlock'],
+    parse: readMermaidPreElement,
+    render: (props) => (
+      <MermaidDiagram
+        diagram={props.block.props.diagram}
+        source={props.block.props.source}
+      />
+    ),
+  },
+)
+
+const TldrawBlock = createReactBlockSpec(
+  {
+    type: TLDRAW_BLOCK_TYPE,
+    propSchema: {
+      boardId: { default: '' },
+      height: { default: TLDRAW_DEFAULT_HEIGHT },
+      snapshot: { default: '{}' },
+      width: { default: '' },
+    },
+    content: 'none',
+  },
+  {
+    runsBefore: ['codeBlock'],
+    render: (props) => (
+      <Suspense fallback={<div className="tldraw-whiteboard tldraw-whiteboard--loading" />}>
+        <TldrawWhiteboard
+          boardId={props.block.props.boardId}
+          height={props.block.props.height}
+          snapshot={props.block.props.snapshot}
+          width={props.block.props.width}
+          onSnapshotChange={(snapshot) => {
+            props.editor.updateBlock(props.block, {
+              type: TLDRAW_BLOCK_TYPE,
+              props: {
+                boardId: props.block.props.boardId,
+                height: props.block.props.height,
+                snapshot,
+                width: props.block.props.width,
+              },
+            })
+          }}
+          onSizeChange={(size) => {
+            props.editor.updateBlock(props.block, {
+              type: TLDRAW_BLOCK_TYPE,
+              props: {
+                boardId: props.block.props.boardId,
+                height: size.height,
+                snapshot: props.block.props.snapshot,
+                width: size.width,
+              },
+            })
+          }}
+        />
+      </Suspense>
+    ),
+  },
+)
+
+const codeBlock = createCodeBlockSpec(createTolariaCodeBlockOptions())
 const mathBlock = MathBlock()
+const mermaidBlock = MermaidBlock()
+const tldrawBlock = TldrawBlock()
 
 export const schema = BlockNoteSchema.create({
   inlineContentSpecs: {
@@ -118,7 +224,9 @@ export const schema = BlockNoteSchema.create({
   },
 }).extend({
   blockSpecs: {
-    codeBlock,
     mathBlock,
+    mermaidBlock,
+    tldrawBlock,
+    codeBlock,
   },
 })

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { useEditorSave } from './useEditorSave'
+import { AUTO_SAVE_DEBOUNCE_MS, useEditorSave } from './useEditorSave'
 
 const mockInvokeFn = vi.fn<(cmd: string, args?: Record<string, unknown>) => Promise<null>>(() => Promise.resolve(null))
 
@@ -81,6 +81,42 @@ describe('useEditorSave', () => {
     })
 
     expect(setToastMessage).toHaveBeenCalledWith(expect.stringContaining('Save failed'))
+    consoleSpy.mockRestore()
+  })
+
+  it('keeps failed Windows path saves pending with a recoverable error toast', async () => {
+    const path = 'C:\\Users\\@raflymln\\notes\\untitled-note-1777236475.md'
+    mockInvokeFn.mockRejectedValueOnce(
+      new Error(`Failed to save ${path}: The filename, directory name, or volume label syntax is incorrect. (os error 123)`),
+    )
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { result } = renderSaveHook()
+
+    act(() => {
+      result.current.handleContentChange(path, '# Draft\n\nUnsaved body')
+    })
+
+    let saved = true
+    await act(async () => {
+      saved = await result.current.handleSave()
+    })
+
+    expect(saved).toBe(false)
+    expect(setToastMessage).toHaveBeenCalledWith(
+      'Save failed: The note path is invalid on this platform. Rename the note or move it to a valid folder, then try again.',
+    )
+    expect(updateVaultContent).not.toHaveBeenCalled()
+
+    await act(async () => {
+      saved = await result.current.handleSave()
+    })
+
+    expect(saved).toBe(true)
+    expect(mockInvokeFn).toHaveBeenLastCalledWith('save_note_content', {
+      path,
+      content: '# Draft\n\nUnsaved body',
+    })
+    expect(updateVaultContent).toHaveBeenCalledWith(path, '# Draft\n\nUnsaved body')
     consoleSpy.mockRestore()
   })
 
@@ -260,7 +296,66 @@ describe('useEditorSave', () => {
     beforeEach(() => { vi.useFakeTimers() })
     afterEach(() => { vi.useRealTimers() })
 
-    it('auto-saves 500ms after last content change', async () => {
+    it('waits for a longer idle window so slower typing does not save mid-keystream', async () => {
+      const lowEndTypingIntervalMs = 900
+      const { result } = renderHook(() =>
+        useEditorSave({ updateVaultContent, setTabs, setToastMessage })
+      )
+
+      act(() => { result.current.handleContentChange('/test/note.md', 'draft 1') })
+      await act(async () => { vi.advanceTimersByTime(lowEndTypingIntervalMs) })
+      expect(mockInvokeFn).not.toHaveBeenCalled()
+
+      act(() => { result.current.handleContentChange('/test/note.md', 'draft 2') })
+      await act(async () => { vi.advanceTimersByTime(lowEndTypingIntervalMs) })
+      expect(mockInvokeFn).not.toHaveBeenCalled()
+
+      await act(async () => {
+        vi.advanceTimersByTime(AUTO_SAVE_DEBOUNCE_MS - lowEndTypingIntervalMs)
+      })
+
+      expect(mockInvokeFn).toHaveBeenCalledWith('save_note_content', {
+        path: '/test/note.md',
+        content: 'draft 2',
+      })
+    })
+
+    it('keeps newer pending content when an earlier slow auto-save resolves during typing', async () => {
+      let resolveFirstSave!: () => void
+      const firstSave = new Promise<void>((resolve) => { resolveFirstSave = resolve })
+      mockInvokeFn
+        .mockImplementationOnce(() => firstSave)
+        .mockResolvedValue(undefined)
+      const { result } = renderHook(() =>
+        useEditorSave({ updateVaultContent, setTabs, setToastMessage })
+      )
+
+      act(() => { result.current.handleContentChange('/test/note.md', 'draft 1') })
+      await act(async () => {
+        vi.advanceTimersByTime(AUTO_SAVE_DEBOUNCE_MS)
+        await Promise.resolve()
+      })
+      expect(mockInvokeFn).toHaveBeenCalledTimes(1)
+
+      act(() => { result.current.handleContentChange('/test/note.md', 'draft 2') })
+      await act(async () => {
+        resolveFirstSave()
+        await firstSave
+        await Promise.resolve()
+      })
+
+      expect(updateVaultContent).not.toHaveBeenCalledWith('/test/note.md', 'draft 1')
+
+      await act(async () => { vi.advanceTimersByTime(AUTO_SAVE_DEBOUNCE_MS) })
+
+      expect(mockInvokeFn).toHaveBeenCalledTimes(2)
+      expect(mockInvokeFn).toHaveBeenLastCalledWith('save_note_content', {
+        path: '/test/note.md',
+        content: 'draft 2',
+      })
+    })
+
+    it('auto-saves after the idle debounce following the last content change', async () => {
       const onNotePersisted = vi.fn()
       const { result } = renderHook(() =>
         useEditorSave({ updateVaultContent, setTabs, setToastMessage, onNotePersisted })
@@ -273,8 +368,7 @@ describe('useEditorSave', () => {
       // Not saved yet
       expect(mockInvokeFn).not.toHaveBeenCalled()
 
-      // Advance 500ms
-      await act(async () => { vi.advanceTimersByTime(500) })
+      await act(async () => { vi.advanceTimersByTime(AUTO_SAVE_DEBOUNCE_MS) })
 
       expect(mockInvokeFn).toHaveBeenCalledWith('save_note_content', {
         path: '/test/note.md',
@@ -290,18 +384,16 @@ describe('useEditorSave', () => {
 
       act(() => { result.current.handleContentChange('/test/note.md', 'v1') })
 
-      // Advance 400ms (not yet 500ms)
-      await act(async () => { vi.advanceTimersByTime(400) })
+      const almostIdleMs = AUTO_SAVE_DEBOUNCE_MS - 100
+      await act(async () => { vi.advanceTimersByTime(almostIdleMs) })
       expect(mockInvokeFn).not.toHaveBeenCalled()
 
       // New edit resets timer
       act(() => { result.current.handleContentChange('/test/note.md', 'v2') })
 
-      // Another 400ms (800ms total, but only 400ms from last edit)
-      await act(async () => { vi.advanceTimersByTime(400) })
+      await act(async () => { vi.advanceTimersByTime(almostIdleMs) })
       expect(mockInvokeFn).not.toHaveBeenCalled()
 
-      // 100ms more = 500ms from last edit
       await act(async () => { vi.advanceTimersByTime(100) })
       expect(mockInvokeFn).toHaveBeenCalledWith('save_note_content', {
         path: '/test/note.md',
@@ -315,9 +407,35 @@ describe('useEditorSave', () => {
       )
 
       act(() => { result.current.handleContentChange('/test/note.md', 'content') })
-      await act(async () => { vi.advanceTimersByTime(500) })
+      await act(async () => { vi.advanceTimersByTime(AUTO_SAVE_DEBOUNCE_MS) })
 
       expect(setToastMessage).not.toHaveBeenCalled()
+    })
+
+    it('auto-save reports invalid path failures and leaves content retryable', async () => {
+      const path = 'C:\\Users\\@raflymln\\notes\\untitled-note-1777236475.md'
+      mockInvokeFn.mockRejectedValueOnce(new Error('The filename, directory name, or volume label syntax is incorrect. (os error 123)'))
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { result } = renderHook(() =>
+        useEditorSave({ updateVaultContent, setTabs, setToastMessage })
+      )
+
+      act(() => { result.current.handleContentChange(path, 'draft from auto-save') })
+      await act(async () => { await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS) })
+
+      expect(setToastMessage).toHaveBeenCalledWith(
+        'Save failed: The note path is invalid on this platform. Rename the note or move it to a valid folder, then try again.',
+      )
+      expect(updateVaultContent).not.toHaveBeenCalled()
+
+      await act(async () => { await result.current.handleSave() })
+
+      expect(mockInvokeFn).toHaveBeenLastCalledWith('save_note_content', {
+        path,
+        content: 'draft from auto-save',
+      })
+      expect(updateVaultContent).toHaveBeenCalledWith(path, 'draft from auto-save')
+      consoleSpy.mockRestore()
     })
 
     it('Cmd+S cancels pending auto-save and saves immediately', async () => {
@@ -333,8 +451,7 @@ describe('useEditorSave', () => {
       expect(mockInvokeFn).toHaveBeenCalledTimes(1)
       expect(setToastMessage).toHaveBeenCalledWith('Saved')
 
-      // Advancing timer should NOT cause a second save
-      await act(async () => { vi.advanceTimersByTime(500) })
+      await act(async () => { vi.advanceTimersByTime(AUTO_SAVE_DEBOUNCE_MS) })
       expect(mockInvokeFn).toHaveBeenCalledTimes(1)
     })
 
@@ -345,7 +462,7 @@ describe('useEditorSave', () => {
       )
 
       act(() => { result.current.handleContentChange('/test/note.md', 'content') })
-      await act(async () => { vi.advanceTimersByTime(500) })
+      await act(async () => { vi.advanceTimersByTime(AUTO_SAVE_DEBOUNCE_MS) })
 
       expect(onAfterSave).toHaveBeenCalled()
     })
@@ -358,7 +475,7 @@ describe('useEditorSave', () => {
       act(() => { result.current.handleContentChange('/test/note.md', 'content') })
       unmount()
 
-      await act(async () => { vi.advanceTimersByTime(500) })
+      await act(async () => { vi.advanceTimersByTime(AUTO_SAVE_DEBOUNCE_MS) })
       // Should not save after unmount
       expect(mockInvokeFn).not.toHaveBeenCalled()
     })

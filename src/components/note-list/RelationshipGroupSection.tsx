@@ -8,11 +8,13 @@ import {
 import { humanizePropertyKey } from '../../utils/propertyLabels'
 import { SortDropdown } from '../SortDropdown'
 import { Button } from '../ui/button'
+import type { AppLocale } from '../../lib/i18n'
 
-export function RelationshipGroupSection({ group, isCollapsed, sortPrefs, onToggle, handleSortChange, renderItem }: {
+export function RelationshipGroupSection({ group, isCollapsed, sortPrefs, locale = 'en', onToggle, handleSortChange, renderItem }: {
   group: RelationshipGroup
   isCollapsed: boolean
   sortPrefs: Record<string, SortConfig>
+  locale?: AppLocale
   onToggle: () => void
   handleSortChange: (groupLabel: string, option: SortOption, direction: SortDirection) => void
   renderItem: (entry: VaultEntry, options?: { forceSelected?: boolean }) => React.ReactNode
@@ -38,7 +40,7 @@ export function RelationshipGroupSection({ group, isCollapsed, sortPrefs, onTogg
           <span className="font-mono-label text-muted-foreground" style={{ fontWeight: 400 }}>{group.entries.length}</span>
         </Button>
         <span className="flex items-center gap-1.5">
-          <SortDropdown groupLabel={group.label} current={groupConfig.option} direction={groupConfig.direction} customProperties={customProperties} onChange={handleSortChange} />
+          <SortDropdown groupLabel={group.label} current={groupConfig.option} direction={groupConfig.direction} customProperties={customProperties} locale={locale} onChange={handleSortChange} />
         </span>
       </div>
       {!isCollapsed && (

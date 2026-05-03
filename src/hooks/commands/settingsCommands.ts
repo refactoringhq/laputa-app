@@ -1,13 +1,17 @@
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../appCommandCatalog'
 import type { CommandAction } from './types'
 import { rememberFeedbackDialogOpener } from '../../lib/feedbackDialogOpener'
+import { requestGitignoredVisibilityToggle } from '../../lib/gitignoredVisibilityEvents'
 import {
+  APP_LOCALES,
   SYSTEM_UI_LANGUAGE,
   createTranslator,
   localeDisplayName,
+  localeSearchKeywords,
   type AppLocale,
   type UiLanguagePreference,
 } from '../../lib/i18n'
+import type { ThemeMode } from '../../lib/themeMode'
 
 interface SettingsCommandsConfig {
   mcpStatus?: string
@@ -23,10 +27,12 @@ interface SettingsCommandsConfig {
   onInstallMcp?: () => void
   onReloadVault?: () => void
   onRepairVault?: () => void
+  onToggleGitignoredFilesVisibility?: () => void
   locale?: AppLocale
   systemLocale?: AppLocale
   selectedUiLanguage?: UiLanguagePreference
   onSetUiLanguage?: (language: UiLanguagePreference) => void
+  onSetThemeMode?: (mode: ThemeMode) => void
 }
 
 function commandKeywords(raw: string): string[] {
@@ -100,21 +106,46 @@ function buildLanguageCommands({
       enabled: canSwitchLanguage && selectedUiLanguage !== SYSTEM_UI_LANGUAGE,
       execute: () => onSetUiLanguage?.(SYSTEM_UI_LANGUAGE),
     },
+    ...APP_LOCALES.map((targetLocale) => ({
+      id: `switch-language-${targetLocale.toLowerCase()}`,
+      label: t('command.switchLanguage', {
+        language: localeDisplayName(targetLocale, locale),
+      }),
+      group: 'Settings' as const,
+      keywords: [
+        'language',
+        'locale',
+        ...localeSearchKeywords(targetLocale),
+      ],
+      enabled: canSwitchLanguage && selectedUiLanguage !== targetLocale,
+      execute: () => onSetUiLanguage?.(targetLocale),
+    })),
+  ]
+}
+
+function buildThemeCommands({
+  locale = 'en',
+  onSetThemeMode,
+}: Pick<SettingsCommandsConfig, 'locale' | 'onSetThemeMode'>): CommandAction[] {
+  const t = createTranslator(locale)
+  const canSetThemeMode = !!onSetThemeMode
+
+  return [
     {
-      id: 'switch-language-en',
-      label: t('command.switchToEnglish'),
+      id: 'use-light-mode',
+      label: t('command.settings.useLightMode'),
       group: 'Settings',
-      keywords: ['language', 'locale', 'english', 'en'],
-      enabled: canSwitchLanguage && selectedUiLanguage !== 'en',
-      execute: () => onSetUiLanguage?.('en'),
+      keywords: ['theme', 'appearance', 'light', 'light mode', 'day'],
+      enabled: canSetThemeMode,
+      execute: () => onSetThemeMode?.('light'),
     },
     {
-      id: 'switch-language-zh-hans',
-      label: t('command.switchToChinese'),
+      id: 'use-dark-mode',
+      label: t('command.settings.useDarkMode'),
       group: 'Settings',
-      keywords: ['language', 'locale', 'chinese', 'simplified', 'zh', '中文'],
-      enabled: canSwitchLanguage && selectedUiLanguage !== 'zh-Hans',
-      execute: () => onSetUiLanguage?.('zh-Hans'),
+      keywords: ['theme', 'appearance', 'dark', 'dark mode', 'night'],
+      enabled: canSetThemeMode,
+      execute: () => onSetThemeMode?.('dark'),
     },
   ]
 }
@@ -140,15 +171,24 @@ function buildMaintenanceCommands({
   onInstallMcp,
   onReloadVault,
   onRepairVault,
-}: Pick<SettingsCommandsConfig, 'mcpStatus' | 'onInstallMcp' | 'onReloadVault' | 'onRepairVault'>): CommandAction[] {
+  onToggleGitignoredFilesVisibility,
+}: Pick<SettingsCommandsConfig, 'mcpStatus' | 'onInstallMcp' | 'onReloadVault' | 'onRepairVault' | 'onToggleGitignoredFilesVisibility'>): CommandAction[] {
   return [
     {
       id: 'install-mcp',
       label: mcpStatus === 'installed' ? 'Manage External AI Tools…' : 'Set Up External AI Tools…',
       group: 'Settings',
-      keywords: ['mcp', 'ai', 'tools', 'external', 'setup', 'connect', 'disconnect', 'claude', 'codex', 'cursor', 'consent'],
+      keywords: ['mcp', 'ai', 'tools', 'external', 'setup', 'details', 'copy', 'export', 'manual', 'config', 'connect', 'disconnect', 'claude', 'gemini', 'codex', 'cursor', 'consent'],
       enabled: true,
       execute: () => onInstallMcp?.(),
+    },
+    {
+      id: 'toggle-gitignored-files-visibility',
+      label: 'Toggle Gitignored Files Visibility',
+      group: 'Settings',
+      keywords: ['gitignore', 'ignored', 'files', 'folders', 'visibility', 'hide', 'show', 'generated', 'local'],
+      enabled: true,
+      execute: onToggleGitignoredFilesVisibility ?? requestGitignoredVisibilityToggle,
     },
     { id: 'reload-vault', label: 'Reload Vault', group: 'Settings', keywords: ['reload', 'refresh', 'rescan', 'sync', 'filesystem', 'cache'], enabled: !!onReloadVault, execute: () => onReloadVault?.() },
     { id: 'repair-vault', label: 'Repair Vault', group: 'Settings', keywords: ['repair', 'fix', 'restore', 'config', 'agents', 'themes', 'missing', 'reset', 'flatten', 'structure'], enabled: !!onRepairVault, execute: () => onRepairVault?.() },
@@ -159,12 +199,13 @@ export function buildSettingsCommands(config: SettingsCommandsConfig): CommandAc
   const {
     mcpStatus, vaultCount, isGettingStartedHidden,
     onOpenSettings, onOpenFeedback, onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
-    onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault,
-    locale = 'en', systemLocale = locale, selectedUiLanguage = SYSTEM_UI_LANGUAGE, onSetUiLanguage,
+    onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault, onToggleGitignoredFilesVisibility,
+    locale = 'en', systemLocale = locale, selectedUiLanguage = SYSTEM_UI_LANGUAGE, onSetUiLanguage, onSetThemeMode,
   } = config
 
   return [
     ...buildPrimarySettingsCommands({ locale, onOpenSettings, onOpenFeedback, onCheckForUpdates }),
+    ...buildThemeCommands({ locale, onSetThemeMode }),
     ...buildLanguageCommands({
       locale,
       systemLocale,
@@ -180,6 +221,12 @@ export function buildSettingsCommands(config: SettingsCommandsConfig): CommandAc
       onRemoveActiveVault,
       onRestoreGettingStarted,
     }),
-    ...buildMaintenanceCommands({ mcpStatus, onInstallMcp, onReloadVault, onRepairVault }),
+    ...buildMaintenanceCommands({
+      mcpStatus,
+      onInstallMcp,
+      onReloadVault,
+      onRepairVault,
+      onToggleGitignoredFilesVisibility,
+    }),
   ]
 }

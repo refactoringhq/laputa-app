@@ -43,14 +43,24 @@ describe('refreshPulledVaultState', () => {
     expect(options.replaceActiveTab).toHaveBeenCalledWith(entries[0])
   })
 
-  it('reloads the active tab after any successful pull with updates', async () => {
+  it('keeps the active tab mounted when updates do not include the active note', async () => {
     const options = makeOptions({ updatedFiles: ['project/plan.md'] })
 
     await refreshPulledVaultState(options)
 
     expect(options.reloadVault).toHaveBeenCalledOnce()
     expect(options.closeAllTabs).not.toHaveBeenCalled()
-    expect(options.replaceActiveTab).toHaveBeenCalledWith(expect.objectContaining({ path: '/vault/active.md' }))
+    expect(options.replaceActiveTab).not.toHaveBeenCalled()
+  })
+
+  it('keeps the active tab mounted for full watcher refreshes with unknown changed files', async () => {
+    const options = makeOptions({ updatedFiles: [] })
+
+    await refreshPulledVaultState(options)
+
+    expect(options.reloadVault).toHaveBeenCalledOnce()
+    expect(options.closeAllTabs).not.toHaveBeenCalled()
+    expect(options.replaceActiveTab).not.toHaveBeenCalled()
   })
 
   it('matches macOS /tmp and /private/tmp aliases when reloading the active tab entry', async () => {
@@ -73,6 +83,27 @@ describe('refreshPulledVaultState', () => {
     })
 
     await refreshPulledVaultState(options)
+
+    expect(options.replaceActiveTab).not.toHaveBeenCalled()
+    expect(options.closeAllTabs).not.toHaveBeenCalled()
+  })
+
+  it('skips stale tab replacement when the active note changes during reload', async () => {
+    let resolveReload!: (entries: VaultEntry[]) => void
+    let currentActivePath: string | null = '/vault/active.md'
+    const options = makeOptions({
+      getActiveTabPath: () => currentActivePath,
+      reloadVault: vi.fn(() => new Promise<VaultEntry[]>((resolve) => {
+        resolveReload = resolve
+      })),
+    })
+
+    const refresh = refreshPulledVaultState(options)
+    await Promise.resolve()
+
+    currentActivePath = '/vault/other.md'
+    resolveReload([makeEntry('/vault/active.md', 'Active'), makeEntry('/vault/other.md', 'Other')])
+    await refresh
 
     expect(options.replaceActiveTab).not.toHaveBeenCalled()
     expect(options.closeAllTabs).not.toHaveBeenCalled()

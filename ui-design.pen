@@ -33,6 +33,137 @@
     },
     {
       "type": "frame",
+      "id": "manual_view_ordering_sidebar",
+      "x": 0,
+      "y": 12740,
+      "name": "Manual saved View ordering - sidebar row",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 420,
+      "height": 206,
+      "fill": "$--sidebar",
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "$--sidebar-border"
+      },
+      "layout": "vertical",
+      "gap": 10,
+      "padding": 16,
+      "children": [
+        {
+          "type": "text",
+          "id": "manual_view_ordering_hdr",
+          "fill": "$--muted-foreground",
+          "content": "VIEWS",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "manual_view_ordering_row",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "$--accent",
+          "cornerRadius": 4,
+          "padding": [
+            6,
+            8,
+            6,
+            8
+          ],
+          "alignItems": "center",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "manual_view_ordering_name",
+              "fill": "$--foreground",
+              "width": "fill_container",
+              "content": "Active Projects",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "500",
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "manual_view_ordering_actions",
+              "fill": "$--muted-foreground",
+              "content": "edit delete",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "500",
+              "letterSpacing": 0
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "manual_view_ordering_note",
+          "fill": "$--muted-foreground",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "Saved Views keep the same row UI as before: pointer users drag the row itself to reorder, while keyboard users use command-palette move actions.",
+          "lineHeight": 1.45,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal",
+          "letterSpacing": 0
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "dark_mode_settings_flow",
+      "x": 460,
+      "y": 12740,
+      "name": "Settings Appearance - immediate dark mode",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 520,
+      "height": 190,
+      "fill": "$--background",
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "$--border"
+      },
+      "layout": "vertical",
+      "gap": 12,
+      "padding": 20,
+      "children": [
+        {
+          "type": "text",
+          "id": "dark_mode_settings_heading",
+          "fill": "$--foreground",
+          "content": "Appearance",
+          "fontFamily": "Inter",
+          "fontSize": 18,
+          "fontWeight": "700",
+          "letterSpacing": 0
+        },
+        {
+          "type": "text",
+          "id": "dark_mode_settings_behavior",
+          "fill": "$--muted-foreground",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "Choosing Dark applies the app-owned theme immediately to Settings, shell chrome, editor surfaces, and the local theme mirror; the same setting persists through app settings.",
+          "lineHeight": 1.45,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal",
+          "letterSpacing": 0
+        }
+      ]
+    },
+    {
+      "type": "frame",
       "id": "mOf4J",
       "x": 0,
       "y": 100,
@@ -2608,6 +2739,107 @@
           "fontFamily": "IBM Plex Mono",
           "fontSize": 11,
           "fontWeight": "normal"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "command_palette_theme_mode_actions",
+      "x": 1040,
+      "y": 4010,
+      "name": "Command palette theme mode actions",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 420,
+      "height": 160,
+      "fill": "$--popover",
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "$--border"
+      },
+      "cornerRadius": "$--radius-lg",
+      "layout": "vertical",
+      "gap": 8,
+      "padding": 12,
+      "children": [
+        {
+          "type": "text",
+          "id": "command_palette_theme_mode_title",
+          "fill": "$--muted-foreground",
+          "content": "COMMAND PALETTE / SETTINGS",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "command_palette_theme_mode_light",
+          "width": "fill_container",
+          "height": 40,
+          "fill": "$--accent",
+          "cornerRadius": "$--radius-md",
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "gap": 10,
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "command_palette_theme_mode_light_icon",
+              "width": 16,
+              "height": 16,
+              "iconFontName": "sun",
+              "iconFontFamily": "lucide",
+              "fill": "$--muted-foreground"
+            },
+            {
+              "type": "text",
+              "id": "command_palette_theme_mode_light_label",
+              "fill": "$--foreground",
+              "content": "Use Light Mode",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "command_palette_theme_mode_dark",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": "$--radius-md",
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "gap": 10,
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "command_palette_theme_mode_dark_icon",
+              "width": 16,
+              "height": 16,
+              "iconFontName": "moon",
+              "iconFontFamily": "lucide",
+              "fill": "$--muted-foreground"
+            },
+            {
+              "type": "text",
+              "id": "command_palette_theme_mode_dark_label",
+              "fill": "$--foreground",
+              "content": "Use Dark Mode",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "500"
+            }
+          ]
         }
       ]
     },
@@ -14026,6 +14258,387 @@
               ]
             }
           ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "gitignored_visibility_settings",
+      "x": 1480,
+      "y": 7900,
+      "name": "Settings - Gitignored files visibility",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 520,
+      "height": 188,
+      "fill": "$--background",
+      "padding": [
+        24,
+        24
+      ],
+      "children": [
+        {
+          "type": "text",
+          "id": "gitignored_visibility_heading",
+          "name": "sectionHeading",
+          "fill": "$--muted-foreground",
+          "content": "VAULT CONTENT",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700",
+          "letterSpacing": 0
+        },
+        {
+          "type": "text",
+          "id": "gitignored_visibility_description",
+          "name": "sectionDescription",
+          "fill": "$--muted-foreground",
+          "content": "Control whether files matched by the vault .gitignore appear in Tolaria.",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "gitignored_visibility_row",
+          "name": "switchRow",
+          "width": 472,
+          "height": 54,
+          "children": [
+            {
+              "type": "text",
+              "id": "gitignored_visibility_label",
+              "fill": "$--foreground",
+              "content": "Hide files and folders ignored by Git",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "500",
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "gitignored_visibility_helper",
+              "fill": "$--muted-foreground",
+              "content": "Keeps generated and local-only vault files out of notes, search, quick open, and folders.",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal",
+              "letterSpacing": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "mcp_config_copy_design",
+      "x": 0,
+      "y": 12580,
+      "name": "MCP Config Copy — Light",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 1440,
+      "fill": "$--background",
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 40,
+      "children": [
+        {
+          "type": "text",
+          "id": "mcp_config_copy_title",
+          "fill": "$--foreground",
+          "content": "MCP Config Copy",
+          "fontFamily": "Inter",
+          "fontSize": 24,
+          "fontWeight": "700",
+          "letterSpacing": 0
+        },
+        {
+          "type": "text",
+          "id": "mcp_config_copy_description",
+          "fill": "$--muted-foreground",
+          "content": "AI panel exposes a compact Copy MCP config action; setup dialog shows the exact generated JSON with a keyboard-focusable code block and copy button.",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "normal",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "mcp_config_copy_ai_header",
+          "name": "AI panel header action",
+          "width": 520,
+          "height": 52,
+          "fill": "$--background",
+          "stroke": {
+            "align": "inside",
+            "thickness": 1,
+            "fill": "$--border"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "mcp_config_copy_ai_label",
+              "fill": "$--muted-foreground",
+              "content": "AI Agent · Claude Code",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            },
+            {
+              "type": "rectangle",
+              "id": "mcp_config_copy_icon_button",
+              "name": "Copy MCP config icon button",
+              "x": 440,
+              "y": 14,
+              "width": 24,
+              "height": 24,
+              "cornerRadius": 6,
+              "fill": "$--muted"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "mcp_config_copy_manual_block",
+          "name": "Manual MCP config block",
+          "width": 520,
+          "fill": "$--background",
+          "layout": "vertical",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "mcp_config_copy_manual_title",
+              "fill": "$--foreground",
+              "content": "Manual MCP config",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            },
+            {
+              "type": "rectangle",
+              "id": "mcp_config_copy_code_block",
+              "width": 520,
+              "height": 148,
+              "cornerRadius": 8,
+              "fill": "$--background",
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "$--border"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ai_agent_permission_mode_header",
+      "x": 560,
+      "y": 13980,
+      "name": "AI agent permission mode - panel header",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 360,
+      "height": 96,
+      "fill": "$--background",
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "$--border"
+      },
+      "layout": "vertical",
+      "padding": 12,
+      "gap": 10,
+      "children": [
+        {
+          "type": "frame",
+          "id": "ai_agent_permission_mode_title_row",
+          "width": "fill_container",
+          "height": 28,
+          "alignItems": "center",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "ai_agent_permission_mode_icon",
+              "fill": "$--muted-foreground",
+              "content": "robot",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            },
+            {
+              "type": "frame",
+              "id": "ai_agent_permission_mode_title_stack",
+              "width": "fill_container",
+              "height": 28,
+              "layout": "vertical",
+              "gap": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ai_agent_permission_mode_title",
+                  "fill": "$--muted-foreground",
+                  "content": "AI Agent",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "600",
+                  "letterSpacing": 0
+                },
+                {
+                  "type": "text",
+                  "id": "ai_agent_permission_mode_agent",
+                  "fill": "$--muted-foreground",
+                  "content": "Claude Code · Safe",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "400",
+                  "letterSpacing": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ai_agent_permission_mode_toggle",
+          "width": "fill_container",
+          "height": 28,
+          "fill": "$--muted",
+          "cornerRadius": 6,
+          "padding": 2,
+          "gap": 2,
+          "children": [
+            {
+              "type": "text",
+              "id": "ai_agent_permission_mode_safe",
+              "width": "fill_container",
+              "height": 24,
+              "fill": "$--foreground",
+              "content": "Vault Safe",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "ai_agent_permission_mode_power",
+              "width": "fill_container",
+              "height": 24,
+              "fill": "$--muted-foreground",
+              "content": "Power User",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "500",
+              "letterSpacing": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "view_color_sidebar_row",
+      "x": 960,
+      "y": 13980,
+      "name": "Saved View color metadata - sidebar row",
+      "theme": {
+        "Mode": "Light"
+      },
+      "width": 420,
+      "height": 128,
+      "fill": "$--sidebar",
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "$--sidebar-border"
+      },
+      "layout": "vertical",
+      "gap": 10,
+      "padding": 16,
+      "children": [
+        {
+          "type": "text",
+          "id": "view_color_sidebar_header",
+          "fill": "$--muted-foreground",
+          "content": "VIEWS",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fontWeight": "700",
+          "letterSpacing": 0
+        },
+        {
+          "type": "frame",
+          "id": "view_color_sidebar_active_row",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "$--accent-blue-light",
+          "cornerRadius": 4,
+          "padding": [
+            6,
+            8,
+            6,
+            16
+          ],
+          "alignItems": "center",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "view_color_sidebar_icon",
+              "fill": "$--accent-blue",
+              "content": "rocket",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "view_color_sidebar_label",
+              "fill": "$--accent-blue",
+              "width": "fill_container",
+              "content": "Active Projects",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "500",
+              "letterSpacing": 0
+            },
+            {
+              "type": "text",
+              "id": "view_color_sidebar_count",
+              "fill": "$--text-inverse",
+              "content": "4",
+              "fontFamily": "Inter",
+              "fontSize": 10,
+              "fontWeight": "600",
+              "letterSpacing": 0
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "view_color_sidebar_note",
+          "fill": "$--muted-foreground",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "Saved Views with color metadata use the accent for the icon, active label, active row tint, and active count pill; invalid or missing colors keep the default active row treatment.",
+          "lineHeight": 1.45,
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal",
+          "letterSpacing": 0
         }
       ]
     }

@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Settings } from '../types'
+import {
+  GITIGNORED_VISIBILITY_CHANGED_EVENT,
+  TOGGLE_GITIGNORED_VISIBILITY_EVENT,
+} from '../lib/gitignoredVisibilityEvents'
 import { useSettings } from './useSettings'
 
 const defaultSettings: Settings = {
@@ -17,9 +21,14 @@ const defaultSettings: Settings = {
   release_channel: null,
   theme_mode: null,
   ui_language: null,
+  note_width_mode: null,
   default_ai_agent: null,
   default_image_folder: null,
   default_video_folder: null,
+  hide_gitignored_files: null,
+  all_notes_show_pdfs: null,
+  all_notes_show_images: null,
+  all_notes_show_unsupported: null,
 }
 
 const savedSettings: Settings = {
@@ -35,9 +44,14 @@ const savedSettings: Settings = {
   release_channel: null,
   theme_mode: null,
   ui_language: null,
+  note_width_mode: null,
   default_ai_agent: null,
   default_image_folder: null,
   default_video_folder: null,
+  hide_gitignored_files: null,
+  all_notes_show_pdfs: null,
+  all_notes_show_images: null,
+  all_notes_show_unsupported: null,
 }
 
 let mockSettingsStore: Settings = { ...defaultSettings }
@@ -85,10 +99,15 @@ function changedSettings(): Settings {
     anonymous_id: null,
     release_channel: null,
     theme_mode: null,
-    ui_language: 'zh-Hans',
+    ui_language: 'zh-CN',
+    note_width_mode: 'wide',
     default_ai_agent: null,
     default_image_folder: null,
     default_video_folder: null,
+    hide_gitignored_files: false,
+    all_notes_show_pdfs: true,
+    all_notes_show_images: false,
+    all_notes_show_unsupported: true,
   }
 }
 
@@ -125,7 +144,7 @@ describe('useSettings', () => {
 
     const settings = await renderLoadedSettings()
 
-    expect(settings.ui_language).toBe('zh-Hans')
+    expect(settings.ui_language).toBe('zh-CN')
     expect(mockInvokeFn).not.toHaveBeenCalledWith('get_settings', {})
   })
 
@@ -142,11 +161,21 @@ describe('useSettings', () => {
   it('normalizes unsupported language preferences on load', async () => {
     mockSettingsStore = {
       ...savedSettings,
-      ui_language: 'fr-FR' as Settings['ui_language'],
+      ui_language: 'xx-ZZ' as Settings['ui_language'],
     }
 
     const settings = await renderLoadedSettings()
     expect(settings.ui_language).toBeNull()
+  })
+
+  it('normalizes unsupported note width modes on load', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      note_width_mode: 'expanded' as Settings['note_width_mode'],
+    }
+
+    const settings = await renderLoadedSettings()
+    expect(settings.note_width_mode).toBeNull()
   })
 
   it('saves settings via backend', async () => {
@@ -164,6 +193,52 @@ describe('useSettings', () => {
 
     expect(mockInvokeFn).toHaveBeenCalledWith('save_settings', { settings: newSettings })
     expect(result.current.settings).toEqual(newSettings)
+  })
+
+  it('preserves the Gitignored files visibility preference', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      hide_gitignored_files: false,
+    }
+
+    const settings = await renderLoadedSettings()
+
+    expect(settings.hide_gitignored_files).toBe(false)
+  })
+
+  it('preserves All Notes file visibility preferences', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      all_notes_show_pdfs: true,
+      all_notes_show_images: false,
+      all_notes_show_unsupported: true,
+    }
+
+    const settings = await renderLoadedSettings()
+
+    expect(settings.all_notes_show_pdfs).toBe(true)
+    expect(settings.all_notes_show_images).toBe(false)
+    expect(settings.all_notes_show_unsupported).toBe(true)
+  })
+
+  it('toggles Gitignored file visibility from the command event', async () => {
+    const listener = vi.fn()
+    window.addEventListener(GITIGNORED_VISIBILITY_CHANGED_EVENT, listener)
+    const { result } = renderHook(() => useSettings())
+
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(TOGGLE_GITIGNORED_VISIBILITY_EVENT))
+    })
+
+    await waitFor(() => {
+      expect(result.current.settings.hide_gitignored_files).toBe(false)
+    })
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener(GITIGNORED_VISIBILITY_CHANGED_EVENT, listener)
   })
 
   it('saves settings through native invoke when Tauri globals are not detectable', async () => {

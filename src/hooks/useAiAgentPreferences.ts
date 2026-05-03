@@ -3,8 +3,8 @@ import { isTauri } from '../mock-tauri'
 import {
   getAiAgentDefinition,
   getNextAiAgentId,
-  isAiAgentInstalled,
   resolveDefaultAiAgent,
+  type AiAgentReadiness,
   type AiAgentId,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
@@ -12,13 +12,28 @@ import type { Settings } from '../types'
 
 interface UseAiAgentPreferencesArgs {
   settings: Settings
+  settingsLoaded: boolean
   saveSettings: (settings: Settings) => void
   aiAgentsStatus: AiAgentsStatus
   onToast?: (message: string) => void
 }
 
+function getDefaultAiAgentReadiness(
+  settingsLoaded: boolean,
+  aiAgentsStatus: AiAgentsStatus,
+  defaultAiAgent: AiAgentId,
+): AiAgentReadiness {
+  if (!settingsLoaded) return 'checking'
+  if (!isTauri()) return 'ready'
+
+  const status = aiAgentsStatus[defaultAiAgent].status
+  if (status === 'checking') return 'checking'
+  return status === 'installed' ? 'ready' : 'missing'
+}
+
 export function useAiAgentPreferences({
   settings,
+  settingsLoaded,
   saveSettings,
   aiAgentsStatus,
   onToast,
@@ -29,7 +44,12 @@ export function useAiAgentPreferences({
   )
 
   const defaultAiAgentLabel = getAiAgentDefinition(defaultAiAgent).label
-  const defaultAiAgentReady = !isTauri() || isAiAgentInstalled(aiAgentsStatus, defaultAiAgent)
+  const defaultAiAgentReadiness = getDefaultAiAgentReadiness(
+    settingsLoaded,
+    aiAgentsStatus,
+    defaultAiAgent,
+  )
+  const defaultAiAgentReady = defaultAiAgentReadiness === 'ready'
 
   const setDefaultAiAgent = useCallback((agent: AiAgentId) => {
     saveSettings({
@@ -46,6 +66,7 @@ export function useAiAgentPreferences({
   return {
     defaultAiAgent,
     defaultAiAgentLabel,
+    defaultAiAgentReadiness,
     defaultAiAgentReady,
     setDefaultAiAgent,
     cycleDefaultAiAgent,

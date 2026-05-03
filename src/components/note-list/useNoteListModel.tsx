@@ -11,8 +11,8 @@ import type {
 import type { AppLocale } from '../../lib/i18n'
 import type { NoteListFilter } from '../../utils/noteListHelpers'
 import { countByFilter, countAllByFilter, countAllNotesByFilter } from '../../utils/noteListHelpers'
+import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
 import { NoteItem } from '../NoteItem'
-import { DraggableNoteItem } from '../note-retargeting/DraggableNoteItem'
 import { prefetchNoteContent } from '../../hooks/useTabManagement'
 import type { MultiSelectState } from '../../hooks/useMultiSelect'
 import { isDeletedNoteEntry, resolveHeaderTitle, type DeletedNoteEntry } from './noteListUtils'
@@ -32,6 +32,10 @@ import { useChangesContextMenu } from './NoteListChangesMenu'
 import { addNoteListSearchToggleListener, dispatchNoteListSearchAvailability } from '../../utils/noteListSearchEvents'
 
 type EntitySelection = Extract<SidebarSelection, { kind: 'entity' }>
+const LIKELY_NEXT_PRELOAD_LIMIT = 6
+const ADJACENT_PRELOAD_RADIUS = 3
+const LIKELY_NEXT_PRELOAD_START_DELAY_MS = 350
+const LIKELY_NEXT_PRELOAD_STEP_DELAY_MS = 180
 
 function useViewFlags(selection: SidebarSelection) {
   const isSectionGroup = selection.kind === 'sectionGroup'
@@ -41,6 +45,54 @@ function useViewFlags(selection: SidebarSelection) {
   const isChangesView = selection.kind === 'filter' && selection.filter === 'changes'
   const showFilterPills = isSectionGroup || isFolderView
   return { isSectionGroup, isFolderView, isInboxView, isAllNotesView, isChangesView, showFilterPills }
+}
+
+function likelyNextPreloadEntries(entries: VaultEntry[], selectedNotePath: string | null): VaultEntry[] {
+  if (entries.length === 0) return []
+  const selectedIndex = selectedNotePath
+    ? entries.findIndex((entry) => entry.path === selectedNotePath)
+    : -1
+  const start = selectedIndex >= 0
+    ? Math.max(0, selectedIndex - ADJACENT_PRELOAD_RADIUS)
+    : 0
+  const end = selectedIndex >= 0
+    ? Math.min(entries.length, selectedIndex + ADJACENT_PRELOAD_RADIUS + 1)
+    : Math.min(entries.length, LIKELY_NEXT_PRELOAD_LIMIT)
+  return entries
+    .slice(start, end)
+    .map((entry, offset) => ({ entry, index: start + offset }))
+    .sort((left, right) => {
+      if (selectedIndex < 0) return 0
+      return Math.abs(left.index - selectedIndex) - Math.abs(right.index - selectedIndex)
+    })
+    .map(({ entry }) => entry)
+    .filter((entry) => entry.path !== selectedNotePath && !isDeletedNoteEntry(entry) && entry.fileKind !== 'binary')
+    .slice(0, LIKELY_NEXT_PRELOAD_LIMIT)
+}
+
+function useLikelyNextPreload(entries: VaultEntry[], selectedNotePath: string | null) {
+  useEffect(() => {
+    const candidates = likelyNextPreloadEntries(entries, selectedNotePath)
+    if (candidates.length === 0) return
+
+    let stepTimer: number | null = null
+    let candidateIndex = 0
+    const startTimer = window.setTimeout(() => {
+      const preloadNext = () => {
+        const entry = candidates[candidateIndex]
+        if (!entry) return
+        candidateIndex += 1
+        prefetchNoteContent(entry)
+        stepTimer = window.setTimeout(preloadNext, LIKELY_NEXT_PRELOAD_STEP_DELAY_MS)
+      }
+      preloadNext()
+    }, LIKELY_NEXT_PRELOAD_START_DELAY_MS)
+
+    return () => {
+      window.clearTimeout(startTimer)
+      if (stepTimer !== null) window.clearTimeout(stepTimer)
+    }
+  }, [entries, selectedNotePath])
 }
 
 function useBulkActions(
@@ -77,13 +129,19 @@ function useBulkActions(
   }
 }
 
-function useFilterCounts(entries: VaultEntry[], selection: SidebarSelection) {
+function useFilterCounts(
+  entries: VaultEntry[],
+  selection: SidebarSelection,
+  allNotesFileVisibility?: AllNotesFileVisibility,
+) {
   return useMemo(() => {
     if (selection.kind === 'sectionGroup') return countByFilter(entries, selection.type)
     if (selection.kind === 'folder') return countAllByFilter(entries)
-    if (selection.kind === 'filter' && selection.filter === 'all') return countAllNotesByFilter(entries)
+    if (selection.kind === 'filter' && selection.filter === 'all') {
+      return countAllNotesByFilter(entries, allNotesFileVisibility)
+    }
     return { open: 0, archived: 0 }
-  }, [entries, selection])
+  }, [allNotesFileVisibility, entries, selection])
 }
 
 interface UseNoteListContentParams {
@@ -95,6 +153,7 @@ interface UseNoteListContentParams {
   modifiedSuffixes: string[]
   modifiedPathSet: Set<string>
   isInboxView: boolean
+  selectedNotePath: string | null
   allNotesNoteListProperties?: string[] | null
   onUpdateAllNotesNoteListProperties?: (value: string[] | null) => void
   inboxNoteListProperties?: string[] | null
@@ -104,6 +163,7 @@ interface UseNoteListContentParams {
   updateEntry?: (path: string, patch: Partial<VaultEntry>) => void
   views?: ViewFile[]
   visibleNotesRef?: React.MutableRefObject<VaultEntry[]>
+  allNotesFileVisibility?: AllNotesFileVisibility
 }
 
 function useNoteListContent({
@@ -115,6 +175,7 @@ function useNoteListContent({
   modifiedSuffixes,
   modifiedPathSet,
   isInboxView,
+  selectedNotePath,
   allNotesNoteListProperties,
   onUpdateAllNotesNoteListProperties,
   inboxNoteListProperties,
@@ -124,6 +185,7 @@ function useNoteListContent({
   updateEntry,
   views,
   visibleNotesRef,
+  allNotesFileVisibility,
 }: UseNoteListContentParams) {
   const subFilter = (selection.kind === 'sectionGroup' || selection.kind === 'folder')
     ? noteListFilter
@@ -184,6 +246,7 @@ function useNoteListContent({
     subFilter,
     inboxPeriod: effectiveInboxPeriod,
     views,
+    allNotesFileVisibility,
   })
   const searched = useMemo(() => filterEntriesByNoteListQuery(sortedEntries, query, {
     allEntries: entries,
@@ -196,6 +259,7 @@ function useNoteListContent({
     displayPropsOverride,
   }), [displayPropsOverride, entries, query, sortedGroups, typeEntryMap])
   useVisibleNotesSync({ visibleNotesRef, isEntityView, entityEntry, searched, searchedGroups })
+  useLikelyNextPreload(searched, selectedNotePath)
 
   return {
     customProperties,
@@ -244,6 +308,7 @@ interface UseNoteListInteractionStateParams {
   onCreateNote: (type?: string) => void
   onBulkArchive?: (paths: string[]) => void
   onBulkDeletePermanently?: (paths: string[]) => void
+  locale: AppLocale
 }
 
 function useNoteListInteractionState({
@@ -267,8 +332,9 @@ function useNoteListInteractionState({
   onCreateNote,
   onBulkArchive,
   onBulkDeletePermanently,
+  locale,
 }: UseNoteListInteractionStateParams) {
-  const changesContextMenu = useChangesContextMenu({ isChangesView, onDiscardFile, modifiedFiles })
+  const changesContextMenu = useChangesContextMenu({ isChangesView, onDiscardFile, modifiedFiles, locale })
   const {
     collapsedGroups,
     handleClickNote,
@@ -367,22 +433,21 @@ function useRenderItem({
         onContextMenu={contextMenuHandler}
       />
     ) : (
-      <DraggableNoteItem key={entry.path} notePath={entry.path}>
-        <NoteItem
-          entry={entry}
-          isSelected={options?.forceSelected || selectedNotePath === entry.path}
-          isMultiSelected={multiSelect.selectedPaths.has(entry.path)}
-          isHighlighted={entry.path === noteListKeyboard.highlightedPath}
-          noteStatus={resolvedGetNoteStatus(entry.path)}
-          changeStatus={getChangeStatus(entry.path)}
-          typeEntryMap={typeEntryMap}
-          allEntries={entries}
-          displayPropsOverride={displayPropsOverride}
-          onClickNote={handleClickNote}
-          onPrefetch={prefetchNoteContent}
-          onContextMenu={contextMenuHandler}
-        />
-      </DraggableNoteItem>
+      <NoteItem
+        key={entry.path}
+        entry={entry}
+        isSelected={options?.forceSelected || selectedNotePath === entry.path}
+        isMultiSelected={multiSelect.selectedPaths.has(entry.path)}
+        isHighlighted={entry.path === noteListKeyboard.highlightedPath}
+        noteStatus={resolvedGetNoteStatus(entry.path)}
+        changeStatus={getChangeStatus(entry.path)}
+        typeEntryMap={typeEntryMap}
+        allEntries={entries}
+        displayPropsOverride={displayPropsOverride}
+        onClickNote={handleClickNote}
+        onPrefetch={prefetchNoteContent}
+        onContextMenu={contextMenuHandler}
+      />
     )
   ), [
     contextMenuHandler,
@@ -402,6 +467,7 @@ export interface NoteListProps {
   entries: VaultEntry[]
   selection: SidebarSelection
   selectedNote: VaultEntry | null
+  loading?: boolean
   noteListFilter: NoteListFilter
   onNoteListFilterChange: (filter: NoteListFilter) => void
   inboxPeriod?: InboxPeriod
@@ -429,6 +495,7 @@ export interface NoteListProps {
   onUpdateViewDefinition?: (filename: string, patch: Partial<ViewDefinition>) => void
   views?: ViewFile[]
   visibleNotesRef?: React.MutableRefObject<VaultEntry[]>
+  allNotesFileVisibility?: AllNotesFileVisibility
   locale?: AppLocale
 }
 
@@ -436,6 +503,7 @@ function buildNoteListLayoutModel(params: {
   selection: SidebarSelection
   views?: ViewFile[]
   sidebarCollapsed?: boolean
+  loading: boolean
   modifiedFilesError?: string | null
   noteListFilter: NoteListFilter
   filterCounts: ReturnType<typeof useFilterCounts>
@@ -452,6 +520,7 @@ function buildNoteListLayoutModel(params: {
 }) {
   return {
     title: resolveHeaderTitle(params.selection, params.content.typeDocument, params.views, params.locale),
+    loading: params.loading,
     locale: params.locale,
     typeDocument: params.content.typeDocument,
     isEntityView: params.content.isEntityView,
@@ -510,6 +579,7 @@ export function useNoteListModel({
   entries,
   selection,
   selectedNote,
+  loading = false,
   noteListFilter,
   onNoteListFilterChange,
   inboxPeriod = 'all',
@@ -535,12 +605,13 @@ export function useNoteListModel({
   onUpdateViewDefinition,
   views,
   visibleNotesRef,
+  allNotesFileVisibility,
   locale = 'en',
 }: NoteListProps) {
   const selectedNotePath = selectedNote?.path ?? null
   const { modifiedPathSet, modifiedSuffixes, resolvedGetNoteStatus } = useModifiedFilesState(modifiedFiles, getNoteStatus)
   const { isInboxView } = useViewFlags(selection)
-  const filterCounts = useFilterCounts(entries, selection)
+  const filterCounts = useFilterCounts(entries, selection, allNotesFileVisibility)
   const content = useNoteListContent({
     entries,
     selection,
@@ -550,6 +621,7 @@ export function useNoteListModel({
     modifiedSuffixes,
     modifiedPathSet,
     isInboxView,
+    selectedNotePath,
     allNotesNoteListProperties,
     onUpdateAllNotesNoteListProperties,
     inboxNoteListProperties,
@@ -559,6 +631,7 @@ export function useNoteListModel({
     updateEntry,
     views,
     visibleNotesRef,
+    allNotesFileVisibility,
   })
   const interaction = useNoteListInteractionState({
     searched: content.searched,
@@ -581,6 +654,7 @@ export function useNoteListModel({
     onCreateNote,
     onBulkArchive,
     onBulkDeletePermanently,
+    locale,
   })
   const renderItem = useRenderItem({
     entries,
@@ -626,6 +700,7 @@ export function useNoteListModel({
     selection,
     views,
     sidebarCollapsed,
+    loading,
     onOpenType: onReplaceActiveTab,
     modifiedFilesError,
     noteListFilter,

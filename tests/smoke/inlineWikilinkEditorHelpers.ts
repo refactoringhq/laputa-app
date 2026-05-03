@@ -84,8 +84,15 @@ function selectEditorTextRangeInBrowser({
 }: SelectEditorTextRangeArgs): void {
   const editor = document.querySelector(`[data-testid="${dataTestId}"]`) as HTMLDivElement | null
   const selection = window.getSelection()
-  const firstText = editor?.firstElementChild?.firstChild as Text | null
-  const lastText = editor?.lastElementChild?.firstChild as Text | null
+  const textNodes: Text[] = []
+  if (editor) {
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode as Text)
+    }
+  }
+  const firstText = textNodes[0] ?? null
+  const lastText = textNodes[textNodes.length - 1] ?? null
   const prerequisites = [selection, firstText, lastText]
 
   if (prerequisites.some(value => !value)) return

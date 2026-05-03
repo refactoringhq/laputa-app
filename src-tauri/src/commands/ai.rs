@@ -1,6 +1,6 @@
 #[cfg(desktop)]
 use crate::ai_agents::{AiAgentStreamRequest, AiAgentsStatus};
-use crate::claude_cli::{AgentStreamRequest, ChatStreamRequest, ClaudeCliStatus};
+use crate::claude_cli::{ChatStreamRequest, ClaudeCliStatus};
 use crate::vault::VaultAiGuidanceStatus;
 
 use super::expand_tilde;
@@ -82,20 +82,25 @@ define_desktop_stream_command!(
 );
 
 #[cfg(desktop)]
-define_desktop_stream_command!(
-    stream_claude_agent,
-    AgentStreamRequest,
-    "claude-agent-stream",
-    crate::claude_cli::run_agent_stream
-);
+fn normalize_agent_request(mut request: AiAgentStreamRequest) -> AiAgentStreamRequest {
+    request.vault_path = expand_tilde(&request.vault_path).into_owned();
+    request
+}
 
 #[cfg(desktop)]
-define_desktop_stream_command!(
-    stream_ai_agent,
-    AiAgentStreamRequest,
-    "ai-agent-stream",
-    crate::ai_agents::run_ai_agent_stream
-);
+#[tauri::command]
+pub async fn stream_ai_agent(
+    app_handle: tauri::AppHandle,
+    request: AiAgentStreamRequest,
+) -> Result<String, String> {
+    run_desktop_stream(
+        app_handle,
+        "ai-agent-stream",
+        normalize_agent_request(request),
+        crate::ai_agents::run_ai_agent_stream,
+    )
+    .await
+}
 
 // ── Claude CLI (mobile stubs) ───────────────────────────────────────────────
 
@@ -120,6 +125,18 @@ pub fn get_ai_agents_status() -> AiAgentsStatus {
             installed: false,
             version: None,
         },
+        opencode: crate::ai_agents::AiAgentAvailability {
+            installed: false,
+            version: None,
+        },
+        pi: crate::ai_agents::AiAgentAvailability {
+            installed: false,
+            version: None,
+        },
+        gemini: crate::ai_agents::AiAgentAvailability {
+            installed: false,
+            version: None,
+        },
     }
 }
 
@@ -128,15 +145,6 @@ pub fn get_ai_agents_status() -> AiAgentsStatus {
 pub async fn stream_claude_chat(
     _app_handle: tauri::AppHandle,
     _request: ChatStreamRequest,
-) -> Result<String, String> {
-    Err("Claude CLI is not available on mobile".into())
-}
-
-#[cfg(mobile)]
-#[tauri::command]
-pub async fn stream_claude_agent(
-    _app_handle: tauri::AppHandle,
-    _request: AgentStreamRequest,
 ) -> Result<String, String> {
     Err("Claude CLI is not available on mobile".into())
 }
@@ -155,6 +163,47 @@ mod tests {
     use super::*;
     use crate::vault::AiGuidanceFileState;
 
+    #[cfg(desktop)]
+    #[test]
+    fn normalize_agent_request_expands_tilde_in_vault_path() {
+        use crate::ai_agents::AiAgentId;
+
+        let home = dirs::home_dir().unwrap();
+        let request = AiAgentStreamRequest {
+            agent: AiAgentId::ClaudeCode,
+            message: "hi".into(),
+            system_prompt: None,
+            vault_path: "~/Vaults/content".into(),
+            permission_mode: None,
+        };
+
+        let normalized = normalize_agent_request(request);
+
+        assert_eq!(
+            normalized.vault_path,
+            format!("{}/Vaults/content", home.display()),
+            "vault_path must be tilde-expanded so spawned agents can chdir into it",
+        );
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn normalize_agent_request_leaves_absolute_vault_path_untouched() {
+        use crate::ai_agents::AiAgentId;
+
+        let request = AiAgentStreamRequest {
+            agent: AiAgentId::Codex,
+            message: "hi".into(),
+            system_prompt: None,
+            vault_path: "/Users/example/vault".into(),
+            permission_mode: None,
+        };
+
+        let normalized = normalize_agent_request(request);
+
+        assert_eq!(normalized.vault_path, "/Users/example/vault");
+    }
+
     #[test]
     fn guidance_commands_report_and_restore_vault_guidance_files() {
         let dir = tempfile::TempDir::new().unwrap();
@@ -163,14 +212,17 @@ mod tests {
         let initial = get_vault_ai_guidance_status(vault_path.clone()).unwrap();
         assert_eq!(initial.agents_state, AiGuidanceFileState::Missing);
         assert_eq!(initial.claude_state, AiGuidanceFileState::Missing);
+        assert_eq!(initial.gemini_state, AiGuidanceFileState::Missing);
         assert!(initial.can_restore);
 
         let restored = restore_vault_ai_guidance(vault_path.clone()).unwrap();
         assert_eq!(restored.agents_state, AiGuidanceFileState::Managed);
         assert_eq!(restored.claude_state, AiGuidanceFileState::Managed);
+        assert_eq!(restored.gemini_state, AiGuidanceFileState::Managed);
         assert!(!restored.can_restore);
 
         assert!(dir.path().join("AGENTS.md").exists());
         assert!(dir.path().join("CLAUDE.md").exists());
+        assert!(dir.path().join("GEMINI.md").exists());
     }
 }

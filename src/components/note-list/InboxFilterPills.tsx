@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import type { InboxPeriod } from '../../types'
 
 interface InboxFilterPillsProps {
@@ -6,17 +7,18 @@ interface InboxFilterPillsProps {
   counts: Record<InboxPeriod, number>
   onChange: (period: InboxPeriod) => void
   position?: 'top' | 'bottom'
+  locale?: AppLocale
 }
 
-const PILLS: { value: InboxPeriod; label: string }[] = [
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
-  { value: 'all', label: 'All' },
+const PILLS: { value: InboxPeriod; labelKey: TranslationKey }[] = [
+  { value: 'week', labelKey: 'noteList.filter.week' },
+  { value: 'month', labelKey: 'noteList.filter.month' },
+  { value: 'all', labelKey: 'noteList.filter.all' },
 ]
 
 const BOTTOM_GRADIENT = 'linear-gradient(to bottom, transparent 0%, var(--card) 30%, var(--card) 100%)'
 
-function InboxFilterPillsInner({ active, counts, onChange, position = 'top' }: InboxFilterPillsProps) {
+function InboxFilterPillsInner({ active, counts, onChange, position = 'top', locale = 'en' }: InboxFilterPillsProps) {
   const isBottom = position === 'bottom'
   return (
     <div
@@ -26,7 +28,7 @@ function InboxFilterPillsInner({ active, counts, onChange, position = 'top' }: I
       style={isBottom ? { background: BOTTOM_GRADIENT } : undefined}
       data-testid="inbox-filter-pills"
     >
-      {PILLS.map(({ value, label }) => (
+      {PILLS.map(({ value, labelKey }) => (
         <button
           key={value}
           type="button"
@@ -40,7 +42,7 @@ function InboxFilterPillsInner({ active, counts, onChange, position = 'top' }: I
           onClick={() => onChange(value)}
           data-testid={`inbox-pill-${value}`}
         >
-          {label}
+          {translate(locale, labelKey)}
           <span className={`text-[10px] tabular-nums ${active === value ? 'text-foreground/70' : 'text-muted-foreground/70'}`}>
             {counts[value]}
           </span>

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { BreadcrumbBar } from './BreadcrumbBar'
 import { formatShortcutDisplay } from '../hooks/appCommandCatalog'
@@ -135,6 +135,26 @@ describe('BreadcrumbBar — archive/unarchive', () => {
   })
 })
 
+describe('BreadcrumbBar — file actions', () => {
+  it('reveals the current file from the breadcrumb toolbar', () => {
+    const onRevealFile = vi.fn()
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onRevealFile={onRevealFile} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal in Finder' }))
+
+    expect(onRevealFile).toHaveBeenCalledWith('/vault/note/test.md')
+  })
+
+  it('copies the current file path from the breadcrumb toolbar', () => {
+    const onCopyFilePath = vi.fn()
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onCopyFilePath={onCopyFilePath} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy file path' }))
+
+    expect(onCopyFilePath).toHaveBeenCalledWith('/vault/note/test.md')
+  })
+})
+
 describe('BreadcrumbBar — organized shortcut hint', () => {
   it('shows Cmd+E on the organized toggle tooltip', async () => {
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onToggleOrganized={vi.fn()} />)
@@ -159,16 +179,18 @@ describe('BreadcrumbBar — title in breadcrumb (always rendered, CSS-toggled)',
     expect(screen.getByText('test')).toBeInTheDocument()
   })
 
-  it('renders emoji note icons in the breadcrumb title', () => {
+  it('does not render emoji note icons in the breadcrumb filename', () => {
     const entryWithEmoji = { ...baseEntry, icon: '🚀' }
     render(<BreadcrumbBar entry={entryWithEmoji} {...defaultProps} />)
-    expect(screen.getByTestId('breadcrumb-note-icon')).toHaveTextContent('🚀')
+    expect(screen.getByTestId('breadcrumb-filename-trigger')).toHaveTextContent('test')
+    expect(screen.queryByText('🚀')).not.toBeInTheDocument()
   })
 
-  it('renders Phosphor note icons in the breadcrumb title', () => {
+  it('does not render Phosphor note icons in the breadcrumb filename', () => {
     const entryWithPhosphor = { ...baseEntry, icon: 'cooking-pot' }
     render(<BreadcrumbBar entry={entryWithPhosphor} {...defaultProps} />)
-    expect(screen.getByTestId('breadcrumb-note-icon').tagName.toLowerCase()).toBe('svg')
+    expect(screen.getByTestId('breadcrumb-filename-trigger')).toHaveTextContent('test')
+    expect(screen.queryByTestId('breadcrumb-note-icon')).not.toBeInTheDocument()
   })
 
   it('falls back to "Note" when isA is null', () => {
@@ -264,12 +286,86 @@ describe('BreadcrumbBar — action buttons always right-aligned', () => {
     const actions = container.querySelector('.breadcrumb-bar__actions')
     expect(actions).toBeInTheDocument()
     expect(actions).toHaveClass('ml-auto')
+    expect(actions).toHaveStyle({ gap: '8px' })
+  })
+
+  it('keeps grouped action buttons evenly spaced', () => {
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        noteWidth="normal"
+        onToggleNoteWidth={vi.fn()}
+        onRevealFile={vi.fn()}
+        onCopyFilePath={vi.fn()}
+      />,
+    )
+
+    const fileActionsGroup = screen.getByTestId('breadcrumb-reveal-file').closest('.breadcrumb-bar__overflowable-action')
+    expect(fileActionsGroup).toHaveClass('gap-2')
+    const widthActionGroup = screen.getByRole('button', { name: 'Switch to wide note width' }).closest('.breadcrumb-bar__overflowable-action')
+    expect(widthActionGroup).toHaveClass('gap-2')
+  })
+
+  it('end-aligns toolbar action tooltips so zoomed windows keep them inside the right edge', async () => {
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        onToggleFavorite={vi.fn()}
+      />,
+    )
+
+    act(() => {
+      fireEvent.focus(screen.getByRole('button', { name: 'Add to favorites' }))
+    })
+
+    const tooltip = await screen.findByRole('tooltip')
+    expect(document.querySelector('[data-slot="tooltip-content"]')).toHaveAttribute('data-align', 'end')
+    expect(tooltip).toHaveTextContent('Add to favorites')
+  })
+
+  it('lets the title use the free space before the fixed drag gap', () => {
+    const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
+
+    expect(container.querySelector('.breadcrumb-bar__title')).toHaveClass('flex-1')
+    expect(container.querySelector('.breadcrumb-bar__drag-spacer')).toHaveClass('w-6', 'shrink-0')
+    expect(container.querySelector('.breadcrumb-bar__drag-spacer')).not.toHaveClass('flex-1')
   })
 
   it('does not render the unused backlinks or more-actions placeholders', () => {
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
     expect(screen.queryByRole('button', { name: 'Backlinks are coming soon' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'More note actions are coming soon' })).not.toBeInTheDocument()
+  })
+
+  it('exposes lower-priority actions through the overflow menu', async () => {
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        showDiffToggle
+        noteWidth="normal"
+        onToggleNoteWidth={vi.fn()}
+        onRevealFile={vi.fn()}
+        onCopyFilePath={vi.fn()}
+        onArchive={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More note actions' }), {
+      button: 0,
+      ctrlKey: false,
+    })
+
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByRole('menuitem', { name: 'Show the current diff' })).toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: 'Switch to wide note width' })).toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: 'Reveal in Finder' })).toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: 'Copy file path' })).toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: 'Archive this note' })).toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: 'Delete this note' })).toBeInTheDocument()
   })
 })
 
@@ -307,25 +403,25 @@ describe('BreadcrumbBar — raw editor toggle', () => {
   })
 })
 
-describe('BreadcrumbBar — note layout toggle', () => {
-  it('shows the left-align layout action while centered', () => {
-    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteLayout="centered" onToggleNoteLayout={vi.fn()} />)
+describe('BreadcrumbBar — note width toggle', () => {
+  it('shows the wide width action while normal', () => {
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteWidth="normal" onToggleNoteWidth={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: 'Switch to left-aligned note layout' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Switch to wide note width' })).toBeInTheDocument()
   })
 
-  it('shows the centered layout action while left-aligned', () => {
-    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteLayout="left" onToggleNoteLayout={vi.fn()} />)
+  it('shows the normal width action while wide', () => {
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteWidth="wide" onToggleNoteWidth={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: 'Switch to centered note layout' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Switch to normal note width' })).toBeInTheDocument()
   })
 
-  it('calls onToggleNoteLayout when the layout button is clicked', () => {
-    const onToggleNoteLayout = vi.fn()
-    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteLayout="centered" onToggleNoteLayout={onToggleNoteLayout} />)
+  it('calls onToggleNoteWidth when the width button is clicked', () => {
+    const onToggleNoteWidth = vi.fn()
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteWidth="normal" onToggleNoteWidth={onToggleNoteWidth} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Switch to left-aligned note layout' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to wide note width' }))
 
-    expect(onToggleNoteLayout).toHaveBeenCalledOnce()
+    expect(onToggleNoteWidth).toHaveBeenCalledOnce()
   })
 })

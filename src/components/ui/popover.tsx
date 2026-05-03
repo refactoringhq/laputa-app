@@ -30,7 +30,7 @@ function PopoverContent({
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[12000] w-72 origin-(--radix-popover-content-transform-origin) rounded-md border p-4 shadow-md outline-hidden",
+          "bg-popover text-popover-foreground z-[12000] w-72 origin-(--radix-popover-content-transform-origin) rounded-md border p-4 shadow-md outline-hidden",
           className
         )}
         {...props}
@@ -45,37 +45,46 @@ function PopoverAnchor({
   return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />
 }
 
-function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="popover-header"
-      className={cn("flex flex-col gap-1 text-sm", className)}
-      {...props}
-    />
-  )
+interface PopoverTextSlotProps extends React.HTMLAttributes<HTMLElement> {
+  baseClassName: string
+  element: "div" | "p"
+  slot: string
 }
 
-function PopoverTitle({ className, ...props }: React.ComponentProps<"h2">) {
-  return (
-    <div
-      data-slot="popover-title"
-      className={cn("font-medium", className)}
-      {...props}
-    />
-  )
-}
-
-function PopoverDescription({
+function PopoverTextSlot({
+  baseClassName,
   className,
+  element,
+  slot,
   ...props
-}: React.ComponentProps<"p">) {
+}: PopoverTextSlotProps) {
+  return React.createElement(
+    element,
+    {
+      "data-slot": slot,
+      className: cn(baseClassName, className),
+      ...props,
+    },
+  )
+}
+
+function PopoverHeader(props: React.ComponentProps<"div">) {
   return (
-    <p
-      data-slot="popover-description"
-      className={cn("text-muted-foreground", className)}
+    <PopoverTextSlot
+      baseClassName="flex flex-col gap-1 text-sm"
+      element="div"
+      slot="popover-header"
       {...props}
     />
   )
+}
+
+function PopoverTitle(props: React.ComponentProps<"div">) {
+  return <PopoverTextSlot baseClassName="font-medium" element="div" slot="popover-title" {...props} />
+}
+
+function PopoverDescription(props: React.ComponentProps<"p">) {
+  return <PopoverTextSlot baseClassName="text-muted-foreground" element="p" slot="popover-description" {...props} />
 }
 
 export {

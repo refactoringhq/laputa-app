@@ -48,6 +48,7 @@ _color: blue              # color assigned to a type
 _order: 10                # sort order in the sidebar
 _sidebar_label: Projects  # override label in sidebar
 _default_folder: Projects # vault-relative folder for new notes of this type (opt-in)
+_width: wide              # rich-editor width override for this note
 ```
 
 **This convention is universal** — apply it to all future system-level frontmatter fields. When a new feature needs to store configuration in a note's frontmatter (especially in Type notes), use `_field_name` to keep it hidden from normal user-facing surfaces while still stored on-disk as plain text.
@@ -57,6 +58,19 @@ The frontmatter parser (Rust: `vault/mod.rs`, TS: `utils/frontmatter.ts`) must f
 ## Document Model
 
 All data lives in markdown files with YAML frontmatter. There is no database — the filesystem is the source of truth.
+
+### Vault Git Capability
+
+Git is a per-vault capability, not a prerequisite for the document model. A vault can be:
+
+| State | Meaning | UI behavior |
+|---|---|---|
+| Git-backed | The vault path contains a Git repository | History, changes, commits, sync, conflict resolution, remotes, AutoGit, and auto-sync are available according to remote/config state |
+| Non-git | The vault path is a plain folder | Markdown scanning, editing, search, and navigation work; Git-dependent status-bar controls and command-palette entries are replaced by `Git disabled` + `Initialize Git for Current Vault` |
+
+Plain folders become Git-backed only when the user explicitly runs Git initialization from the setup dialog, status bar, or command palette. Features that depend on Git must check this capability instead of assuming every vault has `.git`.
+
+Git initialization is intentionally scoped to dedicated vault folders. When the current non-git folder looks like a broad personal root such as Documents, Desktop, or Downloads and does not already carry Tolaria-managed vault markers, `init_git_repo` refuses to run Git and asks the user to select or create a dedicated subfolder instead.
 
 ### VaultEntry
 
@@ -75,6 +89,7 @@ classDiagram
         +Record~string,string[]~ relationships
         +String[] outgoingLinks
         +String? status
+        +String? noteWidth
         +Number? modifiedAt
         +Number? createdAt
         +Number wordCount
@@ -123,6 +138,7 @@ interface VaultEntry {
   relationships: Record<string, string[]>  // All frontmatter fields containing wikilinks
   outgoingLinks: string[]   // All [[wikilinks]] found in note body
   status: string | null     // Active, Done, Paused, Archived, Dropped
+  noteWidth?: 'normal' | 'wide' | null // Rich-editor width mode from `_width`
   modifiedAt: number | null // Unix timestamp (seconds)
   // Note: owner and cadence are now in the generic `properties` map
   createdAt: number | null  // Unix timestamp (seconds)
@@ -133,8 +149,27 @@ interface VaultEntry {
   trashed: boolean          // Kept for backward compatibility (Trash system removed — delete is permanent)
   trashedAt: number | null  // Kept for backward compatibility (Trash system removed)
   properties: Record<string, string>  // Scalar frontmatter fields (custom properties)
+  fileKind?: 'markdown' | 'text' | 'binary'  // Controls editor/raw/preview behavior
 }
 ```
+
+### File kinds and binary previews
+
+`VaultEntry.fileKind` comes from the Rust vault scanner and intentionally stays coarse-grained:
+
+| `fileKind` | Source files | UI behavior |
+|---|---|---|
+| `markdown` or absent | `.md`, `.markdown` | Full Tolaria note model: frontmatter, BlockNote, raw editor, relationships, title sync |
+| `text` | UTF-8 editable formats such as `.yml`, `.json`, `.ts`, `.py`, `.sh` | Opens through the raw editor without Markdown note semantics |
+| `binary` | Images, PDFs, archives, other non-text files | Stays a normal vault file; previewable images and PDFs open in `FilePreview`, unsupported or broken binaries show an explicit fallback |
+
+Asset previewability is inferred in the renderer from the filename extension (`src/utils/filePreview.ts`) rather than stored as a new persisted kind. Supported images render through `<img>` and supported PDFs render through the webview's PDF object renderer, both backed by Tauri asset URLs. Runtime asset access is accumulated only for vault roots Tolaria has loaded in the current app session, because Tauri directory forbids cannot be safely reversed after a vault switch. The "open in default app" action re-enters the active-vault command boundary through `open_vault_file_external` before delegating to the native opener. This keeps the filesystem as source of truth and avoids converting assets into proprietary objects.
+
+### Note Content Freshness
+
+The renderer may cache recently opened or preloaded markdown content, but cached content is only a performance hint. `useTabManagement` can reuse cached text immediately when it carries the same `modifiedAt` and `fileSize` identity as the current `VaultEntry`; otherwise it validates the cached string with the `validate_note_content` Tauri command. That command re-enters the same vault path boundary checks as `get_note_content` and compares the cached text against the current on-disk file bytes. A mismatch, missing file, or unreadable file falls back to the normal fresh-read path and existing missing/unreadable recovery.
+
+`useEditorTabSwap` may reuse BlockNote blocks that were already opened successfully or warmed from prefetched raw content, keyed by vault, path, and exact source content. Background warming is limited to likely next large Markdown notes and defers while the editor is unmounted, raw mode is active, or recent typing/navigation is still inside the foreground idle window. Every async editor swap carries a generation and source-content token so stale conversion results cannot overwrite newer file content or dirty editor state.
 
 ### Entity Types (isA / type)
 
@@ -150,17 +185,19 @@ Type is determined **purely** from the `type:` frontmatter field — it is never
 ├── some-topic.md          ← type: Topic
 ├── AGENTS.md              ← canonical Tolaria AI guidance
 ├── CLAUDE.md              ← compatibility shim pointing at AGENTS.md
+├── GEMINI.md              ← optional Gemini CLI shim pointing at AGENTS.md
+├── project.md             ← type: Type (definition document)
+├── person.md              ← type: Type (definition document)
 ├── ...
-└── type/                  ← type definition documents
 ```
 
-New notes are created at the vault root: `{vault}/{slug}.md`. Changing a note's type only requires updating the `type:` field in frontmatter — the file does not move. Moving a note into a user folder is a separate filesystem concern: the folder path changes, but the note keeps the same filename and `type:` value. The `type/` folder exists solely for type definition documents. Legacy `config/` content is still recognized during migration and repair, but Tolaria's managed AI guidance now lives at the vault root.
+New notes are created at the vault root: `{vault}/{slug}.md`. Changing a note's type only requires updating the `type:` field in frontmatter — the file does not move. Moving a note into a user folder is a separate filesystem concern: the folder path changes, but the note keeps the same filename and `type:` value. Legacy `type/` and `types/` folders are still scanned like other non-hidden vault folders, so existing type documents in those folders continue to work, but new type documents created by Tolaria are written at the vault root. Legacy `config/` content is still recognized during migration and repair, but Tolaria's managed AI guidance now lives at the vault root.
 
 A `flatten_vault` migration command is available to move existing notes from type-based subfolders to the vault root.
 
 ### Types as Files
 
-Each entity type can have a corresponding **type document** in the `type/` folder (e.g., `type/project.md`, `type/person.md`). Type documents:
+Each entity type can have a corresponding **type document**: any markdown note with `type: Type` in its frontmatter. Tolaria creates new type documents at the vault root (e.g., `project.md`, `person.md`) and still reads existing type documents from subfolders. Type documents:
 
 - Have `type: Type` in their frontmatter (`Is A: Type` also accepted as legacy alias)
 - Define type metadata: icon, color, order, sidebar label, template, sort, view, visibility
@@ -172,7 +209,7 @@ Each entity type can have a corresponding **type document** in the `type/` folde
 | Property | Type | Description |
 |----------|------|-------------|
 | `icon` | string | Type icon as a Phosphor name (kebab-case, e.g., "cooking-pot") |
-| `color` | string | Accent color: red, purple, blue, green, yellow, orange |
+| `color` | string | Accent palette key (`red`, `purple`, `blue`, `green`, `yellow`, `orange`, `teal`, `pink`, `gray`) or a valid CSS color value such as `cyan`, `#22d3ee`, or `rgb(34, 211, 238)` |
 | `order` | number | Sidebar display order (lower = higher priority) |
 | `sidebar_label` | string | Custom label overriding auto-pluralization |
 | `template` | string | Markdown template for new notes of this type |
@@ -180,7 +217,7 @@ Each entity type can have a corresponding **type document** in the `type/` folde
 | `view` | string | Default view mode: "all", "editor-list", "editor-only" |
 | `visible` | bool | Whether type appears in sidebar (default: true) |
 
-**Type relationship**: When any entry has an `isA` value (e.g., "Project"), the Rust backend automatically adds a `"Type"` entry to its `relationships` map pointing to `[[type/project]]`. This makes the type navigable from the Inspector panel.
+**Type relationship**: When any entry has an `isA` value (e.g., "Project"), the Rust backend automatically adds a `"Type"` entry to its `relationships` map pointing to `[[project]]`. This makes the type navigable from the Inspector panel while keeping location as an implementation detail.
 
 **UI behavior**:
 - Clicking a section group header pins the type document at the top of the NoteList if it exists
@@ -243,6 +280,7 @@ Tolaria separates **display title** from the file identifier:
 - **Explicit filename actions** (`rename_note`): breadcrumb rename/sync actions stage crash-safe note renames through a hidden `.tolaria-rename-txn/` transaction directory, recover unfinished renames on the next vault scan, update wikilinks across the vault, and surface any failed backlink rewrites instead of silently reporting partial success. The editor body remains the title editing surface.
 - **Unicode-aware note stems** (`src/utils/noteSlug.ts`, `vault/rename.rs`): frontend and backend slugging preserve Unicode letters/digits in note filenames, untitled-rename detection, and fallback wikilink targets while still collapsing symbol-only titles to `untitled`.
 - **Portable filename validation** (`vault/filename_rules.rs`): note filenames, folder names, and custom view filenames all reject Windows-reserved device names, invalid characters, and trailing dot/space suffixes so a vault created on macOS/Linux still clones and syncs cleanly on Windows.
+- **Recoverable save failures** (`useEditorSave`, `vault/file.rs`): invalid platform path syntax is reported as a clear retryable save error, while the editor keeps the unsaved buffer intact for another attempt.
 - **Untitled drafts** start as `untitled-*.md` and are auto-renamed on save once the note gains an H1.
 
 ### Title Surface (UI)
@@ -264,18 +302,25 @@ type SidebarFilter = 'all' | 'archived' | 'changes' | 'pulse'
 type SidebarSelection =
   | { kind: 'filter'; filter: SidebarFilter }
   | { kind: 'sectionGroup'; type: string }    // e.g. type: 'Project'
-  | { kind: 'folder'; path: string }
+  | { kind: 'folder'; path: string; rootPath?: string }
   | { kind: 'entity'; entry: VaultEntry }      // Neighborhood source note
   | { kind: 'view'; filename: string }
 ```
 
 `SidebarSelection.kind === 'folder'` is a first-class navigation target, not just a visual highlight.
 
-- `FolderTree` keeps the folder interaction surface decomposed into `FolderTreeRow`, `FolderNameInput`, `FolderContextMenu`, and disclosure/context-menu hooks so nested row rendering, inline rename, and right-click actions stay isolated.
+- `FolderTree` keeps the folder interaction surface decomposed into `FolderTreeRow`, `FolderNameInput`, `FolderContextMenu`, and disclosure/context-menu hooks so nested row rendering, inline rename, and right-click actions stay isolated. The UI wraps backend folder nodes in a synthetic vault-root row with `path: ""` and `rootPath` set to the opened vault so root-level files can be listed without turning the vault root into a mutable folder. Non-mutating reveal/copy-path menu items stay callback-driven from `App` so filesystem convenience actions do not leak into folder mutation hooks.
+- `src/components/sidebar/sidebarHooks.ts` owns the shared sidebar interaction primitives for menu positioning/dismissal and inline rename input behavior. Folder, Type, and saved View rows keep their domain-specific actions local, but use those primitives so right-click menus and rename fields have the same outside-click, Escape, focus, blur, and submit semantics.
 - `useFolderActions()` composes `useFolderRename()` and `useFolderDelete()` to keep folder mutations selection-aware while the rest of `App.tsx` only wires the resulting callbacks into `Sidebar` and the command registry.
 - `useNoteRetargeting()` is the shared retargeting abstraction for note drops and command-palette actions. It owns the "can drop here?" checks, updates `type:` via frontmatter when a note lands on a type section, and delegates folder moves through the same crash-safe rename pipeline used by the backend rename commands.
 - A successful folder rename reloads the folder tree plus vault entries, rewrites any affected folder-scoped tabs, and updates `SidebarSelection` to the new relative path when the renamed folder stays selected.
 - Folder deletion clears pending rename state, confirms destructive intent, drops affected folder-scoped tabs, reloads vault data, and resets folder selection if the deleted subtree owned the current selection.
+
+### Saved Views
+
+Saved Views live as YAML files under `views/`. Their definition includes user-visible fields (`name`, `icon`, `color`), note-list preferences (`sort`, `listPropertiesDisplay`), filters, and an optional top-level `order` number. The `order` value is stored directly in the YAML document, not in Markdown frontmatter, and lower values render earlier in every saved-View list. Views without an explicit order sort after ordered views by filename for stable fallback behavior.
+
+The renderer uses `viewOrdering` helpers to convert drag or command-palette move intent into dense order updates before saving each affected view file through `save_view_cmd`. The sidebar treats saved View rows like Type rows for direct customization: double-click starts inline rename, right-click opens edit/rename/icon-color/delete actions, and keyboard users can open that same menu from the focused row while command-palette actions remain responsible for saved View ordering.
 
 ### Neighborhood Mode
 
@@ -290,6 +335,12 @@ type SidebarSelection =
 - Plain click / `Enter` open the focused note without replacing the current Neighborhood.
 - Cmd/Ctrl-click and Cmd/Ctrl-`Enter` open the note and pivot the note list into that note's Neighborhood.
 
+## Command Surface
+
+`src/shared/appCommandManifest.json` is the cross-runtime source for stable app command IDs, menu structure, display labels, accelerators, deterministic shortcut QA metadata, and native menu enablement groups. The renderer imports it through `src/hooks/appCommandCatalog.ts`, which derives `APP_COMMAND_IDS`, shortcut lookup maps, Linux titlebar menu sections, native-menu command membership, and test helpers. Tauri includes the same JSON in `src-tauri/src/menu.rs` and uses it to build custom menu items, emit overridden menu item IDs such as the quick-open alias as their primary command IDs, and toggle state-dependent menu items from manifest groups.
+
+Domain command builders still own context-sensitive command-palette entries, availability, and execution callbacks. The manifest owns metadata that must stay identical across native menus, renderer shortcuts, deterministic QA bridges, and the Linux fallback menu; OS-native menu items such as Undo, Copy/Paste, Services, Quit, and Window controls remain local to the native menu implementation.
+
 ## File System Integration
 
 ### Vault Scanning (Rust)
@@ -297,24 +348,31 @@ type SidebarSelection =
 `vault::scan_vault(path)` in `src-tauri/src/vault/mod.rs`:
 
 1. Validates the path exists and is a directory
-2. Scans root-level `.md` files (non-recursive)
-3. Recursively scans protected folders: `type/`, legacy `config/`, `attachments/`
-4. Files in non-protected subfolders are **not indexed** (flat vault enforcement)
-5. For each `.md` file, calls `parse_md_file()`:
+2. Recursively scans non-hidden files while skipping hidden directories such as `.git/`
+3. For each `.md` file, calls `parse_md_file()`:
    - Reads content with `fs::read_to_string()`
    - Parses frontmatter with `gray_matter::Matter::<YAML>`
    - Extracts title from first `#` heading
    - Reads entity type from `type:` frontmatter field (`Is A:` accepted as legacy alias); type is never inferred from folder
    - Parses dates as ISO 8601 to Unix timestamps
    - Extracts relationships, outgoing links, custom properties, word count, snippet
+4. For recognized non-markdown text and binary files, emits a minimal `VaultEntry` with `fileKind`
+5. Sorts by `modified_at` descending
+6. Skips unparseable files with a warning log
 
-The folder tree hides only the dedicated `type/` directory, since note types already have their own sidebar section. Default vault folders such as `attachments/` and `views/` remain visible alongside user-created folders.
-6. Sorts by `modified_at` descending
-7. Skips unparseable files with a warning log
+All Notes starts from Markdown notes and excludes Markdown files under `attachments/`. `src/utils/allNotesFileVisibility.ts` resolves the installation-local PDF, image, and unsupported-file toggles from app settings; `noteListHelpers` applies that policy only to All Notes filtering and counts. Folder/root browsing continues to show files from the selected folder independently of those All Notes toggles.
+
+The folder tree hides the legacy `type/` directory, since those type documents already appear through the Types sidebar section. Default vault folders such as `attachments/` and `views/` remain visible alongside user-created folders under the synthetic vault-root row.
+
+Command-facing vault content is filtered through `vault::filter_gitignored_entries`, `vault::filter_gitignored_folders`, and `vault::filter_gitignored_paths` when the app setting `hide_gitignored_files` is enabled. The cache still stores the complete scan; `list_vault`, `reload_vault`, `list_vault_folders`, and search apply the visibility filter at the boundary before React consumes entries. The filter batches paths through `git check-ignore --no-index --stdin`, drains stdout while stdin is still being written, and short-circuits root `.gitignore` detection before walking for nested ignore files, so large ignored folder sets cannot deadlock the native UI while preserving Git semantics as closely as the app can reasonably support.
 
 A `vault_health_check` command detects stray files in non-protected subfolders and filename-title mismatches. On vault load, a migration banner offers to flatten stray files to the root via `flatten_vault`.
 
-Command-layer path access is fenced to the active vault before file operations reach the vault backend. `src-tauri/src/commands/vault/boundary.rs` canonicalizes the configured/requested vault root, rejects `..` escapes and absolute paths outside that root, and validates writable targets through the nearest existing ancestor so note reads, saves, deletes, view-file edits, folder mutations, and image attachment writes cannot step outside the active vault. Image attachment commands refresh the runtime asset scope after saving so files created under a previously missing `attachments/` directory can render immediately.
+Command-layer path access is fenced to the active vault before file operations reach the vault backend. `src-tauri/src/commands/vault/boundary.rs` canonicalizes the configured/requested vault root, rejects `..` escapes and absolute paths outside that root, and validates writable targets through the nearest existing ancestor so note reads, saves, deletes, view-file edits, folder mutations, and image attachment writes cannot step outside the active vault. If the active root itself cannot be canonicalized, the renderer treats `Active vault is not available` the same as no active vault: it clears stale vault state, drops prefetched note content, and shows the missing-vault recovery screen instead of continuing note/view requests against the disappeared path. Image attachment commands add the current vault root to the runtime asset scope after saving so files created under a previously missing `attachments/` directory can render immediately.
+
+UI-only file actions operate on paths that are already selected or indexed in React state. Reveal-in-Finder routes through the Tauri opener plugin, external-open routes through the `open_vault_file_external` command and active-vault boundary before invoking the native opener, and copy-path uses the browser clipboard API. Plain-text paste reads the desktop clipboard through `read_text_from_clipboard` in Tauri so macOS WKWebView clipboard permissions do not block the command; browser/mock mode falls back to the Web Clipboard API or mock handlers. None of those actions mutate vault contents or bypass the backend write boundary.
+
+The local MCP WebSocket bridge follows the same active-vault boundary. `useVaultSwitcher` calls `sync_mcp_bridge_vault` after the persisted selection loads and after each vault switch; the desktop command starts/restarts the bridge with that vault's canonical path, or stops it when there is no selected vault. App exit uses the same child cleanup path and waits for the bridge process after killing it. MCP Node entrypoints require `VAULT_PATH` and fail clearly instead of falling back to `~/Laputa`. Manual MCP config export uses the same generated stdio entry as registration, so the copied snippet remains scoped to the active vault without writing third-party config files. Desktop snippet copy goes through the native `copy_text_to_clipboard` command, while browser/mock mode keeps using the Web Clipboard API. External-client stdio MCP processes also exit when stdin closes; their UI-bridge reconnect timers and WebSocket are canceled during shutdown so disconnected clients do not leave extra Node processes behind.
 
 ### Vault Caching
 
@@ -411,12 +469,16 @@ interface PulseCommit {
 - Configurable interval (from app settings: `auto_pull_interval_minutes`)
 - Pulls on interval, pushes after commits
 - Awaits the post-pull vault refresh so toasts land after note-list state is fresh
-- Reopens the clean active tab from disk after a successful pull update so the editor and note list stay aligned
+- Reopens the clean active tab from disk only when the pull changed that active note, so unrelated updates do not remount the editor
 - Detects merge conflicts → opens `ConflictResolverModal`
 - Tracks remote status (branch, ahead/behind via `git_remote_status`)
 - Handles push rejection (divergence) → sets `pull_required` status
 - `pullAndPush()`: pulls then auto-pushes for divergence recovery
 - `ConflictNoteBanner`: inline banner in editor for conflicted notes (Keep mine / Keep theirs)
+
+### External Vault Refresh
+
+External vault mutations are any disk writes Tolaria did not just perform through its own save path: Git pulls, AI-agent writes, filesystem watcher events, and edits from another app. These changes must route through `refreshPulledVaultState()` rather than calling `reloadVault()` in isolation. The shared refresh abstraction reloads entries, folders, and saved views together, preserves unsaved active-editor content, reopens a clean active note only when the changed-path list includes that note, and closes the active tab if the file disappeared. Unknown or unrelated watcher updates refresh vault-derived state without remounting the active editor. `useVaultWatcher` supplies changed filesystem paths to this abstraction after debouncing and after filtering recent app-owned saves.
 
 `useGitRemoteStatus` is the commit-time companion to `useAutoSync`:
 - Re-checks `git_remote_status` when the Commit dialog opens and right before submit
@@ -471,8 +533,8 @@ Defined in `src/components/editorSchema.tsx` and styled in `src/components/Edito
 
 - The schema overrides BlockNote's default `codeBlock` spec with `createCodeBlockSpec({ ...codeBlockOptions, defaultLanguage: "text" })` from `@blocknote/code-block`.
 - Fenced code blocks now use BlockNote's supported Shiki-backed highlighter path, which renders `.shiki` token spans directly inside the editor DOM.
-- Tolaria keeps `defaultLanguage: "text"` so unlabeled code blocks do not silently become JavaScript while still supporting the packaged language aliases such as `ts` → `typescript`.
-- Inline-code chip styling remains scoped to `.bn-inline-content code`, so fenced `pre > code` nodes keep BlockNote's dark shell instead of inheriting the muted inline surface.
+- Tolaria keeps `defaultLanguage: "text"` so unlabeled code blocks do not silently become JavaScript at creation time. Parsed unlabeled code blocks then run through Tolaria's lightweight language inference, while explicit fence languages and user dropdown choices still win.
+- Inline-code chip styling remains scoped to `.bn-inline-content code`, so fenced `pre > code` nodes keep the dedicated code-block shell instead of inheriting the muted inline surface.
 
 ### Markdown Math
 
@@ -483,6 +545,25 @@ Defined in `src/utils/mathMarkdown.ts`, `src/components/editorSchema.tsx`, and s
 - `serializeMathAwareBlocks()` converts math nodes back to Markdown delimiters before save, raw-mode entry, and editor-position snapshots.
 - Raw CodeMirror mode always shows the plain Markdown source, so imported technical notes stay editable outside Tolaria.
 
+### Mermaid Diagrams
+
+Defined in `src/utils/mermaidMarkdown.ts`, `src/components/MermaidDiagram.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
+
+- Fenced `mermaid` blocks become `mermaidBlock` schema nodes before BlockNote sees the Markdown body.
+- Each `mermaidBlock` stores the original fenced Markdown plus the diagram body, so raw-mode entry and saves can restore the canonical source instead of serializing generated SVG.
+- The rich editor renders diagrams with the `mermaid` package and uses the original source as an inline fallback when rendering fails.
+- `serializeMermaidAwareBlocks()` wraps the math-aware serializer so math, wikilinks, and diagrams share the same Markdown-first save path.
+- The `/mermaid` slash command inserts a placeholder rectangle diagram using the same schema-backed Markdown storage path, avoiding an invalid empty diagram state.
+
+### Tldraw Whiteboards
+
+Defined in `src/utils/tldrawMarkdown.ts`, `src/components/TldrawWhiteboard.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
+
+- Fenced `tldraw` blocks become `tldrawBlock` schema nodes before BlockNote sees the Markdown body.
+- Each `tldrawBlock` stores a stable `boardId` plus the tldraw document snapshot JSON. Session state such as camera, selected tool, and current selection is not persisted into the note.
+- The rich editor renders the block with the `tldraw` package and saves debounced document snapshot changes back into the block props, so normal Tolaria autosave writes the board into the `.md` file.
+- The `/whiteboard` slash command inserts an empty tldraw block using the same Markdown-durable storage path. Preview images are intentionally omitted; thumbnails can be added later as derived cache artifacts.
+
 ### Formatting Surface Policy
 
 Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tolariaEditorFormattingConfig.ts`:
@@ -490,39 +571,50 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 - `SingleEditorView` disables BlockNote's default formatting toolbar, `/` menu, and side menu, then mounts Tolaria-owned controllers so the visible formatting surface matches Tolaria's markdown round-trip guarantees.
 - The formatting toolbar only exposes inline controls that persist through `blocksToMarkdownLossy()` in Tolaria's save pipeline: bold, italic, strike, nesting, and link creation. Controls that BlockNote can render temporarily but Tolaria cannot faithfully persist, such as underline, color, alignment, and the block-type dropdown, are hidden instead of appearing to work and later disappearing.
 - Tolaria's formatting-toolbar controller also keeps file/image actions mounted across the tiny hover gap between an image block and the floating toolbar, and while the toolbar itself is hovered, so image controls remain usable instead of collapsing mid-interaction.
-- The `/` slash menu remains the supported path for markdown-safe block transformations such as headings, quotes, and list blocks. Tolaria filters out BlockNote's toggle-heading and toggle-list variants because those do not map cleanly to the markdown note model.
-- The block-handle side menu keeps only actions that survive Tolaria's markdown round-trip. Delete and table-header toggles remain available; BlockNote's `Colors` submenu is removed because block colors are not part of Tolaria's supported markdown surface.
+- `useImageLightbox` listens for `dblclick` on the rich-editor container and opens `ImageLightbox` only when the event target resolves to a viewable BlockNote image. The target resolver handles media wrappers, ignores image captions/resize controls, missing sources, and tiny tracking-style images, preserving BlockNote's ordinary single-click image selection path.
+- The `/` slash menu remains the supported path for markdown-safe block transformations such as headings, quotes, list blocks, Mermaid diagrams, and whiteboards. Tolaria filters out BlockNote's toggle-heading and toggle-list variants because those do not map cleanly to the markdown note model.
+- The block-handle side menu keeps only actions that survive Tolaria's markdown round-trip. Delete and table-header toggles remain available; BlockNote's `Colors` submenu is removed because block colors are not part of Tolaria's supported markdown surface. Tolaria renders the add-block button outside the drag handle so the handle stays next to the block content. The side menu aligns itself to the first rendered text line for the hovered block, so H1/H2 typography, line-height, wrapping, and theme changes do not need per-heading offsets. Block reordering uses a Tolaria-owned pointer gesture and direct BlockNote block moves instead of HTML5 `DataTransfer`, keeping it independent from Tauri's native file-drop system. Block-handle actions re-resolve the current live BlockNote block before mutating or dragging, so note reloads and sync churn cannot leave controls acting on stale block references.
+- BlockNote's table row/column handles are patched so stale or missing hovered-table state cancels the drag and hides handles instead of throwing. Add/remove row and column actions also validate the table position and cell indexes before resolving a ProseMirror `CellSelection`, so reloads or menu lag cannot turn stale handles into invalid table-selection positions. Browser and native table regressions should exercise row and column dragging plus add-menu actions because the state is tracked per orientation.
 - `useNoteWikilinkDrop()` is the shared editor-drop abstraction for dragging note rows into either editor mode. It reads the existing note-retargeting drag payload, resolves the vault-relative stem, and inserts a canonical `[[wikilink]]` without hijacking unrelated plain-text drags.
+- `plainTextPaste.ts` is the shared plain-text paste target registry. Rich BlockNote and raw CodeMirror surfaces register focused insertion targets, while ordinary focused text controls use DOM selection replacement, so the `Cmd+Shift+V` command can preserve caret/selection behavior without each surface inventing its own clipboard reader.
+- `useTauriDragDropEvent()` owns the shared Tauri window drag/drop subscription and duplicate-unlisten cleanup used by native drop features.
+- `useNativePathDrop()` is the shared Tauri file/folder-drop abstraction for text inputs that need filesystem paths instead of attachment import. It consumes native window drag/drop events, gates them to the target element bounds or focused text selection, and lets AI composer / command-palette inputs insert formatted paths at the current cursor.
 
 ### Markdown-to-BlockNote Pipeline
 
 ```mermaid
 flowchart LR
     A["📄 Raw markdown\n(from disk)"] --> B["splitFrontmatter()\n→ yaml + body"]
-    B --> C["preProcessWikilinks(body)\n[[target]] → ‹token›"]
-    C --> D["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
-    D --> E["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
-    E --> F["injectWikilinks + injectMathInBlocks\n tokens → schema nodes"]
-    F --> G["editor.replaceBlocks()\n→ rendered editor"]
+    B --> C["preProcessTldrawMarkdown(body)\ntldraw fence → token"]
+    C --> D["preProcessMermaidMarkdown(body)\nmermaid fence → token"]
+    D --> E["preProcessWikilinks(body)\n[[target]] → ‹token›"]
+    E --> F["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
+    F --> G["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
+    G --> H["injectWikilinks + injectMathInBlocks + injectMermaidInBlocks + injectTldrawInBlocks\n tokens → schema nodes"]
+    H --> I["editor.replaceBlocks()\n→ rendered editor"]
 
     style A fill:#f8f9fa,stroke:#6c757d,color:#000
-    style G fill:#d4edda,stroke:#28a745,color:#000
+    style I fill:#d4edda,stroke:#28a745,color:#000
 ```
 
-> Wikilink placeholder tokens use `\u2039` and `\u203A`; math placeholder tokens use ASCII sentinels with URI-encoded LaTeX payloads.
+> Wikilink placeholder tokens use `\u2039` and `\u203A`; math, Mermaid, and tldraw placeholder tokens use ASCII sentinels with URI-encoded payloads.
 
 ### BlockNote-to-Markdown Pipeline (Save)
 
 ```mermaid
 flowchart LR
     A["✏️ BlockNote blocks\n(editor state)"] --> B["blocksToMarkdownLossy()"]
-    B --> C["restoreWikilinks + serializeMathAwareBlocks()\nschema nodes → Markdown source"]
+    B --> C["restoreWikilinks + serializeMermaidAwareBlocks()\nschema nodes → Markdown source"]
     C --> D["prepend frontmatter yaml"]
     D --> E["invoke('save_note_content')\n→ disk write"]
 
     style A fill:#cce5ff,stroke:#004085,color:#000
     style E fill:#d4edda,stroke:#28a745,color:#000
 ```
+
+Rich-editor change events are coalesced before this serialization runs. `useEditorTabSwap` keeps the latest BlockNote state in the editor, schedules one Markdown serialization for a short idle window, and exposes an explicit flush hook for save, note switch, raw-mode entry, and destructive note actions. This keeps long notes from paying full-document Markdown serialization on every keystroke while preserving the disk-first save path.
+
+Autosave then waits for a 1.5s idle window before invoking `save_note_content`. If an older save resolves after the user has already typed newer content, the older save is treated as stale and cannot clear the newer pending buffer or repaint tab state over it; the latest pending content remains scheduled for its own save.
 
 ### Wikilink Navigation
 
@@ -538,6 +630,14 @@ Wikilink resolution (`resolveEntry` in `src/utils/wikilink.ts`) uses multi-pass 
 Toggle via Cmd+K → "Raw Editor" or breadcrumb bar button. Uses CodeMirror 6 (`useCodeMirror` hook) to edit the raw markdown + frontmatter directly. Changes saved via the same `save_note_content` command.
 While the user types, `useEditorSaveWithLinks` derives a transient `VaultEntry` patch from parseable frontmatter so the Inspector, relationship chips, and note-list-visible metadata stay in sync with the raw editor before the next vault reload. Temporarily invalid or half-typed frontmatter is ignored until it becomes parseable again, which avoids clobbering the last known good derived state.
 
+Current-note find/replace is intentionally backed by raw CodeMirror mode. `Cmd+F`, "Find in Note", and "Replace in Note" switch the active Markdown/text note to raw mode, show the compact find bar above CodeMirror, and operate on the current note only. Plain text matching is case-insensitive by default, `Aa` toggles case sensitivity, `.*` toggles JavaScript-regex matching, and regex replacement supports capture groups through JavaScript replacement syntax.
+
+### Rich Editor Width Modes
+
+Rich Markdown editing supports `normal` and `wide` note widths. The effective mode is resolved in `App.tsx` from, in order, the current session's transient note-width cache, `VaultEntry.noteWidth` parsed from `_width`, and the installation-local `settings.note_width_mode` default. The breadcrumb toggle calls the same setter exposed through the command palette.
+
+Per-note width is persisted as hidden `_width` frontmatter only when the note already has a valid or empty frontmatter block. Notes without frontmatter use the transient cache for the current session, so toggling width never creates frontmatter solely to store UI state. The width class is applied around `SingleEditorView` only; raw CodeMirror mode stays outside `.editor-content-wrapper` and remains full-width.
+
 ### Arrow Ligature Normalization
 
 Typed ASCII arrow sequences are normalized consistently in both editor modes:
@@ -545,6 +645,7 @@ Typed ASCII arrow sequences are normalized consistently in both editor modes:
 - Rich editor input mounts `createArrowLigaturesExtension()` (`src/components/arrowLigaturesExtension.ts`) into BlockNote and intercepts typed `beforeinput` events before ProseMirror commits the character.
 - Raw editor input uses the CodeMirror `inputHandler` path in `useCodeMirror` so the same ligature rules apply while editing markdown source directly.
 - Both paths delegate to the shared `resolveArrowLigatureInput()` helper in `src/utils/arrowLigatures.ts`, which prioritizes `<->` over partial matches, keeps paste literal, and lets escaped forms such as `\\->` and `\\<->` remain ASCII.
+- The rich-editor extension treats stale, disconnected, or mid-reload ProseMirror views as a no-op. It never blocks the native input path unless it has already built and dispatched a valid ligature transaction.
 
 ## Styling
 
@@ -553,15 +654,17 @@ The app uses internal light and dark themes owned by Tolaria (see [ADR-0081](adr
 1. **Global CSS variables** (`src/index.css`): Semantic app colors, borders, surfaces, and interaction states via `:root` / `[data-theme]`, bridged to Tailwind v4
 2. **Editor theme** (`src/theme.json`): BlockNote typography, flattened to CSS vars by `useEditorTheme`
 3. **Runtime theme bridge**: Applies `data-theme` and `.dark` for shadcn/ui, while CodeMirror and editor-specific consumers derive any non-CSS-variable values from the same semantic contract
+4. **Theme mode commands**: Command-palette actions for light and dark mode call the same `saveSettings` path as the Settings panel and persist only `settings.theme_mode`
 
 ## Localization
 
-App UI strings are centralized in `src/lib/i18n.ts` (see [ADR-0084](adr/0084-app-localization-foundation.md)):
+App UI strings are resolved through `src/lib/i18n.ts`, with flat JSON catalogs in `src/lib/locales/*.json` (see [ADR-0087](adr/0087-json-catalogs-and-lara-cli-localization.md)):
 
-- `AppLocale`: currently `'en' | 'zh-Hans'`
+- `AppLocale`: canonical locale tags such as `'en'`, `'zh-CN'`, `'fr-FR'`, `'es-419'`
 - `UiLanguagePreference`: `'system' | AppLocale`; persisted settings serialize `system` as `null`
-- `resolveEffectiveLocale()`: maps an explicit preference or system/browser language list to the effective supported locale
+- `resolveEffectiveLocale()`: maps an explicit preference or system/browser language list to the effective supported locale, including legacy aliases
 - `translate()` / `createTranslator()`: resolve keys with English fallback and simple `{name}` interpolation
+- `scripts/validate-locales.mjs`: asserts every checked-in locale catalog matches the English keyset and stays flat-string-only
 
 `App.tsx` owns the effective locale and passes it to localized app chrome through props. Settings and command-palette language commands call back into `saveSettings`, so UI language changes update the current session without touching vault content or reopening the vault.
 
@@ -572,6 +675,7 @@ The Inspector panel (`src/components/Inspector.tsx`) is composed of sub-panels:
 1. **DynamicPropertiesPanel** (`src/components/DynamicPropertiesPanel.tsx`): Renders frontmatter as editable key-value pairs:
    - **Editable properties** (top): Type badge, Status pill with dropdown, number fields, boolean toggles, array tag pills, text fields. Click-to-edit interaction.
    - **Property display modes**: `text`, `number`, `date`, `boolean`, `status`, `url`, `tags`, and `color`. Numeric frontmatter values auto-detect as `number`, and custom scalar keys can be explicitly switched to `Number` through the property-type control.
+   - **Present empty properties**: A top-level frontmatter key with a blank scalar value (for example `start date:`) is treated as present and renders as an editable empty row. Only absent keys are omitted.
    - **Info section** (bottom, separated by border): Read-only derived metadata — Modified, Created, Words, File Size. Uses muted styling with no interaction.
    - Keys in `SKIP_KEYS` (`type`, `aliases`, `notion_id`, `workspace`, `is_a`, `Is A`) are hidden from the editable section.
 
@@ -585,7 +689,7 @@ The Inspector panel (`src/components/Inspector.tsx`) is composed of sub-panels:
 
 ### Search
 
-Keyword-based search scans all vault `.md` files using `walkdir`:
+Keyword-based search scans all vault `.md` files using `walkdir` and applies the same Gitignored-content visibility filter as vault loading:
 
 ```typescript
 interface SearchResult {
@@ -619,16 +723,20 @@ No indexing step required — search runs directly against the filesystem.
 
 Per-vault settings stored locally and scoped by vault path:
 - Managed by `useVaultConfig` hook and `vaultConfigStore`
-- Settings: zoom, view mode, editor mode, note layout, tag colors, status colors, property display modes, Inbox/All Notes note-list column overrides, explicit organization workflow toggle
+- Settings: zoom, view mode, editor mode, tag colors, status colors, property display modes, Inbox/All Notes note-list column overrides, explicit organization workflow toggle, AI agent permission mode (`safe` / `power_user`)
+- Missing, null, and unknown AI agent permission modes normalize to `safe`; the AI panel can switch modes per vault, preserving the transcript and applying the new mode only to the next agent run
 - One-time migration from localStorage (`configMigration.ts`)
+
+Installation-local layout state that should not sync through a vault stays in localStorage. `useLayoutPanels` stores the clamped sidebar, note-list, and inspector widths under `tolaria:layout-panels` so pane sizing survives app relaunches on the same machine.
 
 ### AI Guidance Files
 
 Tolaria tracks managed vault-level AI guidance separately from normal note content:
 - `AGENTS.md` is the canonical managed guidance file for Tolaria-aware coding agents
 - `CLAUDE.md` is a compatibility shim that points Claude Code back to `AGENTS.md`
+- `GEMINI.md` is an optional Gemini CLI compatibility shim that points Gemini back to `AGENTS.md`
 - `useVaultAiGuidanceStatus` reads `get_vault_ai_guidance_status` and normalizes the backend state into four UI cases: `managed`, `missing`, `broken`, and `custom`
-- `restore_vault_ai_guidance` repairs only Tolaria-managed files; user-authored custom `AGENTS.md` / `CLAUDE.md` files are surfaced as custom and left untouched
+- `restore_vault_ai_guidance` repairs only Tolaria-managed files and creates the optional Gemini shim on explicit request; user-authored custom `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` files are surfaced as custom and left untouched
 - The status bar AI badge and command palette consume that abstraction to expose restore actions only when the managed guidance is missing or broken
 
 ### Getting Started / Onboarding
@@ -647,7 +755,7 @@ Tolaria tracks managed vault-level AI guidance separately from normal note conte
 `useAiAgentsOnboarding(enabled)` adds a separate first-launch agent step:
 - Reads a local dismissal flag for the AI agents prompt (with a legacy fallback to the older Claude-only key)
 - Only shows after vault onboarding has already resolved to a ready state
-- Uses `get_ai_agents_status`, whose backend treats the app process path, login-shell path, and supported local/toolchain/app install locations, including Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
+- Uses `get_ai_agents_status`, whose backend treats the app process path, login-shell path, and supported local/toolchain/app install locations, including nvm-managed Node installs plus Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
 - Persists dismissal locally once the user continues
 
 ### Remote Git Operations
@@ -655,6 +763,7 @@ Tolaria tracks managed vault-level AI guidance separately from normal note conte
 Tolaria delegates remote auth to the user's system git setup:
 - `CloneVaultModal` captures a remote URL and local destination
 - `clone_git_repo` and `create_getting_started_vault` both run system git clone work in blocking Tokio tasks so clone UIs stay responsive
+- On Linux AppImage launches, every system-git command removes AppImage loader overrides such as `LD_LIBRARY_PATH`, `LD_PRELOAD`, and `GIT_EXEC_PATH` before spawning `git`, so helpers like `git-remote-https` bind against the host git/library stack instead of Tolaria's bundled WebKit/AppImage libraries
 - `git_add_remote` uses the same system git path and refuses remotes whose history is unrelated or ahead of the local vault
 - Existing `git_pull` / `git_push` commands keep surfacing raw git errors, and clone commands fail fast when git wants interactive terminal input
 - No provider-specific token or username is stored in app settings
@@ -675,14 +784,19 @@ interface Settings {
   anonymous_id: string | null
   release_channel: string | null // null = stable default, "alpha" = every-push prerelease feed
   theme_mode: 'light' | 'dark' | null
-  ui_language: 'en' | 'zh-Hans' | null
-  default_ai_agent: 'claude_code' | 'codex' | null
+  ui_language: AppLocale | null
+  note_width_mode: 'normal' | 'wide' | null
+  default_ai_agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | 'gemini' | null
   default_image_folder: string | null // vault-relative; null falls back to "attachments"
   default_video_folder: string | null // vault-relative; null falls back to "attachments"
+  hide_gitignored_files: boolean | null // null = default true
+  all_notes_show_pdfs: boolean | null // null = default false
+  all_notes_show_images: boolean | null // null = default false
+  all_notes_show_unsupported: boolean | null // null = default false
 }
 ```
 
-Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is installation-local because it controls device comfort rather than vault structure. `ui_language` is also installation-local: `null` follows the supported system language with English fallback, while explicit values pin the UI language for this installation. `default_ai_agent` is an installation-local preference that selects which supported CLI agent the AI panel, command palette AI mode, and status bar should target by default. The AutoGit fields are also installation-local: `useAutoGit` consumes them to schedule automatic checkpoints, while `useCommitFlow` and the status bar quick action reuse the same checkpoint runner and deterministic automatic commit message generation.
+Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is installation-local because it controls device comfort rather than vault structure; the Settings panel and command-palette light/dark actions both update that same value. `ui_language` is also installation-local: `null` follows the supported system language with English fallback, while explicit values pin the UI language for this installation. Stored legacy aliases such as `zh-Hans` are normalized to canonical locale codes before the setting reaches React state. `note_width_mode` is the installation-local default for rich-editor note width; individual notes can override it with `_width` when they already have frontmatter. `default_ai_agent` is an installation-local preference that selects which supported CLI agent the AI panel, command palette AI mode, and status bar should target by default. `hide_gitignored_files` is also installation-local and defaults to `true`; changing it reloads entries, search, saved views, and folders without restarting. The `all_notes_show_pdfs`, `all_notes_show_images`, and `all_notes_show_unsupported` flags are installation-local All Notes category toggles that default off and update the list/counts without changing vault files. The AutoGit fields are also installation-local: `useAutoGit` consumes them to schedule automatic checkpoints, while `useCommitFlow` and the status bar quick action reuse the same checkpoint runner and deterministic automatic commit message generation.
 
 `default_image_folder` and `default_video_folder` are vault-relative folder paths normalized through `normalize_vault_relative_folder` (rejects absolute paths, `..` traversal, empty input). They control where pasted/dropped images and videos land. Per-installation rather than per-vault so users can keep different folder layouts on different machines; both default to `attachments/` when unset. See [ADR-0085](adr/0085-per-type-default-folder-and-media-folders.md).
 
@@ -698,9 +812,16 @@ A related opt-in vault-frontmatter field, `_default_folder`, lives on type entri
 - **`useTelemetry(settings, loaded)`** — Reactively initializes/tears down Sentry and PostHog based on settings. Called once in `App`.
 
 ### Libraries
-- **`src/lib/telemetry.ts`** — `initSentry()`, `teardownSentry()`, `initPostHog()`, `teardownPostHog()`, `trackEvent()`. Path scrubber via `beforeSend` hook. DSN/key from `VITE_SENTRY_DSN` / `VITE_POSTHOG_KEY` env vars.
+- **`src/lib/telemetry.ts`** — `initSentry()`, `teardownSentry()`, `initPostHog()`, `teardownPostHog()`, `trackEvent()`. Path scrubber via `beforeSend` hook. DSN/key from `VITE_SENTRY_DSN` and `VITE_POSTHOG_KEY`; `VITE_SENTRY_RELEASE` is treated as the build version and only becomes Sentry's `release` for stable calendar builds (`YYYY.M.D`). Alpha/prerelease/internal builds tag `tolaria.build_version` and `tolaria.release_kind` without creating normal Sentry Releases entries.
 - **`src/main.tsx`** — React root error callbacks (`onCaughtError`, `onUncaughtError`, `onRecoverableError`) forward component-stack context to `Sentry.reactErrorHandler()` for debuggable production React errors.
-- **`src-tauri/src/telemetry.rs`** — Rust-side Sentry init with `beforeSend` path scrubber. `init_sentry_from_settings()` reads settings and conditionally initializes. `reinit_sentry()` for runtime toggle.
+- **`src-tauri/src/telemetry.rs`** — Rust-side Sentry init with `beforeSend` path scrubber. `init_sentry_from_settings()` reads settings and conditionally initializes; stable calendar `CARGO_PKG_VERSION` values become Sentry releases, while alpha/prerelease/internal versions are kept as diagnostic tags only. `reinit_sentry()` for runtime toggle.
+
+### Product Events
+- **File previews** — `file_preview_opened`, `file_preview_action`, and `file_preview_failed` report only preview/action categories such as `image`, `pdf`, `unsupported`, `open_external`, `copy_path`, and `reveal`.
+- **Inline image lightbox** — `inline_image_lightbox_opened` records that a rich-editor inline image was opened from double-click, without sending note paths, image URLs, alt text, or file names.
+- **Code block copy** — `code_block_copied` records that the rich-editor code-block copy action was used, without sending note paths, languages, or code content.
+- **AI agent sessions** — `ai_agent_message_sent`, `ai_agent_message_blocked`, `ai_agent_response_completed`, `ai_agent_response_failed`, and `ai_agent_permission_mode_changed` use only agent ids, permission modes, counts, and coarse status categories.
+- **All Notes visibility** — `all_notes_visibility_changed` records only the toggled category and enabled state.
 
 ### Tauri Commands
 - **`reinit_telemetry`** — Re-reads settings and toggles Rust Sentry on/off. Called from frontend when user changes crash reporting setting.
@@ -710,7 +831,7 @@ A related opt-in vault-frontmatter field, `_default_folder`, lives on type entri
 ## Updates & Feature Flags
 
 ### Hooks
-- **`useUpdater(releaseChannel)`** — Channel-aware updater state machine. Checks the selected feed, surfaces available/downloading/ready states, and delegates install work to Rust.
+- **`useUpdater(releaseChannel)`** — Channel-aware updater state machine. Checks the selected feed, surfaces checking/available/downloading/ready states, and delegates install work to Rust.
 - **`useFeatureFlag(flag)`** — Returns boolean for a named feature flag. Checks `localStorage` override (`ff_<name>`), then falls back to telemetry-backed evaluation. Type-safe via `FeatureFlagName` union.
 
 ### Frontend helpers
@@ -726,6 +847,6 @@ A related opt-in vault-frontmatter field, `_default_folder`, lives on type entri
 - **`download_and_install_app_update`** — Channel-aware download/install with streamed progress events.
 
 ### CI/CD
-- **`.github/workflows/release.yml`** — Alpha prereleases from every push to `main` using calendar-semver technical versions (`YYYY.M.D-alpha.N`) and clean `Alpha YYYY.M.D.N` release names. GitHub alpha tags zero-pad the prerelease sequence (`alpha-vYYYY.M.D-alpha.NNNN`) so GitHub release ordering stays chronological while the shipped app version remains `YYYY.M.D-alpha.N`. Publishes `alpha/latest.json` with macOS Apple Silicon/Intel, Linux x64, and Windows x64 updater entries, then refreshes the legacy `latest.json` / `latest-canary.json` aliases to the alpha feed.
-- **`.github/workflows/release-stable.yml`** — Stable releases from `stable-vYYYY.M.D` tags. Publishes `stable/latest.json`, macOS Apple Silicon and Intel DMG/updater artifacts, Windows x64 installers/updater bundles, and Linux x86_64 `.deb` / AppImage artifacts.
+- **`.github/workflows/release.yml`** — Alpha prereleases from every push to `main` using calendar-semver technical versions (`YYYY.M.D-alpha.N`) and clean `Alpha YYYY.M.D.N` release names. GitHub alpha tags zero-pad the prerelease sequence (`alpha-vYYYY.M.D-alpha.NNNN`) so GitHub release ordering stays chronological while the shipped app version remains `YYYY.M.D-alpha.N`. Publishes `alpha/latest.json` with macOS Apple Silicon/Intel, Linux x64, and Windows x64 updater entries, then refreshes the legacy `latest.json` / `latest-canary.json` aliases to the alpha feed. macOS release assets use `Tolaria_<version>_macOS_Silicon` and `Tolaria_<version>_macOS_Intel` base names. Packaged builds pass the computed version as `VITE_SENTRY_RELEASE`, which is retained as a diagnostic build-version tag but not registered as a normal Sentry release for alpha builds.
+- **`.github/workflows/release-stable.yml`** — Stable releases from `stable-vYYYY.M.D` tags. Publishes `stable/latest.json`, macOS Apple Silicon and Intel DMG/updater artifacts, Windows x64 installers/updater bundles, and Linux x86_64 `.deb` / AppImage artifacts. Stable macOS DMG/updater assets use the same `Tolaria_<version>_macOS_Silicon` and `Tolaria_<version>_macOS_Intel` base names. Packaged builds pass the computed stable version as `VITE_SENTRY_RELEASE`, which is registered as Sentry's release.
 - **Beta cohorts** are handled in PostHog targeting only. There is no beta updater feed.

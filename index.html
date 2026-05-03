@@ -50,6 +50,50 @@
         }
       })();
     </script>
+    <script>
+      (function () {
+        var readyEventName = 'tolaria:frontend-ready';
+        var reloadAttemptKey = 'tolaria:startup-reload-attempted';
+        var startupTimeoutMs = 10000;
+        var isTauri = '__TAURI__' in window || '__TAURI_INTERNALS__' in window;
+
+        if (!isTauri) return;
+
+        function hasReloadAttempted() {
+          try {
+            return sessionStorage.getItem(reloadAttemptKey) === '1';
+          } catch (err) {
+            return true;
+          }
+        }
+
+        function markReloadAttempted() {
+          try {
+            sessionStorage.setItem(reloadAttemptKey, '1');
+            return true;
+          } catch (err) {
+            return false;
+          }
+        }
+
+        function clearReloadAttempt() {
+          try {
+            sessionStorage.removeItem(reloadAttemptKey);
+          } catch (err) {
+            // Storage can be unavailable in hardened WebView/privacy modes.
+          }
+        }
+
+        window.addEventListener(readyEventName, clearReloadAttempt, { once: true });
+        window.setTimeout(function () {
+          if (window.__tolariaFrontendReady === true) return;
+          if (hasReloadAttempted()) return;
+          if (!markReloadAttempted()) return;
+
+          window.location.reload();
+        }, startupTimeoutMs);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

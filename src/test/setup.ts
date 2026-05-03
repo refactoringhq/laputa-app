@@ -54,7 +54,9 @@ globalThis.IntersectionObserver = class {
 
 // Mock @tauri-apps/plugin-opener for test environment
 vi.mock('@tauri-apps/plugin-opener', () => ({
+  openPath: vi.fn(),
   openUrl: vi.fn(),
+  revealItemInDir: vi.fn(),
 }))
 
 afterEach(() => {

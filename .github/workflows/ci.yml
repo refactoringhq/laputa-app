@@ -65,22 +65,18 @@ jobs:
       - name: Vite build check
         run: pnpm build
 
-      # ── 1. Tests ──────────────────────────────────────────────────────────
-      - name: Run frontend tests
-        run: pnpm test
-
+      # ── 1. Coverage-backed tests ──────────────────────────────────────────
+      # The coverage commands run the same frontend and Rust test suites, so keep
+      # them as the canonical test lane instead of running every suite twice.
       - name: Bundle MCP server resources (required by Tauri build)
         run: node scripts/bundle-mcp-server.mjs
 
-      - name: Run Rust tests
-        run: cargo test --manifest-path=src-tauri/Cargo.toml
-
-      # ── 2. Coverage (enforced — fails build if thresholds not met) ────────
-      - name: Frontend coverage (≥70% lines/functions/branches/statements)
+      # ── 2. Tests + coverage (enforced — fails build if thresholds not met) ─
+      - name: Frontend tests + coverage (≥70% lines/functions/branches/statements)
         run: pnpm test:coverage
         # Thresholds configured in vite.config.ts — exits non-zero if coverage drops
 
-      - name: Rust coverage (≥85% lines)
+      - name: Rust tests + coverage (≥85% lines)
         run: |
           cargo llvm-cov \
             --manifest-path src-tauri/Cargo.toml \

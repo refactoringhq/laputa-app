@@ -4,6 +4,7 @@ import {
   openFixtureVaultDesktopHarness,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
+import { sendShortcut } from './helpers'
 
 let tempVaultDir: string
 
@@ -49,10 +50,10 @@ test('@smoke note open and editor remount flows stay free of duplicate linkify w
   await openNote(page, 'Alpha Project')
   await openNote(page, 'Note B')
 
-  await page.keyboard.press('Control+Backslash')
+  await sendShortcut(page, 'Backslash', ['Control'])
   await expect(page.getByTestId('raw-editor-codemirror')).toBeVisible({ timeout: 5_000 })
 
-  await page.keyboard.press('Control+Backslash')
+  await sendShortcut(page, 'Backslash', ['Control'])
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
 
   await openNote(page, 'Alpha Project')

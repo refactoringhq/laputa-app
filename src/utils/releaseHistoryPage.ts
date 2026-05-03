@@ -124,21 +124,18 @@ const RELEASE_HISTORY_PAGE_STYLES = `
 
     .channel-tabs {
       margin-bottom: 24px;
-      border-bottom: 1px solid var(--release-border-default);
     }
 
     .channel-tablist {
       display: inline-flex;
       gap: 8px;
       flex-wrap: wrap;
-      margin-bottom: -1px;
     }
 
     .channel-tab {
       appearance: none;
       border: 1px solid transparent;
-      border-bottom: none;
-      border-radius: 12px 12px 0 0;
+      border-radius: 999px;
       background: transparent;
       color: var(--release-text-muted);
       cursor: pointer;
@@ -161,7 +158,6 @@ const RELEASE_HISTORY_PAGE_STYLES = `
       background: var(--release-surface-card);
       border-color: var(--release-border-accent);
       color: var(--release-accent);
-      box-shadow: 0 -1px 0 var(--release-surface-card) inset;
     }
 
     .tab-count {

@@ -70,7 +70,7 @@ proposed → active → superseded
 | [0012](0012-claude-cli-for-ai-agent.md) | Claude CLI subprocess for AI agent | active |
 | [0013](0013-remove-theming-system.md) | Remove vault-based theming system | superseded -> [0081](0081-internal-light-dark-theme-runtime.md) |
 | [0014](0014-git-based-vault-cache.md) | Git-based incremental vault cache | active |
-| [0015](0015-auto-save-with-debounce.md) | Auto-save with 500ms debounce | active |
+| [0015](0015-auto-save-with-debounce.md) | Auto-save with 500ms debounce | superseded → [0102](0102-low-end-safe-autosave-idle-window.md) |
 | [0016](0016-sentry-posthog-telemetry.md) | Sentry + PostHog telemetry with consent | active |
 | [0017](canary-release-channel-and-local-feature-flags.md) | Canary release channel and feature flags | superseded → [0057](0057-alpha-stable-release-channels-and-beta-cohorts.md) |
 | [0018](0018-codescene-code-health-gates.md) | CodeScene code health gates in CI | superseded → [0064](0064-ratcheted-codescene-thresholds.md) |
@@ -89,7 +89,7 @@ proposed → active → superseded
 | [0031](0031-full-app-for-note-windows.md) | Full App instance for secondary note windows | active |
 | [0032](0032-status-bar-for-git-actions.md) | Git actions (Changes, Pulse, Commit) in status bar, not sidebar | active |
 | [0033](0033-subfolder-scanning-and-folder-tree.md) | Subfolder scanning and folder tree navigation | active |
-| [0034](0034-git-repo-required-for-vault.md) | Git repo required — blocking modal enforces vault prerequisite | active |
+| [0034](0034-git-repo-required-for-vault.md) | Git repo required — blocking modal enforces vault prerequisite | superseded → [0085](0085-non-git-vault-support.md) |
 | [0035](0035-path-suffix-wikilink-resolution.md) | Path-suffix wikilink resolution for subfolder vaults | active |
 | [0036](0036-external-rename-detection-via-git-diff.md) | External rename detection via git diff on focus regain | active |
 | [0037](0037-codemirror-language-markdown-highlighting.md) | Language-based markdown syntax highlighting in raw editor | active |
@@ -139,3 +139,25 @@ proposed → active → superseded
 | [0081](0081-internal-light-dark-theme-runtime.md) | Internal light and dark theme runtime | active |
 | [0082](0082-markdown-durable-math-notes.md) | Markdown-durable math in notes | active |
 | [0083](0083-dual-architecture-macos-release-artifacts.md) | Dual-architecture macOS release artifacts | active |
+| [0085](0085-non-git-vault-support.md) | Non-git vaults open with explicit later Git initialization | active |
+| [0088](0088-markdown-durable-mermaid-diagrams.md) | Markdown-durable Mermaid diagrams in notes | active |
+| [0089](0089-active-vault-filesystem-watcher.md) | Active vault filesystem watcher | active |
+| [0090](0090-pi-cli-agent-adapter.md) | Pi CLI agent adapter | active |
+| [0091](0091-gemini-cli-external-ai-setup.md) | Gemini CLI external AI setup | active |
+| [0092](0092-vault-ai-agent-permission-modes.md) | Vault-scoped AI agent permission modes | superseded -> [0103](0103-adapter-specific-ai-permission-semantics.md) |
+| [0093](0093-shared-cli-agent-runtime-adapters.md) | Shared CLI agent runtime adapters | active |
+| [0094](0094-gitignored-content-visibility-boundary-filter.md) | Gitignored content visibility as a command-boundary filter | active |
+| [0095](0095-saved-view-order-field.md) | Saved views use an explicit YAML order field | active |
+| [0096](0096-root-created-type-documents.md) | Root-created type documents | active |
+| [0097](0097-gemini-cli-agent-adapter.md) | Gemini CLI agent adapter | active |
+| [0098](0098-in-app-image-and-pdf-file-previews.md) | In-app image and PDF previews for binary vault files | active |
+| [0099](0099-cumulative-vault-asset-scope.md) | Cumulative vault asset scope for previews | active |
+| [0100](0100-synthetic-vault-root-folder-row.md) | Synthetic vault-root row in folder navigation | active |
+| [0101](0101-categorical-product-analytics-events.md) | Categorical product analytics events | active |
+| [0102](0102-low-end-safe-autosave-idle-window.md) | Low-end-safe autosave idle window | active |
+| [0103](0103-adapter-specific-ai-permission-semantics.md) | Adapter-specific AI permission semantics | active |
+| [0104](0104-tauri-frontend-readiness-watchdog.md) | Tauri frontend readiness watchdog | active |
+| [0105](0105-editor-correctness-and-responsiveness-contract.md) | Editor correctness and responsiveness contract | active |
+| [0106](0106-shared-app-command-manifest.md) | Shared app command manifest | active |
+| [0107](0107-markdown-durable-tldraw-whiteboards.md) | Markdown-durable tldraw whiteboards in notes | active |
+| [0107](0107-pointer-owned-editor-block-reordering.md) | Pointer-owned editor block reordering | active |

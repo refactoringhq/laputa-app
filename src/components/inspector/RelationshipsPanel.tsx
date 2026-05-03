@@ -19,6 +19,7 @@ import {
   PROPERTY_PANEL_LABEL_CLASS_NAME,
 } from '../propertyPanelLayout'
 import { humanizePropertyKey } from '../../utils/propertyLabels'
+import { translate, type AppLocale } from '../../lib/i18n'
 
 const RELATIONSHIP_SECTION_ROW_CLASS_NAME = 'flex min-w-0 flex-col gap-1 px-1.5'
 const RELATIONSHIPS_PANEL_GRID_CLASS_NAME = 'grid min-w-0 gap-x-2 gap-y-3'
@@ -68,6 +69,7 @@ function RelationshipSectionRow({ label, children, dataTestId }: {
   label: string
   children: ReactNode
   dataTestId?: string
+  locale: AppLocale
 }) {
   return (
     <div className={RELATIONSHIP_SECTION_ROW_CLASS_NAME} style={{ gridColumn: '1 / -1' }} data-testid={dataTestId}>
@@ -212,9 +214,10 @@ function useCreateOption(
   return { showCreate, createIndex: resultCount, totalItems: resultCount + (showCreate ? 1 : 0) }
 }
 
-function CreateAndOpenOption({ title, selected, onClick, onHover }: {
+function CreateAndOpenOption({ title, selected, locale, onClick, onHover }: {
   title: string
   selected: boolean
+  locale: AppLocale
   onClick: () => void
   onHover: () => void
 }) {
@@ -228,18 +231,19 @@ function CreateAndOpenOption({ title, selected, onClick, onHover }: {
     >
       <Plus size={14} className="shrink-0 text-muted-foreground" />
       <span className="truncate text-foreground">
-        Create &amp; open <strong>{title}</strong>
+        {translate(locale, 'inspector.relationship.createAndOpen')} <strong>{title}</strong>
       </span>
     </div>
   )
 }
 
-function SearchDropdownWithCreate({ search, onSelect, query, entries, onCreateAndOpen }: {
+function SearchDropdownWithCreate({ search, onSelect, query, entries, locale, onCreateAndOpen }: {
   search: ReturnType<typeof useNoteSearch>
   onSelect: (entry: VaultEntry) => void
   query: string
   entries: VaultEntry[]
   onCreateAndOpen?: (title: string) => void
+  locale: AppLocale
 }) {
   const trimmed = query.trim()
   const { showCreate, createIndex } = useCreateOption({
@@ -268,6 +272,7 @@ function SearchDropdownWithCreate({ search, onSelect, query, entries, onCreateAn
         <CreateAndOpenOption
           title={trimmed}
           selected={search.selectedIndex === createIndex}
+          locale={locale}
           onClick={() => onCreateAndOpen(trimmed)}
           onHover={() => search.setSelectedIndex(createIndex)}
         />
@@ -358,11 +363,12 @@ function useInlineAddNoteState(
   }
 }
 
-function InlineAddNote({ entries, vaultPath, onAdd, onCreateAndOpenNote }: {
+function InlineAddNote({ entries, vaultPath, locale, onAdd, onCreateAndOpenNote }: {
   entries: VaultEntry[]
   vaultPath: string
   onAdd: (ref: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
+  locale: AppLocale
 }) {
   const {
     active,
@@ -386,7 +392,7 @@ function InlineAddNote({ entries, vaultPath, onAdd, onCreateAndOpenNote }: {
         onClick={() => setActive(true)}
         data-testid="add-relation-ref"
       >
-        Add
+        {translate(locale, 'inspector.relationship.add')}
       </button>
     )
   }
@@ -399,7 +405,7 @@ function InlineAddNote({ entries, vaultPath, onAdd, onCreateAndOpenNote }: {
           autoFocus
           className="w-full border border-border bg-transparent text-foreground"
           style={{ borderRadius: 6, outline: 'none', minWidth: 0, padding: '6px 10px', fontSize: 12 }}
-          placeholder="Note title"
+          placeholder={translate(locale, 'inspector.relationship.noteTitle')}
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -419,22 +425,24 @@ function InlineAddNote({ entries, vaultPath, onAdd, onCreateAndOpenNote }: {
           query={query}
           entries={entries}
           onCreateAndOpen={onCreateAndOpenNote ? (title) => { handleCreateAndOpen(title) } : undefined}
+          locale={locale}
         />
       )}
     </div>
   )
 }
 
-function RelationshipGroup({ label, refs, entries, typeEntryMap, vaultPath, onNavigate, onRemoveRef, onAddRef, onCreateAndOpenNote }: {
+function RelationshipGroup({ label, refs, entries, typeEntryMap, vaultPath, locale, onNavigate, onRemoveRef, onAddRef, onCreateAndOpenNote }: {
   label: string; refs: string[]; entries: VaultEntry[]; typeEntryMap: Record<string, VaultEntry>; vaultPath: string
   onNavigate: (target: string) => void
   onRemoveRef?: (ref: string) => void
   onAddRef?: (ref: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
+  locale: AppLocale
 }) {
   if (refs.length === 0) return null
   return (
-    <RelationshipSectionRow label={label}>
+    <RelationshipSectionRow label={label} locale={locale}>
       <div className="flex flex-col gap-1">
         {refs.map((ref, idx) => {
           const props = resolveRefProps(ref, entries, typeEntryMap)
@@ -454,6 +462,7 @@ function RelationshipGroup({ label, refs, entries, typeEntryMap, vaultPath, onNa
           vaultPath={vaultPath}
           onAdd={onAddRef}
           onCreateAndOpenNote={onCreateAndOpenNote}
+          locale={locale}
         />
       )}
     </RelationshipSectionRow>
@@ -472,7 +481,7 @@ function extractRelationshipRefs(frontmatter: ParsedFrontmatter): { key: string;
     .filter(({ refs }) => refs.length > 0)
 }
 
-function NoteTargetInput({ entries, value, onChange, onSubmit, onCancel, onCreateAndOpenNote, onSubmitWithCreate }: {
+function NoteTargetInput({ entries, value, locale, onChange, onSubmit, onCancel, onCreateAndOpenNote, onSubmitWithCreate }: {
   entries: VaultEntry[]
   value: string
   onChange: (v: string) => void
@@ -480,6 +489,7 @@ function NoteTargetInput({ entries, value, onChange, onSubmit, onCancel, onCreat
   onCancel?: () => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   onSubmitWithCreate?: (title: string) => void
+  locale: AppLocale
 }) {
   const [focused, setFocused] = useState(false)
   const search = useNoteSearch(entries, value, 8)
@@ -527,7 +537,7 @@ function NoteTargetInput({ entries, value, onChange, onSubmit, onCancel, onCreat
       <input
         className="w-full border border-border bg-transparent px-2 py-1 text-xs text-foreground"
         style={{ borderRadius: 4, outline: 'none' }}
-        placeholder="Note title"
+        placeholder={translate(locale, 'inspector.relationship.noteTitle')}
         value={value}
         onChange={e => onChange(e.target.value)}
         onFocus={() => setFocused(true)}
@@ -541,6 +551,7 @@ function NoteTargetInput({ entries, value, onChange, onSubmit, onCancel, onCreat
           query={value}
           entries={entries}
           onCreateAndOpen={onCreateAndOpenNote ? (title) => onSubmitWithCreate?.(title) : undefined}
+          locale={locale}
         />
       )}
     </div>
@@ -621,11 +632,12 @@ function useRelationshipPanelState({
   }
 }
 
-function AddRelationshipForm({ entries, vaultPath, onAddProperty, onCreateAndOpenNote }: {
+function AddRelationshipForm({ entries, vaultPath, locale, onAddProperty, onCreateAndOpenNote }: {
   entries: VaultEntry[]
   vaultPath: string
   onAddProperty: (key: string, value: FrontmatterValue) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
+  locale: AppLocale
 }) {
   const [relKey, setRelKey] = useState('')
   const [relTarget, setRelTarget] = useState('')
@@ -653,7 +665,7 @@ function AddRelationshipForm({ entries, vaultPath, onAddProperty, onCreateAndOpe
 
   if (!showForm) {
     return (
-      <button className="mt-2 w-full border border-border bg-transparent text-center text-muted-foreground" style={{ borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }} onClick={() => { setShowForm(true); setTimeout(() => keyInputRef.current?.focus(), 0) }}>+ Add relationship</button>
+      <button className="mt-2 w-full border border-border bg-transparent text-center text-muted-foreground" style={{ borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }} onClick={() => { setShowForm(true); setTimeout(() => keyInputRef.current?.focus(), 0) }}>{translate(locale, 'inspector.relationship.addRelationship')}</button>
     )
   }
 
@@ -664,7 +676,7 @@ function AddRelationshipForm({ entries, vaultPath, onAddProperty, onCreateAndOpe
         autoFocus
         className="w-full border border-border bg-transparent px-2 py-1 text-xs text-foreground"
         style={{ borderRadius: 4, outline: 'none' }}
-        placeholder="Relationship name"
+        placeholder={translate(locale, 'inspector.relationship.name')}
         value={relKey}
         onChange={e => setRelKey(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') submitForm(); else if (e.key === 'Escape') resetForm() }}
@@ -677,10 +689,11 @@ function AddRelationshipForm({ entries, vaultPath, onAddProperty, onCreateAndOpe
         onCancel={resetForm}
         onCreateAndOpenNote={onCreateAndOpenNote}
         onSubmitWithCreate={handleCreateAndSubmit}
+        locale={locale}
       />
       <div className="flex gap-1.5">
-        <button className="flex-1 border border-border bg-transparent text-xs text-foreground" style={{ borderRadius: 4, padding: '4px 0' }} onClick={() => submitForm()} disabled={!relKey.trim() || !relTarget.trim()} data-testid="submit-add-relationship">Add</button>
-        <button className="border border-border bg-transparent text-xs text-muted-foreground" style={{ borderRadius: 4, padding: '4px 8px' }} onClick={resetForm}>Cancel</button>
+        <button className="flex-1 border border-border bg-transparent text-xs text-foreground" style={{ borderRadius: 4, padding: '4px 0' }} onClick={() => submitForm()} disabled={!relKey.trim() || !relTarget.trim()} data-testid="submit-add-relationship">{translate(locale, 'inspector.relationship.add')}</button>
+        <button className="border border-border bg-transparent text-xs text-muted-foreground" style={{ borderRadius: 4, padding: '4px 8px' }} onClick={resetForm}>{translate(locale, 'common.cancel')}</button>
       </div>
     </div>
   )
@@ -698,38 +711,41 @@ function updateRefsForAddition(refs: string[], refToAdd: string): FrontmatterVal
   return updated.length === 1 ? updated[0] : updated
 }
 
-function DisabledLinkButton() {
+function DisabledLinkButton({ locale }: { locale: AppLocale }) {
   return (
-    <button className="mt-2 w-full border border-border bg-transparent text-center text-muted-foreground" style={{ borderRadius: 6, padding: '6px 12px', fontSize: 12, opacity: 0.5, cursor: 'not-allowed' }} disabled>+ Add relationship</button>
+    <button className="mt-2 w-full border border-border bg-transparent text-center text-muted-foreground" style={{ borderRadius: 6, padding: '6px 12px', fontSize: 12, opacity: 0.5, cursor: 'not-allowed' }} disabled>{translate(locale, 'inspector.relationship.addRelationship')}</button>
   )
 }
 
-function SuggestedRelationshipSlot({ label, entries, vaultPath, onAdd, onCreateAndOpenNote }: {
+function SuggestedRelationshipSlot({ label, entries, vaultPath, locale, onAdd, onCreateAndOpenNote }: {
   label: string
   entries: VaultEntry[]
   vaultPath: string
   onAdd: (ref: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
+  locale: AppLocale
 }) {
   return (
-    <RelationshipSectionRow label={label} dataTestId="suggested-relationship">
+    <RelationshipSectionRow label={label} dataTestId="suggested-relationship" locale={locale}>
       <InlineAddNote
         entries={entries}
         vaultPath={vaultPath}
         onAdd={onAdd}
         onCreateAndOpenNote={onCreateAndOpenNote}
+        locale={locale}
       />
     </RelationshipSectionRow>
   )
 }
 
-export function DynamicRelationshipsPanel({ frontmatter, entries, typeEntryMap, vaultPath, onNavigate, onAddProperty, onUpdateProperty, onDeleteProperty, onCreateAndOpenNote }: {
+export function DynamicRelationshipsPanel({ frontmatter, entries, typeEntryMap, vaultPath, onNavigate, onAddProperty, onUpdateProperty, onDeleteProperty, onCreateAndOpenNote, locale = 'en' }: {
   frontmatter: ParsedFrontmatter; entries: VaultEntry[]; typeEntryMap: Record<string, VaultEntry>; vaultPath?: string
   onNavigate: (target: string) => void
   onAddProperty?: (key: string, value: FrontmatterValue) => void
   onUpdateProperty?: (key: string, value: FrontmatterValue) => void
   onDeleteProperty?: (key: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
+  locale?: AppLocale
 }) {
   const {
     relationshipEntries,
@@ -755,6 +771,7 @@ export function DynamicRelationshipsPanel({ frontmatter, entries, typeEntryMap, 
           onRemoveRef={canEdit ? (ref) => handleRemoveRef(key, ref) : undefined}
           onAddRef={canEdit ? (ref) => handleAddRef(key, ref) : undefined}
           onCreateAndOpenNote={canEdit ? onCreateAndOpenNote : undefined}
+          locale={locale}
         />
       ))}
       {missingSuggestedRels.map(label => (
@@ -765,12 +782,13 @@ export function DynamicRelationshipsPanel({ frontmatter, entries, typeEntryMap, 
           vaultPath={resolvedVaultPath}
           onAdd={(ref) => onAddProperty!(label, ref)}
           onCreateAndOpenNote={onCreateAndOpenNote}
+          locale={locale}
         />
       ))}
       <RelationshipActionRow>
         {onAddProperty
-          ? <AddRelationshipForm entries={entries} vaultPath={resolvedVaultPath} onAddProperty={onAddProperty} onCreateAndOpenNote={onCreateAndOpenNote} />
-          : <DisabledLinkButton />
+          ? <AddRelationshipForm entries={entries} vaultPath={resolvedVaultPath} onAddProperty={onAddProperty} onCreateAndOpenNote={onCreateAndOpenNote} locale={locale} />
+          : <DisabledLinkButton locale={locale} />
         }
       </RelationshipActionRow>
     </div>

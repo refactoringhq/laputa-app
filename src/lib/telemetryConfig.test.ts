@@ -7,11 +7,13 @@ import {
 
 function resolveConfig(overrides: {
   VITE_SENTRY_DSN?: string
+  VITE_SENTRY_RELEASE?: string
   VITE_POSTHOG_KEY?: string
   VITE_POSTHOG_HOST?: string
 } = {}) {
   return resolveFrontendTelemetryConfig({
     VITE_SENTRY_DSN: 'https://public@example.ingest.sentry.io/123456',
+    VITE_SENTRY_RELEASE: '2026.4.23',
     VITE_POSTHOG_KEY: 'phc_test_key',
     VITE_POSTHOG_HOST: 'https://eu.i.posthog.com',
     ...overrides,
@@ -40,11 +42,14 @@ describe('resolveFrontendTelemetryConfig', () => {
       name: 'keeps valid telemetry values after sanitizing them',
       overrides: {
         VITE_SENTRY_DSN: ' "https://public@example.ingest.sentry.io/123456" ',
+        VITE_SENTRY_RELEASE: " '2026.4.23' ",
         VITE_POSTHOG_KEY: " 'phc_test_key' ",
         VITE_POSTHOG_HOST: ' https://eu.i.posthog.com ',
       },
       expected: {
         sentryDsn: 'https://public@example.ingest.sentry.io/123456',
+        sentryBuildVersion: '2026.4.23',
+        sentryRelease: '2026.4.23',
         posthogKey: 'phc_test_key',
         posthogHost: 'https://eu.i.posthog.com',
       },
@@ -58,6 +63,8 @@ describe('resolveFrontendTelemetryConfig', () => {
       },
       expected: {
         sentryDsn: 'https://public@example.ingest.sentry.io/123456',
+        sentryBuildVersion: '2026.4.23',
+        sentryRelease: '2026.4.23',
         posthogKey: 'phc_test_key',
         posthogHost: 'https://eu.i.posthog.com',
       },
@@ -74,6 +81,28 @@ describe('resolveFrontendTelemetryConfig', () => {
     expect(resolveConfig({ VITE_SENTRY_DSN: 'not a dsn' }).sentryDsn).toBe('')
   })
 
+  it('drops placeholder Sentry release values instead of grouping them', () => {
+    expect(resolveConfig({ VITE_SENTRY_RELEASE: 'false' }).sentryRelease).toBe('')
+  })
+
+  it('keeps stable calendar versions as Sentry releases', () => {
+    expect(resolveConfig({ VITE_SENTRY_RELEASE: '2026.4.28' }).sentryRelease).toBe('2026.4.28')
+  })
+
+  it('drops prerelease versions from the Sentry release field', () => {
+    expect(resolveConfig({ VITE_SENTRY_RELEASE: '2026.4.28-alpha.7' })).toMatchObject({
+      sentryBuildVersion: '2026.4.28-alpha.7',
+      sentryRelease: '',
+    })
+  })
+
+  it('drops local development versions from the Sentry release field', () => {
+    expect(resolveConfig({ VITE_SENTRY_RELEASE: '0.1.0' })).toMatchObject({
+      sentryBuildVersion: '0.1.0',
+      sentryRelease: '',
+    })
+  })
+
   it('drops invalid PostHog hosts instead of loading scripts from them', () => {
     expect(resolveConfig({ VITE_POSTHOG_HOST: 'not a url' }).posthogHost).toBeNull()
   })
@@ -84,6 +113,8 @@ describe('resolveFrontendTelemetryConfig', () => {
       VITE_POSTHOG_HOST: 'false',
     })).toEqual({
       sentryDsn: '',
+      sentryBuildVersion: '2026.4.23',
+      sentryRelease: '2026.4.23',
       posthogKey: 'phc_test_key',
       posthogHost: null,
     })
@@ -95,6 +126,8 @@ describe('resolveFrontendTelemetryConfig', () => {
       VITE_POSTHOG_HOST: 'https://le',
     })).toEqual({
       sentryDsn: '',
+      sentryBuildVersion: '2026.4.23',
+      sentryRelease: '2026.4.23',
       posthogKey: 'phc_test_key',
       posthogHost: null,
     })
@@ -104,6 +137,8 @@ describe('resolveFrontendTelemetryConfig', () => {
       VITE_POSTHOG_HOST: 'http://localhost:8010',
     })).toEqual({
       sentryDsn: 'http://public@localhost:9000/123456',
+      sentryBuildVersion: '2026.4.23',
+      sentryRelease: '2026.4.23',
       posthogKey: 'phc_test_key',
       posthogHost: 'http://localhost:8010',
     })

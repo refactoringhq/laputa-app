@@ -132,6 +132,7 @@ function useHandleFlushPending({
   rawInitialContentRef,
   rawLatestContentRef,
   rawSourceContentRef,
+  flushPendingEditorChangeRef,
   pendingRawRestoreRef,
   pendingRoundTripRawRestoreRef,
   setRawModeContentOverride,
@@ -143,6 +144,7 @@ function useHandleFlushPending({
   rawInitialContentRef: React.MutableRefObject<string | null>
   rawLatestContentRef: React.MutableRefObject<string | null>
   rawSourceContentRef: React.MutableRefObject<string | null>
+  flushPendingEditorChangeRef?: React.MutableRefObject<(() => boolean) | null>
   pendingRawRestoreRef: React.MutableRefObject<CodeMirrorRestoreState | null>
   pendingRoundTripRawRestoreRef: React.MutableRefObject<PendingRoundTripRawRestore | null>
   setRawModeContentOverride: React.Dispatch<React.SetStateAction<PendingRawExitContent | null>>
@@ -150,11 +152,13 @@ function useHandleFlushPending({
 }) {
   return useCallback(async () => {
     rawSourceContentRef.current = activeTabContent
+    const serializeRichEditorContent = flushPendingEditorChangeRef?.current?.() ?? true
     const syncedContent = syncActiveTabIntoRawBuffer({
       editor,
       activeTabPath,
       activeTabContent,
       rawLatestContentRef,
+      serializeRichEditorContent,
       vaultPath,
     })
     rawInitialContentRef.current = syncedContent ?? activeTabContent
@@ -173,6 +177,7 @@ function useHandleFlushPending({
     activeTabContent,
     activeTabPath,
     editor,
+    flushPendingEditorChangeRef,
     pendingRawRestoreRef,
     pendingRoundTripRawRestoreRef,
     rawInitialContentRef,
@@ -269,6 +274,7 @@ export function useRawModeWithFlush(
   activeTabContent: string | null,
   onContentChange?: (path: string, content: string) => void,
   vaultPath?: string,
+  flushPendingEditorChangeRef?: React.MutableRefObject<(() => boolean) | null>,
 ) {
   const rawLatestContentRef = useRef<string | null>(null)
   const rawInitialContentRef = useRef<string | null>(null)
@@ -301,6 +307,7 @@ export function useRawModeWithFlush(
     rawInitialContentRef,
     rawLatestContentRef,
     rawSourceContentRef,
+    flushPendingEditorChangeRef,
     pendingRawRestoreRef,
     pendingRoundTripRawRestoreRef,
     setRawModeContentOverride,

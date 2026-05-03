@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test'
 const SOURCE_NOTE_TITLE = 'Grow Newsletter'
 const INSERTED_WIKILINK_QUERY = '[[Mana'
 const INSERTED_WIKILINK_TITLE = 'Manage Sponsorships'
+const INSERTED_WIKILINK_TARGET = 'manage-sponsorships'
 
 async function insertWikilink(page: Page) {
   const editor = page.locator('.bn-editor')
@@ -12,8 +13,15 @@ async function insertWikilink(page: Page) {
   await expect(
     firstParagraph,
   ).toContainText('Build a sustainable audience through high-quality weekly essays', { timeout: 5000 })
-  await firstParagraph.click()
-  await page.keyboard.press('End')
+  const firstParagraphBox = await firstParagraph.boundingBox()
+  if (!firstParagraphBox) throw new Error('Source paragraph is not visible')
+
+  await firstParagraph.click({
+    position: {
+      x: Math.max(1, firstParagraphBox.width - 2),
+      y: Math.max(1, firstParagraphBox.height - 2),
+    },
+  })
   await page.keyboard.press('Enter')
   await page.waitForTimeout(200)
 
@@ -21,9 +29,10 @@ async function insertWikilink(page: Page) {
 
   const suggestionMenu = page.locator('.wikilink-menu')
   await expect(suggestionMenu).toBeVisible({ timeout: 5000 })
-  const matchingWikilinks = editor.locator('.wikilink').filter({ hasText: INSERTED_WIKILINK_TITLE })
+  const matchingWikilinks = editor.locator(`.wikilink[data-target="${INSERTED_WIKILINK_TARGET}"]`)
   const existingCount = await matchingWikilinks.count()
-  await suggestionMenu.getByText(INSERTED_WIKILINK_TITLE, { exact: true }).click()
+  await expect(suggestionMenu.getByText(INSERTED_WIKILINK_TITLE, { exact: true })).toBeVisible()
+  await page.keyboard.press('Enter')
   await page.waitForTimeout(500)
 
   await expect(matchingWikilinks).toHaveCount(existingCount + 1)

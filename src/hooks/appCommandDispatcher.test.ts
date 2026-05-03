@@ -13,8 +13,19 @@ import {
 } from './appCommandDispatcher'
 import {
   getDeterministicShortcutQaDefinition,
+  APP_COMMAND_MENU_SECTIONS,
+  APP_COMMAND_MENU_STATE_GROUPS,
   getShortcutEventInit,
 } from './appCommandCatalog'
+
+const originalUserAgent = navigator.userAgent
+
+function setUserAgent(userAgent: string) {
+  Object.defineProperty(window.navigator, 'userAgent', {
+    configurable: true,
+    value: userAgent,
+  })
+}
 
 function makeHandlers(): AppCommandHandlers {
   return {
@@ -37,6 +48,7 @@ function makeHandlers(): AppCommandHandlers {
     onToggleRawEditor: vi.fn(),
     onToggleDiff: vi.fn(),
     onToggleAIChat: vi.fn(),
+    onPastePlainText: vi.fn(),
     onGoBack: vi.fn(),
     onGoForward: vi.fn(),
     onCheckForUpdates: vi.fn(),
@@ -58,8 +70,24 @@ function makeHandlers(): AppCommandHandlers {
   }
 }
 
+function expectShortcutEventCommand(
+  event: Partial<KeyboardEvent> & Pick<KeyboardEvent, 'key' | 'code'>,
+  commandId: string | null,
+) {
+  expect(
+    findShortcutCommandIdForEvent({
+      altKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      ...event,
+    }),
+  ).toBe(commandId)
+}
+
 describe('appCommandDispatcher', () => {
   afterEach(() => {
+    setUserAgent(originalUserAgent)
     resetAppCommandDispatchStateForTests()
   })
 
@@ -77,10 +105,36 @@ describe('appCommandDispatcher', () => {
     expect(isNativeMenuCommandId(APP_COMMAND_IDS.noteToggleFavorite)).toBe(false)
   })
 
-  it('finds raw editor and AI shortcuts from the shared catalog', () => {
+  it('derives native menu command IDs from the shared command menu manifest', () => {
+    const menuCommandIds = APP_COMMAND_MENU_SECTIONS.flatMap(section =>
+      section.items.flatMap(item => item.kind === 'command' ? [item.commandId] : []),
+    )
+
+    expect(menuCommandIds).toContain(APP_COMMAND_IDS.fileNewNote)
+    expect(menuCommandIds).toContain(APP_COMMAND_IDS.editPastePlainText)
+    expect(menuCommandIds).toContain(APP_COMMAND_IDS.viewGoBack)
+    expect(menuCommandIds).not.toContain(APP_COMMAND_IDS.noteToggleFavorite)
+  })
+
+  it('keeps native menu state groups inside the shared command menu manifest', () => {
+    const menuCommandIds = new Set(
+      APP_COMMAND_MENU_SECTIONS.flatMap(section =>
+        section.items.flatMap(item => item.kind === 'command' ? [item.menuItemId] : []),
+      ),
+    )
+
+    for (const commandIds of Object.values(APP_COMMAND_MENU_STATE_GROUPS)) {
+      for (const commandId of commandIds) {
+        expect(menuCommandIds.has(commandId)).toBe(true)
+      }
+    }
+  })
+
+  it('finds raw editor, AI, and plain-text paste shortcuts from the shared catalog', () => {
     expect(findShortcutCommandId('command-or-ctrl', 'o', 'KeyO')).toBe(APP_COMMAND_IDS.fileQuickOpen)
     expect(findShortcutCommandId('command-or-ctrl', '\\')).toBe(APP_COMMAND_IDS.editToggleRawEditor)
     expect(findShortcutCommandId('command-or-ctrl-shift', '¬', 'KeyL')).toBe(APP_COMMAND_IDS.viewToggleAiChat)
+    expect(findShortcutCommandId('command-or-ctrl-shift', 'v', 'KeyV')).toBe(APP_COMMAND_IDS.editPastePlainText)
   })
 
   it('gives every shortcut command an explicit deterministic QA strategy', () => {
@@ -100,6 +154,12 @@ describe('appCommandDispatcher', () => {
       preferredMode: 'renderer-shortcut-event',
       supportsRendererShortcutEvent: true,
       supportsNativeMenuCommand: false,
+      requiresManualNativeAcceleratorQa: true,
+    })
+    expect(getDeterministicShortcutQaDefinition(APP_COMMAND_IDS.editPastePlainText)).toMatchObject({
+      preferredMode: 'native-menu-command',
+      supportsRendererShortcutEvent: true,
+      supportsNativeMenuCommand: true,
       requiresManualNativeAcceleratorQa: true,
     })
   })
@@ -130,66 +190,23 @@ describe('appCommandDispatcher', () => {
   })
 
   it('resolves event modifiers through the shared shortcut catalog', () => {
-    expect(
-      findShortcutCommandIdForEvent({
-        key: 'o',
-        code: 'KeyO',
-        altKey: false,
-        ctrlKey: false,
-        metaKey: true,
-        shiftKey: false,
-      }),
-    ).toBe(APP_COMMAND_IDS.fileQuickOpen)
-    expect(
-      findShortcutCommandIdForEvent({
-        key: '¬',
-        code: 'KeyL',
-        altKey: false,
-        ctrlKey: false,
-        metaKey: true,
-        shiftKey: true,
-      }),
-    ).toBe(APP_COMMAND_IDS.viewToggleAiChat)
-    expect(
-      findShortcutCommandIdForEvent({
-        key: 'I',
-        code: 'KeyI',
-        altKey: false,
-        ctrlKey: false,
-        metaKey: true,
-        shiftKey: true,
-      }),
-    ).toBe(APP_COMMAND_IDS.viewToggleProperties)
-    expect(
-      findShortcutCommandIdForEvent({
-        key: 'ArrowLeft',
-        code: 'ArrowLeft',
-        altKey: false,
-        ctrlKey: false,
-        metaKey: true,
-        shiftKey: false,
-      }),
-    ).toBe(APP_COMMAND_IDS.viewGoBack)
-    expect(
-      findShortcutCommandIdForEvent({
-        key: 'ArrowRight',
-        code: 'ArrowRight',
-        altKey: false,
-        ctrlKey: false,
-        metaKey: true,
-        shiftKey: false,
-      }),
-    ).toBe(APP_COMMAND_IDS.viewGoForward)
-    expect(
-      findShortcutCommandIdForEvent({
-        key: 'l',
-        code: 'KeyL',
-        altKey: false,
-        ctrlKey: true,
-        metaKey: false,
-        shiftKey: true,
-      }),
-    ).toBe(APP_COMMAND_IDS.viewToggleAiChat)
+    expectShortcutEventCommand({ key: 'o', code: 'KeyO', metaKey: true }, APP_COMMAND_IDS.fileQuickOpen)
+    expectShortcutEventCommand({ key: '¬', code: 'KeyL', metaKey: true, shiftKey: true }, APP_COMMAND_IDS.viewToggleAiChat)
+    expectShortcutEventCommand({ key: 'I', code: 'KeyI', metaKey: true, shiftKey: true }, APP_COMMAND_IDS.viewToggleProperties)
+    expectShortcutEventCommand({ key: 'ArrowLeft', code: 'ArrowLeft', metaKey: true }, APP_COMMAND_IDS.viewGoBack)
+    expectShortcutEventCommand({ key: 'ArrowRight', code: 'ArrowRight', metaKey: true }, APP_COMMAND_IDS.viewGoForward)
+    expectShortcutEventCommand({ key: 'l', code: 'KeyL', ctrlKey: true, shiftKey: true }, APP_COMMAND_IDS.viewToggleAiChat)
+    expectShortcutEventCommand({ key: 'V', code: 'KeyV', metaKey: true, shiftKey: true }, APP_COMMAND_IDS.editPastePlainText)
+  })
+
+  it('ignores macOS Control-only shortcuts so native text editing bindings pass through', () => {
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')
+
+    expectShortcutEventCommand({ key: 'e', code: 'KeyE', ctrlKey: true }, null)
+    expectShortcutEventCommand({ key: 'n', code: 'KeyN', ctrlKey: true }, null)
+    expectShortcutEventCommand({ key: 'p', code: 'KeyP', ctrlKey: true }, null)
+    expectShortcutEventCommand({ key: 'd', code: 'KeyD', ctrlKey: true }, null)
+    expectShortcutEventCommand({ key: 'e', code: 'KeyE', metaKey: true }, APP_COMMAND_IDS.noteToggleOrganized)
   })
 
   it('dispatches create note through the shared command path', () => {
@@ -208,6 +225,12 @@ describe('appCommandDispatcher', () => {
     const handlers = makeHandlers()
     expect(dispatchAppCommand(APP_COMMAND_IDS.viewToggleAiChat, handlers)).toBe(true)
     expect(handlers.onToggleAIChat).toHaveBeenCalled()
+  })
+
+  it('dispatches plain-text paste through the shared command path', () => {
+    const handlers = makeHandlers()
+    expect(dispatchAppCommand(APP_COMMAND_IDS.editPastePlainText, handlers)).toBe(true)
+    expect(handlers.onPastePlainText).toHaveBeenCalled()
   })
 
   it('uses the active note for note-scoped commands', () => {

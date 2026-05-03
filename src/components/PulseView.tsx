@@ -5,6 +5,7 @@ import { isTauri, mockInvoke } from '../mock-tauri'
 import { useDragRegion } from '../hooks/useDragRegion'
 import type { PulseCommit, PulseFile } from '../types'
 import { relativeDate } from '../utils/noteListHelpers'
+import { getLocaleDateLocale, translate, type AppLocale } from '../lib/i18n'
 import {
   Plus, Minus, PencilSimple, GitCommit, ArrowSquareOut,
   FileText, CaretDown, CaretRight, Pulse,
@@ -19,13 +20,20 @@ interface PulseViewProps {
   onOpenNote?: (relativePath: string, commitHash?: string) => void
   sidebarCollapsed?: boolean
   onExpandSidebar?: () => void
+  locale?: AppLocale
+}
+
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function groupCommitsByDay(commits: PulseCommit[]): Map<string, PulseCommit[]> {
   const groups = new Map<string, PulseCommit[]>()
   for (const commit of commits) {
-    const date = new Date(commit.date * 1000)
-    const key = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    const key = formatDateKey(new Date(commit.date * 1000))
     const existing = groups.get(key)
     if (existing) {
       existing.push(commit)
@@ -37,20 +45,20 @@ function groupCommitsByDay(commits: PulseCommit[]): Map<string, PulseCommit[]> {
 }
 
 function isToday(dateKey: string): boolean {
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-  return dateKey === today
+  return dateKey === formatDateKey(new Date())
 }
 
 function isYesterday(dateKey: string): boolean {
-  const yesterday = new Date(Date.now() - 86400000)
-    .toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-  return dateKey === yesterday
+  return dateKey === formatDateKey(new Date(Date.now() - 86400000))
 }
 
-function formatDayLabel(dateKey: string): string {
-  if (isToday(dateKey)) return 'Today'
-  if (isYesterday(dateKey)) return 'Yesterday'
-  return dateKey
+function formatDayLabel(dateKey: string, locale: AppLocale): string {
+  if (isToday(dateKey)) return translate(locale, 'pulse.today')
+  if (isYesterday(dateKey)) return translate(locale, 'pulse.yesterday')
+
+  const date = new Date(`${dateKey}T00:00:00`)
+  const dateLocale = getLocaleDateLocale(locale)
+  return date.toLocaleDateString(dateLocale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 const STATUS_ICON = {
@@ -124,9 +132,11 @@ function FileItem({
 
 function CommitCard({
   commit,
+  locale,
   onOpenNote,
 }: {
   commit: PulseCommit
+  locale: AppLocale
   onOpenNote?: (path: string, commitHash?: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -173,7 +183,7 @@ function CommitCard({
                     window.open(commit.githubUrl!, '_blank')
                   }
                 }}
-                title="Open on GitHub"
+                title={translate(locale, 'pulse.openOnGitHub')}
               >
                 {commit.shortHash}
                 <ArrowSquareOut size={10} />
@@ -192,7 +202,7 @@ function CommitCard({
             event.stopPropagation()
             toggleExpanded()
           }}
-          aria-label={expanded ? 'Collapse files' : 'Expand files'}
+          aria-label={translate(locale, expanded ? 'pulse.collapseFiles' : 'pulse.expandFiles')}
         >
           <Chevron size={12} />
         </button>
@@ -208,9 +218,10 @@ function CommitCard({
   )
 }
 
-function DayGroup({ label, commits, onOpenNote }: {
+function DayGroup({ label, commits, locale, onOpenNote }: {
   label: string
   commits: PulseCommit[]
+  locale: AppLocale
   onOpenNote?: (path: string, commitHash?: string) => void
 }) {
   const [collapsed, setCollapsed] = useState(false)
@@ -236,11 +247,14 @@ function DayGroup({ label, commits, onOpenNote }: {
           {label}
         </span>
         <span className="text-[11px] text-muted-foreground">
-          ({commits.length} {commits.length === 1 ? 'commit' : 'commits'})
+          ({translate(locale, 'pulse.commitCount', {
+            count: commits.length,
+            label: translate(locale, commits.length === 1 ? 'pulse.commitSingular' : 'pulse.commitPlural'),
+          })})
         </span>
       </div>
       {!collapsed && commits.map((commit) => (
-        <CommitCard key={commit.hash} commit={commit} onOpenNote={onOpenNote} />
+        <CommitCard key={commit.hash} commit={commit} locale={locale} onOpenNote={onOpenNote} />
       ))}
     </div>
   )
@@ -249,7 +263,8 @@ function DayGroup({ label, commits, onOpenNote }: {
 function PulseHeader({
   sidebarCollapsed,
   onExpandSidebar,
-}: Pick<PulseViewProps, 'sidebarCollapsed' | 'onExpandSidebar'>) {
+  locale = 'en',
+}: Pick<PulseViewProps, 'sidebarCollapsed' | 'onExpandSidebar' | 'locale'>) {
   const { onMouseDown } = useDragRegion()
 
   return (
@@ -266,31 +281,31 @@ function PulseHeader({
             className="flex shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             style={{ width: 24, height: 24 }}
             onClick={onExpandSidebar}
-            aria-label="Expand sidebar"
+            aria-label={translate(locale, 'sidebar.action.expand')}
           >
             <CaretRight size={14} weight="bold" />
           </button>
         )}
         <Pulse size={16} className="text-primary" />
-        <span className="text-[14px] font-semibold text-foreground">History</span>
+        <span className="text-[14px] font-semibold text-foreground">{translate(locale, 'pulse.title')}</span>
       </div>
     </div>
   )
 }
 
-function EmptyState() {
+function EmptyState({ locale = 'en' }: { locale?: AppLocale }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground" style={{ padding: 32 }}>
       <Pulse size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
-      <p className="text-[13px]">No activity yet</p>
+      <p className="text-[13px]">{translate(locale, 'pulse.noActivity')}</p>
       <p className="text-[12px]" style={{ marginTop: 4 }}>
-        Commit changes to see your vault's history
+        {translate(locale, 'pulse.emptyDescription')}
       </p>
     </div>
   )
 }
 
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ErrorState({ message, locale = 'en', onRetry }: { message: string; locale?: AppLocale; onRetry: () => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground" style={{ padding: 32 }}>
       <p className="text-[13px]">{message}</p>
@@ -298,7 +313,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
         className="mt-2 cursor-pointer rounded border border-border bg-transparent px-3 py-1 text-[12px] text-foreground transition-colors hover:bg-accent"
         onClick={onRetry}
       >
-        Retry
+        {translate(locale, 'pulse.retry')}
       </button>
     </div>
   )
@@ -310,6 +325,7 @@ function PulseFeed({
   loading,
   loadingMore,
   error,
+  locale,
   onOpenNote,
   onRetry,
   sentinelRef,
@@ -319,6 +335,7 @@ function PulseFeed({
   loading: boolean
   loadingMore: boolean
   error: string | null
+  locale: AppLocale
   onOpenNote?: (path: string, commitHash?: string) => void
   onRetry: () => void
   sentinelRef: React.RefObject<HTMLDivElement | null>
@@ -326,17 +343,17 @@ function PulseFeed({
   if (loading) {
     return (
       <div className="flex items-center justify-center" style={{ padding: 32 }}>
-        <span className="text-[13px] text-muted-foreground">Loading activity…</span>
+        <span className="text-[13px] text-muted-foreground">{translate(locale, 'pulse.loadingActivity')}</span>
       </div>
     )
   }
 
   if (error) {
-    return <ErrorState message={error} onRetry={onRetry} />
+    return <ErrorState message={error} locale={locale} onRetry={onRetry} />
   }
 
   if (commits.length === 0) {
-    return <EmptyState />
+    return <EmptyState locale={locale} />
   }
 
   return (
@@ -344,15 +361,16 @@ function PulseFeed({
       {Array.from(dayGroups.entries()).map(([day, dayCommits]) => (
         <DayGroup
           key={day}
-          label={formatDayLabel(day)}
+          label={formatDayLabel(day, locale)}
           commits={dayCommits}
+          locale={locale}
           onOpenNote={onOpenNote}
         />
       ))}
       <div ref={sentinelRef} style={{ height: 1 }} />
       {loadingMore && (
         <div className="flex items-center justify-center" style={{ padding: 12 }}>
-          <span className="text-[12px] text-muted-foreground">Loading…</span>
+          <span className="text-[12px] text-muted-foreground">{translate(locale, 'pulse.loading')}</span>
         </div>
       )}
     </>
@@ -361,7 +379,7 @@ function PulseFeed({
 
 const PAGE_SIZE = 20
 
-export const PulseView = memo(function PulseView({ vaultPath, onOpenNote, sidebarCollapsed, onExpandSidebar }: PulseViewProps) {
+export const PulseView = memo(function PulseView({ vaultPath, onOpenNote, sidebarCollapsed, onExpandSidebar, locale = 'en' }: PulseViewProps) {
   const [commits, setCommits] = useState<PulseCommit[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -383,12 +401,12 @@ export const PulseView = memo(function PulseView({ vaultPath, onOpenNote, sideba
       setHasMore(result.length >= PAGE_SIZE)
       setSkip(result.length)
     } catch (err) {
-      const msg = typeof err === 'string' ? err : 'Failed to load activity'
+      const msg = typeof err === 'string' ? err : translate(locale, 'pulse.loadError')
       setError(msg)
     } finally {
       setLoading(false)
     }
-  }, [vaultPath])
+  }, [locale, vaultPath])
 
   // Append next page
   const loadMore = useCallback(async () => {
@@ -424,7 +442,7 @@ export const PulseView = memo(function PulseView({ vaultPath, onOpenNote, sideba
 
   return (
     <div className="flex h-full flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-background">
-      <PulseHeader sidebarCollapsed={sidebarCollapsed} onExpandSidebar={onExpandSidebar} />
+      <PulseHeader sidebarCollapsed={sidebarCollapsed} locale={locale} onExpandSidebar={onExpandSidebar} />
 
       <div className="flex-1 overflow-y-auto">
         <PulseFeed
@@ -433,6 +451,7 @@ export const PulseView = memo(function PulseView({ vaultPath, onOpenNote, sideba
           loading={loading}
           loadingMore={loadingMore}
           error={error}
+          locale={locale}
           onOpenNote={onOpenNote}
           onRetry={loadInitial}
           sentinelRef={sentinelRef}

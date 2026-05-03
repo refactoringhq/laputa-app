@@ -100,7 +100,7 @@ test.describe('AI chat conversation history', () => {
     await expect(restoredMessage).toContainText('Keep this thread alive')
     await expect(restoredMessage).toContainText('[mock-claude code]')
 
-    await page.keyboard.press('Tab')
+    await page.getByTitle('New AI chat').focus()
     await expect(page.getByTitle('New AI chat')).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('ai-message')).toHaveCount(0)

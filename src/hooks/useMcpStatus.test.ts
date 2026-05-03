@@ -6,11 +6,16 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
+const runtimeMock = vi.hoisted(() => ({
+  isTauri: false,
+}))
+
 vi.mock('../mock-tauri', () => ({
-  isTauri: () => false,
+  isTauri: () => runtimeMock.isTauri,
   mockInvoke: vi.fn(),
 }))
 
+const { invoke } = await import('@tauri-apps/api/core') as { invoke: ReturnType<typeof vi.fn> }
 const { mockInvoke } = await import('../mock-tauri') as { mockInvoke: ReturnType<typeof vi.fn> }
 
 function mockCommands(handlers: Partial<Record<string, unknown>>) {
@@ -22,6 +27,14 @@ function mockCommands(handlers: Partial<Record<string, unknown>>) {
 
 function renderSubject(onToast = vi.fn()) {
   return renderHook(() => useMcpStatus('/vault', onToast))
+}
+
+function mockClipboard(writeText = vi.fn(() => Promise.resolve())) {
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  })
+  return writeText
 }
 
 function mockStatusFlow(
@@ -75,7 +88,9 @@ async function runMutationScenario({
 
 describe('useMcpStatus', () => {
   beforeEach(() => {
+    runtimeMock.isTauri = false
     vi.clearAllMocks()
+    mockClipboard()
   })
 
   it('checks the active vault status without auto-registering on mount', async () => {
@@ -159,5 +174,74 @@ describe('useMcpStatus', () => {
     expect(result.current.mcpStatus).toBe(expectedStatus)
     expect(mockInvoke).toHaveBeenCalledWith(overrideKey, commandArgs)
     expect(onToast).toHaveBeenCalledWith(expect.stringContaining(toastFragment))
+  })
+
+  it('loads the exact manual MCP config snippet for the active vault', async () => {
+    const snippet = JSON.stringify({ mcpServers: { tolaria: { type: 'stdio' } } })
+    mockCommands({
+      check_mcp_status: 'installed',
+      get_mcp_config_snippet: snippet,
+    })
+    const { result } = renderSubject()
+
+    await waitFor(() => {
+      expect(result.current.mcpStatus).toBe('installed')
+    })
+
+    await act(async () => {
+      await result.current.loadMcpConfigSnippet()
+    })
+
+    expect(result.current.mcpConfigSnippet).toBe(snippet)
+    expect(result.current.mcpConfigError).toBeNull()
+    expect(mockInvoke).toHaveBeenCalledWith('get_mcp_config_snippet', { vaultPath: '/vault' })
+  })
+
+  it('copies the manual MCP config snippet to the clipboard', async () => {
+    const writeText = mockClipboard()
+    const onToast = vi.fn()
+    const snippet = JSON.stringify({ mcpServers: { tolaria: { type: 'stdio' } } })
+    mockCommands({
+      check_mcp_status: 'not_installed',
+      get_mcp_config_snippet: snippet,
+    })
+    const { result } = renderSubject(onToast)
+
+    await waitFor(() => {
+      expect(result.current.mcpStatus).toBe('not_installed')
+    })
+
+    await act(async () => {
+      await expect(result.current.copyMcpConfig()).resolves.toBe(true)
+    })
+
+    expect(writeText).toHaveBeenCalledWith(snippet)
+    expect(onToast).toHaveBeenCalledWith('Tolaria MCP config copied to clipboard')
+  })
+
+  it('uses the native clipboard command inside the Tauri app', async () => {
+    runtimeMock.isTauri = true
+    const writeText = mockClipboard()
+    const onToast = vi.fn()
+    const snippet = JSON.stringify({ mcpServers: { tolaria: { type: 'stdio' } } })
+    invoke.mockImplementation((command: string) => {
+      if (command === 'check_mcp_status') return Promise.resolve('not_installed')
+      if (command === 'get_mcp_config_snippet') return Promise.resolve(snippet)
+      if (command === 'copy_text_to_clipboard') return Promise.resolve(null)
+      return Promise.resolve(null)
+    })
+    const { result } = renderSubject(onToast)
+
+    await waitFor(() => {
+      expect(result.current.mcpStatus).toBe('not_installed')
+    })
+
+    await act(async () => {
+      await expect(result.current.copyMcpConfig()).resolves.toBe(true)
+    })
+
+    expect(invoke).toHaveBeenCalledWith('copy_text_to_clipboard', { text: snippet })
+    expect(writeText).not.toHaveBeenCalled()
+    expect(onToast).toHaveBeenCalledWith('Tolaria MCP config copied to clipboard')
   })
 })

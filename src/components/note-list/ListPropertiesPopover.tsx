@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { translate, type AppLocale } from '../../lib/i18n'
 import {
   OPEN_NOTE_LIST_PROPERTIES_EVENT,
   type NoteListPropertiesScope,
@@ -29,6 +30,7 @@ export interface ListPropertiesPopoverProps {
   onSave: (value: NoteListPropertyKey[] | null) => void
   triggerTitle: string
   triggerClassName?: string
+  locale?: AppLocale
 }
 
 function propertyInputId(id: NoteListPropertyKey): string {
@@ -76,7 +78,7 @@ function reorderDisplayProperties(event: DragEndEvent, currentDisplay: NoteListP
   return arrayMove(selected, oldIndex, newIndex)
 }
 
-function SortablePropertyItem({ id, checked, onToggle }: { id: NoteListPropertyKey; checked: boolean; onToggle: (key: NoteListPropertyKey) => void }) {
+function SortablePropertyItem({ id, checked, locale = 'en', onToggle }: { id: NoteListPropertyKey; checked: boolean; locale?: AppLocale; onToggle: (key: NoteListPropertyKey) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
   const style = { transform: CSS.Transform.toString(transform), transition }
   const inputId = propertyInputId(id)
@@ -110,7 +112,7 @@ function SortablePropertyItem({ id, checked, onToggle }: { id: NoteListPropertyK
         variant="ghost"
         size="icon-xs"
         className="shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing"
-        aria-label={`Reorder ${id}`}
+        aria-label={translate(locale, 'noteList.properties.reorder', { name: id })}
         {...dragAttributes}
         {...listeners}
       >
@@ -125,6 +127,7 @@ function ListPropertiesSearchInput({
   query,
   open,
   listboxId,
+  locale = 'en',
   onQueryChange,
   onKeyDown,
 }: {
@@ -132,6 +135,7 @@ function ListPropertiesSearchInput({
   query: string
   open: boolean
   listboxId: string
+  locale?: AppLocale
   onQueryChange: (value: string) => void
   onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void
 }) {
@@ -142,12 +146,12 @@ function ListPropertiesSearchInput({
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Search properties..."
+        placeholder={translate(locale, 'noteList.properties.searchPlaceholder')}
         role="combobox"
         aria-autocomplete="list"
         aria-controls={listboxId}
         aria-expanded={open}
-        aria-label="Search note-list properties"
+        aria-label={translate(locale, 'noteList.properties.searchLabel')}
         className="h-8 text-[13px]"
         data-testid="list-properties-combobox-input"
       />
@@ -160,6 +164,7 @@ function ListPropertiesOptionsList({
   filteredItems,
   selectedSet,
   sensors,
+  locale = 'en',
   onDragEnd,
   onToggle,
 }: {
@@ -167,6 +172,7 @@ function ListPropertiesOptionsList({
   filteredItems: NoteListPropertyKey[]
   selectedSet: Set<NoteListPropertyKey>
   sensors: ReturnType<typeof useSensors>
+  locale?: AppLocale
   onDragEnd: (event: DragEndEvent) => void
   onToggle: (key: string) => void
 }) {
@@ -174,7 +180,7 @@ function ListPropertiesOptionsList({
     <div className="max-h-60 overflow-y-auto" data-testid="list-properties-scroll-area">
       {filteredItems.length === 0 ? (
         <div className="px-1 py-2 text-[12px] text-muted-foreground">
-          No properties match this search.
+          {translate(locale, 'noteList.properties.noMatches')}
         </div>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -185,6 +191,7 @@ function ListPropertiesOptionsList({
                   key={key}
                   id={key}
                   checked={selectedSet.has(key)}
+                  locale={locale}
                   onToggle={onToggle}
                 />
               ))}
@@ -204,6 +211,7 @@ function ListPropertiesPopoverPanel({
   filteredItems,
   selectedSet,
   sensors,
+  locale = 'en',
   onQueryChange,
   onSearchKeyDown,
   onPanelKeyDown,
@@ -217,6 +225,7 @@ function ListPropertiesPopoverPanel({
   filteredItems: NoteListPropertyKey[]
   selectedSet: Set<NoteListPropertyKey>
   sensors: ReturnType<typeof useSensors>
+  locale?: AppLocale
   onQueryChange: (value: string) => void
   onSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void
   onPanelKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void
@@ -232,13 +241,14 @@ function ListPropertiesPopoverPanel({
     >
       <div onKeyDownCapture={onPanelKeyDown}>
         <div className="mb-2 px-1 text-[11px] font-medium text-muted-foreground">
-          Show in note list
+          {translate(locale, 'noteList.properties.showInNoteList')}
         </div>
         <ListPropertiesSearchInput
           inputRef={inputRef}
           query={query}
           open={open}
           listboxId={listboxId}
+          locale={locale}
           onQueryChange={onQueryChange}
           onKeyDown={onSearchKeyDown}
         />
@@ -247,6 +257,7 @@ function ListPropertiesPopoverPanel({
           filteredItems={filteredItems}
           selectedSet={selectedSet}
           sensors={sensors}
+          locale={locale}
           onDragEnd={onDragEnd}
           onToggle={onToggle}
         />
@@ -355,6 +366,7 @@ export function ListPropertiesPopover({
   onSave,
   triggerTitle,
   triggerClassName,
+  locale = 'en',
 }: ListPropertiesPopoverProps) {
   const {
     open,
@@ -395,6 +407,7 @@ export function ListPropertiesPopover({
         filteredItems={filteredItems}
         selectedSet={selectedSet}
         sensors={sensors}
+        locale={locale}
         onQueryChange={setQuery}
         onSearchKeyDown={handleSearchKeyDown}
         onPanelKeyDown={handlePanelKeyDown}

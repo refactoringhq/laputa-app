@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
-import type { VaultEntry, ModifiedFile, GitCommit } from '../types'
+import type { VaultEntry, ModifiedFile, GitCommit, FolderNode } from '../types'
 import { useVaultLoader, resolveNoteStatus } from './useVaultLoader'
 
 const mockEntries: VaultEntry[] = [
@@ -11,6 +11,8 @@ const mockEntries: VaultEntry[] = [
     archived: false,
     modifiedAt: 1700000000, createdAt: 1700000000, fileSize: 100,
     snippet: '', wordCount: 0, relationships: {}, icon: null, color: null, order: null, template: null, sort: null, outgoingLinks: [],
+    sidebarLabel: null, view: null, visible: null, organized: false, favorite: false, favoriteIndex: null,
+    listPropertiesDisplay: [], properties: {}, hasH1: false,
   },
 ]
 
@@ -152,6 +154,108 @@ describe('useVaultLoader', () => {
     expect(result.current.entries[0].title).toBe('Hello')
   })
 
+  it('normalizes missing entry and view string metadata from vault load', async () => {
+    backendInvokeFn.mockImplementation(((cmd: string) => {
+      if (isVaultLoadCommand(cmd)) {
+        return Promise.resolve([
+          {
+            path: '/vault/note/missing-title.md',
+            filename: undefined,
+            title: undefined,
+            aliases: undefined,
+            outgoingLinks: undefined,
+            relationships: undefined,
+            properties: undefined,
+          },
+        ])
+      }
+      if (cmd === 'list_views') return Promise.resolve([{ filename: undefined, definition: {} }])
+      if (cmd === 'get_modified_files') return Promise.resolve([])
+      if (cmd === 'list_vault_folders') return Promise.resolve([])
+      return Promise.resolve(null)
+    }) as typeof defaultMockInvoke)
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+
+    await waitForEntries(result)
+    await waitFor(() => {
+      expect(result.current.views).toHaveLength(1)
+    })
+
+    expect(result.current.entries[0]).toMatchObject({
+      path: '/vault/note/missing-title.md',
+      filename: 'missing-title.md',
+      title: 'missing-title',
+      aliases: [],
+      outgoingLinks: [],
+      relationships: {},
+      properties: {},
+    })
+    expect(result.current.views[0]).toMatchObject({
+      filename: 'view-1.yml',
+      definition: {
+        name: 'View 1',
+        icon: null,
+        color: null,
+        sort: null,
+        filters: { all: [] },
+      },
+    })
+  })
+
+  it('reports initial vault loading until the note scan resolves', async () => {
+    const entriesLoad = createDeferred<VaultEntry[]>()
+    backendInvokeFn.mockImplementation(((cmd: string) => {
+      if (isVaultLoadCommand(cmd)) return entriesLoad.promise
+      if (cmd === 'get_modified_files') return Promise.resolve([])
+      if (cmd === 'list_vault_folders') return Promise.resolve([])
+      if (cmd === 'list_views') return Promise.resolve([])
+      return Promise.resolve(null)
+    }) as typeof defaultMockInvoke)
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+
+    expect(result.current.isLoading).toBe(true)
+
+    await act(async () => {
+      entriesLoad.resolve(mockEntries)
+      await entriesLoad.promise
+    })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+  })
+
+  it('loads folders while the initial note scan is still pending', async () => {
+    const entriesLoad = createDeferred<VaultEntry[]>()
+    const folders: FolderNode[] = [{ name: 'Projects', path: 'Projects', children: [] }]
+    backendInvokeFn.mockImplementation(((cmd: string) => {
+      if (isVaultLoadCommand(cmd)) return entriesLoad.promise
+      if (cmd === 'get_modified_files') return Promise.resolve([])
+      if (cmd === 'list_vault_folders') return Promise.resolve(folders)
+      if (cmd === 'list_views') return Promise.resolve([])
+      return Promise.resolve(null)
+    }) as typeof defaultMockInvoke)
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+
+    await waitFor(() => {
+      expect(result.current.folders).toEqual(folders)
+    })
+    expect(result.current.isLoading).toBe(true)
+
+    await act(async () => {
+      entriesLoad.resolve(mockEntries)
+      await entriesLoad.promise
+    })
+
+    await waitFor(() => {
+      expect(result.current.entries).toEqual(mockEntries)
+      expect(result.current.isLoading).toBe(false)
+    })
+  })
+
   it('loads modified files on mount', async () => {
     const { result } = renderHook(() => useVaultLoader('/vault'))
 
@@ -205,6 +309,30 @@ describe('useVaultLoader', () => {
     const issuedCommands = backendInvokeFn.mock.calls.map(([command]) => command)
     expect(issuedCommands).toContain('reload_vault')
     expect(issuedCommands).not.toContain('list_vault')
+  })
+
+  it('marks the vault unavailable when the initial load finds a missing active vault', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    backendInvokeFn.mockImplementation(((cmd: string) => {
+      if (isVaultLoadCommand(cmd)) return Promise.reject(new Error('No such file or directory'))
+      if (cmd === 'check_vault_exists') return Promise.resolve(false)
+      if (cmd === 'get_modified_files') return Promise.resolve(mockModifiedFiles)
+      if (cmd === 'list_vault_folders') return Promise.reject(new Error('Active vault is not available'))
+      if (cmd === 'list_views') return Promise.reject(new Error('Active vault is not available'))
+      return Promise.resolve(null)
+    }) as typeof defaultMockInvoke)
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+
+    await waitFor(() => {
+      expect(result.current.unavailableVaultPath).toBe('/vault')
+    })
+    expect(result.current.entries).toEqual([])
+    expect(result.current.folders).toEqual([])
+    expect(result.current.views).toEqual([])
+    expect(result.current.modifiedFiles).toEqual([])
+
+    warnSpy.mockRestore()
   })
 
   it('ignores stale reload_vault results after the vault path changes', async () => {
@@ -319,6 +447,32 @@ describe('useVaultLoader', () => {
       act(() => { result.current.updateEntry('/vault/note/nonexistent.md', { archived: true }) })
 
       expect(result.current.entries).toBe(entriesBefore)
+    })
+
+    it('keeps entry metadata safe when a stale reload patch has undefined fields', async () => {
+      const { result } = await renderVaultLoader()
+
+      act(() => {
+        result.current.updateEntry('/vault/note/hello.md', {
+          title: undefined,
+          filename: undefined,
+          aliases: undefined,
+          outgoingLinks: undefined,
+          relationships: undefined,
+          properties: undefined,
+          snippet: undefined,
+        } as unknown as Partial<VaultEntry>)
+      })
+
+      expect(result.current.entries[0]).toEqual(expect.objectContaining({
+        title: 'hello',
+        filename: 'hello.md',
+        aliases: [],
+        outgoingLinks: [],
+        relationships: {},
+        properties: {},
+        snippet: '',
+      }))
     })
   })
 
@@ -679,9 +833,65 @@ describe('useVaultLoader', () => {
         title: 'Renamed',
       }))
     })
+
+    it('normalizes stale replacement metadata during reload-heavy note switching', async () => {
+      const { result } = await renderVaultLoader()
+
+      act(() => {
+        result.current.replaceEntry('/vault/note/hello.md', {
+          path: '/vault/note/reloaded.md',
+          title: undefined,
+          filename: undefined,
+          aliases: undefined,
+          outgoingLinks: undefined,
+          relationships: undefined,
+          properties: undefined,
+          snippet: undefined,
+        } as unknown as Partial<VaultEntry> & { path: string })
+      })
+
+      expect(result.current.entries[0]).toEqual(expect.objectContaining({
+        path: '/vault/note/reloaded.md',
+        filename: 'reloaded.md',
+        title: 'reloaded',
+        aliases: [],
+        outgoingLinks: [],
+        relationships: {},
+        properties: {},
+        snippet: '',
+      }))
+    })
   })
 
   describe('reloadVault', () => {
+    it('reports reload progress while reload_vault is pending', async () => {
+      const reload = createDeferred<VaultEntry[]>()
+      backendInvokeFn.mockImplementation(((cmd: string) => {
+        if (cmd === 'list_vault') return Promise.resolve(mockEntries)
+        if (cmd === 'reload_vault') return reload.promise
+        if (cmd === 'get_modified_files') return Promise.resolve([])
+        if (cmd === 'list_vault_folders') return Promise.resolve([])
+        if (cmd === 'list_views') return Promise.resolve([])
+        return Promise.resolve(null)
+      }) as typeof defaultMockInvoke)
+
+      const { result } = await renderVaultLoader()
+
+      let pendingReload: Promise<VaultEntry[]> | null = null
+      act(() => {
+        pendingReload = result.current.reloadVault()
+      })
+
+      expect(result.current.isReloading).toBe(true)
+
+      await act(async () => {
+        reload.resolve(mockEntries)
+        await pendingReload!
+      })
+
+      expect(result.current.isReloading).toBe(false)
+    })
+
     it('refreshes entries from reload_vault and reloads modified files', async () => {
       const reloadedEntry = {
         ...mockEntries[0],
@@ -731,6 +941,46 @@ describe('useVaultLoader', () => {
 
       expect(entries).toEqual([])
       expect(result.current.entries).toEqual(mockEntries)
+      warnSpy.mockRestore()
+    })
+
+    it('clears stale entries and marks the vault unavailable when the active vault disappears', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const initialViews = [{
+        filename: 'work.yml',
+        definition: {
+          name: 'Work',
+          icon: null,
+          color: null,
+          order: null,
+          sort: null,
+          filters: { all: [] },
+        },
+      }]
+      backendInvokeFn.mockImplementation(((cmd: string) => {
+        if (cmd === 'list_vault') return Promise.resolve(mockEntries)
+        if (cmd === 'reload_vault') return Promise.reject(new Error('No such file or directory'))
+        if (cmd === 'check_vault_exists') return Promise.resolve(false)
+        if (cmd === 'get_modified_files') return Promise.resolve(mockModifiedFiles)
+        if (cmd === 'list_vault_folders') return Promise.resolve([{ name: 'note', path: '/vault/note', children: [] }])
+        if (cmd === 'list_views') return Promise.resolve(initialViews)
+        return Promise.resolve(null)
+      }) as typeof defaultMockInvoke)
+
+      const { result } = await renderVaultLoader()
+      await waitFor(() => expect(result.current.views).toHaveLength(1))
+
+      let entries: VaultEntry[] = []
+      await act(async () => {
+        entries = await result.current.reloadVault()
+      })
+
+      expect(entries).toEqual([])
+      expect(result.current.entries).toEqual([])
+      expect(result.current.folders).toEqual([])
+      expect(result.current.views).toEqual([])
+      expect(result.current.modifiedFiles).toEqual([])
+      expect(result.current.unavailableVaultPath).toBe('/vault')
       warnSpy.mockRestore()
     })
   })
@@ -795,77 +1045,84 @@ describe('useVaultLoader', () => {
 
 describe('resolveNoteStatus', () => {
   const mf = (path: string, status: string): ModifiedFile => ({ path, relativePath: path.replace('/vault/', ''), status })
+  const status = (
+    path: string,
+    newPaths: Set<string>,
+    modifiedFiles: ModifiedFile[],
+    pendingSavePaths?: Set<string>,
+    unsavedPaths?: Set<string>,
+  ) => resolveNoteStatus({ path, newPaths, modifiedFiles, pendingSavePaths, unsavedPaths })
 
   it('returns new when path is in newPaths (not yet on disk)', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
   })
 
   it('returns new for untracked files in git', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'untracked')])).toBe('new')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'untracked')])).toBe('new')
   })
 
   it('returns new for added files in git', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'added')])).toBe('new')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'added')])).toBe('new')
   })
 
   it('returns modified for git-modified files', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
   })
 
   it('returns clean for files not in git status', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [])).toBe('clean')
+    expect(status('/vault/x.md', new Set(), [])).toBe('clean')
   })
 
   it('returns modified for deleted files so deleted previews keep diff affordances', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'deleted')])).toBe('modified')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'deleted')])).toBe('modified')
   })
 
   it('returns clean for unsupported git statuses', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'renamed')])).toBe('clean')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'renamed')])).toBe('clean')
   })
 
   it('newPaths takes priority over git modified', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [mf('/vault/x.md', 'modified')])).toBe('new')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [mf('/vault/x.md', 'modified')])).toBe('new')
   })
 
   it('pendingSave takes priority over new status', () => {
     const pendingSave = new Set(['/vault/x.md'])
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [], pendingSave)).toBe('pendingSave')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [], pendingSave)).toBe('pendingSave')
   })
 
   it('pendingSave takes priority over modified status', () => {
     const pendingSave = new Set(['/vault/x.md'])
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], pendingSave)).toBe('pendingSave')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], pendingSave)).toBe('pendingSave')
   })
 
   it('pendingSave takes priority over clean status', () => {
     const pendingSave = new Set(['/vault/x.md'])
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [], pendingSave)).toBe('pendingSave')
+    expect(status('/vault/x.md', new Set(), [], pendingSave)).toBe('pendingSave')
   })
 
   it('without pendingSavePaths parameter, behavior is unchanged', () => {
     // Omitting the optional parameter should produce the same results as before
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [])).toBe('clean')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
+    expect(status('/vault/x.md', new Set(), [])).toBe('clean')
   })
 
   it('empty pendingSavePaths set does not affect other statuses', () => {
     const emptyPending = new Set<string>()
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [], emptyPending)).toBe('new')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], emptyPending)).toBe('modified')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [], emptyPending)).toBe('clean')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [], emptyPending)).toBe('new')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], emptyPending)).toBe('modified')
+    expect(status('/vault/x.md', new Set(), [], emptyPending)).toBe('clean')
   })
 
   it('unsaved takes priority over all other statuses', () => {
     const unsaved = new Set(['/vault/x.md'])
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [], undefined, unsaved)).toBe('unsaved')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], undefined, unsaved)).toBe('unsaved')
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [], new Set(['/vault/x.md']), unsaved)).toBe('unsaved')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [], undefined, unsaved)).toBe('unsaved')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')], undefined, unsaved)).toBe('unsaved')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [], new Set(['/vault/x.md']), unsaved)).toBe('unsaved')
   })
 
   it('without unsavedPaths parameter, behavior is unchanged', () => {
-    expect(resolveNoteStatus('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
-    expect(resolveNoteStatus('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
+    expect(status('/vault/x.md', new Set(['/vault/x.md']), [])).toBe('new')
+    expect(status('/vault/x.md', new Set(), [mf('/vault/x.md', 'modified')])).toBe('modified')
   })
 })

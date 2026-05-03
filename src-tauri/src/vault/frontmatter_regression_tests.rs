@@ -133,3 +133,13 @@ fn test_alias_parser_recovers_special_alias_items() {
         assert_alias_parser_recovers(case);
     }
 }
+
+#[test]
+fn test_alias_collisions_keep_frontmatter_with_last_value_winning() {
+    let dir = TempDir::new().unwrap();
+    let content = "---\ntype: Note\nstatus: Active\nStatus: Evergreened\n---\n# Test\n";
+    let entry = parse_test_entry(&dir, "test.md", content);
+
+    assert_eq!(entry.is_a, Some("Note".to_string()));
+    assert_eq!(entry.status, Some("Evergreened".to_string()));
+}

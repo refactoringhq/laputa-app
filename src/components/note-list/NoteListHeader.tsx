@@ -11,6 +11,17 @@ import { ListPropertiesPopover, type ListPropertiesPopoverProps } from './ListPr
 
 const NOTE_LIST_ACTION_BUTTON_CLASSNAME = '!h-auto !w-auto !min-w-0 !rounded-none !p-0 !text-muted-foreground hover:!bg-transparent hover:!text-foreground focus-visible:!bg-transparent data-[state=open]:!bg-transparent data-[state=open]:!text-foreground [&_svg]:!size-4'
 
+function localizePropertiesTriggerTitle(triggerTitle: string, locale: AppLocale): string {
+  if (triggerTitle === 'Customize columns') return translate(locale, 'noteList.properties.customizeColumns')
+  if (triggerTitle === 'Customize All Notes columns') return translate(locale, 'noteList.properties.customizeAllColumns')
+  if (triggerTitle === 'Customize Inbox columns') return translate(locale, 'noteList.properties.customizeInboxColumns')
+
+  const viewMatch = triggerTitle.match(/^Customize (.+) columns$/)
+  return viewMatch
+    ? translate(locale, 'noteList.properties.customizeViewColumns', { name: viewMatch[1] })
+    : triggerTitle
+}
+
 export function NoteListHeader({ title, typeDocument, isEntityView, listSort, listDirection, customProperties, sidebarCollapsed, searchVisible, search, isSearching, searchInputRef, propertyPicker, locale = 'en', onSortChange, onCreateNote, onOpenType, onToggleSearch, onSearchChange, onSearchKeyDown }: {
   title: string
   typeDocument: VaultEntry | null
@@ -45,11 +56,18 @@ export function NoteListHeader({ title, typeDocument, isEntityView, listSort, li
           {title}
         </h3>
         <div className="ml-3 flex shrink-0 items-center justify-end gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          {!isEntityView && <SortDropdown groupLabel="__list__" current={listSort} direction={listDirection} customProperties={customProperties} onChange={onSortChange} />}
+          {!isEntityView && <SortDropdown groupLabel="__list__" current={listSort} direction={listDirection} customProperties={customProperties} locale={locale} onChange={onSortChange} />}
           <Button type="button" variant="ghost" size="icon-xs" className={NOTE_LIST_ACTION_BUTTON_CLASSNAME} onClick={onToggleSearch} title={translate(locale, 'noteList.searchAction')} aria-label={translate(locale, 'noteList.searchAction')}>
             <MagnifyingGlass size={16} />
           </Button>
-          {propertyPicker && <ListPropertiesPopover {...propertyPicker} triggerClassName={NOTE_LIST_ACTION_BUTTON_CLASSNAME} />}
+          {propertyPicker && (
+            <ListPropertiesPopover
+              {...propertyPicker}
+              triggerTitle={localizePropertiesTriggerTitle(propertyPicker.triggerTitle, locale)}
+              triggerClassName={NOTE_LIST_ACTION_BUTTON_CLASSNAME}
+              locale={locale}
+            />
+          )}
           <Button type="button" variant="ghost" size="icon-xs" className={NOTE_LIST_ACTION_BUTTON_CLASSNAME} onClick={onCreateNote} title={translate(locale, 'noteList.createNote')} aria-label={translate(locale, 'noteList.createNote')}>
             <Plus size={16} />
           </Button>

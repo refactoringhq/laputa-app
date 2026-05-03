@@ -1,6 +1,15 @@
 import { useRef, useEffect } from 'react'
-import { EditorView, lineNumbers, highlightActiveLine, keymap } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  lineNumbers,
+  highlightActiveLine,
+  keymap,
+  ViewPlugin,
+  type ViewUpdate,
+} from '@codemirror/view'
+import { EditorState, Prec } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { frontmatterHighlightPlugin, frontmatterHighlightTheme } from '../extensions/frontmatterHighlight'
 import { markdownLanguage } from '../extensions/markdownHighlight'
@@ -18,11 +27,55 @@ const RAW_EDITOR_COLORS = {
   gutterBorder: 'var(--border-subtle)',
   gutterText: 'var(--text-muted)',
 }
+
+const AUTO_TEXT_DIRECTION_LINE = Decoration.line({
+  attributes: { dir: 'auto' },
+})
+interface MarkdownFence {
+  character: '`' | '~'
+  length: number
+}
+
 export interface CodeMirrorCallbacks {
   onDocChange: (doc: string) => void
   onCursorActivity: (view: EditorView) => void
   onSave: () => void
   onEscape: () => boolean
+}
+
+function readMarkdownFence(line: string): MarkdownFence | null {
+  const match = /^( {0,3})(`{3,}|~{3,})/.exec(line)
+  if (!match) return null
+
+  const fence = match[2]
+  return {
+    character: fence[0] as MarkdownFence['character'],
+    length: fence.length,
+  }
+}
+
+function isClosingMarkdownFence(line: string, opening: MarkdownFence): boolean {
+  const match = /^( {0,3})(`{3,}|~{3,})[ \t]*$/.exec(line)
+  if (!match) return false
+
+  const fence = match[2]
+  return fence[0] === opening.character && fence.length >= opening.length
+}
+
+function isInsideMarkdownFence(markdownBeforeCursor: string): boolean {
+  const lines = markdownBeforeCursor.split(/\r?\n/)
+  let opening: MarkdownFence | null = null
+
+  for (const line of lines) {
+    if (opening) {
+      if (isClosingMarkdownFence(line, opening)) opening = null
+      continue
+    }
+
+    opening = readMarkdownFence(line)
+  }
+
+  return opening !== null
 }
 
 function buildBaseTheme() {
@@ -38,18 +91,20 @@ function buildBaseTheme() {
     '.cm-scroller': {
       fontFamily: FONT_FAMILY,
       lineHeight: '1.6',
-      padding: '16px 0',
+      padding: '0',
       overflow: 'auto',
     },
     '.cm-content': {
-      padding: '0 32px 0 16px',
+      padding: '16px 32px 16px 12px',
       caretColor: RAW_EDITOR_COLORS.foreground,
     },
     '.cm-gutters': {
       backgroundColor: RAW_EDITOR_COLORS.gutterBackground,
       color: RAW_EDITOR_COLORS.gutterText,
       borderRight: `1px solid ${RAW_EDITOR_COLORS.gutterBorder}`,
-      paddingLeft: '16px',
+      minHeight: '100%',
+      paddingTop: '16px',
+      paddingLeft: '6px',
     },
     '.cm-lineNumbers .cm-gutterElement': {
       paddingRight: '12px',
@@ -63,24 +118,68 @@ function buildBaseTheme() {
       backgroundColor: RAW_EDITOR_COLORS.activeLineBackground,
     },
     '&.cm-focused': { outline: 'none' },
-    '.cm-line': { padding: '0' },
+    '.cm-line': {
+      padding: '0',
+      unicodeBidi: 'plaintext',
+      textAlign: 'start',
+    },
   })
 }
 
+function buildAutoTextDirectionDecorations(view: EditorView): DecorationSet {
+  const ranges = []
+
+  for (const visibleRange of view.visibleRanges) {
+    for (let pos = visibleRange.from; pos <= visibleRange.to;) {
+      const line = view.state.doc.lineAt(pos)
+      ranges.push(AUTO_TEXT_DIRECTION_LINE.range(line.from))
+      pos = line.to + 1
+    }
+  }
+
+  return Decoration.set(ranges, true)
+}
+
+function buildAutoTextDirectionExtension() {
+  return [
+    EditorView.perLineTextDirection.of(true),
+    ViewPlugin.fromClass(class {
+      decorations: DecorationSet
+
+      constructor(view: EditorView) {
+        this.decorations = buildAutoTextDirectionDecorations(view)
+      }
+
+      update(update: ViewUpdate) {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = buildAutoTextDirectionDecorations(update.view)
+        }
+      }
+    }, {
+      decorations: plugin => plugin.decorations,
+    }),
+  ]
+}
+
 function buildSaveKeymap(callbacks: { current: CodeMirrorCallbacks }) {
-  return keymap.of([{
+  return Prec.highest(keymap.of([{
     key: 'Mod-s',
     run: () => { callbacks.current.onSave(); return true },
   }, {
     key: 'Escape',
     run: () => callbacks.current.onEscape(),
-  }])
+  }]))
 }
 
 function buildArrowLigaturesExtension() {
   let literalAsciiCursor: number | null = null
 
   return EditorView.inputHandler.of((view, from, _to, text) => {
+    if (isInsideMarkdownFence(view.state.doc.sliceString(0, from))) {
+      literalAsciiCursor = null
+      return false
+    }
+
     const beforeText = view.state.doc.sliceString(Math.max(0, from - 2), from)
     const resolution = resolveArrowLigatureInput({
       beforeText,
@@ -141,6 +240,7 @@ export function useCodeMirror(
         lineNumbers(),
         highlightActiveLine(),
         EditorView.lineWrapping,
+        buildAutoTextDirectionExtension(),
         history(),
         buildArrowLigaturesExtension(),
         keymap.of([...defaultKeymap, ...historyKeymap]),

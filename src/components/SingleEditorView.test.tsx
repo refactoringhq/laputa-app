@@ -1,10 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { VaultEntry } from '../types'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
-
-const NOTE_DRAG_MIME = 'application/x-laputa-note-path'
+import { insertPlainTextFromClipboardText } from '../utils/plainTextPaste'
+import { TooltipProvider } from './ui/tooltip'
 
 const state = vi.hoisted(() => ({
   capturedLinkToolbarProps: null as null | Record<string, unknown>,
@@ -16,7 +16,9 @@ const state = vi.hoisted(() => ({
   hoverGuardMock: vi.fn(),
   imageDropState: { isDragOver: false },
   linkActivationMock: vi.fn(),
+  personMentionCandidates: [] as Record<string, unknown>[],
   wikilinkEntriesRef: { current: [] as VaultEntry[] },
+  wikilinkCandidates: [] as Record<string, unknown>[],
 }))
 
 vi.mock('@blocknote/react', () => ({
@@ -147,12 +149,12 @@ vi.mock('../utils/typeColors', () => ({
 vi.mock('../utils/wikilinkSuggestions', () => ({
   MIN_QUERY_LENGTH: 2,
   deduplicateByPath: <T,>(items: T[]) => items,
-  preFilterWikilinks: () => [],
+  preFilterWikilinks: () => state.wikilinkCandidates,
 }))
 
 vi.mock('../utils/personMentionSuggestions', () => ({
   PERSON_MENTION_MIN_QUERY: 1,
-  filterPersonMentions: () => [],
+  filterPersonMentions: () => state.personMentionCandidates,
 }))
 
 vi.mock('../utils/suggestionEnrichment', () => ({
@@ -243,6 +245,7 @@ function createEditor() {
       { id: 'heading-block', type: 'heading', content: [], children: [] },
       cursorBlock,
     ],
+    domElement: undefined as HTMLElement | undefined,
     tryParseMarkdownToBlocks: vi.fn(async () => [
       { type: 'table', content: { type: 'tableContent' } },
     ]),
@@ -256,28 +259,49 @@ function createEditor() {
   }
 }
 
-function createMockDataTransfer(seedData: Record<string, string>): DataTransfer {
-  const data = new Map(Object.entries(seedData))
-  const types = Array.from(data.keys())
+function renderEditorHarness(editor = createEditor()) {
+  render(
+    <SingleEditorView
+      editor={editor as never}
+      entries={[makeEntry()]}
+      onNavigateWikilink={vi.fn()}
+    />,
+    { wrapper: TooltipProvider },
+  )
 
-  return {
-    dropEffect: 'none',
-    effectAllowed: 'move',
-    setData(type: string, value: string) {
-      data.set(type, value)
-      if (!types.includes(type)) types.push(type)
-    },
-    getData(type: string) {
-      return data.get(type) ?? ''
-    },
-    clearData() {
-      data.clear()
-      types.splice(0, types.length)
-    },
-    get types() {
-      return types
-    },
-  } as DataTransfer
+  const container = screen.getByTestId('blocknote-view').closest('.editor__blocknote-container')
+  expect(container).toBeTruthy()
+  return { container: container!, editor }
+}
+
+function createCodeBlockFixture(text: string) {
+  const codeBlock = document.createElement('div')
+  codeBlock.setAttribute('data-content-type', 'codeBlock')
+  const pre = document.createElement('pre')
+  const code = document.createElement('code')
+  code.textContent = text
+  pre.appendChild(code)
+  codeBlock.appendChild(pre)
+  return { codeBlock, code }
+}
+
+function selectNodeContents(node: Node) {
+  const range = document.createRange()
+  range.selectNodeContents(node)
+  const selection = window.getSelection()
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+}
+
+function appendToolbarButton(container: Element, className: string, text: string) {
+  const toolbar = document.createElement('div')
+  toolbar.className = className
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.textContent = text
+  toolbar.appendChild(button)
+  container.appendChild(toolbar)
+  return button
 }
 
 describe('SingleEditorView', () => {
@@ -290,7 +314,9 @@ describe('SingleEditorView', () => {
     state.capturedBlockNoteOnChange = null
     state.capturedMantineGetStyleNonce = null
     state.imageDropState.isDragOver = false
+    state.personMentionCandidates = []
     state.wikilinkEntriesRef.current = []
+    state.wikilinkCandidates = []
     mockOpenExternalUrl.mockClear()
     document.documentElement.removeAttribute('data-theme')
     document.documentElement.classList.remove('dark')
@@ -359,54 +385,6 @@ describe('SingleEditorView', () => {
     )
   })
 
-  it('inserts a canonical wikilink when a note is dropped onto the editor surface', () => {
-    const editor = createEditor()
-
-    render(
-      <SingleEditorView
-        editor={editor as never}
-        entries={[makeEntry()]}
-        onNavigateWikilink={vi.fn()}
-        vaultPath="/vault"
-      />,
-    )
-
-    const noteDropData = createMockDataTransfer({
-      [NOTE_DRAG_MIME]: '/vault/Projects/Alpha.md',
-      'text/plain': '/vault/Projects/Alpha.md',
-    })
-
-    fireEvent.drop(screen.getByTestId('blocknote-view').parentElement as HTMLElement, {
-      dataTransfer: noteDropData,
-    })
-
-    expect(editor.insertInlineContent).toHaveBeenCalledWith([
-      { type: 'wikilink', props: { target: 'Projects/Alpha' } },
-      ' ',
-    ], { updateSelection: true })
-  })
-
-  it('ignores dropped plain text that is not a markdown note path', () => {
-    const editor = createEditor()
-
-    render(
-      <SingleEditorView
-        editor={editor as never}
-        entries={[makeEntry()]}
-        onNavigateWikilink={vi.fn()}
-        vaultPath="/vault"
-      />,
-    )
-
-    fireEvent.drop(screen.getByTestId('blocknote-view').parentElement as HTMLElement, {
-      dataTransfer: createMockDataTransfer({
-        'text/plain': 'Just some dragged text',
-      }),
-    })
-
-    expect(editor.insertInlineContent).not.toHaveBeenCalled()
-  })
-
   it('wires the toolbar mouse guard and suggestion item click handlers', () => {
     const editor = createEditor()
     render(
@@ -463,6 +441,79 @@ describe('SingleEditorView', () => {
 
     expect(onWikiItemClick).toHaveBeenCalledOnce()
     expect(onMentionItemClick).toHaveBeenCalledOnce()
+  })
+
+  it('renders when a reload returns an entry with missing suggestion metadata', () => {
+    const reloadedEntry = {
+      ...makeEntry({ path: '/vault/project/reloaded.md', title: 'Reloaded' }),
+      filename: undefined,
+      aliases: undefined,
+      isA: undefined,
+    } as unknown as VaultEntry
+
+    expect(() => {
+      render(
+        <SingleEditorView
+          editor={createEditor() as never}
+          entries={[reloadedEntry]}
+          onNavigateWikilink={vi.fn()}
+        />,
+      )
+    }).not.toThrow()
+  })
+
+  it('ignores stale suggestion item clicks after the editor DOM disconnects', () => {
+    const editor = createEditor()
+    editor.domElement = document.createElement('div')
+
+    render(
+      <SingleEditorView
+        editor={editor as never}
+        entries={[makeEntry()]}
+        onNavigateWikilink={vi.fn()}
+      />,
+    )
+
+    const staleItemClick = vi.fn(() => {
+      throw new TypeError('Cannot read properties of undefined (reading isConnected)')
+    })
+
+    expect(() => {
+      ;(state.capturedSuggestionProps['[['].onItemClick as (item: { onItemClick: () => void }) => void)({
+        onItemClick: staleItemClick,
+      })
+    }).not.toThrow()
+    expect(staleItemClick).not.toHaveBeenCalled()
+  })
+
+  it('guards stale click handlers stored on wikilink suggestion items', async () => {
+    const editor = createEditor()
+    editor.domElement = document.createElement('div')
+    const staleItemClick = vi.fn(() => {
+      throw new TypeError('Cannot read properties of undefined (reading isConnected)')
+    })
+    state.wikilinkCandidates = [{
+      title: 'Alpha',
+      path: '/vault/project/alpha.md',
+      onItemClick: staleItemClick,
+    }]
+
+    render(
+      <SingleEditorView
+        editor={editor as never}
+        entries={[makeEntry()]}
+        onNavigateWikilink={vi.fn()}
+      />,
+    )
+
+    const getItems = state.capturedSuggestionProps['[['].getItems as (
+      query: string
+    ) => Promise<Array<{ onItemClick: () => void }>>
+    const items = await getItems('al')
+
+    expect(items).toHaveLength(1)
+    expect(() => items[0].onItemClick()).not.toThrow()
+    expect(staleItemClick).not.toHaveBeenCalled()
   })
 
   it('passes the active document theme to BlockNote', () => {
@@ -522,6 +573,78 @@ describe('SingleEditorView', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
+  it('copies selected fenced code text without markdown escape backslashes', async () => {
+    const json = '{\n  "id": "Demo"\n}'
+    const { container } = renderEditorHarness()
+    const { codeBlock, code } = createCodeBlockFixture(json)
+    await act(async () => {
+      container.appendChild(codeBlock)
+      await Promise.resolve()
+    })
+    selectNodeContents(code)
+
+    const clipboardData = { setData: vi.fn() }
+    fireEvent.copy(code, { clipboardData })
+
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', json)
+  })
+
+  it('copies fenced code from the code-block action button', async () => {
+    const json = '{\n  "id": "Demo"\n}'
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    const { container, editor } = renderEditorHarness()
+    const { codeBlock } = createCodeBlockFixture(json)
+    act(() => {
+      container.appendChild(codeBlock)
+    })
+
+    fireEvent.mouseMove(codeBlock)
+    const copyButton = await screen.findByRole('button', { name: 'Copy code to clipboard' })
+    fireEvent.click(copyButton)
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(json))
+    expect(editor.focus).not.toHaveBeenCalled()
+  })
+
+  it('does not override full-note copy selections that merely include a code block', async () => {
+    const { container } = renderEditorHarness()
+    const paragraph = document.createElement('p')
+    paragraph.textContent = 'Before'
+    const { codeBlock, code } = createCodeBlockFixture('const value = 1')
+    await act(async () => {
+      container.append(paragraph, codeBlock)
+      await Promise.resolve()
+    })
+
+    const range = document.createRange()
+    range.setStartBefore(paragraph)
+    range.setEndAfter(codeBlock)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+
+    const clipboardData = { setData: vi.fn() }
+    fireEvent.copy(code, { clipboardData })
+
+    expect(clipboardData.setData).not.toHaveBeenCalled()
+  })
+
+  it('handles registered plain-text paste requests through BlockNote insertion', () => {
+    const { container, editor } = renderEditorHarness()
+
+    fireEvent.focus(container)
+
+    expect(insertPlainTextFromClipboardText('Plain\nText')).toBe(true)
+    expect(editor.focus).toHaveBeenCalled()
+    expect(editor.insertInlineContent).toHaveBeenCalledWith('Plain\nText', {
+      updateSelection: true,
+    })
+  })
+
   it('routes clicks on the empty title wrapper back into the H1 block', async () => {
     const editor = createEditor()
 
@@ -563,26 +686,8 @@ describe('SingleEditorView', () => {
   })
 
   it('ignores editor-container click handling for link toolbar interactions', () => {
-    const editor = createEditor()
-
-    render(
-      <SingleEditorView
-        editor={editor as never}
-        entries={[makeEntry()]}
-        onNavigateWikilink={vi.fn()}
-      />,
-    )
-
-    const container = screen.getByTestId('blocknote-view').closest('.editor__blocknote-container')
-    expect(container).toBeTruthy()
-
-    const linkToolbar = document.createElement('div')
-    linkToolbar.className = 'bn-link-toolbar'
-    const linkAction = document.createElement('button')
-    linkAction.type = 'button'
-    linkAction.textContent = 'Open in a new tab'
-    linkToolbar.appendChild(linkAction)
-    container?.appendChild(linkToolbar)
+    const { container, editor } = renderEditorHarness()
+    const linkAction = appendToolbarButton(container, 'bn-link-toolbar', 'Open in a new tab')
 
     fireEvent.click(linkAction)
 
@@ -591,26 +696,8 @@ describe('SingleEditorView', () => {
   })
 
   it('ignores editor-container click handling for BlockNote side-menu actions', () => {
-    const editor = createEditor()
-
-    render(
-      <SingleEditorView
-        editor={editor as never}
-        entries={[makeEntry()]}
-        onNavigateWikilink={vi.fn()}
-      />,
-    )
-
-    const container = screen.getByTestId('blocknote-view').closest('.editor__blocknote-container')
-    expect(container).toBeTruthy()
-
-    const sideMenu = document.createElement('div')
-    sideMenu.className = 'bn-side-menu'
-    const action = document.createElement('button')
-    action.type = 'button'
-    action.textContent = 'Add block'
-    sideMenu.appendChild(action)
-    container?.appendChild(sideMenu)
+    const { container, editor } = renderEditorHarness()
+    const action = appendToolbarButton(container, 'bn-side-menu', 'Add block')
 
     fireEvent.click(action)
 

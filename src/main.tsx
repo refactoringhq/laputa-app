@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import './index.css'
 import App from './App.tsx'
+import { FrontendReadyMarker } from './components/FrontendReadyMarker'
 import { LinuxTitlebar } from './components/LinuxTitlebar'
 import { applyStoredThemeMode } from './lib/themeMode'
 import {
@@ -17,6 +18,7 @@ import {
   type AppCommandShortcutEventOptions,
 } from './hooks/appCommandCatalog'
 import { shouldUseLinuxWindowChrome } from './utils/platform'
+import { reloadFrontendOnceIfStartupFailed } from './utils/frontendReady'
 
 const EDITOR_DROP_SELECTOR = '.editor__blocknote-container'
 
@@ -113,6 +115,7 @@ function captureReactRootError(
   errorInfo: { componentStack?: string },
 ): void {
   sentryReactErrorHandler(error, { componentStack: errorInfo.componentStack ?? '' })
+  reloadFrontendOnceIfStartupFailed()
 }
 
 createRoot(document.getElementById('root')!, {
@@ -124,6 +127,7 @@ createRoot(document.getElementById('root')!, {
     <TooltipProvider>
       <LinuxTitlebar />
       <App />
+      <FrontendReadyMarker />
     </TooltipProvider>
   </StrictMode>,
 )

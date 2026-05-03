@@ -1,10 +1,11 @@
-import { startTransition, useCallback, useEffect, useRef, type MutableRefObject } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useEditorSaveWithLinks } from './useEditorSaveWithLinks'
 import { flushEditorContent } from '../utils/autoSave'
 import { extractH1TitleFromContent } from '../utils/noteTitle'
 import { isTauri } from '../mock-tauri'
 import type { VaultEntry } from '../types'
+import { createTranslator, type AppLocale } from '../lib/i18n'
 
 interface TabState {
   entry: VaultEntry
@@ -252,6 +253,7 @@ function useUntitledRenameExecutor({
   handleSwitchTab,
   replaceEntry,
   loadModifiedFiles,
+  onInternalVaultWrite,
   renamedPathsRef,
   inFlightUntitledRenameRef,
 }: {
@@ -262,6 +264,7 @@ function useUntitledRenameExecutor({
   handleSwitchTab: AppSaveDeps['handleSwitchTab']
   replaceEntry: AppSaveDeps['replaceEntry']
   loadModifiedFiles: AppSaveDeps['loadModifiedFiles']
+  onInternalVaultWrite?: AppSaveDeps['onInternalVaultWrite']
   renamedPathsRef: MutableRefObject<RenamedPathMap>
   inFlightUntitledRenameRef: MutableRefObject<InFlightRenameMap>
 }) {
@@ -276,6 +279,8 @@ function useUntitledRenameExecutor({
           notePath: path,
         })
         if (!result) return path
+        onInternalVaultWrite?.(path)
+        onInternalVaultWrite?.(result.new_path)
         trackRenamedPath(renamedPathsRef.current, path, result.new_path)
         await reloadAutoRenamedNote({
           oldPath: path,
@@ -305,6 +310,7 @@ function useUntitledRenameExecutor({
     handleSwitchTab,
     replaceEntry,
     loadModifiedFiles,
+    onInternalVaultWrite,
     renamedPathsRef,
     inFlightUntitledRenameRef,
   ])
@@ -360,6 +366,7 @@ function useUntitledRenameCoordinator({
   handleSwitchTab,
   replaceEntry,
   loadModifiedFiles,
+  onInternalVaultWrite,
   initialH1AutoRenameEnabled,
 }: {
   resolvedPath: string
@@ -369,6 +376,7 @@ function useUntitledRenameCoordinator({
   handleSwitchTab: AppSaveDeps['handleSwitchTab']
   replaceEntry: AppSaveDeps['replaceEntry']
   loadModifiedFiles: AppSaveDeps['loadModifiedFiles']
+  onInternalVaultWrite?: AppSaveDeps['onInternalVaultWrite']
   initialH1AutoRenameEnabled: boolean
 }) {
   const {
@@ -386,6 +394,7 @@ function useUntitledRenameCoordinator({
     handleSwitchTab,
     replaceEntry,
     loadModifiedFiles,
+    onInternalVaultWrite,
     renamedPathsRef,
     inFlightUntitledRenameRef,
   })
@@ -424,6 +433,8 @@ interface AppSaveDeps {
   replaceEntry: (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, newContent: string) => void
   resolvedPath: string
   initialH1AutoRenameEnabled: boolean
+  onInternalVaultWrite?: (path: string) => void
+  locale?: AppLocale
 }
 
 function useAppSaveStateRefs({
@@ -463,6 +474,7 @@ function useAppSaveEffects({
 }
 
 function useFlushBeforeAction({
+  canPersist,
   resolveCurrentPath,
   savePendingForPath,
   tabsRef,
@@ -470,7 +482,9 @@ function useFlushBeforeAction({
   clearUnsaved,
   setToastMessage,
   flushPendingUntitledRename,
+  locale,
 }: {
+  canPersist: boolean
   resolveCurrentPath: (path: string) => string
   savePendingForPath: (path: string) => Promise<boolean>
   tabsRef: MutableRefObject<TabState[]>
@@ -478,9 +492,16 @@ function useFlushBeforeAction({
   clearUnsaved: AppSaveDeps['clearUnsaved']
   setToastMessage: AppSaveDeps['setToastMessage']
   flushPendingUntitledRename: (path?: string) => Promise<boolean>
+  locale: AppLocale
 }) {
+  const t = useMemo(() => createTranslator(locale), [locale])
+
   return useCallback(async (path: string) => {
     const currentPath = resolveCurrentPath(path)
+    if (!canPersist) {
+      if (unsavedPathsRef.current.has(currentPath)) setToastMessage(t('save.toast.missingActiveVault'))
+      return
+    }
     try {
       await flushEditorContent(currentPath, {
         savePendingForPath,
@@ -490,10 +511,10 @@ function useFlushBeforeAction({
       })
       await flushPendingUntitledRename(currentPath)
     } catch (err) {
-      setToastMessage(`Auto-save failed: ${err}`)
+      setToastMessage(t('save.error.autoFailed', { error: String(err) }))
       throw err
     }
-  }, [resolveCurrentPath, savePendingForPath, tabsRef, unsavedPathsRef, clearUnsaved, setToastMessage, flushPendingUntitledRename])
+  }, [canPersist, resolveCurrentPath, savePendingForPath, tabsRef, unsavedPathsRef, clearUnsaved, setToastMessage, flushPendingUntitledRename, t])
 }
 
 async function preparePathForManualRename({
@@ -565,7 +586,7 @@ function useHandleSaveAction({
   flushPendingUntitledRename,
   resolveCurrentPath,
 }: {
-  handleSaveRaw: (unsavedFallback?: { path: string; content: string }) => Promise<void>
+  handleSaveRaw: (unsavedFallback?: { path: string; content: string }) => Promise<boolean>
   tabs: TabState[]
   activeTabPath: string | null
   unsavedPaths: Set<string>
@@ -574,12 +595,14 @@ function useHandleSaveAction({
 }) {
   return useCallback(async () => {
     const resolvedActiveTabPath = activeTabPath ? resolveCurrentPath(activeTabPath) : null
-    await handleSaveRaw(findUnsavedFallback({
+    const saveCompleted = await handleSaveRaw(findUnsavedFallback({
       tabs,
       activeTabPath: resolvedActiveTabPath,
       unsavedPaths,
     }))
+    if (!saveCompleted) return false
     await flushPendingUntitledRename(resolvedActiveTabPath ?? undefined)
+    return true
   }, [handleSaveRaw, tabs, activeTabPath, unsavedPaths, flushPendingUntitledRename, resolveCurrentPath])
 }
 
@@ -590,10 +613,13 @@ function useEditorPersistence({
   loadModifiedFiles,
   trackUnsaved,
   clearUnsaved,
+  onInternalVaultWrite,
   reloadViews,
   scheduleUntitledRename,
   resolveCurrentPath,
   resolvePathBeforeSave,
+  canPersist,
+  locale,
 }: {
   updateEntry: AppSaveDeps['updateEntry']
   setTabs: AppSaveDeps['setTabs']
@@ -601,20 +627,24 @@ function useEditorPersistence({
   loadModifiedFiles: AppSaveDeps['loadModifiedFiles']
   trackUnsaved?: AppSaveDeps['trackUnsaved']
   clearUnsaved: AppSaveDeps['clearUnsaved']
+  onInternalVaultWrite?: AppSaveDeps['onInternalVaultWrite']
   reloadViews: AppSaveDeps['reloadViews']
   scheduleUntitledRename: (path: string, content: string) => void
   resolveCurrentPath: (path: string) => string
   resolvePathBeforeSave: (path: string) => Promise<string>
+  canPersist: boolean
+  locale: AppLocale
 }) {
   const onAfterSave = useCallback(() => {
     loadModifiedFiles()
   }, [loadModifiedFiles])
 
   const onNotePersisted = useCallback((path: string, content: string) => {
+    onInternalVaultWrite?.(path)
     clearUnsaved(path)
     if (path.endsWith('.yml')) reloadViews?.()
     scheduleUntitledRename(path, content)
-  }, [clearUnsaved, reloadViews, scheduleUntitledRename])
+  }, [clearUnsaved, onInternalVaultWrite, reloadViews, scheduleUntitledRename])
 
   const {
     handleSave: handleSaveRaw,
@@ -629,12 +659,14 @@ function useEditorPersistence({
     onNotePersisted,
     resolvePath: resolveCurrentPath,
     resolvePathBeforeSave,
+    canPersist,
+    locale,
   })
 
   const handleContentChange = useCallback((path: string, content: string) => {
-    const resolvedPath = resolveCurrentPath(path)
-    trackUnsaved?.(resolvedPath)
-    handleContentChangeRaw(resolvedPath, content)
+    const currentPath = resolveCurrentPath(path)
+    trackUnsaved?.(currentPath)
+    handleContentChangeRaw(currentPath, content)
   }, [handleContentChangeRaw, resolveCurrentPath, trackUnsaved])
 
   const savePendingForPath = useCallback((path: string) => (
@@ -660,6 +692,7 @@ function useReplaceRenamedEntry({
 function useAppSaveHandlers({
   contentChangeRef,
   handleContentChange,
+  canPersist,
   cancelPendingUntitledRename,
   pendingUntitledRenameRef,
   activeTabPath,
@@ -670,6 +703,7 @@ function useAppSaveHandlers({
   clearUnsaved,
   setToastMessage,
   flushPendingUntitledRename,
+  locale,
   handleRenameNote,
   handleRenameFilename,
   resolvedPath,
@@ -681,6 +715,7 @@ function useAppSaveHandlers({
 }: {
   contentChangeRef: MutableRefObject<(path: string, content: string) => void>
   handleContentChange: (path: string, content: string) => void
+  canPersist: boolean
   cancelPendingUntitledRename: (path?: string) => boolean
   pendingUntitledRenameRef: MutableRefObject<PendingUntitledRename | null>
   activeTabPath: string | null
@@ -691,12 +726,13 @@ function useAppSaveHandlers({
   clearUnsaved: AppSaveDeps['clearUnsaved']
   setToastMessage: AppSaveDeps['setToastMessage']
   flushPendingUntitledRename: (path?: string) => Promise<boolean>
+  locale: AppLocale
   handleRenameNote: AppSaveDeps['handleRenameNote']
   handleRenameFilename: AppSaveDeps['handleRenameFilename']
   resolvedPath: string
   replaceRenamedEntry: (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, newContent: string) => void
   loadModifiedFiles: AppSaveDeps['loadModifiedFiles']
-  handleSaveRaw: (unsavedFallback?: { path: string; content: string }) => Promise<void>
+  handleSaveRaw: (unsavedFallback?: { path: string; content: string }) => Promise<boolean>
   tabs: TabState[]
   unsavedPaths: Set<string>
 }) {
@@ -709,6 +745,7 @@ function useAppSaveHandlers({
   })
 
   const flushBeforeAction = useFlushBeforeAction({
+    canPersist,
     resolveCurrentPath,
     savePendingForPath,
     tabsRef,
@@ -716,6 +753,7 @@ function useAppSaveHandlers({
     clearUnsaved,
     setToastMessage,
     flushPendingUntitledRename,
+    locale,
   })
   const { handleFilenameRename, handleTitleSync } = useRenameHandlers({
     resolveCurrentPath,
@@ -740,71 +778,39 @@ function useAppSaveHandlers({
 }
 
 export function useAppSave({
-  updateEntry, setTabs, handleSwitchTab, setToastMessage, loadModifiedFiles, reloadViews,
-  trackUnsaved, clearUnsaved, unsavedPaths, tabs, activeTabPath, handleRenameNote,
-  handleRenameFilename: handleRenameFilenameRaw, replaceEntry, resolvedPath,
-  initialH1AutoRenameEnabled,
+  updateEntry, setTabs, handleSwitchTab, setToastMessage, loadModifiedFiles,
+  reloadViews, trackUnsaved, clearUnsaved, unsavedPaths, tabs, activeTabPath,
+  handleRenameNote, handleRenameFilename: handleRenameFilenameRaw, replaceEntry,
+  resolvedPath, initialH1AutoRenameEnabled, onInternalVaultWrite,
+  locale = 'en',
 }: AppSaveDeps) {
   const contentChangeRef = useRef<(path: string, content: string) => void>(() => {})
+  const canPersist = resolvedPath.trim().length > 0
   const { tabsRef, activeTabPathRef, unsavedPathsRef } = useAppSaveStateRefs({ tabs, activeTabPath, unsavedPaths })
   const {
     pendingUntitledRenameRef, cancelPendingUntitledRename, registerRenamedPath,
     resolveCurrentPath, resolvePathBeforeSave, flushPendingUntitledRename, scheduleUntitledRename,
   } = useUntitledRenameCoordinator({
-    resolvedPath,
-    tabsRef,
-    activeTabPathRef,
-    setTabs,
-    handleSwitchTab,
-    replaceEntry,
-    loadModifiedFiles,
-    initialH1AutoRenameEnabled,
+    resolvedPath, tabsRef, activeTabPathRef, setTabs, handleSwitchTab,
+    replaceEntry, loadModifiedFiles, onInternalVaultWrite, initialH1AutoRenameEnabled,
   })
   const { handleSaveRaw, handleContentChange, savePendingForPath, savePending } = useEditorPersistence({
-    updateEntry,
-    setTabs,
-    setToastMessage,
-    loadModifiedFiles,
-    trackUnsaved,
-    clearUnsaved,
-    reloadViews,
-    scheduleUntitledRename,
-    resolveCurrentPath,
-    resolvePathBeforeSave,
+    updateEntry, setTabs, setToastMessage, loadModifiedFiles, trackUnsaved,
+    clearUnsaved, onInternalVaultWrite, reloadViews, scheduleUntitledRename,
+    resolveCurrentPath, resolvePathBeforeSave, canPersist,
+    locale,
   })
   const replaceRenamedEntry = useReplaceRenamedEntry({ registerRenamedPath, replaceEntry })
   const { handleFilenameRename, handleSave, handleTitleSync, flushBeforeAction } = useAppSaveHandlers({
-    contentChangeRef,
-    handleContentChange,
-    cancelPendingUntitledRename,
-    pendingUntitledRenameRef,
-    activeTabPath,
-    resolveCurrentPath,
-    savePendingForPath,
-    tabsRef,
-    unsavedPathsRef,
-    clearUnsaved,
-    setToastMessage,
-    flushPendingUntitledRename,
-    handleRenameNote,
+    contentChangeRef, handleContentChange, canPersist, cancelPendingUntitledRename,
+    pendingUntitledRenameRef, activeTabPath, resolveCurrentPath, savePendingForPath,
+    tabsRef, unsavedPathsRef, clearUnsaved, setToastMessage, flushPendingUntitledRename, locale, handleRenameNote,
     handleRenameFilename: handleRenameFilenameRaw,
-    resolvedPath,
-    replaceRenamedEntry,
-    loadModifiedFiles,
-    handleSaveRaw,
-    tabs,
-    unsavedPaths,
+    resolvedPath, replaceRenamedEntry, loadModifiedFiles, handleSaveRaw, tabs, unsavedPaths,
   })
 
   return {
-    contentChangeRef,
-    handleContentChange,
-    handleFilenameRename,
-    handleSave,
-    handleTitleSync,
-    savePending,
-    savePendingForPath,
-    trackRenamedPath: registerRenamedPath,
-    flushBeforeAction,
+    contentChangeRef, handleContentChange, handleFilenameRename, handleSave,
+    handleTitleSync, savePending, savePendingForPath, trackRenamedPath: registerRenamedPath, flushBeforeAction,
   }
 }

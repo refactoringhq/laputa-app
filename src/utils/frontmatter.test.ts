@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseFrontmatter, detectFrontmatterState } from './frontmatter'
+import { parseFrontmatter, detectFrontmatterState, detectFrontmatterWarnings } from './frontmatter'
 
 describe('parseFrontmatter', () => {
   describe('numeric values', () => {
@@ -76,6 +76,26 @@ describe('parseFrontmatter', () => {
     expect(fm['Owner']).toBe('[[person/alice]]')
     expect(fm['Belongs to']).toBe('[[project/alpha]]')
   })
+
+  it('parses CRLF frontmatter from Windows-authored notes', () => {
+    const fm = parseFrontmatter('---\r\ntype: Note\r\nstatus: Active\r\n---\r\n# Title')
+    expect(fm['type']).toBe('Note')
+    expect(fm['status']).toBe('Active')
+  })
+
+  it('keeps the last value when frontmatter properties collide', () => {
+    const fm = parseFrontmatter('---\ntype: Note\nstatus: Active\nStatus: Evergreened\n---\n# Title')
+
+    expect(fm['status']).toBeUndefined()
+    expect(fm['Status']).toBe('Evergreened')
+  })
+
+  it('keeps top-level keys with blank scalar values', () => {
+    const fm = parseFrontmatter('---\ntype: Book\nstart date:\nrating: \n---\n# New Book')
+
+    expect(fm['start date']).toBe('')
+    expect(fm['rating']).toBe('')
+  })
 })
 
 describe('detectFrontmatterState', () => {
@@ -99,6 +119,10 @@ describe('detectFrontmatterState', () => {
     expect(detectFrontmatterState('---\ntitle: Hello\ntype: Note\n---\nBody')).toBe('valid')
   })
 
+  it('returns "valid" for CRLF frontmatter', () => {
+    expect(detectFrontmatterState('---\r\ntitle: Hello\r\ntype: Note\r\n---\r\nBody')).toBe('valid')
+  })
+
   it('returns "valid" for frontmatter with only a title', () => {
     expect(detectFrontmatterState('---\ntitle: Test\n---\n')).toBe('valid')
   })
@@ -109,5 +133,15 @@ describe('detectFrontmatterState', () => {
 
   it('returns "invalid" for frontmatter with only garbage text', () => {
     expect(detectFrontmatterState('---\n{broken: [yaml\n---\nBody')).toBe('invalid')
+  })
+})
+
+describe('detectFrontmatterWarnings', () => {
+  it('reports colliding frontmatter properties', () => {
+    const warnings = detectFrontmatterWarnings('---\ntype: Note\nstatus: Active\nStatus: Evergreened\n---\n# Title')
+
+    expect(warnings.collidingProperties).toEqual([
+      { key: 'status', labels: ['status', 'Status'] },
+    ])
   })
 })

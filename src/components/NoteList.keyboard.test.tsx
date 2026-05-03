@@ -115,6 +115,6 @@ describe('NoteList keyboard activation', () => {
 
     fireEvent.mouseEnter(noteRow!)
 
-    expect(prefetchSpy).toHaveBeenCalledWith(mockEntries[1].path)
+    expect(prefetchSpy).toHaveBeenCalledWith(mockEntries[1])
   })
 })

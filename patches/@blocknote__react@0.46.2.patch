@@ -2,9 +2,21 @@ diff --git a/dist/blocknote-react.js b/dist/blocknote-react.js
 index 6271d12d2cd5152e924c5bfe78f3b8904844dbfe..12bb96bb36d445a77d51a18d0de446a3f9f0ea59 100644
 --- a/dist/blocknote-react.js
 +++ b/dist/blocknote-react.js
-@@ -157,6 +157,16 @@ function so(e) {
-   const n = "getBoundingClientRect" in e ? () => e.getBoundingClientRect() : () => e.element.getBoundingClientRect();
-   return () => "element" in e && (e.cacheMountedBoundingClientRect ?? !0) ? (e.element.isConnected && (t = n()), t) : n();
+@@ -155,8 +155,26 @@ var Rt = (e) => {
+ function so(e) {
+   let t = new DOMRect();
+-  const n = "getBoundingClientRect" in e ? () => e.getBoundingClientRect() : () => e.element.getBoundingClientRect();
+-  return () => "element" in e && (e.cacheMountedBoundingClientRect ?? !0) ? (e.element.isConnected && (t = n()), t) : n();
++  const n = () => "getBoundingClientRect" in e ? e.getBoundingClientRect() : e.element instanceof Element ? e.element.getBoundingClientRect() : t;
++  return () => {
++    if (!("element" in e) || !(e.cacheMountedBoundingClientRect ?? !0))
++      return n();
++    if (!(e.element instanceof Element))
++      return n();
++    if (e.element.isConnected)
++      t = n();
++    return t;
++  };
  }
 +function __bnSafeDomAtPos(e, t) {
 +  const n = e.prosemirrorView;
@@ -19,7 +31,7 @@ index 6271d12d2cd5152e924c5bfe78f3b8904844dbfe..12bb96bb36d445a77d51a18d0de446a3
  const z = (e) => {
    var h, b, p;
    const { refs: t, floatingStyles: n, context: o } = Ze({
-@@ -216,9 +226,7 @@ const Lt = (e) => {
+@@ -216,9 +234,7 @@ const Lt = (e) => {
        const s = Ue(t, c.doc);
        if (!s)
          return;
@@ -30,7 +42,7 @@ index 6271d12d2cd5152e924c5bfe78f3b8904844dbfe..12bb96bb36d445a77d51a18d0de446a3
        if (a instanceof Element)
          return {
            element: a
-@@ -3306,14 +3314,15 @@ const pi = (e) => {
+@@ -3306,14 +3322,15 @@ const pi = (e) => {
      );
      if (!m)
        return {};
@@ -49,7 +61,7 @@ index 6271d12d2cd5152e924c5bfe78f3b8904844dbfe..12bb96bb36d445a77d51a18d0de446a3
      return p instanceof Element ? (d.cellReference = { element: p }, d.rowReference = {
        element: f,
        getBoundingClientRect: () => {
-@@ -4371,7 +4380,7 @@ const El = (e) => {
+@@ -4371,7 +4388,7 @@ const El = (e) => {
      const a = Ue(t, c.prosemirrorState.doc);
      if (!a)
        return;

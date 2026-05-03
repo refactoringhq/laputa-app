@@ -14,10 +14,16 @@ type FixtureCommandArgs = Record<string, unknown> | undefined
 interface FixtureVaultPageArgs {
   page: Page
   vaultPath: string
+  isGitRepo: boolean
 }
 
 interface FixturePageArgs {
   page: Page
+}
+
+interface FixtureVaultOptions {
+  isGitRepo?: boolean
+  expectedReadyTitle?: string
 }
 
 interface CopyDirArgs {
@@ -62,10 +68,11 @@ export function removeFixtureVaultCopy(tempVaultDir: string | null | undefined):
   removeFixtureVaultDirectory({ tempVaultDir })
 }
 
-async function installFixtureVaultInitScript({ page, vaultPath }: FixtureVaultPageArgs): Promise<void> {
-  await page.addInitScript(({ dismissedKey, resolvedVaultPath }: { dismissedKey: string; resolvedVaultPath: string }) => {
+async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: FixtureVaultPageArgs): Promise<void> {
+  await page.addInitScript(({ dismissedKey, initialIsGitRepo, resolvedVaultPath }: { dismissedKey: string; initialIsGitRepo: boolean; resolvedVaultPath: string }) => {
     localStorage.clear()
     localStorage.setItem(dismissedKey, '1')
+    let gitRepoReady = initialIsGitRepo
 
     const jsonHeaders = { 'Content-Type': 'application/json' }
     const FRONTMATTER_OPEN = '---\n'
@@ -236,12 +243,29 @@ async function installFixtureVaultInitScript({ page, vaultPath }: FixtureVaultPa
       load_vault_list: () => activeVaultList,
       check_vault_exists: (commandArgs?: FixtureCommandArgs) =>
         readCommandString(commandArgs, 'path') === resolvedVaultPath,
-      is_git_repo: () => true,
+      is_git_repo: () => gitRepoReady,
+      init_git_repo: () => {
+        gitRepoReady = true
+        return null
+      },
       get_last_vault_path: () => resolvedVaultPath,
       get_default_vault_path: () => resolvedVaultPath,
       save_vault_list: () => null,
       save_settings: () => null,
       register_mcp_tools: () => null,
+      get_mcp_config_snippet: () => JSON.stringify({
+        mcpServers: {
+          tolaria: {
+            type: 'stdio',
+            command: 'node',
+            args: ['/fixture/Tolaria/mcp-server/index.js'],
+            env: {
+              VAULT_PATH: resolvedVaultPath,
+              WS_UI_PORT: '9711',
+            },
+          },
+        },
+      }, null, 2),
       reinit_telemetry: () => null,
       update_menu_state: () => null,
       get_settings: () => ({
@@ -268,6 +292,12 @@ async function installFixtureVaultInitScript({ page, vaultPath }: FixtureVaultPa
           `/api/vault/content?path=${encodeURIComponent(readCommandString(commandArgs, 'path'))}`,
         ) as { content: string }
         return data.content
+      },
+      validate_note_content: async (commandArgs?: FixtureCommandArgs) => {
+        const data = await readJson(
+          `/api/vault/content?path=${encodeURIComponent(readCommandString(commandArgs, 'path'))}`,
+        ) as { content: string }
+        return data.content === readCommandString(commandArgs, 'content')
       },
       get_all_content: (commandArgs?: FixtureCommandArgs) =>
         readJson(
@@ -383,14 +413,18 @@ async function installFixtureVaultInitScript({ page, vaultPath }: FixtureVaultPa
         return applyFixtureVaultOverrides(ref) ?? ref
       },
     })
-  }, { dismissedKey: CLAUDE_CODE_ONBOARDING_DISMISSED_KEY, resolvedVaultPath: vaultPath })
+  }, {
+    dismissedKey: CLAUDE_CODE_ONBOARDING_DISMISSED_KEY,
+    initialIsGitRepo: isGitRepo,
+    resolvedVaultPath: vaultPath,
+  })
 }
 
-async function waitForFixtureVaultReady({ page }: FixturePageArgs): Promise<void> {
+async function waitForFixtureVaultReady({ page, expectedTitle }: FixturePageArgs & { expectedTitle: string }): Promise<void> {
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(window.__mockHandlers?.list_vault))
   await page.locator('[data-testid="note-list-container"]').waitFor({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
-  await expect(page.getByText('Alpha Project', { exact: true }).first()).toBeVisible({
+  await expect(page.getByText(expectedTitle, { exact: true }).first()).toBeVisible({
     timeout: FIXTURE_VAULT_READY_TIMEOUT,
   })
 }
@@ -398,9 +432,17 @@ async function waitForFixtureVaultReady({ page }: FixturePageArgs): Promise<void
 export async function openFixtureVault(
   page: Page,
   vaultPath: string,
+  options: FixtureVaultOptions = {},
 ): Promise<void> {
-  await installFixtureVaultInitScript({ page, vaultPath })
-  await waitForFixtureVaultReady({ page })
+  await installFixtureVaultInitScript({
+    page,
+    vaultPath,
+    isGitRepo: options.isGitRepo ?? true,
+  })
+  await waitForFixtureVaultReady({
+    page,
+    expectedTitle: options.expectedReadyTitle ?? 'Alpha Project',
+  })
 }
 
 async function installFixtureVaultDesktopBridge({ page }: FixturePageArgs): Promise<void> {
@@ -419,8 +461,9 @@ async function installFixtureVaultDesktopBridge({ page }: FixturePageArgs): Prom
 export async function openFixtureVaultDesktopHarness(
   page: Page,
   vaultPath: string,
+  options: FixtureVaultOptions = {},
 ): Promise<void> {
-  await openFixtureVault(page, vaultPath)
+  await openFixtureVault(page, vaultPath, options)
   await installFixtureVaultDesktopBridge({ page })
 }
 

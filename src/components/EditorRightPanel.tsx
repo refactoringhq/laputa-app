@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { DEFAULT_AI_AGENT, type AiAgentId } from '../lib/aiAgents'
+import { DEFAULT_AI_AGENT, type AiAgentId, type AiAgentReadiness } from '../lib/aiAgents'
+import type { AppLocale } from '../lib/i18n'
 import type { VaultEntry, GitCommit } from '../types'
 import type { NoteListItem } from '../utils/ai-context'
 import { Inspector, type FrontmatterValue } from './Inspector'
@@ -12,6 +13,7 @@ interface EditorRightPanelProps {
   inspectorCollapsed: boolean
   inspectorWidth: number
   defaultAiAgent?: AiAgentId
+  defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
   onUnsupportedAiPaste?: (message: string) => void
   inspectorEntry: VaultEntry | null
@@ -36,27 +38,31 @@ interface EditorRightPanelProps {
   onFileCreated?: (relativePath: string) => void
   onFileModified?: (relativePath: string) => void
   onVaultChanged?: () => void
+  locale?: AppLocale
 }
 
 export function EditorRightPanel({
   showAIChat, inspectorCollapsed, inspectorWidth,
-  defaultAiAgent = DEFAULT_AI_AGENT, defaultAiAgentReady = true,
+  defaultAiAgent = DEFAULT_AI_AGENT, defaultAiAgentReadiness, defaultAiAgentReady = true,
   onUnsupportedAiPaste,
   inspectorEntry, inspectorContent, entries, gitHistory, vaultPath,
   noteList, noteListFilter,
   onToggleInspector, onToggleAIChat, onNavigateWikilink, onViewCommitDiff,
   onUpdateFrontmatter, onDeleteProperty, onAddProperty, onCreateMissingType, onCreateAndOpenNote, onInitializeProperties, onToggleRawEditor, onOpenNote,
   onFileCreated, onFileModified, onVaultChanged,
+  locale,
 }: EditorRightPanelProps) {
   const aiPanelController = useAiPanelController({
     vaultPath,
     defaultAiAgent,
     defaultAiAgentReady,
+    defaultAiAgentReadiness,
     activeEntry: inspectorEntry,
     activeNoteContent: inspectorContent,
     entries,
     noteList,
     noteListFilter,
+    locale,
     onOpenNote,
     onFileCreated,
     onFileModified,
@@ -85,7 +91,9 @@ export function EditorRightPanel({
           onOpenNote={onOpenNote}
           onUnsupportedAiPaste={onUnsupportedAiPaste}
           defaultAiAgent={defaultAiAgent}
+          defaultAiAgentReadiness={defaultAiAgentReadiness}
           defaultAiAgentReady={defaultAiAgentReady}
+          locale={locale}
           activeEntry={inspectorEntry}
           entries={entries}
         />
@@ -117,6 +125,7 @@ export function EditorRightPanel({
         onCreateAndOpenNote={onCreateAndOpenNote}
         onInitializeProperties={onInitializeProperties}
         onToggleRawEditor={onToggleRawEditor}
+        locale={locale}
       />
     </div>
   )

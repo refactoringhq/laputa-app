@@ -1,33 +1,36 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react'
-import { getDoubleClickedImageSrc } from '../utils/imageLightboxTarget'
+import { trackInlineImageLightboxOpened } from '../lib/productAnalytics'
+import { getDoubleClickedImageTarget, type ImageLightboxTarget } from '../utils/imageLightboxTarget'
 
-interface UseImageLightboxArgs {
+type UseImageLightboxArgs = {
   containerRef: RefObject<HTMLDivElement | null>
 }
 
-interface UseImageLightboxResult {
-  src: string | null
+type UseImageLightboxResult = {
+  image: ImageLightboxTarget | null
   close: () => void
 }
 
 export function useImageLightbox({ containerRef }: UseImageLightboxArgs): UseImageLightboxResult {
-  const [src, setSrc] = useState<string | null>(null)
-  const close = useCallback(() => setSrc(null), [])
+  const [image, setImage] = useState<ImageLightboxTarget | null>(null)
+  const close = useCallback(() => setImage(null), [])
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
     const onDoubleClick = (event: MouseEvent) => {
-      const next = getDoubleClickedImageSrc(event.target)
-      if (!next) return
+      const nextImage = getDoubleClickedImageTarget(event.target)
+      if (!nextImage) return
+
       event.preventDefault()
-      setSrc(next)
+      setImage(nextImage)
+      trackInlineImageLightboxOpened()
     }
 
-    container.addEventListener('dblclick', onDoubleClick)
-    return () => container.removeEventListener('dblclick', onDoubleClick)
+    container.addEventListener('dblclick', onDoubleClick, true)
+    return () => container.removeEventListener('dblclick', onDoubleClick, true)
   }, [containerRef])
 
-  return { src, close }
+  return { image, close }
 }

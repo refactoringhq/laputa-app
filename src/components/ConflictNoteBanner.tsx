@@ -1,11 +1,13 @@
 import { AlertTriangle } from 'lucide-react'
+import { translate, type AppLocale } from '../lib/i18n'
 
 interface ConflictNoteBannerProps {
   onKeepMine: () => void
   onKeepTheirs: () => void
+  locale?: AppLocale
 }
 
-export function ConflictNoteBanner({ onKeepMine, onKeepTheirs }: ConflictNoteBannerProps) {
+export function ConflictNoteBanner({ onKeepMine, onKeepTheirs, locale = 'en' }: ConflictNoteBannerProps) {
   return (
     <div
       data-testid="conflict-note-banner"
@@ -22,7 +24,7 @@ export function ConflictNoteBanner({ onKeepMine, onKeepTheirs }: ConflictNoteBan
       }}
     >
       <AlertTriangle size={13} />
-      <span>This note has a merge conflict</span>
+      <span>{translate(locale, 'editor.banner.conflict')}</span>
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
         <button
           data-testid="conflict-keep-mine-btn"
@@ -39,9 +41,9 @@ export function ConflictNoteBanner({ onKeepMine, onKeepTheirs }: ConflictNoteBan
             color: 'var(--foreground)',
             cursor: 'pointer',
           }}
-          title="Keep my local version"
+          title={translate(locale, 'editor.banner.keepMineTooltip')}
         >
-          Keep mine
+          {translate(locale, 'editor.banner.keepMine')}
         </button>
         <button
           data-testid="conflict-keep-theirs-btn"
@@ -58,9 +60,9 @@ export function ConflictNoteBanner({ onKeepMine, onKeepTheirs }: ConflictNoteBan
             color: 'var(--foreground)',
             cursor: 'pointer',
           }}
-          title="Keep the remote version"
+          title={translate(locale, 'editor.banner.keepTheirsTooltip')}
         >
-          Keep theirs
+          {translate(locale, 'editor.banner.keepTheirs')}
         </button>
       </div>
     </div>

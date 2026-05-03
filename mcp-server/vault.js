@@ -1,6 +1,7 @@
 /**
- * Vault operations — read-only helpers for Laputa markdown vault.
- * Write operations are handled by the agent's native bash/write/edit tools.
+ * Vault operations — read-only helpers for Tolaria markdown vault.
+ * Write operations are handled by the app-managed agent's active permission
+ * profile and native file-edit tools when available.
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'

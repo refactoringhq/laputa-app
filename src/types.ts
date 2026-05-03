@@ -1,4 +1,5 @@
 import type { AiAgentId } from './lib/aiAgents'
+import type { AiAgentPermissionMode } from './lib/aiAgentPermissionMode'
 import type { ThemeMode } from './lib/themeMode'
 import type { AppLocale } from './lib/i18n'
 
@@ -35,6 +36,8 @@ export interface VaultEntry {
   sort: string | null
   /** Default view mode for the note list of this Type: "all", "editor-list", or "editor-only". */
   view: string | null
+  /** Rich-editor note width mode from `_width` frontmatter. null means use the default. */
+  noteWidth?: NoteWidthMode | null
   /** Whether this Type is visible in the sidebar. Defaults to true when absent. */
   visible: boolean | null
   /** For Type entries: optional vault-relative folder where new notes of this Type
@@ -96,12 +99,17 @@ export interface Settings {
   release_channel: string | null
   theme_mode?: ThemeMode | null
   ui_language?: AppLocale | null
+  note_width_mode?: NoteWidthMode | null
   initial_h1_auto_rename_enabled?: boolean | null
   default_ai_agent?: AiAgentId | null
   /** Vault-relative folder where pasted/dropped images are saved. Null = "attachments". */
   default_image_folder?: string | null
   /** Vault-relative folder where pasted/dropped videos are saved. Null = "attachments". */
   default_video_folder?: string | null
+  hide_gitignored_files?: boolean | null
+  all_notes_show_pdfs?: boolean | null
+  all_notes_show_images?: boolean | null
+  all_notes_show_unsupported?: boolean | null
 }
 
 export interface GitPullResult {
@@ -161,12 +169,15 @@ export interface AllNotesConfig {
 /** Vault-scoped UI configuration stored locally per vault path. */
 export type NoteLayout = 'centered' | 'left'
 
+export type NoteWidthMode = 'normal' | 'wide'
+
 /** Vault-scoped UI configuration stored locally per vault path. */
 export interface VaultConfig {
   zoom: number | null
   view_mode: string | null
   editor_mode: string | null
   note_layout?: NoteLayout | null
+  ai_agent_permission_mode?: AiAgentPermissionMode | null
   tag_colors: Record<string, string> | null
   status_colors: Record<string, string> | null
   property_display_modes: Record<string, string> | null
@@ -199,7 +210,7 @@ export type InboxPeriod = 'week' | 'month' | 'quarter' | 'all'
 export type SidebarSelection =
   | { kind: 'filter'; filter: SidebarFilter }
   | { kind: 'sectionGroup'; type: string }
-  | { kind: 'folder'; path: string }
+  | { kind: 'folder'; path: string; rootPath?: string }
   | { kind: 'entity'; entry: VaultEntry }
   | { kind: 'view'; filename: string }
 
@@ -221,6 +232,8 @@ export interface ViewDefinition {
   name: string
   icon: string | null
   color: string | null
+  /** Display order for saved Views in sidebar/list surfaces (lower = higher). */
+  order?: number | null
   sort: string | null
   listPropertiesDisplay?: string[]
   filters: FilterGroup

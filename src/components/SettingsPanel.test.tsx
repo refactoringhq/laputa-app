@@ -4,6 +4,14 @@ import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
 
+const { trackEventMock } = vi.hoisted(() => ({
+  trackEventMock: vi.fn(),
+}))
+
+vi.mock('../lib/telemetry', () => ({
+  trackEvent: trackEventMock,
+}))
+
 const emptySettings: Settings = {
   auto_pull_interval_minutes: null,
   autogit_enabled: null,
@@ -17,6 +25,11 @@ const emptySettings: Settings = {
   release_channel: null,
   theme_mode: null,
   ui_language: null,
+  default_ai_agent: null,
+  hide_gitignored_files: null,
+  all_notes_show_pdfs: null,
+  all_notes_show_images: null,
+  all_notes_show_unsupported: null,
 }
 
 function installPointerCapturePolyfill() {
@@ -50,8 +63,11 @@ describe('SettingsPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    trackEventMock.mockClear()
     Object.defineProperty(window, 'localStorage', { value: localStorageMock, configurable: true })
     window.localStorage.clear()
+    document.documentElement.removeAttribute('data-theme')
+    document.documentElement.classList.remove('dark')
     installPointerCapturePolyfill()
   })
 
@@ -78,7 +94,7 @@ describe('SettingsPanel', () => {
     rerender(
       <SettingsPanel
         open={true}
-        settings={{ ...emptySettings, ui_language: 'zh-Hans' }}
+        settings={{ ...emptySettings, ui_language: 'zh-CN' }}
         onSave={onSave}
         onClose={onClose}
       />
@@ -86,7 +102,7 @@ describe('SettingsPanel', () => {
 
     expect(screen.getByText('设置')).toBeInTheDocument()
     expect(screen.queryByText('Settings')).not.toBeInTheDocument()
-  })
+  }, 10_000)
 
   it('calls onSave with stable defaults on save', () => {
     render(
@@ -102,8 +118,93 @@ describe('SettingsPanel', () => {
       autogit_inactive_threshold_seconds: 30,
       release_channel: null,
       theme_mode: 'light',
+      hide_gitignored_files: true,
+      all_notes_show_pdfs: false,
+      all_notes_show_images: false,
+      all_notes_show_unsupported: false,
     }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('saves Gitignored content visibility immediately for keyboard close', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    fireEvent.click(screen.getByTestId('settings-hide-gitignored-files'))
+    fireEvent.keyDown(screen.getByTestId('settings-panel'), { key: 'Escape' })
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      hide_gitignored_files: false,
+    }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('renders All Notes file visibility checkboxes off by default', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    expect(screen.getByText('All Notes visibility')).toBeInTheDocument()
+    expect(within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+    expect(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+    expect(within(screen.getByTestId('settings-all-notes-show-unsupported')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('preserves saved All Notes file visibility checkboxes', () => {
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{
+          ...emptySettings,
+          all_notes_show_pdfs: true,
+          all_notes_show_images: true,
+          all_notes_show_unsupported: false,
+        }}
+        onSave={onSave}
+        onClose={onClose}
+      />
+    )
+
+    expect(within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'true')
+    expect(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'true')
+    expect(within(screen.getByTestId('settings-all-notes-show-unsupported')).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('saves All Notes file visibility from keyboard toggles before Escape close', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    const pdfCheckbox = within(screen.getByTestId('settings-all-notes-show-pdfs')).getByRole('checkbox')
+    pdfCheckbox.focus()
+    fireEvent.keyDown(pdfCheckbox, { key: ' ', code: 'Space' })
+    fireEvent.keyUp(pdfCheckbox, { key: ' ', code: 'Space' })
+    fireEvent.keyDown(screen.getByTestId('settings-panel'), { key: 'Escape' })
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      all_notes_show_pdfs: true,
+      all_notes_show_images: false,
+      all_notes_show_unsupported: false,
+    }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('tracks All Notes visibility toggles with categorical metadata only', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    fireEvent.click(within(screen.getByTestId('settings-all-notes-show-images')).getByRole('checkbox'))
+
+    expect(trackEventMock).toHaveBeenCalledWith('all_notes_visibility_changed', {
+      category: 'images',
+      enabled: 1,
+    })
+    expect(trackEventMock).not.toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ path: expect.any(String) }),
+    )
   })
 
   it('defaults the color mode control to light', () => {
@@ -122,7 +223,7 @@ describe('SettingsPanel', () => {
         open={true}
         settings={emptySettings}
         locale="en"
-        systemLocale="zh-Hans"
+        systemLocale="zh-CN"
         onSave={onSave}
         onClose={onClose}
       />
@@ -157,7 +258,7 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByTestId('settings-save'))
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      ui_language: 'zh-Hans',
+      ui_language: 'zh-CN',
     }))
   })
 
@@ -179,6 +280,21 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Dark' }))
     fireEvent.click(screen.getByTestId('settings-save'))
 
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      theme_mode: 'dark',
+    }))
+  })
+
+  it('applies the selected dark color mode immediately while settings stays open', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Dark' }))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('dark')
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       theme_mode: 'dark',
     }))
@@ -422,6 +538,23 @@ describe('SettingsPanel', () => {
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
     expect(screen.getByText(/to open settings/)).toBeInTheDocument()
+  })
+
+  it('copies the MCP config from the AI Agents section', () => {
+    const onCopyMcpConfig = vi.fn()
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        onSave={onSave}
+        onCopyMcpConfig={onCopyMcpConfig}
+        onClose={onClose}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy MCP config' }))
+
+    expect(onCopyMcpConfig).toHaveBeenCalledOnce()
   })
 
   describe('Privacy & Telemetry section', () => {

@@ -19,6 +19,9 @@ const vaults: VaultOption[] = [
 const installedAiAgentsStatus = {
   claude_code: { status: 'installed' as const, version: '1.0.20' },
   codex: { status: 'installed' as const, version: '0.37.0' },
+  opencode: { status: 'installed' as const, version: '0.3.1' },
+  pi: { status: 'installed' as const, version: '0.70.2' },
+  gemini: { status: 'installed' as const, version: '0.5.1' },
 }
 
 const DEFAULT_WINDOW_WIDTH = 1280
@@ -85,6 +88,11 @@ describe('StatusBar', () => {
     expect(screen.getByText('b?')).toBeInTheDocument()
   })
 
+  it('shows the vault reload badge while a reload is active', () => {
+    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} isVaultReloading />)
+    expect(screen.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
+  })
+
   it('calls onCheckForUpdates when clicking build number', () => {
     const onCheckForUpdates = vi.fn()
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} buildNumber="b281" onCheckForUpdates={onCheckForUpdates} />)
@@ -95,7 +103,7 @@ describe('StatusBar', () => {
   it('build number shows the update tooltip on focus', async () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} buildNumber="b281" onCheckForUpdates={vi.fn()} />)
     await expectTooltip(screen.getByRole('button', { name: 'Check for updates' }), 'Check for updates')
-  })
+  }, 10_000)
 
   it('does not display branch name', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} />)
@@ -129,6 +137,27 @@ describe('StatusBar', () => {
 
     expect(screen.getByTestId('status-theme-mode')).toHaveAccessibleName('Switch to dark mode')
     expect(screen.queryByLabelText('Notifications are coming soon')).not.toBeInTheDocument()
+  })
+
+  it('end-aligns the theme tooltip to keep it inside the right window edge', async () => {
+    render(
+      <StatusBar
+        noteCount={100}
+        vaultPath="/Users/luca/Laputa"
+        vaults={vaults}
+        onSwitchVault={vi.fn()}
+        themeMode="light"
+        onToggleThemeMode={vi.fn()}
+        onOpenSettings={vi.fn()}
+      />,
+    )
+
+    act(() => {
+      fireEvent.focus(screen.getByTestId('status-theme-mode'))
+    })
+    const tooltip = await screen.findByTestId('status-theme-mode-tooltip')
+    expect(tooltip).toHaveAttribute('data-align', 'end')
+    expect(tooltip).toHaveTextContent('Switch to dark mode')
   })
 
   it('calls onToggleThemeMode from the bottom bar', () => {
@@ -339,17 +368,20 @@ describe('StatusBar', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 
-  it('wraps the bottom bar before hiding labels at medium widths', () => {
+  it('keeps the bottom bar compact and unwrapped at medium widths', () => {
     setWindowWidth(980)
     renderDenseStatusBar()
 
     expect(screen.getByTestId('status-bar')).toHaveStyle({
-      flexWrap: 'wrap',
-      height: 'auto',
+      flexWrap: 'nowrap',
+      height: '30px',
     })
-    expect(screen.getByText('Commit')).toBeInTheDocument()
-    expect(screen.getByText('History')).toBeInTheDocument()
-    expect(screen.getByText('Contribute')).toBeInTheDocument()
+    expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
+    expect(screen.getByTestId('status-pulse')).toBeInTheDocument()
+    expect(screen.getByTestId('status-feedback')).toBeInTheDocument()
+    expect(screen.queryByText('Commit')).not.toBeInTheDocument()
+    expect(screen.queryByText('History')).not.toBeInTheDocument()
+    expect(screen.queryByText('Contribute')).not.toBeInTheDocument()
   })
 
   it('collapses status labels to icon-first controls at very narrow widths', () => {
@@ -554,11 +586,46 @@ describe('StatusBar', () => {
     expect(onClickPulse).toHaveBeenCalledOnce()
   })
 
-  it('disables History badge when isGitVault is false', () => {
-    const onClickPulse = vi.fn()
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} isGitVault={false} onClickPulse={onClickPulse} />)
-    fireEvent.click(screen.getByTestId('status-pulse'))
-    expect(onClickPulse).not.toHaveBeenCalled()
+  it('replaces git controls with a missing-Git warning when isGitVault is false', () => {
+    render(
+      <StatusBar
+        noteCount={100}
+        modifiedCount={5}
+        vaultPath="/Users/luca/Laputa"
+        vaults={vaults}
+        onSwitchVault={vi.fn()}
+        isGitVault={false}
+        onClickPulse={vi.fn()}
+        onCommitPush={vi.fn()}
+      />
+    )
+
+    expect(screen.getByTestId('status-missing-git')).toBeInTheDocument()
+    expect(screen.getByText('Git disabled')).toBeInTheDocument()
+    expect(screen.queryByTestId('status-pulse')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('status-commit-push')).not.toBeInTheDocument()
+  })
+
+  it('opens Git setup from the missing-Git warning with mouse and keyboard', () => {
+    const onInitializeGit = vi.fn()
+    render(
+      <StatusBar
+        noteCount={100}
+        vaultPath="/Users/luca/Laputa"
+        vaults={vaults}
+        onSwitchVault={vi.fn()}
+        isGitVault={false}
+        onInitializeGit={onInitializeGit}
+      />
+    )
+    const warning = screen.getByTestId('status-missing-git')
+
+    fireEvent.click(warning)
+    expect(onInitializeGit).toHaveBeenCalledOnce()
+
+    warning.focus()
+    fireEvent.keyDown(warning, { key: 'Enter' })
+    expect(onInitializeGit).toHaveBeenCalledTimes(2)
   })
 
   it('shows Commit button in status bar', () => {

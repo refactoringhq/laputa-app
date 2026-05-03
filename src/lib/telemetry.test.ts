@@ -1,5 +1,31 @@
-import { describe, it, expect } from 'vitest'
-import { _scrubPathsForTest as scrubPaths, trackEvent, isFeatureEnabled, setReleaseChannel } from './telemetry'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+
+const sentryMocks = vi.hoisted(() => ({
+  close: vi.fn(),
+  init: vi.fn(),
+  setTag: vi.fn(),
+  setUser: vi.fn(),
+}))
+
+vi.mock('@sentry/react', () => sentryMocks)
+
+import {
+  _scrubPathsForTest as scrubPaths,
+  initSentry,
+  isFeatureEnabled,
+  setReleaseChannel,
+  teardownSentry,
+  trackEvent,
+} from './telemetry'
+
+afterEach(() => {
+  teardownSentry()
+  vi.unstubAllEnvs()
+  sentryMocks.close.mockClear()
+  sentryMocks.init.mockClear()
+  sentryMocks.setTag.mockClear()
+  sentryMocks.setUser.mockClear()
+})
 
 describe('telemetry scrubPaths', () => {
   it('redacts macOS absolute paths', () => {
@@ -41,6 +67,27 @@ describe('trackEvent', () => {
 
   it('accepts event name with string and number properties', () => {
     expect(() => trackEvent('note_created', { has_type: 1, creation_path: 'cmd_n' })).not.toThrow()
+  })
+})
+
+describe('initSentry', () => {
+  it.each([
+    ['stable builds', '2026.4.23', '2026.4.23', 'stable'],
+    ['alpha builds', '2026.4.28-alpha.7', undefined, 'prerelease'],
+    ['local builds', '0.1.0', undefined, 'internal'],
+  ])('sets release metadata for %s', (_name, buildVersion, sentryRelease, releaseKind) => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.ingest.sentry.io/123456')
+    vi.stubEnv('VITE_SENTRY_RELEASE', buildVersion)
+
+    initSentry('anonymous-user')
+
+    expect(sentryMocks.init).toHaveBeenCalledWith(expect.objectContaining({
+      dsn: 'https://public@example.ingest.sentry.io/123456',
+      release: sentryRelease,
+    }))
+    expect(sentryMocks.setUser).toHaveBeenCalledWith({ id: 'anonymous-user' })
+    expect(sentryMocks.setTag).toHaveBeenCalledWith('tolaria.build_version', buildVersion)
+    expect(sentryMocks.setTag).toHaveBeenCalledWith('tolaria.release_kind', releaseKind)
   })
 })
 

@@ -42,6 +42,17 @@ describe('useCodeMirror', () => {
     expect(result.current.current?.state.facet(EditorView.cspNonce)).toBe(RUNTIME_STYLE_NONCE)
   })
 
+  it('enables per-line auto text direction for mixed LTR and RTL content', () => {
+    const ref = { current: container }
+    const { result } = renderHook(() =>
+      useCodeMirror(ref, 'English\nمرحبا بالعالم', noopCallbacks),
+    )
+    const view = result.current.current!
+
+    expect(view.state.facet(EditorView.perLineTextDirection)).toBe(true)
+    expect([...container.querySelectorAll('.cm-line')].map(line => line.getAttribute('dir'))).toEqual(['auto', 'auto'])
+  })
+
   it('calls requestMeasure when laputa-zoom-change event fires', () => {
     const ref = { current: container }
     const { result } = renderHook(() =>
@@ -95,6 +106,26 @@ describe('useCodeMirror', () => {
     expect(view.state.doc.toString()).toBe('---\ntitle: Hello\nTrashed: true\n---\nBody')
     // External sync should NOT trigger onDocChange (would cause infinite loop)
     expect(onDocChange).not.toHaveBeenCalled()
+  })
+
+  it('lets app Escape handling run before the CodeMirror default keymap', () => {
+    const ref = { current: container }
+    const onEscape = vi.fn(() => true)
+    const { result } = renderHook(() =>
+      useCodeMirror(ref, 'hello', { ...noopCallbacks, onEscape }),
+    )
+    const view = result.current.current!
+
+    act(() => {
+      view.focus()
+      view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'Escape',
+      }))
+    })
+
+    expect(onEscape).toHaveBeenCalledOnce()
   })
 
   it('does not sync when content matches current editor state', () => {

@@ -9,7 +9,6 @@ const {
   detectYamlErrorMock,
   extractWikilinkQueryMock,
   getRawEditorDropdownPositionMock,
-  insertWikilinkAtCursorMock,
   noteSearchListState,
   replaceActiveWikilinkQueryMock,
   trackEventMock,
@@ -22,7 +21,6 @@ const {
   detectYamlErrorMock: vi.fn(),
   extractWikilinkQueryMock: vi.fn(),
   getRawEditorDropdownPositionMock: vi.fn(),
-  insertWikilinkAtCursorMock: vi.fn(),
   noteSearchListState: { lastProps: null as null | Record<string, unknown> },
   replaceActiveWikilinkQueryMock: vi.fn(),
   trackEventMock: vi.fn(),
@@ -41,10 +39,6 @@ vi.mock('../utils/rawEditorUtils', () => ({
   extractWikilinkQuery: extractWikilinkQueryMock,
   getRawEditorDropdownPosition: getRawEditorDropdownPositionMock,
   replaceActiveWikilinkQuery: replaceActiveWikilinkQueryMock,
-}))
-
-vi.mock('../utils/rawEditorInsertions', () => ({
-  insertWikilinkAtCursor: insertWikilinkAtCursorMock,
 }))
 
 vi.mock('../utils/typeColors', () => ({
@@ -82,6 +76,7 @@ vi.mock('./NoteSearchList', () => ({
 }))
 
 import { RawEditorView } from './RawEditorView'
+import { insertPlainTextFromClipboardText } from '../utils/plainTextPaste'
 
 function entry(title: string, path = `/vault/note/${title}.md`) {
   return {
@@ -118,34 +113,14 @@ function createMockView(docText = '[[Target') {
     state: {
       doc: { toString: () => docText },
       selection: { main: { head: docText.length } },
+      replaceSelection: vi.fn((text: string) => ({
+        changes: { from: 2, to: 5, insert: text },
+        selection: { anchor: 2 + text.length },
+      })),
     },
     dispatch: vi.fn(),
     focus: vi.fn(),
   }
-}
-
-function createMockDataTransfer(seedData: Record<string, string>): DataTransfer {
-  const data = new Map(Object.entries(seedData))
-  const types = Array.from(data.keys())
-
-  return {
-    dropEffect: 'none',
-    effectAllowed: 'move',
-    setData(type: string, value: string) {
-      data.set(type, value)
-      if (!types.includes(type)) types.push(type)
-    },
-    getData(type: string) {
-      return data.get(type) ?? ''
-    },
-    clearData() {
-      data.clear()
-      types.splice(0, types.length)
-    },
-    get types() {
-      return types
-    },
-  } as DataTransfer
 }
 
 describe('RawEditorView behavior coverage', () => {
@@ -168,10 +143,6 @@ describe('RawEditorView behavior coverage', () => {
     replaceActiveWikilinkQueryMock.mockReturnValue({
       text: '[[Inserted]]',
       cursor: 12,
-    })
-    insertWikilinkAtCursorMock.mockReturnValue({
-      text: 'Before [[Projects/Alpha]]',
-      cursor: 'Before [[Projects/Alpha]]'.length,
     })
   })
 
@@ -347,36 +318,30 @@ describe('RawEditorView behavior coverage', () => {
     expect(callbacks.onEscape()).toBe(true)
   })
 
-  it('inserts a canonical wikilink when a note is dropped onto the raw editor', () => {
-    const onContentChange = vi.fn()
-    const mockView = createMockView('Before ')
+  it('handles registered plain-text paste requests with CodeMirror selection replacement', () => {
+    const mockView = createMockView('Alpha Beta')
     viewRefState.current = mockView
 
     render(
       <RawEditorView
-        content="Before "
+        content="Alpha Beta"
         path="/vault/a.md"
         entries={[entry('Alpha')]}
-        onContentChange={onContentChange}
+        onContentChange={vi.fn()}
         onSave={vi.fn()}
-        vaultPath="/vault"
       />,
     )
 
-    fireEvent.drop(screen.getByTestId('raw-editor-codemirror'), {
-      dataTransfer: createMockDataTransfer({
-        'application/x-laputa-note-path': '/vault/Projects/Alpha.md',
-        'text/plain': '/vault/Projects/Alpha.md',
-      }),
-    })
+    fireEvent.focus(screen.getByTestId('raw-editor-codemirror'))
 
-    expect(insertWikilinkAtCursorMock).toHaveBeenCalledWith('Before ', 'Before '.length, 'Projects/Alpha')
+    expect(insertPlainTextFromClipboardText('Plain\nText')).toBe(true)
+    expect(mockView.state.replaceSelection).toHaveBeenCalledWith('Plain\nText')
     expect(mockView.dispatch).toHaveBeenCalledWith({
-      changes: { from: 0, to: 'Before '.length, insert: 'Before [[Projects/Alpha]]' },
-      selection: { anchor: 'Before [[Projects/Alpha]]'.length },
+      changes: { from: 2, to: 5, insert: 'Plain\nText' },
+      selection: { anchor: 12 },
+      userEvent: 'input.paste',
     })
-    expect(onContentChange).toHaveBeenCalledWith('/vault/a.md', 'Before [[Projects/Alpha]]')
-    expect(trackEventMock).toHaveBeenCalledWith('wikilink_inserted')
-    expect(mockView.focus).toHaveBeenCalledTimes(1)
+    expect(mockView.focus).toHaveBeenCalledOnce()
   })
+
 })

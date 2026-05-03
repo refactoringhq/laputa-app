@@ -231,7 +231,7 @@ describe('resolveNewNote', () => {
 })
 
 describe('resolveNewType', () => {
-  it('creates a type entry', () => {
+  it('creates a type entry at the vault root', () => {
     const { entry, content } = resolveNewType({ typeName: 'Recipe', vaultPath: '/vault' })
     expect(entry.path).toBe('/vault/recipe.md')
     expect(entry.isA).toBe('Type')
@@ -270,6 +270,10 @@ describe('useNoteCreation hook', () => {
   })
 
   const tabDeps = { openTabWithContent }
+  const flushImmediateCreate = async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -289,10 +293,13 @@ describe('useNoteCreation hook', () => {
     expect(openTabWithContent.mock.calls[0][1]).toBe('---\ntitle: Test Note\ntype: Note\n---\n')
   })
 
-  it('handleCreateNoteImmediate generates timestamp-based title', () => {
+  it('handleCreateNoteImmediate generates timestamp-based title', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
-    act(() => { result.current.handleCreateNoteImmediate() })
+    await act(async () => {
+      result.current.handleCreateNoteImmediate()
+      await flushImmediateCreate()
+    })
     expect(addEntry).toHaveBeenCalledTimes(1)
     expect(addEntry.mock.calls[0][0].title).toBe('Untitled Note 1700000000')
     expect(addEntry.mock.calls[0][0].filename).toBe('untitled-note-1700000000.md')
@@ -301,17 +308,25 @@ describe('useNoteCreation hook', () => {
     vi.restoreAllMocks()
   })
 
-  it('handleCreateNoteImmediate generates unique names on rapid calls via timestamp', () => {
+  it('handleCreateNoteImmediate generates unique names on rapid calls via timestamp', async () => {
     vi.useFakeTimers()
     let ts = 1700000000000
     vi.spyOn(Date, 'now').mockImplementation(() => { ts += 1000; return ts })
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
-    act(() => {
+    await act(async () => {
       result.current.handleCreateNoteImmediate()
       result.current.handleCreateNoteImmediate()
       result.current.handleCreateNoteImmediate()
+      await flushImmediateCreate()
     })
-    act(() => { vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS * 2) })
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
+      await flushImmediateCreate()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
+      await flushImmediateCreate()
+    })
     const filenames = addEntry.mock.calls.map(([e]: [VaultEntry]) => e.filename)
     // Each call consumes Date.now() multiple times (filename + buildNewEntry), so just verify uniqueness
     expect(new Set(filenames).size).toBe(3)
@@ -321,16 +336,20 @@ describe('useNoteCreation hook', () => {
     vi.restoreAllMocks()
   })
 
-  it('handleCreateNoteImmediate avoids filename collisions when called twice in the same second', () => {
+  it('handleCreateNoteImmediate avoids filename collisions when called twice in the same second', async () => {
     vi.useFakeTimers()
     vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
 
-    act(() => {
+    await act(async () => {
       result.current.handleCreateNoteImmediate()
       result.current.handleCreateNoteImmediate()
+      await flushImmediateCreate()
     })
-    act(() => { vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS) })
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
+      await flushImmediateCreate()
+    })
 
     const filenames = addEntry.mock.calls.map(([entry]: [VaultEntry]) => entry.filename)
     expect(filenames).toEqual([
@@ -341,66 +360,190 @@ describe('useNoteCreation hook', () => {
     vi.restoreAllMocks()
   })
 
-  it('serializes rapid immediate-create bursts after the first note', () => {
+  it('serializes rapid immediate-create bursts after the first note', async () => {
     vi.useFakeTimers()
     vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
 
-    act(() => {
+    await act(async () => {
       result.current.handleCreateNoteImmediate()
       result.current.handleCreateNoteImmediate()
       result.current.handleCreateNoteImmediate()
+      await flushImmediateCreate()
     })
 
     expect(addEntry).toHaveBeenCalledTimes(1)
 
-    act(() => { vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS) })
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
+      await flushImmediateCreate()
+    })
     expect(addEntry).toHaveBeenCalledTimes(2)
 
-    act(() => { vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS) })
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
+      await flushImmediateCreate()
+    })
     expect(addEntry).toHaveBeenCalledTimes(3)
 
     vi.restoreAllMocks()
   })
 
-  it('handleCreateNoteImmediate accepts custom type', () => {
+  it('waits for slow immediate note persistence before starting the queued create', async () => {
+    vi.useFakeTimers()
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
+    let resolveFirstWrite: () => void
+    const firstWrite = new Promise<void>((resolve) => {
+      resolveFirstWrite = resolve
+    })
+    vi.mocked(invoke)
+      .mockImplementationOnce(() => firstWrite)
+      .mockResolvedValue(undefined)
+    const createCalls = () => vi.mocked(invoke).mock.calls.filter(([command]) => command === 'create_note_content')
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
-    act(() => { result.current.handleCreateNoteImmediate('Project') })
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate()
+      result.current.handleCreateNoteImmediate()
+      await flushImmediateCreate()
+    })
+
+    expect(createCalls()).toHaveLength(1)
+
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS * 3)
+      await flushImmediateCreate()
+    })
+
+    expect(createCalls()).toHaveLength(1)
+
+    await act(async () => {
+      resolveFirstWrite()
+      await flushImmediateCreate()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(RAPID_CREATE_NOTE_SETTLE_MS)
+      await flushImmediateCreate()
+    })
+
+    expect(createCalls()).toHaveLength(2)
+    expect(addEntry).toHaveBeenCalledTimes(2)
+    vi.restoreAllMocks()
+  })
+
+  it('handleCreateNoteImmediate accepts custom type', async () => {
+    const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
+    await act(async () => {
+      result.current.handleCreateNoteImmediate('Project')
+      await flushImmediateCreate()
+    })
     expect(addEntry.mock.calls[0][0].isA).toBe('Project')
     expect(addEntry.mock.calls[0][0].status).toBeNull()
     expect(openTabWithContent.mock.calls[0][1]).toBe('---\ntype: Project\n---\n\n# \n\n## Objective\n\n\n\n## Key Results\n\n\n\n## Notes\n\n')
   })
 
-  it('handleCreateNoteImmediate slugifies custom type names for filenames', () => {
+  it('handleCreateNoteImmediate persists typed notes under Windows verbatim vault roots', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValueOnce(undefined)
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
+    const windowsVaultPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria`
+    const createdPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria/untitled-project-1700000000.md`
+    const { result } = renderHook(() => useNoteCreation({
+      ...makeConfig(),
+      vaultPath: windowsVaultPath,
+    }, tabDeps))
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate('Project')
+      await flushImmediateCreate()
+    })
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: createdPath,
+      content: expect.stringContaining('type: Project'),
+    })
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
+      path: createdPath,
+      filename: 'untitled-project-1700000000.md',
+      isA: 'Project',
+    }))
+    expect(setToastMessage).not.toHaveBeenCalled()
+    vi.restoreAllMocks()
+  })
+
+  it('handleCreateNoteImmediate slugifies custom type names for filenames', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
 
-    act(() => {
+    await act(async () => {
       result.current.handleCreateNoteImmediate('Q&A / Ops')
+      await flushImmediateCreate()
     })
 
     expect(addEntry.mock.calls[0][0].filename).toBe('untitled-q-a-ops-1700000000.md')
     vi.restoreAllMocks()
   })
 
-  it('handleCreateNoteImmediate tracks unsaved state', async () => {
-    const trackUnsaved = vi.fn()
-    const markContentPending = vi.fn()
-    const config = makeConfig()
-    config.trackUnsaved = trackUnsaved
-    config.markContentPending = markContentPending
+  it('handleCreateNoteImmediate creates the backing file before opening the note', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValueOnce(undefined)
+    const addPendingSave = vi.fn()
+    const removePendingSave = vi.fn()
+    const onNewNotePersisted = vi.fn()
+    const config = {
+      ...makeConfig(),
+      addPendingSave,
+      removePendingSave,
+      onNewNotePersisted,
+    }
     const { result } = renderHook(() => useNoteCreation(config, tabDeps))
-    await act(async () => { result.current.handleCreateNoteImmediate() })
-    expect(trackUnsaved).toHaveBeenCalledWith(expect.stringMatching(/untitled-note-\d+\.md$/))
-    expect(markContentPending).toHaveBeenCalled()
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate()
+      await flushImmediateCreate()
+    })
+
+    const createdPath = expect.stringMatching(/untitled-note-\d+\.md$/)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: createdPath,
+      content: expect.stringContaining('type: Note'),
+    })
+    expect(addPendingSave).toHaveBeenCalledWith(createdPath)
+    expect(removePendingSave).toHaveBeenCalledWith(createdPath)
+    expect(onNewNotePersisted).toHaveBeenCalledOnce()
+    expect(onNewNotePersisted).toHaveBeenCalledWith(createdPath)
+    expect(addEntry).toHaveBeenCalledTimes(1)
+    expect(openTabWithContent).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(invoke).mock.invocationCallOrder[0]).toBeLessThan(
+      openTabWithContent.mock.invocationCallOrder[0],
+    )
   })
 
-  it('handleCreateNoteImmediate requests editor focus for the new path', () => {
+  it('handleCreateNoteImmediate does not open an optimistic note when disk creation fails', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockRejectedValueOnce(new Error('disk full'))
+    const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate()
+      await flushImmediateCreate()
+    })
+
+    expect(addEntry).not.toHaveBeenCalled()
+    expect(openTabWithContent).not.toHaveBeenCalled()
+    expect(setToastMessage).toHaveBeenCalledWith('Failed to create note — disk write error')
+  })
+
+  it('handleCreateNoteImmediate requests editor focus for the new path', async () => {
     const focusListener = vi.fn()
     window.addEventListener('laputa:focus-editor', focusListener)
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
 
-    act(() => { result.current.handleCreateNoteImmediate() })
+    await act(async () => {
+      result.current.handleCreateNoteImmediate()
+      await flushImmediateCreate()
+    })
 
     expect(focusListener).toHaveBeenCalledTimes(1)
     const event = focusListener.mock.calls[0][0] as CustomEvent
@@ -410,16 +553,59 @@ describe('useNoteCreation hook', () => {
     window.removeEventListener('laputa:focus-editor', focusListener)
   })
 
-  it('handleCreateType creates type entry', () => {
+  it('handleCreateType creates type entry', async () => {
     const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
-    act(() => { result.current.handleCreateType('Recipe') })
+    let created = false
+    await act(async () => {
+      created = await result.current.handleCreateType('Recipe')
+    })
+
+    expect(created).toBe(true)
     expect(addEntry.mock.calls[0][0].isA).toBe('Type')
     expect(addEntry.mock.calls[0][0].title).toBe('Recipe')
   })
 
-  it('handleCreateType blocks when a non-type file already uses the target filename', async () => {
-    const existing = makeEntry({ path: '/test/vault/briefing.md', filename: 'briefing.md', title: 'Briefing', isA: 'Note' })
-    const { result } = renderHook(() => useNoteCreation(makeConfig([existing]), tabDeps))
+  it('handleCreateType persists type files under Windows verbatim vault roots', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke)
+      .mockRejectedValueOnce(new Error('not found'))
+      .mockResolvedValueOnce(undefined)
+    const onTypeStateChanged = vi.fn()
+    const windowsVaultPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria`
+    const createdPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria/recipe.md`
+    const { result } = renderHook(() => useNoteCreation({
+      ...makeConfig(),
+      vaultPath: windowsVaultPath,
+      onTypeStateChanged,
+    }, tabDeps))
+
+    let created = false
+    await act(async () => {
+      created = await result.current.handleCreateType('Recipe')
+    })
+
+    expect(created).toBe(true)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_note_content', {
+      path: createdPath,
+    })
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: createdPath,
+      content: '---\ntype: Type\n---\n\n# Recipe\n',
+    })
+    expect(openTabWithContent).toHaveBeenCalledWith(expect.objectContaining({
+      path: createdPath,
+      filename: 'recipe.md',
+      title: 'Recipe',
+      isA: 'Type',
+    }), expect.stringContaining('type: Type'))
+    expect(onTypeStateChanged).toHaveBeenCalledOnce()
+    expect(setToastMessage).not.toHaveBeenCalled()
+  })
+
+  it('handleCreateType blocks when the target type file already exists', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValueOnce('---\ntype: Note\n---\n# Existing Briefing\n')
+    const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
 
     let created = true
     await act(async () => {
@@ -427,9 +613,91 @@ describe('useNoteCreation hook', () => {
     })
 
     expect(created).toBe(false)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_note_content', {
+      path: '/test/vault/briefing.md',
+    })
+    expect(vi.mocked(invoke).mock.calls.some(([command]) => command === 'create_note_content')).toBe(false)
     expect(addEntry).not.toHaveBeenCalled()
     expect(openTabWithContent).not.toHaveBeenCalled()
+    expect(removeEntry).not.toHaveBeenCalled()
     expect(setToastMessage).toHaveBeenCalledWith('Cannot create type "Briefing" because briefing.md already exists')
+  })
+
+  it('handleCreateType blocks the built-in Note type when stale entries omit existing note.md', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValueOnce('---\ntype: Type\n---\n# Note\n')
+    const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
+
+    let created = true
+    await act(async () => {
+      created = await result.current.handleCreateType('Note')
+    })
+
+    expect(created).toBe(false)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_note_content', {
+      path: '/test/vault/note.md',
+    })
+    expect(vi.mocked(invoke).mock.calls.some(([command]) => command === 'create_note_content')).toBe(false)
+    expect(addEntry).not.toHaveBeenCalled()
+    expect(openTabWithContent).not.toHaveBeenCalled()
+    expect(setToastMessage).toHaveBeenCalledWith('Cannot create type "Note" because note.md already exists')
+  })
+
+  it('handleCreateType lets disk creation decide when a stale entry collides with the target type path', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke)
+      .mockRejectedValueOnce(new Error('not found'))
+      .mockResolvedValueOnce(undefined)
+    const staleEntry = makeEntry({
+      path: '/test/vault/pttep.md',
+      filename: 'pttep.md',
+      title: 'Stale cache entry',
+      isA: 'Note',
+    })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([staleEntry]), tabDeps))
+
+    let created = false
+    await act(async () => {
+      created = await result.current.handleCreateType('PTTEP')
+    })
+
+    expect(created).toBe(true)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_note_content', {
+      path: '/test/vault/pttep.md',
+    })
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: '/test/vault/pttep.md',
+      content: expect.stringContaining('type: Type'),
+    })
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/test/vault/pttep.md',
+      filename: 'pttep.md',
+      title: 'PTTEP',
+      isA: 'Type',
+    }))
+    expect(setToastMessage).not.toHaveBeenCalled()
+  })
+
+  it('handleCreateType writes new type entries to the vault root even when older type entries live in a folder', async () => {
+    const existingType = makeEntry({
+      path: '/test/vault/types/project.md',
+      filename: 'project.md',
+      title: 'Project',
+      isA: 'Type',
+    })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([existingType]), tabDeps))
+
+    await act(async () => {
+      await result.current.handleCreateType('Hotel')
+    })
+
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/test/vault/hotel.md',
+      filename: 'hotel.md',
+      title: 'Hotel',
+      isA: 'Type',
+    }))
+    expect(setToastMessage).not.toHaveBeenCalled()
   })
 
   it('handleCreateType ignores an existing untitled draft when a unicode filename is unique', async () => {

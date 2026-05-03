@@ -6,10 +6,13 @@ import { queueAiPrompt, requestOpenAiChat } from '../utils/aiPromptBridge'
 import type { NoteReference } from '../utils/ai-context'
 import type { CommandAction, CommandGroup } from '../hooks/useCommandRegistry'
 import { groupSortKey } from '../hooks/useCommandRegistry'
+import { localizeCommandGroup } from '../hooks/commands/localizeCommands'
 import { rememberFeedbackDialogOpener } from '../lib/feedbackDialogOpener'
 import { createTranslator, type AppLocale } from '../lib/i18n'
+import { formatDroppedPathList } from './inlineWikilinkDropText'
 import { CommandPaletteAiMode } from './CommandPaletteAiMode'
 import { Input } from './ui/input'
+import { useNativePathDrop } from './useNativePathDrop'
 
 interface CommandPaletteProps {
   open: boolean
@@ -117,6 +120,15 @@ function rememberCommandOpener(
   rememberFeedbackDialogOpener(target instanceof HTMLElement ? target : null)
 }
 
+function inputSelectionRange(input: HTMLInputElement, fallbackIndex: number) {
+  const start = input.selectionStart ?? fallbackIndex
+  const end = input.selectionEnd ?? start
+  return {
+    start: Math.max(0, start),
+    end: Math.max(start, end),
+  }
+}
+
 function CommandPaletteInput({
   inputRef,
   query,
@@ -128,6 +140,27 @@ function CommandPaletteInput({
   onChange: (value: string) => void
   placeholder: string
 }) {
+  const insertNativePathDrop = (paths: string[]) => {
+    const droppedPathText = formatDroppedPathList(paths)
+    const input = inputRef.current
+    if (!droppedPathText || !input) return
+
+    const { start, end } = inputSelectionRange(input, query.length)
+    const nextValue = `${query.slice(0, start)}${droppedPathText}${query.slice(end)}`
+    const nextCursor = start + droppedPathText.length
+
+    onChange(nextValue)
+    window.requestAnimationFrame(() => {
+      input.focus()
+      input.setSelectionRange(nextCursor, nextCursor)
+    })
+  }
+
+  useNativePathDrop({
+    targetRef: inputRef,
+    onPathDrop: insertNativePathDrop,
+  })
+
   return (
     <Input
       ref={inputRef}
@@ -149,6 +182,7 @@ function CommandPaletteResults({
   selectedIndex,
   listRef,
   emptyText,
+  locale,
   onHover,
   onSelect,
 }: {
@@ -156,6 +190,7 @@ function CommandPaletteResults({
   selectedIndex: number
   listRef: React.RefObject<HTMLDivElement | null>
   emptyText: string
+  locale: AppLocale
   onHover: (index: number) => void
   onSelect: (command: CommandAction) => void
 }) {
@@ -189,7 +224,7 @@ function CommandPaletteResults({
         return (
           <div key={group}>
             <div className="px-4 pb-1 pt-2 text-[11px] font-medium text-muted-foreground">
-              {group}
+              {localizeCommandGroup(group, locale)}
             </div>
             {items.map((command, index) => {
               const globalIndex = startIndex + index
@@ -364,6 +399,7 @@ function OpenCommandPalette({
 
   return (
     <div
+      data-command-palette="true"
       className="fixed inset-0 z-[1000] flex justify-center bg-[var(--shadow-dialog)] pt-[15vh]"
       onClick={onClose}
     >
@@ -398,6 +434,7 @@ function OpenCommandPalette({
               selectedIndex={selectedIndex}
               listRef={listRef}
               emptyText={t('command.noMatches')}
+              locale={locale}
               onHover={setSelectedIndex}
               onSelect={handleSelectCommand}
             />

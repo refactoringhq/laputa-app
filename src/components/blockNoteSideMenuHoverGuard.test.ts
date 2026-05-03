@@ -12,6 +12,43 @@ function setRect(element: HTMLElement, nextRect: DOMRect) {
   element.getBoundingClientRect = () => nextRect
 }
 
+function blockNoteHoverFixture() {
+  const container = document.createElement('div')
+  const editor = document.createElement('div')
+  editor.className = 'bn-editor'
+  container.appendChild(editor)
+  document.body.appendChild(container)
+
+  const sideMenu = document.createElement('div')
+  sideMenu.className = 'bn-side-menu'
+  const sideMenuButton = document.createElement('button')
+  sideMenu.appendChild(sideMenuButton)
+  document.body.appendChild(sideMenu)
+
+  setRect(editor, rect(240, 90, 420, 32))
+  setRect(sideMenu, rect(190, 96, 32, 24))
+
+  return { container, sideMenuButton }
+}
+
+function expectHoverSuppression(options: {
+  eventTarget?: EventTarget
+  point: { x: number; y: number }
+  hasPressedButton?: boolean
+  expected: boolean
+}) {
+  const { container, sideMenuButton } = blockNoteHoverFixture()
+  expect(
+    shouldSuppressBlockNoteHandleHoverUpdate({
+      eventTarget: options.eventTarget ?? sideMenuButton,
+      point: options.point,
+      container,
+      doc: document,
+      hasPressedButton: options.hasPressedButton,
+    }),
+  ).toBe(options.expected)
+}
+
 describe('blockNoteSideMenuHoverGuard', () => {
   it('treats the side-menu gutter as part of the hover bridge', () => {
     expect(
@@ -34,76 +71,30 @@ describe('blockNoteSideMenuHoverGuard', () => {
   })
 
   it('suppresses hover updates when the pointer is already over the side menu', () => {
-    const container = document.createElement('div')
-    const editor = document.createElement('div')
-    editor.className = 'bn-editor'
-    container.appendChild(editor)
-    document.body.appendChild(container)
-
-    const sideMenu = document.createElement('div')
-    sideMenu.className = 'bn-side-menu'
-    const sideMenuButton = document.createElement('button')
-    sideMenu.appendChild(sideMenuButton)
-    document.body.appendChild(sideMenu)
-
-    setRect(editor, rect(240, 90, 420, 32))
-    setRect(sideMenu, rect(190, 96, 32, 24))
-
-    expect(
-      shouldSuppressBlockNoteHandleHoverUpdate({
-        eventTarget: sideMenuButton,
-        point: { x: 200, y: 110 },
-        container,
-        doc: document,
-      }),
-    ).toBe(true)
+    expectHoverSuppression({ point: { x: 200, y: 110 }, expected: true })
   })
 
   it('suppresses hover updates while the pointer crosses the handle bridge', () => {
-    const container = document.createElement('div')
-    const editor = document.createElement('div')
-    editor.className = 'bn-editor'
-    container.appendChild(editor)
-    document.body.appendChild(container)
+    expectHoverSuppression({
+      eventTarget: document.body,
+      point: { x: 226, y: 116 },
+      expected: true,
+    })
+  })
 
-    const sideMenu = document.createElement('div')
-    sideMenu.className = 'bn-side-menu'
-    document.body.appendChild(sideMenu)
-
-    setRect(editor, rect(240, 90, 420, 32))
-    setRect(sideMenu, rect(190, 96, 32, 24))
-
-    expect(
-      shouldSuppressBlockNoteHandleHoverUpdate({
-        eventTarget: document.body,
-        point: { x: 226, y: 116 },
-        container,
-        doc: document,
-      }),
-    ).toBe(true)
+  it('leaves block handle drag movement alone', () => {
+    expectHoverSuppression({
+      point: { x: 200, y: 110 },
+      hasPressedButton: true,
+      expected: false,
+    })
   })
 
   it('leaves unrelated pointer movement alone', () => {
-    const container = document.createElement('div')
-    const editor = document.createElement('div')
-    editor.className = 'bn-editor'
-    container.appendChild(editor)
-    document.body.appendChild(container)
-
-    const sideMenu = document.createElement('div')
-    sideMenu.className = 'bn-side-menu'
-    document.body.appendChild(sideMenu)
-
-    setRect(editor, rect(240, 90, 420, 32))
-    setRect(sideMenu, rect(190, 96, 32, 24))
-
-    expect(
-      shouldSuppressBlockNoteHandleHoverUpdate({
-        eventTarget: document.body,
-        point: { x: 360, y: 160 },
-        container,
-        doc: document,
-      }),
-    ).toBe(false)
+    expectHoverSuppression({
+      eventTarget: document.body,
+      point: { x: 360, y: 160 },
+      expected: false,
+    })
   })
 })

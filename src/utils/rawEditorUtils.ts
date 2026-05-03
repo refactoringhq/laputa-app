@@ -114,7 +114,7 @@ export function getRawEditorDropdownPosition(
 export function detectYamlError(content: string): string | null {
   if (!content.startsWith('---')) return null
   const rest = content.slice(3)
-  const closeIdx = rest.search(/\n---(\n|$)/)
+  const closeIdx = rest.search(/(?:^|\r?\n)---(?:\r?\n|$)/)
   if (closeIdx === -1) return 'Unclosed frontmatter block — add a closing --- line'
   const block = rest.slice(0, closeIdx)
   if (/^\t/m.test(block)) return 'YAML frontmatter contains tab indentation — use spaces'

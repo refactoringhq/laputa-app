@@ -18,6 +18,7 @@ export interface AiAction {
 export interface AiMessageProps {
   userMessage: string
   references?: NoteReference[]
+  localMarker?: string
   reasoning?: string
   reasoningDone?: boolean
   actions: AiAction[]
@@ -25,6 +26,18 @@ export interface AiMessageProps {
   isStreaming?: boolean
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
+}
+
+function LocalMarker({ text }: { text: string }) {
+  return (
+    <div
+      className="mx-auto text-center text-muted-foreground"
+      style={{ fontSize: 11, margin: '8px 0 16px', maxWidth: '85%' }}
+      data-testid="ai-local-marker"
+    >
+      {text}
+    </div>
+  )
 }
 
 function ReferencePill({ reference, onClick }: {
@@ -176,7 +189,15 @@ function StreamingIndicator() {
   )
 }
 
-export function AiMessage({ userMessage, references, reasoning, reasoningDone, actions, response, isStreaming, onOpenNote, onNavigateWikilink }: AiMessageProps) {
+export function AiMessage(props: AiMessageProps) {
+  if (props.localMarker) {
+    return <LocalMarker text={props.localMarker} />
+  }
+
+  return <ConversationMessage {...props} />
+}
+
+function ConversationMessage({ userMessage, references, reasoning, reasoningDone, actions, response, isStreaming, onOpenNote, onNavigateWikilink }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState(false)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())

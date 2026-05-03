@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, within } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { Sidebar } from './Sidebar'
 import type { VaultEntry, SidebarSelection } from '../types'
@@ -710,7 +711,7 @@ describe('Sidebar', () => {
           wordCount: 0,
           relationships: {},
           icon: null,
-          color: 'orange',
+          color: 'cyan',
           order: null,
           sidebarLabel: null,
           template: null, sort: null,
@@ -749,7 +750,7 @@ describe('Sidebar', () => {
       fireEvent.click(screen.getByTitle('Customize sections'))
 
       expect(screen.getByLabelText('Toggle Projects').querySelector('svg')).toHaveStyle({ color: 'var(--accent-green)' })
-      expect(screen.getByLabelText('Toggle Recipes').querySelector('svg')).toHaveStyle({ color: 'var(--accent-orange)' })
+      expect(screen.getByLabelText('Toggle Recipes').querySelector('svg')).toHaveStyle({ color: 'rgb(0, 255, 255)' })
     })
 
     it('calls onToggleTypeVisibility when toggling a section in the popover', () => {
@@ -825,63 +826,6 @@ describe('Sidebar', () => {
       render(<Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} />)
       const dragHandles = screen.queryAllByLabelText(/^Drag to reorder/)
       expect(dragHandles.length).toBe(0)
-    })
-  })
-
-  describe('rename section via context menu', () => {
-    it('shows Rename section option in context menu on right-click', () => {
-      render(<Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} />)
-      const projectHeader = screen.getByText('Projects').closest('div')!
-      fireEvent.contextMenu(projectHeader)
-      expect(screen.getByText('Rename section…')).toBeInTheDocument()
-    })
-
-    it('shows Customize icon option in context menu on right-click', () => {
-      render(<Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} />)
-      const projectHeader = screen.getByText('Projects').closest('div')!
-      fireEvent.contextMenu(projectHeader)
-      expect(screen.getByText('Customize icon & color…')).toBeInTheDocument()
-    })
-
-    it('shows inline input when Rename section is clicked', () => {
-      render(<Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} />)
-      const projectHeader = screen.getByText('Projects').closest('div')!
-      fireEvent.contextMenu(projectHeader)
-      fireEvent.click(screen.getByText('Rename section…'))
-      expect(screen.getByRole('textbox', { name: 'Section name' })).toBeInTheDocument()
-    })
-
-    it('inline input is pre-filled with current label', () => {
-      render(<Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} />)
-      const projectHeader = screen.getByText('Projects').closest('div')!
-      fireEvent.contextMenu(projectHeader)
-      fireEvent.click(screen.getByText('Rename section…'))
-      const input = screen.getByRole('textbox', { name: 'Section name' }) as HTMLInputElement
-      expect(input.value).toBe('Projects')
-    })
-
-    it('calls onRenameSection with new name on Enter', () => {
-      const onRenameSection = vi.fn()
-      render(<Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} onRenameSection={onRenameSection} />)
-      const projectHeader = screen.getByText('Projects').closest('div')!
-      fireEvent.contextMenu(projectHeader)
-      fireEvent.click(screen.getByText('Rename section…'))
-      const input = screen.getByRole('textbox', { name: 'Section name' })
-      fireEvent.change(input, { target: { value: 'My Projects' } })
-      fireEvent.keyDown(input, { key: 'Enter' })
-      expect(onRenameSection).toHaveBeenCalledWith('Project', 'My Projects')
-    })
-
-    it('cancels rename on Escape and hides input', () => {
-      const onRenameSection = vi.fn()
-      render(<Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} onRenameSection={onRenameSection} />)
-      const projectHeader = screen.getByText('Projects').closest('div')!
-      fireEvent.contextMenu(projectHeader)
-      fireEvent.click(screen.getByText('Rename section…'))
-      const input = screen.getByRole('textbox', { name: 'Section name' })
-      fireEvent.keyDown(input, { key: 'Escape' })
-      expect(onRenameSection).not.toHaveBeenCalled()
-      expect(screen.queryByRole('textbox', { name: 'Section name' })).not.toBeInTheDocument()
     })
   })
 
@@ -1226,7 +1170,7 @@ describe('Sidebar', () => {
       const favoritesHeader = screen.getByText('FAVORITES').closest('div') as HTMLElement
       const countChip = within(favoritesHeader).getByTestId('sidebar-count-chip')
 
-      expect(favoritesHeader).toHaveStyle({ padding: '8px 8px 8px 16px' })
+      expect(favoritesHeader).toHaveStyle({ padding: '8px 8px 8px 12px' })
       expect(countChip).toHaveStyle({
         background: 'var(--muted)',
         height: '18px',
@@ -1297,7 +1241,7 @@ describe('Sidebar', () => {
     })
   })
 
-  describe('view edit button', () => {
+  describe('view row actions', () => {
     const mockViews = [
       {
         filename: 'active-projects.yml',
@@ -1311,27 +1255,97 @@ describe('Sidebar', () => {
       },
     ]
 
-    it('renders edit button for each view item when onEditView is provided', () => {
+    function renderViewActions(overrides: Partial<ComponentProps<typeof Sidebar>> = {}) {
       render(
-        <Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} views={mockViews} onEditView={() => {}} onDeleteView={() => {}} />
+        <Sidebar
+          entries={mockEntries}
+          selection={defaultSelection}
+          onSelect={() => {}}
+          views={mockViews}
+          onEditView={() => {}}
+          onDeleteView={() => {}}
+          onUpdateViewDefinition={() => {}}
+          {...overrides}
+        />
       )
-      expect(screen.getByTitle('Edit view')).toBeInTheDocument()
-    })
+    }
 
-    it('does not render edit button when onEditView is not provided', () => {
-      render(
-        <Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} views={mockViews} onDeleteView={() => {}} />
-      )
+    function openViewContextMenu() {
+      fireEvent.contextMenu(screen.getByText('Active Projects').closest('[class*="cursor-pointer"]')!)
+    }
+
+    it('keeps edit and delete off the hover row controls', () => {
+      renderViewActions()
       expect(screen.queryByTitle('Edit view')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('Delete view')).not.toBeInTheDocument()
     })
 
-    it('calls onEditView with correct filename when clicked', () => {
+    it('shows View-specific context menu labels on right-click', () => {
+      renderViewActions()
+      openViewContextMenu()
+
+      expect(screen.getByText('Edit view')).toBeInTheDocument()
+      expect(screen.queryByText('Rename view…')).not.toBeInTheDocument()
+      expect(screen.getByText('Customize icon & color…')).toBeInTheDocument()
+      expect(screen.getByText('Delete view')).toBeInTheDocument()
+    })
+
+    it('opens and dismisses the View context menu from the keyboard', () => {
+      renderViewActions()
+      const row = screen.getByText('Active Projects').closest('[class*="cursor-pointer"]')!
+      fireEvent.keyDown(row, { key: 'F10', shiftKey: true })
+      expect(screen.getByText('Edit view')).toBeInTheDocument()
+
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.queryByText('Edit view')).not.toBeInTheDocument()
+    })
+
+    it('calls onEditView from the context menu', () => {
       const onEditView = vi.fn()
-      render(
-        <Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} views={mockViews} onEditView={onEditView} onDeleteView={() => {}} />
-      )
-      fireEvent.click(screen.getByTitle('Edit view'))
+      renderViewActions({ onEditView })
+      openViewContextMenu()
+      fireEvent.click(screen.getByText('Edit view'))
       expect(onEditView).toHaveBeenCalledWith('active-projects.yml')
+    })
+
+    it('starts inline rename when the view row is double-clicked', () => {
+      renderViewActions()
+      fireEvent.doubleClick(screen.getByText('Active Projects').closest('[class*="cursor-pointer"]')!)
+      expect(screen.getByRole('textbox', { name: 'View name' })).toHaveValue('Active Projects')
+    })
+
+    it('submits the renamed view on Enter', () => {
+      const onUpdateViewDefinition = vi.fn()
+      renderViewActions({ onUpdateViewDefinition })
+      fireEvent.doubleClick(screen.getByText('Active Projects').closest('[class*="cursor-pointer"]')!)
+
+      const input = screen.getByRole('textbox', { name: 'View name' })
+      fireEvent.change(input, { target: { value: 'Today Focus' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(onUpdateViewDefinition).toHaveBeenCalledWith('active-projects.yml', { name: 'Today Focus' })
+    })
+
+    it('opens the shared appearance panel from the context menu', () => {
+      const onUpdateViewDefinition = vi.fn()
+      renderViewActions({ onUpdateViewDefinition })
+      openViewContextMenu()
+      fireEvent.click(screen.getByText('Customize icon & color…'))
+
+      fireEvent.click(screen.getByTitle('Blue'))
+      fireEvent.change(screen.getByPlaceholderText('Search icons…'), { target: { value: 'book' } })
+      fireEvent.click(screen.getByTitle('book'))
+
+      expect(onUpdateViewDefinition).toHaveBeenCalledWith('active-projects.yml', { color: 'blue' })
+      expect(onUpdateViewDefinition).toHaveBeenCalledWith('active-projects.yml', { icon: 'book' })
+    })
+
+    it('calls onDeleteView from the context menu', () => {
+      const onDeleteView = vi.fn()
+      renderViewActions({ onDeleteView })
+      openViewContextMenu()
+      fireEvent.click(screen.getByText('Delete view'))
+      expect(onDeleteView).toHaveBeenCalledWith('active-projects.yml')
     })
   })
 
@@ -1384,6 +1398,22 @@ describe('Sidebar', () => {
       },
     ]
 
+    it('does not add visible reorder controls to saved view rows', () => {
+      render(
+        <Sidebar
+          entries={mockEntries}
+          selection={defaultSelection}
+          onSelect={() => {}}
+          views={mockViews}
+          onReorderViews={vi.fn()}
+        />
+      )
+
+      expect(screen.queryByTitle('Move view up')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('Move view down')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('Reorder view')).not.toBeInTheDocument()
+    })
+
     it('shows note count chip for each view matching the filter results', () => {
       render(
         <Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} views={mockViews} />
@@ -1411,7 +1441,7 @@ describe('Sidebar', () => {
       const navItem = viewLabel.closest('[class*="cursor-pointer"]') as HTMLElement
       const countChip = within(navItem).getByTestId('view-count-chip')
 
-      expect(navItem).toHaveStyle({ padding: '6px 8px 6px 16px' })
+      expect(navItem).toHaveStyle({ padding: '6px 8px 6px 12px' })
       expect(countChip).toHaveStyle({
         background: 'var(--muted)',
         height: '20px',
@@ -1430,8 +1460,8 @@ describe('Sidebar', () => {
       const viewItem = screen.getByText('Active Projects').closest('[class*="cursor-pointer"]') as HTMLElement
       const viewCount = within(viewItem).getByTestId('view-count-chip')
 
-      expect(topNavItem).toHaveStyle({ padding: '6px 8px 6px 16px' })
-      expect(viewItem).toHaveStyle({ padding: '6px 8px 6px 16px' })
+      expect(topNavItem).toHaveStyle({ padding: '6px 8px 6px 12px' })
+      expect(viewItem).toHaveStyle({ padding: '6px 8px 6px 12px' })
       expect(topNavCount).toHaveStyle({
         background: 'var(--muted)',
         height: '20px',
@@ -1465,6 +1495,69 @@ describe('Sidebar', () => {
       expect(screen.queryByText('rocket')).not.toBeInTheDocument()
     })
 
+    it('uses saved view color metadata for sidebar accents', () => {
+      const coloredViews = [{
+        filename: 'active-projects.yml',
+        definition: {
+          name: 'Active Projects',
+          icon: 'rocket',
+          color: 'blue',
+          sort: null,
+          filters: { all: [{ field: 'type', op: 'equals' as const, value: 'Project' }] },
+        },
+      }]
+
+      render(
+        <Sidebar
+          entries={mockEntries}
+          selection={{ kind: 'view', filename: 'active-projects.yml' }}
+          onSelect={() => {}}
+          views={coloredViews}
+        />
+      )
+
+      const navItem = screen.getByText('Active Projects').closest('[class*="cursor-pointer"]') as HTMLElement
+      const icon = navItem.querySelector('svg')
+      const countChip = within(navItem).getByTestId('view-count-chip')
+
+      expect(navItem).toHaveStyle({
+        background: 'var(--accent-blue-light)',
+        color: 'var(--accent-blue)',
+      })
+      expect(icon).toHaveStyle({ color: 'var(--accent-blue)' })
+      expect(countChip).toHaveStyle({
+        background: 'var(--accent-blue)',
+        color: 'var(--text-inverse)',
+      })
+    })
+
+    it('keeps the default active styling when a saved view color is invalid', () => {
+      const invalidColorViews = [{
+        filename: 'active-projects.yml',
+        definition: {
+          name: 'Active Projects',
+          icon: 'rocket',
+          color: 'not-a-token',
+          sort: null,
+          filters: { all: [{ field: 'type', op: 'equals' as const, value: 'Project' }] },
+        },
+      }]
+
+      render(
+        <Sidebar
+          entries={mockEntries}
+          selection={{ kind: 'view', filename: 'active-projects.yml' }}
+          onSelect={() => {}}
+          views={invalidColorViews}
+        />
+      )
+
+      const navItem = screen.getByText('Active Projects').closest('[class*="cursor-pointer"]') as HTMLElement
+
+      expect(navItem.className).toContain('text-primary')
+      expect(navItem.getAttribute('style')).not.toContain('--accent-')
+    })
+
     it('does not show count chip for views with 0 matching notes', () => {
       const emptyView = [{
         filename: 'empty.yml',
@@ -1485,7 +1578,7 @@ describe('Sidebar', () => {
       expect(viewContainer?.querySelector('span:last-child')?.textContent).not.toBe('0')
     })
 
-    it('adds hover and focus classes that hide the view count chip while showing the action buttons', () => {
+    it('keeps the view count chip visible because row actions live in the context menu', () => {
       render(
         <Sidebar
           entries={mockEntries}
@@ -1498,21 +1591,12 @@ describe('Sidebar', () => {
       )
 
       const label = screen.getByText('Active Projects')
-      const viewItem = label.closest('.group.relative') as HTMLElement
       const navItem = label.closest('[class*="cursor-pointer"]') as HTMLElement
       const countChip = within(navItem).getByTestId('view-count-chip')
       expect(countChip).toBeTruthy()
-      expect(countChip.className).toContain('transition-opacity')
-      expect(countChip.className).toContain('group-hover:opacity-0')
-      expect(countChip.className).toContain('group-focus-within:opacity-0')
-
-      const actionButton = within(viewItem).getByTitle('Edit view')
-      const actionContainer = actionButton.parentElement as HTMLElement
-      expect(actionContainer.className).toContain('pointer-events-none')
-      expect(actionContainer.className).toContain('group-hover:pointer-events-auto')
-      expect(actionContainer.className).toContain('group-focus-within:pointer-events-auto')
-      expect(actionContainer.className).toContain('group-hover:opacity-100')
-      expect(actionContainer.className).toContain('group-focus-within:opacity-100')
+      expect(countChip.className).not.toContain('group-hover:opacity-0')
+      expect(screen.queryByTitle('Edit view')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('Delete view')).not.toBeInTheDocument()
     })
   })
 })

@@ -21,6 +21,7 @@ import {
   PROPERTY_PANEL_ROW_STYLE,
 } from './propertyPanelLayout'
 import { humanizePropertyKey } from '../utils/propertyLabels'
+import { translate, type AppLocale } from '../lib/i18n'
 import { canonicalSystemMetadataKey, hasSystemMetadataKey } from '../utils/systemMetadata'
 
 // eslint-disable-next-line react-refresh/only-export-components -- utility co-located with component
@@ -32,7 +33,7 @@ export function containsWikilinks(value: FrontmatterValue): boolean {
 
 const PROPERTY_ROW_CLASS_NAME = 'group/prop grid min-h-7 min-w-0 grid-cols-2 items-center gap-2 rounded px-1.5 outline-none transition-colors hover:bg-muted focus:bg-muted focus:ring-1 focus:ring-primary'
 
-function PropertyRow({ propKey, value, editingKey, displayMode, autoMode, vaultStatuses, vaultTags, onStartEdit, onSave, onSaveList, onUpdate, onDelete, onDisplayModeChange }: {
+function PropertyRow({ propKey, value, editingKey, displayMode, autoMode, vaultStatuses, vaultTags, locale, onStartEdit, onSave, onSaveList, onUpdate, onDelete, onDisplayModeChange }: {
   propKey: string; value: FrontmatterValue; editingKey: string | null
   displayMode: PropertyDisplayMode; autoMode: PropertyDisplayMode
   vaultStatuses: string[]; vaultTags: string[]
@@ -40,6 +41,7 @@ function PropertyRow({ propKey, value, editingKey, displayMode, autoMode, vaultS
   onSaveList: (key: string, items: string[]) => void
   onUpdate?: (key: string, value: FrontmatterValue) => void; onDelete?: (key: string) => void
   onDisplayModeChange: (key: string, mode: PropertyDisplayMode | null) => void
+  locale: AppLocale
 }) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.target !== e.currentTarget) {
@@ -57,7 +59,7 @@ function PropertyRow({ propKey, value, editingKey, displayMode, autoMode, vaultS
         <DisplayModeSelector propKey={propKey} currentMode={displayMode} autoMode={autoMode} onSelect={onDisplayModeChange} />
         <span className="min-w-0 flex-1 truncate">{humanizePropertyKey(propKey)}</span>
         {onDelete && (
-          <button className="border-none bg-transparent p-0 text-sm leading-none text-muted-foreground opacity-0 transition-all hover:text-destructive group-hover/prop:opacity-100" onClick={() => onDelete(propKey)} title="Delete property">&times;</button>
+          <button className="border-none bg-transparent p-0 text-sm leading-none text-muted-foreground opacity-0 transition-all hover:text-destructive group-hover/prop:opacity-100" onClick={() => onDelete(propKey)} title={translate(locale, 'inspector.properties.deleteProperty')}>&times;</button>
         )}
       </span>
       <div className="min-w-0">
@@ -67,7 +69,7 @@ function PropertyRow({ propKey, value, editingKey, displayMode, autoMode, vaultS
   )
 }
 
-function AddPropertyButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+function AddPropertyButton({ locale, onClick, disabled }: { locale: AppLocale; onClick: () => void; disabled: boolean }) {
   return (
     <Button
       type="button"
@@ -86,7 +88,7 @@ function AddPropertyButton({ onClick, disabled }: { onClick: () => void; disable
         >
           <Plus className="size-3.5" aria-hidden="true" />
         </span>
-        <span className="min-w-0 truncate">Add property</span>
+        <span className="min-w-0 truncate">{translate(locale, 'inspector.properties.addProperty')}</span>
       </span>
       <span aria-hidden="true" className={PROPERTY_PANEL_PLACEHOLDER_VALUE_CLASS_NAME} />
     </Button>
@@ -230,6 +232,7 @@ function useSuggestedPropertyActions({
 export function DynamicPropertiesPanel({
   entry, frontmatter, entries,
   onUpdateProperty, onDeleteProperty, onAddProperty, onNavigate, onCreateMissingType,
+  locale = 'en',
 }: {
   entry: VaultEntry
   content?: string | null
@@ -240,6 +243,7 @@ export function DynamicPropertiesPanel({
   onAddProperty?: (key: string, value: FrontmatterValue) => void
   onNavigate?: (target: string) => void
   onCreateMissingType?: (typeName: string) => boolean | void | Promise<boolean | void>
+  locale?: AppLocale
 }) {
   const {
     editingKey, setEditingKey, showAddDialog, setShowAddDialog, displayOverrides,
@@ -279,6 +283,7 @@ export function DynamicPropertiesPanel({
           onNavigate={onNavigate}
           missingTypeName={missingTypeName}
           onCreateMissingType={onCreateMissingType}
+          locale={locale}
         />
         {propertyEntries.map(([key, value]) => (
           <PropertyRow
@@ -290,6 +295,7 @@ export function DynamicPropertiesPanel({
             onSaveList={handleSaveList} onUpdate={onUpdateProperty}
             onDelete={onDeleteProperty}
             onDisplayModeChange={handleDisplayModeChange}
+            locale={locale}
           />
         ))}
         {pendingSuggestedKey && editingKey === pendingSuggestedKey && (
@@ -308,6 +314,7 @@ export function DynamicPropertiesPanel({
             onUpdate={undefined}
             onDelete={undefined}
             onDisplayModeChange={handleDisplayModeChange}
+            locale={locale}
           />
         )}
         {missingSuggested.map(({ key, label }) => (
@@ -320,6 +327,7 @@ export function DynamicPropertiesPanel({
         ))}
         {!showAddDialog && (
           <AddPropertyButton
+            locale={locale}
             onClick={() => setShowAddDialog(true)}
             disabled={!onAddProperty}
           />
@@ -330,6 +338,7 @@ export function DynamicPropertiesPanel({
           onAdd={handleAdd}
           onCancel={() => setShowAddDialog(false)}
           vaultStatuses={vaultStatuses}
+          locale={locale}
         />
       )}
     </div>

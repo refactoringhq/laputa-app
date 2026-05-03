@@ -1,11 +1,12 @@
 import type { VaultEntry } from '../../types'
 import { Info } from '@phosphor-icons/react'
 import { countWords } from '../../utils/wikilinks'
+import { getLocaleDateLocale, translate, type AppLocale } from '../../lib/i18n'
 
-function formatDate(timestamp: number | null): string {
+function formatDate(timestamp: number | null, locale: AppLocale): string {
   if (!timestamp) return '\u2014'
   const d = new Date(timestamp * 1000)
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  return d.toLocaleDateString(getLocaleDateLocale(locale), { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function formatFileSize(bytes: number): string {
@@ -25,19 +26,19 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function NoteInfoPanel({ entry, content }: { entry: VaultEntry; content: string | null }) {
+export function NoteInfoPanel({ entry, content, locale = 'en' }: { entry: VaultEntry; content: string | null; locale?: AppLocale }) {
   const wordCount = countWords(content ?? '')
   return (
     <div>
       <h4 className="font-mono-overline mb-2 flex items-center gap-1 text-muted-foreground">
         <Info size={12} className="shrink-0" />
-        Info
+        {translate(locale, 'inspector.info.title')}
       </h4>
       <div className="flex flex-col gap-1.5">
-        <InfoRow label="Modified" value={formatDate(entry.modifiedAt)} />
-        <InfoRow label="Created" value={formatDate(entry.createdAt)} />
-        <InfoRow label="Words" value={String(wordCount)} />
-        <InfoRow label="Size" value={formatFileSize(entry.fileSize)} />
+        <InfoRow label={translate(locale, 'inspector.info.modified')} value={formatDate(entry.modifiedAt, locale)} />
+        <InfoRow label={translate(locale, 'inspector.info.created')} value={formatDate(entry.createdAt, locale)} />
+        <InfoRow label={translate(locale, 'inspector.info.words')} value={String(wordCount)} />
+        <InfoRow label={translate(locale, 'inspector.info.size')} value={formatFileSize(entry.fileSize)} />
       </div>
     </div>
   )

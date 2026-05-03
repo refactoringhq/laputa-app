@@ -22,4 +22,29 @@ describe('useBuildNumber', () => {
     const { result } = renderHook(() => useBuildNumber())
     await waitFor(() => expect(result.current).toBe('b?'))
   })
+
+  it('ignores build number requests that settle after unmount', async () => {
+    const { mockInvoke } = await import('../mock-tauri')
+    let rejectBuildNumber!: (reason?: unknown) => void
+    vi.mocked(mockInvoke).mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        rejectBuildNumber = reject
+      }),
+    )
+
+    const { result, unmount } = renderHook(() => useBuildNumber())
+    unmount()
+
+    const originalWindow = globalThis.window
+    try {
+      vi.stubGlobal('window', undefined)
+      rejectBuildNumber(new Error('late failure'))
+      await Promise.resolve()
+      await Promise.resolve()
+    } finally {
+      vi.stubGlobal('window', originalWindow)
+    }
+
+    expect(result.current).toBeUndefined()
+  })
 })

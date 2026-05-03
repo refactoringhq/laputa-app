@@ -9,6 +9,7 @@ export const APP_STORAGE_KEYS = {
   legacyMigrationFlag: 'tolaria:legacy-storage-migrated',
   sortPreferences: 'tolaria-sort-preferences',
   sidebarCollapsed: 'tolaria:sidebar-collapsed',
+  layoutPanels: 'tolaria:layout-panels',
   welcomeDismissed: 'tolaria_welcome_dismissed',
 } as const
 
@@ -22,6 +23,7 @@ export const LEGACY_APP_STORAGE_KEYS = {
   configMigrationFlag: 'laputa:config-migrated-to-vault',
   sortPreferences: 'laputa-sort-preferences',
   sidebarCollapsed: 'laputa:sidebar-collapsed',
+  layoutPanels: 'laputa:layout-panels',
   welcomeDismissed: 'laputa_welcome_dismissed',
 } as const
 
@@ -37,6 +39,7 @@ const MIGRATABLE_STORAGE_KEYS: MigratableStorageKey[] = [
   'configMigrationFlag',
   'sortPreferences',
   'sidebarCollapsed',
+  'layoutPanels',
   'welcomeDismissed',
 ]
 

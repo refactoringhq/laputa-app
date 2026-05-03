@@ -71,3 +71,29 @@ fn ignores_unknown_underscore_keys_in_properties_and_relationships() {
         Some("Luca")
     );
 }
+
+#[test]
+fn parses_note_width_without_property_leaks() {
+    let dir = TempDir::new().unwrap();
+    let entry = parse_test_entry(
+        &dir,
+        "note.md",
+        "---\ntype: Note\n_width: wide\n---\n# Note\n",
+    );
+
+    assert_eq!(entry.note_width.as_deref(), Some("wide"));
+    assert!(!entry.properties.contains_key("_width"));
+    assert!(!entry.relationships.contains_key("_width"));
+}
+
+#[test]
+fn ignores_invalid_note_width_modes() {
+    let dir = TempDir::new().unwrap();
+    let entry = parse_test_entry(
+        &dir,
+        "note.md",
+        "---\ntype: Note\n_width: expanded\n---\n# Note\n",
+    );
+
+    assert_eq!(entry.note_width, None);
+}

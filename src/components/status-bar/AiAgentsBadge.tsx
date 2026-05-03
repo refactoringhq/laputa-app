@@ -1,6 +1,5 @@
 import { AlertTriangle, ChevronsUpDown } from 'lucide-react'
 import { Sparkle } from '@phosphor-icons/react'
-import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { Button } from '@/components/ui/button'
 import {
   AI_AGENT_DEFINITIONS,
@@ -19,6 +18,7 @@ import {
   vaultAiGuidanceUsesCustomFiles,
   type VaultAiGuidanceStatus,
 } from '../../lib/vaultAiGuidance'
+import { translate, type AppLocale } from '../../lib/i18n'
 import { openExternalUrl } from '../../utils/url'
 import {
   DropdownMenu,
@@ -39,9 +39,11 @@ interface AiAgentsBadgeProps {
   onSetDefaultAgent?: (agent: AiAgentId) => void
   onRestoreGuidance?: () => void
   compact?: boolean
+  locale?: AppLocale
 }
 
 function badgeTooltip(
+  locale: AppLocale,
   statuses: AiAgentsStatus,
   defaultAgent: AiAgentId,
   guidanceStatus?: VaultAiGuidanceStatus,
@@ -49,19 +51,19 @@ function badgeTooltip(
   const guidanceSummary = guidanceStatus && !isVaultAiGuidanceStatusChecking(guidanceStatus)
     ? getVaultAiGuidanceSummary(guidanceStatus)
     : null
-  if (!hasAnyInstalledAiAgent(statuses)) return 'No AI agents detected — click for setup details'
+  if (!hasAnyInstalledAiAgent(statuses)) return translate(locale, 'status.ai.noAgentsTooltip')
   const definition = getAiAgentDefinition(defaultAgent)
   if (!isAiAgentInstalled(statuses, defaultAgent)) {
-    return `${definition.label} is selected but not installed — click for setup details`
+    return translate(locale, 'status.ai.selectedMissing', { agent: definition.label })
   }
   const version = statuses[defaultAgent].version
-  const base = `Default AI agent: ${definition.label}${version ? ` ${version}` : ''}`
+  const base = translate(locale, 'status.ai.defaultAgent', { agent: definition.label, version: version ? ` ${version}` : '' })
   if (!guidanceSummary) return base
   if (vaultAiGuidanceNeedsRestore(guidanceStatus!)) {
-    return `${base}. ${guidanceSummary} — click for restore details`
+    return translate(locale, 'status.ai.restoreDetails', { base, summary: guidanceSummary })
   }
   if (vaultAiGuidanceUsesCustomFiles(guidanceStatus!)) {
-    return `${base}. ${guidanceSummary}`
+    return translate(locale, 'status.ai.withGuidance', { base, summary: guidanceSummary })
   }
   return base
 }
@@ -78,10 +80,11 @@ function triggerLabel(defaultAgent: AiAgentId): string {
   return getAiAgentDefinition(defaultAgent).shortLabel
 }
 
-function menuHeading(defaultAgent: AiAgentId, selectedAgentReady: boolean): string {
+function menuHeading(locale: AppLocale, defaultAgent: AiAgentId, selectedAgentReady: boolean): string {
+  const agent = getAiAgentDefinition(defaultAgent).label
   return selectedAgentReady
-    ? `Active AI agent: ${getAiAgentDefinition(defaultAgent).label}`
-    : `Selected AI agent unavailable: ${getAiAgentDefinition(defaultAgent).label}`
+    ? translate(locale, 'status.ai.active', { agent })
+    : translate(locale, 'status.ai.unavailable', { agent })
 }
 
 function statusText(statuses: AiAgentsStatus, definition: AiAgentDefinition): string {
@@ -140,14 +143,15 @@ function TriggerStateIcon({
 
 function GuidanceMenuSection({
   guidanceStatus,
+  locale = 'en',
   onRestoreGuidance,
-}: Pick<AiAgentsBadgeProps, 'guidanceStatus' | 'onRestoreGuidance'>) {
+}: Pick<AiAgentsBadgeProps, 'guidanceStatus' | 'locale' | 'onRestoreGuidance'>) {
   if (!guidanceStatus || isVaultAiGuidanceStatusChecking(guidanceStatus)) return null
 
   return (
     <>
       <DropdownMenuSeparator />
-      <DropdownMenuLabel>Vault guidance</DropdownMenuLabel>
+      <DropdownMenuLabel>{translate(locale, 'status.ai.vaultGuidance')}</DropdownMenuLabel>
       <DropdownMenuItem disabled data-testid="status-ai-guidance-summary">
         {getVaultAiGuidanceSummary(guidanceStatus)}
       </DropdownMenuItem>
@@ -156,7 +160,7 @@ function GuidanceMenuSection({
           onSelect={() => onRestoreGuidance?.()}
           data-testid="status-ai-guidance-restore"
         >
-          Restore Tolaria AI Guidance
+          {translate(locale, 'status.ai.restoreGuidance')}
         </DropdownMenuItem>
       )}
     </>
@@ -170,6 +174,7 @@ function AgentMenuContent({
   selectedAgentReady,
   onSetDefaultAgent,
   onRestoreGuidance,
+  locale = 'en',
 }: AiAgentsBadgeProps & { selectedAgentReady: boolean }) {
   const installedAgents = installedAgentDefinitions(statuses)
   const missingAgents = missingAgentDefinitions(statuses)
@@ -181,9 +186,9 @@ function AgentMenuContent({
       className="min-w-[18rem]"
       data-testid="status-ai-agents-menu"
     >
-      <DropdownMenuLabel>{menuHeading(defaultAgent, selectedAgentReady)}</DropdownMenuLabel>
+      <DropdownMenuLabel>{menuHeading(locale, defaultAgent, selectedAgentReady)}</DropdownMenuLabel>
       {installedAgents.length === 0 ? (
-        <DropdownMenuItem disabled>No AI agents detected</DropdownMenuItem>
+        <DropdownMenuItem disabled>{translate(locale, 'status.ai.noAgents')}</DropdownMenuItem>
       ) : (
         <DropdownMenuRadioGroup
           value={selectedAgentReady ? defaultAgent : undefined}
@@ -202,19 +207,20 @@ function AgentMenuContent({
       {missingAgents.length > 0 && (
         <>
           <DropdownMenuSeparator />
-          <DropdownMenuLabel>Install</DropdownMenuLabel>
+          <DropdownMenuLabel>{translate(locale, 'status.ai.install')}</DropdownMenuLabel>
           {missingAgents.map((definition) => (
             <DropdownMenuItem
               key={definition.id}
               onSelect={() => void openExternalUrl(definition.installUrl)}
             >
-              Install {definition.label}
+              {translate(locale, 'status.ai.installAgent', { agent: definition.label })}
             </DropdownMenuItem>
           ))}
         </>
       )}
       <GuidanceMenuSection
         guidanceStatus={guidanceStatus}
+        locale={locale}
         onRestoreGuidance={onRestoreGuidance}
       />
     </DropdownMenuContent>
@@ -228,10 +234,12 @@ export function AiAgentsBadge({
   onSetDefaultAgent,
   onRestoreGuidance,
   compact = false,
+  locale = 'en',
 }: AiAgentsBadgeProps) {
   const selectedAgentReady = isAiAgentInstalled(statuses, defaultAgent)
   const showWarning = hasAiAgentWarning(statuses, defaultAgent, guidanceStatus)
   const showSwitcherCue = !showWarning && canShowSwitcherCue(statuses, defaultAgent)
+  const tooltip = badgeTooltip(locale, statuses, defaultAgent, guidanceStatus)
 
   if (isAiAgentsStatusChecking(statuses)) return null
 
@@ -239,24 +247,24 @@ export function AiAgentsBadge({
     <>
       <CompactSeparator compact={compact} />
       <DropdownMenu>
-        <ActionTooltip copy={{ label: badgeTooltip(statuses, defaultAgent, guidanceStatus) }} side="top">
-          <DropdownMenuTrigger asChild={true}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              className={triggerButtonClassName(compact)}
-              aria-label="Open AI agent options"
-              data-testid="status-ai-agents"
-            >
-              <span style={{ ...ICON_STYLE, color: showWarning ? 'var(--accent-orange)' : 'var(--muted-foreground)' }}>
-                <Sparkle size={13} weight="fill" />
-                <TriggerLabel compact={compact} defaultAgent={defaultAgent} />
-                <TriggerStateIcon showWarning={showWarning} showSwitcherCue={showSwitcherCue} />
-              </span>
-            </Button>
-          </DropdownMenuTrigger>
-        </ActionTooltip>
+        <DropdownMenuTrigger asChild={true}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className={triggerButtonClassName(compact)}
+            aria-label={translate(locale, 'status.ai.openOptions')}
+            title={tooltip}
+            data-tooltip-mode="native-title"
+            data-testid="status-ai-agents"
+          >
+            <span style={{ ...ICON_STYLE, color: showWarning ? 'var(--accent-orange)' : 'var(--muted-foreground)' }}>
+              <Sparkle size={13} weight="fill" />
+              <TriggerLabel compact={compact} defaultAgent={defaultAgent} />
+              <TriggerStateIcon showWarning={showWarning} showSwitcherCue={showSwitcherCue} />
+            </span>
+          </Button>
+        </DropdownMenuTrigger>
         <AgentMenuContent
           statuses={statuses}
           guidanceStatus={guidanceStatus}
@@ -264,6 +272,7 @@ export function AiAgentsBadge({
           onSetDefaultAgent={onSetDefaultAgent}
           onRestoreGuidance={onRestoreGuidance}
           selectedAgentReady={selectedAgentReady}
+          locale={locale}
         />
       </DropdownMenu>
     </>

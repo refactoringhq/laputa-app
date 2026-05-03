@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentStatus } from '../hooks/useAiAgent'
-import type { AiAgentMessage } from './aiAgentConversation'
+import type { AgentStatus, AiAgentMessage } from './aiAgentConversation'
 
-const { detectFileOperationMock } = vi.hoisted(() => ({
+const { detectFileOperationMock, trackEventMock } = vi.hoisted(() => ({
   detectFileOperationMock: vi.fn(),
+  trackEventMock: vi.fn(),
 }))
 
-vi.mock('../hooks/useAiAgent', () => ({
+vi.mock('./aiAgentFileOperations', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./aiAgentFileOperations')>(),
   detectFileOperation: detectFileOperationMock,
+}))
+
+vi.mock('./telemetry', () => ({
+  trackEvent: trackEventMock,
 }))
 
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
@@ -37,6 +42,7 @@ function createStatusStore(initialStatus: AgentStatus = 'idle') {
 describe('aiAgentStreamCallbacks', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    trackEventMock.mockClear()
   })
 
   it('handles the happy-path lifecycle and refreshes the vault at the end', () => {
@@ -54,6 +60,7 @@ describe('aiAgentStreamCallbacks', () => {
     const toolInputMapRef = { current: new Map<string, { tool: string; input?: string }>() }
 
     const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
       messageId: 'msg-1',
       vaultPath: '/vault',
       setMessages: messages.setMessages,
@@ -77,13 +84,18 @@ describe('aiAgentStreamCallbacks', () => {
       tool: 'Write',
       input: '{"path":"/vault/note.md"}',
     })
-    expect(detectFileOperationMock).toHaveBeenCalledWith(
-      'Write',
-      '{"path":"/vault/note.md"}',
-      '/vault',
-      fileCallbacks,
-    )
+    expect(detectFileOperationMock).toHaveBeenCalledWith({
+      toolName: 'Write',
+      input: '{"path":"/vault/note.md"}',
+      vaultPath: '/vault',
+      callbacks: fileCallbacks,
+    })
     expect(fileCallbacks.onVaultChanged).toHaveBeenCalledTimes(1)
+    expect(trackEventMock).toHaveBeenCalledWith('ai_agent_response_completed', {
+      agent: 'claude_code',
+      had_text: 1,
+      tool_count: 1,
+    })
     expect(messages.getMessages()).toEqual([
       {
         id: 'msg-1',
@@ -122,6 +134,7 @@ describe('aiAgentStreamCallbacks', () => {
     const responseAccRef = { current: 'Partial reply' }
 
     const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
       messageId: 'msg-1',
       vaultPath: '/vault',
       setMessages: messages.setMessages,
@@ -133,8 +146,15 @@ describe('aiAgentStreamCallbacks', () => {
     })
 
     callbacks.onError('boom')
+    callbacks.onDone()
 
     expect(status.getStatus()).toBe('error')
+    expect(trackEventMock).toHaveBeenCalledWith('ai_agent_response_failed', {
+      agent: 'claude_code',
+      error_kind: 'stream_error',
+      had_partial_response: 1,
+      tool_count: 0,
+    })
     expect(messages.getMessages()).toEqual([
       {
         id: 'msg-1',
@@ -150,9 +170,13 @@ describe('aiAgentStreamCallbacks', () => {
         response: 'Partial reply\n\nError: boom',
       },
     ])
+    expect(trackEventMock).not.toHaveBeenCalledWith('ai_agent_response_completed', expect.anything())
   })
 
-  it('finishes with a readable empty state when Claude exits without assistant text', () => {
+  it.each([
+    ['claude_code', 'Claude Code finished without returning a reply.'],
+    ['pi', 'Pi finished without returning a reply.'],
+  ] as const)('uses the %s label for empty stream responses', (agent, response) => {
     const messages = createMessageStore([
       {
         id: 'msg-1',
@@ -164,6 +188,7 @@ describe('aiAgentStreamCallbacks', () => {
     const status = createStatusStore('thinking')
 
     const callbacks = createStreamCallbacks({
+      agent,
       messageId: 'msg-1',
       vaultPath: '/vault',
       setMessages: messages.setMessages,
@@ -177,6 +202,11 @@ describe('aiAgentStreamCallbacks', () => {
     callbacks.onDone()
 
     expect(status.getStatus()).toBe('done')
+    expect(trackEventMock).toHaveBeenCalledWith('ai_agent_response_completed', {
+      agent,
+      had_text: 0,
+      tool_count: 0,
+    })
     expect(messages.getMessages()).toEqual([
       {
         id: 'msg-1',
@@ -184,9 +214,40 @@ describe('aiAgentStreamCallbacks', () => {
         actions: [],
         isStreaming: false,
         reasoningDone: true,
-        response: 'Claude Code finished without returning a reply.',
+        response,
       },
     ])
+  })
+
+  it('gives OpenCode an actionable empty-response message', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Summarize the current note',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const status = createStatusStore('thinking')
+
+    const callbacks = createStreamCallbacks({
+      agent: 'opencode',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: status.setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onDone()
+
+    expect(status.getStatus()).toBe('done')
+    expect(messages.getMessages()[0].response).toContain('OpenCode returned no assistant text')
+    expect(messages.getMessages()[0].response).toContain('provider/model context limit')
+    expect(messages.getMessages()[0].response).not.toContain('finished without returning a reply')
   })
 
   it('ignores stream events after the request has been aborted', () => {
@@ -202,6 +263,7 @@ describe('aiAgentStreamCallbacks', () => {
     const fileCallbacks = { onVaultChanged: vi.fn() }
 
     const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
       messageId: 'msg-1',
       vaultPath: '/vault',
       setMessages: messages.setMessages,

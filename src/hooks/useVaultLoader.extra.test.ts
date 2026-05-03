@@ -191,6 +191,7 @@ describe('useVaultLoader extra', () => {
 
     const { result } = renderHook(() => useVaultLoader('/vault'))
     await waitForEntries(result)
+    vi.mocked(clearPrefetchCache).mockClear()
 
     backendInvokeFn.mockImplementation((command: string) => {
       if (command === 'reload_vault') {

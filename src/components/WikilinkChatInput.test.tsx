@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
+  act,
   createEvent,
   fireEvent,
   render,
@@ -14,6 +15,32 @@ import {
 } from './InlineWikilinkInput'
 import { isInsertBeforeInput } from './inlineWikilinkBeforeInput'
 import type { VaultEntry } from '../types'
+
+type NativeDropPayload = {
+  type: string
+  paths: string[]
+  position: { x: number; y: number }
+}
+type NativeDropHandler = (event: { payload: NativeDropPayload }) => void
+const nativeDropState = vi.hoisted(() => ({
+  tauriMode: false,
+  handlers: {} as Record<string, NativeDropHandler | undefined>,
+}))
+
+vi.mock('../mock-tauri', () => ({
+  isTauri: () => nativeDropState.tauriMode,
+}))
+
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    onDragDropEvent: vi.fn((handler: NativeDropHandler) => {
+      nativeDropState.handlers['native-drag-drop'] = handler
+      return Promise.resolve(() => {
+        delete nativeDropState.handlers['native-drag-drop']
+      })
+    }),
+  }),
+}))
 
 const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   path: '/vault/note/test.md',
@@ -96,6 +123,7 @@ function setSelection(editor: HTMLElement, offset: number) {
 
 function updateEditorText(text: string) {
   const editor = screen.getByTestId('agent-input')
+  editor.focus()
   fireEvent.focus(editor)
   editor.textContent = text
   setSelection(editor, text.length)
@@ -141,7 +169,52 @@ function createFileLikeDataTransfer({
   }
 }
 
+function resetNativeDropState() {
+  nativeDropState.tauriMode = false
+  for (const eventName of Object.keys(nativeDropState.handlers)) {
+    delete nativeDropState.handlers[eventName]
+  }
+}
+
+function mockElementRect(element: HTMLElement) {
+  Object.defineProperty(element, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 400,
+      bottom: 48,
+      width: 400,
+      height: 48,
+      toJSON: () => ({}),
+    }),
+  })
+}
+
+function emitNativePathDrop(paths: string[], position = { x: 20, y: 20 }) {
+  const handler = nativeDropState.handlers['native-drag-drop']
+  if (!handler) throw new Error('No native drop handler registered')
+  handler({
+    payload: {
+      type: 'drop',
+      paths,
+      position,
+    },
+  })
+}
+
+async function waitForNativePathDropListener() {
+  await waitFor(() => {
+    expect(nativeDropState.handlers['native-drag-drop']).toBeDefined()
+  })
+}
+
 describe('WikilinkChatInput', () => {
+  beforeEach(resetNativeDropState)
+  afterEach(resetNativeDropState)
+
   it('renders the placeholder overlay for an empty draft', () => {
     render(<Controlled placeholder="Ask something..." />)
     expect(screen.getByText('Ask something...')).toBeInTheDocument()
@@ -253,6 +326,34 @@ describe('WikilinkChatInput', () => {
     })
   })
 
+  it('does not duplicate syllables across consecutive IME compositions', async () => {
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+
+    const firstEditor = screen.getByTestId('agent-input') as HTMLDivElement
+    firstEditor.focus()
+    fireEvent.compositionStart(firstEditor)
+    firstEditor.appendChild(document.createTextNode('안'))
+    fireEvent.input(firstEditor)
+    fireEvent.compositionEnd(firstEditor)
+
+    await waitFor(() => {
+      expect(onDraftChange).toHaveBeenLastCalledWith('안')
+    })
+
+    const secondEditor = screen.getByTestId('agent-input') as HTMLDivElement
+    secondEditor.focus()
+    fireEvent.compositionStart(secondEditor)
+    secondEditor.appendChild(document.createTextNode('녕'))
+    fireEvent.input(secondEditor)
+    fireEvent.compositionEnd(secondEditor)
+
+    await waitFor(() => {
+      expect(onDraftChange).toHaveBeenLastCalledWith('안녕')
+    })
+    expect(screen.getByTestId('agent-input').textContent).toBe('안녕')
+  })
+
   it('does not steal focus back if it was moved elsewhere during composition end', async () => {
     const onDraftChange = vi.fn()
     render(
@@ -336,6 +437,26 @@ describe('WikilinkChatInput', () => {
     expect(screen.queryByTestId('inline-wikilink-chip')).toBeNull()
   })
 
+  it('lets native modified delete shortcuts reach the browser editor pipeline', () => {
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+    updateEditorText('delete the previous words')
+    onDraftChange.mockClear()
+
+    const editor = screen.getByTestId('agent-input')
+    const optionBackspace = createEvent.keyDown(editor, { key: 'Backspace', altKey: true })
+    fireEvent(editor, optionBackspace)
+    const commandBackspace = createEvent.keyDown(editor, { key: 'Backspace', metaKey: true })
+    fireEvent(editor, commandBackspace)
+    const controlDelete = createEvent.keyDown(editor, { key: 'Delete', ctrlKey: true })
+    fireEvent(editor, controlDelete)
+
+    expect(optionBackspace.defaultPrevented).toBe(false)
+    expect(commandBackspace.defaultPrevented).toBe(false)
+    expect(controlDelete.defaultPrevented).toBe(false)
+    expect(onDraftChange).not.toHaveBeenCalled()
+  })
+
   it('submits serialized wikilink text and resolved references', () => {
     const onSend = vi.fn()
     render(<Controlled onSend={onSend} />)
@@ -356,6 +477,59 @@ describe('WikilinkChatInput', () => {
     fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter', shiftKey: true })
 
     expect(onSend).not.toHaveBeenCalled()
+  })
+
+  it('inserts one controlled newline on Shift+Enter without duplicating the draft', () => {
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+
+    updateEditorText('first line')
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter', shiftKey: true })
+
+    expect(onDraftChange).toHaveBeenLastCalledWith('first line\n')
+    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n')
+
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter', shiftKey: true })
+
+    expect(onDraftChange).toHaveBeenLastCalledWith('first line\n\n')
+    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n\n')
+  })
+
+  it('inserts one controlled newline from native insertLineBreak beforeinput', () => {
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+
+    updateEditorText('first line')
+    const editor = screen.getByTestId('agent-input')
+    const beforeInputEvent = new Event('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperty(beforeInputEvent, 'inputType', {
+      value: 'insertLineBreak',
+    })
+
+    fireEvent(editor, beforeInputEvent)
+
+    expect(beforeInputEvent.defaultPrevented).toBe(true)
+    expect(onDraftChange).toHaveBeenLastCalledWith('first line\n')
+    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n')
+  })
+
+  it('submits a multi-line draft with normal Enter after Shift+Enter', () => {
+    const onSend = vi.fn()
+    render(<Controlled onSend={onSend} />)
+
+    updateEditorText('first line')
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter', shiftKey: true })
+
+    const editor = screen.getByTestId('agent-input')
+    editor.textContent = 'first line\nsecond line'
+    setSelection(editor, 'first line\nsecond line'.length)
+    fireEvent.input(editor)
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter' })
+
+    expect(onSend).toHaveBeenCalledWith('first line\nsecond line', [])
   })
 
   it('marks the editor disabled when disabled is true', () => {
@@ -401,9 +575,54 @@ describe('WikilinkChatInput', () => {
     )).toBe('"/Users/test/My Folder"')
   })
 
+  it('inserts Tauri native folder drops into the AI composer', async () => {
+    nativeDropState.tauriMode = true
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+
+    const editor = screen.getByTestId('agent-input') as HTMLDivElement
+    mockElementRect(editor)
+    await waitForNativePathDropListener()
+    updateEditorText('Open ')
+    editor.focus()
+    onDraftChange.mockClear()
+
+    act(() => {
+      emitNativePathDrop(['/Users/test/My Folder'])
+    })
+
+    await waitFor(() => {
+      expect(onDraftChange).toHaveBeenCalledWith('Open "/Users/test/My Folder"')
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('agent-input').textContent).toContain('/Users/test/My Folder')
+    })
+  })
+
+  it('accepts Tauri native folder drops for the focused AI composer even when native coordinates miss', async () => {
+    nativeDropState.tauriMode = true
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+
+    const editor = screen.getByTestId('agent-input') as HTMLDivElement
+    mockElementRect(editor)
+    await waitForNativePathDropListener()
+    updateEditorText('Open ')
+    onDraftChange.mockClear()
+
+    act(() => {
+      emitNativePathDrop(['/Users/test/Projects'], { x: 900, y: 900 })
+    })
+
+    await waitFor(() => {
+      expect(onDraftChange).toHaveBeenCalledWith('Open /Users/test/Projects')
+    })
+  })
+
   it('treats missing inputType as a non-insert beforeinput event', () => {
     expect(() => isInsertBeforeInput({} as InputEvent)).not.toThrow()
     expect(isInsertBeforeInput({} as InputEvent)).toBe(false)
+    expect(isInsertBeforeInput({ inputType: 42 })).toBe(false)
     expect(isInsertBeforeInput({ inputType: 'insertFromPaste' } as InputEvent)).toBe(true)
   })
 
@@ -417,6 +636,26 @@ describe('WikilinkChatInput', () => {
     })
 
     expect(() => fireEvent(editor, beforeInputEvent)).not.toThrow()
+
+    updateEditorText('still works')
+    expect(editor.textContent).toContain('still works')
+  })
+
+  it('ignores beforeinput events with non-string inputType instead of calling startsWith', () => {
+    render(<Controlled />)
+
+    const editor = screen.getByTestId('agent-input')
+    const startsWith = vi.fn(() => true)
+    const beforeInputEvent = new Event('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperty(beforeInputEvent, 'inputType', {
+      value: { startsWith },
+    })
+
+    expect(() => fireEvent(editor, beforeInputEvent)).not.toThrow()
+    expect(startsWith).not.toHaveBeenCalled()
 
     updateEditorText('still works')
     expect(editor.textContent).toContain('still works')

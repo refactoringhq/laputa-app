@@ -70,16 +70,16 @@ describe('useNoteActions frontmatter persistence', () => {
       },
     },
   ])('flushes pending raw content before a frontmatter $label', async ({ run }) => {
-    const flushBeforeFrontmatterChange = vi.fn().mockResolvedValue(undefined)
+    const flushBeforeNoteMutation = vi.fn().mockResolvedValue(undefined)
     const { result } = renderHook(() => useNoteActions({
       ...makeConfig(vi.fn()),
-      flushBeforeFrontmatterChange,
+      flushBeforeNoteMutation,
     }))
 
     await act(async () => {
       await run(result)
     })
 
-    expect(flushBeforeFrontmatterChange).toHaveBeenCalledWith('/vault/note.md')
+    expect(flushBeforeNoteMutation).toHaveBeenCalledWith('/vault/note.md')
   })
 })

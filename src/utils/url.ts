@@ -50,9 +50,28 @@ export async function openExternalUrl(url: string): Promise<void> {
 }
 
 /** Open a local file path with the system default app (e.g. TextEdit for .json). */
-export async function openLocalFile(absolutePath: string): Promise<void> {
+export async function openLocalFile(absolutePath: string, vaultPath?: string): Promise<void> {
   if (isTauri()) {
-    const { openPath } = await import('@tauri-apps/plugin-opener')
-    await openPath(absolutePath)
+    const { invoke } = await import('@tauri-apps/api/core')
+    const args: { path: string; vaultPath?: string } = { path: absolutePath }
+    if (vaultPath) args.vaultPath = vaultPath
+    await invoke('open_vault_file_external', args)
   }
+}
+
+/** Reveal a local file or folder in the system file manager. */
+export async function revealLocalPath(absolutePath: string): Promise<void> {
+  if (isTauri()) {
+    const { revealItemInDir } = await import('@tauri-apps/plugin-opener')
+    await revealItemInDir(absolutePath)
+  }
+}
+
+/** Copy a local file or folder path to the system clipboard. */
+export async function copyLocalPath(absolutePath: string): Promise<void> {
+  if (!navigator.clipboard?.writeText) {
+    throw new Error('Clipboard API is unavailable')
+  }
+
+  await navigator.clipboard.writeText(absolutePath)
 }

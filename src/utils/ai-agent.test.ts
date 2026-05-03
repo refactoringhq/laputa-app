@@ -1,11 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-// Mock the mock-tauri module before importing ai-agent
-vi.mock('../mock-tauri', () => ({
-  isTauri: () => false,
-}))
-
-import { buildAgentSystemPrompt, streamClaudeAgent } from './ai-agent'
+import { buildAgentSystemPrompt } from './ai-agent'
 
 // --- buildAgentSystemPrompt ---
 
@@ -13,7 +8,10 @@ describe('buildAgentSystemPrompt', () => {
   it('returns preamble when no vault context', () => {
     const prompt = buildAgentSystemPrompt()
     expect(prompt).toContain('working inside Tolaria')
-    expect(prompt).toContain('full shell access')
+    expect(prompt).toContain('active vault')
+    expect(prompt).toContain('Vault Safe mode is active')
+    expect(prompt).toContain('not available in Vault Safe')
+    expect(prompt).not.toContain('full shell access')
     expect(prompt).not.toContain('Vault context')
   })
 
@@ -24,35 +22,22 @@ describe('buildAgentSystemPrompt', () => {
     expect(prompt).toContain('Recent notes: foo, bar')
   })
 
+  it('allows shell commands in power user mode where supported', () => {
+    const prompt = buildAgentSystemPrompt({ agent: 'codex', permissionMode: 'power_user' })
+    expect(prompt).toContain('Power User mode is active')
+    expect(prompt).toContain('Local shell commands are available')
+    expect(prompt).not.toContain('not available in Vault Safe')
+  })
+
+  it('does not promise shell execution for Pi power user mode', () => {
+    const prompt = buildAgentSystemPrompt({ agent: 'pi', permissionMode: 'power_user' })
+    expect(prompt).toContain('Pi currently uses the same conservative Tolaria MCP configuration')
+    expect(prompt).not.toContain('Local shell commands are available')
+  })
+
   it('instructs AI to use wikilink syntax', () => {
     const prompt = buildAgentSystemPrompt()
     expect(prompt).toContain('[[')
     expect(prompt).toMatch(/wikilink/i)
-  })
-})
-
-// --- streamClaudeAgent ---
-
-describe('streamClaudeAgent', () => {
-  it('calls onText and onDone in non-Tauri environment', async () => {
-    const onText = vi.fn()
-    const onToolStart = vi.fn()
-    const onDone = vi.fn()
-    const onError = vi.fn()
-
-    await streamClaudeAgent('test message', 'system prompt', '/tmp/vault', {
-      onText,
-      onToolStart,
-      onError,
-      onDone,
-    })
-
-    // Wait for the setTimeout mock response
-    await new Promise(r => setTimeout(r, 400))
-
-    expect(onText).toHaveBeenCalledWith(expect.stringContaining('Build Laputa App'))
-    expect(onDone).toHaveBeenCalled()
-    expect(onError).not.toHaveBeenCalled()
-    expect(onToolStart).not.toHaveBeenCalled()
   })
 })

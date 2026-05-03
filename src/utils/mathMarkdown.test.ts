@@ -4,6 +4,7 @@ import {
   MATH_INLINE_TYPE,
   injectMathInBlocks,
   preProcessMathMarkdown,
+  readCompletedInlineMathAtEnd,
   serializeMathAwareBlocks,
 } from './mathMarkdown'
 
@@ -94,6 +95,58 @@ describe('math markdown round-trip', () => {
     )
   })
 
+  it('round-trips inline math inside table cells', () => {
+    const tableCellMath = preProcessMathMarkdown({ markdown: '$a+b$' })
+    const blocks = [{
+      type: 'table',
+      content: {
+        type: 'tableContent',
+        rows: [{
+          cells: [{
+            type: 'tableCell',
+            content: [{ type: 'text', text: tableCellMath, styles: {} }],
+          }],
+        }],
+      },
+      children: [],
+    }]
+
+    const [tableBlock] = injectMathInBlocks(blocks) as Array<{
+      content: { rows: Array<{ cells: Array<{ content: unknown[] }> }> }
+    }>
+
+    expect(tableBlock.content.rows[0].cells[0].content).toEqual([{
+      type: MATH_INLINE_TYPE,
+      props: { latex: 'a+b' },
+      content: undefined,
+    }])
+
+    const editor = {
+      blocksToMarkdownLossy: vi.fn(() => '| Formula |\n| --- |\n| $a+b$ |'),
+    }
+
+    expect(serializeMathAwareBlocks(editor, [tableBlock])).toBe('| Formula |\n| --- |\n| $a+b$ |')
+    expect(editor.blocksToMarkdownLossy).toHaveBeenCalledWith([{
+      type: 'table',
+      content: {
+        type: 'tableContent',
+        rows: [{
+          cells: [{
+            type: 'tableCell',
+            content: [{ type: 'text', text: '$a+b$' }],
+          }],
+        }],
+      },
+      children: [],
+    }])
+  })
+
+  it('leaves display-style math inside table cells as Markdown source', () => {
+    expect(preProcessMathMarkdown({ markdown: '| Formula |\n| --- |\n| $$c$$ |' })).toBe(
+      '| Formula |\n| --- |\n| $$c$$ |',
+    )
+  })
+
   it('leaves inline code and fenced code math-looking text untouched', () => {
     const markdown = [
       'Keep `$not_math$` literal.',
@@ -106,5 +159,19 @@ describe('math markdown round-trip', () => {
     ].join('\n')
 
     expect(preProcessMathMarkdown({ markdown })).toBe(markdown)
+  })
+
+  it('recognizes completed inline math at the end of text', () => {
+    expect(readCompletedInlineMathAtEnd({ text: 'Energy is $E=mc^2$' })).toEqual({
+      latex: 'E=mc^2',
+      start: 10,
+      end: 17,
+    })
+  })
+
+  it('ignores incomplete, escaped, and display-style dollar sequences at text end', () => {
+    expect(readCompletedInlineMathAtEnd({ text: 'Energy is $E=mc^2' })).toBeNull()
+    expect(readCompletedInlineMathAtEnd({ text: String.raw`Energy is $E=mc^2\$` })).toBeNull()
+    expect(readCompletedInlineMathAtEnd({ text: '$$x^2$$' })).toBeNull()
   })
 })

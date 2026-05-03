@@ -1,3 +1,4 @@
+use crate::frontmatter::keys::{canonical_known_frontmatter_key, FrontmatterKey};
 use crate::vault::parsing::contains_wikilink;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -40,6 +41,8 @@ pub(crate) struct Frontmatter {
     pub sort: Option<StringOrList>,
     #[serde(default)]
     pub view: Option<StringOrList>,
+    #[serde(rename = "_width", alias = "width", default)]
+    pub note_width: Option<StringOrList>,
     #[serde(default)]
     pub visible: Option<bool>,
     #[serde(
@@ -187,88 +190,52 @@ fn sanitize_value(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-/// Parse frontmatter from raw YAML data extracted by gray_matter.
-fn parse_frontmatter(data: &HashMap<String, serde_json::Value>) -> Frontmatter {
-    static KNOWN_KEYS: &[&str] = &[
-        "title",
-        "type",
-        "Is A",
-        "is_a",
-        "aliases",
-        "_archived",
-        "Archived",
-        "archived",
-        "_icon",
-        "icon",
-        "color",
-        "_order",
-        "order",
-        "_sidebar_label",
-        "sidebar_label",
-        "sidebar label",
-        "template",
-        "_sort",
-        "sort",
-        "view",
-        "visible",
-        "notion_id",
-        "Status",
-        "status",
-        "_organized",
-        "_favorite",
-        "_favorite_index",
-        "_list_properties_display",
-        "_default_folder",
-        "default_folder",
-        "default folder",
-    ];
-    let filtered: serde_json::Map<String, serde_json::Value> = data
-        .iter()
-        .filter(|(k, _)| KNOWN_KEYS.contains(&k.as_str()))
-        .map(|(k, v)| (k.clone(), sanitize_value(v)))
-        .collect();
-    let value = serde_json::Value::Object(filtered);
-    serde_json::from_value(value).unwrap_or_default()
+fn insert_known_frontmatter_value(
+    target: &mut serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    value: &serde_json::Value,
+    overwrite: bool,
+) {
+    let Some(canonical_key) = canonical_known_frontmatter_key(FrontmatterKey::new(key)) else {
+        return;
+    };
+    if overwrite || !target.contains_key(canonical_key) {
+        target.insert(canonical_key.to_string(), sanitize_value(value));
+    }
 }
 
-/// Known non-relationship frontmatter keys to skip (case-insensitive comparison).
-/// Only skip keys that can never contain wikilinks.
-/// Note: owner and cadence are NOT skipped — they should appear in generic properties.
-const SKIP_KEYS: &[&str] = &[
-    "title",
-    "is_a",
-    "type",
-    "aliases",
-    "_archived",
-    "archived",
-    "icon",
-    "color",
-    "order",
-    "sidebar_label",
-    "template",
-    "sort",
-    "view",
-    "visible",
-    "status",
-    "_organized",
-    "_favorite",
-    "_favorite_index",
-    "_list_properties_display",
-    "default_folder",
-];
+fn raw_frontmatter_keys(raw_content: &str) -> Vec<String> {
+    RawFrontmatter(raw_content)
+        .extract_block()
+        .map(|raw| {
+            raw.lines()
+                .filter_map(|line| YamlLine(line).key().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
 
-#[derive(Clone, Copy)]
-struct FrontmatterKey<'a>(&'a str);
-
-impl FrontmatterKey<'_> {
-    fn normalize(self) -> String {
-        self.0.trim().to_ascii_lowercase().replace(' ', "_")
+fn known_frontmatter_map(
+    data: &HashMap<String, serde_json::Value>,
+    raw_content: &str,
+) -> serde_json::Map<String, serde_json::Value> {
+    let mut filtered = serde_json::Map::new();
+    for key in raw_frontmatter_keys(raw_content) {
+        if let Some(value) = data.get(&key) {
+            insert_known_frontmatter_value(&mut filtered, &key, value, true);
+        }
     }
-
-    fn should_skip(self) -> bool {
-        let normalized = self.normalize();
-        normalized.starts_with('_') || SKIP_KEYS.contains(&normalized.as_str())
+    for (key, value) in data {
+        insert_known_frontmatter_value(&mut filtered, key, value, false);
     }
+    filtered
+}
+
+/// Parse frontmatter from raw YAML data extracted by gray_matter.
+fn parse_frontmatter(data: &HashMap<String, serde_json::Value>, raw_content: &str) -> Frontmatter {
+    let filtered = known_frontmatter_map(data, raw_content);
+    let value = serde_json::Value::Object(filtered);
+    serde_json::from_value(value).unwrap_or_default()
 }
 
 /// Extract all wikilink-containing fields from raw YAML frontmatter.
@@ -278,7 +245,7 @@ pub(crate) fn extract_relationships(
     let mut relationships = HashMap::new();
 
     for (key, value) in data {
-        if FrontmatterKey(key).should_skip() {
+        if FrontmatterKey::new(key).is_reserved() {
             continue;
         }
 
@@ -311,7 +278,7 @@ pub(crate) fn extract_properties(
     let mut properties = HashMap::new();
 
     for (key, value) in data {
-        if FrontmatterKey(key).should_skip() {
+        if FrontmatterKey::new(key).is_reserved() {
             continue;
         }
 
@@ -341,6 +308,16 @@ pub(crate) fn extract_properties(
 /// Resolve `is_a` from frontmatter only.
 pub(crate) fn resolve_is_a(fm_is_a: Option<StringOrList>) -> Option<String> {
     fm_is_a.and_then(|a| a.into_vec().into_iter().next())
+}
+
+pub(crate) fn resolve_note_width(note_width: Option<StringOrList>) -> Option<String> {
+    match note_width
+        .and_then(StringOrList::into_scalar)
+        .map(|value| value.trim().to_ascii_lowercase())
+    {
+        Some(mode) if mode == "normal" || mode == "wide" => Some(mode),
+        _ => None,
+    }
 }
 
 /// Convert gray_matter::Pod to serde_json::Value
@@ -414,7 +391,7 @@ impl<'a> YamlLine<'a> {
             return None;
         }
         let (key, _) = self.0.split_once(':')?;
-        Some(key.trim().trim_matches('"'))
+        Some(key.trim().trim_matches('"').trim_matches('\''))
     }
 
     fn list_item(self) -> Option<&'a str> {
@@ -514,7 +491,7 @@ pub(crate) fn extract_fm_and_rels(
         }
     };
     (
-        parse_frontmatter(&json_map),
+        parse_frontmatter(&json_map, raw_content),
         extract_relationships(&json_map),
         extract_properties(&json_map),
     )

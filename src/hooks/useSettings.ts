@@ -2,10 +2,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { normalizeStoredAiAgent } from '../lib/aiAgents'
+import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
+import {
+  notifyGitignoredVisibilityChanged,
+  TOGGLE_GITIGNORED_VISIBILITY_EVENT,
+} from '../lib/gitignoredVisibilityEvents'
 import { serializeUiLanguagePreference } from '../lib/i18n'
 import { normalizeReleaseChannel, serializeReleaseChannel } from '../lib/releaseChannel'
 import { normalizeThemeMode } from '../lib/themeMode'
 import type { Settings } from '../types'
+import { normalizeNoteWidthMode } from '../utils/noteWidth'
 
 async function invokeNativeIfAvailable<T>(command: string, tauriArgs: Record<string, unknown>): Promise<T | undefined> {
   try {
@@ -38,9 +44,14 @@ const EMPTY_SETTINGS: Settings = {
   release_channel: null,
   theme_mode: null,
   ui_language: null,
+  note_width_mode: null,
   default_ai_agent: null,
   default_image_folder: null,
   default_video_folder: null,
+  hide_gitignored_files: null,
+  all_notes_show_pdfs: null,
+  all_notes_show_images: null,
+  all_notes_show_unsupported: null,
 }
 
 function normalizeSettings(settings: Settings): Settings {
@@ -51,7 +62,12 @@ function normalizeSettings(settings: Settings): Settings {
     ),
     theme_mode: normalizeThemeMode(settings.theme_mode),
     ui_language: serializeUiLanguagePreference(settings.ui_language),
+    note_width_mode: normalizeNoteWidthMode(settings.note_width_mode),
     default_ai_agent: normalizeStoredAiAgent(settings.default_ai_agent),
+    hide_gitignored_files: settings.hide_gitignored_files ?? null,
+    all_notes_show_pdfs: settings.all_notes_show_pdfs ?? null,
+    all_notes_show_images: settings.all_notes_show_images ?? null,
+    all_notes_show_unsupported: settings.all_notes_show_unsupported ?? null,
   }
 }
 
@@ -75,14 +91,35 @@ export function useSettings() {
   }, [loadSettings])
 
   const saveSettings = useCallback(async (newSettings: Settings) => {
+    const previousHideGitignored = shouldHideGitignoredFiles(settings)
     const normalizedSettings = normalizeSettings(newSettings)
     try {
       await tauriCall<null>('save_settings', { settings: normalizedSettings })
       setSettings(normalizedSettings)
+      const nextHideGitignored = shouldHideGitignoredFiles(normalizedSettings)
+      if (previousHideGitignored !== nextHideGitignored) {
+        notifyGitignoredVisibilityChanged(nextHideGitignored)
+      }
     } catch (err) {
       console.error('Failed to save settings:', err)
     }
-  }, [])
+  }, [settings])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleToggleGitignoredVisibility = () => {
+      void saveSettings({
+        ...settings,
+        hide_gitignored_files: !shouldHideGitignoredFiles(settings),
+      })
+    }
+
+    window.addEventListener(TOGGLE_GITIGNORED_VISIBILITY_EVENT, handleToggleGitignoredVisibility)
+    return () => {
+      window.removeEventListener(TOGGLE_GITIGNORED_VISIBILITY_EVENT, handleToggleGitignoredVisibility)
+    }
+  }, [saveSettings, settings])
 
   return { settings, loaded, saveSettings }
 }

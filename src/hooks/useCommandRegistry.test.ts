@@ -14,6 +14,7 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     onCreateNote: vi.fn(),
     onCreateNoteOfType: vi.fn(),
     onSave: vi.fn(),
+    onPastePlainText: vi.fn(),
     onOpenSettings: vi.fn(),
     onDeleteNote: vi.fn(),
     onArchiveNote: vi.fn(),
@@ -25,8 +26,10 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     onToggleInspector: vi.fn(),
     onToggleDiff: vi.fn(),
     onToggleRawEditor: vi.fn(),
-    noteLayout: 'centered',
-    onToggleNoteLayout: vi.fn(),
+    noteWidth: 'normal',
+    defaultNoteWidth: 'normal',
+    onSetNoteWidth: vi.fn(),
+    onSetDefaultNoteWidth: vi.fn(),
     onToggleAIChat: vi.fn(),
     onOpenVault: vi.fn(),
     activeNoteModified: false,
@@ -48,6 +51,20 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
 
 function findCommand(commands: CommandAction[], id: string): CommandAction | undefined {
   return commands.find(c => c.id === id)
+}
+
+function expectFolderCommandStates(overrides: Record<string, unknown>, expected: {
+  copy: boolean
+  delete: boolean
+  rename: boolean
+  reveal: boolean
+}) {
+  const { result } = renderHook(() => useCommandRegistry(makeConfig(overrides)))
+
+  expect(findCommand(result.current, 'reveal-selected-folder')?.enabled).toBe(expected.reveal)
+  expect(findCommand(result.current, 'copy-selected-folder-path')?.enabled).toBe(expected.copy)
+  expect(findCommand(result.current, 'rename-folder')?.enabled).toBe(expected.rename)
+  expect(findCommand(result.current, 'delete-folder')?.enabled).toBe(expected.delete)
 }
 
 describe('useCommandRegistry', () => {
@@ -96,6 +113,31 @@ describe('useCommandRegistry', () => {
     const { result } = renderHook(() => useCommandRegistry(config))
     const cmd = findCommand(result.current, 'commit-push')
     expect(cmd!.enabled).toBe(false)
+  })
+
+  it('includes initialize-git command for non-git vaults', () => {
+    const onInitializeGit = vi.fn()
+    const config = makeConfig({ isGitVault: false, onInitializeGit })
+    const { result } = renderHook(() => useCommandRegistry(config))
+    const cmd = findCommand(result.current, 'initialize-git')
+
+    expect(cmd).toBeDefined()
+    expect(cmd!.group).toBe('Git')
+    expect(cmd!.label).toBe('Initialize Git for Current Vault')
+    expect(cmd!.enabled).toBe(true)
+
+    cmd!.execute()
+    expect(onInitializeGit).toHaveBeenCalledOnce()
+  })
+
+  it('hides remote git commands for non-git vaults', () => {
+    const config = makeConfig({ isGitVault: false, modifiedCount: 5 })
+    const { result } = renderHook(() => useCommandRegistry(config))
+
+    expect(findCommand(result.current, 'commit-push')).toBeUndefined()
+    expect(findCommand(result.current, 'git-pull')).toBeUndefined()
+    expect(findCommand(result.current, 'add-remote')).toBeUndefined()
+    expect(findCommand(result.current, 'view-changes')).toBeUndefined()
   })
 
   it('resolve-conflicts stays enabled across rerenders', () => {
@@ -256,33 +298,178 @@ describe('useCommandRegistry', () => {
     expect(findCommand(result.current, 'archive-note')?.shortcut).toBeUndefined()
   })
 
+  it('exposes active file actions when a note is selected', () => {
+    const onRevealActiveFile = vi.fn()
+    const onCopyActiveFilePath = vi.fn()
+    const config = makeConfig({
+      activeTabPath: '/vault/current.md',
+      entries: [{ path: '/vault/current.md', title: 'Current', fileKind: 'markdown' }],
+      onRevealActiveFile,
+      onCopyActiveFilePath,
+    })
+    const { result } = renderHook(() => useCommandRegistry(config))
+
+    expect(findCommand(result.current, 'reveal-active-file')).toMatchObject({
+      enabled: true,
+      group: 'Note',
+      label: 'Reveal in Finder',
+    })
+    expect(findCommand(result.current, 'copy-active-file-path')).toMatchObject({
+      enabled: true,
+      group: 'Note',
+      label: 'Copy File Path',
+    })
+
+    findCommand(result.current, 'reveal-active-file')!.execute()
+    findCommand(result.current, 'copy-active-file-path')!.execute()
+
+    expect(onRevealActiveFile).toHaveBeenCalledWith('/vault/current.md')
+    expect(onCopyActiveFilePath).toHaveBeenCalledWith('/vault/current.md')
+  })
+
+  it('only enables external open for non-markdown active files', () => {
+    const onOpenActiveFileExternal = vi.fn()
+    const { result, rerender } = renderHook(
+      (props) => useCommandRegistry(props),
+      {
+        initialProps: makeConfig({
+          activeTabPath: '/vault/current.md',
+          entries: [{ path: '/vault/current.md', title: 'Current', fileKind: 'markdown' }],
+          onOpenActiveFileExternal,
+        }),
+      },
+    )
+
+    expect(findCommand(result.current, 'open-active-file-external')?.enabled).toBe(false)
+
+    rerender(makeConfig({
+      activeTabPath: '/vault/Attachments/photo.png',
+      entries: [{ path: '/vault/Attachments/photo.png', title: 'photo.png', fileKind: 'binary' }],
+      onOpenActiveFileExternal,
+    }))
+
+    const command = findCommand(result.current, 'open-active-file-external')!
+    expect(command.enabled).toBe(true)
+    command.execute()
+    expect(onOpenActiveFileExternal).toHaveBeenCalledWith('/vault/Attachments/photo.png')
+  })
+
   it('disables Toggle Raw Editor when the active file cannot switch to rich mode', () => {
     const config = makeConfig({ onToggleRawEditor: undefined })
     const { result } = renderHook(() => useCommandRegistry(config))
     expect(findCommand(result.current, 'toggle-raw-editor')?.enabled).toBe(false)
   })
 
-  it('exposes a command palette action for the note layout preference', () => {
-    const onToggleNoteLayout = vi.fn()
-    const config = makeConfig({ noteLayout: 'centered', onToggleNoteLayout })
+  it('exposes command palette actions for note width modes', () => {
+    const onSetNoteWidth = vi.fn()
+    const config = makeConfig({ noteWidth: 'normal', onSetNoteWidth })
     const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'toggle-note-layout')
+    const cmd = findCommand(result.current, 'set-note-width-wide')
 
     expect(cmd).toBeDefined()
     expect(cmd!.group).toBe('View')
-    expect(cmd!.label).toBe('Use Left-Aligned Note Layout')
+    expect(cmd!.label).toBe('Use Wide Note Width')
     expect(cmd!.keywords).toContain('wide')
 
     cmd!.execute()
 
-    expect(onToggleNoteLayout).toHaveBeenCalledOnce()
+    expect(onSetNoteWidth).toHaveBeenCalledWith('wide')
   })
 
-  it('updates note layout command copy when left alignment is active', () => {
-    const config = makeConfig({ noteLayout: 'left' })
+  it('exposes command palette actions for moving the selected saved view', () => {
+    const onMoveSelectedViewUp = vi.fn()
+    const onMoveSelectedViewDown = vi.fn()
+    const config = makeConfig({
+      selectedViewName: 'Active Projects',
+      onMoveSelectedViewUp,
+      onMoveSelectedViewDown,
+      canMoveSelectedViewUp: true,
+      canMoveSelectedViewDown: true,
+    })
     const { result } = renderHook(() => useCommandRegistry(config))
 
-    expect(findCommand(result.current, 'toggle-note-layout')?.label).toBe('Use Centered Note Layout')
+    const moveUp = findCommand(result.current, 'move-view-up')
+    const moveDown = findCommand(result.current, 'move-view-down')
+
+    expect(moveUp).toMatchObject({
+      label: 'Move Active Projects Up',
+      group: 'View',
+      enabled: true,
+    })
+    expect(moveDown).toMatchObject({
+      label: 'Move Active Projects Down',
+      group: 'View',
+      enabled: true,
+    })
+
+    moveUp!.execute()
+    moveDown!.execute()
+
+    expect(onMoveSelectedViewUp).toHaveBeenCalledOnce()
+    expect(onMoveSelectedViewDown).toHaveBeenCalledOnce()
+  })
+
+  it('disables saved view move commands at list boundaries', () => {
+    const config = makeConfig({
+      selectedViewName: 'Top View',
+      onMoveSelectedViewUp: vi.fn(),
+      onMoveSelectedViewDown: vi.fn(),
+      canMoveSelectedViewUp: false,
+      canMoveSelectedViewDown: true,
+    })
+    const { result } = renderHook(() => useCommandRegistry(config))
+
+    expect(findCommand(result.current, 'move-view-up')?.enabled).toBe(false)
+    expect(findCommand(result.current, 'move-view-down')?.enabled).toBe(true)
+  })
+
+  it('disables the command for the active note width mode', () => {
+    const config = makeConfig({ noteWidth: 'wide' })
+    const { result } = renderHook(() => useCommandRegistry(config))
+
+    expect(findCommand(result.current, 'set-note-width-wide')?.enabled).toBe(false)
+    expect(findCommand(result.current, 'set-note-width-normal')?.enabled).toBe(true)
+  })
+
+  it('exposes command palette actions for the default note width', () => {
+    const onSetDefaultNoteWidth = vi.fn()
+    const config = makeConfig({ defaultNoteWidth: 'normal', onSetDefaultNoteWidth })
+    const { result } = renderHook(() => useCommandRegistry(config))
+    const cmd = findCommand(result.current, 'set-default-note-width-wide')
+
+    expect(cmd).toMatchObject({
+      label: 'Use Wide Note Width by Default',
+      group: 'View',
+      enabled: true,
+    })
+
+    cmd!.execute()
+    expect(onSetDefaultNoteWidth).toHaveBeenCalledWith('wide')
+  })
+
+  it('exposes command palette actions for light and dark mode', () => {
+    const onSetThemeMode = vi.fn()
+    const config = makeConfig({ onSetThemeMode })
+    const { result } = renderHook(() => useCommandRegistry(config))
+    const lightMode = findCommand(result.current, 'use-light-mode')
+    const darkMode = findCommand(result.current, 'use-dark-mode')
+
+    expect(lightMode).toMatchObject({
+      label: 'Use Light Mode',
+      enabled: true,
+      group: 'Settings',
+    })
+    expect(darkMode).toMatchObject({
+      label: 'Use Dark Mode',
+      enabled: true,
+      group: 'Settings',
+    })
+
+    lightMode?.execute()
+    darkMode?.execute()
+
+    expect(onSetThemeMode).toHaveBeenNthCalledWith(1, 'light')
+    expect(onSetThemeMode).toHaveBeenNthCalledWith(2, 'dark')
   })
 
   it('includes a New AI chat command that opens and resets the panel session', () => {
@@ -310,42 +497,56 @@ describe('useCommandRegistry', () => {
   })
 
   it('enables folder commands when a folder is selected', () => {
-    const config = makeConfig({
+    expectFolderCommandStates({
       selection: { kind: 'folder', path: 'projects' },
       onRenameFolder: vi.fn(),
       onDeleteFolder: vi.fn(),
-    })
-    const { result } = renderHook(() => useCommandRegistry(config))
-
-    expect(findCommand(result.current, 'rename-folder')?.enabled).toBe(true)
-    expect(findCommand(result.current, 'delete-folder')?.enabled).toBe(true)
+      onRevealSelectedFolder: vi.fn(),
+      onCopySelectedFolderPath: vi.fn(),
+    }, { copy: true, delete: true, rename: true, reveal: true })
   })
 
   it('disables folder commands outside folder selection', () => {
-    const config = makeConfig({
+    expectFolderCommandStates({
       selection: { kind: 'filter', filter: 'all' },
       onRenameFolder: vi.fn(),
       onDeleteFolder: vi.fn(),
-    })
-    const { result } = renderHook(() => useCommandRegistry(config))
+      onRevealSelectedFolder: vi.fn(),
+      onCopySelectedFolderPath: vi.fn(),
+    }, { copy: false, delete: false, rename: false, reveal: false })
+  })
 
-    expect(findCommand(result.current, 'rename-folder')?.enabled).toBe(false)
-    expect(findCommand(result.current, 'delete-folder')?.enabled).toBe(false)
+  it('keeps root folder reveal and copy commands enabled without destructive actions', () => {
+    expectFolderCommandStates({
+      selection: { kind: 'folder', path: '', rootPath: '/Users/luca/Laputa' },
+      onRenameFolder: vi.fn(),
+      onDeleteFolder: vi.fn(),
+      onRevealSelectedFolder: vi.fn(),
+      onCopySelectedFolderPath: vi.fn(),
+    }, { copy: true, delete: false, rename: false, reveal: true })
   })
 
   it('executes folder command callbacks', () => {
     const onRenameFolder = vi.fn()
     const onDeleteFolder = vi.fn()
+    const onRevealSelectedFolder = vi.fn()
+    const onCopySelectedFolderPath = vi.fn()
     const config = makeConfig({
       selection: { kind: 'folder', path: 'projects' },
       onRenameFolder,
       onDeleteFolder,
+      onRevealSelectedFolder,
+      onCopySelectedFolderPath,
     })
     const { result } = renderHook(() => useCommandRegistry(config))
 
+    findCommand(result.current, 'reveal-selected-folder')!.execute()
+    findCommand(result.current, 'copy-selected-folder-path')!.execute()
     findCommand(result.current, 'rename-folder')!.execute()
     findCommand(result.current, 'delete-folder')!.execute()
 
+    expect(onRevealSelectedFolder).toHaveBeenCalledTimes(1)
+    expect(onCopySelectedFolderPath).toHaveBeenCalledTimes(1)
     expect(onRenameFolder).toHaveBeenCalledTimes(1)
     expect(onDeleteFolder).toHaveBeenCalledTimes(1)
   })
@@ -386,6 +587,22 @@ describe('useCommandRegistry', () => {
       id: 'create-note',
       shortcut: formatShortcutDisplay({ display: '⌘N' }),
     })
+  })
+
+  it('exposes paste without formatting in the command palette', () => {
+    const onPastePlainText = vi.fn()
+    const { result } = renderHook(() => useCommandRegistry(makeConfig({ onPastePlainText })))
+    const command = findCommand(result.current, 'paste-plain-text')
+
+    expect(command).toMatchObject({
+      label: 'Paste without formatting',
+      group: 'Note',
+      shortcut: formatShortcutDisplay({ display: '⌘⇧V' }),
+      enabled: true,
+    })
+
+    command!.execute()
+    expect(onPastePlainText).toHaveBeenCalledOnce()
   })
 
   it('keeps a single canonical New Type command when the Type definition exists', () => {
@@ -627,6 +844,9 @@ describe('reload-vault command', () => {
       aiAgentsStatus: {
         claude_code: { status: 'installed', version: '1.0.20' },
         codex: { status: 'installed', version: '0.37.0' },
+        opencode: { status: 'installed', version: '0.3.1' },
+        pi: { status: 'installed', version: '0.70.2' },
+        gemini: { status: 'installed', version: '0.5.1' },
       },
       selectedAiAgent: 'claude_code',
       onSetDefaultAiAgent,
@@ -636,6 +856,9 @@ describe('reload-vault command', () => {
 
     expect(cmd).toBeDefined()
     expect(cmd!.label).toBe('Switch AI Agent to Codex')
+    expect(findCommand(result.current, 'switch-ai-agent-opencode')).toBeDefined()
+    expect(findCommand(result.current, 'switch-ai-agent-pi')).toBeDefined()
+    expect(findCommand(result.current, 'switch-ai-agent-gemini')).toBeDefined()
 
     cmd!.execute()
     expect(onSetDefaultAiAgent).toHaveBeenCalledWith('codex')
@@ -647,6 +870,9 @@ describe('reload-vault command', () => {
       aiAgentsStatus: {
         claude_code: { status: 'installed', version: '1.0.20' },
         codex: { status: 'missing', version: null },
+        opencode: { status: 'missing', version: null },
+        pi: { status: 'missing', version: null },
+        gemini: { status: 'missing', version: null },
       },
       selectedAiAgent: 'claude_code',
       onSetDefaultAiAgent: vi.fn(),
@@ -654,6 +880,9 @@ describe('reload-vault command', () => {
     const { result } = renderHook(() => useCommandRegistry(config))
 
     expect(findCommand(result.current, 'switch-ai-agent-codex')).toBeUndefined()
+    expect(findCommand(result.current, 'switch-ai-agent-opencode')).toBeUndefined()
+    expect(findCommand(result.current, 'switch-ai-agent-pi')).toBeUndefined()
+    expect(findCommand(result.current, 'switch-ai-agent-gemini')).toBeUndefined()
     expect(findCommand(result.current, 'switch-default-ai-agent')).toBeUndefined()
   })
 })

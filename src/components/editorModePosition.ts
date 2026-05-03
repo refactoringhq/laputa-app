@@ -1,6 +1,6 @@
 import { compactMarkdown } from '../utils/compact-markdown'
 import { restoreWikilinksInBlocks, splitFrontmatter } from '../utils/wikilinks'
-import { serializeMathAwareBlocks } from '../utils/mathMarkdown'
+import { serializeMermaidAwareBlocks } from '../utils/mermaidMarkdown'
 import { findNearestTextCursorBlockById } from './blockNoteCursorTarget'
 
 interface BlockLike {
@@ -81,6 +81,10 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
+function clampSelectionOffset(value: number, maxOffset: number): number {
+  return Number.isFinite(value) ? clamp(value, 0, maxOffset) : 0
+}
+
 function countLines({ text }: { text: string }): number {
   return text.length === 0 ? 1 : text.split('\n').length
 }
@@ -129,11 +133,11 @@ function getLineIndexFromRatio({ totalLines, ratio }: { totalLines: number; rati
 }
 
 function serializeBlock(editor: BlockNotePositionEditor, block: BlockLike): string {
-  return compactMarkdown(serializeMathAwareBlocks(editor, restoreWikilinksInBlocks([block])))
+  return compactMarkdown(serializeMermaidAwareBlocks(editor, restoreWikilinksInBlocks([block])))
 }
 
 function serializeEditorBody(editor: BlockNotePositionEditor): string {
-  return compactMarkdown(serializeMathAwareBlocks(editor, restoreWikilinksInBlocks(editor.document)))
+  return compactMarkdown(serializeMermaidAwareBlocks(editor, restoreWikilinksInBlocks(editor.document)))
 }
 
 function buildBlockLineRanges({
@@ -336,7 +340,17 @@ export function restoreCodeMirrorView(
   const view = getRawEditorView(documentObject)
   if (!view) return false
 
-  view.dispatch({ selection: { anchor: state.anchor, head: state.head } })
+  const maxOffset = view.state.doc.toString().length
+  const selection = {
+    anchor: clampSelectionOffset(state.anchor, maxOffset),
+    head: clampSelectionOffset(state.head, maxOffset),
+  }
+
+  try {
+    view.dispatch({ selection })
+  } catch {
+    return false
+  }
   view.scrollDOM.scrollTop = state.scrollTop
   view.focus()
   return true

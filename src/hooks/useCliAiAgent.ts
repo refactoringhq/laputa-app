@@ -1,26 +1,28 @@
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { AiAgentId } from '../lib/aiAgents'
+import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
 import type { NoteReference } from '../utils/ai-context'
 import {
+  type AgentStatus,
   type AiAgentMessage,
 } from '../lib/aiAgentConversation'
+import type { AgentFileCallbacks } from '../lib/aiAgentFileOperations'
 import {
+  addAgentLocalMarker,
   clearAgentConversation,
   sendAgentMessage,
   type AiAgentSessionRuntime,
 } from '../lib/aiAgentSession'
 import type { ToolInvocation } from '../lib/aiAgentMessageState'
-import {
-  type AgentFileCallbacks,
-  type AgentStatus,
-} from './useAiAgent'
 
-export type { AgentFileCallbacks, AgentStatus } from './useAiAgent'
+export type { AgentFileCallbacks } from '../lib/aiAgentFileOperations'
+export type { AgentStatus } from '../lib/aiAgentConversation'
 export type { AiAgentMessage } from '../lib/aiAgentConversation'
 
 interface UseCliAiAgentOptions {
   agent: AiAgentId
   agentReady: boolean
+  permissionMode: AiAgentPermissionMode
 }
 
 interface UseCliAiAgentRuntime extends AiAgentSessionRuntime {
@@ -67,6 +69,7 @@ export function useCliAiAgent(
   options: UseCliAiAgentOptions,
 ) {
   const { agent, agentReady } = options
+  const { permissionMode } = options
   const runtime = useCliAiAgentRuntime(fileCallbacks)
   const { messages, status } = runtime
 
@@ -77,6 +80,7 @@ export function useCliAiAgent(
         agent,
         ready: agentReady,
         vaultPath,
+        permissionMode,
         systemPromptOverride: contextPrompt,
       },
       prompt: { text, references },
@@ -87,5 +91,9 @@ export function useCliAiAgent(
     clearAgentConversation(runtime)
   }
 
-  return { messages, status, sendMessage, clearConversation }
+  function addLocalMarker(text: string): void {
+    addAgentLocalMarker(runtime, text)
+  }
+
+  return { messages, status, sendMessage, clearConversation, addLocalMarker }
 }

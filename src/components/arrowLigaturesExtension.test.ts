@@ -4,7 +4,11 @@ import { createArrowLigaturesExtension } from './arrowLigaturesExtension'
 function createFixture() {
   let beforeInputListener: ((event: InputEvent) => void) | null = null
   const transaction = { insertText: vi.fn(() => transaction) }
+  const paragraphNode = { type: { name: 'paragraph', spec: {} } }
   const view = {
+    dom: {
+      isConnected: true,
+    },
     dispatch: vi.fn(),
     state: {
       doc: {
@@ -13,6 +17,10 @@ function createFixture() {
       selection: {
         from: 2,
         to: 2,
+        $from: {
+          depth: 0,
+          node: vi.fn(() => paragraphNode),
+        },
       },
       tr: transaction,
     },
@@ -119,6 +127,21 @@ describe('createArrowLigaturesExtension', () => {
     expect(fixture.view.dispatch).not.toHaveBeenCalled()
   })
 
+  it('does not replace arrows while typing inside code blocks', () => {
+    const fixture = createFixture()
+    fixture.mount()
+    fixture.view.state.doc.textBetween.mockReturnValue('-')
+    fixture.view.state.selection.$from.node.mockReturnValue({
+      type: { name: 'codeBlock', spec: { code: true } },
+    })
+
+    const event = fixture.fireInput()
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(fixture.transaction.insertText).not.toHaveBeenCalled()
+    expect(fixture.view.dispatch).not.toHaveBeenCalled()
+  })
+
   it('ignores composing input so IME text is not rewritten', () => {
     const fixture = createFixture()
     fixture.mount()
@@ -128,5 +151,18 @@ describe('createArrowLigaturesExtension', () => {
     expect(event.preventDefault).not.toHaveBeenCalled()
     expect(fixture.transaction.insertText).not.toHaveBeenCalled()
     expect(fixture.view.dispatch).not.toHaveBeenCalled()
+  })
+
+  it('falls through when a reload leaves the ProseMirror view stale during beforeinput', () => {
+    const fixture = createFixture()
+    fixture.mount()
+    Object.defineProperty(fixture.view, 'state', {
+      configurable: true,
+      get: () => {
+        throw new Error('stale editor view')
+      },
+    })
+
+    expect(() => fixture.fireInput()).not.toThrow()
   })
 })

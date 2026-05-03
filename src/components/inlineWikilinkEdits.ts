@@ -14,6 +14,14 @@ function collapseSelection(index: number): InlineSelectionRange {
   return { start: index, end: index }
 }
 
+export function selectedInlineText(
+  value: string,
+  selection: InlineSelectionRange,
+): string {
+  const normalizedSelection = normalizeSelectionRange(selection, value.length)
+  return value.slice(normalizedSelection.start, normalizedSelection.end)
+}
+
 export function replaceInlineSelection(
   value: string,
   selection: InlineSelectionRange,

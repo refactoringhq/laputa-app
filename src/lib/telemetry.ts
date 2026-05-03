@@ -25,15 +25,24 @@ let posthogInstance: typeof import('posthog-js').default | null = null
 export function initSentry(anonymousId: string): void {
   if (sentryInitialized) return
 
-  const { sentryDsn } = resolveFrontendTelemetryConfig()
+  const { sentryDsn, sentryBuildVersion, sentryRelease } = resolveFrontendTelemetryConfig()
   if (!sentryDsn) return
 
   Sentry.init({
     dsn: sentryDsn,
+    release: sentryRelease || undefined,
     sendDefaultPii: false,
     beforeSend: scrubSentryEvent,
   })
   Sentry.setUser({ id: anonymousId })
+  if (sentryBuildVersion) {
+    const releaseKind = sentryRelease
+      ? 'stable'
+      : sentryBuildVersion.includes('-') ? 'prerelease' : 'internal'
+
+    Sentry.setTag('tolaria.build_version', sentryBuildVersion)
+    Sentry.setTag('tolaria.release_kind', releaseKind)
+  }
   sentryInitialized = true
 }
 

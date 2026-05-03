@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { isTauri, addMockEntry } from '../mock-tauri'
+import { isTauri, addMockEntry, mockInvoke } from '../mock-tauri'
 import type { VaultEntry } from '../types'
 import { slugifyNoteStem as slugify } from '../utils/noteSlug'
 import { resolveEntry } from '../utils/wikilink'
 import { trackEvent } from '../lib/telemetry'
+import { cacheNoteContent } from './useTabManagement'
 
 export interface NewEntryParams {
   path: string
@@ -156,7 +157,7 @@ export interface NewTypeParams {
 export function resolveNewType({ typeName, vaultPath }: NewTypeParams): { entry: VaultEntry; content: string } {
   const slug = slugify(typeName)
   const entry = buildNewEntry({ path: `${vaultPath}/${slug}.md`, slug, title: typeName, type: 'Type', status: null })
-  return { entry, content: `---\ntype: Type\n---\n` }
+  return { entry, content: `---\ntype: Type\n---\n\n# ${typeName}\n` }
 }
 
 type ResolvedEntry = { entry: VaultEntry; content: string }
@@ -228,13 +229,6 @@ export function planNewTypeCreation({
   if (existingType) return { status: 'existing', entry: existingType }
 
   const resolved = resolveNewType({ typeName, vaultPath })
-  const collision = findPathCollision(entries, resolved.entry.path)
-  if (collision) {
-    return {
-      status: 'blocked',
-      message: buildCreationCollisionMessage({ noun: 'type', title: typeName, path: resolved.entry.path }),
-    }
-  }
   return { status: 'create', resolved }
 }
 
@@ -255,8 +249,28 @@ function createPersistFailureMessage(entry: VaultEntry, error: unknown): string 
 
 /** Persist a newly created note to disk. Returns a Promise for error handling. */
 export function persistNewNote(path: string, content: string): Promise<void> {
-  if (!isTauri()) return Promise.resolve()
+  if (!isTauri()) return mockInvoke<void>('save_note_content', { path, content }).then(() => {})
   return invoke<void>('create_note_content', { path, content }).then(() => {})
+}
+
+async function typeTargetExistsOnDisk(path: string): Promise<boolean> {
+  if (!isTauri()) return false
+
+  try {
+    await invoke<string>('get_note_content', { path })
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function findTypeTargetCollision(resolved: ResolvedEntry): Promise<string | null> {
+  if (!await typeTargetExistsOnDisk(resolved.entry.path)) return null
+  return buildCreationCollisionMessage({
+    noun: 'type',
+    title: resolved.entry.title,
+    path: resolved.entry.path,
+  })
 }
 
 // Rapid Cmd+N bursts can outpace the note-list render path on desktop. Keep
@@ -279,7 +293,7 @@ function signalFocusEditor(opts?: { selectTitle?: boolean; path?: string }): voi
 interface PersistCallbacks {
   onStart?: (p: string) => void
   onEnd?: (p: string) => void
-  onPersisted?: () => void
+  onPersisted?: (path: string) => void
 }
 
 /** Persist to disk; track pending state via onStart/onEnd. */
@@ -287,7 +301,7 @@ async function persistOptimistic(path: string, content: string, cbs: PersistCall
   cbs.onStart?.(path)
   try {
     await persistNewNote(path, content)
-    cbs.onPersisted?.()
+    cbs.onPersisted?.(path)
   } finally {
     cbs.onEnd?.(path)
   }
@@ -364,6 +378,12 @@ async function createTypeFromName({
     return false
   }
 
+  const collisionMessage = await findTypeTargetCollision(plan.resolved)
+  if (collisionMessage) {
+    setToastMessage(collisionMessage)
+    return false
+  }
+
   try {
     await persistResolvedEntry(plan.resolved)
     trackEvent('type_created')
@@ -388,6 +408,12 @@ async function createTypeSilently({
     throw new Error(plan.message)
   }
 
+  const collisionMessage = await findTypeTargetCollision(plan.resolved)
+  if (collisionMessage) {
+    setToastMessage(collisionMessage)
+    throw new Error(collisionMessage)
+  }
+
   try {
     await persistResolvedEntry(plan.resolved, { openTab: false })
     return plan.resolved.entry
@@ -399,13 +425,15 @@ async function createTypeSilently({
 }
 
 interface ImmediateCreateDeps {
+  addPendingSave?: (path: string) => void
   entries: VaultEntry[]
   vaultPath: string
   pendingSlugs: Set<string>
   openTabWithContent: (entry: VaultEntry, content: string) => void
   addEntry: (entry: VaultEntry) => void
-  trackUnsaved?: (path: string) => void
-  markContentPending?: (path: string, content: string) => void
+  onNewNotePersisted?: (path: string) => void
+  removePendingSave?: (path: string) => void
+  setToastMessage: (msg: string | null) => void
 }
 
 interface ImmediateCreateRequest {
@@ -413,12 +441,14 @@ interface ImmediateCreateRequest {
 }
 
 interface ImmediateCreateQueueConfig {
+  addPendingSave?: (path: string) => void
   entries: VaultEntry[]
   vaultPath: string
   addEntry: (entry: VaultEntry) => void
   openTabWithContent: (entry: VaultEntry, content: string) => void
-  trackUnsaved?: (path: string) => void
-  markContentPending?: (path: string, content: string) => void
+  onNewNotePersisted?: (path: string) => void
+  removePendingSave?: (path: string) => void
+  setToastMessage: (msg: string | null) => void
 }
 
 /** Generate a unique untitled filename using a timestamp. */
@@ -439,8 +469,26 @@ function generateUntitledFilename(entries: VaultEntry[], type: string, pendingSl
   return candidate
 }
 
-/** Create an untitled note without persisting to disk (deferred save). */
-function createNoteImmediate(deps: ImmediateCreateDeps, type?: string): void {
+async function persistImmediateEntry(
+  deps: ImmediateCreateDeps,
+  entry: VaultEntry,
+  content: string,
+): Promise<boolean> {
+  try {
+    await persistOptimistic(entry.path, content, {
+      onStart: deps.addPendingSave,
+      onEnd: deps.removePendingSave,
+      onPersisted: deps.onNewNotePersisted,
+    })
+    return true
+  } catch (error) {
+    deps.setToastMessage(createPersistFailureMessage(entry, error))
+    return false
+  }
+}
+
+/** Create an untitled note and write its backing file before opening it. */
+async function createNoteImmediate(deps: ImmediateCreateDeps, type?: string): Promise<boolean> {
   const noteType = type || 'Note'
   const slug = generateUntitledFilename(deps.entries, noteType, deps.pendingSlugs)
   const title = slug_to_title(slug)
@@ -453,11 +501,68 @@ function createNoteImmediate(deps: ImmediateCreateDeps, type?: string): void {
   })
   const entry = buildNewEntry({ path: `${targetDir}/${slug}.md`, slug, title, type: noteType, status })
   const content = buildNoteContent({ title: null, type: noteType, status, template, initialEmptyHeading: true })
+  const didPersist = await persistImmediateEntry(deps, entry, content)
+  if (!didPersist) return false
+
+  cacheNoteContent(entry.path, content, entry)
   deps.openTabWithContent(entry, content)
   addEntryWithMock(entry, content, deps.addEntry)
-  deps.trackUnsaved?.(entry.path)
-  deps.markContentPending?.(entry.path, content)
   signalFocusEditor({ path: entry.path, selectTitle: true })
+  return true
+}
+
+function trackImmediateCreate(request: ImmediateCreateRequest, didCreate: boolean): void {
+  if (!didCreate) return
+  trackEvent('note_created', {
+    has_type: request.type ? 1 : 0,
+    creation_path: request.type ? 'type_section' : 'cmd_n',
+  })
+}
+
+function useLatestImmediateCreateDeps(
+  config: ImmediateCreateQueueConfig,
+  pendingSlugsRef: MutableRefObject<Set<string>>,
+) {
+  const {
+    entries,
+    vaultPath,
+    openTabWithContent,
+    addEntry,
+    addPendingSave,
+    onNewNotePersisted,
+    removePendingSave,
+    setToastMessage,
+  } = config
+  const latestDepsRef = useRef<ImmediateCreateDeps | null>(null)
+  const syncDeps = useCallback(() => {
+    latestDepsRef.current = {
+      entries,
+      vaultPath,
+      pendingSlugs: pendingSlugsRef.current,
+      openTabWithContent,
+      addEntry,
+      addPendingSave,
+      onNewNotePersisted,
+      removePendingSave,
+      setToastMessage,
+    }
+  }, [
+    entries,
+    vaultPath,
+    openTabWithContent,
+    addEntry,
+    addPendingSave,
+    onNewNotePersisted,
+    removePendingSave,
+    setToastMessage,
+    pendingSlugsRef,
+  ])
+
+  useEffect(() => {
+    syncDeps()
+  }, [syncDeps])
+
+  return { latestDepsRef, syncDeps }
 }
 
 function useImmediateCreateQueue(config: ImmediateCreateQueueConfig): (type?: string) => void {
@@ -465,45 +570,26 @@ function useImmediateCreateQueue(config: ImmediateCreateQueueConfig): (type?: st
   const queuedImmediateCreatesRef = useRef<ImmediateCreateRequest[]>([])
   const immediateCreateLockedRef = useRef(false)
   const immediateCreateTimerRef = useRef<number | null>(null)
-  const latestDepsRef = useRef<ImmediateCreateDeps | null>(null)
+  const queueMountedRef = useRef(true)
+  const { latestDepsRef, syncDeps } = useLatestImmediateCreateDeps(config, pendingSlugsRef)
 
-  const syncDeps = useCallback(() => {
-    latestDepsRef.current = {
-      entries: config.entries,
-      vaultPath: config.vaultPath,
-      pendingSlugs: pendingSlugsRef.current,
-      openTabWithContent: config.openTabWithContent,
-      addEntry: config.addEntry,
-      trackUnsaved: config.trackUnsaved,
-      markContentPending: config.markContentPending,
-    }
-  }, [
-    config.entries,
-    config.vaultPath,
-    config.openTabWithContent,
-    config.addEntry,
-    config.trackUnsaved,
-    config.markContentPending,
-  ])
-
-  useEffect(() => {
-    syncDeps()
-  }, [syncDeps])
-
-  const executeRequest = useCallback((request: ImmediateCreateRequest) => {
+  const executeRequest = useCallback(async (request: ImmediateCreateRequest): Promise<void> => {
     const deps = latestDepsRef.current
     if (!deps) return
-    createNoteImmediate(deps, request.type)
-    trackEvent('note_created', {
-      has_type: request.type ? 1 : 0,
-      creation_path: request.type ? 'type_section' : 'cmd_n',
-    })
-  }, [])
+
+    try {
+      const didCreate = await createNoteImmediate(deps, request.type)
+      trackImmediateCreate(request, didCreate)
+    } catch (error) {
+      console.warn('Failed to create immediate note:', error)
+    }
+  }, [latestDepsRef])
 
   const scheduleQueuedBurst = useCallback(function scheduleQueuedBurst() {
+    if (!queueMountedRef.current) return
     if (immediateCreateTimerRef.current !== null) return
 
-    immediateCreateTimerRef.current = window.setTimeout(() => {
+    immediateCreateTimerRef.current = window.setTimeout(async () => {
       immediateCreateTimerRef.current = null
       const next = queuedImmediateCreatesRef.current.shift()
       if (!next) {
@@ -511,14 +597,18 @@ function useImmediateCreateQueue(config: ImmediateCreateQueueConfig): (type?: st
         return
       }
 
-      executeRequest(next)
+      await executeRequest(next)
       scheduleQueuedBurst()
     }, RAPID_CREATE_NOTE_SETTLE_MS)
   }, [executeRequest])
 
-  useEffect(() => () => {
-    if (immediateCreateTimerRef.current !== null) {
-      window.clearTimeout(immediateCreateTimerRef.current)
+  useEffect(() => {
+    queueMountedRef.current = true
+    return () => {
+      queueMountedRef.current = false
+      if (immediateCreateTimerRef.current !== null) {
+        window.clearTimeout(immediateCreateTimerRef.current)
+      }
     }
   }, [])
 
@@ -531,8 +621,7 @@ function useImmediateCreateQueue(config: ImmediateCreateQueueConfig): (type?: st
     }
 
     immediateCreateLockedRef.current = true
-    executeRequest(request)
-    scheduleQueuedBurst()
+    void executeRequest(request).then(scheduleQueuedBurst)
   }, [syncDeps, executeRequest, scheduleQueuedBurst])
 }
 
@@ -548,7 +637,8 @@ export interface NoteCreationConfig {
   clearUnsaved?: (path: string) => void
   unsavedPaths?: Set<string>
   markContentPending?: (path: string, content: string) => void
-  onNewNotePersisted?: () => void
+  onNewNotePersisted?: (path: string) => void
+  onTypeStateChanged?: () => void | Promise<void>
 }
 
 interface CreationTabDeps {
@@ -556,7 +646,17 @@ interface CreationTabDeps {
 }
 
 export function useNoteCreation(config: NoteCreationConfig, tabDeps: CreationTabDeps) {
-  const { addEntry, removeEntry, entries, setToastMessage, addPendingSave, removePendingSave, vaultPath } = config
+  const {
+    addEntry,
+    removeEntry,
+    entries,
+    setToastMessage,
+    addPendingSave,
+    removePendingSave,
+    vaultPath,
+    onNewNotePersisted,
+    onTypeStateChanged,
+  } = config
   const { openTabWithContent } = tabDeps
 
   const persistResolvedEntry = useCallback(async (
@@ -569,13 +669,16 @@ export function useNoteCreation(config: NoteCreationConfig, tabDeps: CreationTab
       await persistOptimistic(resolved.entry.path, resolved.content, {
         onStart: addPendingSave,
         onEnd: removePendingSave,
-        onPersisted: config.onNewNotePersisted,
+        onPersisted: onNewNotePersisted,
       })
+      if (resolved.entry.isA === 'Type') {
+        await onTypeStateChanged?.()
+      }
     } catch (error) {
       removeEntry(resolved.entry.path)
       throw error
     }
-  }, [openTabWithContent, addEntry, addPendingSave, removePendingSave, config.onNewNotePersisted, removeEntry])
+  }, [openTabWithContent, addEntry, addPendingSave, removePendingSave, onNewNotePersisted, onTypeStateChanged, removeEntry])
 
   const handleCreateNote = useCallback((title: string, type: string): Promise<boolean> =>
     createNamedNote({ entries, vaultPath, setToastMessage, persistResolvedEntry, title, type, creationPath: 'plus_button' }),
@@ -597,9 +700,11 @@ export function useNoteCreation(config: NoteCreationConfig, tabDeps: CreationTab
     entries,
     vaultPath,
     addEntry,
+    addPendingSave,
     openTabWithContent,
-    trackUnsaved: config.trackUnsaved,
-    markContentPending: config.markContentPending,
+    onNewNotePersisted,
+    removePendingSave,
+    setToastMessage,
   })
 
   return {

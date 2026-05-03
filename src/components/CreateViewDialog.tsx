@@ -1,16 +1,21 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FilterBuilder } from './FilterBuilder'
-import { EmojiPicker } from './EmojiPicker'
 import type { FilterGroup, ViewDefinition } from '../types'
+import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
+
+type SaveViewResult = boolean | void
+type SaveViewHandler = (definition: ViewDefinition) => SaveViewResult | Promise<SaveViewResult>
+type InitialViewFormValues = Pick<ViewDefinition, 'name' | 'icon' | 'color' | 'filters'>
 
 interface CreateViewDialogProps {
   open: boolean
   onClose: () => void
-  onCreate: (definition: ViewDefinition) => void
+  onCreate: SaveViewHandler
   availableFields: string[]
+  locale?: AppLocale
   /** When provided, the dialog operates in edit mode with pre-populated fields. */
   editingView?: ViewDefinition | null
 }
@@ -19,25 +24,29 @@ interface CreateViewDialogFormProps {
   availableFields: string[]
   initialName: string
   initialIcon: string
+  initialColor: string | null
   initialFilters: FilterGroup
   isEditing: boolean
+  locale: AppLocale
   onClose: () => void
-  onCreate: (definition: ViewDefinition) => void
+  onCreate: SaveViewHandler
 }
 
 function CreateViewDialogForm({
   availableFields,
   initialName,
   initialIcon,
+  initialColor,
   initialFilters,
   isEditing,
+  locale,
   onClose,
   onCreate,
 }: CreateViewDialogFormProps) {
   const [name, setName] = useState(initialName)
-  const [icon, setIcon] = useState(initialIcon)
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [filters, setFilters] = useState<FilterGroup>(initialFilters)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -45,61 +54,58 @@ function CreateViewDialogForm({
     return () => window.clearTimeout(timeoutId)
   }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSaving) return
     const trimmed = name.trim()
     if (!trimmed) return
     const definition: ViewDefinition = {
       name: trimmed,
-      icon: icon || null,
-      color: null,
+      icon: initialIcon || null,
+      color: initialColor,
       sort: null,
       filters,
     }
-    onCreate(definition)
-    onClose()
+    setSaveError(null)
+    setIsSaving(true)
+
+    let shouldClose = false
+    try {
+      const result = await onCreate(definition)
+      if (result === false) {
+        setSaveError(translate(locale, 'viewDialog.saveError'))
+      } else {
+        shouldClose = true
+      }
+    } catch {
+      setSaveError(translate(locale, 'viewDialog.saveError'))
+    }
+
+    setIsSaving(false)
+    if (shouldClose) onClose()
   }
-
-  const handleSelectEmoji = useCallback((emoji: string) => {
-    setIcon(emoji)
-    setShowEmojiPicker(false)
-  }, [])
-
-  const handleCloseEmojiPicker = useCallback(() => {
-    setShowEmojiPicker(false)
-  }, [])
 
   const isCreateDisabled = !name.trim()
 
   return (
     <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="flex gap-2">
-        <div className="w-16 space-y-1.5 relative">
-          <label className="text-xs font-medium text-muted-foreground">Icon</label>
-          <button
-            type="button"
-            className="flex h-9 w-full items-center justify-center rounded-md border border-input bg-background text-xl cursor-pointer hover:bg-accent transition-colors"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            title="Pick icon"
-          >
-            {icon || <span className="text-sm text-muted-foreground">📋</span>}
-          </button>
-          {showEmojiPicker && (
-            <EmojiPicker onSelect={handleSelectEmoji} onClose={handleCloseEmojiPicker} />
-          )}
-        </div>
-        <div className="flex-1 space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Name</label>
-          <Input
-            ref={inputRef}
-            placeholder="e.g. Active Projects, Reading List..."
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-muted-foreground">{translate(locale, 'viewDialog.nameLabel')}</label>
+        <Input
+          ref={inputRef}
+          placeholder={translate(locale, 'viewDialog.namePlaceholder')}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value)
+            if (saveError) setSaveError(null)
+          }}
+        />
       </div>
+      {saveError && (
+        <p role="alert" className="text-xs text-destructive">{saveError}</p>
+      )}
       <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
-        <label className="text-xs font-medium text-muted-foreground">Filters</label>
+        <label className="text-xs font-medium text-muted-foreground">{translate(locale, 'viewDialog.filtersLabel')}</label>
         <FilterBuilder
           group={filters}
           onChange={setFilters}
@@ -107,35 +113,59 @@ function CreateViewDialogForm({
         />
       </div>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit" disabled={isCreateDisabled}>{isEditing ? 'Save' : 'Create'}</Button>
+        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
+          {translate(locale, 'common.cancel')}
+        </Button>
+        <Button type="submit" disabled={isCreateDisabled || isSaving}>
+          {translate(locale, isEditing ? 'common.save' : 'common.create')}
+        </Button>
       </DialogFooter>
     </form>
   )
 }
 
-export function CreateViewDialog({ open, onClose, onCreate, availableFields, editingView }: CreateViewDialogProps) {
+function getInitialViewFormValues(
+  editingView: ViewDefinition | null | undefined,
+  availableFields: string[],
+): InitialViewFormValues {
+  return {
+    name: editingView?.name ?? '',
+    icon: editingView?.icon ?? '',
+    color: editingView?.color ?? null,
+    filters: editingView?.filters ?? { all: [{ field: availableFields[0] ?? 'type', op: 'equals', value: '' }] },
+  }
+}
+
+function getDialogDescription(isEditing: boolean): TranslationKey {
+  return isEditing
+    ? 'viewDialog.description.edit'
+    : 'viewDialog.description.create'
+}
+
+export function CreateViewDialog({ open, onClose, onCreate, availableFields, locale = 'en', editingView }: CreateViewDialogProps) {
   const isEditing = !!editingView
-  const initialFilters = editingView?.filters ?? { all: [{ field: availableFields[0] ?? 'type', op: 'equals', value: '' }] }
+  const initialValues = getInitialViewFormValues(editingView, availableFields)
   const formKey = editingView ? `edit:${editingView.name}` : `create:${availableFields[0] ?? 'type'}`
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
       <DialogContent showCloseButton={false} className="flex max-h-[80vh] flex-col sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit View' : 'Create View'}</DialogTitle>
+          <DialogTitle>{translate(locale, isEditing ? 'viewDialog.title.edit' : 'viewDialog.title.create')}</DialogTitle>
           <DialogDescription className="sr-only">
-            {isEditing ? 'Update the name, icon, and filters for this saved view.' : 'Create a saved view by choosing a name, icon, and filter rules.'}
+            {translate(locale, getDialogDescription(isEditing))}
           </DialogDescription>
         </DialogHeader>
         {open && (
           <CreateViewDialogForm
             key={formKey}
             availableFields={availableFields}
-            initialName={editingView?.name ?? ''}
-            initialIcon={editingView?.icon ?? ''}
-            initialFilters={initialFilters}
+            initialName={initialValues.name}
+            initialIcon={initialValues.icon ?? ''}
+            initialColor={initialValues.color}
+            initialFilters={initialValues.filters}
             isEditing={isEditing}
+            locale={locale}
             onClose={onClose}
             onCreate={onCreate}
           />

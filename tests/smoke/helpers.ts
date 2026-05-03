@@ -1,10 +1,12 @@
 import { type Page, expect } from '@playwright/test'
 
 const COMMAND_INPUT = 'input[placeholder="Type a command..."]'
+type KeyboardModifier = 'Meta' | 'Control' | 'Shift' | 'Alt'
+const COMMAND_MODIFIER: KeyboardModifier = process.platform === 'darwin' ? 'Meta' : 'Control'
 
 export async function openCommandPalette(page: Page): Promise<void> {
   await page.locator('body').click()
-  await page.keyboard.press('Control+k')
+  await sendShortcut(page, 'k', ['Control'])
   await expect(page.locator(COMMAND_INPUT)).toBeVisible()
 }
 
@@ -58,8 +60,11 @@ export async function verifyFocusable(
 export async function sendShortcut(
   page: Page,
   key: string,
-  modifiers: Array<'Meta' | 'Control' | 'Shift' | 'Alt'> = [],
+  modifiers: KeyboardModifier[] = [],
 ): Promise<void> {
-  const combo = [...modifiers, key].join('+')
+  const normalizedModifiers = modifiers.map((modifier) =>
+    modifier === 'Control' ? COMMAND_MODIFIER : modifier,
+  )
+  const combo = [...new Set(normalizedModifiers), key].join('+')
   await page.keyboard.press(combo)
 }

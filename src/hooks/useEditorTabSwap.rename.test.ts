@@ -105,6 +105,9 @@ async function expectRenameSessionContinues(options: { renamedTabArrivesLate: bo
   act(() => {
     result.current.handleEditorChange()
   })
+  act(() => {
+    result.current.flushPendingEditorChange()
+  })
 
   expect(onContentChange).toHaveBeenCalledWith(
     'fresh-title.md',
@@ -171,6 +174,9 @@ describe('useEditorTabSwap untitled rename continuity', () => {
     act(() => {
       result.current.handleEditorChange()
     })
+    act(() => {
+      result.current.flushPendingEditorChange()
+    })
 
     const syncedContent = onContentChange.mock.calls.at(-1)?.[1]
     expect(typeof syncedContent).toBe('string')
@@ -211,12 +217,18 @@ describe('useEditorTabSwap untitled rename continuity', () => {
     act(() => {
       result.current.handleEditorChange()
     })
+    act(() => {
+      result.current.flushPendingEditorChange()
+    })
     const queryContent = onContentChange.mock.calls.at(-1)?.[1]
     expect(typeof queryContent).toBe('string')
 
     editor.setMarkdown('# Fresh Title\n\nBody\n\n[[manage-sponsorships]] ')
     act(() => {
       result.current.handleEditorChange()
+    })
+    act(() => {
+      result.current.flushPendingEditorChange()
     })
     const insertedContent = onContentChange.mock.calls.at(-1)?.[1]
     expect(typeof insertedContent).toBe('string')

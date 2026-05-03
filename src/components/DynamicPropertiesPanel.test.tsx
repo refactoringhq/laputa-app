@@ -176,6 +176,18 @@ describe('DynamicPropertiesPanel', () => {
     expect(screen.getByText('\u2014').parentElement).toHaveClass('justify-start', 'text-left')
   })
 
+  it('keeps present empty properties visible and editable', () => {
+    renderPanel({ frontmatter: { 'start date': '' }, onUpdateProperty })
+
+    expect(screen.getByText('Start date')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('\u2014'))
+    const input = screen.getByDisplayValue('')
+    fireEvent.change(input, { target: { value: '2026-05-03' } })
+    fireEvent.blur(input)
+
+    expect(onUpdateProperty).toHaveBeenCalledWith('start date', '2026-05-03')
+  })
+
   it('hides Owner with wikilink value from Properties panel', () => {
     renderPanel({ frontmatter: { Owner: '[[person/luca]]' } })
     // Owner with wikilink goes to RelationshipsPanel, not Properties
@@ -203,6 +215,19 @@ describe('DynamicPropertiesPanel', () => {
     // 'Belongs to' has a plain text value, not a wikilink — should render as property
     expect(screen.getByText('Belongs to')).toBeInTheDocument()
     expect(screen.getByText('some-team')).toBeInTheDocument()
+  })
+
+  it('localizes UI actions without translating stored property names', () => {
+    renderPanel({
+      frontmatter: { Status: 'Active', 'Belongs to': 'some-team' },
+      onAddProperty,
+      locale: 'zh-CN',
+    })
+
+    expect(screen.getByText('Type')).toBeInTheDocument()
+    expect(screen.getByText('Status')).toBeInTheDocument()
+    expect(screen.getByText('Belongs to')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '添加属性' })).toBeInTheDocument()
   })
 
   it('hides custom field with wikilink value from Properties', () => {

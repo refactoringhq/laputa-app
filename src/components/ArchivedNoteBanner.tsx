@@ -1,10 +1,12 @@
 import { Archive, ArrowUUpLeft } from '@phosphor-icons/react'
+import { translate, type AppLocale } from '../lib/i18n'
 
 interface ArchivedNoteBannerProps {
   onUnarchive: () => void
+  locale?: AppLocale
 }
 
-export function ArchivedNoteBanner({ onUnarchive }: ArchivedNoteBannerProps) {
+export function ArchivedNoteBanner({ onUnarchive, locale = 'en' }: ArchivedNoteBannerProps) {
   return (
     <div
       data-testid="archived-note-banner"
@@ -21,7 +23,7 @@ export function ArchivedNoteBanner({ onUnarchive }: ArchivedNoteBannerProps) {
       }}
     >
       <Archive size={13} weight="bold" />
-      <span>Archived</span>
+      <span>{translate(locale, 'editor.banner.archived')}</span>
       <button
         data-testid="unarchive-btn"
         onClick={onUnarchive}
@@ -38,10 +40,10 @@ export function ArchivedNoteBanner({ onUnarchive }: ArchivedNoteBannerProps) {
           color: 'var(--muted-foreground)',
           cursor: 'pointer',
         }}
-        title="Unarchive"
+        title={translate(locale, 'editor.banner.unarchive')}
       >
         <ArrowUUpLeft size={12} />
-        Unarchive
+        {translate(locale, 'editor.banner.unarchive')}
       </button>
     </div>
   )

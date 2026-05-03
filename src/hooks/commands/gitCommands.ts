@@ -4,15 +4,41 @@ import type { SidebarSelection } from '../../types'
 interface GitCommandsConfig {
   modifiedCount: number
   canAddRemote: boolean
+  isGitVault?: boolean
   onAddRemote?: () => void
   onCommitPush: () => void
+  onInitializeGit?: () => void
   onPull?: () => void
   onResolveConflicts?: () => void
   onSelect: (sel: SidebarSelection) => void
 }
 
 export function buildGitCommands(config: GitCommandsConfig): CommandAction[] {
-  const { modifiedCount, canAddRemote, onAddRemote, onCommitPush, onPull, onResolveConflicts, onSelect } = config
+  const {
+    modifiedCount,
+    canAddRemote,
+    isGitVault = true,
+    onAddRemote,
+    onCommitPush,
+    onInitializeGit,
+    onPull,
+    onResolveConflicts,
+    onSelect,
+  } = config
+
+  if (!isGitVault) {
+    return [
+      {
+        id: 'initialize-git',
+        label: 'Initialize Git for Current Vault',
+        group: 'Git',
+        keywords: ['git', 'initialize', 'enable', 'history', 'sync'],
+        enabled: Boolean(onInitializeGit),
+        execute: () => onInitializeGit?.(),
+      },
+    ]
+  }
+
   return [
     { id: 'commit-push', label: 'Commit & Push', group: 'Git', keywords: ['git', 'save', 'sync'], enabled: modifiedCount > 0, execute: onCommitPush },
     { id: 'add-remote', label: 'Add Remote to Current Vault', group: 'Git', keywords: ['git', 'remote', 'connect', 'origin', 'no remote'], enabled: canAddRemote && !!onAddRemote, execute: () => onAddRemote?.() },

@@ -24,6 +24,7 @@ const {
 }))
 
 vi.mock('../utils/platform', () => ({
+  isMac: () => false,
   shouldUseLinuxWindowChrome: vi.fn(),
 }))
 

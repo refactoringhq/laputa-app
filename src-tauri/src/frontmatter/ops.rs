@@ -1,3 +1,4 @@
+use super::keys::{frontmatter_key_rule, frontmatter_keys_match, FrontmatterKey};
 use super::yaml::{format_yaml_field, FrontmatterValue};
 
 /// Check if a line continues the previous key's value (indented list item,
@@ -7,31 +8,9 @@ fn is_value_continuation(line: FrontmatterLine<'_>) -> bool {
 }
 
 #[derive(Clone, Copy)]
-enum SystemKey {
-    Icon,
-    Order,
-    SidebarLabel,
-    Sort,
-}
-
-impl SystemKey {
-    fn canonical(self) -> &'static str {
-        match self {
-            Self::Icon => "_icon",
-            Self::Order => "_order",
-            Self::SidebarLabel => "_sidebar_label",
-            Self::Sort => "_sort",
-        }
-    }
-
-    fn legacy_aliases(self) -> &'static [&'static str] {
-        match self {
-            Self::Icon => &["icon"],
-            Self::Order => &["order"],
-            Self::SidebarLabel => &["sidebar_label", "sidebar label"],
-            Self::Sort => &["sort"],
-        }
-    }
+enum KeyMatchMode {
+    Exact,
+    Canonical,
 }
 
 #[derive(Clone, Copy)]
@@ -47,31 +26,50 @@ impl<'a> PropertyKey<'a> {
     fn as_str(self) -> &'a str {
         self.0
     }
+
+    fn matches(self, candidate: &str, mode: KeyMatchMode) -> bool {
+        match mode {
+            KeyMatchMode::Exact => candidate == self.as_str(),
+            KeyMatchMode::Canonical => frontmatter_keys_match(
+                FrontmatterKey::new(candidate),
+                FrontmatterKey::new(self.as_str()),
+            ),
+        }
+    }
+}
+
+impl<'a> FrontmatterLine<'a> {
+    fn key(self) -> Option<&'a str> {
+        let trimmed = self.0.trim_start();
+        if let Some(raw) = trimmed.strip_prefix('"') {
+            return quoted_yaml_key(raw, '"');
+        }
+        if let Some(raw) = trimmed.strip_prefix('\'') {
+            return quoted_yaml_key(raw, '\'');
+        }
+        trimmed
+            .split_once(':')
+            .map(|(key, _)| key.trim())
+            .filter(|key| !key.is_empty())
+    }
+}
+
+fn quoted_yaml_key(raw: &str, quote: char) -> Option<&str> {
+    let (key, rest) = raw.split_once(quote)?;
+    rest.trim_start().starts_with(':').then_some(key)
 }
 
 #[derive(Clone, Copy)]
 struct FieldUpdate<'a> {
     key: PropertyKey<'a>,
     value: Option<&'a FrontmatterValue>,
+    match_mode: KeyMatchMode,
 }
 
 impl<'a> FieldUpdate<'a> {
     fn matches_line(self, line: FrontmatterLine<'_>) -> bool {
-        let trimmed = line.0.trim_start();
-
-        if trimmed.starts_with(self.key.as_str())
-            && trimmed[self.key.as_str().len()..].starts_with(':')
-        {
-            return true;
-        }
-
-        let double_quoted = format!("\"{}\":", self.key.as_str());
-        if trimmed.starts_with(&double_quoted) {
-            return true;
-        }
-
-        let single_quoted = format!("'{}\':", self.key.as_str());
-        trimmed.starts_with(&single_quoted)
+        line.key()
+            .is_some_and(|candidate| self.key.matches(candidate, self.match_mode))
     }
 
     fn prepend_to(self, content: DocumentText<'_>) -> String {
@@ -133,22 +131,6 @@ impl<'a> FieldUpdate<'a> {
     }
 }
 
-fn canonical_system_key(key: PropertyKey<'_>) -> Option<SystemKey> {
-    match key
-        .as_str()
-        .trim()
-        .to_ascii_lowercase()
-        .replace(' ', "_")
-        .as_str()
-    {
-        "_icon" | "icon" => Some(SystemKey::Icon),
-        "_order" | "order" => Some(SystemKey::Order),
-        "_sidebar_label" | "sidebar_label" | "sidebar label" => Some(SystemKey::SidebarLabel),
-        "_sort" | "sort" => Some(SystemKey::Sort),
-        _ => None,
-    }
-}
-
 /// Internal function to update frontmatter content
 pub fn update_frontmatter_content(
     content: &str,
@@ -158,23 +140,25 @@ pub fn update_frontmatter_content(
     let update = FieldUpdate {
         key: PropertyKey(key),
         value: value.as_ref(),
+        match_mode: KeyMatchMode::Exact,
     };
-    let Some(system_key) = canonical_system_key(update.key) else {
+    let Some(rule) = frontmatter_key_rule(FrontmatterKey::new(update.key.as_str()))
+        .filter(|rule| rule.canonicalizes_on_write())
+    else {
         return update.apply_to_content(DocumentText(content));
     };
 
-    let mut updated = content.to_string();
-    for alias in system_key.legacy_aliases() {
-        updated = FieldUpdate {
-            key: PropertyKey(alias),
-            value: None,
-        }
-        .apply_to_content(DocumentText(&updated))?;
+    let updated = FieldUpdate {
+        key: PropertyKey(rule.write_key()),
+        value: None,
+        match_mode: KeyMatchMode::Canonical,
     }
+    .apply_to_content(DocumentText(content))?;
 
     FieldUpdate {
-        key: PropertyKey(system_key.canonical()),
+        key: PropertyKey(rule.write_key()),
         value: update.value,
+        match_mode: KeyMatchMode::Exact,
     }
     .apply_to_content(DocumentText(&updated))
 }

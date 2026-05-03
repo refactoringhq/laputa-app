@@ -129,6 +129,26 @@ describe('Inspector', () => {
     expect(onToggle).toHaveBeenCalledOnce()
   })
 
+  it('shows a colliding-properties warning that opens the raw editor', async () => {
+    const onToggleRawEditor = vi.fn()
+    const content = `---
+type: Note
+status: Active
+Status: Evergreened
+---
+# Test Project
+`
+
+    renderSelectedInspector({ content, onToggleRawEditor })
+
+    const warning = screen.getByRole('button', { name: 'Colliding properties. Open raw editor.' })
+    fireEvent.focus(warning)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Colliding properties')
+
+    fireEvent.click(warning)
+    expect(onToggleRawEditor).toHaveBeenCalledOnce()
+  })
+
   it('shows properties when a note is selected', () => {
     render(<Inspector {...defaultProps} entry={mockEntry} content={mockContent} />)
     expect(screen.getAllByText('Project').length).toBeGreaterThan(0)
@@ -632,6 +652,29 @@ Status: Active
       )
       fireEvent.click(screen.getByText('Initialize properties'))
       expect(onInit).toHaveBeenCalledWith('/vault/plain-note.md')
+    })
+
+    it('does not offer frontmatter initialization for binary attachments', () => {
+      const onInit = vi.fn()
+      const attachmentEntry: VaultEntry = {
+        ...noFrontmatterEntry,
+        path: '/vault/attachments/screenshot.png',
+        filename: 'screenshot.png',
+        title: 'screenshot.png',
+        fileKind: 'binary',
+      }
+
+      render(
+        <Inspector
+          {...defaultProps}
+          entry={attachmentEntry}
+          content=""
+          onInitializeProperties={onInit}
+        />
+      )
+
+      expect(screen.queryByText('Initialize properties')).not.toBeInTheDocument()
+      expect(onInit).not.toHaveBeenCalled()
     })
 
     it('shows invalid frontmatter notice with fix button', () => {

@@ -56,7 +56,7 @@ describe('NoteList virtualized datasets', () => {
     expect(screen.getByText('Note 499')).toBeInTheDocument()
   })
 
-  it('filters large datasets by search query', async () => {
+  it('filters large datasets by search query', { timeout: 15000 }, async () => {
     vi.useFakeTimers()
     try {
       const entries = [

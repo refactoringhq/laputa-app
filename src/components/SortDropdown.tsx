@@ -1,19 +1,32 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { ArrowUp, ArrowDown } from '@phosphor-icons/react'
-import { type SortOption, type SortDirection, getDefaultDirection, SORT_OPTIONS, getSortOptionLabel } from '../utils/noteListHelpers'
+import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
+import { type SortOption, type SortDirection, getDefaultDirection, SORT_OPTIONS } from '../utils/noteListHelpers'
 
 interface SortItem {
   value: SortOption
   label: string
 }
 
+const SORT_LABEL_KEYS = {
+  modified: 'noteList.sort.modified',
+  created: 'noteList.sort.created',
+  title: 'noteList.sort.title',
+  status: 'noteList.sort.status',
+} satisfies Record<string, TranslationKey>
+
 type SortMenuAction =
   | { type: 'close' }
   | { type: 'focus'; index: number }
 
-function buildSortItems(customProperties?: string[]): SortItem[] {
-  const builtInItems = SORT_OPTIONS.map(({ value, label }) => ({ value, label }))
+function getLocalizedSortOptionLabel(option: SortOption, locale: AppLocale): string {
+  if (option.startsWith('property:')) return option.slice('property:'.length)
+  return translate(locale, SORT_LABEL_KEYS[option as keyof typeof SORT_LABEL_KEYS])
+}
+
+function buildSortItems(locale: AppLocale, customProperties?: string[]): SortItem[] {
+  const builtInItems = SORT_OPTIONS.map(({ value }) => ({ value, label: getLocalizedSortOptionLabel(value, locale) }))
   const customItems = (customProperties ?? []).map((key) => ({
     value: `property:${key}` as SortOption,
     label: key,
@@ -148,6 +161,7 @@ function SortDropdownTrigger({
   current,
   groupLabel,
   direction,
+  locale,
   onToggle,
 }: {
   triggerRef: React.RefObject<HTMLButtonElement | null>
@@ -155,9 +169,11 @@ function SortDropdownTrigger({
   current: SortOption
   groupLabel: string
   direction: SortDirection
+  locale: AppLocale
   onToggle: () => void
 }) {
   const DirectionIcon = direction === 'asc' ? ArrowUp : ArrowDown
+  const currentLabel = getLocalizedSortOptionLabel(current, locale)
 
   return (
     <button
@@ -168,13 +184,13 @@ function SortDropdownTrigger({
         event.stopPropagation()
         onToggle()
       }}
-      title={`Sort by ${getSortOptionLabel(current)}`}
+      title={translate(locale, 'noteList.sort.by', { label: currentLabel })}
       aria-haspopup="menu"
       aria-expanded={open}
       data-testid={`sort-button-${groupLabel}`}
     >
       <DirectionIcon size={12} data-testid={`sort-direction-icon-${groupLabel}`} />
-      <span className="text-[10px] font-medium">{getSortOptionLabel(current)}</span>
+      <span className="text-[10px] font-medium">{currentLabel}</span>
     </button>
   )
 }
@@ -186,6 +202,7 @@ function SortDropdownMenu({
   direction,
   sortItems,
   sortButtonRefs,
+  locale,
   onKeyDown,
   onSelect,
 }: {
@@ -195,6 +212,7 @@ function SortDropdownMenu({
   direction: SortDirection
   sortItems: SortItem[]
   sortButtonRefs: React.MutableRefObject<Array<HTMLButtonElement | null>>
+  locale: AppLocale
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void
   onSelect: (option: SortOption, nextDirection: SortDirection) => void
 }) {
@@ -206,7 +224,7 @@ function SortDropdownMenu({
   return (
     <div
       role="menu"
-      aria-label={`Sort ${groupLabel}`}
+      aria-label={translate(locale, 'noteList.sort.menu', { label: groupLabel })}
       className="absolute right-0 top-full mt-1 rounded-md border border-border bg-popover p-1 shadow-md"
       style={{ width: 170, maxHeight: 280, overflowY: 'auto' }}
       onKeyDown={onKeyDown}
@@ -225,6 +243,7 @@ function SortDropdownMenu({
             sortButtonRefs.current[index] = node
           }}
           showSeparator={hasCustom && index === builtInOptionCount}
+          locale={locale}
           onSelect={onSelect}
         />
       ))}
@@ -232,14 +251,15 @@ function SortDropdownMenu({
   )
 }
 
-export function SortDropdown({ groupLabel, current, direction, customProperties, onChange }: {
+export function SortDropdown({ groupLabel, current, direction, customProperties, locale = 'en', onChange }: {
   groupLabel: string
   current: SortOption
   direction: SortDirection
   customProperties?: string[]
+  locale?: AppLocale
   onChange: (groupLabel: string, option: SortOption, direction: SortDirection) => void
 }) {
-  const sortItems = useMemo(() => buildSortItems(customProperties), [customProperties])
+  const sortItems = useMemo(() => buildSortItems(locale, customProperties), [customProperties, locale])
   const {
     open,
     setOpen,
@@ -263,6 +283,7 @@ export function SortDropdown({ groupLabel, current, direction, customProperties,
         current={current}
         groupLabel={groupLabel}
         direction={direction}
+        locale={locale}
         onToggle={() => setOpen((value) => !value)}
       />
       <SortDropdownMenu
@@ -272,6 +293,7 @@ export function SortDropdown({ groupLabel, current, direction, customProperties,
         direction={direction}
         sortItems={sortItems}
         sortButtonRefs={sortButtonRefs}
+        locale={locale}
         onKeyDown={handleMenuKeyDown}
         onSelect={handleSelect}
       />
@@ -279,7 +301,7 @@ export function SortDropdown({ groupLabel, current, direction, customProperties,
   )
 }
 
-function SortRow({ index, groupLabel, value, label, current, direction, buttonRef, showSeparator, onSelect }: {
+function SortRow({ index, groupLabel, value, label, current, direction, buttonRef, showSeparator, locale, onSelect }: {
   index: number
   groupLabel: string
   value: SortOption
@@ -288,6 +310,7 @@ function SortRow({ index, groupLabel, value, label, current, direction, buttonRe
   direction: SortDirection
   buttonRef: (node: HTMLButtonElement | null) => void
   showSeparator: boolean
+  locale: AppLocale
   onSelect: (opt: SortOption, dir: SortDirection) => void
 }) {
   const isActive = value === current
@@ -329,6 +352,7 @@ function SortRow({ index, groupLabel, value, label, current, direction, buttonRe
             onSelect={onSelect}
             icon={<ArrowUp size={12} />}
             itemData={itemData}
+            locale={locale}
           />
           <SortDirectionButton
             value={value}
@@ -338,6 +362,7 @@ function SortRow({ index, groupLabel, value, label, current, direction, buttonRe
             onSelect={onSelect}
             icon={<ArrowDown size={12} />}
             itemData={itemData}
+            locale={locale}
           />
         </span>
       </div>
@@ -353,6 +378,7 @@ function SortDirectionButton({
   onSelect,
   icon,
   itemData,
+  locale,
 }: {
   value: SortOption
   direction: SortDirection
@@ -361,6 +387,7 @@ function SortDirectionButton({
   onSelect: (opt: SortOption, dir: SortDirection) => void
   icon: React.ReactNode
   itemData: Record<string, string>
+  locale: AppLocale
 }) {
   return (
     <button
@@ -371,7 +398,7 @@ function SortDirectionButton({
         onSelect(value, direction)
       }}
       data-testid={`sort-dir-${direction}-${value}`}
-      title={direction === 'asc' ? 'Ascending' : 'Descending'}
+      title={translate(locale, direction === 'asc' ? 'noteList.sort.ascending' : 'noteList.sort.descending')}
       {...itemData}
     >
       {icon}

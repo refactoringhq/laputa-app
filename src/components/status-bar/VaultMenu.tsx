@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { AlertTriangle, Check, FolderOpen, GitBranch, Plus, Rocket, X } from 'lucide-react'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { Button } from '@/components/ui/button'
+import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import type { VaultOption } from './types'
 import { useDismissibleLayer } from './useDismissibleLayer'
 
@@ -16,19 +17,21 @@ interface VaultMenuProps {
   onCloneGettingStarted?: () => void
   onRemoveVault?: (path: string) => void
   compact?: boolean
+  locale?: AppLocale
 }
 
 interface VaultMenuItemProps {
   vault: VaultOption
   isActive: boolean
   canRemove: boolean
+  locale: AppLocale
   onSelect: () => void
   onRemove?: () => void
 }
 
 interface VaultMenuActionProps {
   icon: ReactNode
-  label: string
+  labelKey: TranslationKey
   testId: string
   accent?: boolean
   onClick: () => void
@@ -37,7 +40,7 @@ interface VaultMenuActionProps {
 interface VaultAction {
   key: string
   icon: ReactNode
-  label: string
+  labelKey: TranslationKey
   testId: string
   accent?: boolean
   onClick: () => void
@@ -67,7 +70,7 @@ function buildVaultActions({
     items.push({
       key: 'create-empty',
       icon: <Plus size={12} />,
-      label: 'Create empty vault',
+      labelKey: 'status.vault.createEmpty',
       testId: 'vault-menu-create-empty',
       accent: true,
       onClick: onCreateEmptyVault,
@@ -78,7 +81,7 @@ function buildVaultActions({
     items.push({
       key: 'open-local',
       icon: <FolderOpen size={12} />,
-      label: 'Open local folder',
+      labelKey: 'status.vault.openLocal',
       testId: 'vault-menu-open-local',
       onClick: onOpenLocalFolder,
     })
@@ -88,7 +91,7 @@ function buildVaultActions({
     items.push({
       key: 'clone-git',
       icon: <GitBranch size={12} />,
-      label: 'Clone Git repo',
+      labelKey: 'status.vault.cloneGit',
       testId: 'vault-menu-clone-git',
       onClick: onCloneVault,
     })
@@ -98,7 +101,7 @@ function buildVaultActions({
     items.push({
       key: 'clone-getting-started',
       icon: <Rocket size={12} />,
-      label: 'Clone Getting Started Vault',
+      labelKey: 'status.vault.cloneGettingStarted',
       testId: 'vault-menu-clone-getting-started',
       accent: true,
       onClick: onCloneGettingStarted,
@@ -114,9 +117,9 @@ function VaultMenuIcon({ isActive, unavailable }: { isActive: boolean; unavailab
   return <span style={{ width: 12 }} />
 }
 
-function VaultMenuItem({ vault, isActive, canRemove, onSelect, onRemove }: VaultMenuItemProps) {
+function VaultMenuItem({ vault, isActive, canRemove, locale, onSelect, onRemove }: VaultMenuItemProps) {
   const unavailable = vault.available === false
-  const removeLabel = `Remove ${vault.label} from list`
+  const removeLabel = translate(locale, 'status.vault.remove', { label: vault.label })
   const itemClassName = [
     'w-full justify-start rounded-sm px-2 py-1 text-xs font-normal',
     canRemove ? 'pr-7' : '',
@@ -134,7 +137,7 @@ function VaultMenuItem({ vault, isActive, canRemove, onSelect, onRemove }: Vault
         disabled={unavailable}
         onClick={onSelect}
         aria-current={isActive ? 'true' : undefined}
-        title={unavailable ? `Vault not found: ${vault.path}` : vault.path}
+        title={unavailable ? translate(locale, 'status.vault.notFound', { path: vault.path }) : vault.path}
         data-testid={`vault-menu-item-${vault.label}`}
         className={itemClassName}
         style={{
@@ -169,7 +172,7 @@ function VaultMenuItem({ vault, isActive, canRemove, onSelect, onRemove }: Vault
   )
 }
 
-function VaultMenuAction({ icon, label, testId, accent = false, onClick }: VaultMenuActionProps) {
+function VaultMenuAction({ icon, labelKey, testId, accent = false, onClick, locale = 'en' }: VaultMenuActionProps & { locale?: AppLocale }) {
   return (
     <Button
       type="button"
@@ -181,7 +184,7 @@ function VaultMenuAction({ icon, label, testId, accent = false, onClick }: Vault
       data-testid={testId}
     >
       {icon}
-      {label}
+      {translate(locale, labelKey)}
     </Button>
   )
 }
@@ -196,6 +199,7 @@ export function VaultMenu({
   onCloneGettingStarted,
   onRemoveVault,
   compact = false,
+  locale = 'en',
 }: VaultMenuProps) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -203,7 +207,7 @@ export function VaultMenu({
   const canRemove = !!onRemoveVault && vaults.length > 1
   const triggerClassName = getVaultTriggerClassName(open, compact)
   const triggerSize = compact ? 'icon-xs' : 'xs'
-  const activeVaultLabel = activeVault?.label ?? 'Vault'
+  const activeVaultLabel = activeVault?.label ?? translate(locale, 'status.vault.default')
 
   useDismissibleLayer(open, menuRef, () => setOpen(false))
 
@@ -218,14 +222,14 @@ export function VaultMenu({
 
   return (
     <div ref={menuRef} style={{ position: 'relative' }}>
-      <ActionTooltip copy={{ label: 'Switch vault' }} side="top">
+      <ActionTooltip copy={{ label: translate(locale, 'status.vault.switch') }} side="top">
         <Button
           type="button"
           variant="ghost"
           size={triggerSize}
           className={triggerClassName}
           onClick={() => setOpen((value) => !value)}
-          aria-label="Switch vault"
+          aria-label={translate(locale, 'status.vault.switch')}
           data-testid="status-vault-trigger"
         >
           <FolderOpen size={13} />
@@ -254,6 +258,7 @@ export function VaultMenu({
               vault={vault}
               isActive={vault.path === vaultPath}
               canRemove={canRemove}
+              locale={locale}
               onSelect={() => {
                 onSwitchVault(vault.path)
                 setOpen(false)
@@ -269,9 +274,10 @@ export function VaultMenu({
             <VaultMenuAction
               key={action.key}
               icon={action.icon}
-              label={action.label}
+              labelKey={action.labelKey}
               testId={action.testId}
               accent={action.accent}
+              locale={locale}
               onClick={() => {
                 action.onClick()
                 setOpen(false)

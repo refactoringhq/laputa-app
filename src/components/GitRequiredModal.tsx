@@ -1,13 +1,22 @@
 import { useState } from 'react'
-import { GitBranch } from '@phosphor-icons/react'
-import { OnboardingShell } from './OnboardingShell'
+import { GitBranch } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
-interface GitRequiredModalProps {
-  onCreateRepo: () => Promise<void>
-  onChooseVault: () => void
+interface GitSetupDialogProps {
+  open: boolean
+  onInitGit: () => Promise<void>
+  onDismiss: () => void
 }
 
-export function GitRequiredModal({ onCreateRepo, onChooseVault }: GitRequiredModalProps) {
+export function GitSetupDialog({ open, onInitGit, onDismiss }: GitSetupDialogProps) {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -15,7 +24,7 @@ export function GitRequiredModal({ onCreateRepo, onChooseVault }: GitRequiredMod
     setCreating(true)
     setError(null)
     try {
-      await onCreateRepo()
+      await onInitGit()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setCreating(false)
@@ -23,40 +32,33 @@ export function GitRequiredModal({ onCreateRepo, onChooseVault }: GitRequiredMod
   }
 
   return (
-    <OnboardingShell
-      style={{ background: 'var(--sidebar)' }}
-      contentClassName="w-full max-w-sm"
-      testId="git-required-shell"
-    >
-      <div className="flex flex-col items-center gap-5 rounded-xl border border-border bg-background p-8 shadow-lg">
-        <GitBranch size={36} className="text-muted-foreground" />
-        <h2 className="m-0 text-lg font-semibold text-foreground">Git repository required</h2>
-        <p className="m-0 text-center text-[13px] leading-relaxed text-muted-foreground">
-          Tolaria uses a git repository to track changes, detect moved files, and keep your vault safe.
-          We'll create a local repo — no remote needed.
-        </p>
+    <Dialog open={open} onOpenChange={(nextOpen) => {
+      if (!nextOpen && !creating) onDismiss()
+    }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="mb-1 flex size-9 items-center justify-center rounded-md bg-muted text-muted-foreground">
+            <GitBranch size={18} />
+          </div>
+          <DialogTitle>Enable Git for this vault?</DialogTitle>
+          <DialogDescription>
+            You can keep using this vault without Git. History, sync, commits, and change views stay disabled until you initialize Git.
+          </DialogDescription>
+        </DialogHeader>
         {error && (
-          <p className="m-0 rounded-md bg-destructive/10 px-3 py-2 text-center text-[12px] text-destructive">
+          <p className="m-0 rounded-md bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
             {error}
           </p>
         )}
-        <div className="flex w-full flex-col gap-2">
-          <button
-            className="w-full cursor-pointer rounded-md bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={handleCreate}
-            disabled={creating}
-          >
-            {creating ? 'Creating…' : 'Create repository'}
-          </button>
-          <button
-            className="w-full cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={onChooseVault}
-            disabled={creating}
-          >
-            Choose another vault
-          </button>
-        </div>
-      </div>
-    </OnboardingShell>
+        <DialogFooter>
+          <Button variant="outline" onClick={onDismiss} disabled={creating}>
+            Not now
+          </Button>
+          <Button onClick={handleCreate} disabled={creating}>
+            {creating ? 'Initializing…' : 'Initialize Git'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

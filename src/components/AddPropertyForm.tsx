@@ -12,6 +12,7 @@ import {
 } from '../utils/propertyTypes'
 import { StatusPill, StatusDropdown } from './StatusDropdown'
 import { DISPLAY_MODE_OPTIONS, DISPLAY_MODE_ICONS } from '../utils/propertyTypes'
+import { translate, type AppLocale } from '../lib/i18n'
 
 function parseDateValue(value: string): Date | undefined {
   const iso = toISODate(value)
@@ -39,7 +40,7 @@ function canSubmitProperty({ key, value, displayMode }: { key: string; value: st
   return displayMode !== 'number' || isValidNumberValue(value)
 }
 
-function AddBooleanInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function AddBooleanInput({ value, locale, onChange }: { value: string; locale: AppLocale; onChange: (v: string) => void }) {
   const boolVal = value.toLowerCase() === 'true'
   return (
     <button
@@ -47,12 +48,12 @@ function AddBooleanInput({ value, onChange }: { value: string; onChange: (v: str
       onClick={() => onChange(boolVal ? 'false' : 'true')}
       data-testid="add-property-boolean-toggle"
     >
-      {boolVal ? '\u2713 Yes' : '\u2717 No'}
+      {boolVal ? `\u2713 ${translate(locale, 'inspector.properties.yes')}` : `\u2717 ${translate(locale, 'inspector.properties.no')}`}
     </button>
   )
 }
 
-function AddDateInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function AddDateInput({ value, locale, onChange }: { value: string; locale: AppLocale; onChange: (v: string) => void }) {
   const selectedDate = value ? parseDateValue(value) : undefined
   const formatted = value ? formatDateValue(value) : ''
   return (
@@ -64,7 +65,7 @@ function AddDateInput({ value, onChange }: { value: string; onChange: (v: string
         >
           <CalendarIcon className="size-3 shrink-0 text-muted-foreground" />
           <span className={`min-w-0 truncate${!formatted ? ' text-muted-foreground' : ' text-foreground'}`}>
-            {formatted || 'Pick a date\u2026'}
+            {formatted || translate(locale, 'inspector.properties.pickDate')}
           </span>
         </button>
       </PopoverTrigger>
@@ -122,15 +123,16 @@ function AddNumberInput({ value, onChange, onKeyDown }: {
   )
 }
 
-function AddPropertyValueInput({ displayMode, value, onChange, onKeyDown, vaultStatuses }: {
+function AddPropertyValueInput({ displayMode, value, onChange, onKeyDown, vaultStatuses, locale }: {
   displayMode: PropertyDisplayMode; value: string; onChange: (v: string) => void
   onKeyDown: (e: React.KeyboardEvent) => void; vaultStatuses: string[]
+  locale: AppLocale
 }) {
   switch (displayMode) {
     case 'number':
       return <AddNumberInput value={value} onChange={onChange} onKeyDown={onKeyDown} />
-    case 'boolean': return <AddBooleanInput value={value} onChange={onChange} />
-    case 'date': return <AddDateInput value={value} onChange={onChange} />
+    case 'boolean': return <AddBooleanInput value={value} locale={locale} onChange={onChange} />
+    case 'date': return <AddDateInput value={value} locale={locale} onChange={onChange} />
     case 'status': return <AddStatusInput value={value} onChange={onChange} vaultStatuses={vaultStatuses} />
     case 'tags': return (
       <Input className={ADD_INPUT_CLASS} type="text" placeholder="tag1, tag2, ..." value={value}
@@ -138,16 +140,17 @@ function AddPropertyValueInput({ displayMode, value, onChange, onKeyDown, vaultS
       />
     )
     default: return (
-      <Input className={ADD_INPUT_CLASS} type="text" placeholder="Value" value={value}
+      <Input className={ADD_INPUT_CLASS} type="text" placeholder={translate(locale, 'inspector.properties.valuePlaceholder')} value={value}
         onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown}
       />
     )
   }
 }
 
-export function AddPropertyForm({ onAdd, onCancel, vaultStatuses }: {
+export function AddPropertyForm({ onAdd, onCancel, vaultStatuses, locale = 'en' }: {
   onAdd: (key: string, value: string, displayMode: PropertyDisplayMode) => void; onCancel: () => void
   vaultStatuses: string[]
+  locale?: AppLocale
 }) {
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
@@ -169,7 +172,7 @@ export function AddPropertyForm({ onAdd, onCancel, vaultStatuses }: {
     <div className="mt-1 flex flex-wrap items-center gap-1.5 rounded px-1.5 py-1" data-testid="add-property-form">
       <Input
         className="h-[26px] w-20 shrink-0 rounded border border-border bg-muted px-1.5 text-[12px] text-foreground outline-none focus:border-primary"
-        type="text" placeholder="Property name" value={newKey}
+        type="text" placeholder={translate(locale, 'inspector.properties.propertyName')} value={newKey}
         onChange={(e) => setNewKey(e.target.value)} onKeyDown={handleKeyDown} autoFocus
       />
       <Select value={displayMode} onValueChange={(v) => handleModeChange(v as PropertyDisplayMode)}>
@@ -193,15 +196,15 @@ export function AddPropertyForm({ onAdd, onCancel, vaultStatuses }: {
           })}
         </SelectContent>
       </Select>
-      <AddPropertyValueInput displayMode={displayMode} value={newValue} onChange={setNewValue} onKeyDown={handleKeyDown} vaultStatuses={vaultStatuses} />
+      <AddPropertyValueInput displayMode={displayMode} value={newValue} onChange={setNewValue} onKeyDown={handleKeyDown} vaultStatuses={vaultStatuses} locale={locale} />
       <Button
         size="icon-xs" onClick={() => onAdd(newKey, newValue, displayMode)}
-        disabled={!canSubmit} title="Add property"
+        disabled={!canSubmit} title={translate(locale, 'inspector.properties.addProperty')}
         data-testid="add-property-confirm"
       >
         <Check className="size-3.5" />
       </Button>
-      <Button size="icon-xs" variant="outline" onClick={onCancel} title="Cancel" data-testid="add-property-cancel">
+      <Button size="icon-xs" variant="outline" onClick={onCancel} title={translate(locale, 'common.cancel')} data-testid="add-property-cancel">
         <X className="size-3.5" />
       </Button>
     </div>
