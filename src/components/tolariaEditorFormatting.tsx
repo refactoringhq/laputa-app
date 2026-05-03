@@ -25,6 +25,7 @@ import type {
   StyleSchema,
 } from '@blocknote/core'
 import { FormattingToolbarExtension } from '@blocknote/core/extensions'
+import { useEditorComposing } from './useEditorComposing'
 import {
   useCallback,
   useEffect,
@@ -517,6 +518,7 @@ export function TolariaFormattingToolbarController(props: {
   const show = useExtensionState(FormattingToolbarExtension, {
     editor,
   })
+  const isComposing = useEditorComposing(editor)
   const [toolbarHasFocus, setToolbarHasFocus] = useState(false)
   const [toolbarHovered, setToolbarHovered] = useState(false)
   const { closeGraceActive, clearCloseGrace } = useFormattingToolbarCloseGrace({
@@ -529,7 +531,8 @@ export function TolariaFormattingToolbarController(props: {
     show,
   )
 
-  const isOpen = show || toolbarHasFocus || toolbarHovered || closeGraceActive
+  const isOpen = !isComposing
+    && (show || toolbarHasFocus || toolbarHovered || closeGraceActive)
   const hasFloatingToolbarAnchor = getFormattingToolbarAnchorElement(editor) !== null
   const shouldRenderFloatingToolbar = isOpen && hasFloatingToolbarAnchor
   const currentBridgeBlockId = useEditorState({
