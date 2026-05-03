@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { VaultEntry } from '../types'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 import { insertPlainTextFromClipboardText } from '../utils/plainTextPaste'
+import { TooltipProvider } from './ui/tooltip'
 
 const state = vi.hoisted(() => ({
   capturedLinkToolbarProps: null as null | Record<string, unknown>,
@@ -265,6 +266,7 @@ function renderEditorHarness(editor = createEditor()) {
       entries={[makeEntry()]}
       onNavigateWikilink={vi.fn()}
     />,
+    { wrapper: TooltipProvider },
   )
 
   const container = screen.getByTestId('blocknote-view').closest('.editor__blocknote-container')
@@ -571,11 +573,14 @@ describe('SingleEditorView', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it('copies selected fenced code text without markdown escape backslashes', () => {
+  it('copies selected fenced code text without markdown escape backslashes', async () => {
     const json = '{\n  "id": "Demo"\n}'
     const { container } = renderEditorHarness()
     const { codeBlock, code } = createCodeBlockFixture(json)
-    container.appendChild(codeBlock)
+    await act(async () => {
+      container.appendChild(codeBlock)
+      await Promise.resolve()
+    })
     selectNodeContents(code)
 
     const clipboardData = { setData: vi.fn() }
@@ -584,12 +589,36 @@ describe('SingleEditorView', () => {
     expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', json)
   })
 
-  it('does not override full-note copy selections that merely include a code block', () => {
+  it('copies fenced code from the code-block action button', async () => {
+    const json = '{\n  "id": "Demo"\n}'
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    const { container, editor } = renderEditorHarness()
+    const { codeBlock } = createCodeBlockFixture(json)
+    act(() => {
+      container.appendChild(codeBlock)
+    })
+
+    fireEvent.mouseMove(codeBlock)
+    const copyButton = await screen.findByRole('button', { name: 'Copy code to clipboard' })
+    fireEvent.click(copyButton)
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(json))
+    expect(editor.focus).not.toHaveBeenCalled()
+  })
+
+  it('does not override full-note copy selections that merely include a code block', async () => {
     const { container } = renderEditorHarness()
     const paragraph = document.createElement('p')
     paragraph.textContent = 'Before'
     const { codeBlock, code } = createCodeBlockFixture('const value = 1')
-    container.append(paragraph, codeBlock)
+    await act(async () => {
+      container.append(paragraph, codeBlock)
+      await Promise.resolve()
+    })
 
     const range = document.createRange()
     range.setStartBefore(paragraph)

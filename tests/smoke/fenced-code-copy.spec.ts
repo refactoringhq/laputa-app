@@ -52,6 +52,14 @@ async function copySelectedText(page: Page) {
   return readClipboard(page)
 }
 
+async function copyRichCodeBlockFromButton(page: Page, blockIndex: number) {
+  await clearClipboard(page)
+  const codeBlock = page.locator('.bn-block-content[data-content-type="codeBlock"]').nth(blockIndex)
+  await codeBlock.hover()
+  await page.getByRole('button', { name: 'Copy code to clipboard' }).click()
+  return readClipboard(page)
+}
+
 async function selectRichCodeBlock(page: Page, blockIndex: number) {
   await page.locator(RICH_CODE_SELECTOR).nth(blockIndex).waitFor({ timeout: 10_000 })
   await page.evaluate(({ selector, index }) => {
@@ -104,11 +112,14 @@ test.describe('Fenced code copy', () => {
     removeFixtureVaultCopy(tempVaultDir)
   })
 
-  test('copies rich and raw fenced code selections without escape backslashes', async ({ page }) => {
+  test('copies rich code blocks from the button and selections without escape backslashes', async ({ page }) => {
     const noteList = page.locator('[data-testid="note-list-container"]')
     const noteItem = noteList.getByText(CODE_COPY_NOTE_TITLE, { exact: true })
     await expect(noteItem).toBeVisible({ timeout: 10_000 })
     await noteItem.click()
+
+    await expect.poll(() => copyRichCodeBlockFromButton(page, 0)).toBe(JSON_SNIPPET)
+    await expect.poll(() => copyRichCodeBlockFromButton(page, 1)).toBe(TYPESCRIPT_SNIPPET)
 
     await selectRichCodeBlock(page, 0)
     await expect.poll(() => copySelectedText(page)).toBe(JSON_SNIPPET)
