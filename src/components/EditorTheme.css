@@ -489,6 +489,20 @@
   z-index: 4;
 }
 
+.editor__code-block-copy [data-editor-code-copy-button] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--editor-code-block-language);
+  padding: 0;
+}
+
+.editor__code-block-copy [data-editor-code-copy-button]:hover,
+.editor__code-block-copy [data-editor-code-copy-button]:focus-visible {
+  background: transparent !important;
+  color: var(--editor-code-block-text);
+}
+
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > pre {
   color: inherit;
 }
@@ -511,11 +525,6 @@
 
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] pre code .shiki {
   background-color: transparent !important;
-}
-
-:root:not(.dark) .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] pre code .shiki,
-[data-theme="light"] .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] pre code .shiki {
-  color: var(--editor-code-block-text) !important;
 }
 
 /* --- Blockquote --- */

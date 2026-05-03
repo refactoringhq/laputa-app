@@ -115,8 +115,8 @@
   --diff-removed-text: #F44336;
   --diff-removed-bg: rgba(244, 67, 54, 0.12);
   --diff-hunk-bg: rgba(33, 150, 243, 0.08);
-  --editor-code-block-background: #F5F8FF;
-  --editor-code-block-border: #DDE8FF;
+  --editor-code-block-background: var(--surface-sidebar);
+  --editor-code-block-border: var(--border-subtle);
   --editor-code-block-text: var(--text-primary);
   --editor-code-block-language: var(--text-secondary);
 
