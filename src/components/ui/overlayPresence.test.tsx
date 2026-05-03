@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, renderHook, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import {
   Tooltip,
@@ -11,6 +11,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from './popover'
+import { useZoom } from '@/hooks/useZoom'
 
 const PRESENCE_ANIMATION_CLASS_PARTS = [
   'animate-',
@@ -43,6 +44,33 @@ describe('overlay presence stability', () => {
     )
 
     expectNoPresenceAnimationClasses(screen.getByTestId('tooltip-content'))
+  })
+
+  it('compensates tooltip portal coordinates for app-level CSS zoom', () => {
+    document.documentElement.style.setProperty('--tolaria-overlay-zoom-compensation', '0.7142857142857143')
+
+    render(
+      <TooltipProvider>
+        <Tooltip open>
+          <TooltipTrigger asChild>
+            <button type="button">Tooltip trigger</button>
+          </TooltipTrigger>
+          <TooltipContent data-testid="tooltip-content">Tooltip copy</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>,
+    )
+
+    expect(document.querySelector('[data-slot="tooltip-zoom-compensation"]')).toBeInTheDocument()
+  })
+
+  it('publishes inverse zoom for overlay portals', () => {
+    const { result } = renderHook(() => useZoom())
+
+    act(() => {
+      result.current.zoomIn()
+    })
+
+    expect(document.documentElement.style.getPropertyValue('--tolaria-overlay-zoom-compensation')).toBe(String(100 / 110))
   })
 
   it('keeps popover content free of Radix presence animation classes', () => {
