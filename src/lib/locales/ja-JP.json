@@ -370,6 +370,7 @@
   "editor.toolbar.copyFilePath": "ファイルパスをコピー",
   "editor.toolbar.moreActions": "その他のノート操作",
   "editor.toolbar.openProperties": "プロパティパネルを開く",
+  "editor.codeBlock.copy": "コードをクリップボードにコピー",
   "editor.imageLightbox.title": "画像プレビュー",
   "editor.filename.rename": "ファイル名を変更",
   "editor.filename.renameToTitle": "タイトルと一致するようにファイル名を変更する",

@@ -370,6 +370,7 @@
   "editor.toolbar.copyFilePath": "複製檔案路徑",
   "editor.toolbar.moreActions": "更多筆記操作",
   "editor.toolbar.openProperties": "開啟屬性面板",
+  "editor.codeBlock.copy": "複製代碼至剪貼簿",
   "editor.imageLightbox.title": "圖片預覽",
   "editor.filename.rename": "重新命名檔名",
   "editor.filename.renameToTitle": "將檔案重新命名為匹配標題",
