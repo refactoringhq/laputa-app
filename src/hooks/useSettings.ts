@@ -39,6 +39,8 @@ const EMPTY_SETTINGS: Settings = {
   theme_mode: null,
   ui_language: null,
   default_ai_agent: null,
+  default_image_folder: null,
+  default_video_folder: null,
 }
 
 function normalizeSettings(settings: Settings): Settings {

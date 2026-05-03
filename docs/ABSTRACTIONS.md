@@ -47,6 +47,7 @@ _icon: shapes             # icon assigned to a type
 _color: blue              # color assigned to a type
 _order: 10                # sort order in the sidebar
 _sidebar_label: Projects  # override label in sidebar
+_default_folder: Projects # vault-relative folder for new notes of this type (opt-in)
 ```
 
 **This convention is universal** — apply it to all future system-level frontmatter fields. When a new feature needs to store configuration in a note's frontmatter (especially in Type notes), use `_field_name` to keep it hidden from normal user-facing surfaces while still stored on-disk as plain text.
@@ -676,10 +677,16 @@ interface Settings {
   theme_mode: 'light' | 'dark' | null
   ui_language: 'en' | 'zh-Hans' | null
   default_ai_agent: 'claude_code' | 'codex' | null
+  default_image_folder: string | null // vault-relative; null falls back to "attachments"
+  default_video_folder: string | null // vault-relative; null falls back to "attachments"
 }
 ```
 
 Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is installation-local because it controls device comfort rather than vault structure. `ui_language` is also installation-local: `null` follows the supported system language with English fallback, while explicit values pin the UI language for this installation. `default_ai_agent` is an installation-local preference that selects which supported CLI agent the AI panel, command palette AI mode, and status bar should target by default. The AutoGit fields are also installation-local: `useAutoGit` consumes them to schedule automatic checkpoints, while `useCommitFlow` and the status bar quick action reuse the same checkpoint runner and deterministic automatic commit message generation.
+
+`default_image_folder` and `default_video_folder` are vault-relative folder paths normalized through `normalize_vault_relative_folder` (rejects absolute paths, `..` traversal, empty input). They control where pasted/dropped images and videos land. Per-installation rather than per-vault so users can keep different folder layouts on different machines; both default to `attachments/` when unset. See [ADR-0085](adr/0085-per-type-default-folder-and-media-folders.md).
+
+A related opt-in vault-frontmatter field, `_default_folder`, lives on type entries and routes new notes of that type into the named subfolder. It is parsed into `VaultEntry.defaultFolder` and consulted by `resolveTypeTargetDir` in `useNoteCreation`. Existing notes are not moved, and changing a note's type later does not relocate the file — see ADR-0085 for the trade-offs against the flat-vault baseline ([ADR-0006](adr/0006-flat-vault-structure.md)).
 
 ## Telemetry
 

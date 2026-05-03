@@ -3,6 +3,7 @@ const SYSTEM_METADATA_ALIAS_GROUPS = {
   _order: ['_order', 'order'],
   _sidebar_label: ['_sidebar_label', 'sidebar_label', 'sidebar label'],
   _sort: ['_sort', 'sort'],
+  _default_folder: ['_default_folder', 'default_folder', 'default folder'],
 } as const
 
 const CANONICAL_SYSTEM_METADATA_KEYS = Object.keys(SYSTEM_METADATA_ALIAS_GROUPS)

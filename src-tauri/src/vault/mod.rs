@@ -24,7 +24,7 @@ pub use entry::{FolderNode, VaultEntry};
 pub use file::{create_note_content, get_note_content, save_note_content};
 pub use folders::{delete_folder, rename_folder, FolderRenameResult};
 pub use getting_started::{create_getting_started_vault, default_vault_path, vault_exists};
-pub use image::{copy_image_to_vault, save_image};
+pub use image::{copy_image_to_vault, copy_video_to_vault, save_image, save_video};
 pub use migration::migrate_is_a_to_type;
 pub use rename::{
     auto_rename_untitled, detect_renames, move_note_to_folder, rename_note, rename_note_filename,
@@ -150,6 +150,10 @@ pub fn parse_md_file(path: &Path, git_dates: Option<(u64, u64)>) -> Result<Vault
         sort: frontmatter.sort.and_then(|v| v.into_scalar()),
         view: frontmatter.view.and_then(|v| v.into_scalar()),
         visible: frontmatter.visible,
+        default_folder: frontmatter
+            .default_folder
+            .and_then(|v| v.into_scalar())
+            .and_then(|raw| crate::settings::normalize_vault_relative_folder(Some(&raw))),
         organized: frontmatter.organized.unwrap_or(false),
         favorite: frontmatter.favorite.unwrap_or(false),
         favorite_index: frontmatter.favorite_index,

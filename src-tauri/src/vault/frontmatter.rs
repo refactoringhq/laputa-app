@@ -58,6 +58,13 @@ pub(crate) struct Frontmatter {
     pub favorite_index: Option<i64>,
     #[serde(rename = "_list_properties_display", default)]
     pub list_properties_display: Option<Vec<String>>,
+    #[serde(
+        rename = "_default_folder",
+        alias = "default_folder",
+        alias = "default folder",
+        default
+    )]
+    pub default_folder: Option<StringOrList>,
 }
 
 /// Custom deserializer for boolean fields that may arrive as strings.
@@ -211,6 +218,9 @@ fn parse_frontmatter(data: &HashMap<String, serde_json::Value>) -> Frontmatter {
         "_favorite",
         "_favorite_index",
         "_list_properties_display",
+        "_default_folder",
+        "default_folder",
+        "default folder",
     ];
     let filtered: serde_json::Map<String, serde_json::Value> = data
         .iter()
@@ -244,6 +254,7 @@ const SKIP_KEYS: &[&str] = &[
     "_favorite",
     "_favorite_index",
     "_list_properties_display",
+    "default_folder",
 ];
 
 #[derive(Clone, Copy)]

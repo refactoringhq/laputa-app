@@ -33,6 +33,7 @@ export const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   sort: null,
   view: null,
   visible: null,
+  defaultFolder: null,
   organized: false,
   favorite: false,
   favoriteIndex: null,

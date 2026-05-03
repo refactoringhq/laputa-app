@@ -50,6 +50,10 @@ interface EditorProps {
   inspectorWidth: number
   defaultAiAgent?: AiAgentId
   defaultAiAgentReady?: boolean
+  /** Vault-relative folder for pasted/dropped images. null = "attachments". */
+  defaultImageFolder?: string | null
+  /** Vault-relative folder for pasted/dropped videos. null = "attachments". */
+  defaultVideoFolder?: string | null
   onInspectorResize: (delta: number) => void
   inspectorEntry: VaultEntry | null
   inspectorContent: string | null
@@ -157,6 +161,8 @@ interface EditorSetupParams {
   tabs: Tab[]
   activeTabPath: string | null
   vaultPath?: string
+  imageFolder?: string | null
+  videoFolder?: string | null
   onContentChange?: (path: string, content: string) => void
   onLoadDiff?: (path: string) => Promise<string>
   onLoadDiffAtCommit?: (path: string, commitHash: string) => Promise<string>
@@ -168,16 +174,24 @@ interface EditorSetupParams {
 }
 
 function useEditorSetup({
-  tabs, activeTabPath, vaultPath, onContentChange,
+  tabs, activeTabPath, vaultPath, imageFolder, videoFolder, onContentChange,
   onLoadDiff, onLoadDiffAtCommit, pendingCommitDiffRequest, onPendingCommitDiffHandled, getNoteStatus,
   rawToggleRef, diffToggleRef,
 }: EditorSetupParams) {
   const vaultPathRef = useRef(vaultPath)
   useEffect(() => { vaultPathRef.current = vaultPath }, [vaultPath])
+  const imageFolderRef = useRef<string | null>(imageFolder ?? null)
+  useEffect(() => { imageFolderRef.current = imageFolder ?? null }, [imageFolder])
+  const videoFolderRef = useRef<string | null>(videoFolder ?? null)
+  useEffect(() => { videoFolderRef.current = videoFolder ?? null }, [videoFolder])
 
   const editor = useCreateBlockNote({
     schema,
-    uploadFile: (file: File) => uploadImageFile(file, vaultPathRef.current),
+    uploadFile: (file: File) => {
+      const isVideo = file.type.startsWith('video/')
+      const folder = isVideo ? videoFolderRef.current : imageFolderRef.current
+      return uploadImageFile(file, vaultPathRef.current, folder)
+    },
     _tiptapOptions: { injectNonce: RUNTIME_STYLE_NONCE },
     extensions: [createArrowLigaturesExtension()],
   })
@@ -490,7 +504,10 @@ export const Editor = memo(function Editor(props: EditorProps) {
     handleEditorChange, handleViewCommitDiff,
     isLoadingNewTab, activeStatus, showDiffToggle,
   } = useEditorSetup({
-    tabs, activeTabPath, vaultPath, onContentChange,
+    tabs, activeTabPath, vaultPath,
+    imageFolder: props.defaultImageFolder,
+    videoFolder: props.defaultVideoFolder,
+    onContentChange,
     onLoadDiff: props.onLoadDiff,
     onLoadDiffAtCommit: props.onLoadDiffAtCommit,
     pendingCommitDiffRequest: props.pendingCommitDiffRequest,

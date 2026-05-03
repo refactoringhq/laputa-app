@@ -21,6 +21,8 @@ pub struct Settings {
     pub ui_language: Option<String>,
     pub initial_h1_auto_rename_enabled: Option<bool>,
     pub default_ai_agent: Option<String>,
+    pub default_image_folder: Option<String>,
+    pub default_video_folder: Option<String>,
 }
 
 fn normalize_optional_string(value: Option<String>) -> Option<String> {
@@ -79,6 +81,38 @@ fn is_simplified_chinese_language(code: &str) -> bool {
     matches!(code, "zh" | "zh-cn" | "zh-hans" | "zh-sg")
 }
 
+/// Normalize a user-supplied folder path that must be relative to the vault root.
+/// Returns `None` for empty, absolute, or path-traversal-containing inputs.
+/// Strips surrounding whitespace, normalizes separators to `/`, and trims leading/trailing slashes.
+pub fn normalize_vault_relative_folder(value: Option<&str>) -> Option<String> {
+    let trimmed = value?.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let unified = trimmed.replace('\\', "/");
+    let stripped = unified.trim_matches('/');
+    if stripped.is_empty() {
+        return None;
+    }
+
+    if stripped.starts_with('/') {
+        return None;
+    }
+
+    let segments: Vec<&str> = stripped.split('/').filter(|s| !s.is_empty()).collect();
+    if segments.is_empty() {
+        return None;
+    }
+    for segment in &segments {
+        if *segment == ".." || *segment == "." {
+            return None;
+        }
+    }
+
+    Some(segments.join("/"))
+}
+
 pub fn normalize_ui_language(value: Option<&str>) -> Option<String> {
     let language = canonical_language_code(value?)?;
     if is_english_language(&language) {
@@ -110,6 +144,12 @@ fn normalize_settings(settings: Settings) -> Settings {
         ui_language: normalize_ui_language(settings.ui_language.as_deref()),
         initial_h1_auto_rename_enabled: settings.initial_h1_auto_rename_enabled,
         default_ai_agent: normalize_default_ai_agent(settings.default_ai_agent.as_deref()),
+        default_image_folder: normalize_vault_relative_folder(
+            settings.default_image_folder.as_deref(),
+        ),
+        default_video_folder: normalize_vault_relative_folder(
+            settings.default_video_folder.as_deref(),
+        ),
     }
 }
 
@@ -252,10 +292,100 @@ mod tests {
             ui_language: Some("zh-Hans".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
+            default_image_folder: Some("Media/Images".to_string()),
+            default_video_folder: Some("Media/Videos".to_string()),
         };
         let json = serde_json::to_string(&settings).unwrap();
         let parsed: Settings = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, settings);
+    }
+
+    #[test]
+    fn test_normalize_vault_relative_folder_accepts_simple_name() {
+        assert_eq!(
+            normalize_vault_relative_folder(Some("attachments")).as_deref(),
+            Some("attachments")
+        );
+    }
+
+    #[test]
+    fn test_normalize_vault_relative_folder_accepts_nested() {
+        assert_eq!(
+            normalize_vault_relative_folder(Some("Media/Images")).as_deref(),
+            Some("Media/Images")
+        );
+    }
+
+    #[test]
+    fn test_normalize_vault_relative_folder_trims_whitespace_and_slashes() {
+        assert_eq!(
+            normalize_vault_relative_folder(Some("  /Media/Videos/  ")).as_deref(),
+            Some("Media/Videos")
+        );
+    }
+
+    #[test]
+    fn test_normalize_vault_relative_folder_normalizes_separators() {
+        assert_eq!(
+            normalize_vault_relative_folder(Some("Media\\Images")).as_deref(),
+            Some("Media/Images")
+        );
+    }
+
+    #[test]
+    fn test_normalize_vault_relative_folder_collapses_double_slashes() {
+        assert_eq!(
+            normalize_vault_relative_folder(Some("Media//Images")).as_deref(),
+            Some("Media/Images")
+        );
+    }
+
+    #[test]
+    fn test_normalize_vault_relative_folder_rejects_empty() {
+        assert!(normalize_vault_relative_folder(Some("")).is_none());
+        assert!(normalize_vault_relative_folder(Some("   ")).is_none());
+        assert!(normalize_vault_relative_folder(Some("///")).is_none());
+        assert!(normalize_vault_relative_folder(None).is_none());
+    }
+
+    #[test]
+    fn test_normalize_vault_relative_folder_rejects_traversal() {
+        assert!(normalize_vault_relative_folder(Some("../escape")).is_none());
+        assert!(normalize_vault_relative_folder(Some("Media/../escape")).is_none());
+        assert!(normalize_vault_relative_folder(Some("./Media")).is_none());
+    }
+
+    #[test]
+    fn test_default_media_folders_roundtrip() {
+        let loaded = save_and_reload(Settings {
+            default_image_folder: Some("Media/Images".to_string()),
+            default_video_folder: Some("Media/Videos".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_image_folder.as_deref(), Some("Media/Images"));
+        assert_eq!(loaded.default_video_folder.as_deref(), Some("Media/Videos"));
+    }
+
+    #[test]
+    fn test_default_media_folders_filtered_when_invalid() {
+        let loaded = save_and_reload(Settings {
+            default_image_folder: Some("../escape".to_string()),
+            default_video_folder: Some("".to_string()),
+            ..Default::default()
+        });
+        assert!(loaded.default_image_folder.is_none());
+        assert!(loaded.default_video_folder.is_none());
+    }
+
+    #[test]
+    fn test_default_media_folders_normalize_on_save() {
+        let loaded = save_and_reload(Settings {
+            default_image_folder: Some("  /Media/Images/  ".to_string()),
+            default_video_folder: Some("Media\\Videos".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_image_folder.as_deref(), Some("Media/Images"));
+        assert_eq!(loaded.default_video_folder.as_deref(), Some("Media/Videos"));
     }
 
     #[test]

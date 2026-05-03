@@ -3,6 +3,8 @@ import { MagnifyingGlass } from '@phosphor-icons/react'
 import { ICON_OPTIONS, type IconEntry } from '../utils/iconRegistry'
 import { ACCENT_COLORS } from '../utils/typeColors'
 import { cn } from '@/lib/utils'
+import type { FolderNode } from '../types'
+import { FolderPicker } from './FolderPicker'
 
 function filterIcons(icons: IconEntry[], query: string): IconEntry[] {
   if (!query) return icons
@@ -14,9 +16,12 @@ interface TypeCustomizePopoverProps {
   currentIcon: string | null
   currentColor: string | null
   currentTemplate: string | null
+  currentDefaultFolder?: string | null
+  folders?: FolderNode[]
   onChangeIcon: (icon: string) => void
   onChangeColor: (color: string) => void
   onChangeTemplate: (template: string) => void
+  onChangeDefaultFolder?: (folder: string | null) => void
   onClose: () => void
 }
 
@@ -38,9 +43,12 @@ export function TypeCustomizePopover({
   currentIcon,
   currentColor,
   currentTemplate,
+  currentDefaultFolder = null,
+  folders = [],
   onChangeIcon,
   onChangeColor,
   onChangeTemplate,
+  onChangeDefaultFolder,
   onClose,
 }: TypeCustomizePopoverProps) {
   const [selectedColor, setSelectedColor] = useState(currentColor)
@@ -134,6 +142,20 @@ export function TypeCustomizePopover({
           ))
         )}
       </div>
+
+      {/* Default folder section */}
+      {onChangeDefaultFolder && (
+        <>
+          <div className="font-mono-overline mb-2 mt-3 text-muted-foreground">Default folder for new notes</div>
+          <FolderPicker
+            value={currentDefaultFolder}
+            onChange={onChangeDefaultFolder}
+            folders={folders}
+            placeholder="Vault root (default)"
+            ariaLabel="Default folder for new notes"
+          />
+        </>
+      )}
 
       {/* Template section */}
       <div className="font-mono-overline mb-2 mt-3 text-muted-foreground">Template</div>

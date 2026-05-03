@@ -16,7 +16,8 @@ import {
   type ReactNode,
 } from 'react'
 import { Moon, Sun, X } from '@phosphor-icons/react'
-import type { Settings } from '../types'
+import type { FolderNode, Settings } from '../types'
+import { FolderPicker } from './FolderPicker'
 import {
   SYSTEM_UI_LANGUAGE,
   createTranslator,
@@ -48,6 +49,7 @@ import { Switch } from './ui/switch'
 interface SettingsPanelProps {
   open: boolean
   settings: Settings
+  folders?: FolderNode[]
   aiAgentsStatus?: AiAgentsStatus
   locale?: AppLocale
   systemLocale?: AppLocale
@@ -72,6 +74,8 @@ interface SettingsDraft {
   crashReporting: boolean
   analytics: boolean
   explicitOrganization: boolean
+  defaultImageFolder: string | null
+  defaultVideoFolder: string | null
 }
 
 interface SettingsBodyProps {
@@ -106,6 +110,11 @@ interface SettingsBodyProps {
   setCrashReporting: (value: boolean) => void
   analytics: boolean
   setAnalytics: (value: boolean) => void
+  folders: FolderNode[]
+  defaultImageFolder: string | null
+  setDefaultImageFolder: (value: string | null) => void
+  defaultVideoFolder: string | null
+  setDefaultVideoFolder: (value: string | null) => void
 }
 
 const PULL_INTERVAL_OPTIONS = [1, 2, 5, 10, 15, 30] as const
@@ -141,6 +150,8 @@ function createSettingsDraft(
     crashReporting: settings.crash_reporting_enabled ?? false,
     analytics: settings.analytics_enabled ?? false,
     explicitOrganization: explicitOrganizationEnabled,
+    defaultImageFolder: settings.default_image_folder ?? null,
+    defaultVideoFolder: settings.default_video_folder ?? null,
   }
 }
 
@@ -179,6 +190,8 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     ui_language: serializeUiLanguagePreference(draft.uiLanguage),
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
     default_ai_agent: draft.defaultAiAgent,
+    default_image_folder: draft.defaultImageFolder,
+    default_video_folder: draft.defaultVideoFolder,
   }
 }
 
@@ -199,6 +212,7 @@ function sanitizePositiveInteger(value: number | null | undefined, fallback: num
 export function SettingsPanel({
   open,
   settings,
+  folders,
   aiAgentsStatus = createMissingAiAgentsStatus(),
   locale = 'en',
   systemLocale = locale,
@@ -213,6 +227,7 @@ export function SettingsPanel({
   return (
     <SettingsPanelInner
       settings={settings}
+      folders={folders ?? []}
       aiAgentsStatus={aiAgentsStatus}
       locale={locale}
       systemLocale={systemLocale}
@@ -225,16 +240,18 @@ export function SettingsPanel({
   )
 }
 
-type SettingsPanelInnerProps = Omit<SettingsPanelProps, 'open' | 'explicitOrganizationEnabled' | 'aiAgentsStatus' | 'isGitVault'> & {
+type SettingsPanelInnerProps = Omit<SettingsPanelProps, 'open' | 'explicitOrganizationEnabled' | 'aiAgentsStatus' | 'isGitVault' | 'folders'> & {
   aiAgentsStatus: AiAgentsStatus
   locale: AppLocale
   systemLocale: AppLocale
   isGitVault: boolean
   explicitOrganizationEnabled: boolean
+  folders: FolderNode[]
 }
 
 function SettingsPanelInner({
   settings,
+  folders,
   aiAgentsStatus,
   systemLocale,
   onSave,
@@ -343,6 +360,11 @@ function SettingsPanelInner({
           setCrashReporting={(value) => updateDraft('crashReporting', value)}
           analytics={draft.analytics}
           setAnalytics={(value) => updateDraft('analytics', value)}
+          folders={folders}
+          defaultImageFolder={draft.defaultImageFolder}
+          setDefaultImageFolder={(value) => updateDraft('defaultImageFolder', value)}
+          defaultVideoFolder={draft.defaultVideoFolder}
+          setDefaultVideoFolder={(value) => updateDraft('defaultVideoFolder', value)}
         />
         <SettingsFooter onClose={onClose} onSave={handleSave} t={t} />
       </div>
@@ -402,6 +424,11 @@ function SettingsBody({
   setCrashReporting,
   analytics,
   setAnalytics,
+  folders,
+  defaultImageFolder,
+  setDefaultImageFolder,
+  defaultVideoFolder,
+  setDefaultVideoFolder,
 }: SettingsBodyProps) {
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 0, overflow: 'auto' }}>
@@ -433,6 +460,17 @@ function SettingsBody({
           t={t}
           themeMode={themeMode}
           setThemeMode={setThemeMode}
+        />
+      </SettingsSection>
+
+      <SettingsSection>
+        <MediaSettingsSection
+          t={t}
+          folders={folders}
+          defaultImageFolder={defaultImageFolder}
+          setDefaultImageFolder={setDefaultImageFolder}
+          defaultVideoFolder={defaultVideoFolder}
+          setDefaultVideoFolder={setDefaultVideoFolder}
         />
       </SettingsSection>
 
@@ -565,6 +603,79 @@ function ThemeModeControl({
       <ThemeModeButton label={t('settings.theme.dark')} selected={value === 'dark'} value="dark" onSelect={onChange}>
         <Moon size={14} />
       </ThemeModeButton>
+    </div>
+  )
+}
+
+function MediaSettingsSection({
+  t,
+  folders,
+  defaultImageFolder,
+  setDefaultImageFolder,
+  defaultVideoFolder,
+  setDefaultVideoFolder,
+}: Pick<
+  SettingsBodyProps,
+  't' | 'folders' | 'defaultImageFolder' | 'setDefaultImageFolder' | 'defaultVideoFolder' | 'setDefaultVideoFolder'
+>) {
+  const placeholder = t('settings.media.folderPlaceholder')
+  return (
+    <>
+      <SectionHeading
+        title={t('settings.media.title')}
+        description={t('settings.media.description')}
+      />
+
+      <MediaFolderRow
+        label={t('settings.media.imageFolder')}
+        ariaLabel={t('settings.media.imageFolder')}
+        placeholder={placeholder}
+        value={defaultImageFolder}
+        onChange={setDefaultImageFolder}
+        folders={folders}
+        testId="settings-media-image-folder"
+      />
+
+      <MediaFolderRow
+        label={t('settings.media.videoFolder')}
+        ariaLabel={t('settings.media.videoFolder')}
+        placeholder={placeholder}
+        value={defaultVideoFolder}
+        onChange={setDefaultVideoFolder}
+        folders={folders}
+        testId="settings-media-video-folder"
+      />
+    </>
+  )
+}
+
+function MediaFolderRow({
+  label,
+  ariaLabel,
+  placeholder,
+  value,
+  onChange,
+  folders,
+  testId,
+}: {
+  label: string
+  ariaLabel: string
+  placeholder: string
+  value: string | null
+  onChange: (value: string | null) => void
+  folders: FolderNode[]
+  testId: string
+}) {
+  return (
+    <div className="flex flex-col gap-1.5" data-testid={testId}>
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      <FolderPicker
+        value={value}
+        onChange={onChange}
+        folders={folders}
+        placeholder={placeholder}
+        ariaLabel={ariaLabel}
+      />
     </div>
   )
 }
