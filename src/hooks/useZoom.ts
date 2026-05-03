@@ -28,6 +28,8 @@ function loadPersistedZoom(): number {
 
 function applyZoomToDocument(level: number): void {
   document.documentElement.style.setProperty('zoom', `${level}%`)
+  document.documentElement.style.setProperty('--tolaria-overlay-zoom-factor', String(level / DEFAULT_ZOOM))
+  document.documentElement.style.setProperty('--tolaria-overlay-zoom-inverse', String(DEFAULT_ZOOM / level))
   window.dispatchEvent(new Event('laputa-zoom-change'))
 }
 
@@ -40,7 +42,7 @@ export function useZoom() {
     const level = loadPersistedZoom()
     // Apply zoom synchronously during init so child components (e.g. CodeMirror)
     // measure the correct scale factor in their own effects.
-    document.documentElement.style.setProperty('zoom', `${level}%`)
+    applyZoomToDocument(level)
     return level
   })
 
