@@ -156,10 +156,6 @@ function getMockRemoteState(path: string | null | undefined): boolean {
   return mockRemoteStateByVault[normalizedPath] ?? true
 }
 
-function escapeRegex({ text }: { text: string }) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
 function relativePathStem({ path, vaultPath }: { path: string; vaultPath: string }) {
   const prefix = vaultPath.endsWith('/') ? vaultPath : `${vaultPath}/`
   if (path.startsWith(prefix)) return path.slice(prefix.length).replace(/\.md$/, '')
@@ -192,10 +188,11 @@ function replaceRenamedWikilinks({ content, oldTargets, newPathStem }: {
   newPathStem: string
 }) {
   if (oldTargets.length === 0) return content
-  const pattern = new RegExp(`\\[\\[(?:${oldTargets.map((target) => escapeRegex({ text: target })).join('|')})(\\|[^\\]]*?)?\\]\\]`, 'g')
-  return content.replace(pattern, (_match: string, pipe: string | undefined) =>
-    pipe ? `[[${newPathStem}${pipe}]]` : `[[${newPathStem}]]`
-  )
+  const targets = new Set(oldTargets)
+  return content.replace(/\[\[([^\]|]+)(\|[^\]]*)?\]\]/g, (match: string, target: string, pipe: string | undefined) => {
+    if (!targets.has(target)) return match
+    return pipe ? `[[${newPathStem}${pipe}]]` : `[[${newPathStem}]]`
+  })
 }
 
 function updateMockRenameReferences({ newPath, newPathStem, oldTargets }: {

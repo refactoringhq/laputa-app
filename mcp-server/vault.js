@@ -3,7 +3,7 @@
  * Write operations are handled by the app-managed agent's active permission
  * profile and native file-edit tools when available.
  */
-import fs from 'node:fs/promises'
+import { open, opendir, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import matter from 'gray-matter'
 
@@ -16,17 +16,17 @@ const ACTIVE_VAULT_ERROR = 'Note path must stay inside the active vault'
  */
 export async function findMarkdownFiles(dir) {
   const results = []
-  const items = await fs.readdir(dir, { withFileTypes: true })
-  for (const item of items) {
+  const items = await opendir(dir)
+  for await (const item of items) {
     await collectMarkdownFile(results, dir, item)
   }
   return results
 }
 
 async function resolveVaultNotePath(vaultPath, notePath) {
-  const vaultRoot = await fs.realpath(vaultPath)
+  const vaultRoot = await realpath(vaultPath)
   const requestedPath = resolveRequestedNotePath(vaultRoot, notePath)
-  const noteRealPath = await fs.realpath(requestedPath)
+  const noteRealPath = await realpath(requestedPath)
   const relativePath = path.relative(vaultRoot, noteRealPath)
 
   if (!isVaultRelativePath(relativePath)) {
@@ -51,7 +51,7 @@ export async function getNote(vaultPath, notePath) {
     noteRealPath,
     relativePath,
   } = await resolveVaultNotePath(vaultPath, notePath)
-  const raw = await fs.readFile(noteRealPath, 'utf-8')
+  const raw = await readUtf8File(noteRealPath)
   const parsed = matter(raw)
   return {
     path: relativePath,
@@ -74,7 +74,7 @@ export async function searchNotes(vaultPath, query, limit = 10) {
 
   for (const filePath of files) {
     if (results.length >= limit) break
-    const content = await fs.readFile(filePath, 'utf-8')
+    const content = await readUtf8File(filePath)
     const filename = path.basename(filePath, '.md')
     const titleMatch = extractTitle(content, filename)
     if (!matchesSearchQuery(titleMatch, content, q)) continue
@@ -126,7 +126,8 @@ export async function vaultContext(vaultPath) {
 async function collectMarkdownFile(results, dir, item) {
   if (item.name.startsWith('.')) return
 
-  const full = path.join(dir, item.name)
+  const full = resolveInside(dir, item.name)
+  if (!full) return
   if (item.isDirectory()) {
     results.push(...await findMarkdownFiles(full))
     return
@@ -139,7 +140,16 @@ async function collectMarkdownFile(results, dir, item) {
 
 function resolveRequestedNotePath(vaultRoot, notePath) {
   if (path.isAbsolute(notePath)) return notePath
-  return path.resolve(vaultRoot, notePath)
+  const resolved = resolveInside(vaultRoot, notePath)
+  if (!resolved) throw new Error(ACTIVE_VAULT_ERROR)
+  return resolved
+}
+
+function resolveInside(root, target) {
+  const resolved = path.resolve(root, target)
+  const relative = path.relative(root, resolved)
+  if (isVaultRelativePath(relative)) return resolved
+  return null
 }
 
 function isVaultRelativePath(relativePath) {
@@ -151,11 +161,11 @@ function matchesSearchQuery(title, content, query) {
 }
 
 async function readVaultContextNote(vaultPath, filePath) {
-  const raw = await fs.readFile(filePath, 'utf-8')
+  const raw = await readUtf8File(filePath)
   const parsed = matter(raw)
   const rel = path.relative(vaultPath, filePath)
   const topFolder = extractTopFolder(rel)
-  const stat = await fs.stat(filePath)
+  const stat = await statFile(filePath)
   const type = parsed.data.type || parsed.data.is_a || null
 
   return {
@@ -179,13 +189,31 @@ async function readConfigFiles(vaultPath) {
   const configFiles = {}
 
   try {
-    const agentsPath = path.join(vaultPath, 'config', 'agents.md')
-    configFiles.agents = await fs.readFile(agentsPath, 'utf-8')
+    const agentsPath = resolveInside(vaultPath, 'config/agents.md')
+    if (agentsPath) configFiles.agents = await readUtf8File(agentsPath)
   } catch {
     // config/agents.md may not exist yet
   }
 
   return configFiles
+}
+
+async function readUtf8File(filePath) {
+  const handle = await open(filePath, 'r')
+  try {
+    return await handle.readFile('utf-8')
+  } finally {
+    await handle.close()
+  }
+}
+
+async function statFile(filePath) {
+  const handle = await open(filePath, 'r')
+  try {
+    return await handle.stat()
+  } finally {
+    await handle.close()
+  }
 }
 
 /**

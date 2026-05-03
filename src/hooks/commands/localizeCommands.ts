@@ -2,7 +2,6 @@ import { createTranslator, type AppLocale, type TranslationKey } from '../../lib
 import type { CommandAction, CommandGroup } from './types'
 
 type Translate = ReturnType<typeof createTranslator>
-type CommandLabeler = (command: CommandAction, t: Translate) => string
 
 const GROUP_LABEL_KEYS = {
   Navigation: 'command.group.navigation',
@@ -120,16 +119,20 @@ function localizeMoveSavedViewCommand(command: CommandAction, t: Translate, dire
   })
 }
 
-const VIEW_STATE_LABELERS: Partial<Record<string, CommandLabeler>> = {
-  'zoom-in': (command, t) => t('command.view.zoomIn', { zoom: parenthesizedSuffix(command.label)?.replace('%', '') ?? '' }),
-  'zoom-out': (command, t) => t('command.view.zoomOut', { zoom: parenthesizedSuffix(command.label)?.replace('%', '') ?? '' }),
-  'customize-note-list-columns': localizeColumnsCommand,
-  'move-view-up': (command, t) => localizeMoveSavedViewCommand(command, t, 'Up'),
-  'move-view-down': (command, t) => localizeMoveSavedViewCommand(command, t, 'Down'),
-}
+type CommandLocalizer = (command: CommandAction, t: Translate) => string
+
+const VIEW_STATE_LOCALIZERS: readonly [string, CommandLocalizer][] = [
+  ['zoom-in', (command, t) =>
+    t('command.view.zoomIn', { zoom: parenthesizedSuffix(command.label)?.replace('%', '') ?? '' })],
+  ['zoom-out', (command, t) =>
+    t('command.view.zoomOut', { zoom: parenthesizedSuffix(command.label)?.replace('%', '') ?? '' })],
+  ['customize-note-list-columns', localizeColumnsCommand],
+  ['move-view-up', (command, t) => localizeMoveSavedViewCommand(command, t, 'Up')],
+  ['move-view-down', (command, t) => localizeMoveSavedViewCommand(command, t, 'Down')],
+]
 
 function localizeViewStateCommand(command: CommandAction, t: Translate): string | null {
-  return VIEW_STATE_LABELERS[command.id]?.(command, t) ?? null
+  return VIEW_STATE_LOCALIZERS.find(([id]) => id === command.id)?.[1](command, t) ?? null
 }
 
 function localizeSettingsStateCommand(command: CommandAction, t: Translate): string | null {

@@ -1,7 +1,7 @@
 // Wikilink placeholder tokens for markdown round-trip
 const WL_START = '\u2039WIKILINK:'
 const WL_END = '\u203A'
-const WL_RE = new RegExp(`${WL_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^${WL_END}]+)${WL_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g')
+const WL_RE = /\u2039WIKILINK:([^\u203A]+)\u203A/g
 const WIKILINK_RE = /\[\[([^\]]+)\]\]/g
 const FORMAT_MARKERS = new Set(['*', '_', '`', '~'])
 
@@ -93,6 +93,18 @@ function walkBlocks(blocks: unknown[], transform: ContentTransform, clone = fals
   })
 }
 
+function textSegment(item: InlineItem, text: string): InlineItem {
+  return { ...item, text }
+}
+
+function wikilinkItem(target: string): InlineItem {
+  return {
+    type: 'wikilink',
+    props: { target },
+    content: undefined,
+  }
+}
+
 /** Walk blocks and replace placeholder text with wikilink inline content */
 export function injectWikilinks(blocks: unknown[]): unknown[] {
   return walkBlocks(blocks, expandWikilinksInContent)
@@ -110,29 +122,24 @@ export function restoreWikilinksInBlocks(blocks: unknown[]): unknown[] {
 function expandWikilinksInContent(content: InlineItem[]): InlineItem[] {
   const result: InlineItem[] = []
   for (const item of content) {
-    if (item.type !== 'text' || typeof item.text !== 'string' || !item.text.includes(WL_START)) {
-      result.push(item)
-      continue
-    }
-    const text = item.text as string
-    let lastIndex = 0
-    WL_RE.lastIndex = 0
-    let match
-    while ((match = WL_RE.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        result.push({ ...item, text: text.slice(lastIndex, match.index) })
-      }
-      result.push({
-        type: 'wikilink',
-        props: { target: match[1] },
-        content: undefined,
-      })
-      lastIndex = match.index + match[0].length
-    }
-    if (lastIndex < text.length) {
-      result.push({ ...item, text: text.slice(lastIndex) })
-    }
+    result.push(...expandWikilinksInItem(item))
   }
+  return result
+}
+
+function expandWikilinksInItem(item: InlineItem): InlineItem[] {
+  if (item.type !== 'text' || typeof item.text !== 'string' || !item.text.includes(WL_START)) return [item]
+
+  const result: InlineItem[] = []
+  let lastIndex = 0
+  WL_RE.lastIndex = 0
+  let match
+  while ((match = WL_RE.exec(item.text)) !== null) {
+    if (match.index > lastIndex) result.push(textSegment(item, item.text.slice(lastIndex, match.index)))
+    result.push(wikilinkItem(match[1]))
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < item.text.length) result.push(textSegment(item, item.text.slice(lastIndex)))
   return result
 }
 

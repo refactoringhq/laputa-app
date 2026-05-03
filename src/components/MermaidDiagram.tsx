@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { RUNTIME_STYLE_NONCE } from '@/lib/runtimeStyleNonce'
+import { SafeSvgDiv } from './SafeMarkup'
 
 type MermaidApi = typeof import('mermaid')['default']
 
@@ -52,18 +52,6 @@ function initializeMermaid(mermaid: MermaidApi) {
   initialized = true
 }
 
-function withRuntimeStyleNonce(svg: string): string {
-  if (!svg.includes('<style')) return svg
-  if (typeof document === 'undefined') return svg
-
-  const container = document.createElement('div')
-  container.innerHTML = svg
-  container.querySelectorAll('style').forEach((style) => {
-    style.setAttribute('nonce', RUNTIME_STYLE_NONCE)
-  })
-  return container.innerHTML
-}
-
 async function renderMermaidDiagram({
   diagram,
   renderId,
@@ -75,7 +63,7 @@ async function renderMermaidDiagram({
     const mermaid = (await import('mermaid')).default
     initializeMermaid(mermaid)
     const result = await mermaid.render(renderId, diagram)
-    return withRuntimeStyleNonce(result.svg)
+    return result.svg
   }
   const nextRender = renderQueue.then(render, render)
   renderQueue = nextRender.then(() => undefined, () => undefined)
@@ -84,13 +72,13 @@ async function renderMermaidDiagram({
 
 function MermaidSvgViewport({ ariaLabel, className, svg, testId }: MermaidSvgViewportProps) {
   return (
-    <div
+    <SafeSvgDiv
       aria-label={ariaLabel}
       className={className}
       data-testid={testId}
       role="img"
+      svg={svg}
       tabIndex={0}
-      dangerouslySetInnerHTML={{ __html: svg }}
     />
   )
 }

@@ -161,12 +161,16 @@ function useViewRowKeyboardActions({
   startRename: () => void
 }) {
   const runKeyboardAction = useCallback((action: RowKeyboardAction) => {
-    const actions: Record<RowKeyboardAction, () => void> = {
-      select: onSelect,
-      rename: startRename,
-      menu: openKeyboardContextMenu,
+    switch (action) {
+      case 'select':
+        onSelect()
+        return
+      case 'rename':
+        startRename()
+        return
+      case 'menu':
+        openKeyboardContextMenu()
     }
-    actions[action]()
   }, [onSelect, openKeyboardContextMenu, startRename])
 
   return useCallback((event: KeyboardEvent<HTMLDivElement>) => {

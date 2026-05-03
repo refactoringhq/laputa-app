@@ -38,21 +38,24 @@ interface VaultRelativePathRequest {
   vaultPath: string
 }
 
-type OperationHandler = (context: OperationContext) => void
-
-const OPERATION_HANDLERS: Record<string, OperationHandler> = {
-  Bash: notifyBashOperation,
-  Write: notifyWriteOperation,
-  Edit: notifyEditOperation,
-}
-
 export function detectFileOperation(operation: AgentFileOperation): void {
   if (!operation.callbacks) return
-  OPERATION_HANDLERS[operation.toolName]?.({
+  const context = {
     input: operation.input,
     vaultPath: operation.vaultPath,
     callbacks: operation.callbacks,
-  })
+  }
+
+  switch (operation.toolName) {
+    case 'Bash':
+      notifyBashOperation(context)
+      return
+    case 'Write':
+      notifyWriteOperation(context)
+      return
+    case 'Edit':
+      notifyEditOperation(context)
+  }
 }
 
 function notifyBashOperation(context: OperationContext): void {
