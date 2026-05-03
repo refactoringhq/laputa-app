@@ -43,7 +43,7 @@ const defaultMockHandlers: Record<string, MockCommandHandler> = {
 }
 
 function defaultMockInvoke(cmd: string, args?: Record<string, unknown>) {
-  const handler = defaultMockHandlers[cmd]
+  const handler = Reflect.get(defaultMockHandlers, cmd) as ((args?: Record<string, unknown>) => unknown) | undefined
   return Promise.resolve(handler ? handler(args) : null)
 }
 

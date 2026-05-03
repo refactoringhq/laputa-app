@@ -428,33 +428,49 @@ type ScalarRendererProps = SmartCellProps & {
   editProps: ScalarEditProps
 }
 
-const SCALAR_DISPLAY_RENDERERS: Partial<Record<PropertyDisplayMode, (props: ScalarRendererProps) => ReactNode>> = {
-  status: ({ propKey, value, isEditing, vaultStatuses, onSave, onStartEdit }) => (
-    <StatusValue propKey={propKey} value={value ?? ''} isEditing={isEditing} vaultStatuses={vaultStatuses} onSave={onSave} onStartEdit={onStartEdit} />
-  ),
-  tags: ({ propKey, value, isEditing, vaultTags, onSaveList, onStartEdit }) => (
-    <TagsValue propKey={propKey} value={value ? [String(value)] : []} isEditing={isEditing} vaultTags={vaultTags} onSave={onSaveList} onStartEdit={onStartEdit} />
-  ),
-  date: ({ propKey, value, isEditing, onSave, onStartEdit }) => (
-    <DateValue
-      key={`${propKey}:${isEditing ? 'editing' : 'view'}`}
-      value={String(value ?? '')}
-      onSave={(nextValue) => onSave(propKey, nextValue)}
-      autoOpen={isEditing}
-      onCancel={() => onStartEdit(null)}
+type ScalarDisplayRenderer = (props: ScalarRendererProps & { resolvedMode: PropertyDisplayMode }) => ReactNode
+
+const SCALAR_DISPLAY_RENDERERS: readonly [PropertyDisplayMode, ScalarDisplayRenderer][] = [
+  ['status', (props) => (
+    <StatusValue
+      propKey={props.propKey}
+      value={props.value ?? ''}
+      isEditing={props.isEditing}
+      vaultStatuses={props.vaultStatuses}
+      onSave={props.onSave}
+      onStartEdit={props.onStartEdit}
     />
-  ),
-  number: ({ editProps }) => <NumberValue {...editProps} />,
-  boolean: ({ propKey, value, onUpdate }) => {
-    const boolVal = toBooleanValue(value)
-    return <BooleanToggle value={boolVal} onToggle={() => onUpdate?.(propKey, !boolVal)} />
-  },
-  url: ({ editProps }) => <UrlValue {...editProps} />,
-  color: ({ editProps }) => <ColorEditableValue {...editProps} />,
-}
+  )],
+  ['tags', (props) => (
+    <TagsValue
+      propKey={props.propKey}
+      value={props.value ? [String(props.value)] : []}
+      isEditing={props.isEditing}
+      vaultTags={props.vaultTags}
+      onSave={props.onSaveList}
+      onStartEdit={props.onStartEdit}
+    />
+  )],
+  ['date', (props) => (
+    <DateValue
+      key={`${props.propKey}:${props.isEditing ? 'editing' : 'view'}`}
+      value={String(props.value ?? '')}
+      onSave={(nextValue) => props.onSave(props.propKey, nextValue)}
+      autoOpen={props.isEditing}
+      onCancel={() => props.onStartEdit(null)}
+    />
+  )],
+  ['number', (props) => <NumberValue {...props.editProps} />],
+  ['boolean', (props) => {
+    const boolVal = toBooleanValue(props.value)
+    return <BooleanToggle value={boolVal} onToggle={() => props.onUpdate?.(props.propKey, !boolVal)} />
+  }],
+  ['url', (props) => <UrlValue {...props.editProps} />],
+  ['color', (props) => <ColorEditableValue {...props.editProps} />],
+]
 
 function renderScalarDisplayMode(props: ScalarRendererProps & { resolvedMode: PropertyDisplayMode }) {
-  const renderer = SCALAR_DISPLAY_RENDERERS[props.resolvedMode]
+  const renderer = SCALAR_DISPLAY_RENDERERS.find(([mode]) => mode === props.resolvedMode)?.[1]
   return renderer ? renderer(props) : <EditableValue {...props.editProps} />
 }
 

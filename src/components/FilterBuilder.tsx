@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import type { FilterCondition, FilterOp, FilterGroup, FilterNode } from '../types'
+import { compileSafeUserRegex } from '../utils/safeRegex'
 import { FilterFieldCombobox } from './FilterFieldCombobox'
 import { DateValueInput } from './filter-builder/DateValueInput'
 
@@ -32,12 +33,7 @@ function normalizeRegexFlag(op: FilterOp, enabled: boolean): boolean | undefined
 
 function hasInvalidRegex(value: string, regexEnabled: boolean): boolean {
   if (!regexEnabled) return false
-  try {
-    new RegExp(value, 'i')
-    return false
-  } catch {
-    return true
-  }
+  return !compileSafeUserRegex(value, 'i').ok
 }
 
 function isFilterGroup(node: FilterNode): node is FilterGroup {

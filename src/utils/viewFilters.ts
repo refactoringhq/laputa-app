@@ -1,5 +1,6 @@
 import type { VaultEntry, ViewDefinition, FilterGroup, FilterNode, FilterCondition } from '../types'
 import { toDateFilterTimestamp } from './filterDates'
+import { compileSafeUserRegex } from './safeRegex'
 
 /** Evaluate a view's filters against a list of entries, returning only matches. */
 export function evaluateView(definition: ViewDefinition, entries: VaultEntry[]): VaultEntry[] {
@@ -88,11 +89,8 @@ function toString(v: unknown): string {
 
 function compileRegex(cond: FilterCondition, value: string): RegExp | null {
   if (cond.regex !== true) return null
-  try {
-    return new RegExp(value, 'i')
-  } catch {
-    return null
-  }
+  const compiled = compileSafeUserRegex(value, 'i')
+  return compiled.ok ? compiled.pattern : null
 }
 
 function usesRegex(cond: FilterCondition): boolean {
@@ -100,10 +98,7 @@ function usesRegex(cond: FilterCondition): boolean {
     && (cond.op === 'contains' || cond.op === 'not_contains' || cond.op === 'equals' || cond.op === 'not_equals')
 }
 
-function evaluateCondition(cond: FilterCondition, entry: VaultEntry): boolean {
-  const resolved = resolveField(entry, cond.field)
-  const { op, value } = cond
-
+function evaluateEmptyCondition(op: FilterCondition['op'], resolved: ReturnType<typeof resolveField>): boolean | null {
   if (op === 'is_empty') {
     if (resolved.array) return resolved.array.length === 0
     const s = resolved.scalar
@@ -114,69 +109,93 @@ function evaluateCondition(cond: FilterCondition, entry: VaultEntry): boolean {
     const s = resolved.scalar
     return s != null && s !== '' && s !== false
   }
+  return null
+}
 
-  const condVal = toString(value)
-  const regex = usesRegex(cond) ? compileRegex(cond, condVal) : null
+function evaluateRegexArrayCondition(op: FilterCondition['op'], values: string[], regex: RegExp): boolean {
+  const matched = values.some((item) => relationshipCandidates(item).some((candidate) => regex.test(candidate)))
+  if (op === 'contains' || op === 'equals') return matched
+  if (op === 'not_contains' || op === 'not_equals') return !matched
+  return false
+}
 
-  if (usesRegex(cond) && !regex) return false
+function hasArrayMatch(values: string[], condVal: string): boolean {
+  const stem = wikilinkStem(condVal)
+  const isWikilink = condVal.trim().startsWith('[[')
+  return values.some((item) => (
+    isWikilink ? wikilinkEquals(item, condVal) : wikilinkStem(item).includes(stem)
+  ))
+}
 
-  if (resolved.array) {
-    if (regex) {
-      const matched = resolved.array.some((item) => relationshipCandidates(item).some((candidate) => regex.test(candidate)))
-      if (op === 'contains' || op === 'equals') return matched
-      if (op === 'not_contains' || op === 'not_equals') return !matched
-    }
+function evaluateArrayCondition(cond: FilterCondition, values: string[], condVal: string, regex: RegExp | null): boolean {
+  const { op, value } = cond
+  if (regex) return evaluateRegexArrayCondition(op, values, regex)
 
-    const stem = wikilinkStem(condVal)
-    const isWikilink = condVal.trim().startsWith('[[')
-    const arrayMatch = (arr: string[]) => arr.some((item) =>
-      isWikilink ? wikilinkEquals(item, condVal) : wikilinkStem(item).includes(stem)
-    )
-    if (op === 'contains') return arrayMatch(resolved.array)
-    if (op === 'not_contains') return !arrayMatch(resolved.array)
-    if (op === 'any_of' && Array.isArray(value)) {
-      return resolved.array.some((item) =>
-        (value as string[]).some((v) => wikilinkEquals(item, v))
-      )
-    }
-    if (op === 'none_of' && Array.isArray(value)) {
-      return !resolved.array.some((item) =>
-        (value as string[]).some((v) => wikilinkEquals(item, v))
-      )
-    }
-    return false
+  if (op === 'contains') return hasArrayMatch(values, condVal)
+  if (op === 'not_contains') return !hasArrayMatch(values, condVal)
+  if (op === 'any_of' && Array.isArray(value)) {
+    return values.some((item) => (value as string[]).some((v) => wikilinkEquals(item, v)))
   }
-
-  const fieldRaw = toString(resolved.scalar)
-  if (regex) {
-    const matched = regex.test(fieldRaw)
-    if (op === 'equals' || op === 'contains') return matched
-    if (op === 'not_equals' || op === 'not_contains') return !matched
+  if (op === 'none_of' && Array.isArray(value)) {
+    return !values.some((item) => (value as string[]).some((v) => wikilinkEquals(item, v)))
   }
+  return false
+}
+
+function evaluateRegexScalarCondition(op: FilterCondition['op'], fieldRaw: string, regex: RegExp): boolean {
+  const matched = regex.test(fieldRaw)
+  if (op === 'equals' || op === 'contains') return matched
+  if (op === 'not_equals' || op === 'not_contains') return !matched
+  return false
+}
+
+function evaluateTextCondition(cond: FilterCondition, fieldRaw: string, condVal: string, regex: RegExp | null): boolean {
+  const { op, value } = cond
+  if (regex) return evaluateRegexScalarCondition(op, fieldRaw, regex)
 
   const fieldStr = fieldRaw.toLowerCase()
   const condStr = condVal.toLowerCase()
-
   if (op === 'equals') return fieldStr === condStr
   if (op === 'not_equals') return fieldStr !== condStr
   if (op === 'contains') return fieldStr.includes(condStr)
   if (op === 'not_contains') return !fieldStr.includes(condStr)
   if (op === 'any_of' && Array.isArray(value)) return (value as string[]).some((v) => toString(v).toLowerCase() === fieldStr)
   if (op === 'none_of' && Array.isArray(value)) return !(value as string[]).some((v) => toString(v).toLowerCase() === fieldStr)
+  return false
+}
 
-  // Date comparisons
-  if (op === 'before' || op === 'after') {
-    let tsMs: number | null = null
-    if (typeof resolved.scalar === 'number') {
-      tsMs = resolved.scalar * 1000 // Unix timestamp (seconds) → milliseconds
-    } else if (typeof resolved.scalar === 'string') {
-      tsMs = toDateFilterTimestamp(resolved.scalar)
-    }
-    if (tsMs == null) return false
-    const target = toDateFilterTimestamp(condVal)
-    if (target == null) return false
-    return op === 'before' ? tsMs < target : tsMs > target
+function fieldTimestamp(value: string | number | boolean | null | undefined): number | null {
+  if (typeof value === 'number') return value * 1000 // Unix timestamp (seconds) -> milliseconds
+  if (typeof value === 'string') return toDateFilterTimestamp(value)
+  return null
+}
+
+function evaluateDateCondition(cond: FilterCondition, scalar: string | number | boolean | null | undefined, condVal: string): boolean {
+  if (cond.op !== 'before' && cond.op !== 'after') return false
+
+  const tsMs = fieldTimestamp(scalar)
+  if (tsMs == null) return false
+  const target = toDateFilterTimestamp(condVal)
+  if (target == null) return false
+  return cond.op === 'before' ? tsMs < target : tsMs > target
+}
+
+function evaluateCondition(cond: FilterCondition, entry: VaultEntry): boolean {
+  const resolved = resolveField(entry, cond.field)
+  const emptyResult = evaluateEmptyCondition(cond.op, resolved)
+  if (emptyResult !== null) return emptyResult
+
+  const condVal = toString(cond.value)
+  const regex = usesRegex(cond) ? compileRegex(cond, condVal) : null
+  if (usesRegex(cond) && !regex) return false
+
+  if (resolved.array) {
+    return evaluateArrayCondition(cond, resolved.array, condVal, regex)
   }
 
-  return false
+  if (cond.op === 'before' || cond.op === 'after') {
+    return evaluateDateCondition(cond, resolved.scalar, condVal)
+  }
+
+  return evaluateTextCondition(cond, toString(resolved.scalar), condVal, regex)
 }

@@ -161,3 +161,4 @@ proposed → active → superseded
 | [0106](0106-shared-app-command-manifest.md) | Shared app command manifest | active |
 | [0107](0107-markdown-durable-tldraw-whiteboards.md) | Markdown-durable tldraw whiteboards in notes | active |
 | [0107](0107-pointer-owned-editor-block-reordering.md) | Pointer-owned editor block reordering | active |
+| [0108](0108-sanitized-rendered-markup-and-safe-regex.md) | Sanitized rendered markup and safe user regex | active |

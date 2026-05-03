@@ -33,60 +33,56 @@ interface VaultApiRequest {
 /** Tracks last vault path for commands that don't receive it as an argument. */
 let lastVaultPath: string | null = null
 
-const VAULT_API_COMMANDS: Record<string, (args: Record<string, unknown>) => VaultApiRequest | null> = {
-  list_vault: (args) => {
-    if (args.path) lastVaultPath = args.path as string
-    return args.path ? { url: `/api/vault/list?path=${encodeURIComponent(args.path as string)}` } : null
-  },
-  reload_vault: (args) => {
-    if (args.path) lastVaultPath = args.path as string
-    return args.path ? { url: `/api/vault/list?path=${encodeURIComponent(args.path as string)}&reload=1` } : null
-  },
-  reload_vault_entry: (args) =>
-    args.path ? { url: `/api/vault/entry?path=${encodeURIComponent(args.path as string)}` } : null,
-  get_note_content: (args) =>
-    args.path ? { url: `/api/vault/content?path=${encodeURIComponent(args.path as string)}` } : null,
-  validate_note_content: (args) =>
-    args.path ? { url: `/api/vault/content?path=${encodeURIComponent(args.path as string)}` } : null,
-  get_all_content: (args) =>
-    args.path ? { url: `/api/vault/all-content?path=${encodeURIComponent(args.path as string)}` } : null,
-  save_note_content: (args) =>
-    args.path ? { url: '/api/vault/save', method: 'POST', body: { path: args.path, content: args.content } } : null,
-  rename_note: (args) =>
-    args.old_path ? { url: '/api/vault/rename', method: 'POST', body: { vault_path: args.vault_path, old_path: args.old_path, new_title: args.new_title } } : null,
-  rename_note_filename: (args) =>
-    args.old_path ? {
-      url: '/api/vault/rename-filename',
-      method: 'POST',
-      body: {
-        vault_path: args.vault_path,
-        old_path: args.old_path,
-        new_filename_stem: args.new_filename_stem,
-      },
-    } : null,
-  move_note_to_folder: (args) =>
-    args.old_path && args.folder_path ? {
-      url: '/api/vault/move-to-folder',
-      method: 'POST',
-      body: {
-        vault_path: args.vault_path,
-        old_path: args.old_path,
-        folder_path: args.folder_path,
-      },
-    } : null,
-  delete_note: (args) =>
-    args.path ? { url: '/api/vault/delete', method: 'POST', body: { path: args.path } } : null,
-  search_vault: (args) => {
-    const q = args.query as string
-    if (!q || !lastVaultPath) return null
-    return { url: `/api/vault/search?vault_path=${encodeURIComponent(lastVaultPath)}&query=${encodeURIComponent(q)}&mode=${encodeURIComponent((args.mode as string) || 'all')}` }
-  },
-}
-
 function buildVaultApiRequest(cmd: string, args?: Record<string, unknown>) {
   if (!args) return null
-  const requestBuilder = VAULT_API_COMMANDS[cmd]
-  return requestBuilder?.(args) ?? null
+  switch (cmd) {
+    case 'list_vault':
+      if (args.path) lastVaultPath = args.path as string
+      return args.path ? { url: `/api/vault/list?path=${encodeURIComponent(args.path as string)}` } : null
+    case 'reload_vault':
+      if (args.path) lastVaultPath = args.path as string
+      return args.path ? { url: `/api/vault/list?path=${encodeURIComponent(args.path as string)}&reload=1` } : null
+    case 'reload_vault_entry':
+      return args.path ? { url: `/api/vault/entry?path=${encodeURIComponent(args.path as string)}` } : null
+    case 'get_note_content':
+    case 'validate_note_content':
+      return args.path ? { url: `/api/vault/content?path=${encodeURIComponent(args.path as string)}` } : null
+    case 'get_all_content':
+      return args.path ? { url: `/api/vault/all-content?path=${encodeURIComponent(args.path as string)}` } : null
+    case 'save_note_content':
+      return args.path ? { url: '/api/vault/save', method: 'POST', body: { path: args.path, content: args.content } } : null
+    case 'rename_note':
+      return args.old_path ? { url: '/api/vault/rename', method: 'POST', body: { vault_path: args.vault_path, old_path: args.old_path, new_title: args.new_title } } : null
+    case 'rename_note_filename':
+      return args.old_path ? {
+        url: '/api/vault/rename-filename',
+        method: 'POST',
+        body: {
+          vault_path: args.vault_path,
+          old_path: args.old_path,
+          new_filename_stem: args.new_filename_stem,
+        },
+      } : null
+    case 'move_note_to_folder':
+      return args.old_path && args.folder_path ? {
+        url: '/api/vault/move-to-folder',
+        method: 'POST',
+        body: {
+          vault_path: args.vault_path,
+          old_path: args.old_path,
+          folder_path: args.folder_path,
+        },
+      } : null
+    case 'delete_note':
+      return args.path ? { url: '/api/vault/delete', method: 'POST', body: { path: args.path } } : null
+    case 'search_vault': {
+      const q = args.query as string
+      if (!q || !lastVaultPath) return null
+      return { url: `/api/vault/search?vault_path=${encodeURIComponent(lastVaultPath)}&query=${encodeURIComponent(q)}&mode=${encodeURIComponent((args.mode as string) || 'all')}` }
+    }
+    default:
+      return null
+  }
 }
 
 function buildFetchOptions(request: VaultApiRequest): RequestInit {
@@ -102,7 +98,9 @@ function buildFetchOptions(request: VaultApiRequest): RequestInit {
 }
 
 async function fetchVaultApiResponse(request: VaultApiRequest) {
-  const res = await fetch(request.url, buildFetchOptions(request))
+  const url = new URL(request.url, window.location.origin)
+  if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/vault/')) return undefined
+  const res = await fetch(new Request(url, buildFetchOptions(request)))
   if (!res.ok) return undefined
   return res.json()
 }

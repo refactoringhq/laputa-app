@@ -43,7 +43,7 @@ import { useOnboarding } from './useOnboarding'
 
 function mockCommands(overrides: Record<string, MockOverride> = {}) {
   mockInvokeFn.mockImplementation(async (cmd: string, args?: MockArgs) => {
-    const override = overrides[cmd]
+    const override = Reflect.get(overrides, cmd) as MockOverride | undefined
     if (typeof override === 'function') {
       return override(args)
     }

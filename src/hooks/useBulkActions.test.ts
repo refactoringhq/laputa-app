@@ -44,7 +44,13 @@ describe('useBulkActions', () => {
     const { result } = renderBulkActions(organizedPaths)
 
     await act(async () => {
-      await result.current[action](selectedPaths)
+      switch (action) {
+        case 'handleBulkArchive':
+          await result.current.handleBulkArchive(selectedPaths)
+          return
+        case 'handleBulkOrganize':
+          await result.current.handleBulkOrganize(selectedPaths)
+      }
     })
   }
 

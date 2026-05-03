@@ -566,12 +566,10 @@ describe('useEntryActions', () => {
       expect(onBeforeAction).toHaveBeenCalledWith('/vault/note/test.md')
     })
 
-    it.each([
-      ['archive', 'handleArchiveNote'] as const,
-    ])('does not proceed with %s when onBeforeAction rejects', async (_label, method) => {
+    it('does not proceed with archiving when onBeforeAction rejects', async () => {
       const { result } = setupWithBeforeAction(vi.fn().mockRejectedValue(new Error('Save failed')))
 
-      await expect(act(() => result.current[method]('/vault/note/test.md'))).rejects.toThrow('Save failed')
+      await expect(act(() => result.current.handleArchiveNote('/vault/note/test.md'))).rejects.toThrow('Save failed')
 
       expect(handleUpdateFrontmatter).not.toHaveBeenCalled()
     })

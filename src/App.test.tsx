@@ -311,7 +311,7 @@ function resetMockCommandResults() {
 }
 
 function resolveMockCommandResult(cmd: string, args?: unknown) {
-  const result = mockCommandResults[cmd]
+  const result = Reflect.get(mockCommandResults, cmd) as unknown
   return typeof result === 'function'
     ? (result as (input?: unknown) => unknown)(args)
     : result ?? null
