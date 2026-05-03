@@ -200,6 +200,14 @@ export function planNewTypeCreation({
   if (existingType) return { status: 'existing', entry: existingType }
 
   const resolved = resolveNewType({ typeName, vaultPath })
+  const collision = findPathCollision(entries, resolved.entry.path)
+  if (collision) {
+    return {
+      status: 'blocked',
+      message: buildCreationCollisionMessage({ noun: 'type', title: typeName, path: resolved.entry.path }),
+    }
+  }
+
   return { status: 'create', resolved }
 }
 
