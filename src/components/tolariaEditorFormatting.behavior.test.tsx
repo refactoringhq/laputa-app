@@ -329,6 +329,90 @@ describe('tolariaEditorFormatting behavior', () => {
     expect(formattingToolbarStore.setState).toHaveBeenCalledWith(false)
   })
 
+  it('hides the floating toolbar while the editor is composing IME text', () => {
+    const editor = createMockEditor('paragraph')
+    const editorInput = editor.domElement.firstElementChild as HTMLElement
+
+    useBlockNoteEditorMock.mockReturnValue(editor)
+
+    render(<TolariaFormattingToolbarController />)
+
+    expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+      position: { from: 1, to: 5 },
+      useFloatingOptions: expect.objectContaining({ open: true }),
+    }))
+
+    act(() => {
+      fireEvent.compositionStart(editorInput)
+    })
+
+    expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+      position: undefined,
+      useFloatingOptions: expect.objectContaining({ open: false }),
+    }))
+
+    act(() => {
+      fireEvent.compositionEnd(editorInput)
+    })
+
+    expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+      position: { from: 1, to: 5 },
+      useFloatingOptions: expect.objectContaining({ open: true }),
+    }))
+  })
+
+  it('ignores composition events that start outside the editor', () => {
+    const editor = createMockEditor('paragraph')
+    const outsideInput = document.createElement('input')
+    document.body.appendChild(outsideInput)
+
+    useBlockNoteEditorMock.mockReturnValue(editor)
+
+    render(<TolariaFormattingToolbarController />)
+
+    act(() => {
+      fireEvent.compositionStart(outsideInput)
+    })
+
+    expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+      position: { from: 1, to: 5 },
+      useFloatingOptions: expect.objectContaining({ open: true }),
+    }))
+  })
+
+  it('binds composition listeners after BlockNote provides its editor element', () => {
+    const editor = createMockEditor('paragraph')
+    const lateEditorElement = editor.domElement
+    const editorInput = lateEditorElement.firstElementChild as HTMLElement
+
+    editor.domElement = undefined as unknown as HTMLElement
+    useBlockNoteEditorMock.mockReturnValue(editor)
+
+    const { rerender } = render(<TolariaFormattingToolbarController />)
+
+    expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+      position: undefined,
+      useFloatingOptions: expect.objectContaining({ open: false }),
+    }))
+
+    editor.domElement = lateEditorElement
+    rerender(<TolariaFormattingToolbarController />)
+
+    expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+      position: { from: 1, to: 5 },
+      useFloatingOptions: expect.objectContaining({ open: true }),
+    }))
+
+    act(() => {
+      fireEvent.compositionStart(editorInput)
+    })
+
+    expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+      position: undefined,
+      useFloatingOptions: expect.objectContaining({ open: false }),
+    }))
+  })
+
   it('does not open the floating toolbar when the editor anchor element is unavailable', () => {
     const editor = createMockEditor()
     editor.domElement = document.createElement('div')
