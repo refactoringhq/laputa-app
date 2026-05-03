@@ -176,6 +176,18 @@ describe('DynamicPropertiesPanel', () => {
     expect(screen.getByText('\u2014').parentElement).toHaveClass('justify-start', 'text-left')
   })
 
+  it('keeps present empty properties visible and editable', () => {
+    renderPanel({ frontmatter: { 'start date': '' }, onUpdateProperty })
+
+    expect(screen.getByText('Start date')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('\u2014'))
+    const input = screen.getByDisplayValue('')
+    fireEvent.change(input, { target: { value: '2026-05-03' } })
+    fireEvent.blur(input)
+
+    expect(onUpdateProperty).toHaveBeenCalledWith('start date', '2026-05-03')
+  })
+
   it('hides Owner with wikilink value from Properties panel', () => {
     renderPanel({ frontmatter: { Owner: '[[person/luca]]' } })
     // Owner with wikilink goes to RelationshipsPanel, not Properties
