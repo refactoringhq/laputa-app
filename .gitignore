@@ -72,3 +72,4 @@ CODE-HEALTH-REPORT.md
 # Local environment variables (never commit)
 .env.local
 .env.*.local
+.claude/worktrees/
