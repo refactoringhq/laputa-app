@@ -875,7 +875,7 @@ function MediaFolderRow({
 }) {
   return (
     <div className="flex flex-col gap-1.5" data-testid={testId}>
-      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      <span className="text-xs font-medium text-muted-foreground" aria-hidden="true">{label}</span>
       <FolderPicker
         value={value}
         onChange={onChange}

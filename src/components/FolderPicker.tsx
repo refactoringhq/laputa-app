@@ -43,23 +43,30 @@ function filterMatchingFolders(folders: string[], query: string): string[] {
   return folders.filter((folder) => folder.toLowerCase().includes(normalized))
 }
 
-export function FolderPicker({
-  value,
-  onChange,
-  folders,
-  placeholder,
-  className,
-  ariaLabel,
-}: FolderPickerProps) {
-  const inputId = useId()
+interface FolderPickerHandlers {
+  draft: string
+  open: boolean
+  matches: string[]
+  inputRef: React.RefObject<HTMLInputElement | null>
+  setOpen: (next: boolean | ((prev: boolean) => boolean)) => void
+  handleChange: (event: ChangeEvent<HTMLInputElement>) => void
+  handleBlur: () => void
+  handleKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void
+  handleSelectMatch: (folder: string) => void
+  handleClear: () => void
+}
+
+function useFolderPickerState(
+  value: string | null,
+  onChange: (next: string | null) => void,
+  folders: FolderNode[],
+): FolderPickerHandlers {
   const allFolderPaths = useMemo(() => flattenFolderPaths(folders), [folders])
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(value ?? '')
   const [lastSyncedValue, setLastSyncedValue] = useState(value)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Resync draft when the external value changes between renders (replaces a
-  // setDraft-in-useEffect pattern that triggered cascading renders).
   if (value !== lastSyncedValue) {
     setLastSyncedValue(value)
     setDraft(value ?? '')
@@ -94,9 +101,7 @@ export function FolderPicker({
     }
   }
 
-  const handleBlur = () => {
-    commit(draft)
-  }
+  const handleBlur = () => commit(draft)
 
   const handleSelectMatch = (folder: string) => {
     commit(folder)
@@ -107,6 +112,69 @@ export function FolderPicker({
   const handleClear = () => {
     onChange(null)
     setDraft('')
+    inputRef.current?.focus()
+  }
+
+  return {
+    draft, open, matches, inputRef, setOpen,
+    handleChange, handleBlur, handleKeyDown, handleSelectMatch, handleClear,
+  }
+}
+
+function preventMouseDown(event: React.MouseEvent<HTMLButtonElement>) {
+  event.preventDefault()
+}
+
+function FolderMatchesList({
+  matches,
+  value,
+  onSelect,
+}: {
+  matches: string[]
+  value: string | null
+  onSelect: (folder: string) => void
+}) {
+  if (matches.length === 0) {
+    return <div className="px-2 py-1.5 text-xs text-muted-foreground">No matching folders</div>
+  }
+  return (
+    <div role="listbox" className="flex flex-col">
+      {matches.slice(0, 50).map((folder) => (
+        <button
+          key={folder}
+          type="button"
+          role="option"
+          aria-selected={folder === value}
+          onMouseDown={preventMouseDown}
+          onClick={() => onSelect(folder)}
+          className={cn(
+            'block w-full truncate rounded-sm px-2 py-1 text-left text-sm hover:bg-accent hover:text-accent-foreground',
+            folder === value && 'bg-accent/50',
+          )}
+        >
+          {folder}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export function FolderPicker({
+  value,
+  onChange,
+  folders,
+  placeholder,
+  className,
+  ariaLabel,
+}: FolderPickerProps) {
+  const inputId = useId()
+  const {
+    draft, open, matches, inputRef, setOpen,
+    handleChange, handleBlur, handleKeyDown, handleSelectMatch, handleClear,
+  } = useFolderPickerState(value, onChange, folders)
+
+  const handleToggle = () => {
+    setOpen((prev) => !prev)
     inputRef.current?.focus()
   }
 
@@ -131,7 +199,7 @@ export function FolderPicker({
           {value && (
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
+              onMouseDown={preventMouseDown}
               onClick={handleClear}
               className="absolute right-7 inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-foreground"
               aria-label="Clear folder"
@@ -141,11 +209,8 @@ export function FolderPicker({
           )}
           <button
             type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              setOpen((prev) => !prev)
-              inputRef.current?.focus()
-            }}
+            onMouseDown={preventMouseDown}
+            onClick={handleToggle}
             className="absolute right-2 inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-foreground"
             aria-label="Open folder list"
           >
@@ -159,27 +224,7 @@ export function FolderPicker({
         className="max-h-64 w-[var(--radix-popover-trigger-width)] overflow-auto p-1"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        {matches.length === 0 ? (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">No matching folders</div>
-        ) : (
-          <ul role="listbox" className="flex flex-col">
-            {matches.slice(0, 50).map((folder) => (
-              <li key={folder}>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => handleSelectMatch(folder)}
-                  className={cn(
-                    'block w-full truncate rounded-sm px-2 py-1 text-left text-sm hover:bg-accent hover:text-accent-foreground',
-                    folder === value && 'bg-accent/50',
-                  )}
-                >
-                  {folder}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <FolderMatchesList matches={matches} value={value} onSelect={handleSelectMatch} />
       </PopoverContent>
     </Popover>
   )
