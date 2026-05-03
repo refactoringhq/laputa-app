@@ -469,7 +469,7 @@ function CodeBlockCopyButton({ copyTarget, locale }: { copyTarget: CodeBlockCopy
       <ActionTooltip copy={{ label }} side="left" align="center">
         <Button
           aria-label={label}
-          className="border border-border/70 bg-background/90 text-muted-foreground shadow-sm backdrop-blur hover:bg-background hover:text-foreground focus-visible:bg-background focus-visible:text-foreground"
+          className="border-transparent bg-transparent text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground focus-visible:bg-transparent focus-visible:text-foreground"
           data-editor-code-copy-button
           onBlur={() => setActive(false)}
           onClick={handleCopy}
@@ -481,7 +481,7 @@ function CodeBlockCopyButton({ copyTarget, locale }: { copyTarget: CodeBlockCopy
           type="button"
           variant="ghost"
         >
-          <Copy aria-hidden="true" size={14} weight={active ? 'fill' : 'regular'} />
+          <Copy aria-hidden="true" className="size-6" weight={active ? 'fill' : 'regular'} />
         </Button>
       </ActionTooltip>
     </div>

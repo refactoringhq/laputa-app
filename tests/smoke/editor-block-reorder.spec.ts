@@ -51,7 +51,8 @@ async function expectSideMenuCenteredOnText(page: Page, text: string): Promise<v
 
     const range = document.createRange()
     range.selectNodeContents(inlineContent)
-    const textRect = range.getBoundingClientRect()
+    const textRect = Array.from(range.getClientRects())
+      .find((rect) => rect.width > 0 && rect.height > 0) ?? range.getBoundingClientRect()
     range.detach()
 
     const sideMenuRect = sideMenu.getBoundingClientRect()
@@ -62,6 +63,41 @@ async function expectSideMenuCenteredOnText(page: Page, text: string): Promise<v
   })
 
   expect(delta).toBeLessThanOrEqual(2)
+}
+
+async function expectSideMenuCenteredOnFirstTextLine(page: Page, text: string): Promise<void> {
+  const block = await blockOuterForText(page, text)
+  await block.hover()
+  await expect(page.locator('.bn-side-menu')).toBeVisible({ timeout: 5_000 })
+
+  const metrics = await block.evaluate((blockElement) => {
+    const content = blockElement.querySelector('.bn-block-content')
+    const inlineContent = content?.querySelector('.bn-inline-content') ?? content
+    const sideMenu = document.querySelector('.bn-side-menu')
+    if (!inlineContent || !sideMenu) return null
+
+    const range = document.createRange()
+    range.selectNodeContents(inlineContent)
+    const lineRects = Array.from(range.getClientRects())
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+    const textRect = range.getBoundingClientRect()
+    range.detach()
+    if (lineRects.length < 2 || textRect.height <= lineRects[0].height) return null
+
+    const firstLineCenter = lineRects[0].top + lineRects[0].height / 2
+    const fullTextCenter = textRect.top + textRect.height / 2
+    const sideMenuRect = sideMenu.getBoundingClientRect()
+    const sideMenuCenter = sideMenuRect.top + sideMenuRect.height / 2
+
+    return {
+      firstLineDelta: Math.abs(sideMenuCenter - firstLineCenter),
+      fullTextDelta: Math.abs(sideMenuCenter - fullTextCenter),
+    }
+  })
+
+  expect(metrics).not.toBeNull()
+  expect(metrics!.firstLineDelta).toBeLessThanOrEqual(2)
+  expect(metrics!.fullTextDelta).toBeGreaterThan(8)
 }
 
 async function dragHandleToBlock(page: Page, handle: Locator, targetBlock: Locator): Promise<void> {
@@ -112,4 +148,20 @@ test('dragging the left block handle reorders editor blocks', async ({ page }) =
   await dragHandleToBlock(page, handle, paragraph)
 
   await expect.poll(async () => editor.textContent()).toMatch(/Alpha Project[\s\S]*Notes[\s\S]*This is a test project/)
+})
+
+test('left block handle aligns with the first line of wrapped text', async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 720 })
+  await page.getByText('Alpha Project', { exact: true }).first().click()
+  const editor = page.locator('.bn-editor')
+  await expect(editor).toBeVisible({ timeout: 5_000 })
+
+  await page.addStyleTag({
+    content: '.bn-editor { max-width: 320px !important; }',
+  })
+
+  await expectSideMenuCenteredOnFirstTextLine(
+    page,
+    'This is a test project that references other notes.',
+  )
 })
