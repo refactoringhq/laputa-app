@@ -346,6 +346,20 @@ index b2761001278486a8b2ac1d10c82420b4994e96d9..c44e9c09100c6d1803bd71b2a338c43e
              n.updateBlock(t.id, { props: { language: d } });
            };
            i.addEventListener("change", l), s = () => i.removeEventListener("change", l);
+@@ -1802,9 +1804,12 @@ const ln = () => ({
+     parseContent: ({ el: e, schema: t }) => Y(e, t, "checkListItem"),
+     render(e, t) {
+       const n = document.createDocumentFragment(), o = document.createElement("input");
+       o.type = "checkbox", o.checked = e.props.checked, e.props.checked && o.setAttribute("checked", ""), o.addEventListener("change", () => {
+-        t.updateBlock(e, { props: { checked: !e.props.checked } });
++        const r = t.getBlock(e.id);
++        if (!r)
++          return;
++        t.updateBlock(r, { props: { checked: !r.props.checked } });
+       });
+       const r = document.createElement("p"), a = document.createElement("div");
+       return a.contentEditable = "false", a.appendChild(o), n.appendChild(a), n.appendChild(r), {
+         dom: n,
 @@ -2621,6 +2623,9 @@ class On {
          this.state.referencePos = o.getBoundingClientRect().toJSON(), this.emitUpdate(this.pluginState.triggerCharacter);
        }
@@ -441,6 +455,24 @@ index dbb7fc33a9add7a96488349876bc56ad60111a3f..58c3cf181f25467d85cd8c3788b5b73d
              editor.updateBlock(block.id, { props: { language } });
            };
            select.addEventListener("change", handleLanguageChange);
+diff --git a/src/blocks/ListItem/CheckListItem/block.ts b/src/blocks/ListItem/CheckListItem/block.ts
+index 682cbba711bd9ca107fe3940f44ab39fc757cfe0..2d2f871ac13836b736543b29a620580a7a3f1057 100644
+--- a/src/blocks/ListItem/CheckListItem/block.ts
++++ b/src/blocks/ListItem/CheckListItem/block.ts
+@@ -82,7 +82,12 @@ export const createCheckListItemBlockSpec = createBlockSpec(
+         checkbox.setAttribute("checked", "");
+       }
+       checkbox.addEventListener("change", () => {
+-        editor.updateBlock(block, { props: { checked: !block.props.checked } });
++        const liveBlock = editor.getBlock(block.id);
++        if (!liveBlock) {
++          return;
++        }
++
++        editor.updateBlock(liveBlock, { props: { checked: !liveBlock.props.checked } });
+       });
+       // We use a <p> tag, because for <li> tags we'd need a <ul> element to put
+       // them in to be semantically correct, which we can't have due to the
 diff --git a/src/editor/managers/ExtensionManager/extensions.ts b/src/editor/managers/ExtensionManager/extensions.ts
 index 45f0acf8e5d869eb13a3c3d70e6f67059f86c598..2a4d15c8e8465181cc009ed9912cd284e0930251 100644
 --- a/src/editor/managers/ExtensionManager/extensions.ts
