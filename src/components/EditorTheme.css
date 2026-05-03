@@ -23,6 +23,12 @@
   padding-right: 0;
 }
 
+/* Let each rich-text block resolve its own base direction for mixed LTR/RTL notes. */
+.editor__blocknote-container .bn-inline-content {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
 /* Override BlockNote's default line-height on block-outer so our theme controls it */
 .editor__blocknote-container .bn-block-outer {
   line-height: var(--editor-line-height) !important;
