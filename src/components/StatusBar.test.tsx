@@ -567,6 +567,7 @@ describe('StatusBar', () => {
       />
     )
     fireEvent.click(screen.getByTestId('status-sync'))
+    expect(screen.getByTestId('status-bar')).toHaveStyle({ zIndex: '30' })
     expect(screen.getByTestId('git-status-popup')).toBeInTheDocument()
     expect(screen.getByText('main')).toBeInTheDocument()
     expect(screen.getByText(/2 ahead/)).toBeInTheDocument()
