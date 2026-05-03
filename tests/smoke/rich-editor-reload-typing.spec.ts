@@ -13,6 +13,7 @@ let tempVaultDir: string
 function isEditorTypingCrash(message: string): boolean {
   return (
     message.includes('beforeinput') ||
+    message.includes('Block with ID') ||
     message.includes('stale editor view') ||
     message.includes('Cannot read properties') ||
     message.includes('undefined is not an object') ||
@@ -72,6 +73,44 @@ async function expectNoteFileToContain(filePath: string, marker: string): Promis
   await expect.poll(() => fs.readFileSync(filePath, 'utf8'), { timeout: 10_000 }).toContain(marker)
 }
 
+function writeChecklistNote(filePath: string, marker: string, checked = false): void {
+  fs.writeFileSync(filePath, `---
+Is A: Note
+Status: Active
+---
+
+# Note B
+
+- [${checked ? 'x' : ' '}] Toggle me
+- [ ] Keep me
+
+${marker}
+`, 'utf8')
+}
+
+function checklistCheckbox(page: Page, index: number) {
+  return page.locator('.bn-block-content[data-content-type="checkListItem"] input[type="checkbox"]').nth(index)
+}
+
+async function retainCurrentChecklistCheckbox(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const testWindow = window as typeof window & { __staleChecklistCheckbox?: HTMLInputElement | null }
+    testWindow.__staleChecklistCheckbox = document.querySelector(
+      '.bn-block-content[data-content-type="checkListItem"] input[type="checkbox"]',
+    )
+  })
+}
+
+async function dispatchRetainedChecklistChange(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const testWindow = window as typeof window & { __staleChecklistCheckbox?: HTMLInputElement | null }
+    const checkbox = testWindow.__staleChecklistCheckbox
+    if (!checkbox) throw new Error('Expected retained checklist checkbox')
+    checkbox.checked = !checkbox.checked
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+}
+
 async function reloadVault(page: Page): Promise<void> {
   await triggerMenuCommand(page, 'vault-reload')
   await expect(page.getByText(/Vault reloaded \(\d+ entries\)/).last()).toBeVisible({
@@ -115,6 +154,33 @@ test('@smoke typing after a rich-editor reload and note switch stays usable', as
   await page.keyboard.type(` -> ${afterReloadMarker}`, { delay: 10 })
 
   await expectNoteFileToContain(noteBPath, afterReloadMarker)
+  await page.waitForTimeout(500)
+  expect(crashes).toEqual([])
+})
+
+test('checklist toggles after a rich-editor reload ignore stale checkbox events', async ({ page }) => {
+  const crashes = trackEditorTypingCrashes(page)
+  const noteBPath = path.join(tempVaultDir, 'note', 'note-b.md')
+  const initialMarker = `initial checklist body ${Date.now()}`
+  const reloadMarker = `reloaded checklist body ${Date.now()}`
+
+  writeChecklistNote(noteBPath, initialMarker)
+  await openNote(page, 'Note B')
+  await expect(checklistCheckbox(page, 0)).not.toBeChecked()
+  await retainCurrentChecklistCheckbox(page)
+
+  writeChecklistNote(noteBPath, reloadMarker)
+  await reloadVault(page)
+  await openNote(page, 'Alpha Project')
+  await openNote(page, 'Note B')
+  await expect(page.locator('.bn-editor')).toContainText(reloadMarker)
+
+  await dispatchRetainedChecklistChange(page)
+
+  const liveCheckbox = checklistCheckbox(page, 0)
+  await liveCheckbox.click()
+  await expect(liveCheckbox).toBeChecked()
+  await expectNoteFileToContain(noteBPath, '- [x] Toggle me')
   await page.waitForTimeout(500)
   expect(crashes).toEqual([])
 })
