@@ -800,6 +800,7 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 ### Product Events
 - **File previews** — `file_preview_opened`, `file_preview_action`, and `file_preview_failed` report only preview/action categories such as `image`, `pdf`, `unsupported`, `open_external`, `copy_path`, and `reveal`.
 - **Inline image lightbox** — `inline_image_lightbox_opened` records that a rich-editor inline image was opened from double-click, without sending note paths, image URLs, alt text, or file names.
+- **Code block copy** — `code_block_copied` records that the rich-editor code-block copy action was used, without sending note paths, languages, or code content.
 - **AI agent sessions** — `ai_agent_message_sent`, `ai_agent_message_blocked`, `ai_agent_response_completed`, `ai_agent_response_failed`, and `ai_agent_permission_mode_changed` use only agent ids, permission modes, counts, and coarse status categories.
 - **All Notes visibility** — `all_notes_visibility_changed` records only the toggled category and enabled state.
 

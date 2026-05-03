@@ -4,6 +4,10 @@
    ============================================== */
 
 /* --- Editor root --- */
+.editor__blocknote-container {
+  position: relative;
+}
+
 .editor__blocknote-container .bn-editor {
   font-family: var(--editor-font-family);
   font-size: var(--editor-font-size);
@@ -408,6 +412,12 @@
   background-color: var(--editor-code-block-background) !important;
   border: 1px solid var(--editor-code-block-border);
   color: var(--editor-code-block-text) !important;
+  position: relative;
+}
+
+.editor__code-block-copy {
+  position: absolute;
+  z-index: 4;
 }
 
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > pre {

@@ -370,6 +370,7 @@
   "editor.toolbar.copyFilePath": "파일 경로 복사",
   "editor.toolbar.moreActions": "추가 노트 작업",
   "editor.toolbar.openProperties": "속성 패널 열기",
+  "editor.codeBlock.copy": "클립보드에 코드 복사",
   "editor.imageLightbox.title": "이미지 미리 보기",
   "editor.filename.rename": "파일 이름 변경",
   "editor.filename.renameToTitle": "파일 이름을 제목과 일치하도록 변경",
