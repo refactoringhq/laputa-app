@@ -159,4 +159,5 @@ proposed → active → superseded
 | [0104](0104-tauri-frontend-readiness-watchdog.md) | Tauri frontend readiness watchdog | active |
 | [0105](0105-editor-correctness-and-responsiveness-contract.md) | Editor correctness and responsiveness contract | active |
 | [0106](0106-shared-app-command-manifest.md) | Shared app command manifest | active |
+| [0107](0107-markdown-durable-tldraw-whiteboards.md) | Markdown-durable tldraw whiteboards in notes | active |
 | [0107](0107-pointer-owned-editor-block-reordering.md) | Pointer-owned editor block reordering | active |

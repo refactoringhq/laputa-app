@@ -115,6 +115,7 @@ The note list opportunistically preloads visible and adjacent markdown/text entr
 | Editor | BlockNote | 0.46.2 |
 | Code block highlighting | @blocknote/code-block | 0.46.2 |
 | Diagram rendering | Mermaid | 11.14.0 |
+| Whiteboard rendering | tldraw | 4.5.10 |
 | Raw editor | CodeMirror 6 | - |
 | Styling | Tailwind CSS v4 + CSS variables | 4.1.18 |
 | UI primitives | Radix UI + shadcn/ui | - |

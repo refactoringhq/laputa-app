@@ -2,6 +2,7 @@ import type { useCreateBlockNote } from '@blocknote/react'
 import { preProcessWikilinks, injectWikilinks } from '../utils/wikilinks'
 import { preProcessMathMarkdown, injectMathInBlocks } from '../utils/mathMarkdown'
 import { preProcessMermaidMarkdown, injectMermaidInBlocks } from '../utils/mermaidMarkdown'
+import { preProcessTldrawMarkdown, injectTldrawInBlocks } from '../utils/tldrawMarkdown'
 import { resolveImageUrls } from '../utils/vaultImages'
 import { repairMalformedEditorBlocks } from './editorBlockRepair'
 import {
@@ -132,7 +133,8 @@ async function parseMarkdownBlocks(
 }
 
 function preProcessEditorMarkdown(markdown: MarkdownBody, vaultPath?: VaultPath): PreprocessedMarkdown {
-  const withMermaid = preProcessMermaidMarkdown({ markdown })
+  const withTldraw = preProcessTldrawMarkdown({ markdown })
+  const withMermaid = preProcessMermaidMarkdown({ markdown: withTldraw })
   const withImages = vaultPath ? resolveImageUrls(withMermaid, vaultPath) : withMermaid
   const withWikilinks = preProcessWikilinks(withImages)
   return preProcessMathMarkdown({ markdown: withWikilinks })
@@ -141,7 +143,8 @@ function preProcessEditorMarkdown(markdown: MarkdownBody, vaultPath?: VaultPath)
 function injectEditorMarkdownBlocks(blocks: EditorBlocks): EditorBlocks {
   const withWikilinks = injectWikilinks(blocks)
   const withMath = injectMathInBlocks(withWikilinks)
-  return injectMermaidInBlocks(withMath) as EditorBlocks
+  const withMermaid = injectMermaidInBlocks(withMath)
+  return injectTldrawInBlocks(withMermaid) as EditorBlocks
 }
 
 function repairParsedMarkdownBlocks(parsed: MarkdownParseResult): EditorBlocks {
