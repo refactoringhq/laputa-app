@@ -330,35 +330,102 @@ describe('tolariaEditorFormatting behavior', () => {
   })
 
   it('hides the floating toolbar while the editor is composing IME text', () => {
-    const editor = createMockEditor('paragraph')
-    const editorInput = editor.domElement.firstElementChild as HTMLElement
+    vi.useFakeTimers()
+    try {
+      const editor = createMockEditor('paragraph')
+      const editorInput = editor.domElement.firstElementChild as HTMLElement
 
-    useBlockNoteEditorMock.mockReturnValue(editor)
+      useBlockNoteEditorMock.mockReturnValue(editor)
 
-    render(<TolariaFormattingToolbarController />)
+      render(<TolariaFormattingToolbarController />)
 
-    expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
-      position: { from: 1, to: 5 },
-      useFloatingOptions: expect.objectContaining({ open: true }),
-    }))
+      expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+        position: { from: 1, to: 5 },
+        useFloatingOptions: expect.objectContaining({ open: true }),
+      }))
 
-    act(() => {
-      fireEvent.compositionStart(editorInput)
-    })
+      act(() => {
+        fireEvent.compositionStart(editorInput)
+      })
 
-    expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
-      position: undefined,
-      useFloatingOptions: expect.objectContaining({ open: false }),
-    }))
+      expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+        position: undefined,
+        useFloatingOptions: expect.objectContaining({ open: false }),
+      }))
 
-    act(() => {
-      fireEvent.compositionEnd(editorInput)
-    })
+      act(() => {
+        fireEvent.compositionEnd(editorInput)
+      })
 
-    expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
-      position: { from: 1, to: 5 },
-      useFloatingOptions: expect.objectContaining({ open: true }),
-    }))
+      expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+        position: undefined,
+        useFloatingOptions: expect.objectContaining({ open: false }),
+      }))
+
+      act(() => {
+        vi.advanceTimersByTime(250)
+      })
+
+      expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+        position: { from: 1, to: 5 },
+        useFloatingOptions: expect.objectContaining({ open: true }),
+      }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the floating toolbar hidden through rapid Zhuyin composition settle cycles', () => {
+    vi.useFakeTimers()
+    try {
+      const editor = createMockEditor('paragraph')
+      const editorInput = editor.domElement.firstElementChild as HTMLElement
+
+      useBlockNoteEditorMock.mockReturnValue(editor)
+
+      render(<TolariaFormattingToolbarController />)
+
+      act(() => {
+        fireEvent.compositionStart(editorInput)
+        fireEvent.compositionEnd(editorInput)
+      })
+
+      expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+        position: undefined,
+        useFloatingOptions: expect.objectContaining({ open: false }),
+      }))
+
+      act(() => {
+        vi.advanceTimersByTime(120)
+        fireEvent.compositionStart(editorInput)
+        fireEvent.compositionEnd(editorInput)
+      })
+
+      expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+        position: undefined,
+        useFloatingOptions: expect.objectContaining({ open: false }),
+      }))
+
+      act(() => {
+        vi.advanceTimersByTime(249)
+      })
+
+      expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+        position: undefined,
+        useFloatingOptions: expect.objectContaining({ open: false }),
+      }))
+
+      act(() => {
+        vi.advanceTimersByTime(1)
+      })
+
+      expect(positionPopoverState.lastProps).toEqual(expect.objectContaining({
+        position: { from: 1, to: 5 },
+        useFloatingOptions: expect.objectContaining({ open: true }),
+      }))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('ignores composition events that start outside the editor', () => {
