@@ -405,7 +405,7 @@ The `with_frontmatter()` helper wraps this in a read-transform-write cycle on th
 
 ## Git Integration
 
-Git operations live in `src-tauri/src/git/`. All operations shell out to the `git` CLI (not libgit2).
+Git operations live in `src-tauri/src/git/`. All operations shell out to the `git` CLI (not libgit2). Path-producing commands use `core.quotePath=false` so Unicode note filenames stay as UTF-8 paths across status, history, cache invalidation, and rename detection.
 
 ### Data Types
 

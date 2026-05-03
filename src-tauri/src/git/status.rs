@@ -300,6 +300,14 @@ mod tests {
         git_commit(vp, "initial").unwrap();
     }
 
+    fn force_quoted_git_paths(vault: &Path) {
+        git_command()
+            .args(["config", "core.quotePath", "true"])
+            .current_dir(vault)
+            .output()
+            .unwrap();
+    }
+
     #[test]
     fn test_get_modified_files() {
         let dir = setup_git_repo();
@@ -378,6 +386,28 @@ mod tests {
             "Full path should end with relative path: {}",
             modified[0].path
         );
+    }
+
+    #[test]
+    fn test_get_modified_files_preserves_chinese_markdown_path() {
+        let dir = setup_git_repo();
+        let vault = dir.path();
+        let vp = vault.to_str().unwrap();
+        let relative_path = "中文笔记.md";
+
+        force_quoted_git_paths(vault);
+        write_and_commit_markdown(vault, vp, relative_path, "# 初始\n");
+        fs::write(vault.join(relative_path), "# 初始\n\n更新\n").unwrap();
+
+        let modified = get_modified_files(vp).unwrap();
+        let file = modified
+            .iter()
+            .find(|file| file.relative_path == relative_path)
+            .expect("Chinese markdown path should be reported as modified");
+
+        assert_eq!(file.status, "modified");
+        assert!(file.path.ends_with(relative_path));
+        assert_eq!(file.added_lines, Some(2));
     }
 
     #[test]
