@@ -39,11 +39,19 @@ fn find_codex_binary() -> Result<PathBuf, String> {
 }
 
 fn find_codex_binary_on_path() -> Option<PathBuf> {
-    crate::hidden_command("which")
+    crate::hidden_command(codex_path_lookup_command())
         .arg("codex")
         .output()
         .ok()
         .and_then(|output| path_from_successful_output(&output))
+}
+
+fn codex_path_lookup_command() -> &'static str {
+    if cfg!(windows) {
+        "where"
+    } else {
+        "which"
+    }
 }
 
 fn find_codex_binary_in_user_shell() -> Option<PathBuf> {
@@ -102,13 +110,27 @@ fn codex_binary_candidates() -> Vec<PathBuf> {
 fn codex_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
     let mut candidates = vec![
         home.join(".local/bin/codex"),
+        home.join(".local/bin/codex.exe"),
         home.join(".codex/bin/codex"),
+        home.join(".codex/bin/codex.exe"),
         home.join(".local/share/mise/shims/codex"),
+        home.join(".local/share/mise/shims/codex.exe"),
         home.join(".asdf/shims/codex"),
+        home.join(".asdf/shims/codex.exe"),
         home.join(".npm-global/bin/codex"),
+        home.join(".npm-global/bin/codex.cmd"),
+        home.join(".npm-global/bin/codex.exe"),
         home.join(".npm/bin/codex"),
+        home.join(".npm/bin/codex.cmd"),
+        home.join(".npm/bin/codex.exe"),
         home.join(".bun/bin/codex"),
+        home.join(".bun/bin/codex.exe"),
         home.join(".linuxbrew/bin/codex"),
+        home.join("AppData/Roaming/npm/codex.cmd"),
+        home.join("AppData/Roaming/npm/codex.exe"),
+        home.join("AppData/Local/pnpm/codex.cmd"),
+        home.join("AppData/Local/pnpm/codex.exe"),
+        home.join("scoop/shims/codex.exe"),
         PathBuf::from("/home/linuxbrew/.linuxbrew/bin/codex"),
         PathBuf::from("/usr/local/bin/codex"),
         PathBuf::from("/opt/homebrew/bin/codex"),
@@ -208,6 +230,7 @@ fn build_codex_command(
         .args(args)
         .arg(prompt)
         .current_dir(vault_path)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     command
@@ -218,6 +241,7 @@ fn build_codex_args(
     last_message_path: Option<&Path>,
 ) -> Result<Vec<String>, String> {
     let mcp_server_path = crate::cli_agent_runtime::mcp_server_path_string()?;
+    let node_path = crate::mcp::find_node()?;
 
     let mut args = vec![
         "--sandbox".into(),
@@ -229,14 +253,11 @@ fn build_codex_args(
         "-C".into(),
         request.vault_path.clone(),
         "-c".into(),
-        r#"mcp_servers.tolaria.command="node""#.into(),
+        codex_config_string("mcp_servers.tolaria.command", &node_path.to_string_lossy()),
         "-c".into(),
-        format!(r#"mcp_servers.tolaria.args=["{}"]"#, mcp_server_path),
+        codex_config_string_list("mcp_servers.tolaria.args", &[mcp_server_path.as_str()]),
         "-c".into(),
-        format!(
-            r#"mcp_servers.tolaria.env={{VAULT_PATH="{}"}}"#,
-            request.vault_path
-        ),
+        codex_mcp_env_config(&request.vault_path),
     ];
 
     if let Some(path) = last_message_path {
@@ -245,6 +266,30 @@ fn build_codex_args(
     }
 
     Ok(args)
+}
+
+fn codex_config_string(key: &str, value: &str) -> String {
+    format!(r#"{key}="{}""#, toml_escape(value))
+}
+
+fn codex_config_string_list(key: &str, values: &[&str]) -> String {
+    let values = values
+        .iter()
+        .map(|value| format!(r#""{}""#, toml_escape(value)))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{key}=[{values}]")
+}
+
+fn codex_mcp_env_config(vault_path: &str) -> String {
+    format!(
+        r#"mcp_servers.tolaria.env={{VAULT_PATH="{}",WS_UI_PORT="9711"}}"#,
+        toml_escape(vault_path)
+    )
+}
+
+fn toml_escape(value: &str) -> String {
+    value.replace('\\', r#"\\"#).replace('"', r#"\""#)
 }
 
 fn codex_sandbox(permission_mode: crate::ai_agents::AiAgentPermissionMode) -> &'static str {
@@ -544,6 +589,35 @@ mod tests {
     }
 
     #[test]
+    fn build_codex_args_uses_resolved_mcp_node_and_ui_bridge_env() {
+        let args = build_codex_args(
+            &AgentStreamRequest {
+                message: "Read [[Test note]]".into(),
+                system_prompt: None,
+                vault_path: "/tmp/vault".into(),
+                permission_mode: AiAgentPermissionMode::Safe,
+            },
+            None,
+        )
+        .unwrap();
+
+        let command_override = args
+            .iter()
+            .find(|arg| arg.starts_with("mcp_servers.tolaria.command="))
+            .expect("Codex should receive a transient Tolaria MCP command");
+
+        assert!(
+            !command_override.ends_with(r#""node""#),
+            "Codex MCP command should use Tolaria's resolved Node path, got {command_override}"
+        );
+        assert!(
+            command_override.contains('/'),
+            "Codex MCP command should be an absolute Node path, got {command_override}"
+        );
+        assert!(args.iter().any(|arg| arg.contains(r#"WS_UI_PORT="9711""#)));
+    }
+
+    #[test]
     fn build_codex_command_keeps_agent_process_contract() {
         let binary = PathBuf::from("codex");
         let args = vec!["exec".to_string(), "--json".to_string()];
@@ -664,6 +738,88 @@ exit 2
         assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn run_codex_agent_stream_closes_stdin_even_when_parent_stdin_pipe_is_open() {
+        use std::io::Read;
+        use std::time::{Duration, Instant};
+
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .arg("codex_stdin_probe_parent_child")
+            .arg("--ignored")
+            .arg("--nocapture")
+            .env("TOLARIA_CODEX_STDIN_PROBE_PARENT_CHILD", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let child_stdin = child.stdin.take().unwrap();
+        let mut stdout = child.stdout.take().unwrap();
+        let mut stderr = child.stderr.take().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+
+        let status = loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                break status;
+            }
+            if Instant::now() >= deadline {
+                child.kill().unwrap();
+                drop(child_stdin);
+                panic!("Codex stdin probe child timed out");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+
+        drop(child_stdin);
+        let mut stdout_text = String::new();
+        let mut stderr_text = String::new();
+        stdout.read_to_string(&mut stdout_text).unwrap();
+        stderr.read_to_string(&mut stderr_text).unwrap();
+
+        assert!(
+            status.success(),
+            "Codex stdin probe child failed with {status}\nstdout:\n{stdout_text}\nstderr:\n{stderr_text}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[ignore = "spawned by run_codex_agent_stream_closes_stdin_even_when_parent_stdin_pipe_is_open"]
+    #[test]
+    fn codex_stdin_probe_parent_child() {
+        if std::env::var_os("TOLARIA_CODEX_STDIN_PROBE_PARENT_CHILD").is_none() {
+            return;
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        let binary = executable_script(
+            dir.path(),
+            "codex",
+            r#"stdin="$(cat)"
+if [ -n "$stdin" ]; then
+  echo "stdin was not closed" >&2
+  exit 9
+fi
+printf '%s\n' '{"type":"thread.started","thread_id":"stdin-ok"}'
+printf '%s\n' '{"type":"item.completed","item":{"id":"msg_1","type":"agent_message","text":"stdin closed"}}'
+"#,
+        );
+        let mut events = Vec::new();
+        let result = run_agent_stream_with_binary(
+            &binary,
+            codex_request(vault.path(), AiAgentPermissionMode::Safe),
+            |event| events.push(event),
+        );
+
+        assert_eq!(result.unwrap(), "stdin-ok");
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AiAgentStreamEvent::TextDelta { text } if text == "stdin closed"
+        )));
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+    }
+
     #[test]
     fn codex_binary_candidates_include_supported_macos_installs() {
         let home = PathBuf::from("/Users/alex");
@@ -694,6 +850,34 @@ exit 2
         let expected = [
             home.join(".linuxbrew/bin/codex"),
             PathBuf::from("/home/linuxbrew/.linuxbrew/bin/codex"),
+        ];
+
+        for candidate in expected {
+            assert!(
+                candidates.contains(&candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    #[test]
+    fn codex_binary_candidates_include_windows_npm_and_toolchain_shims() {
+        let home = PathBuf::from("C:/Users/alex");
+        let candidates = codex_binary_candidates_for_home(&home);
+        let expected = [
+            home.join(".local/bin/codex.exe"),
+            home.join(".local/share/mise/shims/codex.exe"),
+            home.join(".asdf/shims/codex.exe"),
+            home.join(".npm-global/bin/codex.cmd"),
+            home.join(".npm-global/bin/codex.exe"),
+            home.join(".npm/bin/codex.cmd"),
+            home.join(".npm/bin/codex.exe"),
+            home.join("AppData/Roaming/npm/codex.cmd"),
+            home.join("AppData/Roaming/npm/codex.exe"),
+            home.join("AppData/Local/pnpm/codex.cmd"),
+            home.join("AppData/Local/pnpm/codex.exe"),
+            home.join("scoop/shims/codex.exe"),
         ];
 
         for candidate in expected {

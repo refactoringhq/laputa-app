@@ -61,6 +61,7 @@ function handleDeleteKeys({
   onDeleteContent,
 }: HandleDeleteKeysArgs): boolean {
   if (isInlineWikilinkCompositionEvent(event, isComposing)) return false
+  if (event.altKey || event.ctrlKey || event.metaKey) return false
 
   if (event.key === 'Backspace') {
     event.preventDefault()

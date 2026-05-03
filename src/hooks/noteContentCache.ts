@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import type { VaultEntry } from '../types'
 import { markNoteOpenTrace } from '../utils/noteOpenPerformance'
+import { errorMessage, isActiveVaultUnavailableError } from '../utils/vaultErrors'
 import { getNoteWindowParams, isNoteWindow } from '../utils/windowMode'
 
 type NotePath = VaultEntry['path']
@@ -273,14 +274,8 @@ export async function loadContentForOpen(options: {
   return loadNoteContent(entry, forceReload || hasResolvedCachedContent(cachedEntry))
 }
 
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  if (typeof error === 'string') return error
-  return String(error)
-}
-
 export function isNoActiveVaultSelectedError(error: unknown): boolean {
-  return /no active vault selected/i.test(errorMessage(error))
+  return isActiveVaultUnavailableError(error)
 }
 
 export function isUnreadableNoteContentError(error: unknown): boolean {

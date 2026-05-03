@@ -51,6 +51,7 @@ export type { Tab }
 interface TabManagementOptions {
   beforeNavigate?: (fromPath: string, toPath: string) => Promise<void>
   hasUnsavedChanges?: (path: string) => boolean
+  onMissingActiveVault?: (entry: VaultEntry, error: unknown) => void | Promise<void>
   onMissingNotePath?: (entry: VaultEntry, error: unknown) => void | Promise<void>
   onUnreadableNoteContent?: (entry: VaultEntry, error: unknown) => void | Promise<void>
 }
@@ -64,6 +65,7 @@ interface NavigateToEntryOptions {
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>
   setActiveTabPath: React.Dispatch<React.SetStateAction<string | null>>
   hasUnsavedChanges?: (path: string) => boolean
+  onMissingActiveVault?: (entry: VaultEntry, error: unknown) => void | Promise<void>
   onMissingNotePath?: (entry: VaultEntry, error: unknown) => void | Promise<void>
   onUnreadableNoteContent?: (entry: VaultEntry, error: unknown) => void | Promise<void>
 }
@@ -252,6 +254,7 @@ function handleRecoverableEntryLoadFailure(options: {
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>
   setActiveTabPath: React.Dispatch<React.SetStateAction<string | null>>
   error: unknown
+  onMissingActiveVault?: (entry: VaultEntry, error: unknown) => void | Promise<void>
   onMissingNotePath?: (entry: VaultEntry, error: unknown) => void | Promise<void>
   onUnreadableNoteContent?: (entry: VaultEntry, error: unknown) => void | Promise<void>
 }) {
@@ -263,6 +266,7 @@ function handleRecoverableEntryLoadFailure(options: {
     setTabs,
     setActiveTabPath,
     error,
+    onMissingActiveVault,
     onMissingNotePath,
     onUnreadableNoteContent,
   } = options
@@ -278,6 +282,16 @@ function handleRecoverableEntryLoadFailure(options: {
     setActiveTabPath,
   })
   failNoteOpenTrace(entry.path, kind)
+
+  if (kind === 'missing-active-vault') {
+    runEntryFailureCallback({
+      callback: onMissingActiveVault,
+      entry,
+      error,
+      warning: 'Failed to handle missing active vault:',
+    })
+    return
+  }
 
   if (kind === 'missing-path') {
     runEntryFailureCallback({
@@ -308,6 +322,7 @@ function handleEntryLoadFailure(options: {
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>
   setActiveTabPath: React.Dispatch<React.SetStateAction<string | null>>
   error: unknown
+  onMissingActiveVault?: (entry: VaultEntry, error: unknown) => void | Promise<void>
   onMissingNotePath?: (entry: VaultEntry, error: unknown) => void | Promise<void>
   onUnreadableNoteContent?: (entry: VaultEntry, error: unknown) => void | Promise<void>
 }) {
@@ -320,6 +335,7 @@ function handleEntryLoadFailure(options: {
     setTabs,
     setActiveTabPath,
     error,
+    onMissingActiveVault,
     onMissingNotePath,
     onUnreadableNoteContent,
   } = options
@@ -337,6 +353,7 @@ function handleEntryLoadFailure(options: {
       setTabs,
       setActiveTabPath,
       error,
+      onMissingActiveVault,
       onMissingNotePath,
       onUnreadableNoteContent,
     })
@@ -370,6 +387,7 @@ async function loadTextEntry(options: Required<Pick<NavigateToEntryOptions, 'for
     activeTabPathRef,
     setTabs,
     setActiveTabPath,
+    onMissingActiveVault,
     onMissingNotePath,
     onUnreadableNoteContent,
   } = options
@@ -409,6 +427,7 @@ async function loadTextEntry(options: Required<Pick<NavigateToEntryOptions, 'for
       setTabs,
       setActiveTabPath,
       error: err,
+      onMissingActiveVault,
       onMissingNotePath,
       onUnreadableNoteContent,
     })
@@ -443,6 +462,7 @@ export function useTabManagement(options: TabManagementOptions = {}) {
   const beforeNavigateSeqRef = useRef(0)
   const beforeNavigate = options.beforeNavigate
   const hasUnsavedChanges = options.hasUnsavedChanges
+  const onMissingActiveVault = options.onMissingActiveVault
   const onMissingNotePath = options.onMissingNotePath
   const onUnreadableNoteContent = options.onUnreadableNoteContent
 
@@ -484,13 +504,14 @@ export function useTabManagement(options: TabManagementOptions = {}) {
       setTabs,
       setActiveTabPath,
       hasUnsavedChanges,
+      onMissingActiveVault,
       onMissingNotePath,
       onUnreadableNoteContent,
     }))
     if (!navigated) {
       resetRequestedPathIfStillPending(requestedActiveTabPathRef, activeTabPathRef, entry.path)
     }
-  }, [executeNavigationWithBoundary, hasUnsavedChanges, onMissingNotePath, onUnreadableNoteContent])
+  }, [executeNavigationWithBoundary, hasUnsavedChanges, onMissingActiveVault, onMissingNotePath, onUnreadableNoteContent])
 
   const handleSwitchTab = useCallback((path: string) => {
     requestedActiveTabPathRef.current = path
@@ -523,13 +544,14 @@ export function useTabManagement(options: TabManagementOptions = {}) {
       activeTabPathRef,
       setTabs,
       setActiveTabPath,
+      onMissingActiveVault,
       onMissingNotePath,
       onUnreadableNoteContent,
     }))
     if (!navigated) {
       resetRequestedPathIfStillPending(requestedActiveTabPathRef, activeTabPathRef, entry.path)
     }
-  }, [executeNavigationWithBoundary, onMissingNotePath, onUnreadableNoteContent])
+  }, [executeNavigationWithBoundary, onMissingActiveVault, onMissingNotePath, onUnreadableNoteContent])
 
   const closeAllTabs = useCallback(() => {
     tabsRef.current = []

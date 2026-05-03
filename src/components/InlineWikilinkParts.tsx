@@ -1,4 +1,5 @@
 import { Fragment, createElement } from 'react'
+import type { CSSProperties } from 'react'
 import type { VaultEntry } from '../types'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { NoteTitleIcon } from './NoteTitleIcon'
@@ -158,6 +159,7 @@ export function InlineWikilinkEditorField({
   inputRef,
   dataTestId,
   editorClassName,
+  editorStyle,
   onCompositionEnd,
   onCompositionStart,
   onInput,
@@ -175,6 +177,7 @@ export function InlineWikilinkEditorField({
   inputRef: React.Ref<HTMLDivElement>
   dataTestId: string
   editorClassName?: string
+  editorStyle?: CSSProperties
   onCompositionEnd: () => void
   onCompositionStart: () => void
   onInput: () => void
@@ -222,7 +225,7 @@ export function InlineWikilinkEditorField({
         onClick={onSelectionChange}
         onKeyUp={onSelectionChange}
         onMouseUp={onSelectionChange}
-        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+        style={{ ...editorStyle, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
       >
         {segments.map((segment, index) => (
           segment.kind === 'text'

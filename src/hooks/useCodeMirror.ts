@@ -1,5 +1,14 @@
 import { useRef, useEffect } from 'react'
-import { EditorView, lineNumbers, highlightActiveLine, keymap } from '@codemirror/view'
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  lineNumbers,
+  highlightActiveLine,
+  keymap,
+  ViewPlugin,
+  type ViewUpdate,
+} from '@codemirror/view'
 import { EditorState, Prec } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { frontmatterHighlightPlugin, frontmatterHighlightTheme } from '../extensions/frontmatterHighlight'
@@ -18,6 +27,10 @@ const RAW_EDITOR_COLORS = {
   gutterBorder: 'var(--border-subtle)',
   gutterText: 'var(--text-muted)',
 }
+
+const AUTO_TEXT_DIRECTION_LINE = Decoration.line({
+  attributes: { dir: 'auto' },
+})
 interface MarkdownFence {
   character: '`' | '~'
   length: number
@@ -105,8 +118,47 @@ function buildBaseTheme() {
       backgroundColor: RAW_EDITOR_COLORS.activeLineBackground,
     },
     '&.cm-focused': { outline: 'none' },
-    '.cm-line': { padding: '0' },
+    '.cm-line': {
+      padding: '0',
+      unicodeBidi: 'plaintext',
+      textAlign: 'start',
+    },
   })
+}
+
+function buildAutoTextDirectionDecorations(view: EditorView): DecorationSet {
+  const ranges = []
+
+  for (const visibleRange of view.visibleRanges) {
+    for (let pos = visibleRange.from; pos <= visibleRange.to;) {
+      const line = view.state.doc.lineAt(pos)
+      ranges.push(AUTO_TEXT_DIRECTION_LINE.range(line.from))
+      pos = line.to + 1
+    }
+  }
+
+  return Decoration.set(ranges, true)
+}
+
+function buildAutoTextDirectionExtension() {
+  return [
+    EditorView.perLineTextDirection.of(true),
+    ViewPlugin.fromClass(class {
+      decorations: DecorationSet
+
+      constructor(view: EditorView) {
+        this.decorations = buildAutoTextDirectionDecorations(view)
+      }
+
+      update(update: ViewUpdate) {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = buildAutoTextDirectionDecorations(update.view)
+        }
+      }
+    }, {
+      decorations: plugin => plugin.decorations,
+    }),
+  ]
 }
 
 function buildSaveKeymap(callbacks: { current: CodeMirrorCallbacks }) {
@@ -188,6 +240,7 @@ export function useCodeMirror(
         lineNumbers(),
         highlightActiveLine(),
         EditorView.lineWrapping,
+        buildAutoTextDirectionExtension(),
         history(),
         buildArrowLigaturesExtension(),
         keymap.of([...defaultKeymap, ...historyKeymap]),

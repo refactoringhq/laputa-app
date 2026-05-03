@@ -310,6 +310,7 @@ type SwapHarnessProps = {
   tabs: ReturnType<typeof makeTab>[]
   activeTabPath: string | null
   rawMode?: boolean
+  vaultPath?: string
 }
 
 async function createSwapHarness(options: {
@@ -859,6 +860,34 @@ describe('useEditorTabSwap raw mode sync', () => {
     expect(onContentChange).not.toHaveBeenCalled()
 
     flushQueuedFrames(frameCallbacks)
+  })
+
+  it('saves BlockNote image asset URLs as vault-relative attachment links', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const onContentChange = vi.fn()
+    const { docRef, mockEditor, result } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false, vaultPath: '/vault' },
+      onContentChange,
+    })
+
+    docRef.current = [{
+      type: 'image',
+      props: { url: 'asset://localhost/%2Fvault%2Fattachments%2Fshot.png' },
+      children: [],
+    }]
+    mockEditor.blocksToMarkdownLossy.mockReturnValue(
+      '![shot](asset://localhost/%2Fvault%2Fattachments%2Fshot.png)\n',
+    )
+
+    act(() => {
+      result.current.handleEditorChange()
+      result.current.flushPendingEditorChange()
+    })
+
+    expect(onContentChange).toHaveBeenCalledWith(
+      'a.md',
+      '---\ntitle: Note A\n---\n![shot](attachments/shot.png)\n',
+    )
   })
 
   it('serializes rich inline math nodes back to Markdown on editor changes', async () => {

@@ -49,7 +49,13 @@
         "laputa-qa-reference.md",
         "attachments/laputa-reference.png"
       ]
+    },
+    {
+      "id": "rtl-mixed-direction",
+      "reason": "Arabic and mixed English/Arabic paragraphs keep rich editor and raw editor BiDi QA anchored to the fixture.",
+      "files": [
+        "rtl-mixed-direction-qa.md"
+      ]
     }
   ]
 }
-

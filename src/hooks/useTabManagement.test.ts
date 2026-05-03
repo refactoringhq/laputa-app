@@ -258,6 +258,23 @@ describe('useTabManagement (single-note model)', () => {
       warnSpy.mockRestore()
     })
 
+    it('reports an unavailable active vault instead of opening a blank stale tab', async () => {
+      vi.mocked(mockInvoke).mockRejectedValueOnce(new Error('Active vault is not available'))
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const onMissingActiveVault = vi.fn()
+
+      const { result } = renderHook(() => useTabManagement({ onMissingActiveVault }))
+      await selectNote(result, { path: '/vault/note/orphaned.md', title: 'Orphaned Note' })
+
+      expect(result.current.tabs).toEqual([])
+      expect(result.current.activeTabPath).toBeNull()
+      expect(onMissingActiveVault).toHaveBeenCalledWith(
+        expect.objectContaining({ path: '/vault/note/orphaned.md', title: 'Orphaned Note' }),
+        expect.any(Error),
+      )
+      warnSpy.mockRestore()
+    })
+
     it('uses the note-window vault path when Tauri reloads the selected note', async () => {
       vi.mocked(isTauri).mockReturnValue(true)
       vi.mocked(invoke).mockResolvedValue('# Window content')

@@ -26,9 +26,17 @@ export interface StreamMutationContext {
 }
 
 function finalResponseText(response: string, agent: AiAgentId): string {
-  return response.trim()
-    ? response
-    : `${getAiAgentDefinition(agent).label} finished without returning a reply.`
+  if (response.trim()) return response
+
+  if (agent === 'opencode') {
+    return [
+      'OpenCode returned no assistant text.',
+      'Check the selected provider/model context limit or retry the request.',
+      'For large active notes, Tolaria sends a compact note snapshot and OpenCode can read the full file with get_note(path).',
+    ].join(' ')
+  }
+
+  return `${getAiAgentDefinition(agent).label} finished without returning a reply.`
 }
 
 export function createStreamCallbacks(context: StreamMutationContext) {
