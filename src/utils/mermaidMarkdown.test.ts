@@ -5,6 +5,7 @@ import {
   preProcessMermaidMarkdown,
   serializeMermaidAwareBlocks,
 } from './mermaidMarkdown'
+import { TLDRAW_BLOCK_TYPE } from './tldrawMarkdown'
 
 describe('mermaid markdown round-trip', () => {
   it('injects fenced Mermaid source into dedicated diagram blocks', () => {
@@ -131,5 +132,26 @@ describe('mermaid markdown round-trip', () => {
     expect(serializeMermaidAwareBlocks(editor, blocks)).toBe(
       '```mermaid\nflowchart LR\nA --> B\n```',
     )
+  })
+
+  it('serializes tldraw blocks beside Mermaid and ordinary Markdown', () => {
+    const editor = {
+      blocksToMarkdownLossy: vi.fn((blocks: unknown[]) => {
+        return (blocks as Array<{ content?: Array<{ text?: string }> }>)
+          .map((block) => block.content?.map((item) => item.text ?? '').join('') ?? '')
+          .join('\n\n')
+      }),
+    }
+    const blocks = [
+      { type: 'paragraph', content: [{ type: 'text', text: 'Intro' }], children: [] },
+      { type: TLDRAW_BLOCK_TYPE, props: { boardId: 'map', height: '640', snapshot: '{ "store": {} }', width: '900' }, children: [] },
+      { type: MERMAID_BLOCK_TYPE, props: { source: '', diagram: 'flowchart LR\nA --> B' }, children: [] },
+    ]
+
+    expect(serializeMermaidAwareBlocks(editor, blocks)).toBe([
+      'Intro',
+      '```tldraw id="map" height="640" width="900"\n{ "store": {} }\n```',
+      '```mermaid\nflowchart LR\nA --> B\n```',
+    ].join('\n\n'))
   })
 })

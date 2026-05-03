@@ -402,6 +402,75 @@
   font-size: 0.85rem;
 }
 
+.editor__blocknote-container .tldraw-whiteboard {
+  position: relative;
+  width: min(var(--tldraw-whiteboard-width, 100%), 100%);
+  max-width: 100%;
+  height: var(--tldraw-whiteboard-height, 520px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.editor__blocknote-container .tldraw-whiteboard .tl-container {
+  --color-background: var(--card);
+  --tl-layer-panels: 30;
+  --tl-layer-menus: 40;
+  --tl-layer-toasts: 50;
+  --tl-layer-cursor: 60;
+  --tl-layer-header-footer: 70;
+  --tl-layer-following-indicator: 80;
+}
+
+.editor__blocknote-container .mantine-Popover-dropdown,
+.editor__blocknote-container .bn-menu,
+.editor__blocknote-container .bn-suggestion-menu {
+  z-index: 1000 !important;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__resize-handle {
+  position: absolute;
+  z-index: 2;
+  background: transparent;
+  touch-action: none;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__resize-handle--width {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 100%;
+  cursor: ew-resize;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__resize-handle--height {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 12px;
+  cursor: ns-resize;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__resize-handle--corner {
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__resize-handle--corner::after {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid color-mix(in srgb, var(--foreground) 42%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--foreground) 42%, transparent);
+  content: '';
+}
+
 .editor__blocknote-container[data-follow-links] .bn-editor a,
 .editor__blocknote-container[data-follow-links] .wikilink {
   cursor: pointer;
