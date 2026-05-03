@@ -7,6 +7,7 @@ import { createElement, type ReactElement } from 'react'
 import {
   CodeBlock,
   File,
+  FlowArrow,
   ImageSquare,
   ListBullets,
   ListChecks,
@@ -14,6 +15,7 @@ import {
   Minus,
   Paragraph,
   Quotes,
+  ScribbleLoop,
   Smiley,
   SpeakerHigh,
   Table,
@@ -26,6 +28,8 @@ import {
   Video,
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
+import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
+import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
 
 type TolariaSlashMenuItem = DefaultReactSuggestionItem & { key: string }
 type TolariaBlockTypeSelectItem = {
@@ -34,6 +38,22 @@ type TolariaBlockTypeSelectItem = {
   props?: Record<string, boolean | number | string>
   icon: PhosphorIcon
 }
+type SlashInsertEditor = {
+  getTextCursorPosition: () => { block: unknown }
+  updateBlock: (block: unknown, update: Record<string, unknown>) => void
+}
+type BlockSlashMenuItemConfig = {
+  aliases: string[]
+  key: string
+  props: Record<string, unknown>
+  title: string
+  type: string
+}
+
+export const MERMAID_SLASH_COMMAND_DIAGRAM = [
+  'flowchart TD',
+  '    edit["Switch to the raw editor to edit"]',
+].join('\n')
 
 const UNSUPPORTED_FORMATTING_TOOLBAR_KEYS = new Set([
   'underlineStyleButton',
@@ -80,6 +100,7 @@ const TOLARIA_SLASH_MENU_ICONS: Partial<Record<string, PhosphorIcon>> = {
   heading_2: TextHTwo,
   heading_3: TextHThree,
   image: ImageSquare,
+  mermaid: FlowArrow,
   numbered_list: ListNumbers,
   paragraph: Paragraph,
   quote: Quotes,
@@ -89,6 +110,84 @@ const TOLARIA_SLASH_MENU_ICONS: Partial<Record<string, PhosphorIcon>> = {
   toggle_heading_3: TextHThree,
   toggle_list: ListBullets,
   video: Video,
+  whiteboard: ScribbleLoop,
+}
+
+function createBoardId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+
+  return `whiteboard-${Date.now().toString(36)}`
+}
+
+function createWhiteboardSlashMenuItem(
+  editor: Parameters<typeof getDefaultReactSlashMenuItems>[0],
+): TolariaSlashMenuItem {
+  return createBlockSlashMenuItem(editor, {
+    key: 'whiteboard',
+    title: 'Whiteboard',
+    aliases: ['tldraw', 'drawing', 'canvas', 'sketch'],
+    type: TLDRAW_BLOCK_TYPE,
+    props: {
+      boardId: createBoardId(),
+      height: TLDRAW_DEFAULT_HEIGHT,
+      snapshot: '{}',
+      width: '',
+    },
+  })
+}
+
+function createMermaidSlashMenuItem(
+  editor: Parameters<typeof getDefaultReactSlashMenuItems>[0],
+): TolariaSlashMenuItem {
+  return createBlockSlashMenuItem(editor, {
+    key: 'mermaid',
+    title: 'Mermaid',
+    aliases: ['diagram', 'flowchart', 'graph', 'chart'],
+    type: MERMAID_BLOCK_TYPE,
+    props: {
+      diagram: MERMAID_SLASH_COMMAND_DIAGRAM,
+      source: mermaidFenceSource({ diagram: MERMAID_SLASH_COMMAND_DIAGRAM }),
+    },
+  })
+}
+
+function createBlockSlashMenuItem(
+  editor: Parameters<typeof getDefaultReactSlashMenuItems>[0],
+  config: BlockSlashMenuItemConfig,
+): TolariaSlashMenuItem {
+  const blockEditor = editor as unknown as SlashInsertEditor
+
+  return {
+    key: config.key,
+    title: config.title,
+    aliases: config.aliases,
+    group: 'Media',
+    onItemClick: () => {
+      const block = blockEditor.getTextCursorPosition().block
+      blockEditor.updateBlock(block, {
+        type: config.type,
+        props: config.props,
+      })
+    },
+  } as TolariaSlashMenuItem
+}
+
+export function addItemsToMediaGroup(
+  items: TolariaSlashMenuItem[],
+  mediaItems: TolariaSlashMenuItem[],
+): TolariaSlashMenuItem[] {
+  const nextItems = [...items]
+  const insertIndex = nextItems.findIndex((item) => item.key === 'emoji')
+
+  if (insertIndex === -1) {
+    nextItems.push(...mediaItems)
+    return nextItems
+  }
+
+  nextItems.splice(insertIndex, 0, ...mediaItems)
+  return nextItems
 }
 
 function createTolariaSlashMenuIcon(Icon: PhosphorIcon) {
@@ -142,9 +241,17 @@ export function getTolariaSlashMenuItems(
   editor: Parameters<typeof getDefaultReactSlashMenuItems>[0],
   query: string,
 ) {
+  const items = addItemsToMediaGroup(
+    getDefaultReactSlashMenuItems(editor) as TolariaSlashMenuItem[],
+    [
+      createMermaidSlashMenuItem(editor),
+      createWhiteboardSlashMenuItem(editor),
+    ],
+  )
+
   return filterSuggestionItems(
     filterTolariaSlashMenuItems(
-      getDefaultReactSlashMenuItems(editor) as TolariaSlashMenuItem[],
+      items,
     ),
     query,
   )
