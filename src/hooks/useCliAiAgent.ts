@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { AiAgentId } from '../lib/aiAgents'
 import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
+import type { AiTarget } from '../lib/aiTargets'
 import type { NoteReference } from '../utils/ai-context'
 import {
   type AgentStatus,
@@ -21,6 +22,7 @@ export type { AiAgentMessage } from '../lib/aiAgentConversation'
 
 interface UseCliAiAgentOptions {
   agent: AiAgentId
+  target?: AiTarget
   agentReady: boolean
   permissionMode: AiAgentPermissionMode
 }
@@ -68,7 +70,7 @@ export function useCliAiAgent(
   fileCallbacks: AgentFileCallbacks | undefined,
   options: UseCliAiAgentOptions,
 ) {
-  const { agent, agentReady } = options
+  const { agent, agentReady, target } = options
   const { permissionMode } = options
   const runtime = useCliAiAgentRuntime(fileCallbacks)
   const { messages, status } = runtime
@@ -78,6 +80,7 @@ export function useCliAiAgent(
       runtime,
       context: {
         agent,
+        target,
         ready: agentReady,
         vaultPath,
         permissionMode,

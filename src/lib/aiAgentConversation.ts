@@ -12,6 +12,7 @@ import type { NoteReference } from '../utils/ai-context'
 import type { AiAgentId } from './aiAgents'
 import { getAiAgentDefinition } from './aiAgents'
 import type { AiAgentPermissionMode } from './aiAgentPermissionMode'
+import type { AiTarget } from './aiTargets'
 
 export interface AiAgentMessage {
   userMessage: string
@@ -29,6 +30,7 @@ export type AgentStatus = 'idle' | 'thinking' | 'tool-executing' | 'done' | 'err
 
 export interface AgentExecutionContext {
   agent: AiAgentId
+  target?: AiTarget
   ready: boolean
   vaultPath: string
   permissionMode: AiAgentPermissionMode

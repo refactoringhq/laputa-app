@@ -1,4 +1,5 @@
 pub mod ai_agents;
+pub mod ai_models;
 pub mod app_updater;
 pub mod claude_cli;
 mod cli_agent_runtime;
@@ -413,6 +414,10 @@ macro_rules! app_invoke_handler {
             commands::restore_vault_ai_guidance,
             commands::stream_claude_chat,
             commands::stream_ai_agent,
+            commands::stream_ai_model,
+            commands::save_ai_model_provider_api_key,
+            commands::delete_ai_model_provider_api_key,
+            commands::test_ai_model_provider,
             commands::reload_vault,
             commands::reload_vault_entry,
             commands::sync_vault_asset_scope_for_window,

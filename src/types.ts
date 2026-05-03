@@ -1,5 +1,6 @@
 import type { AiAgentId } from './lib/aiAgents'
 import type { AiAgentPermissionMode } from './lib/aiAgentPermissionMode'
+import type { AiModelProvider } from './lib/aiTargets'
 import type { ThemeMode } from './lib/themeMode'
 import type { AppLocale } from './lib/i18n'
 
@@ -106,6 +107,8 @@ export interface Settings {
   default_image_folder?: string | null
   /** Vault-relative folder where pasted/dropped videos are saved. Null = "attachments". */
   default_video_folder?: string | null
+  default_ai_target?: string | null
+  ai_model_providers?: AiModelProvider[] | null
   hide_gitignored_files?: boolean | null
   all_notes_show_pdfs?: boolean | null
   all_notes_show_images?: boolean | null

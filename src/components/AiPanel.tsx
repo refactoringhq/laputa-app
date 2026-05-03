@@ -11,6 +11,7 @@ import {
   type AiAgentId,
   type AiAgentReadiness,
 } from '../lib/aiAgents'
+import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
@@ -25,6 +26,7 @@ interface AiPanelProps {
   onOpenNote?: (path: string) => void
   onUnsupportedAiPaste?: (message: string) => void
   defaultAiAgent?: AiAgentId
+  defaultAiTarget?: AiTarget
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
   locale?: AppLocale
@@ -47,6 +49,7 @@ interface AiPanelViewProps {
   onOpenNote?: (path: string) => void
   onUnsupportedAiPaste?: (message: string) => void
   defaultAiAgent?: AiAgentId
+  defaultAiTarget?: AiTarget
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
   locale?: AppLocale
@@ -64,6 +67,7 @@ export function AiPanelView({
   onOpenNote,
   onUnsupportedAiPaste,
   defaultAiAgent: providedDefaultAiAgent,
+  defaultAiTarget,
   defaultAiAgentReadiness: providedDefaultAiAgentReadiness,
   defaultAiAgentReady: providedDefaultAiAgentReady,
   locale = 'en',
@@ -75,7 +79,9 @@ export function AiPanelView({
     ?? readinessFromReadyFlag(providedDefaultAiAgentReady)
   const inputRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
-  const agentLabel = getAiAgentDefinition(defaultAiAgent).label
+  const activeTarget = defaultAiTarget
+  const agentLabel = activeTarget?.label ?? getAiAgentDefinition(defaultAiAgent).label
+  const targetKind = activeTarget?.kind ?? 'agent'
   const {
     agent,
     input,
@@ -118,6 +124,7 @@ export function AiPanelView({
       <AiPanelHeader
         agentLabel={agentLabel}
         agentReadiness={defaultAiAgentReadiness}
+        targetKind={targetKind}
         locale={locale}
         permissionMode={permissionMode}
         permissionModeDisabled={isActive}
@@ -159,6 +166,7 @@ export function AiPanel({
   onOpenNote,
   onUnsupportedAiPaste,
   defaultAiAgent: providedDefaultAiAgent,
+  defaultAiTarget,
   defaultAiAgentReadiness: providedDefaultAiAgentReadiness,
   defaultAiAgentReady: providedDefaultAiAgentReady,
   locale = 'en',
@@ -178,6 +186,7 @@ export function AiPanel({
   const controller = useAiPanelController({
     vaultPath,
     defaultAiAgent: providedDefaultAiAgent ?? DEFAULT_AI_AGENT,
+    defaultAiTarget,
     defaultAiAgentReady: providedDefaultAiAgentReady ?? true,
     defaultAiAgentReadiness,
     activeEntry,
@@ -200,6 +209,7 @@ export function AiPanel({
       onOpenNote={onOpenNote}
       onUnsupportedAiPaste={onUnsupportedAiPaste}
       defaultAiAgent={providedDefaultAiAgent}
+      defaultAiTarget={defaultAiTarget}
       defaultAiAgentReadiness={defaultAiAgentReadiness}
       defaultAiAgentReady={providedDefaultAiAgentReady}
       locale={locale}

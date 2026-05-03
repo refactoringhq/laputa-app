@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+use crate::ai_models::{normalize_ai_model_providers, AiModelProvider};
+
 const APP_CONFIG_DIR: &str = "com.tolaria.app";
 const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
 const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &["claude_code", "codex", "opencode", "pi", "gemini"];
@@ -80,6 +82,8 @@ pub struct Settings {
     pub default_ai_agent: Option<String>,
     pub default_image_folder: Option<String>,
     pub default_video_folder: Option<String>,
+    pub default_ai_target: Option<String>,
+    pub ai_model_providers: Option<Vec<AiModelProvider>>,
     pub hide_gitignored_files: Option<bool>,
     pub all_notes_show_pdfs: Option<bool>,
     pub all_notes_show_images: Option<bool>,
@@ -219,6 +223,8 @@ fn normalize_settings(settings: Settings) -> Settings {
         default_video_folder: normalize_vault_relative_folder(
             settings.default_video_folder.as_deref(),
         ),
+        default_ai_target: normalize_optional_string(settings.default_ai_target),
+        ai_model_providers: normalize_ai_model_providers(settings.ai_model_providers),
         hide_gitignored_files: settings.hide_gitignored_files,
         all_notes_show_pdfs: settings.all_notes_show_pdfs,
         all_notes_show_images: settings.all_notes_show_images,
@@ -368,6 +374,8 @@ mod tests {
             default_ai_agent: Some("codex".to_string()),
             default_image_folder: Some("Media/Images".to_string()),
             default_video_folder: Some("Media/Videos".to_string()),
+            default_ai_target: Some("agent:codex".to_string()),
+            ai_model_providers: None,
             hide_gitignored_files: Some(false),
             all_notes_show_pdfs: Some(true),
             all_notes_show_images: Some(true),

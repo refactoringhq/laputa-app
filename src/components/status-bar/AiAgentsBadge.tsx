@@ -12,6 +12,12 @@ import {
   type AiAgentsStatus,
 } from '../../lib/aiAgents'
 import {
+  configuredModelTargets,
+  resolveAiTarget,
+  type AiModelProvider,
+} from '../../lib/aiTargets'
+import type { Settings } from '../../types'
+import {
   getVaultAiGuidanceSummary,
   isVaultAiGuidanceStatusChecking,
   vaultAiGuidanceNeedsRestore,
@@ -36,7 +42,10 @@ interface AiAgentsBadgeProps {
   statuses: AiAgentsStatus
   guidanceStatus?: VaultAiGuidanceStatus
   defaultAgent: AiAgentId
+  defaultTarget?: string
+  providers?: AiModelProvider[]
   onSetDefaultAgent?: (agent: AiAgentId) => void
+  onSetDefaultTarget?: (target: string) => void
   onRestoreGuidance?: () => void
   compact?: boolean
   locale?: AppLocale
@@ -115,18 +124,13 @@ function canShowSwitcherCue(statuses: AiAgentsStatus, defaultAgent: AiAgentId): 
 
 function triggerButtonClassName(compact: boolean): string {
   return compact
-    ? 'h-6 w-6 rounded-sm p-0 text-[11px] font-medium'
-    : 'h-6 px-2 text-[11px] font-medium'
+    ? 'h-6 w-6 rounded-sm p-0 text-[12px] font-medium'
+    : 'h-6 px-2 text-[12px] font-medium'
 }
 
 function CompactSeparator({ compact }: { compact: boolean }) {
   if (compact) return null
   return <span style={SEP_STYLE}>|</span>
-}
-
-function TriggerLabel({ compact, defaultAgent }: { compact: boolean; defaultAgent: AiAgentId }) {
-  if (compact) return null
-  return triggerLabel(defaultAgent)
 }
 
 function TriggerStateIcon({
@@ -171,13 +175,17 @@ function AgentMenuContent({
   statuses,
   guidanceStatus,
   defaultAgent,
+  defaultTarget,
+  providers = [],
   selectedAgentReady,
   onSetDefaultAgent,
+  onSetDefaultTarget,
   onRestoreGuidance,
   locale = 'en',
 }: AiAgentsBadgeProps & { selectedAgentReady: boolean }) {
   const installedAgents = installedAgentDefinitions(statuses)
   const missingAgents = missingAgentDefinitions(statuses)
+  const modelTargets = configuredModelTargets(providers)
 
   return (
     <DropdownMenuContent
@@ -192,7 +200,10 @@ function AgentMenuContent({
       ) : (
         <DropdownMenuRadioGroup
           value={selectedAgentReady ? defaultAgent : undefined}
-          onValueChange={(value) => onSetDefaultAgent?.(value as AiAgentId)}
+          onValueChange={(value) => {
+            onSetDefaultAgent?.(value as AiAgentId)
+            onSetDefaultTarget?.(`agent:${value}`)
+          }}
         >
           {installedAgents.map((definition) => (
             <DropdownMenuRadioItem key={definition.id} value={definition.id}>
@@ -204,6 +215,12 @@ function AgentMenuContent({
           ))}
         </DropdownMenuRadioGroup>
       )}
+      <ModelTargetMenuSection
+        targets={modelTargets}
+        defaultTarget={defaultTarget}
+        locale={locale}
+        onSetDefaultTarget={onSetDefaultTarget}
+      />
       {missingAgents.length > 0 && (
         <>
           <DropdownMenuSeparator />
@@ -227,19 +244,65 @@ function AgentMenuContent({
   )
 }
 
+function ModelTargetMenuSection({
+  targets,
+  defaultTarget,
+  locale,
+  onSetDefaultTarget,
+}: {
+  targets: ReturnType<typeof configuredModelTargets>
+  defaultTarget?: string
+  locale: AppLocale
+  onSetDefaultTarget?: (target: string) => void
+}) {
+  if (targets.length === 0) return null
+
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel>{translate(locale, 'status.ai.modelTargets')}</DropdownMenuLabel>
+      <DropdownMenuRadioGroup
+        value={defaultTarget}
+        onValueChange={(value) => onSetDefaultTarget?.(value)}
+      >
+        {targets.map((target) => (
+          <DropdownMenuRadioItem key={target.id} value={target.id}>
+            <span>{target.label}</span>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {target.provider.kind === 'ollama' || target.provider.kind === 'lm_studio'
+                ? translate(locale, 'status.ai.localChat')
+                : translate(locale, 'status.ai.apiChat')}
+            </span>
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
+    </>
+  )
+}
+
 export function AiAgentsBadge({
   statuses,
   guidanceStatus,
   defaultAgent,
+  defaultTarget,
+  providers = [],
   onSetDefaultAgent,
+  onSetDefaultTarget,
   onRestoreGuidance,
   compact = false,
   locale = 'en',
 }: AiAgentsBadgeProps) {
-  const selectedAgentReady = isAiAgentInstalled(statuses, defaultAgent)
-  const showWarning = hasAiAgentWarning(statuses, defaultAgent, guidanceStatus)
+  const selectedTarget = resolveAiTarget({
+    default_ai_agent: defaultAgent,
+    default_ai_target: defaultTarget,
+    ai_model_providers: providers,
+  } as Settings)
+  const selectedAgentReady = selectedTarget.kind === 'api_model' || isAiAgentInstalled(statuses, defaultAgent)
+  const showWarning = selectedTarget.kind === 'agent' && hasAiAgentWarning(statuses, defaultAgent, guidanceStatus)
   const showSwitcherCue = !showWarning && canShowSwitcherCue(statuses, defaultAgent)
-  const tooltip = badgeTooltip(locale, statuses, defaultAgent, guidanceStatus)
+  const tooltip = selectedTarget.kind === 'api_model'
+    ? translate(locale, 'status.ai.defaultTarget', { target: selectedTarget.label })
+    : badgeTooltip(locale, statuses, defaultAgent, guidanceStatus)
 
   if (isAiAgentsStatusChecking(statuses)) return null
 
@@ -260,7 +323,7 @@ export function AiAgentsBadge({
           >
             <span style={{ ...ICON_STYLE, color: showWarning ? 'var(--accent-orange)' : 'var(--muted-foreground)' }}>
               <Sparkle size={13} weight="fill" />
-              <TriggerLabel compact={compact} defaultAgent={defaultAgent} />
+              {!compact && (selectedTarget.kind === 'api_model' ? selectedTarget.shortLabel : triggerLabel(defaultAgent))}
               <TriggerStateIcon showWarning={showWarning} showSwitcherCue={showSwitcherCue} />
             </span>
           </Button>
@@ -269,7 +332,10 @@ export function AiAgentsBadge({
           statuses={statuses}
           guidanceStatus={guidanceStatus}
           defaultAgent={defaultAgent}
+          defaultTarget={defaultTarget}
+          providers={providers}
           onSetDefaultAgent={onSetDefaultAgent}
+          onSetDefaultTarget={onSetDefaultTarget}
           onRestoreGuidance={onRestoreGuidance}
           selectedAgentReady={selectedAgentReady}
           locale={locale}
