@@ -5,6 +5,7 @@ import { preProcessMermaidMarkdown, injectMermaidInBlocks } from '../utils/merma
 import { preProcessTldrawMarkdown, injectTldrawInBlocks } from '../utils/tldrawMarkdown'
 import { resolveImageUrls } from '../utils/vaultImages'
 import { repairMalformedEditorBlocks } from './editorBlockRepair'
+import { inferCodeBlockLanguages } from '../utils/codeBlockLanguage'
 import {
   blankParagraphBlocks,
   extractEditorBody,
@@ -150,7 +151,9 @@ function injectEditorMarkdownBlocks(blocks: EditorBlocks): EditorBlocks {
 function repairParsedMarkdownBlocks(parsed: MarkdownParseResult): EditorBlocks {
   const parseSafeBlocks = repairMalformedEditorBlocks(parsed.blocks) as EditorBlocks
   if (parsed.usedSourceFallback) return parseSafeBlocks
-  return repairMalformedEditorBlocks(injectEditorMarkdownBlocks(parseSafeBlocks)) as EditorBlocks
+  return inferCodeBlockLanguages(
+    repairMalformedEditorBlocks(injectEditorMarkdownBlocks(parseSafeBlocks)) as EditorBlocks,
+  ) as EditorBlocks
 }
 
 export async function resolveBlocksForTarget(

@@ -189,7 +189,9 @@ function blockTextAnchorRect(blockElement: HTMLElement): DOMRect | null {
   const ownerDocument = inlineContent.ownerDocument
   const range = ownerDocument.createRange()
   range.selectNodeContents(inlineContent)
-  const textRect = range.getBoundingClientRect()
+  const firstLineRect = Array.from(range.getClientRects())
+    .find((rect) => rect.width > 0 && rect.height > 0)
+  const textRect = firstLineRect ?? range.getBoundingClientRect()
   range.detach()
 
   if (textRect.height > 0) return textRect
