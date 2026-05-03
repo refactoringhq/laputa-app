@@ -654,6 +654,39 @@ describe('App', () => {
     })
   })
 
+  it('shows immediate feedback while a menu-driven update check is pending', async () => {
+    let resolveUpdate: ((result: { kind: 'up-to-date' }) => void) | null = null
+    const checkForUpdates = vi.fn(() => new Promise<{ kind: 'up-to-date' }>((resolve) => {
+      resolveUpdate = resolve
+    }))
+    vi.mocked(useUpdater).mockReturnValue(createMockUpdaterResult(checkForUpdates))
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('All Notes')).toBeInTheDocument()
+      expect(typeof window.__laputaTest?.dispatchBrowserMenuCommand).toBe('function')
+    })
+
+    act(() => {
+      window.__laputaTest?.dispatchBrowserMenuCommand?.('app-check-for-updates')
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Checking for updates...')).toBeInTheDocument()
+    })
+    expect(checkForUpdates).toHaveBeenCalledOnce()
+
+    await act(async () => {
+      resolveUpdate?.({ kind: 'up-to-date' })
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('No newer stable update is available right now')).toBeInTheDocument()
+    })
+  })
+
   it('shows the external AI setup dialog from the menu when AI onboarding is active', async () => {
     localStorage.removeItem(AI_AGENTS_ONBOARDING_DISMISSED_KEY)
     localStorage.removeItem(CLAUDE_CODE_ONBOARDING_DISMISSED_KEY)
