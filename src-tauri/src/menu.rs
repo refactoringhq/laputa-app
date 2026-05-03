@@ -1,9 +1,13 @@
+#[cfg(not(target_os = "macos"))]
+use crate::window_state::MAIN_WINDOW_LABEL;
 use serde::{Deserialize, Deserializer};
 use std::{
     collections::{BTreeMap, HashSet},
     error::Error,
     sync::OnceLock,
 };
+#[cfg(not(target_os = "macos"))]
+use tauri::{menu::MenuEvent, Manager};
 use tauri::{
     menu::{MenuBuilder, MenuItem, MenuItemBuilder, MenuItemKind, Submenu, SubmenuBuilder},
     App, AppHandle, Emitter,
@@ -234,6 +238,10 @@ fn app_menu_includes_services(target_os: &str) -> bool {
     target_os == "macos"
 }
 
+fn window_menu_event_handler_required(target_os: &str) -> bool {
+    target_os != "macos"
+}
+
 fn build_manifest_menu_item(
     app: &App,
     item: &ManifestMenuItem,
@@ -383,6 +391,28 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn Error>> {
         let _ = emit_custom_menu_event(app_handle, id);
     });
 
+    register_window_menu_event_handler(app)?;
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn register_window_menu_event_handler(app: &App) -> Result<(), Box<dyn Error>> {
+    debug_assert!(window_menu_event_handler_required(std::env::consts::OS));
+    let window = app.get_webview_window(MAIN_WINDOW_LABEL).ok_or_else(|| {
+        format!("setup_menu: window '{MAIN_WINDOW_LABEL}' not found; menu events will not fire")
+    })?;
+    let app_handle = app.handle().clone();
+    window.on_menu_event(move |_window, event: MenuEvent| {
+        let id = event.id().0.as_str();
+        let _ = emit_custom_menu_event(&app_handle, id);
+    });
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn register_window_menu_event_handler(_app: &App) -> Result<(), Box<dyn Error>> {
+    debug_assert!(!window_menu_event_handler_required(std::env::consts::OS));
     Ok(())
 }
 
@@ -563,5 +593,12 @@ mod tests {
         assert!(app_menu_includes_services("macos"));
         assert!(!app_menu_includes_services("windows"));
         assert!(!app_menu_includes_services("linux"));
+    }
+
+    #[test]
+    fn window_menu_event_handler_is_required_off_macos() {
+        assert!(!window_menu_event_handler_required("macos"));
+        assert!(window_menu_event_handler_required("windows"));
+        assert!(window_menu_event_handler_required("linux"));
     }
 }

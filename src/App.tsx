@@ -101,6 +101,7 @@ import {
   getBrowserLanguagePreferences,
   resolveEffectiveLocale,
   serializeUiLanguagePreference,
+  translate,
   type UiLanguagePreference,
 } from './lib/i18n'
 import { normalizeReleaseChannel } from './lib/releaseChannel'
@@ -1280,6 +1281,7 @@ function App() {
       await restartApp()
       return
     }
+    setToastMessage(translate(appLocale, 'update.checking'))
     const result = await updateActions.checkForUpdates()
     if (result.kind === 'up-to-date') {
       const checkedChannel = normalizeReleaseChannel(settings.release_channel)
@@ -1289,7 +1291,7 @@ function App() {
     } else {
       setToastMessage(result.message)
     }
-  }, [settings.release_channel, updateActions, updateStatus.state, setToastMessage])
+  }, [appLocale, settings.release_channel, updateActions, updateStatus.state, setToastMessage])
 
   const handleRepairVault = useCallback(async () => {
     if (!resolvedPath) return

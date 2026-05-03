@@ -7,7 +7,7 @@ use tauri::{
     WindowEvent,
 };
 
-const MAIN_WINDOW_LABEL: &str = "main";
+pub(crate) const MAIN_WINDOW_LABEL: &str = "main";
 const WINDOW_STATE_FILE: &str = "window-state.json";
 const MIN_WINDOW_WIDTH: u32 = 480;
 const MIN_WINDOW_HEIGHT: u32 = 400;
