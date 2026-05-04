@@ -5,10 +5,13 @@ import {
   type AiAgentId,
   type AiAgentsStatus,
 } from './aiAgents'
+import providerCatalog from '../shared/aiModelProviderCatalog.json' with { type: 'json' }
 import type { Settings } from '../types'
+import type { TranslationKey } from './i18n'
 
 export type AiModelProviderKind = 'open_ai' | 'anthropic' | 'open_ai_compatible' | 'ollama' | 'lm_studio' | 'open_router' | 'gemini'
 export type AiTargetKind = 'agent' | 'api_model'
+export type AiModelApiKeyStorage = 'none' | 'env' | 'local_file'
 
 export interface AiModelCapabilities {
   streaming: boolean
@@ -31,10 +34,22 @@ export interface AiModelProvider {
   name: string
   kind: AiModelProviderKind
   base_url?: string | null
-  api_key_storage?: 'none' | 'env' | 'local_file' | null
+  api_key_storage?: AiModelApiKeyStorage | null
   api_key_env_var?: string | null
   headers?: Record<string, string> | null
   models: AiModelDefinition[]
+}
+
+export interface AiModelProviderCatalogEntry {
+  kind: AiModelProviderKind
+  name: string
+  label_key: TranslationKey
+  base_url: string
+  runtime_base_url: string | null
+  default_model_id: string
+  api_key_storage: AiModelApiKeyStorage
+  api_key_env_var: string | null
+  local: boolean
 }
 
 export type AiTarget =
@@ -45,7 +60,14 @@ export type AiModelTarget = Extract<AiTarget, { kind: 'api_model' }>
 export const AI_TARGET_PREFIX_AGENT = 'agent:'
 export const AI_TARGET_PREFIX_MODEL = 'model:'
 
-export const LOCAL_AI_PROVIDER_KINDS: readonly AiModelProviderKind[] = ['ollama', 'lm_studio']
+const AI_MODEL_PROVIDER_CATALOG = providerCatalog as readonly AiModelProviderCatalogEntry[]
+const AI_MODEL_PROVIDER_CATALOG_BY_KIND = new Map<AiModelProviderKind, AiModelProviderCatalogEntry>(
+  AI_MODEL_PROVIDER_CATALOG.map((entry) => [entry.kind, entry]),
+)
+
+export const LOCAL_AI_PROVIDER_KINDS: readonly AiModelProviderKind[] = AI_MODEL_PROVIDER_CATALOG
+  .filter((entry) => entry.local)
+  .map((entry) => entry.kind)
 
 export const DEFAULT_MODEL_CAPABILITIES: AiModelCapabilities = {
   streaming: false,
@@ -53,6 +75,16 @@ export const DEFAULT_MODEL_CAPABILITIES: AiModelCapabilities = {
   vision: false,
   json_mode: false,
   reasoning: false,
+}
+
+export function aiModelProviderCatalog(): readonly AiModelProviderCatalogEntry[] {
+  return AI_MODEL_PROVIDER_CATALOG
+}
+
+export function aiModelProviderCatalogEntry(kind: AiModelProviderKind): AiModelProviderCatalogEntry {
+  const entry = AI_MODEL_PROVIDER_CATALOG_BY_KIND.get(kind)
+  if (!entry) throw new Error(`Unknown AI model provider kind: ${kind}`)
+  return entry
 }
 
 export function agentTargetId(agent: AiAgentId): string {
@@ -148,7 +180,7 @@ function emptyToNull(value: string | null | undefined): string | null {
 }
 
 export function isLocalAiProvider(provider: AiModelProvider): boolean {
-  return LOCAL_AI_PROVIDER_KINDS.includes(provider.kind)
+  return aiModelProviderCatalogEntry(provider.kind).local
 }
 
 export function aiTargetReady(target: AiTarget, statuses: AiAgentsStatus): boolean {
