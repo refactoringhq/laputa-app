@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import {
+  Box,
   Tldraw,
   createTLStore,
   getSnapshot,
   loadSnapshot,
+  type Editor,
+  type TLEventInfo,
   type TLStoreSnapshot,
 } from 'tldraw'
 import 'tldraw/tldraw.css'
@@ -78,6 +81,90 @@ function parseSnapshot(source: string): TLStoreSnapshot | null {
 
 function serializeSnapshot(snapshot: TLStoreSnapshot): string {
   return `${JSON.stringify(snapshot, null, 2)}\n`
+}
+
+function documentZoom(): number {
+  const inlineZoom = document.documentElement.style.getPropertyValue('zoom')
+  const computedZoom = getComputedStyle(document.documentElement).zoom
+  const zoom = inlineZoom || computedZoom
+  const parsed = Number.parseFloat(zoom)
+  if (!Number.isFinite(parsed) || parsed <= 0) return 1
+  return zoom.endsWith('%') ? parsed / 100 : parsed
+}
+
+function viewportBounds(screenBounds: Box | HTMLElement): Box | HTMLElement {
+  if (screenBounds instanceof Box) return screenBounds
+
+  const zoom = documentZoom()
+  if (zoom === 1) return screenBounds
+
+  const rect = screenBounds.getBoundingClientRect()
+  return new Box(
+    (rect.left || rect.x) / zoom,
+    (rect.top || rect.y) / zoom,
+    Math.max(rect.width / zoom, 1),
+    Math.max(rect.height / zoom, 1),
+  )
+}
+
+function zoomAdjustedPoint<T extends { x: number; y: number; z?: number }>(point: T, zoom: number): T {
+  return {
+    ...point,
+    x: point.x / zoom,
+    y: point.y / zoom,
+  }
+}
+
+function zoomAdjustedEvent(info: TLEventInfo): TLEventInfo {
+  const zoom = documentZoom()
+  if (zoom === 1) return info
+
+  switch (info.type) {
+    case 'click':
+    case 'pinch':
+    case 'pointer':
+    case 'wheel':
+      return {
+        ...info,
+        point: zoomAdjustedPoint(info.point, zoom),
+      } as TLEventInfo
+    default:
+      return info
+  }
+}
+
+function installZoomAwareViewport(editor: Editor): () => void {
+  const updateViewportScreenBounds = editor.updateViewportScreenBounds.bind(editor)
+  const updateViewport: Editor['updateViewportScreenBounds'] = (screenBounds, center) =>
+    updateViewportScreenBounds(viewportBounds(screenBounds), center)
+  const dispatch = editor.dispatch.bind(editor)
+  const animationFrameIds: number[] = []
+  const timeoutIds: number[] = []
+
+  editor.updateViewportScreenBounds = updateViewport
+  editor.dispatch = (info: TLEventInfo) => dispatch(zoomAdjustedEvent(info))
+
+  const updateCurrentCanvas = () => {
+    const canvas = editor.getContainer().querySelector<HTMLElement>('.tl-canvas')
+    if (canvas) updateViewport(canvas)
+  }
+
+  const scheduleViewportUpdate = () => {
+    updateCurrentCanvas()
+    animationFrameIds.push(window.requestAnimationFrame(updateCurrentCanvas))
+    timeoutIds.push(window.setTimeout(updateCurrentCanvas, 150))
+  }
+
+  scheduleViewportUpdate()
+  window.addEventListener('laputa-zoom-change', scheduleViewportUpdate)
+
+  return () => {
+    window.removeEventListener('laputa-zoom-change', scheduleViewportUpdate)
+    animationFrameIds.forEach((id) => window.cancelAnimationFrame(id))
+    timeoutIds.forEach((id) => window.clearTimeout(id))
+    editor.updateViewportScreenBounds = updateViewportScreenBounds
+    editor.dispatch = dispatch
+  }
 }
 
 export function TldrawWhiteboard({
@@ -182,10 +269,14 @@ export function TldrawWhiteboard({
     <div
       ref={boardRef}
       className="tldraw-whiteboard"
+      contentEditable={false}
       data-board-id={boardId}
       style={cssSize(visibleSize)}
     >
-      <Tldraw store={store} />
+      <Tldraw
+        onMount={installZoomAwareViewport}
+        store={store}
+      />
       <div
         aria-label="Resize whiteboard width"
         className="tldraw-whiteboard__resize-handle tldraw-whiteboard__resize-handle--width"
