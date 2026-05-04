@@ -411,6 +411,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card);
+  user-select: none;
 }
 
 .editor__blocknote-container .tldraw-whiteboard .tl-container {
@@ -421,6 +422,10 @@
   --tl-layer-cursor: 60;
   --tl-layer-header-footer: 70;
   --tl-layer-following-indicator: 80;
+}
+
+.editor__blocknote-container .tldraw-whiteboard [data-radix-popper-content-wrapper] {
+  position: absolute !important;
 }
 
 .editor__blocknote-container .mantine-Popover-dropdown,

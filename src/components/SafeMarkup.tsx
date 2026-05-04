@@ -10,6 +10,13 @@ interface SafeSvgDivProps extends HTMLAttributes<HTMLDivElement> {
   svg: string
 }
 
+const MERMAID_SVG_SANITIZE_CONFIG = {
+  USE_PROFILES: { svg: true, svgFilters: true, html: true },
+  ADD_TAGS: ['foreignObject'],
+  ADD_ATTR: ['xmlns'],
+  HTML_INTEGRATION_POINTS: { foreignobject: true },
+}
+
 function importSanitizedHtmlNodes(html: string): Node[] {
   const sanitized = DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true, mathMl: true },
@@ -19,13 +26,12 @@ function importSanitizedHtmlNodes(html: string): Node[] {
 }
 
 function importSanitizedSvgNode(svg: string): Node | null {
-  const sanitized = DOMPurify.sanitize(svg, {
-    USE_PROFILES: { svg: true, svgFilters: true },
-  })
-  const parsed = new DOMParser().parseFromString(sanitized, 'image/svg+xml')
-  if (parsed.querySelector('parsererror')) return null
+  const sanitized = DOMPurify.sanitize(svg, MERMAID_SVG_SANITIZE_CONFIG)
+  const parsed = new DOMParser().parseFromString(sanitized, 'text/html')
+  const parsedSvg = parsed.body.querySelector('svg')
+  if (!parsedSvg) return null
 
-  const svgNode = document.importNode(parsed.documentElement, true)
+  const svgNode = document.importNode(parsedSvg, true)
   svgNode.querySelectorAll('style').forEach((style) => {
     style.setAttribute('nonce', RUNTIME_STYLE_NONCE)
   })

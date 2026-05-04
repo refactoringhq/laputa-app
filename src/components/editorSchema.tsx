@@ -177,6 +177,7 @@ const TldrawBlock = createReactBlockSpec(
   },
   {
     runsBefore: ['codeBlock'],
+    meta: { selectable: false },
     render: (props) => (
       <Suspense fallback={<div className="tldraw-whiteboard tldraw-whiteboard--loading" />}>
         <TldrawWhiteboard

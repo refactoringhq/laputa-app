@@ -71,6 +71,34 @@ describe('MermaidDiagram', () => {
     expect(style?.getAttribute('nonce')).toBe(RUNTIME_STYLE_NONCE)
   })
 
+  it('keeps Mermaid foreignObject labels visible after sanitizing the SVG', async () => {
+    mermaidMock.render.mockResolvedValueOnce({
+      svg: [
+        '<svg aria-label="Rendered Mermaid">',
+        '<g class="node">',
+        '<foreignObject width="200" height="40">',
+        '<div xmlns="http://www.w3.org/1999/xhtml">',
+        '<span class="nodeLabel" onclick="alert(1)">Employee<br>clocks in</span>',
+        '</div>',
+        '</foreignObject>',
+        '</g>',
+        '</svg>',
+      ].join(''),
+    })
+
+    render(
+      <MermaidDiagram
+        diagram={'flowchart LR\nA(["Employee clocks in"]) --> B'}
+        source={'```mermaid\nflowchart LR\nA(["Employee clocks in"]) --> B\n```'}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram-viewport')).toHaveTextContent('Employeeclocks in')
+    })
+    expect(screen.getByText('Employeeclocks in')).not.toHaveAttribute('onclick')
+  })
+
   it('falls back to the original source when Mermaid cannot render', async () => {
     mermaidMock.render.mockRejectedValueOnce(new Error('parse error'))
 
