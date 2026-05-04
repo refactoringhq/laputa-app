@@ -10,6 +10,7 @@ mod ignored;
 mod image;
 mod migration;
 mod parsing;
+pub(crate) mod path_identity;
 mod rename;
 mod rename_transaction;
 mod title_sync;
@@ -349,11 +350,7 @@ fn lookup_git_dates(
     vault_path: &Path,
     git_dates: &HashMap<String, GitDates>,
 ) -> Option<(u64, u64)> {
-    let rel = path
-        .strip_prefix(vault_path)
-        .ok()?
-        .to_string_lossy()
-        .to_string();
+    let rel = path_identity::vault_relative_path_string(vault_path, path).ok()?;
     git_dates.get(&rel).map(|d| (d.modified_at, d.created_at))
 }
 
@@ -462,11 +459,10 @@ pub fn scan_vault_folders(vault_path: &Path) -> Result<Vec<FolderNode>, String> 
             if is_folder_tree_hidden_dir(&name) {
                 continue;
             }
-            let rel_path = path
-                .strip_prefix(vault_root)
-                .unwrap_or(&path)
-                .to_string_lossy()
-                .replace('\\', "/");
+            let rel_path = path_identity::vault_relative_path_string(vault_root, &path)
+                .unwrap_or_else(|_| {
+                    path_identity::normalize_path_for_identity(&path.to_string_lossy())
+                });
             let children = build_tree(&path, vault_root);
             nodes.push(FolderNode {
                 name,

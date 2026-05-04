@@ -7,6 +7,7 @@ use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 
 use super::filename_rules::validate_filename_stem;
+use super::path_identity::vault_relative_markdown_stem;
 use super::rename_transaction::RenameWorkspace;
 use crate::frontmatter::{update_frontmatter_content, FrontmatterValue};
 
@@ -211,12 +212,7 @@ fn update_note_title_in_content(content: &str, new_title: &str) -> String {
 
 /// Strip vault prefix and .md suffix to get the relative path stem (e.g., "project/weekly-review").
 fn to_path_stem(path: &Path, vault_root: &Path) -> String {
-    let relative = path.strip_prefix(vault_root).unwrap_or(path);
-    let normalized = relative.to_string_lossy().replace('\\', "/");
-    normalized
-        .strip_suffix(".md")
-        .unwrap_or(&normalized)
-        .to_string()
+    vault_relative_markdown_stem(path, vault_root)
 }
 
 pub(crate) fn recover_pending_rename_transactions(vault: &Path) -> Result<(), String> {
@@ -748,6 +744,17 @@ mod tests {
         assert_eq!(renames.len(), 1);
         assert_eq!(renames[0].old_path, "旧名.md");
         assert_eq!(renames[0].new_path, "新名.md");
+    }
+
+    #[test]
+    fn test_path_stem_normalizes_tmp_aliases_and_separators() {
+        assert_eq!(
+            to_path_stem(
+                Path::new("/tmp/tolaria-vault/projects\\weekly-review.md"),
+                Path::new("/private/tmp/tolaria-vault")
+            ),
+            "projects/weekly-review"
+        );
     }
 
     #[test]

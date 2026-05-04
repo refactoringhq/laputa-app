@@ -20,6 +20,7 @@ import {
   prefetchNoteContent as prefetchNoteContentInMemory,
 } from './noteContentCache'
 import { clearParsedNoteBlockCache } from './editorParsedBlockCache'
+import { notePathsMatch } from '../utils/notePathIdentity'
 
 interface Tab {
   entry: VaultEntry
@@ -89,18 +90,6 @@ function resetRequestedPathIfStillPending(
   }
 }
 
-function normalizeComparablePath(path: string): string {
-  return path
-    .replaceAll('\\', '/')
-    .replace(/^\/private\/tmp(?=\/|$)/u, '/tmp')
-    .replace(/\/+$/u, '')
-}
-
-function pathsMatch(leftPath: string | null, rightPath: string | null): boolean {
-  if (!leftPath || !rightPath) return false
-  return normalizeComparablePath(leftPath) === normalizeComparablePath(rightPath)
-}
-
 function setSingleTab(
   tabsRef: React.MutableRefObject<Tab[]>,
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>,
@@ -123,8 +112,8 @@ function isAlreadyViewingPath(
   activeTabPathRef: React.MutableRefObject<string | null>,
   path: string,
 ) {
-  return pathsMatch(activeTabPathRef.current, path)
-    || tabsRef.current.some((tab) => pathsMatch(tab.entry.path, path))
+  return notePathsMatch(activeTabPathRef.current, path)
+    || tabsRef.current.some((tab) => notePathsMatch(tab.entry.path, path))
 }
 
 function startEntryNavigation(options: {
@@ -203,8 +192,8 @@ function shouldApplyLoadedEntry(options: {
 
   if (navSeqRef.current !== seq) return false
   if (forceReload) return true
-  if (!pathsMatch(activeTabPathRef.current, path)) return true
-  const openTab = tabsRef.current.find((tab) => pathsMatch(tab.entry.path, path))
+  if (!notePathsMatch(activeTabPathRef.current, path)) return true
+  const openTab = tabsRef.current.find((tab) => notePathsMatch(tab.entry.path, path))
   return !openTab || openTab.content !== content
 }
 
@@ -472,7 +461,7 @@ export function useTabManagement(options: TabManagementOptions = {}) {
   ) => {
     const seq = ++beforeNavigateSeqRef.current
     const currentPath = activeTabPathRef.current
-    if (beforeNavigate && currentPath && !pathsMatch(currentPath, targetPath)) {
+    if (beforeNavigate && currentPath && !notePathsMatch(currentPath, targetPath)) {
       try {
         markNoteOpenTrace(targetPath, 'beforeNavigateStart')
         await beforeNavigate(currentPath, targetPath)
@@ -491,7 +480,7 @@ export function useTabManagement(options: TabManagementOptions = {}) {
   /** Open a note — replaces the current note (single-note model). */
   const handleSelectNote = useCallback(async (entry: VaultEntry) => {
     requestedActiveTabPathRef.current = entry.path
-    const alreadyViewingDirtyEntry = pathsMatch(entry.path, activeTabPathRef.current)
+    const alreadyViewingDirtyEntry = notePathsMatch(entry.path, activeTabPathRef.current)
       && !!hasUnsavedChanges?.(entry.path)
     if (!alreadyViewingDirtyEntry) {
       beginNoteOpenTrace(entry.path, 'select-note')
@@ -532,7 +521,7 @@ export function useTabManagement(options: TabManagementOptions = {}) {
 
   const handleReplaceActiveTab = useCallback(async (entry: VaultEntry) => {
     requestedActiveTabPathRef.current = entry.path
-    const replacingDifferentEntry = !pathsMatch(entry.path, activeTabPathRef.current)
+    const replacingDifferentEntry = !notePathsMatch(entry.path, activeTabPathRef.current)
     if (replacingDifferentEntry) {
       beginNoteOpenTrace(entry.path, 'replace-active-tab')
     }

@@ -9,6 +9,10 @@ use uuid::Uuid;
 use crate::git::{get_all_file_dates, GitDates};
 use std::collections::HashMap;
 
+use super::path_identity::{
+    normalize_path_for_identity, push_unique_relative_path, relative_path_key,
+    vault_relative_path_string,
+};
 use super::{is_md_file, parse_md_file, parse_non_md_file, scan_vault, VaultEntry};
 
 // --- Vault Cache ---
@@ -83,7 +87,7 @@ fn default_cache_version() -> u32 {
 /// Compute a deterministic hex hash of the vault path for use as cache filename.
 fn vault_path_hash(vault: &Path) -> String {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    vault.to_string_lossy().as_ref().hash(&mut hasher);
+    normalize_path_for_identity(&vault.to_string_lossy()).hash(&mut hasher);
     format!("{:016x}", hasher.finish())
 }
 
@@ -148,28 +152,22 @@ fn parse_porcelain_line(line: &str) -> Option<(&str, String)> {
 /// Includes all non-hidden files (not just .md) so the cache picks up
 /// view files (.yml), binary assets, etc.
 fn collect_paths_from_diff(stdout: &str) -> Vec<String> {
-    stdout
-        .lines()
-        .filter(|line| !line.is_empty() && !has_hidden_segment(line))
-        .map(|line| line.to_string())
-        .collect()
+    let mut paths = Vec::new();
+    for line in stdout.lines() {
+        push_unique_relative_path(&mut paths, line);
+    }
+    paths
 }
 
 /// Extract file paths from git status --porcelain output.
 /// Includes all non-hidden files so incremental cache updates cover
 /// every file type the vault scanner recognises.
 fn collect_paths_from_porcelain(stdout: &str) -> Vec<String> {
-    stdout
-        .lines()
-        .filter_map(parse_porcelain_line)
-        .filter(|(_, path)| !has_hidden_segment(path))
-        .map(|(_, path)| path)
-        .collect()
-}
-
-/// Return true if any path segment starts with `.` (hidden file/directory).
-fn has_hidden_segment(path: &str) -> bool {
-    path.split('/').any(|seg| seg.starts_with('.'))
+    let mut paths = Vec::new();
+    for (_, path) in stdout.lines().filter_map(parse_porcelain_line) {
+        push_unique_relative_path(&mut paths, path);
+    }
+    paths
 }
 
 fn git_changed_files(vault: &Path, from_hash: &str, to_hash: &str) -> Vec<String> {
@@ -182,9 +180,7 @@ fn git_changed_files(vault: &Path, from_hash: &str, to_hash: &str) -> Vec<String
     let uncommitted = git_uncommitted_files(vault);
 
     for path in uncommitted.into_iter() {
-        if !files.contains(&path) {
-            files.push(path);
-        }
+        push_unique_relative_path(&mut files, path);
     }
 
     files
@@ -201,17 +197,16 @@ fn git_uncommitted_files(vault: &Path) -> Vec<String> {
     // files inside — ls-files resolves them so the cache picks up all new files.
     let untracked = run_git(vault, &["ls-files", "--others", "--exclude-standard"])
         .map(|s| {
-            s.lines()
-                .filter(|l| !l.is_empty() && !has_hidden_segment(l))
-                .map(|l| l.to_string())
-                .collect::<Vec<_>>()
+            let mut paths = Vec::new();
+            for line in s.lines() {
+                push_unique_relative_path(&mut paths, line);
+            }
+            paths
         })
         .unwrap_or_default();
 
     for path in untracked {
-        if !files.contains(&path) {
-            files.push(path);
-        }
+        push_unique_relative_path(&mut files, path);
     }
 
     files
@@ -447,13 +442,12 @@ fn write_cache(
 
 /// Normalize an absolute path to a relative path for comparison with git output.
 fn to_relative_path(abs_path: &str, vault: &Path) -> String {
-    let vault_str = vault.to_string_lossy();
-    let with_slash = format!("{}/", vault_str);
-    abs_path
-        .strip_prefix(&with_slash)
-        .or_else(|| abs_path.strip_prefix(vault_str.as_ref()))
-        .unwrap_or(abs_path)
-        .to_string()
+    vault_relative_path_string(vault, Path::new(abs_path))
+        .unwrap_or_else(|_| normalize_path_for_identity(abs_path))
+}
+
+fn to_relative_path_key(abs_path: &str, vault: &Path) -> String {
+    relative_path_key(&to_relative_path(abs_path, vault))
 }
 
 /// Parse files from a list of relative paths, skipping any that don't exist.
@@ -535,7 +529,7 @@ fn prune_stale_entries(vault: &Path, entries: &mut Vec<VaultEntry>) -> bool {
     // Deduplicate by case-folded relative path
     let mut seen = std::collections::HashSet::new();
     entries.retain(|e| {
-        let rel = to_relative_path(&e.path, vault).to_lowercase();
+        let rel = to_relative_path_key(&e.path, vault);
         seen.insert(rel)
     });
     entries.len() != before
@@ -587,8 +581,9 @@ fn update_same_commit(
     let changed = git_uncommitted_files(vault);
     let mut entries = cache.entries;
     if !changed.is_empty() {
-        let changed_set: std::collections::HashSet<String> = changed.iter().cloned().collect();
-        entries.retain(|e| !changed_set.contains(&to_relative_path(&e.path, vault)));
+        let changed_set: std::collections::HashSet<String> =
+            changed.iter().map(|path| relative_path_key(path)).collect();
+        entries.retain(|e| !changed_set.contains(&to_relative_path_key(&e.path, vault)));
         entries.extend(parse_files_at(vault, &changed, git_dates));
     }
     // Always finalize: prune_stale_entries inside finalize_and_cache removes
@@ -605,12 +600,15 @@ fn update_different_commit(
 ) -> Vec<VaultEntry> {
     let LoadedCache { cache, fingerprint } = loaded_cache;
     let changed_files = git_changed_files(vault, &cache.commit_hash, &current_hash);
-    let changed_set: std::collections::HashSet<String> = changed_files.iter().cloned().collect();
+    let changed_set: std::collections::HashSet<String> = changed_files
+        .iter()
+        .map(|path| relative_path_key(path))
+        .collect();
 
     let mut entries: Vec<VaultEntry> = cache
         .entries
         .into_iter()
-        .filter(|e| !changed_set.contains(&to_relative_path(&e.path, vault)))
+        .filter(|e| !changed_set.contains(&to_relative_path_key(&e.path, vault)))
         .collect();
     entries.extend(parse_files_at(vault, &changed_files, git_dates));
 
@@ -618,9 +616,10 @@ fn update_different_commit(
 }
 
 fn cache_requires_full_rescan(cache: &VaultCache, vault_path: &Path) -> bool {
-    let current_vault_str = vault_path.to_string_lossy();
+    let current_vault_str = normalize_path_for_identity(&vault_path.to_string_lossy());
     cache.version != CACHE_VERSION
-        || (!cache.vault_path.is_empty() && cache.vault_path != current_vault_str.as_ref())
+        || (!cache.vault_path.is_empty()
+            && normalize_path_for_identity(&cache.vault_path) != current_vault_str)
 }
 
 fn scan_and_cache_full(
@@ -806,6 +805,17 @@ mod tests {
         let hash1 = vault_path_hash(Path::new("/Users/test/MyVault"));
         let hash2 = vault_path_hash(Path::new("/Users/test/MyVault"));
         assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_to_relative_path_normalizes_aliases_and_separators() {
+        assert_eq!(
+            to_relative_path(
+                "/tmp/tolaria-vault/projects\\active.md",
+                Path::new("/private/tmp/tolaria-vault")
+            ),
+            "projects/active.md"
+        );
     }
 
     #[test]

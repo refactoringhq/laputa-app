@@ -14,6 +14,7 @@ import {
   resolveTemplate,
   DEFAULT_TEMPLATES,
   RAPID_CREATE_NOTE_SETTLE_MS,
+  planNewNoteCreation,
   useNoteCreation,
 } from './useNoteCreation'
 import type { NoteCreationConfig } from './useNoteCreation'
@@ -168,6 +169,17 @@ describe('resolveNewNote', () => {
     const { entry, content } = resolveNewNote({ title: 'Reflection', type: 'Journal', vaultPath: '/vault' })
     expect(entry.status).toBeNull()
     expect(content).not.toContain('status:')
+  })
+
+  it('blocks creation when macOS /tmp aliases point at the same note path', () => {
+    const plan = planNewNoteCreation({
+      entries: [makeEntry({ path: '/private/tmp/tolaria-vault/briefing.md', filename: 'briefing.md' })],
+      title: 'Briefing',
+      type: 'Note',
+      vaultPath: '/tmp/tolaria-vault',
+    })
+
+    expect(plan.status).toBe('blocked')
   })
 })
 

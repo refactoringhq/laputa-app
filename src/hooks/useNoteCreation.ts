@@ -6,6 +6,7 @@ import { slugifyNoteStem as slugify } from '../utils/noteSlug'
 import { resolveEntry } from '../utils/wikilink'
 import { trackEvent } from '../lib/telemetry'
 import { cacheNoteContent } from './useTabManagement'
+import { findByCollidingNotePath, joinVaultPath, notePathFilename } from '../utils/notePathIdentity'
 
 export interface NewEntryParams {
   path: string
@@ -116,7 +117,7 @@ export interface NewNoteParams {
 export function resolveNewNote({ title, type, vaultPath, template }: NewNoteParams): { entry: VaultEntry; content: string } {
   const slug = slugify(title)
   const status = null
-  const entry = buildNewEntry({ path: `${vaultPath}/${slug}.md`, slug, title, type, status })
+  const entry = buildNewEntry({ path: joinVaultPath(vaultPath, `${slug}.md`), slug, title, type, status })
   return { entry, content: buildNoteContent({ title, type, status, template }) }
 }
 
@@ -127,7 +128,7 @@ export interface NewTypeParams {
 
 export function resolveNewType({ typeName, vaultPath }: NewTypeParams): { entry: VaultEntry; content: string } {
   const slug = slugify(typeName)
-  const entry = buildNewEntry({ path: `${vaultPath}/${slug}.md`, slug, title: typeName, type: 'Type', status: null })
+  const entry = buildNewEntry({ path: joinVaultPath(vaultPath, `${slug}.md`), slug, title: typeName, type: 'Type', status: null })
   return { entry, content: `---\ntype: Type\n---\n\n# ${typeName}\n` }
 }
 
@@ -151,17 +152,12 @@ interface ExistingTypeCreationPlan {
 export type NoteCreationPlan = BlockedCreationPlan | ReadyCreationPlan
 export type TypeCreationPlan = BlockedCreationPlan | ExistingTypeCreationPlan | ReadyCreationPlan
 
-function normalizeComparablePath(path: string): string {
-  return path.replace(/\\/g, '/').toLocaleLowerCase()
-}
-
 function findPathCollision(entries: VaultEntry[], path: string): VaultEntry | undefined {
-  const target = normalizeComparablePath(path)
-  return entries.find((entry) => normalizeComparablePath(entry.path) === target)
+  return findByCollidingNotePath(entries, path)
 }
 
 function buildCreationCollisionMessage({ noun, title, path }: { noun: 'note' | 'type'; title: string; path: string }): string {
-  const filename = path.split('/').pop() ?? path
+  const filename = notePathFilename(path)
   return `Cannot create ${noun} "${title}" because ${filename} already exists`
 }
 
@@ -473,7 +469,7 @@ async function createNoteImmediate(deps: ImmediateCreateDeps, type?: string): Pr
   const title = slug_to_title(slug)
   const template = resolveTemplate({ entries: deps.entries, typeName: noteType })
   const status = null
-  const entry = buildNewEntry({ path: `${deps.vaultPath}/${slug}.md`, slug, title, type: noteType, status })
+  const entry = buildNewEntry({ path: joinVaultPath(deps.vaultPath, `${slug}.md`), slug, title, type: noteType, status })
   const content = buildNoteContent({ title: null, type: noteType, status, template, initialEmptyHeading: true })
   const didPersist = await persistImmediateEntry(deps, entry, content)
   if (!didPersist) return false

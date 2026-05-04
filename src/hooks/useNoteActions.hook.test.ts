@@ -6,6 +6,7 @@ import type { VaultEntry } from '../types'
 import { RAPID_CREATE_NOTE_SETTLE_MS } from './useNoteCreation'
 import { useNoteActions } from './useNoteActions'
 import type { NoteActionsConfig } from './useNoteActions'
+import { GITIGNORED_VISIBILITY_APPLIED_EVENT } from '../lib/gitignoredVisibilityEvents'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('../mock-tauri', () => ({
@@ -161,6 +162,31 @@ describe('useNoteActions hook', () => {
 
     expect(warnSpy).toHaveBeenCalledWith('Navigation target not found: Nonexistent')
     warnSpy.mockRestore()
+  })
+
+  it('keeps the active tab open when gitignored visibility reports a /tmp alias', async () => {
+    const activeEntry = makeEntry({
+      path: '/private/tmp/tolaria-vault/active.md',
+      filename: 'active.md',
+      title: 'Active',
+    })
+    const { result } = renderActions([activeEntry])
+
+    await act(async () => {
+      await result.current.handleSelectNote(activeEntry)
+    })
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(GITIGNORED_VISIBILITY_APPLIED_EVENT, {
+        detail: {
+          hide: true,
+          visiblePaths: ['/tmp/tolaria-vault/active.md'],
+        },
+      }))
+    })
+
+    expect(result.current.activeTabPath).toBe('/private/tmp/tolaria-vault/active.md')
+    expect(result.current.tabs).toHaveLength(1)
   })
 
   it('handleUpdateFrontmatter calls updateEntry with mapped patch', async () => {

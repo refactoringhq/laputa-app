@@ -127,11 +127,13 @@ describe('useNoteRename hook', () => {
     ))
 
   const runHandleRenameNote = async ({
+    path = '/vault/old.md',
     entries = [],
     renameResult = { new_path: '/vault/new.md', updated_files: 0, failed_updates: 0 },
     activePath = null,
     onEntryRenamed = vi.fn(),
   }: {
+    path?: string
     entries?: VaultEntry[]
     renameResult?: RenameNoteResult
     activePath?: string | null
@@ -142,7 +144,7 @@ describe('useNoteRename hook', () => {
 
     const { result } = renderUseNoteRename(entries)
     await act(async () => {
-      await result.current.handleRenameNote('/vault/old.md', 'New', '/vault', onEntryRenamed)
+      await result.current.handleRenameNote(path, 'New', '/vault', onEntryRenamed)
     })
 
     return { onEntryRenamed }
@@ -194,6 +196,17 @@ describe('useNoteRename hook', () => {
     })
 
     expect(handleSwitchTab).toHaveBeenCalledWith('/vault/new.md')
+  })
+
+  it('switches active tab when macOS /tmp aliases identify the renamed note', async () => {
+    await runHandleRenameNote({
+      path: '/tmp/vault/old.md',
+      entries: [makeEntry({ path: '/private/tmp/vault/old.md' })],
+      renameResult: { new_path: '/tmp/vault/new.md', updated_files: 0, failed_updates: 0 },
+      activePath: '/private/tmp/vault/old.md',
+    })
+
+    expect(handleSwitchTab).toHaveBeenCalledWith('/tmp/vault/new.md')
   })
 
   it('handleRenameFilename renames the file while preserving the existing title', async () => {
@@ -330,5 +343,34 @@ describe('useNoteRename hook', () => {
       '# Project Kickoff\n',
     )
     expect(setToastMessage).toHaveBeenCalledWith('Moved to "projects" and updated 1 note')
+  })
+
+  it('normalizes folder move targets before sending them to the backend', async () => {
+    const entry = makeEntry({ path: '/vault/notes/project-kickoff.md', filename: 'project-kickoff.md', title: 'Project Kickoff' })
+    vi.mocked(mockInvoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'move_note_to_folder') {
+        return {
+          new_path: '/vault/projects/active/project-kickoff.md',
+          updated_files: 0,
+          failed_updates: 0,
+        }
+      }
+      if (cmd === 'get_note_content') return '# Project Kickoff\n'
+      return ''
+    })
+
+    const { result } = renderHook(() => useNoteRename(
+      { entries: [entry], setToastMessage },
+      { tabs: [], setTabs, activeTabPathRef, handleSwitchTab, updateTabContent },
+    ))
+
+    await act(async () => {
+      await result.current.handleMoveNoteToFolder('/vault/notes/project-kickoff.md', String.raw`/projects\active/`, '/vault', vi.fn())
+    })
+
+    expect(mockInvoke).toHaveBeenCalledWith('move_note_to_folder', expect.objectContaining({
+      folder_path: 'projects/active',
+    }))
+    expect(setToastMessage).toHaveBeenCalledWith('Moved to "active"')
   })
 })

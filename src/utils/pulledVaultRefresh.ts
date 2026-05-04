@@ -1,4 +1,5 @@
 import type { VaultEntry } from '../types'
+import { findByNotePath, joinVaultPath, normalizeNotePathForIdentity, notePathsMatch } from './notePathIdentity'
 
 interface PulledVaultRefreshOptions {
   activeTabPath: string | null
@@ -13,25 +14,17 @@ interface PulledVaultRefreshOptions {
   vaultPath: string
 }
 
-function normalizePath(path: string): string {
-  return path
-    .replaceAll('\\', '/')
-    .replace(/^\/private\/tmp(?=\/|$)/u, '/tmp')
-    .replace(/\/+$/u, '')
-}
-
 function resolveUpdatedFilePath(path: string, vaultPath: string): string {
-  if (path.startsWith('/')) return normalizePath(path)
-  return normalizePath(`${vaultPath}/${path}`)
+  if (path.startsWith('/')) return normalizeNotePathForIdentity(path)
+  return normalizeNotePathForIdentity(joinVaultPath(vaultPath, path))
 }
 
 function didPullUpdateActiveNote(updatedFiles: string[], vaultPath: string, activeTabPath: string): boolean {
-  const normalizedActivePath = normalizePath(activeTabPath)
-  return updatedFiles.some((path) => resolveUpdatedFilePath(path, vaultPath) === normalizedActivePath)
+  return updatedFiles.some((path) => notePathsMatch(resolveUpdatedFilePath(path, vaultPath), activeTabPath))
 }
 
 function didActivePathChange(initialPath: string, latestPath: string): boolean {
-  return normalizePath(initialPath) !== normalizePath(latestPath)
+  return !notePathsMatch(initialPath, latestPath)
 }
 
 export async function refreshPulledVaultState(options: PulledVaultRefreshOptions): Promise<VaultEntry[]> {
@@ -59,7 +52,7 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
   if (didActivePathChange(activeTabPath, latestActiveTabPath)) return entries
   if (hasUnsavedChanges(latestActiveTabPath)) return entries
 
-  const refreshedEntry = entries.find(entry => normalizePath(entry.path) === normalizePath(latestActiveTabPath))
+  const refreshedEntry = findByNotePath(entries, latestActiveTabPath)
   if (!refreshedEntry) {
     closeAllTabs()
     return entries

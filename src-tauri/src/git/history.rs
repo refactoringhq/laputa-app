@@ -1,4 +1,5 @@
 use super::git_command;
+use crate::vault::path_identity::vault_relative_path_string;
 use std::path::Path;
 
 use super::GitCommit;
@@ -7,14 +8,7 @@ use super::GitCommit;
 pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitCommit>, String> {
     let vault = Path::new(vault_path);
     let file = Path::new(file_path);
-
-    let relative = file
-        .strip_prefix(vault)
-        .map_err(|_| format!("File {} is not inside vault {}", file_path, vault_path))?;
-
-    let relative_str = relative
-        .to_str()
-        .ok_or_else(|| "Invalid UTF-8 in path".to_string())?;
+    let relative_str = vault_relative_path_string(vault, file)?;
 
     let output = git_command()
         .args([
@@ -23,7 +17,7 @@ pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitComm
             "-n",
             "20",
             "--",
-            relative_str,
+            &relative_str,
         ])
         .current_dir(vault)
         .output()
@@ -70,18 +64,11 @@ pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitComm
 pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String> {
     let vault = Path::new(vault_path);
     let file = Path::new(file_path);
-
-    let relative = file
-        .strip_prefix(vault)
-        .map_err(|_| format!("File {} is not inside vault {}", file_path, vault_path))?;
-
-    let relative_str = relative
-        .to_str()
-        .ok_or_else(|| "Invalid UTF-8 in path".to_string())?;
+    let relative_str = vault_relative_path_string(vault, file)?;
 
     // First try tracked file diff
     let output = git_command()
-        .args(["diff", "--", relative_str])
+        .args(["diff", "--", &relative_str])
         .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
@@ -91,7 +78,7 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
     // If no diff (maybe staged or untracked), try diff --cached
     if stdout.is_empty() {
         let cached = git_command()
-            .args(["diff", "--cached", "--", relative_str])
+            .args(["diff", "--cached", "--", &relative_str])
             .current_dir(vault)
             .output()
             .map_err(|e| format!("Failed to run git diff --cached: {}", e))?;
@@ -103,7 +90,7 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
 
         // Try showing untracked file as all-new
         let status = git_command()
-            .args(["status", "--porcelain", "--", relative_str])
+            .args(["status", "--porcelain", "--", &relative_str])
             .current_dir(vault)
             .output()
             .map_err(|e| format!("Failed to run git status: {}", e))?;
@@ -134,14 +121,7 @@ pub fn get_file_diff_at_commit(
 ) -> Result<String, String> {
     let vault = Path::new(vault_path);
     let file = Path::new(file_path);
-
-    let relative = file
-        .strip_prefix(vault)
-        .map_err(|_| format!("File {} is not inside vault {}", file_path, vault_path))?;
-
-    let relative_str = relative
-        .to_str()
-        .ok_or_else(|| "Invalid UTF-8 in path".to_string())?;
+    let relative_str = vault_relative_path_string(vault, file)?;
 
     // Show diff between commit^ and commit for this file
     let output = git_command()
@@ -150,7 +130,7 @@ pub fn get_file_diff_at_commit(
             &format!("{}^", commit_hash),
             commit_hash,
             "--",
-            relative_str,
+            &relative_str,
         ])
         .current_dir(vault)
         .output()

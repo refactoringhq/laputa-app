@@ -13,6 +13,7 @@ import {
   performRename, loadNoteContent, renameToastMessage, reloadTabsAfterRename, reloadVaultAfterRename,
 } from './useNoteRename'
 import { runFrontmatterAndApply, type FrontmatterOpOptions } from './frontmatterOps'
+import { findByNotePath, notePathFilename, notePathsMatch } from '../utils/notePathIdentity'
 
 export interface NoteActionsConfig {
   addEntry: (entry: VaultEntry) => void
@@ -89,18 +90,20 @@ interface RenameAfterTitleChangeParams {
 }
 
 async function renameAfterTitleChange({ path, newTitle, deps }: RenameAfterTitleChangeParams): Promise<void> {
-  const oldTitle = deps.tabsRef.current.find(t => t.entry.path === path)?.entry.title
+  const oldTitle = deps.tabsRef.current.find(t => notePathsMatch(t.entry.path, path))?.entry.title
   const result = await performRename({ path, newTitle, vaultPath: deps.vaultPath, oldTitle })
-  if (result.new_path !== path) {
-    const newFilename = result.new_path.split('/').pop() ?? ''
+  if (!notePathsMatch(result.new_path, path)) {
+    const newFilename = notePathFilename(result.new_path)
     deps.onPathRenamed?.(path, result.new_path)
     deps.replaceEntry?.(path, { path: result.new_path, filename: newFilename, title: newTitle } as Partial<VaultEntry> & { path: string })
     const newContent = await loadNoteContent({ path: result.new_path })
-    deps.setTabs(prev => prev.map(t => t.entry.path === path
+    deps.setTabs(prev => prev.map(t => notePathsMatch(t.entry.path, path)
       ? { entry: { ...t.entry, path: result.new_path, filename: newFilename, title: newTitle }, content: newContent }
       : t))
-    if (deps.activeTabPathRef.current === path) deps.handleSwitchTab(result.new_path)
-    const otherTabPaths = deps.tabsRef.current.filter(t => t.entry.path !== path && t.entry.path !== result.new_path).map(t => t.entry.path)
+    if (notePathsMatch(deps.activeTabPathRef.current, path)) deps.handleSwitchTab(result.new_path)
+    const otherTabPaths = deps.tabsRef.current
+      .filter(t => !notePathsMatch(t.entry.path, path) && !notePathsMatch(t.entry.path, result.new_path))
+      .map(t => t.entry.path)
     await reloadTabsAfterRename({ tabPaths: otherTabPaths, updateTabContent: deps.updateTabContent })
   }
   await reloadVaultAfterRename(deps.reloadVault)
@@ -252,7 +255,7 @@ function useGitignoredVisibilityTabCleanup({
     const handleVisibilityApplied = (event: Event) => {
       const { hide, visiblePaths } = (event as GitignoredVisibilityAppliedEvent).detail
       const activePath = activeTabPathRef.current
-      if (!hide || !activePath || visiblePaths.includes(activePath)) return
+      if (!hide || !activePath || visiblePaths.some((path) => notePathsMatch(path, activePath))) return
       closeAllTabs()
       setToastMessage('Closed hidden Gitignored file')
     }
@@ -353,7 +356,7 @@ export function useNoteActions(config: NoteActionsConfig) {
   })
 
   const updateTabContent = useCallback((path: string, newContent: string) => {
-    setTabs((prev) => prev.map((t) => t.entry.path === path ? { ...t, content: newContent } : t))
+    setTabs((prev) => prev.map((t) => notePathsMatch(t.entry.path, path) ? { ...t, content: newContent } : t))
   }, [setTabs])
 
   const creation = useNoteCreation(config, { openTabWithContent })
@@ -374,7 +377,7 @@ export function useNoteActions(config: NoteActionsConfig) {
         path,
         key,
         value,
-        callbacks: { updateTab: updateTabContent, updateEntry, toast: setToastMessage, getEntry: (p) => entries.find((e) => e.path === p) },
+        callbacks: { updateTab: updateTabContent, updateEntry, toast: setToastMessage, getEntry: (p) => findByNotePath(entries, p) },
         options,
       }),
     [updateTabContent, updateEntry, setToastMessage, entries],
