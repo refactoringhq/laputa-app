@@ -1,63 +1,24 @@
+import {
+  type BlockLike,
+  type DurableBlockCodec,
+  type DurableFencePayloadInput,
+  injectDurableMarkdownBlocks,
+  preProcessDurableMarkdownBlocks,
+  readCodeBlockLanguage,
+  readInlineText,
+} from './durableMarkdownBlocks'
+
 export const TLDRAW_BLOCK_TYPE = 'tldrawBlock'
 export const TLDRAW_DEFAULT_HEIGHT = '520'
 
 const TOKEN_PREFIX = '@@TOLARIA_TLDRAW_BLOCK:'
 const TOKEN_SUFFIX = '@@'
 
-interface InlineItem {
-  type: string
-  text?: string
-  props?: Record<string, string>
-  content?: unknown
-  [key: string]: unknown
-}
-
-interface BlockLike {
-  type?: string
-  content?: InlineItem[]
-  props?: Record<string, string>
-  children?: BlockLike[]
-  [key: string]: unknown
-}
-
 interface TldrawPayload {
   boardId: string
   height: string
   snapshot: string
   width: string
-}
-
-interface TldrawFenceStart {
-  character: '`' | '~'
-  length: number
-  boardId: string
-  height: string
-  width: string
-}
-
-interface MarkdownLine {
-  line: string
-}
-
-interface EncodedPayload {
-  encoded: string
-}
-
-interface TokenText {
-  text: string
-}
-
-interface FenceSearch {
-  lines: string[]
-  start: number
-  opening: TldrawFenceStart
-}
-
-interface FenceRange {
-  lines: string[]
-  start: number
-  end: number
-  opening: TldrawFenceStart
 }
 
 interface SnapshotSource {
@@ -68,62 +29,26 @@ interface FenceAttribute {
   value: string
 }
 
-interface CodeBlockSource {
-  block: BlockLike
-}
-
-interface FenceMetadata {
-  info: string
-}
-
 interface FenceAttributeRequest {
   info: string
   name: 'height' | 'id' | 'width'
 }
 
-function lineEnding({ line }: MarkdownLine): string {
-  if (line.endsWith('\r\n')) return '\r\n'
-  return line.endsWith('\n') ? '\n' : ''
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function lineText({ line }: MarkdownLine): string {
-  const ending = lineEnding({ line })
-  return ending ? line.slice(0, -ending.length) : line
-}
+function decodeTldrawPayload(payload: unknown): TldrawPayload | null {
+  if (!isRecord(payload)) return null
+  if (typeof payload.boardId !== 'string') return null
+  if (typeof payload.snapshot !== 'string') return null
 
-function splitMarkdownLines({ markdown }: { markdown: string }): string[] {
-  const lines = markdown.match(/[^\n]*(?:\n|$)/g) ?? []
-  return lines.filter((line, index) => line !== '' || index < lines.length - 1)
-}
-
-function encodePayload(payload: TldrawPayload): string {
-  return encodeURIComponent(JSON.stringify(payload))
-}
-
-function decodePayload({ encoded }: EncodedPayload): TldrawPayload | null {
-  try {
-    const payload = JSON.parse(decodeURIComponent(encoded)) as Partial<TldrawPayload>
-    if (typeof payload.boardId !== 'string') return null
-    if (typeof payload.snapshot !== 'string') return null
-    return {
-      boardId: payload.boardId,
-      height: typeof payload.height === 'string' ? payload.height : TLDRAW_DEFAULT_HEIGHT,
-      snapshot: payload.snapshot,
-      width: typeof payload.width === 'string' ? payload.width : '',
-    }
-  } catch {
-    return null
+  return {
+    boardId: payload.boardId,
+    height: typeof payload.height === 'string' ? payload.height : TLDRAW_DEFAULT_HEIGHT,
+    snapshot: payload.snapshot,
+    width: typeof payload.width === 'string' ? payload.width : '',
   }
-}
-
-function tldrawToken(payload: TldrawPayload): string {
-  return `${TOKEN_PREFIX}${encodePayload(payload)}${TOKEN_SUFFIX}`
-}
-
-function readTldrawToken({ text }: TokenText): TldrawPayload | null {
-  const trimmed = text.trim()
-  if (!trimmed.startsWith(TOKEN_PREFIX) || !trimmed.endsWith(TOKEN_SUFFIX)) return null
-  return decodePayload({ encoded: trimmed.slice(TOKEN_PREFIX.length, -TOKEN_SUFFIX.length) })
 }
 
 function readFenceAttribute({ info, name }: FenceAttributeRequest): string {
@@ -133,7 +58,7 @@ function readFenceAttribute({ info, name }: FenceAttributeRequest): string {
   return ''
 }
 
-function readFenceMetadata({ info }: FenceMetadata): Pick<TldrawPayload, 'boardId' | 'height' | 'width'> {
+function readFenceMetadata(info: string): Pick<TldrawPayload, 'boardId' | 'height' | 'width'> {
   return {
     boardId: readFenceAttribute({ info, name: 'id' }),
     height: readFenceAttribute({ info, name: 'height' }) || TLDRAW_DEFAULT_HEIGHT,
@@ -141,75 +66,18 @@ function readFenceMetadata({ info }: FenceMetadata): Pick<TldrawPayload, 'boardI
   }
 }
 
-function readTldrawFenceStart({ line }: MarkdownLine): TldrawFenceStart | null {
-  const match = /^( {0,3})(`{3,}|~{3,})[ \t]*(.*)$/.exec(line)
-  if (!match) return null
-
-  const fence = match[2]
-  const [language = '', ...infoParts] = match[3].trim().split(/\s+/u)
+function readTldrawFenceMetadata(info: string): Pick<TldrawPayload, 'boardId' | 'height' | 'width'> | null {
+  const [language = '', ...infoParts] = info.trim().split(/\s+/u)
   if (language.toLowerCase() !== 'tldraw') return null
-  const metadata = readFenceMetadata({ info: infoParts.join(' ') })
+  return readFenceMetadata(infoParts.join(' '))
+}
 
+function buildTldrawPayload({ lines, start, end, metadata }: DurableFencePayloadInput): TldrawPayload {
+  const fenceMetadata = metadata as Pick<TldrawPayload, 'boardId' | 'height' | 'width'>
   return {
-    character: fence[0] as '`' | '~',
-    length: fence.length,
-    ...metadata,
-  }
-}
-
-function isClosingFence({ line, opening }: MarkdownLine & { opening: TldrawFenceStart }): boolean {
-  const match = /^( {0,3})(`{3,}|~{3,})[ \t]*$/.exec(line)
-  if (!match) return false
-
-  const fence = match[2]
-  return fence[0] === opening.character && fence.length >= opening.length
-}
-
-function findClosingFence({ lines, start, opening }: FenceSearch): number {
-  for (let index = start + 1; index < lines.length; index++) {
-    if (isClosingFence({ line: lineText({ line: lines[index] }), opening })) return index
-  }
-
-  return -1
-}
-
-function buildPayload({ lines, start, end, opening }: FenceRange): TldrawPayload {
-  return {
-    boardId: opening.boardId,
-    height: opening.height,
+    ...fenceMetadata,
     snapshot: lines.slice(start + 1, end).join('').trim(),
-    width: opening.width,
   }
-}
-
-export function preProcessTldrawMarkdown({ markdown }: { markdown: string }): string {
-  const lines = splitMarkdownLines({ markdown })
-  const result: string[] = []
-
-  for (let index = 0; index < lines.length; index++) {
-    const opening = readTldrawFenceStart({ line: lineText({ line: lines[index] }) })
-    if (!opening) {
-      result.push(lines[index])
-      continue
-    }
-
-    const closingIndex = findClosingFence({ lines, start: index, opening })
-    if (closingIndex === -1) {
-      result.push(lines[index])
-      continue
-    }
-
-    result.push(`${tldrawToken(buildPayload({ lines, start: index, end: closingIndex, opening }))}${lineEnding({ line: lines[closingIndex] })}`)
-    index = closingIndex
-  }
-
-  return result.join('')
-}
-
-function readTldrawPayload(content: InlineItem[] | undefined): TldrawPayload | null {
-  const onlyItem = content?.length === 1 ? content[0] : null
-  if (onlyItem?.type !== 'text' || typeof onlyItem.text !== 'string') return null
-  return readTldrawToken({ text: onlyItem.text })
 }
 
 function buildTldrawBlock(block: BlockLike, payload: TldrawPayload): BlockLike {
@@ -228,21 +96,7 @@ function buildTldrawBlock(block: BlockLike, payload: TldrawPayload): BlockLike {
   }
 }
 
-function readCodeBlockLanguage({ block }: CodeBlockSource): string | null {
-  const language = block.props?.language
-  if (typeof language !== 'string') return null
-
-  return language.trim().split(/\s+/u)[0]?.toLowerCase() ?? null
-}
-
-function readInlineText(content: InlineItem[] | undefined): string | null {
-  if (!Array.isArray(content)) return null
-  return content.map((item) => (
-    item.type === 'text' && typeof item.text === 'string' ? item.text : ''
-  )).join('')
-}
-
-function readTldrawCodeBlock({ block }: CodeBlockSource): TldrawPayload | null {
+function readTldrawCodeBlock(block: BlockLike): TldrawPayload | null {
   if (block.type !== 'codeBlock') return null
   if (readCodeBlockLanguage({ block }) !== 'tldraw') return null
 
@@ -255,17 +109,6 @@ function readTldrawCodeBlock({ block }: CodeBlockSource): TldrawPayload | null {
     snapshot: snapshot.trim(),
     width: '',
   }
-}
-
-function injectTldrawInBlock(block: BlockLike): BlockLike {
-  const payload = readTldrawPayload(block.content)
-  if (payload) return buildTldrawBlock(block, payload)
-
-  const codeBlockPayload = readTldrawCodeBlock({ block })
-  if (codeBlockPayload) return buildTldrawBlock(block, codeBlockPayload)
-
-  const children = Array.isArray(block.children) ? block.children.map(injectTldrawInBlock) : block.children
-  return { ...block, children }
 }
 
 function fenceLengthForSnapshot({ snapshot }: SnapshotSource): number {
@@ -292,10 +135,6 @@ function tldrawFenceMetadata({ boardId, height, width }: Omit<TldrawPayload, 'sn
   return attributes.length > 0 ? ` ${attributes.join(' ')}` : ''
 }
 
-export function injectTldrawInBlocks(blocks: unknown[]): unknown[] {
-  return (blocks as BlockLike[]).map(injectTldrawInBlock)
-}
-
 export function isTldrawBlock(block: BlockLike): boolean {
   return block.type === TLDRAW_BLOCK_TYPE
     && typeof block.props?.snapshot === 'string'
@@ -309,4 +148,24 @@ export function tldrawMarkdown(block: BlockLike): string {
     snapshot: block.props?.snapshot ?? '{}',
     width: block.props?.width ?? '',
   })
+}
+
+export const tldrawMarkdownCodec: DurableBlockCodec = {
+  tokenPrefix: TOKEN_PREFIX,
+  tokenSuffix: TOKEN_SUFFIX,
+  readFenceMetadata: readTldrawFenceMetadata,
+  buildPayload: buildTldrawPayload,
+  decodePayload: decodeTldrawPayload,
+  buildBlock: (block, payload) => buildTldrawBlock(block, payload as TldrawPayload),
+  readCodeBlock: readTldrawCodeBlock,
+  isBlock: isTldrawBlock,
+  serializeBlock: tldrawMarkdown,
+}
+
+export function preProcessTldrawMarkdown({ markdown }: { markdown: string }): string {
+  return preProcessDurableMarkdownBlocks({ markdown, codecs: [tldrawMarkdownCodec] })
+}
+
+export function injectTldrawInBlocks(blocks: unknown[]): unknown[] {
+  return injectDurableMarkdownBlocks({ blocks, codecs: [tldrawMarkdownCodec] })
 }

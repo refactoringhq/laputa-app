@@ -579,9 +579,10 @@ sequenceDiagram
     A->>T: invoke('get_note_content')
     T-->>A: raw markdown
     A->>A: splitFrontmatter → [yaml, body]
+    A->>A: preProcessDurableEditorMarkdown(body)
     A->>A: preProcessWikilinks(body)
     A->>A: tryParseMarkdownToBlocks()
-    A->>A: injectWikilinks(blocks)
+    A->>A: injectWikilinks + injectDurableEditorMarkdownBlocks(blocks)
     A-->>U: Editor renders note
 ```
 

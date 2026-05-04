@@ -546,21 +546,22 @@ Defined in `src/utils/mathMarkdown.ts`, `src/components/editorSchema.tsx`, and s
 
 ### Mermaid Diagrams
 
-Defined in `src/utils/mermaidMarkdown.ts`, `src/components/MermaidDiagram.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
+Defined in `src/utils/durableMarkdownBlocks.ts`, `src/utils/editorDurableMarkdown.ts`, `src/utils/mermaidMarkdown.ts`, `src/components/MermaidDiagram.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
 
 - Fenced `mermaid` blocks become `mermaidBlock` schema nodes before BlockNote sees the Markdown body.
 - Each `mermaidBlock` stores the original fenced Markdown plus the diagram body, so raw-mode entry and saves can restore the canonical source instead of serializing generated SVG.
 - The rich editor renders diagrams with the `mermaid` package and uses the original source as an inline fallback when rendering fails.
-- `serializeMermaidAwareBlocks()` wraps the math-aware serializer so math, wikilinks, and diagrams share the same Markdown-first save path.
+- `serializeDurableEditorBlocks()` wraps the math-aware serializer so math, wikilinks, Mermaid diagrams, and whiteboards share the same Markdown-first save path.
 - The `/mermaid` slash command inserts a placeholder rectangle diagram using the same schema-backed Markdown storage path, avoiding an invalid empty diagram state.
 
 ### Tldraw Whiteboards
 
-Defined in `src/utils/tldrawMarkdown.ts`, `src/components/TldrawWhiteboard.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
+Defined in `src/utils/durableMarkdownBlocks.ts`, `src/utils/editorDurableMarkdown.ts`, `src/utils/tldrawMarkdown.ts`, `src/components/TldrawWhiteboard.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
 
 - Fenced `tldraw` blocks become `tldrawBlock` schema nodes before BlockNote sees the Markdown body.
 - Each `tldrawBlock` stores a stable `boardId` plus the tldraw document snapshot JSON. Session state such as camera, selected tool, and current selection is not persisted into the note.
 - The rich editor renders the block with the `tldraw` package and saves debounced document snapshot changes back into the block props, so normal Tolaria autosave writes the board into the `.md` file.
+- Mermaid and tldraw both register small codecs with the shared durable fenced-block pipeline; scanner, token, block injection, and mixed serialization mechanics live in one owner.
 - The `/whiteboard` slash command inserts an empty tldraw block using the same Markdown-durable storage path. Preview images are intentionally omitted; thumbnails can be added later as derived cache artifacts.
 
 ### Formatting Surface Policy
@@ -585,16 +586,15 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 ```mermaid
 flowchart LR
     A["📄 Raw markdown\n(from disk)"] --> B["splitFrontmatter()\n→ yaml + body"]
-    B --> C["preProcessTldrawMarkdown(body)\ntldraw fence → token"]
-    C --> D["preProcessMermaidMarkdown(body)\nmermaid fence → token"]
-    D --> E["preProcessWikilinks(body)\n[[target]] → ‹token›"]
-    E --> F["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
-    F --> G["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
-    G --> H["injectWikilinks + injectMathInBlocks + injectMermaidInBlocks + injectTldrawInBlocks\n tokens → schema nodes"]
-    H --> I["editor.replaceBlocks()\n→ rendered editor"]
+    B --> C["preProcessDurableEditorMarkdown(body)\nmermaid/tldraw fences → tokens"]
+    C --> D["preProcessWikilinks(body)\n[[target]] → ‹token›"]
+    D --> E["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
+    E --> F["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
+    F --> G["injectWikilinks + injectMathInBlocks + injectDurableEditorMarkdownBlocks\n tokens → schema nodes"]
+    G --> H["editor.replaceBlocks()\n→ rendered editor"]
 
     style A fill:#f8f9fa,stroke:#6c757d,color:#000
-    style I fill:#d4edda,stroke:#28a745,color:#000
+    style H fill:#d4edda,stroke:#28a745,color:#000
 ```
 
 > Wikilink placeholder tokens use `\u2039` and `\u203A`; math, Mermaid, and tldraw placeholder tokens use ASCII sentinels with URI-encoded payloads.
@@ -604,7 +604,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     A["✏️ BlockNote blocks\n(editor state)"] --> B["blocksToMarkdownLossy()"]
-    B --> C["restoreWikilinks + serializeMermaidAwareBlocks()\nschema nodes → Markdown source"]
+    B --> C["restoreWikilinks + serializeDurableEditorBlocks()\nschema nodes → Markdown source"]
     C --> D["prepend frontmatter yaml"]
     D --> E["invoke('save_note_content')\n→ disk write"]
 

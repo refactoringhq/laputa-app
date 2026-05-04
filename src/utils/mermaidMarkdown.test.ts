@@ -3,8 +3,8 @@ import {
   MERMAID_BLOCK_TYPE,
   injectMermaidInBlocks,
   preProcessMermaidMarkdown,
-  serializeMermaidAwareBlocks,
 } from './mermaidMarkdown'
+import { serializeDurableEditorBlocks } from './editorDurableMarkdown'
 import { TLDRAW_BLOCK_TYPE } from './tldrawMarkdown'
 
 describe('mermaid markdown round-trip', () => {
@@ -49,7 +49,7 @@ describe('mermaid markdown round-trip', () => {
       { type: MERMAID_BLOCK_TYPE, props: { source: secondSource, diagram: 'sequenceDiagram\nAlice->>Bob: Hi\n' }, children: [] },
     ]
 
-    expect(serializeMermaidAwareBlocks(editor, blocks)).toBe([
+    expect(serializeDurableEditorBlocks(editor, blocks)).toBe([
       'Intro',
       firstSource,
       'Between',
@@ -129,7 +129,7 @@ describe('mermaid markdown round-trip', () => {
       children: [],
     }]
 
-    expect(serializeMermaidAwareBlocks(editor, blocks)).toBe(
+    expect(serializeDurableEditorBlocks(editor, blocks)).toBe(
       '```mermaid\nflowchart LR\nA --> B\n```',
     )
   })
@@ -148,7 +148,7 @@ describe('mermaid markdown round-trip', () => {
       { type: MERMAID_BLOCK_TYPE, props: { source: '', diagram: 'flowchart LR\nA --> B' }, children: [] },
     ]
 
-    expect(serializeMermaidAwareBlocks(editor, blocks)).toBe([
+    expect(serializeDurableEditorBlocks(editor, blocks)).toBe([
       'Intro',
       '```tldraw id="map" height="640" width="900"\n{ "store": {} }\n```',
       '```mermaid\nflowchart LR\nA --> B\n```',
