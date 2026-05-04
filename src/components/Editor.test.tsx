@@ -538,9 +538,9 @@ describe('Editor', () => {
     expect(screen.getAllByText('Properties').length).toBeGreaterThan(0)
   })
 
-  it('renders the table of contents panel from the editor document', () => {
+  it('renders the table of contents panel from the active note content', async () => {
     mockEditor.document = [
-      { id: 'toc-heading', type: 'heading', content: 'Table Heading', props: { level: 1 }, children: [] },
+      { id: 'toc-heading', type: 'heading', content: [{ type: 'text', text: 'Table Heading' }], props: { level: 2 }, children: [] },
     ]
 
     render(
@@ -549,13 +549,14 @@ describe('Editor', () => {
         tabs={[mockTab]}
         activeTabPath={mockEntry.path}
         inspectorEntry={mockEntry}
+        inspectorContent={`${mockContent}\n\n## Table Heading`}
       />
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Open table of contents' }))
 
     expect(screen.getByTestId('table-of-contents-panel')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Table Heading' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Table Heading' })).toBeInTheDocument()
   })
 
   // Regression: editor content did not appear on first load because BlockNote's

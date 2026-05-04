@@ -17,7 +17,6 @@ interface EditorRightPanelProps {
   inspectorCollapsed: boolean
   inspectorWidth: number
   editor: ReturnType<typeof useCreateBlockNote>
-  tableOfContentsRevision: number
   defaultAiAgent?: AiAgentId
   defaultAiTarget?: AiTarget
   defaultAiAgentReadiness?: AiAgentReadiness
@@ -33,7 +32,6 @@ interface EditorRightPanelProps {
   onToggleInspector: () => void
   onToggleAIChat?: () => void
   onToggleTableOfContents?: () => void
-  onTableOfContentsHeadingSelected?: () => void
   onNavigateWikilink: (target: string) => void
   onViewCommitDiff: (commitHash: string) => Promise<void>
   onUpdateFrontmatter?: (path: string, key: string, value: FrontmatterValue) => Promise<void>
@@ -52,12 +50,12 @@ interface EditorRightPanelProps {
 
 export function EditorRightPanel({
   showAIChat, showTableOfContents, inspectorCollapsed, inspectorWidth,
-  editor, tableOfContentsRevision,
+  editor,
   defaultAiAgent = DEFAULT_AI_AGENT, defaultAiTarget, defaultAiAgentReadiness, defaultAiAgentReady = true,
   onUnsupportedAiPaste,
   inspectorEntry, inspectorContent, entries, gitHistory, vaultPath,
   noteList, noteListFilter,
-  onToggleInspector, onToggleAIChat, onToggleTableOfContents, onTableOfContentsHeadingSelected, onNavigateWikilink, onViewCommitDiff,
+  onToggleInspector, onToggleAIChat, onToggleTableOfContents, onNavigateWikilink, onViewCommitDiff,
   onUpdateFrontmatter, onDeleteProperty, onAddProperty, onCreateMissingType, onCreateAndOpenNote, onInitializeProperties, onToggleRawEditor, onOpenNote,
   onFileCreated, onFileModified, onVaultChanged,
   locale,
@@ -90,6 +88,52 @@ export function EditorRightPanel({
     return () => window.removeEventListener(NEW_AI_CHAT_EVENT, handleRequestedNewChat)
   }, [handleNewChat])
 
+  if (!inspectorCollapsed) {
+    return (
+      <div
+        className="shrink-0 flex flex-col min-h-0"
+        style={{ width: inspectorWidth, height: '100%' }}
+      >
+        <Inspector
+          collapsed={inspectorCollapsed}
+          onToggle={onToggleInspector}
+          entry={inspectorEntry}
+          content={inspectorContent}
+          entries={entries}
+          gitHistory={gitHistory}
+          vaultPath={vaultPath}
+          onNavigate={onNavigateWikilink}
+          onViewCommitDiff={onViewCommitDiff}
+          onUpdateFrontmatter={onUpdateFrontmatter}
+          onDeleteProperty={onDeleteProperty}
+          onAddProperty={onAddProperty}
+          onCreateMissingType={onCreateMissingType}
+          onCreateAndOpenNote={onCreateAndOpenNote}
+          onInitializeProperties={onInitializeProperties}
+          onToggleRawEditor={onToggleRawEditor}
+          locale={locale}
+        />
+      </div>
+    )
+  }
+
+  if (showTableOfContents) {
+    return (
+      <div
+        className="shrink-0 flex flex-col min-h-0"
+        style={{ width: inspectorWidth, minWidth: 240, height: '100%' }}
+      >
+        <TableOfContentsPanel
+          editor={editor}
+          entry={inspectorEntry}
+          locale={locale}
+          onClose={() => onToggleTableOfContents?.()}
+          sourceContent={inspectorContent}
+        />
+      </div>
+    )
+  }
+
   if (showAIChat) {
     return (
       <div
@@ -113,50 +157,5 @@ export function EditorRightPanel({
     )
   }
 
-  if (showTableOfContents) {
-    return (
-      <div
-        className="shrink-0 flex flex-col min-h-0"
-        style={{ width: inspectorWidth, minWidth: 240, height: '100%' }}
-      >
-        <TableOfContentsPanel
-          activeEntry={inspectorEntry}
-          documentRevision={tableOfContentsRevision}
-          editor={editor}
-          locale={locale}
-          onClose={() => onToggleTableOfContents?.()}
-          onHeadingSelected={() => onTableOfContentsHeadingSelected?.()}
-        />
-      </div>
-    )
-  }
-
-  if (inspectorCollapsed) return null
-
-  return (
-    <div
-      className="shrink-0 flex flex-col min-h-0"
-      style={{ width: inspectorWidth, height: '100%' }}
-    >
-      <Inspector
-        collapsed={inspectorCollapsed}
-        onToggle={onToggleInspector}
-        entry={inspectorEntry}
-        content={inspectorContent}
-        entries={entries}
-        gitHistory={gitHistory}
-        vaultPath={vaultPath}
-        onNavigate={onNavigateWikilink}
-        onViewCommitDiff={onViewCommitDiff}
-        onUpdateFrontmatter={onUpdateFrontmatter}
-        onDeleteProperty={onDeleteProperty}
-        onAddProperty={onAddProperty}
-        onCreateMissingType={onCreateMissingType}
-        onCreateAndOpenNote={onCreateAndOpenNote}
-        onInitializeProperties={onInitializeProperties}
-        onToggleRawEditor={onToggleRawEditor}
-        locale={locale}
-      />
-    </div>
-  )
+  return null
 }

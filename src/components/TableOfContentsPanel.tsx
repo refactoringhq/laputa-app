@@ -1,82 +1,252 @@
-import { useCallback, useMemo, useState } from 'react'
-import { CaretDown, CaretRight, ListBullets, X } from '@phosphor-icons/react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { ListBullets, TextHOne, TextHThree, TextHTwo, X } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { useDragRegion } from '../hooks/useDragRegion'
-import { translate, type AppLocale } from '../lib/i18n'
+import { trackEvent } from '../lib/telemetry'
+import type { AppLocale } from '../lib/i18n'
+import { translate } from '../lib/i18n'
 import type { VaultEntry } from '../types'
-import { extractTableOfContents, type TableOfContentsItem } from '../utils/tableOfContents'
+import {
+  buildTableOfContents,
+  resolveTocItemBlockId,
+  type TocItem,
+} from './tableOfContentsModel'
+import { buildTableOfContentsInWorker, TOC_BUILD_DEBOUNCE_MS } from './tableOfContentsWorkerClient'
+import {
+  FOLDER_ROW_CONTENT_INSET,
+  getFolderConnectorLeft,
+  getFolderDepthIndent,
+} from './folder-tree/folderTreeLayout'
 
 interface TableOfContentsEditor {
-  document: unknown
-  focus: () => void
-  setTextCursorPosition: (blockId: string, placement: 'start' | 'end') => void
+  document?: unknown[]
+  focus?: () => void
+  setTextCursorPosition?: (targetBlock: string, placement?: 'start' | 'end') => void
 }
 
 interface TableOfContentsPanelProps {
-  activeEntry: VaultEntry | null
-  documentRevision: number
   editor: TableOfContentsEditor
+  entry: VaultEntry | null
   locale?: AppLocale
   onClose: () => void
-  onHeadingSelected?: (item: TableOfContentsItem) => void
+  sourceContent?: string | null
 }
 
-const EMPTY_COLLAPSED_IDS = new Set<string>()
-
-function headingLabel(item: TableOfContentsItem, locale: AppLocale): string {
-  return item.text || translate(locale, 'tableOfContents.untitledHeading')
+interface TocState {
+  noteKey: string
+  toc: TocItem
 }
 
-function findBlockElement(blockId: string): HTMLElement | null {
-  const candidates = document.querySelectorAll<HTMLElement>('[data-id], [data-block-id]')
-  for (const candidate of candidates) {
-    if (candidate.dataset.id === blockId) return candidate
-    if (candidate.dataset.blockId === blockId) return candidate
-  }
-  return null
+interface DebouncedTocOptions {
+  editor: TableOfContentsEditor
+  noteKey: string
+  sourceContent?: string | null
+  title: string
+  titleOnlyToc: TocItem
 }
 
-function scrollHeadingIntoView(blockId: string) {
-  findBlockElement(blockId)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+function HeadingIcon({ level }: { level: TocItem['level'] }) {
+  const className = 'size-[17px] shrink-0 text-muted-foreground'
+  if (level === 1) return <TextHOne size={17} className={className} />
+  if (level === 2) return <TextHTwo size={17} className={className} />
+  return <TextHThree size={17} className={className} />
 }
 
-function EmptyTableOfContents({ children }: { children: string }) {
+function buildTitleOnlyToc(title: string): TocItem {
+  return { id: 'toc-title', level: 1, title, children: [] }
+}
+
+function noteKeyForEntry(entry: VaultEntry | null, title: string): string {
+  return `${entry?.path ?? ''}:${title}`
+}
+
+function cssAttributeValue(value: string): string {
+  return typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+    ? CSS.escape(value)
+    : value.replace(/["\\]/g, '\\$&')
+}
+
+function scrollBlockIntoView(blockId: string) {
+  requestAnimationFrame(() => {
+    document
+      .querySelector<HTMLElement>(`[data-id="${cssAttributeValue(blockId)}"]`)
+      ?.scrollIntoView?.({ block: 'center' })
+  })
+}
+
+function useDebouncedToc({
+  editor,
+  noteKey,
+  sourceContent,
+  title,
+  titleOnlyToc,
+}: DebouncedTocOptions): TocItem {
+  const [tocState, setTocState] = useState<TocState>(() => ({
+    noteKey,
+    toc: titleOnlyToc,
+  }))
+
+  useEffect(() => {
+    if (sourceContent === undefined) return undefined
+
+    let cancelled = false
+    const timeout = window.setTimeout(() => {
+      void buildTableOfContentsInWorker(title, sourceContent ?? '')
+        .then((nextToc) => {
+          if (!cancelled) setTocState({ noteKey, toc: nextToc })
+        })
+        .catch(() => {
+          if (!cancelled) setTocState({ noteKey, toc: titleOnlyToc })
+        })
+    }, TOC_BUILD_DEBOUNCE_MS)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeout)
+    }
+  }, [noteKey, sourceContent, title, titleOnlyToc])
+
+  useEffect(() => {
+    if (sourceContent !== undefined) return undefined
+
+    const timeout = window.setTimeout(() => {
+      setTocState({ noteKey, toc: buildTableOfContents(title, editor.document ?? []) })
+    }, TOC_BUILD_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timeout)
+  }, [editor.document, noteKey, sourceContent, title])
+
+  return tocState.noteKey === noteKey ? tocState.toc : titleOnlyToc
+}
+
+function useTocNavigation(editor: TableOfContentsEditor, title: string) {
+  return useCallback((item: TocItem) => {
+    const blockId = resolveTocItemBlockId(title, item, editor.document ?? [])
+    if (!blockId) return
+
+    try {
+      editor.setTextCursorPosition?.(blockId, 'start')
+    } catch {
+      // BlockNote can transiently reject selection while a note swap settles.
+    }
+    editor.focus?.()
+    scrollBlockIntoView(blockId)
+    trackEvent('table_of_contents_heading_selected')
+  }, [editor, title])
+}
+
+function TocRow({
+  depth,
+  item,
+  onNavigate,
+}: {
+  depth: number
+  item: TocItem
+  onNavigate: (item: TocItem) => void
+}) {
+  const hasChildren = item.children.length > 0
+  const depthIndent = getFolderDepthIndent(depth)
+  const contentInset = FOLDER_ROW_CONTENT_INSET
+
   return (
-    <div className="flex flex-1 items-center justify-center px-6 text-center text-[13px] text-muted-foreground">
-      {children}
+    <div
+      className="group relative flex items-center gap-1 rounded text-foreground transition-colors hover:bg-accent"
+      style={{ paddingLeft: depthIndent, borderRadius: 4 }}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        className="h-auto flex-1 justify-start gap-2 rounded text-left text-[13px] font-medium text-foreground hover:bg-transparent hover:text-foreground"
+        style={{
+          paddingTop: 6,
+          paddingBottom: 6,
+          paddingLeft: contentInset,
+          paddingRight: 16,
+        }}
+        title={item.title}
+        aria-expanded={hasChildren ? true : undefined}
+        onClick={() => onNavigate(item)}
+      >
+        <HeadingIcon level={item.level} />
+        <span className="truncate">{item.title}</span>
+      </Button>
     </div>
   )
 }
 
-function TableOfContentsHeader({
-  locale,
-  onClose,
+function TocChildren({
+  depth,
+  item,
+  onNavigate,
 }: {
-  locale: AppLocale
-  onClose: () => void
+  depth: number
+  item: TocItem
+  onNavigate: (item: TocItem) => void
 }) {
-  const { onMouseDown } = useDragRegion()
+  if (item.children.length === 0) return null
 
   return (
+    <div className="relative" data-testid={`toc-children:${item.id}`}>
+      <div
+        className="absolute top-0 bottom-0 bg-border"
+        data-testid={`toc-connector:${item.id}`}
+        style={{ left: getFolderConnectorLeft(depth), width: 1 }}
+      />
+      {item.children.map((child) => (
+        <TocItemNode
+          key={child.id}
+          depth={depth + 1}
+          item={child}
+          onNavigate={onNavigate}
+        />
+      ))}
+    </div>
+  )
+}
+
+function TocItemNode({
+  depth,
+  item,
+  onNavigate,
+}: {
+  depth: number
+  item: TocItem
+  onNavigate: (item: TocItem) => void
+}) {
+  return (
+    <>
+      <TocRow
+        depth={depth}
+        item={item}
+        onNavigate={onNavigate}
+      />
+      <TocChildren
+        depth={depth}
+        item={item}
+        onNavigate={onNavigate}
+      />
+    </>
+  )
+}
+
+function TableOfContentsHeader({ locale = 'en', onClose }: Pick<TableOfContentsPanelProps, 'locale' | 'onClose'>) {
+  return (
     <div
-      className="flex shrink-0 items-center gap-2 border-b border-border px-3"
-      style={{ height: 52 }}
-      onMouseDown={onMouseDown}
+      className="flex shrink-0 items-center border-b border-border"
+      style={{ height: 52, padding: '6px 12px', gap: 8, cursor: 'default' }}
     >
       <ListBullets size={16} className="shrink-0 text-muted-foreground" />
-      <h2 className="m-0 truncate text-[13px] font-semibold text-muted-foreground">
+      <span className="text-muted-foreground" style={{ fontSize: 13, fontWeight: 600 }}>
         {translate(locale, 'tableOfContents.title')}
-      </h2>
+      </span>
       <span className="flex-1" />
       <Button
         type="button"
         variant="ghost"
         size="icon-xs"
-        className="text-muted-foreground hover:text-foreground"
-        aria-label={translate(locale, 'tableOfContents.close')}
-        onMouseDown={(event) => event.stopPropagation()}
+        className="h-6 w-6 shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
         onClick={onClose}
+        aria-label={translate(locale, 'tableOfContents.close')}
+        title={translate(locale, 'tableOfContents.close')}
       >
         <X size={16} />
       </Button>
@@ -84,219 +254,35 @@ function TableOfContentsHeader({
   )
 }
 
-function ToggleChildrenButton({
-  collapsed,
-  item,
-  locale,
-  onToggle,
-}: {
-  collapsed: boolean
-  item: TableOfContentsItem
-  locale: AppLocale
-  onToggle: (itemId: string) => void
-}) {
-  const label = headingLabel(item, locale)
-
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      className="size-6 rounded-md text-muted-foreground hover:text-foreground"
-      aria-label={translate(locale, collapsed ? 'tableOfContents.expandHeading' : 'tableOfContents.collapseHeading', { heading: label })}
-      onClick={() => onToggle(item.id)}
-    >
-      {collapsed ? <CaretRight size={14} /> : <CaretDown size={14} />}
-    </Button>
-  )
-}
-
-function TogglePlaceholder() {
-  return <span className="size-6 shrink-0" aria-hidden="true" />
-}
-
-function TableOfContentsNode({
-  collapsedIds,
-  depth,
-  item,
-  locale,
-  onSelect,
-  onToggle,
-}: {
-  collapsedIds: Set<string>
-  depth: number
-  item: TableOfContentsItem
-  locale: AppLocale
-  onSelect: (item: TableOfContentsItem) => void
-  onToggle: (itemId: string) => void
-}) {
-  const collapsed = collapsedIds.has(item.id)
-  const hasChildren = item.children.length > 0
-  const label = headingLabel(item, locale)
-
-  return (
-    <li>
-      <div className="flex min-w-0 items-center gap-1" style={{ paddingLeft: depth * 12 }}>
-        {hasChildren
-          ? <ToggleChildrenButton collapsed={collapsed} item={item} locale={locale} onToggle={onToggle} />
-          : <TogglePlaceholder />}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={cn(
-            'h-7 min-w-0 flex-1 justify-start rounded-md px-2 text-left text-[13px] font-normal text-muted-foreground hover:text-foreground',
-            item.level === 1 && 'font-medium text-foreground',
-          )}
-          onClick={() => onSelect(item)}
-        >
-          <span className="truncate">{label}</span>
-        </Button>
-      </div>
-      {hasChildren && !collapsed && (
-        <ul className="m-0 list-none p-0">
-          {item.children.map((child) => (
-            <TableOfContentsNode
-              key={child.id}
-              collapsedIds={collapsedIds}
-              depth={depth + 1}
-              item={child}
-              locale={locale}
-              onSelect={onSelect}
-              onToggle={onToggle}
-            />
-          ))}
-        </ul>
-      )}
-    </li>
-  )
-}
-
-function TableOfContentsTree({
-  collapsedIds,
-  items,
-  locale,
-  onSelect,
-  onToggle,
-}: {
-  collapsedIds: Set<string>
-  items: TableOfContentsItem[]
-  locale: AppLocale
-  onSelect: (item: TableOfContentsItem) => void
-  onToggle: (itemId: string) => void
-}) {
-  return (
-    <nav aria-label={translate(locale, 'tableOfContents.navLabel')} className="flex-1 overflow-y-auto p-2">
-      <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-        {items.map((item) => (
-          <TableOfContentsNode
-            key={item.id}
-            collapsedIds={collapsedIds}
-            depth={0}
-            item={item}
-            locale={locale}
-            onSelect={onSelect}
-            onToggle={onToggle}
-          />
-        ))}
-      </ul>
-    </nav>
-  )
-}
-
-function useCollapsedHeadingState(activePath: string | null) {
-  const [collapseState, setCollapseState] = useState<{ path: string | null; ids: Set<string> }>(() => ({
-    path: null,
-    ids: new Set(),
-  }))
-  const collapsedIds = collapseState.path === activePath ? collapseState.ids : EMPTY_COLLAPSED_IDS
-
-  const handleToggle = useCallback((itemId: string) => {
-    setCollapseState((current) => {
-      const currentIds = current.path === activePath ? current.ids : EMPTY_COLLAPSED_IDS
-      const next = new Set(currentIds)
-      if (next.has(itemId)) {
-        next.delete(itemId)
-      } else {
-        next.add(itemId)
-      }
-      return { path: activePath, ids: next }
-    })
-  }, [activePath])
-
-  return { collapsedIds, handleToggle }
-}
-
-function TableOfContentsBody({
-  activeEntry,
-  collapsedIds,
-  items,
-  locale,
-  onSelect,
-  onToggle,
-}: {
-  activeEntry: VaultEntry | null
-  collapsedIds: Set<string>
-  items: TableOfContentsItem[]
-  locale: AppLocale
-  onSelect: (item: TableOfContentsItem) => void
-  onToggle: (itemId: string) => void
-}) {
-  if (!activeEntry) {
-    return <EmptyTableOfContents>{translate(locale, 'tableOfContents.emptyNoNote')}</EmptyTableOfContents>
-  }
-
-  if (items.length === 0) {
-    return <EmptyTableOfContents>{translate(locale, 'tableOfContents.empty')}</EmptyTableOfContents>
-  }
-
-  return (
-    <TableOfContentsTree
-      collapsedIds={collapsedIds}
-      items={items}
-      locale={locale}
-      onSelect={onSelect}
-      onToggle={onToggle}
-    />
-  )
-}
-
-export function TableOfContentsPanel({
-  activeEntry,
-  documentRevision,
+export const TableOfContentsPanel = memo(function TableOfContentsPanel({
   editor,
+  entry,
   locale = 'en',
   onClose,
-  onHeadingSelected,
+  sourceContent,
 }: TableOfContentsPanelProps) {
-  const items = useMemo(
-    () => extractTableOfContents(editor.document),
-    [activeEntry?.path, documentRevision, editor],
-  )
-  const activePath = activeEntry?.path ?? null
-  const { collapsedIds, handleToggle } = useCollapsedHeadingState(activePath)
-
-  const handleSelect = useCallback((item: TableOfContentsItem) => {
-    editor.focus()
-    editor.setTextCursorPosition(item.id, 'start')
-    scrollHeadingIntoView(item.id)
-    onHeadingSelected?.(item)
-  }, [editor, onHeadingSelected])
+  const title = entry?.title ?? translate(locale, 'tableOfContents.untitledHeading')
+  const noteKey = noteKeyForEntry(entry, title)
+  const titleOnlyToc = useMemo(() => buildTitleOnlyToc(title), [title])
+  const toc = useDebouncedToc({
+    editor,
+    noteKey,
+    sourceContent,
+    title,
+    titleOnlyToc,
+  })
+  const navigateToItem = useTocNavigation(editor, title)
 
   return (
-    <aside
-      className="flex flex-1 flex-col overflow-hidden border-l border-border bg-background text-foreground"
-      data-testid="table-of-contents-panel"
-    >
+    <aside className="flex flex-1 flex-col overflow-hidden border-l border-border bg-background text-foreground">
       <TableOfContentsHeader locale={locale} onClose={onClose} />
-      <TableOfContentsBody
-        activeEntry={activeEntry}
-        collapsedIds={collapsedIds}
-        items={items}
-        locale={locale}
-        onSelect={handleSelect}
-        onToggle={handleToggle}
-      />
+      <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3" data-testid="table-of-contents-panel">
+        <TocItemNode
+          depth={0}
+          item={toc}
+          onNavigate={navigateToItem}
+        />
+      </div>
     </aside>
   )
-}
+})
