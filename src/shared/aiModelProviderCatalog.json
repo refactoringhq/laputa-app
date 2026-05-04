@@ -1,0 +1,79 @@
+[
+  {
+    "kind": "ollama",
+    "name": "Ollama",
+    "label_key": "settings.aiProviders.kind.ollama",
+    "base_url": "http://localhost:11434/v1",
+    "runtime_base_url": "http://localhost:11434/v1",
+    "default_model_id": "llama3.2",
+    "api_key_storage": "none",
+    "api_key_env_var": null,
+    "local": true
+  },
+  {
+    "kind": "lm_studio",
+    "name": "LM Studio",
+    "label_key": "settings.aiProviders.kind.lmStudio",
+    "base_url": "http://127.0.0.1:1234/v1",
+    "runtime_base_url": "http://127.0.0.1:1234/v1",
+    "default_model_id": "llama3.2",
+    "api_key_storage": "none",
+    "api_key_env_var": null,
+    "local": true
+  },
+  {
+    "kind": "open_ai",
+    "name": "OpenAI",
+    "label_key": "settings.aiProviders.kind.openAi",
+    "base_url": "https://api.openai.com/v1",
+    "runtime_base_url": "https://api.openai.com/v1",
+    "default_model_id": "gpt-4.1-mini",
+    "api_key_storage": "local_file",
+    "api_key_env_var": "OPENAI_API_KEY",
+    "local": false
+  },
+  {
+    "kind": "anthropic",
+    "name": "Anthropic",
+    "label_key": "settings.aiProviders.kind.anthropic",
+    "base_url": "https://api.anthropic.com/v1",
+    "runtime_base_url": "https://api.anthropic.com/v1",
+    "default_model_id": "claude-3-5-sonnet-latest",
+    "api_key_storage": "local_file",
+    "api_key_env_var": "ANTHROPIC_API_KEY",
+    "local": false
+  },
+  {
+    "kind": "gemini",
+    "name": "Gemini",
+    "label_key": "settings.aiProviders.kind.gemini",
+    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "runtime_base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "default_model_id": "gemini-2.5-flash",
+    "api_key_storage": "local_file",
+    "api_key_env_var": "GEMINI_API_KEY",
+    "local": false
+  },
+  {
+    "kind": "open_router",
+    "name": "OpenRouter",
+    "label_key": "settings.aiProviders.kind.openRouter",
+    "base_url": "https://openrouter.ai/api/v1",
+    "runtime_base_url": "https://openrouter.ai/api/v1",
+    "default_model_id": "openai/gpt-4.1-mini",
+    "api_key_storage": "local_file",
+    "api_key_env_var": "OPENROUTER_API_KEY",
+    "local": false
+  },
+  {
+    "kind": "open_ai_compatible",
+    "name": "Custom provider",
+    "label_key": "settings.aiProviders.kind.compatible",
+    "base_url": "https://api.example.com/v1",
+    "runtime_base_url": null,
+    "default_model_id": "gpt-4.1-mini",
+    "api_key_storage": "local_file",
+    "api_key_env_var": "OPENAI_API_KEY",
+    "local": false
+  }
+]

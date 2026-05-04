@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import {
   DEFAULT_MODEL_CAPABILITIES,
+  aiModelProviderCatalog,
+  aiModelProviderCatalogEntry,
   configuredModelTargets,
   isLocalAiProvider,
   normalizeAiModelProviders,
+  type AiModelApiKeyStorage,
   type AiModelProvider,
   type AiModelProviderKind,
 } from '../lib/aiTargets'
@@ -21,7 +24,6 @@ import {
 
 type Translate = ReturnType<typeof createTranslator>
 type ProviderMode = 'local' | 'api'
-type ApiKeyStorage = 'none' | 'local_file' | 'env'
 type TestState = 'idle' | 'testing' | 'success'
 
 interface AiProviderSettingsProps {
@@ -36,67 +38,52 @@ interface ProviderDraft {
   name: string
   baseUrl: string
   modelId: string
-  apiKeyStorage: ApiKeyStorage
+  apiKeyStorage: AiModelApiKeyStorage
   apiKey: string
   apiKeyEnvVar: string
 }
 
-const LOCAL_PROVIDER_KINDS: AiModelProviderKind[] = ['ollama', 'lm_studio']
-const API_PROVIDER_KINDS: AiModelProviderKind[] = ['open_ai', 'anthropic', 'gemini', 'open_router', 'open_ai_compatible']
-
-const PROVIDER_PRESETS: Record<AiModelProviderKind, { name: string; baseUrl: string }> = {
-  ollama: { name: 'Ollama', baseUrl: 'http://localhost:11434/v1' },
-  lm_studio: { name: 'LM Studio', baseUrl: 'http://127.0.0.1:1234/v1' },
-  open_ai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
-  anthropic: { name: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1' },
-  gemini: { name: 'Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai' },
-  open_router: { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' },
-  open_ai_compatible: { name: 'Custom provider', baseUrl: 'https://api.example.com/v1' },
+function providerKindsForMode(mode: ProviderMode): AiModelProviderKind[] {
+  return aiModelProviderCatalog()
+    .filter((entry) => entry.local === (mode === 'local'))
+    .map((entry) => entry.kind)
 }
 
 function initialDraft(mode: ProviderMode): ProviderDraft {
-  const kind = mode === 'local' ? 'ollama' : 'open_ai'
+  const [kind] = providerKindsForMode(mode)
+  if (!kind) throw new Error(`No AI model providers are configured for ${mode} mode`)
+  return draftFromProviderKind(kind)
+}
+
+function draftFromProviderKind(kind: AiModelProviderKind): ProviderDraft {
+  const defaults = aiModelProviderCatalogEntry(kind)
   return {
     kind,
-    name: PROVIDER_PRESETS[kind].name,
-    baseUrl: PROVIDER_PRESETS[kind].baseUrl,
+    name: defaults.name,
+    baseUrl: defaults.base_url,
     modelId: '',
-    apiKeyStorage: mode === 'local' ? 'none' : 'local_file',
+    apiKeyStorage: defaults.api_key_storage,
     apiKey: '',
-    apiKeyEnvVar: '',
+    apiKeyEnvVar: defaults.api_key_env_var ?? '',
   }
 }
 
 function providerKindOptions(mode: ProviderMode, t: Translate): Array<{ value: AiModelProviderKind; label: string }> {
-  const kinds = mode === 'local' ? LOCAL_PROVIDER_KINDS : API_PROVIDER_KINDS
-  return kinds.map((kind) => ({ value: kind, label: providerKindLabel(kind, t) }))
+  return providerKindsForMode(mode).map((kind) => {
+    const defaults = aiModelProviderCatalogEntry(kind)
+    return { value: kind, label: t(defaults.label_key) }
+  })
 }
 
-function providerKindLabel(kind: AiModelProviderKind, t: Translate): string {
+function providerPresetPatch(kind: AiModelProviderKind): Pick<ProviderDraft, 'kind' | 'name' | 'baseUrl' | 'apiKeyStorage' | 'apiKeyEnvVar'> {
+  const defaults = draftFromProviderKind(kind)
   return {
-    ollama: t('settings.aiProviders.kind.ollama'),
-    lm_studio: t('settings.aiProviders.kind.lmStudio'),
-    open_ai: t('settings.aiProviders.kind.openAi'),
-    anthropic: t('settings.aiProviders.kind.anthropic'),
-    gemini: t('settings.aiProviders.kind.gemini'),
-    open_router: t('settings.aiProviders.kind.openRouter'),
-    open_ai_compatible: t('settings.aiProviders.kind.compatible'),
-  }[kind]
-}
-
-function modelPlaceholder(kind: AiModelProviderKind, mode: ProviderMode): string {
-  if (mode === 'local') return 'llama3.2'
-  if (kind === 'anthropic') return 'claude-3-5-sonnet-latest'
-  if (kind === 'gemini') return 'gemini-2.5-flash'
-  if (kind === 'open_router') return 'openai/gpt-4.1-mini'
-  return 'gpt-4.1-mini'
-}
-
-function apiKeyEnvPlaceholder(kind: AiModelProviderKind): string {
-  if (kind === 'anthropic') return 'ANTHROPIC_API_KEY'
-  if (kind === 'gemini') return 'GEMINI_API_KEY'
-  if (kind === 'open_router') return 'OPENROUTER_API_KEY'
-  return 'OPENAI_API_KEY'
+    kind,
+    name: defaults.name,
+    baseUrl: defaults.baseUrl,
+    apiKeyStorage: defaults.apiKeyStorage,
+    apiKeyEnvVar: defaults.apiKeyEnvVar,
+  }
 }
 
 function buildProvider(draft: ProviderDraft, providerId: string): AiModelProvider {
@@ -210,7 +197,7 @@ function ApiKeyStorageFields({
     <>
       <label className="space-y-1.5 text-xs font-medium text-foreground">
         <span>{t('settings.aiProviders.keyStorage')}</span>
-        <Select value={draft.apiKeyStorage} onValueChange={(next) => updateDraft({ apiKeyStorage: next as ApiKeyStorage })}>
+        <Select value={draft.apiKeyStorage} onValueChange={(next) => updateDraft({ apiKeyStorage: next as AiModelApiKeyStorage })}>
           <SelectTrigger className={`h-9 ${editableInputClassName()}`}>
             <SelectValue />
           </SelectTrigger>
@@ -235,7 +222,7 @@ function ApiKeyStorageFields({
           label={t('settings.aiProviders.keyEnv')}
           value={draft.apiKeyEnvVar}
           onChange={(apiKeyEnvVar) => updateDraft({ apiKeyEnvVar })}
-          placeholder={apiKeyEnvPlaceholder(draft.kind)}
+          placeholder={aiModelProviderCatalogEntry(draft.kind).api_key_env_var ?? ''}
         />
       ) : null}
     </>
@@ -290,7 +277,7 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
     resetTest()
     updateDraft(patch)
   }
-  const updateKind = (kind: AiModelProviderKind) => updateForm({ kind, ...PROVIDER_PRESETS[kind] })
+  const updateKind = (kind: AiModelProviderKind) => updateForm(providerPresetPatch(kind))
   const canSave = draft.name.trim() && draft.modelId.trim() && (draft.apiKeyStorage !== 'local_file' || draft.apiKey.trim())
   const apiKeyOverride = draft.apiKeyStorage === 'local_file' ? draft.apiKey : null
 
@@ -302,7 +289,7 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
         await saveAiModelProviderApiKey(providerId, draft.apiKey)
       }
       onChange(normalizeAiModelProviders([...providers, buildProvider(draft, providerId)]))
-      setDraft((current) => ({ ...initialDraft(mode), kind: current.kind, name: current.name, baseUrl: current.baseUrl }))
+      setDraft((current) => ({ ...draftFromProviderKind(current.kind), name: current.name, baseUrl: current.baseUrl }))
       setTestState('idle')
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error))
@@ -335,7 +322,7 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
         <ProviderKindSelect mode={mode} t={t} value={draft.kind} onChange={updateKind} />
         <LabeledInput label={t('settings.aiProviders.name')} value={draft.name} onChange={(name) => updateForm({ name })} />
         <LabeledInput label={t('settings.aiProviders.baseUrl')} value={draft.baseUrl} onChange={(baseUrl) => updateForm({ baseUrl })} />
-        <LabeledInput label={t('settings.aiProviders.model')} value={draft.modelId} onChange={(modelId) => updateForm({ modelId })} placeholder={modelPlaceholder(draft.kind, mode)} />
+        <LabeledInput label={t('settings.aiProviders.model')} value={draft.modelId} onChange={(modelId) => updateForm({ modelId })} placeholder={aiModelProviderCatalogEntry(draft.kind).default_model_id} />
         {mode === 'api' ? <ApiKeyStorageFields t={t} draft={draft} updateDraft={updateForm} /> : null}
       </div>
       <div className="text-xs leading-5 text-muted-foreground">
