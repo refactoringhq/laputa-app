@@ -88,6 +88,7 @@ import { initializeNoteProperties } from './utils/initializeNoteProperties'
 import { filterEntries, filterInboxEntries, type NoteListFilter } from './utils/noteListHelpers'
 import { resolveAllNotesFileVisibility } from './utils/allNotesFileVisibility'
 import { openNoteInNewWindow } from './utils/openNoteWindow'
+import { isWindows } from './utils/platform'
 import { refreshPulledVaultState } from './utils/pulledVaultRefresh'
 import { isNoteWindow, getNoteWindowParams, getNoteWindowPathCandidates, type NoteWindowParams } from './utils/windowMode'
 import { GitSetupDialog } from './components/GitRequiredModal'
@@ -1237,7 +1238,7 @@ function App() {
       inspectorWidth: layout.inspectorWidth,
     })
 
-    void applyMainWindowSizeConstraints(minWidth).catch((err) => console.warn('[window] Size constraints failed:', err))
+    void applyMainWindowSizeConstraints(minWidth, { growToFit: !isWindows() }).catch((err) => console.warn('[window] Size constraints failed:', err))
   }, [layout.inspectorCollapsed, layout.inspectorWidth, layout.noteListWidth, layout.sidebarWidth, noteWindowParams])
 
   const handleSetViewMode = useCallback((mode: ViewMode) => {

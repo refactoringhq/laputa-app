@@ -1381,4 +1381,34 @@ describe('App', () => {
       })
     })
   })
+
+  it('does not ask Windows to grow the native window when toggling Properties', async () => {
+    const { invoke } = await import('@tauri-apps/api/core') as { invoke: ReturnType<typeof vi.fn> }
+    const originalUserAgent = navigator.userAgent
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    })
+
+    try {
+      render(<App />)
+      await waitFor(() => {
+        expect(screen.getByText('All Notes')).toBeInTheDocument()
+      })
+
+      invoke.mockClear()
+
+      fireEvent.keyDown(window, { key: 'I', metaKey: true, shiftKey: true })
+      await waitFor(() => {
+        expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', expect.objectContaining({
+          growToFit: false,
+        }))
+      })
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        configurable: true,
+        value: originalUserAgent,
+      })
+    }
+  })
 })

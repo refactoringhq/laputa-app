@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { isWindows } from '../utils/platform'
 
 const MAIN_WINDOW_MIN_HEIGHT = 400
 const EDITOR_ONLY_MAIN_WINDOW_MIN_WIDTH = 480
@@ -45,11 +46,12 @@ type MainWindowSizeConstraintsOptions = MainWindowPaneVisibility & {
 
 export async function applyMainWindowSizeConstraints(
   minWidth: number,
+  options: { growToFit?: boolean } = {},
 ): Promise<void> {
   await invoke('update_current_window_min_size', {
     minWidth,
     minHeight: MAIN_WINDOW_MIN_HEIGHT,
-    growToFit: true,
+    growToFit: options.growToFit ?? true,
   })
 }
 
@@ -78,7 +80,7 @@ export function useMainWindowSizeConstraints({
 
     void (async () => {
       if (cancelled) return
-      await applyMainWindowSizeConstraints(minWidth)
+      await applyMainWindowSizeConstraints(minWidth, { growToFit: !isWindows() })
     })().catch((err) => console.warn('[window] Size constraints failed:', err))
 
     return () => {
