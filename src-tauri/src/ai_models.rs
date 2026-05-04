@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+use std::sync::OnceLock;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -70,9 +71,33 @@ pub struct AiModelProviderTestRequest {
     pub api_key_override: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct AiModelProviderCatalogEntry {
+    kind: AiModelProviderKind,
+    runtime_base_url: Option<String>,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 struct AiProviderSecrets {
     provider_api_keys: BTreeMap<String, String>,
+}
+
+static AI_MODEL_PROVIDER_CATALOG: OnceLock<Vec<AiModelProviderCatalogEntry>> = OnceLock::new();
+
+fn provider_catalog() -> &'static [AiModelProviderCatalogEntry] {
+    AI_MODEL_PROVIDER_CATALOG
+        .get_or_init(|| {
+            serde_json::from_str(include_str!("../../src/shared/aiModelProviderCatalog.json"))
+                .expect("bundled AI model provider catalog must be valid JSON")
+        })
+        .as_slice()
+}
+
+fn provider_default_base_url(kind: &AiModelProviderKind) -> Option<&'static str> {
+    provider_catalog()
+        .iter()
+        .find(|entry| entry.kind == *kind)
+        .and_then(|entry| entry.runtime_base_url.as_deref())
 }
 
 pub fn normalize_ai_model_providers(
@@ -211,15 +236,7 @@ fn selected_max_tokens(request: &AiModelStreamRequest) -> u32 {
 }
 
 fn normalized_base_url(request: &AiModelStreamRequest) -> Result<String, String> {
-    let fallback = match request.provider.kind {
-        AiModelProviderKind::OpenAi => "https://api.openai.com/v1",
-        AiModelProviderKind::Anthropic => "https://api.anthropic.com/v1",
-        AiModelProviderKind::OpenRouter => "https://openrouter.ai/api/v1",
-        AiModelProviderKind::Gemini => "https://generativelanguage.googleapis.com/v1beta/openai",
-        AiModelProviderKind::Ollama => "http://localhost:11434/v1",
-        AiModelProviderKind::LmStudio => "http://127.0.0.1:1234/v1",
-        AiModelProviderKind::OpenAiCompatible => "",
-    };
+    let fallback = provider_default_base_url(&request.provider.kind).unwrap_or("");
     let base = request
         .provider
         .base_url
@@ -586,6 +603,22 @@ mod tests {
         );
         assert_eq!(selected_max_tokens(&request), 8192);
         assert_eq!(headers, vec![("X-Demo", "demo")]);
+    }
+
+    #[test]
+    fn shared_provider_catalog_supplies_runtime_base_urls() {
+        assert_eq!(
+            provider_default_base_url(&AiModelProviderKind::OpenAi),
+            Some("https://api.openai.com/v1")
+        );
+        assert_eq!(
+            provider_default_base_url(&AiModelProviderKind::Ollama),
+            Some("http://localhost:11434/v1")
+        );
+        assert_eq!(
+            provider_default_base_url(&AiModelProviderKind::OpenAiCompatible),
+            None
+        );
     }
 
     #[test]
