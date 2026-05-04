@@ -40,7 +40,7 @@
         "style-src-elem": "'self' 'nonce-tolaria-runtime-style' https://fonts.googleapis.com",
         "style-src-attr": "'unsafe-inline'",
         "font-src": "'self' data: https://fonts.gstatic.com",
-        "media-src": "'self' data: blob: https:",
+        "media-src": "'self' asset: http://asset.localhost data: blob: https:",
         "object-src": "'self' asset: http://asset.localhost"
       },
       "assetProtocol": {

@@ -54,6 +54,18 @@ const pdfEntry: VaultEntry = {
   filename: 'report.pdf',
   title: 'report.pdf',
 }
+const audioEntry: VaultEntry = {
+  ...imageEntry,
+  path: '/vault/Attachments/meeting.mp3',
+  filename: 'meeting.mp3',
+  title: 'meeting.mp3',
+}
+const videoEntry: VaultEntry = {
+  ...imageEntry,
+  path: '/vault/Attachments/demo.mp4',
+  filename: 'demo.mp4',
+  title: 'demo.mp4',
+}
 
 describe('FilePreview', () => {
   beforeEach(() => {
@@ -110,6 +122,22 @@ describe('FilePreview', () => {
     expect(screen.getByTestId('pdf-file-preview')).toHaveAttribute('data', 'asset:///vault/Attachments/report.pdf')
   })
 
+  it('renders supported audio files through the media asset path', () => {
+    render(<FilePreview entry={audioEntry} />)
+
+    expect(screen.getByTestId('audio-file-preview')).toHaveAttribute('src', 'asset:///vault/Attachments/meeting.mp3')
+    expect(screen.getByText('MP3 file')).toBeInTheDocument()
+    expect(trackEventMock).toHaveBeenCalledWith('file_preview_opened', { preview_kind: 'audio' })
+  })
+
+  it('renders supported video files through the media asset path', () => {
+    render(<FilePreview entry={videoEntry} />)
+
+    expect(screen.getByTestId('video-file-preview')).toHaveAttribute('src', 'asset:///vault/Attachments/demo.mp4')
+    expect(screen.getByTestId('video-file-preview')).toHaveAttribute('title', 'demo.mp4')
+    expect(trackEventMock).toHaveBeenCalledWith('file_preview_opened', { preview_kind: 'video' })
+  })
+
   it('provides a graceful fallback when a PDF preview cannot render', () => {
     render(<FilePreview entry={pdfEntry} />)
 
@@ -123,6 +151,18 @@ describe('FilePreview', () => {
     fireEvent.error(screen.getByTestId('image-file-preview'))
 
     expect(trackEventMock).toHaveBeenCalledWith('file_preview_failed', { preview_kind: 'image' })
+    expect(trackEventMock).not.toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ path: expect.any(String) }),
+    )
+  })
+
+  it('tracks media preview failures without leaking the file path', () => {
+    render(<FilePreview entry={audioEntry} />)
+
+    fireEvent.error(screen.getByTestId('audio-file-preview'))
+
+    expect(trackEventMock).toHaveBeenCalledWith('file_preview_failed', { preview_kind: 'audio' })
     expect(trackEventMock).not.toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ path: expect.any(String) }),

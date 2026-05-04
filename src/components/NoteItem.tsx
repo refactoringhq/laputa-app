@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import {
   Wrench, Flask, Target, ArrowsClockwise,
   Users, CalendarBlank, Tag, FileText, StackSimple,
-  File, FileDashed, FilePdf, ImageSquare,
+  File, FileDashed, FilePdf, ImageSquare, SpeakerHigh, Video,
 } from '@phosphor-icons/react'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { resolveIcon } from '../utils/iconRegistry'
@@ -205,6 +205,8 @@ function resolveNoteTypeIcon(entry: VaultEntry, customIcon?: string | null): Com
   const previewKind = filePreviewKind(entry)
   if (previewKind === 'image') return ImageSquare
   if (previewKind === 'pdf') return FilePdf
+  if (previewKind === 'audio') return SpeakerHigh
+  if (previewKind === 'video') return Video
   if (entry.fileKind && entry.fileKind !== 'markdown') return getFileKindIcon(entry.fileKind)
   return getTypeIcon(entry.isA, customIcon)
 }
@@ -380,6 +382,8 @@ function resolveNoteItemTitle({
 }) {
   if (previewKind === 'image') return 'Open image preview'
   if (previewKind === 'pdf') return 'Open PDF preview'
+  if (previewKind === 'audio') return 'Open audio preview'
+  if (previewKind === 'video') return 'Open video preview'
   return isUnavailableBinary ? 'Cannot open this file type' : undefined
 }
 
