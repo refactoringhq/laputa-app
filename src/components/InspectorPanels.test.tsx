@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, act, within } from '@testing-library/react'
 import { DynamicRelationshipsPanel, BacklinksPanel, ReferencedByPanel, GitHistoryPanel, InstancesPanel } from './InspectorPanels'
 import { TooltipProvider } from './ui/tooltip'
 import type { ReferencedByItem } from './InspectorPanels'
@@ -123,6 +123,35 @@ describe('DynamicRelationshipsPanel', () => {
     )
     expect(screen.getByText('Belongs to')).toBeInTheDocument()
     expect(screen.getByText('Related to')).toBeInTheDocument()
+  })
+
+  it('shows missing type-defined relationships as editable placeholders', () => {
+    const bookType = makeEntry({
+      path: '/vault/book.md',
+      filename: 'book.md',
+      title: 'Book',
+      isA: 'Type',
+      relationships: {
+        Mentor: ['[[person/alice]]'],
+      },
+    })
+
+    renderRelationshipsPanel({
+      entry: makeEntry({ title: 'Dune', isA: 'Book' }),
+      entries: [...entries, bookType],
+      frontmatter: {},
+      onAddProperty,
+    })
+
+    const placeholder = screen.getByTestId('type-derived-relationship')
+    expect(within(placeholder).getByText('Mentor')).toHaveClass('text-muted-foreground/40')
+    fireEvent.click(within(placeholder).getByTestId('add-relation-ref'))
+    fireEvent.change(within(placeholder).getByTestId('add-relation-ref-input'), {
+      target: { value: 'My Project' },
+    })
+    fireEvent.keyDown(within(placeholder).getByTestId('add-relation-ref-input'), { key: 'Enter' })
+
+    expect(onAddProperty).toHaveBeenCalledWith('Mentor', '[[project/my-project]]')
   })
 
   it('navigates when clicking a relationship link', () => {

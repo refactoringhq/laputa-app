@@ -7,6 +7,7 @@ import { resolveEntry } from '../utils/wikilink'
 import { trackEvent } from '../lib/telemetry'
 import { cacheNoteContent } from './useTabManagement'
 import { findByCollidingNotePath, joinVaultPath, notePathFilename } from '../utils/notePathIdentity'
+import { canonicalFrontmatterKey } from '../utils/systemMetadata'
 
 export interface NewEntryParams {
   path: string
@@ -88,6 +89,15 @@ export interface NoteContentParams {
   status: string | null
   template?: string | null
   initialEmptyHeading?: boolean
+  defaults?: TypeInstanceDefault[]
+}
+
+type DefaultValue = string | number | boolean | string[]
+
+export interface TypeInstanceDefault {
+  key: string
+  value: DefaultValue
+  kind: 'property' | 'relationship'
 }
 
 function buildNoteBody({ template, initialEmptyHeading }: Pick<NoteContentParams, 'template' | 'initialEmptyHeading'>): string {
@@ -97,11 +107,103 @@ function buildNoteBody({ template, initialEmptyHeading }: Pick<NoteContentParams
   return template ? `\n${template}` : ''
 }
 
-export function buildNoteContent({ title, type, status, template, initialEmptyHeading = false }: NoteContentParams): string {
+function isDefaultablePropertyValue(value: unknown): value is string | number | boolean {
+  if (typeof value === 'string') return value.trim().length > 0
+  return typeof value === 'number' || typeof value === 'boolean'
+}
+
+function relationshipDefaultValue(refs: string[]): DefaultValue | null {
+  if (refs.length === 0) return null
+  return refs.length === 1 ? refs[0] : refs
+}
+
+function resolveTypeEntry({ entries, typeName }: TemplateLookupParams): VaultEntry | undefined {
+  return entries.find((entry) => entry.isA === 'Type' && entry.title === typeName)
+}
+
+function collectPropertyDefaults(typeEntry: VaultEntry): TypeInstanceDefault[] {
+  return Object.entries(typeEntry.properties ?? {}).flatMap(([key, value]) => (
+    isDefaultablePropertyValue(value) ? [{ key, value, kind: 'property' as const }] : []
+  ))
+}
+
+function collectRelationshipDefaults(typeEntry: VaultEntry): TypeInstanceDefault[] {
+  return Object.entries(typeEntry.relationships ?? {}).flatMap(([key, refs]) => {
+    const value = relationshipDefaultValue(refs)
+    return value ? [{ key, value, kind: 'relationship' as const }] : []
+  })
+}
+
+function appendUniqueDefault(defaults: TypeInstanceDefault[], seenKeys: Set<string>, defaultValue: TypeInstanceDefault) {
+  const canonicalKey = canonicalFrontmatterKey(defaultValue.key)
+  if (canonicalKey === 'type' || canonicalKey === 'title' || seenKeys.has(canonicalKey)) return
+  seenKeys.add(canonicalKey)
+  defaults.push(defaultValue)
+}
+
+export function resolveTypeInstanceDefaults(params: TemplateLookupParams): TypeInstanceDefault[] {
+  const typeEntry = resolveTypeEntry(params)
+  if (!typeEntry) return []
+
+  const defaults: TypeInstanceDefault[] = []
+  const seenKeys = new Set<string>()
+  const candidateDefaults = [
+    ...collectPropertyDefaults(typeEntry),
+    ...collectRelationshipDefaults(typeEntry),
+  ]
+  candidateDefaults.forEach((defaultValue) => appendUniqueDefault(defaults, seenKeys, defaultValue))
+  return defaults
+}
+
+function hasOuterWhitespace(value: string): boolean {
+  return value.trim() !== value
+}
+
+function isYamlWikilink(value: string): boolean {
+  return /^\[\[.*\]\]$/.test(value)
+}
+
+function isAmbiguousYamlScalar(value: string): boolean {
+  return /^(?:true|false|null|[-+]?\d+(?:\.\d+)?)$/i.test(value)
+}
+
+function shouldQuoteYamlString(value: string): boolean {
+  return [
+    hasOuterWhitespace,
+    isYamlWikilink,
+    isAmbiguousYamlScalar,
+    (candidate: string) => candidate.includes(':'),
+  ].some((check) => check(value))
+}
+
+function formatYamlScalar(value: string | number | boolean): string {
+  if (typeof value !== 'string') return String(value)
+  if (shouldQuoteYamlString(value)) return JSON.stringify(value)
+  return value
+}
+
+function appendDefaultFrontmatterLines(lines: string[], defaults: TypeInstanceDefault[]) {
+  const existingKeys = new Set(lines.map((line) => canonicalFrontmatterKey(line.split(':', 1)[0])))
+
+  for (const { key, value } of defaults) {
+    const canonicalKey = canonicalFrontmatterKey(key)
+    if (existingKeys.has(canonicalKey)) continue
+    existingKeys.add(canonicalKey)
+    if (Array.isArray(value)) {
+      lines.push(`${key}:`)
+      value.forEach((item) => lines.push(`  - ${formatYamlScalar(item)}`))
+    } else {
+      lines.push(`${key}: ${formatYamlScalar(value)}`)
+    }
+  }
+}
+
+export function buildNoteContent({ title, type, status, template, initialEmptyHeading = false, defaults = [] }: NoteContentParams): string {
   const lines = ['---']
   if (title) lines.push(`title: ${title}`)
   lines.push(`type: ${type}`)
   if (status) lines.push(`status: ${status}`)
+  appendDefaultFrontmatterLines(lines, defaults)
   lines.push('---')
   const body = buildNoteBody({ template, initialEmptyHeading })
   return `${lines.join('\n')}\n${body}`
@@ -112,13 +214,18 @@ export interface NewNoteParams {
   type: string
   vaultPath: string
   template?: string | null
+  defaults?: TypeInstanceDefault[]
 }
 
-export function resolveNewNote({ title, type, vaultPath, template }: NewNoteParams): { entry: VaultEntry; content: string } {
+export function resolveNewNote({ title, type, vaultPath, template, defaults = [] }: NewNoteParams): { entry: VaultEntry; content: string } {
   const slug = slugify(title)
   const status = null
   const entry = buildNewEntry({ path: joinVaultPath(vaultPath, `${slug}.md`), slug, title, type, status })
-  return { entry, content: buildNoteContent({ title, type, status, template }) }
+  return applyTypeDefaults({
+    entry,
+    content: buildNoteContent({ title, type, status, template, defaults }),
+    defaults,
+  })
 }
 
 export interface NewTypeParams {
@@ -133,6 +240,37 @@ export function resolveNewType({ typeName, vaultPath }: NewTypeParams): { entry:
 }
 
 type ResolvedEntry = { entry: VaultEntry; content: string }
+
+function relationshipRefs(value: DefaultValue): string[] {
+  return Array.isArray(value) ? value : [String(value)]
+}
+
+function applyTypeDefaults({
+  entry,
+  content,
+  defaults,
+}: {
+  entry: VaultEntry
+  content: string
+  defaults: TypeInstanceDefault[]
+}): ResolvedEntry {
+  if (defaults.length === 0) return { entry, content }
+
+  const relationships = { ...entry.relationships }
+  const properties = { ...entry.properties }
+  for (const defaultValue of defaults) {
+    if (defaultValue.kind === 'relationship') {
+      relationships[defaultValue.key] = relationshipRefs(defaultValue.value)
+      continue
+    }
+    properties[defaultValue.key] = defaultValue.value as string | number | boolean
+  }
+
+  return {
+    entry: { ...entry, relationships, properties },
+    content,
+  }
+}
 
 interface BlockedCreationPlan {
   status: 'blocked'
@@ -175,8 +313,9 @@ export function planNewNoteCreation({
   type,
   vaultPath,
   template,
+  defaults,
 }: NewNoteParams & { entries: VaultEntry[] }): NoteCreationPlan {
-  const resolved = resolveNewNote({ title, type, vaultPath, template })
+  const resolved = resolveNewNote({ title, type, vaultPath, template, defaults })
   const collision = findPathCollision(entries, resolved.entry.path)
   if (collision) {
     return {
@@ -314,7 +453,8 @@ async function createNamedNote({
   creationPath,
 }: NoteCreationRequest): Promise<boolean> {
   const template = resolveTemplate({ entries, typeName: type })
-  const plan = planNewNoteCreation({ entries, title, type, vaultPath, template })
+  const defaults = resolveTypeInstanceDefaults({ entries, typeName: type })
+  const plan = planNewNoteCreation({ entries, title, type, vaultPath, template, defaults })
   if (plan.status === 'blocked') {
     setToastMessage(plan.message)
     return false
@@ -468,16 +608,21 @@ async function createNoteImmediate(deps: ImmediateCreateDeps, type?: string): Pr
   const slug = generateUntitledFilename(deps.entries, noteType, deps.pendingSlugs)
   const title = slug_to_title(slug)
   const template = resolveTemplate({ entries: deps.entries, typeName: noteType })
+  const defaults = resolveTypeInstanceDefaults({ entries: deps.entries, typeName: noteType })
   const status = null
   const entry = buildNewEntry({ path: joinVaultPath(deps.vaultPath, `${slug}.md`), slug, title, type: noteType, status })
-  const content = buildNoteContent({ title: null, type: noteType, status, template, initialEmptyHeading: true })
-  const didPersist = await persistImmediateEntry(deps, entry, content)
+  const resolved = applyTypeDefaults({
+    entry,
+    content: buildNoteContent({ title: null, type: noteType, status, template, initialEmptyHeading: true, defaults }),
+    defaults,
+  })
+  const didPersist = await persistImmediateEntry(deps, resolved.entry, resolved.content)
   if (!didPersist) return false
 
-  cacheNoteContent(entry.path, content, entry)
-  deps.openTabWithContent(entry, content)
-  addEntryWithMock(entry, content, deps.addEntry)
-  signalFocusEditor({ path: entry.path, selectTitle: true })
+  cacheNoteContent(resolved.entry.path, resolved.content, resolved.entry)
+  deps.openTabWithContent(resolved.entry, resolved.content)
+  addEntryWithMock(resolved.entry, resolved.content, deps.addEntry)
+  signalFocusEditor({ path: resolved.entry.path, selectTitle: true })
   return true
 }
 

@@ -17,9 +17,11 @@ import { LinkButton } from './LinkButton'
 import {
   PROPERTY_PANEL_GRID_STYLE,
   PROPERTY_PANEL_LABEL_CLASS_NAME,
+  PROPERTY_PANEL_PLACEHOLDER_LABEL_CLASS_NAME,
 } from '../propertyPanelLayout'
 import { humanizePropertyKey } from '../../utils/propertyLabels'
 import { translate, type AppLocale } from '../../lib/i18n'
+import { canonicalFrontmatterKey } from '../../utils/systemMetadata'
 
 const RELATIONSHIP_SECTION_ROW_CLASS_NAME = 'flex min-w-0 flex-col gap-1 px-1.5'
 const RELATIONSHIPS_PANEL_GRID_CLASS_NAME = 'grid min-w-0 gap-x-2 gap-y-3'
@@ -27,6 +29,7 @@ const RELATIONSHIP_SECTION_LABEL_TEXT_CLASS_NAME = 'min-w-0 flex-1 truncate'
 const RELATIONSHIP_SECTION_VALUE_CLASS_NAME = 'min-w-0'
 const RELATIONSHIP_ACTION_ROW_CLASS_NAME = 'min-w-0 px-1.5'
 const SUGGESTED_RELATIONSHIPS = ['belongs_to', 'related_to', 'has'] as const
+const RELATIONSHIP_SCHEMA_KEYS = new Set(['belongs_to', 'related_to', 'has'])
 
 type RelationshipEntryGroup = {
   key: string
@@ -65,16 +68,22 @@ interface TitleSelectionState {
   trimmed: string
 }
 
-function RelationshipSectionRow({ label, children, dataTestId }: {
+function RelationshipSectionRow({ label, children, dataTestId, placeholder = false }: {
   label: string
   children: ReactNode
   dataTestId?: string
   locale: AppLocale
+  placeholder?: boolean
 }) {
+  const labelClassName = placeholder ? PROPERTY_PANEL_PLACEHOLDER_LABEL_CLASS_NAME : PROPERTY_PANEL_LABEL_CLASS_NAME
+  const labelTextClassName = placeholder
+    ? `${RELATIONSHIP_SECTION_LABEL_TEXT_CLASS_NAME} text-muted-foreground/40`
+    : RELATIONSHIP_SECTION_LABEL_TEXT_CLASS_NAME
+
   return (
     <div className={RELATIONSHIP_SECTION_ROW_CLASS_NAME} style={{ gridColumn: '1 / -1' }} data-testid={dataTestId}>
-      <span className={PROPERTY_PANEL_LABEL_CLASS_NAME} data-testid="relationship-section-label">
-        <span className={RELATIONSHIP_SECTION_LABEL_TEXT_CLASS_NAME}>{humanizePropertyKey(label)}</span>
+      <span className={labelClassName} data-testid="relationship-section-label">
+        <span className={labelTextClassName}>{humanizePropertyKey(label)}</span>
       </span>
       <div className={RELATIONSHIP_SECTION_VALUE_CLASS_NAME}>{children}</div>
     </div>
@@ -481,6 +490,56 @@ function extractRelationshipRefs(frontmatter: ParsedFrontmatter): { key: string;
     .filter(({ refs }) => refs.length > 0)
 }
 
+function findTypeEntry(entries: VaultEntry[], entry?: VaultEntry): VaultEntry | undefined {
+  if (!entry?.isA || entry.isA === 'Type') return undefined
+  return entries.find((candidate) => candidate.isA === 'Type' && candidate.title === entry.isA)
+}
+
+function isRelationshipSchemaKey(key: string): boolean {
+  return RELATIONSHIP_SCHEMA_KEYS.has(canonicalFrontmatterKey(key))
+}
+
+function buildExistingRelationshipKeys(frontmatter: ParsedFrontmatter, relationshipEntries: RelationshipEntryGroup[]): Set<string> {
+  const existingKeys = new Set(Object.keys(frontmatter).map(canonicalFrontmatterKey))
+  for (const group of relationshipEntries) existingKeys.add(canonicalFrontmatterKey(group.key))
+  return existingKeys
+}
+
+function buildTypeDerivedRelationshipEntries({
+  entry,
+  entries,
+  frontmatter,
+  relationshipEntries,
+}: {
+  entry?: VaultEntry
+  entries: VaultEntry[]
+  frontmatter: ParsedFrontmatter
+  relationshipEntries: RelationshipEntryGroup[]
+}): RelationshipEntryGroup[] {
+  const typeEntry = findTypeEntry(entries, entry)
+  if (!typeEntry) return []
+
+  const existingKeys = buildExistingRelationshipKeys(frontmatter, relationshipEntries)
+  const result: RelationshipEntryGroup[] = []
+  const seen = new Set<string>()
+
+  const addPlaceholder = (key: string) => {
+    const canonicalKey = canonicalFrontmatterKey(key)
+    if (canonicalKey === 'type' || existingKeys.has(canonicalKey) || seen.has(canonicalKey)) return
+    seen.add(canonicalKey)
+    result.push({ key, refs: [] })
+  }
+
+  for (const [key, refs] of Object.entries(typeEntry.relationships ?? {})) {
+    if (refs.length > 0) addPlaceholder(key)
+  }
+  for (const key of Object.keys(typeEntry.properties ?? {})) {
+    if (isRelationshipSchemaKey(key)) addPlaceholder(key)
+  }
+
+  return result
+}
+
 function NoteTargetInput({ entries, value, locale, onChange, onSubmit, onCancel, onCreateAndOpenNote, onSubmitWithCreate }: {
   entries: VaultEntry[]
   value: string
@@ -602,6 +661,7 @@ function useMissingSuggestedRelationships(
 }
 
 function useRelationshipPanelState({
+  entry,
   frontmatter,
   entries,
   vaultPath,
@@ -609,21 +669,30 @@ function useRelationshipPanelState({
   onUpdateProperty,
   onDeleteProperty,
 }: {
+  entry?: VaultEntry
   frontmatter: ParsedFrontmatter
   entries: VaultEntry[]
   vaultPath?: string
 } & RelationshipPanelEditHandlers) {
   const relationshipEntries = useMemo(() => extractRelationshipRefs(frontmatter), [frontmatter])
+  const typeDerivedRelationshipEntries = useMemo(
+    () => buildTypeDerivedRelationshipEntries({ entry, entries, frontmatter, relationshipEntries }),
+    [entry, entries, frontmatter, relationshipEntries],
+  )
   const resolvedVaultPath = useMemo(() => vaultPath ?? inferVaultPath(entries), [vaultPath, entries])
   const { handleRemoveRef, handleAddRef, canEdit } = useRelationshipMutations(relationshipEntries, {
     onAddProperty,
     onUpdateProperty,
     onDeleteProperty,
   })
-  const missingSuggestedRels = useMissingSuggestedRelationships(relationshipEntries, onAddProperty)
+  const missingSuggestedRels = useMissingSuggestedRelationships(
+    [...relationshipEntries, ...typeDerivedRelationshipEntries],
+    onAddProperty,
+  )
 
   return {
     relationshipEntries,
+    typeDerivedRelationshipEntries,
     resolvedVaultPath,
     handleRemoveRef,
     handleAddRef,
@@ -717,16 +786,17 @@ function DisabledLinkButton({ locale }: { locale: AppLocale }) {
   )
 }
 
-function SuggestedRelationshipSlot({ label, entries, vaultPath, locale, onAdd, onCreateAndOpenNote }: {
+function SuggestedRelationshipSlot({ label, entries, vaultPath, locale, onAdd, onCreateAndOpenNote, dataTestId = 'suggested-relationship' }: {
   label: string
   entries: VaultEntry[]
   vaultPath: string
   onAdd: (ref: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   locale: AppLocale
+  dataTestId?: string
 }) {
   return (
-    <RelationshipSectionRow label={label} dataTestId="suggested-relationship" locale={locale}>
+    <RelationshipSectionRow label={label} dataTestId={dataTestId} locale={locale} placeholder>
       <InlineAddNote
         entries={entries}
         vaultPath={vaultPath}
@@ -738,8 +808,8 @@ function SuggestedRelationshipSlot({ label, entries, vaultPath, locale, onAdd, o
   )
 }
 
-export function DynamicRelationshipsPanel({ frontmatter, entries, typeEntryMap, vaultPath, onNavigate, onAddProperty, onUpdateProperty, onDeleteProperty, onCreateAndOpenNote, locale = 'en' }: {
-  frontmatter: ParsedFrontmatter; entries: VaultEntry[]; typeEntryMap: Record<string, VaultEntry>; vaultPath?: string
+export function DynamicRelationshipsPanel({ entry, frontmatter, entries, typeEntryMap, vaultPath, onNavigate, onAddProperty, onUpdateProperty, onDeleteProperty, onCreateAndOpenNote, locale = 'en' }: {
+  entry?: VaultEntry; frontmatter: ParsedFrontmatter; entries: VaultEntry[]; typeEntryMap: Record<string, VaultEntry>; vaultPath?: string
   onNavigate: (target: string) => void
   onAddProperty?: (key: string, value: FrontmatterValue) => void
   onUpdateProperty?: (key: string, value: FrontmatterValue) => void
@@ -749,12 +819,14 @@ export function DynamicRelationshipsPanel({ frontmatter, entries, typeEntryMap, 
 }) {
   const {
     relationshipEntries,
+    typeDerivedRelationshipEntries,
     resolvedVaultPath,
     handleRemoveRef,
     handleAddRef,
     canEdit,
     missingSuggestedRels,
   } = useRelationshipPanelState({
+    entry,
     frontmatter,
     entries,
     vaultPath,
@@ -772,6 +844,18 @@ export function DynamicRelationshipsPanel({ frontmatter, entries, typeEntryMap, 
           onAddRef={canEdit ? (ref) => handleAddRef(key, ref) : undefined}
           onCreateAndOpenNote={canEdit ? onCreateAndOpenNote : undefined}
           locale={locale}
+        />
+      ))}
+      {onAddProperty && typeDerivedRelationshipEntries.map(({ key }) => (
+        <SuggestedRelationshipSlot
+          key={`type-derived:${key}`}
+          label={key}
+          entries={entries}
+          vaultPath={resolvedVaultPath}
+          onAdd={(ref) => onAddProperty(key, ref)}
+          onCreateAndOpenNote={onCreateAndOpenNote}
+          locale={locale}
+          dataTestId="type-derived-relationship"
         />
       ))}
       {missingSuggestedRels.map(label => (

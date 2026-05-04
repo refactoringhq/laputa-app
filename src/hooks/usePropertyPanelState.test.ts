@@ -122,6 +122,43 @@ describe('usePropertyPanelState', () => {
     ])
   })
 
+  it('derives missing instance property placeholders from its type entry', () => {
+    const entries = [
+      makeEntry({
+        title: 'Book',
+        isA: 'Type',
+        properties: {
+          'start date': null,
+          Rating: 5,
+        },
+      }),
+      makeEntry({
+        title: 'Dune',
+        isA: 'Book',
+        properties: {
+          Rating: 4,
+        },
+      }),
+    ]
+
+    const { result } = renderHook(() =>
+      usePropertyPanelState({
+        entries,
+        entryIsA: 'Book',
+        frontmatter: {
+          Rating: 4,
+        },
+      }),
+    )
+
+    expect(result.current.propertyEntries).toEqual([
+      ['Rating', 4],
+    ])
+    expect(result.current.typeDerivedPropertyEntries).toEqual([
+      ['start date', null],
+    ])
+  })
+
   it('saves scalar and list properties through the correct handlers', () => {
     const onUpdateProperty = vi.fn()
     const onDeleteProperty = vi.fn()

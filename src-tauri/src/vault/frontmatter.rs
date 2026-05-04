@@ -242,26 +242,51 @@ pub(crate) fn extract_relationships(
             continue;
         }
 
-        match value {
-            serde_json::Value::String(s) if contains_wikilink(s) => {
-                relationships.insert(key.clone(), vec![s.clone()]);
-            }
-            serde_json::Value::Array(arr) => {
-                let wikilinks: Vec<String> = arr
-                    .iter()
-                    .filter_map(|v| v.as_str())
-                    .filter(|s| contains_wikilink(s))
-                    .map(|s| s.to_string())
-                    .collect();
-                if !wikilinks.is_empty() {
-                    relationships.insert(key.clone(), wikilinks);
-                }
-            }
-            _ => {}
+        let wikilinks = relationship_wikilinks(value);
+        if !wikilinks.is_empty() {
+            relationships.insert(key.clone(), wikilinks);
         }
     }
 
     relationships
+}
+
+fn relationship_wikilinks(value: &serde_json::Value) -> Vec<String> {
+    let mut wikilinks = Vec::new();
+    collect_relationship_wikilinks(value, 0, &mut wikilinks);
+    wikilinks
+}
+
+fn collect_relationship_wikilinks(
+    value: &serde_json::Value,
+    depth: usize,
+    wikilinks: &mut Vec<String>,
+) {
+    match value {
+        serde_json::Value::String(s) if contains_wikilink(s) => wikilinks.push(s.clone()),
+        serde_json::Value::Array(arr) => {
+            if let Some(link) = nested_flow_wikilink(arr, depth) {
+                wikilinks.push(link);
+                return;
+            }
+            for item in arr {
+                collect_relationship_wikilinks(item, depth + 1, wikilinks);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn nested_flow_wikilink(arr: &[serde_json::Value], depth: usize) -> Option<String> {
+    if depth == 0 {
+        return None;
+    }
+    match arr {
+        [serde_json::Value::String(target)] if !contains_wikilink(target) => {
+            Some(format!("[[{target}]]"))
+        }
+        _ => None,
+    }
 }
 
 /// Extract custom scalar properties from raw YAML frontmatter.
@@ -276,6 +301,9 @@ pub(crate) fn extract_properties(
         }
 
         match value {
+            serde_json::Value::Null => {
+                properties.insert(key.clone(), value.clone());
+            }
             serde_json::Value::String(s) if !contains_wikilink(s) => {
                 properties.insert(key.clone(), value.clone());
             }

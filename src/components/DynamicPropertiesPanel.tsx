@@ -153,6 +153,83 @@ function SuggestedPropertySlot({ label, displayMode, onAdd }: {
   )
 }
 
+function TypeDerivedPropertySlot({
+  propKey,
+  editingKey,
+  displayMode,
+  autoMode,
+  vaultStatuses,
+  vaultTags,
+  onStartEdit,
+  onSave,
+  onSaveList,
+  onUpdate,
+  onDisplayModeChange,
+  locale,
+}: {
+  propKey: string
+  editingKey: string | null
+  displayMode: PropertyDisplayMode
+  autoMode: PropertyDisplayMode
+  vaultStatuses: string[]
+  vaultTags: string[]
+  onStartEdit: (key: string | null) => void
+  onSave: (key: string, value: string) => void
+  onSaveList: (key: string, items: string[]) => void
+  onUpdate?: (key: string, value: FrontmatterValue) => void
+  onDisplayModeChange: (key: string, mode: PropertyDisplayMode | null) => void
+  locale: AppLocale
+}) {
+  if (editingKey === propKey) {
+    return (
+      <PropertyRow
+        propKey={propKey}
+        value=""
+        editingKey={editingKey}
+        displayMode={displayMode}
+        autoMode={autoMode}
+        vaultStatuses={vaultStatuses}
+        vaultTags={vaultTags}
+        onStartEdit={onStartEdit}
+        onSave={onSave}
+        onSaveList={onSaveList}
+        onUpdate={onUpdate}
+        onDisplayModeChange={onDisplayModeChange}
+        locale={locale}
+      />
+    )
+  }
+
+  const PlaceholderIcon = DISPLAY_MODE_ICONS[displayMode]
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className={PROPERTY_PANEL_INTERACTIVE_ROW_CLASS_NAME}
+      style={PROPERTY_PANEL_ROW_STYLE}
+      onClick={() => onStartEdit(propKey)}
+      disabled={!onUpdate}
+      data-testid="type-derived-property"
+    >
+      <span className={PROPERTY_PANEL_PLACEHOLDER_LABEL_CLASS_NAME}>
+        <span
+          className={PROPERTY_PANEL_LABEL_ICON_SLOT_CLASS_NAME}
+          data-testid="type-derived-property-icon-slot"
+        >
+          <PlaceholderIcon
+            className="size-3.5 shrink-0 text-muted-foreground/40"
+            data-testid={`type-derived-property-icon-${displayMode}`}
+          />
+        </span>
+        <span className="min-w-0 truncate text-muted-foreground/40">{humanizePropertyKey(propKey)}</span>
+      </span>
+      <span className={PROPERTY_PANEL_PLACEHOLDER_VALUE_CLASS_NAME}>{'\u2014'}</span>
+    </Button>
+  )
+}
+
 function getExistingPropertyKeys(propertyEntries: [string, FrontmatterValue][], frontmatter: ParsedFrontmatter): Set<string> {
   const keys = new Set(propertyEntries.map(([key]) => key.toLowerCase()))
   for (const key of Object.keys(frontmatter)) keys.add(key.toLowerCase())
@@ -229,6 +306,139 @@ function useSuggestedPropertyActions({
   }
 }
 
+function PropertyEntryRows({
+  source,
+  entries,
+  editingKey,
+  displayOverrides,
+  vaultStatuses,
+  vaultTagsByKey,
+  locale,
+  onStartEdit,
+  onSave,
+  onSaveList,
+  onUpdate,
+  onDelete,
+  onDisplayModeChange,
+}: {
+  source: 'frontmatter' | 'type-derived'
+  entries: [string, FrontmatterValue][]
+  editingKey: string | null
+  displayOverrides: Record<string, PropertyDisplayMode>
+  vaultStatuses: string[]
+  vaultTagsByKey: Record<string, string[]>
+  locale: AppLocale
+  onStartEdit: (key: string | null) => void
+  onSave: (key: string, value: string) => void
+  onSaveList: (key: string, items: string[]) => void
+  onUpdate?: (key: string, value: FrontmatterValue) => void
+  onDelete?: (key: string) => void
+  onDisplayModeChange: (key: string, mode: PropertyDisplayMode | null) => void
+}) {
+  return (
+    <>
+      {entries.map(([key, value]) => (
+        source === 'type-derived' ? (
+          <TypeDerivedPropertySlot
+            key={`type-derived:${key}`}
+            propKey={key}
+            editingKey={editingKey}
+            displayMode={getEffectiveDisplayMode(key, value, displayOverrides)}
+            autoMode={detectPropertyType(key, value)}
+            vaultStatuses={vaultStatuses}
+            vaultTags={vaultTagsByKey[key] ?? []}
+            onStartEdit={onStartEdit}
+            onSave={onSave}
+            onSaveList={onSaveList}
+            onUpdate={onUpdate}
+            onDisplayModeChange={onDisplayModeChange}
+            locale={locale}
+          />
+        ) : (
+          <PropertyRow
+            key={key} propKey={key} value={value}
+            editingKey={editingKey} displayMode={getEffectiveDisplayMode(key, value, displayOverrides)} autoMode={detectPropertyType(key, value)}
+            vaultStatuses={vaultStatuses}
+            vaultTags={vaultTagsByKey[key] ?? []}
+            onStartEdit={onStartEdit} onSave={onSave}
+            onSaveList={onSaveList} onUpdate={onUpdate}
+            onDelete={onDelete}
+            onDisplayModeChange={onDisplayModeChange}
+            locale={locale}
+          />
+        )
+      ))}
+    </>
+  )
+}
+
+function PendingSuggestedPropertyRow({
+  pendingSuggestedKey,
+  editingKey,
+  vaultStatuses,
+  vaultTagsByKey,
+  locale,
+  onStartEdit,
+  onSave,
+  onSaveList,
+  onDisplayModeChange,
+}: {
+  pendingSuggestedKey: string | null
+  editingKey: string | null
+  vaultStatuses: string[]
+  vaultTagsByKey: Record<string, string[]>
+  locale: AppLocale
+  onStartEdit: (key: string | null) => void
+  onSave: (key: string, value: string) => void
+  onSaveList: (key: string, items: string[]) => void
+  onDisplayModeChange: (key: string, mode: PropertyDisplayMode | null) => void
+}) {
+  if (!pendingSuggestedKey || editingKey !== pendingSuggestedKey) {
+    return null
+  }
+
+  return (
+    <PropertyRow
+      key={`pending:${pendingSuggestedKey}`}
+      propKey={pendingSuggestedKey}
+      value=""
+      editingKey={editingKey}
+      displayMode={getSuggestedDisplayMode(pendingSuggestedKey)}
+      autoMode={getSuggestedDisplayMode(pendingSuggestedKey)}
+      vaultStatuses={vaultStatuses}
+      vaultTags={vaultTagsByKey[pendingSuggestedKey] ?? []}
+      onStartEdit={onStartEdit}
+      onSave={onSave}
+      onSaveList={onSaveList}
+      onUpdate={undefined}
+      onDelete={undefined}
+      onDisplayModeChange={onDisplayModeChange}
+      locale={locale}
+    />
+  )
+}
+
+function SuggestedPropertyRows({
+  properties,
+  onAdd,
+}: {
+  properties: Array<{ key: string; label: string }>
+  onAdd: (key: string) => void
+}) {
+  return (
+    <>
+      {properties.map(({ key, label }) => (
+        <SuggestedPropertySlot
+          key={key}
+          label={label}
+          displayMode={getSuggestedDisplayMode(key)}
+          onAdd={() => onAdd(key)}
+        />
+      ))}
+    </>
+  )
+}
+
 export function DynamicPropertiesPanel({
   entry, frontmatter, entries,
   onUpdateProperty, onDeleteProperty, onAddProperty, onNavigate, onCreateMissingType,
@@ -248,12 +458,15 @@ export function DynamicPropertiesPanel({
   const {
     editingKey, setEditingKey, showAddDialog, setShowAddDialog, displayOverrides,
     availableTypes, customColorKey, typeColorKeys, typeIconKeys, vaultStatuses, vaultTagsByKey, propertyEntries,
-    handleSaveValue, handleSaveList, handleAdd, handleDisplayModeChange,
+    typeDerivedPropertyEntries, handleSaveValue, handleSaveTypeDerivedValue, handleSaveList, handleAdd, handleDisplayModeChange,
   } = usePropertyPanelState({ entries, entryIsA: entry.isA, frontmatter, onUpdateProperty, onDeleteProperty, onAddProperty })
   const [pendingSuggestedKey, setPendingSuggestedKey] = useState<string | null>(null)
   const missingTypeName = useMemo(() => resolveMissingTypeName(entry.isA, availableTypes), [entry.isA, availableTypes])
 
-  const existingKeys = useMemo(() => getExistingPropertyKeys(propertyEntries, frontmatter), [propertyEntries, frontmatter])
+  const existingKeys = useMemo(
+    () => getExistingPropertyKeys([...propertyEntries, ...typeDerivedPropertyEntries], frontmatter),
+    [propertyEntries, typeDerivedPropertyEntries, frontmatter],
+  )
   const missingSuggested = useMemo(
     () => getMissingSuggestedProperties(Boolean(onAddProperty), existingKeys, pendingSuggestedKey),
     [existingKeys, onAddProperty, pendingSuggestedKey],
@@ -285,46 +498,47 @@ export function DynamicPropertiesPanel({
           onCreateMissingType={onCreateMissingType}
           locale={locale}
         />
-        {propertyEntries.map(([key, value]) => (
-          <PropertyRow
-            key={key} propKey={key} value={value}
-            editingKey={editingKey} displayMode={getEffectiveDisplayMode(key, value, displayOverrides)} autoMode={detectPropertyType(key, value)}
-            vaultStatuses={vaultStatuses}
-            vaultTags={vaultTagsByKey[key] ?? []}
-            onStartEdit={setEditingKey} onSave={handleSaveValue}
-            onSaveList={handleSaveList} onUpdate={onUpdateProperty}
-            onDelete={onDeleteProperty}
-            onDisplayModeChange={handleDisplayModeChange}
-            locale={locale}
-          />
-        ))}
-        {pendingSuggestedKey && editingKey === pendingSuggestedKey && (
-          <PropertyRow
-            key={`pending:${pendingSuggestedKey}`}
-            propKey={pendingSuggestedKey}
-            value=""
-            editingKey={editingKey}
-            displayMode={getSuggestedDisplayMode(pendingSuggestedKey)}
-            autoMode={getSuggestedDisplayMode(pendingSuggestedKey)}
-            vaultStatuses={vaultStatuses}
-            vaultTags={vaultTagsByKey[pendingSuggestedKey] ?? []}
-            onStartEdit={handlePendingSuggestedEdit}
-            onSave={handleSaveSuggestedValue}
-            onSaveList={handleSaveList}
-            onUpdate={undefined}
-            onDelete={undefined}
-            onDisplayModeChange={handleDisplayModeChange}
-            locale={locale}
-          />
-        )}
-        {missingSuggested.map(({ key, label }) => (
-          <SuggestedPropertySlot
-            key={key}
-            label={label}
-            displayMode={getSuggestedDisplayMode(key)}
-            onAdd={() => handleSuggestedAdd(key)}
-          />
-        ))}
+        <PropertyEntryRows
+          source="frontmatter"
+          entries={propertyEntries}
+          editingKey={editingKey}
+          displayOverrides={displayOverrides}
+          vaultStatuses={vaultStatuses}
+          vaultTagsByKey={vaultTagsByKey}
+          locale={locale}
+          onStartEdit={setEditingKey}
+          onSave={handleSaveValue}
+          onSaveList={handleSaveList}
+          onUpdate={onUpdateProperty}
+          onDelete={onDeleteProperty}
+          onDisplayModeChange={handleDisplayModeChange}
+        />
+        <PropertyEntryRows
+          source="type-derived"
+          entries={typeDerivedPropertyEntries}
+          editingKey={editingKey}
+          displayOverrides={displayOverrides}
+          vaultStatuses={vaultStatuses}
+          vaultTagsByKey={vaultTagsByKey}
+          locale={locale}
+          onStartEdit={setEditingKey}
+          onSave={handleSaveTypeDerivedValue}
+          onSaveList={handleSaveList}
+          onUpdate={onUpdateProperty}
+          onDisplayModeChange={handleDisplayModeChange}
+        />
+        <PendingSuggestedPropertyRow
+          pendingSuggestedKey={pendingSuggestedKey}
+          editingKey={editingKey}
+          vaultStatuses={vaultStatuses}
+          vaultTagsByKey={vaultTagsByKey}
+          locale={locale}
+          onStartEdit={handlePendingSuggestedEdit}
+          onSave={handleSaveSuggestedValue}
+          onSaveList={handleSaveList}
+          onDisplayModeChange={handleDisplayModeChange}
+        />
+        <SuggestedPropertyRows properties={missingSuggested} onAdd={handleSuggestedAdd} />
         {!showAddDialog && (
           <AddPropertyButton
             locale={locale}
