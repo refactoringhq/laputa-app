@@ -1,6 +1,6 @@
 import { compactMarkdown } from '../utils/compact-markdown'
 import { restoreWikilinksInBlocks, splitFrontmatter } from '../utils/wikilinks'
-import { serializeMermaidAwareBlocks } from '../utils/mermaidMarkdown'
+import { serializeDurableEditorBlocks } from '../utils/editorDurableMarkdown'
 import { findNearestTextCursorBlockById } from './blockNoteCursorTarget'
 
 interface BlockLike {
@@ -133,11 +133,11 @@ function getLineIndexFromRatio({ totalLines, ratio }: { totalLines: number; rati
 }
 
 function serializeBlock(editor: BlockNotePositionEditor, block: BlockLike): string {
-  return compactMarkdown(serializeMermaidAwareBlocks(editor, restoreWikilinksInBlocks([block])))
+  return compactMarkdown(serializeDurableEditorBlocks(editor, restoreWikilinksInBlocks([block])))
 }
 
 function serializeEditorBody(editor: BlockNotePositionEditor): string {
-  return compactMarkdown(serializeMermaidAwareBlocks(editor, restoreWikilinksInBlocks(editor.document)))
+  return compactMarkdown(serializeDurableEditorBlocks(editor, restoreWikilinksInBlocks(editor.document)))
 }
 
 function buildBlockLineRanges({
