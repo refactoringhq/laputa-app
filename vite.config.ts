@@ -59,18 +59,51 @@ function extractWikiLinks(value: string): string[] {
 
 /** Extract wiki-links from a frontmatter value (string or array of strings). */
 function wikiLinksFromValue(value: unknown): string[] {
-  if (typeof value === 'string') return extractWikiLinks(value)
-  if (Array.isArray(value)) {
-    return value.flatMap((v) => (typeof v === 'string' ? extractWikiLinks(v) : []))
-  }
-  return []
+  return collectWikiLinksFromValue(value, 0)
 }
 
-// Frontmatter keys that map to dedicated VaultEntry fields (skip in generic relationships)
+function collectWikiLinksFromValue(value: unknown, depth: number): string[] {
+  if (typeof value === 'string') return extractWikiLinks(value)
+  if (!Array.isArray(value)) return []
+
+  const nestedLink = nestedFlowWikilink(value, depth)
+  if (nestedLink) return [nestedLink]
+  return value.flatMap((item) => collectWikiLinksFromValue(item, depth + 1))
+}
+
+function nestedFlowWikilink(value: unknown[], depth: number): string | null {
+  if (depth === 0 || value.length !== 1 || typeof value[0] !== 'string') return null
+  return extractWikiLinks(value[0]).length === 0 ? `[[${value[0]}]]` : null
+}
+
+// Frontmatter keys that map to dedicated VaultEntry fields (skip in generic properties/relationships)
 const DEDICATED_KEYS = new Set([
-  'aliases', 'is_a', 'is a', 'belongs_to', 'belongs to',
-  'related_to', 'related to', 'status', 'title',
-])
+  'aliases', 'is_a', 'is a', 'type', 'status', 'title', '_archived',
+  'archived', '_icon', 'icon', 'color', '_order', 'order',
+  '_sidebar_label', 'sidebar_label', 'sidebar label', 'template',
+  '_sort', 'sort', 'view', '_width', 'width', 'visible',
+  '_organized', '_favorite', '_favorite_index', '_list_properties_display',
+].map((key) => key.toLowerCase()))
+
+type FrontmatterPropertyValue = string | number | boolean | null
+type VaultSearchResult = { title: string; path: string; snippet: string; score: number; note_type: string | null }
+
+interface SearchEntryInput {
+  entry: VaultEntry
+  query: string
+  rawContent: string
+}
+
+interface SearchRequestInput {
+  query: string
+  vaultPath: string
+}
+
+interface SearchResponseInput {
+  mode: string
+  query: string
+  results: VaultSearchResult[]
+}
 
 function getFrontmatterValue(
   frontmatter: Record<string, unknown>,
@@ -211,6 +244,38 @@ function frontmatterRelationships(frontmatter: Record<string, unknown>): Record<
   return relationships
 }
 
+function frontmatterProperties(frontmatter: Record<string, unknown>): Record<string, FrontmatterPropertyValue> {
+  const properties: Record<string, FrontmatterPropertyValue> = {}
+  for (const [key, value] of Object.entries(frontmatter)) {
+    if (DEDICATED_KEYS.has(key.toLowerCase()) || key.trim().startsWith('_')) continue
+    const propertyValue = frontmatterPropertyValue(value)
+    if (propertyValue !== undefined) properties[key] = propertyValue
+  }
+  return properties
+}
+
+function isScalarFrontmatterProperty(value: unknown): value is number | boolean {
+  return typeof value === 'number' || typeof value === 'boolean'
+}
+
+function singleStringArrayValue(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined
+  if (value.length !== 1) return undefined
+  return typeof value[0] === 'string' ? value[0] : undefined
+}
+
+function wikiLinkFreeString(value: string): string | undefined {
+  return extractWikiLinks(value).length === 0 ? value : undefined
+}
+
+function frontmatterPropertyValue(value: unknown): FrontmatterPropertyValue | undefined {
+  if (value === null) return null
+  if (isScalarFrontmatterProperty(value)) return value
+  if (typeof value === 'string') return wikiLinkFreeString(value)
+  const singleArrayValue = singleStringArrayValue(value)
+  return singleArrayValue === undefined ? undefined : wikiLinkFreeString(singleArrayValue)
+}
+
 function parseMarkdownFile(filePath: string): VaultEntry | null {
   try {
     const raw = readUtf8File(filePath)
@@ -252,7 +317,7 @@ function parseMarkdownFile(filePath: string): VaultEntry | null {
       view: frontmatterString(fm, 'view'),
       visible: frontmatterBool(fm, 'visible'),
       outgoingLinks: [],
-      properties: {},
+      properties: frontmatterProperties(fm),
     }
   } catch {
     return null
@@ -390,21 +455,39 @@ function handleVaultSearch(url: URL, res: ServerResponse): boolean {
   const query = (url.searchParams.get('query') ?? '').toLowerCase()
   const mode = url.searchParams.get('mode') ?? 'all'
   if (!vaultPath || !query) {
-    sendJson(res, { results: [], elapsed_ms: 0, query, mode })
+    sendVaultSearchResponse(res, { results: [], query, mode })
     return true
   }
 
-  const results: { title: string; path: string; snippet: string; score: number; note_type: string | null }[] = []
+  sendVaultSearchResponse(res, {
+    results: collectVaultSearchResults({ vaultPath, query }),
+    query,
+    mode,
+  })
+  return true
+}
+
+function collectVaultSearchResults({ vaultPath, query }: SearchRequestInput): VaultSearchResult[] {
+  const results: VaultSearchResult[] = []
   for (const filePath of findMarkdownFiles(vaultPath)) {
     const entry = parseMarkdownFile(filePath)
     if (!entry || entry.trashed) continue
-    const raw = readUtf8File(filePath)
-    if (entry.title.toLowerCase().includes(query) || raw.toLowerCase().includes(query)) {
-      results.push({ title: entry.title, path: entry.path, snippet: entry.snippet, score: 1.0, note_type: entry.isA })
-    }
+    const rawContent = readUtf8File(filePath)
+    if (entryMatchesSearch({ entry, rawContent, query })) results.push(searchResultFromEntry(entry))
   }
-  sendJson(res, { results: results.slice(0, 20), elapsed_ms: 1, query, mode })
-  return true
+  return results.slice(0, 20)
+}
+
+function entryMatchesSearch({ entry, rawContent, query }: SearchEntryInput): boolean {
+  return entry.title.toLowerCase().includes(query) || rawContent.toLowerCase().includes(query)
+}
+
+function searchResultFromEntry(entry: VaultEntry): VaultSearchResult {
+  return { title: entry.title, path: entry.path, snippet: entry.snippet, score: 1.0, note_type: entry.isA }
+}
+
+function sendVaultSearchResponse(res: ServerResponse, { results, query, mode }: SearchResponseInput): void {
+  sendJson(res, { results, elapsed_ms: results.length > 0 ? 1 : 0, query, mode })
 }
 
 async function handleVaultSave(url: URL, req: IncomingMessage, res: ServerResponse): Promise<boolean> {

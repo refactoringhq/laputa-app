@@ -188,6 +188,32 @@ describe('DynamicPropertiesPanel', () => {
     expect(onUpdateProperty).toHaveBeenCalledWith('start date', '2026-05-03')
   })
 
+  it('shows missing type-defined properties as gray editable placeholders', () => {
+    const typeEntry = makeEntry({
+      title: 'Book',
+      isA: 'Type',
+      properties: {
+        'start date': null,
+      },
+    })
+
+    renderPanel({
+      entry: makeEntry({ title: 'Dune', isA: 'Book' }),
+      entries: [typeEntry],
+      frontmatter: {},
+      onUpdateProperty,
+    })
+
+    const placeholder = screen.getByTestId('type-derived-property')
+    expect(within(placeholder).getByText('Start date')).toHaveClass('text-muted-foreground/40')
+    fireEvent.click(placeholder)
+    const input = screen.getByDisplayValue('')
+    fireEvent.change(input, { target: { value: '2026-05-04' } })
+    fireEvent.blur(input)
+
+    expect(onUpdateProperty).toHaveBeenCalledWith('start date', '2026-05-04')
+  })
+
   it('hides Owner with wikilink value from Properties panel', () => {
     renderPanel({ frontmatter: { Owner: '[[person/luca]]' } })
     // Owner with wikilink goes to RelationshipsPanel, not Properties

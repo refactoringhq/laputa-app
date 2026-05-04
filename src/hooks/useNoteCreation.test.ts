@@ -12,6 +12,7 @@ import {
   resolveNewNote,
   resolveNewType,
   resolveTemplate,
+  resolveTypeInstanceDefaults,
   DEFAULT_TEMPLATES,
   RAPID_CREATE_NOTE_SETTLE_MS,
   planNewNoteCreation,
@@ -169,6 +170,33 @@ describe('resolveNewNote', () => {
     const { entry, content } = resolveNewNote({ title: 'Reflection', type: 'Journal', vaultPath: '/vault' })
     expect(entry.status).toBeNull()
     expect(content).not.toContain('status:')
+  })
+
+  it('applies valued properties and relationships from the type entry to newly created instances', () => {
+    const typeEntry = makeEntry({
+      title: 'Book',
+      isA: 'Type',
+      properties: {
+        Rating: 5,
+        'start date': null,
+      },
+      relationships: {
+        Author: ['[[person/frank-herbert]]'],
+      },
+    })
+    const defaults = resolveTypeInstanceDefaults({ entries: [typeEntry], typeName: 'Book' })
+    const { entry, content } = resolveNewNote({
+      title: 'Dune',
+      type: 'Book',
+      vaultPath: '/vault',
+      defaults,
+    })
+
+    expect(content).toContain('Rating: 5')
+    expect(content).toContain('Author: "[[person/frank-herbert]]"')
+    expect(content).not.toContain('start date:')
+    expect(entry.properties).toEqual({ Rating: 5 })
+    expect(entry.relationships).toEqual({ Author: ['[[person/frank-herbert]]'] })
   })
 
   it('blocks creation when macOS /tmp aliases point at the same note path', () => {

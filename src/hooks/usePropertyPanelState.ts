@@ -10,11 +10,14 @@ import {
   removeDisplayModeOverride,
 } from '../utils/propertyTypes'
 import { containsWikilinks } from '../components/DynamicPropertiesPanel'
-import { canonicalSystemMetadataKey, isSystemMetadataKey } from '../utils/systemMetadata'
+import { canonicalFrontmatterKey, canonicalSystemMetadataKey, isSystemMetadataKey } from '../utils/systemMetadata'
 
 // Keys to skip showing in Properties (handled by dedicated UI or internal)
 // Compared case-insensitively via isVisibleProperty()
 const SKIP_KEYS = new Set(['aliases', 'workspace', 'title', 'type', 'is_a', 'is a', '_archived', 'archived', 'archived_at', '_favorite', '_favorite_index', '_organized'])
+const RELATIONSHIP_SCHEMA_KEYS = new Set(['belongs_to', 'related_to', 'has'])
+
+type PropertyEntry = [string, FrontmatterValue]
 
 function coerceValue(raw: string): FrontmatterValue {
   if (raw.toLowerCase() === 'true') return true
@@ -88,8 +91,8 @@ function isVisibleProperty([key, value]: [string, FrontmatterValue]): boolean {
   return !isHiddenPropertyKey(key) && !containsWikilinks(value)
 }
 
-function buildVisiblePropertyEntries(frontmatter: ParsedFrontmatter): [string, FrontmatterValue][] {
-  const result: [string, FrontmatterValue][] = []
+function buildVisiblePropertyEntries(frontmatter: ParsedFrontmatter): PropertyEntry[] {
+  const result: PropertyEntry[] = []
   const seen = new Set<string>()
 
   for (const [key, value] of Object.entries(frontmatter)) {
@@ -97,6 +100,46 @@ function buildVisiblePropertyEntries(frontmatter: ParsedFrontmatter): [string, F
 
     const canonicalKey = canonicalSystemMetadataKey(key)
     if (seen.has(canonicalKey)) continue
+    seen.add(canonicalKey)
+    result.push([key, value])
+  }
+
+  return result
+}
+
+function findTypeEntry(entries: VaultEntry[] | undefined, entryIsA: string | null): VaultEntry | undefined {
+  if (!entryIsA || entryIsA === 'Type') return undefined
+  return entries?.find((entry) => entry.isA === 'Type' && entry.title === entryIsA)
+}
+
+function isRelationshipSchemaKey(key: string): boolean {
+  return RELATIONSHIP_SCHEMA_KEYS.has(canonicalFrontmatterKey(key))
+}
+
+function buildExistingFrontmatterKeys(frontmatter: ParsedFrontmatter): Set<string> {
+  return new Set(Object.keys(frontmatter).map(canonicalFrontmatterKey))
+}
+
+function buildTypeDerivedPropertyEntries({
+  entries,
+  entryIsA,
+  frontmatter,
+}: {
+  entries: VaultEntry[] | undefined
+  entryIsA: string | null
+  frontmatter: ParsedFrontmatter
+}): PropertyEntry[] {
+  const typeEntry = findTypeEntry(entries, entryIsA)
+  if (!typeEntry) return []
+
+  const existingKeys = buildExistingFrontmatterKeys(frontmatter)
+  const result: PropertyEntry[] = []
+  const seen = new Set<string>()
+
+  for (const [key, value] of Object.entries(typeEntry.properties ?? {})) {
+    const canonicalKey = canonicalFrontmatterKey(key)
+    if (existingKeys.has(canonicalKey) || seen.has(canonicalKey) || isRelationshipSchemaKey(key)) continue
+    if (!isVisibleProperty([key, value])) continue
     seen.add(canonicalKey)
     result.push([key, value])
   }
@@ -197,10 +240,20 @@ export function usePropertyPanelState(deps: PropertyPanelDeps) {
   const vaultStatuses = useMemo(() => collectVaultStatuses(entries), [entries])
   const vaultTagsByKey = useMemo(() => collectAllVaultTags(entries), [entries])
   const propertyEntries = useMemo(() => buildVisiblePropertyEntries(frontmatter), [frontmatter])
+  const typeDerivedPropertyEntries = useMemo(
+    () => buildTypeDerivedPropertyEntries({ entries, entryIsA, frontmatter }),
+    [entries, entryIsA, frontmatter],
+  )
 
   const handleSaveValue = useCallback((key: string, newValue: string) => {
     setEditingKey(null)
     if (!onUpdateProperty) return
+    saveScalarProperty({ key, newValue, frontmatter, displayOverrides, onUpdateProperty, onDeleteProperty })
+  }, [displayOverrides, frontmatter, onDeleteProperty, onUpdateProperty])
+
+  const handleSaveTypeDerivedValue = useCallback((key: string, newValue: string) => {
+    setEditingKey(null)
+    if (!onUpdateProperty || newValue.trim() === '') return
     saveScalarProperty({ key, newValue, frontmatter, displayOverrides, onUpdateProperty, onDeleteProperty })
   }, [displayOverrides, frontmatter, onDeleteProperty, onUpdateProperty])
 
@@ -226,7 +279,7 @@ export function usePropertyPanelState(deps: PropertyPanelDeps) {
 
   return {
     editingKey, setEditingKey, showAddDialog, setShowAddDialog, displayOverrides,
-    availableTypes, customColorKey, typeColorKeys, typeIconKeys, vaultStatuses, vaultTagsByKey, propertyEntries,
-    handleSaveValue, handleSaveList, handleAdd, handleDisplayModeChange,
+    availableTypes, customColorKey, typeColorKeys, typeIconKeys, vaultStatuses, vaultTagsByKey, propertyEntries, typeDerivedPropertyEntries,
+    handleSaveValue, handleSaveTypeDerivedValue, handleSaveList, handleAdd, handleDisplayModeChange,
   }
 }

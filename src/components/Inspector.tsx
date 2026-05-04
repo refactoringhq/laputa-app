@@ -96,6 +96,7 @@ function ValidFrontmatterPanels({
       />
       <Separator data-testid="inspector-properties-relationships-separator" />
       <DynamicRelationshipsPanel
+        entry={entry}
         frontmatter={frontmatter}
         entries={entries}
         typeEntryMap={typeEntryMap}
