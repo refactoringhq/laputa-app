@@ -12,6 +12,7 @@ import {
   resolveNewNote,
   resolveNewType,
   resolveTemplate,
+  resolveTypeTargetDir,
   DEFAULT_TEMPLATES,
   RAPID_CREATE_NOTE_SETTLE_MS,
   useNoteCreation,
@@ -146,6 +147,64 @@ describe('buildNoteContent', () => {
       initialEmptyHeading: true,
     })
     expect(content).toBe('---\ntype: Project\nstatus: Active\n---\n\n# \n\n## Objective\n\n')
+  })
+})
+
+describe('resolveTypeTargetDir', () => {
+  it('returns the vault root when no type entry matches', () => {
+    expect(
+      resolveTypeTargetDir({ entries: [], typeName: 'Journal', vaultPath: '/vault' })
+    ).toBe('/vault')
+  })
+
+  it('returns the vault root when the type has no defaultFolder set', () => {
+    const journal = makeEntry({ title: 'Journal', isA: 'Type', defaultFolder: null })
+    expect(
+      resolveTypeTargetDir({ entries: [journal], typeName: 'Journal', vaultPath: '/vault' })
+    ).toBe('/vault')
+  })
+
+  it('returns the configured subfolder when the type defines defaultFolder', () => {
+    const journal = makeEntry({ title: 'Journal', isA: 'Type', defaultFolder: 'Journal' })
+    expect(
+      resolveTypeTargetDir({ entries: [journal], typeName: 'Journal', vaultPath: '/vault' })
+    ).toBe('/vault/Journal')
+  })
+
+  it('strips leading and trailing slashes from defaultFolder', () => {
+    const journal = makeEntry({ title: 'Journal', isA: 'Type', defaultFolder: '/Daily/Journal/' })
+    expect(
+      resolveTypeTargetDir({ entries: [journal], typeName: 'Journal', vaultPath: '/vault' })
+    ).toBe('/vault/Daily/Journal')
+  })
+
+  it('ignores non-Type entries with the same title', () => {
+    const note = makeEntry({ title: 'Journal', isA: 'Note', defaultFolder: 'Should/Be/Ignored' })
+    expect(
+      resolveTypeTargetDir({ entries: [note], typeName: 'Journal', vaultPath: '/vault' })
+    ).toBe('/vault')
+  })
+})
+
+describe('resolveNewNote with entries', () => {
+  it('places the note inside the type defaultFolder when entries are provided', () => {
+    const journal = makeEntry({ title: 'Journal', isA: 'Type', defaultFolder: 'Journal' })
+    const { entry } = resolveNewNote({
+      title: 'Morning Pages',
+      type: 'Journal',
+      vaultPath: '/vault',
+      entries: [journal],
+    })
+    expect(entry.path).toBe('/vault/Journal/morning-pages.md')
+  })
+
+  it('still places the note at the vault root when entries are omitted', () => {
+    const { entry } = resolveNewNote({
+      title: 'Morning Pages',
+      type: 'Journal',
+      vaultPath: '/vault',
+    })
+    expect(entry.path).toBe('/vault/morning-pages.md')
   })
 })
 

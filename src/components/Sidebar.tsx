@@ -42,6 +42,7 @@ interface SidebarProps {
   onCreateNewType?: () => void
   onCustomizeType?: (typeName: string, icon: string, color: string) => void
   onUpdateTypeTemplate?: (typeName: string, template: string) => void
+  onUpdateTypeDefaultFolder?: (typeName: string, folder: string | null) => void
   onReorderSections?: (orderedTypes: { typeName: string; order: number }[]) => void
   onRenameSection?: (typeName: string, label: string) => void
   onDeleteType?: (typeName: string) => void
@@ -480,6 +481,7 @@ function useSidebarRuntime({
   onSelectNote,
   onCustomizeType,
   onUpdateTypeTemplate,
+  onUpdateTypeDefaultFolder,
   onReorderSections,
   onRenameSection,
   onDeleteType,
@@ -495,6 +497,7 @@ function useSidebarRuntime({
     typeEntryMap,
     onCustomizeType,
     onUpdateTypeTemplate,
+    onUpdateTypeDefaultFolder,
     onRenameSection,
     onDeleteType,
   })
@@ -600,9 +603,11 @@ function SidebarRuntimeNavigation({
 
 function SidebarInteractionOverlays({
   locale,
+  folders,
   runtime,
 }: {
   locale: AppLocale
+  folders?: FolderNode[]
   runtime: ReturnType<typeof useSidebarRuntime>
 }) {
   return (
@@ -620,8 +625,10 @@ function SidebarInteractionOverlays({
         target={runtime.typeInteractions.customizeTarget}
         typeEntryMap={runtime.typeEntryMap}
         innerRef={runtime.typeInteractions.popoverRef}
+        folders={folders}
         onCustomize={runtime.typeInteractions.handleCustomize}
         onChangeTemplate={runtime.typeInteractions.handleChangeTemplate}
+        onChangeDefaultFolder={runtime.typeInteractions.handleChangeDefaultFolder}
         onClose={runtime.typeInteractions.closeCustomizeTarget}
         locale={locale}
       />
@@ -644,7 +651,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
         canGoForward={props.canGoForward}
       />
       <SidebarRuntimeNavigation props={props} runtime={runtime} />
-      <SidebarInteractionOverlays locale={locale} runtime={runtime} />
+      <SidebarInteractionOverlays locale={locale} folders={props.folders} runtime={runtime} />
     </aside>
   )
 })

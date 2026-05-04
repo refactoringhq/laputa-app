@@ -5,33 +5,63 @@ import { useTauriDragDropEvent, type TauriDragDropEvent } from './useTauriDragDr
 
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff']
+const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska']
+const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v']
 
-type ImageUrlHandler = (url: string) => void
+type MediaUrlHandler = (url: string) => void
+type MediaKind = 'image' | 'video'
 
-function hasImageFiles(dt: DataTransfer): boolean {
+function hasMediaFiles(dt: DataTransfer): boolean {
   for (let i = 0; i < dt.items.length; i++) {
-    if (dt.items[i].kind === 'file' && IMAGE_MIME_TYPES.includes(dt.items[i].type)) return true
+    const item = dt.items[i]
+    if (item.kind !== 'file') continue
+    if (IMAGE_MIME_TYPES.includes(item.type) || VIDEO_MIME_TYPES.includes(item.type)) return true
   }
   return false
 }
 
-function isImagePath(path: string): boolean {
-  const ext = path.split('.').pop()?.toLowerCase() ?? ''
-  return IMAGE_EXTENSIONS.includes(ext)
+function pathExtension(path: string): string {
+  return path.split('.').pop()?.toLowerCase() ?? ''
 }
 
-/** Upload an image file — saves to vault/attachments in Tauri, returns data URL in browser */
-export async function uploadImageFile(file: File, vaultPath?: string): Promise<string> {
+function classifyPath(path: string): MediaKind | null {
+  const ext = pathExtension(path)
+  if (IMAGE_EXTENSIONS.includes(ext)) return 'image'
+  if (VIDEO_EXTENSIONS.includes(ext)) return 'video'
+  return null
+}
+
+function classifyFile(file: File): MediaKind | null {
+  if (IMAGE_MIME_TYPES.includes(file.type)) return 'image'
+  if (VIDEO_MIME_TYPES.includes(file.type)) return 'video'
+  return classifyPath(file.name)
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  const buf = await file.arrayBuffer()
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  return btoa(binary)
+}
+
+/** Upload a media file. In Tauri mode, saves into the vault under the resolved
+ *  folder; in browser mode, returns a data URL. `folder` is optional — when omitted
+ *  the Rust side falls back to "attachments". */
+export async function uploadImageFile(
+  file: File,
+  vaultPath?: string,
+  folder?: string | null,
+): Promise<string> {
+  const kind = classifyFile(file) ?? 'image'
   if (isTauri() && vaultPath) {
-    const buf = await file.arrayBuffer()
-    const bytes = new Uint8Array(buf)
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-    const base64 = btoa(binary)
-    const savedPath = await invoke<string>('save_image', {
+    const base64 = await fileToBase64(file)
+    const command = kind === 'video' ? 'save_video' : 'save_image'
+    const savedPath = await invoke<string>(command, {
       vaultPath,
       filename: file.name,
       data: base64,
+      folder: folder ?? null,
     })
     return convertFileSrc(savedPath)
   }
@@ -43,40 +73,65 @@ export async function uploadImageFile(file: File, vaultPath?: string): Promise<s
   })
 }
 
-/** Copy a dropped file (by OS path) into vault/attachments and return its asset URL. */
-async function copyImageToVault(sourcePath: string, vaultPath: string): Promise<string> {
-  const savedPath = await invoke<string>('copy_image_to_vault', { vaultPath, sourcePath })
+/** Tauri-native drop: copy a file (image or video) by OS path into the vault. */
+async function copyMediaToVault(
+  sourcePath: string,
+  vaultPath: string,
+  folder: string | null,
+  kind: MediaKind,
+): Promise<string> {
+  const command = kind === 'video' ? 'copy_video_to_vault' : 'copy_image_to_vault'
+  const savedPath = await invoke<string>(command, { vaultPath, sourcePath, folder })
   return convertFileSrc(savedPath)
 }
 
-function insertDroppedImages(
-  imagePaths: string[],
-  vaultPath: string | undefined,
-  onImageUrl: ImageUrlHandler | undefined,
-): void {
-  if (imagePaths.length === 0) return
-  if (!vaultPath || !onImageUrl) return
+interface DropContext {
+  vaultPath: string | undefined
+  imageFolder: string | null
+  videoFolder: string | null
+  onMediaUrl: MediaUrlHandler | undefined
+}
 
-  for (const sourcePath of imagePaths) {
-    void copyImageToVault(sourcePath, vaultPath).then(onImageUrl)
+function insertDroppedMedia(paths: string[], ctx: DropContext): void {
+  if (paths.length === 0) return
+  if (!ctx.vaultPath || !ctx.onMediaUrl) return
+
+  for (const sourcePath of paths) {
+    const kind = classifyPath(sourcePath)
+    if (!kind) continue
+    const folder = kind === 'video' ? ctx.videoFolder : ctx.imageFolder
+    void copyMediaToVault(sourcePath, ctx.vaultPath, folder, kind).then(ctx.onMediaUrl)
   }
 }
 
 interface UseImageDropOptions {
   containerRef: RefObject<HTMLDivElement | null>
-  /** Called with an asset URL for each image dropped via Tauri native drag-drop. */
+  /** Called with an asset URL for each media file dropped via Tauri native drag-drop. */
   onImageUrl?: (url: string) => void
   vaultPath?: string
+  /** Vault-relative folder for images (from settings). null/undefined = "attachments". */
+  imageFolder?: string | null
+  /** Vault-relative folder for videos (from settings). null/undefined = "attachments". */
+  videoFolder?: string | null
 }
 
-function useLatestImageDropRefs(onImageUrl: ImageUrlHandler | undefined, vaultPath: string | undefined) {
+function useLatestImageDropRefs(
+  onImageUrl: MediaUrlHandler | undefined,
+  vaultPath: string | undefined,
+  imageFolder: string | null | undefined,
+  videoFolder: string | null | undefined,
+) {
   const onImageUrlRef = useRef(onImageUrl)
   const vaultPathRef = useRef(vaultPath)
+  const imageFolderRef = useRef<string | null>(imageFolder ?? null)
+  const videoFolderRef = useRef<string | null>(videoFolder ?? null)
 
   useEffect(() => { onImageUrlRef.current = onImageUrl }, [onImageUrl])
   useEffect(() => { vaultPathRef.current = vaultPath }, [vaultPath])
+  useEffect(() => { imageFolderRef.current = imageFolder ?? null }, [imageFolder])
+  useEffect(() => { videoFolderRef.current = videoFolder ?? null }, [videoFolder])
 
-  return { onImageUrlRef, vaultPathRef }
+  return { onImageUrlRef, vaultPathRef, imageFolderRef, videoFolderRef }
 }
 
 function useHtmlImageDropFeedback(
@@ -88,7 +143,7 @@ function useHtmlImageDropFeedback(
     if (!container) return
 
     const handleDragOver = (e: DragEvent) => {
-      if (!e.dataTransfer || !hasImageFiles(e.dataTransfer)) return
+      if (!e.dataTransfer || !hasMediaFiles(e.dataTransfer)) return
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
       setIsDragOver(true)
@@ -112,23 +167,41 @@ function useHtmlImageDropFeedback(
   }, [containerRef, setIsDragOver])
 }
 
-function handleNativeImageDrop(
+function handleNativeMediaDrop(
   event: TauriDragDropEvent,
-  vaultPath: string | undefined,
-  onImageUrl: ImageUrlHandler | undefined,
+  ctx: DropContext,
 ): void {
   if (event.payload.type !== 'drop') return
-  insertDroppedImages(event.payload.paths.filter(isImagePath), vaultPath, onImageUrl)
+  insertDroppedMedia(
+    event.payload.paths.filter((path) => classifyPath(path) !== null),
+    ctx,
+  )
 }
 
-export function useImageDrop({ containerRef, onImageUrl, vaultPath }: UseImageDropOptions) {
+export function useImageDrop({
+  containerRef,
+  onImageUrl,
+  vaultPath,
+  imageFolder,
+  videoFolder,
+}: UseImageDropOptions) {
   const [isDragOver, setIsDragOver] = useState(false)
-  const { onImageUrlRef, vaultPathRef } = useLatestImageDropRefs(onImageUrl, vaultPath)
+  const { onImageUrlRef, vaultPathRef, imageFolderRef, videoFolderRef } = useLatestImageDropRefs(
+    onImageUrl,
+    vaultPath,
+    imageFolder,
+    videoFolder,
+  )
 
   useHtmlImageDropFeedback(containerRef, setIsDragOver)
   useTauriDragDropEvent((event) => {
     setIsDragOver(false)
-    handleNativeImageDrop(event, vaultPathRef.current, onImageUrlRef.current)
+    handleNativeMediaDrop(event, {
+      vaultPath: vaultPathRef.current,
+      imageFolder: imageFolderRef.current,
+      videoFolder: videoFolderRef.current,
+      onMediaUrl: onImageUrlRef.current,
+    })
   })
 
   return { isDragOver }

@@ -100,8 +100,51 @@ describe('uploadImageFile', () => {
       vaultPath: '/vault',
       filename: 'test.png',
       data: expect.any(String),
+      folder: null,
     })
     expect(url).toBe('asset://localhost/vault/attachments/123-test.png')
+
+    tauriMode = false
+  })
+
+  it('forwards a custom folder to save_image when provided', async () => {
+    tauriMode = true
+
+    const { invoke, convertFileSrc } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockResolvedValue('/vault/Media/Images/123-test.png')
+    vi.mocked(convertFileSrc).mockReturnValue('asset://localhost/vault/Media/Images/123-test.png')
+
+    const blob = new Blob([new Uint8Array([0x89, 0x50])], { type: 'image/png' })
+    const file = new File([blob], 'test.png', { type: 'image/png' })
+
+    await uploadImageFile(file, '/vault', 'Media/Images')
+    expect(invoke).toHaveBeenCalledWith('save_image', {
+      vaultPath: '/vault',
+      filename: 'test.png',
+      data: expect.any(String),
+      folder: 'Media/Images',
+    })
+
+    tauriMode = false
+  })
+
+  it('routes a video file through save_video', async () => {
+    tauriMode = true
+
+    const { invoke, convertFileSrc } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockResolvedValue('/vault/Media/Videos/123-clip.mp4')
+    vi.mocked(convertFileSrc).mockReturnValue('asset://localhost/vault/Media/Videos/123-clip.mp4')
+
+    const blob = new Blob([new Uint8Array([0x00, 0x01])], { type: 'video/mp4' })
+    const file = new File([blob], 'clip.mp4', { type: 'video/mp4' })
+
+    await uploadImageFile(file, '/vault', 'Media/Videos')
+    expect(invoke).toHaveBeenCalledWith('save_video', {
+      vaultPath: '/vault',
+      filename: 'clip.mp4',
+      data: expect.any(String),
+      folder: 'Media/Videos',
+    })
 
     tauriMode = false
   })

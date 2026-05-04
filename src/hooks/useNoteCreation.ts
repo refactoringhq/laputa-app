@@ -22,8 +22,25 @@ export function buildNewEntry({ path, slug, title, type, status }: NewEntryParam
     aliases: [], belongsTo: [], relatedTo: [],
     status, archived: false,
     modifiedAt: now, createdAt: now, fileSize: 0,
-    snippet: '', wordCount: 0, relationships: {}, icon: null, color: null, order: null, outgoingLinks: [], sidebarLabel: null, template: null, sort: null, view: null, visible: null, properties: {}, organized: false, favorite: false, favoriteIndex: null, listPropertiesDisplay: [], hasH1: false,
+    snippet: '', wordCount: 0, relationships: {}, icon: null, color: null, order: null, outgoingLinks: [], sidebarLabel: null, template: null, sort: null, view: null, visible: null, defaultFolder: null, properties: {}, organized: false, favorite: false, favoriteIndex: null, listPropertiesDisplay: [], hasH1: false,
   }
+}
+
+/** Resolve the absolute directory where new notes of `typeName` should be created.
+ *  Looks up the type entry's `defaultFolder` (opt-in subfolder); falls back to vault root. */
+export function resolveTypeTargetDir({
+  entries,
+  typeName,
+  vaultPath,
+}: {
+  entries: VaultEntry[]
+  typeName: string
+  vaultPath: string
+}): string {
+  const typeEntry = entries.find((entry) => entry.isA === 'Type' && entry.title === typeName)
+  const subfolder = typeEntry?.defaultFolder?.trim()
+  if (!subfolder) return vaultPath
+  return `${vaultPath}/${subfolder.replace(/^\/+|\/+$/g, '')}`
 }
 
 export { slugify }
@@ -111,12 +128,24 @@ export interface NewNoteParams {
   type: string
   vaultPath: string
   template?: string | null
+  /** When provided, the type's `defaultFolder` is consulted to place the note
+   *  inside a subfolder. Without `entries`, the note is created at the vault root. */
+  entries?: VaultEntry[]
 }
 
-export function resolveNewNote({ title, type, vaultPath, template }: NewNoteParams): { entry: VaultEntry; content: string } {
+export function resolveNewNote({
+  title,
+  type,
+  vaultPath,
+  template,
+  entries,
+}: NewNoteParams): { entry: VaultEntry; content: string } {
   const slug = slugify(title)
   const status = null
-  const entry = buildNewEntry({ path: `${vaultPath}/${slug}.md`, slug, title, type, status })
+  const targetDir = entries
+    ? resolveTypeTargetDir({ entries, typeName: type, vaultPath })
+    : vaultPath
+  const entry = buildNewEntry({ path: `${targetDir}/${slug}.md`, slug, title, type, status })
   return { entry, content: buildNoteContent({ title, type, status, template }) }
 }
 
@@ -180,7 +209,7 @@ export function planNewNoteCreation({
   vaultPath,
   template,
 }: NewNoteParams & { entries: VaultEntry[] }): NoteCreationPlan {
-  const resolved = resolveNewNote({ title, type, vaultPath, template })
+  const resolved = resolveNewNote({ title, type, vaultPath, template, entries })
   const collision = findPathCollision(entries, resolved.entry.path)
   if (collision) {
     return {
@@ -473,7 +502,12 @@ async function createNoteImmediate(deps: ImmediateCreateDeps, type?: string): Pr
   const title = slug_to_title(slug)
   const template = resolveTemplate({ entries: deps.entries, typeName: noteType })
   const status = null
-  const entry = buildNewEntry({ path: `${deps.vaultPath}/${slug}.md`, slug, title, type: noteType, status })
+  const targetDir = resolveTypeTargetDir({
+    entries: deps.entries,
+    typeName: noteType,
+    vaultPath: deps.vaultPath,
+  })
+  const entry = buildNewEntry({ path: `${targetDir}/${slug}.md`, slug, title, type: noteType, status })
   const content = buildNoteContent({ title: null, type: noteType, status, template, initialEmptyHeading: true })
   const didPersist = await persistImmediateEntry(deps, entry, content)
   if (!didPersist) return false

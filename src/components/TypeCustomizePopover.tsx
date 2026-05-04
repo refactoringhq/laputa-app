@@ -3,6 +3,8 @@ import { MagnifyingGlass } from '@phosphor-icons/react'
 import { ICON_OPTIONS, type IconEntry } from '../utils/iconRegistry'
 import { ACCENT_COLORS } from '../utils/typeColors'
 import { cn } from '@/lib/utils'
+import type { FolderNode } from '../types'
+import { FolderPicker } from './FolderPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -18,9 +20,12 @@ interface TypeCustomizePopoverProps {
   currentIcon: string | null
   currentColor: string | null
   currentTemplate: string | null
+  currentDefaultFolder?: string | null
+  folders?: FolderNode[]
   onChangeIcon: (icon: string) => void
   onChangeColor: (color: string) => void
   onChangeTemplate: (template: string) => void
+  onChangeDefaultFolder?: (folder: string | null) => void
   onClose: () => void
   showTemplate?: boolean
   showDone?: boolean
@@ -181,6 +186,33 @@ function TemplateSection({ templateText, locale, onTemplateChange }: TemplateSec
   )
 }
 
+function DefaultFolderSection({
+  locale,
+  value,
+  folders,
+  onChange,
+}: {
+  locale: AppLocale
+  value: string | null
+  folders: FolderNode[]
+  onChange: (folder: string | null) => void
+}) {
+  return (
+    <>
+      <div className="font-mono-overline mb-2 mt-3 text-muted-foreground">
+        {translate(locale, 'customize.defaultFolder')}
+      </div>
+      <FolderPicker
+        value={value}
+        onChange={onChange}
+        folders={folders}
+        placeholder={translate(locale, 'customize.defaultFolderPlaceholder')}
+        ariaLabel={translate(locale, 'customize.defaultFolder')}
+      />
+    </>
+  )
+}
+
 function DoneSection({ locale, onClose }: { locale: AppLocale; onClose: () => void }) {
   return (
     <div className="mt-3 flex justify-end">
@@ -201,9 +233,12 @@ export function TypeCustomizePopover({
   currentIcon,
   currentColor,
   currentTemplate,
+  currentDefaultFolder = null,
+  folders = [],
   onChangeIcon,
   onChangeColor,
   onChangeTemplate,
+  onChangeDefaultFolder,
   onClose,
   showTemplate = true,
   showDone = true,
@@ -253,6 +288,14 @@ export function TypeCustomizePopover({
         onSearchChange={setSearch}
         onSelectIcon={handleIconClick}
       />
+      {onChangeDefaultFolder && (
+        <DefaultFolderSection
+          locale={locale}
+          value={currentDefaultFolder}
+          folders={folders}
+          onChange={onChangeDefaultFolder}
+        />
+      )}
       {showTemplate && (
         <TemplateSection templateText={templateText} locale={locale} onTemplateChange={handleTemplateChange} />
       )}

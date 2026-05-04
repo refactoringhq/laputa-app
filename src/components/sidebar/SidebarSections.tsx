@@ -481,16 +481,20 @@ export function CustomizeOverlay({
   target,
   typeEntryMap,
   innerRef,
+  folders,
   onCustomize,
   onChangeTemplate,
+  onChangeDefaultFolder,
   onClose,
   locale = 'en',
 }: {
   target: string | null
   typeEntryMap: Record<string, VaultEntry>
   innerRef: Ref<HTMLDivElement>
+  folders?: import('../../types').FolderNode[]
   onCustomize: (prop: 'icon' | 'color', value: string) => void
   onChangeTemplate: (template: string) => void
+  onChangeDefaultFolder?: (folder: string | null) => void
   onClose: () => void
   locale?: AppLocale
 }) {
@@ -502,9 +506,12 @@ export function CustomizeOverlay({
         currentIcon={typeEntryMap[target]?.icon ?? null}
         currentColor={typeEntryMap[target]?.color ?? null}
         currentTemplate={typeEntryMap[target]?.template ?? null}
+        currentDefaultFolder={typeEntryMap[target]?.defaultFolder ?? null}
+        folders={folders}
         onChangeIcon={(icon) => onCustomize('icon', icon)}
         onChangeColor={(color) => onCustomize('color', color)}
         onChangeTemplate={onChangeTemplate}
+        onChangeDefaultFolder={onChangeDefaultFolder}
         onClose={onClose}
         locale={locale}
       />

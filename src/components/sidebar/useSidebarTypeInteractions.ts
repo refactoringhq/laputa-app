@@ -12,6 +12,7 @@ interface SidebarTypeInteractionsInput {
   typeEntryMap: Record<string, VaultEntry>
   onCustomizeType?: (typeName: string, icon: string, color: string) => void
   onUpdateTypeTemplate?: (typeName: string, template: string) => void
+  onUpdateTypeDefaultFolder?: (typeName: string, folder: string | null) => void
   onRenameSection?: (typeName: string, label: string) => void
   onDeleteType?: (typeName: string) => void
 }
@@ -96,6 +97,7 @@ export function useSidebarTypeInteractions({
   typeEntryMap,
   onCustomizeType,
   onUpdateTypeTemplate,
+  onUpdateTypeDefaultFolder,
   onRenameSection,
   onDeleteType,
 }: SidebarTypeInteractionsInput) {
@@ -121,6 +123,10 @@ export function useSidebarTypeInteractions({
     if (state.customizeTarget) onUpdateTypeTemplate?.(state.customizeTarget, template)
   }, [onUpdateTypeTemplate, state.customizeTarget])
 
+  const handleChangeDefaultFolder = useCallback((folder: string | null) => {
+    if (state.customizeTarget) onUpdateTypeDefaultFolder?.(state.customizeTarget, folder)
+  }, [onUpdateTypeDefaultFolder, state.customizeTarget])
+
   const openCustomizeTarget = useCallback((type: string) => {
     state.closeContextMenu()
     state.setCustomizeTarget(type)
@@ -139,6 +145,7 @@ export function useSidebarTypeInteractions({
     customizeRef: state.customizeRef,
     customizeTarget: state.customizeTarget,
     handleChangeTemplate,
+    handleChangeDefaultFolder,
     handleContextMenu,
     handleCustomize,
     handleDeleteType,

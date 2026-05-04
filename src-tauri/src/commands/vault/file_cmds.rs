@@ -248,9 +248,10 @@ pub fn save_image(
     vault_path: PathBuf,
     filename: String,
     data: String,
+    folder: Option<String>,
 ) -> Result<String, String> {
     with_image_asset_scope(&app_handle, vault_path.as_path(), |requested_root| {
-        vault::save_image(requested_root, &filename, &data)
+        vault::save_image(requested_root, folder.as_deref(), &filename, &data)
     })
 }
 
@@ -259,9 +260,55 @@ pub fn copy_image_to_vault(
     app_handle: tauri::AppHandle,
     vault_path: PathBuf,
     source_path: PathBuf,
+    folder: Option<String>,
 ) -> Result<String, String> {
     with_image_asset_scope(&app_handle, vault_path.as_path(), |requested_root| {
-        vault::copy_image_to_vault(requested_root, source_path.to_string_lossy().as_ref())
+        vault::copy_image_to_vault(
+            requested_root,
+            folder.as_deref(),
+            source_path.to_string_lossy().as_ref(),
+        )
+    })
+}
+
+#[tauri::command]
+pub fn save_video(
+    app_handle: tauri::AppHandle,
+    vault_path: PathBuf,
+    filename: String,
+    data: String,
+    folder: Option<String>,
+) -> Result<String, String> {
+    with_image_asset_scope(&app_handle, vault_path.as_path(), |requested_root| {
+        vault::save_video(requested_root, folder.as_deref(), &filename, &data)
+    })
+}
+
+#[tauri::command]
+pub fn copy_video_to_vault(
+    app_handle: tauri::AppHandle,
+    vault_path: PathBuf,
+    source_path: PathBuf,
+    folder: Option<String>,
+) -> Result<String, String> {
+    with_image_asset_scope(&app_handle, vault_path.as_path(), |requested_root| {
+        vault::copy_video_to_vault(
+            requested_root,
+            folder.as_deref(),
+            source_path.to_string_lossy().as_ref(),
+        )
+    })
+}
+
+#[tauri::command]
+pub fn ensure_vault_folder(vault_path: PathBuf, folder: String) -> Result<String, String> {
+    with_requested_root_path(vault_path.as_path(), |requested_root| {
+        let normalized = crate::settings::normalize_vault_relative_folder(Some(&folder))
+            .ok_or_else(|| format!("Invalid folder path: {}", folder))?;
+        let target = Path::new(requested_root).join(&normalized);
+        std::fs::create_dir_all(&target)
+            .map_err(|e| format!("Failed to create folder {}: {}", normalized, e))?;
+        Ok(normalized)
     })
 }
 

@@ -47,6 +47,7 @@ _icon: shapes             # icon assigned to a type
 _color: blue              # color assigned to a type
 _order: 10                # sort order in the sidebar
 _sidebar_label: Projects  # override label in sidebar
+_default_folder: Projects # vault-relative folder for new notes of this type (opt-in)
 _width: wide              # rich-editor width override for this note
 ```
 
@@ -787,6 +788,8 @@ interface Settings {
   ui_language: AppLocale | null
   note_width_mode: 'normal' | 'wide' | null
   default_ai_agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | 'gemini' | null
+  default_image_folder: string | null // vault-relative; null falls back to "attachments"
+  default_video_folder: string | null // vault-relative; null falls back to "attachments"
   default_ai_target: string | null // "agent:codex" or "model:<provider>/<model>"
   ai_model_providers: AiModelProvider[] | null
   hide_gitignored_files: boolean | null // null = default true
@@ -797,6 +800,10 @@ interface Settings {
 ```
 
 Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is installation-local because it controls device comfort rather than vault structure; the Settings panel and command-palette light/dark actions both update that same value. `ui_language` is also installation-local: `null` follows the supported system language with English fallback, while explicit values pin the UI language for this installation. Stored legacy aliases such as `zh-Hans` are normalized to canonical locale codes before the setting reaches React state. `note_width_mode` is the installation-local default for rich-editor note width; individual notes can override it with `_width` when they already have frontmatter. `default_ai_agent` remains the legacy installation-local CLI fallback. `default_ai_target` is the active AI target used by the AI panel and status bar; it can point at a coding agent or a configured direct model. `ai_model_providers` stores non-secret provider metadata for local/API model targets, while hosted API keys live in Tolaria's local app-data secrets file or user-managed environment variables instead of being persisted in app settings. Provider defaults and local/API grouping come from the shared `src/shared/aiModelProviderCatalog.json` catalog used by both renderer settings and the Tauri direct-model runtime. `hide_gitignored_files` is also installation-local and defaults to `true`; changing it reloads entries, search, saved views, and folders without restarting. The `all_notes_show_pdfs`, `all_notes_show_images`, and `all_notes_show_unsupported` flags are installation-local All Notes category toggles that default off and update the list/counts without changing vault files. The AutoGit fields are also installation-local: `useAutoGit` consumes them to schedule automatic checkpoints, while `useCommitFlow` and the status bar quick action reuse the same checkpoint runner and deterministic automatic commit message generation.
+
+`default_image_folder` and `default_video_folder` are vault-relative folder paths normalized through `normalize_vault_relative_folder` (rejects absolute paths, `..` traversal, empty input). They control where pasted/dropped images and videos land. Per-installation rather than per-vault so users can keep different folder layouts on different machines; both default to `attachments/` when unset. See [ADR-0085](adr/0085-per-type-default-folder-and-media-folders.md).
+
+A related opt-in vault-frontmatter field, `_default_folder`, lives on type entries and routes new notes of that type into the named subfolder. It is parsed into `VaultEntry.defaultFolder` and consulted by `resolveTypeTargetDir` in `useNoteCreation`. Existing notes are not moved, and changing a note's type later does not relocate the file — see ADR-0085 for the trade-offs against the flat-vault baseline ([ADR-0006](adr/0006-flat-vault-structure.md)).
 
 ## Telemetry
 

@@ -59,6 +59,11 @@ pub struct VaultEntry {
     pub note_width: Option<String>,
     /// Whether this Type is visible in the sidebar. Defaults to true when absent.
     pub visible: Option<bool>,
+    /// For Type entries: optional vault-relative folder where new notes of this Type
+    /// are created. None means create at the vault root (default behaviour).
+    /// Stored as `_default_folder` in frontmatter.
+    #[serde(rename = "defaultFolder")]
+    pub default_folder: Option<String>,
     /// Whether this note has been explicitly organized (removed from Inbox).
     pub organized: bool,
     /// Whether this note is a user favorite (shown in FAVORITES sidebar section).

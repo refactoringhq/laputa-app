@@ -41,6 +41,9 @@ export interface VaultEntry {
   noteWidth?: NoteWidthMode | null
   /** Whether this Type is visible in the sidebar. Defaults to true when absent. */
   visible: boolean | null
+  /** For Type entries: optional vault-relative folder where new notes of this Type
+   *  are created. null = create at vault root (default). Stored as `_default_folder`. */
+  defaultFolder: string | null
   /** Whether this note has been explicitly organized (removed from Inbox). */
   organized: boolean
   /** Whether this note is a user favorite (shown in FAVORITES sidebar section). */
@@ -100,6 +103,10 @@ export interface Settings {
   note_width_mode?: NoteWidthMode | null
   initial_h1_auto_rename_enabled?: boolean | null
   default_ai_agent?: AiAgentId | null
+  /** Vault-relative folder where pasted/dropped images are saved. Null = "attachments". */
+  default_image_folder?: string | null
+  /** Vault-relative folder where pasted/dropped videos are saved. Null = "attachments". */
+  default_video_folder?: string | null
   default_ai_target?: string | null
   ai_model_providers?: AiModelProvider[] | null
   hide_gitignored_files?: boolean | null

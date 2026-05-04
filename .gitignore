@@ -73,3 +73,4 @@ CODE-HEALTH-REPORT.md
 .env
 .env.local
 .env.*.local
+.claude/worktrees/

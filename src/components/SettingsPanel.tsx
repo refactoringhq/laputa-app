@@ -25,7 +25,8 @@ import {
 } from 'react'
 import { Moon, Sun, X } from '@phosphor-icons/react'
 import { Bot, Copy, Folder, GitBranch, ListChecks, Palette, RefreshCw, ShieldCheck } from 'lucide-react'
-import type { Settings } from '../types'
+import type { FolderNode, Settings } from '../types'
+import { FolderPicker } from './FolderPicker'
 import {
   APP_LOCALES,
   SYSTEM_UI_LANGUAGE,
@@ -70,6 +71,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 interface SettingsPanelProps {
   open: boolean
   settings: Settings
+  folders?: FolderNode[]
   aiAgentsStatus?: AiAgentsStatus
   locale?: AppLocale
   systemLocale?: AppLocale
@@ -99,6 +101,8 @@ interface SettingsDraft {
   crashReporting: boolean
   analytics: boolean
   explicitOrganization: boolean
+  defaultImageFolder: string | null
+  defaultVideoFolder: string | null
 }
 
 interface SettingsBodyProps {
@@ -142,6 +146,11 @@ interface SettingsBodyProps {
   setCrashReporting: (value: boolean) => void
   analytics: boolean
   setAnalytics: (value: boolean) => void
+  folders: FolderNode[]
+  defaultImageFolder: string | null
+  setDefaultImageFolder: (value: string | null) => void
+  defaultVideoFolder: string | null
+  setDefaultVideoFolder: (value: string | null) => void
 }
 
 const PULL_INTERVAL_OPTIONS = [1, 2, 5, 10, 15, 30] as const
@@ -190,6 +199,8 @@ function createSettingsDraft(
     crashReporting: settings.crash_reporting_enabled ?? false,
     analytics: settings.analytics_enabled ?? false,
     explicitOrganization: explicitOrganizationEnabled,
+    defaultImageFolder: settings.default_image_folder ?? null,
+    defaultVideoFolder: settings.default_video_folder ?? null,
   }
 }
 
@@ -228,6 +239,8 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     ui_language: serializeUiLanguagePreference(draft.uiLanguage),
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
     default_ai_agent: draft.defaultAiAgent,
+    default_image_folder: draft.defaultImageFolder,
+    default_video_folder: draft.defaultVideoFolder,
     default_ai_target: draft.defaultAiTarget,
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
     hide_gitignored_files: draft.hideGitignoredFiles,
@@ -263,6 +276,7 @@ function useSettingsPanelAutofocus(panelRef: RefObject<HTMLDivElement | null>): 
 export function SettingsPanel({
   open,
   settings,
+  folders,
   aiAgentsStatus = createMissingAiAgentsStatus(),
   locale = 'en',
   systemLocale = locale,
@@ -278,6 +292,7 @@ export function SettingsPanel({
   return (
     <SettingsPanelInner
       settings={settings}
+      folders={folders ?? []}
       aiAgentsStatus={aiAgentsStatus}
       locale={locale}
       systemLocale={systemLocale}
@@ -291,16 +306,18 @@ export function SettingsPanel({
   )
 }
 
-type SettingsPanelInnerProps = Omit<SettingsPanelProps, 'open' | 'explicitOrganizationEnabled' | 'aiAgentsStatus' | 'isGitVault'> & {
+type SettingsPanelInnerProps = Omit<SettingsPanelProps, 'open' | 'explicitOrganizationEnabled' | 'aiAgentsStatus' | 'isGitVault' | 'folders'> & {
   aiAgentsStatus: AiAgentsStatus
   locale: AppLocale
   systemLocale: AppLocale
   isGitVault: boolean
   explicitOrganizationEnabled: boolean
+  folders: FolderNode[]
 }
 
 function SettingsPanelInner({
   settings,
+  folders,
   aiAgentsStatus,
   systemLocale,
   onSave,
@@ -398,6 +415,7 @@ function SettingsPanelInner({
           setThemeMode={handleThemeModeChange}
           setHideGitignoredFiles={handleGitignoredVisibilityChange}
           setAllNotesFileVisibility={handleAllNotesFileVisibilityChange}
+          folders={folders}
         />
         <SettingsFooter onClose={onClose} onSave={handleSave} t={t} />
       </div>
@@ -437,6 +455,7 @@ interface SettingsBodyFromDraftProps {
   setThemeMode: (value: ThemeMode) => void
   setHideGitignoredFiles: (value: boolean) => void
   setAllNotesFileVisibility: (value: AllNotesFileVisibility) => void
+  folders: FolderNode[]
 }
 
 function SettingsBodyFromDraft({
@@ -451,6 +470,7 @@ function SettingsBodyFromDraft({
   setThemeMode,
   setHideGitignoredFiles,
   setAllNotesFileVisibility,
+  folders,
 }: SettingsBodyFromDraftProps) {
   return (
     <SettingsBody
@@ -494,6 +514,11 @@ function SettingsBodyFromDraft({
       setCrashReporting={(value) => updateDraft('crashReporting', value)}
       analytics={draft.analytics}
       setAnalytics={(value) => updateDraft('analytics', value)}
+      folders={folders}
+      defaultImageFolder={draft.defaultImageFolder}
+      setDefaultImageFolder={(value) => updateDraft('defaultImageFolder', value)}
+      defaultVideoFolder={draft.defaultVideoFolder}
+      setDefaultVideoFolder={(value) => updateDraft('defaultVideoFolder', value)}
     />
   )
 }
@@ -562,6 +587,11 @@ function SettingsSyncAndAppearanceSections({
   setThemeMode,
   uiLanguage,
   setUiLanguage,
+  folders,
+  defaultImageFolder,
+  setDefaultImageFolder,
+  defaultVideoFolder,
+  setDefaultVideoFolder,
 }: SettingsBodyProps) {
   return (
     <>
@@ -603,6 +633,17 @@ function SettingsSyncAndAppearanceSections({
             setUiLanguage={setUiLanguage}
           />
         </SettingsGroup>
+      </SettingsSection>
+
+      <SettingsSection>
+        <MediaSettingsSection
+          t={t}
+          folders={folders}
+          defaultImageFolder={defaultImageFolder}
+          setDefaultImageFolder={setDefaultImageFolder}
+          defaultVideoFolder={defaultVideoFolder}
+          setDefaultVideoFolder={setDefaultVideoFolder}
+        />
       </SettingsSection>
     </>
   )
@@ -769,6 +810,79 @@ function ThemeModeControl({
       <ThemeModeButton label={t('settings.theme.dark')} selected={value === 'dark'} value="dark" onSelect={onChange}>
         <Moon size={14} />
       </ThemeModeButton>
+    </div>
+  )
+}
+
+function MediaSettingsSection({
+  t,
+  folders,
+  defaultImageFolder,
+  setDefaultImageFolder,
+  defaultVideoFolder,
+  setDefaultVideoFolder,
+}: Pick<
+  SettingsBodyProps,
+  't' | 'folders' | 'defaultImageFolder' | 'setDefaultImageFolder' | 'defaultVideoFolder' | 'setDefaultVideoFolder'
+>) {
+  const placeholder = t('settings.media.folderPlaceholder')
+  return (
+    <>
+      <SectionHeading
+        title={t('settings.media.title')}
+        description={t('settings.media.description')}
+      />
+
+      <MediaFolderRow
+        label={t('settings.media.imageFolder')}
+        ariaLabel={t('settings.media.imageFolder')}
+        placeholder={placeholder}
+        value={defaultImageFolder}
+        onChange={setDefaultImageFolder}
+        folders={folders}
+        testId="settings-media-image-folder"
+      />
+
+      <MediaFolderRow
+        label={t('settings.media.videoFolder')}
+        ariaLabel={t('settings.media.videoFolder')}
+        placeholder={placeholder}
+        value={defaultVideoFolder}
+        onChange={setDefaultVideoFolder}
+        folders={folders}
+        testId="settings-media-video-folder"
+      />
+    </>
+  )
+}
+
+function MediaFolderRow({
+  label,
+  ariaLabel,
+  placeholder,
+  value,
+  onChange,
+  folders,
+  testId,
+}: {
+  label: string
+  ariaLabel: string
+  placeholder: string
+  value: string | null
+  onChange: (value: string | null) => void
+  folders: FolderNode[]
+  testId: string
+}) {
+  return (
+    <div className="flex flex-col gap-1.5" data-testid={testId}>
+      <span className="text-xs font-medium text-muted-foreground" aria-hidden="true">{label}</span>
+      <FolderPicker
+        value={value}
+        onChange={onChange}
+        folders={folders}
+        placeholder={placeholder}
+        ariaLabel={ariaLabel}
+      />
     </div>
   )
 }

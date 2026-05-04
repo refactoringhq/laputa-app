@@ -47,6 +47,8 @@ const EMPTY_SETTINGS: Settings = {
   ui_language: null,
   note_width_mode: null,
   default_ai_agent: null,
+  default_image_folder: null,
+  default_video_folder: null,
   default_ai_target: null,
   ai_model_providers: null,
   hide_gitignored_files: null,

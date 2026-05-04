@@ -327,10 +327,11 @@ mod tests {
 
     #[test]
     fn test_search_vault_uses_h1_for_result_title() {
-        let dir = Builder::new()
-            .prefix("search-vault-")
-            .tempdir_in(std::env::current_dir().unwrap())
-            .unwrap();
+        // Use OS tempdir (not current_dir) so the test path never traverses a
+        // dotfile component (e.g. .claude/worktrees/...) — `search_vault` skips
+        // any path containing a hidden segment, which would silently drop the
+        // fixture and produce a phantom 0-result failure on certain checkouts.
+        let dir = Builder::new().prefix("search-vault-").tempdir().unwrap();
         let note_path = dir.path().join("legacy-name.md");
         fs::write(
             &note_path,
@@ -347,9 +348,13 @@ mod tests {
 
     #[test]
     fn test_search_vault_hides_gitignored_notes_when_enabled() {
+        // Use OS tempdir (not current_dir) so the test path never traverses a
+        // dotfile component (e.g. .claude/worktrees/...) — `search_vault` skips
+        // any path containing a hidden segment, which would silently drop the
+        // fixture and make the assertion fail with 0 vs 1 results.
         let dir = Builder::new()
             .prefix("search-gitignored-")
-            .tempdir_in(std::env::current_dir().unwrap())
+            .tempdir()
             .unwrap();
         init_git_repo(dir.path());
         fs::create_dir_all(dir.path().join("ignored")).unwrap();

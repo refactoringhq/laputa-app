@@ -82,6 +82,17 @@ export function useEntryActions({
     onFrontmatterPersisted?.()
   }, [entries, handleUpdateFrontmatter, updateEntry, createTypeEntry, onFrontmatterPersisted])
 
+  const handleUpdateTypeDefaultFolder = useCallback(async (typeName: string, folder: string | null) => {
+    const typeEntry = await findOrCreateType(entries, typeName, createTypeEntry)
+    if (folder) {
+      await handleUpdateFrontmatter(typeEntry.path, '_default_folder', folder)
+    } else {
+      await handleDeleteProperty(typeEntry.path, '_default_folder')
+    }
+    updateEntry(typeEntry.path, { defaultFolder: folder })
+    onFrontmatterPersisted?.()
+  }, [entries, handleUpdateFrontmatter, handleDeleteProperty, updateEntry, createTypeEntry, onFrontmatterPersisted])
+
   const handleRenameSection = useCallback(async (typeName: string, label: string) => {
     const typeEntry = await findOrCreateType(entries, typeName, createTypeEntry)
     const trimmed = label.trim()
@@ -174,5 +185,5 @@ export function useEntryActions({
     onFrontmatterPersisted?.()
   }, [entries, handleUpdateFrontmatter, handleDeleteProperty, updateEntry, createTypeEntry, onFrontmatterPersisted])
 
-  return { handleArchiveNote, handleUnarchiveNote, handleCustomizeType, handleReorderSections, handleUpdateTypeTemplate, handleRenameSection, handleToggleTypeVisibility, handleToggleFavorite, handleToggleOrganized, handleReorderFavorites }
+  return { handleArchiveNote, handleUnarchiveNote, handleCustomizeType, handleReorderSections, handleUpdateTypeTemplate, handleUpdateTypeDefaultFolder, handleRenameSection, handleToggleTypeVisibility, handleToggleFavorite, handleToggleOrganized, handleReorderFavorites }
 }

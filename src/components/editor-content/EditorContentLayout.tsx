@@ -67,6 +67,7 @@ const LOADING_BREADCRUMB_ENTRY: VaultEntry = {
   favorite: false,
   favoriteIndex: null,
   listPropertiesDisplay: [],
+  defaultFolder: null,
   outgoingLinks: [],
   properties: {},
   hasH1: false,

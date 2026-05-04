@@ -248,9 +248,11 @@ mod tests {
 
     #[tokio::test]
     async fn search_vault_command_uses_default_limit_and_returns_results() {
+        // Use OS tempdir (not current_dir) — search_vault skips paths with
+        // dotfile-prefixed components (e.g. .claude/worktrees/...).
         let dir = tempfile::Builder::new()
             .prefix("scan-search-")
-            .tempdir_in(std::env::current_dir().unwrap())
+            .tempdir()
             .unwrap();
         write_note(dir.path(), "search.md", "# Searchable\n\nneedle");
 
@@ -272,7 +274,7 @@ mod tests {
     async fn search_vault_command_honors_explicit_limit() {
         let dir = tempfile::Builder::new()
             .prefix("scan-search-limit-")
-            .tempdir_in(std::env::current_dir().unwrap())
+            .tempdir()
             .unwrap();
         write_note(dir.path(), "first.md", "# First\n\nneedle");
         write_note(dir.path(), "second.md", "# Second\n\nneedle");

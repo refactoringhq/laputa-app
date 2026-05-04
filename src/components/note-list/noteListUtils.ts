@@ -164,6 +164,7 @@ function createDeletedNoteEntry(file: ModifiedFile): DeletedNoteEntry {
     sort: null,
     view: null,
     visible: null,
+    defaultFolder: null,
     organized: false,
     favorite: false,
     favoriteIndex: null,
