@@ -162,3 +162,4 @@ proposed → active → superseded
 | [0107](0107-markdown-durable-tldraw-whiteboards.md) | Markdown-durable tldraw whiteboards in notes | active |
 | [0107](0107-pointer-owned-editor-block-reordering.md) | Pointer-owned editor block reordering | active |
 | [0108](0108-sanitized-rendered-markup-and-safe-regex.md) | Sanitized rendered markup and safe user regex | active |
+| [0109](0109-debounced-worker-derived-editor-indexes.md) | Debounced worker-derived editor indexes | active |
