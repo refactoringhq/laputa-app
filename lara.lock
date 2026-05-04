@@ -421,6 +421,8 @@ files:
     editor.toolbar.showDiff: 08d579de8d3abdcdfce0953a797362c6
     editor.toolbar.openAi: d2e93006570a66709c8ce0dc27082ef1
     editor.toolbar.closeAi: cd46973ef73076d612dff9903ce54498
+    editor.toolbar.openTableOfContents: b733f053ea3fde4a9acd589ec7f58c10
+    editor.toolbar.closeTableOfContents: d3292972a10edd1a06a627f3552f760a
     editor.toolbar.restoreArchived: 1bff5cf4943af64c05b2e9aeadccbc84
     editor.toolbar.archive: 63dc964c32e715217b49f8739d49636b
     editor.toolbar.delete: f48134a07b016a1de05d4ba6d2fbfb41
@@ -428,6 +430,14 @@ files:
     editor.toolbar.copyFilePath: 64c6cec5ca57efbb8c9c93ae5fbccd27
     editor.toolbar.moreActions: 89e19353176b94068dec4c768c25e70b
     editor.toolbar.openProperties: 948b90b60b8ce827f179e8c5b85b112e
+    tableOfContents.title: f61d6c3e3733db355168b7e1aee6780b
+    tableOfContents.close: d3292972a10edd1a06a627f3552f760a
+    tableOfContents.empty: e4f02ad69cbbce1ec65d14215e3d5871
+    tableOfContents.emptyNoNote: 046d95682b747a30ed8a7b0b1d581629
+    tableOfContents.navLabel: 598b8ae10dfce818e73d3218daddbdae
+    tableOfContents.untitledHeading: 93c2dde207965b383b7b22af005ebe4f
+    tableOfContents.expandHeading: 6353ab44fe75f5dd935789bdab8551a0
+    tableOfContents.collapseHeading: 040b4c102283028831ea78713235e478
     editor.codeBlock.copy: 8e477020fb3f7ab844b91ff1d7de8347
     editor.imageLightbox.title: 2c5a15c875bcdc2478c4a5cad044e10c
     editor.filename.rename: c31c2b468229232ad6287e734fe67d96

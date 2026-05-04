@@ -8,6 +8,7 @@ import { DEFAULT_AI_AGENT, type AiAgentId, type AiAgentReadiness } from '../lib/
 import type { AiTarget } from '../lib/aiTargets'
 import { translate, type AppLocale } from '../lib/i18n'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
+import { trackEvent } from '../lib/telemetry'
 import type { VaultEntry, GitCommit, NoteWidthMode, NoteStatus } from '../types'
 import type { NoteListItem } from '../utils/ai-context'
 import type { FrontmatterValue } from './Inspector'
@@ -437,6 +438,27 @@ function EditorLayout({
 }) {
   const activeBinaryTab = activeTab?.entry.fileKind === 'binary' ? activeTab : null
   const showEmptyState = tabs.length === 0 && activeTabPath === null && !isVaultLoading
+  const [showTableOfContents, setShowTableOfContents] = useState(false)
+  const [tableOfContentsRevision, setTableOfContentsRevision] = useState(0)
+  const handleEditorChangeWithToc = useCallback(() => {
+    handleEditorChange()
+    setTableOfContentsRevision((revision) => revision + 1)
+  }, [handleEditorChange])
+  const handleToggleAIChatExclusive = useCallback(() => {
+    if (!showAIChat) setShowTableOfContents(false)
+    onToggleAIChat?.()
+  }, [onToggleAIChat, showAIChat])
+  const handleToggleTableOfContents = useCallback(() => {
+    const opening = !showTableOfContents
+    if (opening && showAIChat) onToggleAIChat?.()
+    setShowTableOfContents(opening)
+    trackEvent('table_of_contents_toggled', { open: opening ? 1 : 0 })
+  }, [onToggleAIChat, showAIChat, showTableOfContents])
+  const handleTableOfContentsHeadingSelected = useCallback(() => {
+    trackEvent('table_of_contents_heading_selected')
+  }, [])
+
+  const visibleTableOfContents = showTableOfContents && !showAIChat
 
   return (
     <div className="editor flex flex-col min-h-0 overflow-hidden bg-background text-foreground">
@@ -470,11 +492,13 @@ function EditorLayout({
               activeStatus={activeStatus}
               showDiffToggle={showDiffToggle}
               showAIChat={showAIChat}
-              onToggleAIChat={onToggleAIChat}
+              onToggleAIChat={handleToggleAIChatExclusive}
+              showTableOfContents={visibleTableOfContents}
+              onToggleTableOfContents={handleToggleTableOfContents}
               inspectorCollapsed={inspectorCollapsed}
               onToggleInspector={onToggleInspector}
               onNavigateWikilink={onNavigateWikilink}
-              onEditorChange={handleEditorChange}
+              onEditorChange={handleEditorChangeWithToc}
               onToggleFavorite={onToggleFavorite}
               onToggleOrganized={onToggleOrganized}
               onRevealFile={onRevealFile}
@@ -495,11 +519,14 @@ function EditorLayout({
               locale={locale}
             />
         }
-        {(showAIChat || !inspectorCollapsed) && <ResizeHandle onResize={onInspectorResize} />}
+        {(showAIChat || visibleTableOfContents || !inspectorCollapsed) && <ResizeHandle onResize={onInspectorResize} />}
         <EditorRightPanel
           showAIChat={showAIChat}
+          showTableOfContents={visibleTableOfContents}
           inspectorCollapsed={inspectorCollapsed}
           inspectorWidth={inspectorWidth}
+          editor={editor}
+          tableOfContentsRevision={tableOfContentsRevision}
           defaultAiAgent={defaultAiAgent}
           defaultAiTarget={defaultAiTarget}
           defaultAiAgentReadiness={defaultAiAgentReadiness}
@@ -513,7 +540,9 @@ function EditorLayout({
           noteList={noteList}
           noteListFilter={noteListFilter}
           onToggleInspector={onToggleInspector}
-          onToggleAIChat={onToggleAIChat}
+          onToggleAIChat={handleToggleAIChatExclusive}
+          onToggleTableOfContents={handleToggleTableOfContents}
+          onTableOfContentsHeadingSelected={handleTableOfContentsHeadingSelected}
           onNavigateWikilink={onNavigateWikilink}
           onViewCommitDiff={handleViewCommitDiff}
           onUpdateFrontmatter={onUpdateFrontmatter}

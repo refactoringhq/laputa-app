@@ -170,6 +170,10 @@ The renderer may cache recently opened or preloaded markdown content, but cached
 
 `useEditorTabSwap` may reuse BlockNote blocks that were already opened successfully or warmed from prefetched raw content, keyed by vault, path, and exact source content. Background warming is limited to likely next large Markdown notes and defers while the editor is unmounted, raw mode is active, or recent typing/navigation is still inside the foreground idle window. Every async editor swap carries a generation and source-content token so stale conversion results cannot overwrite newer file content or dirty editor state.
 
+### Table of Contents Outline
+
+The editor Table of Contents is derived from the live BlockNote document, not from saved Markdown text. `src/utils/tableOfContents.ts` reads structural `heading` blocks with stable ids and levels, extracts inline text from nested BlockNote content, and nests headings by level while preserving document order. `TableOfContentsPanel` receives a document revision from `Editor`, so rich-editor edits refresh the outline immediately without waiting for autosave or a vault reload. Selecting a heading focuses BlockNote and moves the cursor to that block id, while nested headings can be collapsed independently in panel-local UI state.
+
 ### Entity Types (isA / type)
 
 Entity type is stored in the `type:` frontmatter field (e.g. `type: Quarter`). The legacy field name `Is A:` is still accepted as an alias for backwards compatibility but new notes use `type:`. The `VaultEntry.isA` property in TypeScript/Rust holds the resolved value.

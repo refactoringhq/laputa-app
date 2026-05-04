@@ -17,6 +17,7 @@ import {
   GitBranch,
   Code,
   Sparkle,
+  ListBullets,
   SidebarSimple,
   Trash,
   Archive,
@@ -46,6 +47,8 @@ interface BreadcrumbBarProps {
   forceRawMode?: boolean
   showAIChat?: boolean
   onToggleAIChat?: () => void
+  showTableOfContents?: boolean
+  onToggleTableOfContents?: () => void
   inspectorCollapsed?: boolean
   onToggleInspector?: () => void
   onToggleFavorite?: () => void
@@ -348,6 +351,24 @@ function AIChatAction({ showAIChat, locale = 'en', onToggleAIChat }: Pick<Breadc
     >
       <Sparkle size={16} weight={showAIChat ? 'fill' : 'regular'} className={BREADCRUMB_ICON_CLASS} />
     </ToggleIconAction>
+  )
+}
+
+function TableOfContentsAction({
+  showTableOfContents,
+  locale = 'en',
+  onToggleTableOfContents,
+}: Pick<BreadcrumbBarProps, 'showTableOfContents' | 'locale' | 'onToggleTableOfContents'>) {
+  if (!onToggleTableOfContents) return null
+
+  return (
+    <IconActionButton
+      copy={{ label: translate(locale, showTableOfContents ? 'editor.toolbar.closeTableOfContents' : 'editor.toolbar.openTableOfContents') }}
+      onClick={onToggleTableOfContents}
+      className={cn(showTableOfContents ? 'text-foreground' : 'hover:text-foreground')}
+    >
+      <ListBullets size={16} weight={showTableOfContents ? 'bold' : 'regular'} className={BREADCRUMB_ICON_CLASS} />
+    </IconActionButton>
   )
 }
 
@@ -796,6 +817,8 @@ function BreadcrumbActions({
   onToggleNoteWidth,
   showAIChat,
   onToggleAIChat,
+  showTableOfContents,
+  onToggleTableOfContents,
   inspectorCollapsed,
   onToggleInspector,
   onToggleFavorite,
@@ -836,6 +859,13 @@ function BreadcrumbActions({
       </OverflowToolbarAction>
       <AIChatAction showAIChat={showAIChat} locale={locale} onToggleAIChat={onToggleAIChat} />
       <OverflowToolbarAction>
+        <TableOfContentsAction
+          showTableOfContents={showTableOfContents}
+          locale={locale}
+          onToggleTableOfContents={onToggleTableOfContents}
+        />
+      </OverflowToolbarAction>
+      <OverflowToolbarAction>
         <FilePathActions entry={entry} locale={locale} onRevealFile={onRevealFile} onCopyFilePath={onCopyFilePath} />
       </OverflowToolbarAction>
       <OverflowToolbarAction>
@@ -852,6 +882,8 @@ function BreadcrumbActions({
         onToggleDiff={onToggleDiff}
         noteWidth={noteWidth}
         onToggleNoteWidth={onToggleNoteWidth}
+        showTableOfContents={showTableOfContents}
+        onToggleTableOfContents={onToggleTableOfContents}
         onRevealFile={onRevealFile}
         onCopyFilePath={onCopyFilePath}
         onArchive={onArchive}
@@ -872,6 +904,8 @@ function BreadcrumbOverflowMenu({
   onToggleDiff,
   noteWidth,
   onToggleNoteWidth,
+  showTableOfContents,
+  onToggleTableOfContents,
   onRevealFile,
   onCopyFilePath,
   onArchive,
@@ -887,6 +921,8 @@ function BreadcrumbOverflowMenu({
   | 'onToggleDiff'
   | 'noteWidth'
   | 'onToggleNoteWidth'
+  | 'showTableOfContents'
+  | 'onToggleTableOfContents'
   | 'onRevealFile'
   | 'onCopyFilePath'
   | 'onArchive'
@@ -901,6 +937,7 @@ function BreadcrumbOverflowMenu({
   const diffLabel = translate(locale, diffMenuLabelKey({ showDiffToggle, diffMode, diffLoading }))
   const noteWidthLabel = translate(locale, noteWidthLabelKey(noteWidth))
   const archiveLabel = translate(locale, archiveLabelKey(entry.archived))
+  const tableOfContentsLabel = translate(locale, showTableOfContents ? 'editor.toolbar.closeTableOfContents' : 'editor.toolbar.openTableOfContents')
 
   return (
     <DropdownMenu>
@@ -926,6 +963,10 @@ function BreadcrumbOverflowMenu({
         <DropdownMenuItem disabled={!onToggleNoteWidth} onSelect={onToggleNoteWidth}>
           <NoteWidthMenuIcon noteWidth={noteWidth} />
           {noteWidthLabel}
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!onToggleTableOfContents} onSelect={onToggleTableOfContents}>
+          <ListBullets size={16} />
+          {tableOfContentsLabel}
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!runRevealAction} onSelect={runRevealAction}>
           <FolderOpen size={16} />

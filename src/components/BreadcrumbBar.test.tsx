@@ -425,3 +425,54 @@ describe('BreadcrumbBar — note width toggle', () => {
     expect(onToggleNoteWidth).toHaveBeenCalledOnce()
   })
 })
+
+describe('BreadcrumbBar — table of contents toggle', () => {
+  it('shows the table of contents action and calls the toggle handler', () => {
+    const onToggleTableOfContents = vi.fn()
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        onToggleTableOfContents={onToggleTableOfContents}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open table of contents' }))
+
+    expect(onToggleTableOfContents).toHaveBeenCalledOnce()
+  })
+
+  it('uses the close label while the table of contents panel is active', () => {
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        showTableOfContents
+        onToggleTableOfContents={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Close table of contents' })).toBeInTheDocument()
+  })
+
+  it('offers the table of contents action from the overflow menu', async () => {
+    const onToggleTableOfContents = vi.fn()
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        onToggleTableOfContents={onToggleTableOfContents}
+      />,
+    )
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More note actions' }), {
+      button: 0,
+      ctrlKey: false,
+    })
+
+    const menu = await screen.findByRole('menu')
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Open table of contents' }))
+
+    expect(onToggleTableOfContents).toHaveBeenCalledOnce()
+  })
+})

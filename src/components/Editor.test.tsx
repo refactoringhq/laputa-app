@@ -236,6 +236,7 @@ describe('Editor', () => {
   beforeEach(() => {
     blockNoteCreation.options = []
     blockNoteViewState.onChange = null
+    mockEditor.document = [{ id: '1', type: 'paragraph', content: [], props: {}, children: [] }]
     clearParsedNoteBlockCache()
   })
 
@@ -535,6 +536,26 @@ describe('Editor', () => {
     )
     // Inspector renders "Properties" header
     expect(screen.getAllByText('Properties').length).toBeGreaterThan(0)
+  })
+
+  it('renders the table of contents panel from the editor document', () => {
+    mockEditor.document = [
+      { id: 'toc-heading', type: 'heading', content: 'Table Heading', props: { level: 1 }, children: [] },
+    ]
+
+    render(
+      <Editor
+        {...defaultProps}
+        tabs={[mockTab]}
+        activeTabPath={mockEntry.path}
+        inspectorEntry={mockEntry}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open table of contents' }))
+
+    expect(screen.getByTestId('table-of-contents-panel')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Table Heading' })).toBeInTheDocument()
   })
 
   // Regression: editor content did not appear on first load because BlockNote's

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import type { useCreateBlockNote } from '@blocknote/react'
 import { DEFAULT_AI_AGENT, type AiAgentId, type AiAgentReadiness } from '../lib/aiAgents'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
@@ -8,11 +9,15 @@ import { Inspector, type FrontmatterValue } from './Inspector'
 import { AiPanelView } from './AiPanel'
 import { useAiPanelController } from './useAiPanelController'
 import { NEW_AI_CHAT_EVENT } from '../utils/aiPromptBridge'
+import { TableOfContentsPanel } from './TableOfContentsPanel'
 
 interface EditorRightPanelProps {
   showAIChat?: boolean
+  showTableOfContents?: boolean
   inspectorCollapsed: boolean
   inspectorWidth: number
+  editor: ReturnType<typeof useCreateBlockNote>
+  tableOfContentsRevision: number
   defaultAiAgent?: AiAgentId
   defaultAiTarget?: AiTarget
   defaultAiAgentReadiness?: AiAgentReadiness
@@ -27,6 +32,8 @@ interface EditorRightPanelProps {
   noteListFilter?: { type: string | null; query: string }
   onToggleInspector: () => void
   onToggleAIChat?: () => void
+  onToggleTableOfContents?: () => void
+  onTableOfContentsHeadingSelected?: () => void
   onNavigateWikilink: (target: string) => void
   onViewCommitDiff: (commitHash: string) => Promise<void>
   onUpdateFrontmatter?: (path: string, key: string, value: FrontmatterValue) => Promise<void>
@@ -44,12 +51,13 @@ interface EditorRightPanelProps {
 }
 
 export function EditorRightPanel({
-  showAIChat, inspectorCollapsed, inspectorWidth,
+  showAIChat, showTableOfContents, inspectorCollapsed, inspectorWidth,
+  editor, tableOfContentsRevision,
   defaultAiAgent = DEFAULT_AI_AGENT, defaultAiTarget, defaultAiAgentReadiness, defaultAiAgentReady = true,
   onUnsupportedAiPaste,
   inspectorEntry, inspectorContent, entries, gitHistory, vaultPath,
   noteList, noteListFilter,
-  onToggleInspector, onToggleAIChat, onNavigateWikilink, onViewCommitDiff,
+  onToggleInspector, onToggleAIChat, onToggleTableOfContents, onTableOfContentsHeadingSelected, onNavigateWikilink, onViewCommitDiff,
   onUpdateFrontmatter, onDeleteProperty, onAddProperty, onCreateMissingType, onCreateAndOpenNote, onInitializeProperties, onToggleRawEditor, onOpenNote,
   onFileCreated, onFileModified, onVaultChanged,
   locale,
@@ -100,6 +108,24 @@ export function EditorRightPanel({
           locale={locale}
           activeEntry={inspectorEntry}
           entries={entries}
+        />
+      </div>
+    )
+  }
+
+  if (showTableOfContents) {
+    return (
+      <div
+        className="shrink-0 flex flex-col min-h-0"
+        style={{ width: inspectorWidth, minWidth: 240, height: '100%' }}
+      >
+        <TableOfContentsPanel
+          activeEntry={inspectorEntry}
+          documentRevision={tableOfContentsRevision}
+          editor={editor}
+          locale={locale}
+          onClose={() => onToggleTableOfContents?.()}
+          onHeadingSelected={() => onTableOfContentsHeadingSelected?.()}
         />
       </div>
     )

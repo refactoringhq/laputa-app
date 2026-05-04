@@ -31,6 +31,8 @@ export interface EditorContentProps {
   showDiffToggle: boolean
   showAIChat?: boolean
   onToggleAIChat?: () => void
+  showTableOfContents?: boolean
+  onToggleTableOfContents?: () => void
   inspectorCollapsed: boolean
   onToggleInspector: () => void
   onNavigateWikilink: (target: string) => void
