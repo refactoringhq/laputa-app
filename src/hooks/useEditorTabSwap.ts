@@ -3,7 +3,7 @@ import type { useCreateBlockNote } from '@blocknote/react'
 import type { VaultEntry } from '../types'
 import { splitFrontmatter, restoreWikilinksInBlocks } from '../utils/wikilinks'
 import { compactMarkdown } from '../utils/compact-markdown'
-import { serializeMermaidAwareBlocks } from '../utils/mermaidMarkdown'
+import { serializeDurableEditorBlocks } from '../utils/editorDurableMarkdown'
 import { failNoteOpenTrace, finishNoteOpenTrace } from '../utils/noteOpenPerformance'
 import { portableImageUrls } from '../utils/vaultImages'
 import { useEditorMountState, useLatestRef } from './editorTabSwapLifecycle'
@@ -123,7 +123,7 @@ function findActiveTab(options: {
 
 function serializeEditorBody(editor: ReturnType<typeof useCreateBlockNote>): string {
   const restored = restoreWikilinksInBlocks(editor.document)
-  return compactMarkdown(serializeMermaidAwareBlocks(editor, restored))
+  return compactMarkdown(serializeDurableEditorBlocks(editor, restored))
 }
 
 function trySerializeEditorBody(

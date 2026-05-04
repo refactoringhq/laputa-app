@@ -1,182 +1,51 @@
-import { serializeMathAwareBlocks } from './mathMarkdown'
-import { isTldrawBlock, tldrawMarkdown } from './tldrawMarkdown'
+import {
+  type BlockLike,
+  type DurableBlockCodec,
+  type DurableFencePayloadInput,
+  injectDurableMarkdownBlocks,
+  preProcessDurableMarkdownBlocks,
+  readCodeBlockLanguage,
+  readInlineText,
+} from './durableMarkdownBlocks'
 
 export const MERMAID_BLOCK_TYPE = 'mermaidBlock'
 
 const TOKEN_PREFIX = '@@TOLARIA_MERMAID_BLOCK:'
 const TOKEN_SUFFIX = '@@'
 
-interface InlineItem {
-  type: string
-  text?: string
-  props?: Record<string, string>
-  content?: unknown
-  [key: string]: unknown
-}
-
-interface BlockLike {
-  type?: string
-  content?: InlineItem[]
-  props?: Record<string, string>
-  children?: BlockLike[]
-  [key: string]: unknown
-}
-
-interface MarkdownSerializer {
-  blocksToMarkdownLossy: (blocks: unknown[]) => string
-}
-
 interface MermaidPayload {
   source: string
   diagram: string
-}
-
-interface MermaidFenceStart {
-  character: '`' | '~'
-  length: number
-}
-
-interface MarkdownLine {
-  line: string
-}
-
-interface EncodedPayload {
-  encoded: string
-}
-
-interface TokenText {
-  text: string
-}
-
-interface FenceSearch {
-  lines: string[]
-  start: number
-  opening: MermaidFenceStart
-}
-
-interface FenceRange {
-  lines: string[]
-  start: number
-  end: number
 }
 
 interface DiagramSource {
   diagram: string
 }
 
-interface CodeBlockSource {
-  block: BlockLike
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function lineEnding({ line }: MarkdownLine): string {
-  if (line.endsWith('\r\n')) return '\r\n'
-  return line.endsWith('\n') ? '\n' : ''
+function decodeMermaidPayload(payload: unknown): MermaidPayload | null {
+  if (!isRecord(payload)) return null
+  if (typeof payload.source !== 'string') return null
+  if (typeof payload.diagram !== 'string') return null
+  return { source: payload.source, diagram: payload.diagram }
 }
 
-function lineText({ line }: MarkdownLine): string {
-  const ending = lineEnding({ line })
-  return ending ? line.slice(0, -ending.length) : line
+function readMermaidFenceMetadata(info: string): Record<string, never> | null {
+  const language = info.trim().split(/\s+/u)[0]?.toLowerCase()
+  return language === 'mermaid' ? {} : null
 }
 
-function splitMarkdownLines(markdown: string): string[] {
-  const lines = markdown.match(/[^\n]*(?:\n|$)/g) ?? []
-  return lines.filter((line, index) => line !== '' || index < lines.length - 1)
-}
-
-function encodePayload(payload: MermaidPayload): string {
-  return encodeURIComponent(JSON.stringify(payload))
-}
-
-function decodePayload({ encoded }: EncodedPayload): MermaidPayload | null {
-  try {
-    const payload = JSON.parse(decodeURIComponent(encoded)) as Partial<MermaidPayload>
-    if (typeof payload.source !== 'string') return null
-    if (typeof payload.diagram !== 'string') return null
-    return { source: payload.source, diagram: payload.diagram }
-  } catch {
-    return null
-  }
-}
-
-function mermaidToken(payload: MermaidPayload): string {
-  return `${TOKEN_PREFIX}${encodePayload(payload)}${TOKEN_SUFFIX}`
-}
-
-function readMermaidToken({ text }: TokenText): MermaidPayload | null {
-  const trimmed = text.trim()
-  if (!trimmed.startsWith(TOKEN_PREFIX) || !trimmed.endsWith(TOKEN_SUFFIX)) return null
-  return decodePayload({ encoded: trimmed.slice(TOKEN_PREFIX.length, -TOKEN_SUFFIX.length) })
-}
-
-function readMermaidFenceStart({ line }: MarkdownLine): MermaidFenceStart | null {
-  const match = /^( {0,3})(`{3,}|~{3,})[ \t]*(.*)$/.exec(line)
-  if (!match) return null
-
-  const fence = match[2]
-  const language = match[3].trim().split(/\s+/)[0]?.toLowerCase()
-  if (language !== 'mermaid') return null
-
-  return {
-    character: fence[0] as '`' | '~',
-    length: fence.length,
-  }
-}
-
-function isClosingFence({ line, opening }: MarkdownLine & { opening: MermaidFenceStart }): boolean {
-  const match = /^( {0,3})(`{3,}|~{3,})[ \t]*$/.exec(line)
-  if (!match) return false
-
-  const fence = match[2]
-  return fence[0] === opening.character && fence.length >= opening.length
-}
-
-function findClosingFence({ lines, start, opening }: FenceSearch): number {
-  for (let index = start + 1; index < lines.length; index++) {
-    if (isClosingFence({ line: lineText({ line: lines[index] }), opening })) return index
-  }
-
-  return -1
-}
-
-function buildPayload({ lines, start, end }: FenceRange): MermaidPayload {
+function buildMermaidPayload({ lines, start, end }: DurableFencePayloadInput): MermaidPayload {
   return {
     source: lines.slice(start, end + 1).join(''),
     diagram: lines.slice(start + 1, end).join(''),
   }
 }
 
-export function preProcessMermaidMarkdown({ markdown }: { markdown: string }): string {
-  const lines = splitMarkdownLines(markdown)
-  const result: string[] = []
-
-  for (let index = 0; index < lines.length; index++) {
-    const opening = readMermaidFenceStart({ line: lineText({ line: lines[index] }) })
-    if (!opening) {
-      result.push(lines[index])
-      continue
-    }
-
-    const closingIndex = findClosingFence({ lines, start: index, opening })
-    if (closingIndex === -1) {
-      result.push(lines[index])
-      continue
-    }
-
-    const payload = buildPayload({ lines, start: index, end: closingIndex })
-    result.push(`${mermaidToken(payload)}${lineEnding({ line: lines[closingIndex] })}`)
-    index = closingIndex
-  }
-
-  return result.join('')
-}
-
-function readMermaidPayload(content: InlineItem[] | undefined): MermaidPayload | null {
-  const onlyItem = content?.length === 1 ? content[0] : null
-  if (onlyItem?.type !== 'text' || typeof onlyItem.text !== 'string') return null
-  return readMermaidToken({ text: onlyItem.text })
-}
-
-function buildMermaidBlock({ block, payload }: { block: BlockLike; payload: MermaidPayload }): BlockLike {
+function buildMermaidBlock(block: BlockLike, payload: MermaidPayload): BlockLike {
   return {
     ...block,
     type: MERMAID_BLOCK_TYPE,
@@ -195,23 +64,9 @@ export function mermaidFenceSource({ diagram }: DiagramSource): string {
   return `\`\`\`mermaid\n${body}\`\`\``
 }
 
-function readCodeBlockLanguage({ block }: CodeBlockSource): string | null {
-  const language = block.props?.language
-  if (typeof language !== 'string') return null
-
-  return language.trim().split(/\s+/)[0]?.toLowerCase() ?? null
-}
-
-function readInlineText(content: InlineItem[] | undefined): string | null {
-  if (!Array.isArray(content)) return null
-  return content.map((item) => (
-    item.type === 'text' && typeof item.text === 'string' ? item.text : ''
-  )).join('')
-}
-
 function looksLikeMermaidDiagram(diagram: string): boolean {
   const firstStatement = diagram
-    .split(/\r?\n/)
+    .split(/\r?\n/u)
     .map(line => line.trim())
     .find(line => line.length > 0 && !line.startsWith('%%'))
 
@@ -232,7 +87,7 @@ function shouldInjectCodeBlockAsMermaid({
   return looksLikeMermaidDiagram(diagram)
 }
 
-function readMermaidCodeBlock({ block }: CodeBlockSource): MermaidPayload | null {
+function readMermaidCodeBlock(block: BlockLike): MermaidPayload | null {
   if (block.type !== 'codeBlock') return null
 
   const diagram = readInlineText(block.content)
@@ -244,17 +99,6 @@ function readMermaidCodeBlock({ block }: CodeBlockSource): MermaidPayload | null
     diagram: normalizedDiagram,
     source: mermaidFenceSource({ diagram: normalizedDiagram }),
   }
-}
-
-function injectMermaidInBlock(block: BlockLike): BlockLike {
-  const payload = readMermaidPayload(block.content)
-  if (payload) return buildMermaidBlock({ block, payload })
-
-  const codeBlockPayload = readMermaidCodeBlock({ block })
-  if (codeBlockPayload) return buildMermaidBlock({ block, payload: codeBlockPayload })
-
-  const children = Array.isArray(block.children) ? block.children.map(injectMermaidInBlock) : block.children
-  return { ...block, children }
 }
 
 function isMermaidBlock(block: BlockLike): boolean {
@@ -270,34 +114,22 @@ function mermaidMarkdown(block: BlockLike): string {
   return mermaidFenceSource({ diagram: block.props?.diagram ?? '' })
 }
 
-export function injectMermaidInBlocks(blocks: unknown[]): unknown[] {
-  return (blocks as BlockLike[]).map(injectMermaidInBlock)
+export const mermaidMarkdownCodec: DurableBlockCodec = {
+  tokenPrefix: TOKEN_PREFIX,
+  tokenSuffix: TOKEN_SUFFIX,
+  readFenceMetadata: readMermaidFenceMetadata,
+  buildPayload: buildMermaidPayload,
+  decodePayload: decodeMermaidPayload,
+  buildBlock: (block, payload) => buildMermaidBlock(block, payload as MermaidPayload),
+  readCodeBlock: readMermaidCodeBlock,
+  isBlock: isMermaidBlock,
+  serializeBlock: mermaidMarkdown,
 }
 
-export function serializeMermaidAwareBlocks(editor: MarkdownSerializer, blocks: unknown[]): string {
-  const chunks: string[] = []
-  let pending: unknown[] = []
+export function preProcessMermaidMarkdown({ markdown }: { markdown: string }): string {
+  return preProcessDurableMarkdownBlocks({ markdown, codecs: [mermaidMarkdownCodec] })
+}
 
-  const flushPending = () => {
-    if (pending.length === 0) return
-
-    const markdown = serializeMathAwareBlocks(editor, pending).trimEnd()
-    if (markdown) chunks.push(markdown)
-    pending = []
-  }
-
-  for (const block of blocks as BlockLike[]) {
-    if (isMermaidBlock(block)) {
-      flushPending()
-      chunks.push(mermaidMarkdown(block))
-    } else if (isTldrawBlock(block)) {
-      flushPending()
-      chunks.push(tldrawMarkdown(block))
-    } else {
-      pending.push(block)
-    }
-  }
-
-  flushPending()
-  return chunks.join('\n\n')
+export function injectMermaidInBlocks(blocks: unknown[]): unknown[] {
+  return injectDurableMarkdownBlocks({ blocks, codecs: [mermaidMarkdownCodec] })
 }
