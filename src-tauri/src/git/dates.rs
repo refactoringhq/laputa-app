@@ -1,4 +1,4 @@
-use super::git_command;
+use super::{git_command, GitRepoContext};
 use chrono::DateTime;
 use std::collections::HashMap;
 use std::path::Path;
@@ -19,9 +19,14 @@ pub struct GitDates {
 /// Files not yet committed (untracked / only staged) will not appear in the map;
 /// callers should fall back to filesystem metadata for those.
 pub fn get_all_file_dates(vault_path: &Path) -> HashMap<String, GitDates> {
+    let Ok(repo) = GitRepoContext::discover(vault_path) else {
+        return HashMap::new();
+    };
     let output = match git_command()
         .args(["log", "--format=COMMIT %aI", "--name-only"])
-        .current_dir(vault_path)
+        .arg("--")
+        .arg(repo.vault_pathspec())
+        .current_dir(&repo.worktree_root)
         .output()
     {
         Ok(o) if o.status.success() => o,
@@ -29,7 +34,7 @@ pub fn get_all_file_dates(vault_path: &Path) -> HashMap<String, GitDates> {
     };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_git_log_output(&stdout)
+    parse_git_log_output(&stdout, Some(&repo))
 }
 
 /// Parse the output of `git log --format="COMMIT %aI" --name-only`.
@@ -49,7 +54,7 @@ pub fn get_all_file_dates(vault_path: &Path) -> HashMap<String, GitDates> {
 /// Commits are ordered newest-first. For each file:
 /// - First occurrence → sets `modified_at`
 /// - Every subsequent occurrence overwrites `created_at` (last one = oldest commit wins)
-fn parse_git_log_output(stdout: &str) -> HashMap<String, GitDates> {
+fn parse_git_log_output(stdout: &str, repo: Option<&GitRepoContext>) -> HashMap<String, GitDates> {
     let mut map: HashMap<String, GitDates> = HashMap::new();
     let mut current_ts: Option<u64> = None;
 
@@ -63,13 +68,23 @@ fn parse_git_log_output(stdout: &str) -> HashMap<String, GitDates> {
         if path.is_empty() || current_ts.is_none() {
             continue;
         }
-        // Only process .md files
         if !path.ends_with(".md") {
             continue;
         }
+        let path = match repo {
+            Some(repo) => {
+                let Some(vault_relative) =
+                    repo.vault_relative_from_worktree_relative(Path::new(path))
+                else {
+                    continue;
+                };
+                vault_relative.to_string_lossy().to_string()
+            }
+            None => path.to_string(),
+        };
 
         let ts = current_ts.unwrap();
-        map.entry(path.to_string())
+        map.entry(path)
             .and_modify(|d| d.created_at = ts)
             .or_insert(GitDates {
                 created_at: ts,
@@ -98,7 +113,7 @@ COMMIT 2026-03-15T10:00:00+00:00
 file-a.md
 file-b.md
 ";
-        let map = parse_git_log_output(output);
+        let map = parse_git_log_output(output, None);
         assert_eq!(map.len(), 2);
         assert_eq!(map["file-a.md"].created_at, 1773568800);
         assert_eq!(map["file-a.md"].modified_at, 1773568800);
@@ -116,7 +131,7 @@ COMMIT 2026-03-10T08:00:00+00:00
 file-a.md
 file-b.md
 ";
-        let map = parse_git_log_output(output);
+        let map = parse_git_log_output(output, None);
         assert_eq!(map.len(), 2);
         // file-a: modified = newest (2026-03-15), created = oldest (2026-03-10)
         assert_eq!(map["file-a.md"].modified_at, 1773568800);
@@ -135,14 +150,14 @@ README.txt
 note.md
 image.png
 ";
-        let map = parse_git_log_output(output);
+        let map = parse_git_log_output(output, None);
         assert_eq!(map.len(), 1);
         assert!(map.contains_key("note.md"));
     }
 
     #[test]
     fn test_empty_output() {
-        let map = parse_git_log_output("");
+        let map = parse_git_log_output("", None);
         assert!(map.is_empty());
     }
 
@@ -154,7 +169,7 @@ COMMIT 2026-03-15T10:00:00+00:00
 docs/adr/0001-stack.md
 notes/daily.md
 ";
-        let map = parse_git_log_output(output);
+        let map = parse_git_log_output(output, None);
         assert_eq!(map.len(), 2);
         assert!(map.contains_key("docs/adr/0001-stack.md"));
         assert!(map.contains_key("notes/daily.md"));

@@ -1,4 +1,4 @@
-use super::git_command;
+use super::{git_command, GitRepoContext};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -16,10 +16,10 @@ pub struct GitPullResult {
 
 /// Check whether the vault repo has at least one remote configured.
 pub fn has_remote(vault_path: &str) -> Result<bool, String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
     let output = git_command()
         .args(["remote"])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git remote: {}", e))?;
 
@@ -29,7 +29,7 @@ pub fn has_remote(vault_path: &str) -> Result<bool, String> {
 /// Pull latest changes from remote. Uses --no-rebase to merge.
 /// Returns a structured result with status and affected files.
 pub fn git_pull(vault_path: &str) -> Result<GitPullResult, String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
 
     if !has_remote(vault_path)? {
         return Ok(GitPullResult {
@@ -42,7 +42,7 @@ pub fn git_pull(vault_path: &str) -> Result<GitPullResult, String> {
 
     let output = git_command()
         .args(["pull", "--no-rebase"])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git pull: {}", e))?;
 
@@ -58,7 +58,7 @@ pub fn git_pull(vault_path: &str) -> Result<GitPullResult, String> {
                 conflict_files: vec![],
             });
         }
-        let updated = parse_updated_files(&stdout);
+        let updated = parse_updated_files(&stdout, Some(&repo));
         return Ok(GitPullResult {
             status: "updated".to_string(),
             message: format!("{} file(s) updated", updated.len()),
@@ -93,7 +93,7 @@ pub fn git_pull(vault_path: &str) -> Result<GitPullResult, String> {
 }
 
 /// Parse `git pull` output to extract updated file paths.
-fn parse_updated_files(stdout: &str) -> Vec<String> {
+fn parse_updated_files(stdout: &str, repo: Option<&GitRepoContext>) -> Vec<String> {
     stdout
         .lines()
         .filter_map(|line| {
@@ -102,7 +102,12 @@ fn parse_updated_files(stdout: &str) -> Vec<String> {
             if trimmed.contains('|') {
                 let path = trimmed.split('|').next()?.trim();
                 if !path.is_empty() {
-                    return Some(path.to_string());
+                    return match repo {
+                        Some(repo) => repo
+                            .vault_relative_from_worktree_relative(Path::new(path))
+                            .map(|path| path.to_string_lossy().to_string()),
+                        None => Some(path.to_string()),
+                    };
                 }
             }
             None
@@ -121,10 +126,10 @@ pub struct GitRemoteStatus {
 
 /// Get the current branch name, and how many commits ahead/behind the upstream.
 pub fn git_remote_status(vault_path: &str) -> Result<GitRemoteStatus, String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
 
     if !has_remote(vault_path)? {
-        let branch = current_branch(vault)?;
+        let branch = current_branch(&repo.worktree_root)?;
         return Ok(GitRemoteStatus {
             branch,
             ahead: 0,
@@ -136,14 +141,14 @@ pub fn git_remote_status(vault_path: &str) -> Result<GitRemoteStatus, String> {
     // Fetch latest remote refs (silent, best-effort)
     let _ = git_command()
         .args(["fetch", "--quiet"])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output();
 
-    let branch = current_branch(vault)?;
+    let branch = current_branch(&repo.worktree_root)?;
 
     let output = git_command()
         .args(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git rev-list: {}", e))?;
 
@@ -281,11 +286,11 @@ fn push_error_detail(stderr: &str) -> String {
 
 /// Push to remote.
 pub fn git_push(vault_path: &str) -> Result<GitPushResult, String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
 
     let output = git_command()
         .args(["push"])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git push: {}", e))?;
 
@@ -384,14 +389,14 @@ mod tests {
     fn test_parse_updated_files_diffstat() {
         let stdout =
             " Fast-forward\n note.md | 2 +-\n project/plan.md | 4 ++--\n 2 files changed\n";
-        let files = parse_updated_files(stdout);
+        let files = parse_updated_files(stdout, None);
         assert_eq!(files, vec!["note.md", "project/plan.md"]);
     }
 
     #[test]
     fn test_parse_updated_files_empty() {
         let stdout = "Already up to date.\n";
-        let files = parse_updated_files(stdout);
+        let files = parse_updated_files(stdout, None);
         assert!(files.is_empty());
     }
 

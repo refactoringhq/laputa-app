@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::path::Path;
 
-use super::{git_command, parse_github_repo_path};
+use super::{git_command, parse_github_repo_path, GitRepoContext};
 
 #[derive(Debug, Serialize, Clone)]
 pub struct PulseFile {
@@ -58,11 +58,7 @@ pub fn get_vault_pulse(
     limit: usize,
     skip: usize,
 ) -> Result<Vec<PulseCommit>, String> {
-    let vault = Path::new(vault_path);
-
-    if !vault.join(".git").exists() {
-        return Err("Not a git repository".to_string());
-    }
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
 
     let limit_str = limit.to_string();
     let skip_str = skip.to_string();
@@ -77,9 +73,9 @@ pub fn get_vault_pulse(
             "--skip",
             &skip_str,
             "--",
-            "*.md",
         ])
-        .current_dir(vault)
+        .arg(repo.vault_pathspec())
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to run git log: {}", e))?;
 
@@ -93,14 +89,14 @@ pub fn get_vault_pulse(
 
     let github_base = get_github_base_url(vault_path);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(parse_pulse_output(&stdout, &github_base))
+    Ok(parse_pulse_output(&stdout, &github_base, Some(&repo)))
 }
 
 fn get_github_base_url(vault_path: &str) -> Option<String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path)).ok()?;
     let output = git_command()
         .args(["remote", "get-url", "origin"])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output()
         .ok()?;
 
@@ -113,7 +109,11 @@ fn get_github_base_url(vault_path: &str) -> Option<String> {
     Some(format!("https://github.com/{}", repo_path))
 }
 
-fn parse_pulse_output(stdout: &str, github_base: &Option<String>) -> Vec<PulseCommit> {
+fn parse_pulse_output(
+    stdout: &str,
+    github_base: &Option<String>,
+    repo: Option<&GitRepoContext>,
+) -> Vec<PulseCommit> {
     let mut commits: Vec<PulseCommit> = Vec::new();
     let mut current: Option<PulseCommit> = None;
 
@@ -129,7 +129,7 @@ fn parse_pulse_output(stdout: &str, github_base: &Option<String>) -> Vec<PulseCo
         }
 
         if let Some(ref mut commit) = current {
-            add_file_change(commit, line);
+            add_file_change(commit, line, repo);
         }
     }
 
@@ -181,14 +181,26 @@ fn parse_commit_header(line: &str, github_base: &Option<String>) -> Option<Pulse
     })
 }
 
-fn add_file_change(commit: &mut PulseCommit, line: &str) {
+fn add_file_change(commit: &mut PulseCommit, line: &str, repo: Option<&GitRepoContext>) {
     let file_parts: Vec<&str> = line.splitn(2, '\t').collect();
     if file_parts.len() != 2 {
         return;
     }
 
     let status = parse_file_status(file_parts[0].trim());
-    let path = file_parts[1].trim();
+    let worktree_path = Path::new(file_parts[1].trim());
+    if !worktree_path.to_string_lossy().ends_with(".md") {
+        return;
+    }
+    let path = match repo {
+        Some(repo) => {
+            let Some(vault_path) = repo.vault_relative_from_worktree_relative(worktree_path) else {
+                return;
+            };
+            vault_path.to_string_lossy().to_string()
+        }
+        None => file_parts[1].trim().to_string(),
+    };
     match status {
         "added" => commit.added += 1,
         "deleted" => commit.deleted += 1,
@@ -197,7 +209,7 @@ fn add_file_change(commit: &mut PulseCommit, line: &str) {
     commit.files.push(PulseFile {
         path: path.to_string(),
         status: status.to_string(),
-        title: title_from_path(path),
+        title: title_from_path(&path),
     });
 }
 
@@ -402,7 +414,7 @@ mod tests {
     fn test_parse_pulse_output_basic() {
         let stdout =
             "abc123|abc123d|Add notes|2026-03-05T10:00:00+01:00\nA\tnote.md\nM\tproject.md\n";
-        let commits = parse_pulse_output(stdout, &None);
+        let commits = parse_pulse_output(stdout, &None, None);
 
         assert_eq!(commits.len(), 1);
         assert_eq!(commits[0].message, "Add notes");
@@ -418,7 +430,7 @@ mod tests {
     fn test_parse_pulse_output_with_github() {
         let stdout = "abc123|abc123d|Msg|2026-03-05T10:00:00+01:00\nA\tnote.md\n";
         let base = Some("https://github.com/o/r".to_string());
-        let commits = parse_pulse_output(stdout, &base);
+        let commits = parse_pulse_output(stdout, &base, None);
 
         assert_eq!(
             commits[0].github_url.as_deref(),
@@ -429,7 +441,7 @@ mod tests {
     #[test]
     fn test_parse_pulse_output_multiple_commits() {
         let stdout = "aaa|aaa1234|First|2026-03-05T10:00:00+01:00\nA\ta.md\n\nbbb|bbb1234|Second|2026-03-04T10:00:00+01:00\nM\tb.md\nD\tc.md\n";
-        let commits = parse_pulse_output(stdout, &None);
+        let commits = parse_pulse_output(stdout, &None, None);
 
         assert_eq!(commits.len(), 2);
         assert_eq!(commits[0].message, "First");

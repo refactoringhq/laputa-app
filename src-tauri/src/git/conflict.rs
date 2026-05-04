@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::{git_command, run_git};
+use super::{git_command, run_git, GitRepoContext};
 
 /// List files with merge conflicts (unmerged paths).
 ///
@@ -8,10 +8,10 @@ use super::{git_command, run_git};
 /// ls-files reliably detects unmerged index entries even when the merge state is
 /// stale (e.g. after a reboot or when MERGE_HEAD is missing).
 pub fn get_conflict_files(vault_path: &str) -> Result<Vec<String>, String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
     let output = git_command()
         .args(["ls-files", "--unmerged"])
-        .current_dir(vault)
+        .current_dir(&repo.worktree_root)
         .output()
         .map_err(|e| format!("Failed to check conflicts: {}", e))?;
 
@@ -20,7 +20,11 @@ pub fn get_conflict_files(vault_path: &str) -> Result<Vec<String>, String> {
     // Format: "<mode> <hash> <stage>\t<path>"
     let mut files: Vec<String> = stdout
         .lines()
-        .filter_map(|line| line.split('\t').nth(1).map(|s| s.to_string()))
+        .filter_map(|line| {
+            let worktree_relative = Path::new(line.split('\t').nth(1)?);
+            repo.vault_relative_from_worktree_relative(worktree_relative)
+                .map(|path| path.to_string_lossy().to_string())
+        })
         .collect();
     files.sort();
     files.dedup();
@@ -30,7 +34,9 @@ pub fn get_conflict_files(vault_path: &str) -> Result<Vec<String>, String> {
 /// Resolve a single conflict file by choosing "ours" or "theirs" strategy,
 /// then stage the result.
 pub fn git_resolve_conflict(vault_path: &str, file: &str, strategy: &str) -> Result<(), String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
+    let worktree_relative = repo.worktree_relative_from_vault_relative(Path::new(file))?;
+    let worktree_relative_str = GitRepoContext::worktree_relative_str(&worktree_relative)?;
 
     let checkout_flag = match strategy {
         "ours" => "--ours",
@@ -43,25 +49,26 @@ pub fn git_resolve_conflict(vault_path: &str, file: &str, strategy: &str) -> Res
         }
     };
 
-    run_git(vault, &["checkout", checkout_flag, "--", file])?;
-    run_git(vault, &["add", "--", file])?;
+    run_git(&repo.worktree_root, &["checkout", checkout_flag, "--", worktree_relative_str])?;
+    run_git(&repo.worktree_root, &["add", "--", worktree_relative_str])?;
 
     Ok(())
 }
 
 /// Check whether a rebase is currently in progress.
 pub fn is_rebase_in_progress(vault_path: &str) -> bool {
-    let vault = Path::new(vault_path);
-    let git_dir = vault.join(".git");
-    git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists()
+    let Ok(repo) = GitRepoContext::discover(Path::new(vault_path)) else {
+        return false;
+    };
+    repo.git_dir.join("rebase-merge").exists() || repo.git_dir.join("rebase-apply").exists()
 }
 
 /// Check whether a merge is currently in progress.
 pub fn is_merge_in_progress(vault_path: &str) -> bool {
-    Path::new(vault_path)
-        .join(".git")
-        .join("MERGE_HEAD")
-        .exists()
+    let Ok(repo) = GitRepoContext::discover(Path::new(vault_path)) else {
+        return false;
+    };
+    repo.git_dir.join("MERGE_HEAD").exists()
 }
 
 /// Returns the current conflict mode: "rebase", "merge", or "none".
@@ -79,7 +86,7 @@ pub fn get_conflict_mode(vault_path: &str) -> String {
 /// Detects whether the repo is in a merge or rebase state and uses the
 /// appropriate command (`git commit` vs `git rebase --continue`).
 pub fn git_commit_conflict_resolution(vault_path: &str) -> Result<String, String> {
-    let vault = Path::new(vault_path);
+    let repo = GitRepoContext::discover(Path::new(vault_path))?;
 
     // Verify no remaining conflicts
     let remaining = get_conflict_files(vault_path)?;
@@ -95,12 +102,12 @@ pub fn git_commit_conflict_resolution(vault_path: &str) -> Result<String, String
         "rebase" => git_command()
             .args(["rebase", "--continue"])
             .env("GIT_EDITOR", "true")
-            .current_dir(vault)
+            .current_dir(&repo.worktree_root)
             .output()
             .map_err(|e| format!("Failed to run git rebase --continue: {}", e))?,
         _ => git_command()
             .args(["commit", "-m", "Resolve merge conflicts"])
-            .current_dir(vault)
+            .current_dir(&repo.worktree_root)
             .output()
             .map_err(|e| format!("Failed to run git commit: {}", e))?,
     };
