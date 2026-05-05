@@ -217,6 +217,29 @@ describe('resolveImageUrls — note-relative paths', () => {
       `![shot](${assetUrl('C:\\Users\\a\\Vault\\folder\\img\\foo.png')})`,
     )
   })
+
+  it('resolves note-relative paths when the note is at the filesystem root', () => {
+    // Edge case: notePath has its only separator at index 0.
+    // Previously the directory was reported as the full notePath, so the
+    // image filename ended up appended to the note's filename.
+    tauriMode = true
+    const notePath = '/note.md'
+    const markdown = '![shot](./img/foo.png)'
+
+    expect(resolveImageUrls(markdown, '/', notePath)).toBe(
+      `![shot](${assetUrl('/img/foo.png')})`,
+    )
+  })
+
+  it('resolves note-relative paths when notePath has no separator', () => {
+    tauriMode = true
+    const notePath = 'note.md'
+    const markdown = '![shot](img/foo.png)'
+
+    expect(resolveImageUrls(markdown, '/vault', notePath)).toBe(
+      `![shot](${assetUrl('./img/foo.png')})`,
+    )
+  })
 })
 
 describe('portableImageUrls', () => {
@@ -254,11 +277,14 @@ describe('portableImageUrls', () => {
     expect(portableImageUrls(markdown, '')).toBe(markdown)
   })
 
-  it('leaves asset URLs from other vaults unchanged', () => {
+  it('unwraps asset URLs from other vaults to absolute filesystem paths', () => {
+    // The internal asset:// scheme must never survive into saved markdown,
+    // even for URLs that point outside the current vault. Falling back to the
+    // decoded absolute path keeps the file readable and portable.
     const url = assetUrl('/other-vault/attachments/file.png')
     const markdown = `![alt](${url})`
 
-    expect(portableImageUrls(markdown, '/vault')).toBe(markdown)
+    expect(portableImageUrls(markdown, '/vault')).toBe('![alt](/other-vault/attachments/file.png)')
   })
 
   it('leaves relative and external paths unchanged', () => {
@@ -282,6 +308,23 @@ describe('portableImageUrls', () => {
     const markdown = `![shot](${assetUrl('/vault/attachments/a.png')} "starter vault")`
 
     expect(portableImageUrls(markdown, '/vault')).toBe('![shot](attachments/a.png "starter vault")')
+  })
+
+  it('falls back to absolute filesystem path when asset is outside vault and no notePath', () => {
+    // Without a notePath we cannot compute a note-relative form. Returning the
+    // decoded absolute filesystem path keeps the markdown free of the internal
+    // asset:// scheme so it survives round-tripping and inspection by other tools.
+    const url = assetUrl('/Users/me/external/photo.png')
+    const markdown = `![alt](${url})`
+
+    expect(portableImageUrls(markdown, '/vault')).toBe('![alt](/Users/me/external/photo.png)')
+  })
+
+  it('round-trips absolute filesystem paths outside the vault', () => {
+    tauriMode = true
+    const markdown = '![alt](/Users/me/external/photo.png)'
+
+    expect(portableImageUrls(resolveImageUrls(markdown, '/vault'), '/vault')).toBe(markdown)
   })
 })
 

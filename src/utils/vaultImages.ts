@@ -73,7 +73,8 @@ function withoutTrailingSlash(path: AbsolutePath): AbsolutePath {
 
 function noteDirectoryPath(notePath: NotePath): AbsolutePath {
   const idx = Math.max(notePath.lastIndexOf('/'), notePath.lastIndexOf('\\'))
-  if (idx <= 0) return notePath
+  if (idx === -1) return '.'
+  if (idx === 0) return notePath.charAt(0)
   return notePath.slice(0, idx)
 }
 
@@ -227,9 +228,13 @@ export function portableImageUrls(
     if (attachmentPath) return attachmentPath
 
     if (notePath) {
-      return noteRelativeFromAssetUrl(url, notePath)
+      const noteRelative = noteRelativeFromAssetUrl(url, notePath)
+      if (noteRelative) return noteRelative
     }
 
-    return null
+    // Fall back to the absolute filesystem path so saved markdown
+    // never carries the internal asset:// scheme.
+    const absolutePath = decodeAssetPath(url)
+    return absolutePath || null
   })
 }
