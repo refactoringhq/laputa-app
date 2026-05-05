@@ -1,8 +1,9 @@
 diff --git a/dist/blocknote-react.js b/dist/blocknote-react.js
-index 6271d12d2cd5152e924c5bfe78f3b8904844dbfe..12bb96bb36d445a77d51a18d0de446a3f9f0ea59 100644
+index d4d36cd4dbb5370c3b7431ffeb577e4870b39825..5a6c325bf0ff9a23f2023169d7fcf6319df91544 100644
 --- a/dist/blocknote-react.js
 +++ b/dist/blocknote-react.js
-@@ -155,8 +155,26 @@ var Rt = (e) => {
+@@ -154,8 +154,26 @@ const co = (e) => {
+ };
  function so(e) {
    let t = new DOMRect();
 -  const n = "getBoundingClientRect" in e ? () => e.getBoundingClientRect() : () => e.element.getBoundingClientRect();
@@ -17,7 +18,7 @@ index 6271d12d2cd5152e924c5bfe78f3b8904844dbfe..12bb96bb36d445a77d51a18d0de446a3
 +      t = n();
 +    return t;
 +  };
- }
++}
 +function __bnSafeDomAtPos(e, t) {
 +  const n = e.prosemirrorView;
 +  if (!n || n.isDestroyed)
@@ -27,11 +28,10 @@ index 6271d12d2cd5152e924c5bfe78f3b8904844dbfe..12bb96bb36d445a77d51a18d0de446a3
 +  } catch {
 +    return null;
 +  }
-+}
+ }
  const z = (e) => {
    var h, b, p;
-   const { refs: t, floatingStyles: n, context: o } = Ze({
-@@ -216,9 +234,7 @@ const Lt = (e) => {
+@@ -216,9 +234,7 @@ const z = (e) => {
        const s = Ue(t, c.doc);
        if (!s)
          return;
@@ -42,7 +42,39 @@ index 6271d12d2cd5152e924c5bfe78f3b8904844dbfe..12bb96bb36d445a77d51a18d0de446a3
        if (a instanceof Element)
          return {
            element: a
-@@ -3306,14 +3322,15 @@ const pi = (e) => {
+@@ -2499,7 +2515,14 @@ function Kr(e) {
+     columns: d
+   } = e, m = H(
+     (C) => {
+-      a(), s(), u == null || u(C);
++      a();
++      try {
++        s();
++      } catch (x) {
++        console.warn("Ignored stale suggestion menu query cleanup:", x);
++        return;
++      }
++      u == null || u(C);
+     },
+     [u, a, s]
+   ), { items: g, usedQuery: f, loadingState: h } = Yt(
+@@ -2734,7 +2757,14 @@ function ti(e) {
+     onItemClick: u
+   } = e, d = H(
+     (p) => {
+-      a(), s(), u == null || u(p);
++      a();
++      try {
++        s();
++      } catch (C) {
++        console.warn("Ignored stale suggestion menu query cleanup:", C);
++        return;
++      }
++      u == null || u(p);
+     },
+     [u, a, s]
+   ), { items: m, usedQuery: g, loadingState: f } = Yt(
+@@ -3306,14 +3336,15 @@ const ii = (e, t = 0.3) => {
      );
      if (!m)
        return {};
@@ -61,7 +93,7 @@ index 6271d12d2cd5152e924c5bfe78f3b8904844dbfe..12bb96bb36d445a77d51a18d0de446a3
      return p instanceof Element ? (d.cellReference = { element: p }, d.rowReference = {
        element: f,
        getBoundingClientRect: () => {
-@@ -4371,7 +4388,7 @@ const El = (e) => {
+@@ -4371,7 +4402,7 @@ const zi = (e) => {
      const a = Ue(t, c.prosemirrorState.doc);
      if (!a)
        return;
