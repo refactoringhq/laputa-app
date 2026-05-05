@@ -130,6 +130,14 @@ import {
 import { requestPlainTextPaste } from './utils/plainTextPaste'
 import './App.css'
 
+const ACTIVE_EDITOR_SURFACE_SELECTOR = '.editor__blocknote-container, .raw-editor-codemirror'
+
+function isActiveElementInsideEditorSurface(): boolean {
+  const activeElement = document.activeElement
+  if (!(activeElement instanceof HTMLElement)) return false
+  return Boolean(activeElement.closest(ACTIVE_EDITOR_SURFACE_SELECTOR))
+}
+
 // Type declarations for mock content storage and test overrides
 declare global {
   interface Window {
@@ -619,12 +627,18 @@ function App() {
   useEffect(() => {
     noteWindowActionsRef.current = { handleSelectNote, openTabWithContent }
   }, [handleSelectNote, openTabWithContent])
-  const handlePulledVaultUpdate = useCallback(async (updatedFiles: string[]) => {
+  const handleVaultUpdate = useCallback(async (
+    updatedFiles: string[],
+    options: { preserveFocusedEditor?: boolean } = {},
+  ) => {
     await refreshPulledVaultState({
       activeTabPath: notes.activeTabPath,
       closeAllTabs,
       getActiveTabPath: () => notes.activeTabPathRef.current,
       hasUnsavedChanges: (path) => vault.unsavedPaths.has(path),
+      shouldKeepActiveEditorMounted: options.preserveFocusedEditor
+        ? isActiveElementInsideEditorSurface
+        : undefined,
       reloadFolders: vault.reloadFolders,
       reloadVault: vault.reloadVault,
       reloadViews: vault.reloadViews,
@@ -643,9 +657,17 @@ function App() {
       vault.reloadViews,
       vault.unsavedPaths,
     ])
+  const handlePulledVaultUpdate = useCallback(
+    (updatedFiles: string[]) => handleVaultUpdate(updatedFiles),
+    [handleVaultUpdate],
+  )
+  const handleFocusedVaultUpdate = useCallback(
+    (updatedFiles: string[]) => handleVaultUpdate(updatedFiles, { preserveFocusedEditor: true }),
+    [handleVaultUpdate],
+  )
   useVaultWatcher({
     vaultPath: noteWindowParams ? '' : resolvedPath,
-    onVaultChanged: handlePulledVaultUpdate,
+    onVaultChanged: handleFocusedVaultUpdate,
     filterChangedPaths: filterExternalVaultPaths,
   })
   const autoSync = useAutoSync({
@@ -774,6 +796,7 @@ function App() {
     closeAllTabs,
     replaceActiveTab: handleReplaceActiveTab,
     hasUnsavedChanges: (path) => vault.unsavedPaths.has(path),
+    shouldKeepActiveEditorMounted: isActiveElementInsideEditorSurface,
     onSelectNote: notes.handleSelectNote,
     activeTabPath: notes.activeTabPath,
     getActiveTabPath: () => notes.activeTabPathRef.current,

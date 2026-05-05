@@ -88,6 +88,21 @@ describe('refreshPulledVaultState', () => {
     expect(options.closeAllTabs).not.toHaveBeenCalled()
   })
 
+  it('keeps the active tab mounted while the editor is focused', async () => {
+    const options = makeOptions({
+      shouldKeepActiveEditorMounted: vi.fn(() => true),
+    })
+
+    await refreshPulledVaultState(options)
+
+    expect(options.shouldKeepActiveEditorMounted).toHaveBeenCalledOnce()
+    expect(options.reloadVault).toHaveBeenCalledOnce()
+    expect(options.reloadFolders).toHaveBeenCalledOnce()
+    expect(options.reloadViews).toHaveBeenCalledOnce()
+    expect(options.replaceActiveTab).not.toHaveBeenCalled()
+    expect(options.closeAllTabs).not.toHaveBeenCalled()
+  })
+
   it('skips stale tab replacement when the active note changes during reload', async () => {
     let resolveReload!: (entries: VaultEntry[]) => void
     let currentActivePath: string | null = '/vault/active.md'
