@@ -416,14 +416,35 @@ describe('WikilinkChatInput', () => {
     fireEvent.input(editor)
     expect(onDraftChange).toHaveBeenLastCalledWith(portugueseText)
 
-    const cjkKey = createEvent.keyDown(editor, { key: '你' })
-    fireEvent(editor, cjkKey)
+    const updatedEditor = screen.getByTestId('agent-input')
+    const cjkKey = createEvent.keyDown(updatedEditor, { key: '你' })
+    fireEvent(updatedEditor, cjkKey)
     expect(cjkKey.defaultPrevented).toBe(false)
 
-    editor.textContent = `${portugueseText}你`
-    setSelection(editor, portugueseText.length + 1)
-    fireEvent.input(editor)
+    updatedEditor.textContent = `${portugueseText}你`
+    setSelection(updatedEditor, portugueseText.length + 1)
+    fireEvent.input(updatedEditor)
     expect(onDraftChange).toHaveBeenLastCalledWith(`${portugueseText}你`)
+  })
+
+  it('remounts after native DOM input so React does not diff a mutated contentEditable tree', async () => {
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+    const initialEditor = screen.getByTestId('agent-input') as HTMLDivElement
+    initialEditor.focus()
+
+    initialEditor.textContent = 'follow up after edit'
+    setSelection(initialEditor, 'follow up after edit'.length)
+    fireEvent.input(initialEditor)
+
+    await waitFor(() => {
+      expect(onDraftChange).toHaveBeenLastCalledWith('follow up after edit')
+    })
+
+    const remountedEditor = screen.getByTestId('agent-input') as HTMLDivElement
+    expect(remountedEditor).not.toBe(initialEditor)
+    expect(remountedEditor.textContent).toBe('follow up after edit')
+    expect(document.activeElement).toBe(remountedEditor)
   })
 
   it('deletes an inline chip with a single Backspace', () => {

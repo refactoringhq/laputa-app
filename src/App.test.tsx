@@ -779,8 +779,6 @@ describe('App', () => {
     fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
 
     const input = await screen.findByTestId('agent-input')
-    input.textContent = 'Summarize the active vault'
-    fireEvent.input(input)
     fireEvent.click(screen.getByTestId('agent-send'))
 
     await act(async () => {
@@ -805,6 +803,8 @@ describe('App', () => {
       expect(input).toHaveAttribute('aria-placeholder', 'Ask Codex')
     })
 
+    input.textContent = 'Summarize the active vault'
+    fireEvent.input(input)
     fireEvent.click(screen.getByTestId('agent-send'))
 
     await waitFor(() => {

@@ -191,7 +191,6 @@ export function InlineWikilinkInput({
     setSelectionRange,
     setCombinedRef,
     syncSelectionRange,
-    commitValueFromEditor,
     focusSelectionRange,
   } = useInlineWikilinkSelection({
     value,
@@ -396,7 +395,20 @@ export function InlineWikilinkInput({
       }
     }
 
-    commitValueFromEditor()
+    if (!editor) return
+
+    const nextValue = normalizeInlineWikilinkValue(serializeInlineNode(editor))
+    const nextSelection = readSelectionRange(editor)
+    const clampedSelection: InlineSelectionRange = {
+      start: Math.min(nextSelection.start, nextValue.length),
+      end: Math.min(nextSelection.end, nextValue.length),
+    }
+
+    const shouldRestoreFocus = document.activeElement === editor
+    pendingFocusAfterRemountRef.current = shouldRestoreFocus ? clampedSelection : null
+    onChange(nextValue)
+    setSelectionRange(clampedSelection)
+    forceRender((current) => current + 1)
   }
   const flushPendingCompositionInput = () => {
     if (isComposingRef.current || !pendingCompositionInputRef.current) return
@@ -431,6 +443,8 @@ export function InlineWikilinkInput({
     queueMicrotask(flushPendingCompositionInput)
   }
   const handleInput = () => {
+    if (disabled) return
+
     if (isComposingRef.current) {
       pendingCompositionInputRef.current = true
       return
