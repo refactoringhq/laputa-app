@@ -266,10 +266,31 @@ export function clearListSortFromLocalStorage(): void {
   } catch { /* ignore */ }
 }
 
+function stringField(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function filenameStemFromEntry(entry: VaultEntry): string {
+  const filename = stringField(entry.filename)
+  if (filename) return filename.replace(/\.md$/, '')
+
+  const pathLeaf = stringField(entry.path).split(/[\\/]/u).pop() ?? ''
+  return pathLeaf.replace(/\.md$/, '')
+}
+
+function relativePathStemFromEntry(entry: VaultEntry): string {
+  const normalizedPath = stringField(entry.path).replaceAll('\\', '/')
+  return normalizedPath.replace(/^.*\/Laputa\//, '').replace(/\.md$/, '')
+}
+
+function linkTargetsForEntry(entry: VaultEntry): Set<string> {
+  const title = stringField(entry.title)
+  const aliases = Array.isArray(entry.aliases) ? entry.aliases : []
+  return new Set([title, ...aliases, filenameStemFromEntry(entry), relativePathStemFromEntry(entry)].filter(Boolean))
+}
+
 function findBacklinks(entity: VaultEntry, allEntries: VaultEntry[]): VaultEntry[] {
-  const stem = entity.filename.replace(/\.md$/, '')
-  const pathStem = entity.path.replace(/^.*\/Laputa\//, '').replace(/\.md$/, '')
-  const targets = new Set([entity.title, ...entity.aliases, stem, pathStem])
+  const targets = linkTargetsForEntry(entity)
 
   return allEntries.filter((e) => {
     if (e.path === entity.path) return false
