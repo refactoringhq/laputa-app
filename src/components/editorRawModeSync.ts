@@ -27,11 +27,14 @@ export function serializeEditorDocumentToMarkdown(
   editor: ReturnType<typeof useCreateBlockNote>,
   tabContent: string,
   vaultPath?: string,
+  notePath?: string,
 ): string {
   const blocks = editor.document
   const restored = restoreWikilinksInBlocks(blocks)
   const rawBodyMarkdown = compactMarkdown(serializeDurableEditorBlocks(editor, restored))
-  const bodyMarkdown = vaultPath ? portableImageUrls(rawBodyMarkdown, vaultPath) : rawBodyMarkdown
+  const bodyMarkdown = vaultPath
+    ? portableImageUrls(rawBodyMarkdown, vaultPath, notePath)
+    : rawBodyMarkdown
   const [frontmatter] = splitFrontmatter(tabContent)
   return `${frontmatter}${bodyMarkdown}`
 }
@@ -93,7 +96,7 @@ export function syncActiveTabIntoRawBuffer(options: {
 
   const shouldSerializeRichEditorContent = serializeRichEditorContent || hasDurableEditorBlocks(editor.document)
   const syncedContent = shouldSerializeRichEditorContent
-    ? serializeEditorDocumentToMarkdown(editor, activeTabContent, vaultPath)
+    ? serializeEditorDocumentToMarkdown(editor, activeTabContent, vaultPath, activeTabPath)
     : activeTabContent
   rawLatestContentRef.current = syncedContent
   return syncedContent

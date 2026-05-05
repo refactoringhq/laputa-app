@@ -209,7 +209,7 @@ function useEditorChangeHandler(options: {
     const rawBodyMarkdown = trySerializeEditorBody(editor, 'editor change')
     if (rawBodyMarkdown === null) return
     const bodyMarkdown = vaultPathRef.current
-      ? portableImageUrls(rawBodyMarkdown, vaultPathRef.current)
+      ? portableImageUrls(rawBodyMarkdown, vaultPathRef.current, path)
       : rawBodyMarkdown
     const [frontmatter] = splitFrontmatter(tab.content)
     const nextContent = `${frontmatter}${bodyMarkdown}`
