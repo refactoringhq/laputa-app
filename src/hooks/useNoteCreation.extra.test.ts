@@ -319,6 +319,15 @@ describe('resolveNewType', () => {
     expect(entry.path).toBe('/other/vault/responsibility.md')
     expect(entry.path).not.toContain('/Users/luca/Laputa')
   })
+
+  it('normalizes the built-in Notes label to the Note type definition', () => {
+    const { entry, content } = resolveNewType({ typeName: 'Notes', vaultPath: '/my/vault' })
+
+    expect(entry.path).toBe('/my/vault/note.md')
+    expect(entry.filename).toBe('note.md')
+    expect(entry.title).toBe('Note')
+    expect(content).toContain('# Note')
+  })
 })
 
 describe('planNewTypeCreation', () => {
@@ -343,5 +352,25 @@ describe('planNewTypeCreation', () => {
     })
 
     expect(plan.status).toBe('blocked')
+  })
+
+  it('does not treat an existing notes.md note as a collision for the built-in Notes label', () => {
+    const plan = planNewTypeCreation({
+      entries: [makeEntry({ path: '/my/vault/notes.md', filename: 'notes.md', title: 'Meeting Notes', isA: 'Note' })],
+      typeName: 'Notes',
+      vaultPath: '/my/vault',
+    })
+
+    expect(plan).toEqual({
+      status: 'create',
+      resolved: expect.objectContaining({
+        entry: expect.objectContaining({
+          path: '/my/vault/note.md',
+          filename: 'note.md',
+          title: 'Note',
+          isA: 'Type',
+        }),
+      }),
+    })
   })
 })
