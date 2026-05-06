@@ -118,10 +118,26 @@ describe('buildStableDownloadRedirectPage', () => {
     expect(html).toContain('Download Tolaria for Intel Mac')
     expect(html).toContain('hasMultipleMacDownloads')
     expect(html).toContain('Choose the Apple Silicon or Intel Mac download below.')
-    expect(html).toContain('window.location.replace')
+    expect(html).toContain('tolaria-download-frame')
     expect(html).toContain('color-scheme: light dark')
     expect(html).toContain('@media (prefers-color-scheme: dark)')
     expect(html).toContain('background: var(--download-surface-page)')
+  })
+
+  it('starts platform downloads without navigating away from the download page', () => {
+    const html = buildStableDownloadRedirectPage({
+      'windows-x86_64': {
+        buttonLabel: 'Download Tolaria for Windows',
+        label: 'Windows',
+        url: 'https://example.com/Tolaria-setup.exe',
+      },
+    })
+
+    expect(html).toContain('name="tolaria-download-frame"')
+    expect(html).toContain('target="tolaria-download-frame"')
+    expect(html).toContain('sandbox="allow-downloads"')
+    expect(html).toContain('startDownload(target)')
+    expect(html).not.toContain('window.location.replace')
   })
 
   it('builds a fallback page when no stable downloads exist yet', () => {

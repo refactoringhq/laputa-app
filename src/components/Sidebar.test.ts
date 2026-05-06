@@ -41,6 +41,11 @@ describe('buildSectionGroup', () => {
     expect(group.Icon).toBe(FileText)
   })
 
+  it('uses exact type names when automatic pluralization is disabled', () => {
+    const group = buildSectionGroup('Widget', {}, false)
+    expect(group.label).toBe('Widget')
+  })
+
   it('overrides built-in type icon/color when type entry has custom values', () => {
     const typeEntryMap: Record<string, VaultEntry> = {
       Project: { ...baseEntry, title: 'Project', isA: 'Type', icon: 'rocket', color: 'green', sidebarLabel: 'My Projects' },

@@ -29,6 +29,7 @@ interface ViewCommandsConfig {
   onSetNoteWidth?: (mode: NoteWidthMode) => void
   onSetDefaultNoteWidth?: (mode: NoteWidthMode) => void
   onToggleAIChat?: () => void
+  onToggleTableOfContents?: () => void
   zoomLevel: number
   onZoomIn: () => void
   onZoomOut: () => void
@@ -92,12 +93,27 @@ function buildMoveSavedViewCommand(
   }
 }
 
+function buildToggleTableOfContentsCommand(
+  hasActiveNote: boolean,
+  onToggleTableOfContents?: () => void,
+): CommandAction {
+  return {
+    id: 'toggle-table-of-contents',
+    label: 'Toggle Table of Contents',
+    group: 'View',
+    shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewToggleTableOfContents),
+    keywords: ['toc', 'outline', 'headings', 'contents', 'panel'],
+    enabled: hasActiveNote && !!onToggleTableOfContents,
+    execute: () => onToggleTableOfContents?.(),
+  }
+}
+
 export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
   const {
     hasActiveNote, activeNoteModified,
     onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor,
     noteWidth = DEFAULT_NOTE_WIDTH_MODE, defaultNoteWidth = DEFAULT_NOTE_WIDTH_MODE,
-    onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat,
+    onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, onToggleTableOfContents,
     zoomLevel, onZoomIn, onZoomOut, onZoomReset,
     onCustomizeNoteListColumns, canCustomizeNoteListColumns, noteListColumnsLabel,
     selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown,
@@ -116,6 +132,7 @@ export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
     buildSetDefaultNoteWidthCommand('normal', defaultNoteWidth, onSetDefaultNoteWidth),
     buildSetDefaultNoteWidthCommand('wide', defaultNoteWidth, onSetDefaultNoteWidth),
     { id: 'toggle-ai-panel', label: 'Toggle AI Panel', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewToggleAiChat), keywords: ['ai', 'agent', 'chat', 'assistant', 'contextual'], enabled: true, execute: () => onToggleAIChat?.() },
+    buildToggleTableOfContentsCommand(hasActiveNote, onToggleTableOfContents),
     { id: 'new-ai-chat', label: 'New AI chat', group: 'View', keywords: ['ai', 'agent', 'chat', 'assistant', 'new', 'fresh', 'conversation', 'reset'], enabled: true, execute: requestNewAiChat },
     { id: 'toggle-backlinks', label: 'Toggle Backlinks', group: 'View', keywords: ['backlinks', 'references', 'links', 'mentions', 'incoming'], enabled: hasActiveNote, execute: onToggleInspector },
     buildMoveSavedViewCommand('Up', selectedViewName, onMoveSelectedViewUp, canMoveSelectedViewUp),

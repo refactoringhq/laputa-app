@@ -113,6 +113,39 @@ function useCurrentVaultPathGuard(vaultPath: string) {
   return useCallback((path: string) => currentPathRef.current === path, [])
 }
 
+function useCoalescedAsyncTask<T>(runTask: () => Promise<T>) {
+  const inFlightRef = useRef<Promise<T> | null>(null)
+  const requestedDuringFlightRef = useRef(false)
+  const latestTaskRef = useRef<(() => Promise<T>) | null>(null)
+
+  const task = useCallback(async () => {
+    if (inFlightRef.current) {
+      requestedDuringFlightRef.current = true
+      return inFlightRef.current
+    }
+
+    const next = (async () => {
+      try {
+        return await runTask()
+      } finally {
+        inFlightRef.current = null
+        if (requestedDuringFlightRef.current) {
+          requestedDuringFlightRef.current = false
+          void latestTaskRef.current?.()
+        }
+      }
+    })()
+    inFlightRef.current = next
+    return next
+  }, [runTask])
+
+  useEffect(() => {
+    latestTaskRef.current = task
+  }, [task])
+
+  return task
+}
+
 function useNewNoteTracker() {
   const [newPaths, setNewPaths] = useState<Set<string>>(new Set())
 
@@ -284,7 +317,7 @@ function useModifiedFilesLoader(vaultPath: string, isCurrentVaultPath: (path: st
   const [modifiedFiles, setModifiedFiles] = useState<ModifiedFile[]>([])
   const [modifiedFilesError, setModifiedFilesError] = useState<string | null>(null)
 
-  const loadModifiedFiles = useCallback(async () => {
+  const runModifiedFilesLoad = useCallback(async () => {
     const path = vaultPath
     setModifiedFilesError(null)
 
@@ -309,7 +342,9 @@ function useModifiedFilesLoader(vaultPath: string, isCurrentVaultPath: (path: st
     }
   }, [vaultPath, isCurrentVaultPath])
 
-  useEffect(() => { loadModifiedFiles() }, [loadModifiedFiles]) // eslint-disable-line react-hooks/set-state-in-effect -- trigger initial load
+  const loadModifiedFiles = useCoalescedAsyncTask(runModifiedFilesLoad)
+
+  useEffect(() => { loadModifiedFiles() }, [loadModifiedFiles])
 
   return {
     modifiedFiles,
@@ -462,7 +497,7 @@ function useEntryReload({
   setEntries,
   vaultPath,
 }: EntryReloadOptions) {
-  return useCallback(async () => {
+  const runEntryReload = useCallback(async () => {
     const path = vaultPath
     if (!hasVaultPath({ vaultPath: path })) return [] as VaultEntry[]
     clearPrefetchCache()
@@ -482,6 +517,8 @@ function useEntryReload({
       finishReload()
     }
   }, [handleVaultAvailable, handleVaultUnavailable, vaultPath, beginReload, finishReload, loadModifiedFiles, isCurrentVaultPath, setEntries])
+
+  return useCoalescedAsyncTask(runEntryReload)
 }
 
 function useViewReload({

@@ -1,4 +1,5 @@
 const RELEASE_HISTORY_URL = 'https://refactoringhq.github.io/tolaria/'
+const DOWNLOAD_FRAME_NAME = 'tolaria-download-frame'
 
 type StablePlatformKey =
   | 'darwin-aarch64'
@@ -120,7 +121,7 @@ const REDIRECT_PAGE_STYLES = `
       width: min(100%, 520px);
       background: var(--download-surface-card);
       border: 1px solid var(--download-border-default);
-      border-radius: 16px;
+      border-radius: 8px;
       padding: 24px;
       box-shadow: 0 16px 40px var(--download-shadow-card);
     }
@@ -149,7 +150,7 @@ const REDIRECT_PAGE_STYLES = `
       justify-content: center;
       min-height: 44px;
       padding: 0 16px;
-      border-radius: 10px;
+      border-radius: 8px;
       background: var(--download-accent);
       color: var(--download-text-on-accent);
       text-decoration: none;
@@ -372,7 +373,7 @@ function buildStableDownloadPageContent(
 ): DownloadPageContent {
   if (Object.keys(downloads).length > 0) {
     return {
-      helperText: 'If the download does not start automatically, use one of the platform links below.',
+      helperText: 'Your download should start automatically. If it does not, use one of the platform links below.',
       message: 'Preparing the latest stable Tolaria download for your platform.',
       shouldRedirect: true,
       title: 'Tolaria Stable Download',
@@ -399,18 +400,24 @@ function buildDownloadsMarkup(downloads: StableDownloadTargets): string {
   const primaryTarget = targets[0]
   const secondaryLinks = targets
     .map((target) => (
-      `<a href="${escapeHtml(target.url)}" data-secondary="true">${escapeHtml(target.label)}</a>`
+      `<a href="${escapeHtml(target.url)}" target="${DOWNLOAD_FRAME_NAME}" rel="noreferrer" data-secondary="true">${escapeHtml(target.label)}</a>`
     ))
     .join('')
 
   return `
     <div class="button-list">
-      <a id="download-link" href="${escapeHtml(primaryTarget.url)}">${escapeHtml(primaryTarget.buttonLabel)}</a>
+      <a id="download-link" href="${escapeHtml(primaryTarget.url)}" target="${DOWNLOAD_FRAME_NAME}" rel="noreferrer">${escapeHtml(primaryTarget.buttonLabel)}</a>
     </div>
     <div class="button-list">${secondaryLinks}</div>
     <div class="button-list">
       <a href="${RELEASE_HISTORY_URL}" data-secondary="true">View release history</a>
     </div>`
+}
+
+function buildDownloadFrameMarkup(downloads: StableDownloadTargets): string {
+  if (Object.keys(downloads).length === 0) return ''
+
+  return `<iframe title="Tolaria installer download" name="${DOWNLOAD_FRAME_NAME}" sandbox="allow-downloads" hidden></iframe>`
 }
 
 function buildRedirectMarkup(downloads: StableDownloadTargets): string {
@@ -433,28 +440,71 @@ function buildRedirectMarkup(downloads: StableDownloadTargets): string {
         return null;
       }
 
-      const detectedPlatform = detectPlatform(navigator.userAgent);
-      const resolvedTarget = (
-        detectedPlatform && DOWNLOAD_TARGETS[detectedPlatform]
-      ) || DOWNLOAD_TARGETS[PLATFORM_ORDER.find((platform) => DOWNLOAD_TARGETS[platform])] || null;
-      const requiresMacChoice = hasMultipleMacDownloads && /Mac OS X|Macintosh/i.test(navigator.userAgent);
-
-      if (resolvedTarget) {
-        const link = document.getElementById('download-link');
-        const message = document.getElementById('download-message');
-        if (link) {
-          link.href = resolvedTarget.url;
-          link.textContent = resolvedTarget.buttonLabel;
-        }
-        if (message) {
-          message.textContent = requiresMacChoice
-            ? 'Choose the Apple Silicon or Intel Mac download below.'
-            : 'Redirecting to the latest stable Tolaria download for ' + resolvedTarget.label + '.';
-        }
-        if (!requiresMacChoice) {
-          window.location.replace(resolvedTarget.url);
-        }
+      function firstAvailableTarget() {
+        return DOWNLOAD_TARGETS[PLATFORM_ORDER.find((platform) => DOWNLOAD_TARGETS[platform])] || null;
       }
+
+      function startDownload(target) {
+        const frame = document.querySelector('iframe[name="${DOWNLOAD_FRAME_NAME}"]');
+        if (!frame || !target) return;
+        frame.src = target.url;
+      }
+
+      function resolvedDownloadTarget() {
+        const detectedPlatform = detectPlatform(navigator.userAgent);
+        if (detectedPlatform && DOWNLOAD_TARGETS[detectedPlatform]) {
+          return DOWNLOAD_TARGETS[detectedPlatform];
+        }
+
+        return firstAvailableTarget();
+      }
+
+      function requiresMacDownloadChoice() {
+        return hasMultipleMacDownloads && /Mac OS X|Macintosh/i.test(navigator.userAgent);
+      }
+
+      function updatePrimaryDownloadLink(target) {
+        const link = document.getElementById('download-link');
+        if (!link) return;
+
+        link.href = target.url;
+        link.textContent = target.buttonLabel;
+      }
+
+      function downloadMessage(target, requiresMacChoice) {
+        if (requiresMacChoice) {
+          return 'Choose the Apple Silicon or Intel Mac download below.';
+        }
+
+        return 'Starting the latest stable Tolaria download for ' + target.label + '.';
+      }
+
+      function updateDownloadMessage(target, requiresMacChoice) {
+        const message = document.getElementById('download-message');
+        if (!message) return;
+
+        message.textContent = downloadMessage(target, requiresMacChoice);
+      }
+
+      function scheduleAutomaticDownload(target, requiresMacChoice) {
+        if (requiresMacChoice) return;
+
+        window.setTimeout(function () {
+          startDownload(target);
+        }, 250);
+      }
+
+      function setupDownloadPage() {
+        const target = resolvedDownloadTarget();
+        if (!target) return;
+
+        const requiresMacChoice = requiresMacDownloadChoice();
+        updatePrimaryDownloadLink(target);
+        updateDownloadMessage(target, requiresMacChoice);
+        scheduleAutomaticDownload(target, requiresMacChoice);
+      }
+
+      window.addEventListener('DOMContentLoaded', setupDownloadPage);
     </script>`
 }
 
@@ -475,10 +525,11 @@ export function buildStableDownloadRedirectPage(
 <body>
   <main>
     <h1>${page.title}</h1>
-    <p id="download-message">${page.message}</p>
+    <p id="download-message" aria-live="polite">${page.message}</p>
     <p>${page.helperText}</p>
     ${buildDownloadsMarkup(downloads)}
   </main>
+  ${buildDownloadFrameMarkup(downloads)}
 </body>
 </html>
 `

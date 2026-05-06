@@ -10,6 +10,7 @@ import {
   clearPrefetchCache,
   NOTE_CONTENT_CACHE_MAX_BYTES,
   NOTE_CONTENT_ENTRY_MAX_BYTES,
+  NOTE_CONTENT_PREFETCH_CONCURRENCY,
 } from './useTabManagement'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
@@ -517,6 +518,94 @@ describe('useTabManagement (single-note model)', () => {
       prefetchNoteContent('/vault/note/dup.md')
 
       await vi.waitFor(() => expect(vi.mocked(mockInvoke)).toHaveBeenCalledTimes(1))
+    })
+
+    it('limits concurrent background prefetch reads', async () => {
+      const pendingReads = new Map<string, ReturnType<typeof createDeferred<string>>>()
+      let activeReads = 0
+      let maxActiveReads = 0
+      vi.mocked(mockInvoke).mockImplementation((_cmd: string, args?: Record<string, unknown>) => {
+        const path = typeof args?.path === 'string' ? args.path : ''
+        const deferred = createDeferred<string>()
+        pendingReads.set(path, deferred)
+        activeReads += 1
+        maxActiveReads = Math.max(maxActiveReads, activeReads)
+        return deferred.promise.finally(() => {
+          activeReads -= 1
+        })
+      })
+
+      const paths = Array.from({ length: NOTE_CONTENT_PREFETCH_CONCURRENCY + 3 }, (_, index) => `/vault/note/pre-${index}.md`)
+      for (const path of paths) prefetchNoteContent(path)
+
+      await vi.waitFor(() => {
+        expect(vi.mocked(mockInvoke)).toHaveBeenCalledTimes(NOTE_CONTENT_PREFETCH_CONCURRENCY)
+      })
+      expect(maxActiveReads).toBe(NOTE_CONTENT_PREFETCH_CONCURRENCY)
+
+      await act(async () => {
+        pendingReads.get(paths[0])?.resolve('# First')
+        await Promise.resolve()
+      })
+
+      await vi.waitFor(() => {
+        expect(vi.mocked(mockInvoke)).toHaveBeenCalledTimes(NOTE_CONTENT_PREFETCH_CONCURRENCY + 1)
+      })
+      expect(maxActiveReads).toBe(NOTE_CONTENT_PREFETCH_CONCURRENCY)
+
+      await act(async () => {
+        for (const deferred of pendingReads.values()) deferred.resolve('# Done')
+        await Promise.resolve()
+      })
+      await vi.waitFor(() => {
+        expect(vi.mocked(mockInvoke)).toHaveBeenCalledTimes(paths.length)
+      })
+      await act(async () => {
+        for (const deferred of pendingReads.values()) deferred.resolve('# Done')
+        await Promise.resolve()
+      })
+    })
+
+    it('promotes a queued prefetch when the note is opened', async () => {
+      const pendingReads = new Map<string, ReturnType<typeof createDeferred<string>>>()
+      vi.mocked(mockInvoke).mockImplementation((_cmd: string, args?: Record<string, unknown>) => {
+        const path = typeof args?.path === 'string' ? args.path : ''
+        const deferred = createDeferred<string>()
+        pendingReads.set(path, deferred)
+        return deferred.promise
+      })
+
+      const paths = Array.from({ length: NOTE_CONTENT_PREFETCH_CONCURRENCY + 1 }, (_, index) => `/vault/note/promote-${index}.md`)
+      for (const path of paths) prefetchNoteContent(path)
+
+      await vi.waitFor(() => {
+        expect(vi.mocked(mockInvoke)).toHaveBeenCalledTimes(NOTE_CONTENT_PREFETCH_CONCURRENCY)
+      })
+
+      const queuedPath = paths[NOTE_CONTENT_PREFETCH_CONCURRENCY]
+      const { result } = renderHook(() => useTabManagement())
+      await act(async () => {
+        void result.current.handleSelectNote(makeEntry({ path: queuedPath, title: 'Queued' }))
+        await Promise.resolve()
+      })
+
+      await vi.waitFor(() => {
+        expect(pendingReads.has(queuedPath)).toBe(true)
+      })
+
+      await act(async () => {
+        pendingReads.get(queuedPath)?.resolve('# Queued content')
+        await Promise.resolve()
+      })
+
+      expect(result.current.tabs[0].content).toBe('# Queued content')
+
+      await act(async () => {
+        for (const [path, deferred] of pendingReads) {
+          if (path !== queuedPath) deferred.resolve('# Done')
+        }
+        await Promise.resolve()
+      })
     })
 
     it('swallows no-active-vault prefetch failures and lets a later open recover', async () => {

@@ -14,6 +14,7 @@ import {
 import {
   configuredModelTargets,
   resolveAiTarget,
+  type AiTarget,
   type AiModelProvider,
 } from '../../lib/aiTargets'
 import type { Settings } from '../../types'
@@ -89,8 +90,12 @@ function triggerLabel(defaultAgent: AiAgentId): string {
   return getAiAgentDefinition(defaultAgent).shortLabel
 }
 
-function menuHeading(locale: AppLocale, defaultAgent: AiAgentId, selectedAgentReady: boolean): string {
-  const agent = getAiAgentDefinition(defaultAgent).label
+function menuHeading(locale: AppLocale, selectedTarget: AiTarget, selectedAgentReady: boolean): string {
+  if (selectedTarget.kind === 'api_model') {
+    return translate(locale, 'status.ai.defaultTarget', { target: selectedTarget.label })
+  }
+
+  const agent = selectedTarget.label
   return selectedAgentReady
     ? translate(locale, 'status.ai.active', { agent })
     : translate(locale, 'status.ai.unavailable', { agent })
@@ -174,18 +179,18 @@ function GuidanceMenuSection({
 function AgentMenuContent({
   statuses,
   guidanceStatus,
-  defaultAgent,
-  defaultTarget,
   providers = [],
+  selectedTarget,
   selectedAgentReady,
   onSetDefaultAgent,
   onSetDefaultTarget,
   onRestoreGuidance,
   locale = 'en',
-}: AiAgentsBadgeProps & { selectedAgentReady: boolean }) {
+}: AiAgentsBadgeProps & { selectedTarget: AiTarget; selectedAgentReady: boolean }) {
   const installedAgents = installedAgentDefinitions(statuses)
   const missingAgents = missingAgentDefinitions(statuses)
   const modelTargets = configuredModelTargets(providers)
+  const selectedAgentValue = selectedTarget.kind === 'agent' && selectedAgentReady ? selectedTarget.agent : undefined
 
   return (
     <DropdownMenuContent
@@ -194,12 +199,12 @@ function AgentMenuContent({
       className="min-w-[18rem]"
       data-testid="status-ai-agents-menu"
     >
-      <DropdownMenuLabel>{menuHeading(locale, defaultAgent, selectedAgentReady)}</DropdownMenuLabel>
+      <DropdownMenuLabel>{menuHeading(locale, selectedTarget, selectedAgentReady)}</DropdownMenuLabel>
       {installedAgents.length === 0 ? (
         <DropdownMenuItem disabled>{translate(locale, 'status.ai.noAgents')}</DropdownMenuItem>
       ) : (
         <DropdownMenuRadioGroup
-          value={selectedAgentReady ? defaultAgent : undefined}
+          value={selectedAgentValue}
           onValueChange={(value) => {
             onSetDefaultAgent?.(value as AiAgentId)
             onSetDefaultTarget?.(`agent:${value}`)
@@ -217,7 +222,7 @@ function AgentMenuContent({
       )}
       <ModelTargetMenuSection
         targets={modelTargets}
-        defaultTarget={defaultTarget}
+        selectedTarget={selectedTarget}
         locale={locale}
         onSetDefaultTarget={onSetDefaultTarget}
       />
@@ -246,12 +251,12 @@ function AgentMenuContent({
 
 function ModelTargetMenuSection({
   targets,
-  defaultTarget,
+  selectedTarget,
   locale,
   onSetDefaultTarget,
 }: {
   targets: ReturnType<typeof configuredModelTargets>
-  defaultTarget?: string
+  selectedTarget: AiTarget
   locale: AppLocale
   onSetDefaultTarget?: (target: string) => void
 }) {
@@ -262,7 +267,7 @@ function ModelTargetMenuSection({
       <DropdownMenuSeparator />
       <DropdownMenuLabel>{translate(locale, 'status.ai.modelTargets')}</DropdownMenuLabel>
       <DropdownMenuRadioGroup
-        value={defaultTarget}
+        value={selectedTarget.kind === 'api_model' ? selectedTarget.id : undefined}
         onValueChange={(value) => onSetDefaultTarget?.(value)}
       >
         {targets.map((target) => (
@@ -337,6 +342,7 @@ export function AiAgentsBadge({
           onSetDefaultAgent={onSetDefaultAgent}
           onSetDefaultTarget={onSetDefaultTarget}
           onRestoreGuidance={onRestoreGuidance}
+          selectedTarget={selectedTarget}
           selectedAgentReady={selectedAgentReady}
           locale={locale}
         />

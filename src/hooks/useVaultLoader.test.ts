@@ -783,6 +783,48 @@ describe('useVaultLoader', () => {
   })
 
   describe('loadModifiedFiles', () => {
+    it('coalesces overlapping modified-file refreshes while git status is in flight', async () => {
+      const firstStatus = createDeferred<ModifiedFile[]>()
+      const secondStatus = createDeferred<ModifiedFile[]>()
+      let statusCalls = 0
+      backendInvokeFn.mockImplementation(((cmd: string) => {
+        if (isVaultLoadCommand(cmd)) return Promise.resolve(mockEntries)
+        if (cmd === 'list_vault_folders' || cmd === 'list_views') return Promise.resolve([])
+        if (cmd === 'get_modified_files') {
+          statusCalls += 1
+          return statusCalls === 1 ? firstStatus.promise : secondStatus.promise
+        }
+        return Promise.resolve(null)
+      }) as typeof defaultMockInvoke)
+
+      const { result } = renderHook(() => useVaultLoader('/vault'))
+      await waitForEntries(result)
+
+      await act(async () => {
+        void result.current.loadModifiedFiles()
+        void result.current.loadModifiedFiles()
+        await Promise.resolve()
+      })
+
+      expect(statusCalls).toBe(1)
+
+      await act(async () => {
+        firstStatus.resolve([])
+        await Promise.resolve()
+      })
+
+      await waitFor(() => {
+        expect(statusCalls).toBe(2)
+      })
+
+      await act(async () => {
+        secondStatus.resolve(mockModifiedFiles)
+        await Promise.resolve()
+      })
+
+      await waitForModifiedFiles(result)
+    })
+
     it('refreshes modified files list', async () => {
       const { result } = await renderVaultLoader()
 
@@ -890,6 +932,52 @@ describe('useVaultLoader', () => {
       })
 
       expect(result.current.isReloading).toBe(false)
+    })
+
+    it('serializes overlapping vault reloads and runs one trailing reload', async () => {
+      const firstReload = createDeferred<VaultEntry[]>()
+      const secondReload = createDeferred<VaultEntry[]>()
+      let reloadCalls = 0
+      backendInvokeFn.mockImplementation(((cmd: string) => {
+        if (cmd === 'list_vault') return Promise.resolve(mockEntries)
+        if (cmd === 'reload_vault') {
+          reloadCalls += 1
+          return reloadCalls === 1 ? firstReload.promise : secondReload.promise
+        }
+        if (cmd === 'get_modified_files' || cmd === 'list_vault_folders' || cmd === 'list_views') return Promise.resolve([])
+        return Promise.resolve(null)
+      }) as typeof defaultMockInvoke)
+
+      const { result } = await renderVaultLoader()
+
+      let firstReloadPromise: Promise<VaultEntry[]> | undefined
+      await act(async () => {
+        firstReloadPromise = result.current.reloadVault()
+        void result.current.reloadVault()
+        await Promise.resolve()
+      })
+
+      expect(reloadCalls).toBe(1)
+
+      await act(async () => {
+        firstReload.resolve([mockEntries[0]])
+        await firstReloadPromise
+      })
+
+      await waitFor(() => {
+        expect(reloadCalls).toBe(2)
+      })
+
+      await act(async () => {
+        secondReload.resolve([
+          { ...mockEntries[0], path: '/vault/note/trailing.md', filename: 'trailing.md', title: 'Trailing' },
+        ])
+        await Promise.resolve()
+      })
+
+      await waitFor(() => {
+        expect(result.current.entries[0]?.title).toBe('Trailing')
+      })
     })
 
     it('refreshes entries from reload_vault and reloads modified files', async () => {

@@ -39,6 +39,7 @@ export interface EditorContentProps {
   onEditorChange?: () => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
+  onEnterNeighborhood?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
   onCopyFilePath?: (path: string) => void
   onDeleteNote?: (path: string) => void

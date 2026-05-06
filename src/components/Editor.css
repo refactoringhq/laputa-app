@@ -55,15 +55,11 @@
 }
 
 .breadcrumb-bar__overflow-menu {
-  display: none;
+  display: flex;
 }
 
 .breadcrumb-bar__actions[data-overflow-collapsed='true'] .breadcrumb-bar__overflowable-action {
   display: none;
-}
-
-.breadcrumb-bar__actions[data-overflow-collapsed='true'] .breadcrumb-bar__overflow-menu {
-  display: flex;
 }
 
 /* Scroll area wrapping title + editor — single scroll context for alignment */

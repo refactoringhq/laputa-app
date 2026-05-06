@@ -2,8 +2,9 @@
 type: ADR
 id: "0071"
 title: "External vault updates reload derived state and reopen the clean active note"
-status: active
+status: superseded
 date: 2026-04-21
+superseded_by: "0111"
 ---
 
 ## Context

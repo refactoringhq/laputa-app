@@ -72,6 +72,7 @@ describe('buildSettingsCommands', () => {
 
     const lightMode = commands.find((item) => item.id === 'use-light-mode')
     const darkMode = commands.find((item) => item.id === 'use-dark-mode')
+    const systemMode = commands.find((item) => item.id === 'use-system-theme-mode')
 
     expect(lightMode).toMatchObject({
       label: 'Use Light Mode',
@@ -85,12 +86,20 @@ describe('buildSettingsCommands', () => {
       group: 'Settings',
     })
     expect(darkMode?.keywords).toEqual(expect.arrayContaining(['theme', 'dark mode']))
+    expect(systemMode).toMatchObject({
+      label: 'Use System Theme',
+      enabled: true,
+      group: 'Settings',
+    })
+    expect(systemMode?.keywords).toEqual(expect.arrayContaining(['theme', 'system theme']))
 
     lightMode?.execute()
     darkMode?.execute()
+    systemMode?.execute()
 
     expect(onSetThemeMode).toHaveBeenNthCalledWith(1, 'light')
     expect(onSetThemeMode).toHaveBeenNthCalledWith(2, 'dark')
+    expect(onSetThemeMode).toHaveBeenNthCalledWith(3, 'system')
   })
 
   it('keeps theme mode commands visible but disabled until settings can be saved', () => {
@@ -102,6 +111,10 @@ describe('buildSettingsCommands', () => {
     })
     expect(commands.find((item) => item.id === 'use-dark-mode')).toMatchObject({
       label: 'Use Dark Mode',
+      enabled: false,
+    })
+    expect(commands.find((item) => item.id === 'use-system-theme-mode')).toMatchObject({
+      label: 'Use System Theme',
       enabled: false,
     })
   })
@@ -124,6 +137,9 @@ describe('buildSettingsCommands', () => {
     })
     expect(commands.find((item) => item.id === 'use-light-mode')).toMatchObject({
       label: '使用浅色模式',
+    })
+    expect(commands.find((item) => item.id === 'use-system-theme-mode')).toMatchObject({
+      label: '使用系统主题',
     })
   })
 

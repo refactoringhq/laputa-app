@@ -124,12 +124,57 @@ describe('useMainWindowSizeConstraints', () => {
   })
 
   it('sends the grow-to-fit payload through the native command helper', async () => {
-    await applyMainWindowSizeConstraints(1200)
+    await applyMainWindowSizeConstraints(1200, { growToFit: false })
 
     expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', {
       minWidth: 1200,
       minHeight: 400,
-      growToFit: true,
+      growToFit: false,
+    })
+  })
+
+  it('does not request native grow-to-fit on Windows', async () => {
+    const originalUserAgent = navigator.userAgent
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    })
+
+    try {
+      renderHook(() => useMainWindowSizeConstraints({
+        sidebarVisible: true,
+        noteListVisible: true,
+        inspectorCollapsed: false,
+      }))
+
+      await waitFor(() => {
+        expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', {
+          minWidth: 1160,
+          minHeight: 400,
+          growToFit: false,
+        })
+      })
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        configurable: true,
+        value: originalUserAgent,
+      })
+    }
+  })
+
+  it('keeps grow-to-fit enabled on non-Windows platforms', async () => {
+    renderHook(() => useMainWindowSizeConstraints({
+      sidebarVisible: true,
+      noteListVisible: true,
+      inspectorCollapsed: false,
+    }))
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', {
+        minWidth: 1160,
+        minHeight: 400,
+        growToFit: true,
+      })
     })
   })
 })

@@ -15,6 +15,10 @@ export function isMac(): boolean {
   return userAgent.includes('Mac OS X') || userAgent.includes('Macintosh')
 }
 
+export function isWindows(): boolean {
+  return getUserAgent().includes('Windows')
+}
+
 export function shouldUseLinuxWindowChrome(): boolean {
   return isTauri() && isLinux()
 }

@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { NoteWidthMode, VaultEntry } from '../types'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../lib/i18n'
-import { formatShortcutDisplay } from '../hooks/appCommandCatalog'
+import { APP_COMMAND_IDS, formatShortcutDisplay, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ActionTooltip, type ActionTooltipCopy } from '@/components/ui/action-tooltip'
@@ -24,6 +24,7 @@ import {
   ArrowUUpLeft,
   ClipboardText,
   FolderOpen,
+  MapTrifold,
   Star,
   CheckCircle,
   ArrowsClockwise,
@@ -58,6 +59,7 @@ interface BreadcrumbBarProps {
   onDelete?: () => void
   onArchive?: () => void
   onUnarchive?: () => void
+  onEnterNeighborhood?: (entry: VaultEntry) => void
   onRenameFilename?: (path: string, newFilenameStem: string) => void
   noteWidth?: NoteWidthMode
   onToggleNoteWidth?: () => void
@@ -67,7 +69,6 @@ interface BreadcrumbBarProps {
   loadingTitle?: boolean
 }
 
-const DISABLED_ICON_STYLE = { opacity: 0.4, cursor: 'not-allowed' } as const
 const BREADCRUMB_ICON_CLASS = 'size-[16px]'
 const TITLE_ACTION_GAP_PX = 24
 
@@ -310,31 +311,20 @@ function OrganizedAction({
   return <ConfiguredToggleAction active={organized} config={TOGGLE_ACTION_CONFIGS.organized} locale={locale} onClick={onToggleOrganized} />
 }
 
-function DiffAction({
-  showDiffToggle,
-  diffMode,
-  diffLoading,
+function NeighborhoodAction({
+  entry,
   locale = 'en',
-  onToggleDiff,
-}: Pick<BreadcrumbBarProps, 'showDiffToggle' | 'diffMode' | 'diffLoading' | 'locale' | 'onToggleDiff'>) {
-  if (!showDiffToggle) {
-    return (
-      <IconActionButton copy={{ label: translate(locale, 'editor.toolbar.noDiff') }} style={DISABLED_ICON_STYLE}>
-        <GitBranch size={16} className={BREADCRUMB_ICON_CLASS} />
-      </IconActionButton>
-    )
-  }
+  onEnterNeighborhood,
+}: Pick<BreadcrumbBarProps, 'entry' | 'locale' | 'onEnterNeighborhood'>) {
+  if (!onEnterNeighborhood) return null
 
-  const copy: ActionTooltipCopy = diffLoading
-    ? { label: translate(locale, 'editor.toolbar.loadingDiff') }
-    : { label: translate(locale, diffMode ? 'editor.toolbar.rawReturn' : 'editor.toolbar.showDiff') }
   return (
     <IconActionButton
-      copy={copy}
-      onClick={onToggleDiff}
-      className={cn(diffMode ? 'text-foreground' : 'hover:text-foreground')}
+      copy={{ label: translate(locale, 'editor.toolbar.openNeighborhood') }}
+      onClick={() => onEnterNeighborhood(entry)}
+      className="hover:text-foreground"
     >
-      <GitBranch size={16} className={BREADCRUMB_ICON_CLASS} />
+      <MapTrifold size={16} className={BREADCRUMB_ICON_CLASS} />
     </IconActionButton>
   )
 }
@@ -363,47 +353,14 @@ function TableOfContentsAction({
 
   return (
     <IconActionButton
-      copy={{ label: translate(locale, showTableOfContents ? 'editor.toolbar.closeTableOfContents' : 'editor.toolbar.openTableOfContents') }}
+      copy={{
+        label: translate(locale, showTableOfContents ? 'editor.toolbar.closeTableOfContents' : 'editor.toolbar.openTableOfContents'),
+        shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewToggleTableOfContents),
+      }}
       onClick={onToggleTableOfContents}
       className={cn(showTableOfContents ? 'text-foreground' : 'hover:text-foreground')}
     >
       <ListBullets size={16} weight={showTableOfContents ? 'bold' : 'regular'} className={BREADCRUMB_ICON_CLASS} />
-    </IconActionButton>
-  )
-}
-
-function ArchiveAction({
-  archived,
-  locale = 'en',
-  onArchive,
-  onUnarchive,
-}: Pick<VaultEntry, 'archived'> & Pick<BreadcrumbBarProps, 'locale' | 'onArchive' | 'onUnarchive'>) {
-  if (archived) {
-    return (
-      <IconActionButton copy={{ label: translate(locale, 'editor.toolbar.restoreArchived') }} onClick={onUnarchive} className="hover:text-foreground">
-        <ArrowUUpLeft size={16} className={BREADCRUMB_ICON_CLASS} />
-      </IconActionButton>
-    )
-  }
-
-  return (
-    <IconActionButton copy={{ label: translate(locale, 'editor.toolbar.archive') }} onClick={onArchive} className="hover:text-foreground">
-      <Archive size={16} className={BREADCRUMB_ICON_CLASS} />
-    </IconActionButton>
-  )
-}
-
-function DeleteAction({ locale = 'en', onDelete }: Pick<BreadcrumbBarProps, 'locale' | 'onDelete'>) {
-  return (
-    <IconActionButton
-      copy={{
-        label: translate(locale, 'editor.toolbar.delete'),
-        shortcut: formatShortcutDisplay({ display: '⌘⌫ / ⌘⌦' }),
-      }}
-      onClick={onDelete}
-      className="hover:text-destructive"
-    >
-      <Trash size={16} className={BREADCRUMB_ICON_CLASS} />
     </IconActionButton>
   )
 }
@@ -465,17 +422,6 @@ function OverflowToolbarAction({ children }: { children: ReactNode }) {
   return <span className="breadcrumb-bar__overflowable-action flex items-center gap-2">{children}</span>
 }
 
-function diffMenuLabelKey({
-  showDiffToggle,
-  diffMode,
-  diffLoading,
-}: Pick<BreadcrumbBarProps, 'showDiffToggle' | 'diffMode' | 'diffLoading'>): Parameters<typeof translate>[1] {
-  if (diffLoading) return 'editor.toolbar.loadingDiff'
-  if (diffMode) return 'editor.toolbar.rawReturn'
-  if (showDiffToggle) return 'editor.toolbar.showDiff'
-  return 'editor.toolbar.noDiff'
-}
-
 function availableDiffAction(showDiffToggle: boolean, onToggleDiff: () => void): (() => void) | undefined {
   return showDiffToggle ? onToggleDiff : undefined
 }
@@ -506,6 +452,13 @@ function pathAction(action: ((path: string) => void) | undefined, path: string):
 
 function ArchiveMenuIcon({ archived }: { archived: boolean }) {
   return archived ? <ArrowUUpLeft size={16} /> : <Archive size={16} />
+}
+
+function neighborhoodAction(
+  entry: VaultEntry,
+  onEnterNeighborhood?: (entry: VaultEntry) => void,
+): (() => void) | undefined {
+  return onEnterNeighborhood ? () => onEnterNeighborhood(entry) : undefined
 }
 
 function measureExpandedActionsWidth(
@@ -807,8 +760,6 @@ function BreadcrumbTitleSkeleton() {
 function BreadcrumbActions({
   entry,
   showDiffToggle,
-  diffMode,
-  diffLoading,
   onToggleDiff,
   rawMode,
   onToggleRaw,
@@ -828,6 +779,7 @@ function BreadcrumbActions({
   onDelete,
   onArchive,
   onUnarchive,
+  onEnterNeighborhood,
   actionsRef,
   overflowCollapsed,
   locale = 'en',
@@ -845,13 +797,7 @@ function BreadcrumbActions({
       <FavoriteAction favorite={entry.favorite} locale={locale} onToggleFavorite={onToggleFavorite} />
       <OrganizedAction organized={entry.organized} locale={locale} onToggleOrganized={onToggleOrganized} />
       <OverflowToolbarAction>
-        <DiffAction
-          showDiffToggle={showDiffToggle}
-          diffMode={diffMode}
-          diffLoading={diffLoading}
-          onToggleDiff={onToggleDiff}
-          locale={locale}
-        />
+        <NeighborhoodAction entry={entry} locale={locale} onEnterNeighborhood={onEnterNeighborhood} />
       </OverflowToolbarAction>
       {!forceRawMode && <RawToggleButton rawMode={rawMode} locale={locale} onToggleRaw={onToggleRaw} />}
       <OverflowToolbarAction>
@@ -868,17 +814,9 @@ function BreadcrumbActions({
       <OverflowToolbarAction>
         <FilePathActions entry={entry} locale={locale} onRevealFile={onRevealFile} onCopyFilePath={onCopyFilePath} />
       </OverflowToolbarAction>
-      <OverflowToolbarAction>
-        <ArchiveAction archived={entry.archived} locale={locale} onArchive={onArchive} onUnarchive={onUnarchive} />
-      </OverflowToolbarAction>
-      <OverflowToolbarAction>
-        <DeleteAction locale={locale} onDelete={onDelete} />
-      </OverflowToolbarAction>
       <BreadcrumbOverflowMenu
         entry={entry}
         showDiffToggle={showDiffToggle}
-        diffMode={diffMode}
-        diffLoading={diffLoading}
         onToggleDiff={onToggleDiff}
         noteWidth={noteWidth}
         onToggleNoteWidth={onToggleNoteWidth}
@@ -889,6 +827,8 @@ function BreadcrumbActions({
         onArchive={onArchive}
         onUnarchive={onUnarchive}
         onDelete={onDelete}
+        onEnterNeighborhood={onEnterNeighborhood}
+        showResponsiveActions={overflowCollapsed}
         locale={locale}
       />
       <InspectorAction inspectorCollapsed={inspectorCollapsed} locale={locale} onToggleInspector={onToggleInspector} />
@@ -899,8 +839,6 @@ function BreadcrumbActions({
 function BreadcrumbOverflowMenu({
   entry,
   showDiffToggle,
-  diffMode,
-  diffLoading,
   onToggleDiff,
   noteWidth,
   onToggleNoteWidth,
@@ -911,13 +849,13 @@ function BreadcrumbOverflowMenu({
   onArchive,
   onUnarchive,
   onDelete,
+  onEnterNeighborhood,
+  showResponsiveActions,
   locale = 'en',
 }: Pick<
   BreadcrumbBarProps,
   | 'entry'
   | 'showDiffToggle'
-  | 'diffMode'
-  | 'diffLoading'
   | 'onToggleDiff'
   | 'noteWidth'
   | 'onToggleNoteWidth'
@@ -928,16 +866,21 @@ function BreadcrumbOverflowMenu({
   | 'onArchive'
   | 'onUnarchive'
   | 'onDelete'
+  | 'onEnterNeighborhood'
   | 'locale'
->) {
+> & {
+  showResponsiveActions: boolean
+}) {
   const runDiffAction = availableDiffAction(showDiffToggle, onToggleDiff)
   const runRevealAction = pathAction(onRevealFile, entry.path)
   const runCopyPathAction = pathAction(onCopyFilePath, entry.path)
   const runArchiveAction = archiveAction(entry.archived, onArchive, onUnarchive)
-  const diffLabel = translate(locale, diffMenuLabelKey({ showDiffToggle, diffMode, diffLoading }))
+  const runNeighborhoodAction = neighborhoodAction(entry, onEnterNeighborhood)
+  const diffLabel = translate(locale, 'editor.toolbar.gitDiff')
   const noteWidthLabel = translate(locale, noteWidthLabelKey(noteWidth))
   const archiveLabel = translate(locale, archiveLabelKey(entry.archived))
   const tableOfContentsLabel = translate(locale, showTableOfContents ? 'editor.toolbar.closeTableOfContents' : 'editor.toolbar.openTableOfContents')
+  const neighborhoodLabel = translate(locale, 'editor.toolbar.openNeighborhood')
 
   return (
     <DropdownMenu>
@@ -960,22 +903,30 @@ function BreadcrumbOverflowMenu({
           <GitBranch size={16} />
           {diffLabel}
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!onToggleNoteWidth} onSelect={onToggleNoteWidth}>
-          <NoteWidthMenuIcon noteWidth={noteWidth} />
-          {noteWidthLabel}
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!onToggleTableOfContents} onSelect={onToggleTableOfContents}>
-          <ListBullets size={16} />
-          {tableOfContentsLabel}
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!runRevealAction} onSelect={runRevealAction}>
-          <FolderOpen size={16} />
-          {translate(locale, 'editor.toolbar.revealFile')}
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!runCopyPathAction} onSelect={runCopyPathAction}>
-          <ClipboardText size={16} />
-          {translate(locale, 'editor.toolbar.copyFilePath')}
-        </DropdownMenuItem>
+        {showResponsiveActions && (
+          <>
+            <DropdownMenuItem disabled={!runNeighborhoodAction} onSelect={runNeighborhoodAction}>
+              <MapTrifold size={16} />
+              {neighborhoodLabel}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!onToggleNoteWidth} onSelect={onToggleNoteWidth}>
+              <NoteWidthMenuIcon noteWidth={noteWidth} />
+              {noteWidthLabel}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!onToggleTableOfContents} onSelect={onToggleTableOfContents}>
+              <ListBullets size={16} />
+              {tableOfContentsLabel}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!runRevealAction} onSelect={runRevealAction}>
+              <FolderOpen size={16} />
+              {translate(locale, 'editor.toolbar.revealFile')}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!runCopyPathAction} onSelect={runCopyPathAction}>
+              <ClipboardText size={16} />
+              {translate(locale, 'editor.toolbar.copyFilePath')}
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuItem disabled={!runArchiveAction} onSelect={runArchiveAction}>
           <ArchiveMenuIcon archived={entry.archived} />
           {archiveLabel}

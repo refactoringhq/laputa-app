@@ -75,8 +75,8 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: Fix
     let gitRepoReady = initialIsGitRepo
 
     const jsonHeaders = { 'Content-Type': 'application/json' }
-    const FRONTMATTER_OPEN = '---\n'
-    const FRONTMATTER_CLOSE = '\n---\n'
+    const FRONTMATTER_DELIMITER = '---'
+    const DEFAULT_FRONTMATTER_LINE_ENDING = '\n'
     const nativeFetch = window.fetch.bind(window)
 
     window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
@@ -112,23 +112,35 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: Fix
     }
 
     const splitFrontmatter = (content: string) => {
-      if (!content.startsWith(FRONTMATTER_OPEN)) {
-        return { frontmatter: null as string | null, body: content }
+      const lineEnding = content.startsWith(`${FRONTMATTER_DELIMITER}\r\n`)
+        ? '\r\n'
+        : content.startsWith(`${FRONTMATTER_DELIMITER}\n`)
+          ? '\n'
+          : null
+      if (!lineEnding) {
+        return { frontmatter: null as string | null, body: content, lineEnding: DEFAULT_FRONTMATTER_LINE_ENDING }
       }
 
-      const closeIndex = content.indexOf(FRONTMATTER_CLOSE, FRONTMATTER_OPEN.length)
+      const afterOpen = content.slice(FRONTMATTER_DELIMITER.length + lineEnding.length)
+      if (afterOpen.startsWith(FRONTMATTER_DELIMITER)) {
+        return { frontmatter: '', body: afterOpen.slice(FRONTMATTER_DELIMITER.length), lineEnding }
+      }
+
+      const closeMarker = `${lineEnding}${FRONTMATTER_DELIMITER}`
+      const closeIndex = afterOpen.indexOf(closeMarker)
       if (closeIndex === -1) {
-        return { frontmatter: null as string | null, body: content }
+        return { frontmatter: null as string | null, body: content, lineEnding: DEFAULT_FRONTMATTER_LINE_ENDING }
       }
 
       return {
-        frontmatter: content.slice(FRONTMATTER_OPEN.length, closeIndex),
-        body: content.slice(closeIndex + FRONTMATTER_CLOSE.length),
+        frontmatter: afterOpen.slice(0, closeIndex),
+        body: afterOpen.slice(closeIndex + closeMarker.length),
+        lineEnding,
       }
     }
 
     const splitFrontmatterEntries = (frontmatter: string) => {
-      const lines = frontmatter.split('\n')
+      const lines = frontmatter.split(/\r?\n/)
       const entries: Array<{ key: string; lines: string[] }> = []
       let current: { key: string; lines: string[] } | null = null
 
@@ -163,7 +175,7 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: Fix
     }
 
     const replaceFrontmatterEntry = (content: string, key: string, value: unknown) => {
-      const { frontmatter, body } = splitFrontmatter(content)
+      const { frontmatter, body, lineEnding } = splitFrontmatter(content)
       const entryLines = serializeFrontmatterValue(value)
       const nextEntryLines =
         entryLines[0] === ''
@@ -171,7 +183,7 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: Fix
           : [`${key}: ${entryLines[0]}`]
 
       if (frontmatter === null) {
-        return `${FRONTMATTER_OPEN}${nextEntryLines.join('\n')}${FRONTMATTER_CLOSE}${body}`
+        return `${FRONTMATTER_DELIMITER}\n${nextEntryLines.join('\n')}\n${FRONTMATTER_DELIMITER}\n${body}`
       }
 
       const nextEntries = splitFrontmatterEntries(frontmatter)
@@ -183,11 +195,11 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: Fix
         nextEntries.push({ key, lines: nextEntryLines })
       }
 
-      return `${FRONTMATTER_OPEN}${nextEntries.flatMap((entry) => entry.lines).join('\n')}${FRONTMATTER_CLOSE}${body}`
+      return `${FRONTMATTER_DELIMITER}${lineEnding}${nextEntries.flatMap((entry) => entry.lines).join(lineEnding)}${lineEnding}${FRONTMATTER_DELIMITER}${body}`
     }
 
     const removeFrontmatterEntry = (content: string, key: string) => {
-      const { frontmatter, body } = splitFrontmatter(content)
+      const { frontmatter, body, lineEnding } = splitFrontmatter(content)
       if (frontmatter === null) return content
 
       const nextEntries = splitFrontmatterEntries(frontmatter)
@@ -197,7 +209,7 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: Fix
         return body
       }
 
-      return `${FRONTMATTER_OPEN}${nextEntries.flatMap((entry) => entry.lines).join('\n')}${FRONTMATTER_CLOSE}${body}`
+      return `${FRONTMATTER_DELIMITER}${lineEnding}${nextEntries.flatMap((entry) => entry.lines).join(lineEnding)}${lineEnding}${FRONTMATTER_DELIMITER}${body}`
     }
 
     const persistFrontmatterChange = async (notePath: string, transform: (content: string) => string) => {

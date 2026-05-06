@@ -93,6 +93,7 @@ files:
     command.settings.repairVault: cee560b1fd5ad9d1ff1c19a0a2afe77a
     command.settings.useLightMode: a76d5b1c076983bc113d247f0520c166
     command.settings.useDarkMode: ba7873c42ae00542ba71db9be3b6761f
+    command.settings.useSystemTheme: 6d8c69d916d3df8ceed8dfc154196d07
     command.settings.toggleGitignoredFilesVisibility: 0a2d3ea4e8ff8b00a801183caeb97a03
     command.ai.openAgents: 612abe804edd0f5ae228a534f77f3d23
     command.ai.restoreGuidance: 23331fecc692d11d85cf24838ed273f2
@@ -114,6 +115,7 @@ files:
     settings.theme.label: d721757161f7f70c5b0949fdb6ec2c30
     settings.theme.light: 9914a0ce04a7b7b6a8e39bec55064b82
     settings.theme.dark: a18366b217ebf811ad1886e4f4f865b2
+    settings.theme.system: a45da96d0bf6575970f2d27af22be28a
     settings.language.title: 4994a8ffeba4ac3140beb89e8d41f174
     settings.language.description: e2bb9b523067fdc32a494b1d6fd97906
     settings.language.label: 244c7b77926f077b863c33ff1244e1ec
@@ -134,6 +136,12 @@ files:
     settings.titles.autoRenameDescription: cc28c28d8817736e658082a2261d9a6e
     settings.vaultContent.title: 78b883ce9acb9c25e611158a518d9185
     settings.vaultContent.description: a53487bf1c7898a1459dc1510e216f7d
+    settings.noteWidth.default: 66be0f882801fd19468181f31f58dc20
+    settings.noteWidth.defaultDescription: 2b5fb6d7dfa2b1da1e47bcac30f58e8d
+    settings.noteWidth.normal: 960b44c579bc2f6818d2daaf9e4c16f0
+    settings.noteWidth.wide: e7c770a61dbdf81ca922ae0260e327c1
+    settings.sidebarTypePluralization.label: 1e5bd615b1abbf39129ef241f5cf2249
+    settings.sidebarTypePluralization.description: 8d7bb0649fd7e637552429ea91298de8
     settings.vaultContent.hideGitignored: 2c07ee6c8bfe746d356f44275d42f90e
     settings.vaultContent.hideGitignoredDescription: e8b1ddfa416610f9d6eb299fa123a1d6
     settings.allNotesVisibility.title: 0e07c3d48b91e1a4c42c1ff3e5751ec3
@@ -416,8 +424,10 @@ files:
     editor.toolbar.addFavorite: 910885435dbc44a22b68cb45c79e4a7e
     editor.toolbar.markUnorganized: 83fb1b23a3609fab493737fe7af0a198
     editor.toolbar.markOrganized: 9d170c916afae3d7a82456838728ffa5
+    editor.toolbar.openNeighborhood: 80f659c99954ab7681266b5a1e5da6df
     editor.toolbar.noDiff: b2c4189f90648aaeb5cd2e81f9bd8d94
     editor.toolbar.loadingDiff: 430386d6aae3570fd399a133e41c7372
+    editor.toolbar.gitDiff: 51b46b6eac27ba484479246b875f76f5
     editor.toolbar.showDiff: 08d579de8d3abdcdfce0953a797362c6
     editor.toolbar.openAi: d2e93006570a66709c8ce0dc27082ef1
     editor.toolbar.closeAi: cd46973ef73076d612dff9903ce54498

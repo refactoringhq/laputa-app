@@ -47,6 +47,35 @@ describe('buildReleaseHistoryPage', () => {
     expect(html).toContain('<strong>Alpha</strong> notes')
     expect(html).toContain('Tolaria-setup.exe')
     expect(html).toContain('View on GitHub')
+    expect(html).not.toContain('class="release-channel"')
+  })
+
+  it('loads readable notes for stable releases at runtime and keeps commits as the fallback', () => {
+    const html = buildReleaseHistoryPage([
+      {
+        body: "## What's Changed\n\n- ee71a00 feat: add paste without formatting command",
+        body_html: [
+          '<h2>What&apos;s Changed</h2>',
+          '<ul>',
+          '<li><a href="https://github.com/refactoringhq/tolaria/commit/ee71a00">ee71a00</a> feat: add paste without formatting command</li>',
+          '</ul>',
+        ].join(''),
+        html_url: 'https://github.com/refactoringhq/tolaria/releases/tag/stable-v2026.5.2',
+        name: 'Tolaria 2026.5.2',
+        prerelease: false,
+        published_at: '2026-05-02T16:15:00Z',
+        tag_name: 'stable-v2026.5.2',
+      },
+    ])
+
+    expect(html).toContain('data-readable-notes-url="release-notes/stable-v2026.5.2.md"')
+    expect(html).toContain("fetch(notesUrl, { cache: 'no-cache' })")
+    expect(html).toContain('ee71a00')
+    expect(html).toContain('feat: add paste without formatting command')
+    expect(html).not.toContain('data-release-detail-tab')
+    expect(html).not.toContain('>Readable<')
+    expect(html).not.toContain('>Commits<')
+    expect(html).not.toContain('📋 <strong>Paste Without Formatting</strong>')
   })
 
   it('falls back to escaped paragraph markup when rendered html is unavailable', () => {

@@ -78,6 +78,37 @@ describe('NoteItem', () => {
     expect(screen.getByTestId('type-icon')).toHaveAttribute('data-file-preview-kind', 'pdf')
   })
 
+  it('renders audio and video files as clickable media preview rows', () => {
+    const audioEntry = makeEntry({
+      path: '/vault/attachments/interview.mp3',
+      filename: 'interview.mp3',
+      title: 'interview.mp3',
+      fileKind: 'binary',
+    })
+    const videoEntry = makeEntry({
+      path: '/vault/attachments/demo.mp4',
+      filename: 'demo.mp4',
+      title: 'demo.mp4',
+      fileKind: 'binary',
+    })
+    const onClickNote = vi.fn()
+
+    render(
+      <>
+        <NoteItem entry={audioEntry} isSelected={false} typeEntryMap={{}} onClickNote={onClickNote} />
+        <NoteItem entry={videoEntry} isSelected={false} typeEntryMap={{}} onClickNote={onClickNote} />
+      </>,
+    )
+
+    expect(screen.getByTestId('audio-file-item')).toHaveAttribute('title', 'Open audio preview')
+    expect(screen.getByTestId('video-file-item')).toHaveAttribute('title', 'Open video preview')
+
+    fireEvent.click(screen.getByTestId('audio-file-item'))
+    fireEvent.click(screen.getByTestId('video-file-item'))
+    expect(onClickNote).toHaveBeenCalledWith(audioEntry, expect.any(Object))
+    expect(onClickNote).toHaveBeenCalledWith(videoEntry, expect.any(Object))
+  })
+
   it('renders text files as clickable rows', () => {
     const textEntry = makeEntry({
       path: '/vault/config.yml',

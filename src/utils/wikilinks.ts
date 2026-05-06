@@ -5,23 +5,42 @@ const WL_START = '\u2039WIKILINK:'
 const WL_END = '\u203A'
 const WL_RE = /\u2039WIKILINK:([^\u203A]+)\u203A/g
 const WIKILINK_RE = /\[\[([^\]]+)\]\]/g
+const TABLE_PLACEHOLDER_PREFIX = 'ENC:'
 const FORMAT_MARKERS = new Set(['*', '_', '`', '~'])
 
+type MarkdownSource = string
+type MarkdownLine = string
+type MarkdownLines = MarkdownLine[]
+type TableLineMap = boolean[]
+type PlaceholderPayload = string
+type WikilinkTarget = string
+type FrontmatterSplit = [MarkdownSource, MarkdownSource]
+type CharacterCount = number
+type LineIndex = number
+type TextOffset = number
+type TokenSequence = string
+type ParsedTextRange = { text: MarkdownSource, nextIndex: TextOffset }
+type MatchTargets = Set<WikilinkTarget>
+type WordCount = number
+
 /** Pre-process markdown: replace [[target]] with placeholder tokens */
-export function preProcessWikilinks(md: string): string {
+export function preProcessWikilinks(md: MarkdownSource): MarkdownSource {
   const lines = md.split('\n')
   const tableLines = findMarkdownTableLines(lines)
   return lines.map((line, index) => (
-    tableLines[index] ? line : replaceWikilinksWithPlaceholders(line)
+    replaceWikilinksWithPlaceholders(line, { encodePayload: tableLines[index] })
   )).join('\n')
 }
 
 // Minimal shape of a BlockNote block for wikilink processing
 interface BlockLike {
-  content?: InlineItem[]
+  content?: BlockContent
   children?: BlockLike[]
   [key: string]: unknown
 }
+
+type ScalarBlockContent = string | number | boolean | null | undefined
+type BlockContent = InlineItem[] | TableContentLike | Record<string, unknown> | ScalarBlockContent
 
 interface InlineItem {
   type: string
@@ -31,13 +50,59 @@ interface InlineItem {
   [key: string]: unknown
 }
 
-type ContentTransform = (content: InlineItem[]) => InlineItem[]
-
-function replaceWikilinksWithPlaceholders(line: string): string {
-  return line.replace(WIKILINK_RE, (_match, target) => `${WL_START}${target}${WL_END}`)
+interface TableContentLike {
+  type: 'tableContent'
+  rows?: TableRowLike[]
+  [key: string]: unknown
 }
 
-function findMarkdownTableLines(lines: string[]): boolean[] {
+interface TableRowLike {
+  cells?: TableCellLike[]
+  [key: string]: unknown
+}
+
+type TableCellLike = string | TableCellObjectLike
+
+interface TableCellObjectLike {
+  content?: InlineItem[]
+  [key: string]: unknown
+}
+
+type ContentTransform = (content: InlineItem[]) => InlineItem[]
+
+interface WikilinkReplacementOptions {
+  encodePayload: boolean
+}
+
+function replaceWikilinksWithPlaceholders(
+  line: MarkdownLine,
+  options: WikilinkReplacementOptions,
+): MarkdownLine {
+  return line.replace(WIKILINK_RE, (_match, target) => wikilinkPlaceholder(target, options))
+}
+
+function wikilinkPlaceholder(
+  target: WikilinkTarget,
+  options: WikilinkReplacementOptions,
+): string {
+  const payload = options.encodePayload
+    ? `${TABLE_PLACEHOLDER_PREFIX}${encodeURIComponent(target)}`
+    : target
+  return `${WL_START}${payload}${WL_END}`
+}
+
+function decodePlaceholderPayload(payload: PlaceholderPayload): WikilinkTarget {
+  if (!payload.startsWith(TABLE_PLACEHOLDER_PREFIX)) return payload
+
+  const encoded = payload.slice(TABLE_PLACEHOLDER_PREFIX.length)
+  try {
+    return decodeURIComponent(encoded)
+  } catch {
+    return encoded
+  }
+}
+
+function findMarkdownTableLines(lines: MarkdownLines): TableLineMap {
   const tableLines = lines.map(() => false)
   for (let index = 0; index < lines.length - 1; index++) {
     if (!isPotentialTableRow(lines[index]) || !isMarkdownTableSeparator(lines[index + 1])) {
@@ -51,7 +116,11 @@ function findMarkdownTableLines(lines: string[]): boolean[] {
   return tableLines
 }
 
-function markTableBodyLines(lines: string[], tableLines: boolean[], start: number): number {
+function markTableBodyLines(
+  lines: MarkdownLines,
+  tableLines: TableLineMap,
+  start: LineIndex,
+): LineIndex {
   let index = start
   while (index < lines.length && isPotentialTableRow(lines[index])) {
     tableLines[index] = true
@@ -60,24 +129,24 @@ function markTableBodyLines(lines: string[], tableLines: boolean[], start: numbe
   return index
 }
 
-function isPotentialTableRow(line: string): boolean {
+function isPotentialTableRow(line: MarkdownLine): boolean {
   const trimmed = line.trim()
   return trimmed.includes('|') && trimmed !== '|'
 }
 
-function isMarkdownTableSeparator(line: string): boolean {
+function isMarkdownTableSeparator(line: MarkdownLine): boolean {
   const cells = splitTableCells(line)
   return cells.length > 1 && cells.every(isMarkdownTableSeparatorCell)
 }
 
-function splitTableCells(line: string): string[] {
+function splitTableCells(line: MarkdownLine): MarkdownLines {
   let trimmed = line.trim()
   if (trimmed.startsWith('|')) trimmed = trimmed.slice(1)
   if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1)
   return trimmed.split('|').map((cell) => cell.trim()).filter(Boolean)
 }
 
-function isMarkdownTableSeparatorCell(cell: string): boolean {
+function isMarkdownTableSeparatorCell(cell: MarkdownLine): boolean {
   return /^:?-{3,}:?$/.test(cell)
 }
 
@@ -85,9 +154,7 @@ function isMarkdownTableSeparatorCell(cell: string): boolean {
 function walkBlocks(blocks: unknown[], transform: ContentTransform, clone = false): unknown[] {
   return (blocks as BlockLike[]).map(block => {
     const b = clone ? { ...block } : block
-    if (b.content && Array.isArray(b.content)) {
-      b.content = transform(b.content)
-    }
+    b.content = transformBlockContent(b.content, transform)
     if (b.children && Array.isArray(b.children)) {
       b.children = walkBlocks(b.children, transform, clone) as BlockLike[]
     }
@@ -95,11 +162,45 @@ function walkBlocks(blocks: unknown[], transform: ContentTransform, clone = fals
   })
 }
 
-function textSegment(item: InlineItem, text: string): InlineItem {
+function transformBlockContent(content: BlockContent, transform: ContentTransform): BlockContent {
+  if (Array.isArray(content)) return transform(content)
+  if (isTableContent(content)) return transformTableContent(content, transform)
+  return content
+}
+
+function isTableContent(content: BlockContent): content is TableContentLike {
+  return Boolean(
+    content
+      && typeof content === 'object'
+      && !Array.isArray(content)
+      && (content as TableContentLike).type === 'tableContent'
+      && Array.isArray((content as TableContentLike).rows),
+  )
+}
+
+function transformTableContent(
+  content: TableContentLike,
+  transform: ContentTransform,
+): TableContentLike {
+  return {
+    ...content,
+    rows: content.rows?.map((row) => ({
+      ...row,
+      cells: row.cells?.map((cell) => transformTableCell(cell, transform)),
+    })),
+  }
+}
+
+function transformTableCell(cell: TableCellLike, transform: ContentTransform): TableCellLike {
+  if (typeof cell === 'string' || !Array.isArray(cell.content)) return cell
+  return { ...cell, content: transform(cell.content) }
+}
+
+function textSegment(item: InlineItem, text: MarkdownSource): InlineItem {
   return { ...item, text }
 }
 
-function wikilinkItem(target: string): InlineItem {
+function wikilinkItem(target: WikilinkTarget): InlineItem {
   return {
     type: 'wikilink',
     props: { target },
@@ -138,7 +239,7 @@ function expandWikilinksInItem(item: InlineItem): InlineItem[] {
   let match
   while ((match = WL_RE.exec(item.text)) !== null) {
     if (match.index > lastIndex) result.push(textSegment(item, item.text.slice(lastIndex, match.index)))
-    result.push(wikilinkItem(match[1]))
+    result.push(wikilinkItem(decodePlaceholderPayload(match[1])))
     lastIndex = match.index + match[0].length
   }
   if (lastIndex < item.text.length) result.push(textSegment(item, item.text.slice(lastIndex)))
@@ -157,21 +258,41 @@ function collapseWikilinksInContent(content: InlineItem[]): InlineItem[] {
   return result
 }
 
+function frontmatterOpeningLength(content: MarkdownSource): CharacterCount | null {
+  if (content.startsWith('---\r\n')) return 5
+  if (content.startsWith('---\n')) return 4
+  return null
+}
+
+function precedingLineEndingLength(value: MarkdownSource): CharacterCount {
+  return value.startsWith('\r\n') ? 2 : value.startsWith('\n') ? 1 : 0
+}
+
+function frontmatterCloseLength(value: MarkdownSource): CharacterCount {
+  const lineEndingLength = precedingLineEndingLength(value)
+  if (value.endsWith('\r\n')) return lineEndingLength + 5
+  if (value.endsWith('\n')) return lineEndingLength + 4
+  return lineEndingLength + 3
+}
+
 /** Strip YAML frontmatter from markdown, returning [frontmatter, body] */
-export function splitFrontmatter(content: string): [string, string] {
-  if (!content.startsWith('---')) return ['', content]
-  const end = content.indexOf('\n---', 3)
-  if (end === -1) return ['', content]
-  let to = end + 4
-  if (content[to] === '\n') to++
+export function splitFrontmatter(content: MarkdownSource): FrontmatterSplit {
+  const openLength = frontmatterOpeningLength(content)
+  if (openLength === null) return ['', content]
+
+  const afterOpen = content.slice(openLength)
+  const close = afterOpen.match(/(?:^|\r?\n)---(?:\r?\n|$)/)
+  if (!close || close.index === undefined) return ['', content]
+
+  const to = openLength + close.index + frontmatterCloseLength(close[0])
   return [content.slice(0, to), content.slice(to)]
 }
 
 /** Extract all outgoing wikilink targets from content.
  * Finds [[target]] and [[target|display]] patterns, returning just the target part.
  * Returns a sorted, deduplicated array. */
-export function extractOutgoingLinks(content: string): string[] {
-  const links: string[] = []
+export function extractOutgoingLinks(content: MarkdownSource): WikilinkTarget[] {
+  const links: WikilinkTarget[] = []
   const re = /\[\[([^\]]+)\]\]/g
   let match
   while ((match = re.exec(content)) !== null) {
@@ -187,10 +308,10 @@ export function extractOutgoingLinks(content: string): string[] {
  * Searches for any target in the set, returns the first matching paragraph trimmed
  * to a max length. Returns null if no match found. */
 export function extractBacklinkContext(
-  content: string,
-  matchTargets: Set<string>,
-  maxLength = 120,
-): string | null {
+  content: MarkdownSource,
+  matchTargets: MatchTargets,
+  maxLength: CharacterCount = 120,
+): MarkdownSource | null {
   const [, body] = splitFrontmatter(content)
   // Remove the H1 title line
   const withoutTitle = body.replace(/^\s*# [^\n]+\n?/, '')
@@ -217,8 +338,32 @@ export function extractBacklinkContext(
   return null
 }
 
+/** Check if a line is useful for snippet extraction (not blank, heading, code fence, or rule). */
+function isSnippetLine(line: MarkdownLine): boolean {
+  const t = line.trim()
+  return t !== '' && !t.startsWith('#') && !t.startsWith('```') && !t.startsWith('---')
+}
+
+/** Strip leading list markers (*, -, +, 1.) from a line. */
+function stripListMarker(line: MarkdownLine): MarkdownLine {
+  const t = line.trimStart()
+  for (const prefix of ['* ', '- ', '+ ']) {
+    if (t.startsWith(prefix)) return t.slice(prefix.length)
+  }
+  const dotPos = t.indexOf('. ')
+  if (isOrderedListMarker(t, dotPos)) {
+    return t.slice(dotPos + 2)
+  }
+  return t
+}
+
+function isOrderedListMarker(line: MarkdownLine, dotPos: TextOffset): boolean {
+  if (dotPos < 1 || dotPos > 3) return false
+  return /^\d+$/.test(line.slice(0, dotPos))
+}
+
 /** Remove the first H1 heading line, allowing leading blank lines. */
-function removeH1Line(body: string): string {
+function removeH1Line(body: MarkdownSource): MarkdownSource {
   const lines = body.split('\n')
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].trim().startsWith('# ')) return lines.slice(i + 1).join('\n')
@@ -228,7 +373,7 @@ function removeH1Line(body: string): string {
 }
 
 /** Strip markdown formatting chars: bold, italic, code, strikethrough, and resolve links. */
-function stripMarkdownChars(s: string): string {
+function stripMarkdownChars(s: MarkdownSource): MarkdownSource {
   let result = ''
   let i = 0
   while (i < s.length) {
@@ -250,32 +395,40 @@ function stripMarkdownChars(s: string): string {
   return result
 }
 
-function readUntilSequence(value: string, start: number, sequence: string): { text: string, nextIndex: number } {
+function readUntilSequence(
+  value: MarkdownSource,
+  start: TextOffset,
+  sequence: TokenSequence,
+): ParsedTextRange {
   const end = value.indexOf(sequence, start)
   if (end === -1) return { text: value.slice(start), nextIndex: value.length }
   return { text: value.slice(start, end), nextIndex: end + sequence.length }
 }
 
-function readUntilChar(value: string, start: number, char: string): { text: string, nextIndex: number } {
+function readUntilChar(
+  value: MarkdownSource,
+  start: TextOffset,
+  char: TokenSequence,
+): ParsedTextRange {
   const end = value.indexOf(char, start)
   if (end === -1) return { text: value.slice(start), nextIndex: value.length }
   return { text: value.slice(start, end), nextIndex: end + 1 }
 }
 
-function skipMarkdownLinkDestination(value: string, start: number): number {
+function skipMarkdownLinkDestination(value: MarkdownSource, start: TextOffset): TextOffset {
   if (value[start] !== '(') return start
 
   const end = value.indexOf(')', start + 1)
   return end === -1 ? value.length : end + 1
 }
 
-function wikilinkDisplayText(inner: string): string {
+function wikilinkDisplayText(inner: WikilinkTarget): MarkdownSource {
   const pipe = inner.indexOf('|')
   return pipe === -1 ? inner : inner.slice(pipe + 1)
 }
 
 /** Extract sub-heading text (## , ### , etc.) stripped of the # prefix. */
-function extractSubheadingText(line: string): string | null {
+function extractSubheadingText(line: MarkdownLine): MarkdownSource | null {
   const t = line.trim()
   const stripped = t.replace(/^#+/, '')
   if (stripped.length < t.length && stripped.startsWith(' ')) {
@@ -286,9 +439,8 @@ function extractSubheadingText(line: string): string | null {
 }
 
 /** Extract a snippet: first ~160 chars of body content, stripped of markdown.
- *  Mirrors the Rust extract_snippet() logic for frontend use. Table blocks
- *  collapse to a `📊 col1 · col2 · …` marker so sidebar previews stay readable. */
-export function extractSnippet(content: string): string {
+ *  Mirrors the Rust extract_snippet() logic for frontend use. */
+export function extractSnippet(content: MarkdownSource): MarkdownSource {
   const [, body] = splitFrontmatter(content)
   const withoutH1 = removeH1Line(body)
   const tableAware = markdownBodyText(withoutH1)
@@ -300,7 +452,7 @@ export function extractSnippet(content: string): string {
   // Fallback: collect sub-heading text when no paragraph content exists
   const headingText = withoutH1.split('\n')
     .map(extractSubheadingText)
-    .filter((t): t is string => t !== null)
+    .filter((t): t is MarkdownSource => t !== null)
     .join(' ')
   const headingStripped = stripMarkdownChars(headingText).trim()
   if (!headingStripped) return ''
@@ -308,7 +460,7 @@ export function extractSnippet(content: string): string {
   return headingStripped.slice(0, 160) + '...'
 }
 
-export function countWords(content: string): number {
+export function countWords(content: MarkdownSource): WordCount {
   const [, body] = splitFrontmatter(content)
   const withoutTitle = body.replace(/^\s*# [^\n]+\n?/, '')
   const withoutWikilinks = withoutTitle.replace(/\[\[[^\]]*\]\]/g, '')

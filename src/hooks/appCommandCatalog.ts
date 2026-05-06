@@ -45,6 +45,7 @@ type SimpleHandlerKey =
   | 'onToggleDiff'
   | 'onToggleInspector'
   | 'onToggleAIChat'
+  | 'onToggleTableOfContents'
   | 'onCommandPalette'
   | 'onZoomIn'
   | 'onZoomOut'

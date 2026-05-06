@@ -1,4 +1,4 @@
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, act, within } from '@testing-library/react'
 import type { ComponentProps, PropsWithChildren, ReactElement } from 'react'
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { formatShortcutDisplay } from '../hooks/appCommandCatalog'
@@ -454,14 +454,18 @@ describe('Editor', () => {
     expect(editable).toHaveAttribute('autocapitalize', 'off')
   })
 
-  it('renders breadcrumb bar with action buttons', () => {
+  it('renders breadcrumb bar with action buttons', async () => {
     renderEditor({
       tabs: [mockTab],
       activeTabPath: mockEntry.path,
     })
 
     expect(screen.getByRole('button', { name: 'Open the raw editor' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Delete this note' })).toBeInTheDocument()
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More note actions' }), {
+      button: 0,
+      ctrlKey: false,
+    })
+    expect(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Delete this note' })).toBeInTheDocument()
   })
 
   it('keeps editor chrome visible while active note content is loading', () => {
@@ -511,7 +515,7 @@ describe('Editor', () => {
     expect(screen.getByTestId('blocknote-view')).toBeInTheDocument()
   })
 
-  it('renders diff toggle button when file is modified', () => {
+  it('renders git diff in the breadcrumb overflow menu when file is modified', async () => {
     render(
       <Editor
         {...defaultProps}
@@ -521,8 +525,11 @@ describe('Editor', () => {
         onLoadDiff={async () => '+ added line'}
       />
     )
-    const diffBtn = screen.getByRole('button', { name: 'Show the current diff' })
-    expect(diffBtn).toBeInTheDocument()
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More note actions' }), {
+      button: 0,
+      ctrlKey: false,
+    })
+    expect(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Git diff' })).toBeInTheDocument()
   })
 
   it('includes inspector panel', () => {

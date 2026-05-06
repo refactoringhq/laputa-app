@@ -122,8 +122,11 @@ export function AiAgentsOnboardingPrompt({
       contentClassName="w-full max-w-2xl"
       testId="ai-agents-onboarding-screen"
     >
-      <Card className="border-border bg-background shadow-sm">
-        <CardHeader className="items-center gap-5 text-center">
+      <Card
+        className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-border bg-background shadow-sm"
+        data-testid="ai-agents-onboarding-card"
+      >
+        <CardHeader className="shrink-0 items-center gap-5 text-center">
           <div className={`flex size-16 items-center justify-center rounded-2xl ${copy.accentClassName}`}>
             {copy.icon}
           </div>
@@ -137,7 +140,10 @@ export function AiAgentsOnboardingPrompt({
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain"
+          data-testid="ai-agents-onboarding-scroll"
+        >
           <AiModeChoices />
           {showLegacyClaudeCompatibility ? (
             <div
@@ -153,7 +159,7 @@ export function AiAgentsOnboardingPrompt({
           <AgentStatusList statuses={statuses} />
         </CardContent>
 
-        <CardFooter className="flex-wrap justify-center gap-3">
+        <CardFooter className="shrink-0 flex-wrap justify-center gap-3">
           {missingAgents.map((definition) => (
             <Button
               key={definition.id}

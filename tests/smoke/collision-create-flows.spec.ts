@@ -120,6 +120,24 @@ test.describe('Collision-safe create flows', () => {
     expect(fs.readFileSync(defaultNoteTypePath, 'utf8')).toContain('# Note')
   })
 
+  test('command palette type creation maps the built-in Notes label away from notes.md collisions', async ({ page }) => {
+    const existingNotesPath = writeFixtureNote(
+      tempVaultDir,
+      'notes.md',
+      '---\ntype: Note\n---\n# Meeting Notes\n',
+    )
+    fs.rmSync(path.join(tempVaultDir, 'type', 'note.md'), { force: true })
+    const defaultNoteTypePath = path.join(tempVaultDir, 'note.md')
+
+    await openFixtureVaultDesktopHarness(page, tempVaultDir)
+    await createTypeFromCommandPalette(page, 'Notes')
+
+    await expect.poll(() => fs.existsSync(defaultNoteTypePath)).toBe(true)
+    await expect(toast(page)).toContainText('Type "Notes" created')
+    expect(fs.readFileSync(defaultNoteTypePath, 'utf8')).toContain('# Note')
+    expect(fs.readFileSync(existingNotesPath, 'utf8')).toContain('# Meeting Notes')
+  })
+
   test('unicode type creation ignores an unrelated untitled draft filename', async ({ page }) => {
     const untitledPath = writeFixtureNote(
       tempVaultDir,

@@ -240,6 +240,19 @@ function makeEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {
 
 function createEditor() {
   const cursorBlock = { id: 'cursor-block', type: 'paragraph', content: [], children: [] }
+  const tiptapDom = document.createElement('div')
+  tiptapDom.getBoundingClientRect = vi.fn(() => ({
+    bottom: 420,
+    height: 360,
+    left: 120,
+    right: 720,
+    toJSON: () => ({}),
+    top: 60,
+    width: 600,
+    x: 120,
+    y: 60,
+  }))
+
   return {
     document: [
       { id: 'heading-block', type: 'heading', content: [], children: [] },
@@ -250,7 +263,17 @@ function createEditor() {
       { type: 'table', content: { type: 'tableContent' } },
     ]),
     blocksToHTMLLossy: vi.fn(() => '<table>seeded</table>'),
-    _tiptapEditor: { commands: { setContent: vi.fn() } },
+    _tiptapEditor: {
+      commands: {
+        setContent: vi.fn(),
+        setTextSelection: vi.fn(),
+      },
+      state: { doc: { content: { size: 100 } } },
+      view: {
+        dom: tiptapDom,
+        posAtCoords: vi.fn(() => ({ pos: 1 })),
+      },
+    },
     focus: vi.fn(),
     getTextCursorPosition: vi.fn(() => ({ block: cursorBlock })),
     insertBlocks: vi.fn(),
@@ -274,6 +297,26 @@ function renderEditorHarness(editor = createEditor()) {
   return { container: container!, editor }
 }
 
+function renderEditorHarnessInScrollArea(editor = createEditor()) {
+  render(
+    <div className="editor-scroll-area" data-testid="editor-scroll-area">
+      <div className="editor-content-wrapper">
+        <SingleEditorView
+          editor={editor as never}
+          entries={[makeEntry()]}
+          onNavigateWikilink={vi.fn()}
+        />
+      </div>
+    </div>,
+    { wrapper: TooltipProvider },
+  )
+
+  const scrollArea = screen.getByTestId('editor-scroll-area')
+  const container = screen.getByTestId('blocknote-view').closest('.editor__blocknote-container')
+  expect(container).toBeTruthy()
+  return { container: container!, editor, scrollArea }
+}
+
 function createCodeBlockFixture(text: string) {
   const codeBlock = document.createElement('div')
   codeBlock.setAttribute('data-content-type', 'codeBlock')
@@ -283,6 +326,13 @@ function createCodeBlockFixture(text: string) {
   pre.appendChild(code)
   codeBlock.appendChild(pre)
   return { codeBlock, code }
+}
+
+function createParagraphFixture(text: string) {
+  const paragraph = document.createElement('p')
+  const textNode = document.createTextNode(text)
+  paragraph.appendChild(textNode)
+  return { paragraph, textNode }
 }
 
 function selectNodeContents(node: Node) {
@@ -629,7 +679,7 @@ describe('SingleEditorView', () => {
     expect(editor.focus).not.toHaveBeenCalled()
   })
 
-  it('does not override full-note copy selections that merely include a code block', async () => {
+  it('keeps full-note copy selections from collapsing to code-block text only', async () => {
     const { container } = renderEditorHarness()
     const paragraph = document.createElement('p')
     paragraph.textContent = 'Before'
@@ -649,7 +699,57 @@ describe('SingleEditorView', () => {
     const clipboardData = { setData: vi.fn() }
     fireEvent.copy(code, { clipboardData })
 
-    expect(clipboardData.setData).not.toHaveBeenCalled()
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', 'Beforeconst value = 1')
+    expect(clipboardData.setData).not.toHaveBeenCalledWith('text/plain', 'const value = 1')
+  })
+
+  it('copies ordinary selected editor text without appending a newline', async () => {
+    const { container } = renderEditorHarness()
+    const { paragraph, textNode } = createParagraphFixture('Only copied words')
+    await act(async () => {
+      container.appendChild(paragraph)
+      await Promise.resolve()
+    })
+    selectNodeContents(textNode)
+
+    const clipboardData = { setData: vi.fn() }
+    fireEvent.copy(paragraph, { clipboardData })
+
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', 'Only copied words')
+  })
+
+  it('removes one synthetic terminal newline while preserving internal newlines', async () => {
+    const { container } = renderEditorHarness()
+    const { paragraph, textNode } = createParagraphFixture('First line\nSecond line\n')
+    await act(async () => {
+      container.appendChild(paragraph)
+      await Promise.resolve()
+    })
+    selectNodeContents(textNode)
+
+    const clipboardData = { setData: vi.fn() }
+    fireEvent.copy(paragraph, { clipboardData })
+
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', 'First line\nSecond line')
+  })
+
+  it('keeps selected rich text available as HTML when normalizing plain copy text', async () => {
+    const { container } = renderEditorHarness()
+    const paragraph = document.createElement('p')
+    const strong = document.createElement('strong')
+    strong.textContent = 'Bold copy'
+    paragraph.appendChild(strong)
+    await act(async () => {
+      container.appendChild(paragraph)
+      await Promise.resolve()
+    })
+    selectNodeContents(strong)
+
+    const clipboardData = { setData: vi.fn() }
+    fireEvent.copy(strong, { clipboardData })
+
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', 'Bold copy')
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/html', '<strong>Bold copy</strong>')
   })
 
   it('handles registered plain-text paste requests through BlockNote insertion', () => {
@@ -778,6 +878,97 @@ describe('SingleEditorView', () => {
     expect(() => fireEvent.click(container!)).not.toThrow()
     expect(editor.setTextCursorPosition).toHaveBeenCalledWith('paragraph-block', 'end')
     expect(editor.focus).toHaveBeenCalled()
+  })
+
+  it('extends mouse selections from editor whitespace using clamped BlockNote coordinates', () => {
+    const { container, editor } = renderEditorHarness()
+    editor._tiptapEditor.view.posAtCoords
+      .mockReturnValueOnce({ pos: 4 })
+      .mockReturnValueOnce({ pos: 18 })
+      .mockReturnValueOnce({ pos: 18 })
+
+    fireEvent.mouseDown(container, { button: 0, clientX: 12, clientY: 72 })
+    fireEvent.mouseMove(window, { buttons: 1, clientX: 680, clientY: 180 })
+    fireEvent.mouseUp(window, { clientX: 680, clientY: 180 })
+
+    expect(editor.focus).toHaveBeenCalled()
+    expect(editor._tiptapEditor.view.posAtCoords).toHaveBeenNthCalledWith(1, {
+      left: 121,
+      top: 72,
+    })
+    expect(editor._tiptapEditor.commands.setTextSelection).toHaveBeenNthCalledWith(1, {
+      from: 4,
+      to: 4,
+    })
+    expect(editor._tiptapEditor.commands.setTextSelection).toHaveBeenLastCalledWith({
+      from: 4,
+      to: 18,
+    })
+
+    fireEvent.click(container)
+
+    expect(editor.setTextCursorPosition).not.toHaveBeenCalled()
+  })
+
+  it('extends mouse selections from the surrounding editor scroll whitespace', () => {
+    const { editor, scrollArea } = renderEditorHarnessInScrollArea()
+    editor._tiptapEditor.view.posAtCoords
+      .mockReturnValueOnce({ pos: 5 })
+      .mockReturnValueOnce({ pos: 22 })
+      .mockReturnValueOnce({ pos: 22 })
+
+    fireEvent.mouseDown(scrollArea, { button: 0, clientX: 24, clientY: 96 })
+    fireEvent.mouseMove(window, { buttons: 1, clientX: 920, clientY: 190 })
+    fireEvent.mouseUp(window, { clientX: 920, clientY: 190 })
+
+    expect(editor.focus).toHaveBeenCalled()
+    expect(editor._tiptapEditor.view.posAtCoords).toHaveBeenNthCalledWith(1, {
+      left: 121,
+      top: 96,
+    })
+    expect(editor._tiptapEditor.view.posAtCoords).toHaveBeenNthCalledWith(2, {
+      left: 719,
+      top: 190,
+    })
+    expect(editor._tiptapEditor.commands.setTextSelection).toHaveBeenLastCalledWith({
+      from: 5,
+      to: 22,
+    })
+  })
+
+  it('extends mouse selections to the document end when dragging below the editor content', () => {
+    const { container, editor } = renderEditorHarness()
+    editor._tiptapEditor.state.doc.content.size = 42
+    editor._tiptapEditor.view.posAtCoords
+      .mockReturnValueOnce({ pos: 7 })
+      .mockReturnValue(null)
+
+    fireEvent.mouseDown(container, { button: 0, clientX: 250, clientY: 80 })
+    fireEvent.mouseMove(window, { buttons: 1, clientX: 260, clientY: 900 })
+    fireEvent.mouseUp(window, { clientX: 260, clientY: 900 })
+
+    expect(editor._tiptapEditor.view.posAtCoords).toHaveBeenNthCalledWith(2, {
+      left: 260,
+      top: 419,
+    })
+    expect(editor._tiptapEditor.commands.setTextSelection).toHaveBeenLastCalledWith({
+      from: 7,
+      to: 41,
+    })
+  })
+
+  it('leaves native BlockNote and non-primary mouse selections alone', () => {
+    const { container, editor } = renderEditorHarness()
+    const editable = document.createElement('div')
+    editable.setAttribute('contenteditable', 'true')
+    container.appendChild(editable)
+
+    fireEvent.mouseDown(editable, { button: 0, clientX: 200, clientY: 80 })
+    fireEvent.mouseMove(window, { buttons: 1, clientX: 260, clientY: 120 })
+    fireEvent.mouseDown(container, { button: 2, clientX: 200, clientY: 80 })
+
+    expect(editor._tiptapEditor.view.posAtCoords).not.toHaveBeenCalled()
+    expect(editor._tiptapEditor.commands.setTextSelection).not.toHaveBeenCalled()
   })
 
   it('routes the custom link-toolbar open action through openExternalUrl', () => {

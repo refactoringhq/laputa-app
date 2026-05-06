@@ -624,6 +624,46 @@ describe('useNoteCreation hook', () => {
     expect(setToastMessage).toHaveBeenCalledWith('Cannot create type "Note" because note.md already exists')
   })
 
+  it('handleCreateType creates the built-in Note type when notes.md is an existing ordinary note', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke)
+      .mockRejectedValueOnce(new Error('not found'))
+      .mockResolvedValueOnce(undefined)
+    const existingNotes = makeEntry({
+      path: '/test/vault/notes.md',
+      filename: 'notes.md',
+      title: 'Meeting Notes',
+      isA: 'Note',
+    })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([existingNotes]), tabDeps))
+
+    let created = false
+    await act(async () => {
+      created = await result.current.handleCreateType('Notes')
+    })
+
+    expect(created).toBe(true)
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_note_content', {
+      path: '/test/vault/note.md',
+    })
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: '/test/vault/note.md',
+      content: '---\ntype: Type\n---\n\n# Note\n',
+    })
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/test/vault/note.md',
+      filename: 'note.md',
+      title: 'Note',
+      isA: 'Type',
+    }))
+    expect(openTabWithContent).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/test/vault/note.md',
+      title: 'Note',
+      isA: 'Type',
+    }), expect.stringContaining('# Note'))
+    expect(setToastMessage).not.toHaveBeenCalled()
+  })
+
   it('handleCreateType blocks when a loaded non-Type entry collides with the target type path', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
     const staleEntry = makeEntry({

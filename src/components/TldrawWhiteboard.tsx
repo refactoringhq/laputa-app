@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { getAssetUrlsByImport } from '@tldraw/assets/imports.vite'
 import {
   Box,
   Tldraw,
@@ -10,6 +11,14 @@ import {
   type TLStoreSnapshot,
 } from 'tldraw'
 import 'tldraw/tldraw.css'
+
+const EMPTY_TLDRAW_TRANSLATION_URL = 'data:application/json;base64,e30K'
+
+function resolveTldrawAssetUrl(assetUrl: string | undefined): string {
+  return assetUrl ?? EMPTY_TLDRAW_TRANSLATION_URL
+}
+
+const tldrawAssetUrls = getAssetUrlsByImport(resolveTldrawAssetUrl)
 
 interface TldrawWhiteboardProps {
   boardId: string
@@ -274,6 +283,7 @@ export function TldrawWhiteboard({
       style={cssSize(visibleSize)}
     >
       <Tldraw
+        assetUrls={tldrawAssetUrls}
         onMount={installZoomAwareViewport}
         store={store}
       />

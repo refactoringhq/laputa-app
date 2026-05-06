@@ -3,6 +3,8 @@ import type { AiAgentPermissionMode } from './aiAgentPermissionMode'
 import { trackEvent } from './telemetry'
 import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import type { FilePreviewKind } from '../utils/filePreview'
+import type { NoteWidthMode } from '../types'
+import type { ThemeMode } from './themeMode'
 
 type TrackedPreviewKind = FilePreviewKind | 'unsupported'
 type FilePreviewAction = 'copy_path' | 'open_external' | 'reveal'
@@ -52,8 +54,26 @@ export function trackAllNotesVisibilityChanged(
   }
 }
 
+export function trackDefaultNoteWidthChanged(mode: NoteWidthMode): void {
+  trackEvent('note_width_default_changed', { mode })
+}
+
+export function trackSidebarTypePluralizationChanged(enabled: boolean): void {
+  trackEvent('sidebar_type_pluralization_changed', {
+    enabled: numericFlag(enabled),
+  })
+}
+
+export function trackThemeModeChanged(mode: ThemeMode): void {
+  trackEvent('theme_mode_changed', { mode })
+}
+
 export function trackInlineImageLightboxOpened(): void {
   trackEvent('inline_image_lightbox_opened')
+}
+
+export function trackDatePropertyDirectEntrySaved(): void {
+  trackEvent('date_property_direct_entry_saved', { source: 'properties_panel' })
 }
 
 export function trackAiAgentMessageBlocked(agent: AiAgentId, reason: AgentBlockedReason): void {

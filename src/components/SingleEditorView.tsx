@@ -286,6 +286,7 @@ function isSelectionInsideElement(element: HTMLElement): boolean {
 const TITLE_HEADING_SELECTOR = 'h1, [data-content-type="heading"][data-level="1"], [data-content-type="heading"]:not([data-level])'
 const TITLE_HEADING_WRAPPER_SELECTOR = '.bn-block-outer, .bn-block'
 const CODE_BLOCK_SELECTOR = '[data-content-type="codeBlock"]'
+const CLIPBOARD_INLINE_FORMAT_SELECTOR = 'a, b, code, em, i, s, span, strong, u'
 const CODE_BLOCK_COPY_RESET_MS = 1200
 
 function nodeElement(node: Node | null): HTMLElement | null {
@@ -341,6 +342,36 @@ function selectedCodeBlockText(options: {
   if (!range) return null
 
   return options.selection?.toString() || range.cloneContents().textContent || ''
+}
+
+function selectedEditorRange(selection: Selection | null, container: HTMLElement): Range | null {
+  if (!hasSingleActiveRange(selection)) return null
+
+  const range = selection.getRangeAt(0)
+  return rangeBelongsToElement(range, container) ? range : null
+}
+
+function selectedEditorPlainText(selection: Selection, range: Range): string | null {
+  const text = selection.toString() || range.cloneContents().textContent || ''
+  if (text.length === 0) return null
+
+  return text.replace(/\r?\n$/, '')
+}
+
+function selectedEditorHtml(range: Range): string {
+  const wrapper = document.createElement('div')
+  const selectedContent = range.cloneContents()
+  const commonElement = nodeElement(range.commonAncestorContainer)
+
+  if (commonElement?.matches(CLIPBOARD_INLINE_FORMAT_SELECTOR)) {
+    const inlineWrapper = commonElement.cloneNode(false)
+    inlineWrapper.appendChild(selectedContent)
+    wrapper.appendChild(inlineWrapper)
+    return wrapper.innerHTML
+  }
+
+  wrapper.appendChild(selectedContent)
+  return wrapper.innerHTML
 }
 
 function codeBlockText(codeBlock: HTMLElement): string {
@@ -559,14 +590,324 @@ function queueTitleHeadingCursorRepair(
   return true
 }
 
+type EditorClientPoint = Pick<MouseEvent, 'clientX' | 'clientY'>
+type TiptapSelectionRange = { from: number; to: number }
+type TiptapSelectionBridge = {
+  commands?: {
+    setTextSelection?: (selection: number | TiptapSelectionRange) => unknown
+  }
+  state?: {
+    doc?: {
+      content?: { size?: unknown }
+    }
+  }
+  view?: {
+    dom?: Element
+    posAtCoords?: (coords: { left: number; top: number }) => { pos?: unknown } | null
+  }
+}
+type EditorWithTiptapSelection = {
+  _tiptapEditor?: TiptapSelectionBridge
+}
+type WhitespaceSelectionStart = {
+  anchor: number
+  tiptapEditor: TiptapSelectionBridge
+}
+type WhitespaceDragState = WhitespaceSelectionStart & {
+  moved: boolean
+  startX: number
+  startY: number
+}
+type WhitespaceMouseDownEvent = EditorClientPoint & {
+  button: number
+  target: EventTarget | null
+  preventDefault: () => void
+}
+
+const EDGE_SELECTION_INSET_PX = 1
+const DRAG_SELECTION_THRESHOLD_PX = 3
+
+function getTiptapSelectionBridge(
+  editor: ReturnType<typeof useCreateBlockNote>,
+): TiptapSelectionBridge | null {
+  return (editor as EditorWithTiptapSelection)._tiptapEditor ?? null
+}
+
+function isValidDocumentPosition(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+function textSelectionDocumentBounds(
+  tiptapEditor: TiptapSelectionBridge,
+): { start: number; end: number } | null {
+  const size = tiptapEditor.state?.doc?.content?.size
+  if (!isValidDocumentPosition(size)) return null
+  if (size <= 0) return { start: 0, end: 0 }
+
+  const end = Math.max(1, Math.floor(size) - 1)
+  return { start: Math.min(1, end), end }
+}
+
+function clampCoordinate(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min
+  if (max <= min) return min
+  return Math.min(max, Math.max(min, value))
+}
+
+function clampedEditorCoords(
+  point: EditorClientPoint,
+  editorRect: DOMRect,
+): { left: number; top: number } {
+  return {
+    left: clampCoordinate(
+      point.clientX,
+      editorRect.left + EDGE_SELECTION_INSET_PX,
+      editorRect.right - EDGE_SELECTION_INSET_PX,
+    ),
+    top: clampCoordinate(
+      point.clientY,
+      editorRect.top + EDGE_SELECTION_INSET_PX,
+      editorRect.bottom - EDGE_SELECTION_INSET_PX,
+    ),
+  }
+}
+
+function fallbackTextPosition(
+  tiptapEditor: TiptapSelectionBridge,
+  point: EditorClientPoint,
+  editorRect: DOMRect,
+): number | null {
+  const bounds = textSelectionDocumentBounds(tiptapEditor)
+  if (!bounds) return null
+
+  return point.clientY < editorRect.top ? bounds.start : bounds.end
+}
+
+function textPositionAtEditorPoint(
+  tiptapEditor: TiptapSelectionBridge,
+  point: EditorClientPoint,
+): number | null {
+  const view = tiptapEditor.view
+  const editorDom = view?.dom
+  if (!editorDom || typeof view.posAtCoords !== 'function') return null
+
+  const editorRect = editorDom.getBoundingClientRect()
+  const position = view.posAtCoords(clampedEditorCoords(point, editorRect))?.pos
+  if (isValidDocumentPosition(position)) return position
+
+  return fallbackTextPosition(tiptapEditor, point, editorRect)
+}
+
+function applyTiptapTextSelection(
+  tiptapEditor: TiptapSelectionBridge,
+  anchor: number,
+  head: number,
+): boolean {
+  const setTextSelection = tiptapEditor.commands?.setTextSelection
+  if (typeof setTextSelection !== 'function') return false
+
+  const range = {
+    from: Math.min(anchor, head),
+    to: Math.max(anchor, head),
+  }
+
+  try {
+    setTextSelection(range)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function suppressNextContainerClick(suppressNextContainerClickRef: React.MutableRefObject<boolean>) {
+  suppressNextContainerClickRef.current = true
+  window.setTimeout(() => {
+    suppressNextContainerClickRef.current = false
+  }, 0)
+}
+
+function whitespaceSelectionStartFromEvent(options: {
+  editable: boolean
+  editor: ReturnType<typeof useCreateBlockNote>
+  event: WhitespaceMouseDownEvent
+  selectionRoot: HTMLElement
+}): WhitespaceSelectionStart | null {
+  const { editable, editor, event, selectionRoot } = options
+  if (!editable || event.button !== 0) return null
+
+  const target = eventTargetElement(event.target)
+  if (!target || !selectionRoot.contains(target)) return null
+  if (shouldIgnoreContainerClick(target)) return null
+
+  const tiptapEditor = getTiptapSelectionBridge(editor)
+  if (!tiptapEditor) return null
+
+  const anchor = textPositionAtEditorPoint(tiptapEditor, event)
+  return anchor === null ? null : { anchor, tiptapEditor }
+}
+
+function movedPastDragThreshold(state: WhitespaceDragState, point: EditorClientPoint): boolean {
+  const movedDistance = Math.max(
+    Math.abs(point.clientX - state.startX),
+    Math.abs(point.clientY - state.startY),
+  )
+
+  return movedDistance >= DRAG_SELECTION_THRESHOLD_PX
+}
+
+function updateWhitespaceDragSelection(
+  state: WhitespaceDragState,
+  point: EditorClientPoint,
+): boolean {
+  const head = textPositionAtEditorPoint(state.tiptapEditor, point)
+  if (head === null) return false
+
+  state.moved = state.moved || movedPastDragThreshold(state, point) || head !== state.anchor
+  return applyTiptapTextSelection(state.tiptapEditor, state.anchor, head)
+}
+
+function installWhitespaceSelectionDrag(options: {
+  cleanupDragRef: React.MutableRefObject<(() => void) | null>
+  state: WhitespaceDragState
+  suppressNextContainerClickRef: React.MutableRefObject<boolean>
+}): () => void {
+  const { cleanupDragRef, state, suppressNextContainerClickRef } = options
+
+  function cleanupDrag() {
+    window.removeEventListener('mousemove', handleMouseMove)
+    window.removeEventListener('mouseup', handleMouseUp)
+    if (cleanupDragRef.current === cleanupDrag) {
+      cleanupDragRef.current = null
+    }
+  }
+
+  function handleMouseMove(moveEvent: MouseEvent) {
+    if ((moveEvent.buttons & 1) !== 1) {
+      cleanupDrag()
+      return
+    }
+
+    if (updateWhitespaceDragSelection(state, moveEvent)) {
+      moveEvent.preventDefault()
+    }
+  }
+
+  function handleMouseUp(upEvent: MouseEvent) {
+    updateWhitespaceDragSelection(state, upEvent)
+    if (state.moved) {
+      suppressNextContainerClick(suppressNextContainerClickRef)
+    }
+    cleanupDrag()
+  }
+
+  window.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('mouseup', handleMouseUp)
+  return cleanupDrag
+}
+
+function closestEditorScrollArea(container: HTMLElement): HTMLElement | null {
+  const scrollArea = container.closest('.editor-scroll-area')
+  return scrollArea instanceof HTMLElement ? scrollArea : null
+}
+
+function eventTargetIsOutsideContainer(event: MouseEvent, container: HTMLElement): boolean {
+  const target = eventTargetElement(event.target)
+  return !target || !container.contains(target)
+}
+
+function installScrollAreaWhitespaceSelection(options: {
+  beginWhitespaceSelection: (event: WhitespaceMouseDownEvent, selectionRoot: HTMLElement) => void
+  container: HTMLElement
+}): (() => void) | undefined {
+  const { beginWhitespaceSelection, container } = options
+  const scrollArea = closestEditorScrollArea(container)
+  if (!scrollArea || scrollArea === container) return undefined
+  const selectionRoot = scrollArea
+
+  function handleScrollAreaMouseDown(event: MouseEvent) {
+    if (eventTargetIsOutsideContainer(event, container)) {
+      beginWhitespaceSelection(event, selectionRoot)
+    }
+  }
+
+  selectionRoot.addEventListener('mousedown', handleScrollAreaMouseDown, true)
+  return () => {
+    selectionRoot.removeEventListener('mousedown', handleScrollAreaMouseDown, true)
+  }
+}
+
+function useEditorWhitespaceMouseSelection(options: {
+  containerRef: React.RefObject<HTMLDivElement | null>
+  editable: boolean
+  editor: ReturnType<typeof useCreateBlockNote>
+  suppressNextContainerClickRef: React.MutableRefObject<boolean>
+}) {
+  const { containerRef, editable, editor, suppressNextContainerClickRef } = options
+  const cleanupDragRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => () => {
+    cleanupDragRef.current?.()
+  }, [])
+
+  const beginWhitespaceSelection = useCallback((
+    event: WhitespaceMouseDownEvent,
+    selectionRoot: HTMLElement,
+  ) => {
+    const selectionStart = whitespaceSelectionStartFromEvent({
+      editable,
+      editor,
+      event,
+      selectionRoot,
+    })
+    if (!selectionStart) return
+
+    cleanupDragRef.current?.()
+    editor.focus()
+
+    const { anchor, tiptapEditor } = selectionStart
+    if (!applyTiptapTextSelection(tiptapEditor, anchor, anchor)) return
+    event.preventDefault()
+
+    const state: WhitespaceDragState = {
+      ...selectionStart,
+      moved: false,
+      startX: event.clientX,
+      startY: event.clientY,
+    }
+
+    cleanupDragRef.current = installWhitespaceSelectionDrag({
+      cleanupDragRef,
+      state,
+      suppressNextContainerClickRef,
+    })
+  }, [editable, editor, suppressNextContainerClickRef])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    return installScrollAreaWhitespaceSelection({ beginWhitespaceSelection, container })
+  }, [beginWhitespaceSelection, containerRef])
+
+  return useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    beginWhitespaceSelection(event, event.currentTarget)
+  }, [beginWhitespaceSelection])
+}
+
 function useEditorContainerClickHandler(options: {
   editable: boolean
   editor: ReturnType<typeof useCreateBlockNote>
+  suppressNextContainerClickRef: React.MutableRefObject<boolean>
 }) {
-  const { editable, editor } = options
+  const { editable, editor, suppressNextContainerClickRef } = options
 
   return useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!editable) return
+    if (suppressNextContainerClickRef.current) {
+      suppressNextContainerClickRef.current = false
+      return
+    }
+
     const target = e.target as HTMLElement
     if (queueTitleHeadingCursorRepair(target, editor)) return
     if (shouldIgnoreContainerClick(target)) return
@@ -582,7 +923,7 @@ function useEditorContainerClickHandler(options: {
       }
     }
     editor.focus()
-  }, [editor, editable])
+  }, [editor, editable, suppressNextContainerClickRef])
 }
 
 function useCompositionAwareEditorChange(options: {
@@ -636,15 +977,40 @@ function useCompositionAwareEditorChange(options: {
   }, [])
 }
 
-function handleCodeBlockCopy(event: React.ClipboardEvent<HTMLDivElement>) {
+function handleCodeBlockCopy(event: React.ClipboardEvent<HTMLDivElement>): boolean {
   const codeText = selectedCodeBlockText({
     selection: window.getSelection(),
     container: event.currentTarget,
   })
-  if (codeText === null) return
+  if (codeText === null) return false
 
   event.clipboardData.setData('text/plain', codeText)
   event.preventDefault()
+  return true
+}
+
+function handleSelectedEditorCopy(event: React.ClipboardEvent<HTMLDivElement>) {
+  const selection = window.getSelection()
+  const range = selectedEditorRange(selection, event.currentTarget)
+  if (!selection || !range) return
+
+  const plainText = selectedEditorPlainText(selection, range)
+  if (plainText === null) return
+
+  event.clipboardData.setData('text/plain', plainText)
+
+  const html = selectedEditorHtml(range)
+  if (html.length > 0) {
+    event.clipboardData.setData('text/html', html)
+  }
+
+  event.preventDefault()
+}
+
+function handleEditorCopy(event: React.ClipboardEvent<HTMLDivElement>) {
+  if (handleCodeBlockCopy(event)) return
+
+  handleSelectedEditorCopy(event)
 }
 
 function nonEmptyString(value: unknown): string | null {
@@ -877,7 +1243,18 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
   const { cssVars } = useEditorTheme()
   const themeMode = useDocumentThemeMode()
   const containerRef = useRef<HTMLDivElement>(null)
-  const handleContainerClick = useEditorContainerClickHandler({ editable, editor })
+  const suppressNextContainerClickRef = useRef(false)
+  const handleContainerClick = useEditorContainerClickHandler({
+    editable,
+    editor,
+    suppressNextContainerClickRef,
+  })
+  const handleWhitespaceMouseSelection = useEditorWhitespaceMouseSelection({
+    containerRef,
+    editable,
+    editor,
+    suppressNextContainerClickRef,
+  })
   const handleEditorChange = useCompositionAwareEditorChange({ containerRef, onChange })
   const onImageUrl = useInsertImageCallback(editor)
   const { isDragOver } = useImageDrop({ containerRef, onImageUrl, vaultPath })
@@ -927,6 +1304,10 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
     activatePlainTextPaste()
     handleCodeBlockCopyFocus(event)
   }, [activatePlainTextPaste, handleCodeBlockCopyFocus])
+  const handleMouseDownCapture = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    activatePlainTextPaste()
+    handleWhitespaceMouseSelection(event)
+  }, [activatePlainTextPaste, handleWhitespaceMouseSelection])
   const insertWikilink = useInsertWikilink(editor, runEditorAction)
   const suggestionMenuItems = useSuggestionMenuItems({
     baseItems,
@@ -943,10 +1324,10 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
       className={`editor__blocknote-container${isDragOver ? ' editor__blocknote-container--drag-over' : ''}`}
       style={cssVars as React.CSSProperties}
       onClick={handleContainerClick}
-      onCopyCapture={handleCodeBlockCopy}
+      onCopyCapture={handleEditorCopy}
       onFocusCapture={handleFocusCapture}
       onMouseLeave={clearCopyTarget}
-      onMouseDownCapture={activatePlainTextPaste}
+      onMouseDownCapture={handleMouseDownCapture}
       onMouseMove={handleCodeBlockCopyMouseMove}
       onPasteCapture={handleTitleHeadingRichPaste}
     >

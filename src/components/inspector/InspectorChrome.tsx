@@ -1,4 +1,4 @@
-import { SlidersHorizontal, X, Sparkle, WarningCircle, PencilSimple } from '@phosphor-icons/react'
+import { SidebarSimple, X, Sparkle, WarningCircle, PencilSimple } from '@phosphor-icons/react'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { Button } from '@/components/ui/button'
 import { useDragRegion } from '../../hooks/useDragRegion'
@@ -35,6 +35,16 @@ export function InspectorHeader({ collapsed, frontmatterWarnings, locale = 'en',
   const { onMouseDown } = useDragRegion()
   const propertiesTitle = translate(locale, 'inspector.title.properties')
   const showWarnings = Boolean(frontmatterWarnings && hasFrontmatterWarnings(frontmatterWarnings) && onOpenRawEditor)
+  const propertiesIcon = (testId?: string) => (
+    <SidebarSimple
+      size={16}
+      weight="regular"
+      className="shrink-0 text-muted-foreground"
+      style={{ transform: 'scaleX(-1)' }}
+      data-testid={testId}
+    />
+  )
+  const toggleLabel = translate(locale, collapsed ? 'inspector.title.propertiesShortcut' : 'inspector.title.closePropertiesShortcut')
 
   return (
     <div
@@ -46,13 +56,21 @@ export function InspectorHeader({ collapsed, frontmatterWarnings, locale = 'en',
         <button
           className="shrink-0 border-none bg-transparent p-1 text-muted-foreground cursor-pointer hover:text-foreground"
           onClick={onToggle}
-          title={translate(locale, 'inspector.title.propertiesShortcut')}
+          title={toggleLabel}
+          aria-label={toggleLabel}
         >
-          <SlidersHorizontal size={16} />
+          {propertiesIcon('properties-panel-icon')}
         </button>
       ) : (
         <>
-          <SlidersHorizontal size={16} className="shrink-0 text-muted-foreground" />
+          <button
+            className="shrink-0 border-none bg-transparent p-1 text-muted-foreground cursor-pointer hover:text-foreground"
+            onClick={onToggle}
+            title={toggleLabel}
+            aria-label={toggleLabel}
+          >
+            {propertiesIcon('properties-panel-icon')}
+          </button>
           <span className="text-muted-foreground" style={{ fontSize: 13, fontWeight: 600 }}>{propertiesTitle}</span>
           {showWarnings && onOpenRawEditor && (
             <FrontmatterWarningsButton locale={locale} onOpenRawEditor={onOpenRawEditor} />
@@ -61,7 +79,8 @@ export function InspectorHeader({ collapsed, frontmatterWarnings, locale = 'en',
           <button
             className="shrink-0 border-none bg-transparent p-1 text-muted-foreground cursor-pointer hover:text-foreground"
             onClick={onToggle}
-            title={translate(locale, 'inspector.title.closePropertiesShortcut')}
+            title={toggleLabel}
+            aria-label={toggleLabel}
           >
             <X size={16} />
           </button>

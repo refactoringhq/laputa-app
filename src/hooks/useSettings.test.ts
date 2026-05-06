@@ -8,6 +8,10 @@ import {
 } from '../lib/gitignoredVisibilityEvents'
 import { useSettings } from './useSettings'
 
+const { trackEventMock } = vi.hoisted(() => ({
+  trackEventMock: vi.fn(),
+}))
+
 const defaultSettings: Settings = {
   auto_pull_interval_minutes: null,
   autogit_enabled: null,
@@ -22,6 +26,7 @@ const defaultSettings: Settings = {
   theme_mode: null,
   ui_language: null,
   note_width_mode: null,
+  sidebar_type_pluralization_enabled: null,
   default_ai_agent: null,
   default_ai_target: null,
   ai_model_providers: null,
@@ -45,6 +50,7 @@ const savedSettings: Settings = {
   theme_mode: null,
   ui_language: null,
   note_width_mode: null,
+  sidebar_type_pluralization_enabled: null,
   default_ai_agent: null,
   default_ai_target: null,
   ai_model_providers: null,
@@ -76,6 +82,10 @@ vi.mock('../mock-tauri', () => ({
   mockInvoke: (cmd: string, args?: Record<string, unknown>) => mockInvokeFn(cmd, args),
 }))
 
+vi.mock('../lib/telemetry', () => ({
+  trackEvent: trackEventMock,
+}))
+
 async function renderLoadedSettings(): Promise<Settings> {
   const { result } = renderHook(() => useSettings())
 
@@ -101,6 +111,7 @@ function changedSettings(): Settings {
     theme_mode: null,
     ui_language: 'zh-CN',
     note_width_mode: 'wide',
+    sidebar_type_pluralization_enabled: false,
     default_ai_agent: null,
     default_ai_target: null,
     ai_model_providers: null,
@@ -114,6 +125,7 @@ function changedSettings(): Settings {
 describe('useSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    trackEventMock.mockClear()
     mockSettingsStore = { ...defaultSettings }
     nativeInvoke.mockResolvedValue(undefined)
   })
@@ -193,6 +205,23 @@ describe('useSettings', () => {
 
     expect(mockInvokeFn).toHaveBeenCalledWith('save_settings', { settings: newSettings })
     expect(result.current.settings).toEqual(newSettings)
+  })
+
+  it('tracks theme mode changes after settings save succeeds', async () => {
+    const { result } = renderHook(() => useSettings())
+
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+
+    await act(async () => {
+      await result.current.saveSettings({
+        ...defaultSettings,
+        theme_mode: 'system',
+      })
+    })
+
+    expect(trackEventMock).toHaveBeenCalledWith('theme_mode_changed', { mode: 'system' })
   })
 
   it('preserves the Gitignored files visibility preference', async () => {

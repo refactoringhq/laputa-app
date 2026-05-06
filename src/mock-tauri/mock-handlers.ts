@@ -113,6 +113,8 @@ let mockSettings: Settings = {
   release_channel: null,
   theme_mode: null,
   ui_language: null,
+  note_width_mode: null,
+  sidebar_type_pluralization_enabled: null,
   default_ai_agent: 'claude_code',
 }
 
@@ -424,6 +426,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       release_channel: s.release_channel,
       theme_mode: s.theme_mode ?? null,
       ui_language: s.ui_language ?? null,
+      note_width_mode: s.note_width_mode ?? null,
+      sidebar_type_pluralization_enabled: s.sidebar_type_pluralization_enabled ?? null,
       default_ai_agent: s.default_ai_agent ?? null,
     }
     return null

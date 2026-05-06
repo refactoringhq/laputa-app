@@ -21,9 +21,9 @@ let nativeDropUnlisten = () => {
   capturedDragDropHandler = undefined
 }
 
-vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: () => ({
-    onDragDropEvent: vi.fn((cb: DragDropCallback) => {
+vi.mock('@tauri-apps/api/webview', () => ({
+  getCurrentWebview: () => ({
+    listen: vi.fn((_eventName: string, cb: DragDropCallback) => {
       capturedDragDropHandler = cb
       return Promise.resolve(nativeDropUnlisten)
     }),

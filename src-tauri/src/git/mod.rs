@@ -2,14 +2,17 @@ mod clone;
 mod commit;
 mod conflict;
 mod connect;
+mod credentials;
 mod dates;
 mod history;
 mod pulse;
 mod remote;
 mod status;
 
-use std::path::Path;
+use std::ffi::{OsStr, OsString};
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 
 pub use clone::clone_repo;
 pub use commit::git_commit;
@@ -56,11 +59,137 @@ const DEFAULT_GITIGNORE: &str = "# Tolaria app files (machine-specific, never co
 *.swp\n\
 *.swo\n";
 
+#[derive(Clone)]
+struct GitLaunchConfig {
+    program: OsString,
+    path: Option<OsString>,
+}
+
+#[derive(Default)]
+struct ShellGitConfig {
+    git_path: Option<PathBuf>,
+    path: Option<OsString>,
+}
+
 pub(crate) fn git_command() -> Command {
-    let mut command = crate::hidden_command("git");
+    let config = git_launch_config();
+    let mut command = crate::hidden_command(&config.program);
+    if let Some(path) = &config.path {
+        command.env("PATH", path);
+    }
     sanitize_linux_appimage_git_env(&mut command);
     command.args(["-c", "core.quotePath=false"]);
     command
+}
+
+fn git_launch_config() -> &'static GitLaunchConfig {
+    static CONFIG: OnceLock<GitLaunchConfig> = OnceLock::new();
+    CONFIG.get_or_init(detect_git_launch_config)
+}
+
+fn detect_git_launch_config() -> GitLaunchConfig {
+    let parent_path = std::env::var_os("PATH");
+    git_launch_config_from_parts(parent_path, shell_git_config())
+}
+
+fn git_launch_config_from_parts(
+    parent_path: Option<OsString>,
+    shell: Option<ShellGitConfig>,
+) -> GitLaunchConfig {
+    let shell = shell.unwrap_or_default();
+    let program = shell
+        .git_path
+        .map(PathBuf::into_os_string)
+        .unwrap_or_else(|| OsString::from("git"));
+    let path = path_with_git_parent(shell.path.or(parent_path), &program);
+
+    GitLaunchConfig { program, path }
+}
+
+fn path_with_git_parent(base: Option<OsString>, program: &OsStr) -> Option<OsString> {
+    let mut paths = base
+        .map(|path| std::env::split_paths(&path).collect::<Vec<_>>())
+        .unwrap_or_default();
+
+    let program_path = Path::new(program);
+    if let Some(parent) = program_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        push_unique_path(&mut paths, parent.to_path_buf());
+    }
+
+    if paths.is_empty() {
+        return None;
+    }
+
+    std::env::join_paths(paths).ok()
+}
+
+fn push_unique_path(paths: &mut Vec<PathBuf>, candidate: PathBuf) {
+    if paths.iter().any(|path| path == &candidate) {
+        return;
+    }
+    paths.push(candidate);
+}
+
+#[cfg(target_os = "macos")]
+fn shell_git_config() -> Option<ShellGitConfig> {
+    user_shell_candidates()
+        .into_iter()
+        .filter(|shell| shell.exists())
+        .find_map(|shell| shell_git_config_from_shell(&shell))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn shell_git_config() -> Option<ShellGitConfig> {
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn shell_git_config_from_shell(shell: &Path) -> Option<ShellGitConfig> {
+    let output = crate::hidden_command(shell)
+        .arg("-lc")
+        .arg("printf '%s\\n%s' \"$(command -v git 2>/dev/null || true)\" \"$PATH\"")
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut lines = stdout.lines();
+    let git_path = lines
+        .next()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(PathBuf::from)
+        .filter(|path| path.exists());
+    let path = lines
+        .next()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(OsString::from);
+
+    if git_path.is_none() && path.is_none() {
+        return None;
+    }
+
+    Some(ShellGitConfig { git_path, path })
+}
+
+#[cfg(target_os = "macos")]
+fn user_shell_candidates() -> Vec<PathBuf> {
+    let mut shells = Vec::new();
+    if let Some(shell) = std::env::var_os("SHELL") {
+        if !shell.is_empty() {
+            shells.push(PathBuf::from(shell));
+        }
+    }
+    shells.push(PathBuf::from("/bin/zsh"));
+    shells.push(PathBuf::from("/bin/bash"));
+    shells
 }
 
 #[cfg(any(test, all(desktop, target_os = "linux")))]
@@ -210,6 +339,7 @@ fn parse_github_repo_path(url: &str) -> Option<String> {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use std::ffi::OsString;
     use std::fs;
     use tempfile::TempDir;
 
@@ -303,6 +433,31 @@ mod tests {
                 )
             })
             .collect()
+    }
+
+    #[test]
+    fn test_git_launch_config_prefers_login_shell_git_and_path() {
+        let config = git_launch_config_from_parts(
+            Some(OsString::from("/usr/bin:/bin")),
+            Some(ShellGitConfig {
+                git_path: Some(PathBuf::from("/opt/homebrew/bin/git")),
+                path: Some(OsString::from("/opt/homebrew/bin:/usr/bin:/bin")),
+            }),
+        );
+
+        assert_eq!(config.program, OsString::from("/opt/homebrew/bin/git"));
+        assert_eq!(
+            config.path,
+            Some(OsString::from("/opt/homebrew/bin:/usr/bin:/bin"))
+        );
+    }
+
+    #[test]
+    fn test_git_launch_config_keeps_default_git_when_shell_is_unavailable() {
+        let config = git_launch_config_from_parts(Some(OsString::from("/usr/bin:/bin")), None);
+
+        assert_eq!(config.program, OsString::from("git"));
+        assert_eq!(config.path, Some(OsString::from("/usr/bin:/bin")));
     }
 
     #[test]

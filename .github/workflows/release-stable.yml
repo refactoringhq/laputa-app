@@ -4,10 +4,14 @@ on:
   push:
     tags:
       - 'stable-v*'
+      - 'v20*'
 
 env:
   # Bump this when Tauri/Rust target artifacts capture stale absolute paths.
   RUST_TARGET_CACHE_VERSION: v2026-04-14-tolaria
+  # The production Vite bundle can exceed Node's default ~2GB heap on
+  # macOS arm64 runners while Tauri runs beforeBuildCommand.
+  NODE_OPTIONS: --max-old-space-size=4096
 
 concurrency:
   group: release-stable-${{ github.ref }}
@@ -34,14 +38,24 @@ jobs:
           from datetime import date
 
           tag = os.environ["GITHUB_REF_NAME"]
-          version = tag.removeprefix("stable-v")
-          match = re.fullmatch(r"(\d{4})\.(\d{1,2})\.(\d{1,2})", version)
-          if not match:
-              raise SystemExit(f"Stable tags must use stable-vYYYY.M.D, got {tag}")
+          legacy_match = re.fullmatch(r"stable-v(\d{4})\.(\d{1,2})\.(\d{1,2})", tag)
+          date_match = re.fullmatch(r"v(\d{4})-(\d{2})-(\d{2})", tag)
 
-          date(*map(int, match.groups()))
+          if date_match:
+              year, month, day = map(int, date_match.groups())
+              date(year, month, day)
+              version = f"{year}.{month}.{day}"
+              display_version = tag
+          elif legacy_match:
+              year, month, day = map(int, legacy_match.groups())
+              date(year, month, day)
+              version = f"{year}.{month}.{day}"
+              display_version = version
+          else:
+              raise SystemExit(f"Stable tags must use vYYYY-MM-DD or stable-vYYYY.M.D, got {tag}")
+
           print(f"version={version}")
-          print(f"display_version={version}")
+          print(f"display_version={display_version}")
           print(f"tag={tag}")
           PY
 
@@ -565,16 +579,23 @@ jobs:
 
       - name: Generate release notes
         run: |
-          PREV_TAG=$(git tag --list 'stable-v*' --sort=-version:refname | grep -vx "${{ needs.version.outputs.tag }}" | head -n 1 || echo "")
-          if [ -z "$PREV_TAG" ]; then
-            NOTES=$(git log --oneline --no-merges -20)
+          NOTES_FILE="release-notes/${{ needs.version.outputs.tag }}.md"
+          if [ -f "$NOTES_FILE" ]; then
+            cat "$NOTES_FILE" > release_notes.md
           else
-            NOTES=$(git log --oneline --no-merges "${PREV_TAG}..${{ needs.version.outputs.tag }}")
+            PREV_TAG=$(git for-each-ref --sort=-creatordate --format='%(refname:short)' refs/tags/v20* refs/tags/stable-v* | grep -vx "${{ needs.version.outputs.tag }}" | head -n 1 || echo "")
+            if [ -z "$PREV_TAG" ]; then
+              NOTES=$(git log --oneline --no-merges -20)
+            else
+              NOTES=$(git log --oneline --no-merges "${PREV_TAG}..${{ needs.version.outputs.tag }}")
+            fi
+            {
+              echo "## What's Changed"
+              echo ""
+              echo "$NOTES" | while IFS= read -r line; do echo "- $line"; done
+            } > release_notes.md
           fi
           {
-            echo "## What's Changed"
-            echo ""
-            echo "$NOTES" | while IFS= read -r line; do echo "- $line"; done
             echo ""
             echo "---"
             echo "**Stable release — manually promoted from \`main\`**"
@@ -582,7 +603,7 @@ jobs:
             echo "**Includes macOS (Apple Silicon and Intel), Windows x64, and Linux x64 bundles**"
             echo ""
             echo "*Built from \`$(git rev-parse --short ${{ needs.version.outputs.tag }})\` on $(date -u +%Y-%m-%d)*"
-          } > release_notes.md
+          } >> release_notes.md
 
       - name: Build stable-latest.json
         run: |
@@ -727,7 +748,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p _site/alpha _site/stable
+          mkdir -p _site/alpha _site/stable _site/release-notes
+          if [ -d release-notes ]; then cp release-notes/*.md _site/release-notes/ 2>/dev/null || true; fi
           gh api -H "Accept: application/vnd.github.html+json" repos/${{ github.repository }}/releases --paginate > _site/releases.json
           PAGES_URL="https://refactoringhq.github.io/${GITHUB_REPOSITORY#*/}"
 

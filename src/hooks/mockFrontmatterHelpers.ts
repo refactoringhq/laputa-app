@@ -8,6 +8,13 @@ type YamlKey = string
 type YamlValue = string
 type YamlLine = string
 type ReplacementLine = string | null
+type LineEnding = '\n' | '\r\n'
+
+interface ParsedFrontmatter {
+  fm: MarkdownContent
+  rest: MarkdownContent
+  lineEnding: LineEnding
+}
 
 function canonicalWriteKey(key: FrontmatterKey): FrontmatterKey {
   return canonicalFrontmatterWriteKey(key)
@@ -24,11 +31,28 @@ function formatYamlKey(key: FrontmatterKey): YamlKey {
   return key.includes(' ') ? `"${key}"` : key
 }
 
-function parseFrontmatter(content: MarkdownContent): { fm: MarkdownContent; rest: MarkdownContent } | null {
-  if (!content.startsWith('---\n')) return null
-  const fmEnd = content.indexOf('\n---', 4)
+function frontmatterOpening(content: MarkdownContent): { bodyStart: number; lineEnding: LineEnding } | null {
+  if (content.startsWith('---\r\n')) return { bodyStart: 5, lineEnding: '\r\n' }
+  if (content.startsWith('---\n')) return { bodyStart: 4, lineEnding: '\n' }
+  return null
+}
+
+function parseFrontmatter(content: MarkdownContent): ParsedFrontmatter | null {
+  const opening = frontmatterOpening(content)
+  if (!opening) return null
+  const afterOpening = content.slice(opening.bodyStart)
+  if (afterOpening.startsWith('---')) {
+    return { fm: '', rest: afterOpening.slice(3), lineEnding: opening.lineEnding }
+  }
+
+  const closeMarker = `${opening.lineEnding}---`
+  const fmEnd = afterOpening.indexOf(closeMarker)
   if (fmEnd === -1) return null
-  return { fm: content.slice(4, fmEnd), rest: content.slice(fmEnd + 4) }
+  return {
+    fm: afterOpening.slice(0, fmEnd),
+    rest: afterOpening.slice(fmEnd + closeMarker.length),
+    lineEnding: opening.lineEnding,
+  }
 }
 
 function formatKeyValue(yamlKey: YamlKey, yamlValue: YamlValue, isArray: boolean): YamlLine {
@@ -87,6 +111,14 @@ function hasMatchingKey(lines: YamlLine[], key: FrontmatterKey): boolean {
   return lines.some(line => lineMatchesKey(line, key))
 }
 
+function frontmatterLines(fm: MarkdownContent, lineEnding: LineEnding): YamlLine[] {
+  return fm === '' ? [] : fm.split(lineEnding)
+}
+
+function formatFrontmatterBlock(lines: YamlLine[], lineEnding: LineEnding, rest: MarkdownContent): MarkdownContent {
+  return `---${lineEnding}${lines.join(lineEnding)}${lineEnding}---${rest}`
+}
+
 function processKeyInLines(lines: YamlLine[], key: FrontmatterKey, replacement: ReplacementLine): YamlLine[] {
   const newLines: YamlLine[] = []
   let i = 0
@@ -114,16 +146,16 @@ export function updateMockFrontmatter(path: VaultPath, key: FrontmatterKey, valu
     return `---\n${formatKeyValue(yamlKey, yamlValue, isArray)}\n---\n${content}`
   }
 
-  const { fm, rest } = parsed
-  const lines = fm.split('\n')
+  const { fm, rest, lineEnding } = parsed
+  const lines = frontmatterLines(fm, lineEnding)
   const replacement = formatKeyValue(yamlKey, yamlValue, isArray)
 
   if (hasMatchingKey(lines, key)) {
     const newLines = processKeyInLines(lines, key, replacement)
-    return `---\n${newLines.join('\n')}\n---${rest}`
+    return formatFrontmatterBlock(newLines, lineEnding, rest)
   }
 
-  return `---\n${fm}\n${replacement}\n---${rest}`
+  return formatFrontmatterBlock([...lines, replacement], lineEnding, rest)
 }
 
 export function deleteMockFrontmatterProperty(path: VaultPath, key: FrontmatterKey): MarkdownContent {
@@ -131,7 +163,7 @@ export function deleteMockFrontmatterProperty(path: VaultPath, key: FrontmatterK
   const parsed = parseFrontmatter(content)
   if (!parsed) return content
 
-  const { fm, rest } = parsed
-  const newLines = processKeyInLines(fm.split('\n'), key, null)
-  return `---\n${newLines.join('\n')}\n---${rest}`
+  const { fm, rest, lineEnding } = parsed
+  const newLines = processKeyInLines(frontmatterLines(fm, lineEnding), key, null)
+  return formatFrontmatterBlock(newLines, lineEnding, rest)
 }

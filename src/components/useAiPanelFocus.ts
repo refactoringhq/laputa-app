@@ -13,6 +13,8 @@ function focusPreferredElement(
   inputRef: React.RefObject<HTMLDivElement | null>,
   shouldFocusPanel: boolean,
 ) {
+  if (panelRef.current?.contains(document.activeElement)) return
+
   if (shouldFocusPanel) {
     panelRef.current?.focus()
     return

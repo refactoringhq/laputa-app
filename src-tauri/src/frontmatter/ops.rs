@@ -22,6 +22,13 @@ struct FrontmatterLine<'a>(&'a str);
 #[derive(Clone, Copy)]
 struct PropertyKey<'a>(&'a str);
 
+#[derive(Clone, Copy)]
+struct FrontmatterBlock<'a> {
+    body: &'a str,
+    rest: &'a str,
+    line_ending: &'static str,
+}
+
 impl<'a> PropertyKey<'a> {
     fn as_str(self) -> &'a str {
         self.0
@@ -57,6 +64,42 @@ impl<'a> FrontmatterLine<'a> {
 fn quoted_yaml_key(raw: &str, quote: char) -> Option<&str> {
     let (key, rest) = raw.split_once(quote)?;
     rest.trim_start().starts_with(':').then_some(key)
+}
+
+fn frontmatter_open(content: &str) -> Option<(&str, &'static str)> {
+    content
+        .strip_prefix("---\n")
+        .map(|after| (after, "\n"))
+        .or_else(|| content.strip_prefix("---\r\n").map(|after| (after, "\r\n")))
+}
+
+fn close_marker(line_ending: &str) -> String {
+    format!("{line_ending}---")
+}
+
+fn split_frontmatter_block(content: &str) -> Result<Option<FrontmatterBlock<'_>>, String> {
+    let Some((after_open, line_ending)) = frontmatter_open(content) else {
+        return Ok(None);
+    };
+
+    if let Some(rest) = after_open.strip_prefix("---") {
+        return Ok(Some(FrontmatterBlock {
+            body: "",
+            rest,
+            line_ending,
+        }));
+    }
+
+    let marker = close_marker(line_ending);
+    let close_start = after_open
+        .find(&marker)
+        .ok_or_else(|| "Malformed frontmatter: no closing ---".to_string())?;
+    let rest_start = close_start + marker.len();
+    Ok(Some(FrontmatterBlock {
+        body: &after_open[..close_start],
+        rest: &after_open[rest_start..],
+        line_ending,
+    }))
 }
 
 #[derive(Clone, Copy)]
@@ -108,26 +151,19 @@ impl<'a> FieldUpdate<'a> {
     }
 
     fn apply_to_content(self, content: DocumentText<'_>) -> Result<String, String> {
-        if !content.0.starts_with("---\n") {
+        let Some(block) = split_frontmatter_block(content.0)? else {
             return match self.value {
                 Some(_) => Ok(self.prepend_to(content)),
                 None => Ok(content.0.to_string()),
             };
-        }
-
-        let after_open = &content.0[4..];
-        let (fm_content, rest) = if let Some(stripped) = after_open.strip_prefix("---") {
-            ("", stripped)
-        } else {
-            let fm_end = after_open
-                .find("\n---")
-                .map(|i| i + 4)
-                .ok_or_else(|| "Malformed frontmatter: no closing ---".to_string())?;
-            (&content.0[4..fm_end], &content.0[fm_end + 4..])
         };
-        let lines: Vec<FrontmatterLine<'_>> = fm_content.lines().map(FrontmatterLine).collect();
-        let new_fm = self.apply_to_lines(&lines).join("\n");
-        Ok(format!("---\n{}\n---{}", new_fm, rest))
+
+        let lines: Vec<FrontmatterLine<'_>> = block.body.lines().map(FrontmatterLine).collect();
+        let new_fm = self.apply_to_lines(&lines).join(block.line_ending);
+        Ok(format!(
+            "---{}{}{}---{}",
+            block.line_ending, new_fm, block.line_ending, block.rest
+        ))
     }
 }
 
@@ -161,4 +197,71 @@ pub fn update_frontmatter_content(
         match_mode: KeyMatchMode::Exact,
     }
     .apply_to_content(DocumentText(&updated))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn bool_value(value: bool) -> FrontmatterValue {
+        FrontmatterValue::Bool(value)
+    }
+
+    fn string_value(value: &str) -> FrontmatterValue {
+        FrontmatterValue::String(value.to_string())
+    }
+
+    fn frontmatter_delimiter_lines(content: &str) -> usize {
+        content.lines().filter(|line| *line == "---").count()
+    }
+
+    #[test]
+    fn updates_existing_crlf_frontmatter_without_creating_a_second_block() {
+        let content = concat!(
+            "---\r\n",
+            "type: Note\r\n",
+            "related_to:\r\n",
+            "  - \"[[tolaria]]\"\r\n",
+            "---\r\n",
+            "# Properties Panel\r\n",
+        );
+
+        let updated = update_frontmatter_content(content, "_organized", Some(bool_value(true)))
+            .expect("frontmatter update should succeed");
+
+        assert_eq!(frontmatter_delimiter_lines(&updated), 2);
+        assert_eq!(
+            updated,
+            concat!(
+                "---\r\n",
+                "type: Note\r\n",
+                "related_to:\r\n",
+                "  - \"[[tolaria]]\"\r\n",
+                "_organized: true\r\n",
+                "---\r\n",
+                "# Properties Panel\r\n",
+            )
+        );
+    }
+
+    #[test]
+    fn repeated_crlf_updates_stay_in_the_original_frontmatter_block() {
+        let content = concat!(
+            "---\r\n",
+            "type: Note\r\n",
+            "related_to: \"[[tolaria]]\"\r\n",
+            "---\r\n",
+            "# Properties Panel\r\n",
+        );
+
+        let widened = update_frontmatter_content(content, "_width", Some(string_value("wide")))
+            .expect("width update should succeed");
+        let organized = update_frontmatter_content(&widened, "_organized", Some(bool_value(true)))
+            .expect("organized update should succeed");
+
+        assert_eq!(frontmatter_delimiter_lines(&organized), 2);
+        assert!(organized.contains("type: Note\r\n"));
+        assert!(organized.contains("_width: wide\r\n"));
+        assert!(organized.contains("_organized: true\r\n"));
+    }
 }

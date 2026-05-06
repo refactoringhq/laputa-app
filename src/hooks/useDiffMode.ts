@@ -2,6 +2,8 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
+  useMemo,
   type Dispatch,
   type SetStateAction,
 } from 'react'
@@ -25,6 +27,37 @@ interface DiffStateSetters {
   setDiffContent: Dispatch<SetStateAction<string | null>>
   setDiffLoading: Dispatch<SetStateAction<boolean>>
   setDiffPath: Dispatch<SetStateAction<string | null>>
+}
+
+type DiffLoadCancellation = { current: boolean }
+
+function useDiffLoadCancellation() {
+  const activeDiffLoadRef = useRef<DiffLoadCancellation | null>(null)
+
+  const cancelActiveDiffLoad = useCallback(() => {
+    if (!activeDiffLoadRef.current) return
+    activeDiffLoadRef.current.current = true
+    activeDiffLoadRef.current = null
+  }, [])
+
+  const createDiffLoadCancellation = useCallback(() => {
+    cancelActiveDiffLoad()
+    const cancellation = { current: false }
+    activeDiffLoadRef.current = cancellation
+    return cancellation
+  }, [cancelActiveDiffLoad])
+
+  const clearDiffLoadCancellation = useCallback((cancellation: DiffLoadCancellation) => {
+    if (activeDiffLoadRef.current === cancellation) {
+      activeDiffLoadRef.current = null
+    }
+  }, [])
+
+  return {
+    cancelActiveDiffLoad,
+    createDiffLoadCancellation,
+    clearDiffLoadCancellation,
+  }
 }
 
 async function loadDiffForPath(
@@ -78,7 +111,7 @@ function hasCommitHash(pendingCommitDiffRequest: CommitDiffRequest): pendingComm
 }
 
 function buildGuardedDiffStateSetters(
-  cancelledRef: { current: boolean },
+  cancelledRef: DiffLoadCancellation,
   { setDiffMode, setDiffContent, setDiffLoading, setDiffPath }: DiffStateSetters,
 ): DiffStateSetters {
   return {
@@ -87,6 +120,18 @@ function buildGuardedDiffStateSetters(
     setDiffLoading: (value) => { if (!cancelledRef.current) setDiffLoading(value) },
     setDiffPath: (value) => { if (!cancelledRef.current) setDiffPath(value) },
   }
+}
+
+function closeDiffMode(activeTabPath: string | null, {
+  setDiffMode,
+  setDiffContent,
+  setDiffLoading,
+  setDiffPath,
+}: DiffStateSetters) {
+  setDiffPath(activeTabPath)
+  setDiffMode(false)
+  setDiffContent(null)
+  setDiffLoading(false)
 }
 
 function runPendingCommitDiffRequest(
@@ -153,6 +198,21 @@ function usePendingCommitDiffRequest({
   }, [activeTabPath, onLoadDiff, onLoadDiffAtCommit, onPendingCommitDiffHandled, pendingCommitDiffRequest, setDiffContent, setDiffLoading, setDiffMode, setDiffPath])
 }
 
+function useDiffPathReset(
+  activeTabPath: string | null,
+  cancelActiveDiffLoad: () => void,
+  diffState: DiffStateSetters,
+) {
+  useEffect(() => {
+    cancelActiveDiffLoad()
+    closeDiffMode(activeTabPath, diffState)
+  }, [activeTabPath, cancelActiveDiffLoad, diffState])
+}
+
+function useCancelDiffLoadOnUnmount(cancelActiveDiffLoad: () => void) {
+  useEffect(() => () => cancelActiveDiffLoad(), [cancelActiveDiffLoad])
+}
+
 export function useDiffMode({
   activeTabPath,
   onLoadDiff,
@@ -164,6 +224,20 @@ export function useDiffMode({
   const [diffContent, setDiffContent] = useState<string | null>(null)
   const [diffLoading, setDiffLoading] = useState(false)
   const [diffPath, setDiffPath] = useState<string | null>(activeTabPath)
+  const diffState = useMemo(() => ({
+    setDiffMode,
+    setDiffContent,
+    setDiffLoading,
+    setDiffPath,
+  }), [setDiffMode, setDiffContent, setDiffLoading, setDiffPath])
+  const {
+    cancelActiveDiffLoad,
+    createDiffLoadCancellation,
+    clearDiffLoadCancellation,
+  } = useDiffLoadCancellation()
+
+  useDiffPathReset(activeTabPath, cancelActiveDiffLoad, diffState)
+  useCancelDiffLoadOnUnmount(cancelActiveDiffLoad)
 
   usePendingCommitDiffRequest({
     activeTabPath,
@@ -181,29 +255,28 @@ export function useDiffMode({
 
   const handleToggleDiff = useCallback(async () => {
     if (isDiffVisible) {
-      setDiffPath(activeTabPath)
-      setDiffMode(false)
-      setDiffContent(null)
+      cancelActiveDiffLoad()
+      closeDiffMode(activeTabPath, diffState)
       return
     }
     if (!activeTabPath || !onLoadDiff) return
-    await loadDiffForPath(activeTabPath, onLoadDiff, {
-      setDiffMode,
-      setDiffContent,
-      setDiffLoading,
-      setDiffPath,
-    })
-  }, [activeTabPath, isDiffVisible, onLoadDiff, setDiffContent, setDiffLoading, setDiffMode, setDiffPath])
+    const cancellation = createDiffLoadCancellation()
+    try {
+      await loadDiffForPath(activeTabPath, onLoadDiff, buildGuardedDiffStateSetters(cancellation, diffState))
+    } finally {
+      clearDiffLoadCancellation(cancellation)
+    }
+  }, [activeTabPath, cancelActiveDiffLoad, clearDiffLoadCancellation, createDiffLoadCancellation, diffState, isDiffVisible, onLoadDiff])
 
   const handleViewCommitDiff = useCallback(async (commitHash: string) => {
     if (!activeTabPath) return
-    await loadCommitDiffForPath(activeTabPath, commitHash, onLoadDiffAtCommit, {
-      setDiffMode,
-      setDiffContent,
-      setDiffLoading,
-      setDiffPath,
-    })
-  }, [activeTabPath, onLoadDiffAtCommit, setDiffContent, setDiffLoading, setDiffMode, setDiffPath])
+    const cancellation = createDiffLoadCancellation()
+    try {
+      await loadCommitDiffForPath(activeTabPath, commitHash, onLoadDiffAtCommit, buildGuardedDiffStateSetters(cancellation, diffState))
+    } finally {
+      clearDiffLoadCancellation(cancellation)
+    }
+  }, [activeTabPath, clearDiffLoadCancellation, createDiffLoadCancellation, diffState, onLoadDiffAtCommit])
 
   return {
     diffMode: isDiffVisible,

@@ -31,6 +31,7 @@ type BreadcrumbActions = Pick<
   | 'showDiffToggle'
   | 'onToggleFavorite'
   | 'onToggleOrganized'
+  | 'onEnterNeighborhood'
   | 'onRevealFile'
   | 'onCopyFilePath'
   | 'onDeleteNote'
@@ -195,6 +196,7 @@ function ActiveTabBreadcrumb({
       onToggleInspector={actions.onToggleInspector}
       onToggleFavorite={bindPath(actions.onToggleFavorite, path)}
       onToggleOrganized={bindPath(actions.onToggleOrganized, path)}
+      onEnterNeighborhood={actions.onEnterNeighborhood}
       onRevealFile={actions.onRevealFile}
       onCopyFilePath={actions.onCopyFilePath}
       onDelete={bindPath(actions.onDeleteNote, path)}
@@ -259,6 +261,7 @@ function buildBreadcrumbActions(model: EditorContentModel): BreadcrumbActions {
     showDiffToggle: model.showDiffToggle,
     onToggleFavorite: model.onToggleFavorite,
     onToggleOrganized: model.onToggleOrganized,
+    onEnterNeighborhood: model.onEnterNeighborhood,
     onRevealFile: model.onRevealFile,
     onCopyFilePath: model.onCopyFilePath,
     onDeleteNote: model.onDeleteNote,

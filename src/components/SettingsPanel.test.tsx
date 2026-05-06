@@ -57,15 +57,50 @@ function createStorageMock(): Storage {
   }
 }
 
+function installMatchMedia(matches = false) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: vi.fn((query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(() => true),
+    })),
+  })
+}
+
 describe('SettingsPanel', () => {
   const onSave = vi.fn()
   const onClose = vi.fn()
   const localStorageMock = createStorageMock()
 
+  function renderOpenSettings(settings: Settings = emptySettings) {
+    return render(
+      <SettingsPanel open={true} settings={settings} onSave={onSave} onClose={onClose} />
+    )
+  }
+
+  function saveSettingsPanel() {
+    fireEvent.click(screen.getByTestId('settings-save'))
+  }
+
+  function expectSettingsSaved(partial: Partial<Settings>) {
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining(partial))
+  }
+
+  function selectThemeMode(label: string) {
+    fireEvent.click(screen.getByRole('radio', { name: label }))
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     trackEventMock.mockClear()
     Object.defineProperty(window, 'localStorage', { value: localStorageMock, configurable: true })
+    installMatchMedia(false)
     window.localStorage.clear()
     document.documentElement.removeAttribute('data-theme')
     document.documentElement.classList.remove('dark')
@@ -160,6 +195,8 @@ describe('SettingsPanel', () => {
       autogit_inactive_threshold_seconds: 30,
       release_channel: null,
       theme_mode: 'light',
+      note_width_mode: 'normal',
+      sidebar_type_pluralization_enabled: true,
       hide_gitignored_files: true,
       all_notes_show_pdfs: false,
       all_notes_show_images: false,
@@ -255,6 +292,7 @@ describe('SettingsPanel', () => {
     expect(screen.getByTestId('settings-theme-mode')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'Light' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('radio', { name: 'System' })).toHaveAttribute('aria-checked', 'false')
   })
 
   it('defaults the language selector to system language', () => {
@@ -271,6 +309,53 @@ describe('SettingsPanel', () => {
 
     expect(screen.getByTestId('settings-ui-language')).toHaveAttribute('data-value', 'system')
     expect(screen.getByText('系统（简体中文）')).toBeInTheDocument()
+  })
+
+  it('defaults note width to normal and sidebar type pluralization to enabled', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    expect(screen.getByTestId('settings-default-note-width')).toHaveAttribute('data-value', 'normal')
+    expect(
+      within(screen.getByTestId('settings-sidebar-type-pluralization')).getByRole('switch')
+    ).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('preserves saved default note width and sidebar type pluralization preferences', () => {
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{
+          ...emptySettings,
+          note_width_mode: 'wide',
+          sidebar_type_pluralization_enabled: false,
+        }}
+        onSave={onSave}
+        onClose={onClose}
+      />
+    )
+
+    expect(screen.getByTestId('settings-default-note-width')).toHaveAttribute('data-value', 'wide')
+    expect(
+      within(screen.getByTestId('settings-sidebar-type-pluralization')).getByRole('switch')
+    ).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('saves default note width and sidebar type pluralization preferences', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    fireEvent.pointerDown(screen.getByTestId('settings-default-note-width'), { button: 0, pointerType: 'mouse' })
+    fireEvent.click(screen.getByRole('option', { name: 'Wide' }))
+    fireEvent.click(within(screen.getByTestId('settings-sidebar-type-pluralization')).getByRole('switch'))
+    fireEvent.click(screen.getByTestId('settings-save'))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      note_width_mode: 'wide',
+      sidebar_type_pluralization_enabled: false,
+    }))
   })
 
   it('keeps the language selector keyboard accessible', () => {
@@ -313,31 +398,42 @@ describe('SettingsPanel', () => {
   })
 
   it('saves the selected dark color mode', () => {
-    render(
-      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
-    )
+    renderOpenSettings()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Dark' }))
-    fireEvent.click(screen.getByTestId('settings-save'))
+    selectThemeMode('Dark')
+    saveSettingsPanel()
 
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+    expectSettingsSaved({
       theme_mode: 'dark',
-    }))
+    })
   })
 
   it('applies the selected dark color mode immediately while settings stays open', () => {
-    render(
-      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
-    )
+    renderOpenSettings()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Dark' }))
+    selectThemeMode('Dark')
 
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).toHaveClass('dark')
     expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('dark')
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+    expectSettingsSaved({
       theme_mode: 'dark',
-    }))
+    })
+  })
+
+  it('saves system color mode while applying the current OS appearance immediately', () => {
+    installMatchMedia(true)
+    renderOpenSettings()
+
+    selectThemeMode('System')
+    saveSettingsPanel()
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('system')
+    expectSettingsSaved({
+      theme_mode: 'system',
+    })
   })
 
   it('preserves a saved dark color mode until changed', () => {
@@ -578,6 +674,29 @@ describe('SettingsPanel', () => {
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
     expect(screen.getByText(/to open settings/)).toBeInTheDocument()
+  })
+
+  it('keeps Tab focus inside the settings panel', () => {
+    render(
+      <>
+        <button type="button" data-testid="background-action">Background</button>
+        <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+      </>
+    )
+
+    const backgroundAction = screen.getByTestId('background-action')
+    const closeButton = screen.getByTitle('Close settings')
+    const saveButton = screen.getByTestId('settings-save')
+
+    backgroundAction.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(closeButton).toHaveFocus()
+
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(saveButton).toHaveFocus()
+
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(closeButton).toHaveFocus()
   })
 
   it('copies the MCP config from the AI Agents section', () => {

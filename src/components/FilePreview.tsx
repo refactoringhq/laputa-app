@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, WarningCircle } from '@phosphor-icons/react'
+import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, SpeakerHigh, Video, WarningCircle } from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
 import { trackFilePreviewAction, trackFilePreviewFailed, trackFilePreviewOpened } from '../lib/productAnalytics'
 import { filePreviewKind, previewFileTypeLabel, type FilePreviewKind } from '../utils/filePreview'
@@ -53,6 +53,14 @@ function FilePreviewHeaderIcon({ previewKind }: { previewKind: FilePreviewKind |
 
   if (previewKind === 'pdf') {
     return <FilePdf size={17} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+  }
+
+  if (previewKind === 'audio') {
+    return <SpeakerHigh size={17} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+  }
+
+  if (previewKind === 'video') {
+    return <Video size={17} className="shrink-0 text-muted-foreground" aria-hidden="true" />
   }
 
   return <FileDashed size={17} className="shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -179,6 +187,61 @@ function FilePreviewImage({
   )
 }
 
+function FilePreviewMediaFrame({
+  children,
+  video = false,
+}: {
+  children: ReactNode
+  video?: boolean
+}) {
+  return (
+    <div className={`flex h-full items-center justify-center ${video ? 'min-h-[320px] bg-black p-4' : 'min-h-[260px] p-6'}`}>
+      {children}
+    </div>
+  )
+}
+
+function FilePreviewMedia({
+  entry,
+  mediaKind,
+  mediaSrc,
+  onMediaError,
+}: {
+  entry: VaultEntry
+  mediaKind: 'audio' | 'video'
+  mediaSrc: string
+  onMediaError: () => void
+}) {
+  if (mediaKind === 'audio') {
+    return (
+      <FilePreviewMediaFrame>
+        <audio
+          controls
+          preload="metadata"
+          src={mediaSrc}
+          className="w-full max-w-2xl"
+          data-testid="audio-file-preview"
+          onError={onMediaError}
+        />
+      </FilePreviewMediaFrame>
+    )
+  }
+
+  return (
+    <FilePreviewMediaFrame video>
+      <video
+        controls
+        preload="metadata"
+        src={mediaSrc}
+        title={entry.title}
+        className="max-h-full max-w-full"
+        data-testid="video-file-preview"
+        onError={onMediaError}
+      />
+    </FilePreviewMediaFrame>
+  )
+}
+
 function shouldRenderImagePreview(isImage: boolean, imageSrc: string | null, imageFailed: boolean): imageSrc is string {
   return isImage && imageSrc !== null && !imageFailed
 }
@@ -189,6 +252,8 @@ function FilePreviewBody({
   assetSrc,
   imageFailed,
   onImageError,
+  onAudioError,
+  onVideoError,
   onOpenExternal,
 }: {
   entry: VaultEntry
@@ -196,6 +261,8 @@ function FilePreviewBody({
   assetSrc: string | null
   imageFailed: boolean
   onImageError: () => void
+  onAudioError: () => void
+  onVideoError: () => void
   onOpenExternal: () => void
 }) {
   if (shouldRenderImagePreview(previewKind === 'image', assetSrc, imageFailed)) {
@@ -204,6 +271,14 @@ function FilePreviewBody({
 
   if (previewKind === 'pdf' && assetSrc !== null) {
     return <FilePreviewPdf entry={entry} pdfSrc={assetSrc} onOpenExternal={onOpenExternal} />
+  }
+
+  if (previewKind === 'audio' && assetSrc !== null) {
+    return <FilePreviewMedia entry={entry} mediaKind="audio" mediaSrc={assetSrc} onMediaError={onAudioError} />
+  }
+
+  if (previewKind === 'video' && assetSrc !== null) {
+    return <FilePreviewMedia entry={entry} mediaKind="video" mediaSrc={assetSrc} onMediaError={onVideoError} />
   }
 
   const fallback = fallbackContentForPreviewKind(previewKind)
@@ -218,47 +293,95 @@ function FilePreviewBody({
   )
 }
 
+function useFilePreviewFailureState(entryPath: string) {
+  const [failedImagePath, setFailedImagePath] = useState<string | null>(null)
+  const [failedMediaPath, setFailedMediaPath] = useState<string | null>(null)
+
+  const handleImageError = useCallback(() => {
+    setFailedImagePath(entryPath)
+    trackFilePreviewFailed('image')
+  }, [entryPath])
+  const handleAudioError = useCallback(() => {
+    setFailedMediaPath(entryPath)
+    trackFilePreviewFailed('audio')
+  }, [entryPath])
+  const handleVideoError = useCallback(() => {
+    setFailedMediaPath(entryPath)
+    trackFilePreviewFailed('video')
+  }, [entryPath])
+
+  return {
+    imageFailed: failedImagePath === entryPath,
+    mediaFailed: failedMediaPath === entryPath,
+    handleImageError,
+    handleAudioError,
+    handleVideoError,
+  }
+}
+
+function useFilePreviewActions({
+  entryPath,
+  onCopyFilePath,
+  onOpenExternalFile,
+  onRevealFile,
+  previewKind,
+}: {
+  entryPath: string
+  onCopyFilePath?: (path: string) => void
+  onOpenExternalFile?: (path: string) => void
+  onRevealFile?: (path: string) => void
+  previewKind: FilePreviewKind | null
+}) {
+  const handleOpenExternal = useCallback(() => {
+    trackFilePreviewAction('open_external', previewKind)
+    if (onOpenExternalFile) {
+      onOpenExternalFile(entryPath)
+      return
+    }
+
+    void openLocalFile(entryPath).catch((error) => {
+      console.warn('Failed to open file with default app:', error)
+    })
+  }, [entryPath, onOpenExternalFile, previewKind])
+
+  const handleRevealFile = useCallback(() => {
+    trackFilePreviewAction('reveal', previewKind)
+    onRevealFile?.(entryPath)
+  }, [entryPath, onRevealFile, previewKind])
+
+  const handleCopyFilePath = useCallback(() => {
+    trackFilePreviewAction('copy_path', previewKind)
+    onCopyFilePath?.(entryPath)
+  }, [entryPath, onCopyFilePath, previewKind])
+
+  return { handleOpenExternal, handleRevealFile, handleCopyFilePath }
+}
+
+function previewKindForBody(previewKind: FilePreviewKind | null, mediaFailed: boolean): FilePreviewKind | null {
+  return mediaFailed ? null : previewKind
+}
+
 export function FilePreview({
   entry,
   onCopyFilePath,
   onOpenExternalFile,
   onRevealFile,
 }: FilePreviewProps) {
-  const [failedImagePath, setFailedImagePath] = useState<string | null>(null)
   const previewKind = filePreviewKind(entry)
   const assetSrc = useMemo(() => (previewKind ? convertFileSrc(entry.path) : null), [entry.path, previewKind])
   const fileTypeLabel = previewFileTypeLabel(entry)
-  const imageFailed = failedImagePath === entry.path
-  const handleImageError = useCallback(() => {
-    setFailedImagePath(entry.path)
-    trackFilePreviewFailed('image')
-  }, [entry.path])
+  const failures = useFilePreviewFailureState(entry.path)
+  const actions = useFilePreviewActions({
+    entryPath: entry.path,
+    onCopyFilePath,
+    onOpenExternalFile,
+    onRevealFile,
+    previewKind,
+  })
 
   useEffect(() => {
     trackFilePreviewOpened(previewKind)
   }, [entry.path, previewKind])
-
-  const handleOpenExternal = useCallback(() => {
-    trackFilePreviewAction('open_external', previewKind)
-    if (onOpenExternalFile) {
-      onOpenExternalFile(entry.path)
-      return
-    }
-
-    void openLocalFile(entry.path).catch((error) => {
-      console.warn('Failed to open file with default app:', error)
-    })
-  }, [entry.path, onOpenExternalFile, previewKind])
-
-  const handleRevealFile = useCallback(() => {
-    trackFilePreviewAction('reveal', previewKind)
-    onRevealFile?.(entry.path)
-  }, [entry.path, onRevealFile, previewKind])
-
-  const handleCopyFilePath = useCallback(() => {
-    trackFilePreviewAction('copy_path', previewKind)
-    onCopyFilePath?.(entry.path)
-  }, [entry.path, onCopyFilePath, previewKind])
 
   const handleKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Escape') return
@@ -279,18 +402,20 @@ export function FilePreview({
         entry={entry}
         previewKind={previewKind}
         fileTypeLabel={fileTypeLabel}
-        onOpenExternal={handleOpenExternal}
-        onRevealFile={onRevealFile ? handleRevealFile : undefined}
-        onCopyFilePath={onCopyFilePath ? handleCopyFilePath : undefined}
+        onOpenExternal={actions.handleOpenExternal}
+        onRevealFile={onRevealFile ? actions.handleRevealFile : undefined}
+        onCopyFilePath={onCopyFilePath ? actions.handleCopyFilePath : undefined}
       />
       <div className="min-h-0 flex-1 overflow-auto bg-background">
         <FilePreviewBody
           entry={entry}
-          previewKind={previewKind}
+          previewKind={previewKindForBody(previewKind, failures.mediaFailed)}
           assetSrc={assetSrc}
-          imageFailed={imageFailed}
-          onImageError={handleImageError}
-          onOpenExternal={handleOpenExternal}
+          imageFailed={failures.imageFailed}
+          onImageError={failures.handleImageError}
+          onAudioError={failures.handleAudioError}
+          onVideoError={failures.handleVideoError}
+          onOpenExternal={actions.handleOpenExternal}
         />
       </div>
     </section>

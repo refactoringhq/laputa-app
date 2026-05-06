@@ -144,6 +144,51 @@ describe('BlockNote table handles regression', () => {
     view.destroy()
   })
 
+  it('hides stale table handles instead of throwing when a reload clears the hovered block', () => {
+    const editorRoot = document.createElement('div')
+    document.body.appendChild(editorRoot)
+
+    const editor = {
+      getBlock: vi.fn(),
+    }
+    const emitUpdate = vi.fn()
+
+    const view = new TableHandlesView(
+      editor as never,
+      {
+        dom: editorRoot,
+        root: document,
+      } as never,
+      emitUpdate,
+    )
+
+    view.state = {
+      block: undefined,
+      show: true,
+      showAddOrRemoveRowsButton: true,
+      showAddOrRemoveColumnsButton: true,
+      rowIndex: 0,
+      colIndex: 0,
+      draggingState: {
+        draggedCellOrientation: 'row',
+        originalIndex: 0,
+        mousePos: 10,
+      },
+    } as never
+
+    expect(() => view.update()).not.toThrow()
+    expect(editor.getBlock).not.toHaveBeenCalled()
+    expect(view.state?.show).toBe(false)
+    expect(view.state?.showAddOrRemoveRowsButton).toBe(false)
+    expect(view.state?.showAddOrRemoveColumnsButton).toBe(false)
+    expect(view.state?.rowIndex).toBeUndefined()
+    expect(view.state?.colIndex).toBeUndefined()
+    expect(view.state?.draggingState).toBeUndefined()
+    expect(emitUpdate).toHaveBeenCalled()
+
+    view.destroy()
+  })
+
   it('ignores stale table drag starts instead of throwing when hover state is unavailable', () => {
     const { editor, extension, view } = mountTableHandlesExtension()
 

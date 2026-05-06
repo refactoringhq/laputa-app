@@ -178,7 +178,7 @@ where
     let last_message_path = last_message_dir.path().join("last-message.txt");
     let args = build_codex_args(&request, Some(&last_message_path))?;
     let prompt = build_codex_prompt(&request);
-    let command = build_codex_command(binary, args, prompt, &request.vault_path);
+    let command = build_codex_command(binary, args, prompt, &request.vault_path)?;
     let emit = with_codex_last_message_fallback(emit, last_message_path);
 
     crate::cli_agent_runtime::run_ai_agent_json_stream(
@@ -223,9 +223,13 @@ fn build_codex_command(
     args: Vec<String>,
     prompt: String,
     vault_path: &str,
-) -> std::process::Command {
-    let mut command = crate::hidden_command(binary);
+) -> Result<std::process::Command, String> {
+    let target = codex_command_target(binary)?;
+    let mut command = crate::hidden_command(&target.program);
     crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
+    if let Some(first_arg) = target.first_arg {
+        command.arg(first_arg);
+    }
     command
         .args(args)
         .arg(prompt)
@@ -233,7 +237,65 @@ fn build_codex_command(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    command
+    Ok(command)
+}
+
+struct CodexCommandTarget {
+    program: PathBuf,
+    first_arg: Option<PathBuf>,
+}
+
+fn codex_command_target(binary: &Path) -> Result<CodexCommandTarget, String> {
+    if is_windows_batch_shim(binary) {
+        if let Some(script) = node_script_from_windows_cmd_shim(binary) {
+            return Ok(CodexCommandTarget {
+                program: crate::mcp::find_node()?,
+                first_arg: Some(script),
+            });
+        }
+    }
+
+    Ok(CodexCommandTarget {
+        program: binary.to_path_buf(),
+        first_arg: None,
+    })
+}
+
+fn is_windows_batch_shim(binary: &Path) -> bool {
+    binary
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("cmd") || extension.eq_ignore_ascii_case("bat")
+        })
+}
+
+fn node_script_from_windows_cmd_shim(binary: &Path) -> Option<PathBuf> {
+    let contents = std::fs::read_to_string(binary).ok()?;
+    contents
+        .split('"')
+        .skip(1)
+        .step_by(2)
+        .filter(|token| is_node_script_token(token))
+        .find_map(|token| resolve_cmd_shim_script_path(binary, token))
+}
+
+fn is_node_script_token(token: &str) -> bool {
+    let lower = token.to_ascii_lowercase();
+    (lower.ends_with(".js") || lower.ends_with(".mjs") || lower.ends_with(".cjs"))
+        && (lower.starts_with("%dp0%") || lower.starts_with("%~dp0"))
+}
+
+fn resolve_cmd_shim_script_path(binary: &Path, token: &str) -> Option<PathBuf> {
+    let relative = token
+        .strip_prefix("%dp0%")
+        .or_else(|| token.strip_prefix("%~dp0"))?
+        .trim_start_matches(['\\', '/']);
+    let mut script = binary.parent()?.to_path_buf();
+    for part in relative.split(['\\', '/']).filter(|part| !part.is_empty()) {
+        script.push(part);
+    }
+    script.is_file().then_some(script)
 }
 
 fn build_codex_args(
@@ -621,7 +683,7 @@ mod tests {
     fn build_codex_command_keeps_agent_process_contract() {
         let binary = PathBuf::from("codex");
         let args = vec!["exec".to_string(), "--json".to_string()];
-        let command = build_codex_command(&binary, args, "Summarize".into(), "/tmp/vault");
+        let command = build_codex_command(&binary, args, "Summarize".into(), "/tmp/vault").unwrap();
         let actual_args: Vec<&OsStr> = command.get_args().collect();
 
         assert_eq!(command.get_program(), OsStr::new("codex"));
@@ -644,7 +706,8 @@ mod tests {
             vec!["exec".to_string(), "--json".to_string()],
             "Summarize".into(),
             "/tmp/vault",
-        );
+        )
+        .unwrap();
         let path_value = command
             .get_envs()
             .find(|(key, _)| *key == OsStr::new("PATH"))
@@ -656,6 +719,51 @@ mod tests {
             paths.contains(&PathBuf::from("/opt/homebrew/bin")),
             "PATH should include the resolved Codex binary directory, got {paths:?}"
         );
+    }
+
+    #[test]
+    fn build_codex_command_avoids_windows_cmd_shim_for_complex_args() {
+        let dir = tempfile::tempdir().unwrap();
+        let shim = dir.path().join("codex.cmd");
+        let script = dir
+            .path()
+            .join("node_modules")
+            .join("@openai")
+            .join("codex")
+            .join("bin")
+            .join("codex.js");
+        std::fs::create_dir_all(script.parent().unwrap()).unwrap();
+        std::fs::write(&script, "console.log('codex')\n").unwrap();
+        std::fs::write(
+            &shim,
+            r#"@ECHO off
+"%_prog%" "%dp0%\node_modules\@openai\codex\bin\codex.js" %*
+"#,
+        )
+        .unwrap();
+
+        let command = build_codex_command(
+            &shim,
+            vec![
+                "exec".to_string(),
+                "-c".to_string(),
+                r#"mcp_servers.tolaria.command="C:\\Program Files\\node.exe""#.to_string(),
+            ],
+            "Summarize".into(),
+            "/tmp/vault",
+        )
+        .unwrap();
+
+        assert_ne!(
+            command.get_program(),
+            shim.as_os_str(),
+            "Codex npm .cmd shims cannot safely receive quoted -c args directly"
+        );
+        let actual_args = command.get_args().collect::<Vec<_>>();
+        assert_eq!(actual_args.first().copied(), Some(script.as_os_str()));
+        assert!(actual_args
+            .iter()
+            .any(|arg| *arg == OsStr::new("Summarize")));
     }
 
     #[cfg(unix)]

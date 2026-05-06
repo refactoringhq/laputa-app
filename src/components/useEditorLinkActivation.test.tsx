@@ -50,8 +50,8 @@ function appendUrl(container: HTMLElement, href: string) {
   return link
 }
 
-function dispatchClick(target: HTMLElement, options: MouseEventInit = {}) {
-  const event = new MouseEvent('click', {
+function dispatchMouseEvent(target: HTMLElement, type: string, options: MouseEventInit = {}) {
+  const event = new MouseEvent(type, {
     bubbles: true,
     cancelable: true,
     ...options,
@@ -65,18 +65,34 @@ describe('useEditorLinkActivation', () => {
     mockOpenExternalUrl.mockClear()
   })
 
-  it('navigates wikilinks only on Cmd+click', () => {
+  it('navigates wikilinks only on Cmd+click after the native click stack settles', async () => {
     const { container, onNavigateWikilink } = renderHarness()
     const wikilink = appendWikilink(container, 'Alpha Project')
 
-    fireEvent.click(wikilink)
+    dispatchMouseEvent(wikilink, 'click')
     expect(onNavigateWikilink).not.toHaveBeenCalled()
 
-    fireEvent.click(wikilink, { metaKey: true })
+    const modifiedClick = dispatchMouseEvent(wikilink, 'click', { metaKey: true })
+    expect(modifiedClick.defaultPrevented).toBe(true)
+    expect(onNavigateWikilink).not.toHaveBeenCalled()
+
+    await Promise.resolve()
     expect(onNavigateWikilink).toHaveBeenCalledWith('Alpha Project')
   })
 
-  it('blurs an active editor before navigating a Cmd-clicked wikilink', () => {
+  it('consumes plain wikilink mousedown and click events before editor internals see stale link nodes', () => {
+    const { container, onNavigateWikilink } = renderHarness()
+    const wikilink = appendWikilink(container, 'Alpha Project')
+
+    const mouseDown = dispatchMouseEvent(wikilink, 'mousedown')
+    const click = dispatchMouseEvent(wikilink, 'click')
+
+    expect(mouseDown.defaultPrevented).toBe(true)
+    expect(click.defaultPrevented).toBe(true)
+    expect(onNavigateWikilink).not.toHaveBeenCalled()
+  })
+
+  it('blurs an active editor before navigating a Cmd-clicked wikilink', async () => {
     const { container, onNavigateWikilink } = renderHarness()
     const { editable, wikilink } = appendEditableWikilink(container, 'Alpha Project')
 
@@ -85,19 +101,20 @@ describe('useEditorLinkActivation', () => {
 
     fireEvent.click(wikilink, { metaKey: true })
 
-    expect(onNavigateWikilink).toHaveBeenCalledWith('Alpha Project')
     expect(document.activeElement).not.toBe(editable)
+    await Promise.resolve()
+    expect(onNavigateWikilink).toHaveBeenCalledWith('Alpha Project')
   })
 
   it('opens URLs only on Cmd+click', () => {
     const { container } = renderHarness()
     const link = appendUrl(container, 'https://example.com')
 
-    const plainClick = dispatchClick(link)
+    const plainClick = dispatchMouseEvent(link, 'click')
     expect(mockOpenExternalUrl).not.toHaveBeenCalled()
     expect(plainClick.defaultPrevented).toBe(true)
 
-    const modifiedClick = dispatchClick(link, { metaKey: true })
+    const modifiedClick = dispatchMouseEvent(link, 'click', { metaKey: true })
     expect(mockOpenExternalUrl).toHaveBeenCalledWith('https://example.com')
     expect(modifiedClick.defaultPrevented).toBe(true)
   })
@@ -106,8 +123,8 @@ describe('useEditorLinkActivation', () => {
     const { container } = renderHarness()
     const link = appendUrl(container, 'https://exa mple.com')
 
-    const plainClick = dispatchClick(link)
-    const modifiedClick = dispatchClick(link, { metaKey: true })
+    const plainClick = dispatchMouseEvent(link, 'click')
+    const modifiedClick = dispatchMouseEvent(link, 'click', { metaKey: true })
 
     expect(plainClick.defaultPrevented).toBe(true)
     expect(modifiedClick.defaultPrevented).toBe(true)

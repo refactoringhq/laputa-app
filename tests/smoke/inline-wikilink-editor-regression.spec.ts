@@ -35,6 +35,24 @@ test.describe('Inline wikilink editor regression', () => {
     await expectNoPageErrors(pageErrors)
   })
 
+  test('keeps follow-up typing stable after editing the active note body', async ({ page }) => {
+    const pageErrors = trackPageErrors(page)
+    const noteBlock = page.locator('.bn-block-content').nth(1)
+    const editor = page.getByTestId('agent-input')
+    const noteMarker = ` follow-up guard ${Date.now()}`
+
+    await expect(noteBlock).toBeVisible({ timeout: 5_000 })
+    await noteBlock.click()
+    await page.keyboard.type(noteMarker)
+    await expect(page.locator('.bn-editor')).toContainText(noteMarker.trim())
+
+    await editor.click()
+    await page.keyboard.type('follow up after note edit')
+
+    await expectNormalizedEditorText(editor, 'follow up after note edit')
+    await expectNoPageErrors(pageErrors)
+  })
+
   test('keeps select-all cut scoped to the AI panel chat input', async ({ page }) => {
     const pageErrors = trackPageErrors(page)
     const editor = page.getByTestId('agent-input')

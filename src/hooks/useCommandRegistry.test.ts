@@ -453,6 +453,7 @@ describe('useCommandRegistry', () => {
     const { result } = renderHook(() => useCommandRegistry(config))
     const lightMode = findCommand(result.current, 'use-light-mode')
     const darkMode = findCommand(result.current, 'use-dark-mode')
+    const systemMode = findCommand(result.current, 'use-system-theme-mode')
 
     expect(lightMode).toMatchObject({
       label: 'Use Light Mode',
@@ -464,12 +465,19 @@ describe('useCommandRegistry', () => {
       enabled: true,
       group: 'Settings',
     })
+    expect(systemMode).toMatchObject({
+      label: 'Use System Theme',
+      enabled: true,
+      group: 'Settings',
+    })
 
     lightMode?.execute()
     darkMode?.execute()
+    systemMode?.execute()
 
     expect(onSetThemeMode).toHaveBeenNthCalledWith(1, 'light')
     expect(onSetThemeMode).toHaveBeenNthCalledWith(2, 'dark')
+    expect(onSetThemeMode).toHaveBeenNthCalledWith(3, 'system')
   })
 
   it('includes a New AI chat command that opens and resets the panel session', () => {

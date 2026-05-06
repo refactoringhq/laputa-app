@@ -515,6 +515,22 @@ describe('Sidebar', () => {
       // Recipe has no sidebarLabel → should auto-pluralize to "Recipes"
       expect(screen.getByText('Recipes')).toBeInTheDocument()
     })
+
+    it('uses exact type names when automatic sidebar pluralization is disabled', () => {
+      render(
+        <Sidebar
+          entries={entriesWithCustomTypes}
+          selection={defaultSelection}
+          onSelect={() => {}}
+          pluralizeTypeLabels={false}
+        />
+      )
+
+      expect(screen.getByText('Recipe')).toBeInTheDocument()
+      expect(screen.getByText('Project')).toBeInTheDocument()
+      expect(screen.queryByText('Recipes')).not.toBeInTheDocument()
+      expect(screen.queryByText('Projects')).not.toBeInTheDocument()
+    })
   })
 
   describe('type visibility via visible property', () => {

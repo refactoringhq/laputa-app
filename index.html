@@ -30,11 +30,23 @@
       (function () {
         var key = 'tolaria-theme';
         var legacyKey = 'laputa-theme';
+        var systemDarkQuery = '(prefers-color-scheme: dark)';
         function normalizeTheme(value) {
-          return value === 'dark' || value === 'light' ? value : null;
+          return value === 'dark' || value === 'light' || value === 'system' ? value : null;
+        }
+        function prefersDarkTheme() {
+          try {
+            return typeof window.matchMedia === 'function' && window.matchMedia(systemDarkQuery).matches;
+          } catch (err) {
+            return false;
+          }
+        }
+        function resolveTheme(value) {
+          var mode = normalizeTheme(value) || 'light';
+          return mode === 'system' ? (prefersDarkTheme() ? 'dark' : 'light') : mode;
         }
         function applyTheme(value) {
-          var mode = normalizeTheme(value) || 'light';
+          var mode = resolveTheme(value);
           document.documentElement.setAttribute('data-theme', mode);
           document.documentElement.classList.toggle('dark', mode === 'dark');
         }

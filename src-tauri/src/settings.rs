@@ -78,6 +78,7 @@ pub struct Settings {
     pub theme_mode: Option<String>,
     pub ui_language: Option<String>,
     pub note_width_mode: Option<String>,
+    pub sidebar_type_pluralization_enabled: Option<bool>,
     pub initial_h1_auto_rename_enabled: Option<bool>,
     pub default_ai_agent: Option<String>,
     pub default_ai_target: Option<String>,
@@ -122,7 +123,7 @@ pub fn normalize_default_ai_agent(value: Option<&str>) -> Option<String> {
 
 pub fn normalize_theme_mode(value: Option<&str>) -> Option<String> {
     match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
-        Some(mode) if mode == "light" || mode == "dark" => Some(mode),
+        Some(mode) if mode == "light" || mode == "dark" || mode == "system" => Some(mode),
         _ => None,
     }
 }
@@ -181,6 +182,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         theme_mode: normalize_theme_mode(settings.theme_mode.as_deref()),
         ui_language: normalize_ui_language(settings.ui_language.as_deref()),
         note_width_mode: normalize_note_width_mode(settings.note_width_mode.as_deref()),
+        sidebar_type_pluralization_enabled: settings.sidebar_type_pluralization_enabled,
         initial_h1_auto_rename_enabled: settings.initial_h1_auto_rename_enabled,
         default_ai_agent: normalize_default_ai_agent(settings.default_ai_agent.as_deref()),
         default_ai_target: normalize_optional_string(settings.default_ai_target),
@@ -330,6 +332,7 @@ mod tests {
             theme_mode: Some("dark".to_string()),
             ui_language: Some("zh-Hans".to_string()),
             note_width_mode: Some("wide".to_string()),
+            sidebar_type_pluralization_enabled: Some(false),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
             default_ai_target: Some("agent:codex".to_string()),
@@ -364,6 +367,7 @@ mod tests {
             theme_mode: Some("dark".to_string()),
             ui_language: Some("zh-Hans".to_string()),
             note_width_mode: Some("wide".to_string()),
+            sidebar_type_pluralization_enabled: Some(false),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
             hide_gitignored_files: Some(false),
@@ -381,6 +385,7 @@ mod tests {
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
         assert_eq!(loaded.ui_language.as_deref(), Some("zh-CN"));
         assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
+        assert_eq!(loaded.sidebar_type_pluralization_enabled, Some(false));
         assert_eq!(loaded.initial_h1_auto_rename_enabled, Some(false));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
         assert_eq!(loaded.hide_gitignored_files, Some(false));
@@ -487,9 +492,18 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_theme_mode_is_filtered() {
+    fn test_system_theme_mode_is_preserved() {
         let loaded = save_and_reload(Settings {
             theme_mode: Some("system".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.theme_mode.as_deref(), Some("system"));
+    }
+
+    #[test]
+    fn test_invalid_theme_mode_is_filtered() {
+        let loaded = save_and_reload(Settings {
+            theme_mode: Some("sepia".to_string()),
             ..Default::default()
         });
         assert!(loaded.theme_mode.is_none());

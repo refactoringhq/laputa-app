@@ -13,6 +13,10 @@ describe('mockFrontmatterHelpers', () => {
     window.__mockContent = {}
   })
 
+  function frontmatterDelimiterLineCount(content: string): number {
+    return content.split(/\r?\n/).filter((line) => line === '---').length
+  }
+
   describe('updateMockFrontmatter', () => {
     it('updates an existing string property', () => {
       window.__mockContent = {
@@ -155,6 +159,27 @@ describe('mockFrontmatterHelpers', () => {
       expect(result).not.toContain('sidebar label: Projects')
       expect(result).not.toContain('sidebar_label: Legacy')
       expect(result).not.toContain('archived: false')
+    })
+
+    it('updates existing CRLF frontmatter without adding a second block', () => {
+      window.__mockContent = {
+        '/test.md': [
+          '---',
+          'type: Note',
+          'related_to: "[[Alpha Project]]"',
+          '---',
+          '# CRLF Inbox Syntax',
+          '',
+        ].join('\r\n'),
+      }
+
+      const result = updateMockFrontmatter('/test.md', '_organized', true)
+
+      expect(frontmatterDelimiterLineCount(result)).toBe(2)
+      expect(result).toContain('type: Note\r\n')
+      expect(result).toContain('related_to: "[[Alpha Project]]"\r\n')
+      expect(result).toContain('_organized: true\r\n')
+      expect(result).toContain('\r\n---\r\n# CRLF Inbox Syntax')
     })
   })
 

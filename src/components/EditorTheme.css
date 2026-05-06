@@ -416,6 +416,7 @@
 
 .editor__blocknote-container .tldraw-whiteboard .tl-container {
   --color-background: var(--card);
+  --tl-layer-menu-click-capture: 25;
   --tl-layer-panels: 30;
   --tl-layer-menus: 40;
   --tl-layer-toasts: 50;

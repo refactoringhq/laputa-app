@@ -1,13 +1,13 @@
 import { useSyncExternalStore } from 'react'
 import {
   DEFAULT_THEME_MODE,
-  normalizeThemeMode,
-  type ThemeMode,
+  normalizeResolvedThemeMode,
+  type ResolvedThemeMode,
 } from '../lib/themeMode'
 
-function readDocumentThemeMode(): ThemeMode {
+function readDocumentThemeMode(): ResolvedThemeMode {
   if (typeof document === 'undefined') return DEFAULT_THEME_MODE
-  return normalizeThemeMode(document.documentElement.getAttribute('data-theme')) ?? DEFAULT_THEME_MODE
+  return normalizeResolvedThemeMode(document.documentElement.getAttribute('data-theme')) ?? DEFAULT_THEME_MODE
 }
 
 function subscribeDocumentThemeMode(onChange: () => void): () => void {
@@ -24,7 +24,7 @@ function subscribeDocumentThemeMode(onChange: () => void): () => void {
   return () => observer.disconnect()
 }
 
-export function useDocumentThemeMode(): ThemeMode {
+export function useDocumentThemeMode(): ResolvedThemeMode {
   return useSyncExternalStore(
     subscribeDocumentThemeMode,
     readDocumentThemeMode,

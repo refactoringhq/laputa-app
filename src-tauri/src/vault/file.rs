@@ -2,7 +2,10 @@ use std::borrow::Cow;
 use std::fs;
 use std::io::{Error, ErrorKind, Write};
 use std::path::Path;
-use std::time::UNIX_EPOCH;
+use std::thread;
+use std::time::{Duration, UNIX_EPOCH};
+
+const SAVE_RETRY_DELAYS_MS: [u64; 4] = [25, 50, 100, 200];
 
 /// Read file metadata (modified_at timestamp, created_at timestamp, file size).
 /// Creation time is sourced from filesystem metadata (birthtime on macOS).
@@ -28,6 +31,25 @@ fn invalid_utf8_text_error(path: &Path) -> String {
 
 fn is_invalid_platform_path_error(error: &Error) -> bool {
     error.kind() == ErrorKind::InvalidInput || error.raw_os_error() == Some(123)
+}
+
+fn is_retryable_save_error(error: &Error) -> bool {
+    error.kind() == ErrorKind::PermissionDenied
+        || (cfg!(windows) && error.raw_os_error() == Some(5))
+}
+
+fn write_with_retry(
+    mut write_once: impl FnMut() -> Result<(), Error>,
+    mut wait_before_retry: impl FnMut(u64),
+) -> Result<(), Error> {
+    for delay in SAVE_RETRY_DELAYS_MS {
+        match write_once() {
+            Ok(()) => return Ok(()),
+            Err(error) if is_retryable_save_error(&error) => wait_before_retry(delay),
+            Err(error) => return Err(error),
+        }
+    }
+    write_once()
 }
 
 fn read_existing_note_bytes(path: &Path) -> Result<Vec<u8>, String> {
@@ -141,8 +163,11 @@ pub fn save_note_content(path: &str, content: &str) -> Result<(), String> {
         }
     }
     validate_save_path(file_path, path)?;
-    fs::write(file_path, content)
-        .map_err(|e| note_io_error(NoteIoOperation::Save, NotePathDisplay::new(path), &e))
+    write_with_retry(
+        || fs::write(file_path, content),
+        |delay| thread::sleep(Duration::from_millis(delay)),
+    )
+    .map_err(|e| note_io_error(NoteIoOperation::Save, NotePathDisplay::new(path), &e))
 }
 
 /// Create a new note file without overwriting any existing file.
@@ -195,6 +220,28 @@ mod tests {
             RawNotePath(path).normalized_for_file_io(),
             r"\\?\C:\Users\alex\Documents\Tolaria\Getting Started\untitled-project.md"
         );
+    }
+
+    #[test]
+    fn retries_transient_access_denied_save_errors() {
+        let mut attempts = 0;
+        let mut delays = Vec::new();
+
+        write_with_retry(
+            || {
+                attempts += 1;
+                if attempts == 1 {
+                    Err(Error::new(ErrorKind::PermissionDenied, "Access is denied"))
+                } else {
+                    Ok(())
+                }
+            },
+            |delay| delays.push(delay),
+        )
+        .unwrap();
+
+        assert_eq!(attempts, 2);
+        assert_eq!(delays, vec![25]);
     }
 
     #[test]

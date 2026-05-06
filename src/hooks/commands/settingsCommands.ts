@@ -147,6 +147,14 @@ function buildThemeCommands({
       enabled: canSetThemeMode,
       execute: () => onSetThemeMode?.('dark'),
     },
+    {
+      id: 'use-system-theme-mode',
+      label: t('command.settings.useSystemTheme'),
+      group: 'Settings',
+      keywords: ['theme', 'appearance', 'system', 'system theme', 'auto'],
+      enabled: canSetThemeMode,
+      execute: () => onSetThemeMode?.('system'),
+    },
   ]
 }
 

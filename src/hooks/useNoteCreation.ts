@@ -8,6 +8,7 @@ import { trackEvent } from '../lib/telemetry'
 import { cacheNoteContent } from './useTabManagement'
 import { findByCollidingNotePath, joinVaultPath, notePathFilename } from '../utils/notePathIdentity'
 import { canonicalFrontmatterKey } from '../utils/systemMetadata'
+import { canonicalizeTypeName } from '../utils/vaultTypes'
 
 export interface NewEntryParams {
   path: string
@@ -233,10 +234,20 @@ export interface NewTypeParams {
   vaultPath: string
 }
 
+const TYPE_CREATION_ALIASES = new Map<string, string>([
+  ['notes', 'Note'],
+])
+
+export function normalizeTypeCreationName(typeName: string): string {
+  const trimmed = typeName.trim()
+  return TYPE_CREATION_ALIASES.get(trimmed.toLowerCase()) ?? canonicalizeTypeName(trimmed) ?? trimmed
+}
+
 export function resolveNewType({ typeName, vaultPath }: NewTypeParams): { entry: VaultEntry; content: string } {
-  const slug = slugify(typeName)
-  const entry = buildNewEntry({ path: joinVaultPath(vaultPath, `${slug}.md`), slug, title: typeName, type: 'Type', status: null })
-  return { entry, content: `---\ntype: Type\n---\n\n# ${typeName}\n` }
+  const normalizedTypeName = normalizeTypeCreationName(typeName)
+  const slug = slugify(normalizedTypeName)
+  const entry = buildNewEntry({ path: joinVaultPath(vaultPath, `${slug}.md`), slug, title: normalizedTypeName, type: 'Type', status: null })
+  return { entry, content: `---\ntype: Type\n---\n\n# ${normalizedTypeName}\n` }
 }
 
 type ResolvedEntry = { entry: VaultEntry; content: string }
@@ -300,7 +311,7 @@ function buildCreationCollisionMessage({ noun, title, path }: { noun: 'note' | '
 }
 
 function findEquivalentTypeEntry(entries: VaultEntry[], typeName: string): VaultEntry | undefined {
-  const trimmed = typeName.trim()
+  const trimmed = normalizeTypeCreationName(typeName)
   const targetSlug = slugify(trimmed)
   return entries.find((entry) =>
     entry.isA === 'Type' && (entry.title === trimmed || slugify(entry.title) === targetSlug)

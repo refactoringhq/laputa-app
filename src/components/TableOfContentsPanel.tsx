@@ -16,6 +16,7 @@ import {
   getFolderConnectorLeft,
   getFolderDepthIndent,
 } from './folder-tree/folderTreeLayout'
+import { NoteInfoPanel } from './inspector/NoteInfoPanel'
 
 interface TableOfContentsEditor {
   document?: unknown[]
@@ -283,6 +284,11 @@ export const TableOfContentsPanel = memo(function TableOfContentsPanel({
           onNavigate={navigateToItem}
         />
       </div>
+      {entry && (
+        <div className="shrink-0 border-t border-border p-3">
+          <NoteInfoPanel entry={entry} content={sourceContent ?? null} locale={locale} />
+        </div>
+      )}
     </aside>
   )
 })

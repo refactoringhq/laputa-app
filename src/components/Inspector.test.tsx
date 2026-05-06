@@ -113,6 +113,7 @@ describe('Inspector', () => {
     render(<Inspector {...defaultProps} />)
     // Header now says "Properties" (not "Inspector")
     expect(screen.getAllByText('Properties').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('properties-panel-icon')).toBeInTheDocument()
     expect(screen.getByText('No note selected')).toBeInTheDocument()
   })
 
@@ -122,10 +123,19 @@ describe('Inspector', () => {
     expect(screen.queryByText('No note selected')).not.toBeInTheDocument()
   })
 
-  it('calls onToggle when toggle button clicked', () => {
+  it('calls onToggle when the close button is clicked', () => {
     const onToggle = vi.fn()
     render(<Inspector {...defaultProps} onToggle={onToggle} />)
-    fireEvent.click(screen.getByRole('button'))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close Properties (⌘⇧I)' })[1])
+    expect(onToggle).toHaveBeenCalledOnce()
+  })
+
+  it('closes when the properties sidebar icon is clicked', () => {
+    const onToggle = vi.fn()
+    render(<Inspector {...defaultProps} onToggle={onToggle} />)
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close Properties (⌘⇧I)' })[0])
+
     expect(onToggle).toHaveBeenCalledOnce()
   })
 

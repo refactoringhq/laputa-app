@@ -146,6 +146,34 @@ describe('useDiffMode', () => {
     expect(result.current.diffContent).toBe('commit diff')
   })
 
+  it('does not reopen diff mode when a later history diff resolves after returning to the note', async () => {
+    let resolveSecondDiff: (value: string) => void = () => {}
+    onLoadDiffAtCommit
+      .mockResolvedValueOnce('first diff')
+      .mockImplementationOnce(() => new Promise<string>((resolve) => {
+        resolveSecondDiff = resolve
+      }))
+    const { result } = renderDiffHook()
+
+    await act(async () => { await result.current.handleViewCommitDiff('first') })
+    expect(result.current.diffMode).toBe(true)
+    expect(result.current.diffContent).toBe('first diff')
+
+    await act(async () => { void result.current.handleViewCommitDiff('second') })
+    expect(onLoadDiffAtCommit).toHaveBeenCalledWith('/note.md', 'second')
+
+    await act(async () => { await result.current.handleToggleDiff() })
+    expect(result.current.diffMode).toBe(false)
+
+    await act(async () => {
+      resolveSecondDiff('second diff')
+      await Promise.resolve()
+    })
+
+    expect(result.current.diffMode).toBe(false)
+    expect(result.current.diffContent).toBeNull()
+  })
+
   it('skips commit diff when no callback', async () => {
     const { result } = renderHook(() => useDiffMode({ activeTabPath: '/note.md' }))
 

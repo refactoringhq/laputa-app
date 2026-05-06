@@ -65,6 +65,7 @@ const STATIC_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
   'repair-vault': 'command.settings.repairVault',
   'use-light-mode': 'command.settings.useLightMode',
   'use-dark-mode': 'command.settings.useDarkMode',
+  'use-system-theme-mode': 'command.settings.useSystemTheme',
   'toggle-gitignored-files-visibility': 'command.settings.toggleGitignoredFilesVisibility',
   'open-ai-agents': 'command.ai.openAgents',
   'restore-vault-ai-guidance': 'command.ai.restoreGuidance',

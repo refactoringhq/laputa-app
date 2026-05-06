@@ -18,6 +18,9 @@ export interface NoteContentCacheEntry {
   value: string | null
   byteSize: number
   identity: NoteContentIdentity | null
+  requestState?: NoteContentRequestState
+  startRequest?: () => void
+  cancelRequest?: () => void
 }
 
 export interface NoteContentResolvedEvent {
@@ -27,14 +30,21 @@ export interface NoteContentResolvedEvent {
 }
 
 type NoteContentResolvedListener = (event: NoteContentResolvedEvent) => void
+type NoteContentRequestState = 'queued' | 'running' | 'settled' | 'canceled'
+type NoteContentRequestMode = 'foreground' | 'prefetch'
 
 const prefetchCache = new Map<string, NoteContentCacheEntry>()
+const prefetchQueue: NoteContentCacheEntry[] = []
 const resolvedListeners = new Set<NoteContentResolvedListener>()
 const contentSizeEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null
 
 export const NOTE_CONTENT_CACHE_LIMIT = 48
 export const NOTE_CONTENT_ENTRY_MAX_BYTES = 2 * 1024 * 1024
 export const NOTE_CONTENT_CACHE_MAX_BYTES = 24 * 1024 * 1024
+export const NOTE_CONTENT_PREFETCH_CONCURRENCY = 4
+const NOTE_CONTENT_REQUEST_CANCELED = 'Note content request canceled'
+
+let activePrefetchRequests = 0
 
 export function subscribeNoteContentResolved(listener: NoteContentResolvedListener): () => void {
   resolvedListeners.add(listener)
@@ -95,6 +105,8 @@ function getRetainedPrefetchCacheBytes(): number {
 function dropOldestPrefetchEntry(): void {
   const oldestPath = prefetchCache.keys().next().value
   if (!oldestPath) return
+  const entry = prefetchCache.get(oldestPath)
+  entry?.cancelRequest?.()
   prefetchCache.delete(oldestPath)
 }
 
@@ -110,7 +122,14 @@ function trimPrefetchCache(): void {
 
 function rememberNoteContent(entry: NoteContentCacheEntry): NoteContentCacheEntry {
   const { path } = entry
-  if (prefetchCache.has(path)) prefetchCache.delete(path)
+  const existing = prefetchCache.get(path)
+  if (existing && existing !== entry) {
+    removeQueuedPrefetch(existing)
+    existing.cancelRequest?.()
+    prefetchCache.delete(path)
+  } else if (existing) {
+    prefetchCache.delete(path)
+  }
   prefetchCache.set(path, entry)
   trimPrefetchCache()
   return entry
@@ -137,6 +156,13 @@ function getNoteContentCommandPayload(path: string): { path: string; vaultPath?:
   return noteWindowParams ? { path, vaultPath: noteWindowParams.vaultPath } : { path }
 }
 
+function runGetNoteContentCommand(path: string): Promise<string> {
+  const commandPayload = getNoteContentCommandPayload(path)
+  return isTauri()
+    ? invoke<string>('get_note_content', commandPayload)
+    : mockInvoke<string>('get_note_content', commandPayload)
+}
+
 function getValidateNoteContentCommandPayload(path: string, content: string): { path: string; content: string; vaultPath?: string } {
   return { ...getNoteContentCommandPayload(path), content }
 }
@@ -146,7 +172,13 @@ function shouldReuseExistingRequest(existing: NoteContentCacheEntry, identity: N
   return sameIdentity(existing.identity, identity)
 }
 
-function requestNoteContent(target: string | VaultEntry): NoteContentCacheEntry {
+function markRequestSettled(entry: NoteContentCacheEntry, state: Extract<NoteContentRequestState, 'settled' | 'canceled'>): void {
+  entry.requestState = state
+  entry.startRequest = undefined
+  entry.cancelRequest = undefined
+}
+
+function createNoteContentRequest(target: string | VaultEntry): NoteContentCacheEntry {
   const path = targetPath(target)
   const sourceEntry = targetEntry(target)
   const identity = targetIdentity(target)
@@ -156,23 +188,85 @@ function requestNoteContent(target: string | VaultEntry): NoteContentCacheEntry 
     value: null,
     byteSize: 0,
     identity,
+    requestState: 'queued',
   }
-  const commandPayload = getNoteContentCommandPayload(path)
-  const promise = (isTauri()
-    ? invoke<string>('get_note_content', commandPayload)
-    : mockInvoke<string>('get_note_content', commandPayload)
-  )
-    .then((content) => {
-      retainResolvedNoteContent(cacheEntry, content, sourceEntry)
-      return content
-    })
-    .catch((err) => {
-      if (prefetchCache.get(path) === cacheEntry) prefetchCache.delete(path)
-      throw err
-    })
+  let started = false
+  let settled = false
+  let startRequest: () => void = () => {}
+  let cancelRequest: () => void = () => {}
+  const promise = new Promise<string>((resolve, reject) => {
+    startRequest = () => {
+      if (started || settled) return
+      started = true
+      cacheEntry.requestState = 'running'
+      runGetNoteContentCommand(path)
+        .then((content) => {
+          settled = true
+          markRequestSettled(cacheEntry, 'settled')
+          retainResolvedNoteContent(cacheEntry, content, sourceEntry)
+          resolve(content)
+        })
+        .catch((err) => {
+          settled = true
+          markRequestSettled(cacheEntry, 'settled')
+          if (prefetchCache.get(path) === cacheEntry) prefetchCache.delete(path)
+          reject(err)
+        })
+    }
+
+    cancelRequest = () => {
+      if (started || settled) return
+      settled = true
+      markRequestSettled(cacheEntry, 'canceled')
+      reject(new Error(NOTE_CONTENT_REQUEST_CANCELED))
+    }
+  })
 
   cacheEntry.promise = promise
-  return rememberNoteContent(cacheEntry)
+  cacheEntry.startRequest = startRequest
+  cacheEntry.cancelRequest = cancelRequest
+  return cacheEntry
+}
+
+function removeQueuedPrefetch(entry: NoteContentCacheEntry): void {
+  const index = prefetchQueue.indexOf(entry)
+  if (index >= 0) prefetchQueue.splice(index, 1)
+}
+
+function startNoteContentRequestNow(entry: NoteContentCacheEntry): void {
+  removeQueuedPrefetch(entry)
+  entry.startRequest?.()
+}
+
+function runQueuedPrefetches(): void {
+  while (activePrefetchRequests < NOTE_CONTENT_PREFETCH_CONCURRENCY && prefetchQueue.length > 0) {
+    const entry = prefetchQueue.shift()
+    if (!entry || prefetchCache.get(entry.path) !== entry || entry.requestState !== 'queued') continue
+
+    activePrefetchRequests += 1
+    void entry.promise
+      .finally(() => {
+        activePrefetchRequests = Math.max(0, activePrefetchRequests - 1)
+        runQueuedPrefetches()
+      })
+      .catch(() => {})
+    entry.startRequest?.()
+  }
+}
+
+function enqueuePrefetchRequest(entry: NoteContentCacheEntry): void {
+  prefetchQueue.push(entry)
+  runQueuedPrefetches()
+}
+
+function requestNoteContent(target: string | VaultEntry, mode: NoteContentRequestMode = 'foreground'): NoteContentCacheEntry {
+  const cacheEntry = rememberNoteContent(createNoteContentRequest(target))
+  if (mode === 'prefetch') {
+    enqueuePrefetchRequest(cacheEntry)
+  } else {
+    startNoteContentRequestNow(cacheEntry)
+  }
+  return cacheEntry
 }
 
 export function prefetchNoteContent(target: string | VaultEntry): void {
@@ -181,8 +275,8 @@ export function prefetchNoteContent(target: string | VaultEntry): void {
   const existing = prefetchCache.get(path)
   if (existing && shouldReuseExistingRequest(existing, identity)) return
 
-  void requestNoteContent(target).promise.catch((error) => {
-    if (isNoActiveVaultSelectedError(error) || isUnreadableNoteContentError(error)) return
+  void requestNoteContent(target, 'prefetch').promise.catch((error) => {
+    if (isCanceledNoteContentRequest(error) || isNoActiveVaultSelectedError(error) || isUnreadableNoteContentError(error)) return
     console.warn('Failed to prefetch note content:', error)
   })
 }
@@ -205,6 +299,7 @@ export function cacheNoteContent(path: string, content: string, entry?: VaultEnt
 }
 
 export function clearNoteContentCache(): void {
+  for (const entry of prefetchQueue.splice(0)) entry.cancelRequest?.()
   prefetchCache.clear()
 }
 
@@ -236,6 +331,7 @@ function canUseExistingContentRequest(target: VaultEntry, existing: NoteContentC
 async function loadNoteContent(target: VaultEntry, forceFresh = false): Promise<string> {
   const existing = prefetchCache.get(target.path)
   if (canUseExistingContentRequest(target, existing, forceFresh)) {
+    startNoteContentRequestNow(existing)
     return existing.promise
   }
   return requestNoteContent(target).promise
@@ -276,6 +372,10 @@ export async function loadContentForOpen(options: {
 
 export function isNoActiveVaultSelectedError(error: unknown): boolean {
   return isActiveVaultUnavailableError(error)
+}
+
+export function isCanceledNoteContentRequest(error: unknown): boolean {
+  return errorMessage(error) === NOTE_CONTENT_REQUEST_CANCELED
 }
 
 export function isUnreadableNoteContentError(error: unknown): boolean {

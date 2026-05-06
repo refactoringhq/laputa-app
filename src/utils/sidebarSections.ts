@@ -80,16 +80,27 @@ export function collectActiveTypes(entries: VaultEntry[]): Set<string> {
   return types
 }
 
-function resolveLabel(type: string, typeEntry: VaultEntry | undefined, builtIn: SectionGroup | undefined): string {
-  return typeEntry?.sidebarLabel || builtIn?.label || pluralizeType(type)
+function resolveLabel(
+  type: string,
+  typeEntry: VaultEntry | undefined,
+  builtIn: SectionGroup | undefined,
+  pluralizeTypeLabel: boolean,
+): string {
+  if (typeEntry?.sidebarLabel) return typeEntry.sidebarLabel
+  if (!pluralizeTypeLabel) return type
+  return builtIn?.label || pluralizeType(type)
 }
 
 /** Build a single SectionGroup for a type, using built-in metadata or Type entry for icon/label */
-export function buildSectionGroup(type: string, typeEntryMap: Record<string, VaultEntry>): SectionGroup {
+export function buildSectionGroup(
+  type: string,
+  typeEntryMap: Record<string, VaultEntry>,
+  pluralizeTypeLabel = true,
+): SectionGroup {
   const builtIn = BUILT_IN_TYPE_MAP.get(type)
   const typeEntry = typeEntryMap[type]
   const customColor = typeEntry?.color ?? null
-  const label = resolveLabel(type, typeEntry, builtIn)
+  const label = resolveLabel(type, typeEntry, builtIn, pluralizeTypeLabel)
   const icon = resolveIcon(typeEntry?.icon ?? null)
   if (builtIn) {
     return { ...builtIn, label, Icon: typeEntry?.icon ? icon : builtIn.Icon, customColor }
@@ -98,7 +109,11 @@ export function buildSectionGroup(type: string, typeEntryMap: Record<string, Vau
 }
 
 /** Build sections dynamically from vault entries and defined types — types with 0 notes still appear */
-export function buildDynamicSections(entries: VaultEntry[], typeEntryMap: Record<string, VaultEntry>): SectionGroup[] {
+export function buildDynamicSections(
+  entries: VaultEntry[],
+  typeEntryMap: Record<string, VaultEntry>,
+  pluralizeTypeLabels = true,
+): SectionGroup[] {
   const activeTypes = new Map<string, string>()
   for (const type of collectActiveTypes(entries)) {
     addSectionType(activeTypes, type, typeEntryMap)
@@ -109,7 +124,7 @@ export function buildDynamicSections(entries: VaultEntry[], typeEntryMap: Record
   }
   return Array.from(activeTypes.values())
     .filter((type) => shouldIncludeSectionType(type, typeEntryMap))
-    .map((type) => buildSectionGroup(type, typeEntryMap))
+    .map((type) => buildSectionGroup(type, typeEntryMap, pluralizeTypeLabels))
 }
 
 export function sortSections(groups: SectionGroup[], typeEntryMap: Record<string, VaultEntry>): SectionGroup[] {

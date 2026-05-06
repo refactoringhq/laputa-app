@@ -86,6 +86,21 @@ describe('AiAgentsOnboardingPrompt', () => {
     })
   })
 
+  it('keeps the long setup card bounded with a scrollable content area', () => {
+    renderPrompt()
+
+    expect(screen.getByTestId('ai-agents-onboarding-card')).toHaveClass(
+      'max-h-[calc(100dvh-2rem)]',
+      'overflow-hidden',
+    )
+    expect(screen.getByTestId('ai-agents-onboarding-scroll')).toHaveClass(
+      'min-h-0',
+      'overflow-y-auto',
+      'overscroll-contain',
+    )
+    expect(screen.getByTestId('ai-agents-onboarding-continue')).toHaveTextContent('Set up later')
+  })
+
   it('uses the surrounding surface as a drag region and excludes the card', () => {
     renderPrompt({
       claude_code: { status: 'installed', version: '1.0.20' },

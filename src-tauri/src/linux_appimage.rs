@@ -15,6 +15,16 @@ const LINUX_APPIMAGE_WEBKIT_OVERRIDES: [StartupEnvOverride; 2] = [
     },
 ];
 
+const FCITX_GTK_IM_MODULE_OVERRIDE: StartupEnvOverride = StartupEnvOverride {
+    key: "GTK_IM_MODULE",
+    value: "fcitx",
+};
+const FCITX_ENV_HINT_KEYS: [&str; 4] = [
+    "XMODIFIERS",
+    "INPUT_METHOD",
+    "QT_IM_MODULE",
+    "SDL_IM_MODULE",
+];
 const COLRV1_EMOJI_FONT_FILE: &str = "Noto-COLRv1.ttf";
 #[cfg(all(desktop, target_os = "linux"))]
 const TOLARIA_COLRV1_FONTCONFIG_FILE: &str = "tolaria-appimage-no-colrv1-emoji.conf";
@@ -51,6 +61,13 @@ where
     get_var(key).is_some_and(|value| !value.trim().is_empty())
 }
 
+fn has_env<F>(get_var: &mut F, key: &str) -> bool
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    get_var(key).is_some()
+}
+
 fn has_explicit_fontconfig_env<F>(get_var: &mut F) -> bool
 where
     F: FnMut(&str) -> Option<String>,
@@ -69,6 +86,39 @@ where
     }
 
     !has_explicit_fontconfig_env(get_var)
+}
+
+fn env_mentions_fcitx(value: &str) -> bool {
+    value.to_ascii_lowercase().contains("fcitx")
+}
+
+fn has_fcitx_env_hint<F>(get_var: &mut F) -> bool
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    FCITX_ENV_HINT_KEYS
+        .into_iter()
+        .any(|key| get_var(key).is_some_and(|value| env_mentions_fcitx(&value)))
+}
+
+fn fcitx_gtk_im_module_override_with<F>(get_var: &mut F) -> Option<StartupEnvOverride>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    if !is_linux_appimage_launch(&mut *get_var) {
+        return None;
+    }
+    if !is_wayland_session(&mut *get_var) {
+        return None;
+    }
+    if has_env(get_var, "GTK_IM_MODULE") {
+        return None;
+    }
+    if !has_fcitx_env_hint(get_var) {
+        return None;
+    }
+
+    Some(FCITX_GTK_IM_MODULE_OVERRIDE)
 }
 
 fn is_wayland_session<F>(mut get_var: F) -> bool
@@ -179,10 +229,16 @@ where
         return Vec::new();
     }
 
-    LINUX_APPIMAGE_WEBKIT_OVERRIDES
+    let mut overrides: Vec<_> = LINUX_APPIMAGE_WEBKIT_OVERRIDES
         .into_iter()
         .filter(|env_override| !has_non_empty_env(&mut get_var, env_override.key))
-        .collect()
+        .collect();
+
+    if let Some(env_override) = fcitx_gtk_im_module_override_with(&mut get_var) {
+        overrides.push(env_override);
+    }
+
+    overrides
 }
 
 #[cfg(all(desktop, target_os = "linux"))]
@@ -289,6 +345,38 @@ mod tests {
         startup_env_overrides_with, wayland_client_preload_path_with, StartupEnvOverride,
     };
 
+    fn default_webkit_overrides() -> Vec<StartupEnvOverride> {
+        vec![
+            StartupEnvOverride {
+                key: "WEBKIT_DISABLE_DMABUF_RENDERER",
+                value: "1",
+            },
+            StartupEnvOverride {
+                key: "WEBKIT_DISABLE_COMPOSITING_MODE",
+                value: "1",
+            },
+        ]
+    }
+
+    fn default_webkit_and_fcitx_overrides() -> Vec<StartupEnvOverride> {
+        let mut overrides = default_webkit_overrides();
+        overrides.push(StartupEnvOverride {
+            key: "GTK_IM_MODULE",
+            value: "fcitx",
+        });
+        overrides
+    }
+
+    fn appimage_wayland_fcitx_env(key: &str, gtk_im_module: Option<&str>) -> Option<String> {
+        match key {
+            "APPIMAGE" => Some("/tmp/Tolaria.AppImage".to_string()),
+            "WAYLAND_DISPLAY" => Some("wayland-1".to_string()),
+            "XMODIFIERS" => Some("@im=fcitx".to_string()),
+            "GTK_IM_MODULE" => gtk_im_module.map(ToOwned::to_owned),
+            _ => None,
+        }
+    }
+
     #[test]
     fn startup_env_overrides_are_empty_outside_appimage_launches() {
         let overrides = startup_env_overrides_with(|_| None);
@@ -303,19 +391,7 @@ mod tests {
             _ => None,
         });
 
-        assert_eq!(
-            overrides,
-            vec![
-                StartupEnvOverride {
-                    key: "WEBKIT_DISABLE_DMABUF_RENDERER",
-                    value: "1",
-                },
-                StartupEnvOverride {
-                    key: "WEBKIT_DISABLE_COMPOSITING_MODE",
-                    value: "1",
-                }
-            ]
-        );
+        assert_eq!(overrides, default_webkit_overrides());
     }
 
     #[test]
@@ -333,6 +409,32 @@ mod tests {
                 value: "1",
             }]
         );
+    }
+
+    #[test]
+    fn startup_env_overrides_enable_fcitx_gtk_module_for_wayland_appimage() {
+        let overrides = startup_env_overrides_with(|key| appimage_wayland_fcitx_env(key, None));
+
+        assert_eq!(overrides, default_webkit_and_fcitx_overrides());
+    }
+
+    #[test]
+    fn startup_env_overrides_preserve_explicit_gtk_im_module() {
+        let overrides =
+            startup_env_overrides_with(|key| appimage_wayland_fcitx_env(key, Some("wayland")));
+
+        assert_eq!(overrides, default_webkit_overrides());
+    }
+
+    #[test]
+    fn startup_env_overrides_leave_non_fcitx_wayland_appimage_input_unchanged() {
+        let overrides = startup_env_overrides_with(|key| match key {
+            "APPIMAGE" => Some("/tmp/Tolaria.AppImage".to_string()),
+            "WAYLAND_DISPLAY" => Some("wayland-1".to_string()),
+            _ => None,
+        });
+
+        assert_eq!(overrides, default_webkit_overrides());
     }
 
     #[test]

@@ -31,9 +31,14 @@ function setFollowLinksActive(container: HTMLElement, active: boolean) {
   else container.removeAttribute('data-follow-links')
 }
 
-function consumeEditorLinkClick(event: MouseEvent) {
+function consumeEditorLinkEvent(event: MouseEvent) {
   event.preventDefault()
   event.stopPropagation()
+}
+
+function scheduleAfterNativeClick(callback: () => void) {
+  if (typeof queueMicrotask === 'function') queueMicrotask(callback)
+  else window.setTimeout(callback, 0)
 }
 
 function activateWikilink(
@@ -42,15 +47,16 @@ function activateWikilink(
   target: string,
   onNavigateWikilink: (target: string) => void,
 ) {
+  consumeEditorLinkEvent(event)
+
   if (!hasFollowModifier(event)) return
 
-  consumeEditorLinkClick(event)
   blurActiveEditable(container)
-  onNavigateWikilink(target)
+  scheduleAfterNativeClick(() => onNavigateWikilink(target))
 }
 
 function activateExternalUrl(event: MouseEvent, href: string) {
-  consumeEditorLinkClick(event)
+  consumeEditorLinkEvent(event)
 
   if (!hasFollowModifier(event)) return
 
@@ -77,6 +83,12 @@ function handleEditorLinkClick(
   if (href) activateExternalUrl(event, href)
 }
 
+function handleEditorLinkMouseDown(event: MouseEvent) {
+  if (!(event.target instanceof HTMLElement) || isInsideCodeContext(event.target)) return
+
+  if (resolveWikilinkTarget(event.target)) consumeEditorLinkEvent(event)
+}
+
 export function useEditorLinkActivation(
   containerRef: RefObject<HTMLDivElement | null>,
   onNavigateWikilink: (target: string) => void,
@@ -96,6 +108,7 @@ export function useEditorLinkActivation(
       handleEditorLinkClick(event, container, onNavigateWikilink)
     }
 
+    container.addEventListener('mousedown', handleEditorLinkMouseDown, true)
     container.addEventListener('click', handleClick, true)
     window.addEventListener('keydown', handleModifierChange)
     window.addEventListener('keyup', handleModifierChange)
@@ -103,6 +116,7 @@ export function useEditorLinkActivation(
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
+      container.removeEventListener('mousedown', handleEditorLinkMouseDown, true)
       container.removeEventListener('click', handleClick, true)
       window.removeEventListener('keydown', handleModifierChange)
       window.removeEventListener('keyup', handleModifierChange)

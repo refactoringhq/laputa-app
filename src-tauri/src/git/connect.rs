@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Output;
 
+use super::credentials::request_remote_credentials;
 use super::{ensure_author_config, git_command};
 
 const DEFAULT_REMOTE_NAME: &str = "origin";
@@ -103,10 +104,9 @@ pub fn git_add_remote(vault_path: &str, remote_url: &str) -> Result<GitAddRemote
     }
     let connection = RemoteConnection::new(branch);
 
-    run_git(
-        vault,
-        &["remote", "add", DEFAULT_REMOTE_NAME, remote_url.trim()],
-    )?;
+    let trimmed_url = remote_url.trim();
+    run_git(vault, &["remote", "add", DEFAULT_REMOTE_NAME, trimmed_url])?;
+    request_remote_credentials(vault, trimmed_url);
 
     let result = finish_remote_connection(vault, &connection);
     if result.status != "connected" {

@@ -16,6 +16,7 @@ import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { MermaidDiagram } from './MermaidDiagram'
 import { SafeHtmlSpan } from './SafeMarkup'
+import { updateTldrawBlockPropsSafely } from './tldrawBlockProps'
 
 const TldrawWhiteboard = lazy(() => import('./TldrawWhiteboard').then(module => ({
   default: module.TldrawWhiteboard,
@@ -186,25 +187,24 @@ const TldrawBlock = createReactBlockSpec(
           snapshot={props.block.props.snapshot}
           width={props.block.props.width}
           onSnapshotChange={(snapshot) => {
-            props.editor.updateBlock(props.block, {
-              type: TLDRAW_BLOCK_TYPE,
-              props: {
-                boardId: props.block.props.boardId,
-                height: props.block.props.height,
+            updateTldrawBlockPropsSafely({
+              blockId: props.block.id,
+              editor: props.editor,
+              nextProps: (currentProps) => ({
+                ...currentProps,
                 snapshot,
-                width: props.block.props.width,
-              },
+              }),
             })
           }}
           onSizeChange={(size) => {
-            props.editor.updateBlock(props.block, {
-              type: TLDRAW_BLOCK_TYPE,
-              props: {
-                boardId: props.block.props.boardId,
+            updateTldrawBlockPropsSafely({
+              blockId: props.block.id,
+              editor: props.editor,
+              nextProps: (currentProps) => ({
+                ...currentProps,
                 height: size.height,
-                snapshot: props.block.props.snapshot,
                 width: size.width,
-              },
+              }),
             })
           }}
         />

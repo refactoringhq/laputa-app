@@ -31,6 +31,7 @@ import {
 import { useRegisterEditorContentFlushes } from './editorContentFlushRegistration'
 import { useRawModeWithFlush } from './useRawModeWithFlush'
 import { createArrowLigaturesExtension } from './arrowLigaturesExtension'
+import { createImeCompositionKeyGuardExtension } from './imeCompositionKeyGuardExtension'
 import { createMathInputExtension } from './mathInputExtension'
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
 import './Editor.css'
@@ -78,6 +79,7 @@ interface EditorProps {
   noteListFilter?: { type: string | null; query: string }
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
+  onEnterNeighborhood?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
   onCopyFilePath?: (path: string) => void
   onOpenExternalFile?: (path: string) => void
@@ -101,6 +103,8 @@ interface EditorProps {
   findInNoteRef?: React.MutableRefObject<((options?: { replace?: boolean }) => void) | null>
   /** Mutable ref that Editor registers its diff-mode toggle into, for command palette access. */
   diffToggleRef?: React.MutableRefObject<() => void>
+  /** Mutable ref that Editor registers its table-of-contents toggle into, for app shortcuts and menus. */
+  tableOfContentsToggleRef?: React.MutableRefObject<() => void>
   onFileCreated?: (relativePath: string) => void
   onFileModified?: (relativePath: string) => void
   onVaultChanged?: () => void
@@ -200,7 +204,11 @@ function useEditorSetup({
     tables: { headers: true, splitCells: true, cellBackgroundColor: true, cellTextColor: true },
     uploadFile: (file: File) => uploadImageFile(file, vaultPathRef.current),
     _tiptapOptions: { injectNonce: RUNTIME_STYLE_NONCE },
-    extensions: [createArrowLigaturesExtension(), createMathInputExtension()],
+    extensions: [
+      createImeCompositionKeyGuardExtension(),
+      createArrowLigaturesExtension(),
+      createMathInputExtension(),
+    ],
   })
   useFilenameAutolinkGuard(editor)
   const activeTab = tabs.find((t) => t.entry.path === activeTabPath) ?? null
@@ -333,6 +341,7 @@ function EditorLayout({
   handleEditorChange,
   onToggleFavorite,
   onToggleOrganized,
+  onEnterNeighborhood,
   onRevealFile,
   onCopyFilePath,
   onOpenExternalFile,
@@ -400,6 +409,7 @@ function EditorLayout({
   handleEditorChange: () => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
+  onEnterNeighborhood?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
   onCopyFilePath?: (path: string) => void
   onOpenExternalFile?: (path: string) => void
@@ -484,6 +494,7 @@ function EditorLayout({
               onEditorChange={handleEditorChange}
               onToggleFavorite={onToggleFavorite}
               onToggleOrganized={onToggleOrganized}
+              onEnterNeighborhood={onEnterNeighborhood}
               onRevealFile={onRevealFile}
               onCopyFilePath={onCopyFilePath}
               onDeleteNote={onDeleteNote}
@@ -593,6 +604,12 @@ export const Editor = memo(function Editor(props: EditorProps) {
     flushPendingRawContentRef: props.flushPendingRawContentRef,
   })
   const rightPanel = useRightPanelExclusion(props)
+  const { tableOfContentsToggleRef } = props
+  useEffect(() => {
+    if (tableOfContentsToggleRef) {
+      tableOfContentsToggleRef.current = rightPanel.handleToggleTableOfContents
+    }
+  }, [tableOfContentsToggleRef, rightPanel.handleToggleTableOfContents])
 
   return (
     <EditorLayout

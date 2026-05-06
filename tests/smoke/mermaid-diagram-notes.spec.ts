@@ -4,6 +4,8 @@ import path from 'path'
 import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from '../helpers/fixtureVault'
 import { executeCommand, openCommandPalette } from './helpers'
 import { RUNTIME_STYLE_NONCE } from '../../src/lib/runtimeStyleNonce'
+import { APP_COMMAND_IDS } from '../../src/hooks/appCommandCatalog'
+import { triggerShortcutCommand } from './testBridge'
 
 let tempVaultDir: string
 
@@ -96,6 +98,11 @@ test.beforeEach(async ({ page }, testInfo) => {
   fs.writeFileSync(
     path.join(tempVaultDir, 'note', 'mermaid-reported.md'),
     [
+      '---',
+      'Status: Active',
+      'Date: 2026-04-29T00:00:00',
+      '---',
+      '',
       '# Mermaid Reported',
       '',
       REPORTED_THEME_DIAGRAM,
@@ -260,6 +267,28 @@ test('Mermaid diagrams render when opening saved notes directly', async ({ page 
     styleNonce: RUNTIME_STYLE_NONCE,
     text: expect.stringContaining('Linked to a planned shift?'),
   })
+})
+
+test('Mermaid diagrams stay mounted after property edits refresh frontmatter', async ({ page }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+
+  await openNote(page, 'Mermaid Reported')
+  await expectRenderedDiagramCount(page, 1)
+  await triggerShortcutCommand(page, APP_COMMAND_IDS.viewToggleProperties)
+  await expect(page.getByTestId('add-property-row')).toBeVisible()
+
+  const dateRow = page.getByTestId('editable-property').filter({ hasText: 'Date' })
+  await dateRow.getByTestId('date-display').click()
+  const nextDateLabel = await page.evaluate(() => new Date(2026, 3, 30).toLocaleDateString())
+  await page.locator(`button[data-day="${nextDateLabel}"]`).first().click()
+
+  await expect.poll(() => (
+    fs.readFileSync(path.join(tempVaultDir, 'note', 'mermaid-reported.md'), 'utf8')
+  )).toMatch(/Date: "?2026-04-30"?/)
+  await expectRenderedDiagramCount(page, 1)
+  await expect(page.locator('[data-testid="mermaid-diagram-viewport"]').first()).toContainText('Linked to a planned shift?')
+  expect(pageErrors).toEqual([])
 })
 
 test('Mermaid diagrams render, fall back, and round-trip through raw mode', async ({ page }) => {

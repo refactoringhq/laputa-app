@@ -6,6 +6,9 @@ import { buildTableOfContents, buildTableOfContentsFromMarkdown } from './tableO
 
 const entry = {
   title: 'The Compounding Software Factory',
+  modifiedAt: 1700000000,
+  createdAt: 1700000000,
+  fileSize: 2048,
 } as VaultEntry
 
 const blocks = [
@@ -139,5 +142,21 @@ describe('TableOfContentsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /What causes teams to degrade/ }))
     expect(setTextCursorPosition).toHaveBeenCalledWith('h2', 'start')
+  })
+
+  it('shows note info at the bottom of the table of contents', () => {
+    render(
+      <TableOfContentsPanel
+        editor={{ document: blocks, setTextCursorPosition: vi.fn() }}
+        entry={entry}
+        sourceContent="One two three"
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Info')).toBeInTheDocument()
+    expect(screen.getByText('Words')).toBeInTheDocument()
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('2.0 KB')).toBeInTheDocument()
   })
 })

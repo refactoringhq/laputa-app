@@ -349,6 +349,28 @@ describe('AiPanel', () => {
     vi.useRealTimers()
   })
 
+  it('does not steal composer focus after a response when the send button becomes enabled', async () => {
+    vi.useFakeTimers()
+    mockMessages = [{
+      userMessage: 'First question',
+      actions: [],
+      response: 'First answer.',
+      id: 'msg-3',
+    }]
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+
+    const input = screen.getByTestId('agent-input')
+    input.focus()
+    input.textContent = 'f'
+    fireEvent.input(input)
+
+    await act(() => { vi.advanceTimersByTime(1) })
+
+    expect(screen.getByTestId('agent-send')).toBeEnabled()
+    expect(document.activeElement).toBe(screen.getByTestId('agent-input'))
+    vi.useRealTimers()
+  })
+
   it('calls onClose when Escape is pressed while panel has focus', async () => {
     vi.useFakeTimers()
     const onClose = vi.fn()

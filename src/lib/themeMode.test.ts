@@ -26,17 +26,19 @@ describe('themeMode', () => {
   it('normalizes only supported theme modes', () => {
     expect(normalizeThemeMode('light')).toBe('light')
     expect(normalizeThemeMode('dark')).toBe('dark')
-    expect(normalizeThemeMode('system')).toBeNull()
-    expect(resolveThemeMode('system')).toBe('light')
+    expect(normalizeThemeMode('system')).toBe('system')
+    expect(resolveThemeMode('system', makeMatchMedia(true))).toBe('dark')
+    expect(resolveThemeMode('system', makeMatchMedia(false))).toBe('light')
+    expect(resolveThemeMode('sepia')).toBe('light')
   })
 
   it('reads and writes the current storage key', () => {
     const storage = makeStorage()
 
-    writeStoredThemeMode(storage, 'dark')
+    writeStoredThemeMode(storage, 'system')
 
-    expect(readStoredThemeMode(storage)).toBe('dark')
-    expect(storage.setItem).toHaveBeenCalledWith(THEME_MODE_STORAGE_KEY, 'dark')
+    expect(readStoredThemeMode(storage)).toBe('system')
+    expect(storage.setItem).toHaveBeenCalledWith(THEME_MODE_STORAGE_KEY, 'system')
   })
 
   it('migrates the legacy storage key', () => {
@@ -63,4 +65,25 @@ describe('themeMode', () => {
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).toHaveClass('dark')
   })
+
+  it('bootstraps system mode to the current OS appearance without storing system in data-theme', () => {
+    const storage = makeStorage({ [THEME_MODE_STORAGE_KEY]: 'system' })
+
+    expect(applyStoredThemeMode(document, storage, makeMatchMedia(true))).toBe('dark')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+  })
 })
+
+function makeMatchMedia(matches: boolean): Window['matchMedia'] {
+  return ((query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(() => true),
+  })) as Window['matchMedia']
+}

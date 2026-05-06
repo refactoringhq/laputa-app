@@ -17,6 +17,7 @@ import {
   NOTE_CONTENT_CACHE_LIMIT,
   NOTE_CONTENT_CACHE_MAX_BYTES,
   NOTE_CONTENT_ENTRY_MAX_BYTES,
+  NOTE_CONTENT_PREFETCH_CONCURRENCY,
   prefetchNoteContent as prefetchNoteContentInMemory,
 } from './noteContentCache'
 import { clearParsedNoteBlockCache } from './editorParsedBlockCache'
@@ -31,6 +32,7 @@ export {
   NOTE_CONTENT_CACHE_LIMIT,
   NOTE_CONTENT_CACHE_MAX_BYTES,
   NOTE_CONTENT_ENTRY_MAX_BYTES,
+  NOTE_CONTENT_PREFETCH_CONCURRENCY,
 }
 
 export function prefetchNoteContent(target: string | VaultEntry): void {

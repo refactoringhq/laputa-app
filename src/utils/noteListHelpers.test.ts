@@ -250,6 +250,27 @@ describe('buildRelationshipGroups', () => {
     expect(groups).toEqual([])
   })
 
+  it('keeps stale entity views usable when a rapidly switched entry lacks filename metadata', () => {
+    const staleEntity = {
+      ...makeEntry({
+        path: 'C:\\Users\\luca\\Laputa\\project\\alpha.md',
+        title: 'Alpha project',
+        isA: 'Project',
+      }),
+      filename: undefined,
+    } as unknown as ReturnType<typeof makeEntry>
+    const backlink = makeEntry({
+      path: '/Users/luca/Laputa/note/backlink.md',
+      filename: 'backlink.md',
+      title: 'Backlink',
+      outgoingLinks: ['project/alpha'],
+    })
+
+    const groups = buildRelationshipGroups(staleEntity, [staleEntity, backlink])
+
+    expect(groups.find((group) => group.label === 'Backlinks')?.entries).toEqual([backlink])
+  })
+
   it('allows the same note to appear in multiple relationship groups', () => {
     const parent = makeEntry({
       path: '/vault/parent.md',

@@ -1022,6 +1022,55 @@ describe('useEditorTabSwap raw mode sync', () => {
     }
   })
 
+  it('reopens a switched-away note with the rich-editor content that was flushed during the switch', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = makeTab('b.md', 'Note B')
+    const savedContentByPath = new Map<string, string>()
+    const onContentChange = vi.fn((path: string, content: string) => {
+      savedContentByPath.set(path, content)
+    })
+    const { docRef, mockEditor, rerenderWith, result } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+      onContentChange,
+      setupEditor: (editor) => {
+        editor.tryParseMarkdownToBlocks.mockImplementation((markdown: string) => [
+          makeTextParagraphBlock(markdown.includes('Changed before switch')
+            ? 'Changed before switch'
+            : 'Parsed tab body'),
+        ])
+      },
+    })
+
+    docRef.current = [makeTextParagraphBlock('Changed before switch')]
+    mockEditor.blocksToMarkdownLossy.mockReturnValue('Changed before switch\n')
+
+    act(() => {
+      result.current.handleEditorChange()
+    })
+
+    await rerenderWith({ tabs: [tabA, tabB], activeTabPath: 'b.md' })
+
+    const flushedTabAContent = savedContentByPath.get('a.md')
+    expect(flushedTabAContent).toBe('---\ntitle: Note A\n---\nChanged before switch\n')
+
+    mockEditor.replaceBlocks.mockClear()
+    mockEditor.tryParseMarkdownToBlocks.mockClear()
+
+    await rerenderWith({
+      tabs: [{ ...tabA, content: flushedTabAContent! }, tabB],
+      activeTabPath: 'a.md',
+    })
+
+    const appliedBlocks = mockEditor.replaceBlocks.mock.calls.at(-1)?.[1] as Array<{
+      content?: Array<{ text?: string }>
+    }>
+    const appliedText = appliedBlocks
+      .flatMap(block => block.content?.map(part => part.text ?? '') ?? [])
+      .join('\n')
+
+    expect(appliedText).toContain('Changed before switch')
+  })
+
   it('rejects unserializable mixed paragraph and list content without crashing', async () => {
     const tabA = makeTab('mixed.md', 'Mixed Note')
     const onContentChange = vi.fn()

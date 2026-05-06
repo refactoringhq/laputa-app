@@ -157,12 +157,12 @@ export function useSidebarInlineRenameInput({
   }
 }
 
-export function useSidebarSections(entries: VaultEntry[]) {
+export function useSidebarSections(entries: VaultEntry[], pluralizeTypeLabels = true) {
   const typeEntryMap = useMemo(() => buildTypeEntryMap(entries), [entries])
   const allSectionGroups = useMemo(() => {
-    const sections = buildDynamicSections(entries, typeEntryMap)
+    const sections = buildDynamicSections(entries, typeEntryMap, pluralizeTypeLabels)
     return sortSections(sections, typeEntryMap)
-  }, [entries, typeEntryMap])
+  }, [entries, pluralizeTypeLabels, typeEntryMap])
   const visibleSections = useMemo(
     () => allSectionGroups.filter((group) => typeEntryMap[group.type]?.visible !== false),
     [allSectionGroups, typeEntryMap],

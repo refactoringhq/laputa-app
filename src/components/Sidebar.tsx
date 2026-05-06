@@ -66,6 +66,7 @@ interface SidebarProps {
   showInbox?: boolean
   inboxCount?: number
   allNotesFileVisibility?: AllNotesFileVisibility
+  pluralizeTypeLabels?: boolean
   locale?: AppLocale
   onCollapse?: () => void
   onGoBack?: () => void
@@ -485,9 +486,10 @@ function useSidebarRuntime({
   onDeleteType,
   onToggleTypeVisibility,
   allNotesFileVisibility,
+  pluralizeTypeLabels = true,
   locale = 'en',
 }: SidebarProps) {
-  const { typeEntryMap, allSectionGroups, visibleSections, sectionIds } = useSidebarSections(entries)
+  const { typeEntryMap, allSectionGroups, visibleSections, sectionIds } = useSidebarSections(entries, pluralizeTypeLabels)
   const { activeCount, archivedCount } = useEntryCounts(entries, allNotesFileVisibility)
   const { collapsed: groupCollapsed, toggle: toggleGroup } = useSidebarCollapsed()
   const typeInteractions = useSidebarTypeInteractions({

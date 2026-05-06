@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isTauri } from '../mock-tauri'
-import { isLinux, isMac, shouldUseLinuxWindowChrome } from './platform'
+import { isLinux, isMac, isWindows, shouldUseLinuxWindowChrome } from './platform'
 
 vi.mock('../mock-tauri', () => ({
   isTauri: vi.fn(),
@@ -32,6 +32,14 @@ describe('platform helpers', () => {
   it('detects macOS user agents', () => {
     setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')
     expect(isMac()).toBe(true)
+  })
+
+  it('detects Windows user agents', () => {
+    setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+    expect(isWindows()).toBe(true)
+
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')
+    expect(isWindows()).toBe(false)
   })
 
   it('only enables Linux window chrome inside Tauri', () => {

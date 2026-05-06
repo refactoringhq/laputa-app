@@ -20,6 +20,22 @@ status: Active
 Plain paragraph after the list.
 `
 
+const NUMBERED_REENTRY_CONTENT = `---
+title: Note B
+type: Note
+status: Active
+---
+
+# Note B
+
+Intro paragraph before the list.
+
+1. First numbered item
+2. Second numbered item
+
+Plain paragraph after the numbered list.
+`
+
 let tempVaultDir: string
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -138,5 +154,52 @@ test('mixed rich-text blocks with Korean list content stay editable after action
   const raw = await getRawEditorContent(page)
   expect(raw).toContain('> 인용문 추가')
   expect(raw).toContain('- 첫 번째 항목 계속')
+  expectNoBlockContainerCrash(crashSignals)
+})
+
+test('numbered list content stays editable after autosave and re-entry', async ({ page }) => {
+  const crashSignals = collectEditorCrashSignals(page)
+  const markerId = Date.now()
+  const listMarker = `list-token-${markerId}`
+  const paragraphMarker = `paragraph-token-${markerId}`
+  const reentryMarker = `reentry-token-${markerId}`
+
+  await openNote(page, 'Note B')
+  await toggleRawMode(page, '.cm-content')
+  await setRawEditorContent(page, NUMBERED_REENTRY_CONTENT)
+  await page.waitForTimeout(700)
+  await toggleRawMode(page, '.bn-editor')
+
+  const numberedItem = page.locator('.bn-block-content[data-content-type="numberedListItem"]', {
+    hasText: 'First numbered item',
+  }).first()
+  await expect(numberedItem).toBeVisible({ timeout: 5_000 })
+  await numberedItem.click()
+  await page.keyboard.press('End')
+  await page.keyboard.insertText(` ${listMarker}`)
+  await page.waitForTimeout(900)
+
+  const paragraph = page.locator('.bn-block-content', {
+    hasText: 'Plain paragraph after the numbered list.',
+  }).first()
+  await paragraph.click()
+  await page.keyboard.press('End')
+  await page.keyboard.insertText(` ${paragraphMarker}`)
+  await page.waitForTimeout(900)
+
+  await openNote(page, 'Note C')
+  await openNote(page, 'Note B')
+  await numberedItem.click()
+  await page.keyboard.press('End')
+  await page.keyboard.insertText(` ${reentryMarker}`)
+  await page.waitForTimeout(700)
+
+  expectNoBlockContainerCrash(crashSignals)
+
+  await toggleRawMode(page, '.cm-content')
+  const raw = await getRawEditorContent(page)
+  expect(raw).toContain(listMarker)
+  expect(raw).toContain(paragraphMarker)
+  expect(raw).toContain(reentryMarker)
   expectNoBlockContainerCrash(crashSignals)
 })

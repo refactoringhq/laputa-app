@@ -9,8 +9,9 @@ import {
   TOGGLE_GITIGNORED_VISIBILITY_EVENT,
 } from '../lib/gitignoredVisibilityEvents'
 import { serializeUiLanguagePreference } from '../lib/i18n'
+import { trackThemeModeChanged } from '../lib/productAnalytics'
 import { normalizeReleaseChannel, serializeReleaseChannel } from '../lib/releaseChannel'
-import { normalizeThemeMode } from '../lib/themeMode'
+import { DEFAULT_THEME_MODE, normalizeThemeMode, type ThemeMode } from '../lib/themeMode'
 import type { Settings } from '../types'
 import { normalizeNoteWidthMode } from '../utils/noteWidth'
 
@@ -46,6 +47,7 @@ const EMPTY_SETTINGS: Settings = {
   theme_mode: null,
   ui_language: null,
   note_width_mode: null,
+  sidebar_type_pluralization_enabled: null,
   default_ai_agent: null,
   default_ai_target: null,
   ai_model_providers: null,
@@ -66,6 +68,7 @@ function normalizeSettings(settings: Settings): Settings {
     theme_mode: normalizeThemeMode(settings.theme_mode),
     ui_language: serializeUiLanguagePreference(settings.ui_language),
     note_width_mode: normalizeNoteWidthMode(settings.note_width_mode),
+    sidebar_type_pluralization_enabled: settings.sidebar_type_pluralization_enabled ?? null,
     default_ai_agent: normalizeStoredAiAgent(settings.default_ai_agent),
     default_ai_target: settings.default_ai_target?.trim() || null,
     ai_model_providers: aiModelProviders.length > 0 ? aiModelProviders : null,
@@ -74,6 +77,10 @@ function normalizeSettings(settings: Settings): Settings {
     all_notes_show_images: settings.all_notes_show_images ?? null,
     all_notes_show_unsupported: settings.all_notes_show_unsupported ?? null,
   }
+}
+
+function effectiveThemeMode(settings: Settings): ThemeMode {
+  return normalizeThemeMode(settings.theme_mode) ?? DEFAULT_THEME_MODE
 }
 
 export function useSettings() {
@@ -97,10 +104,15 @@ export function useSettings() {
 
   const saveSettings = useCallback(async (newSettings: Settings) => {
     const previousHideGitignored = shouldHideGitignoredFiles(settings)
+    const previousThemeMode = effectiveThemeMode(settings)
     const normalizedSettings = normalizeSettings(newSettings)
     try {
       await tauriCall<null>('save_settings', { settings: normalizedSettings })
       setSettings(normalizedSettings)
+      const nextThemeMode = effectiveThemeMode(normalizedSettings)
+      if (previousThemeMode !== nextThemeMode) {
+        trackThemeModeChanged(nextThemeMode)
+      }
       const nextHideGitignored = shouldHideGitignoredFiles(normalizedSettings)
       if (previousHideGitignored !== nextHideGitignored) {
         notifyGitignoredVisibilityChanged(nextHideGitignored)

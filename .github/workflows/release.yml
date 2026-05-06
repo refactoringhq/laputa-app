@@ -8,6 +8,9 @@ on:
 env:
   # Bump this when Tauri/Rust target artifacts capture stale absolute paths.
   RUST_TARGET_CACHE_VERSION: v2026-04-14-tolaria
+  # The production Vite bundle can exceed Node's default ~2GB heap on
+  # macOS arm64 runners while Tauri runs beforeBuildCommand.
+  NODE_OPTIONS: --max-old-space-size=4096
 
 concurrency:
   group: release-alpha-${{ github.ref }}
@@ -69,10 +72,18 @@ jobs:
           else:
               today = datetime.now(timezone.utc).date()
               stable_date = None
-              stable_pattern = re.compile(r"^stable-v(\d{4})\.(\d{1,2})\.(\d{1,2})$")
+              stable_patterns = (
+                  re.compile(r"^v(\d{4})-(\d{2})-(\d{2})$"),
+                  re.compile(r"^stable-v(\d{4})\.(\d{1,2})\.(\d{1,2})$"),
+              )
 
-              for stable_tag in lines(["git", "tag", "--list", "stable-v*", "--sort=-version:refname"]):
-                  match = stable_pattern.fullmatch(stable_tag)
+              stable_tags = lines([
+                  "git", "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)",
+                  "refs/tags/v20*", "refs/tags/stable-v*",
+              ])
+
+              for stable_tag in stable_tags:
+                  match = next((pattern.fullmatch(stable_tag) for pattern in stable_patterns if pattern.fullmatch(stable_tag)), None)
                   if not match:
                       continue
 
@@ -778,7 +789,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p _site/alpha _site/stable
+          mkdir -p _site/alpha _site/stable _site/release-notes
+          if [ -d release-notes ]; then cp release-notes/*.md _site/release-notes/ 2>/dev/null || true; fi
           gh api -H "Accept: application/vnd.github.html+json" repos/${{ github.repository }}/releases --paginate > _site/releases.json
           PAGES_URL="https://refactoringhq.github.io/${GITHUB_REPOSITORY#*/}"
 

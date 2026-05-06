@@ -182,6 +182,19 @@
         "requiresManualNativeAcceleratorQa": true
       }
     },
+    "viewToggleTableOfContents": {
+      "id": "view-toggle-table-of-contents",
+      "route": { "kind": "handler", "handler": "onToggleTableOfContents" },
+      "menuOwned": true,
+      "shortcut": {
+        "combo": "command-or-ctrl-shift",
+        "key": "t",
+        "code": "KeyT",
+        "display": "⌘⇧T",
+        "accelerator": "CmdOrCtrl+Shift+T",
+        "requiresManualNativeAcceleratorQa": true
+      }
+    },
     "viewToggleBacklinks": {
       "id": "view-toggle-backlinks",
       "route": { "kind": "handler", "handler": "onToggleInspector" },
@@ -474,6 +487,7 @@
         { "kind": "command", "command": "noteOpenInNewWindow", "label": "Open in New Window" },
         { "kind": "separator" },
         { "kind": "command", "command": "editToggleRawEditor", "label": "Toggle Raw Editor" },
+        { "kind": "command", "command": "viewToggleTableOfContents", "label": "Toggle Table of Contents" },
         { "kind": "command", "command": "viewToggleAiChat", "label": "Toggle AI Panel" },
         { "kind": "command", "command": "viewToggleBacklinks", "label": "Toggle Backlinks" }
       ]
@@ -510,6 +524,7 @@
       { "command": "noteDelete" },
       { "command": "editToggleRawEditor" },
       { "command": "editToggleDiff" },
+      { "command": "viewToggleTableOfContents" },
       { "command": "viewToggleBacklinks" },
       { "command": "noteOpenInNewWindow" }
     ],

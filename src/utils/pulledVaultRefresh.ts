@@ -6,6 +6,7 @@ interface PulledVaultRefreshOptions {
   getActiveTabPath?: () => string | null
   closeAllTabs: () => void
   hasUnsavedChanges: (path: string) => boolean
+  shouldKeepActiveEditorMounted?: () => boolean
   reloadFolders: () => Promise<unknown> | unknown
   reloadVault: () => Promise<VaultEntry[]>
   reloadViews: () => Promise<unknown> | unknown
@@ -33,6 +34,7 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
     closeAllTabs,
     getActiveTabPath,
     hasUnsavedChanges,
+    shouldKeepActiveEditorMounted,
     reloadFolders,
     reloadVault,
     reloadViews,
@@ -51,6 +53,7 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
   if (!activeTabPath || !latestActiveTabPath) return entries
   if (didActivePathChange(activeTabPath, latestActiveTabPath)) return entries
   if (hasUnsavedChanges(latestActiveTabPath)) return entries
+  if (shouldKeepActiveEditorMounted?.()) return entries
 
   const refreshedEntry = findByNotePath(entries, latestActiveTabPath)
   if (!refreshedEntry) {

@@ -30,6 +30,15 @@ async function calendarDay(page: Page, year: number, monthIndex: number, day: nu
   return page.locator(`button[data-day="${dateLabel}"]`).first()
 }
 
+async function chooseCalendarOption(page: Page, calendar: Locator, index: number, optionName: string): Promise<void> {
+  const trigger = calendar.getByRole('combobox').nth(index)
+  await expect(trigger).toBeVisible()
+  await trigger.click()
+  const option = page.getByRole('option', { name: optionName, exact: true })
+  await expect(option).toBeVisible()
+  await option.click()
+}
+
 test.describe('Frontmatter date picker', () => {
   test.beforeEach(async ({ page }) => {
     tempVaultDir = createFixtureVaultCopy()
@@ -54,9 +63,57 @@ test.describe('Frontmatter date picker', () => {
     const dateRow = page.getByTestId('editable-property').filter({ hasText: 'Date' })
     await dateRow.getByTestId('date-display').click()
 
+    await expect(page.getByTestId('date-picker-input')).toHaveValue('2026-04-29')
+    const triggerBox = await dateRow.getByTestId('date-display').boundingBox()
+    const popoverBox = await page.getByTestId('date-picker-popover').boundingBox()
+    const rowBox = await dateRow.boundingBox()
+    expect(popoverBox?.y).toBeGreaterThanOrEqual((rowBox?.y ?? 0) + (rowBox?.height ?? 0) - 1)
+    expect((popoverBox?.x ?? 0) + (popoverBox?.width ?? 0)).toBeLessThanOrEqual((triggerBox?.x ?? 0) + (triggerBox?.width ?? 0) + 2)
+
     await expect(await calendarDay(page, 2026, 3, 29)).toHaveAttribute('data-selected-single', 'true')
     await (await calendarDay(page, 2026, 3, 30)).click()
 
     await expect.poll(() => fs.readFileSync(notePath, 'utf8')).toMatch(/Date: "?2026-04-30"?/)
+  })
+
+  test('month and year controls change the visible calendar page', async ({ page }) => {
+    const notePath = alphaProjectPath(tempVaultDir)
+
+    await page.getByTestId('note-list-container').getByText('Alpha Project', { exact: true }).click()
+    await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('heading', { name: 'Alpha Project', level: 1 })).toBeVisible({ timeout: 5_000 })
+    await triggerShortcutCommand(page, APP_COMMAND_IDS.viewToggleProperties)
+
+    const dateRow = page.getByTestId('editable-property').filter({ hasText: 'Date' })
+    await dateRow.getByTestId('date-display').click()
+
+    const calendar = page.getByTestId('date-picker-calendar')
+    await expect(calendar).toBeVisible()
+    await chooseCalendarOption(page, calendar, 0, 'May')
+    const lastWeekDayBox = await (await calendarDay(page, 2026, 4, 31)).boundingBox()
+    const clearButtonBox = await page.getByTestId('date-picker-clear').boundingBox()
+    expect(clearButtonBox?.y).toBeGreaterThanOrEqual((lastWeekDayBox?.y ?? 0) + (lastWeekDayBox?.height ?? 0) - 1)
+    await chooseCalendarOption(page, calendar, 1, '2027')
+    await (await calendarDay(page, 2027, 4, 13)).click()
+
+    await expect.poll(() => fs.readFileSync(notePath, 'utf8')).toMatch(/Date: "?2027-05-13"?/)
+  })
+
+  test('manual date input updates the date property', async ({ page }) => {
+    const notePath = alphaProjectPath(tempVaultDir)
+
+    await page.getByTestId('note-list-container').getByText('Alpha Project', { exact: true }).click()
+    await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('heading', { name: 'Alpha Project', level: 1 })).toBeVisible({ timeout: 5_000 })
+    await triggerShortcutCommand(page, APP_COMMAND_IDS.viewToggleProperties)
+
+    const dateRow = page.getByTestId('editable-property').filter({ hasText: 'Date' })
+    await dateRow.getByTestId('date-display').click()
+
+    const input = page.getByTestId('date-picker-input')
+    await input.fill('2026-05-13')
+    await input.press('Enter')
+
+    await expect.poll(() => fs.readFileSync(notePath, 'utf8')).toMatch(/Date: "?2026-05-13"?/)
   })
 })

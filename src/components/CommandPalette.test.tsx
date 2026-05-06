@@ -114,7 +114,7 @@ function updateAiInput(text: string) {
   editor.textContent = text
   setSelection(editor, text.length)
   fireEvent.input(editor)
-  return editor
+  return screen.queryByTestId('command-palette-ai-input') ?? editor
 }
 
 function resetNativeDropState() {

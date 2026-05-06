@@ -143,6 +143,13 @@ test('embedded tldraw interactions stay inside the whiteboard', async ({ page })
   expect(menuBox!.x).toBeGreaterThanOrEqual(boardBox!.x - 1)
   expect(menuBox!.x).toBeLessThanOrEqual(buttonBox!.x + 1)
   await expectNoEditorNodeSelection(page)
+
+  await page.getByTestId('tools.more-button').click()
+  const ellipseTool = page.getByTestId('tools.more.ellipse')
+  await expect(ellipseTool).toBeVisible({ timeout: 5_000 })
+  await ellipseTool.click()
+  await expect(page.getByTestId('tools.ellipse')).toHaveAttribute('aria-pressed', 'true')
+  await expectNoEditorNodeSelection(page)
 })
 
 test('embedded tldraw drawing uses the clicked coordinates while zoomed', async ({ page }) => {

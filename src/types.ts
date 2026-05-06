@@ -98,6 +98,7 @@ export interface Settings {
   theme_mode?: ThemeMode | null
   ui_language?: AppLocale | null
   note_width_mode?: NoteWidthMode | null
+  sidebar_type_pluralization_enabled?: boolean | null
   initial_h1_auto_rename_enabled?: boolean | null
   default_ai_agent?: AiAgentId | null
   default_ai_target?: string | null

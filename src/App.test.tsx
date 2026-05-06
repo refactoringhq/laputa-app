@@ -136,6 +136,18 @@ const mockVaultList = {
 const mockDefaultVaultPath = '/Users/mock/Documents/Getting Started'
 const expectedDefaultVaultPath = DEFAULT_VAULTS[0].path || mockDefaultVaultPath
 
+function createSettings(overrides: Partial<Settings> = {}): Settings {
+  return {
+    auto_pull_interval_minutes: null,
+    telemetry_consent: true,
+    crash_reporting_enabled: null,
+    analytics_enabled: null,
+    anonymous_id: null,
+    release_channel: null,
+    ...overrides,
+  }
+}
+
 const mockCommandResults: Record<string, unknown> = {
   load_vault_list: mockVaultList,
   list_vault: mockEntries,
@@ -148,7 +160,7 @@ const mockCommandResults: Record<string, unknown> = {
   reload_vault_entry: ({ path }: { path: string }) => mockEntries.find((entry) => entry.path === path) ?? null,
   sync_vault_asset_scope_for_window: null,
   get_file_history: [],
-  get_settings: { auto_pull_interval_minutes: null, telemetry_consent: true, crash_reporting_enabled: null, analytics_enabled: null, anonymous_id: null, release_channel: null },
+  get_settings: createSettings(),
   is_git_repo: true,
   init_git_repo: null,
   git_pull: { status: 'up_to_date', message: 'Already up to date', updatedFiles: [], conflictFiles: [] },
@@ -291,15 +303,7 @@ function resetMockCommandResults() {
     reload_vault_entry: ({ path }: { path: string }) => mockEntries.find((entry) => entry.path === path) ?? null,
     sync_vault_asset_scope_for_window: null,
     get_file_history: [],
-    get_settings: {
-      auto_pull_interval_minutes: null,
-      auto_advance_inbox_after_organize: null,
-      telemetry_consent: true,
-      crash_reporting_enabled: null,
-      analytics_enabled: null,
-      anonymous_id: null,
-      release_channel: null,
-    },
+    get_settings: createSettings({ auto_advance_inbox_after_organize: null }),
     is_git_repo: true,
     init_git_repo: null,
     save_settings: null,
@@ -721,16 +725,10 @@ describe('App', () => {
   })
 
   it('routes right-panel AI chat messages to the selected default agent', async () => {
-    mockCommandResults.get_settings = {
-      auto_pull_interval_minutes: null,
+    mockCommandResults.get_settings = createSettings({
       auto_advance_inbox_after_organize: null,
-      telemetry_consent: true,
-      crash_reporting_enabled: null,
-      analytics_enabled: null,
-      anonymous_id: null,
-      release_channel: null,
       default_ai_agent: 'codex',
-    }
+    })
     mockCommandResults.get_ai_agents_status = {
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
@@ -779,8 +777,6 @@ describe('App', () => {
     fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
 
     const input = await screen.findByTestId('agent-input')
-    input.textContent = 'Summarize the active vault'
-    fireEvent.input(input)
     fireEvent.click(screen.getByTestId('agent-send'))
 
     await act(async () => {
@@ -789,22 +785,18 @@ describe('App', () => {
     expect(streamAiAgent).not.toHaveBeenCalled()
 
     await act(async () => {
-      resolveSettings?.({
-        auto_pull_interval_minutes: null,
+      resolveSettings?.(createSettings({
         auto_advance_inbox_after_organize: null,
-        telemetry_consent: true,
-        crash_reporting_enabled: null,
-        analytics_enabled: null,
-        anonymous_id: null,
-        release_channel: null,
         default_ai_agent: 'codex',
-      })
+      }))
     })
 
     await waitFor(() => {
       expect(input).toHaveAttribute('aria-placeholder', 'Ask Codex')
     })
 
+    input.textContent = 'Summarize the active vault'
+    fireEvent.input(input)
     fireEvent.click(screen.getByTestId('agent-send'))
 
     await waitFor(() => {
@@ -815,14 +807,7 @@ describe('App', () => {
   })
 
   it('shows onboarding after telemetry consent when no active vault is configured', async () => {
-    mockCommandResults.get_settings = {
-      auto_pull_interval_minutes: null,
-      telemetry_consent: null,
-      crash_reporting_enabled: null,
-      analytics_enabled: null,
-      anonymous_id: null,
-      release_channel: null,
-    }
+    mockCommandResults.get_settings = createSettings({ telemetry_consent: null })
     mockCommandResults.load_vault_list = { vaults: [], active_vault: null, hidden_defaults: [] }
     mockCommandResults.check_vault_exists = (args?: { path?: string }) => args?.path === expectedDefaultVaultPath
 
@@ -847,14 +832,7 @@ describe('App', () => {
     const rememberedDefaultVaultPath = expectedDefaultVaultPath
     localStorage.setItem('tolaria_welcome_dismissed', '1')
     mockCommandResults.get_default_vault_path = rememberedDefaultVaultPath
-    mockCommandResults.get_settings = {
-      auto_pull_interval_minutes: null,
-      telemetry_consent: null,
-      crash_reporting_enabled: null,
-      analytics_enabled: null,
-      anonymous_id: null,
-      release_channel: null,
-    }
+    mockCommandResults.get_settings = createSettings({ telemetry_consent: null })
     mockCommandResults.load_vault_list = {
       vaults: [],
       active_vault: rememberedDefaultVaultPath,
@@ -1152,15 +1130,7 @@ describe('App', () => {
 
   it('auto-advances to the next inbox item after organizing when the setting is enabled', async () => {
     configureNeighborhoodVault()
-    mockCommandResults.get_settings = {
-      auto_pull_interval_minutes: null,
-      auto_advance_inbox_after_organize: true,
-      telemetry_consent: true,
-      crash_reporting_enabled: null,
-      analytics_enabled: null,
-      anonymous_id: null,
-      release_channel: null,
-    }
+    mockCommandResults.get_settings = createSettings({ auto_advance_inbox_after_organize: true })
 
     render(<App />)
 
@@ -1187,15 +1157,7 @@ describe('App', () => {
 
   it('keeps the manually selected note after organizing finishes later', async () => {
     configureNeighborhoodVault()
-    mockCommandResults.get_settings = {
-      auto_pull_interval_minutes: null,
-      auto_advance_inbox_after_organize: true,
-      telemetry_consent: true,
-      crash_reporting_enabled: null,
-      analytics_enabled: null,
-      anonymous_id: null,
-      release_channel: null,
-    }
+    mockCommandResults.get_settings = createSettings({ auto_advance_inbox_after_organize: true })
 
     let resolveOrganizeSave!: () => void
     const organizeSave = new Promise<void>((resolve) => {
@@ -1380,5 +1342,35 @@ describe('App', () => {
         growToFit: true,
       })
     })
+  })
+
+  it('does not ask Windows to grow the native window when toggling Properties', async () => {
+    const { invoke } = await import('@tauri-apps/api/core') as { invoke: ReturnType<typeof vi.fn> }
+    const originalUserAgent = navigator.userAgent
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    })
+
+    try {
+      render(<App />)
+      await waitFor(() => {
+        expect(screen.getByText('All Notes')).toBeInTheDocument()
+      })
+
+      invoke.mockClear()
+
+      fireEvent.keyDown(window, { key: 'I', metaKey: true, shiftKey: true })
+      await waitFor(() => {
+        expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', expect.objectContaining({
+          growToFit: false,
+        }))
+      })
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        configurable: true,
+        value: originalUserAgent,
+      })
+    }
   })
 })
