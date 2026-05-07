@@ -208,6 +208,10 @@ async function computedCss(locator: Locator, property: 'color' | 'fill' | 'strok
   ), property)
 }
 
+function mermaidNodeLabel(node: Locator): Locator {
+  return node.locator('.nodeLabel, text').first()
+}
+
 async function readStyleNonce(svg: Locator): Promise<string | null> {
   return svg.locator('style').first().evaluate((style) => {
     const nonce = (style as HTMLElement).nonce
@@ -218,7 +222,7 @@ async function readStyleNonce(svg: Locator): Promise<string | null> {
 async function labelFitsNode(node: Locator): Promise<boolean> {
   return node.evaluate((element) => {
     const shape = element.querySelector<SVGGraphicsElement>('rect, polygon, circle, ellipse, path')!
-    const label = element.querySelector<HTMLElement>('.nodeLabel')!
+    const label = element.querySelector<SVGGraphicsElement | HTMLElement>('.nodeLabel, text')!
     const shapeBox = shape.getBoundingClientRect()
     const labelBox = label.getBoundingClientRect()
     return [
@@ -232,14 +236,15 @@ async function readReportedDiagramMetrics(page: Page, diagramIndex: number) {
   const svg = mermaidSvg(page, diagramIndex)
   const scheduledNode = mermaidNode(page, diagramIndex, 'Other path')
   const scheduledShape = scheduledNode.locator('rect, polygon, circle, ellipse, path').first()
-  const scheduledLabel = scheduledNode.locator('.nodeLabel').first()
+  const scheduledLabel = mermaidNodeLabel(scheduledNode)
 
   return {
     connectorStroke: await computedCss(svg.locator('.flowchart-link').first(), 'stroke'),
     markerFill: await computedCss(svg.locator('marker path').first(), 'fill'),
     scheduledFill: await computedCss(scheduledShape, 'fill'),
     scheduledStroke: await computedCss(scheduledShape, 'stroke'),
-    scheduledTextColor: await computedCss(scheduledLabel, 'color'),
+    scheduledTextFill: await computedCss(scheduledLabel, 'fill'),
+    foreignObjectCount: await svg.locator('foreignObject').count(),
     labelsFit: [
       await labelFitsNode(scheduledNode),
       await labelFitsNode(mermaidNode(page, diagramIndex, 'Contract path')),
@@ -262,7 +267,8 @@ test('Mermaid diagrams render when opening saved notes directly', async ({ page 
     markerFill: 'rgb(31, 58, 138)',
     scheduledFill: 'rgb(255, 244, 214)',
     scheduledStroke: 'rgb(122, 91, 0)',
-    scheduledTextColor: 'rgb(58, 44, 0)',
+    scheduledTextFill: 'rgb(58, 44, 0)',
+    foreignObjectCount: 0,
     labelsFit: true,
     styleNonce: RUNTIME_STYLE_NONCE,
     text: expect.stringContaining('Linked to a planned shift?'),
@@ -320,7 +326,8 @@ ${SYSTEM_OVERVIEW_DIAGRAM}
     markerFill: 'rgb(31, 58, 138)',
     scheduledFill: 'rgb(255, 244, 214)',
     scheduledStroke: 'rgb(122, 91, 0)',
-    scheduledTextColor: 'rgb(58, 44, 0)',
+    scheduledTextFill: 'rgb(58, 44, 0)',
+    foreignObjectCount: 0,
     labelsFit: true,
     styleNonce: RUNTIME_STYLE_NONCE,
     text: expect.stringContaining('Linked to a planned shift?'),

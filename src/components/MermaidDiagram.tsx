@@ -44,6 +44,7 @@ function initializeMermaid(mermaid: MermaidApi) {
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
+    htmlLabels: false,
     theme: 'default',
     themeVariables: {
       fontFamily: 'ui-sans-serif, system-ui, sans-serif',

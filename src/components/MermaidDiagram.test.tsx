@@ -32,7 +32,10 @@ describe('MermaidDiagram', () => {
       expect(screen.getByTestId('mermaid-diagram-viewport').querySelector('svg')).not.toBeNull()
     })
     expect(mermaidMock.render).toHaveBeenCalledWith(expect.stringMatching(/^tolaria-mermaid-/), 'flowchart LR\nA --> B')
-    expect(mermaidMock.initialize).toHaveBeenCalledWith(expect.objectContaining({ theme: 'default' }))
+    expect(mermaidMock.initialize).toHaveBeenCalledWith(expect.objectContaining({
+      htmlLabels: false,
+      theme: 'default',
+    }))
   })
 
   it('opens the rendered SVG in a lightbox', async () => {
