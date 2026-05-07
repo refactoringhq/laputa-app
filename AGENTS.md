@@ -50,10 +50,14 @@ Use `osascript` for keyboard interactions. Write result as Todoist comment (✅ 
 After both phases pass, add a **completion comment** to the Todoist task. The comment must include:
 - What was implemented (a few lines covering logic and UX/UI)
 - QA: what was tested and how (Playwright / native screenshot / osascript)
+- Tests/coverage: commands run and final coverage result
+- CodeScene: before/after touched-file checks plus final Hotspot and Average scores after push
+- Codacy: MCP/CLI scan summary; confirm no new Critical/High findings
+- Localization: `pnpm l10n:translate` + `pnpm l10n:validate` result, or "no UI copy changes"
+- PostHog: event name(s) added, or why no event was needed
 - Refactoring: any files refactored to meet the CodeScene gate (or "none needed")
 - ADRs: any new/updated ADRs (or "none")
 - Docs: any updated docs (ARCHITECTURE.md, ABSTRACTIONS.md, etc.) (or "none")
-- Code health: final Hotspot and Average scores after push
 
 ---
 
@@ -91,6 +95,8 @@ When adding or changing a meaningful user-facing feature, include the event name
 
 Pre-commit and pre-push hooks enforce **Hotspot Code Health** and **Average Code Health** ≥ thresholds in `.codescene-thresholds`. Both gates block commit/push. Thresholds are a **ratchet** — only go up. When pre-push sees improved remote scores, it updates `.codescene-thresholds`, stages it, and stops so you can commit the new floor with normal verified hooks before pushing again. Never add `// eslint-disable`, `#[allow(...)]`, or `as any`.
 
+**Release rule:** CodeScene is a before/after gate, not just a final score. Every task must record the starting CodeScene state before edits and the final state after edits. If touched code gets worse, refactor before committing.
+
 **⛔ NEVER edit `.codescene-thresholds` to lower the values.** If the gate blocks you, improve the code — do not lower the bar.
 
 **CodeScene access order:** use CodeScene MCP tools if available. If MCP is unavailable, use the installed `cs` CLI for file-level review/delta work, and use the CodeScene API (`CODESCENE_PAT` + `CODESCENE_PROJECT_ID`) for project-wide Hotspot/Average threshold checks from `.codescene-thresholds`.
@@ -103,11 +109,39 @@ Pre-commit and pre-push hooks enforce **Hotspot Code Health** and **Average Code
 
 **If CodeScene gate blocks your push:** use `mcp__codescene__code_health_score` to find the worst file, refactor it, commit, push again. Do NOT stop or wait for laputa-refactor — that is a background loop, not a substitute for fixing your own regressions.
 
+### Security scan with Codacy (mandatory)
+
+Use Codacy as a security and static-analysis gate before a task is considered releasable.
+
+- Prefer the Codacy MCP inside Codex to inspect repository/file issues for every touched code file.
+- If MCP is unavailable, use the local CLI wrapper, e.g. `.codacy/cli.sh analyze <path> --format sarif`; choose the relevant tool when useful (`eslint`, `opengrep`, `trivy`, `lizard`).
+- **Always fix Critical and High severity findings introduced by your change.** Do not move the task to In Review with new Critical/High Codacy issues.
+- Review Medium findings. Fix them when they are real defects or security-sensitive; otherwise explain why they are acceptable in the completion comment.
+- Never silence a Codacy rule just to pass the scan. Prefer small code changes that remove the finding.
+
 ### Check suite (runs on every push)
 ```bash
 pnpm lint && npx tsc --noEmit && pnpm test && pnpm test:coverage  # frontend ≥70%
 cargo test && cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --fail-under-lines 85
 ```
+
+Coverage is a release gate, not a vanity metric:
+- Frontend coverage must stay ≥70%.
+- Rust line coverage must stay ≥85%.
+- For bug fixes, add a regression test when practical.
+- For new behavior, add targeted coverage close to the changed code; do not rely only on broad E2E coverage.
+
+### Release-readiness checklist
+
+Before pushing or moving a task to In Review, verify and mention the result in the Todoist completion comment:
+
+- CodeScene before/after checked for every touched/new scorable file; final Hotspot and Average pass `.codescene-thresholds`.
+- Coverage commands passed (`pnpm test:coverage` and `cargo llvm-cov ... --fail-under-lines 85`) or the change is docs-only.
+- Codacy checked via MCP or `.codacy/cli.sh`; all new Critical/High issues fixed.
+- Localization checked: any user-facing copy lives in `src/lib/locales/en.json`, `pnpm l10n:translate` was run, and `pnpm l10n:validate` passes. If no copy changed, say “Localization: no UI copy changes”.
+- PostHog checked: meaningful new user actions/events are instrumented with safe metadata; noisy/minor changes explicitly say “PostHog: no event needed because …”.
+- Docs/ADRs checked under the rules below.
+- Demo vault dirt checked: `git status --short -- demo-vault demo-vault-v2` is empty unless fixture changes are intentional.
 
 ### ADRs & docs
 
