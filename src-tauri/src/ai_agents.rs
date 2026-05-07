@@ -398,7 +398,8 @@ fn write_kiro_mcp_json(vault_path: &str, mcp_server_path: &str) -> Result<(), St
 }
 
 fn strip_ansi_codes(input: &str) -> String {
-    let re = Regex::new(r"\x1b\[[0-9;]*m").unwrap();
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r"\x1b\[[0-9;]*m").unwrap());
     re.replace_all(input, "").to_string()
 }
 
