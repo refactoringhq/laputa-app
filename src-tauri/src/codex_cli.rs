@@ -30,8 +30,10 @@ where
 
 fn find_codex_binary() -> Result<PathBuf, String> {
     find_codex_binary_on_path()
-        .filter(is_usable_codex_binary)
-        .or_else(|| find_codex_binary_in_user_shell().filter(is_usable_codex_binary))
+        .filter(|binary| is_usable_codex_binary(binary))
+        .or_else(|| {
+            find_codex_binary_in_user_shell().filter(|binary| is_usable_codex_binary(binary))
+        })
         .or_else(|| find_usable_codex_binary(codex_binary_candidates()))
         .ok_or_else(|| {
             "Codex CLI not found. Install it: https://developers.openai.com/codex/cli".into()
@@ -156,10 +158,12 @@ fn nvm_node_binary_candidates_for_home(home: &Path, binary_name: &str) -> Vec<Pa
 }
 
 fn find_usable_codex_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
-    candidates.into_iter().find(is_usable_codex_binary)
+    candidates
+        .into_iter()
+        .find(|binary| is_usable_codex_binary(binary))
 }
 
-fn is_usable_codex_binary(binary: &PathBuf) -> bool {
+fn is_usable_codex_binary(binary: &Path) -> bool {
     crate::cli_agent_runtime::version_for_binary(binary).is_some()
 }
 
@@ -224,7 +228,7 @@ fn build_codex_command(
     prompt: String,
     vault_path: &str,
 ) -> Result<std::process::Command, String> {
-    let target = codex_command_target(binary)?;
+    let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(binary)?;
     let mut command = crate::hidden_command(&target.program);
     crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
     if let Some(first_arg) = target.first_arg {
@@ -238,64 +242,6 @@ fn build_codex_command(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     Ok(command)
-}
-
-struct CodexCommandTarget {
-    program: PathBuf,
-    first_arg: Option<PathBuf>,
-}
-
-fn codex_command_target(binary: &Path) -> Result<CodexCommandTarget, String> {
-    if is_windows_batch_shim(binary) {
-        if let Some(script) = node_script_from_windows_cmd_shim(binary) {
-            return Ok(CodexCommandTarget {
-                program: crate::mcp::find_node()?,
-                first_arg: Some(script),
-            });
-        }
-    }
-
-    Ok(CodexCommandTarget {
-        program: binary.to_path_buf(),
-        first_arg: None,
-    })
-}
-
-fn is_windows_batch_shim(binary: &Path) -> bool {
-    binary
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| {
-            extension.eq_ignore_ascii_case("cmd") || extension.eq_ignore_ascii_case("bat")
-        })
-}
-
-fn node_script_from_windows_cmd_shim(binary: &Path) -> Option<PathBuf> {
-    let contents = std::fs::read_to_string(binary).ok()?;
-    contents
-        .split('"')
-        .skip(1)
-        .step_by(2)
-        .filter(|token| is_node_script_token(token))
-        .find_map(|token| resolve_cmd_shim_script_path(binary, token))
-}
-
-fn is_node_script_token(token: &str) -> bool {
-    let lower = token.to_ascii_lowercase();
-    (lower.ends_with(".js") || lower.ends_with(".mjs") || lower.ends_with(".cjs"))
-        && (lower.starts_with("%dp0%") || lower.starts_with("%~dp0"))
-}
-
-fn resolve_cmd_shim_script_path(binary: &Path, token: &str) -> Option<PathBuf> {
-    let relative = token
-        .strip_prefix("%dp0%")
-        .or_else(|| token.strip_prefix("%~dp0"))?
-        .trim_start_matches(['\\', '/']);
-    let mut script = binary.parent()?.to_path_buf();
-    for part in relative.split(['\\', '/']).filter(|part| !part.is_empty()) {
-        script.push(part);
-    }
-    script.is_file().then_some(script)
 }
 
 fn build_codex_args(

@@ -19,6 +19,11 @@ pub(crate) struct JsonLineRun {
     pub status: ExitStatus,
 }
 
+pub(crate) struct AgentCommandTarget {
+    pub program: PathBuf,
+    pub first_arg: Option<PathBuf>,
+}
+
 pub(crate) fn build_prompt(message: &str, system_prompt: Option<&str>) -> String {
     match system_prompt
         .map(str::trim)
@@ -39,15 +44,37 @@ pub(crate) fn mcp_server_path_string() -> Result<String, String> {
         .to_string())
 }
 
-pub(crate) fn version_for_binary(binary: &PathBuf) -> Option<String> {
-    let mut command = crate::hidden_command(binary);
+pub(crate) fn version_for_binary(binary: &Path) -> Option<String> {
+    let target = command_target_avoiding_windows_cmd_shim(binary).ok()?;
+    let mut command = crate::hidden_command(&target.program);
     configure_agent_command_environment(&mut command, binary);
+    if let Some(first_arg) = target.first_arg {
+        command.arg(first_arg);
+    }
     command
         .arg("--version")
         .output()
         .ok()
         .filter(|output| output.status.success())
         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+pub(crate) fn command_target_avoiding_windows_cmd_shim(
+    binary: &Path,
+) -> Result<AgentCommandTarget, String> {
+    if is_windows_batch_shim(binary) {
+        if let Some(script) = node_script_from_windows_cmd_shim(binary) {
+            return Ok(AgentCommandTarget {
+                program: crate::mcp::find_node()?,
+                first_arg: Some(script),
+            });
+        }
+    }
+
+    Ok(AgentCommandTarget {
+        program: binary.to_path_buf(),
+        first_arg: None,
+    })
 }
 
 pub(crate) fn configure_agent_command_environment(command: &mut Command, binary: &Path) {
@@ -151,10 +178,62 @@ fn is_executable_file(path: &Path) -> bool {
             .unwrap_or(false)
     }
 
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        path.is_file() && has_windows_cli_extension(path)
+    }
+
+    #[cfg(all(not(unix), not(windows)))]
     {
         path.is_file()
     }
+}
+
+pub(crate) fn has_windows_cli_extension(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            ["bat", "cmd", "com", "exe"]
+                .iter()
+                .any(|expected| extension.eq_ignore_ascii_case(expected))
+        })
+}
+
+fn is_windows_batch_shim(binary: &Path) -> bool {
+    binary
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("cmd") || extension.eq_ignore_ascii_case("bat")
+        })
+}
+
+fn node_script_from_windows_cmd_shim(binary: &Path) -> Option<PathBuf> {
+    let contents = std::fs::read_to_string(binary).ok()?;
+    contents
+        .split('"')
+        .skip(1)
+        .step_by(2)
+        .filter(|token| is_node_script_token(token))
+        .find_map(|token| resolve_cmd_shim_script_path(binary, token))
+}
+
+fn is_node_script_token(token: &str) -> bool {
+    let lower = token.to_ascii_lowercase();
+    (lower.ends_with(".js") || lower.ends_with(".mjs") || lower.ends_with(".cjs"))
+        && (lower.starts_with("%dp0%") || lower.starts_with("%~dp0"))
+}
+
+fn resolve_cmd_shim_script_path(binary: &Path, token: &str) -> Option<PathBuf> {
+    let relative = token
+        .strip_prefix("%dp0%")
+        .or_else(|| token.strip_prefix("%~dp0"))?
+        .trim_start_matches(['\\', '/']);
+    let mut script = binary.parent()?.to_path_buf();
+    for part in relative.split(['\\', '/']).filter(|part| !part.is_empty()) {
+        script.push(part);
+    }
+    script.is_file().then_some(script)
 }
 
 pub(crate) fn parse_json_line(

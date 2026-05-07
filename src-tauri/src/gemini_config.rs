@@ -9,8 +9,12 @@ pub(crate) fn build_command(
     settings_dir: &Path,
 ) -> Result<std::process::Command, String> {
     let settings_path = write_settings(settings_dir, &request.vault_path, request.permission_mode)?;
-    let mut command = crate::hidden_command(binary);
+    let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(binary)?;
+    let mut command = crate::hidden_command(&target.program);
     crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
+    if let Some(first_arg) = target.first_arg {
+        command.arg(first_arg);
+    }
     command
         .args(build_args(request.permission_mode))
         .arg("--prompt")
@@ -143,6 +147,43 @@ mod tests {
             paths.contains(&PathBuf::from("/opt/homebrew/bin")),
             "PATH should include the resolved Gemini binary directory, got {paths:?}"
         );
+    }
+
+    #[test]
+    fn command_avoids_windows_cmd_shim_for_prompt_args() {
+        let dir = tempfile::tempdir().unwrap();
+        let shim = dir.path().join("gemini.cmd");
+        let script = dir
+            .path()
+            .join("node_modules")
+            .join("@google")
+            .join("gemini-cli")
+            .join("dist")
+            .join("index.js");
+        std::fs::create_dir_all(script.parent().unwrap()).unwrap();
+        std::fs::write(&script, "console.log('gemini')\n").unwrap();
+        std::fs::write(
+            &shim,
+            r#"@ECHO off
+"%_prog%" "%~dp0\node_modules\@google\gemini-cli\dist\index.js" %*
+"#,
+        )
+        .unwrap();
+
+        let settings_dir = tempfile::tempdir().unwrap();
+        let command = build_command(&shim, &request(), settings_dir.path()).unwrap();
+        let actual_args = command.get_args().collect::<Vec<_>>();
+
+        assert_ne!(
+            command.get_program(),
+            shim.as_os_str(),
+            "Gemini npm .cmd shims cannot safely receive prompt args directly"
+        );
+        assert_eq!(actual_args.first().copied(), Some(script.as_os_str()));
+        assert!(actual_args.iter().any(|arg| *arg == OsStr::new("--prompt")));
+        assert!(actual_args
+            .iter()
+            .any(|arg| *arg == OsStr::new("Rename the note")));
     }
 
     #[test]

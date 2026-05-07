@@ -283,6 +283,11 @@ fn linux_package_mcp_server_dirs(root: &Path) -> Vec<PathBuf> {
     vec![
         root.join("Tolaria").join("mcp-server"),
         root.join("Tolaria").join("resources").join("mcp-server"),
+        root.join("lib").join("Tolaria").join("mcp-server"),
+        root.join("lib")
+            .join("Tolaria")
+            .join("resources")
+            .join("mcp-server"),
         root.join("lib").join("tolaria").join("mcp-server"),
         root.join("lib")
             .join("tolaria")
@@ -762,13 +767,26 @@ mod tests {
         let expected = [
             PathBuf::from("/usr/local/Tolaria/mcp-server"),
             PathBuf::from("/usr/local/Tolaria/resources/mcp-server"),
+            PathBuf::from("/usr/local/lib/Tolaria/mcp-server"),
+            PathBuf::from("/usr/local/lib/Tolaria/resources/mcp-server"),
             PathBuf::from("/usr/local/lib/tolaria/mcp-server"),
             PathBuf::from("/usr/local/lib/tolaria/resources/mcp-server"),
+            PathBuf::from("/usr/lib/Tolaria/mcp-server"),
+            PathBuf::from("/usr/lib/Tolaria/resources/mcp-server"),
             PathBuf::from("/usr/lib/tolaria/mcp-server"),
             PathBuf::from("/usr/lib/tolaria/resources/mcp-server"),
         ];
 
         assert!(expected.iter().all(|path| candidates.contains(path)));
+    }
+
+    #[test]
+    fn mcp_server_dir_candidates_include_deb_capitalized_lib_root() {
+        let dev_path = Path::new("/repo/mcp-server");
+        let exe_path = Path::new("/usr/bin/tolaria");
+        let candidates = mcp_server_dir_candidates(dev_path, exe_path, None);
+
+        assert!(candidates.contains(&PathBuf::from("/usr/lib/Tolaria/mcp-server")));
     }
 
     #[test]
