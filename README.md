@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/refactoringhq-tolaria-badge.png)](https://mseep.ai/app/refactoringhq-tolaria)
+
 ![Latest stable](https://img.shields.io/github/v/release/refactoringhq/tolaria?display_name=tag) [![CI](https://github.com/refactoringhq/tolaria/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/refactoringhq/tolaria/actions/workflows/ci.yml) [![Build](https://github.com/refactoringhq/tolaria/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/refactoringhq/tolaria/actions/workflows/release.yml) [![Codecov](https://codecov.io/gh/refactoringhq/tolaria/graph/badge.svg?branch=main)](https://codecov.io/gh/refactoringhq/tolaria) [![CodeScene Hotspot Code Health](https://codescene.io/projects/76865/status-badges/hotspot-code-health)](https://codescene.io/projects/76865)
 
 # 💧 Tolaria
