@@ -4,7 +4,7 @@ Tolaria releases are published on GitHub.
 
 - [Latest release](https://github.com/refactoringhq/tolaria/releases/latest)
 - [All releases](https://github.com/refactoringhq/tolaria/releases)
-- [Download page](/download/)
+- <a href="https://tolaria.md/download/" target="_self">Download page</a>
 
 ## Release Channels
 

@@ -18,6 +18,7 @@ async function openNoteViaQuickOpen(page: Page, query: string): Promise<void> {
   const searchInput = page.locator('input[placeholder="Search notes..."]')
   await expect(searchInput).toBeVisible()
   await searchInput.fill(query)
+  await expect(page.getByTestId('quick-open-palette').getByText(query).first()).toBeVisible()
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(new RegExp(query, 'i'), { timeout: 5_000 })
 }

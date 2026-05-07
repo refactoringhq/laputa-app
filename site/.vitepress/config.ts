@@ -27,7 +27,7 @@ export default defineConfig({
       { text: "Start", link: "/start/install" },
       { text: "Concepts", link: "/concepts/vaults" },
       { text: "Guides", link: "/guides/capture-a-note" },
-      { text: "Downloads", link: "/download/" },
+      { text: "Downloads", link: "https://tolaria.md/download/", target: "_self", noIcon: true },
     ],
     search: {
       provider: "local",

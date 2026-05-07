@@ -4,6 +4,7 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: 0 4px 12px var(--shadow-dialog);
+  color: var(--popover-foreground);
   max-height: 320px;
   overflow: hidden;
   min-width: 260px;
@@ -22,9 +23,15 @@
   line-height: 1.4;
 }
 
-.wikilink-menu__item:hover,
+.wikilink-menu__item:hover {
+  background: var(--state-hover);
+}
+
+.wikilink-menu .bg-accent,
 .wikilink-menu__item--selected {
-  background: var(--accent);
+  background: var(--state-selected);
+  box-shadow: inset 3px 0 0 var(--accent-blue);
+  color: var(--foreground);
 }
 
 .wikilink-menu__title {
