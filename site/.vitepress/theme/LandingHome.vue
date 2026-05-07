@@ -440,8 +440,8 @@ const testimonials = [
 }
 
 .hero-section {
-  padding-top: 32px;
-  padding-bottom: 40px;
+  padding-top: 40px;
+  padding-bottom: 52px;
 }
 
 .hero-section h1 {
@@ -942,8 +942,8 @@ const testimonials = [
   }
 
   .hero-section {
-    padding-top: 48px;
-    padding-bottom: 64px;
+    padding-top: 64px;
+    padding-bottom: 84px;
   }
 
   .hero-section h1 {
