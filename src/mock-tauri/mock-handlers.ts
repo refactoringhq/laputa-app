@@ -119,6 +119,7 @@ let mockSettings: Settings = {
 }
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
+const MOCK_IMPORTED_PAGE_TITLE = 'Imported Page'
 const DEFAULT_MOCK_VAULT = {
   label: 'demo-vault-v2',
   path: DEFAULT_MOCK_VAULT_PATH,
@@ -189,39 +190,71 @@ function uniqueMockNotePath(vaultPath: string, slug: string): string {
   return candidate
 }
 
-function titleFromMockUrl(url: string): string {
-  const parsed = URL.canParse(url) ? new URL(url) : null
-  const segments = parsed?.pathname.split('/').filter(Boolean) ?? []
-  const fallbackSegment = parsed?.hostname.replace(/^www\./, '') ?? 'Imported Page'
-  return titleizeMockUrlSegment(segments.at(-1) ?? fallbackSegment)
-}
-
-function titleizeMockUrlSegment(segment: string): string {
-  return segment
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
-}
-
-function mockImportNoteFromUrl(args: {
+interface MockImportNoteFromUrlArgs {
   vaultPath?: string
   vault_path?: string
   url: string
   noteType?: string
   note_type?: string
-}) {
-  const vaultPath = args.vaultPath ?? args.vault_path ?? DEFAULT_MOCK_VAULT_PATH
-  const noteType = args.noteType ?? args.note_type ?? 'Note'
-  const title = titleFromMockUrl(args.url)
-  const slug = slugifyMockTitle({ title }) || 'imported-page'
-  const path = uniqueMockNotePath(vaultPath, slug)
-  const filename = path.split('/').pop() ?? 'imported-page.md'
-  const content = `---\ntype: ${noteType}\nurl: ${args.url}\n---\n\n# ${title}\n\nImported web page content.\n`
+}
+
+interface MockImportedNoteDraft {
+  content: string
+  filename: string
+  noteType: string
+  path: string
+  title: string
+}
+
+function mockImportNoteFromUrl(args: MockImportNoteFromUrlArgs) {
+  const draft = buildMockImportedNoteDraft(args)
+  const entry = buildMockImportedNoteEntry(draft)
+  saveMockImportedNote(entry, draft.content)
+  return mockImportedNoteResult(entry, draft.content)
+}
+
+function buildMockImportedNoteDraft(args: MockImportNoteFromUrlArgs): MockImportedNoteDraft {
+  const title = MOCK_IMPORTED_PAGE_TITLE
+  const noteType = mockImportNoteType(args)
+  const path = uniqueMockNotePath(mockImportVaultPath(args), mockImportSlug(title))
+  return {
+    content: `---\ntype: ${noteType}\nurl: ${args.url}\n---\n\n# ${title}\n\nImported web page content.\n`,
+    filename: mockImportFilename(path),
+    noteType,
+    path,
+    title,
+  }
+}
+
+function mockImportVaultPath(args: MockImportNoteFromUrlArgs): string {
+  if (args.vaultPath) return args.vaultPath
+  if (args.vault_path) return args.vault_path
+  return DEFAULT_MOCK_VAULT_PATH
+}
+
+function mockImportNoteType(args: MockImportNoteFromUrlArgs): string {
+  if (args.noteType) return args.noteType
+  if (args.note_type) return args.note_type
+  return 'Note'
+}
+
+function mockImportSlug(title: string): string {
+  const slug = slugifyMockTitle({ title })
+  return slug ? slug : 'imported-page'
+}
+
+function mockImportFilename(path: string): string {
+  const filename = path.split('/').pop()
+  return filename ? filename : 'imported-page.md'
+}
+
+function buildMockImportedNoteEntry(draft: MockImportedNoteDraft): VaultEntry {
   const now = Math.floor(Date.now() / 1000)
   const entry: VaultEntry = {
-    path,
-    filename,
-    title,
-    isA: noteType,
+    path: draft.path,
+    filename: draft.filename,
+    title: draft.title,
+    isA: draft.noteType,
     aliases: [],
     belongsTo: [],
     relatedTo: [],
@@ -229,10 +262,10 @@ function mockImportNoteFromUrl(args: {
     archived: false,
     modifiedAt: now,
     createdAt: now,
-    fileSize: content.length,
+    fileSize: draft.content.length,
     snippet: 'Imported web page content.',
     wordCount: 4,
-    relationships: noteType === 'Type' ? {} : { Type: [`[[${noteType.toLowerCase()}]]`] },
+    relationships: mockImportRelationships(draft.noteType),
     icon: null,
     color: null,
     order: null,
@@ -250,10 +283,22 @@ function mockImportNoteFromUrl(args: {
     hasH1: true,
     fileKind: 'markdown',
   }
+  return entry
+}
+
+function mockImportRelationships(noteType: string): Record<string, string[]> {
+  if (noteType === 'Type') return {}
+  return { Type: [`[[${noteType.toLowerCase()}]]`] }
+}
+
+function saveMockImportedNote(entry: VaultEntry, content: string): void {
   MOCK_ENTRIES.unshift(entry)
-  MOCK_CONTENT[path] = content
-  mockSavedSinceCommit.add(path)
+  MOCK_CONTENT[entry.path] = content
+  mockSavedSinceCommit.add(entry.path)
   syncWindowContent()
+}
+
+function mockImportedNoteResult(entry: VaultEntry, content: string) {
   return {
     entry,
     content,

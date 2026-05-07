@@ -1137,7 +1137,6 @@ function App() {
     notes.openTabWithContent,
     recordAutoGitActivity,
     resolvedPath,
-    setToastMessage,
     vault.addEntry,
     vault.entries,
     vault.loadModifiedFiles,

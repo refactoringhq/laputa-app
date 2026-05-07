@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { createElement, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,45 +35,63 @@ export function NewNoteFromUrlDialog({
   const handleOpenChange = createOpenChangeHandler(importing, closeDialog)
   const handleUrlChange = createUrlChangeHandler({ error, setUrl, setError })
 
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent showCloseButton={false} className="sm:max-w-[420px]">
-        <DialogHeader>
-          <DialogTitle>{t('urlImport.title')}</DialogTitle>
-          <DialogDescription>{t('urlImport.description')}</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor="new-note-from-url-input" className="text-xs font-medium text-muted-foreground">
-              {t('urlImport.urlLabel')}
-            </label>
-            <Input
-              id="new-note-from-url-input"
-              autoFocus
-              inputMode="url"
-              placeholder={t('urlImport.placeholder')}
-              value={url}
-              aria-invalid={Boolean(error)}
-              aria-describedby={error ? 'new-note-from-url-error' : undefined}
-              disabled={importing}
-              onChange={handleUrlChange}
-            />
-            {error && (
-              <p id="new-note-from-url-error" className="text-xs text-destructive">
-                {error}
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" disabled={importing} onClick={closeDialog}>
-              {t('urlImport.cancel')}
-            </Button>
-            <Button type="submit" disabled={!canSubmit}>
-              {importing ? t('urlImport.importing') : t('urlImport.submit')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+  return createElement(
+    Dialog,
+    { open, onOpenChange: handleOpenChange },
+    createElement(
+      DialogContent,
+      { showCloseButton: false, className: 'sm:max-w-[420px]' },
+      createElement(
+        DialogHeader,
+        null,
+        createElement(DialogTitle, null, t('urlImport.title')),
+        createElement(DialogDescription, null, t('urlImport.description')),
+      ),
+      createElement(
+        'form',
+        { onSubmit: handleSubmit, className: 'space-y-4' },
+        createElement(
+          'div',
+          { className: 'space-y-1.5' },
+          createElement(
+            'label',
+            { htmlFor: 'new-note-from-url-input', className: 'text-xs font-medium text-muted-foreground' },
+            t('urlImport.urlLabel'),
+          ),
+          createElement(Input, {
+            id: 'new-note-from-url-input',
+            autoFocus: true,
+            inputMode: 'url',
+            placeholder: t('urlImport.placeholder'),
+            value: url,
+            'aria-invalid': Boolean(error),
+            'aria-describedby': error ? 'new-note-from-url-error' : undefined,
+            disabled: importing,
+            onChange: handleUrlChange,
+          }),
+          error
+            ? createElement(
+              'p',
+              { id: 'new-note-from-url-error', className: 'text-xs text-destructive' },
+              error,
+            )
+            : null,
+        ),
+        createElement(
+          DialogFooter,
+          null,
+          createElement(
+            Button,
+            { type: 'button', variant: 'outline', disabled: importing, onClick: closeDialog },
+            t('urlImport.cancel'),
+          ),
+          createElement(
+            Button,
+            { type: 'submit', disabled: !canSubmit },
+            importing ? t('urlImport.importing') : t('urlImport.submit'),
+          ),
+        ),
+      ),
+    ),
   )
 }
