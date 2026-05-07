@@ -355,24 +355,35 @@ fn ensure_kiro_mcp_config(vault_path: &str) -> Result<(), String> {
 }
 
 fn write_kiro_mcp_json(vault_path: &str, mcp_server_path: &str) -> Result<(), String> {
-    let config = serde_json::json!({
-        "mcpServers": {
-            "tolaria": {
-                "command": "node",
-                "args": [mcp_server_path],
-                "env": { "VAULT_PATH": vault_path },
-                "disabled": false
-            }
-        }
-    });
-
     let config_dir = Path::new(vault_path).join(".kiro").join("settings");
     std::fs::create_dir_all(&config_dir)
         .map_err(|e| format!("Failed to create .kiro/settings: {e}"))?;
 
     let config_path = config_dir.join("mcp.json");
-    std::fs::write(&config_path, serde_json::to_string_pretty(&config).unwrap())
-        .map_err(|e| format!("Failed to write mcp.json: {e}"))?;
+
+    let mut config: serde_json::Value = std::fs::read_to_string(&config_path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    let servers = config
+        .as_object_mut()
+        .ok_or("Invalid mcp.json: not an object")?
+        .entry("mcpServers")
+        .or_insert_with(|| serde_json::json!({}));
+
+    servers["tolaria"] = serde_json::json!({
+        "command": "node",
+        "args": [mcp_server_path],
+        "env": { "VAULT_PATH": vault_path },
+        "disabled": false
+    });
+
+    std::fs::write(
+        &config_path,
+        serde_json::to_string_pretty(&config).map_err(|e| format!("JSON serialize error: {e}"))?,
+    )
+    .map_err(|e| format!("Failed to write mcp.json: {e}"))?;
 
     Ok(())
 }
@@ -849,18 +860,29 @@ mod tests {
     }
 
     #[test]
-    fn write_kiro_mcp_json_overwrites_existing_config() {
+    fn write_kiro_mcp_json_merges_preserving_existing_servers() {
         let dir = tempfile::tempdir().unwrap();
         let vault_path = dir.path().to_str().unwrap();
 
-        write_kiro_mcp_json(vault_path, "/old/index.js").unwrap();
+        // Pre-create config with another server
+        let config_dir = dir.path().join(".kiro/settings");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(
+            config_dir.join("mcp.json"),
+            r#"{"mcpServers":{"other":{"command":"python","args":["server.py"]}}}"#,
+        )
+        .unwrap();
+
         write_kiro_mcp_json(vault_path, "/new/index.js").unwrap();
 
         let content: serde_json::Value = serde_json::from_str(
             &std::fs::read_to_string(dir.path().join(".kiro/settings/mcp.json")).unwrap(),
         )
         .unwrap();
+        // tolaria entry updated
         assert_eq!(content["mcpServers"]["tolaria"]["args"][0], "/new/index.js");
+        // existing server preserved
+        assert_eq!(content["mcpServers"]["other"]["command"], "python");
     }
 
     #[test]
