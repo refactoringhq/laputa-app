@@ -164,6 +164,14 @@ interface VaultEntry {
 
 Asset previewability is inferred in the renderer from the filename extension (`src/utils/filePreview.ts`) rather than stored as a new persisted kind. Supported images render through `<img>`, supported audio/video render through native HTML media controls, and supported PDFs render through the webview's PDF object renderer, all backed by Tauri asset URLs. Runtime asset access is accumulated only for vault roots Tolaria has loaded in the current app session, because Tauri directory forbids cannot be safely reversed after a vault switch. The "open in default app" action re-enters the active-vault command boundary through `open_vault_file_external` before delegating to the native opener. This keeps the filesystem as source of truth and avoids converting assets into proprietary objects.
 
+### URL note imports
+
+`import_note_from_url` creates a new root-level Markdown note from a web URL. The renderer opens it through the File menu item "New Note from URL...", the command palette action "New Note from URL...", or the shared `Cmd/Ctrl-U` app command. The selected Type section supplies the imported note's `type:` value; every other selection defaults to `Note`.
+
+The Rust importer uses `curl.md` for v0.1 Markdown conversion, then rewrites the result into Tolaria's durable note shape. The created note owns frontmatter such as `type:`, clean `url:`, and an optional supported HTTPS favicon `icon:`. Type frontmatter defaults are applied, but Type body templates are not appended because the imported page body is the note body.
+
+Imported media is saved flat under `attachments/` with unique names like `url-import-<note-slug>-<index>-<hash>.<ext>`. Markdown media references are rewritten to vault-root-relative paths such as `attachments/url-import-page-01-a1b2c3d4.webp`. The importer only handles media directly referenced by the converted Markdown and does not crawl arbitrary links.
+
 ### Note Content Freshness
 
 The renderer may cache recently opened or preloaded markdown content, but cached content is only a performance hint. `useTabManagement` can reuse cached text immediately when it carries the same `modifiedAt` and `fileSize` identity as the current `VaultEntry`; otherwise it validates the cached string with the `validate_note_content` Tauri command. That command re-enters the same vault path boundary checks as `get_note_content` and compares the cached text against the current on-disk file bytes. A mismatch, missing file, or unreadable file falls back to the normal fresh-read path and existing missing/unreadable recovery. Background note prefetch is bounded to a small number of concurrent native reads, and a note opened while queued is promoted to foreground instead of waiting behind the prefetch backlog. Note-open entry objects are re-normalized at the tab boundary, so transient reload or bridge payloads with missing display metadata fall back to filename/title defaults before editor chrome renders; entries without a usable path are ignored instead of opening a broken tab.
@@ -838,6 +846,7 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 ### Product Events
 - **File previews** — `file_preview_opened`, `file_preview_action`, and `file_preview_failed` report only preview/action categories such as `image`, `pdf`, `unsupported`, `open_external`, `copy_path`, and `reveal`.
 - **Inline image lightbox** — `inline_image_lightbox_opened` records that a rich-editor inline image was opened from double-click, without sending note paths, image URLs, alt text, or file names.
+- **URL note import**: `note_imported_from_url` records provider, status, inherited-type flag, icon presence, and media counts. It must not send the source URL, page title, note path, or attachment filenames.
 - **Code block copy** — `code_block_copied` records that the rich-editor code-block copy action was used, without sending note paths, languages, or code content.
 - **AI agent sessions** — `ai_agent_message_sent`, `ai_agent_message_blocked`, `ai_agent_response_completed`, `ai_agent_response_failed`, and `ai_agent_permission_mode_changed` use only agent ids, permission modes, counts, and coarse status categories.
 - **All Notes visibility** — `all_notes_visibility_changed` records only the toggled category and enabled state.

@@ -31,6 +31,7 @@ function makeHandlers(): AppCommandHandlers {
   return {
     onSetViewMode: vi.fn(),
     onCreateNote: vi.fn(),
+    onCreateNoteFromUrl: vi.fn(),
     onCreateType: vi.fn(),
     onQuickOpen: vi.fn(),
     onSave: vi.fn(),
@@ -112,9 +113,20 @@ describe('appCommandDispatcher', () => {
     )
 
     expect(menuCommandIds).toContain(APP_COMMAND_IDS.fileNewNote)
+    expect(menuCommandIds).toContain(APP_COMMAND_IDS.fileNewNoteFromUrl)
     expect(menuCommandIds).toContain(APP_COMMAND_IDS.editPastePlainText)
     expect(menuCommandIds).toContain(APP_COMMAND_IDS.viewGoBack)
     expect(menuCommandIds).not.toContain(APP_COMMAND_IDS.noteToggleFavorite)
+  })
+
+  it('places New Note from URL directly after New Note in the File menu', () => {
+    const fileMenu = APP_COMMAND_MENU_SECTIONS.find(section => section.label === 'File')
+    const fileCommandIds = fileMenu?.items.flatMap(item => item.kind === 'command' ? [item.commandId] : []) ?? []
+
+    expect(fileCommandIds.slice(0, 2)).toEqual([
+      APP_COMMAND_IDS.fileNewNote,
+      APP_COMMAND_IDS.fileNewNoteFromUrl,
+    ])
   })
 
   it('keeps native menu state groups inside the shared command menu manifest', () => {
@@ -133,6 +145,7 @@ describe('appCommandDispatcher', () => {
 
   it('finds raw editor, AI, and plain-text paste shortcuts from the shared catalog', () => {
     expect(findShortcutCommandId('command-or-ctrl', 'o', 'KeyO')).toBe(APP_COMMAND_IDS.fileQuickOpen)
+    expect(findShortcutCommandId('command-or-ctrl', 'u', 'KeyU')).toBe(APP_COMMAND_IDS.fileNewNoteFromUrl)
     expect(findShortcutCommandId('command-or-ctrl', '\\')).toBe(APP_COMMAND_IDS.editToggleRawEditor)
     expect(findShortcutCommandId('command-or-ctrl-shift', '¬', 'KeyL')).toBe(APP_COMMAND_IDS.viewToggleAiChat)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'T', 'KeyT')).toBe(APP_COMMAND_IDS.viewToggleTableOfContents)
@@ -141,6 +154,12 @@ describe('appCommandDispatcher', () => {
 
   it('gives every shortcut command an explicit deterministic QA strategy', () => {
     expect(getDeterministicShortcutQaDefinition(APP_COMMAND_IDS.fileNewNote)).toMatchObject({
+      preferredMode: 'native-menu-command',
+      supportsRendererShortcutEvent: true,
+      supportsNativeMenuCommand: true,
+      requiresManualNativeAcceleratorQa: true,
+    })
+    expect(getDeterministicShortcutQaDefinition(APP_COMMAND_IDS.fileNewNoteFromUrl)).toMatchObject({
       preferredMode: 'native-menu-command',
       supportsRendererShortcutEvent: true,
       supportsNativeMenuCommand: true,
@@ -174,6 +193,13 @@ describe('appCommandDispatcher', () => {
       ctrlKey: false,
       shiftKey: true,
     })
+    expect(getShortcutEventInit(APP_COMMAND_IDS.fileNewNoteFromUrl)).toMatchObject({
+      key: 'u',
+      code: 'KeyU',
+      metaKey: true,
+      ctrlKey: false,
+      shiftKey: false,
+    })
     expect(getShortcutEventInit(APP_COMMAND_IDS.viewToggleAiChat, { preferControl: true })).toMatchObject({
       key: 'l',
       code: 'KeyL',
@@ -193,6 +219,7 @@ describe('appCommandDispatcher', () => {
 
   it('resolves event modifiers through the shared shortcut catalog', () => {
     expectShortcutEventCommand({ key: 'o', code: 'KeyO', metaKey: true }, APP_COMMAND_IDS.fileQuickOpen)
+    expectShortcutEventCommand({ key: 'u', code: 'KeyU', metaKey: true }, APP_COMMAND_IDS.fileNewNoteFromUrl)
     expectShortcutEventCommand({ key: '¬', code: 'KeyL', metaKey: true, shiftKey: true }, APP_COMMAND_IDS.viewToggleAiChat)
     expectShortcutEventCommand({ key: 'I', code: 'KeyI', metaKey: true, shiftKey: true }, APP_COMMAND_IDS.viewToggleProperties)
     expectShortcutEventCommand({ key: 'ArrowLeft', code: 'ArrowLeft', metaKey: true }, APP_COMMAND_IDS.viewGoBack)
@@ -207,6 +234,7 @@ describe('appCommandDispatcher', () => {
 
     expectShortcutEventCommand({ key: 'e', code: 'KeyE', ctrlKey: true }, null)
     expectShortcutEventCommand({ key: 'n', code: 'KeyN', ctrlKey: true }, null)
+    expectShortcutEventCommand({ key: 'u', code: 'KeyU', ctrlKey: true }, null)
     expectShortcutEventCommand({ key: 'p', code: 'KeyP', ctrlKey: true }, null)
     expectShortcutEventCommand({ key: 'd', code: 'KeyD', ctrlKey: true }, null)
     expectShortcutEventCommand({ key: 'e', code: 'KeyE', metaKey: true }, APP_COMMAND_IDS.noteToggleOrganized)
@@ -216,6 +244,12 @@ describe('appCommandDispatcher', () => {
     const handlers = makeHandlers()
     expect(dispatchAppCommand(APP_COMMAND_IDS.fileNewNote, handlers)).toBe(true)
     expect(handlers.onCreateNote).toHaveBeenCalled()
+  })
+
+  it('dispatches New Note from URL through the shared command path', () => {
+    const handlers = makeHandlers()
+    expect(dispatchAppCommand(APP_COMMAND_IDS.fileNewNoteFromUrl, handlers)).toBe(true)
+    expect(handlers.onCreateNoteFromUrl).toHaveBeenCalled()
   })
 
   it('dispatches inspector toggle through the shared command path', () => {

@@ -12,6 +12,7 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     modifiedCount: 0,
     onQuickOpen: vi.fn(),
     onCreateNote: vi.fn(),
+    onCreateNoteFromUrl: vi.fn(),
     onCreateNoteOfType: vi.fn(),
     onSave: vi.fn(),
     onPastePlainText: vi.fn(),
@@ -150,6 +151,22 @@ describe('useCommandRegistry', () => {
 
     rerender(makeConfig())
     expect(findCommand(result.current, 'resolve-conflicts')!.enabled).toBe(true)
+  })
+
+  it('includes New Note from URL in the Note group with import keywords and shortcut', () => {
+    const onCreateNoteFromUrl = vi.fn()
+    const { result } = renderHook(() => useCommandRegistry(makeConfig({ onCreateNoteFromUrl })))
+    const cmd = findCommand(result.current, 'create-note-from-url')
+
+    expect(cmd).toBeDefined()
+    expect(cmd!.group).toBe('Note')
+    expect(cmd!.label).toBe('New Note from URL…')
+    expect(cmd!.enabled).toBe(true)
+    expect(formatShortcutDisplay({ display: '⌘U' })).toBe(cmd!.shortcut)
+    expect(cmd!.keywords).toEqual(expect.arrayContaining(['url', 'import', 'source']))
+
+    cmd!.execute()
+    expect(onCreateNoteFromUrl).toHaveBeenCalledOnce()
   })
 
   it('includes set-note-icon command in Note group', () => {

@@ -5,6 +5,7 @@ import type { DeletedNoteEntry } from './components/note-list/noteListUtils'
 import { Editor } from './components/Editor'
 import { ResizeHandle } from './components/ResizeHandle'
 import { CreateTypeDialog } from './components/CreateTypeDialog'
+import { NewNoteFromUrlDialog } from './components/NewNoteFromUrlDialog'
 import { CreateViewDialog } from './components/CreateViewDialog'
 import { QuickOpenPalette } from './components/QuickOpenPalette'
 import { CommandPalette } from './components/CommandPalette'
@@ -36,7 +37,7 @@ import { useDocumentThemeMode } from './hooks/useDocumentThemeMode'
 import { useThemeMode } from './hooks/useThemeMode'
 import type { ThemeMode } from './lib/themeMode'
 import { useNoteActions } from './hooks/useNoteActions'
-import { planNewTypeCreation } from './hooks/useNoteCreation'
+import { planNewTypeCreation, resolveTypeInstanceDefaults } from './hooks/useNoteCreation'
 import { useCommitFlow } from './hooks/useCommitFlow'
 import { useGitRemoteStatus } from './hooks/useGitRemoteStatus'
 import { useViewMode, type ViewMode } from './hooks/useViewMode'
@@ -82,7 +83,7 @@ import { DeleteProgressNotice } from './components/DeleteProgressNotice'
 import { UpdateBanner } from './components/UpdateBanner'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from './mock-tauri'
-import type { SidebarSelection, InboxPeriod, VaultEntry, ViewDefinition } from './types'
+import type { SidebarSelection, InboxPeriod, VaultEntry, ViewDefinition, ImportNoteFromUrlResult } from './types'
 import type { NoteListItem } from './utils/ai-context'
 import { initializeNoteProperties } from './utils/initializeNoteProperties'
 import { filterEntries, filterInboxEntries, type NoteListFilter } from './utils/noteListHelpers'
@@ -99,6 +100,7 @@ import { focusNoteIconPropertyEditor } from './components/noteIconPropertyEvents
 import { trackEvent } from './lib/telemetry'
 import { TOLARIA_DOCS_URL } from './constants/feedback'
 import { openExternalUrl } from './utils/url'
+import { formatUrlImportToast, noteTypeForUrlImport } from './utils/urlImport'
 import {
   SYSTEM_UI_LANGUAGE,
   getBrowserLanguagePreferences,
@@ -1119,6 +1121,49 @@ function App() {
     return created
   }, [notes, setToastMessage])
 
+  const handleCreateNoteFromUrl = useCallback(async (url: string) => {
+    const noteType = noteTypeForUrlImport(effectiveSelection)
+    const typeDefaults = resolveTypeInstanceDefaults({ entries: vault.entries, typeName: noteType })
+    const target = isTauri() ? invoke : mockInvoke
+
+    try {
+      const result = await target<ImportNoteFromUrlResult>('import_note_from_url', {
+        vaultPath: resolvedPath,
+        url,
+        noteType,
+        typeDefaults,
+      })
+      markRecentVaultWrite(result.entry.path)
+      vault.addEntry(result.entry)
+      notes.openTabWithContent(result.entry, result.content)
+      void vault.loadModifiedFiles()
+      recordAutoGitActivity()
+      trackEvent('note_imported_from_url', {
+        provider: 'curl_md',
+        status: 'ok',
+        inherited_type: noteType === 'Note' ? 0 : 1,
+        has_icon: result.entry.icon ? 1 : 0,
+        saved_media_count: result.savedMediaCount,
+        skipped_media_count: result.skippedMediaCount,
+      })
+      setToastMessage(formatUrlImportToast(result))
+      return true
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      trackEvent('note_imported_from_url', { provider: 'curl_md', status: 'error' })
+      setToastMessage(`Could not import URL: ${message}`)
+      return false
+    }
+  }, [
+    effectiveSelection,
+    markRecentVaultWrite,
+    notes,
+    recordAutoGitActivity,
+    resolvedPath,
+    setToastMessage,
+    vault,
+  ])
+
   const handleCreateMissingType = useCallback(async (path: string, missingType: string, nextTypeName: string) => {
     const trimmed = nextTypeName.trim()
     if (!trimmed) return false
@@ -1382,6 +1427,7 @@ function App() {
     && !activeDeletedFile
   const shouldBlockNeighborhoodEscape = (
     dialogs.showCreateTypeDialog
+    || dialogs.showCreateNoteFromUrlDialog
     || dialogs.showQuickOpen
     || dialogs.showCommandPalette
     || dialogs.showAIChat
@@ -1552,6 +1598,7 @@ function App() {
     onReplaceInNote: activeDeletedFile ? undefined : replaceInNoteCommand,
     onPastePlainText: pastePlainTextCommand,
     onCreateNote: notes.handleCreateNoteImmediate,
+    onCreateNoteFromUrl: dialogs.openCreateNoteFromUrl,
     onCreateNoteOfType: notes.handleCreateNoteImmediate,
     onSave: appSave.handleSave,
     onOpenSettings: dialogs.openSettings,
@@ -1833,6 +1880,7 @@ function App() {
         />
         <SearchPanel open={dialogs.showSearch} vaultPath={resolvedPath} entries={vault.entries} onSelectNote={notes.handleSelectNote} onClose={dialogs.closeSearch} />
         <CreateTypeDialog open={dialogs.showCreateTypeDialog} onClose={dialogs.closeCreateType} onCreate={handleCreateType} />
+        <NewNoteFromUrlDialog open={dialogs.showCreateNoteFromUrlDialog} onClose={dialogs.closeCreateNoteFromUrl} onImport={handleCreateNoteFromUrl} locale={appLocale} />
         <NoteRetargetingDialogs
           dialogState={noteRetargetingUi.dialogState}
           dialogEntry={noteRetargetingUi.dialogEntry}

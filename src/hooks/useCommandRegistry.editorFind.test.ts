@@ -10,6 +10,7 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     modifiedCount: 0,
     onArchiveNote: vi.fn(),
     onCreateNote: vi.fn(),
+    onCreateNoteFromUrl: vi.fn(),
     onCreateNoteOfType: vi.fn(),
     onDeleteNote: vi.fn(),
     onFindInNote: vi.fn(),

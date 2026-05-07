@@ -60,6 +60,14 @@ export interface VaultEntry {
   fileKind?: 'markdown' | 'text' | 'binary'
 }
 
+export interface ImportNoteFromUrlResult {
+  entry: VaultEntry
+  content: string
+  savedMediaCount: number
+  skippedMediaCount: number
+  warnings?: string[]
+}
+
 export type NoteStatus = 'new' | 'modified' | 'clean' | 'pendingSave' | 'unsaved'
 
 export interface GitCommit {

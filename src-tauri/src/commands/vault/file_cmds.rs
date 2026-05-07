@@ -266,6 +266,30 @@ pub fn copy_image_to_vault(
 }
 
 #[tauri::command]
+pub async fn import_note_from_url(
+    app_handle: tauri::AppHandle,
+    vault_path: PathBuf,
+    url: String,
+    note_type: String,
+    type_defaults: Vec<vault::TypeInstanceDefault>,
+) -> Result<vault::ImportNoteFromUrlResult, String> {
+    tokio::task::spawn_blocking(move || {
+        with_requested_root_path(vault_path.as_path(), |requested_root| {
+            let result = vault::import_note_from_url(
+                Path::new(requested_root),
+                &url,
+                &note_type,
+                type_defaults,
+            )?;
+            sync_image_asset_scope(&app_handle, requested_root)?;
+            Ok(result)
+        })
+    })
+    .await
+    .map_err(|e| format!("Task panicked: {e}"))?
+}
+
+#[tauri::command]
 pub fn list_vault(path: PathBuf) -> Result<Vec<VaultEntry>, String> {
     with_expanded_vault_root(path.as_path(), scan_visible_vault_entries)
 }

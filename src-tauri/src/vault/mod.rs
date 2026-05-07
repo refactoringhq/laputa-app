@@ -15,6 +15,7 @@ mod rename;
 mod rename_transaction;
 mod title_sync;
 mod trash;
+mod url_import;
 mod views;
 
 pub use cache::{invalidate_cache, scan_vault_cached};
@@ -36,6 +37,7 @@ pub use rename::{
 };
 pub use title_sync::{sync_title_on_open, SyncAction};
 pub use trash::{batch_delete_notes, delete_note};
+pub use url_import::{import_note_from_url, ImportNoteFromUrlResult, TypeInstanceDefault};
 pub use views::{
     delete_view, evaluate_view, save_view, scan_views, FilterCondition, FilterGroup, FilterNode,
     FilterOp, ViewDefinition, ViewFile,

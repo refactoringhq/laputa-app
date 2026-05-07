@@ -34,6 +34,7 @@ type SimpleHandlerKey =
   | 'onOpenSettings'
   | 'onCheckForUpdates'
   | 'onCreateNote'
+  | 'onCreateNoteFromUrl'
   | 'onCreateType'
   | 'onQuickOpen'
   | 'onSave'

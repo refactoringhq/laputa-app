@@ -178,6 +178,90 @@ function buildRenamedMockPath({ oldPath, newTitle }: { oldPath: string; newTitle
   return `${parentDir}/${slugifyMockTitle({ title: newTitle })}.md`
 }
 
+function uniqueMockNotePath(vaultPath: string, slug: string): string {
+  const normalizedVaultPath = vaultPath.replace(/\/+$/, '')
+  let candidate = `${normalizedVaultPath}/${slug || 'imported-page'}.md`
+  let suffix = 1
+  while (Object.prototype.hasOwnProperty.call(MOCK_CONTENT, candidate)) {
+    candidate = `${normalizedVaultPath}/${slug || 'imported-page'}-${suffix}.md`
+    suffix += 1
+  }
+  return candidate
+}
+
+function titleFromMockUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    const stem = parsed.pathname.split('/').filter(Boolean).pop()
+    return (stem ?? parsed.hostname.replace(/^www\./, ''))
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+  } catch {
+    return 'Imported Page'
+  }
+}
+
+function mockImportNoteFromUrl(args: {
+  vaultPath?: string
+  vault_path?: string
+  url: string
+  noteType?: string
+  note_type?: string
+}) {
+  const vaultPath = args.vaultPath ?? args.vault_path ?? DEFAULT_MOCK_VAULT_PATH
+  const noteType = args.noteType ?? args.note_type ?? 'Note'
+  const title = titleFromMockUrl(args.url)
+  const slug = slugifyMockTitle({ title }) || 'imported-page'
+  const path = uniqueMockNotePath(vaultPath, slug)
+  const filename = path.split('/').pop() ?? 'imported-page.md'
+  const content = `---\ntype: ${noteType}\nurl: ${args.url}\n---\n\n# ${title}\n\nImported web page content.\n`
+  const now = Math.floor(Date.now() / 1000)
+  const entry: VaultEntry = {
+    path,
+    filename,
+    title,
+    isA: noteType,
+    aliases: [],
+    belongsTo: [],
+    relatedTo: [],
+    status: null,
+    archived: false,
+    modifiedAt: now,
+    createdAt: now,
+    fileSize: content.length,
+    snippet: 'Imported web page content.',
+    wordCount: 4,
+    relationships: noteType === 'Type' ? {} : { Type: [`[[${noteType.toLowerCase()}]]`] },
+    icon: null,
+    color: null,
+    order: null,
+    sidebarLabel: null,
+    template: null,
+    sort: null,
+    view: null,
+    visible: null,
+    organized: false,
+    favorite: false,
+    favoriteIndex: null,
+    listPropertiesDisplay: [],
+    outgoingLinks: [],
+    properties: {},
+    hasH1: true,
+    fileKind: 'markdown',
+  }
+  MOCK_ENTRIES.unshift(entry)
+  MOCK_CONTENT[path] = content
+  mockSavedSinceCommit.add(path)
+  syncWindowContent()
+  return {
+    entry,
+    content,
+    savedMediaCount: 0,
+    skippedMediaCount: 0,
+    warnings: [],
+  }
+}
+
 function replaceMockTitleFrontmatter({ content, newTitle }: { content: string; newTitle: string }) {
   return /^title:\s*/m.test(content)
     ? content.replace(/^title:\s*.*$/m, `title: ${newTitle}`)
@@ -402,6 +486,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     syncWindowContent()
     return null
   },
+  import_note_from_url: mockImportNoteFromUrl,
   save_image: (args: { vault_path?: string; filename: string; data: string }) => {
     const vault = args.vault_path ?? '/Users/luca/Laputa'
     return `${vault}/attachments/${Date.now()}-${args.filename}`

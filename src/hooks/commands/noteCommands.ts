@@ -9,6 +9,7 @@ interface NoteCommandsConfig {
   isArchived: boolean
   activeNoteHasIcon?: boolean
   onCreateNote: () => void
+  onCreateNoteFromUrl: () => void
   onCreateType?: () => void
   onSave: () => void
   onFindInNote?: () => void
@@ -72,6 +73,14 @@ function buildCoreNoteCommands(config: NoteCommandsConfig): CommandAction[] {
       keywords: ['new', 'create', 'add'],
       enabled: true,
       execute: config.onCreateNote,
+    }),
+    createNoteCommand({
+      id: 'create-note-from-url',
+      label: 'New Note from URL…',
+      shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.fileNewNoteFromUrl),
+      keywords: ['new', 'create', 'url', 'web', 'clip', 'import', 'capture', 'source'],
+      enabled: true,
+      execute: config.onCreateNoteFromUrl,
     }),
     createNoteCommand({
       id: 'create-type',
