@@ -190,17 +190,10 @@ function uniqueMockNotePath(vaultPath: string, slug: string): string {
 }
 
 function titleFromMockUrl(url: string): string {
-  return titleizeMockUrlSegment(mockUrlTitleSegment(url))
-}
-
-function mockUrlTitleSegment(url: string): string {
-  try {
-    const parsed = new URL(url)
-    const segments = parsed.pathname.split('/').filter(Boolean)
-    return segments.at(-1) ?? parsed.hostname.replace(/^www\./, '')
-  } catch {
-    return 'Imported Page'
-  }
+  const parsed = URL.canParse(url) ? new URL(url) : null
+  const segments = parsed?.pathname.split('/').filter(Boolean) ?? []
+  const fallbackSegment = parsed?.hostname.replace(/^www\./, '') ?? 'Imported Page'
+  return titleizeMockUrlSegment(segments.at(-1) ?? fallbackSegment)
 }
 
 function titleizeMockUrlSegment(segment: string): string {

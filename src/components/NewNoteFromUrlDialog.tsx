@@ -1,11 +1,15 @@
-// biome-ignore-all lint/nursery/useQwikValidLexicalScope: Tolaria is a React app, so Qwik closure rules do not apply.
-// biome-ignore-all lint/suspicious/noReactSpecificProps: Tolaria is a React app, so React JSX props are intentional.
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { normalizeExternalUrl } from '../utils/url'
+import {
+  createCloseHandler,
+  createOpenChangeHandler,
+  createSubmitHandler,
+  createUrlChangeHandler,
+} from './newNoteFromUrlDialogHandlers'
 
 interface NewNoteFromUrlDialogProps {
   open: boolean
@@ -25,36 +29,14 @@ export function NewNoteFromUrlDialog({
   const [error, setError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
 
-  useEffect(() => {
-    if (!open) {
-      setUrl('')
-      setError(null)
-      setImporting(false)
-    }
-  }, [open])
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    const normalized = normalizeExternalUrl(url)
-    if (!normalized) {
-      setError(t('urlImport.invalidUrl'))
-      return
-    }
-
-    setImporting(true)
-    setError(null)
-    try {
-      const imported = await onImport(normalized)
-      if (imported !== false) onClose()
-    } finally {
-      setImporting(false)
-    }
-  }
-
   const canSubmit = Boolean(normalizeExternalUrl(url)) && !importing
+  const closeDialog = createCloseHandler(onClose, { setUrl, setError, setImporting })
+  const handleSubmit = createSubmitHandler({ url, t, onImport, onClose: closeDialog, setError, setImporting })
+  const handleOpenChange = createOpenChangeHandler(importing, closeDialog)
+  const handleUrlChange = createUrlChangeHandler({ error, setUrl, setError })
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !importing) onClose() }}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent showCloseButton={false} className="sm:max-w-[420px]">
         <DialogHeader>
           <DialogTitle>{t('urlImport.title')}</DialogTitle>
@@ -74,10 +56,7 @@ export function NewNoteFromUrlDialog({
               aria-invalid={Boolean(error)}
               aria-describedby={error ? 'new-note-from-url-error' : undefined}
               disabled={importing}
-              onChange={(event) => {
-                setUrl(event.target.value)
-                if (error) setError(null)
-              }}
+              onChange={handleUrlChange}
             />
             {error && (
               <p id="new-note-from-url-error" className="text-xs text-destructive">
@@ -86,7 +65,7 @@ export function NewNoteFromUrlDialog({
             )}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={importing} onClick={onClose}>
+            <Button type="button" variant="outline" disabled={importing} onClick={closeDialog}>
               {t('urlImport.cancel')}
             </Button>
             <Button type="submit" disabled={!canSubmit}>
