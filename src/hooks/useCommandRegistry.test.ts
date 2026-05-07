@@ -159,13 +159,14 @@ describe('useCommandRegistry', () => {
     const cmd = findCommand(result.current, 'create-note-from-url')
 
     expect(cmd).toBeDefined()
-    expect(cmd!.group).toBe('Note')
-    expect(cmd!.label).toBe('New Note from URL…')
-    expect(cmd!.enabled).toBe(true)
-    expect(formatShortcutDisplay({ display: '⌘U' })).toBe(cmd!.shortcut)
-    expect(cmd!.keywords).toEqual(expect.arrayContaining(['url', 'import', 'source']))
+    if (!cmd) throw new Error('New Note from URL command not found')
+    expect(cmd.group).toBe('Note')
+    expect(cmd.label).toBe('New Note from URL…')
+    expect(cmd.enabled).toBe(true)
+    expect(formatShortcutDisplay({ display: '⌘U' })).toBe(cmd.shortcut)
+    expect(cmd.keywords).toEqual(expect.arrayContaining(['url', 'import', 'source']))
 
-    cmd!.execute()
+    cmd.execute()
     expect(onCreateNoteFromUrl).toHaveBeenCalledOnce()
   })
 

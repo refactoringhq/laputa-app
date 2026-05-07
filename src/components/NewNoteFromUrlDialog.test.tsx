@@ -23,7 +23,9 @@ describe('NewNoteFromUrlDialog', () => {
     render(<NewNoteFromUrlDialog open onClose={onClose} onImport={onImport} />)
 
     fireEvent.change(screen.getByLabelText('URL'), { target: { value: 'ftp://example.com/file' } })
-    fireEvent.submit(screen.getByText('Import').closest('form')!)
+    const form = screen.getByText('Import').closest('form')
+    if (!form) throw new Error('Import form not found')
+    fireEvent.submit(form)
 
     expect(await screen.findByText('Enter a valid web URL.')).toBeInTheDocument()
     expect(onImport).not.toHaveBeenCalled()

@@ -182,7 +182,7 @@ function uniqueMockNotePath(vaultPath: string, slug: string): string {
   const normalizedVaultPath = vaultPath.replace(/\/+$/, '')
   let candidate = `${normalizedVaultPath}/${slug || 'imported-page'}.md`
   let suffix = 1
-  while (Object.prototype.hasOwnProperty.call(MOCK_CONTENT, candidate)) {
+  while (Object.hasOwn(MOCK_CONTENT, candidate)) {
     candidate = `${normalizedVaultPath}/${slug || 'imported-page'}-${suffix}.md`
     suffix += 1
   }
@@ -190,15 +190,23 @@ function uniqueMockNotePath(vaultPath: string, slug: string): string {
 }
 
 function titleFromMockUrl(url: string): string {
+  return titleizeMockUrlSegment(mockUrlTitleSegment(url))
+}
+
+function mockUrlTitleSegment(url: string): string {
   try {
     const parsed = new URL(url)
-    const stem = parsed.pathname.split('/').filter(Boolean).pop()
-    return (stem ?? parsed.hostname.replace(/^www\./, ''))
-      .replace(/[-_]+/g, ' ')
-      .replace(/\b\w/g, (char) => char.toUpperCase())
+    const segments = parsed.pathname.split('/').filter(Boolean)
+    return segments.at(-1) ?? parsed.hostname.replace(/^www\./, '')
   } catch {
     return 'Imported Page'
   }
+}
+
+function titleizeMockUrlSegment(segment: string): string {
+  return segment
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 function mockImportNoteFromUrl(args: {

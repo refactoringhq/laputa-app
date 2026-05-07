@@ -1127,12 +1127,12 @@ function App() {
     const target = isTauri() ? invoke : mockInvoke
 
     try {
-      const result = await target<ImportNoteFromUrlResult>('import_note_from_url', {
+      const result = await target('import_note_from_url', {
         vaultPath: resolvedPath,
         url,
         noteType,
         typeDefaults,
-      })
+      }) as ImportNoteFromUrlResult
       markRecentVaultWrite(result.entry.path)
       vault.addEntry(result.entry)
       notes.openTabWithContent(result.entry, result.content)
@@ -1160,7 +1160,6 @@ function App() {
     notes,
     recordAutoGitActivity,
     resolvedPath,
-    setToastMessage,
     vault,
   ])
 

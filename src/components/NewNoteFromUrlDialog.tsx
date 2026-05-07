@@ -1,3 +1,5 @@
+// biome-ignore-all lint/nursery/useQwikValidLexicalScope: Tolaria is a React app, so Qwik closure rules do not apply.
+// biome-ignore-all lint/suspicious/noReactSpecificProps: Tolaria is a React app, so React JSX props are intentional.
 import { useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'

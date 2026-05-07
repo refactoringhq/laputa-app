@@ -5291,6 +5291,7 @@ dependencies = [
  "gray_matter",
  "log",
  "notify",
+ "once_cell",
  "regex",
  "reqwest 0.12.28",
  "sentry",
