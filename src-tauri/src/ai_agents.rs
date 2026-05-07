@@ -288,14 +288,21 @@ where
         .arg("chat")
         .arg("--no-interactive")
         .arg("--trust-all-tools")
-        .arg(prompt)
         .current_dir(&request.vault_path)
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
     let mut child = command
         .spawn()
         .map_err(|error| format!("Failed to spawn kiro-cli: {error}"))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin
+            .write_all(prompt.as_bytes())
+            .map_err(|e| format!("Failed to write prompt to stdin: {e}"))?;
+    }
 
     let session_id = format!("kiro-{}", std::process::id());
     emit(AiAgentStreamEvent::Init {
