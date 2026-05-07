@@ -297,6 +297,7 @@ The BlockNote body is the only title editing surface:
 - The first H1 is the canonical display title.
 - There is no separate title row above the editor, even when a note has no H1.
 - Notes without an H1 show the editor body and placeholder only.
+- Legacy no-H1 notes whose display title differs from the filename show that title as read-only breadcrumb context beside the editable filename, so referenced notes remain identifiable without raw mode.
 - Filename changes are explicit breadcrumb actions, not a dedicated title-input side effect.
 
 ### Sidebar Selection

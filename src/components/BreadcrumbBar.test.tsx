@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { BreadcrumbBar } from './BreadcrumbBar'
@@ -54,6 +55,52 @@ const defaultProps = {
   diffMode: false,
   diffLoading: false,
   onToggleDiff: vi.fn(),
+}
+
+type BreadcrumbBarRenderProps = Omit<ComponentProps<typeof BreadcrumbBar>, 'entry'>
+
+function makeEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {
+  return { ...baseEntry, ...overrides }
+}
+
+function renderBreadcrumb(
+  entryOverrides: Partial<VaultEntry> = {},
+  props: Partial<BreadcrumbBarRenderProps> = {},
+) {
+  const entry = makeEntry(entryOverrides)
+  return {
+    entry,
+    ...render(<BreadcrumbBar entry={entry} {...defaultProps} {...props} />),
+  }
+}
+
+function renderEditableFilenameBreadcrumb(
+  entryOverrides: Partial<VaultEntry> = {},
+  props: Partial<BreadcrumbBarRenderProps> = {},
+) {
+  const onRenameFilename = vi.fn()
+  const result = renderBreadcrumb(entryOverrides, { ...props, onRenameFilename })
+  return { ...result, onRenameFilename }
+}
+
+function startFilenameRename() {
+  fireEvent.doubleClick(screen.getByTestId('breadcrumb-filename-trigger'))
+  return screen.getByTestId('breadcrumb-filename-input')
+}
+
+function expectDisplayTitleState(
+  entryOverrides: Partial<VaultEntry>,
+  expected: { displayTitle: string | null; filenameStem: string },
+  props: Partial<BreadcrumbBarRenderProps> = {},
+) {
+  renderEditableFilenameBreadcrumb(entryOverrides, props)
+
+  if (expected.displayTitle) {
+    expect(screen.getByTestId('breadcrumb-display-title')).toHaveTextContent(expected.displayTitle)
+  } else {
+    expect(screen.queryByTestId('breadcrumb-display-title')).not.toBeInTheDocument()
+  }
+  expect(screen.getByTestId('breadcrumb-filename-trigger')).toHaveTextContent(expected.filenameStem)
 }
 
 async function expectTooltip(trigger: HTMLElement, ...parts: string[]) {
@@ -271,50 +318,121 @@ describe('BreadcrumbBar — title in breadcrumb (always rendered, CSS-toggled)',
 })
 
 describe('BreadcrumbBar — filename controls', () => {
+  it('shows a legacy display title while keeping the filename visible', () => {
+    expectDisplayTitleState(
+      {
+        title: 'Reference Planning Notes',
+        filename: 'ref-570.md',
+        hasH1: false,
+      },
+      { displayTitle: 'Reference Planning Notes', filenameStem: 'ref-570' },
+    )
+  })
+
+  it('uses opened content when stale metadata marks a legacy note as H1-titled', () => {
+    expectDisplayTitleState(
+      {
+        title: 'Reference Planning Notes',
+        filename: 'ref-570.md',
+        hasH1: true,
+      },
+      { displayTitle: 'Reference Planning Notes', filenameStem: 'ref-570' },
+      {
+        content: '---\ntitle: Reference Planning Notes\ntype: Note\n---\n\nBody without an H1.',
+      },
+    )
+  })
+
+  it('keeps content-derived H1 notes focused on the filename breadcrumb', () => {
+    expectDisplayTitleState(
+      {
+        title: 'Reference Planning Notes',
+        filename: 'manual-filename.md',
+        hasH1: false,
+      },
+      { displayTitle: null, filenameStem: 'manual-filename' },
+      {
+        content: '---\ntitle: Reference Planning Notes\n---\n\n# Canonical H1\n\nBody.',
+      },
+    )
+  })
+
+  it('does not duplicate the display title when the filename already matches it', () => {
+    expectDisplayTitleState(
+      {
+        title: 'Reference Planning Notes',
+        filename: 'reference-planning-notes.md',
+        hasH1: false,
+      },
+      { displayTitle: null, filenameStem: 'reference-planning-notes' },
+    )
+  })
+
+  it('does not duplicate the display title when the filename matches with spaces', () => {
+    expectDisplayTitleState(
+      {
+        title: 'Reference Planning Notes',
+        filename: 'Reference Planning Notes.md',
+        hasH1: false,
+      },
+      { displayTitle: null, filenameStem: 'Reference Planning Notes' },
+    )
+  })
+
+  it('keeps H1-titled notes focused on the filename breadcrumb', () => {
+    expectDisplayTitleState(
+      {
+        title: 'Reference Planning Notes',
+        filename: 'manual-filename.md',
+        hasH1: true,
+      },
+      { displayTitle: null, filenameStem: 'manual-filename' },
+    )
+  })
+
   it('shows the sync button when the filename diverges from the title slug', () => {
-    const entry = { ...baseEntry, title: 'Fresh Title', filename: 'untitled-note-123.md' }
-    render(<BreadcrumbBar entry={entry} {...defaultProps} onRenameFilename={vi.fn()} />)
+    renderEditableFilenameBreadcrumb({ title: 'Fresh Title', filename: 'untitled-note-123.md' })
     expect(screen.getByTestId('breadcrumb-sync-button')).toBeInTheDocument()
   })
 
   it('hides the sync button when the filename already matches the title slug', () => {
-    const entry = { ...baseEntry, title: 'Test Note', filename: 'test-note.md' }
-    render(<BreadcrumbBar entry={entry} {...defaultProps} onRenameFilename={vi.fn()} />)
+    renderEditableFilenameBreadcrumb({ title: 'Test Note', filename: 'test-note.md' })
     expect(screen.queryByTestId('breadcrumb-sync-button')).not.toBeInTheDocument()
   })
 
   it('clicking the sync button renames the file to the title slug', () => {
-    const onRenameFilename = vi.fn()
-    const entry = { ...baseEntry, title: 'Fresh Title', filename: 'untitled-note-123.md' }
-    render(<BreadcrumbBar entry={entry} {...defaultProps} onRenameFilename={onRenameFilename} />)
+    const { entry, onRenameFilename } = renderEditableFilenameBreadcrumb({
+      title: 'Fresh Title',
+      filename: 'untitled-note-123.md',
+    })
+
     fireEvent.click(screen.getByTestId('breadcrumb-sync-button'))
+
     expect(onRenameFilename).toHaveBeenCalledWith(entry.path, 'fresh-title')
   })
 
   it('lets keyboard users press Enter on the filename to start editing', () => {
-    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onRenameFilename={vi.fn()} />)
+    renderEditableFilenameBreadcrumb()
+
     fireEvent.keyDown(screen.getByTestId('breadcrumb-filename-trigger'), { key: 'Enter' })
+
     expect(screen.getByTestId('breadcrumb-filename-input')).toHaveValue('test')
   })
 
   it('double-clicking the filename enters edit mode and Enter confirms the rename', () => {
-    const onRenameFilename = vi.fn()
-    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onRenameFilename={onRenameFilename} />)
+    const { entry, onRenameFilename } = renderEditableFilenameBreadcrumb()
 
-    fireEvent.doubleClick(screen.getByTestId('breadcrumb-filename-trigger'))
-    const input = screen.getByTestId('breadcrumb-filename-input')
+    const input = startFilenameRename()
     fireEvent.change(input, { target: { value: 'renamed-file' } })
     fireEvent.keyDown(input, { key: 'Enter' })
 
-    expect(onRenameFilename).toHaveBeenCalledWith(baseEntry.path, 'renamed-file')
+    expect(onRenameFilename).toHaveBeenCalledWith(entry.path, 'renamed-file')
   })
 
   it('pressing Escape while editing cancels the inline rename', () => {
-    const onRenameFilename = vi.fn()
-    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onRenameFilename={onRenameFilename} />)
+    const { onRenameFilename } = renderEditableFilenameBreadcrumb()
 
-    fireEvent.doubleClick(screen.getByTestId('breadcrumb-filename-trigger'))
-    const input = screen.getByTestId('breadcrumb-filename-input')
+    const input = startFilenameRename()
     fireEvent.change(input, { target: { value: 'renamed-file' } })
     fireEvent.keyDown(input, { key: 'Escape' })
 
@@ -323,15 +441,13 @@ describe('BreadcrumbBar — filename controls', () => {
   })
 
   it('blur confirms the inline rename when the value changed', () => {
-    const onRenameFilename = vi.fn()
-    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onRenameFilename={onRenameFilename} />)
+    const { entry, onRenameFilename } = renderEditableFilenameBreadcrumb()
 
-    fireEvent.doubleClick(screen.getByTestId('breadcrumb-filename-trigger'))
-    const input = screen.getByTestId('breadcrumb-filename-input')
+    const input = startFilenameRename()
     fireEvent.change(input, { target: { value: 'renamed-on-blur' } })
     fireEvent.blur(input)
 
-    expect(onRenameFilename).toHaveBeenCalledWith(baseEntry.path, 'renamed-on-blur')
+    expect(onRenameFilename).toHaveBeenCalledWith(entry.path, 'renamed-on-blur')
   })
 })
 

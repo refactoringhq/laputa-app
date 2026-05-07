@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { EditorContentLayout } from './EditorContentLayout'
 
 vi.mock('../BreadcrumbBar', () => ({
-  BreadcrumbBar: ({ noteWidth }: { noteWidth?: string }) => <div data-testid="breadcrumb-bar" data-note-width={noteWidth} />,
+  BreadcrumbBar: ({ content, noteWidth }: { content?: string; noteWidth?: string }) => (
+    <div data-testid="breadcrumb-bar" data-content={content} data-note-width={noteWidth} />
+  ),
 }))
 
 vi.mock('../ArchivedNoteBanner', () => ({
@@ -107,6 +109,24 @@ describe('EditorContentLayout', () => {
 
     expect(container.firstElementChild).toHaveClass('editor-content-width--wide')
     expect(screen.getByTestId('breadcrumb-bar')).toHaveAttribute('data-note-width', 'wide')
+  })
+
+  it('passes the active note content into the breadcrumb', () => {
+    render(<EditorContentLayout {...createModel({
+      activeTab: {
+        entry: {
+          path: '/vault/project/ref-570.md',
+          filename: 'ref-570.md',
+          title: 'Reference Planning Notes',
+        },
+        content: '---\ntitle: Reference Planning Notes\n---\n\nBody',
+      },
+    })} />)
+
+    expect(screen.getByTestId('breadcrumb-bar')).toHaveAttribute(
+      'data-content',
+      '---\ntitle: Reference Planning Notes\n---\n\nBody',
+    )
   })
 
   it('keeps raw mode out of the rich-editor content wrapper', () => {

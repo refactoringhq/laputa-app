@@ -178,6 +178,7 @@ function ActiveTabBreadcrumb({
   return (
     <BreadcrumbBar
       entry={activeTab.entry}
+      content={activeTab.content}
       wordCount={wordCount}
       barRef={barRef}
       loadingTitle={loadingTitle}

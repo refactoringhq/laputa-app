@@ -3,6 +3,7 @@ import type { NoteWidthMode, VaultEntry } from '../types'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../lib/i18n'
 import { APP_COMMAND_IDS, formatShortcutDisplay, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
+import { extractFrontmatterTitleFromContent, extractH1TitleFromContent } from '../utils/noteTitle'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ActionTooltip, type ActionTooltipCopy } from '@/components/ui/action-tooltip'
@@ -67,6 +68,7 @@ interface BreadcrumbBarProps {
   barRef?: React.Ref<HTMLDivElement>
   locale?: AppLocale
   loadingTitle?: boolean
+  content?: string | null
 }
 
 const BREADCRUMB_ICON_CLASS = 'size-[16px]'
@@ -579,6 +581,35 @@ function deriveSyncStem(entry: VaultEntry): string | null {
   return expectedStem
 }
 
+interface BreadcrumbDisplayTitleState {
+  hasH1: boolean
+  title: string
+}
+
+function deriveContentDisplayTitleState(content?: string | null): BreadcrumbDisplayTitleState | null {
+  if (typeof content !== 'string') return null
+  const h1Title = extractH1TitleFromContent(content)
+  if (h1Title) return { title: h1Title, hasH1: true }
+
+  const frontmatterTitle = extractFrontmatterTitleFromContent(content)
+  return frontmatterTitle ? { title: frontmatterTitle, hasH1: false } : null
+}
+
+function deriveEntryDisplayTitleState(entry: VaultEntry): BreadcrumbDisplayTitleState {
+  return {
+    title: entry.title.trim(),
+    hasH1: entry.hasH1,
+  }
+}
+
+function deriveBreadcrumbDisplayTitle(entry: VaultEntry, filenameStem: string, content?: string | null): string | null {
+  const displayState = deriveContentDisplayTitleState(content) ?? deriveEntryDisplayTitleState(entry)
+  const displayTitle = displayState.title.trim()
+  if (!displayTitle || displayState.hasH1) return null
+  if (slugify(displayTitle) === slugify(filenameStem)) return null
+  return displayTitle
+}
+
 function FilenameInput({
   inputRef,
   draftStem,
@@ -669,6 +700,7 @@ function SyncFilenameButton({
 }
 
 function FilenameDisplay({
+  content,
   entry,
   filenameStem,
   syncStem,
@@ -676,6 +708,7 @@ function FilenameDisplay({
   onRenameFilename,
   onStartEditing,
 }: {
+  content?: string | null
   entry: VaultEntry
   filenameStem: string
   syncStem: string | null
@@ -683,15 +716,29 @@ function FilenameDisplay({
   onRenameFilename?: (path: string, newFilenameStem: string) => void
   onStartEditing: () => void
 }) {
+  const displayTitle = deriveBreadcrumbDisplayTitle(entry, filenameStem, content)
+
   return (
     <div className="flex min-w-0 items-center gap-1">
+      {displayTitle && (
+        <>
+          <span
+            className="min-w-0 max-w-[min(24rem,45vw)] truncate text-foreground"
+            data-testid="breadcrumb-display-title"
+            title={displayTitle}
+          >
+            {displayTitle}
+          </span>
+          <span aria-hidden="true" className="shrink-0 text-border">·</span>
+        </>
+      )}
       <FilenameTrigger filenameStem={filenameStem} locale={locale} onStartEditing={onStartEditing} />
       <SyncFilenameButton entryPath={entry.path} syncStem={syncStem} locale={locale} onRenameFilename={onRenameFilename} />
     </div>
   )
 }
 
-function FilenameCrumb({ entry, locale = 'en', onRenameFilename }: Pick<BreadcrumbBarProps, 'entry' | 'locale' | 'onRenameFilename'>) {
+function FilenameCrumb({ content, entry, locale = 'en', onRenameFilename }: Pick<BreadcrumbBarProps, 'content' | 'entry' | 'locale' | 'onRenameFilename'>) {
   const filenameStem = useMemo(() => entry.filename.replace(/\.md$/, ''), [entry.filename])
   const syncStem = useMemo(() => deriveSyncStem(entry), [entry])
   const [isEditing, setIsEditing] = useState(false)
@@ -737,6 +784,7 @@ function FilenameCrumb({ entry, locale = 'en', onRenameFilename }: Pick<Breadcru
 
   return (
     <FilenameDisplay
+      content={content}
       entry={entry}
       filenameStem={filenameStem}
       syncStem={syncStem}
@@ -941,11 +989,12 @@ function BreadcrumbOverflowMenu({
 }
 
 function BreadcrumbTitle({
+  content,
   entry,
   locale,
   loadingTitle,
   onRenameFilename,
-}: Pick<BreadcrumbBarProps, 'entry' | 'locale' | 'loadingTitle' | 'onRenameFilename'>) {
+}: Pick<BreadcrumbBarProps, 'content' | 'entry' | 'locale' | 'loadingTitle' | 'onRenameFilename'>) {
   const typeLabel = entry.isA ?? 'Note'
   return (
     <div className="breadcrumb-bar__title-content flex items-center gap-1.5 min-w-0 text-sm text-muted-foreground">
@@ -954,13 +1003,14 @@ function BreadcrumbTitle({
       <div className="flex min-w-0 items-center gap-1 truncate">
         {loadingTitle
           ? <BreadcrumbTitleSkeleton />
-          : <FilenameCrumb entry={entry} locale={locale} onRenameFilename={onRenameFilename} />}
+          : <FilenameCrumb content={content} entry={entry} locale={locale} onRenameFilename={onRenameFilename} />}
       </div>
     </div>
   )
 }
 
 export const BreadcrumbBar = memo(function BreadcrumbBar({
+  content,
   entry,
   barRef,
   locale = 'en',
@@ -990,6 +1040,7 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
       >
         <div ref={titleRef} className="breadcrumb-bar__title min-w-0 flex-1 overflow-hidden">
           <BreadcrumbTitle
+            content={content}
             entry={entry}
             locale={locale}
             loadingTitle={loadingTitle}
