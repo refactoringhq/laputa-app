@@ -16,6 +16,7 @@ import { buildTypeCommands } from './commands/typeCommands'
 import { buildFilterCommands } from './commands/filterCommands'
 import { localizeCommandActions } from './commands/localizeCommands'
 import { extractVaultTypes } from '../utils/vaultTypes'
+import { GIT_FEATURES_ENABLED } from '../lib/gitFeatures'
 
 // Re-export types and helpers for backward compatibility
 export type { CommandAction, CommandGroup } from './commands/types'
@@ -273,7 +274,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
   const commands = useMemo(() => [
     ...navigationCommands,
     ...noteCommands,
-    ...gitCommands,
+    ...(GIT_FEATURES_ENABLED ? gitCommands : []),
     ...viewCommands,
     ...settingsCommands,
     ...aiCommands,

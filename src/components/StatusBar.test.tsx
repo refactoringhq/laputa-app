@@ -371,7 +371,7 @@ describe('StatusBar', () => {
     expect(onRemoveVault).toHaveBeenCalledWith('/Users/luca/Work')
   })
 
-  it('shows Changes badge with count when modifiedCount is > 0', () => {
+  it.skip('shows Changes badge with count when modifiedCount is > 0 (git UI hidden in this fork)', () => {
     render(<StatusBar noteCount={100} modifiedCount={3} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} />)
     expect(screen.getByTestId('status-modified-count')).toBeInTheDocument()
     expect(screen.getByText('Changes')).toBeInTheDocument()
@@ -386,11 +386,7 @@ describe('StatusBar', () => {
       flexWrap: 'nowrap',
       height: '30px',
     })
-    expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
-    expect(screen.getByTestId('status-pulse')).toBeInTheDocument()
     expect(screen.getByTestId('status-feedback')).toBeInTheDocument()
-    expect(screen.queryByText('Commit')).not.toBeInTheDocument()
-    expect(screen.queryByText('History')).not.toBeInTheDocument()
     expect(screen.queryByText('Contribute')).not.toBeInTheDocument()
   })
 
@@ -402,13 +398,9 @@ describe('StatusBar', () => {
       flexWrap: 'nowrap',
       height: '30px',
     })
-    expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
-    expect(screen.getByTestId('status-pulse')).toBeInTheDocument()
     expect(screen.getByTestId('status-feedback')).toBeInTheDocument()
     expect(screen.getByTestId('status-build-number')).toBeInTheDocument()
     expect(screen.getByTestId('status-claude-code')).toBeInTheDocument()
-    expect(screen.queryByText('Commit')).not.toBeInTheDocument()
-    expect(screen.queryByText('History')).not.toBeInTheDocument()
     expect(screen.queryByText('Contribute')).not.toBeInTheDocument()
     expect(screen.queryByText('No remote')).not.toBeInTheDocument()
     expect(screen.queryByText('MCP')).not.toBeInTheDocument()
@@ -453,7 +445,7 @@ describe('StatusBar', () => {
     expect(screen.queryByText('Open local folder')).not.toBeInTheDocument()
   })
 
-  it('calls onClickPending when clicking the pending count', () => {
+  it.skip('calls onClickPending when clicking the pending count (git UI hidden in this fork)', () => {
     const onClickPending = vi.fn()
     render(
       <StatusBar noteCount={100} modifiedCount={5} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onClickPending={onClickPending} />
@@ -462,7 +454,7 @@ describe('StatusBar', () => {
     expect(onClickPending).toHaveBeenCalledOnce()
   })
 
-  it('pending changes tooltip is available on keyboard focus', async () => {
+  it.skip('pending changes tooltip is available on keyboard focus (git UI hidden in this fork)', async () => {
     render(
       <StatusBar noteCount={100} modifiedCount={3} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onClickPending={vi.fn()} />
     )
@@ -507,7 +499,7 @@ describe('StatusBar', () => {
     expect(onInstallMcp).toHaveBeenCalledOnce()
   })
 
-  it('shows Pull required label when syncStatus is pull_required', () => {
+  it.skip('shows Pull required label when syncStatus is pull_required (git UI hidden in this fork)', () => {
     render(
       <StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} syncStatus="pull_required" />
     )
@@ -521,7 +513,7 @@ describe('StatusBar', () => {
     expect(screen.getByTestId('status-offline')).toHaveTextContent('Offline')
   })
 
-  it('shows a no-remote chip when the active git vault has no remote', () => {
+  it.skip('shows a no-remote chip when the active git vault has no remote (git UI hidden in this fork)', () => {
     render(
       <StatusBar
         noteCount={100}
@@ -534,7 +526,7 @@ describe('StatusBar', () => {
     expect(screen.getByTestId('status-no-remote')).toHaveTextContent('No remote')
   })
 
-  it('opens the add-remote flow when clicking the no-remote chip', () => {
+  it.skip('opens the add-remote flow when clicking the no-remote chip (git UI hidden in this fork)', () => {
     const onAddRemote = vi.fn()
     render(
       <TooltipProvider>
@@ -556,7 +548,7 @@ describe('StatusBar', () => {
     expect(onAddRemote).toHaveBeenCalledOnce()
   })
 
-  it('calls onPullAndPush when clicking Pull required badge', () => {
+  it.skip('calls onPullAndPush when clicking Pull required badge (git UI hidden in this fork)', () => {
     const onPullAndPush = vi.fn()
     render(
       <StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} syncStatus="pull_required" onPullAndPush={onPullAndPush} />
@@ -565,7 +557,7 @@ describe('StatusBar', () => {
     expect(onPullAndPush).toHaveBeenCalledOnce()
   })
 
-  it('shows git status popup when clicking idle sync badge', () => {
+  it.skip('shows git status popup when clicking idle sync badge (git UI hidden in this fork)', () => {
     render(
       <StatusBar
         noteCount={100}
@@ -584,20 +576,20 @@ describe('StatusBar', () => {
     expect(screen.getByText(/1 behind/)).toBeInTheDocument()
   })
 
-  it('shows History badge in status bar', () => {
+  it.skip('shows History badge in status bar (git UI hidden in this fork)', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} isGitVault />)
     expect(screen.getByTestId('status-pulse')).toBeInTheDocument()
     expect(screen.getByText('History')).toBeInTheDocument()
   })
 
-  it('calls onClickPulse when clicking History badge', () => {
+  it.skip('calls onClickPulse when clicking History badge (git UI hidden in this fork)', () => {
     const onClickPulse = vi.fn()
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} isGitVault onClickPulse={onClickPulse} />)
     fireEvent.click(screen.getByTestId('status-pulse'))
     expect(onClickPulse).toHaveBeenCalledOnce()
   })
 
-  it('replaces git controls with a missing-Git warning when isGitVault is false', () => {
+  it.skip('replaces git controls with a missing-Git warning when isGitVault is false (git UI hidden in this fork)', () => {
     render(
       <StatusBar
         noteCount={100}
@@ -617,7 +609,7 @@ describe('StatusBar', () => {
     expect(screen.queryByTestId('status-commit-push')).not.toBeInTheDocument()
   })
 
-  it('opens Git setup from the missing-Git warning with mouse and keyboard', () => {
+  it.skip('opens Git setup from the missing-Git warning with mouse and keyboard (git UI hidden in this fork)', () => {
     const onInitializeGit = vi.fn()
     render(
       <StatusBar
@@ -639,7 +631,7 @@ describe('StatusBar', () => {
     expect(onInitializeGit).toHaveBeenCalledTimes(2)
   })
 
-  it('shows Commit button in status bar', () => {
+  it.skip('shows Commit button in status bar (git UI hidden in this fork)', () => {
     const onCommitPush = vi.fn()
     render(<StatusBar noteCount={100} modifiedCount={5} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onCommitPush={onCommitPush} />)
     expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
@@ -647,7 +639,7 @@ describe('StatusBar', () => {
     expect(onCommitPush).toHaveBeenCalledOnce()
   })
 
-  it('activates the Commit button with the keyboard', () => {
+  it.skip('activates the Commit button with the keyboard (git UI hidden in this fork)', () => {
     const onCommitPush = vi.fn()
     render(<StatusBar noteCount={100} modifiedCount={5} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onCommitPush={onCommitPush} />)
     const commitButton = screen.getByTestId('status-commit-push')
@@ -656,7 +648,7 @@ describe('StatusBar', () => {
     expect(onCommitPush).toHaveBeenCalledOnce()
   })
 
-  it('uses a local-only tooltip for the commit button when no remote is configured', async () => {
+  it.skip('uses a local-only tooltip for the commit button when no remote is configured (git UI hidden in this fork)', async () => {
     render(
       <StatusBar
         noteCount={100}
@@ -671,7 +663,7 @@ describe('StatusBar', () => {
     await expectTooltip(screen.getByRole('button', { name: 'Commit changes locally' }), 'Commit changes locally')
   })
 
-  it('shows Commit button even when no modified files', () => {
+  it.skip('shows Commit button even when no modified files (git UI hidden in this fork)', () => {
     render(<StatusBar noteCount={100} modifiedCount={0} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onCommitPush={vi.fn()} />)
     expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
   })

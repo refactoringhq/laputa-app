@@ -281,7 +281,7 @@ This is a test note with some words to count.
     expect(onNavigate).toHaveBeenCalledWith('Referrer Note')
   })
 
-  it('shows git history with commit hashes and messages', () => {
+  it.skip('shows git history with commit hashes and messages (git history hidden in this fork)', () => {
     renderSelectedInspector({ gitHistory: mockGitHistory })
     expect(screen.getByText('History')).toBeInTheDocument()
     expect(screen.getByText('a1b2c3d')).toBeInTheDocument()
@@ -289,7 +289,7 @@ This is a test note with some words to count.
     expect(screen.getByText('i7j8k9l')).toBeInTheDocument()
   })
 
-  it('renders commit entries as clickable buttons', () => {
+  it.skip('renders commit entries as clickable buttons (git history hidden in this fork)', () => {
     const onViewCommitDiff = vi.fn()
     renderSelectedInspector({
       gitHistory: mockGitHistory,
@@ -714,7 +714,7 @@ Status: Active
       expect(onToggle).toHaveBeenCalledOnce()
     })
 
-    it('still shows backlinks and history for notes without frontmatter', () => {
+    it('still shows backlinks for notes without frontmatter', () => {
       render(
         <Inspector
           {...defaultProps}
@@ -727,7 +727,8 @@ Status: Active
       )
       expect(screen.getByText('Initialize properties')).toBeInTheDocument()
       expect(screen.getByText('Backlinks')).toBeInTheDocument()
-      expect(screen.getByText('History')).toBeInTheDocument()
+      // History panel is hidden in this fork (git integration disabled).
+      expect(screen.queryByText('History')).not.toBeInTheDocument()
     })
   })
 })

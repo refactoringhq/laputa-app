@@ -9,6 +9,7 @@ import type { McpStatus } from '../../hooks/useMcpStatus'
 import type { ThemeMode } from '../../lib/themeMode'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import { useStatusBarAddRemote } from '../../hooks/useStatusBarAddRemote'
+import { GIT_FEATURES_ENABLED } from '../../lib/gitFeatures'
 import type { GitRemoteStatus, SyncStatus } from '../../types'
 import { rememberFeedbackDialogOpener } from '../../lib/feedbackDialogOpener'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
@@ -251,7 +252,7 @@ function StatusBarPrimaryBadges({
     <>
       <OfflineBadge isOffline={isOffline} showSeparator={!compact} compact={compact} locale={locale} />
       <VaultReloadingBadge isReloading={isVaultReloading} showSeparator={!compact} compact={compact} locale={locale} />
-      {isGitVault ? (
+      {GIT_FEATURES_ENABLED && (isGitVault ? (
         <>
           <NoRemoteBadge remoteStatus={visibleRemoteStatus} onAddRemote={onAddRemote} showSeparator={!compact} compact={compact} locale={locale} />
           <ChangesBadge count={modifiedCount} onClick={onClickPending} showSeparator={!compact} compact={compact} locale={locale} />
@@ -271,7 +272,7 @@ function StatusBarPrimaryBadges({
         </>
       ) : (
         <MissingGitBadge onClick={onInitializeGit} showSeparator={!compact} compact={compact} locale={locale} />
-      )}
+      ))}
       {mcpStatus && <McpBadge status={mcpStatus} onInstall={onInstallMcp} showSeparator={!compact} compact={compact} locale={locale} />}
       <StatusBarAiBadge
         aiAgentsStatus={aiAgentsStatus}
@@ -504,12 +505,14 @@ export function StatusBarPrimarySection({
         compact={compact}
         locale={locale}
       />
-      <AddRemoteModal
-        open={showAddRemote}
-        vaultPath={vaultPath}
-        onClose={closeAddRemote}
-        onRemoteConnected={handleRemoteConnected}
-      />
+      {GIT_FEATURES_ENABLED && (
+        <AddRemoteModal
+          open={showAddRemote}
+          vaultPath={vaultPath}
+          onClose={closeAddRemote}
+          onRemoteConnected={handleRemoteConnected}
+        />
+      )}
     </div>
   )
 }

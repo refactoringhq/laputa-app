@@ -119,7 +119,7 @@ describe('SettingsPanel', () => {
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
     expect(screen.getByText('Settings')).toBeInTheDocument()
-    expect(screen.getAllByText('Sync & Updates').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Appearance').length).toBeGreaterThan(0)
   })
 
   it('separates coding agents, local models, and API models in AI settings', async () => {
@@ -189,13 +189,9 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByTestId('settings-save'))
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      auto_pull_interval_minutes: 5,
-      autogit_enabled: false,
-      autogit_idle_threshold_seconds: 90,
-      autogit_inactive_threshold_seconds: 30,
       release_channel: null,
       theme_mode: 'light',
-      note_width_mode: 'normal',
+      note_width_mode: 'wide',
       sidebar_type_pluralization_enabled: true,
       hide_gitignored_files: true,
       all_notes_show_pdfs: false,
@@ -316,7 +312,7 @@ describe('SettingsPanel', () => {
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    expect(screen.getByTestId('settings-default-note-width')).toHaveAttribute('data-value', 'normal')
+    expect(screen.getByTestId('settings-default-note-width')).toHaveAttribute('data-value', 'wide')
     expect(
       within(screen.getByTestId('settings-sidebar-type-pluralization')).getByRole('switch')
     ).toHaveAttribute('aria-checked', 'true')
@@ -454,7 +450,7 @@ describe('SettingsPanel', () => {
     }))
   })
 
-  it('defaults the release channel trigger to stable', () => {
+  it.skip('defaults the release channel trigger to stable (release channel UI lives in hidden Sync section)', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
@@ -486,7 +482,7 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('option', { name: /Codex/i })).toBeInTheDocument()
   })
 
-  it('treats a legacy beta release channel as stable', () => {
+  it.skip('treats a legacy beta release channel as stable (release channel UI lives in hidden Sync section)', () => {
     render(
       <SettingsPanel
         open={true}
@@ -538,7 +534,7 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('switch', { name: 'Auto-rename untitled notes from first H1' })).toHaveAttribute('aria-checked', 'true')
   })
 
-  it('defaults AutoGit to off with recommended thresholds', () => {
+  it.skip('defaults AutoGit to off with recommended thresholds (AutoGit UI is hidden in this fork)', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
@@ -548,7 +544,7 @@ describe('SettingsPanel', () => {
     expect(screen.getByTestId('settings-autogit-inactive-threshold')).toHaveValue(30)
   })
 
-  it('saves AutoGit preferences when toggled and edited', () => {
+  it.skip('saves AutoGit preferences when toggled and edited (AutoGit UI is hidden in this fork)', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
@@ -565,7 +561,7 @@ describe('SettingsPanel', () => {
     }))
   })
 
-  it('disables AutoGit controls when the current vault is not git-enabled', () => {
+  it.skip('disables AutoGit controls when the current vault is not git-enabled (AutoGit UI is hidden in this fork)', () => {
     render(
       <SettingsPanel
         open={true}

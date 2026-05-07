@@ -499,12 +499,6 @@
         { "kind": "command", "command": "vaultRemove", "label": "Remove Vault from List" },
         { "kind": "command", "command": "vaultRestoreGettingStarted", "label": "Restore Getting Started" },
         { "kind": "separator" },
-        { "kind": "command", "command": "vaultAddRemote", "label": "Add Remote…", "enabled": false },
-        { "kind": "command", "command": "vaultCommitPush", "label": "Commit & Push" },
-        { "kind": "command", "command": "vaultPull", "label": "Pull from Remote" },
-        { "kind": "command", "command": "vaultResolveConflicts", "label": "Resolve Conflicts", "enabled": false },
-        { "kind": "command", "command": "vaultViewChanges", "label": "View Pending Changes" },
-        { "kind": "separator" },
         { "kind": "command", "command": "vaultReload", "label": "Reload Vault" },
         { "kind": "command", "command": "vaultRepair", "label": "Repair Vault" },
         { "kind": "command", "command": "vaultInstallMcp", "label": "Set Up External AI Tools…" }
@@ -537,15 +531,6 @@
     ],
     "restoreDeletedDependent": [
       { "command": "noteRestoreDeleted" }
-    ],
-    "gitCommitDependent": [
-      { "command": "vaultCommitPush" }
-    ],
-    "gitConflictDependent": [
-      { "command": "vaultResolveConflicts" }
-    ],
-    "gitNoRemoteDependent": [
-      { "command": "vaultAddRemote" }
     ]
   }
 }

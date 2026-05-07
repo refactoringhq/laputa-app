@@ -16,6 +16,7 @@ import type { ReferencedByItem } from './InspectorPanels'
 import { EmptyInspector, InitializePropertiesPrompt, InspectorHeader, InvalidFrontmatterNotice } from './inspector/InspectorChrome'
 import { useBacklinks, useReferencedBy } from './inspector/useInspectorData'
 import { useInspectorPropertyActions } from './inspector/useInspectorPropertyActions'
+import { GIT_FEATURES_ENABLED } from '../lib/gitFeatures'
 import type { AppLocale } from '../lib/i18n'
 
 export type FrontmatterValue = string | number | boolean | string[] | null
@@ -241,8 +242,10 @@ function InspectorBody({
       <BacklinksPanel backlinks={backlinks} onNavigate={onNavigate} />
       <Separator />
       <NoteInfoPanel entry={entry} content={content} locale={locale} />
-      {gitHistory.length > 0 && <Separator />}
-      <GitHistoryPanel commits={gitHistory} onViewCommitDiff={onViewCommitDiff} />
+      {GIT_FEATURES_ENABLED && gitHistory.length > 0 && <Separator />}
+      {GIT_FEATURES_ENABLED && (
+        <GitHistoryPanel commits={gitHistory} onViewCommitDiff={onViewCommitDiff} />
+      )}
     </>
   )
 }

@@ -26,6 +26,7 @@ import {
 import { Moon, Sun, X } from '@phosphor-icons/react'
 import { Bot, Copy, Folder, GitBranch, ListChecks, Monitor, Palette, RefreshCw, ShieldCheck } from 'lucide-react'
 import type { Settings } from '../types'
+import { GIT_FEATURES_ENABLED } from '../lib/gitFeatures'
 import {
   APP_LOCALES,
   SYSTEM_UI_LANGUAGE,
@@ -616,8 +617,12 @@ function SettingsBody(props: SettingsBodyProps) {
 
 function SettingsBodyNav({ t }: { t: Translate }) {
   const items = [
-    { id: SETTINGS_SECTION_IDS.sync, label: t('settings.sync.title'), Icon: RefreshCw },
-    { id: SETTINGS_SECTION_IDS.autogit, label: t('settings.autogit.title'), Icon: GitBranch },
+    ...(GIT_FEATURES_ENABLED
+      ? [
+          { id: SETTINGS_SECTION_IDS.sync, label: t('settings.sync.title'), Icon: RefreshCw },
+          { id: SETTINGS_SECTION_IDS.autogit, label: t('settings.autogit.title'), Icon: GitBranch },
+        ]
+      : []),
     { id: SETTINGS_SECTION_IDS.appearance, label: t('settings.appearance.title'), Icon: Palette },
     { id: SETTINGS_SECTION_IDS.content, label: t('settings.vaultContent.title'), Icon: Folder },
     { id: SETTINGS_SECTION_IDS.ai, label: t('settings.aiAgents.title'), Icon: Bot },
@@ -668,29 +673,33 @@ function SettingsSyncAndAppearanceSections({
 }: SettingsBodyProps) {
   return (
     <>
-      <SettingsSection id={SETTINGS_SECTION_IDS.sync} showDivider={false}>
-        <SyncAndUpdatesSection
-          t={t}
-          pullInterval={pullInterval}
-          setPullInterval={setPullInterval}
-          releaseChannel={releaseChannel}
-          setReleaseChannel={setReleaseChannel}
-        />
-      </SettingsSection>
-      <SettingsSection id={SETTINGS_SECTION_IDS.autogit}>
-        <AutoGitSettingsSection
-          t={t}
-          isGitVault={isGitVault}
-          autoGitEnabled={autoGitEnabled}
-          setAutoGitEnabled={setAutoGitEnabled}
-          autoGitIdleThresholdSeconds={autoGitIdleThresholdSeconds}
-          setAutoGitIdleThresholdSeconds={setAutoGitIdleThresholdSeconds}
-          autoGitInactiveThresholdSeconds={autoGitInactiveThresholdSeconds}
-          setAutoGitInactiveThresholdSeconds={setAutoGitInactiveThresholdSeconds}
-        />
-      </SettingsSection>
+      {GIT_FEATURES_ENABLED && (
+        <SettingsSection id={SETTINGS_SECTION_IDS.sync} showDivider={false}>
+          <SyncAndUpdatesSection
+            t={t}
+            pullInterval={pullInterval}
+            setPullInterval={setPullInterval}
+            releaseChannel={releaseChannel}
+            setReleaseChannel={setReleaseChannel}
+          />
+        </SettingsSection>
+      )}
+      {GIT_FEATURES_ENABLED && (
+        <SettingsSection id={SETTINGS_SECTION_IDS.autogit}>
+          <AutoGitSettingsSection
+            t={t}
+            isGitVault={isGitVault}
+            autoGitEnabled={autoGitEnabled}
+            setAutoGitEnabled={setAutoGitEnabled}
+            autoGitIdleThresholdSeconds={autoGitIdleThresholdSeconds}
+            setAutoGitIdleThresholdSeconds={setAutoGitIdleThresholdSeconds}
+            autoGitInactiveThresholdSeconds={autoGitInactiveThresholdSeconds}
+            setAutoGitInactiveThresholdSeconds={setAutoGitInactiveThresholdSeconds}
+          />
+        </SettingsSection>
+      )}
 
-      <SettingsSection id={SETTINGS_SECTION_IDS.appearance}>
+      <SettingsSection id={SETTINGS_SECTION_IDS.appearance} showDivider={GIT_FEATURES_ENABLED}>
         <SectionHeading title={t('settings.appearance.title')} />
         <SettingsGroup>
           <AppearanceSettingsSection

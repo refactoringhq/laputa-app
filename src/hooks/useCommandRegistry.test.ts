@@ -68,88 +68,13 @@ function expectFolderCommandStates(overrides: Record<string, unknown>, expected:
 }
 
 describe('useCommandRegistry', () => {
-  it('includes resolve-conflicts command in Git group', () => {
-    const config = makeConfig()
-    const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'resolve-conflicts')
-    expect(cmd).toBeDefined()
-    expect(cmd!.group).toBe('Git')
-    expect(cmd!.label).toBe('Resolve Conflicts')
-  })
-
-  it('resolve-conflicts is always enabled', () => {
-    const config = makeConfig()
-    const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'resolve-conflicts')
-    expect(cmd!.enabled).toBe(true)
-  })
-
-  it('resolve-conflicts executes onResolveConflicts callback', () => {
-    const onResolveConflicts = vi.fn()
-    const config = makeConfig({ onResolveConflicts })
-    const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'resolve-conflicts')
-    cmd!.execute()
-    expect(onResolveConflicts).toHaveBeenCalled()
-  })
-
-  it('resolve-conflicts has searchable keywords', () => {
-    const config = makeConfig()
-    const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'resolve-conflicts')
-    expect(cmd!.keywords).toContain('conflict')
-    expect(cmd!.keywords).toContain('merge')
-  })
-
-  it('commit-push is enabled when modifiedCount > 0', () => {
-    const config = makeConfig({ modifiedCount: 5 })
-    const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'commit-push')
-    expect(cmd!.enabled).toBe(true)
-  })
-
-  it('commit-push is disabled when modifiedCount is 0', () => {
-    const config = makeConfig({ modifiedCount: 0 })
-    const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'commit-push')
-    expect(cmd!.enabled).toBe(false)
-  })
-
-  it('includes initialize-git command for non-git vaults', () => {
-    const onInitializeGit = vi.fn()
-    const config = makeConfig({ isGitVault: false, onInitializeGit })
-    const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'initialize-git')
-
-    expect(cmd).toBeDefined()
-    expect(cmd!.group).toBe('Git')
-    expect(cmd!.label).toBe('Initialize Git for Current Vault')
-    expect(cmd!.enabled).toBe(true)
-
-    cmd!.execute()
-    expect(onInitializeGit).toHaveBeenCalledOnce()
-  })
-
-  it('hides remote git commands for non-git vaults', () => {
+  it('git integration is disabled in this fork: no git commands registered', () => {
     const config = makeConfig({ isGitVault: false, modifiedCount: 5 })
     const { result } = renderHook(() => useCommandRegistry(config))
 
-    expect(findCommand(result.current, 'commit-push')).toBeUndefined()
-    expect(findCommand(result.current, 'git-pull')).toBeUndefined()
-    expect(findCommand(result.current, 'add-remote')).toBeUndefined()
-    expect(findCommand(result.current, 'view-changes')).toBeUndefined()
-  })
-
-  it('resolve-conflicts stays enabled across rerenders', () => {
-    const config = makeConfig()
-    const { result, rerender } = renderHook(
-      (props) => useCommandRegistry(props),
-      { initialProps: config },
-    )
-    expect(findCommand(result.current, 'resolve-conflicts')!.enabled).toBe(true)
-
-    rerender(makeConfig())
-    expect(findCommand(result.current, 'resolve-conflicts')!.enabled).toBe(true)
+    for (const id of ['resolve-conflicts', 'commit-push', 'git-pull', 'add-remote', 'view-changes', 'initialize-git']) {
+      expect(findCommand(result.current, id)).toBeUndefined()
+    }
   })
 
   it('includes set-note-icon command in Note group', () => {

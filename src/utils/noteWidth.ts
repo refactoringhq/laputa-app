@@ -1,7 +1,7 @@
 import type { NoteWidthMode } from '../types'
 import { detectFrontmatterState } from './frontmatter'
 
-export const DEFAULT_NOTE_WIDTH_MODE: NoteWidthMode = 'normal'
+export const DEFAULT_NOTE_WIDTH_MODE: NoteWidthMode = 'wide'
 
 export function normalizeNoteWidthMode(value: unknown): NoteWidthMode | null {
   if (typeof value !== 'string') return null

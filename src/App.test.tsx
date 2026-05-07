@@ -1236,7 +1236,7 @@ describe('App', () => {
     })
   })
 
-  it('clears the Git setup dialog when switching to a Git-enabled vault', async () => {
+  it.skip('clears the Git setup dialog when switching to a Git-enabled vault (Git setup UI hidden in this fork)', async () => {
     mockCommandResults.load_vault_list = {
       vaults: [
         { label: 'Missing Git', path: '/work' },
