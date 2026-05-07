@@ -318,11 +318,13 @@ where
 
         if !line.is_empty() {
             let clean = strip_ansi_codes(&line);
-            if !clean.is_empty() {
-                emit(AiAgentStreamEvent::TextDelta {
-                    text: format!("{clean}\n"),
-                });
-            }
+            emit(AiAgentStreamEvent::TextDelta {
+                text: format!("{clean}\n"),
+            });
+        } else {
+            emit(AiAgentStreamEvent::TextDelta {
+                text: "\n".to_string(),
+            });
         }
     }
 
