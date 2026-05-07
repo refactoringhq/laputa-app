@@ -277,6 +277,33 @@ describe('noteListHooks extra', () => {
     expect(onUpdateViewDefinition).toHaveBeenCalledWith(view.filename, { sort: 'modified:desc' })
   })
 
+  it('keeps bare custom-property saved view sorts visible when entries are missing the property', () => {
+    const view: ViewFile = {
+      filename: 'priority.view',
+      definition: {
+        name: 'Priority',
+        icon: null,
+        color: null,
+        sort: 'priority:asc',
+        filters: { all: [] },
+      },
+    }
+
+    const { result } = renderHook(() =>
+      useNoteListSort({
+        entries: [makeEntry({ title: 'Alpha', properties: {} })],
+        selection: { kind: 'view', filename: view.filename },
+        modifiedPathSet: new Set<string>(),
+        modifiedSuffixes: [],
+        views: [view],
+      }),
+    )
+
+    expect(result.current.listSort).toBe('property:priority')
+    expect(result.current.listDirection).toBe('asc')
+    expect(result.current.customProperties).toContain('priority')
+  })
+
   it('handles keyboard shortcuts for multi-select flows and ignores select-all in focused inputs', () => {
     const onArchive = vi.fn()
     const onDelete = vi.fn()

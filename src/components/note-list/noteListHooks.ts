@@ -316,6 +316,13 @@ function deriveEffectiveSort(configOption: SortOption, customProperties: string[
   return customProperties.includes(configOption.slice('property:'.length)) ? configOption : 'modified'
 }
 
+function includeConfiguredSortProperty(customProperties: string[], configOption: SortOption): string[] {
+  if (!configOption.startsWith('property:')) return customProperties
+  const propertyName = configOption.slice('property:'.length)
+  if (!propertyName || customProperties.includes(propertyName)) return customProperties
+  return [...customProperties, propertyName].sort((a, b) => a.localeCompare(b))
+}
+
 export interface UseNoteListSortParams {
   entries: VaultEntry[]
   selection: SidebarSelection
@@ -381,7 +388,10 @@ export function useNoteListSort({
     inboxPeriod,
     views,
   })
-  const customProperties = useMemo(() => extractSortableProperties(filteredEntries), [filteredEntries])
+  const customProperties = useMemo(
+    () => includeConfiguredSortProperty(extractSortableProperties(filteredEntries), listConfig.option),
+    [filteredEntries, listConfig.option],
+  )
   const listSort = useMemo<SortOption>(() => deriveEffectiveSort(listConfig.option, customProperties), [listConfig.option, customProperties])
   const listDirection = listSort === listConfig.option ? listConfig.direction : 'desc'
 

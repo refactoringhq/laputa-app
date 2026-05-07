@@ -150,6 +150,7 @@ describe('noteListHelpers extra coverage', () => {
     expect(parseSortConfig('date:desc')).toEqual({ option: 'property:date', direction: 'desc' })
     expect(parseSortConfig('broken')).toBeNull()
     expect(parseSortConfig('title:sideways')).toBeNull()
+    expect(parseSortConfig('property::asc')).toBeNull()
 
     localStorage.setItem(APP_STORAGE_KEYS.sortPreferences, JSON.stringify({
       '__list__': 'title',

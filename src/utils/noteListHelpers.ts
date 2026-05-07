@@ -219,6 +219,7 @@ export function parseSortConfig(raw: string | null | undefined): SortConfig | nu
   const dir = raw.slice(lastColon + 1)
   if (dir !== 'asc' && dir !== 'desc') return null
   const optionName = raw.slice(0, lastColon)
+  if (optionName === 'property:') return null
   const option = (
     optionName.startsWith('property:') || BUILT_IN_SORT_OPTIONS.has(optionName)
       ? optionName

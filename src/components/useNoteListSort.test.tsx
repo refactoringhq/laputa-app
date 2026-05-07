@@ -31,6 +31,20 @@ function makeEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {
 
 const noop = vi.fn()
 
+function storeListSort(option: string, direction: 'asc' | 'desc') {
+  localStorageMock.setItem(APP_STORAGE_KEYS.sortPreferences, JSON.stringify({ '__list__': { option, direction } }))
+}
+
+function renderWithPrioritySort(entries: VaultEntry[]) {
+  storeListSort('property:priority', 'asc')
+  renderNoteList({ entries, selection: { kind: 'filter', filter: 'all' } })
+}
+
+function expectVisibleNoteOrder(expectedTitles: string[]) {
+  const items = screen.getAllByText(new RegExp(expectedTitles.join('|')))
+  expect(items.map((item) => item.textContent)).toEqual(expectedTitles)
+}
+
 function renderNoteList(props: {
   entries: VaultEntry[]
   selection: SidebarSelection
@@ -89,7 +103,7 @@ describe('useNoteListSort (via NoteList)', () => {
   })
 
   it('migrates localStorage sort to type frontmatter when type has no sort', () => {
-    localStorageMock.setItem(APP_STORAGE_KEYS.sortPreferences, JSON.stringify({ '__list__': { option: 'title', direction: 'asc' } }))
+    storeListSort('title', 'asc')
     const onUpdateTypeSort = vi.fn()
     const updateEntry = vi.fn()
     const typeDoc = makeEntry({ path: '/project.md', title: 'Project', isA: 'Type', sort: null })
@@ -107,7 +121,7 @@ describe('useNoteListSort (via NoteList)', () => {
   })
 
   it('does not migrate if type already has sort', () => {
-    localStorageMock.setItem(APP_STORAGE_KEYS.sortPreferences, JSON.stringify({ '__list__': { option: 'title', direction: 'asc' } }))
+    storeListSort('title', 'asc')
     const onUpdateTypeSort = vi.fn()
     const updateEntry = vi.fn()
     const typeDoc = makeEntry({ path: '/project.md', title: 'Project', isA: 'Type', sort: 'modified:desc' })
@@ -123,30 +137,21 @@ describe('useNoteListSort (via NoteList)', () => {
     expect(onUpdateTypeSort).not.toHaveBeenCalled()
   })
 
-  it('falls back to modified when property sort references missing property', () => {
-    localStorageMock.setItem(APP_STORAGE_KEYS.sortPreferences, JSON.stringify({ '__list__': { option: 'property:priority', direction: 'asc' } }))
-    const entries = [
+  it('keeps property sort safe when entries are missing the property', () => {
+    renderWithPrioritySort([
       makeEntry({ path: '/a.md', title: 'Alpha', modifiedAt: 1000, properties: {} }),
       makeEntry({ path: '/b.md', title: 'Beta', modifiedAt: 3000, properties: {} }),
-    ]
-    renderNoteList({ entries, selection: { kind: 'filter', filter: 'all' } })
-    const items = screen.getAllByText(/Alpha|Beta/)
-    // Should be sorted by modified desc (fallback), so Beta first
-    expect(items[0].textContent).toBe('Beta')
-    expect(items[1].textContent).toBe('Alpha')
+    ])
+    expectVisibleNoteOrder(['Alpha', 'Beta'])
+    expect(screen.getByTestId('sort-button-__list__')).toHaveTextContent('priority')
   })
 
   it('uses property sort when property exists in entries', () => {
-    localStorageMock.setItem(APP_STORAGE_KEYS.sortPreferences, JSON.stringify({ '__list__': { option: 'property:priority', direction: 'asc' } }))
-    const entries = [
+    renderWithPrioritySort([
       makeEntry({ path: '/b.md', title: 'Beta', modifiedAt: 3000, properties: { priority: 2 } }),
       makeEntry({ path: '/a.md', title: 'Alpha', modifiedAt: 1000, properties: { priority: 1 } }),
-    ]
-    renderNoteList({ entries, selection: { kind: 'filter', filter: 'all' } })
-    const items = screen.getAllByText(/Alpha|Beta/)
-    // Should be sorted by priority asc: Alpha (1) first, then Beta (2)
-    expect(items[0].textContent).toBe('Alpha')
-    expect(items[1].textContent).toBe('Beta')
+    ])
+    expectVisibleNoteOrder(['Alpha', 'Beta'])
   })
 
   it('reads legacy list sort preferences when Tolaria key is absent', () => {
