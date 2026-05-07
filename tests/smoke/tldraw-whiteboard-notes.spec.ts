@@ -152,6 +152,34 @@ test('embedded tldraw interactions stay inside the whiteboard', async ({ page })
   await expectNoEditorNodeSelection(page)
 })
 
+test('embedded tldraw dialogs appear and release focus when closed', async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+
+  const whiteboard = page.locator('.tldraw-whiteboard')
+  await expect(whiteboard).toBeVisible({ timeout: 20_000 })
+
+  await page.getByTestId('main-menu.button').click()
+  await page.getByTestId('main-menu.keyboard-shortcuts-button').click()
+
+  const shortcutsDialog = page.locator('.tldraw-whiteboard .tlui-dialog__content')
+  await expect(shortcutsDialog).toBeVisible({ timeout: 5_000 })
+  await expect(shortcutsDialog).toContainText('Keyboard shortcuts')
+
+  const dialogBox = await shortcutsDialog.boundingBox()
+  const boardBox = await whiteboard.boundingBox()
+  expect(dialogBox).not.toBeNull()
+  expect(boardBox).not.toBeNull()
+  expect(dialogBox!.x).toBeGreaterThanOrEqual(boardBox!.x)
+  expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(boardBox!.x + boardBox!.width)
+
+  await page.getByTestId('dialog.close').click()
+  await expect(shortcutsDialog).toHaveCount(0)
+
+  await page.getByTestId('tools.select').click()
+  await expect(page.getByTestId('tools.select')).toHaveAttribute('aria-pressed', 'true')
+  await expectNoEditorNodeSelection(page)
+})
+
 test('embedded tldraw drawing uses the clicked coordinates while zoomed', async ({ page }) => {
   await openNote(page, 'Whiteboard Embed')
   await applyZoom(page, 110)

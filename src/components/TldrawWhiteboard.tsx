@@ -1,13 +1,22 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react'
 import { getAssetUrlsByImport } from '@tldraw/assets/imports.vite'
 import {
   Box,
+  DefaultKeyboardShortcutsDialog,
+  DefaultKeyboardShortcutsDialogContent,
+  TldrawUiButton,
+  TldrawUiButtonIcon,
+  TldrawUiMenuContextProvider,
   Tldraw,
   createTLStore,
   getSnapshot,
   loadSnapshot,
+  react as reactToTldrawSignal,
+  useDialogs,
+  useTranslation,
   type Editor,
   type TLEventInfo,
+  type TLUiDialog,
   type TLStoreSnapshot,
 } from 'tldraw'
 import 'tldraw/tldraw.css'
@@ -20,6 +29,7 @@ function resolveTldrawAssetUrl(assetUrl: string | undefined): string {
 }
 
 const tldrawAssetUrls = getAssetUrlsByImport(resolveTldrawAssetUrl)
+const tldrawUiComponents = { Dialogs: TolariaTldrawDialogs }
 
 interface TldrawWhiteboardProps {
   boardId: string
@@ -187,6 +197,181 @@ function installWhiteboardRuntimeGuards(editor: Editor): () => void {
   }
 }
 
+interface TolariaTldrawDialogProps {
+  dialog: TLUiDialog
+  onClose: (id: string) => void
+}
+
+const DIALOG_OPEN_DISMISS_GRACE_MS = 250
+
+function isKeyboardShortcutsDialog(dialog: TLUiDialog): boolean {
+  return dialog.component === DefaultKeyboardShortcutsDialog
+}
+
+interface TolariaKeyboardShortcutsDialogProps {
+  onClose: () => void
+}
+
+function TolariaKeyboardShortcutsDialog({ onClose }: TolariaKeyboardShortcutsDialogProps) {
+  const msg = useTranslation()
+
+  return (
+    <>
+      <div className="tlui-dialog__header tlui-shortcuts-dialog__header">
+        <div className="tlui-dialog__header__title">{msg('shortcuts-dialog.title')}</div>
+        <div className="tlui-dialog__header__close">
+          <TldrawUiButton
+            type="icon"
+            aria-label={msg('ui.close')}
+            data-testid="dialog.close"
+            onClick={onClose}
+            title={msg('ui.close')}
+          >
+            <TldrawUiButtonIcon small icon="cross-2" />
+          </TldrawUiButton>
+        </div>
+      </div>
+      <div className="tlui-dialog__body tlui-shortcuts-dialog__body" tabIndex={0}>
+        <TldrawUiMenuContextProvider type="keyboard-shortcuts" sourceId="kbd">
+          <DefaultKeyboardShortcutsDialogContent />
+        </TldrawUiMenuContextProvider>
+      </div>
+      <div className="tlui-dialog__scrim" />
+    </>
+  )
+}
+
+function useDeferredDialogOpen() {
+  const openedAtRef = useRef(0)
+  const [readyToOpen, setReadyToOpen] = useState(false)
+
+  useEffect(() => {
+    const animationFrameId = window.requestAnimationFrame(() => {
+      openedAtRef.current = performance.now()
+      setReadyToOpen(true)
+    })
+    return () => { window.cancelAnimationFrame(animationFrameId) }
+  }, [])
+
+  return { openedAtRef, readyToOpen }
+}
+
+function canDismissDialog(openedAt: number): boolean {
+  return performance.now() - openedAt >= DIALOG_OPEN_DISMISS_GRACE_MS
+}
+
+function isOverlayEvent(event: ReactMouseEvent<HTMLDivElement>): boolean {
+  return event.target === event.currentTarget
+}
+
+function shouldCloseFromOverlayClick(
+  event: ReactMouseEvent<HTMLDivElement>,
+  dialog: TLUiDialog,
+  mouseDownInsideContent: boolean
+): boolean {
+  return isOverlayEvent(event) && !dialog.preventBackgroundClose && !mouseDownInsideContent
+}
+
+interface TolariaTldrawDialogContentProps {
+  dialog: TLUiDialog
+  dialogTitle: string | undefined
+  mouseDownInsideContentRef: MutableRefObject<boolean>
+  onClose: () => void
+}
+
+function TolariaTldrawDialogContent({
+  dialog,
+  dialogTitle,
+  mouseDownInsideContentRef,
+  onClose,
+}: TolariaTldrawDialogContentProps) {
+  const ModalContent = dialog.component
+  const handleClose = () => {
+    mouseDownInsideContentRef.current = false
+    onClose()
+  }
+
+  return (
+    <div
+      dir="ltr"
+      className="tlui-dialog__content"
+      aria-describedby={undefined}
+      aria-label={dialogTitle}
+      role="dialog"
+      onMouseDown={() => { mouseDownInsideContentRef.current = true }}
+      onMouseUp={() => { mouseDownInsideContentRef.current = false }}
+    >
+      {isKeyboardShortcutsDialog(dialog)
+        ? <TolariaKeyboardShortcutsDialog onClose={handleClose} />
+        : <ModalContent onClose={handleClose} />}
+    </div>
+  )
+}
+
+const TolariaTldrawDialog = memo(function TolariaTldrawDialog({ dialog, onClose }: TolariaTldrawDialogProps) {
+  const mouseDownInsideContentRef = useRef(false)
+  const { openedAtRef, readyToOpen } = useDeferredDialogOpen()
+  const msg = useTranslation()
+  const dialogTitle = isKeyboardShortcutsDialog(dialog) ? msg('shortcuts-dialog.title') : undefined
+
+  const closeDialog = useCallback(() => {
+    if (!canDismissDialog(openedAtRef.current)) return
+    onClose(dialog.id)
+  }, [dialog.id, onClose, openedAtRef])
+  const closeDialogNow = useCallback(() => { onClose(dialog.id) }, [dialog.id, onClose])
+
+  if (!readyToOpen) return null
+
+  return (
+    <div
+      dir="ltr"
+      className="tlui-dialog__overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) mouseDownInsideContentRef.current = false
+      }}
+      onClick={(event) => {
+        if (shouldCloseFromOverlayClick(event, dialog, mouseDownInsideContentRef.current)) closeDialog()
+      }}
+    >
+      <TolariaTldrawDialogContent
+        dialog={dialog}
+        dialogTitle={dialogTitle}
+        mouseDownInsideContentRef={mouseDownInsideContentRef}
+        onClose={closeDialogNow}
+      />
+    </div>
+  )
+})
+
+function TolariaTldrawDialogs() {
+  const { dialogs, removeDialog } = useDialogs()
+  const [visibleDialogs, setVisibleDialogs] = useState<TLUiDialog[]>(() => dialogs.get())
+
+  const closeVisibleDialog = useCallback((id: string) => {
+    setVisibleDialogs((current) => current.filter((dialog) => dialog.id !== id))
+    removeDialog(id)
+  }, [removeDialog])
+
+  useEffect(() => reactToTldrawSignal(
+    'tolaria tldraw dialogs',
+    () => {
+      const nextDialogs = dialogs.get()
+      if (nextDialogs.length > 0) {
+        // tldraw clears the dialog atom while Radix closes the menu; keep the last requested dialog mounted locally.
+        setVisibleDialogs(nextDialogs)
+      }
+    }
+  ), [dialogs])
+
+  return visibleDialogs.map((dialog) => (
+    <TolariaTldrawDialog
+      key={dialog.id}
+      dialog={dialog}
+      onClose={closeVisibleDialog}
+    />
+  ))
+}
+
 export function TldrawWhiteboard({
   boardId,
   height,
@@ -295,6 +480,7 @@ export function TldrawWhiteboard({
     >
       <Tldraw
         assetUrls={tldrawAssetUrls}
+        components={tldrawUiComponents}
         onMount={installWhiteboardRuntimeGuards}
         store={store}
       />
