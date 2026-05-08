@@ -2,7 +2,7 @@
 type: ADR
 id: "0115"
 title: "Dynamic vault resolution for MCP agents"
-status: proposed
+status: active
 date: 2026-05-08
 ---
 
