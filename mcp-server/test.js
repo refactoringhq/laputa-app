@@ -10,10 +10,13 @@ import { fileURLToPath } from 'node:url'
 import {
   findMarkdownFiles, getNote, searchNotes, vaultContext,
 } from './vault.js'
-import { requireVaultPath } from './vault-path.js'
+import {
+  requireVaultPath, resolveVaultPath, loadVaultList, vaultsJsonPath,
+} from './vault-path.js'
 import { evaluateBridgeRequest } from './ws-bridge.js'
 
 let tmpDir
+const tempConfigDirs = []
 const ACTIVE_VAULT_ERROR = 'Note path must stay inside the active vault'
 const MCP_SERVER_DIR = path.dirname(fileURLToPath(import.meta.url))
 
@@ -60,6 +63,7 @@ Another project for testing list and context.
 
 after(async () => {
   await rm(tmpDir, { recursive: true, force: true })
+  await Promise.all(tempConfigDirs.map(dir => rm(dir, { recursive: true, force: true })))
 })
 
 describe('findMarkdownFiles', () => {
@@ -213,6 +217,166 @@ describe('requireVaultPath', () => {
   })
 })
 
+describe('resolveVaultPath', () => {
+  it('returns session override when provided', () => {
+    assert.equal(
+      resolveVaultPath('/tmp/session-vault', { env: {} }),
+      '/tmp/session-vault',
+    )
+  })
+
+  it('returns VAULT_PATH env when set and no override', () => {
+    assert.equal(
+      resolveVaultPath(undefined, { env: { VAULT_PATH: '/tmp/env-vault' } }),
+      '/tmp/env-vault',
+    )
+  })
+
+  it('returns active_vault from vaults.json when env is unset', async () => {
+    const configDir = await createConfigDirFixture({
+      files: {
+        'com.tolaria.app': {
+          active_vault: '/tmp/active-vault',
+          vaults: [
+            { label: 'Active', path: '/tmp/active-vault' },
+            { label: 'Other', path: '/tmp/other-vault' },
+          ],
+        },
+      }
+    })
+
+    assert.equal(
+      resolveVaultPath(undefined, {
+        env: {},
+        loadVaultListFn: () => loadVaultList({ configDir }),
+      }),
+      '/tmp/active-vault',
+    )
+  })
+
+  it('returns single vault path when vaults.json has exactly one vault', async () => {
+    const configDir = await createConfigDirFixture({
+      files: {
+        'com.tolaria.app': {
+          vaults: [{ label: 'Only', path: '/tmp/only-vault' }],
+        },
+      }
+    })
+
+    assert.equal(
+      resolveVaultPath(undefined, {
+        env: {},
+        loadVaultListFn: () => loadVaultList({ configDir }),
+      }),
+      '/tmp/only-vault',
+    )
+  })
+
+  it('throws Multiple vaults error when vaults.json has >1 vault and no active_vault', async () => {
+    const configDir = await createConfigDirFixture({
+      files: {
+        'com.tolaria.app': {
+          vaults: [
+            { label: 'First', path: '/tmp/first-vault' },
+            { label: 'Second', path: '/tmp/second-vault' },
+          ],
+        },
+      }
+    })
+
+    assert.throws(
+      () => resolveVaultPath(undefined, {
+        env: {},
+        loadVaultListFn: () => loadVaultList({ configDir }),
+      }),
+      /Multiple vaults configured but none is active/,
+    )
+  })
+
+  it('throws No vault configured when no env and no vaults.json', async () => {
+    const configDir = await mkdtemp(path.join(os.tmpdir(), 'tolaria-config-test-'))
+    tempConfigDirs.push(configDir)
+
+    assert.throws(
+      () => resolveVaultPath(undefined, {
+        env: {},
+        loadVaultListFn: () => loadVaultList({ configDir }),
+      }),
+      /No vault configured\. Open a vault in Tolaria first\./,
+    )
+  })
+})
+
+describe('loadVaultList', () => {
+  it('returns null when vaults.json does not exist', async () => {
+    const configDir = await mkdtemp(path.join(os.tmpdir(), 'tolaria-config-test-'))
+    tempConfigDirs.push(configDir)
+
+    assert.equal(loadVaultList({ configDir }), null)
+  })
+
+  it('parses valid vaults.json with multiple vaults', async () => {
+    const configDir = await createConfigDirFixture({
+      files: {
+        'com.tolaria.app': {
+          active_vault: '/tmp/active-vault',
+          vaults: [
+            { label: 'A', path: '/tmp/a', alias: 'alpha' },
+            { label: 'B', path: '/tmp/b' },
+          ],
+        },
+      }
+    })
+
+    assert.deepEqual(loadVaultList({ configDir }), {
+      activeVault: '/tmp/active-vault',
+      vaults: [
+        { label: 'A', path: '/tmp/a', alias: 'alpha' },
+        { label: 'B', path: '/tmp/b', alias: null },
+      ],
+    })
+  })
+
+  it('returns null on malformed JSON', async () => {
+    const configDir = await createConfigDirFixture({
+      files: {
+        'com.tolaria.app': '{not-json',
+      }
+    })
+
+    assert.equal(loadVaultList({ configDir }), null)
+  })
+})
+
+describe('vaultsJsonPath', () => {
+  it('prefers com.tolaria.app over com.laputa.app', async () => {
+    const configDir = await createConfigDirFixture({
+      files: {
+        'com.tolaria.app': { vaults: [{ label: 'Preferred', path: '/tmp/preferred' }] },
+        'com.laputa.app': { vaults: [{ label: 'Legacy', path: '/tmp/legacy' }] },
+      }
+    })
+
+    assert.equal(
+      vaultsJsonPath({ configDir }),
+      path.join(configDir, 'com.tolaria.app', 'vaults.json'),
+    )
+  })
+
+  it('falls back to com.laputa.app when preferred missing', async () => {
+    const configDir = await createConfigDirFixture({
+      files: {
+        'com.laputa.app': { vaults: [{ label: 'Legacy', path: '/tmp/legacy' }] },
+      }
+    })
+
+    assert.equal(
+      vaultsJsonPath({ configDir }),
+      path.join(configDir, 'com.laputa.app', 'vaults.json'),
+    )
+  })
+})
+
 describe('stdio process lifecycle', () => {
   it('exits when the MCP client closes stdin', async () => {
     const child = spawn(process.execPath, ['index.js'], {
@@ -263,6 +427,20 @@ async function writeTextFile(filePath, content) {
   } finally {
     await handle.close()
   }
+}
+
+async function createConfigDirFixture({ files = {} } = {}) {
+  const configDir = await mkdtemp(path.join(os.tmpdir(), 'tolaria-config-test-'))
+  tempConfigDirs.push(configDir)
+
+  await Promise.all(Object.entries(files).map(async ([appDir, content]) => {
+    const appConfigDir = path.join(configDir, appDir)
+    await mkdir(appConfigDir, { recursive: true })
+    const rawContent = typeof content === 'string' ? content : JSON.stringify(content)
+    await writeTextFile(path.join(appConfigDir, 'vaults.json'), rawContent)
+  }))
+
+  return configDir
 }
 
 function sleep(ms) {
