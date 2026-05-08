@@ -377,21 +377,6 @@ fn entry_has_ui_port(entry: &serde_json::Value) -> bool {
     entry["env"]["WS_UI_PORT"].as_str() == Some("9711")
 }
 
-fn entry_targets_vault(entry: &serde_json::Value, vault_path: &Path) -> bool {
-    let Some(entry_vault_path) = entry["env"]["VAULT_PATH"].as_str() else {
-        return false;
-    };
-
-    let Ok(expected) = std::fs::canonicalize(vault_path) else {
-        return false;
-    };
-    let Ok(actual) = std::fs::canonicalize(entry_vault_path) else {
-        return false;
-    };
-
-    actual == expected
-}
-
 /// Build the MCP server entry JSON for a given index.js path.
 fn build_mcp_entry(node_command: &str, index_js: &str) -> serde_json::Value {
     serde_json::json!({
@@ -559,17 +544,15 @@ pub fn remove_mcp() -> String {
 
 /// Check whether the MCP server is properly installed and registered.
 ///
-/// Returns `Installed` when the Tolaria entry exists for the active vault in
-/// an external AI tool config and the referenced index.js file is present.
+/// Returns `Installed` when the Tolaria entry exists in an external AI tool
+/// config and the referenced index.js file is present.
 /// Otherwise returns `NotInstalled`.
-pub fn check_mcp_status(vault_path: &str) -> McpStatus {
-    let active_vault_path = Path::new(vault_path);
+pub fn check_mcp_status(_vault_path: &str) -> McpStatus {
     if mcp_config_paths().into_iter().any(|config_path| {
         read_registered_mcp_entry(&config_path).is_some_and(|entry| {
             entry_uses_stdio(&entry)
                 && entry_index_js_exists(&entry)
                 && entry_has_ui_port(&entry)
-                && entry_targets_vault(&entry, active_vault_path)
         })
     }) {
         McpStatus::Installed
@@ -1224,10 +1207,8 @@ mod tests {
     }
 
     #[test]
-    fn check_mcp_status_returns_installed_for_matching_vault() {
+    fn check_mcp_status_returns_installed_without_vault_path_matching() {
         let tmp = tempfile::tempdir().unwrap();
-        let vault_path = tmp.path().join("vault");
-        std::fs::create_dir_all(&vault_path).unwrap();
         let index_js = write_index_js(tmp.path());
         let config_path = tmp.path().join("mcp.json");
         let config = serde_json::json!({
@@ -1235,31 +1216,15 @@ mod tests {
                 "tolaria": {
                     "command": "node",
                     "args": [index_js.to_string_lossy()],
-                    "env": { "VAULT_PATH": vault_path.to_string_lossy() }
+                    "env": { "WS_UI_PORT": "9711" }
                 }
             }
         });
         std::fs::write(&config_path, serde_json::to_string(&config).unwrap()).unwrap();
 
         let entry = read_registered_mcp_entry(&config_path).unwrap();
-        assert!(entry_targets_vault(&entry, &vault_path));
         assert!(entry_index_js_exists(&entry));
-    }
-
-    #[test]
-    fn entry_targets_vault_requires_matching_existing_directory() {
-        let tmp = tempfile::tempdir().unwrap();
-        let first_vault = tmp.path().join("vault-a");
-        let second_vault = tmp.path().join("vault-b");
-        std::fs::create_dir_all(&first_vault).unwrap();
-        std::fs::create_dir_all(&second_vault).unwrap();
-
-        let entry = serde_json::json!({
-            "env": { "VAULT_PATH": first_vault.to_string_lossy() }
-        });
-
-        assert!(entry_targets_vault(&entry, &first_vault));
-        assert!(!entry_targets_vault(&entry, &second_vault));
+        assert!(entry_has_ui_port(&entry));
     }
 
     #[test]
