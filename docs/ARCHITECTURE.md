@@ -334,7 +334,7 @@ Each CLI agent authenticates itself outside Tolaria. Claude Code uses its existi
 
 The MCP server (`mcp-server/`) exposes vault operations as tools for AI assistants (Claude Code, Gemini CLI, Cursor, or any MCP-compatible client).
 
-### Tool Surface (14 tools)
+### Tool Surface (16 tools)
 
 | Tool | Params | Description |
 |------|--------|-------------|
@@ -348,45 +348,62 @@ The MCP server (`mcp-server/`) exposes vault operations as tools for AI assistan
 | `link_notes` | `source_path, property, target_title` | Add a target to an array property in frontmatter |
 | `list_notes` | `[type_filter], [sort]` | List all notes, optionally filtered by type |
 | `vault_context` | — | Get vault summary: entity types + 20 recent notes + configFiles |
+| `list_vaults` | — | List all configured vaults and their active status |
+| `switch_vault` | `path` | Set a session-local vault override (stdio only) |
 | `ui_open_note` | `path` | Open a note in the Tolaria UI editor |
 | `ui_open_tab` | `path` | Open a note in a new UI tab |
 | `ui_highlight` | `element, [path]` | Highlight a UI element (editor, tab, properties, notelist) |
 | `ui_set_filter` | `type` | Set the sidebar filter to a specific type |
 
+### Vault Resolution
+
+The MCP server resolves the target vault dynamically at tool-call time rather than baking it into the process configuration. This allows a single registered MCP entry to serve multiple vaults.
+
+**Resolution Priority:**
+1. **Session Override** — set via `switch_vault` tool. This is process-local and cleared when the MCP server exits. It never modifies `vaults.json` or the Tolaria UI.
+2. **Environment Variable** — `VAULT_PATH` provided during bridge spawn or legacy registration.
+3. **App Configuration** — reads `~/.config/com.tolaria.app/vaults.json` to find the `active_vault` or auto-selects if only one vault is configured.
+
+If resolution fails (e.g., multiple vaults configured but no active vault selected), the server returns an actionable error message.
+
 ### Transports
 
-- **stdio** — standard MCP transport for Claude Code / Cursor (`node mcp-server/index.js`)
+- **stdio** — standard MCP transport for Claude Code / Cursor (`node mcp-server/index.js`). Supports `switch_vault` for session-local isolation.
 - **WebSocket** — live bridge for Tolaria app integration:
-  - Port **9710**: Tool bridge — AI/Claude clients call vault tools here
-  - Port **9711**: UI bridge — Frontend listens for UI action broadcasts from MCP tools
+  - Port **9710**: Tool bridge — AI/Claude clients call vault tools here. Resolves vault per call based on Tolaria's active state.
+  - Port **9711**: UI bridge — Frontend listens for UI action broadcasts from MCP tools.
 
 ### Explicit External Tool Setup
 
 Tolaria can register itself as an MCP server in:
-- `~/.claude.json` and `~/.claude/mcp.json` (Claude Code compatibility across current CLI and legacy MCP-file setups)
+- `~/.claude.json` and `~/.claude/mcp.json` (Claude Code compatibility)
 - `~/.gemini/settings.json` (Gemini CLI)
 - `~/.cursor/mcp.json` (Cursor)
 - `~/.config/mcp/mcp.json` (generic MCP-compatible clients)
 
-That setup is user-initiated through the status bar / command palette flow, not a startup side effect. Registration is non-destructive (additive, preserves other servers and Gemini settings), uses `upsert` semantics, and can be reversed by removing Tolaria's entry again. Tolaria verifies Node.js is available before writing config, writes an explicit `type: "stdio"` entry, pins `VAULT_PATH` to the active vault, and sets `WS_UI_PORT=9711` so UI actions route back to the desktop app. The same generated entry is exposed as a manual JSON snippet in the MCP setup dialog and through the AI panel copy action, giving users a transparent fallback for MCP-compatible tools Tolaria does not auto-configure. In the desktop app, `useMcpStatus` copies that snippet through the native `copy_text_to_clipboard` command instead of the Web Clipboard API so macOS WKWebView permission policy cannot block setup. Packaged builds resolve `mcp-server/` from the installed resource directory next to the executable before falling back to macOS `Resources`, Linux package roots such as `/usr/local/Tolaria`, `/usr/lib/tolaria`, and `/usr/lib/tolaria/resources`, and AppImage paths. The `useMcpStatus` hook tracks whether the active vault is explicitly connected (`checking | installed | not_installed`) and owns connect, disconnect, exact-snippet load, and copy-to-clipboard actions. Gemini CLI still owns its own install and sign-in; Tolaria writes the durable external MCP entry only on explicit setup, while app-managed Gemini sessions use transient settings and optional vault guidance. The desktop WebSocket bridge is started only when a persisted active vault exists and is resynced from React state on vault changes; no selected vault stops the bridge instead of falling back to `~/Laputa`. Stdio MCP server processes are owned by the external client that launched them: when that client closes stdin, Tolaria cancels UI-bridge reconnect timers, closes any UI WebSocket, and exits the Node process instead of keeping it alive in the background.
+Registration is user-initiated, additive, and uses `upsert` semantics. The entry includes the resolved Node.js path and `WS_UI_PORT=9711`, but **no longer bakes `VAULT_PATH`** into the environment (unless falling back to legacy paths). `check_mcp_status` validates only that the registration exists, not the specific path match, as resolution is now dynamic.
+
+Packaged builds resolve `mcp-server/` from the installed resource directory. `useMcpStatus` manages the connection state and snippet generation.
 
 ### Architecture
 
 ```mermaid
 flowchart TD
-    subgraph MCP["MCP Server (Node.js) — selected-vault scoped"]
+    subgraph MCP["MCP Server (Node.js) — dynamic vault resolution"]
         IDX["index.js"]
-        VAULT["vault.js\n(findMarkdownFiles, readNote, createNote,\nsearchNotes, appendToNote, editNoteFrontmatter,\ndeleteNote, linkNotes, listNotes, vaultContext)"]
+        VP["vault-path.js\n(session-local vs env vs vaults.json)"]
+        VAULT["vault.js\n(file operations)"]
         WSB["ws-bridge.js"]
 
-        IDX -->|"stdio transport"| STDIO["Claude Code / Cursor"]
+        IDX --> VP
         IDX --> VAULT
         IDX --> WSB
+        IDX -->|"stdio transport"| STDIO["Claude Code / Cursor"]
         WSB -->|"port 9710 — tool bridge"| AI["AI Clients\n(Claude Code, external)"]
         WSB -->|"port 9711 — UI bridge"| FE["Frontend\n(useAiActivity)"]
     end
 
-    TAURI["Tauri bridge lifecycle"] -->|"start/stop/restart with active VAULT_PATH"| MCP
+    TAURI["Tauri bridge lifecycle"] -->|"spawn bridge with WS_UI_PORT"| MCP
     UI["Status bar / Command Palette"] -->|"explicit setup or disconnect"| CFG["~/.claude.json\n~/.claude/mcp.json\n~/.cursor/mcp.json\n~/.config/mcp/mcp.json"]
 ```
 
