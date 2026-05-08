@@ -416,11 +416,11 @@ flowchart LR
 |----------|---------|
 | `spawn_ws_bridge(vault_path)` | Spawns `ws-bridge.js` as child process with VAULT_PATH env |
 | `sync_mcp_bridge_vault(vault_path?)` | Starts, restarts, or stops the desktop WebSocket bridge as the selected vault changes |
-| `extract_mcp_server_to_stable_dir(app_version)` | On Linux AppImage launches, copies `mcp-server/` from the ephemeral mount to `~/.local/share/tolaria/mcp-server/` so external tool configs survive app restarts. Writes a `.tolaria-version` marker file with the Tauri app version after extraction; skips the copy when the marker matches the running app version. No-op on macOS, Windows, and .deb installs where paths are already stable |
+| `extract_mcp_server_to_stable_dir(app_version)` | On Linux AppImage launches, atomically extracts `mcp-server/` from the ephemeral mount to `~/.local/share/tolaria/mcp-server/` so external tool configs survive app restarts. Uses a cross-process file lock (`mcp-server.lock` with PID + 120 s stale detection), stages into `mcp-server.staging/`, writes a `.tolaria-version` marker, then renames staging → live with rollback on failure. Skips extraction when the marker matches the running app version. No-op on macOS, Windows, and .deb installs where paths are already stable |
 | `register_mcp(vault_path)` | Verifies Node.js, resolves the packaged `mcp-server/` (preferring the stable extracted copy when present), and writes Tolaria's explicit entry to Claude Code, Gemini CLI, Cursor, OpenCode, and generic MCP configs on user request |
 | `mcp_config_snippet(vault_path)` | Builds the exact `mcpServers.tolaria` JSON users can copy into any compatible client without writing third-party config files |
 | `remove_mcp()` | Removes Tolaria's MCP entry from Claude Code, Gemini CLI, Cursor, OpenCode, and generic MCP configs |
-| `upsert_mcp_config(path, entry)` | Atomic config file update (create/merge, preserves others) |
+| `upsert_mcp_config(path, entry)` | Atomic config file update (write to `.tmp` then rename; create/merge, preserves others) |
 
 The `WsBridgeChild` state wrapper in `lib.rs` ensures the bridge process is replaced on vault switches, stopped when no active vault is selected, and killed plus waited on app exit via the `RunEvent::Exit` handler. The same desktop layer keeps Tauri asset protocol access limited to vault roots loaded during the current app session; command calls remain active-vault scoped for reads, writes, and external opens.
 

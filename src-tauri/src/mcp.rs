@@ -1,6 +1,9 @@
 use serde::Serialize;
+use std::fs::OpenOptions;
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
+use std::time::Duration;
 
 const MCP_SERVER_NAME: &str = "tolaria";
 const LEGACY_MCP_SERVER_NAME: &str = "laputa";
@@ -255,6 +258,118 @@ fn stable_mcp_server_dir() -> Result<PathBuf, String> {
     Ok(data_dir.join("tolaria").join("mcp-server"))
 }
 
+const EXTRACTION_LOCK_STALE_SECS: u64 = 120;
+
+struct ExtractionLock {
+    path: PathBuf,
+}
+
+impl Drop for ExtractionLock {
+    fn drop(&mut self) {
+        if let Err(error) = std::fs::remove_file(&self.path) {
+            if error.kind() != ErrorKind::NotFound {
+                log::warn!(
+                    "Failed to remove extraction lock file {}: {}",
+                    self.path.display(),
+                    error
+                );
+            }
+        }
+    }
+}
+
+fn extraction_lock_path() -> Result<PathBuf, String> {
+    let stable_dir = stable_mcp_server_dir()?;
+    let Some(parent) = stable_dir.parent() else {
+        return Err(format!(
+            "Stable MCP server directory has no parent: {}",
+            stable_dir.display()
+        ));
+    };
+    Ok(parent.join("mcp-server.lock"))
+}
+
+fn extraction_lock_is_stale(lock_path: &Path) -> bool {
+    let Ok(metadata) = std::fs::metadata(lock_path) else {
+        return false;
+    };
+    let Ok(modified) = metadata.modified() else {
+        return false;
+    };
+    let Ok(elapsed) = modified.elapsed() else {
+        return false;
+    };
+    elapsed > Duration::from_secs(EXTRACTION_LOCK_STALE_SECS)
+}
+
+fn try_create_extraction_lock(lock_path: &Path) -> Result<Option<ExtractionLock>, String> {
+    if let Some(parent) = lock_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "Failed to create extraction lock parent directory {}: {}",
+                parent.display(),
+                error
+            )
+        })?;
+    }
+
+    match OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(lock_path)
+    {
+        Ok(mut file) => {
+            writeln!(file, "{}", std::process::id()).map_err(|error| {
+                format!(
+                    "Failed to write extraction lock {}: {}",
+                    lock_path.display(),
+                    error
+                )
+            })?;
+            file.sync_all().map_err(|error| {
+                format!(
+                    "Failed to sync extraction lock {}: {}",
+                    lock_path.display(),
+                    error
+                )
+            })?;
+            Ok(Some(ExtractionLock {
+                path: lock_path.to_path_buf(),
+            }))
+        }
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => Ok(None),
+        Err(error) => Err(format!(
+            "Failed to create extraction lock {}: {}",
+            lock_path.display(),
+            error
+        )),
+    }
+}
+
+fn acquire_extraction_lock(lock_path: &Path) -> Result<Option<ExtractionLock>, String> {
+    if let Some(lock) = try_create_extraction_lock(lock_path)? {
+        return Ok(Some(lock));
+    }
+
+    if extraction_lock_is_stale(lock_path) {
+        match std::fs::remove_file(lock_path) {
+            Ok(()) => return try_create_extraction_lock(lock_path),
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                return try_create_extraction_lock(lock_path);
+            }
+            Err(error) => {
+                return Err(format!(
+                    "Failed to remove stale extraction lock {}: {}",
+                    lock_path.display(),
+                    error
+                ));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
 fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dst).map_err(|e| {
         format!(
@@ -270,10 +385,27 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
         let entry = entry.map_err(|e| format!("Failed to read entry in {}: {e}", src.display()))?;
         let source_path = entry.path();
         let target_path = dst.join(entry.file_name());
-        let metadata = std::fs::metadata(&source_path)
+        let metadata = std::fs::symlink_metadata(&source_path)
             .map_err(|e| format!("Failed to read metadata for {}: {e}", source_path.display()))?;
 
-        if metadata.is_dir() {
+        if metadata.is_symlink() {
+            let link_target = std::fs::read_link(&source_path)
+                .map_err(|e| format!("Failed to read symlink {}: {e}", source_path.display()))?;
+            #[cfg(unix)]
+            std::os::unix::fs::symlink(&link_target, &target_path).map_err(|e| {
+                format!(
+                    "Failed to create symlink {} -> {}: {e}",
+                    target_path.display(),
+                    link_target.display()
+                )
+            })?;
+            #[cfg(not(unix))]
+            return Err(format!(
+                "Symlink copy is not supported on this platform for {} -> {}",
+                target_path.display(),
+                link_target.display()
+            ));
+        } else if metadata.is_dir() {
             copy_dir_all(&source_path, &target_path)?;
         } else {
             std::fs::copy(&source_path, &target_path).map_err(|e| {
@@ -319,13 +451,52 @@ pub fn extract_mcp_server_to_stable_dir(app_version: &str) -> Result<PathBuf, St
         return Ok(target_dir);
     }
 
-    if target_dir.exists() {
-        std::fs::remove_dir_all(&target_dir)
-            .map_err(|e| format!("Failed to remove {}: {e}", target_dir.display()))?;
+    let lock_path = extraction_lock_path()?;
+    let Some(_lock) = acquire_extraction_lock(&lock_path)? else {
+        log::info!("MCP extraction skipped: another instance is extracting");
+        return Ok(target_dir);
+    };
+
+    // Re-check after acquiring lock — another process may have finished extraction
+    if !needs_extraction(app_version, &target_dir) {
+        return Ok(target_dir);
     }
 
-    copy_dir_all(&source_dir, &target_dir)?;
-    write_version_marker(&target_dir, app_version)?;
+    let parent = target_dir
+        .parent()
+        .ok_or("stable MCP server dir has no parent")?;
+    std::fs::create_dir_all(parent)
+        .map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
+
+    let staging_dir = parent.join("mcp-server.staging");
+    let old_dir = parent.join("mcp-server.old");
+
+    // Clean up any leftover staging/old dirs from prior crashed runs
+    let _ = std::fs::remove_dir_all(&staging_dir);
+    let _ = std::fs::remove_dir_all(&old_dir);
+
+    // Stage: copy into staging dir + write version marker
+    copy_dir_all(&source_dir, &staging_dir)?;
+    write_version_marker(&staging_dir, app_version)?;
+
+    // Swap: move current → old, staging → current
+    if target_dir.exists() {
+        std::fs::rename(&target_dir, &old_dir).map_err(|e| {
+            // Clean up staging on failure
+            let _ = std::fs::remove_dir_all(&staging_dir);
+            format!("Failed to move old MCP dir aside: {e}")
+        })?;
+    }
+
+    std::fs::rename(&staging_dir, &target_dir).map_err(|e| {
+        // Attempt rollback: restore old dir
+        let _ = std::fs::rename(&old_dir, &target_dir);
+        format!("Failed to move staging MCP dir into place: {e}")
+    })?;
+
+    // Cleanup old dir (best effort)
+    let _ = std::fs::remove_dir_all(&old_dir);
+
     log::info!(
         "Extracted MCP server to stable path: {}",
         target_dir.display()
@@ -336,7 +507,7 @@ pub fn extract_mcp_server_to_stable_dir(app_version: &str) -> Result<PathBuf, St
 
 fn mcp_server_dir_for_registration() -> Result<PathBuf, String> {
     let stable_dir = stable_mcp_server_dir()?;
-    if mcp_server_dir_has_files(&stable_dir) {
+    if mcp_server_dir_has_files(&stable_dir) && read_version_marker(&stable_dir).is_some() {
         return Ok(stable_dir);
     }
     mcp_server_dir()
@@ -441,6 +612,13 @@ fn mcp_config_paths_for_home(home: &Path) -> Vec<PathBuf> {
     ]
 }
 
+/// Returns the OpenCode config file path.
+///
+/// Uses `dirs::config_dir()` which resolves to `$XDG_CONFIG_HOME` (or `~/.config`)
+/// on Linux. Note this differs from `stable_mcp_server_dir()` which uses
+/// `dirs::data_dir()` (`$XDG_DATA_HOME` / `~/.local/share`). The divergence is
+/// intentional: OpenCode stores its own config under `config_dir`, while extracted
+/// MCP server binaries belong under `data_dir` per the XDG Base Directory spec.
 fn opencode_config_path() -> Option<PathBuf> {
     dirs::config_dir().map(|config_dir| config_dir.join("opencode").join("opencode.json"))
 }
@@ -615,16 +793,31 @@ fn upsert_mcp_config(config_path: &Path, entry: &serde_json::Value) -> Result<bo
     upsert_mcp_config_with_key(config_path, entry, "mcpServers")
 }
 
+fn atomic_write_json(path: &Path, json: &str) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Config path has no parent: {}", path.display()))?;
+    std::fs::create_dir_all(parent)
+        .map_err(|e| format!("Cannot create dir {}: {e}", parent.display()))?;
+
+    let tmp_path = path.with_extension("tmp");
+    std::fs::write(&tmp_path, json)
+        .map_err(|e| format!("Cannot write temp file {}: {e}", tmp_path.display()))?;
+    std::fs::rename(&tmp_path, path).map_err(|e| {
+        format!(
+            "Cannot rename {} to {}: {e}",
+            tmp_path.display(),
+            path.display()
+        )
+    })?;
+    Ok(())
+}
+
 fn upsert_mcp_config_with_key(
     config_path: &Path,
     entry: &serde_json::Value,
     config_key: &str,
 ) -> Result<bool, String> {
-    if let Some(parent) = config_path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Cannot create dir {}: {e}", parent.display()))?;
-    }
-
     let mut config: serde_json::Value = if config_path.exists() {
         let raw = std::fs::read_to_string(config_path)
             .map_err(|e| format!("Cannot read {}: {e}", config_path.display()))?;
@@ -651,8 +844,7 @@ fn upsert_mcp_config_with_key(
 
     let json = serde_json::to_string_pretty(&config)
         .map_err(|e| format!("Failed to serialize config: {e}"))?;
-    std::fs::write(config_path, json)
-        .map_err(|e| format!("Cannot write {}: {e}", config_path.display()))?;
+    atomic_write_json(config_path, &json)?;
 
     Ok(was_update)
 }
@@ -712,8 +904,7 @@ fn remove_mcp_from_config_with_key(config_path: &Path, config_key: &str) -> Resu
 
     let json = serde_json::to_string_pretty(&config)
         .map_err(|e| format!("Failed to serialize config: {e}"))?;
-    std::fs::write(config_path, json)
-        .map_err(|e| format!("Cannot write {}: {e}", config_path.display()))?;
+    atomic_write_json(config_path, &json)?;
 
     Ok(true)
 }
@@ -816,6 +1007,22 @@ mod tests {
 
     fn write_config_json(config_path: &Path, config: serde_json::Value) {
         std::fs::write(config_path, serde_json::to_string(&config).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn atomic_write_json_writes_and_renames() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sub").join("config.json");
+
+        atomic_write_json(&path, r#"{"key":"value"}"#).unwrap();
+
+        assert!(path.exists());
+        assert!(
+            !path.with_extension("tmp").exists(),
+            "temp file should be cleaned up"
+        );
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(content, r#"{"key":"value"}"#);
     }
 
     fn managed_server(index_js: &str, vault_path: &str) -> serde_json::Value {
@@ -1513,6 +1720,53 @@ mod tests {
     }
 
     #[test]
+    fn extraction_lock_acquired_and_released() {
+        let _env_lock = ENV_MUTEX.lock().unwrap();
+        let data_home = tempfile::tempdir().unwrap();
+        let _guard = EnvVarGuard::set("XDG_DATA_HOME", data_home.path());
+
+        let lock_path = extraction_lock_path().expect("lock path should resolve");
+        assert!(
+            !lock_path.exists(),
+            "test precondition: lock file should not exist"
+        );
+
+        {
+            let _lock = acquire_extraction_lock(&lock_path)
+                .expect("acquire should succeed")
+                .expect("lock should be acquired");
+            assert!(lock_path.is_file(), "lock file should exist while held");
+        }
+
+        assert!(
+            !lock_path.exists(),
+            "lock file should be removed when lock guard drops"
+        );
+    }
+
+    #[test]
+    fn extraction_lock_rejects_concurrent_acquire() {
+        let _env_lock = ENV_MUTEX.lock().unwrap();
+        let data_home = tempfile::tempdir().unwrap();
+        let _guard = EnvVarGuard::set("XDG_DATA_HOME", data_home.path());
+
+        let lock_path = extraction_lock_path().expect("lock path should resolve");
+        let first = acquire_extraction_lock(&lock_path)
+            .expect("first acquire should succeed")
+            .expect("first lock should be acquired");
+
+        let second = acquire_extraction_lock(&lock_path).expect("second acquire should not error");
+        assert!(second.is_none(), "second acquire should be rejected while held");
+
+        drop(first);
+
+        let third = acquire_extraction_lock(&lock_path)
+            .expect("third acquire should succeed")
+            .expect("third acquire should lock after release");
+        drop(third);
+    }
+
+    #[test]
     fn copy_dir_all_copies_files_and_subdirs() {
         let temp = tempfile::tempdir().unwrap();
         let source = temp.path().join("source");
@@ -1557,6 +1811,24 @@ mod tests {
             destination.join("ws-bridge.js").is_file(),
             "copied file should exist in destination"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn copy_dir_all_preserves_symlinks() {
+        let src = tempfile::tempdir().unwrap();
+        let dst = tempfile::tempdir().unwrap();
+        let dst_path = dst.path().join("out");
+
+        std::fs::write(src.path().join("real.txt"), "content").unwrap();
+        std::os::unix::fs::symlink("real.txt", src.path().join("link.txt")).unwrap();
+
+        copy_dir_all(src.path(), &dst_path).unwrap();
+
+        let link_meta = std::fs::symlink_metadata(dst_path.join("link.txt")).unwrap();
+        assert!(link_meta.is_symlink(), "symlink should be preserved");
+        let target = std::fs::read_link(dst_path.join("link.txt")).unwrap();
+        assert_eq!(target, PathBuf::from("real.txt"));
     }
 
     #[test]
@@ -1607,9 +1879,30 @@ mod tests {
         std::fs::create_dir_all(&stable_dir).unwrap();
         std::fs::write(stable_dir.join("index.js"), "console.log('index');").unwrap();
         std::fs::write(stable_dir.join("ws-bridge.js"), "console.log('ws bridge');").unwrap();
+        write_version_marker(&stable_dir, "test").unwrap();
 
         let resolved = mcp_server_dir_for_registration().expect("registration dir should resolve");
         assert_eq!(resolved, stable_dir);
+    }
+
+    #[test]
+    fn mcp_server_dir_for_registration_rejects_partial_extraction() {
+        let _env_lock = ENV_MUTEX.lock().unwrap();
+        let data_home = tempfile::tempdir().unwrap();
+        let _guard = EnvVarGuard::set("XDG_DATA_HOME", data_home.path());
+
+        let stable_dir = stable_mcp_server_dir().expect("stable dir should resolve");
+        std::fs::create_dir_all(&stable_dir).unwrap();
+        // Create files but NO version marker — simulates partial extraction
+        std::fs::write(stable_dir.join("index.js"), "").unwrap();
+        std::fs::write(stable_dir.join("ws-bridge.js"), "").unwrap();
+
+        let resolved = mcp_server_dir_for_registration().expect("should resolve");
+        // Should fall back to runtime dir, not use the partial stable dir
+        assert_ne!(
+            resolved, stable_dir,
+            "should not use stable dir without version marker"
+        );
     }
 
     #[test]
