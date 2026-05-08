@@ -24,10 +24,10 @@ import { WebSocketServer } from 'ws'
 import {
   getNote, searchNotes, vaultContext,
 } from './vault.js'
-import { requireVaultPath } from './vault-path.js'
+import { resolveVaultPath, loadVaultList } from './vault-path.js'
 
-const WS_PORT = parseInt(process.env.WS_PORT || '9710', 10)
-const WS_UI_PORT = parseInt(process.env.WS_UI_PORT || '9711', 10)
+const WS_PORT = Number.parseInt(process.env.WS_PORT || '9710', 10)
+const WS_UI_PORT = Number.parseInt(process.env.WS_UI_PORT || '9711', 10)
 const LOOPBACK_HOST = 'localhost'
 const TRUSTED_UI_ORIGINS = new Set([
   'tauri://localhost',
@@ -37,12 +37,10 @@ const TRUSTED_UI_ORIGINS = new Set([
 
 /** @type {WebSocketServer | null} */
 let uiBridge = null
-let vaultPath = null
 const UNKNOWN_TOOL = Symbol('unknown tool')
 
 function activeVaultPath() {
-  vaultPath ??= requireVaultPath()
-  return vaultPath
+  return resolveVaultPath(null)
 }
 
 function broadcastUiAction(action, payload) {
@@ -86,7 +84,24 @@ function refreshVaultTool(args) {
   return { ok: true }
 }
 
+function listVaultsTool() {
+  const list = loadVaultList()
+  if (!list || list.vaults.length === 0) {
+    return { error: 'No vaults configured' }
+  }
+  const currentPath = process.env.VAULT_PATH?.trim() || list.activeVault
+  return {
+    vaults: list.vaults.map(v => ({
+      path: v.path,
+      label: v.label,
+      alias: v.alias,
+      active: v.path === currentPath,
+    })),
+  }
+}
+
 const TOOL_EXECUTORS = [
+  ['list_vaults', listVaultsTool],
   ['open_note', readNoteTool],
   ['read_note', readNoteTool],
   ['search_notes', (args) => searchNotes(activeVaultPath(), args.query, args.limit)],
