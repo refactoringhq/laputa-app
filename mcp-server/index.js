@@ -18,12 +18,15 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
+import { existsSync } from 'node:fs'
 import WebSocket from 'ws'
 import { searchNotes, getNote, vaultContext } from './vault.js'
-import { requireVaultPath } from './vault-path.js'
+import { resolveVaultPath, loadVaultList } from './vault-path.js'
 
-const VAULT_PATH = requireVaultPath()
-const WS_UI_PORT = parseInt(process.env.WS_UI_PORT || '9711', 10)
+// Session-local vault override — set by switch_vault, cleared on process exit.
+// Never persisted, never affects Tolaria UI (D7).
+let sessionVaultOverride = null
+const WS_UI_PORT = Number.parseInt(process.env.WS_UI_PORT || '9711', 10)
 const WS_UI_URL = `ws://localhost:${WS_UI_PORT}`
 
 // Connect as a WebSocket CLIENT to the UI bridge (run by ws-bridge.js).
@@ -112,6 +115,22 @@ const TOOLS = [
     },
   },
   {
+    name: 'list_vaults',
+    description: 'List all configured Tolaria vaults with their labels, paths, and active status. Use switch_vault to change which vault subsequent tool calls operate on.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'switch_vault',
+    description: 'Switch to a different vault for this session. Only affects this MCP connection — does not change the Tolaria app. Use list_vaults to see available vaults first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Absolute path to the vault (from list_vaults)' },
+      },
+      required: ['path'],
+    },
+  },
+  {
     name: 'get_vault_context',
     description: 'Get vault orientation: entity types, total note count, top-level folders, and 20 most recently modified notes.',
     inputSchema: { type: 'object', properties: {} },
@@ -162,21 +181,63 @@ const TOOLS = [
   },
 ]
 
+function currentVaultPath() {
+  return resolveVaultPath(sessionVaultOverride)
+}
+
 async function handleSearchNotes(args) {
-  const results = await searchNotes(VAULT_PATH, args.query, args.limit)
+  const results = await searchNotes(currentVaultPath(), args.query, args.limit)
   const text = results.length === 0
     ? 'No matching notes found.'
     : results.map(r => `**${r.title}** (${r.path})\n${r.snippet}`).join('\n\n')
   return { content: [{ type: 'text', text }] }
 }
 
+function handleListVaults() {
+  const list = loadVaultList()
+  if (!list || list.vaults.length === 0) {
+    return { content: [{ type: 'text', text: 'No vaults configured. Open a vault in Tolaria first.' }] }
+  }
+
+  const currentPath = sessionVaultOverride
+    || process.env.VAULT_PATH?.trim()
+    || list.activeVault
+
+  const vaults = list.vaults.map(v => ({
+    path: v.path,
+    label: v.label,
+    alias: v.alias,
+    active: v.path === currentPath,
+  }))
+
+  return { content: [{ type: 'text', text: JSON.stringify({ vaults }, null, 2) }] }
+}
+
+function handleSwitchVault(args) {
+  const vaultPath = args.path?.trim()
+  if (!vaultPath) {
+    throw new Error('Vault path is required')
+  }
+  if (!existsSync(vaultPath)) {
+    throw new Error(`Vault path does not exist: ${vaultPath}`)
+  }
+
+  sessionVaultOverride = vaultPath
+  return {
+    content: [{
+      type: 'text',
+      text: `Switched to vault: ${vaultPath}. All subsequent tool calls will use this vault.`,
+    }],
+  }
+}
+
 async function handleVaultContext() {
-  const ctx = await vaultContext(VAULT_PATH)
+  const ctx = await vaultContext(currentVaultPath())
   return { content: [{ type: 'text', text: JSON.stringify(ctx, null, 2) }] }
 }
 
 async function handleGetNote(args) {
-  const note = await getNote(VAULT_PATH, args.path)
+  const note = await getNote(currentVaultPath(), args.path)
   return { content: [{ type: 'text', text: JSON.stringify(note, null, 2) }] }
 }
 
@@ -202,6 +263,10 @@ function callToolHandler(name, args) {
   switch (name) {
     case 'search_notes':
       return handleSearchNotes(args)
+    case 'list_vaults':
+      return handleListVaults()
+    case 'switch_vault':
+      return handleSwitchVault(args)
     case 'get_vault_context':
       return handleVaultContext()
     case 'get_note':
@@ -277,7 +342,7 @@ async function main() {
 
   connectUiBridge()
   await server.connect(transport)
-  console.error(`Tolaria MCP server running (vault: ${VAULT_PATH})`)
+  console.error('[mcp] Tolaria MCP server running (vault resolved per call)')
 }
 
 main().catch((error) => {

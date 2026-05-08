@@ -403,6 +403,46 @@ describe('stdio process lifecycle', () => {
     assert.equal(exit.signal, null)
     assert.equal(exit.code, 0, stderr)
   })
+
+  it('lists list_vaults and switch_vault tools without VAULT_PATH', async () => {
+    const child = spawn(process.execPath, ['index.js'], {
+      cwd: MCP_SERVER_DIR,
+      env: { ...process.env, WS_UI_PORT: '65534' },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+
+    let stderr = ''
+    child.stderr.setEncoding('utf8')
+    child.stderr.on('data', chunk => {
+      stderr += chunk
+    })
+
+    child.stdin.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'test', version: '0.1' },
+      },
+    })}\n`)
+
+    child.stdin.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/list',
+      params: {},
+    })}\n`)
+
+    const toolsListResponse = await waitForJsonRpcResponse(child, 2, 2_000)
+    child.stdin.end()
+    await waitForExit(child, 1_500)
+
+    const toolNames = (toolsListResponse.result?.tools || []).map(tool => tool.name)
+    assert.ok(toolNames.includes('list_vaults'), `Expected list_vaults in tools/list. stderr:\n${stderr}`)
+    assert.ok(toolNames.includes('switch_vault'), `Expected switch_vault in tools/list. stderr:\n${stderr}`)
+  })
 })
 
 async function assertRejectsOutsideVault(prefix, resolveNotePath) {
@@ -463,6 +503,69 @@ function waitForExit(child, timeoutMs) {
 
     function cleanup() {
       clearTimeout(timer)
+      child.off('exit', onExit)
+    }
+  })
+}
+
+function waitForJsonRpcResponse(child, id, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let buffer = ''
+
+    const timer = setTimeout(() => {
+      cleanup()
+      reject(new Error(`Timed out waiting for JSON-RPC response id=${id}`))
+    }, timeoutMs)
+
+    child.stdout.setEncoding('utf8')
+    child.stdout.on('data', onData)
+    child.once('error', onError)
+    child.once('exit', onExit)
+
+    function onData(chunk) {
+      buffer += chunk
+      let lineEnd = buffer.indexOf('\n')
+      while (lineEnd !== -1) {
+        const line = buffer.slice(0, lineEnd).trim()
+        buffer = buffer.slice(lineEnd + 1)
+
+        if (!line) {
+          lineEnd = buffer.indexOf('\n')
+          continue
+        }
+
+        let payload
+        try {
+          payload = JSON.parse(line)
+        } catch {
+          lineEnd = buffer.indexOf('\n')
+          continue
+        }
+
+        if (payload.id === id) {
+          cleanup()
+          resolve(payload)
+          return
+        }
+
+        lineEnd = buffer.indexOf('\n')
+      }
+    }
+
+    function onError(error) {
+      cleanup()
+      reject(error)
+    }
+
+    function onExit(code, signal) {
+      cleanup()
+      reject(new Error(`Process exited before response id=${id} (code=${code}, signal=${signal})`))
+    }
+
+    function cleanup() {
+      clearTimeout(timer)
+      child.stdout.off('data', onData)
+      child.off('error', onError)
       child.off('exit', onExit)
     }
   })
