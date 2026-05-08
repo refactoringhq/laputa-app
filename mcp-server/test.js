@@ -445,6 +445,107 @@ describe('stdio process lifecycle', () => {
   })
 })
 
+describe('switch_vault security', () => {
+  let configDir
+  let validVaultDir
+
+  before(async () => {
+    validVaultDir = await mkdtemp(path.join(os.tmpdir(), 'tolaria-vault-'))
+    configDir = await mkdtemp(path.join(os.tmpdir(), 'tolaria-switchsec-'))
+    const appDir = path.join(configDir, 'com.tolaria.app')
+    await mkdir(appDir, { recursive: true })
+    await writeTextFile(path.join(appDir, 'vaults.json'), JSON.stringify({
+      vaults: [{ label: 'Test', path: validVaultDir }],
+      active_vault: validVaultDir,
+    }))
+  })
+
+  after(async () => {
+    await rm(configDir, { recursive: true, force: true })
+    await rm(validVaultDir, { recursive: true, force: true })
+  })
+
+  function spawnMcpServer() {
+    return spawn(process.execPath, ['index.js'], {
+      cwd: MCP_SERVER_DIR,
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        XDG_CONFIG_HOME: configDir,
+        WS_UI_PORT: '65534',
+      },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+  }
+
+  async function callSwitchVault(child, vaultPath) {
+    child.stdin.write(`${JSON.stringify({
+      jsonrpc: '2.0', id: 1, method: 'initialize',
+      params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '0.1' } },
+    })}\n`)
+    await waitForJsonRpcResponse(child, 1, 2_000)
+
+    child.stdin.write(`${JSON.stringify({
+      jsonrpc: '2.0', id: 2, method: 'tools/call',
+      params: { name: 'switch_vault', arguments: { path: vaultPath } },
+    })}\n`)
+    return waitForJsonRpcResponse(child, 2, 2_000)
+  }
+
+  it('rejects relative paths', async () => {
+    const child = spawnMcpServer()
+    try {
+      const resp = await callSwitchVault(child, './some/relative/path')
+      assert.equal(resp.result?.isError, true)
+      assert.ok(resp.result?.content?.[0]?.text?.includes('must be absolute'))
+    } finally {
+      child.stdin.end()
+      child.kill()
+    }
+  })
+
+  it('rejects files (not directories)', async () => {
+    const tmpFile = path.join(os.tmpdir(), `tolaria-switchsec-file-${Date.now()}`)
+    await writeTextFile(tmpFile, 'not a vault')
+    const child = spawnMcpServer()
+    try {
+      const resp = await callSwitchVault(child, tmpFile)
+      assert.equal(resp.result?.isError, true)
+      assert.ok(resp.result?.content?.[0]?.text?.includes('not a directory'))
+    } finally {
+      child.stdin.end()
+      child.kill()
+      await rm(tmpFile, { force: true })
+    }
+  })
+
+  it('rejects paths not in configured vault list', async () => {
+    const unconfiguredDir = await mkdtemp(path.join(os.tmpdir(), 'tolaria-unconfigured-'))
+    const child = spawnMcpServer()
+    try {
+      const resp = await callSwitchVault(child, unconfiguredDir)
+      assert.equal(resp.result?.isError, true)
+      assert.ok(resp.result?.content?.[0]?.text?.includes('not a configured vault'))
+    } finally {
+      child.stdin.end()
+      child.kill()
+      await rm(unconfiguredDir, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts a configured vault directory', async () => {
+    const child = spawnMcpServer()
+    try {
+      const resp = await callSwitchVault(child, validVaultDir)
+      assert.equal(resp.result?.isError, undefined)
+      assert.ok(resp.result?.content?.[0]?.text?.includes('Switched to vault'))
+    } finally {
+      child.stdin.end()
+      child.kill()
+    }
+  })
+})
+
 async function assertRejectsOutsideVault(prefix, resolveNotePath) {
   const outsideDir = await mkdtemp(path.join(os.tmpdir(), prefix))
   const outsideNote = path.join(outsideDir, 'outside.md')

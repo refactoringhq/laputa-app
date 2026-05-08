@@ -18,7 +18,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
+import path from 'node:path'
 import WebSocket from 'ws'
 import { searchNotes, getNote, vaultContext } from './vault.js'
 import { resolveVaultPath, loadVaultList } from './vault-path.js'
@@ -218,8 +219,22 @@ function handleSwitchVault(args) {
   if (!vaultPath) {
     throw new Error('Vault path is required')
   }
-  if (!existsSync(vaultPath)) {
-    throw new Error(`Vault path does not exist: ${vaultPath}`)
+  if (!path.isAbsolute(vaultPath)) {
+    throw new Error('Vault path must be absolute')
+  }
+  if (!existsSync(vaultPath) || !statSync(vaultPath).isDirectory()) {
+    throw new Error(`Vault path does not exist or is not a directory: ${vaultPath}`)
+  }
+
+  const list = loadVaultList()
+  if (list && list.vaults.length > 0) {
+    const known = list.vaults.some(v => v.path === vaultPath)
+    if (!known) {
+      throw new Error(
+        `Vault path is not a configured vault: ${vaultPath}. `
+        + 'Use list_vaults to see available vaults.',
+      )
+    }
   }
 
   sessionVaultOverride = vaultPath
