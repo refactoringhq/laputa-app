@@ -54,6 +54,10 @@ where
         .any(|key| get_var(key).is_some_and(|value| !value.trim().is_empty()))
 }
 
+pub(crate) fn is_running() -> bool {
+    is_linux_appimage_launch(|key| std::env::var(key).ok())
+}
+
 fn has_non_empty_env<F>(get_var: &mut F, key: &str) -> bool
 where
     F: FnMut(&str) -> Option<String>,

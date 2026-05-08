@@ -218,6 +218,12 @@ fn sync_ws_bridge_for_selected_vault(app_handle: &tauri::AppHandle) {
 fn spawn_initial_ws_bridge_sync(app: &tauri::App) {
     let app_handle = app.handle().clone();
     spawn_background_task("tolaria-ws-bridge-startup", move || {
+        if linux_appimage::is_running() {
+            let app_version = app_handle.package_info().version.to_string();
+            if let Err(e) = mcp::extract_mcp_server_to_stable_dir(&app_version) {
+                log::warn!("Failed to extract MCP server to stable path: {e}");
+            }
+        }
         sync_ws_bridge_for_selected_vault(&app_handle);
     });
 }

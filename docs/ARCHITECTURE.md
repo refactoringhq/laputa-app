@@ -367,6 +367,7 @@ Tolaria can register itself as an MCP server in:
 - `~/.gemini/settings.json` (Gemini CLI)
 - `~/.cursor/mcp.json` (Cursor)
 - `~/.config/mcp/mcp.json` (generic MCP-compatible clients)
+- `~/.config/opencode/opencode.json` (OpenCode — uses `"mcp"` key, `"command"` array, `"environment"` for env vars)
 
 That setup is user-initiated through the status bar / command palette flow, not a startup side effect. Registration is non-destructive (additive, preserves other servers and Gemini settings), uses `upsert` semantics, and can be reversed by removing Tolaria's entry again. Tolaria verifies Node.js is available before writing config, writes an explicit `type: "stdio"` entry, pins `VAULT_PATH` to the active vault, and sets `WS_UI_PORT=9711` so UI actions route back to the desktop app. The same generated entry is exposed as a manual JSON snippet in the MCP setup dialog and through the AI panel copy action, giving users a transparent fallback for MCP-compatible tools Tolaria does not auto-configure. In the desktop app, `useMcpStatus` copies that snippet through the native `copy_text_to_clipboard` command instead of the Web Clipboard API so macOS WKWebView permission policy cannot block setup. Packaged builds resolve `mcp-server/` from the installed resource directory next to the executable before falling back to macOS `Resources`, Linux package roots such as `/usr/local/Tolaria`, `/usr/lib/tolaria`, and `/usr/lib/tolaria/resources`, and AppImage paths. The `useMcpStatus` hook tracks whether the active vault is explicitly connected (`checking | installed | not_installed`) and owns connect, disconnect, exact-snippet load, and copy-to-clipboard actions. Gemini CLI still owns its own install and sign-in; Tolaria writes the durable external MCP entry only on explicit setup, while app-managed Gemini sessions use transient settings and optional vault guidance. The desktop WebSocket bridge is started only when a persisted active vault exists and is resynced from React state on vault changes; no selected vault stops the bridge instead of falling back to `~/Laputa`. Stdio MCP server processes are owned by the external client that launched them: when that client closes stdin, Tolaria cancels UI-bridge reconnect timers, closes any UI WebSocket, and exits the Node process instead of keeping it alive in the background.
 
@@ -387,7 +388,7 @@ flowchart TD
     end
 
     TAURI["Tauri bridge lifecycle"] -->|"start/stop/restart with active VAULT_PATH"| MCP
-    UI["Status bar / Command Palette"] -->|"explicit setup or disconnect"| CFG["~/.claude.json\n~/.claude/mcp.json\n~/.cursor/mcp.json\n~/.config/mcp/mcp.json"]
+    UI["Status bar / Command Palette"] -->|"explicit setup or disconnect"| CFG["~/.claude.json\n~/.claude/mcp.json\n~/.cursor/mcp.json\n~/.config/mcp/mcp.json\n~/.config/opencode/opencode.json"]
 ```
 
 ### WebSocket Bridge
@@ -415,9 +416,10 @@ flowchart LR
 |----------|---------|
 | `spawn_ws_bridge(vault_path)` | Spawns `ws-bridge.js` as child process with VAULT_PATH env |
 | `sync_mcp_bridge_vault(vault_path?)` | Starts, restarts, or stops the desktop WebSocket bridge as the selected vault changes |
-| `register_mcp(vault_path)` | Verifies Node.js, resolves the packaged `mcp-server/`, and writes Tolaria's explicit stdio entry to Claude Code, Gemini CLI, Cursor, and generic MCP configs on user request |
+| `extract_mcp_server_to_stable_dir(app_version)` | On Linux AppImage launches, copies `mcp-server/` from the ephemeral mount to `~/.local/share/tolaria/mcp-server/` so external tool configs survive app restarts. Writes a `.tolaria-version` marker file with the Tauri app version after extraction; skips the copy when the marker matches the running app version. No-op on macOS, Windows, and .deb installs where paths are already stable |
+| `register_mcp(vault_path)` | Verifies Node.js, resolves the packaged `mcp-server/` (preferring the stable extracted copy when present), and writes Tolaria's explicit entry to Claude Code, Gemini CLI, Cursor, OpenCode, and generic MCP configs on user request |
 | `mcp_config_snippet(vault_path)` | Builds the exact `mcpServers.tolaria` JSON users can copy into any compatible client without writing third-party config files |
-| `remove_mcp()` | Removes Tolaria's MCP entry from Claude Code, Gemini CLI, Cursor, and generic MCP configs |
+| `remove_mcp()` | Removes Tolaria's MCP entry from Claude Code, Gemini CLI, Cursor, OpenCode, and generic MCP configs |
 | `upsert_mcp_config(path, entry)` | Atomic config file update (create/merge, preserves others) |
 
 The `WsBridgeChild` state wrapper in `lib.rs` ensures the bridge process is replaced on vault switches, stopped when no active vault is selected, and killed plus waited on app exit via the `RunEvent::Exit` handler. The same desktop layer keeps Tauri asset protocol access limited to vault roots loaded during the current app session; command calls remain active-vault scoped for reads, writes, and external opens.
@@ -531,6 +533,7 @@ Tolaria no longer implements provider-specific OAuth or remote-repository APIs. 
 2. User pastes any git URL and chooses a local destination
 3. The `clone_git_repo()` Tauri command runs `git clone` inside a blocking Tokio task so the Tauri window stays responsive during slow or failing clones
 4. Linux AppImage builds strip AppImage loader variables from system-git subprocesses before spawning `git`, keeping `git-remote-https` on the host git/library stack
+5. Linux AppImage builds extract the bundled `mcp-server/` to `~/.local/share/tolaria/mcp-server/` on startup so external MCP registrations reference a stable path that survives AppImage restarts and updates
 5. `git_push()` / `git_pull()` continue to use the same system git path
 6. On macOS, `git_add_remote()` asks Git's credential helper for HTTPS credentials before the first fetch so Keychain can grant access to the same saved credential item the shell uses
 7. Clone commands disable interactive terminal / askpass prompts and surface the git failure back to the UI instead of freezing the app waiting for input
@@ -566,6 +569,7 @@ sequenceDiagram
 
     T->>T: apply Linux AppImage WebKit env/preload safeguards<br/>(AppImage only)
     T->>T: start background legacy vault housekeeping<br/>(does not block setup)
+    T->>T: extract MCP server to stable path<br/>(AppImage only, skipped when version unchanged)
     T->>MCP: start background initial ws-bridge sync<br/>(if active vault exists)
     T->>A: App mounts
 

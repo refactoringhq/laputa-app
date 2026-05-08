@@ -248,6 +248,100 @@ pub(crate) fn mcp_server_dir() -> Result<PathBuf, String> {
     ))
 }
 
+fn stable_mcp_server_dir() -> Result<PathBuf, String> {
+    let Some(data_dir) = dirs::data_dir() else {
+        return Err("Unable to resolve data directory for stable MCP server path".into());
+    };
+    Ok(data_dir.join("tolaria").join("mcp-server"))
+}
+
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(dst).map_err(|e| {
+        format!(
+            "Failed to create destination directory {}: {e}",
+            dst.display()
+        )
+    })?;
+
+    let entries = std::fs::read_dir(src)
+        .map_err(|e| format!("Failed to read source directory {}: {e}", src.display()))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read entry in {}: {e}", src.display()))?;
+        let source_path = entry.path();
+        let target_path = dst.join(entry.file_name());
+        let metadata = std::fs::metadata(&source_path)
+            .map_err(|e| format!("Failed to read metadata for {}: {e}", source_path.display()))?;
+
+        if metadata.is_dir() {
+            copy_dir_all(&source_path, &target_path)?;
+        } else {
+            std::fs::copy(&source_path, &target_path).map_err(|e| {
+                format!(
+                    "Failed to copy file {} to {}: {e}",
+                    source_path.display(),
+                    target_path.display()
+                )
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
+const VERSION_MARKER_FILE: &str = ".tolaria-version";
+
+fn read_version_marker(dir: &Path) -> Option<String> {
+    let marker = dir.join(VERSION_MARKER_FILE);
+    std::fs::read_to_string(marker)
+        .ok()
+        .map(|s| s.trim().to_string())
+}
+
+fn write_version_marker(dir: &Path, version: &str) -> Result<(), String> {
+    let marker = dir.join(VERSION_MARKER_FILE);
+    std::fs::write(&marker, version)
+        .map_err(|e| format!("Failed to write version marker {}: {e}", marker.display()))
+}
+
+fn needs_extraction(app_version: &str, target: &Path) -> bool {
+    if !mcp_server_dir_has_files(target) {
+        return true;
+    }
+    read_version_marker(target).as_deref() != Some(app_version)
+}
+
+pub fn extract_mcp_server_to_stable_dir(app_version: &str) -> Result<PathBuf, String> {
+    let source_dir = mcp_server_dir()?;
+    let target_dir = stable_mcp_server_dir()?;
+
+    if !needs_extraction(app_version, &target_dir) {
+        return Ok(target_dir);
+    }
+
+    if target_dir.exists() {
+        std::fs::remove_dir_all(&target_dir)
+            .map_err(|e| format!("Failed to remove {}: {e}", target_dir.display()))?;
+    }
+
+    copy_dir_all(&source_dir, &target_dir)?;
+    write_version_marker(&target_dir, app_version)?;
+    log::info!(
+        "Extracted MCP server to stable path: {}",
+        target_dir.display()
+    );
+
+    Ok(target_dir)
+}
+
+fn mcp_server_dir_for_registration() -> Result<PathBuf, String> {
+    let stable_dir = stable_mcp_server_dir()?;
+    if mcp_server_dir_has_files(&stable_dir) {
+        return Ok(stable_dir);
+    }
+    mcp_server_dir()
+}
+
 fn mcp_server_dir_candidates(dev_path: &Path, resource_roots: &[PathBuf]) -> Vec<PathBuf> {
     let mut candidates = vec![dev_path.to_path_buf()];
 
@@ -347,11 +441,22 @@ fn mcp_config_paths_for_home(home: &Path) -> Vec<PathBuf> {
     ]
 }
 
+fn opencode_config_path() -> Option<PathBuf> {
+    dirs::config_dir().map(|config_dir| config_dir.join("opencode").join("opencode.json"))
+}
+
 fn read_registered_mcp_entry(config_path: &Path) -> Option<serde_json::Value> {
+    read_registered_mcp_entry_with_key(config_path, "mcpServers")
+}
+
+fn read_registered_mcp_entry_with_key(
+    config_path: &Path,
+    config_key: &str,
+) -> Option<serde_json::Value> {
     let raw = std::fs::read_to_string(config_path).ok()?;
     let config: serde_json::Value = serde_json::from_str(&raw).ok()?;
     config
-        .get("mcpServers")
+        .get(config_key)
         .and_then(|value| value.as_object())
         .and_then(|servers| {
             servers
@@ -377,8 +482,35 @@ fn entry_has_ui_port(entry: &serde_json::Value) -> bool {
     entry["env"]["WS_UI_PORT"].as_str() == Some("9711")
 }
 
+fn entry_has_ui_port_in_key(entry: &serde_json::Value, key: &str) -> bool {
+    entry[key]["WS_UI_PORT"].as_str() == Some("9711")
+}
+
 fn entry_targets_vault(entry: &serde_json::Value, vault_path: &Path) -> bool {
     let Some(entry_vault_path) = entry["env"]["VAULT_PATH"].as_str() else {
+        return false;
+    };
+
+    let Ok(expected) = std::fs::canonicalize(vault_path) else {
+        return false;
+    };
+    let Ok(actual) = std::fs::canonicalize(entry_vault_path) else {
+        return false;
+    };
+
+    actual == expected
+}
+
+fn opencode_entry_index_js_exists(entry: &serde_json::Value) -> bool {
+    entry["command"]
+        .as_array()
+        .and_then(|command| command.get(1))
+        .and_then(|value| value.as_str())
+        .is_some_and(|index_js| Path::new(index_js).exists())
+}
+
+fn opencode_entry_targets_vault(entry: &serde_json::Value, vault_path: &Path) -> bool {
+    let Some(entry_vault_path) = entry["environment"]["VAULT_PATH"].as_str() else {
         return false;
     };
 
@@ -405,6 +537,22 @@ fn build_mcp_entry(node_command: &str, index_js: &str, vault_path: &str) -> serd
     })
 }
 
+fn build_opencode_mcp_entry(
+    node_command: &str,
+    index_js: &str,
+    vault_path: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "type": "local",
+        "command": [node_command, index_js],
+        "environment": {
+            "VAULT_PATH": vault_path,
+            "WS_UI_PORT": "9711"
+        },
+        "enabled": true
+    })
+}
+
 fn build_mcp_config_snippet(entry: &serde_json::Value) -> Result<String, String> {
     let mut servers = serde_json::Map::new();
     servers.insert(MCP_SERVER_NAME.to_string(), entry.clone());
@@ -419,7 +567,7 @@ pub fn mcp_config_snippet(vault_path: &str) -> Result<String, String> {
     let node = find_node().map_err(|e| {
         format!("Node.js 18+ is required on PATH before Tolaria can build MCP config: {e}")
     })?;
-    let server_dir = mcp_server_dir()?;
+    let server_dir = mcp_server_dir_for_registration()?;
     let index_js = server_dir.join("index.js").to_string_lossy().into_owned();
     let node_command = node.to_string_lossy().into_owned();
     let entry = build_mcp_entry(&node_command, &index_js, vault_path);
@@ -446,17 +594,32 @@ pub fn register_mcp(vault_path: &str) -> Result<String, String> {
     let node = find_node().map_err(|e| {
         format!("Node.js 18+ is required on PATH before Tolaria can register MCP tools: {e}")
     })?;
-    let server_dir = mcp_server_dir()?;
+    let server_dir = mcp_server_dir_for_registration()?;
     let index_js = server_dir.join("index.js").to_string_lossy().into_owned();
     let node_command = node.to_string_lossy().into_owned();
 
     let entry = build_mcp_entry(&node_command, &index_js, vault_path);
+
+    if let Some(opencode_path) = opencode_config_path() {
+        let opencode_entry = build_opencode_mcp_entry(&node_command, &index_js, vault_path);
+        if let Err(e) = upsert_mcp_config_with_key(&opencode_path, &opencode_entry, "mcp") {
+            log::warn!("Failed to update OpenCode config: {e}");
+        }
+    }
 
     Ok(register_mcp_to_configs(&entry, &mcp_config_paths()))
 }
 
 /// Insert or update the Tolaria entry in an MCP config file.
 fn upsert_mcp_config(config_path: &Path, entry: &serde_json::Value) -> Result<bool, String> {
+    upsert_mcp_config_with_key(config_path, entry, "mcpServers")
+}
+
+fn upsert_mcp_config_with_key(
+    config_path: &Path,
+    entry: &serde_json::Value,
+    config_key: &str,
+) -> Result<bool, String> {
     if let Some(parent) = config_path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Cannot create dir {}: {e}", parent.display()))?;
@@ -474,12 +637,12 @@ fn upsert_mcp_config(config_path: &Path, entry: &serde_json::Value) -> Result<bo
     let servers = config
         .as_object_mut()
         .ok_or("Config is not a JSON object")?
-        .entry("mcpServers")
+        .entry(config_key)
         .or_insert_with(|| serde_json::json!({}));
 
     let servers = servers
         .as_object_mut()
-        .ok_or("mcpServers is not a JSON object")?;
+        .ok_or_else(|| format!("{config_key} is not a JSON object"))?;
 
     let was_update =
         servers.get(MCP_SERVER_NAME).is_some() || servers.get(LEGACY_MCP_SERVER_NAME).is_some();
@@ -512,6 +675,10 @@ fn remove_mcp_from_configs(config_paths: &[PathBuf]) -> String {
 }
 
 fn remove_mcp_from_config(config_path: &Path) -> Result<bool, String> {
+    remove_mcp_from_config_with_key(config_path, "mcpServers")
+}
+
+fn remove_mcp_from_config_with_key(config_path: &Path, config_key: &str) -> Result<bool, String> {
     if !config_path.exists() {
         return Ok(false);
     }
@@ -525,12 +692,12 @@ fn remove_mcp_from_config(config_path: &Path) -> Result<bool, String> {
         return Err("Config is not a JSON object".into());
     };
 
-    let Some(servers_value) = config_object.get_mut("mcpServers") else {
+    let Some(servers_value) = config_object.get_mut(config_key) else {
         return Ok(false);
     };
 
     let Some(servers) = servers_value.as_object_mut() else {
-        return Err("mcpServers is not a JSON object".into());
+        return Err(format!("{config_key} is not a JSON object"));
     };
 
     let removed_primary = servers.remove(MCP_SERVER_NAME).is_some();
@@ -540,7 +707,7 @@ fn remove_mcp_from_config(config_path: &Path) -> Result<bool, String> {
     }
 
     if servers.is_empty() {
-        config_object.remove("mcpServers");
+        config_object.remove(config_key);
     }
 
     let json = serde_json::to_string_pretty(&config)
@@ -552,7 +719,24 @@ fn remove_mcp_from_config(config_path: &Path) -> Result<bool, String> {
 }
 
 pub fn remove_mcp() -> String {
-    remove_mcp_from_configs(&mcp_config_paths())
+    let removed_from_standard_configs = remove_mcp_from_configs(&mcp_config_paths()) == "removed";
+    let removed_from_opencode = if let Some(opencode_path) = opencode_config_path() {
+        match remove_mcp_from_config_with_key(&opencode_path, "mcp") {
+            Ok(removed) => removed,
+            Err(e) => {
+                log::warn!("Failed to update {}: {}", opencode_path.display(), e);
+                false
+            }
+        }
+    } else {
+        false
+    };
+
+    if removed_from_standard_configs || removed_from_opencode {
+        "removed".to_string()
+    } else {
+        "already_absent".to_string()
+    }
 }
 
 /// Check whether the MCP server is properly installed and registered.
@@ -562,14 +746,26 @@ pub fn remove_mcp() -> String {
 /// Otherwise returns `NotInstalled`.
 pub fn check_mcp_status(vault_path: &str) -> McpStatus {
     let active_vault_path = Path::new(vault_path);
-    if mcp_config_paths().into_iter().any(|config_path| {
+    let standard_installed = mcp_config_paths().into_iter().any(|config_path| {
         read_registered_mcp_entry(&config_path).is_some_and(|entry| {
             entry_uses_stdio(&entry)
                 && entry_index_js_exists(&entry)
                 && entry_has_ui_port(&entry)
                 && entry_targets_vault(&entry, active_vault_path)
         })
-    }) {
+    });
+
+    let opencode_installed = opencode_config_path().is_some_and(|config_path| {
+        read_registered_mcp_entry_with_key(&config_path, "mcp").is_some_and(|entry| {
+            entry["type"].as_str() == Some("local")
+                && entry["enabled"].as_bool() == Some(true)
+                && opencode_entry_index_js_exists(&entry)
+                && entry_has_ui_port_in_key(&entry, "environment")
+                && opencode_entry_targets_vault(&entry, active_vault_path)
+        })
+    });
+
+    if standard_installed || opencode_installed {
         McpStatus::Installed
     } else {
         McpStatus::NotInstalled
@@ -579,6 +775,33 @@ pub fn check_mcp_status(vault_path: &str) -> McpStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsString;
+    use std::sync::Mutex;
+
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
+    struct EnvVarGuard {
+        key: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl EnvVarGuard {
+        fn set(key: &'static str, value: &Path) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::set_var(key, value);
+            Self { key, previous }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            if let Some(previous) = self.previous.as_ref() {
+                std::env::set_var(self.key, previous);
+            } else {
+                std::env::remove_var(self.key);
+            }
+        }
+    }
 
     fn read_config(config_path: &Path) -> serde_json::Value {
         let raw = std::fs::read_to_string(config_path).unwrap();
@@ -1274,5 +1497,370 @@ mod tests {
         assert_eq!(json, r#""installed""#);
         let json = serde_json::to_string(&McpStatus::NotInstalled).unwrap();
         assert_eq!(json, r#""not_installed""#);
+    }
+
+    #[test]
+    fn stable_mcp_server_dir_returns_data_dir_path() {
+        let expected = dirs::data_dir()
+            .expect("data dir should exist in test environment")
+            .join("tolaria")
+            .join("mcp-server");
+        assert_eq!(
+            stable_mcp_server_dir().expect("stable mcp dir should be resolved"),
+            expected,
+            "stable MCP path should be under data dir"
+        );
+    }
+
+    #[test]
+    fn copy_dir_all_copies_files_and_subdirs() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source");
+        let destination = temp.path().join("destination");
+
+        std::fs::create_dir_all(source.join("nested").join("deeper")).unwrap();
+        std::fs::write(source.join("index.js"), "console.log('index');").unwrap();
+        std::fs::write(source.join("nested").join("dep.txt"), "nested").unwrap();
+        std::fs::write(
+            source.join("nested").join("deeper").join("leaf.txt"),
+            "leaf",
+        )
+        .unwrap();
+
+        copy_dir_all(&source, &destination).expect("copy_dir_all should succeed");
+
+        assert!(destination.join("index.js").is_file());
+        assert!(destination.join("nested").join("dep.txt").is_file());
+        assert!(destination
+            .join("nested")
+            .join("deeper")
+            .join("leaf.txt")
+            .is_file());
+    }
+
+    #[test]
+    fn copy_dir_all_creates_destination() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source");
+        let destination = temp.path().join("destination");
+
+        std::fs::create_dir_all(&source).unwrap();
+        std::fs::write(source.join("ws-bridge.js"), "console.log('bridge');").unwrap();
+
+        assert!(
+            !destination.exists(),
+            "test precondition: destination should not exist"
+        );
+        copy_dir_all(&source, &destination).expect("copy_dir_all should create destination");
+        assert!(destination.exists(), "destination should be created");
+        assert!(
+            destination.join("ws-bridge.js").is_file(),
+            "copied file should exist in destination"
+        );
+    }
+
+    #[test]
+    fn extract_mcp_server_to_stable_dir_creates_copy() {
+        let _env_lock = ENV_MUTEX.lock().unwrap();
+        let data_home = tempfile::tempdir().unwrap();
+        let _guard = EnvVarGuard::set("XDG_DATA_HOME", data_home.path());
+
+        let extracted = extract_mcp_server_to_stable_dir("2025.5.1")
+            .expect("extract_mcp_server_to_stable_dir should succeed in dev mode");
+
+        assert!(extracted.join("index.js").is_file());
+        assert!(extracted.join("ws-bridge.js").is_file());
+        assert_eq!(
+            read_version_marker(&extracted),
+            Some("2025.5.1".to_string()),
+            "version marker should be written after extraction"
+        );
+    }
+
+    #[test]
+    fn extract_mcp_server_to_stable_dir_replaces_existing() {
+        let _env_lock = ENV_MUTEX.lock().unwrap();
+        let data_home = tempfile::tempdir().unwrap();
+        let _guard = EnvVarGuard::set("XDG_DATA_HOME", data_home.path());
+
+        let stable_dir = stable_mcp_server_dir().expect("stable dir should resolve");
+        std::fs::create_dir_all(&stable_dir).unwrap();
+        std::fs::write(stable_dir.join("stale.txt"), "old").unwrap();
+
+        let extracted =
+            extract_mcp_server_to_stable_dir("2025.5.2").expect("re-extraction should succeed");
+
+        assert!(
+            !extracted.join("stale.txt").exists(),
+            "stale content should be removed before copy"
+        );
+        assert!(extracted.join("index.js").is_file());
+    }
+
+    #[test]
+    fn mcp_server_dir_for_registration_prefers_stable() {
+        let _env_lock = ENV_MUTEX.lock().unwrap();
+        let data_home = tempfile::tempdir().unwrap();
+        let _guard = EnvVarGuard::set("XDG_DATA_HOME", data_home.path());
+
+        let stable_dir = stable_mcp_server_dir().expect("stable dir should resolve");
+        std::fs::create_dir_all(&stable_dir).unwrap();
+        std::fs::write(stable_dir.join("index.js"), "console.log('index');").unwrap();
+        std::fs::write(stable_dir.join("ws-bridge.js"), "console.log('ws bridge');").unwrap();
+
+        let resolved = mcp_server_dir_for_registration().expect("registration dir should resolve");
+        assert_eq!(resolved, stable_dir);
+    }
+
+    #[test]
+    fn mcp_server_dir_for_registration_falls_back_to_runtime() {
+        let _env_lock = ENV_MUTEX.lock().unwrap();
+        let data_home = tempfile::tempdir().unwrap();
+        let _guard = EnvVarGuard::set("XDG_DATA_HOME", data_home.path());
+
+        let stable_dir = stable_mcp_server_dir().expect("stable dir should resolve");
+        std::fs::create_dir_all(&stable_dir).unwrap();
+
+        let expected_runtime = mcp_server_dir().expect("runtime mcp server dir should resolve");
+        let resolved = mcp_server_dir_for_registration().expect("registration dir should resolve");
+        assert_eq!(resolved, expected_runtime);
+    }
+
+    #[test]
+    fn build_opencode_mcp_entry_produces_correct_json() {
+        let entry = build_opencode_mcp_entry("node", "/tmp/mcp/index.js", "/tmp/vault");
+        assert_eq!(
+            entry,
+            serde_json::json!({
+                "type": "local",
+                "command": ["node", "/tmp/mcp/index.js"],
+                "environment": {
+                    "VAULT_PATH": "/tmp/vault",
+                    "WS_UI_PORT": "9711"
+                },
+                "enabled": true
+            })
+        );
+    }
+
+    #[test]
+    fn upsert_mcp_config_with_key_uses_custom_key() {
+        let (_tmp, config_path) = temp_config_path("opencode.json");
+        let entry = build_opencode_mcp_entry("node", "/opt/index.js", "/vault");
+
+        let was_update =
+            upsert_mcp_config_with_key(&config_path, &entry, "mcp").expect("upsert should succeed");
+
+        assert!(
+            !was_update,
+            "new OpenCode config should report registration"
+        );
+        let config = read_config(&config_path);
+        assert!(config["mcp"][MCP_SERVER_NAME].is_object());
+        assert!(
+            config.get("mcpServers").is_none(),
+            "custom key upsert should not create mcpServers"
+        );
+    }
+
+    #[test]
+    fn upsert_opencode_preserves_other_config_fields() {
+        let (_tmp, config_path) = temp_config_path("opencode.json");
+        write_config_json(
+            &config_path,
+            serde_json::json!({
+                "plugins": ["a", "b"],
+                "agent": { "model": "x" },
+                "mcp": {
+                    "other": { "type": "local", "command": ["node", "other.js"] }
+                }
+            }),
+        );
+
+        let entry = build_opencode_mcp_entry("node", "/app/index.js", "/vault");
+        upsert_mcp_config_with_key(&config_path, &entry, "mcp").expect("upsert should succeed");
+
+        let config = read_config(&config_path);
+        assert_eq!(config["plugins"], serde_json::json!(["a", "b"]));
+        assert_eq!(config["agent"]["model"], "x");
+        assert!(config["mcp"]["other"].is_object());
+        assert!(config["mcp"][MCP_SERVER_NAME].is_object());
+    }
+
+    #[test]
+    fn remove_mcp_from_config_with_key_removes_entry() {
+        let (_tmp, config_path) = temp_config_path("opencode.json");
+        write_config_json(
+            &config_path,
+            serde_json::json!({
+                "mcp": {
+                    MCP_SERVER_NAME: { "type": "local", "command": ["node", "index.js"] },
+                    LEGACY_MCP_SERVER_NAME: { "type": "local", "command": ["node", "legacy.js"] },
+                    "other": { "type": "local", "command": ["node", "other.js"] }
+                }
+            }),
+        );
+
+        let removed =
+            remove_mcp_from_config_with_key(&config_path, "mcp").expect("remove should succeed");
+        assert!(
+            removed,
+            "remove should report true when managed servers exist"
+        );
+
+        let config = read_config(&config_path);
+        assert!(config["mcp"][MCP_SERVER_NAME].is_null());
+        assert!(config["mcp"][LEGACY_MCP_SERVER_NAME].is_null());
+        assert!(config["mcp"]["other"].is_object());
+    }
+
+    #[test]
+    fn opencode_config_path_returns_config_dir_path() {
+        let expected = dirs::config_dir().map(|dir| dir.join("opencode").join("opencode.json"));
+        assert_eq!(opencode_config_path(), expected);
+    }
+
+    #[test]
+    fn entry_has_ui_port_in_key_reads_requested_env_key() {
+        let valid = serde_json::json!({
+            "environment": {
+                "WS_UI_PORT": "9711"
+            }
+        });
+        assert!(entry_has_ui_port_in_key(&valid, "environment"));
+
+        let invalid = serde_json::json!({
+            "environment": {
+                "WS_UI_PORT": "9000"
+            }
+        });
+        assert!(!entry_has_ui_port_in_key(&invalid, "environment"));
+    }
+
+    #[test]
+    fn opencode_entry_index_js_exists_checks_second_command_arg() {
+        let tmp = tempfile::tempdir().unwrap();
+        let index_js = write_index_js(tmp.path());
+        let valid = serde_json::json!({
+            "command": ["node", index_js.to_string_lossy()]
+        });
+        assert!(opencode_entry_index_js_exists(&valid));
+
+        let missing = serde_json::json!({
+            "command": ["node", tmp.path().join("missing.js").to_string_lossy()]
+        });
+        assert!(!opencode_entry_index_js_exists(&missing));
+    }
+
+    #[test]
+    fn opencode_entry_targets_vault_uses_environment_vault_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        let first_vault = tmp.path().join("vault-a");
+        let second_vault = tmp.path().join("vault-b");
+        std::fs::create_dir_all(&first_vault).unwrap();
+        std::fs::create_dir_all(&second_vault).unwrap();
+
+        let entry = serde_json::json!({
+            "environment": {
+                "VAULT_PATH": first_vault.to_string_lossy()
+            }
+        });
+
+        assert!(opencode_entry_targets_vault(&entry, &first_vault));
+        assert!(!opencode_entry_targets_vault(&entry, &second_vault));
+    }
+
+    #[test]
+    fn read_version_marker_returns_stored_version() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join(VERSION_MARKER_FILE), "2025.5.8").unwrap();
+
+        assert_eq!(read_version_marker(tmp.path()), Some("2025.5.8".into()));
+    }
+
+    #[test]
+    fn read_version_marker_trims_whitespace() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join(VERSION_MARKER_FILE), "  2025.5.8\n").unwrap();
+
+        assert_eq!(read_version_marker(tmp.path()), Some("2025.5.8".into()));
+    }
+
+    #[test]
+    fn read_version_marker_returns_none_for_missing_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert_eq!(read_version_marker(tmp.path()), None);
+    }
+
+    #[test]
+    fn write_version_marker_creates_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_version_marker(tmp.path(), "2025.5.8").unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join(VERSION_MARKER_FILE)).unwrap(),
+            "2025.5.8"
+        );
+    }
+
+    #[test]
+    fn needs_extraction_true_when_target_has_no_files() {
+        let target = tempfile::tempdir().unwrap();
+
+        assert!(needs_extraction("2025.5.8", target.path()));
+    }
+
+    #[test]
+    fn needs_extraction_true_when_versions_differ() {
+        let target = tempfile::tempdir().unwrap();
+
+        std::fs::write(target.path().join("index.js"), "").unwrap();
+        std::fs::write(target.path().join("ws-bridge.js"), "").unwrap();
+        write_version_marker(target.path(), "2025.4.1").unwrap();
+
+        assert!(needs_extraction("2025.5.8", target.path()));
+    }
+
+    #[test]
+    fn needs_extraction_true_when_marker_missing() {
+        let target = tempfile::tempdir().unwrap();
+
+        std::fs::write(target.path().join("index.js"), "").unwrap();
+        std::fs::write(target.path().join("ws-bridge.js"), "").unwrap();
+
+        assert!(needs_extraction("2025.5.8", target.path()));
+    }
+
+    #[test]
+    fn needs_extraction_false_when_versions_match() {
+        let target = tempfile::tempdir().unwrap();
+
+        std::fs::write(target.path().join("index.js"), "").unwrap();
+        std::fs::write(target.path().join("ws-bridge.js"), "").unwrap();
+        write_version_marker(target.path(), "2025.5.8").unwrap();
+
+        assert!(!needs_extraction("2025.5.8", target.path()));
+    }
+
+    #[test]
+    fn extract_mcp_server_skips_when_version_matches() {
+        let _env_lock = ENV_MUTEX.lock().unwrap();
+        let data_home = tempfile::tempdir().unwrap();
+        let _guard = EnvVarGuard::set("XDG_DATA_HOME", data_home.path());
+
+        let extracted =
+            extract_mcp_server_to_stable_dir("2025.5.8").expect("first extraction should succeed");
+
+        let marker = extracted.join("marker.txt");
+        std::fs::write(&marker, "should survive").unwrap();
+
+        let extracted_again =
+            extract_mcp_server_to_stable_dir("2025.5.8").expect("second extraction should succeed");
+
+        assert_eq!(extracted, extracted_again);
+        assert!(
+            marker.is_file(),
+            "marker file should survive when version unchanged"
+        );
     }
 }
