@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::Duration;
 
+mod paths;
+
 const MCP_SERVER_NAME: &str = "tolaria";
 const LEGACY_MCP_SERVER_NAME: &str = "laputa";
 
@@ -232,7 +234,7 @@ pub(crate) fn mcp_server_dir() -> Result<PathBuf, String> {
     let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("mcp-server");
-    let resource_roots = runtime_resource_roots();
+    let resource_roots = paths::runtime_resource_roots();
     let candidates = mcp_server_dir_candidates(&dev_path, &resource_roots);
     if let Some(path) = candidates
         .iter()
@@ -525,28 +527,6 @@ fn mcp_server_dir_candidates(dev_path: &Path, resource_roots: &[PathBuf]) -> Vec
     candidates.extend(linux_package_mcp_server_dirs(Path::new("/usr/local")));
     candidates.extend(linux_package_mcp_server_dirs(Path::new("/usr")));
     candidates
-}
-
-fn runtime_resource_roots() -> Vec<PathBuf> {
-    let mut roots = Vec::new();
-
-    if let Some(resource_path) = non_empty_env_path("RESOURCEPATH") {
-        roots.push(resource_path);
-    }
-
-    if let Some(appdir) = non_empty_env_path("APPDIR") {
-        roots.push(appdir.join("usr"));
-        roots.push(appdir.join("usr").join("lib").join("tolaria"));
-        roots.push(appdir.join("usr").join("lib").join("Tolaria"));
-    }
-
-    roots
-}
-
-fn non_empty_env_path(key: &str) -> Option<PathBuf> {
-    std::env::var_os(key)
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
 }
 
 fn linux_package_mcp_server_dirs(root: &Path) -> Vec<PathBuf> {
