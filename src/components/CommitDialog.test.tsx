@@ -134,4 +134,5 @@ describe('CommitDialog', () => {
     expect(screen.getByTestId('commit-repository-select')).toBeInTheDocument()
     expect(screen.getByText('Work')).toBeInTheDocument()
   })
+
 })

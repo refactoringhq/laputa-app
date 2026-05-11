@@ -590,6 +590,7 @@
   "status.commit.local": "Commit changes locally",
   "status.commit.push": "Commit and push changes",
   "status.commit.label": "Commit",
+  "status.commit.preparing": "Preparing commit…",
   "status.commit.openOnGitHub": "Open commit {hash} on GitHub",
   "status.git.disabledTooltip": "Git is disabled for this vault. Initialize Git to enable history, sync, commits, and change views.",
   "status.git.disabled": "Git disabled",

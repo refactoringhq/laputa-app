@@ -763,15 +763,45 @@ export function ChangesBadge({
   )
 }
 
+function CommitPopup({ locale = 'en' }: { locale?: AppLocale }) {
+  return (
+    <div
+      data-testid="commit-status-popup"
+      style={{
+        position: 'absolute',
+        bottom: '100%',
+        left: 0,
+        marginBottom: 4,
+        background: 'var(--sidebar)',
+        border: '1px solid var(--border)',
+        borderRadius: 6,
+        padding: 8,
+        minWidth: 180,
+        boxShadow: '0 4px 12px var(--shadow-dialog)',
+        zIndex: 1000,
+        fontSize: 12,
+        color: 'var(--foreground)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Loader2 size={13} className="animate-spin" style={{ color: 'var(--muted-foreground)' }} />
+        <span>{translate(locale, 'status.commit.preparing')}</span>
+      </div>
+    </div>
+  )
+}
+
 export function CommitButton({
   onClick,
   remoteStatus,
+  isPreparingCommit = false,
   showSeparator = true,
   compact = false,
   locale = 'en',
 }: {
   onClick?: () => void
   remoteStatus?: GitRemoteStatus | null
+  isPreparingCommit?: boolean
   showSeparator?: boolean
   compact?: boolean
   locale?: AppLocale
@@ -781,12 +811,21 @@ export function CommitButton({
   return (
     <>
       <StatusBarSeparator show={showSeparator} />
-      <StatusBarAction copy={commitButtonTooltipCopy(locale, remoteStatus)} onClick={onClick} testId="status-commit-push" compact={compact}>
-        <span style={ICON_STYLE}>
-          <GitCommitHorizontal size={13} />
-          {compact ? null : translate(locale, 'status.commit.label')}
-        </span>
-      </StatusBarAction>
+      <div style={{ position: 'relative' }}>
+        <StatusBarAction
+          copy={isPreparingCommit ? { label: translate(locale, 'status.commit.preparing') } : commitButtonTooltipCopy(locale, remoteStatus)}
+          onClick={isPreparingCommit ? undefined : onClick}
+          testId="status-commit-push"
+          disabled={isPreparingCommit}
+          compact={compact}
+        >
+          <span style={ICON_STYLE}>
+            {isPreparingCommit ? <Loader2 size={13} className="animate-spin" /> : <GitCommitHorizontal size={13} />}
+            {compact ? null : translate(locale, isPreparingCommit ? 'status.commit.preparing' : 'status.commit.label')}
+          </span>
+        </StatusBarAction>
+        {isPreparingCommit && <CommitPopup locale={locale} />}
+      </div>
     </>
   )
 }

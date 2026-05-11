@@ -58,6 +58,7 @@ interface StatusBarPrimarySectionProps {
   onClickPulse?: () => void
   onCommitPush?: () => void
   onInitializeGit?: () => void
+  isPreparingCommit?: boolean
   isOffline?: boolean
   isVaultReloading?: boolean
   isGitVault?: boolean
@@ -196,6 +197,7 @@ function StatusBarPrimaryBadges({
   onClickPending,
   onCommitPush,
   onInitializeGit,
+  isPreparingCommit,
   syncStatus,
   lastSyncTime,
   onTriggerSync,
@@ -227,6 +229,7 @@ function StatusBarPrimaryBadges({
   onClickPending?: () => void
   onCommitPush?: () => void
   onInitializeGit?: () => void
+  isPreparingCommit?: boolean
   syncStatus: SyncStatus
   lastSyncTime: number | null
   onTriggerSync?: () => void
@@ -260,7 +263,7 @@ function StatusBarPrimaryBadges({
         <>
           <NoRemoteBadge remoteStatus={visibleRemoteStatus} onAddRemote={onAddRemote} showSeparator={!compact} compact={compact} locale={locale} />
           <ChangesBadge count={modifiedCount} onClick={onClickPending} showSeparator={!compact} compact={compact} locale={locale} />
-          <CommitButton onClick={onCommitPush} remoteStatus={visibleRemoteStatus} showSeparator={!compact} compact={compact} locale={locale} />
+          <CommitButton onClick={onCommitPush} remoteStatus={visibleRemoteStatus} isPreparingCommit={isPreparingCommit} showSeparator={!compact} compact={compact} locale={locale} />
           <SyncBadge
             status={syncStatus}
             lastSyncTime={lastSyncTime}
@@ -419,6 +422,7 @@ export function StatusBarPrimarySection({
   onClickPulse,
   onCommitPush,
   onInitializeGit,
+  isPreparingCommit,
   isOffline = false, isVaultReloading = false, isGitVault = true,
   syncStatus,
   lastSyncTime,
@@ -489,6 +493,7 @@ export function StatusBarPrimarySection({
         onClickPending={onClickPending}
         onCommitPush={onCommitPush}
         onInitializeGit={onInitializeGit}
+        isPreparingCommit={isPreparingCommit}
         syncStatus={syncStatus}
         lastSyncTime={lastSyncTime}
         onTriggerSync={onTriggerSync}

@@ -541,6 +541,7 @@ function useOpenCommitDialog({
   savePending,
   setCommitMode,
   setShowCommitDialog,
+  setIsPreparingCommit,
   vaultPath,
 }: Pick<
   CommitFlowConfig,
@@ -554,19 +555,25 @@ function useOpenCommitDialog({
   commitModeVaultPathRef: MutableRefObject<string | null>
   setCommitMode: (mode: CommitMode) => void
   setShowCommitDialog: (open: boolean) => void
+  setIsPreparingCommit: (value: boolean) => void
 }) {
   return useCallback(async () => {
-    await savePending()
-    await loadModifiedFiles()
-    const targetVaultPath = manualVaultPath || vaultPath
-    const remoteStatus = await resolveRemoteStatusForPath(targetVaultPath, {
-      resolveRemoteStatus,
-      resolveRemoteStatusForVaultPath,
-      vaultPath,
-    })
-    commitModeVaultPathRef.current = targetVaultPath
-    setCommitMode(commitModeFromRemoteStatus(remoteStatus))
-    setShowCommitDialog(true)
+    setIsPreparingCommit(true)
+    try {
+      await savePending()
+      await loadModifiedFiles()
+      const targetVaultPath = manualVaultPath || vaultPath
+      const remoteStatus = await resolveRemoteStatusForPath(targetVaultPath, {
+        resolveRemoteStatus,
+        resolveRemoteStatusForVaultPath,
+        vaultPath,
+      })
+      commitModeVaultPathRef.current = targetVaultPath
+      setCommitMode(commitModeFromRemoteStatus(remoteStatus))
+      setShowCommitDialog(true)
+    } finally {
+      setIsPreparingCommit(false)
+    }
   }, [
     commitModeVaultPathRef,
     loadModifiedFiles,
@@ -575,6 +582,7 @@ function useOpenCommitDialog({
     resolveRemoteStatusForVaultPath,
     savePending,
     setCommitMode,
+    setIsPreparingCommit,
     setShowCommitDialog,
     vaultPath,
   ])
@@ -594,6 +602,7 @@ export function useCommitFlow({
 }: CommitFlowConfig) {
   const [showCommitDialog, setShowCommitDialog] = useState(false)
   const [commitMode, setCommitMode] = useState<CommitMode>('push')
+  const [isPreparingCommit, setIsPreparingCommit] = useState(false)
   const checkpointInFlightRef = useRef(false)
   const commitModeVaultPathRef = useRef<string | null>(null)
 
@@ -606,6 +615,7 @@ export function useCommitFlow({
     savePending,
     setCommitMode,
     setShowCommitDialog,
+    setIsPreparingCommit,
     vaultPath,
   })
 
@@ -645,5 +655,5 @@ export function useCommitFlow({
 
   const closeCommitDialog = useCallback(() => setShowCommitDialog(false), [])
 
-  return { showCommitDialog, commitMode, openCommitDialog, handleCommitPush, closeCommitDialog, runAutomaticCheckpoint }
+  return { showCommitDialog, commitMode, isPreparingCommit, openCommitDialog, handleCommitPush, closeCommitDialog, runAutomaticCheckpoint }
 }

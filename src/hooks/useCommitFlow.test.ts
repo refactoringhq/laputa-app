@@ -285,4 +285,20 @@ describe('useCommitFlow', () => {
     })
     expect(result.current.showCommitDialog).toBe(false)
   })
+
+  it('isPreparingCommit is false initially', () => {
+    const { result } = renderCommitFlow()
+    expect(result.current.isPreparingCommit).toBe(false)
+  })
+
+  it('isPreparingCommit resets to false after openCommitDialog completes', async () => {
+    const { result } = renderCommitFlow()
+
+    await act(async () => {
+      await result.current.openCommitDialog()
+    })
+
+    expect(result.current.showCommitDialog).toBe(true)
+    expect(result.current.isPreparingCommit).toBe(false)
+  })
 })
