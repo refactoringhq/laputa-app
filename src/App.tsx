@@ -34,6 +34,7 @@ import { useDocumentThemeMode } from './hooks/useDocumentThemeMode'
 import { useThemeMode } from './hooks/useThemeMode'
 import type { ThemeMode } from './lib/themeMode'
 import { useNoteActions } from './hooks/useNoteActions'
+import { useClipDeepLinkHandler } from './hooks/useClipDeepLinkHandler'
 import { planNewTypeCreation } from './hooks/useNoteCreation'
 import { useCommitFlow } from './hooks/useCommitFlow'
 import { useGitRemoteStatus } from './hooks/useGitRemoteStatus'
@@ -627,6 +628,14 @@ function App() {
   useEffect(() => {
     noteWindowActionsRef.current = { handleSelectNote, openTabWithContent }
   }, [handleSelectNote, openTabWithContent])
+  useClipDeepLinkHandler({
+    addEntry: vault.addEntry,
+    enabled: !noteWindowParams,
+    openTabWithContent,
+    reloadVault: vault.reloadVault,
+    setToastMessage,
+    vaultPath: resolvedPath,
+  })
   const handleVaultUpdate = useCallback(async (
     updatedFiles: string[],
     options: { preserveFocusedEditor?: boolean } = {},
