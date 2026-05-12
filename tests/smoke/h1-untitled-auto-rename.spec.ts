@@ -1,7 +1,8 @@
 import fs from 'fs'
 import { test, expect, type Page } from '@playwright/test'
+import { APP_COMMAND_IDS } from '../../src/hooks/appCommandCatalog'
 import { createFixtureVaultCopy, openFixtureVaultTauri, removeFixtureVaultCopy } from '../helpers/fixtureVault'
-import { triggerMenuCommand } from './testBridge'
+import { triggerMenuCommand, triggerShortcutCommand } from './testBridge'
 
 function markdownFiles(vaultPath: string): string[] {
   return fs.readdirSync(vaultPath).filter((name) => name.endsWith('.md')).sort()
@@ -118,11 +119,51 @@ async function expectStableEmptyTitleHeading(page: Page): Promise<void> {
 
 async function activeSelectionBlockType(page: Page): Promise<string | null> {
   return page.evaluate(() => {
-    const selection = window.getSelection()
-    const anchorNode = selection?.anchorNode ?? null
-    const anchorElement = anchorNode instanceof Element ? anchorNode : anchorNode?.parentElement ?? null
-    return anchorElement?.closest('.bn-block-content')?.getAttribute('data-content-type') ?? null
+    const anchorNode = window.getSelection()?.anchorNode
+    if (!anchorNode) return null
+
+    const anchorElement = anchorNode instanceof Element ? anchorNode : anchorNode.parentElement
+    if (!anchorElement) return null
+
+    return anchorElement.closest('.bn-block-content')?.getAttribute('data-content-type') ?? null
   })
+}
+
+async function getRawEditorContent(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const host = document.querySelector('[data-testid="raw-editor-codemirror"]') as (Element & {
+      __cmView?: { state: { doc: { toString: () => string } } }
+    }) | null
+    const view = host?.__cmView
+    if (!view) throw new Error('CodeMirror view is missing')
+    return view.state.doc.toString()
+  })
+}
+
+async function setRawEditorContent(page: Page, content: string): Promise<void> {
+  await page.evaluate((nextContent) => {
+    const host = document.querySelector('[data-testid="raw-editor-codemirror"]') as (Element & {
+      __cmView?: {
+        state: { doc: { toString: () => string } }
+        dispatch: (spec: { changes: { from: number; to: number; insert: string } }) => void
+      }
+    }) | null
+    const view = host?.__cmView
+    if (!view) throw new Error('CodeMirror view is missing')
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.toString().length, insert: nextContent },
+    })
+  }, content)
+}
+
+async function openRawEditor(page: Page): Promise<void> {
+  await triggerShortcutCommand(page, APP_COMMAND_IDS.editToggleRawEditor)
+  await expect(page.getByTestId('raw-editor-codemirror')).toBeVisible({ timeout: 5_000 })
+}
+
+async function openRichEditor(page: Page): Promise<void> {
+  await triggerShortcutCommand(page, APP_COMMAND_IDS.editToggleRawEditor)
+  await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
 }
 
 async function expectTitleHeadingText(page: Page, title: string): Promise<void> {
@@ -246,6 +287,44 @@ test('@smoke new-note typing stays focused through initial save settlement', asy
     filename: `${slugifyTitle(title)}.md`,
     text: 'Still focused.',
   })
+})
+
+test('@smoke new-note editor mode roundtrip stays editable after auto-rename', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (err) => {
+    errors.push(err.message)
+  })
+  const title = 'Mode Switch Crash Guard'
+  const filename = `${slugifyTitle(title)}.md`
+  const rawLine = 'Raw mode edit after auto-rename.'
+  const richLine = 'Rich editor still accepts typing after the raw-mode return.'
+
+  await createUntitledNote(page)
+  await writeNewHeadingAndBody(page, title, 'Initial body before the raw-mode round trip.')
+  await expectActiveFilename(page, slugifyTitle(title))
+  await expectRenamedFile({ vaultPath: tempVaultDir, filename })
+
+  await openRawEditor(page)
+  const rawContent = await getRawEditorContent(page)
+  await setRawEditorContent(page, `${rawContent}\n\n${rawLine}`)
+  await page.waitForTimeout(650)
+
+  await openRichEditor(page)
+  await expect(page.locator('.bn-editor')).toContainText(rawLine, { timeout: 5_000 })
+  await page.locator('.bn-editor').click()
+  await page.keyboard.type(richLine)
+
+  await expectFileContentContains({
+    vaultPath: tempVaultDir,
+    filename,
+    text: rawLine,
+  })
+  await expectFileContentContains({
+    vaultPath: tempVaultDir,
+    filename,
+    text: richLine,
+  })
+  expect(errors).toEqual([])
 })
 
 test('@smoke new-note H1 auto-rename preserves body typing and cursor while rename lands', async ({ page }) => {

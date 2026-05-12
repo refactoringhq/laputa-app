@@ -62,6 +62,17 @@ function useBlockNoteRestoreEffect({
   useEffect(() => {
     if (rawMode) return
 
+    let restoreFrame = 0
+    let canceled = false
+
+    const cancelPendingRestore = () => {
+      canceled = true
+      if (restoreFrame === 0) return
+
+      window.cancelAnimationFrame(restoreFrame)
+      restoreFrame = 0
+    }
+
     const handleEditorTabSwapped = (event: Event) => {
       const pendingSnapshot = pendingRichRestoreRef.current
       if (!activeTabPath || !pendingSnapshot) return
@@ -69,7 +80,14 @@ function useBlockNoteRestoreEffect({
       const customEvent = event as CustomEvent<{ path: string }>
       if (customEvent.detail.path !== activeTabPath) return
 
-      window.requestAnimationFrame(() => {
+      if (restoreFrame !== 0) {
+        window.cancelAnimationFrame(restoreFrame)
+      }
+
+      restoreFrame = window.requestAnimationFrame(() => {
+        restoreFrame = 0
+        if (canceled) return
+
         restoreBlockNoteView(editor, pendingSnapshot, document)
         pendingRoundTripRawRestoreRef.current = null
         pendingRichRestoreRef.current = null
@@ -78,6 +96,7 @@ function useBlockNoteRestoreEffect({
 
     window.addEventListener('laputa:editor-tab-swapped', handleEditorTabSwapped)
     return () => {
+      cancelPendingRestore()
       window.removeEventListener('laputa:editor-tab-swapped', handleEditorTabSwapped)
     }
   }, [activeTabPath, editor, pendingRichRestoreRef, pendingRoundTripRawRestoreRef, rawMode])

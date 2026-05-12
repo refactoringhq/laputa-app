@@ -162,4 +162,66 @@ describe('useEditorModePositionSync', () => {
     expect(editor.setTextCursorPosition).toHaveBeenCalledWith('details', 'end')
     expect(editor.focus).toHaveBeenCalled()
   })
+
+  it('cancels a pending BlockNote restore when raw mode starts again before the frame runs', () => {
+    const editor = makeEditor()
+    const paragraphOffset = content.indexOf('Paragraph one') + 5
+    const pendingRawRestoreRef = { current: null as CodeMirrorRestoreState | null }
+    const pendingRoundTripRawRestoreRef = { current: null as { path: string; state: CodeMirrorRestoreState } | null }
+    const pendingRichRestoreRef = { current: null as RawEditorPositionSnapshot | null }
+    const frames = new Map<number, FrameRequestCallback>()
+    let nextFrame = 1
+    vi.mocked(window.requestAnimationFrame).mockImplementation((callback: FrameRequestCallback) => {
+      const id = nextFrame
+      nextFrame += 1
+      frames.set(id, callback)
+      return id
+    })
+    installRawView({
+      state: {
+        doc: { toString: () => content },
+        selection: { main: { anchor: paragraphOffset, head: paragraphOffset } },
+      },
+      scrollDOM: { scrollTop: 24 },
+      dispatch: vi.fn(),
+      focus: vi.fn(),
+    })
+
+    const { result, rerender } = renderHook(
+      ({ rawMode }) => {
+        useEditorModePositionSync({
+          activeTabPath: 'note.md',
+          editor: editor as never,
+          pendingRawRestoreRef,
+          pendingRoundTripRawRestoreRef,
+          pendingRichRestoreRef,
+          rawMode,
+        })
+        return { pendingRawRestoreRef, pendingRoundTripRawRestoreRef, pendingRichRestoreRef }
+      },
+      { initialProps: { rawMode: true } },
+    )
+
+    act(() => {
+      result.current.pendingRichRestoreRef.current = captureRawEditorPositionSnapshot(document)
+    })
+    rerender({ rawMode: false })
+    act(() => {
+      window.dispatchEvent(new CustomEvent('laputa:editor-tab-swapped', {
+        detail: { path: 'note.md' },
+      }))
+    })
+    const restoreFrame = frames.get(1)
+    expect(restoreFrame).toBeDefined()
+
+    rerender({ rawMode: true })
+    expect(window.cancelAnimationFrame).toHaveBeenCalledWith(1)
+
+    act(() => {
+      restoreFrame?.(0)
+    })
+
+    expect(editor.setTextCursorPosition).not.toHaveBeenCalled()
+    expect(editor.focus).not.toHaveBeenCalled()
+  })
 })

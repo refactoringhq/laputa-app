@@ -73,6 +73,21 @@ function capturePendingRoundTripRawRestore(activeTabPath: string | null): Pendin
     : null
 }
 
+function resolveActiveTabContent({
+  activeTabContent,
+  activeTabPath,
+  pendingRawExitContent,
+}: {
+  activeTabContent: string | null
+  activeTabPath: string | null
+  pendingRawExitContent: PendingRawExitContent | null
+}) {
+  if (activeTabPath && pendingRawExitContent?.path === activeTabPath) {
+    return pendingRawExitContent.content
+  }
+  return activeTabContent
+}
+
 function useTrackRawBuffer({
   activeTabContent,
   activeTabPath,
@@ -285,8 +300,13 @@ export function useRawModeWithFlush(
   const pendingRoundTripRawRestoreRef = useRef<PendingRoundTripRawRestore | null>(null)
   const [pendingRawExitContent, setPendingRawExitContent] = useState<PendingRawExitContent | null>(null)
   const [rawModeContentOverride, setRawModeContentOverride] = useState<PendingRawExitContent | null>(null)
-  useTrackRawBuffer({
+  const effectiveActiveTabContent = resolveActiveTabContent({
     activeTabContent,
+    activeTabPath,
+    pendingRawExitContent,
+  })
+  useTrackRawBuffer({
+    activeTabContent: effectiveActiveTabContent,
     activeTabPath,
     rawInitialContentRef,
     rawBufferPathRef,
@@ -294,7 +314,7 @@ export function useRawModeWithFlush(
     rawSourceContentRef,
   })
   useSyncRawModeContentOverride({
-    activeTabContent,
+    activeTabContent: effectiveActiveTabContent,
     activeTabPath,
     rawSourceContentRef,
     setRawModeContentOverride,
@@ -303,7 +323,7 @@ export function useRawModeWithFlush(
   const handleFlushPending = useHandleFlushPending({
     editor,
     activeTabPath,
-    activeTabContent,
+    activeTabContent: effectiveActiveTabContent,
     rawInitialContentRef,
     rawLatestContentRef,
     rawSourceContentRef,
@@ -315,7 +335,7 @@ export function useRawModeWithFlush(
   })
   const handleBeforeRawEnd = useHandleBeforeRawEnd({
     activeTabPath,
-    activeTabContent,
+    activeTabContent: effectiveActiveTabContent,
     onContentChange,
     rawInitialContentRef,
     rawBufferPathRef,
