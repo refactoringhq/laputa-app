@@ -124,6 +124,7 @@ import { activeGitRepositories } from './utils/gitRepositories'
 import { useVisibleWorkspaceEntries, useWorkspaceGraphState } from './hooks/useWorkspaceGraphState'
 import { useGitSetupState } from './hooks/useGitSetupState'
 import { useAppPreferences } from './hooks/useAppPreferences'
+import { useInboxOrganizeAdvance } from './hooks/useInboxOrganizeAdvance'
 import './App.css'
 
 const ACTIVE_EDITOR_SURFACE_SELECTOR = '.editor__blocknote-container, .raw-editor-codemirror'
@@ -144,12 +145,6 @@ declare global {
 }
 
 const DEFAULT_SELECTION: SidebarSelection = INBOX_SELECTION
-
-function getNextVisibleInboxEntry(entries: VaultEntry[], currentPath: string): VaultEntry | null {
-  const currentIndex = entries.findIndex((entry) => entry.path === currentPath)
-  if (currentIndex < 0) return null
-  return entries[currentIndex + 1] ?? null
-}
 
 function shouldPreferOnboardingVaultPath(
   onboardingState: { status: string; vaultPath?: string },
@@ -1638,30 +1633,17 @@ function App() {
     const entry = vault.entries.find((candidate) => candidate.path === notes.activeTabPath)
     return hasNoteIconValue(entry?.icon)
   }, [notes.activeTabPath, vault.entries])
-  const handleToggleOrganizedWithInboxAdvance = useCallback(async (path: string) => {
-    const entry = visibleEntries.find((candidate) => candidate.path === path)
-    if (!entry) return
-
-    const shouldAutoAdvance = settings.auto_advance_inbox_after_organize === true
-      && !entry.organized
-      && notes.activeTabPath === path
-      && effectiveSelection.kind === 'filter'
-      && effectiveSelection.filter === 'inbox'
-    const nextVisibleInboxEntry = shouldAutoAdvance
-      ? getNextVisibleInboxEntry(visibleNotesRef.current, path)
-      : null
-
-    const organized = await entryActions.handleToggleOrganized(path)
-
-    if (
-      organized
-      && nextVisibleInboxEntry
-      && notes.activeTabPathRef.current === path
-      && notes.requestedActiveTabPathRef.current === path
-    ) {
-      void notes.handleSelectNote(nextVisibleInboxEntry)
-    }
-  }, [effectiveSelection, entryActions, notes, settings.auto_advance_inbox_after_organize, visibleEntries])
+  const handleToggleOrganizedWithInboxAdvance = useInboxOrganizeAdvance({
+    activeTabPath: notes.activeTabPath,
+    activeTabPathRef: notes.activeTabPathRef,
+    autoAdvanceEnabled: settings.auto_advance_inbox_after_organize === true,
+    entries: visibleEntries,
+    onSelectNote: notes.handleSelectNote,
+    onToggleOrganized: entryActions.handleToggleOrganized,
+    requestedActiveTabPathRef: notes.requestedActiveTabPathRef,
+    selection: effectiveSelection,
+    visibleNotesRef,
+  })
   const toggleOrganizedCommand = explicitOrganizationEnabled ? handleToggleOrganizedWithInboxAdvance : undefined
   const canCustomizeNoteListColumns = useMemo(() => (
     canCustomizeColumnsForSelection(effectiveSelection, explicitOrganizationEnabled)
