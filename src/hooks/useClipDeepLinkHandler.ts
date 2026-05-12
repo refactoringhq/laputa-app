@@ -6,19 +6,19 @@ import type { VaultEntry } from '../types'
 import { importClipDeepLinkFromClipboard } from '../utils/clipDeepLink'
 
 interface ClipDeepLinkHandlerParams {
-  addEntry: (entry: VaultEntry) => void
+  addEntry(entry: VaultEntry): void
   enabled?: boolean
-  openTabWithContent: (entry: VaultEntry, content: string) => void
-  reloadVault: () => Promise<unknown> | unknown
-  setToastMessage: (message: string) => void
+  openTabWithContent(entry: VaultEntry, content: string): void
+  reloadVault(): Promise<unknown> | void
+  setToastMessage(message: string): void
   vaultPath: string
 }
 
 interface ClipDeepLinkRegistrationParams {
-  getCurrentUrls: () => Promise<string[] | null>
-  importUrl: (rawUrl: string) => void
-  onOpenUrl: (handler: (urls: string[]) => void) => Promise<() => void>
-  onRegistrationError: (error: unknown) => void
+  getCurrentUrls(): Promise<string[] | null>
+  importUrl(rawUrl: string): void
+  onOpenUrl(handler: (urls: string[]) => void): Promise<() => void>
+  onRegistrationError(error: unknown): void
 }
 
 export function registerClipDeepLinkImports({
@@ -30,9 +30,11 @@ export function registerClipDeepLinkImports({
   let disposed = false
   let unlisten: (() => void) | null = null
 
-  const importUrls = (urls: string[] | null) => {
+  function importUrls(urls: string[] | null): void {
     if (disposed || !urls) return
-    urls.forEach((url) => importUrl(url))
+    urls.forEach((url) => {
+      importUrl(url)
+    })
   }
 
   getCurrentUrls()
@@ -66,17 +68,17 @@ export function useClipDeepLinkHandler({
   useEffect(() => {
     if (!enabled || !isTauri()) return
 
-    const importUrl = (rawUrl: string) => {
+    function importUrl(rawUrl: string): void {
       void importClipDeepLinkFromClipboard({
         rawUrl,
         vaultPath,
         services: {
           readClipboardText: () => invoke<string>('read_text_from_clipboard'),
-          createNoteContent: (path, content, targetVaultPath) => invoke<void>('create_note_content', {
+          createNoteContent: (path, content, targetVaultPath) => invoke('create_note_content', {
             path,
             content,
             vaultPath: targetVaultPath,
-          }),
+          }) as Promise<void>,
           reloadVaultEntry: (path, targetVaultPath) => invoke<VaultEntry>('reload_vault_entry', {
             path,
             vaultPath: targetVaultPath,
