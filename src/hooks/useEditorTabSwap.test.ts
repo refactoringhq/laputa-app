@@ -995,6 +995,43 @@ describe('useEditorTabSwap raw mode sync', () => {
     }
   })
 
+  it('flushes pending rich-editor content before a switched-away tab is removed', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = makeTab('b.md', 'Note B')
+    const onContentChange = vi.fn()
+    const { docRef, mockEditor, rerender, result } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+      onContentChange,
+    })
+    docRef.current = [{
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Changed before close', styles: {} }],
+      children: [],
+    }]
+    mockEditor.blocksToMarkdownLossy.mockReturnValue('Changed before close\n')
+
+    vi.useFakeTimers()
+    try {
+      act(() => {
+        result.current.handleEditorChange()
+      })
+
+      expect(onContentChange).not.toHaveBeenCalled()
+
+      act(() => {
+        rerender({ tabs: [tabB], activeTabPath: 'b.md', rawMode: false })
+      })
+      await act(async () => { await Promise.resolve() })
+
+      expect(onContentChange).toHaveBeenCalledWith(
+        'a.md',
+        '---\ntitle: Note A\n---\nChanged before close\n',
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('reopens a switched-away note with the rich-editor content that was flushed during the switch', async () => {
     const tabA = makeTab('a.md', 'Note A')
     const tabB = makeTab('b.md', 'Note B')

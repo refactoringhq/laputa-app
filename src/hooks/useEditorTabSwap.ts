@@ -203,7 +203,8 @@ function useEditorChangeHandler(options: {
     if (editorContentPathRef.current !== path) return
 
     const tab = tabsRef.current.find(t => t.entry.path === path)
-    if (!tab) return
+    const previousContent = tab?.content ?? tabCacheRef.current.get(path)?.sourceContent
+    if (!previousContent) return
 
     const blocks = editor.document
     const rawBodyMarkdown = trySerializeEditorBody(editor, 'editor change')
@@ -211,7 +212,7 @@ function useEditorChangeHandler(options: {
     const bodyMarkdown = vaultPathRef.current
       ? portableImageUrls(rawBodyMarkdown, vaultPathRef.current, path)
       : rawBodyMarkdown
-    const [frontmatter] = splitFrontmatter(tab.content)
+    const [frontmatter] = splitFrontmatter(previousContent)
     const nextContent = `${frontmatter}${bodyMarkdown}`
     pendingLocalContentRef.current = { path, content: nextContent }
     cacheResolvedEditorState(tabCacheRef.current, path, {
