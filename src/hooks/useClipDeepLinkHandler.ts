@@ -6,19 +6,19 @@ import type { VaultEntry } from '../types'
 import { importClipDeepLinkFromClipboard } from '../utils/clipDeepLink'
 
 interface ClipDeepLinkHandlerParams {
-  addEntry(entry: VaultEntry): void
+  addEntry: (_entry: VaultEntry) => void
   enabled?: boolean
-  openTabWithContent(entry: VaultEntry, content: string): void
-  reloadVault(): Promise<unknown> | void
-  setToastMessage(message: string): void
+  openTabWithContent: (_entry: VaultEntry, _content: string) => void
+  reloadVault: () => Promise<unknown>
+  setToastMessage: (_message: string) => void
   vaultPath: string
 }
 
 interface ClipDeepLinkRegistrationParams {
-  getCurrentUrls(): Promise<string[] | null>
-  importUrl(rawUrl: string): void
-  onOpenUrl(handler: (urls: string[]) => void): Promise<() => void>
-  onRegistrationError(error: unknown): void
+  getCurrentUrls: () => Promise<string[] | null>
+  importUrl: (_rawUrl: string) => void
+  onOpenUrl: (_handler: (urls: string[]) => void) => Promise<() => void>
+  onRegistrationError: (_error: unknown) => void
 }
 
 export function registerClipDeepLinkImports({
@@ -68,7 +68,7 @@ export function useClipDeepLinkHandler({
   useEffect(() => {
     if (!enabled || !isTauri()) return
 
-    function importUrl(rawUrl: string): void {
+    const importUrl = (rawUrl: string): void => {
       void importClipDeepLinkFromClipboard({
         rawUrl,
         vaultPath,

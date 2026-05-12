@@ -8,13 +8,13 @@ export interface ClipDeepLink {
 export type ClipDeepLinkImportResult = 'ignored' | 'rejected' | 'imported'
 
 export interface ClipDeepLinkImportServices {
-  readClipboardText(): Promise<string>
-  createNoteContent(path: string, content: string, vaultPath: string): Promise<void>
-  reloadVaultEntry(path: string, vaultPath: string): Promise<VaultEntry>
-  reloadVault(): Promise<unknown> | void
-  addEntry(entry: VaultEntry): void
-  openTabWithContent(entry: VaultEntry, content: string): void
-  setToastMessage(message: string): void
+  readClipboardText: () => Promise<string>
+  createNoteContent: (_path: string, _content: string, _vaultPath: string) => Promise<void>
+  reloadVaultEntry: (_path: string, _vaultPath: string) => Promise<VaultEntry>
+  reloadVault: () => Promise<unknown>
+  addEntry: (_entry: VaultEntry) => void
+  openTabWithContent: (_entry: VaultEntry, _content: string) => void
+  setToastMessage: (_message: string) => void
 }
 
 export interface ClipDeepLinkImportParams {
@@ -89,7 +89,12 @@ export async function importClipDeepLinkFromClipboard({
     services.addEntry(entry)
     await services.reloadVault()
     services.openTabWithContent(entry, content)
-    services.setToastMessage(`Imported clip “${entry.title ?? clip.title ?? clip.path}”`)
+    const importedTitle = entry.title.trim()
+      ? entry.title
+      : clip.title?.trim()
+        ? clip.title
+        : clip.path
+    services.setToastMessage(`Imported clip “${importedTitle}”`)
     return 'imported'
   } catch (error) {
     services.setToastMessage(`Failed to import clip: ${errorMessage(error)}`)
