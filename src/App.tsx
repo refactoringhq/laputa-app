@@ -1218,12 +1218,18 @@ function App() {
     handleSetViewMode('editor-list')
   }, [handleSetViewMode])
 
+  const lastExplicitSelectionRef = useRef<SidebarSelection | null>(null)
+
   const handleSidebarNavSelect = useCallback((sel: SidebarSelection) => {
-    if (isSelectionActive(effectiveSelection, sel)) {
+    const isAlreadySelected = isSelectionActive(effectiveSelection, sel)
+    const userWasAlreadyHere = lastExplicitSelectionRef.current !== null && isSelectionActive(lastExplicitSelectionRef.current, sel)
+
+    if (isAlreadySelected && userWasAlreadyHere) {
       setNoteListHidden((h) => !h)
     } else {
+      lastExplicitSelectionRef.current = sel
       setNoteListHidden(false)
-      handleSetSelection(sel)
+      if (!isAlreadySelected) handleSetSelection(sel)
     }
   }, [effectiveSelection, handleSetSelection])
 
