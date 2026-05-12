@@ -839,6 +839,9 @@ No Redux or global context. State lives in the root `App.tsx` and custom hooks:
 | `App.tsx` | `selection`, panel widths, dialog visibility, toast, view mode | UI state |
 | `useVaultLoader` | `entries`, `allContent`, `modifiedFiles` | Vault data |
 | `useNoteActions` | `tabs`, `activeTabPath` | Composes `useNoteCreation` + `useNoteRename` + `frontmatterOps` |
+| `useNoteWindowLifecycle` | note-window open/title side effects | Opens `tauri://` note windows without full vault scans and keeps the native title current |
+| `useStartupScreenState` | startup visibility booleans | Keeps onboarding, telemetry-consent, missing-vault, and initial indexing decisions out of `App.tsx` |
+| `useVaultRenameDetection` | detected rename banner state | Detects external Git renames on focus and owns the wikilink update callback |
 | `useNoteCreation` | — | Note/type creation with optimistic persistence |
 | `useNoteRename` | — | Note renaming and folder moves with wikilink update |
 | `useNoteRetargeting` | — | Shared note retargeting logic for drag/drop and command-palette actions |

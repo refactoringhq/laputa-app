@@ -77,7 +77,7 @@ Linux AppImage builds still use the user's system `git`. Before Tolaria spawns t
 tolaria/
 ├── src/                          # React frontend
 │   ├── main.tsx                  # Entry point (renders <App />)
-│   ├── App.tsx                   # Root component — orchestrates layout + state
+│   ├── App.tsx                   # Root component — wires layout + state hooks
 │   ├── App.css                   # App shell layout styles
 │   ├── types.ts                  # Shared TS types (VaultEntry, Settings, etc.)
 │   ├── mock-tauri.ts             # Mock Tauri layer for browser testing
@@ -124,7 +124,7 @@ tolaria/
 │   │   └── ui/                   # shadcn/ui primitives
 │   │       ├── button.tsx, dialog.tsx, input.tsx, ...
 │   │
-│   ├── hooks/                    # Custom React hooks (~86 files)
+│   ├── hooks/                    # Custom React hooks (~90 files)
 │   │   ├── useVaultLoader.ts     # Loads vault entries + content
 │   │   ├── useVaultSwitcher.ts   # Multi-vault management
 │   │   ├── useVaultConfig.ts     # Per-vault UI settings
@@ -258,7 +258,7 @@ tolaria/
 
 | File | Why it matters |
 |------|---------------|
-| `src/App.tsx` | Root component. Shows the 4-panel layout, state flow, and how all features connect. |
+| `src/App.tsx` | Root component. Shows the 4-panel layout, state flow, and how orchestration hooks connect. |
 | `src/types.ts` | All shared TypeScript types. Read this first to understand the data model. |
 | `src-tauri/src/commands/` | Tauri command handlers (split into modules). This is the frontend-backend API surface. |
 | `src-tauri/src/lib.rs` | Tauri setup, command registration, startup tasks, WebSocket bridge lifecycle. |
@@ -271,6 +271,9 @@ tolaria/
 | `src/hooks/useNoteActions.ts` | Orchestrates note operations: composes `useNoteCreation`, `useNoteRename`, frontmatter CRUD, and wikilink navigation. |
 | `src/hooks/useVaultSwitcher.ts` | Multi-vault management, vault switching, and persisting cloned vaults in the switcher list. |
 | `src/hooks/useGettingStartedClone.ts` | Shared "Clone Getting Started Vault" action for the status bar and command palette. |
+| `src/hooks/useNoteWindowLifecycle.ts` | Note-window URL opening, asset-scope sync, and window-title updates. |
+| `src/hooks/useVaultRenameDetection.ts` | Focus-triggered Git rename detection and wikilink update action wiring. |
+| `src/hooks/useStartupScreenState.ts` | Startup-screen and vault-content loading visibility decisions. |
 | `src/components/AddRemoteModal.tsx` | Modal UI for connecting a local-only vault to a compatible remote. |
 | `src/mock-tauri.ts` | Mock data for browser testing. Shows the shape of all Tauri responses. |
 
