@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+/* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars -- Callback type parameters document the deep-link service contract. */
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link'
 import { isTauri } from '../mock-tauri'

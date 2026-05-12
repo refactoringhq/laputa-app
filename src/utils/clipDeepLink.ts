@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars -- Callback type parameters document the clip import service contract. */
 import type { VaultEntry } from '../types'
 
 export interface ClipDeepLink {
