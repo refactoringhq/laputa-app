@@ -274,6 +274,7 @@ tolaria/
 | `src/hooks/useNoteWindowLifecycle.ts` | Note-window URL opening, asset-scope sync, and window-title updates. |
 | `src/hooks/useVaultRenameDetection.ts` | Focus-triggered Git rename detection and wikilink update action wiring. |
 | `src/hooks/useStartupScreenState.ts` | Startup-screen and vault-content loading visibility decisions. |
+| `src/hooks/useGitFileWorkflows.ts` | Git diff/history/discard wiring and deleted-note preview workflow. |
 | `src/components/AddRemoteModal.tsx` | Modal UI for connecting a local-only vault to a compatible remote. |
 | `src/mock-tauri.ts` | Mock data for browser testing. Shows the shape of all Tauri responses. |
 

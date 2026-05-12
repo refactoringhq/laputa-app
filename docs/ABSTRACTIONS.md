@@ -177,6 +177,8 @@ The status-bar workspace manager edits installation-local identity and mount sta
 
 Git-facing renderer code must pass an explicit repository path instead of assuming a single active vault. Changes and Pulse/history display one selected repository at a time, manual commit selects one target repository, and AutoGit checkpoints iterate every active repository. Diff, file history, note saves, and discarded changes resolve the repository from the note's workspace provenance or from the selected Git surface.
 
+`useGitFileWorkflows` is the renderer abstraction for note-scoped Git file actions. It translates active tabs, visible entries, and modified-file surfaces into the correct repository path for diff/history commands, deleted-note previews, queued editor diff requests, and discard refresh behavior.
+
 ### File kinds and binary previews
 
 `VaultEntry.fileKind` comes from the Rust vault scanner and intentionally stays coarse-grained:

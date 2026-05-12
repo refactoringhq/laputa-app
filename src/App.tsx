@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { NoteList } from './components/NoteList'
-import type { DeletedNoteEntry } from './components/note-list/noteListUtils'
 import { Editor } from './components/Editor'
 import { ResizeHandle } from './components/ResizeHandle'
 import { CreateTypeDialog } from './components/CreateTypeDialog'
@@ -75,14 +74,13 @@ import {
 } from './hooks/useNeighborhoodSelection'
 import { createViewFilename } from './utils/viewFilename'
 import { nextViewOrder } from './utils/viewOrdering'
-import type { CommitDiffRequest } from './hooks/useDiffMode'
 import { ConflictResolverModal } from './components/ConflictResolverModal'
 import { ConfirmDeleteDialog } from './components/ConfirmDeleteDialog'
 import { DeleteProgressNotice } from './components/DeleteProgressNotice'
 import { UpdateBanner } from './components/UpdateBanner'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from './mock-tauri'
-import type { SidebarSelection, InboxPeriod, VaultEntry, ViewDefinition, GitCommit, GitRemoteStatus, WorkspaceIdentity } from './types'
+import type { SidebarSelection, InboxPeriod, VaultEntry, ViewDefinition, GitRemoteStatus, WorkspaceIdentity } from './types'
 import type { NoteListItem } from './utils/ai-context'
 import { initializeNoteProperties } from './utils/initializeNoteProperties'
 import { filterEntries, filterInboxEntries, type NoteListFilter } from './utils/noteListHelpers'
@@ -105,10 +103,8 @@ import { normalizeReleaseChannel } from './lib/releaseChannel'
 import {
   buildVaultAiGuidanceRefreshKey,
 } from './lib/vaultAiGuidance'
-import { extractDeletedContentFromDiff } from './components/note-list/noteListUtils'
 import { isActiveVaultUnavailableError } from './utils/vaultErrors'
 import { hasNoteIconValue } from './utils/noteIcon'
-import { filenameStemToTitle } from './utils/noteTitle'
 import { OPEN_AI_CHAT_EVENT } from './utils/aiPromptBridge'
 import {
   INBOX_SELECTION,
@@ -129,6 +125,7 @@ import { syncVaultAssetScope, useNoteWindowLifecycle } from './hooks/useNoteWind
 import { useVaultRenameDetection } from './hooks/useVaultRenameDetection'
 import { useVaultOpenedTelemetry } from './hooks/useVaultOpenedTelemetry'
 import { useStartupScreenState } from './hooks/useStartupScreenState'
+import { useGitFileWorkflows } from './hooks/useGitFileWorkflows'
 import './App.css'
 
 const ACTIVE_EDITOR_SURFACE_SELECTOR = '.editor__blocknote-container, .raw-editor-codemirror'
@@ -160,10 +157,6 @@ function shouldPreferOnboardingVaultPath(
     && !vaults.some((vault) => vault.path === onboardingState.vaultPath)
 }
 
-function appTauriCall<T>(command: string, args: Record<string, unknown>): Promise<T> {
-  return isTauri() ? invoke<T>(command, args) : mockInvoke<T>(command, args)
-}
-
 function canCustomizeColumnsForSelection(
   selection: SidebarSelection,
   explicitOrganizationEnabled: boolean,
@@ -172,48 +165,6 @@ function canCustomizeColumnsForSelection(
   if (selection.kind !== 'filter') return false
   if (selection.filter === 'all') return true
   return explicitOrganizationEnabled && selection.filter === 'inbox'
-}
-
-function createPulseDeletedNoteEntry(fullPath: string, relativePath: string): DeletedNoteEntry {
-  const filename = relativePath.split('/').pop() ?? relativePath
-  return {
-    path: fullPath,
-    filename,
-    title: filenameStemToTitle(filename),
-    isA: 'Note',
-    aliases: [],
-    belongsTo: [],
-    relatedTo: [],
-    status: null,
-    archived: false,
-    modifiedAt: null,
-    createdAt: null,
-    fileSize: 0,
-    snippet: '',
-    wordCount: 0,
-    relationships: {},
-    icon: null,
-    color: null,
-    order: null,
-    sidebarLabel: null,
-    template: null,
-    sort: null,
-    view: null,
-    visible: null,
-    organized: false,
-    favorite: false,
-    favoriteIndex: null,
-    listPropertiesDisplay: [],
-    outgoingLinks: [],
-    properties: {},
-    hasH1: true,
-    fileKind: 'markdown',
-    __deletedNotePreview: true,
-    __deletedRelativePath: relativePath,
-    __changeAddedLines: null,
-    __changeDeletedLines: null,
-    __changeBinary: false,
-  }
 }
 
 /** Wraps useEditorSave to also keep outgoingLinks in sync on save and on content change. */
@@ -473,7 +424,9 @@ function App() {
     if (vaultPath === resolvedPath) return refreshGitRemoteStatus()
 
     try {
-      return await appTauriCall<GitRemoteStatus>('git_remote_status', { vaultPath })
+      return await (isTauri()
+        ? invoke<GitRemoteStatus>('git_remote_status', { vaultPath })
+        : mockInvoke<GitRemoteStatus>('git_remote_status', { vaultPath }))
     } catch {
       return null
     }
@@ -681,9 +634,6 @@ function App() {
     },
     onToast: (msg) => setToastMessage(msg),
   })
-  const pendingDiffRequestIdRef = useRef(0)
-  const [pendingDiffRequest, setPendingDiffRequest] = useState<CommitDiffRequest | null>(null)
-
   // Keep note entry in sync with vault entries so banners (trash/archive)
   // and read-only state react immediately without reopening the note.
   useEffect(() => {
@@ -706,47 +656,6 @@ function App() {
     activeTabPath: notes.activeTabPath,
     onSelectNote: notes.handleSelectNote,
   })
-
-  const queuePendingDiff = useCallback((path: string, commitHash?: string) => {
-    pendingDiffRequestIdRef.current += 1
-    setPendingDiffRequest({
-      requestId: pendingDiffRequestIdRef.current,
-      path,
-      commitHash,
-    })
-  }, [])
-
-  const handlePendingDiffHandled = useCallback((requestId: number) => {
-    setPendingDiffRequest((current) =>
-      current?.requestId === requestId ? null : current,
-    )
-  }, [])
-
-  const handlePulseOpenNote = useCallback((relativePath: string, commitHash?: string) => {
-    const fullPath = `${gitSurfaces.historyRepositoryPath}/${relativePath}`
-    const entry = entriesByPath.get(fullPath) ?? entriesByPath.get(relativePath)
-
-    if (commitHash) {
-      const targetPath = entry?.path ?? fullPath
-      queuePendingDiff(targetPath, commitHash)
-      if (entry) {
-        void handleSelectNote(entry)
-      } else {
-        openTabWithContent(createPulseDeletedNoteEntry(fullPath, relativePath), 'Content not available')
-      }
-      return
-    }
-
-    if (entry) {
-      void handleSelectNote(entry)
-    }
-  }, [
-    entriesByPath,
-    gitSurfaces.historyRepositoryPath,
-    queuePendingDiff,
-    handleSelectNote,
-    openTabWithContent,
-  ])
 
   const handleOpenFavorite = useCallback(async (entry: VaultEntry) => {
     await handleReplaceActiveTab(entry)
@@ -958,106 +867,38 @@ function App() {
   const changesRepositoryPath = gitSurfaces.changesRepositoryPath
   const gitModifiedCount = gitSurfaces.totalModifiedCount
 
-  const findEntryForPath = useCallback((path: string) => {
-    const openTabEntry = notes.tabs.find((tab) => tab.entry.path === path)?.entry
-    if (openTabEntry) return openTabEntry
-
-    const visibleEntry = visibleEntries.find((entry) => entry.path === path)
-    if (visibleEntry) return visibleEntry
-
-    return vault.entries.find((entry) => entry.path === path) ?? null
-  }, [notes.tabs, vault.entries, visibleEntries])
-
-  const vaultPathForNotePath = useCallback((path: string) => {
-    const entry = findEntryForPath(path)
-    if (entry) return vaultPathForEntry(entry, resolvedPath)
-
-    const modifiedFile = allGitModifiedFiles.find((file) =>
-      file.path === path || file.relativePath === path || path.endsWith('/' + file.relativePath),
-    )
-    return modifiedFile?.vaultPath ?? resolvedPath
-  }, [allGitModifiedFiles, findEntryForPath, resolvedPath])
-
-  const loadGitHistoryForPath = useCallback(async (path: string): Promise<GitCommit[]> => {
-    try {
-      return await appTauriCall<GitCommit[]>('get_file_history', {
-        vaultPath: vaultPathForNotePath(path),
-        path,
-      })
-    } catch (err) {
-      console.warn('Failed to load git history:', err)
-      return []
-    }
-  }, [vaultPathForNotePath])
-
-  const loadDiffForPath = useCallback((path: string): Promise<string> =>
-    appTauriCall<string>('get_file_diff', {
-      vaultPath: vaultPathForNotePath(path),
-      path,
-    }), [vaultPathForNotePath])
-
-  const loadDiffAtCommitForPath = useCallback((path: string, commitHash: string): Promise<string> =>
-    appTauriCall<string>('get_file_diff_at_commit', {
-      vaultPath: vaultPathForNotePath(path),
-      path,
-      commitHash,
-    }), [vaultPathForNotePath])
-
-  const handleDiscardFile = useCallback(async (relativePath: string) => {
-    const targetVaultPath = changesRepositoryPath
-    const targetFile = selectedChangesModifiedFiles.find((file) => file.relativePath === relativePath)
-    const activePathBefore = notes.activeTabPath
-    try {
-      await appTauriCall('git_discard_file', { vaultPath: targetVaultPath, relativePath })
-      await loadModifiedFilesForRepository(targetVaultPath)
-      const reloadedEntries = await vault.reloadVault()
-      const affectedActiveTab = !!activePathBefore
-        && (activePathBefore === targetFile?.path || activePathBefore.endsWith('/' + relativePath))
-      if (!affectedActiveTab) return
-      const refreshedEntry = reloadedEntries.find((entry) =>
-        entry.path === targetFile?.path || entry.path.endsWith('/' + relativePath),
-      )
-      if (refreshedEntry) {
-        await notes.handleReplaceActiveTab(refreshedEntry)
-      } else {
-        notes.closeAllTabs()
-      }
-    } catch (err) {
-      setToastMessage(typeof err === 'string' ? err : 'Failed to discard changes')
-    }
-  }, [
+  const {
+    activeDeletedFile,
+    activeNoteModified,
+    handleDiscardFile,
+    handleOpenDeletedNote,
+    handlePendingDiffHandled,
+    handlePulseOpenNote,
+    handleReplaceActiveTabWithQueuedDiff,
+    loadDiffAtCommitForPath,
+    loadDiffForPath,
+    loadGitHistoryForPath,
+    pendingDiffRequest,
+  } = useGitFileWorkflows({
+    activeTabPath: notes.activeTabPath,
+    allGitModifiedFiles,
     changesRepositoryPath,
+    effectiveSelection,
+    entriesByPath,
+    historyRepositoryPath: gitSurfaces.historyRepositoryPath,
     loadModifiedFilesForRepository,
-    notes,
+    onCloseAllTabs: notes.closeAllTabs,
+    onOpenTabWithContent: notes.openTabWithContent,
+    onReplaceActiveTab: notes.handleReplaceActiveTab,
+    onSelectNote: notes.handleSelectNote,
+    reloadVault: vault.reloadVault,
+    resolvedPath,
     selectedChangesModifiedFiles,
     setToastMessage,
-    vault,
-  ])
-
-  const handleOpenDeletedNote = useCallback(async (entry: DeletedNoteEntry) => {
-    let previewContent = 'Content not available (untracked)'
-    let hasDiff = false
-    try {
-      const diff = await loadDiffForPath(entry.path)
-      hasDiff = diff.length > 0
-      previewContent = extractDeletedContentFromDiff(diff) ?? previewContent
-    } catch (err) {
-      console.warn('Failed to load deleted note preview:', err)
-    }
-    notes.openTabWithContent(entry, previewContent)
-    if (hasDiff) {
-      queuePendingDiff(entry.path)
-    } else {
-      setToastMessage('Content not available (untracked)')
-    }
-  }, [loadDiffForPath, notes, queuePendingDiff, setToastMessage])
-
-  const handleReplaceActiveTabWithQueuedDiff = useCallback((entry: VaultEntry) => {
-    notes.handleReplaceActiveTab(entry)
-    if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes') {
-      queuePendingDiff(entry.path)
-    }
-  }, [effectiveSelection, notes, queuePendingDiff])
+    tabs: notes.tabs,
+    vaultEntries: vault.entries,
+    visibleEntries,
+  })
 
   const commitFlow = useCommitFlow({
     savePending: appSave.savePending,
@@ -1444,15 +1285,6 @@ function App() {
     }
   }, [refreshVaultAiGuidance, resolvedPath, vault, setToastMessage])
 
-  const activeDeletedFile = useMemo(() => {
-    const activeTabPath = notes.activeTabPath
-    if (!activeTabPath) return null
-    return allGitModifiedFiles.find((file) =>
-      file.status === 'deleted'
-      && (file.path === activeTabPath || activeTabPath.endsWith('/' + file.relativePath)),
-    ) ?? null
-  }, [allGitModifiedFiles, notes.activeTabPath])
-
   const activeCommandEntry = useMemo(() => {
     if (!notes.activeTabPath) return null
     return notes.tabs.find((tab) => tab.entry.path === notes.activeTabPath)?.entry
@@ -1514,10 +1346,6 @@ function App() {
     onToast: setToastMessage,
     locale: appLocale,
   })
-  const activeNoteModified = useMemo(
-    () => allGitModifiedFiles.some((file) => file.path === notes.activeTabPath),
-    [allGitModifiedFiles, notes.activeTabPath],
-  )
   const toggleDiffCommand = useCallback(() => diffToggleRef.current(), [])
   const toggleRawEditorCommand = useMemo(
     () => canToggleRichEditor ? () => rawToggleRef.current() : undefined,

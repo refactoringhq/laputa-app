@@ -110,6 +110,8 @@ The registered vault list can act as a mounted-workspace set. `useVaultSwitcher`
 
 Git surfaces resolve repository paths explicitly. `useGitRepositories` derives the active repository set from the mounted available workspaces, keeps separate selected repositories for Changes, Pulse/history, and manual commits, and exposes the combined modified-file count for status/commands. AutoGit checkpoints iterate that repository set, while manual commit, history, diff, and discard operations use the selected surface or the note's workspace provenance.
 
+Renderer git file workflows stay behind `useGitFileWorkflows`. The hook resolves per-note repository paths, queues editor diff requests, opens Pulse history entries including deleted-file previews, and keeps discard/reload handling close to the selected Git surface while `App.tsx` only wires the resulting callbacks into `NoteList`, `PulseView`, and `Editor`.
+
 Cross-workspace note reads and writes keep the disk-first invariant. When an absolute note path is saved or read without an explicit `vaultPath`, the Tauri boundary resolves the deepest registered vault root that contains the path and validates against that root before touching disk. This lets an editor tab opened from a mounted workspace save back to its source repository while preserving the same path-escape protections as active-vault operations.
 
 #### Note Opening Fast Path
@@ -841,6 +843,7 @@ No Redux or global context. State lives in the root `App.tsx` and custom hooks:
 | `useNoteActions` | `tabs`, `activeTabPath` | Composes `useNoteCreation` + `useNoteRename` + `frontmatterOps` |
 | `useNoteWindowLifecycle` | note-window open/title side effects | Opens `tauri://` note windows without full vault scans and keeps the native title current |
 | `useStartupScreenState` | startup visibility booleans | Keeps onboarding, telemetry-consent, missing-vault, and initial indexing decisions out of `App.tsx` |
+| `useGitFileWorkflows` | git diff/history/discard callbacks | Resolves note-scoped repository paths and owns deleted-file preview and queued diff side effects |
 | `useVaultRenameDetection` | detected rename banner state | Detects external Git renames on focus and owns the wikilink update callback |
 | `useNoteCreation` | — | Note/type creation with optimistic persistence |
 | `useNoteRename` | — | Note renaming and folder moves with wikilink update |
