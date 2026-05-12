@@ -478,7 +478,7 @@ Tolaria's app chrome uses an app-owned localization runtime in `src/lib/i18n.ts`
 
 `App.tsx` derives the effective locale from settings and browser/system language hints, then passes it down to localized surfaces. Settings exposes a keyboard-accessible shadcn `Select`, and the command palette includes actions to open language settings or switch directly to a supported language.
 
-`App.tsx` also resolves the installation-local date display format from `settings.date_display_format`. Note rows, note-list property chips, inspector property cells, note info, table-of-contents metadata, and search result subtitles render dates through the same `src/utils/dateDisplay.ts` formatter so the visible style stays consistent. Date picker text entry remains ISO (`YYYY-MM-DD`) to preserve predictable manual input and frontmatter storage.
+`App.tsx` also resolves the installation-local date display format from `settings.date_display_format` and publishes it through `AppPreferencesProvider` in `src/hooks/useAppPreferences.ts`. Note rows, note-list property chips, inspector property cells, note info, table-of-contents metadata, and search result subtitles read that shared preference and render dates through `src/utils/dateDisplay.ts` so the visible style stays consistent. Date picker text entry remains ISO (`YYYY-MM-DD`) to preserve predictable manual input and frontmatter storage.
 
 ## Vault Management
 

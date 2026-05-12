@@ -23,19 +23,30 @@ export function initialVaultsForPath(path: string, vaults?: VaultOption[]): Vaul
   return matchingVaults.length > 0 ? matchingVaults : undefined
 }
 
-function workspacePathsFromEntries(entries: VaultEntry[], fallbackVaultPath: string): string[] {
+function workspacePathsFromEntries(
+  entries: VaultEntry[],
+  fallbackVaultPath: string,
+  inferFallbackWorkspacePath: boolean,
+): string[] {
   const paths = new Set<string>()
   for (const entry of entries) {
-    const path = entryWorkspacePath(entry, fallbackVaultPath)
+    const path = inferFallbackWorkspacePath
+      ? entryWorkspacePath(entry, fallbackVaultPath)
+      : entry.workspace?.path ?? ''
     if (path.trim()) paths.add(path)
   }
   return [...paths]
 }
 
-export function loadedWorkspacePathsFromEntries(entries: VaultEntry[], fallbackVaultPath: string): string[] {
-  const paths = workspacePathsFromEntries(entries, fallbackVaultPath)
+export function loadedWorkspacePathsFromEntries(
+  entries: VaultEntry[],
+  fallbackVaultPath: string,
+  options: { inferFallbackWorkspacePath?: boolean } = {},
+): string[] {
+  const inferFallbackWorkspacePath = options.inferFallbackWorkspacePath ?? true
+  const paths = workspacePathsFromEntries(entries, fallbackVaultPath, inferFallbackWorkspacePath)
   if (paths.length > 0) return paths
-  return fallbackVaultPath.trim() ? [fallbackVaultPath] : []
+  return inferFallbackWorkspacePath && fallbackVaultPath.trim() ? [fallbackVaultPath] : []
 }
 
 type WorkspaceIdentityMetadataKey =

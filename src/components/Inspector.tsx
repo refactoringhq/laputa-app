@@ -18,7 +18,6 @@ import { EmptyInspector, InitializePropertiesPrompt, InspectorHeader, InvalidFro
 import { useBacklinks, useReferencedBy } from './inspector/useInspectorData'
 import { useInspectorPropertyActions } from './inspector/useInspectorPropertyActions'
 import type { AppLocale } from '../lib/i18n'
-import type { DateDisplayFormat } from '../utils/dateDisplay'
 
 export type FrontmatterValue = string | number | boolean | string[] | null
 
@@ -42,7 +41,6 @@ interface InspectorProps {
   onToggleRawEditor?: () => void
   workspaces?: WorkspaceIdentity[]
   locale?: AppLocale
-  dateDisplayFormat?: DateDisplayFormat
 }
 
 function buildTypeEntryMap(entries: VaultEntry[]): Record<string, VaultEntry> {
@@ -73,7 +71,6 @@ function ValidFrontmatterPanels({
   onChangeWorkspace,
   workspaces,
   locale,
-  dateDisplayFormat,
 }: {
   entry: VaultEntry
   entries: VaultEntry[]
@@ -90,7 +87,6 @@ function ValidFrontmatterPanels({
   onChangeWorkspace?: (entry: VaultEntry, workspace: WorkspaceIdentity) => Promise<void> | void
   workspaces?: WorkspaceIdentity[]
   locale: AppLocale
-  dateDisplayFormat?: DateDisplayFormat
 }) {
   return (
     <>
@@ -106,7 +102,6 @@ function ValidFrontmatterPanels({
         onChangeWorkspace={onChangeWorkspace ? (workspace) => onChangeWorkspace(entry, workspace) : undefined}
         workspaces={workspaces}
         locale={locale}
-        dateDisplayFormat={dateDisplayFormat}
       />
       <Separator data-testid="inspector-properties-relationships-separator" />
       <DynamicRelationshipsPanel
@@ -147,7 +142,6 @@ function PrimaryInspectorPanel({
   onChangeWorkspace,
   workspaces,
   locale,
-  dateDisplayFormat,
 }: {
   entry: VaultEntry
   frontmatterState: ReturnType<typeof detectFrontmatterState>
@@ -167,7 +161,6 @@ function PrimaryInspectorPanel({
   onChangeWorkspace?: (entry: VaultEntry, workspace: WorkspaceIdentity) => Promise<void> | void
   workspaces?: WorkspaceIdentity[]
   locale: AppLocale
-  dateDisplayFormat?: DateDisplayFormat
 }) {
   if (frontmatterState === 'valid') {
     return (
@@ -187,7 +180,6 @@ function PrimaryInspectorPanel({
         onChangeWorkspace={onChangeWorkspace}
         workspaces={workspaces}
         locale={locale}
-        dateDisplayFormat={dateDisplayFormat}
       />
     )
   }
@@ -217,7 +209,6 @@ function InspectorBody({
   onToggleRawEditor,
   workspaces,
   locale = 'en',
-  dateDisplayFormat,
 }: Omit<InspectorProps, 'collapsed' | 'onToggle'>) {
   const referencedBy = useReferencedBy(entry, entries)
   const backlinks = useBacklinks(entry, entries, referencedBy)
@@ -263,13 +254,12 @@ function InspectorBody({
           onChangeWorkspace={onChangeWorkspace}
           workspaces={workspaces}
           locale={locale}
-          dateDisplayFormat={dateDisplayFormat}
         />
       )}
       {backlinks.length > 0 && <Separator />}
       <BacklinksPanel backlinks={backlinks} onNavigate={onNavigate} />
       <Separator />
-      <NoteInfoPanel entry={entry} content={content} locale={locale} dateDisplayFormat={dateDisplayFormat} />
+      <NoteInfoPanel entry={entry} content={content} locale={locale} />
       {gitHistory.length > 0 && <Separator />}
       <GitHistoryPanel commits={gitHistory} onViewCommitDiff={onViewCommitDiff} />
     </>

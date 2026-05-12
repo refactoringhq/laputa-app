@@ -11,7 +11,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { XIcon } from 'lucide-react'
 import { trackDatePropertyDirectEntrySaved } from '../lib/productAnalytics'
 import { translate, type AppLocale } from '../lib/i18n'
-import { DEFAULT_DATE_DISPLAY_FORMAT, type DateDisplayFormat } from '../utils/dateDisplay'
 import { isValidCssColor } from '../utils/colorUtils'
 import {
   type PropertyDisplayMode,
@@ -28,6 +27,7 @@ import { ColorEditableValue } from './ColorInput'
 import { IconEditableValue } from './IconEditableValue'
 import { PROPERTY_CHIP_STYLE } from './propertyChipStyles'
 import { canonicalSystemMetadataKey } from '../utils/systemMetadata'
+import { useDateDisplayFormat } from '../hooks/useAppPreferences'
 
 const ISO_DATE_INPUT_RE = /^(\d{4})-(\d{2})-(\d{2})$/
 const DEFAULT_DATE_PICKER_START_YEAR = 1800
@@ -275,14 +275,14 @@ function NumberValue({
   )
 }
 
-function DateValue({ value, onSave, locale = 'en', dateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT, autoOpen = false, onCancel }: {
+function DateValue({ value, onSave, locale = 'en', autoOpen = false, onCancel }: {
   value: string
   onSave: (newValue: string) => void
   locale?: AppLocale
-  dateDisplayFormat?: DateDisplayFormat
   autoOpen?: boolean
   onCancel?: () => void
 }) {
+  const dateDisplayFormat = useDateDisplayFormat()
   const [open, setOpen] = useState(autoOpen)
   const formatted = formatDateValue(value, dateDisplayFormat)
   const pickDateLabel = translate(locale, 'inspector.properties.pickDate')
@@ -522,7 +522,6 @@ function autoDetectFromValue(propKey: string, value: FrontmatterValue): Property
 type SmartCellProps = {
   propKey: string; value: FrontmatterValue; displayMode: PropertyDisplayMode; isEditing: boolean
   locale?: AppLocale
-  dateDisplayFormat?: DateDisplayFormat
   vaultStatuses: string[]; vaultTags: string[]
   onStartEdit: (key: string | null) => void; onSave: (key: string, value: string) => void
   onSaveList: (key: string, items: string[]) => void; onUpdate?: (key: string, value: FrontmatterValue) => void
@@ -590,7 +589,6 @@ const SCALAR_DISPLAY_RENDERERS: readonly [PropertyDisplayMode, ScalarDisplayRend
       key={`${props.propKey}:${props.isEditing ? 'editing' : 'view'}`}
       value={String(props.value ?? '')}
       locale={props.locale}
-      dateDisplayFormat={props.dateDisplayFormat}
       onSave={(nextValue) => props.onSave(props.propKey, nextValue)}
       autoOpen={props.isEditing}
       onCancel={() => props.onStartEdit(null)}

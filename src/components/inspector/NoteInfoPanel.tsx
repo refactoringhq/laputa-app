@@ -3,10 +3,10 @@ import { Info } from '@phosphor-icons/react'
 import { countWords } from '../../utils/wikilinks'
 import { translate, type AppLocale } from '../../lib/i18n'
 import {
-  DEFAULT_DATE_DISPLAY_FORMAT,
   formatTimestampForDateDisplay,
   type DateDisplayFormat,
 } from '../../utils/dateDisplay'
+import { useDateDisplayFormat } from '../../hooks/useAppPreferences'
 
 function formatDate(timestamp: number | null, dateDisplayFormat: DateDisplayFormat): string {
   if (!timestamp) return '\u2014'
@@ -34,13 +34,12 @@ export function NoteInfoPanel({
   entry,
   content,
   locale = 'en',
-  dateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
 }: {
   entry: VaultEntry
   content: string | null
   locale?: AppLocale
-  dateDisplayFormat?: DateDisplayFormat
 }) {
+  const dateDisplayFormat = useDateDisplayFormat()
   const wordCount = countWords(content ?? '')
   return (
     <div>

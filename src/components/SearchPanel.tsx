@@ -4,11 +4,12 @@ import type { SearchResult, VaultEntry } from '../types'
 import { useUnifiedSearch } from '../hooks/useUnifiedSearch'
 import { getTypeColor, buildTypeEntryMap } from '../utils/typeColors'
 import { formatSearchSubtitle } from '../utils/noteListHelpers'
-import { DEFAULT_DATE_DISPLAY_FORMAT, type DateDisplayFormat } from '../utils/dateDisplay'
+import type { DateDisplayFormat } from '../utils/dateDisplay'
 import { scrollSelectedHTMLChildIntoView } from '../utils/domScroll'
 import { getTypeIcon } from './NoteItem'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { WorkspaceInitialsBadge } from './WorkspaceInitialsBadge'
+import { useDateDisplayFormat } from '../hooks/useAppPreferences'
 
 interface SearchPanelProps {
   open: boolean
@@ -16,7 +17,6 @@ interface SearchPanelProps {
   entries: VaultEntry[]
   onSelectNote: (entry: VaultEntry) => void
   onClose: () => void
-  dateDisplayFormat?: DateDisplayFormat
 }
 
 type SearchKeyboardAction = 'close' | 'next' | 'previous' | 'select'
@@ -182,8 +182,8 @@ export function SearchPanel({
   entries,
   onSelectNote,
   onClose,
-  dateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
 }: SearchPanelProps) {
+  const dateDisplayFormat = useDateDisplayFormat()
   const {
     elapsedMs,
     entryLookup,
@@ -332,9 +332,21 @@ function resolveSearchResultPresentation({
     noteType,
     subtitle: entry ? formatSearchSubtitle(entry, dateDisplayFormat) : null,
     title: entry?.title ?? result.title,
-    typeColor: noteType ? getTypeColor(isA, typeEntry?.color) : undefined,
-    workspace: showWorkspace ? entry?.workspace ?? null : null,
+    typeColor: resolveSearchResultTypeColor(noteType, isA, typeEntry),
+    workspace: resolveSearchResultWorkspace(showWorkspace, entry),
   }
+}
+
+function resolveSearchResultTypeColor(
+  noteType: string | null,
+  isA: string | null,
+  typeEntry: VaultEntry | undefined,
+): string | undefined {
+  return noteType ? getTypeColor(isA, typeEntry?.color) : undefined
+}
+
+function resolveSearchResultWorkspace(showWorkspace: boolean, entry: VaultEntry | undefined): VaultEntry['workspace'] | null {
+  return showWorkspace ? entry?.workspace ?? null : null
 }
 
 function SearchResultRow({

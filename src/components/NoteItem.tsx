@@ -9,13 +9,14 @@ import {
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { resolveIcon } from '../utils/iconRegistry'
 import { getDisplayDate } from '../utils/noteListHelpers'
-import { DEFAULT_DATE_DISPLAY_FORMAT, formatTimestampForDateDisplay, type DateDisplayFormat } from '../utils/dateDisplay'
+import { formatTimestampForDateDisplay } from '../utils/dateDisplay'
 import { filePreviewKind, type FilePreviewKind } from '../utils/filePreview'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { PropertyChips } from './note-item/PropertyChips'
 import { ChangeNoteContent } from './note-item/ChangeNoteContent'
 import { workspaceForEntry } from '../utils/workspaces'
 import { WorkspaceInitialsBadge } from './WorkspaceInitialsBadge'
+import { useDateDisplayFormat } from '../hooks/useAppPreferences'
 
 const TYPE_ICON_MAP: Record<string, ComponentType<SVGAttributes<SVGSVGElement>>> = {
   Project: Wrench,
@@ -158,14 +159,12 @@ function NotePropertySection({
   displayProps,
   allEntries,
   typeEntryMap,
-  dateDisplayFormat,
   onClickNote,
 }: {
   entry: VaultEntry
   displayProps: string[]
   allEntries: VaultEntry[]
   typeEntryMap: Record<string, VaultEntry>
-  dateDisplayFormat: DateDisplayFormat
   onClickNote: NoteItemProps['onClickNote']
 }) {
   if (displayProps.length === 0) return null
@@ -176,7 +175,6 @@ function NotePropertySection({
       displayProps={displayProps}
       allEntries={allEntries}
       typeEntryMap={typeEntryMap}
-      dateDisplayFormat={dateDisplayFormat}
       onOpenNote={onClickNote}
     />
   )
@@ -189,7 +187,6 @@ function InteractiveNoteDetails({
   displayProps,
   allEntries,
   typeEntryMap,
-  dateDisplayFormat,
   onClickNote,
 }: {
   entry: VaultEntry
@@ -198,7 +195,6 @@ function InteractiveNoteDetails({
   displayProps: string[]
   allEntries: VaultEntry[]
   typeEntryMap: Record<string, VaultEntry>
-  dateDisplayFormat: DateDisplayFormat
   onClickNote: NoteItemProps['onClickNote']
 }) {
   return (
@@ -215,10 +211,9 @@ function InteractiveNoteDetails({
         displayProps={displayProps}
         allEntries={allEntries}
         typeEntryMap={typeEntryMap}
-        dateDisplayFormat={dateDisplayFormat}
         onClickNote={onClickNote}
       />
-      <NoteDateRow entry={entry} allEntries={allEntries} dateDisplayFormat={dateDisplayFormat} />
+      <NoteDateRow entry={entry} allEntries={allEntries} />
     </>
   )
 }
@@ -243,7 +238,6 @@ function StandardNoteContent({
   displayProps,
   allEntries,
   typeEntryMap,
-  dateDisplayFormat,
   onClickNote,
 }: {
   entry: VaultEntry
@@ -255,7 +249,6 @@ function StandardNoteContent({
   displayProps: string[]
   allEntries: VaultEntry[]
   typeEntryMap: Record<string, VaultEntry>
-  dateDisplayFormat: DateDisplayFormat
   onClickNote: NoteItemProps['onClickNote']
 }) {
   const te = typeEntryMap[entry.isA ?? '']
@@ -281,7 +274,6 @@ function StandardNoteContent({
             displayProps={displayProps}
             allEntries={allEntries}
             typeEntryMap={typeEntryMap}
-            dateDisplayFormat={dateDisplayFormat}
             onClickNote={onClickNote}
           />
         )}
@@ -317,12 +309,11 @@ function NoteTitleRow({
 function NoteDateRow({
   entry,
   allEntries,
-  dateDisplayFormat,
 }: {
   entry: VaultEntry
   allEntries: VaultEntry[]
-  dateDisplayFormat: DateDisplayFormat
 }) {
+  const dateDisplayFormat = useDateDisplayFormat()
   const modifiedLabel = formatTimestampForDateDisplay(getDisplayDate(entry), dateDisplayFormat)
   const createdLabel = entry.createdAt ? `Created ${formatTimestampForDateDisplay(entry.createdAt, dateDisplayFormat)}` : null
 
@@ -368,7 +359,6 @@ type NoteItemProps = {
   typeEntryMap: Record<string, VaultEntry>
   allEntries?: VaultEntry[]
   displayPropsOverride?: string[] | null
-  dateDisplayFormat?: DateDisplayFormat
   onClickNote: (entry: VaultEntry, e: ReactMouseEvent) => void
   onPrefetch?: (entry: VaultEntry) => void
   onContextMenu?: (entry: VaultEntry, e: ReactMouseEvent) => void
@@ -501,7 +491,6 @@ function NoteItemContent({
   displayProps,
   allEntries,
   typeEntryMap,
-  dateDisplayFormat,
   onClickNote,
 }: {
   entry: VaultEntry
@@ -514,7 +503,6 @@ function NoteItemContent({
   displayProps: string[]
   allEntries: VaultEntry[]
   typeEntryMap: Record<string, VaultEntry>
-  dateDisplayFormat: DateDisplayFormat
   onClickNote: NoteItemProps['onClickNote']
 }) {
   if (changeStatus) {
@@ -539,13 +527,12 @@ function NoteItemContent({
       displayProps={displayProps}
       allEntries={allEntries}
       typeEntryMap={typeEntryMap}
-      dateDisplayFormat={dateDisplayFormat}
       onClickNote={onClickNote}
     />
   )
 }
 
-export function NoteItem({ entry, isSelected, isMultiSelected = false, isHighlighted = false, noteStatus = 'clean', changeStatus, typeEntryMap, allEntries, displayPropsOverride, dateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT, onClickNote, onPrefetch, onContextMenu }: NoteItemProps) {
+export function NoteItem({ entry, isSelected, isMultiSelected = false, isHighlighted = false, noteStatus = 'clean', changeStatus, typeEntryMap, allEntries, displayPropsOverride, onClickNote, onPrefetch, onContextMenu }: NoteItemProps) {
   const isBinary = entry.fileKind === 'binary'
   const previewKind = filePreviewKind(entry)
   const isPreviewableFile = previewKind !== null
@@ -586,7 +573,6 @@ export function NoteItem({ entry, isSelected, isMultiSelected = false, isHighlig
         displayProps={displayProps}
         allEntries={allEntries ?? [entry]}
         typeEntryMap={typeEntryMap}
-        dateDisplayFormat={dateDisplayFormat}
         onClickNote={onClickNote}
       />
     </NoteItemRow>

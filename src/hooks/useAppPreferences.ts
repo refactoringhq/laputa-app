@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react'
 import type { Settings } from '../types'
 import type { ThemeMode } from '../lib/themeMode'
 import {
@@ -8,7 +8,7 @@ import {
   serializeUiLanguagePreference,
   type UiLanguagePreference,
 } from '../lib/i18n'
-import { DEFAULT_DATE_DISPLAY_FORMAT, normalizeDateDisplayFormat } from '../utils/dateDisplay'
+import { DEFAULT_DATE_DISPLAY_FORMAT, normalizeDateDisplayFormat, type DateDisplayFormat } from '../utils/dateDisplay'
 import { resolveAllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import { useAiAgentPreferences } from './useAiAgentPreferences'
 import type { AiAgentsStatus } from '../lib/aiAgents'
@@ -22,6 +22,31 @@ interface AppPreferencesConfig {
   saveSettings: (settings: Settings) => void | Promise<void>
   settings: Settings
   settingsLoaded: boolean
+}
+
+interface AppPreferenceValues {
+  dateDisplayFormat: DateDisplayFormat
+}
+
+const DEFAULT_APP_PREFERENCES: AppPreferenceValues = {
+  dateDisplayFormat: DEFAULT_DATE_DISPLAY_FORMAT,
+}
+
+const AppPreferencesContext = createContext<AppPreferenceValues>(DEFAULT_APP_PREFERENCES)
+
+export function AppPreferencesProvider({
+  children,
+  dateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
+}: {
+  children: ReactNode
+  dateDisplayFormat?: DateDisplayFormat
+}) {
+  const value = useMemo(() => ({ dateDisplayFormat }), [dateDisplayFormat])
+  return createElement(AppPreferencesContext.Provider, { value }, children)
+}
+
+export function useDateDisplayFormat(): DateDisplayFormat {
+  return useContext(AppPreferencesContext).dateDisplayFormat
 }
 
 export function useAppPreferences({

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useVaultLoader } from './useVaultLoader'
 import type { ModifiedFile, VaultEntry, ViewFile } from '../types'
+import { loadedWorkspacePathsFromEntries } from './vaultWorkspaceEntries'
 
 const clearPrefetchCache = vi.fn()
 const backendInvokeFn = vi.fn()
@@ -295,5 +296,31 @@ describe('useVaultLoader extra', () => {
 
     expect(folders).toEqual([])
     expect(views).toEqual([])
+  })
+
+  it('does not infer the fallback workspace from untagged entries when explicit workspace metadata is required', () => {
+    expect(loadedWorkspacePathsFromEntries([
+      makeEntry({ path: '/research/research-beacon.md' }),
+    ], '/field', { inferFallbackWorkspacePath: false })).toEqual([])
+  })
+
+  it('uses explicit workspace metadata when fallback inference is disabled', () => {
+    expect(loadedWorkspacePathsFromEntries([
+      makeEntry({
+        path: '/research/research-beacon.md',
+        workspace: {
+          id: 'workspace',
+          label: 'Workspace',
+          alias: 'workspace',
+          path: '/research',
+          shortLabel: 'WS',
+          color: null,
+          icon: null,
+          mounted: true,
+          available: true,
+          defaultForNewNotes: false,
+        },
+      }),
+    ], '/field', { inferFallbackWorkspacePath: false })).toEqual(['/research'])
   })
 })

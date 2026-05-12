@@ -17,7 +17,6 @@ import {
   getFolderDepthIndent,
 } from './folder-tree/folderTreeLayout'
 import { NoteInfoPanel } from './inspector/NoteInfoPanel'
-import type { DateDisplayFormat } from '../utils/dateDisplay'
 
 interface TableOfContentsEditor {
   document?: unknown[]
@@ -29,7 +28,6 @@ interface TableOfContentsPanelProps {
   editor: TableOfContentsEditor
   entry: VaultEntry | null
   locale?: AppLocale
-  dateDisplayFormat?: DateDisplayFormat
   onClose: () => void
   sourceContent?: string | null
 }
@@ -261,7 +259,6 @@ export const TableOfContentsPanel = memo(function TableOfContentsPanel({
   editor,
   entry,
   locale = 'en',
-  dateDisplayFormat,
   onClose,
   sourceContent,
 }: TableOfContentsPanelProps) {
@@ -289,7 +286,7 @@ export const TableOfContentsPanel = memo(function TableOfContentsPanel({
       </div>
       {entry && (
         <div className="shrink-0 border-t border-border p-3">
-          <NoteInfoPanel entry={entry} content={sourceContent ?? null} locale={locale} dateDisplayFormat={dateDisplayFormat} />
+          <NoteInfoPanel entry={entry} content={sourceContent ?? null} locale={locale} />
         </div>
       )}
     </aside>

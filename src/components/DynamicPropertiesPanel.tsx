@@ -24,7 +24,6 @@ import {
 import { humanizePropertyKey } from '../utils/propertyLabels'
 import { translate, type AppLocale } from '../lib/i18n'
 import { canonicalSystemMetadataKey, hasSystemMetadataKey } from '../utils/systemMetadata'
-import { DEFAULT_DATE_DISPLAY_FORMAT, type DateDisplayFormat } from '../utils/dateDisplay'
 
 // eslint-disable-next-line react-refresh/only-export-components -- utility co-located with component
 export function containsWikilinks(value: FrontmatterValue): boolean {
@@ -35,11 +34,10 @@ export function containsWikilinks(value: FrontmatterValue): boolean {
 
 const PROPERTY_ROW_CLASS_NAME = 'group/prop grid min-h-7 min-w-0 grid-cols-2 items-center gap-2 rounded px-1.5 outline-none transition-colors hover:bg-muted focus:bg-muted focus:ring-1 focus:ring-primary'
 
-function PropertyRow({ propKey, value, editingKey, displayMode, autoMode, vaultStatuses, vaultTags, dateDisplayFormat, locale, onStartEdit, onSave, onSaveList, onUpdate, onDelete, onDisplayModeChange }: {
+function PropertyRow({ propKey, value, editingKey, displayMode, autoMode, vaultStatuses, vaultTags, locale, onStartEdit, onSave, onSaveList, onUpdate, onDelete, onDisplayModeChange }: {
   propKey: string; value: FrontmatterValue; editingKey: string | null
   displayMode: PropertyDisplayMode; autoMode: PropertyDisplayMode
   vaultStatuses: string[]; vaultTags: string[]
-  dateDisplayFormat: DateDisplayFormat
   onStartEdit: (key: string | null) => void; onSave: (key: string, value: string) => void
   onSaveList: (key: string, items: string[]) => void
   onUpdate?: (key: string, value: FrontmatterValue) => void; onDelete?: (key: string) => void
@@ -66,7 +64,7 @@ function PropertyRow({ propKey, value, editingKey, displayMode, autoMode, vaultS
         )}
       </span>
       <div className="min-w-0">
-        <SmartPropertyValueCell propKey={propKey} value={value} displayMode={displayMode} isEditing={editingKey === propKey} locale={locale} dateDisplayFormat={dateDisplayFormat} vaultStatuses={vaultStatuses} vaultTags={vaultTags} onStartEdit={onStartEdit} onSave={onSave} onSaveList={onSaveList} onUpdate={onUpdate} />
+        <SmartPropertyValueCell propKey={propKey} value={value} displayMode={displayMode} isEditing={editingKey === propKey} locale={locale} vaultStatuses={vaultStatuses} vaultTags={vaultTags} onStartEdit={onStartEdit} onSave={onSave} onSaveList={onSaveList} onUpdate={onUpdate} />
       </div>
     </div>
   )
@@ -163,7 +161,6 @@ function TypeDerivedPropertySlot({
   autoMode,
   vaultStatuses,
   vaultTags,
-  dateDisplayFormat,
   onStartEdit,
   onSave,
   onSaveList,
@@ -177,7 +174,6 @@ function TypeDerivedPropertySlot({
   autoMode: PropertyDisplayMode
   vaultStatuses: string[]
   vaultTags: string[]
-  dateDisplayFormat: DateDisplayFormat
   onStartEdit: (key: string | null) => void
   onSave: (key: string, value: string) => void
   onSaveList: (key: string, items: string[]) => void
@@ -195,7 +191,6 @@ function TypeDerivedPropertySlot({
         autoMode={autoMode}
         vaultStatuses={vaultStatuses}
         vaultTags={vaultTags}
-        dateDisplayFormat={dateDisplayFormat}
         onStartEdit={onStartEdit}
         onSave={onSave}
         onSaveList={onSaveList}
@@ -320,7 +315,6 @@ function PropertyEntryRows({
   vaultStatuses,
   vaultTagsByKey,
   locale,
-  dateDisplayFormat,
   onStartEdit,
   onSave,
   onSaveList,
@@ -335,7 +329,6 @@ function PropertyEntryRows({
   vaultStatuses: string[]
   vaultTagsByKey: Record<string, string[]>
   locale: AppLocale
-  dateDisplayFormat: DateDisplayFormat
   onStartEdit: (key: string | null) => void
   onSave: (key: string, value: string) => void
   onSaveList: (key: string, items: string[]) => void
@@ -355,7 +348,6 @@ function PropertyEntryRows({
             autoMode={detectPropertyType(key, value)}
             vaultStatuses={vaultStatuses}
             vaultTags={(Reflect.get(vaultTagsByKey, key) as string[] | undefined) ?? []}
-            dateDisplayFormat={dateDisplayFormat}
             onStartEdit={onStartEdit}
             onSave={onSave}
             onSaveList={onSaveList}
@@ -369,7 +361,6 @@ function PropertyEntryRows({
             editingKey={editingKey} displayMode={getEffectiveDisplayMode(key, value, displayOverrides)} autoMode={detectPropertyType(key, value)}
             vaultStatuses={vaultStatuses}
             vaultTags={(Reflect.get(vaultTagsByKey, key) as string[] | undefined) ?? []}
-            dateDisplayFormat={dateDisplayFormat}
             onStartEdit={onStartEdit} onSave={onSave}
             onSaveList={onSaveList} onUpdate={onUpdate}
             onDelete={onDelete}
@@ -388,7 +379,6 @@ function PendingSuggestedPropertyRow({
   vaultStatuses,
   vaultTagsByKey,
   locale,
-  dateDisplayFormat,
   onStartEdit,
   onSave,
   onSaveList,
@@ -399,7 +389,6 @@ function PendingSuggestedPropertyRow({
   vaultStatuses: string[]
   vaultTagsByKey: Record<string, string[]>
   locale: AppLocale
-  dateDisplayFormat: DateDisplayFormat
   onStartEdit: (key: string | null) => void
   onSave: (key: string, value: string) => void
   onSaveList: (key: string, items: string[]) => void
@@ -419,7 +408,6 @@ function PendingSuggestedPropertyRow({
       autoMode={getSuggestedDisplayMode(pendingSuggestedKey)}
       vaultStatuses={vaultStatuses}
       vaultTags={(Reflect.get(vaultTagsByKey, pendingSuggestedKey) as string[] | undefined) ?? []}
-      dateDisplayFormat={dateDisplayFormat}
       onStartEdit={onStartEdit}
       onSave={onSave}
       onSaveList={onSaveList}
@@ -511,7 +499,6 @@ function DynamicPropertiesPanelContent({
   pendingSuggestedKey,
   missingSuggested,
   missingTypeName,
-  dateDisplayFormat,
   locale,
   workspaces,
   onUpdateProperty,
@@ -529,7 +516,6 @@ function DynamicPropertiesPanelContent({
   pendingSuggestedKey: string | null
   missingSuggested: Array<{ key: string; label: string }>
   missingTypeName: string | null
-  dateDisplayFormat: DateDisplayFormat
   locale: AppLocale
   workspaces?: WorkspaceIdentity[]
   onUpdateProperty?: (key: string, value: FrontmatterValue) => void
@@ -573,7 +559,6 @@ function DynamicPropertiesPanelContent({
           vaultStatuses={vaultStatuses}
           vaultTagsByKey={vaultTagsByKey}
           locale={locale}
-          dateDisplayFormat={dateDisplayFormat}
           onStartEdit={setEditingKey}
           onSave={handleSaveValue}
           onSaveList={handleSaveList}
@@ -589,7 +574,6 @@ function DynamicPropertiesPanelContent({
           vaultStatuses={vaultStatuses}
           vaultTagsByKey={vaultTagsByKey}
           locale={locale}
-          dateDisplayFormat={dateDisplayFormat}
           onStartEdit={setEditingKey}
           onSave={handleSaveTypeDerivedValue}
           onSaveList={handleSaveList}
@@ -602,7 +586,6 @@ function DynamicPropertiesPanelContent({
           vaultStatuses={vaultStatuses}
           vaultTagsByKey={vaultTagsByKey}
           locale={locale}
-          dateDisplayFormat={dateDisplayFormat}
           onStartEdit={onStartPendingSuggestedEdit}
           onSave={onSaveSuggestedValue}
           onSaveList={handleSaveList}
@@ -623,7 +606,6 @@ function DynamicPropertiesPanelContent({
           onCancel={() => setShowAddDialog(false)}
           vaultStatuses={vaultStatuses}
           locale={locale}
-          dateDisplayFormat={dateDisplayFormat}
         />
       )}
     </div>
@@ -643,7 +625,6 @@ interface DynamicPropertiesPanelProps {
   onCreateMissingType?: (typeName: string) => boolean | void | Promise<boolean | void>
   onChangeWorkspace?: (workspace: WorkspaceIdentity) => void | Promise<void>
   locale?: AppLocale
-  dateDisplayFormat?: DateDisplayFormat
 }
 
 export function DynamicPropertiesPanel({
@@ -651,7 +632,6 @@ export function DynamicPropertiesPanel({
   onUpdateProperty, onDeleteProperty, onAddProperty, onNavigate, onCreateMissingType,
   onChangeWorkspace, workspaces,
   locale = 'en',
-  dateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
 }: DynamicPropertiesPanelProps) {
   const propertyState = usePropertyPanelState({ entries, entryIsA: entry.isA, frontmatter, onUpdateProperty, onDeleteProperty, onAddProperty })
   const [pendingSuggestedKey, setPendingSuggestedKey] = useState<string | null>(null)
@@ -684,7 +664,6 @@ export function DynamicPropertiesPanel({
       pendingSuggestedKey={pendingSuggestedKey}
       missingSuggested={missingSuggested}
       missingTypeName={missingTypeName}
-      dateDisplayFormat={dateDisplayFormat}
       locale={locale}
       workspaces={workspaces}
       onUpdateProperty={onUpdateProperty}

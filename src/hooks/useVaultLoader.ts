@@ -378,6 +378,10 @@ function useInitialVaultLoad(options: InitialVaultLoadOptions) {
     defaultWorkspacePath,
   } = options
   const loadOptionsRef = useInitialVaultLoadSnapshot(vaults, defaultWorkspacePath)
+  const loadOptionsKey = useMemo(
+    () => workspacePathSetKey(uniqueWorkspacePathsFromVaults(vaultPath, vaults)),
+    [vaultPath, vaults],
+  )
 
   useEffect(() => {
     const path = vaultPath
@@ -415,6 +419,7 @@ function useInitialVaultLoad(options: InitialVaultLoadOptions) {
     resetReloading,
     setEntries, setFolders, setIsLoading, setModifiedFiles, setModifiedFilesError, setViews,
     loadOptionsRef,
+    loadOptionsKey,
   ])
 }
 
@@ -836,21 +841,25 @@ function useInitialLoadedWorkspaceMarker({
   isLoading,
   loadedWorkspacePathsRef,
   vaultPath,
+  vaults,
 }: {
   entries: VaultEntry[]
   initialLoadedVaultPathRef: MutableRefObject<string | null>
   isLoading: boolean
   loadedWorkspacePathsRef: MutableRefObject<Set<string>>
   vaultPath: string
+  vaults?: VaultOption[]
 }) {
   useEffect(() => {
     if (isLoading || !hasVaultPath({ vaultPath }) || initialLoadedVaultPathRef.current === vaultPath) return
     initialLoadedVaultPathRef.current = vaultPath
     loadedWorkspacePathsRef.current = new Set([
       ...loadedWorkspacePathsRef.current,
-      ...loadedWorkspacePathsFromEntries(entries, vaultPath),
+      ...loadedWorkspacePathsFromEntries(entries, vaultPath, {
+        inferFallbackWorkspacePath: !vaults?.length,
+      }),
     ])
-  }, [entries, initialLoadedVaultPathRef, isLoading, loadedWorkspacePathsRef, vaultPath])
+  }, [entries, initialLoadedVaultPathRef, isLoading, loadedWorkspacePathsRef, vaultPath, vaults])
 }
 
 function useWorkspaceMetadataRetagEffect({
@@ -1022,7 +1031,7 @@ function useWorkspaceEntrySync({
   const refs = useWorkspaceLoadRefs()
 
   usePrunedWorkspaceLoadRefs(refs, desiredWorkspaceKey, desiredWorkspacePaths)
-  useInitialLoadedWorkspaceMarker({ entries, vaultPath, isLoading, ...refs })
+  useInitialLoadedWorkspaceMarker({ entries, vaultPath, vaults, isLoading, ...refs })
   useWorkspaceMetadataRetagEffect({
     defaultWorkspacePath,
     desiredWorkspaceKey,

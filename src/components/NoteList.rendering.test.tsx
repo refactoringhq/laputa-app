@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { NoteList } from './NoteList'
 import { openNoteListPropertiesPicker } from './note-list/noteListPropertiesEvents'
+import { AppPreferencesProvider } from '../hooks/useAppPreferences'
 import {
   allSelection,
   buildNoteListProps,
@@ -656,11 +657,15 @@ describe('NoteList rendering', () => {
   })
 
   it('formats date properties in note-list chips with the selected display format', async () => {
-    renderNoteList({
+    const built = buildNoteListProps({
       entries: makeBookTypeEntries(['Due'], { properties: { Due: '2026-05-11' } }),
       selection: { kind: 'sectionGroup', type: 'Book' },
-      dateDisplayFormat: 'european',
     })
+    render(
+      <AppPreferencesProvider dateDisplayFormat="european">
+        <NoteList {...built.props} />
+      </AppPreferencesProvider>,
+    )
 
     expect(screen.getByTestId('property-chip-due-0')).toHaveTextContent('11/5/2026')
 
