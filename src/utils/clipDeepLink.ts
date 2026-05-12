@@ -9,12 +9,12 @@ export type ClipDeepLinkImportResult = 'ignored' | 'rejected' | 'imported'
 
 export interface ClipDeepLinkImportServices {
   readClipboardText: () => Promise<string>
-  createNoteContent: (_path: string, _content: string, _vaultPath: string) => Promise<void>
-  reloadVaultEntry: (_path: string, _vaultPath: string) => Promise<VaultEntry>
+  createNoteContent: (...args: [string, string, string]) => Promise<void>
+  reloadVaultEntry: (...args: [string, string]) => Promise<VaultEntry>
   reloadVault: () => Promise<unknown>
-  addEntry: (_entry: VaultEntry) => void
-  openTabWithContent: (_entry: VaultEntry, _content: string) => void
-  setToastMessage: (_message: string) => void
+  addEntry: (...args: [VaultEntry]) => void
+  openTabWithContent: (...args: [VaultEntry, string]) => void
+  setToastMessage: (...args: [string]) => void
 }
 
 export interface ClipDeepLinkImportParams {
