@@ -1219,14 +1219,13 @@ function App() {
   }, [handleSetViewMode])
 
   const handleSidebarNavSelect = useCallback((sel: SidebarSelection) => {
-    const isSame = isSelectionActive(selectionRef.current, sel)
-    if (isSame && !noteListHidden) {
-      setNoteListHidden(true)
+    if (isSelectionActive(effectiveSelection, sel)) {
+      setNoteListHidden((h) => !h)
     } else {
       setNoteListHidden(false)
       handleSetSelection(sel)
     }
-  }, [noteListHidden, handleSetSelection])
+  }, [effectiveSelection, handleSetSelection])
 
   const handleToggleInspector = useCallback(() => {
     const nextInspectorCollapsed = !layout.inspectorCollapsed
