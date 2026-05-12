@@ -6,10 +6,11 @@ import { useMultiSelectKeyboard } from './note-list/useMultiSelectKeyboard'
 
 type NoteListInnerProps = NoteListProps & {
   onBulkOrganize?: (paths: string[]) => void
+  onCollapse?: () => void
   multiSelectionCommandRef?: React.MutableRefObject<NoteListMultiSelectionCommands | null>
 }
 
-function NoteListInner({ onBulkOrganize, multiSelectionCommandRef, ...props }: NoteListInnerProps) {
+function NoteListInner({ onBulkOrganize, onCollapse, multiSelectionCommandRef, ...props }: NoteListInnerProps) {
   const model = useNoteListModel(props)
 
   const handleBulkOrganize = useCallback(() => {
@@ -47,7 +48,7 @@ function NoteListInner({ onBulkOrganize, multiSelectionCommandRef, ...props }: N
     props.onBulkDeletePermanently,
   ])
 
-  return <NoteListLayout {...model} handleBulkOrganize={onBulkOrganize ? handleBulkOrganize : undefined} />
+  return <NoteListLayout {...model} handleBulkOrganize={onBulkOrganize ? handleBulkOrganize : undefined} onCollapse={onCollapse} />
 }
 
 export const NoteList = memo(NoteListInner)

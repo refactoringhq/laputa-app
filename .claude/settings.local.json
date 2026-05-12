@@ -5,7 +5,13 @@
       "Read(*)",
       "Bash(cat*)",
       "Bash(ls*)",
-      "Write(*)"
+      "Write(*)",
+      "Bash(hunk *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(pnpm test *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

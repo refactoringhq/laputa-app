@@ -19,22 +19,28 @@ function loadViewMode(): ViewMode {
 
 export function useViewMode(initialOverride?: ViewMode) {
   const [viewMode, setViewModeState] = useState<ViewMode>(initialOverride ?? loadViewMode)
+  const [noteListHidden, setNoteListHidden] = useState(false)
 
   // Re-sync when vault config becomes available
   useEffect(() => {
     return subscribeVaultConfig(() => {
       const stored = getVaultConfig().view_mode
-      if (isViewMode(stored)) setViewModeState(stored)
+      if (isViewMode(stored)) {
+        setViewModeState(stored)
+        setNoteListHidden(false)
+      }
     })
   }, [])
 
   const setViewMode = useCallback((mode: ViewMode) => {
     setViewModeState(mode)
+    setNoteListHidden(false)
     updateVaultConfigField('view_mode', mode)
   }, [])
 
   const sidebarVisible = viewMode === 'all'
   const noteListVisible = viewMode === 'all' || viewMode === 'editor-list'
+  const effectiveNoteListVisible = noteListVisible && !noteListHidden
 
-  return { viewMode, setViewMode, sidebarVisible, noteListVisible }
+  return { viewMode, setViewMode, sidebarVisible, noteListVisible, effectiveNoteListVisible, setNoteListHidden }
 }

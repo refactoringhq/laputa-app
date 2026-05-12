@@ -374,6 +374,7 @@
   "noteList.title.notes": "Notes",
   "noteList.searchPlaceholder": "Search notes...",
   "noteList.searchAction": "Search notes",
+  "noteList.action.collapse": "Collapse note list",
   "noteList.createNote": "Create new note",
   "noteList.empty.changesError": "Failed to load changes: {error}",
   "noteList.empty.noChanges": "No pending changes",

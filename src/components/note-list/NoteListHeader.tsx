@@ -1,4 +1,4 @@
-import { MagnifyingGlass, Plus, SidebarSimple } from '@phosphor-icons/react'
+import { ArrowLineLeft, MagnifyingGlass, Plus, SidebarSimple } from '@phosphor-icons/react'
 import { Loader2 } from 'lucide-react'
 import type { VaultEntry } from '../../types'
 import type { SortOption, SortDirection } from '../../utils/noteListHelpers'
@@ -51,6 +51,7 @@ interface NoteListHeaderProps {
   onSearchChange: (value: string) => void
   onSearchKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void
   onGitRepositoryChange?: (path: string) => void
+  onCollapse?: () => void
 }
 
 function dispatchExpandSidebarFromHeader() {
@@ -154,6 +155,7 @@ function HeaderActions({
   onSortChange,
   onCreateNote,
   onToggleSearch,
+  onCollapse,
 }: Pick<
   NoteListHeaderProps,
   | 'isEntityView'
@@ -165,9 +167,12 @@ function HeaderActions({
   | 'onSortChange'
   | 'onCreateNote'
   | 'onToggleSearch'
+  | 'onCollapse'
 > & {
   locale: AppLocale
 }) {
+  const collapseLabel = translate(locale, 'noteList.action.collapse')
+
   return (
     <div className="ml-3 flex shrink-0 items-center justify-end gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
       {!isEntityView && <SortDropdown groupLabel="__list__" current={listSort} direction={listDirection} customProperties={customProperties} locale={locale} onChange={onSortChange} />}
@@ -185,6 +190,11 @@ function HeaderActions({
       <Button type="button" variant="ghost" size="icon-xs" className={NOTE_LIST_ACTION_BUTTON_CLASSNAME} onClick={onCreateNote} title={translate(locale, 'noteList.createNote')} aria-label={translate(locale, 'noteList.createNote')}>
         <Plus size={16} />
       </Button>
+      {onCollapse && (
+        <Button type="button" variant="ghost" size="icon-xs" className={NOTE_LIST_ACTION_BUTTON_CLASSNAME} onClick={onCollapse} title={collapseLabel} aria-label={collapseLabel}>
+          <ArrowLineLeft size={16} />
+        </Button>
+      )}
     </div>
   )
 }
@@ -259,6 +269,7 @@ export function NoteListHeader({
   onSearchChange,
   onSearchKeyDown,
   onGitRepositoryChange,
+  onCollapse,
 }: NoteListHeaderProps) {
   const { onMouseDown: onDragMouseDown } = useDragRegion()
 
@@ -282,6 +293,7 @@ export function NoteListHeader({
           onSortChange={onSortChange}
           onCreateNote={onCreateNote}
           onToggleSearch={onToggleSearch}
+          onCollapse={onCollapse}
         />
       </div>
       <RepositorySelectorRow
