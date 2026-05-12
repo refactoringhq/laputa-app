@@ -15,6 +15,12 @@ mod rename;
 mod rename_transaction;
 mod title_sync;
 mod trash;
+mod view_date_filters;
+mod view_migration;
+mod view_relationships;
+#[cfg(test)]
+mod view_tests;
+mod view_value_conversions;
 mod views;
 
 pub use cache::{invalidate_cache, scan_vault_cached};
