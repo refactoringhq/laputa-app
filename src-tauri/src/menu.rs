@@ -9,7 +9,10 @@ use std::{
 #[cfg(not(target_os = "macos"))]
 use tauri::{menu::MenuEvent, Manager};
 use tauri::{
-    menu::{MenuBuilder, MenuItem, MenuItemBuilder, MenuItemKind, Submenu, SubmenuBuilder},
+    menu::{
+        MenuBuilder, MenuItem, MenuItemBuilder, MenuItemKind, Submenu, SubmenuBuilder,
+        WINDOW_SUBMENU_ID,
+    },
     App, AppHandle, Emitter,
 };
 
@@ -242,6 +245,14 @@ fn window_menu_event_handler_required(target_os: &str) -> bool {
     target_os != "macos"
 }
 
+fn native_window_menu_submenu_id(target_os: &str) -> Option<&'static str> {
+    if target_os == "macos" {
+        Some(WINDOW_SUBMENU_ID)
+    } else {
+        None
+    }
+}
+
 fn build_manifest_menu_item(
     app: &App,
     item: &ManifestMenuItem,
@@ -355,7 +366,12 @@ fn build_vault_menu(app: &App) -> MenuResult {
 }
 
 fn build_window_menu(app: &App) -> MenuResult {
-    Ok(SubmenuBuilder::new(app, "Window")
+    let mut builder = SubmenuBuilder::new(app, "Window");
+    if let Some(id) = native_window_menu_submenu_id(std::env::consts::OS) {
+        builder = builder.id(id);
+    }
+
+    Ok(builder
         .minimize()
         .maximize()
         .separator()
@@ -614,5 +630,15 @@ mod tests {
         assert!(!window_menu_event_handler_required("macos"));
         assert!(window_menu_event_handler_required("windows"));
         assert!(window_menu_event_handler_required("linux"));
+    }
+
+    #[test]
+    fn window_menu_uses_native_nsapp_integration_on_macos_only() {
+        assert_eq!(
+            native_window_menu_submenu_id("macos"),
+            Some(WINDOW_SUBMENU_ID)
+        );
+        assert_eq!(native_window_menu_submenu_id("windows"), None);
+        assert_eq!(native_window_menu_submenu_id("linux"), None);
     }
 }
