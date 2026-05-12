@@ -28,6 +28,7 @@ import { useRecentVaultWrites, useVaultWatcher } from './hooks/useVaultWatcher'
 import { useSettings } from './hooks/useSettings'
 import { useNoteWidthMode } from './hooks/useNoteWidthMode'
 import { useNoteActions } from './hooks/useNoteActions'
+import { useClipDeepLinkHandler } from './hooks/useClipDeepLinkHandler'
 import { planNewTypeCreation } from './hooks/useNoteCreation'
 import { useCommitFlow } from './hooks/useCommitFlow'
 import { useGitRepositories } from './hooks/useGitRepositories'
@@ -618,6 +619,14 @@ function App() {
     openTabWithContent,
     setToastMessage,
     tabs: notes.tabs,
+  })
+  useClipDeepLinkHandler({
+    addEntry: vault.addEntry,
+    enabled: !noteWindowParams,
+    openTabWithContent,
+    reloadVault: vault.reloadVault,
+    setToastMessage,
+    vaultPath: resolvedPath,
   })
   const handleVaultUpdate = useCallback(async (
     updatedFiles: string[],
