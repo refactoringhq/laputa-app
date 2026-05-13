@@ -516,6 +516,10 @@ const RELEASE_CHANNEL_LABELS: Record<ReleaseChannel, string> = {
 const RELEASE_CHANNEL_LABELS_BY_CHANNEL = new Map<ReleaseChannel, string>(
   Object.entries(RELEASE_CHANNEL_LABELS) as Array<[ReleaseChannel, string]>,
 )
+const STABLE_TAG_DATE_PATTERNS = [
+  /^stable-v(\d{4})\.(\d{1,2})\.(\d{1,2})$/,
+  /^v(\d{4})-(\d{1,2})-(\d{1,2})$/,
+]
 
 function escapeMarkupText(value: string): string {
   return value
@@ -635,6 +639,71 @@ function readableNotesUrlForRelease(channel: ReleaseChannel, tagName: string): s
   return `release-notes/${encodeURIComponent(tagName)}.md`
 }
 
+function normalizeStableTagDate(tagName: string): string | null {
+  for (const pattern of STABLE_TAG_DATE_PATTERNS) {
+    const match = tagName.match(pattern)
+    if (!match) continue
+
+    const [, year, month, day] = match
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+  }
+
+  return null
+}
+
+function stableReleaseDedupeKey(release: ReleaseEntry): string {
+  const stableDate = normalizeStableTagDate(release.tagName)
+  return stableDate === null ? `tag:${release.tagName}` : `date:${stableDate}`
+}
+
+function releaseNotesListItemCount(notesHtml: string): number {
+  return notesHtml.match(/<li\b/gi)?.length ?? 0
+}
+
+function releasePreferenceScore(release: ReleaseEntry): number {
+  return releaseNotesListItemCount(release.notesHtml) + release.downloads.length
+}
+
+function mergeReleaseDownloads(primary: ReleaseDownload[], secondary: ReleaseDownload[]): ReleaseDownload[] {
+  const seenUrls = new Set<string>()
+  const downloads: ReleaseDownload[] = []
+
+  for (const download of [...primary, ...secondary]) {
+    if (seenUrls.has(download.url)) continue
+
+    seenUrls.add(download.url)
+    downloads.push(download)
+  }
+
+  return downloads
+}
+
+function preferredRelease(left: ReleaseEntry, right: ReleaseEntry): ReleaseEntry {
+  const leftScore = releasePreferenceScore(left)
+  const rightScore = releasePreferenceScore(right)
+  const selectedRelease = rightScore !== leftScore
+    ? (rightScore > leftScore ? right : left)
+    : (right.publishedTimestamp > left.publishedTimestamp ? right : left)
+  const fallbackRelease = selectedRelease === right ? left : right
+
+  return {
+    ...selectedRelease,
+    downloads: mergeReleaseDownloads(selectedRelease.downloads, fallbackRelease.downloads),
+  }
+}
+
+function deduplicateStableReleases(releases: ReleaseEntry[]): ReleaseEntry[] {
+  const releasesByDate = new Map<string, ReleaseEntry>()
+
+  for (const release of releases) {
+    const key = stableReleaseDedupeKey(release)
+    const existingRelease = releasesByDate.get(key)
+    releasesByDate.set(key, existingRelease ? preferredRelease(existingRelease, release) : release)
+  }
+
+  return Array.from(releasesByDate.values())
+}
+
 function normalizeReleaseEntry(release: GitHubReleasePayload): [ReleaseChannel, ReleaseEntry] | null {
   if (release.draft === true) return null
 
@@ -677,6 +746,8 @@ function collectReleaseSections(payload: unknown): ReleaseSections {
 
     appendReleaseSection(sections, normalizedRelease)
   }
+
+  sections.stable = deduplicateStableReleases(sections.stable)
 
   for (const channel of ['stable', 'alpha'] as const) {
     const section = Reflect.get(sections, channel) as ReleaseEntry[]

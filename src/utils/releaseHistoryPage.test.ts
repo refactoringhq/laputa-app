@@ -121,6 +121,52 @@ describe('buildReleaseHistoryPage', () => {
     expect(html.indexOf('Tolaria Alpha 2026.4.20.10')).toBeLessThan(html.indexOf('Tolaria Alpha 2026.4.20.9'))
   })
 
+  it('deduplicates equivalent stable calendar tags and keeps the richer notes', () => {
+    const html = buildReleaseHistoryPage([
+      {
+        assets: [
+          {
+            browser_download_url: 'https://example.com/Tolaria_2026.5.13_macOS_Silicon.dmg',
+            name: 'Tolaria_2026.5.13_macOS_Silicon.dmg',
+          },
+        ],
+        body: '## What&apos;s Changed\n\n<ul><li></li></ul>',
+        body_html: '<h2>What&apos;s Changed</h2><ul><li></li></ul>',
+        html_url: 'https://github.com/refactoringhq/tolaria/releases/tag/stable-v2026.5.13',
+        name: 'Tolaria 2026.5.13',
+        prerelease: false,
+        published_at: '2026-05-13T09:30:44Z',
+        tag_name: 'stable-v2026.5.13',
+      },
+      {
+        assets: [
+          {
+            browser_download_url: 'https://example.com/Tolaria_2026.5.13_macOS_Silicon.dmg',
+            name: 'Tolaria_2026.5.13_macOS_Silicon.dmg',
+          },
+        ],
+        body_html: [
+          '<h2>What&apos;s Changed</h2>',
+          '<h3>Features</h3>',
+          '<ul>',
+          '<li>Add AI visibility setting</li>',
+          '<li>Support mounted vault workspaces</li>',
+          '</ul>',
+        ].join(''),
+        html_url: 'https://github.com/refactoringhq/tolaria/releases/tag/v2026-05-13',
+        name: 'Tolaria v2026-05-13',
+        prerelease: false,
+        published_at: '2026-05-13T09:21:30Z',
+        tag_name: 'v2026-05-13',
+      },
+    ])
+
+    expect(html).toContain('Stable<span class="tab-count">1</span>')
+    expect(html).toContain('Tolaria v2026-05-13')
+    expect(html).toContain('Add AI visibility setting')
+    expect(html).not.toContain('Tolaria 2026.5.13')
+  })
+
   it('filters draft releases and shows an empty state for channels without published builds', () => {
     const html = buildReleaseHistoryPage([
       {
