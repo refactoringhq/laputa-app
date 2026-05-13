@@ -820,7 +820,7 @@ Tolaria delegates remote auth to the user's system git setup:
 - `CloneVaultModal` captures a remote URL and local destination
 - `clone_git_repo` and `create_getting_started_vault` both run system git clone work in blocking Tokio tasks so clone UIs stay responsive
 - On macOS, system-git commands prefer the user's login-shell `git` and `PATH`, and `git_add_remote` preflights HTTPS remotes through `git credential fill` so Keychain can prompt/grant access before the first fetch or push
-- On Linux AppImage launches, every system-git command removes AppImage loader overrides such as `LD_LIBRARY_PATH`, `LD_PRELOAD`, and `GIT_EXEC_PATH` before spawning `git`, so helpers like `git-remote-https` bind against the host git/library stack instead of Tolaria's bundled WebKit/AppImage libraries
+- On Linux AppImage launches, every system-git command and MCP Node subprocess removes AppImage loader overrides such as `LD_LIBRARY_PATH`, `LD_PRELOAD`, and `GIT_EXEC_PATH` before spawning, so helpers like `git-remote-https` and system `node` bind against the host library stack instead of Tolaria's bundled WebKit/AppImage libraries
 - On Linux AppImage Wayland launches, startup environment safeguards also set `GTK_IM_MODULE=fcitx` when common input-method variables already indicate fcitx and the user has not explicitly chosen a GTK IM module, allowing WebKitGTK editor input to reach fcitx5 on compositors such as niri without overriding deliberate `GTK_IM_MODULE` choices.
 - `git_add_remote` uses the same system git path and refuses remotes whose history is unrelated or ahead of the local vault
 - Existing `git_pull` / `git_push` commands keep surfacing raw git errors, and clone commands fail fast when git wants interactive terminal input

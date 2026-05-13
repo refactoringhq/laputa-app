@@ -559,7 +559,7 @@ Tolaria no longer implements provider-specific OAuth or remote-repository APIs. 
 1. User opens `CloneVaultModal` from onboarding or the vault menu
 2. User pastes any git URL and chooses a local destination
 3. The `clone_git_repo()` Tauri command runs `git clone` inside a blocking Tokio task so the Tauri window stays responsive during slow or failing clones
-4. Linux AppImage builds strip AppImage loader variables from system-git subprocesses before spawning `git`, keeping `git-remote-https` on the host git/library stack
+4. Linux AppImage builds strip AppImage loader variables from system-git and MCP Node subprocesses before spawning them, keeping `git-remote-https` and system `node` on the host library stack
 5. `git_push()` / `git_pull()` continue to use the same system git path
 6. On macOS, `git_add_remote()` asks Git's credential helper for HTTPS credentials before the first fetch so Keychain can grant access to the same saved credential item the shell uses
 7. Clone commands disable interactive terminal / askpass prompts and surface the git failure back to the UI instead of freezing the app waiting for input

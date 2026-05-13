@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 
 mod paths;
+mod subprocess;
 
 const MCP_SERVER_NAME: &str = "tolaria";
 const LEGACY_MCP_SERVER_NAME: &str = "laputa";
@@ -76,7 +77,7 @@ fn user_shell_candidates() -> Vec<PathBuf> {
 }
 
 fn command_path_from_shell(shell: &Path, command: &str) -> Option<PathBuf> {
-    crate::hidden_command(shell)
+    subprocess::command(shell)
         .arg("-lc")
         .arg(format!("command -v {command}"))
         .output()
@@ -104,7 +105,7 @@ fn first_existing_path(stdout: &str) -> Option<PathBuf> {
 }
 
 fn verify_node_version(node: &Path) -> Result<(), String> {
-    let output = crate::hidden_command(node)
+    let output = subprocess::command(node)
         .arg("--version")
         .output()
         .map_err(|e| format!("Failed to run {} --version: {e}", node.display()))?;
@@ -143,9 +144,9 @@ fn node_major_version(version: &str) -> Option<u32> {
 
 fn node_lookup_command() -> Command {
     #[cfg(windows)]
-    let mut command = crate::hidden_command("where.exe");
+    let mut command = subprocess::command("where.exe");
     #[cfg(not(windows))]
-    let mut command = crate::hidden_command("which");
+    let mut command = subprocess::command("which");
 
     command.arg("node");
     command
@@ -397,7 +398,8 @@ pub fn spawn_ws_bridge_with_paths(
     let vault_path = vault_path.as_ref();
     let active_vault_paths = active_vault_paths_json(vault_path, vault_paths);
 
-    let child = crate::hidden_command(node)
+    let mut command = subprocess::command(node);
+    let child = command
         .arg(&script)
         .env("VAULT_PATH", vault_path)
         .env("VAULT_PATHS", active_vault_paths)
