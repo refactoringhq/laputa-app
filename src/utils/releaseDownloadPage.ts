@@ -1,4 +1,4 @@
-const RELEASE_HISTORY_URL = 'https://refactoringhq.github.io/tolaria/'
+const RELEASE_HISTORY_URL = 'https://tolaria.md/releases/'
 const DOWNLOAD_FRAME_NAME = 'tolaria-download-frame'
 
 type StablePlatformKey =
