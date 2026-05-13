@@ -4,6 +4,8 @@ import type { Tab } from '../hooks/useTabManagement'
 import {
   applyPendingRawExitContent,
   rememberPendingRawExitContent,
+  resolvePendingRawExitContent,
+  resolveRawModeContent,
   syncActiveTabIntoRawBuffer,
 } from './editorRawModeSync'
 
@@ -209,5 +211,32 @@ describe('raw-mode sync content guards', () => {
 
     expect(result).toEqual({ path: mockEntry.path, content: editedContent })
     expect(onContentChange).toHaveBeenCalledWith(mockEntry.path, editedContent)
+  })
+
+  it('keeps raw exit edits available until parent tab state catches up', () => {
+    const editedContent = `${normalizedContent}\nEdited before switching tabs\n`
+    const { result: pendingRawExitContent } = rememberRawExit(editedContent)
+    expect(pendingRawExitContent).not.toBeNull()
+
+    expect(applyPendingRawExitContent([mockTab, otherTab], pendingRawExitContent)[0]).toEqual({
+      ...mockTab,
+      content: editedContent,
+    })
+    expect(resolveRawModeContent({
+      activeTab: mockTab,
+      rawModeContentOverride: pendingRawExitContent,
+    })).toBe(editedContent)
+
+    expect(resolvePendingRawExitContent({
+      activeTabPath: mockEntry.path,
+      tabs: [mockTab, otherTab],
+      pendingRawExitContent,
+    })).toEqual(pendingRawExitContent)
+
+    expect(resolvePendingRawExitContent({
+      activeTabPath: mockEntry.path,
+      tabs: [{ ...mockTab, content: editedContent }, otherTab],
+      pendingRawExitContent,
+    })).toBeNull()
   })
 })
