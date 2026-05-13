@@ -168,3 +168,4 @@ proposed → active → superseded
 | [0112](0112-system-theme-mode.md) | System theme mode | active |
 | [0113](0113-shared-renderer-attachment-path-normalization.md) | Shared renderer attachment path normalization | active |
 | [0114](0114-mounted-workspaces-unified-graph.md) | Mounted workspaces unified graph | active |
+| [0116](0116-rich-raw-transition-and-serialization-ownership.md) | Rich/raw transition and serialization ownership | active |

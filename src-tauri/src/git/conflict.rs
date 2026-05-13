@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::{git_command, run_git};
+use super::{ensure_author_config, git_command, run_git};
 
 /// List files with merge conflicts (unmerged paths).
 ///
@@ -90,6 +90,8 @@ pub fn git_commit_conflict_resolution(vault_path: &str) -> Result<String, String
         ));
     }
 
+    ensure_author_config(vault)?;
+
     let mode = get_conflict_mode(vault_path);
     let output = match mode.as_str() {
         "rebase" => git_command()
@@ -130,7 +132,31 @@ mod tests {
     use crate::git::tests::{setup_git_repo, setup_remote_pair};
     use crate::git::{git_commit, git_pull, git_push};
     use std::fs;
+    use std::path::Path;
     use tempfile::TempDir;
+
+    fn unset_local_author_config(vault: &Path) {
+        for key in ["user.name", "user.email"] {
+            let status = git_command()
+                .args(["config", "--local", "--unset-all", key])
+                .current_dir(vault)
+                .status()
+                .unwrap();
+            assert!(status.success(), "failed to unset {key}");
+        }
+    }
+
+    fn local_config_value(vault: &Path, key: &str) -> Option<String> {
+        let output = git_command()
+            .args(["config", "--local", key])
+            .current_dir(vault)
+            .output()
+            .unwrap();
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+    }
 
     #[test]
     fn test_get_conflict_files_empty_when_clean() {
@@ -280,6 +306,30 @@ mod tests {
         assert!(result.is_ok());
 
         assert_eq!(get_conflict_mode(vp_b), "none");
+    }
+
+    #[test]
+    fn test_commit_conflict_resolution_sets_missing_local_author_identity() {
+        let (_bare, _clone_a, clone_b) = setup_conflict_pair();
+        let vault = clone_b.path();
+        let vp_b = vault.to_str().unwrap();
+
+        git_resolve_conflict(vp_b, "conflict.md", "ours").unwrap();
+        unset_local_author_config(vault);
+
+        let result = git_commit_conflict_resolution(vp_b);
+        assert!(
+            result.is_ok(),
+            "conflict commit should set local fallback identity: {result:?}"
+        );
+        assert_eq!(
+            local_config_value(vault, "user.name").as_deref(),
+            Some("Tolaria")
+        );
+        assert_eq!(
+            local_config_value(vault, "user.email").as_deref(),
+            Some("vault@tolaria.md")
+        );
     }
 
     /// Set up a rebase conflict: clone_b has diverged from origin and

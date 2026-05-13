@@ -496,10 +496,10 @@ interface PulseCommit {
 | `history.rs` | File history | `git log` — last 20 commits per file |
 | `status.rs` | Modified files | `git status --porcelain` — filtered to `.md` |
 | `status.rs` | File diff | `git diff`, fallback to `--cached`, then synthetic for untracked |
-| `commit.rs` | Commit | `git add -A && git commit -m "..."`; broken signing helpers trigger one unsigned retry for the same app-managed commit |
+| `commit.rs` | Commit | Ensures a local author fallback when needed, then runs `git add -A && git commit -m "..."`; broken signing helpers trigger one unsigned retry for the same app-managed commit |
 | `remote.rs` | Pull / Push | `git pull --rebase` / `git push` |
 | `connect.rs` | Add remote | Adds `origin`, fetches it, validates history compatibility, and only starts tracking when the remote is safe |
-| `conflict.rs` | Conflict resolution | Detect conflicts, resolve with ours/theirs/manual |
+| `conflict.rs` | Conflict resolution | Detect conflicts, resolve with ours/theirs/manual, and ensure a local author fallback before commit/rebase continuation |
 | `pulse.rs` | Activity feed | `git log` with `--name-status` for file changes |
 
 ### Auto-Sync
