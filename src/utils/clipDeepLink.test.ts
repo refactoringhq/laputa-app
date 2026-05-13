@@ -74,6 +74,7 @@ describe('importClipDeepLinkFromClipboard', () => {
     const services = makeClipServices()
 
     await expect(importClipDeepLinkFromClipboard({
+      locale: 'en',
       rawUrl: 'tolaria://clip/new?v=1&clipboard=1&path=Clippings%2FExample.md&title=Example',
       vaultPath: '/vault',
       services,
@@ -92,6 +93,7 @@ describe('importClipDeepLinkFromClipboard', () => {
     services.readClipboardText.mockResolvedValue('  \n  ')
 
     await expect(importClipDeepLinkFromClipboard({
+      locale: 'en',
       rawUrl: 'tolaria://clip/new?v=1&clipboard=1&path=Clippings%2FExample.md',
       vaultPath: '/vault',
       services,
@@ -105,6 +107,7 @@ describe('importClipDeepLinkFromClipboard', () => {
     const services = makeClipServices()
 
     await expect(importClipDeepLinkFromClipboard({
+      locale: 'en',
       rawUrl: 'tolaria://clip/new?v=1&clipboard=1&path=Clippings%2FExample.md',
       vaultPath: '',
       services,

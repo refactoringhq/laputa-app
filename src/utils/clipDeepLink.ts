@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars -- Callback type parameters document the clip import service contract. */
 import type { VaultEntry } from '../types'
+import { translate, type AppLocale } from '../lib/i18n'
 
 export interface ClipDeepLink {
   path: string
@@ -19,6 +20,7 @@ export interface ClipDeepLinkImportServices {
 }
 
 export interface ClipDeepLinkImportParams {
+  locale: AppLocale
   rawUrl: string
   vaultPath: string
   services: ClipDeepLinkImportServices
@@ -66,6 +68,7 @@ function errorMessage(error: unknown): string {
 }
 
 export async function importClipDeepLinkFromClipboard({
+  locale,
   rawUrl,
   vaultPath,
   services,
@@ -74,14 +77,14 @@ export async function importClipDeepLinkFromClipboard({
   if (!clip) return 'ignored'
 
   if (!vaultPath.trim()) {
-    services.setToastMessage('Open a vault before importing a clip')
+    services.setToastMessage(translate(locale, 'clip.toast.openVaultBeforeImport'))
     return 'rejected'
   }
 
   try {
     const content = await services.readClipboardText()
     if (!content.trim()) {
-      services.setToastMessage('Clip clipboard is empty — capture cancelled')
+      services.setToastMessage(translate(locale, 'clip.toast.clipboardEmpty'))
       return 'rejected'
     }
 
@@ -95,10 +98,10 @@ export async function importClipDeepLinkFromClipboard({
       : clip.title?.trim()
         ? clip.title
         : clip.path
-    services.setToastMessage(`Imported clip “${importedTitle}”`)
+    services.setToastMessage(translate(locale, 'clip.toast.imported', { title: importedTitle }))
     return 'imported'
   } catch (error) {
-    services.setToastMessage(`Failed to import clip: ${errorMessage(error)}`)
+    services.setToastMessage(translate(locale, 'clip.toast.importFailed', { error: errorMessage(error) }))
     return 'rejected'
   }
 }

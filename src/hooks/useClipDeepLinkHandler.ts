@@ -1,14 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 /* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars -- Callback type parameters document the deep-link service contract. */
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link'
 import { isTauri } from '../mock-tauri'
 import type { VaultEntry } from '../types'
+import type { AppLocale } from '../lib/i18n'
 import { importClipDeepLinkFromClipboard } from '../utils/clipDeepLink'
 
 interface ClipDeepLinkHandlerParams {
   addEntry: (...args: [VaultEntry]) => void
   enabled?: boolean
+  locale: AppLocale
   openTabWithContent: (...args: [VaultEntry, string]) => void
   reloadVault: () => Promise<unknown>
   setToastMessage: (...args: [string]) => void
@@ -63,16 +65,24 @@ export function registerClipDeepLinkImports({
 export function useClipDeepLinkHandler({
   addEntry,
   enabled = true,
+  locale,
   openTabWithContent,
   reloadVault,
   setToastMessage,
   vaultPath,
 }: ClipDeepLinkHandlerParams) {
+  const localeRef = useRef(locale)
+
+  useEffect(() => {
+    localeRef.current = locale
+  }, [locale])
+
   useEffect(() => {
     if (!enabled || !isTauri()) return
 
     function importUrl(rawUrl: string): void {
       void importClipDeepLinkFromClipboard({
+        locale: localeRef.current,
         rawUrl,
         vaultPath,
         services: {
