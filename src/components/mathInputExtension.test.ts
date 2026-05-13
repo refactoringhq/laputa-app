@@ -1,5 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { createMathInputExtension } from './mathInputExtension'
+import { trackEvent } from '../lib/telemetry'
+
+vi.mock('../lib/telemetry', () => ({
+  trackEvent: vi.fn(),
+}))
+
+function transformError(message = 'Invalid math transform') {
+  const error = new Error(message)
+  error.name = 'TransformError'
+  return error
+}
 
 function createTransaction() {
   const transaction = {
@@ -98,6 +109,15 @@ function createFixture(beforeText = 'Inline $x^2$') {
   }
 }
 
+beforeEach(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.clearAllMocks()
+})
+
 describe('createMathInputExtension', () => {
   it('registers a beforeinput listener when the editor mounts', () => {
     const fixture = createFixture()
@@ -161,5 +181,21 @@ describe('createMathInputExtension', () => {
     expect(fixture.transaction.replaceWith).not.toHaveBeenCalled()
     expect(fixture.view.dispatch).not.toHaveBeenCalled()
     expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('falls back to native input when an inline math transform is stale', () => {
+    const fixture = createFixture()
+    fixture.transaction.replaceWith.mockImplementation(() => {
+      throw transformError()
+    })
+    fixture.mount()
+
+    const event = fixture.fireInput()
+
+    expect(fixture.view.dispatch).not.toHaveBeenCalled()
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+      reason: 'transform_error',
+    })
   })
 })

@@ -19,6 +19,13 @@ type TextBlockTarget = { text: string }
 type NoteTitleTarget = { title: string }
 type NotePathTarget = { notePath: string }
 type MediaBlockquoteFile = { filePath: string }
+type MockHandler = (args?: Record<string, unknown>) => unknown
+type SaveProbe = Array<{ content: string; path: string }>
+type SaveCountExpectation = { expectedCount: number; page: Page }
+type RichEditorSaveProbeWindow = Window & typeof globalThis & {
+  __mockHandlers?: Record<string, MockHandler>
+  __richEditorTransformSaveProbe?: SaveProbe
+}
 
 function isEditorTypingCrash(message: string): boolean {
   return (
@@ -92,6 +99,52 @@ async function placeCaretAtEndOfBlockElement(block: ReturnType<Page['locator']>)
 
 async function expectNoteFileToContain(filePath: string, marker: string): Promise<void> {
   await expect.poll(() => fs.readFileSync(filePath, 'utf8'), { timeout: 10_000 }).toContain(marker)
+}
+
+async function installRichEditorSaveProbe(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const probeWindow = window as RichEditorSaveProbeWindow
+    const saves: SaveProbe = []
+    const patchHandlers = (handlers?: Record<string, MockHandler> | null) => {
+      if (!handlers || Reflect.get(handlers, '__richEditorTransformProbePatched') === true) {
+        return handlers ?? null
+      }
+
+      const originalSaveNoteContent = handlers.save_note_content
+      handlers.save_note_content = (args?: Record<string, unknown>) => {
+        saves.push({
+          content: typeof args?.content === 'string' ? args.content : '',
+          path: typeof args?.path === 'string' ? args.path : '',
+        })
+        return originalSaveNoteContent?.(args)
+      }
+      Object.defineProperty(handlers, '__richEditorTransformProbePatched', {
+        configurable: true,
+        enumerable: false,
+        value: true,
+      })
+      return handlers
+    }
+
+    let ref = patchHandlers(probeWindow.__mockHandlers) ?? null
+    probeWindow.__richEditorTransformSaveProbe = saves
+    Object.defineProperty(probeWindow, '__mockHandlers', {
+      configurable: true,
+      get() {
+        return patchHandlers(ref) ?? ref
+      },
+      set(value) {
+        ref = patchHandlers(value) ?? null
+      },
+    })
+  })
+}
+
+async function expectSaveCount({ expectedCount, page }: SaveCountExpectation): Promise<void> {
+  await expect.poll(() => page.evaluate(() => {
+    const probeWindow = window as RichEditorSaveProbeWindow
+    return probeWindow.__richEditorTransformSaveProbe?.length ?? 0
+  }), { timeout: 10_000 }).toBeGreaterThanOrEqual(expectedCount)
 }
 
 function writeChecklistNote(filePath: string, marker: string, checked = false): void {
@@ -240,6 +293,33 @@ test('@smoke typing after a rich-editor reload and note switch stays usable', as
 
   await expectNoteFileToContain(noteBPath, afterReloadMarker)
   await page.waitForTimeout(500)
+  expect(crashes).toEqual([])
+})
+
+test('@smoke rich-editor typing stays usable through repeated saves and transforms', async ({ page }) => {
+  const crashes = trackEditorTypingCrashes(page)
+  const noteBPath = path.join(tempVaultDir, 'note', 'note-b.md')
+  const firstMarker = `repeated save transform first ${Date.now()}`
+  const secondMarker = `repeated save transform second ${Date.now()}`
+  const finalMarker = `repeated save transform final ${Date.now()}`
+
+  await installRichEditorSaveProbe(page)
+  await openNote(page, 'Note B')
+  await placeCaretAtEndOfBlock(page, 1)
+
+  await page.keyboard.type(` ${firstMarker} $x^2$`, { delay: 10 })
+  await triggerMenuCommand(page, 'file-save')
+  await expectSaveCount({ expectedCount: 1, page })
+
+  await page.keyboard.type(` ${secondMarker} ->`, { delay: 10 })
+  await triggerMenuCommand(page, 'file-save')
+  await expectSaveCount({ expectedCount: 2, page })
+
+  await page.keyboard.type(` ${finalMarker}`, { delay: 10 })
+  await triggerMenuCommand(page, 'file-save')
+  await expectSaveCount({ expectedCount: 3, page })
+
+  await expectNoteFileToContain(noteBPath, finalMarker)
   expect(crashes).toEqual([])
 })
 

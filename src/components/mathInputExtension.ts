@@ -1,6 +1,10 @@
 import { createExtension } from '@blocknote/core'
 import type { useCreateBlockNote } from '@blocknote/react'
 import { MATH_INLINE_TYPE, readCompletedInlineMathAtEnd } from '../utils/mathMarkdown'
+import {
+  isRecoverableEditorTransformError,
+  reportRecoveredEditorTransformError,
+} from './richEditorTransformErrorRecoveryExtension'
 
 const INLINE_WHITESPACE_RE = /^[^\S\r\n]$/
 const NEWLINE_INPUT_TYPES = new Set(['insertParagraph', 'insertLineBreak'])
@@ -83,6 +87,38 @@ function replaceCompletedInlineMath(
   return transaction.scrollIntoView()
 }
 
+function recoverTransformError(error: unknown): boolean {
+  if (!isRecoverableEditorTransformError(error)) return false
+
+  reportRecoveredEditorTransformError('transform_error', error)
+  return true
+}
+
+function readMathInputTransaction(
+  view: EditorViewLike,
+  trailingText?: string,
+): EditorViewLike['state']['tr'] | null {
+  try {
+    return replaceCompletedInlineMath(view, trailingText)
+  } catch (error) {
+    if (!recoverTransformError(error)) throw error
+    return null
+  }
+}
+
+function dispatchMathInputTransaction(
+  view: EditorViewLike,
+  transaction: EditorViewLike['state']['tr'],
+): boolean {
+  try {
+    view.dispatch(transaction)
+    return true
+  } catch (error) {
+    if (!recoverTransformError(error)) throw error
+    return false
+  }
+}
+
 export const createMathInputExtension = createExtension(({ editor }) => {
   const readView = () => editor._tiptapEditor?.view ?? editor.prosemirrorView
 
@@ -94,10 +130,10 @@ export const createMathInputExtension = createExtension(({ editor }) => {
         if (!view || shouldSkipInput(event, view)) return
 
         const trailingText = isInsertedInlineWhitespace(event) ? event.data : undefined
-        const transaction = replaceCompletedInlineMath(view, trailingText)
+        const transaction = readMathInputTransaction(view, trailingText)
         if (!transaction) return
 
-        view.dispatch(transaction)
+        if (!dispatchMathInputTransaction(view, transaction)) return
         if (trailingText !== undefined) {
           event.preventDefault()
         }
