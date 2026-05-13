@@ -13,6 +13,7 @@ import {
   InstancesPanel,
   NoteInfoPanel,
 } from './InspectorPanels'
+import { normalizeNotePathForIdentity } from '../utils/notePathIdentity'
 import type { ReferencedByItem } from './InspectorPanels'
 import { EmptyInspector, InitializePropertiesPrompt, InspectorHeader, InvalidFrontmatterNotice } from './inspector/InspectorChrome'
 import { useBacklinks, useReferencedBy } from './inspector/useInspectorData'
@@ -55,6 +56,26 @@ function supportsFrontmatter(entry: VaultEntry): boolean {
   return entry.fileKind === undefined || entry.fileKind === 'markdown'
 }
 
+function pathBelongsToWorkspace(path: string, workspace: WorkspaceIdentity): boolean {
+  const normalizedPath = normalizeNotePathForIdentity(path)
+  const normalizedWorkspacePath = normalizeNotePathForIdentity(workspace.path)
+  if (!normalizedWorkspacePath) return false
+  return normalizedPath === normalizedWorkspacePath || normalizedPath.startsWith(`${normalizedWorkspacePath}/`)
+}
+
+function inferEntryWorkspace(entry: VaultEntry, workspaces: WorkspaceIdentity[] | undefined): WorkspaceIdentity | undefined {
+  if (entry.workspace) return entry.workspace
+  return workspaces
+    ?.filter((workspace) => pathBelongsToWorkspace(entry.path, workspace))
+    .sort((left, right) => right.path.length - left.path.length)
+    .at(0)
+}
+
+function entryWithInferredWorkspace(entry: VaultEntry, workspaces: WorkspaceIdentity[] | undefined): VaultEntry {
+  const workspace = inferEntryWorkspace(entry, workspaces)
+  return workspace && workspace !== entry.workspace ? { ...entry, workspace } : entry
+}
+
 function ValidFrontmatterPanels({
   entry,
   entries,
@@ -88,10 +109,11 @@ function ValidFrontmatterPanels({
   workspaces?: WorkspaceIdentity[]
   locale: AppLocale
 }) {
+  const entryForWorkspaceActions = entryWithInferredWorkspace(entry, workspaces)
   return (
     <>
       <DynamicPropertiesPanel
-        entry={entry}
+        entry={entryForWorkspaceActions}
         frontmatter={frontmatter}
         entries={entries}
         onUpdateProperty={onUpdateProperty}
@@ -99,7 +121,7 @@ function ValidFrontmatterPanels({
         onAddProperty={onAddProperty}
         onNavigate={onNavigate}
         onCreateMissingType={onCreateMissingType}
-        onChangeWorkspace={onChangeWorkspace ? (workspace) => onChangeWorkspace(entry, workspace) : undefined}
+        onChangeWorkspace={onChangeWorkspace ? (workspace) => onChangeWorkspace(entryForWorkspaceActions, workspace) : undefined}
         workspaces={workspaces}
         locale={locale}
       />
