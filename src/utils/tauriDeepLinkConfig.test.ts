@@ -17,4 +17,12 @@ describe('Tauri deep-link configuration', () => {
 
     expect(libRs).toContain('tauri_plugin_deep_link::init()')
   })
+
+  it('grants desktop permission for reading the cold-start deep link', () => {
+    const capability = JSON.parse(
+      repoFile('src-tauri/capabilities/default.json'),
+    )
+
+    expect(capability.permissions).toContain('deep-link:default')
+  })
 })
