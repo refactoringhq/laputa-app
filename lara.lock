@@ -62,6 +62,9 @@ files:
     command.git.resolveConflicts: 871ac36968cfca3d2297a89b28b25dee
     command.git.viewChanges: b2699edf69d8e1031afce2b2f94e5c8d
     git.repository.select: 33fcf2b3ec4686d9cd06051c726d0ba2
+    git.toast.autoGitFailed: 3e5d7e183a78e1f54c87ad0dba8a302b
+    git.toast.commitFailed: bb50986d29c30042bed1446f8adaa544
+    git.toast.missingAuthor: 0d4e7a7d6b6a3f883146dd86c9cdca09
     command.view.editorOnly: 8355e056b32086b9190d639be290dda8
     command.view.editorNoteList: b9604b1609eb6f581cd9570dca72d3f0
     command.view.fullLayout: 1cebdf839eee2b1713828731aaa3b507

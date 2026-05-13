@@ -7,16 +7,19 @@ type MockHandler = (args?: Record<string, unknown>) => unknown
 function installAutoGitMocks() {
   type BrowserWindow = Window & typeof globalThis & {
     __getDirtyPathCount?: () => number
+    __gitCommitAttempts?: number
     __gitCommitMessages?: string[]
     __gitPushCalls?: number
     __mockHandlers?: Record<string, MockHandler>
     __setMockAppActive?: (active: boolean) => void
+    __setMockGitCommitFailure?: (message: string | null) => void
   }
 
   const browserWindow = window as BrowserWindow
   const dirtyPaths = new Set<string>()
   let appActive = true
   let ahead = 0
+  let gitCommitFailure: string | null = null
 
   const createModifiedFiles = () => [...dirtyPaths].map((path) => ({
     path,
@@ -40,6 +43,11 @@ function installAutoGitMocks() {
     handlers.get_modified_files = () => createModifiedFiles()
 
     handlers.git_commit = (args?: Record<string, unknown>) => {
+      browserWindow.__gitCommitAttempts = (browserWindow.__gitCommitAttempts ?? 0) + 1
+      if (gitCommitFailure) {
+        throw new Error(gitCommitFailure)
+      }
+
       const message = typeof args?.message === 'string' ? args.message : ''
       browserWindow.__gitCommitMessages?.push(message)
       dirtyPaths.clear()
@@ -84,7 +92,11 @@ function installAutoGitMocks() {
   browserWindow.__setMockAppActive = (active: boolean) => {
     appActive = active
   }
+  browserWindow.__setMockGitCommitFailure = (message: string | null) => {
+    gitCommitFailure = message
+  }
   browserWindow.__getDirtyPathCount = () => dirtyPaths.size
+  browserWindow.__gitCommitAttempts = 0
   browserWindow.__gitCommitMessages = []
   browserWindow.__gitPushCalls = 0
 
@@ -114,7 +126,9 @@ async function openAutoGitSettings(page: Page) {
   const settingsPanel = page.getByTestId('settings-panel')
   await expect(settingsPanel).toBeVisible({ timeout: 5_000 })
 
-  await page.getByRole('switch', { name: 'AutoGit' }).click()
+  const autoGitSwitch = settingsPanel.getByRole('switch', { name: 'AutoGit' })
+  await expect(autoGitSwitch).toBeEnabled({ timeout: 5_000 })
+  await autoGitSwitch.click({ force: true })
   await page.getByTestId('settings-autogit-idle-threshold').fill('2')
   await page.getByTestId('settings-autogit-inactive-threshold').fill('2')
   await page.getByTestId('settings-save').click()
@@ -130,6 +144,12 @@ async function expectDirtyPathCount(page: Page, expectedCount: number) {
 async function expectCommitMessageCount(page: Page, expectedCount: number) {
   await expect.poll(async () =>
     page.evaluate(() => (window as Window & { __gitCommitMessages?: string[] }).__gitCommitMessages?.length ?? 0),
+  ).toBe(expectedCount)
+}
+
+async function expectCommitAttemptCount(page: Page, expectedCount: number) {
+  await expect.poll(async () =>
+    page.evaluate(() => (window as Window & { __gitCommitAttempts?: number }).__gitCommitAttempts ?? 0),
   ).toBe(expectedCount)
 }
 
@@ -166,13 +186,21 @@ async function setMockAppActive(page: Page, active: boolean) {
   }, active)
 }
 
-async function triggerQuickCommit(page: Page) {
-  const commitButton = page.getByTestId('status-commit-push')
-  await commitButton.focus()
-  await page.keyboard.press('Enter')
+async function setMockGitCommitFailure(page: Page, message: string | null) {
+  await page.evaluate((failureMessage) => {
+    ;(window as Window & {
+      __setMockGitCommitFailure?: (message: string | null) => void
+    }).__setMockGitCommitFailure?.(failureMessage)
+  }, message)
 }
 
-test('@smoke AutoGit checkpoints on idle and inactive, and the bottom bar reuses the same message', async ({ page }) => {
+async function triggerQuickCommit(page: Page) {
+  const commitButton = page.getByTestId('status-commit-push')
+  await expect(commitButton).toBeEnabled({ timeout: 5_000 })
+  await commitButton.click()
+}
+
+test('@smoke AutoGit checkpoints on idle, and the bottom bar reuses the same message', async ({ page }) => {
   await page.addInitScript(installAutoGitMocks)
   await page.goto('/')
   await page.waitForLoadState('networkidle')
@@ -184,13 +212,42 @@ test('@smoke AutoGit checkpoints on idle and inactive, and the bottom bar reuses
   await expectCheckpoint(page, 1)
 
   await seedSavedChange(page)
-  await setMockAppActive(page, false)
+  await triggerQuickCommit(page)
   await expectCheckpoint(page, 2)
 
-  await setMockAppActive(page, true)
-  await seedSavedChange(page)
-  await triggerQuickCommit(page)
-  await expectCheckpoint(page, 3)
-
   await expect(page.locator('.fixed.bottom-8')).toContainText('Committed and pushed', { timeout: 5_000 })
+})
+
+test('AutoGit checkpoints when the app is inactive', async ({ page }) => {
+  await page.addInitScript(installAutoGitMocks)
+  await page.goto('/')
+  await page.waitForLoadState('networkidle')
+
+  await openAutoGitSettings(page)
+  await openFirstNote(page)
+  await setMockAppActive(page, false)
+
+  await seedSavedChange(page)
+  await expectCheckpoint(page, 1)
+})
+
+test('AutoGit does not retry a failed checkpoint until the next saved change', async ({ page }) => {
+  await page.addInitScript(installAutoGitMocks)
+  await page.goto('/')
+  await page.waitForLoadState('networkidle')
+
+  await openAutoGitSettings(page)
+  await openFirstNote(page)
+  await setMockGitCommitFailure(page, 'Author identity unknown')
+
+  await seedSavedChange(page)
+  await expectCommitAttemptCount(page, 1)
+  await expectDirtyPathCount(page, 1)
+  await expect(page.locator('.fixed.bottom-8')).toContainText('Set a Git author before AutoGit can commit', { timeout: 5_000 })
+
+  await page.waitForTimeout(3_500)
+  await expectCommitAttemptCount(page, 1)
+
+  await seedSavedChange(page)
+  await expectCommitAttemptCount(page, 2)
 })

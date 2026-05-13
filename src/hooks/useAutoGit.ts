@@ -125,7 +125,10 @@ export function useAutoGit({
 
     void onCheckpoint(trigger).then((didRun) => {
       if (didRun) markTriggerAsHandled(lastTriggeredRef.current, trigger, lastActivityAt)
-    }).catch((err) => console.warn('[git] Auto-commit failed:', err))
+    }).catch((err) => {
+      markTriggerAsHandled(lastTriggeredRef.current, trigger, lastActivityAt)
+      console.warn('[git] Auto-commit failed:', err)
+    })
   })
 
   const updateAppActivity = useEffectEvent((active: boolean) => {

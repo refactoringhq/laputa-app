@@ -2,6 +2,55 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAutoGit } from './useAutoGit'
 
+type AutoGitOptions = Parameters<typeof useAutoGit>[0]
+
+function defaultAutoGitOptions(onCheckpoint: AutoGitOptions['onCheckpoint']): AutoGitOptions {
+  return {
+    enabled: true,
+    idleThresholdSeconds: 1,
+    inactiveThresholdSeconds: 1,
+    isGitVault: true,
+    hasPendingChanges: true,
+    hasUnsavedChanges: false,
+    onCheckpoint,
+  }
+}
+
+function renderAutoGit(overrides: Partial<AutoGitOptions> = {}) {
+  const onCheckpoint = overrides.onCheckpoint ?? vi.fn().mockResolvedValue(true)
+  const hook = renderHook(() => useAutoGit({
+    ...defaultAutoGitOptions(onCheckpoint),
+    ...overrides,
+    onCheckpoint,
+  }))
+
+  return { onCheckpoint, ...hook }
+}
+
+async function advanceAutoGitBy(ms: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms)
+  })
+}
+
+async function expectSingleCheckpointPerActivityBurst(
+  onCheckpoint: AutoGitOptions['onCheckpoint'],
+  recordActivity: () => void,
+) {
+  await advanceAutoGitBy(1_000)
+  expect(onCheckpoint).toHaveBeenCalledTimes(1)
+
+  await advanceAutoGitBy(3_000)
+  expect(onCheckpoint).toHaveBeenCalledTimes(1)
+
+  act(() => {
+    recordActivity()
+  })
+
+  await advanceAutoGitBy(1_000)
+  expect(onCheckpoint).toHaveBeenCalledTimes(2)
+}
+
 describe('useAutoGit', () => {
   let hasFocus = true
 
@@ -17,39 +66,23 @@ describe('useAutoGit', () => {
   })
 
   it('triggers an idle checkpoint after the configured threshold', async () => {
-    const onCheckpoint = vi.fn().mockResolvedValue(true)
-    renderHook(() => useAutoGit({
-      enabled: true,
+    const { onCheckpoint } = renderAutoGit({
       idleThresholdSeconds: 3,
       inactiveThresholdSeconds: 2,
-      isGitVault: true,
-      hasPendingChanges: true,
-      hasUnsavedChanges: false,
-      onCheckpoint,
-    }))
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_999)
     })
+
+    await advanceAutoGitBy(2_999)
     expect(onCheckpoint).not.toHaveBeenCalled()
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1)
-    })
+    await advanceAutoGitBy(1)
     expect(onCheckpoint).toHaveBeenCalledWith('idle')
   })
 
   it('waits for the app to become inactive before triggering the inactive checkpoint', async () => {
-    const onCheckpoint = vi.fn().mockResolvedValue(true)
-    renderHook(() => useAutoGit({
-      enabled: true,
+    const { onCheckpoint } = renderAutoGit({
       idleThresholdSeconds: 10,
       inactiveThresholdSeconds: 2,
-      isGitVault: true,
-      hasPendingChanges: true,
-      hasUnsavedChanges: false,
-      onCheckpoint,
-    }))
+    })
 
     hasFocus = false
     await act(async () => {
@@ -61,53 +94,27 @@ describe('useAutoGit', () => {
   })
 
   it('does not trigger while the editor still has unsaved changes', async () => {
-    const onCheckpoint = vi.fn().mockResolvedValue(true)
-    renderHook(() => useAutoGit({
-      enabled: true,
-      idleThresholdSeconds: 1,
-      inactiveThresholdSeconds: 1,
-      isGitVault: true,
-      hasPendingChanges: true,
+    const { onCheckpoint } = renderAutoGit({
       hasUnsavedChanges: true,
-      onCheckpoint,
-    }))
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_000)
     })
+
+    await advanceAutoGitBy(2_000)
 
     expect(onCheckpoint).not.toHaveBeenCalled()
   })
 
   it('only triggers once per activity burst until activity is recorded again', async () => {
-    const onCheckpoint = vi.fn().mockResolvedValue(true)
-    const { result } = renderHook(() => useAutoGit({
-      enabled: true,
-      idleThresholdSeconds: 1,
-      inactiveThresholdSeconds: 1,
-      isGitVault: true,
-      hasPendingChanges: true,
-      hasUnsavedChanges: false,
+    const { onCheckpoint, result } = renderAutoGit()
+    await expectSingleCheckpointPerActivityBurst(onCheckpoint, result.current.recordActivity)
+  })
+
+  it('does not retry a rejected checkpoint for the same activity burst', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const onCheckpoint = vi.fn().mockRejectedValue(new Error('Author identity unknown'))
+    const { result } = renderAutoGit({
       onCheckpoint,
-    }))
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1_000)
     })
-    expect(onCheckpoint).toHaveBeenCalledTimes(1)
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000)
-    })
-    expect(onCheckpoint).toHaveBeenCalledTimes(1)
-
-    act(() => {
-      result.current.recordActivity()
-    })
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1_000)
-    })
-    expect(onCheckpoint).toHaveBeenCalledTimes(2)
+    await expectSingleCheckpointPerActivityBurst(onCheckpoint, result.current.recordActivity)
+    expect(warnSpy).toHaveBeenCalledWith('[git] Auto-commit failed:', expect.any(Error))
   })
 })

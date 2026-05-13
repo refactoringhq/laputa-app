@@ -151,6 +151,26 @@ describe('useCommitFlow', () => {
     expect(setToastMessage).toHaveBeenCalledWith('Committed and pushed')
   })
 
+  it('runAutomaticCheckpoint treats commit failures as handled after showing recovery feedback', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockInvokeFn.mockImplementation((command: string) => {
+      if (command === 'git_commit') return Promise.reject(new Error('Author identity unknown'))
+      throw new Error(`Unexpected command: ${command}`)
+    })
+    const { result } = renderCommitFlow()
+    let didHandleCheckpoint = false
+
+    await act(async () => {
+      didHandleCheckpoint = await result.current.runAutomaticCheckpoint()
+    })
+
+    expect(didHandleCheckpoint).toBe(true)
+    expect(setToastMessage).toHaveBeenCalledWith(
+      'Set a Git author before AutoGit can commit. Run git config --global user.name "Your Name" and git config --global user.email you@example.com.',
+    )
+    consoleSpy.mockRestore()
+  })
+
   it('runAutomaticCheckpoint commits and pushes all active repositories', async () => {
     const resolveRemoteStatusForVaultPath = vi.fn().mockResolvedValue({
       branch: 'main',
@@ -189,6 +209,37 @@ describe('useCommitFlow', () => {
     expect(resolveRemoteStatusForVaultPath).toHaveBeenCalledWith('/work')
     expect(loadModifiedFiles).toHaveBeenCalled()
     expect(setToastMessage).toHaveBeenCalledWith('AutoGit checkpointed 2 repositories')
+  })
+
+  it('runAutomaticCheckpoint treats multi-repository commit failures as handled', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const loadModifiedFilesForVaultPath = vi.fn((vaultPath: string) => Promise.resolve([{
+      path: `${vaultPath}/note.md`,
+      relativePath: 'note.md',
+      status: 'modified',
+    }]))
+    mockInvokeFn.mockImplementation((command: string) => {
+      if (command === 'git_commit') return Promise.reject(new Error('Please tell me who you are'))
+      throw new Error(`Unexpected command: ${command}`)
+    })
+
+    const { result } = renderCommitFlow({
+      automaticVaultPaths: ['/vault', '/work'],
+      loadModifiedFilesForVaultPath,
+    })
+    let didHandleCheckpoint = false
+
+    await act(async () => {
+      didHandleCheckpoint = await result.current.runAutomaticCheckpoint()
+    })
+
+    expect(didHandleCheckpoint).toBe(true)
+    expect(loadModifiedFilesForVaultPath).toHaveBeenCalledWith('/vault')
+    expect(loadModifiedFilesForVaultPath).toHaveBeenCalledWith('/work')
+    expect(setToastMessage).toHaveBeenCalledWith(
+      'Set a Git author before AutoGit can commit. Run git config --global user.name "Your Name" and git config --global user.email you@example.com.',
+    )
+    consoleSpy.mockRestore()
   })
 
   it('runAutomaticCheckpoint retries push-only when local commits are already ahead', async () => {

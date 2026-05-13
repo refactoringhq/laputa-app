@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { GitPushResult, GitRemoteStatus, ModifiedFile } from '../types'
 import { trackEvent } from '../lib/telemetry'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { generateAutomaticCommitMessage } from '../utils/automaticCommitMessage'
+import { createTranslator, type AppLocale } from '../lib/i18n'
 
 export type CommitMode = 'push' | 'local'
 
@@ -27,6 +28,7 @@ interface CommitFlowConfig {
   setToastMessage: (msg: string | null) => void
   onPushRejected?: () => void
   automaticVaultPaths?: string[]
+  locale?: AppLocale
   manualVaultPath?: string
   vaultPath: string
 }
@@ -80,6 +82,7 @@ type FinalizeCheckpointConfig = Pick<
   CommitFlowConfig,
   'loadModifiedFiles' | 'resolveRemoteStatusForVaultPath' | 'setToastMessage' | 'onPushRejected'
 >
+type Translator = ReturnType<typeof createTranslator>
 
 interface FinalizeCheckpointArgs extends FinalizeCheckpointConfig {
   result: CommitResult
@@ -132,8 +135,29 @@ function isPushRejected(result: CommitResult): boolean {
   return result.status === 'rejected'
 }
 
-function formatCommitError(error: unknown): string {
+function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+function isMissingGitAuthorIdentityError(message: string): boolean {
+  const normalized = message.toLowerCase()
+  return normalized.includes('author identity unknown')
+    || normalized.includes('please tell me who you are')
+    || normalized.includes('unable to auto-detect email address')
+    || (normalized.includes('user.email') && normalized.includes('not set'))
+    || (normalized.includes('user.name') && normalized.includes('not set'))
+}
+
+function formatCommitFailureToast(error: unknown, t: Translator): string {
+  const message = errorMessage(error)
+  if (isMissingGitAuthorIdentityError(message)) return t('git.toast.missingAuthor')
+  return t('git.toast.commitFailed', { error: message })
+}
+
+function formatAutoGitFailureToast(error: unknown, t: Translator): string {
+  const message = errorMessage(error)
+  if (isMissingGitAuthorIdentityError(message)) return t('git.toast.missingAuthor')
+  return t('git.toast.autoGitFailed', { error: message })
 }
 
 function shouldRetryPush(remoteStatus: GitRemoteStatus | null): boolean {
@@ -227,15 +251,15 @@ async function checkpointRepository(
   return { action, remoteStatus, result, status: 'executed', vaultPath }
 }
 
-function multiRepositoryCheckpointToast(results: RepositoryCheckpointResult[]): string {
+function multiRepositoryCheckpointToast(results: RepositoryCheckpointResult[], t: Translator): string {
   const executedCount = results.filter((result) => result.status === 'executed').length
   const failedCount = results.filter((result) => result.status === 'failed').length
   const rejectedCount = results.filter((result) => result.result && isPushRejected(result.result)).length
 
   if (executedCount === 0) {
     const firstError = results.find((result) => result.status === 'failed')?.error
-    return firstError
-      ? `AutoGit failed: ${formatCommitError(firstError)}`
+    return firstError !== undefined
+      ? formatAutoGitFailureToast(firstError, t)
       : 'Nothing to commit or push'
   }
 
@@ -331,6 +355,7 @@ async function checkpointRepositories(
 async function runMultipleRepositoryCheckpoint(
   targetVaultPaths: string[],
   config: AutomaticCheckpointRunConfig,
+  t: Translator,
 ): Promise<boolean> {
   const results = await checkpointRepositories(targetVaultPaths, config)
 
@@ -338,13 +363,13 @@ async function runMultipleRepositoryCheckpoint(
     config.onPushRejected?.()
   }
 
-  config.setToastMessage(multiRepositoryCheckpointToast(results))
+  config.setToastMessage(multiRepositoryCheckpointToast(results, t))
   await runCheckpointRefresh({
     loadModifiedFiles: config.loadModifiedFiles,
     resolveRemoteStatusForVaultPath: config.resolveRemoteStatusForVaultPath,
     vaultPaths: targetVaultPaths,
   })
-  return results.some((result) => result.status === 'executed')
+  return results.some((result) => result.status === 'executed' || result.status === 'failed')
 }
 
 function useAutomaticCheckpointAction({
@@ -357,8 +382,10 @@ function useAutomaticCheckpointAction({
   onPushRejected,
   automaticVaultPaths,
   vaultPath,
+  t,
 }: CommitFlowConfig & {
   checkpointInFlightRef: MutableRefObject<boolean>
+  t: Translator
 }) {
   return useCallback(async ({
     savePendingBeforeCommit = false,
@@ -380,13 +407,13 @@ function useAutomaticCheckpointAction({
         setToastMessage,
         vaultPath,
       }
-      return targetVaultPaths.length === 1
+      return await (targetVaultPaths.length === 1
         ? runSingleRepositoryCheckpoint(targetVaultPaths[0], runConfig)
-        : runMultipleRepositoryCheckpoint(targetVaultPaths, runConfig)
+        : runMultipleRepositoryCheckpoint(targetVaultPaths, runConfig, t))
     } catch (err) {
       console.error('Commit failed:', err)
-      setToastMessage(`Commit failed: ${formatCommitError(err)}`)
-      return false
+      setToastMessage(formatCommitFailureToast(err, t))
+      return true
     } finally {
       checkpointInFlightRef.current = false
     }
@@ -399,6 +426,7 @@ function useAutomaticCheckpointAction({
     resolveRemoteStatusForVaultPath,
     savePending,
     setToastMessage,
+    t,
     vaultPath,
   ])
 }
@@ -413,6 +441,7 @@ function useManualCommitPushAction({
   manualVaultPath,
   vaultPath,
   setShowCommitDialog,
+  t,
 }: Pick<
   CommitFlowConfig,
   | 'savePending'
@@ -425,6 +454,7 @@ function useManualCommitPushAction({
 > & {
   checkpointInFlightRef: MutableRefObject<boolean>
   setShowCommitDialog: (open: boolean) => void
+  t: Translator
 }) {
   return useCallback(async (message: string) => {
     setShowCommitDialog(false)
@@ -453,7 +483,7 @@ function useManualCommitPushAction({
       })
     } catch (err) {
       console.error('Commit failed:', err)
-      setToastMessage(`Commit failed: ${formatCommitError(err)}`)
+      setToastMessage(formatCommitFailureToast(err, t))
     } finally {
       checkpointInFlightRef.current = false
     }
@@ -466,6 +496,7 @@ function useManualCommitPushAction({
     savePending,
     setShowCommitDialog,
     setToastMessage,
+    t,
     vaultPath,
   ])
 }
@@ -553,7 +584,7 @@ function useOpenCommitDialog({
       setShowCommitDialog(true)
     } catch (err) {
       console.error('Commit dialog failed:', err)
-      setToastMessage(`Commit dialog failed: ${formatCommitError(err)}`)
+      setToastMessage(`Commit dialog failed: ${errorMessage(err)}`)
     } finally {
       dialogOpeningRef.current = false
       setDialogOpening(false)
@@ -582,6 +613,7 @@ export function useCommitFlow({
   setToastMessage,
   onPushRejected,
   automaticVaultPaths,
+  locale,
   manualVaultPath,
   vaultPath,
 }: CommitFlowConfig) {
@@ -591,6 +623,7 @@ export function useCommitFlow({
   const checkpointInFlightRef = useRef(false)
   const dialogOpeningRef = useRef(false)
   const commitModeVaultPathRef = useRef<string | null>(null)
+  const t = useMemo(() => createTranslator(locale), [locale])
 
   const openCommitDialog = useOpenCommitDialog({
     dialogOpeningRef,
@@ -616,6 +649,7 @@ export function useCommitFlow({
     onPushRejected,
     automaticVaultPaths,
     vaultPath,
+    t,
   })
 
   const handleCommitPush = useManualCommitPushAction({
@@ -628,6 +662,7 @@ export function useCommitFlow({
     manualVaultPath,
     vaultPath,
     setShowCommitDialog,
+    t,
   })
   useCommitModeRefresh({
     commitModeVaultPathRef,
