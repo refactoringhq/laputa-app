@@ -622,7 +622,7 @@ function App() {
   })
   useClipDeepLinkHandler({
     addEntry: vault.addEntry,
-    enabled: !noteWindowParams,
+    enabled: !noteWindowParams && vaultSwitcher.loaded,
     locale: appLocale,
     openTabWithContent,
     reloadVault: vault.reloadVault,

@@ -57,4 +57,68 @@ describe('registerClipDeepLinkImports', () => {
     expect(importUrl).not.toHaveBeenCalled()
     expect(dispose).toHaveBeenCalledOnce()
   })
+
+  it('imports stored launch URLs once across handler re-registrations', async () => {
+    const handledCurrentUrls = new Set<string>()
+    const importUrl = vi.fn().mockResolvedValue('imported')
+    const getCurrentUrls = vi.fn().mockResolvedValue([startupUrl])
+    const onOpenUrl = vi.fn().mockResolvedValue(vi.fn())
+
+    const firstCleanup = registerClipDeepLinkImports({
+      getCurrentUrls,
+      handledCurrentUrls,
+      importUrl,
+      onOpenUrl,
+      onRegistrationError: vi.fn(),
+    })
+    await flushPromises()
+    firstCleanup()
+
+    const secondCleanup = registerClipDeepLinkImports({
+      getCurrentUrls,
+      handledCurrentUrls,
+      importUrl,
+      onOpenUrl,
+      onRegistrationError: vi.fn(),
+    })
+    await flushPromises()
+    secondCleanup()
+
+    expect(getCurrentUrls).toHaveBeenCalledTimes(2)
+    expect(importUrl).toHaveBeenCalledTimes(1)
+    expect(importUrl).toHaveBeenCalledWith(startupUrl)
+  })
+
+  it('retries stored launch URLs after rejected imports', async () => {
+    const handledCurrentUrls = new Set<string>()
+    const importUrl = vi.fn()
+      .mockResolvedValueOnce('rejected')
+      .mockResolvedValueOnce('imported')
+    const getCurrentUrls = vi.fn().mockResolvedValue([startupUrl])
+    const onOpenUrl = vi.fn().mockResolvedValue(vi.fn())
+
+    const firstCleanup = registerClipDeepLinkImports({
+      getCurrentUrls,
+      handledCurrentUrls,
+      importUrl,
+      onOpenUrl,
+      onRegistrationError: vi.fn(),
+    })
+    await flushPromises()
+    firstCleanup()
+
+    const secondCleanup = registerClipDeepLinkImports({
+      getCurrentUrls,
+      handledCurrentUrls,
+      importUrl,
+      onOpenUrl,
+      onRegistrationError: vi.fn(),
+    })
+    await flushPromises()
+    secondCleanup()
+
+    expect(importUrl).toHaveBeenCalledTimes(2)
+    expect(importUrl).toHaveBeenNthCalledWith(1, startupUrl)
+    expect(importUrl).toHaveBeenNthCalledWith(2, startupUrl)
+  })
 })
