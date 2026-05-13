@@ -29,8 +29,9 @@ export interface ClipDeepLinkImportParams {
 function isVaultRelativePath(path: string): boolean {
   if (!path || path.startsWith('/') || path.startsWith('\\')) return false
   if (/^[A-Za-z]:[\\/]/.test(path)) return false
+  if (!path.toLowerCase().endsWith('.md')) return false
   const parts = path.split(/[\\/]+/)
-  return parts.every((part) => part.length > 0 && part !== '.' && part !== '..')
+  return parts.every((part) => part.length > 0 && part !== '.' && part !== '..' && !part.startsWith('.'))
 }
 
 const BODY_QUERY_PARAMS = ['body', 'content', 'html', 'markdown']

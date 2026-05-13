@@ -10,11 +10,14 @@ describe('parseClipDeepLink', () => {
     })
   })
 
-  it('rejects absolute and traversal paths from external URLs', () => {
+  it('rejects absolute, traversal, control-directory, and non-note paths from external URLs', () => {
     expect(parseClipDeepLink('tolaria://clip/new?v=1&clipboard=1&path=%2Ftmp%2Foutside.md')).toBeNull()
     expect(parseClipDeepLink('tolaria://clip/new?v=1&clipboard=1&path=C%3A%5CUsers%5Calex%5Coutside.md')).toBeNull()
     expect(parseClipDeepLink('tolaria://clip/new?v=1&clipboard=1&path=..%2Foutside.md')).toBeNull()
     expect(parseClipDeepLink('tolaria://clip/new?v=1&clipboard=1&path=Clippings%2F..%2Foutside.md')).toBeNull()
+    expect(parseClipDeepLink('tolaria://clip/new?v=1&clipboard=1&path=.git%2Findex.lock')).toBeNull()
+    expect(parseClipDeepLink('tolaria://clip/new?v=1&clipboard=1&path=Clippings%2F.hidden%2FExample.md')).toBeNull()
+    expect(parseClipDeepLink('tolaria://clip/new?v=1&clipboard=1&path=Clippings%2FExample.txt')).toBeNull()
   })
 
   it('rejects URLs that try to put note bodies in query params', () => {
