@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- module-level schema, not a component file */
 import {
+  createCodeBlockSpec,
   BlockNoteSchema,
   defaultInlineContentSpecs,
 } from '@blocknote/core'
@@ -11,7 +12,7 @@ import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/ma
 import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
 import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
 import type { VaultEntry } from '../types'
-import { createTolariaCodeBlockSpec } from './codeBlockOptions'
+import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { MermaidDiagram } from './MermaidDiagram'
 import { SafeHtmlSpan } from './SafeMarkup'
@@ -212,7 +213,7 @@ const TldrawBlock = createReactBlockSpec(
   },
 )
 
-const codeBlock = createTolariaCodeBlockSpec()
+const codeBlock = createCodeBlockSpec(createTolariaCodeBlockOptions())
 const mathBlock = MathBlock()
 const mermaidBlock = MermaidBlock()
 const tldrawBlock = TldrawBlock()

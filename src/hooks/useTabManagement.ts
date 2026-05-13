@@ -368,7 +368,12 @@ function handleEntryLoadFailure(options: {
     return
   }
 
-  setSingleTab(tabsRef, setTabs, { entry, content: '' })
+  resetFailedEntrySelection({
+    tabsRef,
+    activeTabPathRef,
+    setTabs,
+    setActiveTabPath,
+  })
   failNoteOpenTrace(entry.path, 'load-failed')
 }
 

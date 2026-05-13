@@ -94,6 +94,7 @@ export function useEditorSaveWithLinks(config: {
   setTabs: Parameters<typeof useEditorSave>[0]['setTabs']
   setToastMessage: (msg: string | null) => void
   onAfterSave: () => void
+  onBeforePersist?: (path: string) => void
   onNotePersisted?: (path: string, content: string) => void
   resolvePath?: (path: string) => string
   resolvePathBeforeSave?: (path: string) => Promise<string>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { isTauri } from '../mock-tauri'
+import { isPathInsideVaultRoot } from '../utils/vaultPathContainment'
 
 export const VAULT_CHANGED_EVENT = 'vault-changed'
 export const VAULT_WATCHER_DEBOUNCE_MS = 350
@@ -52,9 +53,7 @@ export function resolveChangedPath({ path, vaultPath }: ChangedPathOptions): Wat
 }
 
 function isSamePathOrChild({ path, parent }: PathContainmentOptions): boolean {
-  const normalizedPath = normalizeWatchPath(path)
-  const normalizedParent = normalizeWatchPath(parent)
-  return normalizedPath === normalizedParent || normalizedPath.startsWith(`${normalizedParent}/`)
+  return isPathInsideVaultRoot(normalizeWatchPath(path), normalizeWatchPath(parent))
 }
 
 function uniqueWatchRoots(paths: WatchPath[]): WatchPath[] {
@@ -103,7 +102,7 @@ function resolvePathForKnownRoots({
 
 function eventRootForPayload(vaultPath: WatchPath, roots: readonly WatchPath[]): WatchPath | null {
   const eventRoot = normalizeWatchPath(vaultPath)
-  return roots.find((root) => root === eventRoot) ?? null
+  return roots.some((root) => isSamePathOrChild({ path: eventRoot, parent: root })) ? eventRoot : null
 }
 
 function pruneRecentWrites(writes: Map<string, number>, now: number) {

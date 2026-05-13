@@ -707,6 +707,7 @@ function useEditorPersistence({
     setTabs,
     setToastMessage,
     onAfterSave,
+    onBeforePersist: onInternalVaultWrite,
     onNotePersisted,
     resolvePath: resolveCurrentPath,
     resolvePathBeforeSave,

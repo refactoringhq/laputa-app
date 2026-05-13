@@ -140,7 +140,7 @@ export const createRichEditorTransformErrorRecoveryExtension = createExtension((
     const view = editor._tiptapEditor?.view ?? editor.prosemirrorView
     if (!view || typeof view.dispatch !== 'function') return
 
-    const uninstall = installRichEditorTransformErrorRecovery(view)
+    const uninstall = installRichEditorTransformErrorRecovery(view as unknown as RichEditorDispatchView)
     signal.addEventListener('abort', uninstall, { once: true })
   },
 } as const))

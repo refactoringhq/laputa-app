@@ -51,6 +51,27 @@ async function selectNote(result: HookState, overrides: Partial<VaultEntry>) {
   })
 }
 
+async function selectNoteWithTimers(result: HookState, overrides: Partial<VaultEntry>, advanceMs: number) {
+  let openPromise!: Promise<void>
+  act(() => {
+    openPromise = result.current.handleSelectNote(makeEntry(overrides))
+  })
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(advanceMs)
+    await openPromise
+  })
+}
+
+async function withFakeTimers(run: () => Promise<void>) {
+  vi.useFakeTimers()
+  try {
+    await run()
+  } finally {
+    vi.useRealTimers()
+  }
+}
+
 async function replaceActiveNote(result: HookState, overrides: Partial<VaultEntry>) {
   await act(async () => {
     await result.current.handleReplaceActiveTab(makeEntry(overrides))
@@ -239,16 +260,43 @@ describe('useTabManagement (single-note model)', () => {
       expect(dirtyResult.current.tabs[0].content).toBe('# Local draft')
     })
 
-    it('handles load content failure gracefully', async () => {
-      vi.mocked(mockInvoke).mockRejectedValueOnce(new Error('fail'))
+    it('retries transient note content load failures before opening the note', async () => {
+      vi.mocked(mockInvoke)
+        .mockRejectedValueOnce(new Error('transient IPC failure'))
+        .mockResolvedValueOnce('# Recovered content')
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      const { result } = renderHook(() => useTabManagement())
-      await selectNote(result, {})
+      try {
+        await withFakeTimers(async () => {
+          const { result } = renderHook(() => useTabManagement())
+          await selectNoteWithTimers(result, { path: '/vault/note/recovered.md' }, 120)
 
-      expect(result.current.tabs).toHaveLength(1)
-      expect(result.current.tabs[0].content).toBe('')
-      warnSpy.mockRestore()
+          expect(result.current.tabs).toHaveLength(1)
+          expect(result.current.tabs[0].content).toBe('# Recovered content')
+          expect(vi.mocked(mockInvoke)).toHaveBeenCalledTimes(2)
+          expect(warnSpy).not.toHaveBeenCalled()
+        })
+      } finally {
+        warnSpy.mockRestore()
+      }
+    })
+
+    it('does not display a note as empty when content loading fails', async () => {
+      vi.mocked(mockInvoke).mockRejectedValue(new Error('transient IPC failure'))
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      try {
+        await withFakeTimers(async () => {
+          const { result } = renderHook(() => useTabManagement())
+          await selectNoteWithTimers(result, { path: '/vault/note/failing.md' }, 1_240)
+
+          expect(result.current.tabs).toEqual([])
+          expect(result.current.activeTabPath).toBeNull()
+          expect(warnSpy).toHaveBeenCalledWith('Failed to load note content:', expect.any(Error))
+        })
+      } finally {
+        warnSpy.mockRestore()
+      }
     })
 
     it('clears the active note when the file is missing on disk', async () => {

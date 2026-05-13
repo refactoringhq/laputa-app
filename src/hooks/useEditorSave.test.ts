@@ -67,6 +67,29 @@ describe('useEditorSave', () => {
     expect(setToastMessage).toHaveBeenCalledWith('Nothing to save')
   })
 
+  it('calls onBeforePersist before writing content to disk', async () => {
+    const calls: string[] = []
+    const onBeforePersist = vi.fn((path: string) => calls.push(`before:${path}`))
+    mockInvokeFn.mockImplementationOnce(async () => {
+      calls.push('write')
+      return null
+    })
+    const { result } = renderHook(() =>
+      useEditorSave({ updateVaultContent, setTabs, setToastMessage, onBeforePersist })
+    )
+
+    act(() => {
+      result.current.handleContentChange('/test/note.md', 'content')
+    })
+
+    await act(async () => {
+      await result.current.handleSave()
+    })
+
+    expect(onBeforePersist).toHaveBeenCalledWith('/test/note.md')
+    expect(calls).toEqual(['before:/test/note.md', 'write'])
+  })
+
   it('handleSave shows error toast on failure', async () => {
     mockInvokeFn.mockRejectedValueOnce(new Error('Disk full'))
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})

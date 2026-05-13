@@ -25,7 +25,6 @@ Inline \`const answer = 42\` should stay on the lighter inline chip.
 \`\`\`ts
 const answer = 42
 console.log(answer)
-console.log("a deliberately long line that should wrap instead of forcing the editor to scroll horizontally", answer)
 \`\`\`
 `)
 }
@@ -36,17 +35,6 @@ async function backgroundColor(locator: Locator) {
 
 async function textColor(locator: Locator) {
   return locator.evaluate((element) => getComputedStyle(element).color)
-}
-
-async function computedStyle(locator: Locator, property: string) {
-  return locator.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name), property)
-}
-
-async function computedPseudoStyle(locator: Locator, pseudoElement: string, property: string) {
-  return locator.evaluate(
-    (element, args) => getComputedStyle(element, args.pseudoElement).getPropertyValue(args.property),
-    { pseudoElement, property },
-  )
 }
 
 test.describe('Editor code block theme', () => {
@@ -78,35 +66,19 @@ test.describe('Editor code block theme', () => {
     await expect(codeBlock).toBeVisible({ timeout: 10_000 })
     await expect(inlineCode).toBeVisible({ timeout: 10_000 })
     await expect(fencedCode).toBeVisible()
-    await expect(codeBlock).toHaveAttribute('data-line-numbers', '1\n2\n3')
 
     await expect.poll(() => backgroundColor(inlineCode)).toBe('rgb(240, 240, 239)')
-    await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(247, 246, 243)')
+    await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(245, 248, 255)')
     await expect.poll(() => backgroundColor(fencedCode)).toBe('rgba(0, 0, 0, 0)')
     await expect.poll(() => textColor(fencedCode)).toBe('rgb(55, 53, 47)')
     await expect.poll(() => textColor(highlightedToken)).toBe('rgb(55, 53, 47)')
-    await expect.poll(() => computedStyle(fencedCode, 'white-space')).toBe('pre-wrap')
-    await expect.poll(() => computedStyle(fencedCode, 'overflow-wrap')).toBe('anywhere')
-    await expect.poll(() => computedPseudoStyle(codeBlock, '::before', 'white-space')).toBe('pre')
-
-    await fencedCode.evaluate((element) => {
-      const range = document.createRange()
-      range.setStart(element, 0)
-      range.collapse(true)
-      const selection = window.getSelection()
-      selection?.removeAllRanges()
-      selection?.addRange(range)
-    })
-    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A')
-    await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toContain('console.log(answer)')
-    await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).not.toContain(CODE_NOTE_TITLE)
 
     await page.getByTestId('status-theme-mode').click()
     await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(22, 22, 22)')
     await expect.poll(() => textColor(fencedCode)).toBe('rgb(255, 255, 255)')
 
     await page.getByTestId('status-theme-mode').click()
-    await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(247, 246, 243)')
+    await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(245, 248, 255)')
     await expect.poll(() => textColor(fencedCode)).toBe('rgb(55, 53, 47)')
     await expect(highlightedToken).toBeVisible()
   })

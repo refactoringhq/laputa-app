@@ -41,7 +41,6 @@ function installLookbehindMissingRegExp() {
 }
 
 afterEach(() => {
-  document.body.innerHTML = ''
   document.documentElement.classList.remove('dark')
   delete document.documentElement.dataset.theme
   restoreRegExpConstructor()
@@ -49,42 +48,6 @@ afterEach(() => {
 })
 
 describe('editor schema code block highlighting', () => {
-  it('renders one line number per code block source line', async () => {
-    vi.resetModules()
-
-    const { createTolariaCodeBlockSpec } = await import('./codeBlockOptions')
-    const codeBlockSpec = createTolariaCodeBlockSpec()
-    type Render = typeof codeBlockSpec.implementation.render
-    type CodeBlock = Parameters<Render>[0]
-    type CodeBlockEditor = Parameters<Render>[1]
-    type RenderContext = ThisParameterType<Render>
-
-    const block = {
-      id: 'code-block-1',
-      type: 'codeBlock',
-      props: { language: 'text' },
-      content: [{ type: 'text', text: 'const a = 1\nconsole.log(a)' }],
-      children: [],
-    } as CodeBlock
-    const editor = {
-      isEditable: true,
-      getBlock: () => block,
-      updateBlock: () => {},
-    } as CodeBlockEditor
-    const rendered = codeBlockSpec.implementation.render.call(
-      { blockContentDOMAttributes: {}, props: undefined, renderType: 'dom' } as RenderContext,
-      block,
-      editor,
-    )
-    const host = document.createElement('div')
-    host.append(rendered.dom)
-    document.body.append(host)
-
-    expect(host.querySelector('[data-content-type="codeBlock"]')?.getAttribute('data-line-numbers')).toBe('1\n2')
-
-    rendered.destroy?.()
-  })
-
   it('uses the light Shiki theme first in light mode', async () => {
     vi.resetModules()
     document.documentElement.classList.remove('dark')

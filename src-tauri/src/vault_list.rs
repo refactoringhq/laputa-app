@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+use crate::commands::expand_tilde;
+
 const APP_CONFIG_DIR: &str = "com.tolaria.app";
 const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
 
@@ -79,8 +81,26 @@ fn save_at(path: &PathBuf, list: &VaultList) -> Result<(), String> {
     fs::write(path, json).map_err(|e| format!("Failed to write vault list: {}", e))
 }
 
+fn expand_optional_tilde_path(path: Option<String>) -> Option<String> {
+    path.map(|value| expand_tilde(&value).into_owned())
+}
+
+fn expand_vault_list_paths(mut list: VaultList) -> VaultList {
+    for vault in &mut list.vaults {
+        vault.path = expand_tilde(&vault.path).into_owned();
+    }
+    list.active_vault = expand_optional_tilde_path(list.active_vault);
+    list.default_workspace_path = expand_optional_tilde_path(list.default_workspace_path);
+    list.hidden_defaults = list
+        .hidden_defaults
+        .into_iter()
+        .map(|path| expand_tilde(&path).into_owned())
+        .collect();
+    list
+}
+
 pub fn load_vault_list() -> Result<VaultList, String> {
-    load_at(&vault_list_path()?)
+    load_at(&vault_list_path()?).map(expand_vault_list_paths)
 }
 
 pub fn save_vault_list(list: &VaultList) -> Result<(), String> {
@@ -240,6 +260,33 @@ mod tests {
         assert_eq!(loaded.vaults[0].color.as_deref(), Some("green"));
         assert_eq!(loaded.vaults[0].icon.as_deref(), Some("briefcase"));
         assert_eq!(loaded.vaults[0].mounted, Some(false));
+    }
+
+    #[test]
+    fn loaded_vault_list_expands_tilde_paths() {
+        let home = dirs::home_dir().unwrap();
+        let expected_vault = home.join("Workspace/refactoring-vault");
+        let expected_hidden = home.join("Workspace/tolaria/demo-vault-v2");
+        let list = VaultList {
+            vaults: vec![VaultEntry {
+                label: "Refactoring".to_string(),
+                path: "~/Workspace/refactoring-vault".to_string(),
+                ..Default::default()
+            }],
+            active_vault: Some("~/Workspace/refactoring-vault".to_string()),
+            default_workspace_path: Some("~/Workspace/refactoring-vault".to_string()),
+            hidden_defaults: vec!["~/Workspace/tolaria/demo-vault-v2".to_string()],
+        };
+
+        let loaded = expand_vault_list_paths(list);
+
+        assert_eq!(loaded.vaults[0].path, expected_vault.to_string_lossy());
+        assert_eq!(loaded.active_vault.as_deref(), expected_vault.to_str());
+        assert_eq!(
+            loaded.default_workspace_path.as_deref(),
+            expected_vault.to_str()
+        );
+        assert_eq!(loaded.hidden_defaults[0], expected_hidden.to_string_lossy());
     }
 
     #[test]

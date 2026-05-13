@@ -218,8 +218,8 @@ mod tests {
         assert_save_view_cmd_rejects_invalid_filename("con.yml");
     }
 
-    #[test]
-    fn test_reload_vault_invalidates_cache_and_rescans() {
+    #[tokio::test]
+    async fn test_reload_vault_invalidates_cache_and_rescans() {
         let dir = tempfile::TempDir::new().unwrap();
         let vault_path = dir.path();
         std::process::Command::new("git")
@@ -260,7 +260,7 @@ mod tests {
             .output()
             .unwrap();
 
-        let entries = list_vault(vault_path.into()).unwrap();
+        let entries = list_vault(vault_path.into()).await.unwrap();
         assert!(!entries[0].archived);
 
         std::fs::write(

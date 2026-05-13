@@ -96,6 +96,7 @@ interface StatusBarProps {
   onCheckForUpdates?: () => void
   onRemoveVault?: (path: string) => void
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
+  aiFeaturesEnabled?: boolean
   mcpStatus?: McpStatus
   onInstallMcp?: () => void
   aiAgentsStatus?: AiAgentsStatus
@@ -148,6 +149,7 @@ function StatusBarPrimaryFromFooter({
   onCheckForUpdates,
   onRemoveVault,
   onUpdateWorkspaceIdentity,
+  aiFeaturesEnabled = true,
   mcpStatus,
   onInstallMcp,
   aiAgentsStatus,
@@ -197,7 +199,7 @@ function StatusBarPrimaryFromFooter({
       onCheckForUpdates={onCheckForUpdates}
       onRemoveVault={onRemoveVault}
       onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
-      mcpStatus={mcpStatus}
+      mcpStatus={aiFeaturesEnabled ? mcpStatus : undefined}
       onInstallMcp={onInstallMcp}
       aiAgentsStatus={aiAgentsStatus}
       vaultAiGuidanceStatus={vaultAiGuidanceStatus}

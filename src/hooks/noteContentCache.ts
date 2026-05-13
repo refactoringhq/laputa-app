@@ -45,6 +45,7 @@ export const NOTE_CONTENT_ENTRY_MAX_BYTES = 2 * 1024 * 1024
 export const NOTE_CONTENT_CACHE_MAX_BYTES = 24 * 1024 * 1024
 export const NOTE_CONTENT_PREFETCH_CONCURRENCY = 4
 const NOTE_CONTENT_REQUEST_CANCELED = 'Note content request canceled'
+const NOTE_CONTENT_LOAD_RETRY_DELAYS_MS = [120, 320, 800] as const
 
 let activePrefetchRequests = 0
 
@@ -171,6 +172,36 @@ function runGetNoteContentCommand(path: string, vaultPath?: string): Promise<str
     : mockInvoke<string>('get_note_content', commandPayload)
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isMissingNoteContentError(error: unknown): boolean {
+  return /does not exist|not found|enoent/i.test(errorMessage(error))
+}
+
+function isRetryableNoteContentLoadError(error: unknown): boolean {
+  return !isNoActiveVaultSelectedError(error)
+    && !isMissingNoteContentError(error)
+    && !isUnreadableNoteContentError(error)
+}
+
+async function runGetNoteContentCommandWithRetry(path: string, vaultPath?: string): Promise<string> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= NOTE_CONTENT_LOAD_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return await runGetNoteContentCommand(path, vaultPath)
+    } catch (error) {
+      lastError = error
+      if (!isRetryableNoteContentLoadError(error) || attempt === NOTE_CONTENT_LOAD_RETRY_DELAYS_MS.length) {
+        throw error
+      }
+      await delay(NOTE_CONTENT_LOAD_RETRY_DELAYS_MS[attempt])
+    }
+  }
+  throw lastError
+}
+
 function getValidateNoteContentCommandPayload(path: string, content: string, vaultPath?: string): { path: string; content: string; vaultPath?: string } {
   return { ...getNoteContentCommandPayload(path, vaultPath), content }
 }
@@ -214,7 +245,7 @@ function createNoteContentRequest(target: string | VaultEntry): NoteContentCache
       if (started || settled) return
       started = true
       cacheEntry.requestState = 'running'
-      runGetNoteContentCommand(path, vaultPath)
+      runGetNoteContentCommandWithRetry(path, vaultPath)
         .then((content) => {
           settled = true
           markRequestSettled(cacheEntry, 'settled')

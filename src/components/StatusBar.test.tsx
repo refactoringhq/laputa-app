@@ -656,6 +656,13 @@ describe('StatusBar', () => {
     expect(screen.queryByTestId('status-mcp')).not.toBeInTheDocument()
   })
 
+  it('hides MCP badge when AI features are disabled', () => {
+    render(
+      <StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} aiFeaturesEnabled={false} mcpStatus="not_installed" />
+    )
+    expect(screen.queryByTestId('status-mcp')).not.toBeInTheDocument()
+  })
+
   it('calls onInstallMcp when clicking MCP badge with not_installed status', () => {
     const onInstallMcp = vi.fn()
     render(

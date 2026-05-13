@@ -1,7 +1,6 @@
 import { codeBlockOptions } from '@blocknote/code-block'
-import { createCodeBlockSpec, type CodeBlockOptions } from '@blocknote/core'
+import type { CodeBlockOptions } from '@blocknote/core'
 import { supportsModernRegexFeatures } from '../utils/regexCapabilities'
-import { lineNumbersForText } from '../utils/codeBlockEnhancements'
 
 const LIGHT_CODE_THEME = 'github-light'
 const DARK_CODE_THEME = 'github-dark'
@@ -40,53 +39,4 @@ export function createTolariaCodeBlockOptions(): Partial<CodeBlockOptions> {
 
   delete options.createHighlighter
   return options
-}
-
-interface InlineTextItem {
-  text?: unknown
-}
-
-interface CodeBlockRenderContext {
-  blockContentDOMAttributes?: Record<string, string>
-  props?: unknown
-  renderType?: unknown
-}
-
-function textFromInlineContent(content: unknown): string {
-  if (!Array.isArray(content)) return ''
-
-  return content
-    .map((item: InlineTextItem) => typeof item.text === 'string' ? item.text : '')
-    .join('')
-}
-
-export function createTolariaCodeBlockSpec() {
-  const spec = createCodeBlockSpec(createTolariaCodeBlockOptions())
-  if (!spec.implementation?.render) return spec
-
-  const baseRender = spec.implementation.render
-  const render: typeof baseRender = function (this: ThisParameterType<typeof baseRender>, block, editor) {
-    const context = this as CodeBlockRenderContext
-    const blockContentDOMAttributes = {
-      ...context.blockContentDOMAttributes,
-      'data-line-numbers': lineNumbersForText(textFromInlineContent(block.content)),
-    }
-
-    return baseRender.call(
-      {
-        ...context,
-        blockContentDOMAttributes,
-      } as ThisParameterType<typeof baseRender>,
-      block,
-      editor,
-    )
-  }
-
-  return {
-    ...spec,
-    implementation: {
-      ...spec.implementation,
-      render,
-    },
-  }
 }

@@ -488,10 +488,6 @@
   background-color: var(--editor-code-block-background) !important;
   border: 1px solid var(--editor-code-block-border);
   color: var(--editor-code-block-text) !important;
-  column-gap: 12px;
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  overflow-x: hidden;
   position: relative;
 }
 
@@ -514,34 +510,8 @@
   color: var(--editor-code-block-text);
 }
 
-.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"]::before {
-  border-right: 1px solid color-mix(in srgb, var(--editor-code-block-language) 28%, transparent);
-  color: var(--editor-code-block-language);
-  content: attr(data-line-numbers);
-  font: inherit;
-  grid-column: 1;
-  grid-row: 2;
-  line-height: inherit;
-  min-width: 2ch;
-  padding-right: 10px;
-  pointer-events: none;
-  text-align: right;
-  user-select: none;
-  white-space: pre;
-}
-
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > pre {
   color: inherit;
-  grid-column: 2;
-  grid-row: 2;
-  min-width: 0;
-  overflow-x: hidden;
-  white-space: pre-wrap;
-}
-
-.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > div {
-  grid-column: 1 / -1;
-  grid-row: 1;
 }
 
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > div > select {
@@ -555,21 +525,13 @@
 
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] pre code {
   background-color: transparent;
-  border-radius: 0;
   color: inherit;
-  display: block;
-  grid-column: 2;
-  min-width: 0;
-  overflow-wrap: anywhere;
   padding: 0;
-  white-space: pre-wrap;
+  border-radius: 0;
 }
 
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] pre code .shiki {
   background-color: transparent !important;
-  color: inherit !important;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap !important;
 }
 
 /* --- Blockquote --- */

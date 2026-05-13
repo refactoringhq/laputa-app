@@ -270,8 +270,12 @@ pub fn copy_image_to_vault(
 }
 
 #[tauri::command]
-pub fn list_vault(path: PathBuf) -> Result<Vec<VaultEntry>, String> {
-    with_expanded_vault_root(path.as_path(), scan_visible_vault_entries)
+pub async fn list_vault(path: PathBuf) -> Result<Vec<VaultEntry>, String> {
+    tokio::task::spawn_blocking(move || {
+        with_expanded_vault_root(path.as_path(), scan_visible_vault_entries)
+    })
+    .await
+    .map_err(|e| format!("Task panicked: {e}"))?
 }
 
 #[tauri::command]
@@ -371,7 +375,7 @@ mod tests {
         );
         fs::write(dir.path().join("Projects/project.md"), "# Project\n").unwrap();
 
-        let entries = list_vault(root.clone()).unwrap();
+        let entries = list_vault(root.clone()).await.unwrap();
         assert!(entries.iter().any(|entry| entry.filename == "root.md"));
         assert!(entries.iter().any(|entry| entry.filename == "project.md"));
 
