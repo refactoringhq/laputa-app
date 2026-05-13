@@ -226,6 +226,28 @@ test('embedded tldraw dialogs appear and release focus when closed', async ({ pa
   await expectNoEditorNodeSelection(page)
 })
 
+test('embedded tldraw insert embed dialog opens without crashing the note', async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+
+  const whiteboard = page.locator('.tldraw-whiteboard')
+  await expect(whiteboard).toBeVisible({ timeout: 20_000 })
+
+  await page.getByTestId('main-menu.button').click()
+  await page.getByTestId('main-menu.insert-embed').click()
+
+  const embedDialog = page.locator('.tldraw-whiteboard .tlui-dialog__content')
+  await expect(embedDialog).toBeVisible({ timeout: 5_000 })
+  await expect(embedDialog).toContainText('Insert embed')
+  await expect(page.locator('.error-boundary')).toHaveCount(0)
+
+  const dialogBox = await embedDialog.boundingBox()
+  const boardBox = await whiteboard.boundingBox()
+  expect(dialogBox).not.toBeNull()
+  expect(boardBox).not.toBeNull()
+  expect(dialogBox!.x).toBeGreaterThanOrEqual(boardBox!.x)
+  expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(boardBox!.x + boardBox!.width)
+})
+
 test(TAURI_CONTEXT_MENU_TEST, async ({ page }) => {
   await openNote(page, 'Whiteboard Embed')
 
