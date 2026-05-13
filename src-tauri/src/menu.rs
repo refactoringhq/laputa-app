@@ -2,6 +2,7 @@
 use crate::window_state::MAIN_WINDOW_LABEL;
 use serde::{Deserialize, Deserializer};
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, HashSet},
     error::Error,
     sync::OnceLock,
@@ -253,6 +254,14 @@ fn native_window_menu_submenu_id(target_os: &str) -> Option<&'static str> {
     }
 }
 
+fn native_menu_label(label: &str) -> Cow<'_, str> {
+    if label.contains('&') {
+        Cow::Owned(label.replace('&', "&&"))
+    } else {
+        Cow::Borrowed(label)
+    }
+}
+
 fn build_manifest_menu_item(
     app: &App,
     item: &ManifestMenuItem,
@@ -263,8 +272,11 @@ fn build_manifest_menu_item(
     let Some(label) = item.label(std::env::consts::OS) else {
         return Ok(None);
     };
+    let label = native_menu_label(label);
 
-    let mut builder = MenuItemBuilder::new(label).id(id).enabled(item.enabled());
+    let mut builder = MenuItemBuilder::new(label.as_ref())
+        .id(id)
+        .enabled(item.enabled());
     if let Some(accelerator) = item.accelerator(manifest()) {
         builder = builder.accelerator(accelerator);
     }
@@ -640,5 +652,29 @@ mod tests {
         );
         assert_eq!(native_window_menu_submenu_id("windows"), None);
         assert_eq!(native_window_menu_submenu_id("linux"), None);
+    }
+
+    #[test]
+    fn native_menu_labels_escape_literal_ampersands() {
+        assert_eq!(native_menu_label("Commit & Push"), "Commit && Push");
+        assert_eq!(
+            native_menu_label("Research && Development"),
+            "Research &&&& Development"
+        );
+    }
+
+    #[test]
+    fn native_menu_labels_without_ampersands_are_unchanged() {
+        assert_eq!(native_menu_label("Pull from Remote"), "Pull from Remote");
+    }
+
+    #[test]
+    fn vault_commit_push_menu_label_is_native_menu_safe() {
+        let item = menu_item_by_id("vault-commit-push");
+        let label = item.label("windows").expect("commit push label exists");
+
+        assert_eq!(label, "Commit & Push");
+        assert_eq!(native_menu_label(label), "Commit && Push");
+        assert_eq!(item.accelerator(manifest()), None);
     }
 }
