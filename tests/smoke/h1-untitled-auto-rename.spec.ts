@@ -172,6 +172,23 @@ async function expectTitleHeadingText(page: Page, title: string): Promise<void> 
   })
 }
 
+async function clickEditorChromeBelowLastBlock(page: Page): Promise<void> {
+  const point = await page.evaluate(() => {
+    const container = document.querySelector('.editor__blocknote-container')?.getBoundingClientRect()
+    const blocks = Array.from(document.querySelectorAll('.bn-block-outer'))
+    const lastBlock = blocks.at(-1)?.getBoundingClientRect()
+    if (!container || !lastBlock) return null
+
+    return {
+      x: Math.min(container.right - 24, Math.max(container.left + 24, lastBlock.left + 40)),
+      y: Math.min(container.bottom - 24, lastBlock.bottom + 18),
+    }
+  })
+
+  expect(point).not.toBeNull()
+  await page.mouse.click(point!.x, point!.y)
+}
+
 let tempVaultDir: string
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -361,6 +378,42 @@ test('@smoke new-note H1 auto-rename preserves body typing and cursor while rena
   })
   await expectEditorFocused(page)
   await expect(errors).toEqual([])
+})
+
+test('@smoke fresh-note Enter stays stable after autosave and editor chrome clicks', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (err) => {
+    errors.push(err.message)
+  })
+  const title = 'Enter Selection Guard'
+  const filename = 'enter-selection-guard.md'
+  const firstLine = 'First paragraph before chrome clicks.'
+  const secondLine = 'Second paragraph after editor chrome click.'
+  const thirdLine = 'Third paragraph after another chrome click.'
+
+  await createUntitledNote(page)
+  await page.keyboard.type(title, { delay: 35 })
+  await page.keyboard.press('Enter')
+  await page.keyboard.type(firstLine, { delay: 35 })
+
+  await expectActiveFilename(page, 'enter-selection-guard')
+  await expectRenamedFile({ vaultPath: tempVaultDir, filename })
+  await page.waitForTimeout(900)
+
+  await clickEditorChromeBelowLastBlock(page)
+  await page.keyboard.press('Enter')
+  await page.keyboard.type(secondLine, { delay: 35 })
+
+  await clickEditorChromeBelowLastBlock(page)
+  await page.keyboard.press('Enter')
+  await page.keyboard.type(thirdLine, { delay: 35 })
+
+  await expect(page.locator('.error-boundary')).toHaveCount(0)
+  await expectEditorFocused(page)
+  expect(errors).toEqual([])
+  await expectFileContentContains({ vaultPath: tempVaultDir, filename, text: firstLine })
+  await expectFileContentContains({ vaultPath: tempVaultDir, filename, text: secondLine })
+  await expectFileContentContains({ vaultPath: tempVaultDir, filename, text: thirdLine })
 })
 
 test('@smoke new-note H1 auto-rename does not recreate the untitled file when a buffered save lands after rename', async ({ page }) => {
