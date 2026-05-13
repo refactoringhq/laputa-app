@@ -219,6 +219,9 @@ mod tests {
     use super::*;
     use std::ffi::OsStr;
     use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    static PI_AGENT_ENV_LOCK: Mutex<()> = Mutex::new(());
 
     struct EnvGuard {
         key: &'static str,
@@ -270,7 +273,10 @@ mod tests {
 
     #[test]
     fn command_sets_vault_cwd_closed_stdin_and_config_dir() {
+        let _env_lock = PI_AGENT_ENV_LOCK.lock().unwrap();
+        let source_agent_dir = tempfile::tempdir().unwrap();
         let agent_dir = tempfile::tempdir().unwrap();
+        let _guard = EnvGuard::set("PI_CODING_AGENT_DIR", source_agent_dir.path());
         let command = build_command(&PathBuf::from("pi"), &request(), agent_dir.path()).unwrap();
         let actual_args: Vec<&OsStr> = command.get_args().collect();
         let config_dir = command
@@ -301,6 +307,7 @@ mod tests {
 
     #[test]
     fn command_seeds_temp_agent_dir_from_existing_pi_config() {
+        let _env_lock = PI_AGENT_ENV_LOCK.lock().unwrap();
         let source_agent_dir = tempfile::tempdir().unwrap();
         let agent_dir = tempfile::tempdir().unwrap();
         write_existing_pi_config(source_agent_dir.path());
