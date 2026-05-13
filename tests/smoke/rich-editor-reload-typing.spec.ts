@@ -32,6 +32,7 @@ function isEditorTypingCrash(message: string): boolean {
     message.includes('beforeinput') ||
     message.includes('Block with ID') ||
     message.includes('stale editor view') ||
+    message.includes('Maximum update depth') ||
     message.includes('Cannot read properties') ||
     message.includes('undefined is not an object') ||
     message.includes('RangeError') ||
@@ -52,10 +53,38 @@ function trackEditorTypingCrashes(page: Page): string[] {
   return messages
 }
 
+function slugifyTitle(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+}
+
 async function openNote(page: Page, title: string): Promise<void> {
   const noteList = page.getByTestId('note-list-container')
   await noteList.getByText(title, { exact: true }).click()
   await expect(page.locator('.bn-editor h1').first()).toHaveText(title, { timeout: 5_000 })
+}
+
+async function createUntitledNote(page: Page): Promise<void> {
+  await page.locator('body').click()
+  await triggerMenuCommand(page, 'file-new-note')
+  await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(/untitled-note-\d+(?:-\d+)?/i, {
+    timeout: 5_000,
+  })
+  const titleBlock = page.locator('.bn-block-content[data-content-type="heading"]').first()
+  await expect(titleBlock).toBeVisible({ timeout: 5_000 })
+  await titleBlock.click()
+  await expectEditorFocused(page)
+}
+
+async function expectActiveFilename(page: Page, filenameStem: string): Promise<void> {
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(filenameStem, { timeout: 10_000 })
+}
+
+async function expectEditorFocused(page: Page): Promise<void> {
+  await expect.poll(async () => page.evaluate(() => {
+    const active = document.activeElement as HTMLElement | null
+    return Boolean(active?.isContentEditable || active?.closest('[contenteditable="true"]'))
+  }), { timeout: 5_000 }).toBe(true)
 }
 
 async function placeCaretAtEndOfBlock(page: Page, blockIndex: number): Promise<void> {
@@ -222,6 +251,22 @@ async function reloadVault(page: Page): Promise<void> {
   })
 }
 
+async function stubUpdatedPull(page: Page, updatedFile: string): Promise<void> {
+  await page.evaluate((filePath) => {
+    window.__mockHandlers!.git_pull = () => ({
+      status: 'updated',
+      message: 'Pulled 1 update from remote',
+      updatedFiles: [filePath],
+      conflictFiles: [],
+    })
+  }, updatedFile)
+}
+
+async function pullFromRemote(page: Page): Promise<void> {
+  await triggerMenuCommand(page, 'vault-pull')
+  await expect(page.getByText('Pulled 1 update(s) from remote')).toBeVisible({ timeout: 5_000 })
+}
+
 async function notePathForTitle(page: Page, target: NoteTitleTarget): Promise<string> {
   const note = page
     .getByTestId('note-list-container')
@@ -341,6 +386,39 @@ test('typing after current-note filesystem refresh stays usable', async ({ page 
   await page.keyboard.type(` -> ${afterRefreshMarker}`, { delay: 10 })
 
   await expectNoteFileToContain(noteBPath, afterRefreshMarker)
+  await page.waitForTimeout(500)
+  expect(crashes).toEqual([])
+})
+
+test('editing after create-note pull reload and note switch avoids React update loops', async ({ page }) => {
+  const crashes = trackEditorTypingCrashes(page)
+  const title = `Reload Loop Guard ${Date.now()}`
+  const filenameStem = slugifyTitle(title)
+  const createdNotePath = path.join(tempVaultDir, `${filenameStem}.md`)
+  const noteCPath = path.join(tempVaultDir, 'note', 'note-c.md')
+  const createdBody = `Created before reload loop ${Date.now()}`
+  const pulledMarker = `Unrelated pulled reload loop change ${Date.now()}`
+  const afterSwitchMarker = `typing after create pull reload ${Date.now()}`
+
+  await createUntitledNote(page)
+  await page.keyboard.type(title, { delay: 10 })
+  await page.keyboard.press('Enter')
+  await page.keyboard.type(createdBody, { delay: 10 })
+  await expectActiveFilename(page, filenameStem)
+  await expectNoteFileToContain(createdNotePath, createdBody)
+
+  fs.appendFileSync(noteCPath, `\n\n${pulledMarker}\n`, 'utf8')
+  await stubUpdatedPull(page, noteCPath)
+  await pullFromRemote(page)
+  await reloadVault(page)
+
+  await openNote(page, 'Alpha Project')
+  await openNote(page, title)
+  await placeCaretAtEndOfBlockContaining(page, { text: createdBody })
+  await page.keyboard.type(` ${afterSwitchMarker}`, { delay: 10 })
+
+  await expectNoteFileToContain(createdNotePath, afterSwitchMarker)
+  await expect(page.locator('.error-boundary')).toHaveCount(0)
   await page.waitForTimeout(500)
   expect(crashes).toEqual([])
 })
