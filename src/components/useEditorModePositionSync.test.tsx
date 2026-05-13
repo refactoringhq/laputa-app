@@ -4,12 +4,13 @@ import {
   buildCodeMirrorRestoreState,
   captureRawEditorPositionSnapshot,
   captureRichEditorPositionSnapshot,
-  type CodeMirrorRestoreState,
   type BlockNotePositionEditor,
   type CodeMirrorViewLike,
-  type RawEditorPositionSnapshot,
 } from './editorModePosition'
-import { useEditorModePositionSync } from './useEditorModePositionSync'
+import {
+  createEditorModeRestoreTransition,
+  useEditorModePositionSync,
+} from './useEditorModePositionSync'
 
 interface MockBlock {
   id: string
@@ -54,6 +55,10 @@ function installRawView(view: CodeMirrorViewLike) {
   document.body.appendChild(host)
 }
 
+function createRestoreTransitionRef() {
+  return { current: createEditorModeRestoreTransition() }
+}
+
 describe('useEditorModePositionSync', () => {
   beforeEach(() => {
     installBlockNoteScrollHost()
@@ -73,9 +78,7 @@ describe('useEditorModePositionSync', () => {
     const editor = makeEditor()
     const dispatch = vi.fn()
     const focus = vi.fn()
-    const pendingRawRestoreRef = { current: null as CodeMirrorRestoreState | null }
-    const pendingRoundTripRawRestoreRef = { current: null as { path: string; state: CodeMirrorRestoreState } | null }
-    const pendingRichRestoreRef = { current: null as RawEditorPositionSnapshot | null }
+    const restoreTransitionRef = createRestoreTransitionRef()
     installRawView({
       state: {
         doc: { toString: () => content },
@@ -91,19 +94,17 @@ describe('useEditorModePositionSync', () => {
         useEditorModePositionSync({
           activeTabPath: 'note.md',
           editor: editor as never,
-          pendingRawRestoreRef,
-          pendingRoundTripRawRestoreRef,
-          pendingRichRestoreRef,
+          restoreTransitionRef,
           rawMode,
         })
-        return { pendingRawRestoreRef, pendingRoundTripRawRestoreRef, pendingRichRestoreRef }
+        return { restoreTransitionRef }
       },
       { initialProps: { rawMode: false } },
     )
 
     act(() => {
       const snapshot = captureRichEditorPositionSnapshot(editor, document)
-      result.current.pendingRawRestoreRef.current = snapshot
+      result.current.restoreTransitionRef.current.rawRestore = snapshot
         ? buildCodeMirrorRestoreState(editor, content, snapshot)
         : null
     })
@@ -118,9 +119,7 @@ describe('useEditorModePositionSync', () => {
   it('restores the BlockNote cursor after toggling back from raw mode', async () => {
     const editor = makeEditor()
     const paragraphOffset = content.indexOf('Paragraph one') + 5
-    const pendingRawRestoreRef = { current: null as CodeMirrorRestoreState | null }
-    const pendingRoundTripRawRestoreRef = { current: null as { path: string; state: CodeMirrorRestoreState } | null }
-    const pendingRichRestoreRef = { current: null as RawEditorPositionSnapshot | null }
+    const restoreTransitionRef = createRestoreTransitionRef()
     installRawView({
       state: {
         doc: { toString: () => content },
@@ -136,18 +135,16 @@ describe('useEditorModePositionSync', () => {
         useEditorModePositionSync({
           activeTabPath: 'note.md',
           editor: editor as never,
-          pendingRawRestoreRef,
-          pendingRoundTripRawRestoreRef,
-          pendingRichRestoreRef,
+          restoreTransitionRef,
           rawMode,
         })
-        return { pendingRawRestoreRef, pendingRoundTripRawRestoreRef, pendingRichRestoreRef }
+        return { restoreTransitionRef }
       },
       { initialProps: { rawMode: true } },
     )
 
     act(() => {
-      result.current.pendingRichRestoreRef.current = captureRawEditorPositionSnapshot(document)
+      result.current.restoreTransitionRef.current.richRestore = captureRawEditorPositionSnapshot(document)
     })
     rerender({ rawMode: false })
     await act(async () => {
@@ -166,9 +163,7 @@ describe('useEditorModePositionSync', () => {
   it('cancels a pending BlockNote restore when raw mode starts again before the frame runs', () => {
     const editor = makeEditor()
     const paragraphOffset = content.indexOf('Paragraph one') + 5
-    const pendingRawRestoreRef = { current: null as CodeMirrorRestoreState | null }
-    const pendingRoundTripRawRestoreRef = { current: null as { path: string; state: CodeMirrorRestoreState } | null }
-    const pendingRichRestoreRef = { current: null as RawEditorPositionSnapshot | null }
+    const restoreTransitionRef = createRestoreTransitionRef()
     const frames = new Map<number, FrameRequestCallback>()
     let nextFrame = 1
     vi.mocked(window.requestAnimationFrame).mockImplementation((callback: FrameRequestCallback) => {
@@ -192,18 +187,16 @@ describe('useEditorModePositionSync', () => {
         useEditorModePositionSync({
           activeTabPath: 'note.md',
           editor: editor as never,
-          pendingRawRestoreRef,
-          pendingRoundTripRawRestoreRef,
-          pendingRichRestoreRef,
+          restoreTransitionRef,
           rawMode,
         })
-        return { pendingRawRestoreRef, pendingRoundTripRawRestoreRef, pendingRichRestoreRef }
+        return { restoreTransitionRef }
       },
       { initialProps: { rawMode: true } },
     )
 
     act(() => {
-      result.current.pendingRichRestoreRef.current = captureRawEditorPositionSnapshot(document)
+      result.current.restoreTransitionRef.current.richRestore = captureRawEditorPositionSnapshot(document)
     })
     rerender({ rawMode: false })
     act(() => {

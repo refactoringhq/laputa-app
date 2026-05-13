@@ -8,15 +8,21 @@ import {
   captureRawEditorPositionSnapshot,
   captureRichEditorPositionSnapshot,
   type CodeMirrorRestoreState,
-  type RawEditorPositionSnapshot,
 } from './editorModePosition'
 import {
   type PendingRawExitContent,
   buildPendingRawExitContent,
+  createRawModeContentTransition,
   rememberPendingRawExitContent,
   syncActiveTabIntoRawBuffer,
+  withPendingRawExitContent,
+  withRawModeContentOverride,
 } from './editorRawModeSync'
-import { useEditorModePositionSync } from './useEditorModePositionSync'
+import {
+  createEditorModeRestoreTransition,
+  type EditorModeRestoreTransition,
+  useEditorModePositionSync,
+} from './useEditorModePositionSync'
 
 interface PendingRoundTripRawRestore {
   path: string
@@ -25,14 +31,14 @@ interface PendingRoundTripRawRestore {
 
 function getRoundTripRawRestore({
   activeTabPath,
-  pendingRoundTripRawRestore,
+  restoreTransition,
 }: {
   activeTabPath: string | null
-  pendingRoundTripRawRestore: PendingRoundTripRawRestore | null
+  restoreTransition: EditorModeRestoreTransition
 }) {
   if (!activeTabPath) return null
-  return pendingRoundTripRawRestore?.path === activeTabPath
-    ? pendingRoundTripRawRestore.state
+  return restoreTransition.roundTripRawRestore?.path === activeTabPath
+    ? restoreTransition.roundTripRawRestore.state
     : null
 }
 
@@ -40,18 +46,18 @@ function buildPendingRawRestore({
   activeTabContent,
   activeTabPath,
   editor,
-  pendingRoundTripRawRestore,
+  restoreTransition,
   syncedContent,
 }: {
   activeTabContent: string | null
   activeTabPath: string | null
   editor: ReturnType<typeof useCreateBlockNote>
-  pendingRoundTripRawRestore: PendingRoundTripRawRestore | null
+  restoreTransition: EditorModeRestoreTransition
   syncedContent: string | null
 }) {
   const roundTripRestore = getRoundTripRawRestore({
     activeTabPath,
-    pendingRoundTripRawRestore,
+    restoreTransition,
   })
   if (roundTripRestore) return roundTripRestore
 
@@ -148,8 +154,7 @@ function useHandleFlushPending({
   rawLatestContentRef,
   rawSourceContentRef,
   flushPendingEditorChangeRef,
-  pendingRawRestoreRef,
-  pendingRoundTripRawRestoreRef,
+  restoreTransitionRef,
   setRawModeContentOverride,
   vaultPath,
 }: {
@@ -160,8 +165,7 @@ function useHandleFlushPending({
   rawLatestContentRef: React.MutableRefObject<string | null>
   rawSourceContentRef: React.MutableRefObject<string | null>
   flushPendingEditorChangeRef?: React.MutableRefObject<(() => boolean) | null>
-  pendingRawRestoreRef: React.MutableRefObject<CodeMirrorRestoreState | null>
-  pendingRoundTripRawRestoreRef: React.MutableRefObject<PendingRoundTripRawRestore | null>
+  restoreTransitionRef: React.MutableRefObject<EditorModeRestoreTransition>
   setRawModeContentOverride: React.Dispatch<React.SetStateAction<PendingRawExitContent | null>>
   vaultPath?: string
 }) {
@@ -177,14 +181,15 @@ function useHandleFlushPending({
       vaultPath,
     })
     rawInitialContentRef.current = syncedContent ?? activeTabContent
-    pendingRawRestoreRef.current = buildPendingRawRestore({
+    const restoreTransition = restoreTransitionRef.current
+    restoreTransition.rawRestore = buildPendingRawRestore({
       activeTabContent,
       activeTabPath,
       editor,
-      pendingRoundTripRawRestore: pendingRoundTripRawRestoreRef.current,
+      restoreTransition,
       syncedContent,
     })
-    pendingRoundTripRawRestoreRef.current = null
+    restoreTransition.roundTripRawRestore = null
     setRawModeContentOverride(buildPendingRawExitContent(activeTabPath, syncedContent))
     clearTableResizeState(editor)
     return true
@@ -193,8 +198,7 @@ function useHandleFlushPending({
     activeTabPath,
     editor,
     flushPendingEditorChangeRef,
-    pendingRawRestoreRef,
-    pendingRoundTripRawRestoreRef,
+    restoreTransitionRef,
     rawInitialContentRef,
     rawLatestContentRef,
     rawSourceContentRef,
@@ -211,9 +215,7 @@ function useHandleBeforeRawEnd({
   rawBufferPathRef,
   rawLatestContentRef,
   rawSourceContentRef,
-  pendingRawRestoreRef,
-  pendingRichRestoreRef,
-  pendingRoundTripRawRestoreRef,
+  restoreTransitionRef,
   setPendingRawExitContent,
   setRawModeContentOverride,
 }: {
@@ -224,16 +226,15 @@ function useHandleBeforeRawEnd({
   rawBufferPathRef: React.MutableRefObject<string | null>
   rawLatestContentRef: React.MutableRefObject<string | null>
   rawSourceContentRef: React.MutableRefObject<string | null>
-  pendingRawRestoreRef: React.MutableRefObject<CodeMirrorRestoreState | null>
-  pendingRichRestoreRef: React.MutableRefObject<RawEditorPositionSnapshot | null>
-  pendingRoundTripRawRestoreRef: React.MutableRefObject<PendingRoundTripRawRestore | null>
+  restoreTransitionRef: React.MutableRefObject<EditorModeRestoreTransition>
   setPendingRawExitContent: React.Dispatch<React.SetStateAction<PendingRawExitContent | null>>
   setRawModeContentOverride: React.Dispatch<React.SetStateAction<PendingRawExitContent | null>>
 }) {
   return useCallback(() => {
-    pendingRoundTripRawRestoreRef.current = capturePendingRoundTripRawRestore(activeTabPath)
-    pendingRichRestoreRef.current = captureRawEditorPositionSnapshot(document)
-    pendingRawRestoreRef.current = null
+    const restoreTransition = restoreTransitionRef.current
+    restoreTransition.roundTripRawRestore = capturePendingRoundTripRawRestore(activeTabPath)
+    restoreTransition.richRestore = captureRawEditorPositionSnapshot(document)
+    restoreTransition.rawRestore = null
     setPendingRawExitContent(rememberPendingRawExitContent({
       activeTabPath,
       activeTabContent,
@@ -247,9 +248,7 @@ function useHandleBeforeRawEnd({
     activeTabContent,
     activeTabPath,
     onContentChange,
-    pendingRawRestoreRef,
-    pendingRichRestoreRef,
-    pendingRoundTripRawRestoreRef,
+    restoreTransitionRef,
     rawInitialContentRef,
     rawBufferPathRef,
     rawLatestContentRef,
@@ -295,15 +294,18 @@ export function useRawModeWithFlush(
   const rawInitialContentRef = useRef<string | null>(null)
   const rawBufferPathRef = useRef<string | null>(null)
   const rawSourceContentRef = useRef<string | null>(null)
-  const pendingRawRestoreRef = useRef<CodeMirrorRestoreState | null>(null)
-  const pendingRichRestoreRef = useRef<RawEditorPositionSnapshot | null>(null)
-  const pendingRoundTripRawRestoreRef = useRef<PendingRoundTripRawRestore | null>(null)
-  const [pendingRawExitContent, setPendingRawExitContent] = useState<PendingRawExitContent | null>(null)
-  const [rawModeContentOverride, setRawModeContentOverride] = useState<PendingRawExitContent | null>(null)
+  const restoreTransitionRef = useRef(createEditorModeRestoreTransition())
+  const [contentTransition, setContentTransition] = useState(createRawModeContentTransition)
+  const setPendingRawExitContent = useCallback<React.Dispatch<React.SetStateAction<PendingRawExitContent | null>>>((action) => {
+    setContentTransition(transition => withPendingRawExitContent(transition, action))
+  }, [])
+  const setRawModeContentOverride = useCallback<React.Dispatch<React.SetStateAction<PendingRawExitContent | null>>>((action) => {
+    setContentTransition(transition => withRawModeContentOverride(transition, action))
+  }, [])
   const effectiveActiveTabContent = resolveActiveTabContent({
     activeTabContent,
     activeTabPath,
-    pendingRawExitContent,
+    pendingRawExitContent: contentTransition.pendingExitContent,
   })
   useTrackRawBuffer({
     activeTabContent: effectiveActiveTabContent,
@@ -328,8 +330,7 @@ export function useRawModeWithFlush(
     rawLatestContentRef,
     rawSourceContentRef,
     flushPendingEditorChangeRef,
-    pendingRawRestoreRef,
-    pendingRoundTripRawRestoreRef,
+    restoreTransitionRef,
     setRawModeContentOverride,
     vaultPath,
   })
@@ -341,9 +342,7 @@ export function useRawModeWithFlush(
     rawBufferPathRef,
     rawLatestContentRef,
     rawSourceContentRef,
-    pendingRawRestoreRef,
-    pendingRichRestoreRef,
-    pendingRoundTripRawRestoreRef,
+    restoreTransitionRef,
     setPendingRawExitContent,
     setRawModeContentOverride,
   })
@@ -356,11 +355,16 @@ export function useRawModeWithFlush(
   useEditorModePositionSync({
     activeTabPath,
     editor,
-    pendingRawRestoreRef,
-    pendingRoundTripRawRestoreRef,
-    pendingRichRestoreRef,
+    restoreTransitionRef,
     rawMode,
   })
 
-  return { rawMode, handleToggleRaw, rawLatestContentRef, pendingRawExitContent, setPendingRawExitContent, rawModeContentOverride }
+  return {
+    rawMode,
+    handleToggleRaw,
+    rawLatestContentRef,
+    pendingRawExitContent: contentTransition.pendingExitContent,
+    setPendingRawExitContent,
+    rawModeContentOverride: contentTransition.rawModeContentOverride,
+  }
 }

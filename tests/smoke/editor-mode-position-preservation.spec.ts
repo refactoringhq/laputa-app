@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { sendShortcut } from './helpers'
 
 interface RawEditorState {
   lineCount: number
@@ -28,6 +29,8 @@ function isPreferredBodyLine(line: string) {
     && !trimmed.startsWith('#')
     && !trimmed.startsWith('- ')
     && !trimmed.startsWith('* ')
+    && !trimmed.startsWith('|')
+    && trimmed !== '---'
     && !/^\d+\.\s/.test(trimmed)
 }
 
@@ -58,12 +61,12 @@ function rawOffsetForLine(lines: string[], lineIndex: number) {
 }
 
 async function openRawEditor(page: Page) {
-  await page.keyboard.press('Control+Backslash')
+  await sendShortcut(page, 'Backslash', ['Control'])
   await expect(page.locator('[data-testid="raw-editor-codemirror"]')).toBeVisible({ timeout: 5_000 })
 }
 
 async function openRichEditor(page: Page) {
-  await page.keyboard.press('Control+Backslash')
+  await sendShortcut(page, 'Backslash', ['Control'])
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
 }
 

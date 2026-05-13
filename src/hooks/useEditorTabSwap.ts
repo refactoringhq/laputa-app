@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 import type { useCreateBlockNote } from '@blocknote/react'
 import type { VaultEntry } from '../types'
-import { splitFrontmatter, restoreWikilinksInBlocks } from '../utils/wikilinks'
 import { compactMarkdown } from '../utils/compact-markdown'
-import { serializeDurableEditorBlocks } from '../utils/editorDurableMarkdown'
 import { failNoteOpenTrace, finishNoteOpenTrace } from '../utils/noteOpenPerformance'
-import { portableImageUrls } from '../utils/vaultImages'
+import {
+  serializeRichEditorBodyToMarkdown,
+  serializeRichEditorDocumentToMarkdown,
+} from '../utils/richEditorMarkdown'
 import { useEditorMountState, useLatestRef } from './editorTabSwapLifecycle'
 import {
   applyBlankStateToEditor,
@@ -122,8 +123,7 @@ function findActiveTab(options: {
 }
 
 function serializeEditorBody(editor: ReturnType<typeof useCreateBlockNote>): string {
-  const restored = restoreWikilinksInBlocks(editor.document)
-  return compactMarkdown(serializeDurableEditorBlocks(editor, restored))
+  return serializeRichEditorBodyToMarkdown(editor)
 }
 
 function trySerializeEditorBody(
@@ -201,13 +201,15 @@ function serializedEditorChange(options: {
 }): { blocks: CachedTabState['blocks'], content: string } | null {
   const { editor, path, previousContent, vaultPath } = options
   const blocks = editor.document
-  const rawBodyMarkdown = trySerializeEditorBody(editor, 'editor change')
-  if (rawBodyMarkdown === null) return null
-  const bodyMarkdown = vaultPath
-    ? portableImageUrls(rawBodyMarkdown, vaultPath, path)
-    : rawBodyMarkdown
-  const [frontmatter] = splitFrontmatter(previousContent)
-  return { blocks, content: `${frontmatter}${bodyMarkdown}` }
+  try {
+    return {
+      blocks,
+      content: serializeRichEditorDocumentToMarkdown(editor, previousContent, vaultPath, path),
+    }
+  } catch (error) {
+    console.warn('[editor] Skipped editor change because BlockNote document could not be serialized:', error)
+    return null
+  }
 }
 
 function useEditorChangeHandler(options: {

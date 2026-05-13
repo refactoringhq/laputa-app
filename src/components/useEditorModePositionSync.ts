@@ -9,26 +9,40 @@ import {
 
 const MAX_RAW_RESTORE_ATTEMPTS = 5
 
+export interface EditorModeRestoreTransition {
+  rawRestore: CodeMirrorRestoreState | null
+  roundTripRawRestore: { path: string; state: CodeMirrorRestoreState } | null
+  richRestore: RawEditorPositionSnapshot | null
+}
+
+export function createEditorModeRestoreTransition(): EditorModeRestoreTransition {
+  return {
+    rawRestore: null,
+    roundTripRawRestore: null,
+    richRestore: null,
+  }
+}
+
 function useRawEditorRestoreEffect({
   activeTabPath,
-  pendingRawRestoreRef,
+  restoreTransitionRef,
   rawMode,
 }: {
   activeTabPath: string | null
-  pendingRawRestoreRef: React.MutableRefObject<CodeMirrorRestoreState | null>
+  restoreTransitionRef: React.MutableRefObject<EditorModeRestoreTransition>
   rawMode: boolean
 }) {
   useEffect(() => {
-    if (!rawMode || !pendingRawRestoreRef.current) return
+    if (!rawMode || !restoreTransitionRef.current.rawRestore) return
 
     let frame = 0
     let attempts = 0
 
     const tryRestore = () => {
-      const pendingState = pendingRawRestoreRef.current
+      const pendingState = restoreTransitionRef.current.rawRestore
       if (!pendingState) return
       if (restoreCodeMirrorView(document, pendingState)) {
-        pendingRawRestoreRef.current = null
+        restoreTransitionRef.current.rawRestore = null
         return
       }
       attempts += 1
@@ -43,20 +57,18 @@ function useRawEditorRestoreEffect({
         window.cancelAnimationFrame(frame)
       }
     }
-  }, [activeTabPath, pendingRawRestoreRef, rawMode])
+  }, [activeTabPath, restoreTransitionRef, rawMode])
 }
 
 function useBlockNoteRestoreEffect({
   activeTabPath,
   editor,
-  pendingRoundTripRawRestoreRef,
-  pendingRichRestoreRef,
+  restoreTransitionRef,
   rawMode,
 }: {
   activeTabPath: string | null
   editor: ReturnType<typeof useCreateBlockNote>
-  pendingRoundTripRawRestoreRef: React.MutableRefObject<{ path: string; state: CodeMirrorRestoreState } | null>
-  pendingRichRestoreRef: React.MutableRefObject<RawEditorPositionSnapshot | null>
+  restoreTransitionRef: React.MutableRefObject<EditorModeRestoreTransition>
   rawMode: boolean
 }) {
   useEffect(() => {
@@ -74,7 +86,7 @@ function useBlockNoteRestoreEffect({
     }
 
     const handleEditorTabSwapped = (event: Event) => {
-      const pendingSnapshot = pendingRichRestoreRef.current
+      const pendingSnapshot = restoreTransitionRef.current.richRestore
       if (!activeTabPath || !pendingSnapshot) return
 
       const customEvent = event as CustomEvent<{ path: string }>
@@ -89,8 +101,8 @@ function useBlockNoteRestoreEffect({
         if (canceled) return
 
         restoreBlockNoteView(editor, pendingSnapshot, document)
-        pendingRoundTripRawRestoreRef.current = null
-        pendingRichRestoreRef.current = null
+        restoreTransitionRef.current.roundTripRawRestore = null
+        restoreTransitionRef.current.richRestore = null
       })
     }
 
@@ -99,24 +111,20 @@ function useBlockNoteRestoreEffect({
       cancelPendingRestore()
       window.removeEventListener('laputa:editor-tab-swapped', handleEditorTabSwapped)
     }
-  }, [activeTabPath, editor, pendingRichRestoreRef, pendingRoundTripRawRestoreRef, rawMode])
+  }, [activeTabPath, editor, restoreTransitionRef, rawMode])
 }
 
 export function useEditorModePositionSync({
   activeTabPath,
   editor,
-  pendingRawRestoreRef,
-  pendingRoundTripRawRestoreRef,
-  pendingRichRestoreRef,
+  restoreTransitionRef,
   rawMode,
 }: {
   activeTabPath: string | null
   editor: ReturnType<typeof useCreateBlockNote>
-  pendingRawRestoreRef: React.MutableRefObject<CodeMirrorRestoreState | null>
-  pendingRoundTripRawRestoreRef: React.MutableRefObject<{ path: string; state: CodeMirrorRestoreState } | null>
-  pendingRichRestoreRef: React.MutableRefObject<RawEditorPositionSnapshot | null>
+  restoreTransitionRef: React.MutableRefObject<EditorModeRestoreTransition>
   rawMode: boolean
 }) {
-  useRawEditorRestoreEffect({ activeTabPath, pendingRawRestoreRef, rawMode })
-  useBlockNoteRestoreEffect({ activeTabPath, editor, pendingRoundTripRawRestoreRef, pendingRichRestoreRef, rawMode })
+  useRawEditorRestoreEffect({ activeTabPath, restoreTransitionRef, rawMode })
+  useBlockNoteRestoreEffect({ activeTabPath, editor, restoreTransitionRef, rawMode })
 }
