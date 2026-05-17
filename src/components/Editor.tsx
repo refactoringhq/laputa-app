@@ -39,6 +39,11 @@ import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
 import './Editor.css'
 import './EditorTheme.css'
 
+const RICH_EDITOR_BIDI_DOM_ATTRIBUTES = {
+  blockContent: { dir: 'auto' },
+  inlineContent: { dir: 'auto' },
+}
+
 interface Tab {
   entry: VaultEntry
   content: string
@@ -206,6 +211,7 @@ function useEditorSetup({
 
   const editor = useCreateBlockNote({
     schema,
+    domAttributes: RICH_EDITOR_BIDI_DOM_ATTRIBUTES,
     uploadFile: (file: File) => uploadImageFile(file, vaultPathRef.current),
     _tiptapOptions: { injectNonce: RUNTIME_STYLE_NONCE },
     extensions: [

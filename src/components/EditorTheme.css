@@ -21,13 +21,15 @@
 
 .editor-content-width--wide .editor__blocknote-container .bn-editor {
   max-width: none;
-  margin-left: 0;
-  margin-right: 0;
-  padding-left: 0;
-  padding-right: 0;
+  margin-inline: 0;
+  padding-inline: 0;
 }
 
 /* Let each rich-text block resolve its own base direction for mixed LTR/RTL notes. */
+.editor__blocknote-container .bn-block-content {
+  text-align: start;
+}
+
 .editor__blocknote-container .bn-inline-content {
   unicode-bidi: plaintext;
   text-align: start;
@@ -65,7 +67,7 @@
   /* The side menu is positioned via transform — we shift it further left */
 }
 .editor__blocknote-container .bn-block-content {
-  margin-left: 8px;
+  margin-inline-start: 8px;
 }
 
 .editor__blocknote-container .bn-editor ::selection {
@@ -154,7 +156,7 @@
 /* BlockNote renders bullet as ::before on [data-content-type="bulletListItem"] 
    with content: "•", display: flex, width: 24px */
 .editor__blocknote-container [data-content-type="bulletListItem"] {
-  padding-left: var(--lists-padding-left);
+  padding-inline-start: var(--lists-padding-left);
   margin-bottom: var(--lists-item-spacing);
   gap: var(--lists-bullet-gap) !important;
 }
@@ -172,17 +174,17 @@
 
 /* Nested list indentation */
 .editor__blocknote-container .bn-block-group .bn-block-group {
-  margin-left: var(--lists-indent-size);
+  margin-inline-start: var(--lists-indent-size);
 }
 
 /* Hide the vertical nesting lines — cleaner without them */
 .editor__blocknote-container .bn-block-group .bn-block-group .bn-block-outer::before {
-  border-left: none !important;
+  border-inline-start: none !important;
 }
 
 /* --- Numbered lists --- */
 .editor__blocknote-container [data-content-type="numberedListItem"] {
-  padding-left: var(--lists-padding-left);
+  padding-inline-start: var(--lists-padding-left);
   margin-bottom: var(--lists-item-spacing);
   gap: var(--lists-bullet-gap) !important;
 }
@@ -537,8 +539,8 @@
 /* --- Blockquote --- */
 .editor__blocknote-container [data-content-type="blockquote"],
 .editor__blocknote-container blockquote {
-  border-left: var(--blockquote-border-left-width) solid var(--blockquote-border-left-color);
-  padding-left: var(--blockquote-padding-left);
+  border-inline-start: var(--blockquote-border-left-width) solid var(--blockquote-border-left-color);
+  padding-inline-start: var(--blockquote-padding-left);
   margin-top: var(--blockquote-margin-vertical);
   margin-bottom: var(--blockquote-margin-vertical);
   color: var(--blockquote-color);
@@ -559,6 +561,7 @@
 .editor__blocknote-container [data-content-type="table"] td {
   padding: var(--table-cell-padding-vertical) var(--table-cell-padding-horizontal);
   border-color: var(--table-border-color);
+  text-align: start;
 }
 
 /* --- Horizontal rule --- */
