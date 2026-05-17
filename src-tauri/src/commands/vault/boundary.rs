@@ -97,8 +97,26 @@ impl VaultBoundary {
                 .canonicalize()
                 .map_err(|_| "File does not exist".to_string())?
         };
-        self.ensure_within_root(&canonical)?;
-        Ok(path_to_string(&requested))
+
+        if self.ensure_within_root(&canonical).is_ok() {
+            return Ok(path_to_string(&requested));
+        }
+
+        // Reject paths with `..` before we check for symlinks
+        if requested
+            .components()
+            .any(|c| matches!(c, Component::ParentDir))
+        {
+            return Err(ACTIVE_VAULT_PATH_ERROR.to_string());
+        }
+
+        // Allow paths through symlinks inside the vault pointing outside the vault.
+        // canonicalize() resolves the symlink, and the above within_root check would fail.
+        if path_contains_symlink_under(&self.requested_root, &requested) {
+            return Ok(path_to_string(&requested));
+        }
+
+        Err(ACTIVE_VAULT_PATH_ERROR.to_string())
     }
 
     fn requested_path(&self, raw_path: &str) -> PathBuf {
@@ -197,6 +215,31 @@ fn build_vault_root_paths(raw_vault_path: &str) -> Result<VaultRootPaths, String
         requested,
         canonical,
     })
+}
+
+/// Returns `true` if `path` is lexically inside `root` and passes through a
+/// symlink. This allows users to symlink external directories into their vault:
+/// `canonicalize()` would follow the symlink and fail the boundary check, but
+/// if the unresolved path is inside the vault and the symlink was placed there,
+/// the user put it there intentionally.
+fn path_contains_symlink_under(root: &Path, path: &Path) -> bool {
+    let Ok(relative) = path.strip_prefix(root) else {
+        return false;
+    };
+
+    let mut current = root.to_path_buf();
+    for component in relative.components() {
+        current.push(component);
+        if current
+            // Use `symlink_metadata` so we inspect the symlink itself, not its target.
+            .symlink_metadata()
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false)
+        {
+            return true;
+        }
+    }
+    false
 }
 
 fn canonicalize_candidate_for_write(path: &Path) -> Result<PathBuf, String> {
@@ -383,6 +426,56 @@ pub(crate) fn with_view_file<T>(
 mod tests {
     use super::*;
     use crate::vault_list::{VaultEntry, VaultList};
+
+    #[test]
+    fn validate_path_allows_symlink_pointing_outside_vault() {
+        use std::os::unix::fs::symlink;
+
+        let vault_dir = tempfile::TempDir::new().unwrap();
+        let external_dir = tempfile::TempDir::new().unwrap();
+
+        let external_note = external_dir.path().join("note.md");
+        std::fs::write(&external_note, "# Hello").unwrap();
+
+        let link_path = vault_dir.path().join("linked");
+        symlink(external_dir.path(), &link_path).unwrap();
+
+        let boundary = VaultBoundary {
+            requested_root: vault_dir.path().to_path_buf(),
+            canonical_root: vault_dir.path().canonicalize().unwrap(),
+        };
+
+        let note_path = link_path.join("note.md").to_string_lossy().to_string();
+        let result = boundary.validate_existing_path(&note_path);
+        assert!(
+            result.is_ok(),
+            "symlinked path should be allowed: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn validate_path_blocks_traversal_outside_vault() {
+        use std::os::unix::fs::symlink;
+
+        let vault_dir = tempfile::TempDir::new().unwrap();
+        let external_dir = tempfile::TempDir::new().unwrap();
+        let external_note = external_dir.path().join("note.md");
+        std::fs::write(&external_note, "# Hello").unwrap();
+
+        let link_path = vault_dir.path().join("linked");
+        symlink(external_dir.path(), &link_path).unwrap();
+
+        let boundary = VaultBoundary {
+            requested_root: vault_dir.path().to_path_buf(),
+            canonical_root: vault_dir.path().canonicalize().unwrap(),
+        };
+
+        // `..` traversal that escapes the vault root must be blocked
+        let traversal = format!("{}/linked/../../{}", vault_dir.path().display(), "note.md");
+        let result = boundary.validate_existing_path(&traversal);
+        assert!(result.is_err(), "path traversal must be blocked");
+    }
 
     #[test]
     fn registered_vault_roots_skip_unavailable_vaults() {
