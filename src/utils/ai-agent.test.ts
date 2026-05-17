@@ -23,12 +23,23 @@ describe('buildAgentSystemPrompt', () => {
     expect(prompt).toContain('Recent notes: foo, bar')
   })
 
-  it('points agents to bundled Tolaria docs when available', () => {
+  it('points safe-mode agents to bundled Tolaria docs without shell commands', () => {
     const prompt = buildAgentSystemPrompt({ agentDocsPath: '/app/agent-docs' })
 
     expect(prompt).toContain('/app/agent-docs/index.md')
-    expect(prompt).toContain('ripgrep')
+    expect(prompt).not.toContain('ripgrep')
     expect(prompt).toContain('Prefer bundled docs over guesses')
+  })
+
+  it('keeps ripgrep guidance for bundled docs in shell-capable power user mode', () => {
+    const prompt = buildAgentSystemPrompt({
+      agent: 'codex',
+      agentDocsPath: '/app/agent-docs',
+      permissionMode: 'power_user',
+    })
+
+    expect(prompt).toContain('ripgrep')
+    expect(prompt).toContain('Power User mode is active')
   })
 
   it('allows shell commands in power user mode where supported', () => {

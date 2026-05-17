@@ -190,6 +190,7 @@ describe('windowMode', () => {
       })).toEqual([
         'demo-vault-v2/untitled-note-29.md',
         '/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2/untitled-note-29.md',
+        'untitled-note-29.md',
       ])
     })
 
@@ -218,6 +219,16 @@ describe('windowMode', () => {
         notePath: '/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2/untitled-note-29.md',
         vaultPath: '/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2',
       })).toBeUndefined()
+    })
+
+    it('prefers exact relative-path matches over same-suffix entries', () => {
+      const archivedEntry = makeEntry('archive/folder/note.md', 'Archived Note')
+      const liveEntry = makeEntry('folder/note.md', 'Live Note')
+
+      expect(findNoteWindowEntry([archivedEntry, liveEntry], {
+        notePath: 'folder/note.md',
+        vaultPath: '/vault',
+      })).toBe(liveEntry)
     })
   })
 })

@@ -132,7 +132,7 @@ export function SelectControl({
       >
         <SelectValue />
       </SelectTrigger>
-      <SelectContent position="popper" data-anchor-strategy="popper">
+      <SelectContent position="popper" data-anchor-strategy="popper" data-settings-panel-portal="true">
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             {option.label}

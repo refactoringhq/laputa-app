@@ -11,6 +11,7 @@ export function getAnchoredDropdownLeft(
   const rightAlignedLeft = anchorRight - dropdownWidth
   const minLeft = margin
   const maxLeft = viewportWidth - dropdownWidth - margin
+  if (maxLeft < minLeft) return minLeft
   return Math.min(Math.max(rightAlignedLeft, minLeft), maxLeft)
 }
 

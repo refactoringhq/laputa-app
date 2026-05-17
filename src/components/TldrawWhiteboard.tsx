@@ -111,6 +111,11 @@ function parseSnapshot(source: string): TLStoreSnapshot | null {
   }
 }
 
+function createBoardStore(boardId: string) {
+  void boardId
+  return createTLStore()
+}
+
 function serializeSnapshot(snapshot: TLStoreSnapshot): string {
   return `${JSON.stringify(snapshot, null, 2)}\n`
 }
@@ -364,9 +369,10 @@ export function TldrawWhiteboard({
   onSnapshotChange,
   onSizeChange,
 }: TldrawWhiteboardProps) {
-  const store = useMemo(() => createTLStore(), [])
+  const store = useMemo(() => createBoardStore(boardId), [boardId])
   const boardRef = useRef<HTMLDivElement | null>(null)
   const savedSnapshotRef = useRef<string | null>(null)
+  const savedBoardIdRef = useRef<string | null>(null)
   const onSnapshotChangeRef = useRef(onSnapshotChange)
   const persistedSize = useMemo(() => normalizeSize({ height, width }), [height, width])
   const [resizingSize, setResizingSize] = useState<PixelSize | null>(null)
@@ -384,12 +390,13 @@ export function TldrawWhiteboard({
   }, [onSnapshotChange])
 
   useEffect(() => {
-    if (snapshot === savedSnapshotRef.current) return
+    if (boardId === savedBoardIdRef.current && snapshot === savedSnapshotRef.current) return
 
     const parsed = parseSnapshot(snapshot)
     if (parsed) {
       try {
         loadSnapshot(store, parsed)
+        savedBoardIdRef.current = boardId
         savedSnapshotRef.current = snapshot
         return
       } catch {
@@ -397,8 +404,12 @@ export function TldrawWhiteboard({
       }
     }
 
-    savedSnapshotRef.current = serializeSnapshot(getSnapshot(store).document)
-  }, [snapshot, store])
+    const emptyStore = createTLStore()
+    const emptySnapshot = getSnapshot(emptyStore).document
+    loadSnapshot(store, emptySnapshot)
+    savedBoardIdRef.current = boardId
+    savedSnapshotRef.current = serializeSnapshot(emptySnapshot)
+  }, [boardId, snapshot, store])
 
   useEffect(() => {
     let timeoutId: number | null = null
@@ -408,6 +419,7 @@ export function TldrawWhiteboard({
       const nextSnapshot = serializeSnapshot(getSnapshot(store).document)
       if (nextSnapshot === savedSnapshotRef.current) return
 
+      savedBoardIdRef.current = boardId
       savedSnapshotRef.current = nextSnapshot
       onSnapshotChangeRef.current(nextSnapshot)
     }
@@ -422,7 +434,7 @@ export function TldrawWhiteboard({
       cleanup()
       if (timeoutId !== null) window.clearTimeout(timeoutId)
     }
-  }, [store])
+  }, [boardId, store])
 
   const startResize = (mode: ResizeMode) => (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -472,6 +484,7 @@ export function TldrawWhiteboard({
       <Tldraw
         assetUrls={tldrawAssetUrls}
         components={tldrawUiComponents}
+        key={boardId}
         onMount={installWhiteboardRuntimeGuards}
         store={store}
         user={tldrawUser}

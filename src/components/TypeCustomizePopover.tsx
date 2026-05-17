@@ -52,18 +52,37 @@ interface TemplateSectionProps {
 const ICON_PICKER_ICON_SIZE = 18
 const ICON_PICKER_ICON_CLASS_NAME = 'size-[18px]'
 
-/** Debounce a callback by `delay` ms. Returns a stable ref-based wrapper. */
-function useDebouncedCallback(fn: (v: string) => void, delay: number): (v: string) => void {
+interface DebouncedCallback {
+  flush: () => void
+  run: (value: string) => void
+}
+
+/** Debounce a callback by `delay` ms. Pending work is flushed on unmount. */
+function useDebouncedCallback(fn: (v: string) => void, delay: number): DebouncedCallback {
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const pendingValueRef = useRef<string | null>(null)
   const fnRef = useRef(fn)
   useEffect(() => { fnRef.current = fn })
 
-  useEffect(() => () => { clearTimeout(timerRef.current) }, [])
-
-  return useCallback((v: string) => {
+  const flush = useCallback(() => {
     clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => fnRef.current(v), delay)
-  }, [delay])
+    timerRef.current = undefined
+    if (pendingValueRef.current === null) return
+
+    const value = pendingValueRef.current
+    pendingValueRef.current = null
+    fnRef.current(value)
+  }, [])
+
+  const run = useCallback((value: string) => {
+    clearTimeout(timerRef.current)
+    pendingValueRef.current = value
+    timerRef.current = setTimeout(flush, delay)
+  }, [delay, flush])
+
+  useEffect(() => () => { flush() }, [flush])
+
+  return useMemo(() => ({ flush, run }), [flush, run])
 }
 
 function ColorSection({ selectedColor, locale, onSelectColor }: ColorSectionProps) {
@@ -188,6 +207,7 @@ export function TypeCustomizePopover({
   const [templateText, setTemplateText] = useState(currentTemplate ?? '')
 
   const filteredIcons = useMemo(() => filterIcons(ICON_OPTIONS, search), [search])
+  const debouncedSaveTemplate = useDebouncedCallback(onChangeTemplate, 500)
 
   const handleColorClick = (key: string) => {
     setSelectedColor(key)
@@ -199,11 +219,14 @@ export function TypeCustomizePopover({
     onChangeIcon(name)
   }
 
-  const debouncedSaveTemplate = useDebouncedCallback(onChangeTemplate, 500)
-
   const handleTemplateChange = (value: string) => {
     setTemplateText(value)
-    debouncedSaveTemplate(value)
+    debouncedSaveTemplate.run(value)
+  }
+
+  const handleDone = () => {
+    debouncedSaveTemplate.flush()
+    onClose()
   }
 
   return (
@@ -228,7 +251,7 @@ export function TypeCustomizePopover({
       {showTemplate && (
         <TemplateSection templateText={templateText} locale={locale} onTemplateChange={handleTemplateChange} />
       )}
-      {showDone && <DoneSection locale={locale} onClose={onClose} />}
+      {showDone && <DoneSection locale={locale} onClose={handleDone} />}
     </div>
   )
 }

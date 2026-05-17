@@ -55,7 +55,7 @@ function matchSingleCharacterQuery(
 }
 
 function buildTopSuggestions(items: SuggestionItem[]): InlineWikilinkSuggestion[] {
-  return [...items]
+  return disambiguateTitles(deduplicateByPath([...items]))
     .sort((left, right) => left.title.localeCompare(right.title))
     .slice(0, MAX_RESULTS)
     .map(toSuggestion)

@@ -33,6 +33,12 @@ describe('getDocumentZoom', () => {
     spy.mockRestore()
   })
 
+  it('normalizes a computed percentage zoom value', () => {
+    const spy = mockComputedZoom('125%')
+    expect(getDocumentZoom()).toBe(1.25)
+    spy.mockRestore()
+  })
+
   it('returns the zoom factor for sub-100% zoom', () => {
     const spy = mockComputedZoom('0.8')
     expect(getDocumentZoom()).toBe(0.8)

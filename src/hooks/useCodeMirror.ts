@@ -103,7 +103,7 @@ function buildBaseTheme() {
       color: RAW_EDITOR_COLORS.gutterText,
       borderRight: `1px solid ${RAW_EDITOR_COLORS.gutterBorder}`,
       minHeight: '100%',
-      paddingTop: '16px',
+      paddingTop: '0',
       paddingLeft: '6px',
     },
     '.cm-lineNumbers .cm-gutterElement': {

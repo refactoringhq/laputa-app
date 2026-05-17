@@ -7,9 +7,8 @@ import { createElement, type ReactNode, type ComponentType } from 'react'
 // undici rejects with InvalidArgumentError (UND_ERR_INVALID_ARG).
 // Tests should never make real network requests — individual tests can
 // override this stub via vi.mocked(fetch).mockImplementation(...).
-globalThis.fetch = vi.fn(() =>
-  Promise.resolve(new Response(null, { status: 418 })),
-) as typeof globalThis.fetch
+const defaultFetchMock = () => Promise.resolve(new Response(null, { status: 418 }))
+globalThis.fetch = vi.fn(defaultFetchMock) as typeof globalThis.fetch
 
 // Stub WebSocket to prevent Node 22 + undici WebSocket incompatibility.
 // undici's WebSocket dispatchEvent crashes with "The event argument must be
@@ -62,6 +61,11 @@ vi.mock('@tauri-apps/plugin-opener', () => ({
 afterEach(() => {
   vi.clearAllTimers()
   vi.useRealTimers()
+  if (vi.isMockFunction(globalThis.fetch)) {
+    vi.mocked(globalThis.fetch).mockReset().mockImplementation(defaultFetchMock)
+  } else {
+    globalThis.fetch = vi.fn(defaultFetchMock) as typeof globalThis.fetch
+  }
 })
 
 // Mock react-day-picker: Calendar component uses DayPicker which needs real DOM APIs not available in jsdom

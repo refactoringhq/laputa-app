@@ -6,6 +6,7 @@ const DISPATCH_RECOVERY_STATE_KEY = '__tolariaRichEditorTransformErrorRecovery'
 
 type RichEditorDispatch = (transaction: unknown) => unknown
 type RecoverEditorDocument = () => void
+type RecoveryToken = symbol
 
 interface RichEditorDispatchView {
   dispatch: RichEditorDispatch
@@ -18,7 +19,10 @@ interface RichEditorDispatchView {
 
 interface DispatchRecoveryState {
   originalDispatch: RichEditorDispatch
-  recoverDocument?: RecoverEditorDocument
+  recoverDocuments: Array<{
+    recoverDocument: RecoverEditorDocument
+    token: RecoveryToken
+  }>
   refCount: number
 }
 
@@ -90,10 +94,12 @@ function releaseRecoveryState(
   view: RichEditorDispatchView,
   recoveryState: DispatchRecoveryState,
   originalDispatch: RichEditorDispatch,
+  token: RecoveryToken,
 ): void {
   const state = Reflect.get(view, DISPATCH_RECOVERY_STATE_KEY)
   if (!isDispatchRecoveryState(state) || state.originalDispatch !== originalDispatch) return
 
+  state.recoverDocuments = state.recoverDocuments.filter((entry) => entry.token !== token)
   state.refCount -= 1
   if (state.refCount > 0) return
 
@@ -104,11 +110,16 @@ function releaseRecoveryState(
 function retainRecoveryState(
   view: RichEditorDispatchView,
   recoveryState: DispatchRecoveryState,
+  token: RecoveryToken,
   recoverDocument?: RecoverEditorDocument,
 ): () => void {
   recoveryState.refCount += 1
-  if (recoverDocument) recoveryState.recoverDocument = recoverDocument
-  return () => releaseRecoveryState(view, recoveryState, recoveryState.originalDispatch)
+  if (recoverDocument) recoveryState.recoverDocuments.push({ recoverDocument, token })
+  return () => releaseRecoveryState(view, recoveryState, recoveryState.originalDispatch, token)
+}
+
+function activeRecoverDocument(recoveryState: DispatchRecoveryState): RecoverEditorDocument | undefined {
+  return recoveryState.recoverDocuments.at(-1)?.recoverDocument
 }
 
 function createRecoveringDispatch(
@@ -122,7 +133,7 @@ function createRecoveringDispatch(
       if (!isRecoverableEditorTransformError(error)) throw error
 
       if (isInvalidContentTransactionError(error)) {
-        recoveryState.recoverDocument?.()
+        activeRecoverDocument(recoveryState)?.()
       }
       reportRecoveredEditorTransformError(recoveryReason(error, transaction, view), error)
       return undefined
@@ -133,11 +144,12 @@ function createRecoveringDispatch(
 function installRecoveryState(
   view: RichEditorDispatchView,
   originalDispatch: RichEditorDispatch,
+  token: RecoveryToken,
   recoverDocument?: RecoverEditorDocument,
 ): DispatchRecoveryState {
   const recoveryState: DispatchRecoveryState = {
     originalDispatch,
-    recoverDocument,
+    recoverDocuments: recoverDocument ? [{ recoverDocument, token }] : [],
     refCount: 1,
   }
 
@@ -164,15 +176,16 @@ export function installRichEditorTransformErrorRecovery(
   view: RichEditorDispatchView,
   options: InstallRecoveryOptions = {},
 ): () => void {
+  const token = Symbol('rich-editor-transform-error-recovery')
   const currentState = Reflect.get(view, DISPATCH_RECOVERY_STATE_KEY)
   if (isDispatchRecoveryState(currentState)) {
-    return retainRecoveryState(view, currentState, options.recoverDocument)
+    return retainRecoveryState(view, currentState, token, options.recoverDocument)
   }
 
   const originalDispatch = view.dispatch
-  const recoveryState = installRecoveryState(view, originalDispatch, options.recoverDocument)
+  const recoveryState = installRecoveryState(view, originalDispatch, token, options.recoverDocument)
 
-  return () => releaseRecoveryState(view, recoveryState, originalDispatch)
+  return () => releaseRecoveryState(view, recoveryState, originalDispatch, token)
 }
 
 export const createRichEditorTransformErrorRecoveryExtension = createExtension(({ editor }) => ({

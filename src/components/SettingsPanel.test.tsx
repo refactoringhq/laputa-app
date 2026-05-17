@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
@@ -853,6 +853,29 @@ describe('SettingsPanel', () => {
 
     fireEvent.keyDown(document, { key: 'Tab' })
     expect(closeButton).toHaveFocus()
+  })
+
+  it('does not trap focus away from a portaled settings dropdown', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    act(() => {
+      fireEvent.pointerDown(screen.getByTestId('settings-default-ai-agent'), { button: 0, pointerType: 'mouse' })
+    })
+    const option = screen.getByRole('option', { name: /Codex/i })
+    act(() => {
+      option.focus()
+    })
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    act(() => {
+      document.dispatchEvent(event)
+    })
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(screen.getByTitle('Close settings')).not.toHaveFocus()
+    expect(screen.getByTestId('settings-save')).not.toHaveFocus()
   })
 
   it('copies the MCP config from the AI Agents section', () => {

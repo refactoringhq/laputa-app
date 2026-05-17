@@ -117,6 +117,24 @@ describe('installRichEditorTransformErrorRecovery', () => {
     secondUninstall()
     expect(view.dispatch).toBe(dispatch)
   })
+
+  it('restores the previous recoverDocument callback when a later install unmounts', () => {
+    const schemaError = new RangeError(
+      'Invalid content for node blockContainer: <paragraph("Procedures are long-running"), blockGroup(blockContainer(bulletListItem("Step")))>',
+    )
+    const { currentDoc, view } = createView(schemaError)
+    const firstRecoverDocument = vi.fn()
+    const secondRecoverDocument = vi.fn()
+
+    installRichEditorTransformErrorRecovery(view, { recoverDocument: firstRecoverDocument })
+    const secondUninstall = installRichEditorTransformErrorRecovery(view, { recoverDocument: secondRecoverDocument })
+    secondUninstall()
+
+    view.dispatch({ before: currentDoc })
+
+    expect(firstRecoverDocument).toHaveBeenCalledTimes(1)
+    expect(secondRecoverDocument).not.toHaveBeenCalled()
+  })
 })
 
 describe('createRichEditorTransformErrorRecoveryExtension', () => {

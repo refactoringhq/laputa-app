@@ -24,7 +24,10 @@ function isVersionNumberPart(value: string, expectedLength?: number): boolean {
 }
 
 function parseCalendarVersion(version: string): CalendarVersionParts | null {
-  const [calendar, prerelease] = version.split('-', 2)
+  const versionParts = version.split('-')
+  if (versionParts.length > 2) return null
+
+  const [calendar, prerelease] = versionParts
   const calendarVersion = parseCalendarVersionParts(calendar)
   if (!calendarVersion) return null
   if (prerelease === undefined) return calendarVersion

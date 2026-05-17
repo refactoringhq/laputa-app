@@ -109,8 +109,22 @@ function stripKnownVaultPrefix({ notePath, vaultPath }: NoteWindowPathContext): 
   if (vaultName && normalizedPath.startsWith(`${vaultName}/`)) {
     return normalizedPath.slice(vaultName.length + 1)
   }
+  if (vaultName) {
+    const embeddedVaultPrefix = `/${vaultName}/`
+    const embeddedVaultIndex = normalizedPath.indexOf(embeddedVaultPrefix)
+    if (embeddedVaultIndex !== -1) {
+      return normalizedPath.slice(embeddedVaultIndex + embeddedVaultPrefix.length)
+    }
+  }
 
   return normalizedPath.replace(/^\/+/, '')
+}
+
+function getVaultRelativeCandidate(vaultName: string | undefined, relativePath: string): string | null {
+  if (!vaultName) return null
+  if (!relativePath) return null
+  if (relativePath.startsWith(`${vaultName}/`)) return null
+  return `${vaultName}/${relativePath}`
 }
 
 export function getNoteWindowPathCandidates({ notePath, vaultPath }: NoteWindowPathContext): string[] {
@@ -122,13 +136,22 @@ export function getNoteWindowPathCandidates({ notePath, vaultPath }: NoteWindowP
   if (normalizedVaultPath) {
     candidates.add(`${normalizedVaultPath}/${relativePath}`)
   }
+  if (relativePath !== normalizedPath) {
+    candidates.add(relativePath)
+  }
+  const vaultName = normalizedVaultPath.split('/').pop()
+  const vaultRelativeCandidate = getVaultRelativeCandidate(vaultName, relativePath)
+  if (vaultRelativeCandidate) candidates.add(vaultRelativeCandidate)
+  const withoutLeadingSlash = normalizedPath.replace(/^\/+/, '')
+  if (withoutLeadingSlash !== normalizedPath) {
+    candidates.add(withoutLeadingSlash)
+  }
 
   return [...candidates]
 }
 
 function pathsMatch(leftPath: string, rightPath: string): boolean {
-  if (leftPath === rightPath) return true
-  return leftPath.endsWith(`/${rightPath}`) || rightPath.endsWith(`/${leftPath}`)
+  return leftPath === rightPath
 }
 
 function variantsOverlap(left: Set<string>, right: Set<string>): boolean {

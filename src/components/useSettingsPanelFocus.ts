@@ -19,7 +19,8 @@ const settingsBoundaryElement = (focusableElements: HTMLElement[], shiftKey: boo
 }
 
 const isSettingsPanelElement = (panel: HTMLElement, activeElement: Element | null): activeElement is Element => {
-  return activeElement instanceof Element && panel.contains(activeElement)
+  return activeElement instanceof Element
+    && (panel.contains(activeElement) || activeElement.closest('[data-settings-panel-portal="true"]') !== null)
 }
 
 const isSettingsFocusBoundary = (activeElement: Element, focusableElements: HTMLElement[], shiftKey: boolean): boolean => {

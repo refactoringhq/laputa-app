@@ -26,6 +26,17 @@ const tldrawMock = vi.hoisted(() => ({
   Tldraw: vi.fn(),
 }))
 
+const tldrawStoreMock = vi.hoisted(() => ({
+  createTLStore: vi.fn(() => ({
+    document: { records: {} },
+    listen: vi.fn(() => vi.fn()),
+  })),
+  getSnapshot: vi.fn((store: { document?: unknown }) => ({ document: store.document ?? { records: {} } })),
+  loadSnapshot: vi.fn((store: { document?: unknown }, snapshot: unknown) => {
+    store.document = snapshot
+  }),
+}))
+
 const assetImportMock = vi.hoisted(() => ({
   getAssetUrlsByImport: vi.fn((formatAssetUrl: (assetUrl?: string) => string) => ({
     embedIcons: {},
@@ -68,15 +79,13 @@ vi.mock('tldraw', async () => {
       }
     },
     Tldraw: tldrawMock.Tldraw,
-    createTLStore: vi.fn(() => ({
-      listen: vi.fn(() => vi.fn()),
-    })),
+    createTLStore: tldrawStoreMock.createTLStore,
     defaultUserPreferences: {
       colorScheme: 'light',
       locale: 'en',
     },
-    getSnapshot: vi.fn(() => ({ document: {} })),
-    loadSnapshot: vi.fn(),
+    getSnapshot: tldrawStoreMock.getSnapshot,
+    loadSnapshot: tldrawStoreMock.loadSnapshot,
     useTldrawUser: vi.fn(({ userPreferences }: { userPreferences: { colorScheme: string } }) => ({
       setUserPreferences: vi.fn(),
       userPreferences: {
@@ -235,5 +244,34 @@ describe('TldrawWhiteboard', () => {
 
     cleanup()
     expect(() => editor.textMeasure.measureElementTextNodeSpans(measuredTextElement())).toThrow('top')
+  })
+
+  it('resets the drawing store when switching to a blank board snapshot', () => {
+    const boardASnapshot = { records: { shape: 'from-board-a' } }
+    const { rerender } = render(
+      <TldrawWhiteboard
+        boardId="board-1"
+        height="520"
+        snapshot={JSON.stringify(boardASnapshot)}
+        width=""
+        onSizeChange={vi.fn()}
+        onSnapshotChange={vi.fn()}
+      />
+    )
+
+    expect(tldrawStoreMock.loadSnapshot).toHaveBeenLastCalledWith(expect.any(Object), boardASnapshot)
+
+    rerender(
+      <TldrawWhiteboard
+        boardId="board-2"
+        height="520"
+        snapshot=""
+        width=""
+        onSizeChange={vi.fn()}
+        onSnapshotChange={vi.fn()}
+      />
+    )
+
+    expect(tldrawStoreMock.loadSnapshot).toHaveBeenLastCalledWith(expect.any(Object), { records: {} })
   })
 })

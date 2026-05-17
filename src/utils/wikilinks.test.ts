@@ -54,6 +54,21 @@ describe('preProcessWikilinks', () => {
     expect(result).not.toContain('[[project/beta|Project Beta]]')
   })
 
+  it('leaves wikilinks inside fenced code unchanged', () => {
+    const input = [
+      'Before [[Real Note]]',
+      '',
+      '```ts',
+      "const sample = '[[Not a note]]'",
+      '```',
+    ].join('\n')
+
+    const result = preProcessWikilinks(input)
+
+    expect(result).toContain('WIKILINK:Real Note')
+    expect(result).toContain('[[Not a note]]')
+  })
+
   it('handles empty string', () => {
     expect(preProcessWikilinks('')).toBe('')
   })
@@ -491,6 +506,18 @@ describe('extractOutgoingLinks', () => {
     expect(extractOutgoingLinks(content)).toEqual(['First', 'Second', 'Third'])
   })
 
+  it('ignores wikilinks inside fenced code blocks', () => {
+    const content = [
+      'See [[Real Note]].',
+      '',
+      '```ts',
+      "const sample = '[[Not a note]]'",
+      '```',
+    ].join('\n')
+
+    expect(extractOutgoingLinks(content)).toEqual(['Real Note'])
+  })
+
   it('ignores empty wikilinks', () => {
     const content = 'Text [[]] and [[Valid]]'
     expect(extractOutgoingLinks(content)).toEqual(['Valid'])
@@ -552,6 +579,20 @@ describe('extractBacklinkContext', () => {
     const content = '---\ntitle: X\n---\n\n# X\n\nFirst [[My Note]] mention.\n\nSecond [[My Note]] mention.'
     const result = extractBacklinkContext(content, targets)
     expect(result).toBe('First [[My Note]] mention.')
+  })
+
+  it('ignores backlink matches inside fenced code blocks', () => {
+    const content = [
+      '# Test',
+      '',
+      '```ts',
+      "const sample = '[[My Note]]'",
+      '```',
+      '',
+      'No real backlink here.',
+    ].join('\n')
+
+    expect(extractBacklinkContext(content, targets)).toBeNull()
   })
 
   it('does not return paragraph when maxLength is respected', () => {

@@ -33,6 +33,17 @@ describe('useCodeMirror', () => {
     expect(container.querySelector('.cm-editor')).toBeInTheDocument()
   })
 
+  it('does not vertically offset line numbers from editor text', () => {
+    const ref = { current: container }
+    renderHook(() =>
+      useCodeMirror(ref, '---\ntype: Note\n---', noopCallbacks),
+    )
+    const gutters = container.querySelector('.cm-gutters')
+
+    expect(gutters).toBeInTheDocument()
+    expect(getComputedStyle(gutters!).paddingTop).toBe('0px')
+  })
+
   it('tags generated CodeMirror style elements with the runtime CSP nonce', () => {
     const ref = { current: container }
     const { result } = renderHook(() =>

@@ -19,14 +19,13 @@ function buildDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const doc = view.state.doc
   const fmEnd = findFrontmatterEnd(doc)
+  if (fmEnd === -1) return builder.finish()
 
-  for (let i = 1; i <= doc.lines; i++) {
+  for (let i = 1; i <= fmEnd; i++) {
     const line = doc.line(i)
     const text = line.text
 
-    if (i <= fmEnd) {
-      decorateFrontmatterLine(builder, line.from, text, i === 1 || i === fmEnd)
-    }
+    decorateFrontmatterLine(builder, line.from, text, i === 1 || i === fmEnd)
   }
 
   return builder.finish()
@@ -64,7 +63,7 @@ export const frontmatterHighlightPlugin = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view)
     }
     update(update: { docChanged: boolean; viewportChanged: boolean; view: EditorView }) {
-      if (update.docChanged || update.viewportChanged) {
+      if (update.docChanged) {
         this.decorations = buildDecorations(update.view)
       }
     }

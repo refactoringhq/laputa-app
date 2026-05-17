@@ -155,6 +155,21 @@ describe('TypeCustomizePopover', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('flushes the latest template edit before closing', () => {
+    vi.useFakeTimers()
+    try {
+      renderPopover()
+      fireEvent.change(screen.getByTestId('template-textarea'), { target: { value: '## Immediate' } })
+
+      fireEvent.click(screen.getByText('Done'))
+
+      expect(onChangeTemplate).toHaveBeenCalledWith('## Immediate')
+      expect(onClose).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('renders curated color options without the teal near-duplicate', () => {
     renderPopover()
 
@@ -203,6 +218,20 @@ describe('TypeCustomizePopover', () => {
       })
 
       expect(onChangeTemplate).toHaveBeenCalledWith('## Debounced')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('flushes a pending template edit on unmount', () => {
+    vi.useFakeTimers()
+    try {
+      const { unmount } = renderPopover()
+      fireEvent.change(screen.getByTestId('template-textarea'), { target: { value: '## Unmounted' } })
+
+      unmount()
+
+      expect(onChangeTemplate).toHaveBeenCalledWith('## Unmounted')
     } finally {
       vi.useRealTimers()
     }

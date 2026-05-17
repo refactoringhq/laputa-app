@@ -25,4 +25,8 @@ describe('propertyDropdownUtils', () => {
     expect(getAnchoredDropdownLeft(100, 208, 800)).toBe(8)
     expect(getAnchoredDropdownLeft(900, 208, 800)).toBe(584)
   })
+
+  it('keeps an over-wide dropdown at the visible left margin', () => {
+    expect(getAnchoredDropdownLeft(320, 400, 320, 8)).toBe(8)
+  })
 })

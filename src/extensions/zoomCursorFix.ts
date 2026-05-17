@@ -1,26 +1,25 @@
 import { EditorView, ViewPlugin } from '@codemirror/view'
 
+function parseZoomValue(source: string | undefined): number | null {
+  const value = source?.trim() ?? ''
+  if (!value || value === 'normal') return null
+
+  let parsed = parseFloat(value)
+  if (value.endsWith('%')) parsed /= 100
+  return parsed > 0 && isFinite(parsed) ? parsed : null
+}
+
 /**
  * Read the current CSS zoom factor from document.documentElement.
  * Returns 1 when no zoom is applied or the value is unparseable.
- *
- * Checks getComputedStyle first (real browsers return the decimal value),
- * then falls back to the inline style property (works in jsdom and test
- * environments where getComputedStyle doesn't report zoom).
  */
 export function getDocumentZoom(): number {
-  const computed = getComputedStyle(document.documentElement).zoom
-  if (computed && computed !== 'normal') {
-    const parsed = parseFloat(computed)
-    if (parsed > 0 && isFinite(parsed)) return parsed
-  }
+  const computedZoom = parseZoomValue(getComputedStyle(document.documentElement).zoom)
+  if (computedZoom !== null) return computedZoom
 
   const inline = document.documentElement.style.getPropertyValue('zoom')
-  if (inline && inline !== 'normal') {
-    let value = parseFloat(inline)
-    if (inline.endsWith('%')) value /= 100
-    if (value > 0 && isFinite(value)) return value
-  }
+  const inlineZoom = parseZoomValue(inline)
+  if (inlineZoom !== null) return inlineZoom
 
   return 1
 }
@@ -69,6 +68,54 @@ function caretPosFromPoint(
 
 type Coords = { x: number; y: number }
 type PosAndSide = { pos: number; assoc: -1 | 1 }
+type CoordsMethod<Result> = (
+  this: EditorView,
+  coords: Coords,
+  precise?: boolean,
+) => Result
+
+type EditorViewCoordsOverrides = {
+  posAtCoords?: CoordsMethod<number | null>
+  posAndSideAtCoords?: CoordsMethod<PosAndSide | null>
+}
+
+interface ZoomAwareCoordsCall<Result> {
+  self: EditorView
+  coords: Coords
+  precise: boolean | undefined
+  originalMethod: CoordsMethod<Result>
+  resultFromCaret: (pos: number) => Result
+}
+
+function callZoomAwareCoords<Result>(call: ZoomAwareCoordsCall<Result>): Result {
+  const { self, coords, precise, originalMethod, resultFromCaret } = call
+  const zoom = getDocumentZoom()
+  if (zoom === 1) return originalMethod.call(self, coords, precise)
+
+  const pos = caretPosFromPoint(self, coords.x, coords.y)
+  if (pos !== null) return resultFromCaret(pos)
+
+  return originalMethod.call(self, adjustCoordsForZoom(coords, zoom), precise)
+}
+
+function makeZoomCoordsOverride<Result>(
+  originalMethod: CoordsMethod<Result>,
+  resultFromCaret: (pos: number) => Result,
+): CoordsMethod<Result> {
+  return function zoomAwareCoordsOverride(
+    this: EditorView,
+    coords: Coords,
+    precise?: boolean,
+  ): Result {
+    return callZoomAwareCoords({
+      self: this,
+      coords,
+      precise,
+      originalMethod,
+      resultFromCaret,
+    })
+  }
+}
 
 /**
  * CodeMirror extension that fixes cursor positioning at non-100% CSS zoom.
@@ -85,71 +132,24 @@ type PosAndSide = { pos: number; assoc: -1 | 1 }
  *    factor if caretRangeFromPoint is unavailable or returns no result.
  */
 export function zoomCursorFix() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  type AnyFn = (...args: any[]) => any
-
   return ViewPlugin.define((view) => {
-    const origPosAtCoords: AnyFn =
-      Object.getPrototypeOf(view).posAtCoords
-    const origPosAndSideAtCoords: AnyFn =
-      Object.getPrototypeOf(view).posAndSideAtCoords
-
-    function zoomPosAtCoords(
-      self: EditorView,
-      coords: Coords,
-      precise?: boolean,
-    ): number | null {
-      const zoom = getDocumentZoom()
-      if (zoom === 1) return origPosAtCoords.call(self, coords, precise)
-
-      const pos = caretPosFromPoint(self, coords.x, coords.y)
-      if (pos !== null) return pos
-
-      const adjusted = adjustCoordsForZoom(coords, zoom)
-      return origPosAtCoords.call(self, adjusted, precise)
-    }
-
-    function zoomPosAndSideAtCoords(
-      self: EditorView,
-      coords: Coords,
-      precise?: boolean,
-    ): PosAndSide | null {
-      const zoom = getDocumentZoom()
-      if (zoom === 1)
-        return origPosAndSideAtCoords.call(self, coords, precise)
-
-      const pos = caretPosFromPoint(self, coords.x, coords.y)
-      if (pos !== null) return { pos, assoc: 1 }
-
-      const adjusted = adjustCoordsForZoom(coords, zoom)
-      return origPosAndSideAtCoords.call(self, adjusted, precise)
-    }
+    const prototype = Object.getPrototypeOf(view) as Required<EditorViewCoordsOverrides>
+    const origPosAtCoords = prototype.posAtCoords
+    const origPosAndSideAtCoords = prototype.posAndSideAtCoords
+    const overrides = view as EditorViewCoordsOverrides
 
     // Override on the instance (shadows prototype methods)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(view as any).posAtCoords = function (
-      this: EditorView,
-      coords: Coords,
-      precise?: boolean,
-    ) {
-      return zoomPosAtCoords(this, coords, precise)
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(view as any).posAndSideAtCoords = function (
-      this: EditorView,
-      coords: Coords,
-      precise?: boolean,
-    ) {
-      return zoomPosAndSideAtCoords(this, coords, precise)
-    }
+    overrides.posAtCoords = makeZoomCoordsOverride(origPosAtCoords, (pos) => pos)
+    overrides.posAndSideAtCoords = makeZoomCoordsOverride(
+      origPosAndSideAtCoords,
+      (pos) => ({ pos, assoc: 1 }),
+    )
 
     return {
       destroy() {
         // Remove instance overrides, restoring prototype methods
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (view as any).posAtCoords
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (view as any).posAndSideAtCoords
+        delete overrides.posAtCoords
+        delete overrides.posAndSideAtCoords
       },
     }
   })

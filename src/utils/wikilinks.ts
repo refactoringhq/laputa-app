@@ -20,14 +20,23 @@ type TokenSequence = string
 type ParsedTextRange = { text: MarkdownSource, nextIndex: TextOffset }
 type MatchTargets = Set<WikilinkTarget>
 type WordCount = number
+type FenceMarker = string | null
 
 /** Pre-process markdown: replace [[target]] with placeholder tokens */
 export function preProcessWikilinks(md: MarkdownSource): MarkdownSource {
   const lines = md.split('\n')
   const tableLines = findMarkdownTableLines(lines)
-  return lines.map((line, index) => (
-    replaceWikilinksWithPlaceholders(line, { encodePayload: tableLines.at(index) ?? false })
-  )).join('\n')
+  let fenceMarker: FenceMarker = null
+
+  return lines.map((line, index) => {
+    const nextFenceMarker = nextMarkdownFenceMarker(line, fenceMarker)
+    if (nextFenceMarker !== fenceMarker || fenceMarker !== null) {
+      fenceMarker = nextFenceMarker
+      return line
+    }
+
+    return replaceWikilinksWithPlaceholders(line, { encodePayload: tableLines.at(index) ?? false })
+  }).join('\n')
 }
 
 // Minimal shape of a BlockNote block for wikilink processing
@@ -100,12 +109,41 @@ function decodePlaceholderPayload(payload: PlaceholderPayload): WikilinkTarget {
   }
 }
 
+function lineFenceMarker(line: MarkdownLine): FenceMarker {
+  return line.trimStart().match(/^(`{3,}|~{3,})/)?.[1] ?? null
+}
+
+function nextMarkdownFenceMarker(line: MarkdownLine, currentMarker: FenceMarker): FenceMarker {
+  const marker = lineFenceMarker(line)
+  if (!marker) return currentMarker
+  if (!currentMarker) return marker
+  return marker[0] === currentMarker[0] && marker.length >= currentMarker.length ? null : currentMarker
+}
+
+function blankFencedCodeLines(content: MarkdownSource): MarkdownSource {
+  let fenceMarker: FenceMarker = null
+  return content.split('\n').map((line) => {
+    const nextFenceMarker = nextMarkdownFenceMarker(line, fenceMarker)
+    const shouldBlank = fenceMarker !== null || nextFenceMarker !== fenceMarker
+    fenceMarker = nextFenceMarker
+    return shouldBlank ? '' : line
+  }).join('\n')
+}
+
 function findMarkdownTableLines(lines: MarkdownLines): TableLineMap {
   const tableLines = lines.map(() => false)
+  let fenceMarker: FenceMarker = null
+
   for (let index = 0; index < lines.length - 1; index++) {
     const line = lines.at(index)
     const nextLine = lines.at(index + 1)
     if (line === undefined || nextLine === undefined) continue
+    const nextFenceMarker = nextMarkdownFenceMarker(line, fenceMarker)
+    if (fenceMarker !== null || nextFenceMarker !== fenceMarker) {
+      fenceMarker = nextFenceMarker
+      continue
+    }
+
     if (!isPotentialTableRow(line) || !isMarkdownTableSeparator(nextLine)) {
       continue
     }
@@ -298,11 +336,15 @@ export function extractOutgoingLinks(content: MarkdownSource): WikilinkTarget[] 
   const links: WikilinkTarget[] = []
   const re = /\[\[([^\]]+)\]\]/g
   let match
-  while ((match = re.exec(content)) !== null) {
-    const inner = match[1]
-    const pipeIdx = inner.indexOf('|')
-    const target = pipeIdx !== -1 ? inner.slice(0, pipeIdx) : inner
-    if (target) links.push(target)
+  const searchableContent = blankFencedCodeLines(content)
+  for (const line of searchableContent.split('\n')) {
+    re.lastIndex = 0
+    while ((match = re.exec(line)) !== null) {
+      const inner = match[1]
+      const pipeIdx = inner.indexOf('|')
+      const target = pipeIdx !== -1 ? inner.slice(0, pipeIdx) : inner
+      if (target) links.push(target)
+    }
   }
   return [...new Set(links)].sort()
 }
@@ -316,8 +358,9 @@ export function extractBacklinkContext(
   maxLength: CharacterCount = 120,
 ): MarkdownSource | null {
   const [, body] = splitFrontmatter(content)
+  const searchableBody = blankFencedCodeLines(body)
   // Remove the H1 title line
-  const withoutTitle = body.replace(/^\s*# [^\n]+\n?/, '')
+  const withoutTitle = searchableBody.replace(/^\s*# [^\n]+\n?/, '')
   const paragraphs = withoutTitle.split(/\n{2,}/)
 
   for (const para of paragraphs) {
