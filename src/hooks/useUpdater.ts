@@ -9,7 +9,7 @@ import {
 import { formatCalendarVersionForDisplay } from '../utils/calendarVersion'
 import { openExternalUrl } from '../utils/url'
 
-const RELEASE_NOTES_URL = 'https://refactoringhq.github.io/tolaria/'
+const RELEASE_NOTES_URL = 'https://tolaria.md/releases/'
 
 interface UpdateVersionInfo {
   version: string

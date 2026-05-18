@@ -279,7 +279,7 @@ describe('useUpdater', () => {
     })
 
     expect(mockOpenExternalUrl).toHaveBeenCalledWith(
-      'https://refactoringhq.github.io/tolaria/'
+      'https://tolaria.md/releases/'
     )
   })
 
