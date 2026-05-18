@@ -313,7 +313,7 @@
   "mcp.setup.disconnect": "Rozłącz",
   "mcp.setup.connecting": "Łączenie…",
   "mcp.setup.disconnecting": "Rozłączanie…",
-  "mcp.setup.nodeRequirement": "Ta konfiguracja wymaga Node.js 18+ w PATH i narzędzia kompatybilnego z MCP. Tolaria sprawdza Node.js przed zapisem konfiguracji, aby narzędzie nie wskazywało na uszkodzone polecenie.",
+  "mcp.setup.runtimeRequirement": "Ta konfiguracja wymaga Node.js 18+ lub Bun 1+ w PATH oraz narzędzia kompatybilnego z MCP. Tolaria sprawdza środowisko uruchomieniowe przed zapisem konfiguracji, aby narzędzie nie wskazywało na uszkodzone polecenie.",
   "mcp.setup.writeEntryDescription": "Potwierdzenie tej akcji zapisze lub zaktualizuje pojedynczy wpis MCP {entry} Tolaria w:",
   "mcp.setup.clientPathsDescription": "Claude Code CLI czyta ~/.claude.json, Gemini CLI czyta ~/.gemini/settings.json, Cursor czyta ~/.cursor/mcp.json, a ogólna ścieżka ~/.config/mcp/mcp.json jest obsługiwana przez inne narzędzia kompatybilne z MCP. Zamknięcie pozostawia wszystkie pliki nietknięte, chyba że połączysz lub rozłączysz; ponowne połączenie jest idempotentne, a rozłączenie usuwa wpis Tolaria.",
   "mcp.setup.geminiGuidanceDescription": "Gemini CLI wymaga własnej instalacji i logowania. Użyj Przywróć wytyczne Tolaria AI, gdy chcesz plik GEMINI.md w katalogu głównym sejfu wskazujący na wspólne instrukcje AGENTS.md bez nadpisywania niestandardowych wytycznych.",

@@ -24,44 +24,108 @@ pub enum McpStatus {
     NotInstalled,
 }
 
-/// Find the `node` binary path at runtime.
-pub(crate) fn find_node() -> Result<PathBuf, String> {
-    let mut last_error = None;
-    for path in node_binary_candidates() {
-        match verify_node_version(&path) {
-            Ok(()) => return Ok(path),
-            Err(error) => last_error = Some(error),
-        }
-    }
-
-    Err(last_error.unwrap_or_else(|| "node not found in PATH or common install locations".into()))
+/// A resolved runtime that can execute the MCP server scripts.
+#[derive(Debug, Clone)]
+pub(crate) struct McpRuntime {
+    pub(crate) kind: McpRuntimeKind,
+    pub(crate) binary: PathBuf,
 }
 
-fn node_binary_candidates() -> Vec<PathBuf> {
-    let mut candidates = find_node_on_path();
-    candidates.extend(find_node_in_user_shell());
-    candidates.extend(fallback_node_paths());
+/// Which JS runtime was selected for the MCP server.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum McpRuntimeKind {
+    Node,
+    Bun,
+}
+
+impl McpRuntimeKind {
+    fn binary_name(self) -> &'static str {
+        match self {
+            McpRuntimeKind::Node => node_binary_name(),
+            McpRuntimeKind::Bun => bun_binary_name(),
+        }
+    }
+}
+
+/// Find any supported MCP runtime, preferring Node over Bun.
+pub(crate) fn find_mcp_runtime() -> Result<McpRuntime, String> {
+    let mut last_error = None;
+    for kind in [McpRuntimeKind::Node, McpRuntimeKind::Bun] {
+        if let Some(binary) = try_runtime(kind, &mut last_error) {
+            return Ok(McpRuntime { kind, binary });
+        }
+    }
+    Err(last_error.unwrap_or_else(|| {
+        "No supported MCP runtime found. Install Node.js 18+ or Bun 1+ and ensure it's on PATH."
+            .into()
+    }))
+}
+
+/// Find the `node` binary specifically. Used by Codex/CLI agent shims that
+/// require Node and cannot fall back to Bun.
+pub(crate) fn find_node() -> Result<PathBuf, String> {
+    let mut last_error = None;
+    if let Some(binary) = try_runtime(McpRuntimeKind::Node, &mut last_error) {
+        return Ok(binary);
+    }
+    Err(last_error.unwrap_or_else(|| {
+        format!(
+            "{} not found in PATH or common install locations",
+            McpRuntimeKind::Node.binary_name()
+        )
+    }))
+}
+
+fn try_runtime(kind: McpRuntimeKind, last_error: &mut Option<String>) -> Option<PathBuf> {
+    for path in runtime_binary_candidates(kind) {
+        match verify_runtime_version(kind, &path) {
+            Ok(()) => return Some(path),
+            Err(error) => *last_error = Some(error),
+        }
+    }
+    None
+}
+
+fn runtime_binary_candidates(kind: McpRuntimeKind) -> Vec<PathBuf> {
+    let command = kind.binary_name();
+    let mut candidates = find_on_path(command);
+    candidates.extend(find_in_user_shell(command));
+    candidates.extend(fallback_paths_for(kind));
     candidates
 }
 
-fn find_node_on_path() -> Vec<PathBuf> {
-    node_lookup_command()
+fn fallback_paths_for(kind: McpRuntimeKind) -> Vec<PathBuf> {
+    match kind {
+        McpRuntimeKind::Node => fallback_node_paths(),
+        McpRuntimeKind::Bun => fallback_bun_paths(),
+    }
+}
+
+fn verify_runtime_version(kind: McpRuntimeKind, path: &Path) -> Result<(), String> {
+    match kind {
+        McpRuntimeKind::Node => verify_node_version(path),
+        McpRuntimeKind::Bun => verify_bun_version(path),
+    }
+}
+
+fn find_on_path(command: &str) -> Vec<PathBuf> {
+    lookup_command(command)
         .output()
         .ok()
         .filter(|output| output.status.success())
-        .map(|output| node_lookup_paths(&output.stdout))
+        .map(|output| lookup_paths(&output.stdout))
         .unwrap_or_default()
 }
 
-fn find_node_in_user_shell() -> Vec<PathBuf> {
+fn find_in_user_shell(command: &str) -> Vec<PathBuf> {
     user_shell_candidates()
         .into_iter()
         .filter(|shell| shell.exists())
-        .filter_map(|shell| command_path_from_shell(&shell, "node"))
+        .filter_map(|shell| command_path_from_shell(&shell, command))
         .collect()
 }
 
-fn node_lookup_paths(stdout: &[u8]) -> Vec<PathBuf> {
+fn lookup_paths(stdout: &[u8]) -> Vec<PathBuf> {
     String::from_utf8_lossy(stdout)
         .lines()
         .map(str::trim)
@@ -148,14 +212,14 @@ fn node_major_version(version: &str) -> Option<u32> {
         .and_then(|major| major.parse().ok())
 }
 
-fn node_lookup_command() -> Command {
+fn lookup_command(command: &str) -> Command {
     #[cfg(windows)]
-    let mut command = subprocess::command("where.exe");
+    let mut cmd = subprocess::command("where.exe");
     #[cfg(not(windows))]
-    let mut command = subprocess::command("which");
+    let mut cmd = subprocess::command("which");
 
-    command.arg("node");
-    command
+    cmd.arg(command);
+    cmd
 }
 
 fn fallback_node_paths() -> Vec<PathBuf> {
@@ -228,6 +292,81 @@ fn node_binary_name() -> &'static str {
     } else {
         "node"
     }
+}
+
+fn fallback_bun_paths() -> Vec<PathBuf> {
+    let mut candidates = vec![
+        PathBuf::from("/opt/homebrew/bin/bun"),
+        PathBuf::from("/usr/local/bin/bun"),
+    ];
+
+    #[cfg(windows)]
+    {
+        if let Some(profile) = std::env::var_os("USERPROFILE") {
+            candidates.push(
+                PathBuf::from(profile)
+                    .join(".bun")
+                    .join("bin")
+                    .join("bun.exe"),
+            );
+        }
+    }
+
+    if let Some(home) = dirs::home_dir() {
+        candidates.extend(bun_binary_candidates_for_home(&home));
+    }
+
+    candidates
+        .into_iter()
+        .filter(|path| path.is_file())
+        .collect()
+}
+
+fn bun_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
+    vec![
+        home.join(".bun").join("bin").join(bun_binary_name()),
+        home.join(".local/share/mise/shims").join(bun_binary_name()),
+        home.join(".mise").join("shims").join(bun_binary_name()),
+        home.join(".asdf").join("shims").join(bun_binary_name()),
+        home.join(".proto").join("bin").join(bun_binary_name()),
+    ]
+}
+
+fn bun_binary_name() -> &'static str {
+    if cfg!(windows) {
+        "bun.exe"
+    } else {
+        "bun"
+    }
+}
+
+fn verify_bun_version(bun: &Path) -> Result<(), String> {
+    let output = subprocess::command(bun)
+        .arg("--version")
+        .output()
+        .map_err(|e| format!("Failed to run {} --version: {e}", bun.display()))?;
+    if !output.status.success() {
+        return Err(format!(
+            "{} --version failed; install Bun 1+ and make it available on PATH",
+            bun.display()
+        ));
+    }
+
+    let raw_version = String::from_utf8_lossy(&output.stdout);
+    let Some(major) = node_major_version(&raw_version) else {
+        return Err(format!(
+            "Cannot parse Bun version from '{}'",
+            raw_version.trim()
+        ));
+    };
+    if major < 1 {
+        return Err(format!(
+            "Bun 1+ is required for Tolaria MCP tools; found {}",
+            raw_version.trim()
+        ));
+    }
+
+    Ok(())
 }
 
 /// Resolve the path to `mcp-server/`.
@@ -407,13 +546,13 @@ pub fn spawn_ws_bridge_with_paths(
     vault_path: impl AsRef<Path>,
     vault_paths: &[PathBuf],
 ) -> Result<Child, String> {
-    let node = find_node()?;
+    let runtime = find_mcp_runtime()?;
     let server_dir = mcp_server_dir()?;
     let script = server_dir.join("ws-bridge.js");
     let vault_path = vault_path.as_ref();
     let active_vault_paths = active_vault_paths_json(vault_path, vault_paths);
 
-    let mut command = subprocess::command(node);
+    let mut command = subprocess::command(&runtime.binary);
     let child = command
         .arg(&script)
         .env("VAULT_PATH", vault_path)
@@ -427,8 +566,9 @@ pub fn spawn_ws_bridge_with_paths(
         .map_err(|e| format!("Failed to spawn ws-bridge: {e}"))?;
 
     log::info!(
-        "ws-bridge spawned (pid: {}, vault: {})",
+        "ws-bridge spawned (pid: {}, runtime: {:?}, vault: {})",
         child.id(),
+        runtime.kind,
         vault_path.display()
     );
     Ok(child)
@@ -498,10 +638,10 @@ fn entry_has_ui_port(entry: &serde_json::Value) -> bool {
 }
 
 /// Build the durable external MCP server entry JSON for an index.js path.
-fn build_mcp_entry(node_command: &str, index_js: &str) -> serde_json::Value {
+fn build_mcp_entry(runtime_command: &str, index_js: &str) -> serde_json::Value {
     serde_json::json!({
         "type": "stdio",
-        "command": node_command,
+        "command": runtime_command,
         "args": [index_js],
         "env": {
             "WS_UI_PORT": "9711"
@@ -521,13 +661,15 @@ fn build_mcp_config_snippet(entry: &serde_json::Value) -> Result<String, String>
 /// Build the exact MCP config JSON users can copy into compatible tools.
 pub fn mcp_config_snippet(vault_path: &str) -> Result<String, String> {
     let _ = vault_path;
-    let node = find_node().map_err(|e| {
-        format!("Node.js 18+ is required on PATH before Tolaria can build MCP config: {e}")
+    let runtime = find_mcp_runtime().map_err(|e| {
+        format!(
+            "Node.js 18+ or Bun 1+ is required on PATH before Tolaria can build MCP config: {e}"
+        )
     })?;
     let server_dir = mcp_server_dir_for_registration()?;
     let index_js = server_dir.join("index.js").to_string_lossy().into_owned();
-    let node_command = node.to_string_lossy().into_owned();
-    let entry = build_mcp_entry(&node_command, &index_js);
+    let runtime_command = runtime.binary.to_string_lossy().into_owned();
+    let entry = build_mcp_entry(&runtime_command, &index_js);
 
     build_mcp_config_snippet(&entry)
 }
@@ -549,15 +691,17 @@ fn register_mcp_to_configs(entry: &serde_json::Value, config_paths: &[PathBuf]) 
 /// Register Tolaria as an MCP server in external AI tool config files.
 pub fn register_mcp(vault_path: &str) -> Result<String, String> {
     let _ = vault_path;
-    let node = find_node().map_err(|e| {
-        format!("Node.js 18+ is required on PATH before Tolaria can register MCP tools: {e}")
+    let runtime = find_mcp_runtime().map_err(|e| {
+        format!(
+            "Node.js 18+ or Bun 1+ is required on PATH before Tolaria can register MCP tools: {e}"
+        )
     })?;
     let server_dir = mcp_server_dir_for_registration()?;
     let index_js = server_dir.join("index.js").to_string_lossy().into_owned();
-    let node_command = node.to_string_lossy().into_owned();
+    let runtime_command = runtime.binary.to_string_lossy().into_owned();
 
-    let entry = build_mcp_entry(&node_command, &index_js);
-    let opencode_entry = opencode::build_entry(&node_command, &index_js);
+    let entry = build_mcp_entry(&runtime_command, &index_js);
+    let opencode_entry = opencode::build_entry(&runtime_command, &index_js);
     if let Some(config_path) = opencode::config_path() {
         if let Err(e) = opencode::upsert_config(&config_path, &opencode_entry) {
             log::warn!("Failed to update {}: {}", config_path.display(), e);
@@ -793,10 +937,10 @@ mod tests {
     }
 
     #[test]
-    fn node_lookup_paths_keep_non_empty_lines_in_order() {
+    fn lookup_paths_keep_non_empty_lines_in_order() {
         let stdout = b"\nC:\\Program Files\\nodejs\\node.exe\r\nC:\\Other\\node.exe\r\n";
         assert_eq!(
-            node_lookup_paths(stdout),
+            lookup_paths(stdout),
             vec![
                 PathBuf::from("C:\\Program Files\\nodejs\\node.exe"),
                 PathBuf::from("C:\\Other\\node.exe"),
@@ -1141,6 +1285,63 @@ mod tests {
             "path should contain 'node': {:?}",
             node
         );
+    }
+
+    #[test]
+    fn find_mcp_runtime_returns_valid_runtime() {
+        let runtime = find_mcp_runtime().unwrap();
+        assert!(
+            runtime.binary.exists(),
+            "runtime binary should exist at {:?}",
+            runtime.binary
+        );
+        let expected = match runtime.kind {
+            McpRuntimeKind::Node => "node",
+            McpRuntimeKind::Bun => "bun",
+        };
+        assert!(
+            runtime.binary.to_string_lossy().contains(expected),
+            "path should contain '{expected}': {:?}",
+            runtime.binary
+        );
+    }
+
+    #[test]
+    fn bun_binary_candidates_include_shell_managed_installs() {
+        let home = PathBuf::from("/Users/alex");
+        let candidates = bun_binary_candidates_for_home(&home);
+        let expected = [
+            home.join(".bun/bin/bun"),
+            home.join(".local/share/mise/shims/bun"),
+            home.join(".mise/shims/bun"),
+            home.join(".asdf/shims/bun"),
+            home.join(".proto/bin/bun"),
+        ];
+
+        for candidate in expected {
+            assert!(
+                candidates.contains(&candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    #[test]
+    fn verify_bun_version_accepts_real_bun_binary() {
+        let Ok(bun) = find_bun_for_test() else {
+            // Bun is optional on dev machines; skip when absent.
+            return;
+        };
+        verify_bun_version(&bun).expect("installed bun should satisfy version requirement");
+    }
+
+    fn find_bun_for_test() -> Result<PathBuf, String> {
+        let mut last_error = None;
+        if let Some(bin) = try_runtime(McpRuntimeKind::Bun, &mut last_error) {
+            return Ok(bin);
+        }
+        Err(last_error.unwrap_or_else(|| "bun not present in test environment".into()))
     }
 
     #[test]

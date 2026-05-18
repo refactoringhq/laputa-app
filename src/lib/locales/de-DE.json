@@ -313,7 +313,7 @@
   "mcp.setup.disconnect": "Verbindung trennen",
   "mcp.setup.connecting": "Verbindung wird hergestellt …",
   "mcp.setup.disconnecting": "Verbindung wird getrennt …",
-  "mcp.setup.nodeRequirement": "Für diese Einrichtung sind Node.js 18+ im PATH und ein MCP-kompatibles Desktop-Tool erforderlich. Tolaria prüft Node.js, bevor es die Konfiguration schreibt, damit das Tool nicht auf einen fehlerhaften Befehl verweist.",
+  "mcp.setup.runtimeRequirement": "Für diese Einrichtung sind Node.js 18+ oder Bun 1+ im PATH und ein MCP-kompatibles Desktop-Tool erforderlich. Tolaria prüft die Laufzeitumgebung, bevor es die Konfiguration schreibt, damit das Tool nicht auf einen fehlerhaften Befehl verweist.",
   "mcp.setup.writeEntryDescription": "Wenn Sie diese Aktion bestätigen, wird der einzige {entry}-MCP-Eintrag von Tolaria geschrieben oder aktualisiert in:",
   "mcp.setup.clientPathsDescription": "Die Claude Code CLI liest ~/.claude.json, die Gemini CLI liest ~/.gemini/settings.json, Cursor liest ~/.cursor/mcp.json, und der allgemeine Pfad ~/.config/mcp/mcp.json wird von anderen MCP-kompatiblen Tools erkannt. Beim Schließen bleiben alle Dateien unverändert, es sei denn, Sie stellen eine Verbindung her oder trennen sie. Das Wiederherstellen der Verbindung ist idempotent, und das Trennen der Verbindung entfernt den Tolaria-Eintrag erneut.",
   "mcp.setup.geminiGuidanceDescription": "Für die Gemini-CLI sind eine eigene Installation und eine eigene Anmeldung erforderlich. Verwenden Sie „Restore Tolaria AI Guidance“, wenn Sie einen GEMINI.md-Kompatibilitäts-Shim für den Vault-Root benötigen, der Gemini zurück zu den gemeinsamen AGENTS.md-Anweisungen führt, ohne die benutzerdefinierte Anleitung zu überschreiben.",

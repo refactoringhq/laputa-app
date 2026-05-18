@@ -313,7 +313,7 @@
   "mcp.setup.disconnect": "Disconnetti",
   "mcp.setup.connecting": "Connessione in corso…",
   "mcp.setup.disconnecting": "Disconnessione in corso…",
-  "mcp.setup.nodeRequirement": "Per questa configurazione sono necessari Node.js 18 o versioni successive nel PATH e uno strumento desktop compatibile con MCP. Tolaria verifica Node.js prima di scrivere la configurazione, in modo che lo strumento non punti a un comando non funzionante.",
+  "mcp.setup.runtimeRequirement": "Per questa configurazione sono necessari Node.js 18+ o Bun 1+ nel PATH e uno strumento desktop compatibile con MCP. Tolaria verifica il runtime prima di scrivere la configurazione, in modo che lo strumento non punti a un comando non funzionante.",
   "mcp.setup.writeEntryDescription": "Confermando questa azione, verrà scritta o aggiornata l'unica voce MCP {entry} di Tolaria in:",
   "mcp.setup.clientPathsDescription": "La CLI di Claude Code legge ~/.claude.json, la CLI di Gemini legge ~/.gemini/settings.json, Cursor legge ~/.cursor/mcp.json e il percorso generico ~/.config/mcp/mcp.json viene utilizzato da altri strumenti compatibili con MCP. Alla chiusura, tutti i file rimangono inalterati a meno che non ci si connetta o si disconnetta; la riconnessione è idempotente e la disconnessione rimuove nuovamente la voce di Tolaria.",
   "mcp.setup.geminiGuidanceDescription": "La CLI di Gemini richiede una propria installazione e un proprio accesso. Utilizza Restore Tolaria AI Guidance quando desideri uno shim di compatibilità GEMINI.md a livello di vault-root che reindirizzi Gemini alle istruzioni condivise di AGENTS.md senza sovrascrivere la guida personalizzata.",

@@ -74,6 +74,7 @@ import {
 import { createViewFilename } from './utils/viewFilename'
 import { nextViewOrder } from './utils/viewOrdering'
 import { viewMatchesSelection, viewVaultPath } from './utils/viewIdentity'
+import { viewCreationVaultPath } from './utils/viewTargetVault'
 import { ConflictResolverModal } from './components/ConflictResolverModal'
 import { ConfirmDeleteDialog } from './components/ConfirmDeleteDialog'
 import { DeleteProgressNotice } from './components/DeleteProgressNotice'
@@ -1168,8 +1169,13 @@ function App() {
 
   const handleCreateOrUpdateView = useCallback(async (definition: ViewDefinition) => {
     const editing = dialogs.editingView
-    const activeVaultViews = viewsForVault(vault.views, resolvedPath)
-    const targetVaultPath = editing?.rootPath ?? resolvedPath
+    const targetVaultPath = viewCreationVaultPath({
+      editingRootPath: editing?.rootPath,
+      fallbackVaultPath: resolvedPath,
+      graphDefaultWorkspacePath,
+      multiWorkspaceEnabled,
+    })
+    const activeVaultViews = viewsForVault(vault.views, targetVaultPath)
     const filename = savedViewFilename(definition, editing, activeVaultViews)
     const nextDefinition = savedViewDefinition(definition, editing, activeVaultViews)
     const target = isTauri() ? invoke : mockInvoke
@@ -1190,7 +1196,7 @@ function App() {
       setToastMessage(`Could not save view: ${message}`)
       return false
     }
-  }, [resolvedPath, vault, handleSetSelection, dialogs.editingView, setToastMessage])
+  }, [graphDefaultWorkspacePath, multiWorkspaceEnabled, resolvedPath, vault, handleSetSelection, dialogs.editingView, setToastMessage])
 
   const handleUpdateViewDefinition = useCallback(async (filename: string, patch: Partial<ViewDefinition>, rootPath?: string) => {
     const existing = vault.views.find((view) => viewMatchesSelection(view, viewSelection(filename, rootPath)))

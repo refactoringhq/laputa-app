@@ -313,7 +313,7 @@
   "mcp.setup.disconnect": "切断",
   "mcp.setup.connecting": "接続中…",
   "mcp.setup.disconnecting": "切断中…",
-  "mcp.setup.nodeRequirement": "このセットアップには、PATH に Node.js 18 以上が設定されていること、および MCP 対応のデスクトップツールが必要です。Tolariaは、構成を書き込む前にNode.jsを確認するため、ツールが機能しないコマンドを指す状態になることはありません。",
+  "mcp.setup.runtimeRequirement": "このセットアップには、PATH に Node.js 18+ または Bun 1+ が設定されていること、および MCP 対応のデスクトップツールが必要です。Tolaria は構成を書き込む前にランタイムを確認するため、ツールが機能しないコマンドを指す状態になることはありません。",
   "mcp.setup.writeEntryDescription": "このアクションを確認すると、Tolariaの単一の{entry} MCPエントリが次の場所に書き込まれるか、更新されます：",
   "mcp.setup.clientPathsDescription": "Claude Code CLI は ~/.claude.json を読み取り、Gemini CLI は ~/.gemini/settings.json を読み取り、Cursor は ~/.cursor/mcp.json を読み取ります。また、一般的なパス ~/.config/mcp/mcp.json は、他の MCP 互換ツールによって読み取られます。閉じても、接続または切断しない限り、すべてのファイルは変更されません。再接続は冪等性があり、切断すると Tolaria のエントリは再度削除されます。",
   "mcp.setup.geminiGuidanceDescription": "Gemini CLIは、独自のインストールとサインインが必要です。カスタムガイダンスを上書きせずに、Gemini を共有の AGENTS.md 指示に戻すための vault-root GEMINI.md 互換シムが必要な場合は、「Restore Tolaria AI Guidance」を使用します。",

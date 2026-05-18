@@ -31,7 +31,7 @@ describe('McpSetupDialog', () => {
 
     expect(screen.getByText('Set Up External AI Tools')).toBeInTheDocument()
     expect(screen.getByText(/will not touch third-party config files until you confirm here/i)).toBeInTheDocument()
-    expect(screen.getByText(/requires Node.js 18\+ on PATH/i)).toBeInTheDocument()
+    expect(screen.getByText(/requires Node.js 18\+ or Bun 1\+ on PATH/i)).toBeInTheDocument()
     expect(screen.getByTestId('mcp-config-snippet')).toHaveTextContent('"type": "stdio"')
     expect(screen.getByTestId('mcp-config-snippet')).not.toHaveTextContent('"VAULT_PATH"')
     expect(screen.getByTestId('mcp-config-snippet')).toHaveTextContent('"WS_UI_PORT": "9711"')

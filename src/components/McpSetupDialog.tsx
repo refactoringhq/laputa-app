@@ -196,7 +196,7 @@ export function McpSetupDialog({
           data-testid="mcp-setup-scroll-body"
         >
           <p>
-            {t('mcp.setup.nodeRequirement')}
+            {t('mcp.setup.runtimeRequirement')}
           </p>
           <p>
             {t('mcp.setup.writeEntryDescription', { entry: 'tolaria' })}

@@ -313,7 +313,7 @@
   "mcp.setup.disconnect": "断开连接",
   "mcp.setup.connecting": "正在连接…",
   "mcp.setup.disconnecting": "正在断开连接……",
-  "mcp.setup.nodeRequirement": "此设置需要 PATH 中包含 Node.js 18+ 及以上版本，并需要一个与 MCP 兼容的桌面工具。Tolaria 会在写入配置之前检查 Node.js，以确保该工具不会指向无效的命令。",
+  "mcp.setup.runtimeRequirement": "此设置需要 PATH 中包含 Node.js 18+ 或 Bun 1+，并需要一个与 MCP 兼容的桌面工具。Tolaria 会在写入配置之前检查运行时，以确保该工具不会指向无效的命令。",
   "mcp.setup.writeEntryDescription": "确认此操作将写入或更新 Tolaria 在以下位置的单个 {entry} MCP 条目：",
   "mcp.setup.clientPathsDescription": "Claude Code CLI 读取 ~/.claude.json，Gemini CLI 读取 ~/.gemini/settings.json，Cursor 读取 ~/.cursor/mcp.json，而通用路径 ~/.config/mcp/mcp.json 则由其他与 MCP 兼容的工具读取。关闭应用程序后，除非您连接或断开连接，否则所有文件都不会受到影响。重新连接是幂等操作，而断开连接会再次删除 Tolaria 的条目。",
   "mcp.setup.geminiGuidanceDescription": "Gemini CLI 需要单独安装并登录。如果您希望获得一个 Vault 根目录 GEMINI.md 兼容性 shim，使 Gemini 重新指向共享的 AGENTS.md 指南而不覆盖自定义指南，请使用“Restore Tolaria AI Guidance”。",

@@ -17,12 +17,16 @@ const hasMaxWorkersOverride = forwardedArgs.some((arg) =>
 )
 const maxAttempts = 2
 
+// Standalone pnpm installs ship a native binary, so npm_execpath points at
+// a Mach-O/ELF executable. Only reuse process.execPath (node) when the path
+// is something node can actually load as a module.
 const packageManagerExec = process.env.npm_execpath
-const command = packageManagerExec ? process.execPath : 'pnpm'
-const baseCommandArgs = packageManagerExec
+const isJsExecpath = packageManagerExec && /\.[mc]?js$/i.test(packageManagerExec)
+const command = isJsExecpath ? process.execPath : 'pnpm'
+const baseCommandArgs = isJsExecpath
   ? [packageManagerExec, 'exec', 'vitest', 'run', '--coverage']
   : ['exec', 'vitest', 'run', '--coverage']
-const clearCacheCommandArgs = packageManagerExec
+const clearCacheCommandArgs = isJsExecpath
   ? [packageManagerExec, 'exec', 'vitest', '--clearCache']
   : ['exec', 'vitest', '--clearCache']
 

@@ -313,7 +313,7 @@
   "mcp.setup.disconnect": "Адключыць",
   "mcp.setup.connecting": "Падключэнне…",
   "mcp.setup.disconnecting": "Адключэнне…",
-  "mcp.setup.nodeRequirement": "Патрабуецца Node.js 18+.",
+  "mcp.setup.runtimeRequirement": "Для гэтай налады патрабуецца Node.js 18+ або Bun 1+ у PATH і настольны інструмент, сумяшчальны з MCP. Tolaria правярае асяроддзе выканання перад запісам канфігурацыі, каб інструмент не спасылаўся на няспраўную каманду.",
   "mcp.setup.writeEntryDescription": "Гэтае дзеянне дадасць канфігурацыю ў {entry}:",
   "mcp.setup.clientPathsDescription": "Канфігурацыя для сумяшчальных MCP кліентаў.",
   "mcp.setup.geminiGuidanceDescription": "Канфігурацыя для Gemini CLI.",

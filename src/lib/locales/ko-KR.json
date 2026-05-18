@@ -313,7 +313,7 @@
   "mcp.setup.disconnect": "연결 해제",
   "mcp.setup.connecting": "연결 중…",
   "mcp.setup.disconnecting": "연결 해제 중…",
-  "mcp.setup.nodeRequirement": "이 설정을 사용하려면 PATH에 Node.js 18 이상이 있어야 하며 MCP와 호환되는 데스크톱 도구가 필요합니다. Tolaria는 구성 파일을 작성하기 전에 Node.js를 확인하여 도구가 잘못된 명령어를 가리키지 않도록 합니다.",
+  "mcp.setup.runtimeRequirement": "이 설정을 사용하려면 PATH에 Node.js 18+ 또는 Bun 1+가 있어야 하며 MCP와 호환되는 데스크톱 도구가 필요합니다. Tolaria는 구성 파일을 작성하기 전에 런타임을 확인하여 도구가 잘못된 명령어를 가리키지 않도록 합니다.",
   "mcp.setup.writeEntryDescription": "이 작업을 확인하면 Tolaria의 단일 {entry} MCP 항목이 다음 위치에 작성되거나 업데이트됩니다:",
   "mcp.setup.clientPathsDescription": "Claude Code CLI는 ~/.claude.json 파일을 읽고, Gemini CLI는 ~/.gemini/settings.json 파일을 읽고, Cursor는 ~/.cursor/mcp.json 파일을 읽으며, 일반 경로인 ~/.config/mcp/mcp.json은 다른 MCP 호환 도구에서 읽습니다. 종료 시 연결하거나 연결 해제하지 않는 한 모든 파일이 그대로 유지됩니다. 다시 연결하는 것은 멱등적이며, 연결 해제 시 Tolaria의 항목이 다시 제거됩니다.",
   "mcp.setup.geminiGuidanceDescription": "Gemini CLI는 별도의 설치 및 로그인이 필요합니다. 사용자 지정 가이드를 덮어쓰지 않고 Gemini를 공유 AGENTS.md 지침으로 다시 연결하는 볼트 루트 GEMINI.md 호환성 시름을 원할 경우, 'Restore Tolaria AI Guidance'를 사용하세요.",

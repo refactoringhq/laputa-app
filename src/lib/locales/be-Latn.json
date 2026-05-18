@@ -313,7 +313,7 @@
   "mcp.setup.disconnect": "Adkliučyć",
   "mcp.setup.connecting": "Padkliučennie…",
   "mcp.setup.disconnecting": "Adkliučennie…",
-  "mcp.setup.nodeRequirement": "Patrabujecca Node.js 18+.",
+  "mcp.setup.runtimeRequirement": "Dlia hetaj nalady patrabujecca Node.js 18+ abo Bun 1+ u PATH i nastoĺny instrumient, sumiaščaĺny z MCP. Tolaria praviaraje asiaroddzie vykanannia pierad zapisam kanfihuracyi, kab instrumient nie spasylsia na niaspraŭnuju kamandu.",
   "mcp.setup.writeEntryDescription": "Hetaje dziejannie dadasć kanfihuracyju ŭ {entry}:",
   "mcp.setup.clientPathsDescription": "Kanfihuracyja dlia sumiaščaĺnych MCP klijentaŭ.",
   "mcp.setup.geminiGuidanceDescription": "Kanfihuracyja dlia Gemini CLI.",
