@@ -658,5 +658,7 @@
   "locale.jaJP": "日本語",
   "locale.koKR": "한국어",
   "locale.vi": "베트남어",
-  "locale.plPL": "폴란드어"
+  "locale.plPL": "폴란드어",
+  "locale.beBY": "벨라루스어",
+  "locale.beLatn": "벨라루스어 (라틴 문자)"
 }

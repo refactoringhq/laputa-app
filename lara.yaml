@@ -23,6 +23,7 @@ locales:
     - ko-KR
     - vi
     - pl-PL
+    - be-BY
 
 files:
   json:

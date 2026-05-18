@@ -658,5 +658,7 @@
   "locale.jaJP": "Tiếng Nhật",
   "locale.koKR": "Tiếng Hàn",
   "locale.vi": "Tiếng Việt",
-  "locale.plPL": "Tiếng Ba Lan"
+  "locale.plPL": "Tiếng Ba Lan",
+  "locale.beBY": "Tiếng Belarus",
+  "locale.beLatn": "Tiếng Belarus (Latinh)"
 }

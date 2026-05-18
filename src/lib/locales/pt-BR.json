@@ -658,5 +658,7 @@
   "locale.jaJP": "Japonês",
   "locale.koKR": "Coreano",
   "locale.vi": "Vietnamita",
-  "locale.plPL": "Polonês"
+  "locale.plPL": "Polonês",
+  "locale.beBY": "Bielorrusso",
+  "locale.beLatn": "Bielorrusso (Latim)"
 }

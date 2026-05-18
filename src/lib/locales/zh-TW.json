@@ -658,5 +658,7 @@
   "locale.jaJP": "日語",
   "locale.koKR": "韓語",
   "locale.vi": "越南文",
-  "locale.plPL": "波蘭語"
+  "locale.plPL": "波蘭語",
+  "locale.beBY": "白俄羅斯語",
+  "locale.beLatn": "白俄羅斯語（拉丁語）"
 }
