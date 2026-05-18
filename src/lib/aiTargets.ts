@@ -1,5 +1,6 @@
 import {
   DEFAULT_AI_AGENT,
+  getAiAgentAvailability,
   getAiAgentDefinition,
   normalizeStoredAiAgent,
   type AiAgentId,
@@ -185,5 +186,5 @@ export function isLocalAiProvider(provider: AiModelProvider): boolean {
 
 export function aiTargetReady(target: AiTarget, statuses: AiAgentsStatus): boolean {
   if (target.kind === 'api_model') return true
-  return statuses[target.agent].status === 'installed'
+  return getAiAgentAvailability(statuses, target.agent).status === 'installed'
 }

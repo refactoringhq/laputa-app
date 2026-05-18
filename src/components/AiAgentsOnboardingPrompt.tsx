@@ -1,6 +1,7 @@
 import { ArrowUpRight, CheckCircle as CheckCircle2, CircleNotch as Loader2, Cloud, HardDrive, Robot as Bot, Terminal } from '@phosphor-icons/react'
 import {
   AI_AGENT_DEFINITIONS,
+  getAiAgentAvailability,
   getAiAgentDefinition,
   hasAnyInstalledAiAgent,
   isAiAgentsStatusChecking,
@@ -81,7 +82,7 @@ function AgentStatusList({ statuses }: { statuses: AiAgentsStatus }) {
   return (
     <div className="space-y-3">
       {AI_AGENT_DEFINITIONS.map((definition) => {
-        const status = statuses[definition.id]
+        const status = getAiAgentAvailability(statuses, definition.id)
         const ready = status.status === 'installed'
         return (
           <div
@@ -113,8 +114,8 @@ export function AiAgentsOnboardingPrompt({
   onContinue,
 }: AiAgentsOnboardingPromptProps) {
   const copy = getPromptCopy(statuses)
-  const showLegacyClaudeCompatibility = statuses.claude_code.status !== 'installed'
-  const missingAgents = AI_AGENT_DEFINITIONS.filter((definition) => statuses[definition.id].status === 'missing')
+  const showLegacyClaudeCompatibility = getAiAgentAvailability(statuses, 'claude_code').status !== 'installed'
+  const missingAgents = AI_AGENT_DEFINITIONS.filter((definition) => getAiAgentAvailability(statuses, definition.id).status === 'missing')
 
   return (
     <OnboardingShell

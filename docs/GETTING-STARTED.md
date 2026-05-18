@@ -151,7 +151,7 @@ tolaria/
 │   │   ├── useNoteRename.ts     # Note renaming + wikilink updates
 │   │   ├── useCliAiAgent.ts      # Selected AI agent state + normalized session pipeline
 │   │   ├── aiAgentPermissionMode.ts # Safe/Power User mode normalization + labels
-│   │   ├── useAiAgentsStatus.ts  # Claude/Codex/OpenCode/Pi/Gemini availability polling
+│   │   ├── useAiAgentsStatus.ts  # Claude/Codex/OpenCode/Pi/Gemini/Kiro availability polling
 │   │   ├── useAiAgentPreferences.ts # Default-agent persistence + cycling
 │   │   ├── useAiActivity.ts      # MCP UI bridge listener
 │   │   ├── useAutoSync.ts        # Auto git pull/push
@@ -231,6 +231,7 @@ tolaria/
 │   │   ├── claude_cli.rs         # Claude CLI adapter
 │   │   ├── codex_cli.rs          # Codex CLI adapter
 │   │   ├── pi_cli.rs             # Pi CLI adapter
+│   │   ├── kiro_cli.rs           # Kiro CLI adapter
 │   │   ├── mcp.rs                # MCP server lifecycle + explicit config registration/removal
 │   │   ├── app_updater.rs        # Alpha/stable updater metadata resolution
 │   │   ├── settings.rs           # App settings persistence
@@ -307,7 +308,7 @@ tolaria/
 | `src-tauri/src/search.rs` | Keyword search — scans vault files with walkdir. |
 | `src-tauri/src/ai_agents.rs` | CLI-agent request normalization, availability aggregation, adapter dispatch, and Claude event mapping. |
 | `src-tauri/src/cli_agent_runtime.rs` | Shared CLI-agent request shape, prompt wrapping, JSON subprocess lifecycle, version probing, and MCP path helpers. |
-| `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/pi_cli.rs`, `src-tauri/src/gemini_cli.rs` | Per-agent command, config, discovery, and JSON event adapters. |
+| `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/pi_cli.rs`, `src-tauri/src/gemini_cli.rs`, `src-tauri/src/kiro_cli.rs` | Per-agent command, config, discovery, and event adapters. |
 | `src-tauri/src/app_updater.rs` | Desktop updater bridge — resolves alpha/stable manifests and streams install progress. |
 
 ### Editor
@@ -467,7 +468,7 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 3. **Tool action display**: Edit `src/components/AiActionCard.tsx`
 4. **Permission-mode UI and request plumbing**: Edit `src/lib/aiAgentPermissionMode.ts`, `src/components/AiPanel*.tsx`, `src/hooks/useCliAiAgent.ts`, and `src/utils/streamAiAgent.ts`
 5. **Shared CLI runtime behavior**: Edit `src-tauri/src/cli_agent_runtime.rs` for process lifecycle, prompt wrapping, version probing, and common Tolaria MCP path handling.
-6. **Agent-specific arguments/events**: Edit the per-agent adapter modules (`claude_cli.rs`, `codex_cli.rs`, `opencode_*`, `pi_*`, `gemini_*`). Keep Codex Safe on `read-only` + `untrusted` and Codex Power User on active-vault `workspace-write` + `never`, keep Pi and Gemini on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode. Pi's transient agent directory must be seeded from the user's existing Pi agent directory before Tolaria MCP is merged so standalone provider/auth setup keeps working. Gemini Power User intentionally uses Gemini's `yolo` mode per ADR-0103.
+6. **Agent-specific arguments/events**: Edit the per-agent adapter modules (`claude_cli.rs`, `codex_cli.rs`, `opencode_*`, `pi_*`, `gemini_*`, `kiro_*`). Keep Codex Safe on `read-only` + `untrusted` and Codex Power User on active-vault `workspace-write` + `never`, keep Pi, Gemini, and Kiro on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode. Pi's transient agent directory must be seeded from the user's existing Pi agent directory before Tolaria MCP is merged so standalone provider/auth setup keeps working. Gemini Power User intentionally uses Gemini's `yolo` mode per ADR-0103. Kiro receives prompt content over stdin and writes Tolaria MCP config into `.kiro/settings/mcp.json` in the active vault.
 
 ### Work with external MCP setup
 

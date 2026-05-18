@@ -1,4 +1,4 @@
-export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi' | 'gemini'
+export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi' | 'gemini' | 'kiro'
 
 export type AiAgentStatus = 'checking' | 'installed' | 'missing'
 export type AiAgentReadiness = 'checking' | 'ready' | 'missing'
@@ -50,30 +50,33 @@ export const AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] = [
     shortLabel: 'Gemini',
     installUrl: 'https://google-gemini.github.io/gemini-cli/',
   },
+  {
+    id: 'kiro',
+    label: 'Kiro',
+    shortLabel: 'Kiro',
+    installUrl: 'https://kiro.dev/docs/cli',
+  },
 ] as const
 
 export function createAiAgentAvailability(status: AiAgentStatus = 'checking', version: string | null = null): AiAgentAvailability {
   return { status, version }
 }
 
+function createAiAgentsStatus(status: AiAgentStatus): AiAgentsStatus {
+  return Object.fromEntries(
+    AI_AGENT_DEFINITIONS.map((definition) => [
+      definition.id,
+      createAiAgentAvailability(status),
+    ]),
+  ) as AiAgentsStatus
+}
+
 export function createCheckingAiAgentsStatus(): AiAgentsStatus {
-  return {
-    claude_code: createAiAgentAvailability(),
-    codex: createAiAgentAvailability(),
-    opencode: createAiAgentAvailability(),
-    pi: createAiAgentAvailability(),
-    gemini: createAiAgentAvailability(),
-  }
+  return createAiAgentsStatus('checking')
 }
 
 export function createMissingAiAgentsStatus(): AiAgentsStatus {
-  return {
-    claude_code: createAiAgentAvailability('missing'),
-    codex: createAiAgentAvailability('missing'),
-    opencode: createAiAgentAvailability('missing'),
-    pi: createAiAgentAvailability('missing'),
-    gemini: createAiAgentAvailability('missing'),
-  }
+  return createAiAgentsStatus('missing')
 }
 
 export function normalizeStoredAiAgent(value: string | null | undefined): AiAgentId | null {
@@ -104,18 +107,23 @@ export function normalizeAiAgentsStatus(payload: Partial<Record<AiAgentId, { ins
     opencode: normalizeAvailability(payload?.opencode),
     pi: normalizeAvailability(payload?.pi),
     gemini: normalizeAvailability(payload?.gemini),
+    kiro: normalizeAvailability(payload?.kiro),
   }
 }
 
-export function isAiAgentsStatusChecking(statuses: AiAgentsStatus): boolean {
-  return AI_AGENT_DEFINITIONS.some((definition) => statuses[definition.id].status === 'checking')
+export function getAiAgentAvailability(statuses: Partial<AiAgentsStatus>, agent: AiAgentId): AiAgentAvailability {
+  return statuses[agent] ?? createAiAgentAvailability('missing')
 }
 
-export function isAiAgentInstalled(statuses: AiAgentsStatus, agent: AiAgentId): boolean {
-  return (Reflect.get(statuses, agent) as AiAgentAvailability).status === 'installed'
+export function isAiAgentsStatusChecking(statuses: Partial<AiAgentsStatus>): boolean {
+  return AI_AGENT_DEFINITIONS.some((definition) => getAiAgentAvailability(statuses, definition.id).status === 'checking')
 }
 
-export function hasAnyInstalledAiAgent(statuses: AiAgentsStatus): boolean {
+export function isAiAgentInstalled(statuses: Partial<AiAgentsStatus>, agent: AiAgentId): boolean {
+  return getAiAgentAvailability(statuses, agent).status === 'installed'
+}
+
+export function hasAnyInstalledAiAgent(statuses: Partial<AiAgentsStatus>): boolean {
   return AI_AGENT_DEFINITIONS.some((definition) => isAiAgentInstalled(statuses, definition.id))
 }
 

@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react'
 import { isTauri } from '../mock-tauri'
 import {
   getAiAgentDefinition,
+  getAiAgentAvailability,
   getNextAiAgentId,
   type AiAgentReadiness,
   type AiAgentId,
@@ -33,7 +34,7 @@ function getDefaultAiTargetReadiness(
   if (defaultTarget.kind === 'api_model') return 'ready'
   if (!isTauri()) return 'ready'
 
-  const status = aiAgentsStatus[defaultTarget.agent].status
+  const status = getAiAgentAvailability(aiAgentsStatus, defaultTarget.agent).status
   if (status === 'checking') return 'checking'
   return status === 'installed' ? 'ready' : 'missing'
 }

@@ -2,6 +2,7 @@ import { Copy, Cube, Monitor, Moon, Sun, X } from '@phosphor-icons/react'
 import {
   AI_AGENT_DEFINITIONS,
   createMissingAiAgentsStatus,
+  getAiAgentAvailability,
   getAiAgentDefinition,
   resolveDefaultAiAgent,
   type AiAgentId,
@@ -939,7 +940,7 @@ function buildDefaultAiTargetOptions(
   t: Translate,
 ): Array<{ value: string; label: string }> {
   const agentOptions = AI_AGENT_DEFINITIONS.map((definition) => {
-    const status = aiAgentsStatus[definition.id]
+    const status = getAiAgentAvailability(aiAgentsStatus, definition.id)
     const suffix = status.status === 'installed'
       ? ` (${t('settings.aiAgents.installed')}${status.version ? ` ${status.version}` : ''})`
       : ` (${t('settings.aiAgents.missing')})`
@@ -1110,7 +1111,7 @@ function AiAgentsInstalledSection({
       <div className="mt-1 text-xs leading-5 text-muted-foreground">{t('settings.aiAgents.installedDescription')}</div>
       <div className="mt-3 grid grid-cols-2 gap-2">
         {AI_AGENT_DEFINITIONS.map((definition) => {
-          const status = aiAgentsStatus[definition.id]
+          const status = getAiAgentAvailability(aiAgentsStatus, definition.id)
           const installed = status.status === 'installed'
           return (
             <div key={definition.id} className="rounded-md border border-border bg-background px-3 py-2">
@@ -1133,7 +1134,7 @@ function AiAgentsInstalledSection({
 
 function renderDefaultAiAgentSummary(defaultAiAgent: AiAgentId, aiAgentsStatus: AiAgentsStatus, t: Translate): string {
   const definition = getAiAgentDefinition(defaultAiAgent)
-  const status = Reflect.get(aiAgentsStatus, defaultAiAgent) as AiAgentsStatus[AiAgentId]
+  const status = getAiAgentAvailability(aiAgentsStatus, defaultAiAgent)
   if (status.status === 'installed') {
     return t('settings.aiAgents.ready', {
       agent: definition.label,
