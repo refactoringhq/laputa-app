@@ -83,3 +83,79 @@ wrong.  Selection background is incorrect."
 the FOLDERS section header carries the chevron-down on the left.
 Outstanding polish: thin vertical connector line under nested
 folders, deferred until a real folder dataset surfaces in Phase 9.
+
+### 003 — TYPES rows ignore each type's frontmatter icon / colour / label
+
+| Current | Reference |
+|---------|-----------|
+| [issue-003-current.png](live-snapshots/issue-003-current.png) | [issue-003-reference.png](live-snapshots/issue-003-reference.png) |
+
+**Reporter:** "The note type icon / accent is defined by frontmatter
+e.g. `type: Type, icon: calendar, color: orange, sidebar label:
+Events`.  The selection background is light accent of note-type
+colour."
+
+**Diagnosis** — every type document under `demo-vault-v2/type/`
+carries the visual contract for its row:
+
+| File | icon | color | sidebar label |
+|------|------|-------|---------------|
+| `area.md` | folders | amber | Areas |
+| `event.md` | calendar | orange | Events |
+| `measure.md` | chart-line-up | cyan | Measures |
+| `note.md` | note | slate | Notes |
+| `person.md` | user | rose | People |
+| `project.md` | rocket | blue | Projects |
+| `quarter.md` | clock-countdown | emerald | Quarters |
+| `responsibility.md` | (read for shape) | … | Responsibilities |
+| `topic.md` | books | indigo | Topics |
+
+The current renderer hard-codes a colour-dot palette from the type
+display name (`type_color` fn).  Need to:
+
+1. Load each `type/*.md` file from the vault.
+2. Parse YAML frontmatter to extract `icon`, `color`,
+   `sidebar label`.
+3. Replace the colour-dot with a Phosphor-style icon in the type's
+   colour.
+4. When a TYPES row is selected, paint the row bg with a *light tint*
+   of the type's colour (orange → orange-light), text + icon in the
+   type's full colour, count chip filled with the type's colour and
+   white text.
+
+Icon-name mapping is best-effort: `gpui-component-assets` exposes
+`calendar`, `chart-pie`, `book-open`, `file`, `folder`, `rocket`-like
+glyphs at the closest match; missing icons fall back to `file`.
+
+**Status:** fixed.  `load_type_styles` scans `<root>/type/*.md`,
+`parse_frontmatter` lifts `icon` / `color` / `sidebar label`,
+`icon_for_frontmatter_name` and `color_for_frontmatter_name` map the
+tokens to `IconName::*` and 24-bit hex.  Each TYPES row builds with
+`palette_tinted_with(type.color)` so selection paints the row bg
+with the type's light tint and the count pill with its full colour
+(white text).  Verified in
+[after-003-events-selected.png](live-snapshots/after-003-events-selected.png) —
+clicking the Measures row paints a cyan accent on the row + cyan
+count pill.
+
+### 004 — Sidebar / note-list rows hover with a light-green tint
+
+| Current |
+|---------|
+| [issue-004-current.png](live-snapshots/issue-004-current.png) |
+
+**Reporter:** "Sidebar items and note list items have light-green
+hover background."
+
+**Diagnosis** — `Palette` provides no explicit hover state for rows,
+so the cursor-pointer style appears to surface a default macOS
+highlight tint that reads as greenish on the warm sidebar palette.
+Need to attach `.hover(|this| this.bg(theme.list_hover))` to every
+clickable row so the hover paint is the neutral
+`--state-hover-subtle` (`#F0F0EF`) rather than the OS default.
+
+**Status:** fixed.  `Palette::hover_bg` exposes `theme.list_hover`
+(`#F0F0EF`); every unselected row in `build_row` /
+`sidebar_folder_row` paints it via
+`.hover(|this| this.bg(hover_bg))`.  Selected rows skip the
+hover paint so the selection fill stays stable.

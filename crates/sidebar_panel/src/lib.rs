@@ -68,12 +68,38 @@ pub enum SidebarSelection {
 }
 
 /// One typed group of notes shown in the `TYPES` section.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// `icon`, `color`, and `display_label` come from the type's own
+/// frontmatter (`<vault_root>/type/<name>.md`) when one exists:
+///
+/// ```yaml
+/// ---
+/// type: Type
+/// icon: calendar
+/// color: orange
+/// sidebar label: Events
+/// ---
+/// ```
+///
+/// `icon` maps the frontmatter glyph name to the closest available
+/// [`IconName`] (icon SVGs are bundled via `gpui-component-assets`);
+/// missing names fall back to [`IconName::File`].  `color` maps the
+/// frontmatter colour token to a 24-bit hex value (see
+/// [`type_color`]).
+#[derive(Clone)]
 pub struct TypeEntry {
-    /// Display label.
+    /// Display label (preferred from `sidebar label:` frontmatter,
+    /// else derived from the filename prefix).
     pub label: SharedString,
     /// Leading-glyph fill colour.
     pub color: Hsla,
+    /// Leading icon — sourced from `icon:` frontmatter when present.
+    ///
+    /// `IconName` from `gpui-component` does not implement `Debug` /
+    /// `PartialEq`, so this struct intentionally drops those derives;
+    /// tests that need to compare TYPES rows do so via
+    /// `(label, count)` pairs.
+    pub icon: IconName,
     /// Number of notes in this type.
     pub count: usize,
 }
@@ -239,12 +265,32 @@ impl SidebarPanel {
             }
         }
 
+        // Read each `<vault_root>/type/<stem>.md` and project its
+        // YAML frontmatter into a (display-label → style) map so the
+        // TYPES rows pick up the icon / colour / sidebar-label
+        // contract the demo vault encodes there.
+        let styles = vault_root
+            .as_deref()
+            .map(|r| load_type_styles(r))
+            .unwrap_or_default();
+
         let mut types: Vec<TypeEntry> = counts
             .into_iter()
-            .map(|(label, count)| TypeEntry {
-                label: SharedString::new_static(label),
-                color: type_color(label),
-                count,
+            .map(|(default_label, count)| {
+                let style = styles.get(default_label);
+                let label = style
+                    .map(|s| s.label.clone())
+                    .unwrap_or_else(|| SharedString::new_static(default_label));
+                let color = style
+                    .map(|s| s.color)
+                    .unwrap_or_else(|| type_color(default_label));
+                let icon = style.map(|s| s.icon.clone()).unwrap_or(IconName::File);
+                TypeEntry {
+                    label,
+                    color,
+                    icon,
+                    count,
+                }
             })
             .collect();
         // Stable, alphabetical order — matches the reference's row order.
@@ -396,6 +442,156 @@ fn type_label_for(path: &Path) -> &'static str {
     }
 }
 
+/// Visual contract for one TYPES row, sourced from a type doc's
+/// frontmatter.
+#[derive(Clone)]
+struct TypeStyle {
+    icon: IconName,
+    color: Hsla,
+    label: SharedString,
+}
+
+/// Walk `<vault_root>/type/` and project every type doc's frontmatter
+/// into a map keyed by the prefix label our `type_label_for` function
+/// emits (e.g. `event.md` → `"Events"`).  Returns an empty map when
+/// the directory is missing or unreadable so the caller never panics.
+fn load_type_styles(vault_root: &Path) -> std::collections::HashMap<&'static str, TypeStyle> {
+    let mut out = std::collections::HashMap::new();
+    let dir = vault_root.join("type");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("md") {
+            continue;
+        }
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(str::to_ascii_lowercase)
+            .unwrap_or_default();
+        let Some(default_label) = label_for_type_stem(&stem) else {
+            continue;
+        };
+        let Ok(body) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let frontmatter = parse_frontmatter(&body);
+        let icon = frontmatter
+            .get("icon")
+            .map(|s| icon_for_frontmatter_name(s))
+            .unwrap_or(IconName::File);
+        let color = frontmatter
+            .get("color")
+            .map(|s| color_for_frontmatter_name(s))
+            .unwrap_or_else(|| type_color(default_label));
+        let label: SharedString = frontmatter
+            .get("sidebar label")
+            .map(|s| SharedString::from(s.clone()))
+            .unwrap_or_else(|| SharedString::new_static(default_label));
+        out.insert(default_label, TypeStyle { icon, color, label });
+    }
+    out
+}
+
+/// Reverse of `type_label_for`'s prefix mapping: a lowercase type
+/// stem (`event`, `area`, …) → the display label our row counter
+/// uses as a map key.  Returns `None` for stems that aren't part of
+/// the canonical TYPES set.
+fn label_for_type_stem(stem: &str) -> Option<&'static str> {
+    match stem {
+        "area" => Some("Areas"),
+        "event" => Some("Events"),
+        "measure" => Some("Measures"),
+        "note" => Some("Notes"),
+        "person" => Some("People"),
+        "procedure" => Some("Procedures"),
+        "project" => Some("Projects"),
+        "quarter" => Some("Quarters"),
+        "responsibility" => Some("Responsibilities"),
+        "topic" => Some("Topics"),
+        _ => None,
+    }
+}
+
+/// Parse a minimal subset of YAML frontmatter — `key: value` lines
+/// between two `---` markers.  Values are trimmed and stripped of
+/// surrounding `"` / `'` quotes.  Anything more elaborate (lists,
+/// nested maps) is out of scope for the visual-fidelity pass.
+fn parse_frontmatter(body: &str) -> std::collections::HashMap<String, String> {
+    let mut out = std::collections::HashMap::new();
+    let mut lines = body.lines();
+    let Some(first) = lines.next() else {
+        return out;
+    };
+    if first.trim() != "---" {
+        return out;
+    }
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed == "---" {
+            break;
+        }
+        let Some((key, value)) = trimmed.split_once(':') else {
+            continue;
+        };
+        let key = key.trim().to_ascii_lowercase();
+        let value = value.trim().trim_matches(|c| c == '"' || c == '\'').trim();
+        if !value.is_empty() {
+            out.insert(key, value.to_owned());
+        }
+    }
+    out
+}
+
+/// Map a frontmatter `icon:` token to the closest available
+/// `gpui-component-assets` icon.  Tokens lifted from
+/// `demo-vault-v2/type/*.md`; unknown names degrade to
+/// [`IconName::File`].
+fn icon_for_frontmatter_name(name: &str) -> IconName {
+    match name.to_ascii_lowercase().as_str() {
+        "calendar" => IconName::Calendar,
+        "folder" | "folders" => IconName::FolderClosed,
+        "book" | "books" | "book-open" => IconName::BookOpen,
+        "chart" | "chart-line-up" | "chart-pie" => IconName::ChartPie,
+        "user" | "person" => IconName::User,
+        "rocket" => IconName::Frame,
+        "clock" | "clock-countdown" | "timer" => IconName::Calendar,
+        "note" | "note-pencil" => IconName::File,
+        "star" => IconName::Star,
+        "settings" | "gear" => IconName::Settings,
+        "globe" => IconName::Globe,
+        _ => IconName::File,
+    }
+}
+
+/// Map a frontmatter `color:` token to a 24-bit HSL value matching
+/// the tailwind / shadcn palette used by the React app.
+fn color_for_frontmatter_name(name: &str) -> Hsla {
+    let rgb_u32: u32 = match name.to_ascii_lowercase().as_str() {
+        "amber" => 0xF59E0B,
+        "orange" => 0xD9730D,
+        "yellow" => 0xD69E2E,
+        "red" => 0xE53E3E,
+        "rose" => 0xE11D48,
+        "pink" => 0xEC4899,
+        "violet" => 0x8B5CF6,
+        "purple" => 0x805AD5,
+        "indigo" => 0x6366F1,
+        "blue" => 0x155DFF,
+        "sky" => 0x38BDF8,
+        "cyan" => 0x06B6D4,
+        "teal" => 0x14B8A6,
+        "emerald" => 0x10B981,
+        "green" => 0x38A169,
+        "slate" => 0x64748B,
+        "gray" | "grey" => 0x6B7280,
+        _ => 0x6B7280,
+    };
+    rgb(rgb_u32).into()
+}
+
 /// Accent colour for a typed group's leading glyph.
 fn type_color(label: &str) -> Hsla {
     let rgb_u32: u32 = match label {
@@ -440,6 +636,10 @@ struct Palette {
     /// Label + leading-icon colour on the selected row — accent-blue
     /// (`--accent-blue`).
     selection_fg: Hsla,
+    /// Row hover fill (`--state-hover-subtle`).  Unselected rows
+    /// pick this up via `.hover(...)` so the platform's default
+    /// highlight doesn't bleed through.
+    hover_bg: Hsla,
     /// Count-pill fill when the row is *not* selected — `--muted`.
     pill_bg: Hsla,
     /// Count-pill fill when the row *is* selected — `--accent-blue`.
@@ -459,6 +659,7 @@ impl Palette {
             muted_fg: theme.muted_foreground,
             selection_bg: theme.list_active,
             selection_fg: theme.primary,
+            hover_bg: theme.list_hover,
             pill_bg: theme.muted,
             pill_selected_bg: theme.primary,
             pill_selected_fg: theme.primary_foreground,
@@ -494,17 +695,6 @@ fn count_pill(count: usize, selected: bool, p: &Palette) -> Option<AnyElement> {
             .child(SharedString::from(format!("{count}")))
             .into_any_element(),
     )
-}
-
-/// 8-px colour dot used as the leading glyph in TYPES rows.
-fn color_dot(color: Hsla) -> AnyElement {
-    div()
-        .w(px(8.0))
-        .h(px(8.0))
-        .flex_shrink_0()
-        .rounded_full()
-        .bg(color)
-        .into_any_element()
 }
 
 /// Wrap an [`IconName`] in a fixed-size box so the leading-icon column
@@ -590,9 +780,18 @@ fn header_action(id: &'static str, icon: IconName, p: &Palette) -> AnyElement {
 
 /// Build a clickable row — generic over the leading glyph slot.  Used
 /// by every concrete row builder below (top-nav, view, type, folder).
+///
+/// `gpui_id` is the unique GPUI element id (used for stateful
+/// interactivity — distinct rows must never share one or
+/// `.on_click` collisions silently swallow events).  `dump_id` is the
+/// periscope tag and may be shared across "row kinds" (e.g. every
+/// type row carries `sidebar-type-row`) — periscope's tree-dump JSON
+/// keys by the most-recent paint, so duplicates are acceptable for
+/// click-by-id targeting of the *last* visible row of the kind.
 #[allow(clippy::too_many_arguments)]
 fn build_row(
-    id: &'static str,
+    gpui_id: impl Into<gpui::ElementId>,
+    dump_id: &'static str,
     label: &str,
     leading: AnyElement,
     count: usize,
@@ -608,8 +807,9 @@ fn build_row(
     };
     let chip = count_pill(count, selected, p);
 
+    let hover_bg = p.hover_bg;
     let mut row = div()
-        .id(id)
+        .id(gpui_id)
         .flex()
         .flex_row()
         .items_center()
@@ -633,9 +833,14 @@ fn build_row(
     }
     if let Some(bg) = row_bg {
         row = row.bg(bg);
+    } else {
+        // Only paint a hover fill on unselected rows; the selection
+        // bg already dominates so a hover overlay there would just
+        // flicker the colour.
+        row = row.hover(move |this| this.bg(hover_bg));
     }
     row.on_click(move |_, _window, cx| on_click(cx))
-        .dump_as(id)
+        .dump_as(dump_id)
         .into_any_element()
 }
 
@@ -780,6 +985,7 @@ fn sidebar_top_row(
     let sel_clone = sel.clone();
     let handle = entity.clone();
     build_row(
+        SharedString::new_static(id),
         id,
         label,
         leading,
@@ -807,7 +1013,9 @@ fn sidebar_view_row(
     );
     let name = view.name.clone();
     let handle = entity.clone();
+    let gpui_id: SharedString = format!("sidebar-view-{}", view.name).into();
     build_row(
+        gpui_id,
         "sidebar-view-row",
         view.name.as_ref(),
         leading,
@@ -821,31 +1029,33 @@ fn sidebar_view_row(
     )
 }
 
-/// TYPES section row builder — 8-px colour dot in the type accent.
+/// TYPES section row builder — Phosphor-style icon in the type's
+/// accent colour.  When the row is selected the whole `Palette` is
+/// re-tinted with the type's colour so the row bg, label, icon, and
+/// count pill all switch to the type's hue (matches the React
+/// `SectionHeader` selection styling).
 fn sidebar_type_row(
     entry: &TypeEntry,
     selected: bool,
     p: &Palette,
     entity: &gpui::Entity<SidebarPanel>,
 ) -> AnyElement {
-    let leading = div()
-        .w(px(16.0))
-        .h(px(16.0))
-        .flex_shrink_0()
-        .flex()
-        .items_center()
-        .justify_center()
-        .child(color_dot(entry.color))
-        .into_any_element();
+    // Per the reference, the type icon always renders in the type's
+    // colour — selection only swaps the row bg/text, not the icon
+    // hue.  Matches `SectionHeader` in `SidebarParts.tsx`.
+    let leading = icon_glyph(entry.icon.clone(), entry.color);
     let label = entry.label.clone();
     let handle = entity.clone();
+    let type_palette = palette_tinted_with(p, entry.color);
+    let gpui_id: SharedString = format!("sidebar-type-{}", entry.label).into();
     build_row(
+        gpui_id,
         "sidebar-type-row",
         entry.label.as_ref(),
         leading,
         entry.count,
         selected,
-        p,
+        &type_palette,
         move |cx: &mut App| {
             let label = label.clone();
             handle.update(cx, |this, cx| {
@@ -853,6 +1063,29 @@ fn sidebar_type_row(
             });
         },
     )
+}
+
+/// Build a per-row Palette whose selection treatment uses `tint`
+/// instead of the global primary.  The row bg becomes a soft tint of
+/// the colour (~14 % alpha) so it reads as an "orange-light /
+/// green-light / …" highlight; the text and count pill take the full
+/// colour.  Mirrors the type's accent treatment in
+/// `SidebarSections.tsx`.
+fn palette_tinted_with(base: &Palette, tint: Hsla) -> Palette {
+    let mut light = tint;
+    light.a = 0.14;
+    Palette {
+        bg: base.bg,
+        border: base.border,
+        fg: base.fg,
+        muted_fg: base.muted_fg,
+        selection_bg: light,
+        selection_fg: tint,
+        hover_bg: base.hover_bg,
+        pill_bg: base.pill_bg,
+        pill_selected_bg: tint,
+        pill_selected_fg: base.pill_selected_fg,
+    }
 }
 
 /// FOLDERS section row builder.  Root folder (`depth == 0`) gets a
@@ -879,11 +1112,12 @@ fn sidebar_folder_row(
 
     let path = folder.path.clone();
     let handle = entity.clone();
-    let id: &'static str = if folder.depth == 0 {
+    let dump_id: &'static str = if folder.depth == 0 {
         "sidebar-folder-root"
     } else {
         "sidebar-folder-child"
     };
+    let gpui_id: SharedString = format!("sidebar-folder-{}", folder.path).into();
     let pad_left = px(12.0 + f32::from(folder.depth) * 16.0);
 
     let label = folder.display.clone();
@@ -893,8 +1127,9 @@ fn sidebar_folder_row(
         (None, p.fg)
     };
 
+    let hover_bg = p.hover_bg;
     let mut row = div()
-        .id(id)
+        .id(gpui_id)
         .flex()
         .flex_row()
         .items_center()
@@ -910,6 +1145,8 @@ fn sidebar_folder_row(
         .child(div().flex_1().child(label));
     if let Some(bg) = row_bg {
         row = row.bg(bg);
+    } else {
+        row = row.hover(move |this| this.bg(hover_bg));
     }
     row.on_click(move |_, _window, cx| {
         let path = path.clone();
@@ -917,7 +1154,7 @@ fn sidebar_folder_row(
             this.select(SidebarSelection::Folder(path), cx)
         });
     })
-    .dump_as(id)
+    .dump_as(dump_id)
     .into_any_element()
 }
 
