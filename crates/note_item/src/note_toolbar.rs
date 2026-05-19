@@ -75,7 +75,12 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
                 .cursor_pointer()
                 .text_color(muted)
                 .hover(|this| this.text_color(fg))
-                .child(IconName::Replace)
+                // React's `BreadcrumbBar` uses Phosphor `ArrowsClockwise` for the
+                // sync glyph.  gpui-component's pack has no clockwise icon;
+                // `Redo` (Lucide's curving arrow) is the closest visual match
+                // — single curved stroke matching the React reference rather
+                // than the two-straight-arrows shape of `IconName::Replace`.
+                .child(IconName::Undo)
                 .dump_as("note-toolbar-sync")
                 .into_any_element(),
         );
