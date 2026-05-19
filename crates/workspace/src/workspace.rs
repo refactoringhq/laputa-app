@@ -36,13 +36,16 @@ use toasts::Toast;
 /// Height of the macOS native title-bar spacer inserted at the top
 /// of the workspace render tree, in logical points.
 ///
-/// Reused by `ui::tree_dump` so the periscope-side click coordinate
-/// system stays in lockstep with what GPUI lays out — see the
-/// `set_window_y_offset` block in `crates/tolaria/src/main.rs`.
-/// Bumping this constant requires bumping the offset wired in
-/// `main.rs` too; keeping it as a single named constant avoids two
-/// magic numbers drifting apart.
-pub const NATIVE_TITLE_BAR_HEIGHT_PT: f32 = 32.0;
+/// Matches the floor of Zed's `platform_title_bar_height` formula:
+/// `(1.75 * rem_size).max(px(34.))` at the default 16-pt rem size.
+/// The live render in `title_bar.rs` applies the dynamic formula;
+/// this constant is the static fallback used by `ui::tree_dump` so
+/// the periscope-side click coordinate system stays in lockstep with
+/// what GPUI lays out — see the `set_window_y_offset` block in
+/// `crates/tolaria/src/main.rs`.  Bumping this constant requires
+/// bumping the offset wired in `main.rs` too; keeping it as a single
+/// named constant avoids two magic numbers drifting apart.
+pub const NATIVE_TITLE_BAR_HEIGHT_PT: f32 = 34.0;
 
 use crate::{
     dock::Dock,

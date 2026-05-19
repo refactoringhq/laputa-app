@@ -42,7 +42,7 @@ mod macos {
     use std::path::PathBuf;
 
     use gpui::{
-        px, size, App, AppContext, Bounds, QuitMode, SharedString, TitlebarOptions, WindowBounds,
+        point, px, size, App, AppContext, Bounds, QuitMode, TitlebarOptions, WindowBounds,
         WindowOptions,
     };
     use gpui_platform::application;
@@ -370,26 +370,22 @@ mod macos {
                 let opts = WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
                     titlebar: Some(TitlebarOptions {
-                        title: Some(SharedString::from("Tolaria")),
-                        // Let the workspace draw its own title-bar strip
-                        // (Phase 7.8) under the macOS chrome — traffic
-                        // lights stay flush-left in their default spot;
-                        // the strip reserves
-                        // `TRAFFIC_LIGHTS_PADDING_PT` so the action
-                        // triplet doesn't collide with them.
+                        // `title: None` lets the workspace draw its own
+                        // strip without a system title string — mirrors
+                        // Zed's `zed.rs:350` (`title: None`).
+                        title: None,
+                        // Hide the system titlebar so our custom strip
+                        // paints flush with the top of the window.
                         appears_transparent: true,
-                        // The traffic lights are constrained to live
-                        // inside the system titlebar (~28 pt regardless
-                        // of `appears_transparent`), so we cannot
-                        // simply centre them in our taller custom
-                        // strip via `traffic_light_position`.  Instead
-                        // the title-bar view aligns its own action
-                        // cluster to the traffic-light baseline (see
-                        // `workspace::title_bar`'s top-anchored
-                        // layout) — keeping the lights at their
-                        // default `(7, 6)` and matching the action
-                        // icons to the same y.
-                        ..Default::default()
+                        // Pin traffic lights to (9, 9) — mirrors Zed's
+                        // `zed.rs:352` (`traffic_light_position: Some(point(px(9.0), px(9.0)))`).
+                        // The y value is the *top inset* of the close button;
+                        // GPUI/AppKit flips it internally
+                        // (`gpui_macos/src/window.rs:538-544`).
+                        // The strip reserves `TRAFFIC_LIGHTS_PADDING_PT`
+                        // (71 pt) on the left so the action cluster never
+                        // overlaps the lights.
+                        traffic_light_position: Some(point(px(9.0), px(9.0))),
                     }),
                     ..Default::default()
                 };

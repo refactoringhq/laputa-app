@@ -492,3 +492,45 @@ consistency."
   (`crates/note_list_pane/src/lib.rs:682`) now read the same theme
   field, so a single value drives both surfaces.  Any future
   row-hover paint must follow the same rule — no hard-coded colours.
+
+### 016 — Title bar matches Zed dims
+
+**Reporter:** engineering — no crop required (numeric spec only).
+
+**Diagnosis** — three values diverged from the Zed reference
+(`zed-title-bar-analysis.md` section 5):
+
+1. **Strip height** — Tolaria used a static `32 pt`; Zed's
+   `platform_title_bar_height` formula is
+   `(1.75 * rem_size).max(px(34.))`, yielding **34 pt** at the
+   default 16-pt rem.  The static fallback constant
+   `NATIVE_TITLE_BAR_HEIGHT_PT` (used by `ui::tree_dump`) was also
+   `32`; both must be `34`.
+2. **Traffic-lights leading padding** — Tolaria used `72 pt`; Zed's
+   `TRAFFIC_LIGHT_PADDING` is **71 pt** (or 78 pt on macOS SDK 26 /
+   Tahoe — gated behind `#[cfg(macos_sdk_26)]`).
+3. **`TitlebarOptions`** — Tolaria set `title: Some("Tolaria")` and
+   left `traffic_light_position` at the AppKit default `(7, 6)`.
+   Zed uses `title: None` and pins lights to
+   **`(9, 9)`** (`zed.rs:350-354`).
+4. **Right-cluster gap** — Tolaria used `px(2.0)` for both clusters;
+   Zed uses `gap_0p5` (2 px) on the left and `gap_1` (4 px) on the
+   right (`title_bar.rs:244`, `:316`).
+
+**Fix** (`crates/workspace/src/{workspace,title_bar}.rs`,
+`crates/tolaria/src/main.rs`):
+
+- `NATIVE_TITLE_BAR_HEIGHT_PT`: `32.0` → `34.0`.
+- `TRAFFIC_LIGHTS_PADDING_PT`: `72.0` → `71.0` (TODO: `78.0` behind
+  `cfg(macos_sdk_26)` when targeting Tahoe).
+- `title_bar.rs` `render`: strip height now uses the dynamic
+  `(window.rem_size() * 1.75).max(px(34.0))` formula.
+- Right-cluster `gap`: `px(2.0)` → `px(4.0)`.
+- `main.rs` `TitlebarOptions`: `title: None`,
+  `traffic_light_position: Some(point(px(9.0), px(9.0)))`.
+- TODO: `WindowControlArea::Drag` and `titlebar_double_click` not
+  wired — neither is exposed in the currently pinned GPUI revision.
+
+**Status:** fixed in commit `fix(workspace): native title bar —
+Zed-matching dims (issue 016)`.  Screenshots skipped — no Screen
+Recording grant / display available in the CI environment.
