@@ -973,14 +973,14 @@ impl Render for NoteListPane {
         v_flex()
             .size_full()
             .bg(bg)
-            // Visual-issue #019 follow-up: paint a 1-pt right border
-            // so the note-list column is visually separated from the
-            // note container (editor) on its right.  Matches the
-            // `border-r` divider React draws between
-            // `NoteListPane` and the `BreadcrumbBar` + editor
-            // (`src/components/NoteListPane.tsx`).
-            .border_r_1()
-            .border_color(border_color)
+            // The vertical divider between this column and the note
+            // container is painted by gpui-component's
+            // `ResizeHandle` (1 pt, `theme.border`).  An explicit
+            // `border_r_1` here would stack on top of the handle and
+            // read as a 2-pt seam at the top of the column (issue
+            // #019 follow-up reported by the user as "extra pixel
+            // border between top note panel and top note list
+            // panel").
             .child(header_strip)
             .child(list)
             .children(bulk_bar)
