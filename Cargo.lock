@@ -1860,25 +1860,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "embed_poc"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "env_logger",
- "gpui",
- "gpui-component",
- "gpui-wry",
- "gpui_platform",
- "lb-wry",
- "log",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "raw-window-handle",
- "serde_json",
-]
-
-[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
