@@ -94,29 +94,33 @@ export function useEditorMemoryProbeController(entries: VaultEntry[]) {
 
   const run = useCallback(async (options: ProbeRunOptions = {}): Promise<ProbeResult> => {
     clear()
-    await settleAfterMount(options.settleMs ?? DEFAULT_PROBE_SETTLE_MS)
-    const baseline = await readMemorySnapshot()
-    const selectedEntries = selectProbeEntries(entries, options)
-    const loadedTargets = await Promise.all(selectedEntries.map(loadProbeTarget))
-    const afterContentLoad = await readMemorySnapshot()
-    const batchSize = Math.max(1, options.batchSize ?? DEFAULT_PROBE_BATCH_SIZE)
-    const settleMs = options.settleMs ?? DEFAULT_PROBE_SETTLE_MS
-    const steps: ProbeStep[] = []
+    try {
+      await settleAfterMount(options.settleMs ?? DEFAULT_PROBE_SETTLE_MS)
+      const baseline = await readMemorySnapshot()
+      const selectedEntries = selectProbeEntries(entries, options)
+      const loadedTargets = await Promise.all(selectedEntries.map(loadProbeTarget))
+      const afterContentLoad = await readMemorySnapshot()
+      const batchSize = Math.max(1, options.batchSize ?? DEFAULT_PROBE_BATCH_SIZE)
+      const settleMs = options.settleMs ?? DEFAULT_PROBE_SETTLE_MS
+      const steps: ProbeStep[] = []
 
-    for (const count of resolveMountCounts(loadedTargets.length, batchSize)) {
-      const mountedTargets = loadedTargets.slice(0, count)
-      setTargets(mountedTargets)
-      await waitForReadyPaths(mountedTargets.map(target => target.entry.path))
-      await settleAfterMount(settleMs)
-      steps.push(createProbeStep(mountedTargets, await readMemorySnapshot(), baseline))
-    }
+      for (const count of resolveMountCounts(loadedTargets.length, batchSize)) {
+        const mountedTargets = loadedTargets.slice(0, count)
+        setTargets(mountedTargets)
+        await waitForReadyPaths(mountedTargets.map(target => target.entry.path))
+        await settleAfterMount(settleMs)
+        steps.push(createProbeStep(mountedTargets, await readMemorySnapshot(), baseline))
+      }
 
-    return {
-      targets: loadedTargets.map(summarizeTarget),
-      baseline,
-      afterContentLoad,
-      contentLoadDeltaBytes: memoryDelta(afterContentLoad, baseline),
-      steps,
+      return {
+        targets: loadedTargets.map(summarizeTarget),
+        baseline,
+        afterContentLoad,
+        contentLoadDeltaBytes: memoryDelta(afterContentLoad, baseline),
+        steps,
+      }
+    } finally {
+      clear()
     }
   }, [clear, entries, waitForReadyPaths])
 

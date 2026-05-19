@@ -103,7 +103,7 @@ describe('useParsedBlockPreload', () => {
     vi.restoreAllMocks()
   })
 
-  it('prepares parsed blocks for a warmed large markdown note after foreground work is idle', async () => {
+  it('does not preparse warmed large markdown notes while memory-heavy preload is disabled', async () => {
     const refs = makeRefs()
     const prepareParsedBlocks = vi.fn(async () => {})
     const entry = makeEntry()
@@ -111,12 +111,7 @@ describe('useParsedBlockPreload', () => {
     renderParsedPreload(refs, prepareParsedBlocks)
     await emitResolvedContent(entry, '# Large\n\nPrepared body.')
 
-    expect(prepareParsedBlocks).toHaveBeenCalledWith({
-      entry,
-      path: entry.path,
-      content: '# Large\n\nPrepared body.',
-      parsedBlockPreload: true,
-    })
+    expect(prepareParsedBlocks).not.toHaveBeenCalled()
   })
 
   it('skips raw prefetches that are not parsed-block warmup candidates', async () => {

@@ -5,7 +5,7 @@ import { subscribeNoteContentResolved } from './noteContentCache'
 export const PARSED_BLOCK_PRELOAD_MIN_BYTES = 32 * 1024
 export const PARSED_BLOCK_PRELOAD_DELAY_MS = 1800
 export const PARSED_BLOCK_PRELOAD_FOREGROUND_IDLE_MS = 1500
-export const PARSED_BLOCK_PRELOAD_ENABLED = true
+export const PARSED_BLOCK_PRELOAD_ENABLED = false
 
 type PrepareParsedBlocks = (event: NoteContentResolvedEvent) => Promise<void>
 

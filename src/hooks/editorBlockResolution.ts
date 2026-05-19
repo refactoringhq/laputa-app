@@ -33,7 +33,7 @@ export type CachedTabState = {
   sourceContent: NoteContent
 }
 
-const TAB_STATE_CACHE_LIMIT = 24
+const TAB_STATE_CACHE_LIMIT = 8
 
 export function cacheEditorState(
   cache: Map<NotePath, CachedTabState>,
