@@ -310,10 +310,22 @@ impl Render for TolariaWorkspace {
                                 .dump_as("workspace-left-dock"),
                         ),
                 );
+                // Sized siblings call `.flex_none()` so they don't
+                // absorb the freed sidebar width when the left dock
+                // toggles hidden — the gpui-component author flagged
+                // this as the load-bearing case in
+                // `gpui-component/.../resizable/panel.rs`.  Without
+                // it, every sized panel inherits the resizable group's
+                // `flex_grow()` default and grows proportionally; the
+                // user reported the note-list column getting wider on
+                // sidebar collapse and shrinking back on restore.  The
+                // unsized center panel keeps the `flex_grow` default,
+                // so it's the sole destination for freed width.
                 if let Some(view) = note_list_column {
                     panels.push(
                         resizable_panel()
                             .size(px(300.0))
+                            .flex_none()
                             .child(div().size_full().child(view).dump_as("workspace-note-list")),
                     );
                 }
@@ -327,7 +339,7 @@ impl Render for TolariaWorkspace {
                 );
                 if let Some(right_dock) = right_dock {
                     panels.push(
-                        resizable_panel().size(px(240.0)).child(
+                        resizable_panel().size(px(240.0)).flex_none().child(
                             div()
                                 .size_full()
                                 .child(right_dock)
