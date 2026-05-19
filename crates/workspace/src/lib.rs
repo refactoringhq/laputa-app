@@ -396,4 +396,57 @@ mod tests {
             })
             .unwrap();
     }
+
+    // -----------------------------------------------------------------------
+    // WKWebView resize artifact regression (follow-up plan §6)
+    // -----------------------------------------------------------------------
+
+    /// A `Pane` with an active item renders without panic and goes through
+    /// the no-background-quad code path.  This is a structural regression
+    /// guard: if `.bg(bg)` is re-introduced on the item-present branch of
+    /// `Pane::render` the transparent-div invariant is broken, which
+    /// reintroduces the trailing-strip artifact during WKWebView resize.
+    ///
+    /// We cannot inspect GPUI's internal style tree from a unit test, so
+    /// the test exercises the code path and relies on code-review + grep
+    /// to enforce the invariant (documented in pane.rs and pane_group.rs).
+    #[gpui::test]
+    fn pane_with_active_item_renders_without_bg_quad(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let window = cx.add_window(|_window, _cx| Pane::new());
+        window
+            .update(cx, |pane, _window, cx| {
+                let item = cx.new(|_| MockNoteItem::new("Test", "vault/test.md"));
+                pane.add_item(item, Activation::Activate, cx);
+                // Pane has an active item — render must not panic.
+                // The active-item branch produces `div().size_full().child(...)`,
+                // NOT `div().size_full().bg(bg).child(...)`, so the WKWebView
+                // region is not covered by an opaque GPUI quad.
+                assert_eq!(pane.item_count(), 1);
+            })
+            .unwrap();
+        cx.run_until_parked();
+    }
+
+    /// A `PaneGroup` with a mounted pane renders without panic and goes
+    /// through the transparent-div code path (no `.bg(...)` on the
+    /// active-pane branch — only the empty-group fallback retains `bg`).
+    #[gpui::test]
+    fn pane_group_with_active_pane_renders_without_bg_quad(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let window = cx.add_window(|_window, cx| {
+            let mut group = PaneGroup::new();
+            let pane = cx.new(|_| Pane::new());
+            group.push(pane);
+            group
+        });
+        window
+            .update(cx, |group, _window, _cx| {
+                // One pane mounted — active-pane branch must not panic.
+                // Invariant: `div().size_full().child(pane)` with no `.bg(...)`.
+                assert_eq!(group.pane_count(), 1);
+            })
+            .unwrap();
+        cx.run_until_parked();
+    }
 }

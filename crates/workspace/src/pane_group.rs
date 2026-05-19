@@ -66,14 +66,21 @@ impl Default for PaneGroup {
 
 impl Render for PaneGroup {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Explicit fill so the centre pane tracks dark-mode background
-        // when the active item leaves any uncovered area (no item
-        // mounted, or a child with intrinsic size smaller than the
-        // pane's bounds).  Phase 7.5 fix.
-        let bg = cx.theme().background;
+        // No `.bg(...)` here: the workspace root div already paints
+        // `theme.background` over the full window surface.  Painting the
+        // same colour again on every intermediate container (pane_group →
+        // pane → note_item) stacks redundant opaque quads over the
+        // WKWebView region.  During a live resize GPUI redraws those quads
+        // synchronously at the new size while the WKWebView's remote
+        // CALayer (in the WebKit GPU process) is still one IPC frame behind
+        // — producing the visible trailing-strip artifact.  The transparent
+        // div lets the workspace root's single bg quad composite cleanly
+        // through the Metal surface without obscuring the WebView layer.
+        // (WKWebView resize artifact fix — see follow-up plan §6.)
         if let Some(pane) = self.panes.get(self.active_pane_index) {
-            div().size_full().bg(bg).child(pane.clone())
+            div().size_full().child(pane.clone())
         } else {
+            let bg = cx.theme().background;
             div()
                 .size_full()
                 .bg(bg)

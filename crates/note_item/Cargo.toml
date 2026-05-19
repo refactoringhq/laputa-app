@@ -24,6 +24,9 @@ gpui-component.workspace = true
 gpui-wry.workspace = true
 wry.workspace = true
 raw-window-handle.workspace = true
+objc2.workspace = true
+objc2-app-kit.workspace = true
+objc2-foundation.workspace = true
 
 [dev-dependencies]
 chrono.workspace = true

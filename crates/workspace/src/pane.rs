@@ -107,17 +107,22 @@ impl Default for Pane {
 
 impl Render for Pane {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Phase 7.5: explicit `theme.background` fill so an empty pane
-        // (or one whose active item leaves uncovered area) tracks the
-        // dark/light theme instead of bleeding the window's default
-        // chrome through.
-        let bg = cx.theme().background;
+        // No `.bg(...)` on the pane wrapper: the workspace root div already
+        // fills the full surface with `theme.background`.  Every additional
+        // opaque quad stacked on top of the WKWebView region creates a
+        // one-frame trailing-strip artifact during live resize because GPUI
+        // redraws synchronously while WKWebView's remote CALayer lags one
+        // IPC round-trip behind.  Keep bg only for the empty-pane
+        // placeholder where there is no WebView layer to composite through.
+        // (WKWebView resize artifact fix — see follow-up plan §6.)
         let muted = cx.theme().muted_foreground;
         let content: AnyElement = if let Some(item) = self.items.get(self.active_item_index) {
             item.to_any().into_any_element()
         } else {
+            let bg = cx.theme().background;
             div()
                 .size_full()
+                .bg(bg)
                 .flex()
                 .items_center()
                 .justify_center()
@@ -125,6 +130,6 @@ impl Render for Pane {
                 .child("No items open")
                 .into_any_element()
         };
-        div().size_full().bg(bg).child(content)
+        div().size_full().child(content)
     }
 }

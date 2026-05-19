@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![warn(missing_docs)]
 //! Per-note WKWebView `Item` hosting the embedded editor (ADR-0115
 //! Phase 4-MVP).
@@ -550,6 +550,7 @@ impl NoteItem {
 // ---------------------------------------------------------------------------
 
 #[cfg(target_os = "macos")]
+#[allow(unsafe_code)]
 mod macos {
     use super::{NoteId, EDITOR_HOST_HTML};
     use anyhow::{Context as _, Result};
@@ -558,11 +559,13 @@ mod macos {
         LayoutId, Pixels, Size as GpuiSize, Style, Window,
     };
     use gpui_wry::WebView;
-    use raw_window_handle::HasWindowHandle;
+    use objc2_app_kit::{NSAutoresizingMaskOptions, NSColor, NSView};
+    use objc2_foundation::{ns_string, NSNumber, NSObjectNSKeyValueCoding};
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
     use std::{cell::Cell, rc::Rc};
     use wry::{
         dpi::{self, LogicalPosition, LogicalSize},
-        Rect, WebViewBuilder,
+        Rect, WebViewBuilder, WebViewExtMacOS,
     };
 
     /// 0.5-logical-pixel epsilon per ADR-0115 §4.  Mirrors
@@ -625,7 +628,116 @@ mod macos {
             .build_as_child(&handle)
             .context("wry::WebViewBuilder::build_as_child failed")?;
 
+        // Seamless-resize fixes (mirrors embed_poc::spawn_test_webview).
+        // Must run on the bare wry::WebView before WebView::new wraps it
+        // in an Rc.  See follow-up plan §4 / §6 for rationale.
+        fix_autoresize_mask(&webview_raw);
+        fix_draws_background(&webview_raw);
+        fix_window_background(&handle);
+        fix_under_page_background(&webview_raw);
+
         Ok(cx.new(|cx: &mut Context<WebView>| WebView::new(webview_raw, window, cx)))
+    }
+
+    /// Fix 1 — Autoresize mask (mirrors `embed_poc::fix_autoresize_mask`).
+    ///
+    /// lb-wry's `build_as_child` sets `ViewMinYMargin` only.  Override to
+    /// `ViewWidthSizable | ViewHeightSizable` so AppKit propagates frame
+    /// changes to the WKWebView during live-resize inside its own geometry
+    /// phase — eliminating one latency source in the trailing-strip artifact.
+    fn fix_autoresize_mask(webview: &wry::WebView) {
+        let wk: objc2::rc::Retained<wry::WryWebView> = webview.webview();
+        wk.setAutoresizingMask(
+            NSAutoresizingMaskOptions::ViewWidthSizable
+                | NSAutoresizingMaskOptions::ViewHeightSizable,
+        );
+    }
+
+    /// Fix 2 — `drawsBackground = false` (mirrors `embed_poc::fix_draws_background`).
+    ///
+    /// Suppresses WebKit's own opaque-white fill during resize so only the
+    /// GPUI Metal surface (and ultimately the WKWebView's own content) is
+    /// visible.
+    fn fix_draws_background(webview: &wry::WebView) {
+        let wk: objc2::rc::Retained<wry::WryWebView> = webview.webview();
+        let no = NSNumber::numberWithBool(false);
+        // SAFETY: KVC `setValue:forKey:` on a live WKWebView instance on the
+        // main thread.  `drawsBackground` is a documented WKWebView property
+        // (macOS 10.14+).  `wk` is ARC-retained and not aliased.
+        unsafe { wk.setValue_forKey(Some(&no), ns_string!("drawsBackground")) }
+    }
+
+    /// Fix 3 — NSWindow background colour (mirrors `embed_poc::fix_window_background`).
+    ///
+    /// Sets `NSWindow.backgroundColor` to `theme.background` (dark `#1F1E1B`,
+    /// light `#FFFFFF`) so any 1-frame gap between the Metal layer and the
+    /// WKWebView's remote CALayer is filled with the matching colour rather
+    /// than the default light-grey chrome.
+    ///
+    /// # Safety
+    /// Unsafe pointer cast from `AppKitWindowHandle.ns_view` + objc2 retain.
+    fn fix_window_background(window_handle: &impl HasWindowHandle) {
+        let Ok(handle) = window_handle.window_handle() else {
+            log::warn!("note_item::fix_window_background: could not obtain window handle");
+            return;
+        };
+        let RawWindowHandle::AppKit(appkit) = handle.as_raw() else {
+            log::warn!("note_item::fix_window_background: window handle is not AppKit");
+            return;
+        };
+        // SAFETY: `ns_view` is a valid, live NSView pointer for the duration
+        // of this call.  We retain it temporarily, walk to NSWindow, and set
+        // the background colour.  All on the main thread.
+        unsafe {
+            let ns_view_ptr: *mut NSView = appkit.ns_view.as_ptr().cast();
+            let Some(ns_view) = objc2::rc::Retained::retain(ns_view_ptr) else {
+                log::warn!("note_item::fix_window_background: NSView retain returned nil");
+                return;
+            };
+            let Some(ns_window) = ns_view.window() else {
+                log::warn!("note_item::fix_window_background: NSView.window() returned nil");
+                return;
+            };
+            // Dark theme: `theme.palette::apply_dark` background = #1F1E1B.
+            // Light theme: #FFFFFF.  We cannot read the live theme here
+            // because this runs during WebView construction before any
+            // GPUI render pass.  Use the dark value as the safe default
+            // (matches the `drawsBackground = false` intent and is
+            // invisible under normal compositing).  A theme-change observer
+            // in `main.rs` can update this later if needed.
+            let color = NSColor::colorWithSRGBRed_green_blue_alpha(
+                0x1F_u8 as f64 / 255.0,
+                0x1E_u8 as f64 / 255.0,
+                0x1B_u8 as f64 / 255.0,
+                1.0,
+            );
+            ns_window.setBackgroundColor(Some(&color));
+        }
+    }
+
+    /// Fix 4 — `underPageBackgroundColor` (new, not in embed_poc).
+    ///
+    /// Sets `WKWebView.underPageBackgroundColor` to `theme.background` so the
+    /// colour WebKit paints in the gap region (when the remote CALayer hasn't
+    /// yet committed its new geometry) matches the GPUI Metal surface colour.
+    /// This makes the 1-frame IPC lag invisible in both light and dark mode.
+    ///
+    /// `underPageBackgroundColor` is macOS 12+ API; on earlier releases the
+    /// KVC write is silently ignored.
+    fn fix_under_page_background(webview: &wry::WebView) {
+        let wk: objc2::rc::Retained<wry::WryWebView> = webview.webview();
+        // Dark background (#1F1E1B).  See fix_window_background comment for
+        // why we use the dark value as the safe default.
+        let color = NSColor::colorWithSRGBRed_green_blue_alpha(
+            0x1F_u8 as f64 / 255.0,
+            0x1E_u8 as f64 / 255.0,
+            0x1B_u8 as f64 / 255.0,
+            1.0,
+        );
+        // SAFETY: KVC `setValue:forKey:` on a live WKWebView instance on the
+        // main thread.  `underPageBackgroundColor` is macOS 12+ (silently
+        // ignored on earlier releases).  `wk` is ARC-retained and not aliased.
+        unsafe { wk.setValue_forKey(Some(&color), ns_string!("underPageBackgroundColor")) }
     }
 
     /// Custom `Element` mirroring `embed_poc::InstrumentedWebView`.
