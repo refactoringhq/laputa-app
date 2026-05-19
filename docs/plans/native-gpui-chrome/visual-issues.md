@@ -733,3 +733,67 @@ inspector).  Two consequences:
 (pins `NOTE_TOOLBAR_HEIGHT_PT = 52.0` to `BreadcrumbBar.tsx:1061`).
 2/2 toolbar tests pass; 23/23 workspace tests pass; clippy clean
 for `-p note_item -p workspace --all-targets -D warnings`.
+
+### 020 — Sidebar show / hide button
+
+**Reporter:** "Implement sidebar show/hide button."  Reference crop
+shows `[● ● ●] [▢] [←] [→]` in the title-bar's left cluster — the
+panel-left toggle glyph sits between the macOS traffic lights and
+the back / forward navigation arrows.
+
+**Diagnosis** — the title-bar strip carried back / forward only;
+hiding the left dock required mouse drag against the resizable
+divider.  React's `SidebarTopNav` shows the same `panel-left`
+glyph in the same slot, click-to-toggle.  Two questions to settle
+in the implementation:
+
+1. How does the click reach the dock?  `actions::ToggleSidebar`
+   already exists, but no `cx.on_action::<ToggleSidebar>` handler
+   is registered anywhere in the workspace today, so dispatching
+   the action would log-and-drop.  Routing the click through the
+   dock entity directly is the only path with real effect right
+   now.
+2. Where does the wiring live?  `TitleBar` is mounted by
+   `TolariaWorkspace::empty` (which already owns the left dock
+   entity); passing the dock to `TitleBar::new` is a one-line
+   change that keeps the click-to-effect path inside one crate
+   and avoids a `Global` lookup for a transient toggle.
+
+**Status:** fixed.
+
+- `crates/workspace/src/title_bar.rs`:
+  - `TitleBar` gains one field, `sidebar_toggle_target: Entity<Dock>`,
+    named for the *role* of the entity (the thing the sidebar
+    button toggles) rather than its current position so a future
+    setting that parks the sidebar in the right dock won't
+    require a rename.
+  - `pub fn new(sidebar_toggle_target: Entity<Dock>)` replaces the
+    prior nullary constructor.
+  - `Render::render` prepends a new toggle cell to the left
+    cluster — id `"title-bar-toggle-sidebar"`, `IconName::PanelLeft`,
+    `on_click` clones `self.sidebar_toggle_target` and calls
+    `dock.toggle(cx)`.  Same 20 × 28 pt hit target as the other
+    title-bar action cells.
+- `crates/workspace/src/workspace.rs`: single-line constructor
+  update — `TitleBar::new(left_dock.clone())` passes the
+  workspace's left dock entity into the new title bar.
+- The toggle is the first title-bar action wired to real
+  workspace state (the rest remain log-only stubs per the Phase
+  7.8 precedent until the Phase 8 modal-chrome wiring lands).
+
+**Tests:**
+
+- Existing `title_bar_renders` + `title_bar_zed_matching_dims`
+  updated to construct a fresh `Entity<Dock>` for the new
+  constructor signature.
+- New `title_bar_left_dock_toggle_round_trip` attaches a local
+  `ToggleFixturePanel` (a minimal `Panel` impl whose
+  `starts_open == false`) and exercises the same `Dock::toggle`
+  call the button's `on_click` makes — Empty → still Closed
+  after attach → Open after first toggle → Closed again after
+  second.  Documents the click contract since the GPUI test
+  harness can't synthesise a real pointer event on a nested
+  element id without re-implementing periscope's tree walk.
+
+3/3 title_bar tests pass; clippy clean for `-p workspace
+--all-targets -D warnings`.

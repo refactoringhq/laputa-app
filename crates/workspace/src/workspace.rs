@@ -94,7 +94,7 @@ impl TolariaWorkspace {
         let right_dock = cx.new(|_| Dock::new(DockPosition::Right));
         let bottom_dock = cx.new(|_| Dock::new(DockPosition::Bottom));
         let center_group = cx.new(|_| PaneGroup::new());
-        let title_bar = cx.new(|_| TitleBar::new());
+        let title_bar = cx.new(|_| TitleBar::new(left_dock.clone()));
         // `StatusBar::from_or_empty` populates from mock globals if installed
         // (TOLARIA_MOCK=1 launches), or returns an empty bar otherwise.
         let status_bar = cx.new(|cx| StatusBar::from_or_empty(cx));
