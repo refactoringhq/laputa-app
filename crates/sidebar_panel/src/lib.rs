@@ -712,12 +712,6 @@ fn icon_glyph(icon: IconName, color: Hsla) -> AnyElement {
         .into_any_element()
 }
 
-/// Section header — small-caps muted label with optional trailing
-/// action glyphs (`+` / `⇅`).  Mirrors `SidebarGroupHeader.tsx`.
-fn section_header(label: &'static str, p: &Palette, actions: Vec<AnyElement>) -> gpui::AnyElement {
-    section_header_with_leading(label, None, p, actions)
-}
-
 /// Section header with an optional leading caret/icon — used by the
 /// FOLDERS group, which exposes a chevron-down on the left so the
 /// whole section can collapse (mirrors the React `<FolderTree />`
@@ -937,14 +931,24 @@ impl Render for SidebarPanel {
             .child(row_inbox)
             .child(row_all)
             .child(row_arch)
-            .child(section_header(
+            .child(section_header_with_leading(
                 "VIEWS",
+                Some(header_action(
+                    "sidebar-views-caret",
+                    IconName::ChevronDown,
+                    p,
+                )),
                 p,
                 vec![header_action("sidebar-views-add", IconName::Plus, p)],
             ))
             .children(view_rows)
-            .child(section_header(
+            .child(section_header_with_leading(
                 "TYPES",
+                Some(header_action(
+                    "sidebar-types-caret",
+                    IconName::ChevronDown,
+                    p,
+                )),
                 p,
                 vec![
                     header_action("sidebar-types-sort", IconName::ChevronsUpDown, p),

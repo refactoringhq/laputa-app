@@ -179,4 +179,27 @@ reads as glued to the window edge.  Bumping the strip's height to
 38 pt gives 9 pt top / 9 pt bottom around the cells and lets the
 traffic lights breathe symmetrically.
 
+**Status:** fixed.  `NATIVE_TITLE_BAR_HEIGHT_PT` bumped from `28.0`
+to `38.0`; the change cascades into the
+`ui::tree_dump::set_window_y_offset` initialisation in `main.rs` so
+periscope's click coordinates stay aligned with the new strip
+height.  Verified in
+[after-005-title-bar.png](live-snapshots/after-005-title-bar.png).
+
+### 006 — VIEWS / TYPES section headers missing collapse caret
+
+| Current |
+|---------|
+| [issue-006-current.png](live-snapshots/issue-006-current.png) |
+
+**Reporter:** "Types and Views section should have collapsible
+arrows.  Similar to the folders section."
+
+**Diagnosis** — FOLDERS already renders a chevron-down to the left
+of its label (issue 002).  VIEWS and TYPES used the base
+`section_header(...)` builder which only emits a label and trailing
+actions; switching them to `section_header_with_leading(...)` with a
+`ChevronDown` glyph in the leading slot makes the collapse
+affordance uniform across all three groups.
+
 **Status:** open.
