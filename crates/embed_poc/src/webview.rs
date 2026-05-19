@@ -20,6 +20,37 @@
 //! alive, which keeps the NSView attached to the window. We just stop
 //! routing through the upstream `Render` impl that would otherwise call
 //! `set_bounds` unconditionally.
+//!
+//! ## Seamless-resize fixes (ADR-0115 §4.1 / §4.2 / §4.3)
+//!
+//! Three changes applied in `spawn_test_webview` right after
+//! `build_as_child` eliminate the trailing-strip artifact observed
+//! during live resize and `h_resizable` splitter drags:
+//!
+//! 1. **Autoresize mask** (`fix_autoresize_mask`): flips the WKWebView's
+//!    `NSAutoresizingMaskOptions` from `ViewMinYMargin` (lb-wry child
+//!    default) to `ViewWidthSizable | ViewHeightSizable`.  AppKit then
+//!    updates the NSView frame inside its own geometry phase — on the
+//!    same display-link tick that resizes the window — rather than
+//!    waiting for GPUI's next render pass.  Ref:
+//!    `wry/0.54.2/src/wkwebview/mod.rs:484-495`.
+//!
+//! 2. **Window background colour** (`fix_window_background`): sets
+//!    `NSWindow.backgroundColor` to `rgb(0x12141a)` (the content-panel
+//!    bg defined in `layout.rs:179`) so any residual 1-frame mismatch
+//!    between the Metal layer and the WebView's CALayer is invisible
+//!    rather than flashing the default light-grey.  We go via objc2
+//!    directly because GPUI's `set_background_appearance` only supports
+//!    opaque-black or near-transparent.  Ref: ADR-0115 §4.2.
+//!
+//! 3. **drawsBackground = false** (`fix_draws_background`): sets the
+//!    private-but-documented KVC key `drawsBackground` on the
+//!    `WKWebViewConfiguration` to `NO`, preventing WebKit from painting
+//!    its own opaque-white fill during resize.  Mirrors Tauri's exact
+//!    technique at `wry/0.54.2/src/wkwebview/mod.rs:353-371` and
+//!    `mod.rs:940-945`.  lb-wry's guard for this flag is gated on
+//!    `attributes.transparent` only, so we apply it unconditionally via
+//!    KVC after construction.
 
 use std::{cell::Cell, rc::Rc};
 
@@ -33,6 +64,15 @@ use wry::{
     dpi::{self, LogicalPosition, LogicalSize},
     Rect, WebViewBuilder,
 };
+
+#[cfg(target_os = "macos")]
+use objc2_app_kit::{NSAutoresizingMaskOptions, NSColor, NSView};
+#[cfg(target_os = "macos")]
+use objc2_foundation::{ns_string, NSNumber, NSObjectNSKeyValueCoding};
+#[cfg(target_os = "macos")]
+use raw_window_handle::RawWindowHandle;
+#[cfg(target_os = "macos")]
+use wry::WebViewExtMacOS;
 
 const TEST_PAGE_HTML: &str = include_str!("../assets/test-page.html");
 const IPC_TARGET: &str = "embed_poc::ipc";
@@ -49,6 +89,12 @@ pub(crate) const FRAME_EPSILON: f32 = 0.5;
 
 /// Construct the spike's WebView entity — built `as_child` of the current
 /// `NSWindow`'s content view so it sits next to GPUI's Metal renderer.
+///
+/// After construction the three seamless-resize fixes described in the
+/// module doc are applied: autoresize mask, window background colour, and
+/// `drawsBackground = false`.  All three are gated on
+/// `#[cfg(target_os = "macos")]` so non-macOS builds (stub path in
+/// `main.rs`) are unaffected.
 pub fn spawn_test_webview(window: &mut Window, cx: &mut App) -> Entity<WebView> {
     cx.new(|cx: &mut Context<WebView>| {
         let window_handle = window
@@ -67,8 +113,116 @@ pub fn spawn_test_webview(window: &mut Window, cx: &mut App) -> Entity<WebView> 
             .build_as_child(&window_handle)
             .expect("failed to build child wry::WebView");
 
+        // Fix 1: autoresize mask — must run before WebView::new wraps the
+        // wry::WebView in an Rc, because we need the bare wry::WebView to
+        // call WebViewExtMacOS::webview().
+        #[cfg(target_os = "macos")]
+        fix_autoresize_mask(&webview);
+
+        // Fix 3: drawsBackground = false — same timing requirement as Fix 1.
+        #[cfg(target_os = "macos")]
+        fix_draws_background(&webview);
+
+        // Fix 2: window background colour — we have the raw window handle here
+        // and can walk ns_view → window → setBackgroundColor.
+        #[cfg(target_os = "macos")]
+        fix_window_background(&window_handle);
+
         WebView::new(webview, window, cx)
     })
+}
+
+/// Fix 1 — Autoresize mask (ADR-0115 §4.1).
+///
+/// lb-wry's `build_as_child` path sets `ViewMinYMargin` only, which keeps
+/// the bottom margin constant but does NOT make the WebView track the
+/// parent's width or height.  Overriding the mask here makes AppKit
+/// propagate frame changes to the WKWebView inside its own geometry phase
+/// — the same display-link tick that resizes the window — eliminating the
+/// one-frame trailing-strip artifact.
+///
+/// Reference: `wry/0.54.2/src/wkwebview/mod.rs:484-495`.
+#[cfg(target_os = "macos")]
+fn fix_autoresize_mask(webview: &wry::WebView) {
+    // `webview()` returns a `Retained<WryWebView>` (ARC-managed).
+    // `WryWebView` extends `WKWebView` which extends `NSView`, so the
+    // deref coercion to `&NSView` is valid.  `setAutoresizingMask` is a
+    // safe method in objc2 (no unsafe required here).
+    let wk: objc2::rc::Retained<wry::WryWebView> = webview.webview();
+    // `WryWebView` extends `WKWebView` which extends `NSView`; auto-deref
+    // via `Retained<T>: Deref<Target = T>` resolves `setAutoresizingMask`
+    // without an explicit cast.
+    wk.setAutoresizingMask(
+        NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
+    );
+}
+
+/// Fix 3 — `drawsBackground = false` (ADR-0115 §4.3).
+///
+/// lb-wry's `drawsBackground` KVC override is gated on
+/// `attributes.transparent`, which we do not set.  Apply it ourselves via
+/// KVC after construction so WebKit stops painting its own opaque-white fill
+/// during resize.
+///
+/// Reference: `wry/0.54.2/src/wkwebview/mod.rs:353-371` and
+/// `mod.rs:940-945`.
+#[cfg(target_os = "macos")]
+fn fix_draws_background(webview: &wry::WebView) {
+    // SAFETY: `webview()` returns a valid `Retained<WryWebView>`.  KVC
+    // `setValue:forKey:` is a standard Objective-C message send on NSObject,
+    // and `drawsBackground` is a documented (private-API, but stable since
+    // macOS 10.14) configuration key on `WKWebViewConfiguration`.  We are on
+    // the main thread.
+    unsafe {
+        let wk: objc2::rc::Retained<wry::WryWebView> = webview.webview();
+        let no = NSNumber::numberWithBool(false);
+        wk.setValue_forKey(Some(&no), ns_string!("drawsBackground"));
+    }
+}
+
+/// Fix 2 — NSWindow background colour (ADR-0115 §4.2).
+///
+/// GPUI's `set_background_appearance` only offers opaque-black or
+/// near-transparent modes.  We need the content-panel colour
+/// `rgb(0x12141a)` so any 1-frame gap between the Metal layer and the
+/// WebView's CALayer is invisible rather than flashing the default
+/// light-grey.  We walk `AppKitWindowHandle.ns_view → window() →
+/// setBackgroundColor:` directly.
+#[cfg(target_os = "macos")]
+fn fix_window_background(window_handle: &impl HasWindowHandle) {
+    let Ok(handle) = window_handle.window_handle() else {
+        log::warn!("fix_window_background: could not obtain window handle");
+        return;
+    };
+    let RawWindowHandle::AppKit(appkit) = handle.as_raw() else {
+        log::warn!("fix_window_background: window handle is not AppKit");
+        return;
+    };
+    // SAFETY: `AppKitWindowHandle.ns_view` is a valid, non-null pointer to an
+    // `NSView` that is guaranteed to remain alive for the duration of this
+    // call (the window is open and we hold no ownership).  We retain it
+    // temporarily via `Retained::retain` to get a safe reference, then walk
+    // `.window()` to reach the `NSWindow`.  The colour constants are computed
+    // on the stack and do not outlive this function.
+    unsafe {
+        let ns_view_ptr: *mut NSView = appkit.ns_view.as_ptr().cast();
+        let Some(ns_view) = objc2::rc::Retained::retain(ns_view_ptr) else {
+            log::warn!("fix_window_background: NSView retain returned nil");
+            return;
+        };
+        let Some(ns_window) = ns_view.window() else {
+            log::warn!("fix_window_background: NSView.window() returned nil");
+            return;
+        };
+        // Content-panel background: rgb(0x12, 0x14, 0x1a) == layout.rs:179.
+        let color = NSColor::colorWithSRGBRed_green_blue_alpha(
+            0x12_u8 as f64 / 255.0,
+            0x14_u8 as f64 / 255.0,
+            0x1a_u8 as f64 / 255.0,
+            1.0,
+        );
+        ns_window.setBackgroundColor(Some(&color));
+    }
 }
 
 /// Shared state tracking the bounds we last pushed to `wry::WebView`.
@@ -508,5 +662,32 @@ mod tests {
         // `webview_focus state=…` line.
         assert_eq!(WebviewFocusState::In.as_log_str(), "in");
         assert_eq!(WebviewFocusState::Out.as_log_str(), "out");
+    }
+
+    /// Verify that the autoresize-mask constants used by `fix_autoresize_mask`
+    /// have the correct bit values.
+    ///
+    /// The live wire-up (calling `setAutoresizingMask` on a real `WKWebView`)
+    /// requires an actual AppKit NSView and cannot run in the GPUI test
+    /// platform.  This test asserts on the bitmask constants themselves,
+    /// locking the values that `fix_autoresize_mask` passes to AppKit so a
+    /// future objc2-app-kit version bump can't silently break the fix.
+    ///
+    /// Reference: `NSViewWidthSizable = 2`, `NSViewHeightSizable = 16`
+    /// (AppKit NSView.h).  The combined mask is `0b10010` = 18.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn autoresize_mask_constants_have_expected_bit_values() {
+        use objc2_app_kit::NSAutoresizingMaskOptions;
+
+        let mask = NSAutoresizingMaskOptions::ViewWidthSizable
+            | NSAutoresizingMaskOptions::ViewHeightSizable;
+        // NSViewWidthSizable = 2, NSViewHeightSizable = 16 → combined = 18.
+        assert_eq!(
+            mask.bits(),
+            18,
+            "ViewWidthSizable | ViewHeightSizable must be 0x12 (18); \
+             if this fails a dependency version changed the bit layout"
+        );
     }
 }
