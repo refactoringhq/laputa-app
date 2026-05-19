@@ -98,7 +98,7 @@ reaches the click handlers.  CGEvent is the only path that works.
 
 ---
 
-## Driving the UI by element name — `dump-tree` + `click-id`
+## Driving the UI by element name — `dump-tree` + `click --id`
 
 Hand-picked pixel coordinates rot the moment a layout tweak shifts an
 element.  For stable targets, Tolaria (in debug builds) ships a
@@ -113,7 +113,7 @@ Typical loop:
 cargo run -q -p periscope -- dump-tree --title Tolaria
 
 # 2. Drive a click by name:
-cargo run -q -p periscope -- click-id \
+cargo run -q -p periscope -- click \
     --title Tolaria --raise --id status-bar-theme-toggle
 ```
 
@@ -123,7 +123,7 @@ cargo run -q -p periscope -- click-id \
 snapshot, waits for the on-disk sequence counter to bump, then
 pretty-prints every name → bounds in the registry.  Use it to find
 what's registered, sanity-check element geometry after a layout
-change, or diagnose `click-id: no element registered as "..."`
+change, or diagnose `click --id: no element registered as "..."`
 errors.
 
 ```sh
@@ -156,7 +156,7 @@ Flags:
 | `--no-refresh` | off | Skip the SIGUSR1 trigger; print whatever's on disk.  Useful when the target is paused under `lldb` or you want to see the snapshot from a previous run. |
 | `--timeout-ms <ms>` | `2000` | How long to wait for the writer to bump the sequence counter before erroring out. |
 
-`dump-tree` is intentionally distinct from `click-id` so it can be
+`dump-tree` is intentionally distinct from `click --id` so it can be
 used purely as a registry probe — it never moves the cursor and
 never modifies the target's state.  It's the safe diagnostic when
 something doesn't show up where you expected.
@@ -192,10 +192,10 @@ kill -USR1 $(pgrep -f "target/debug/tolaria --vault")
 cat "$TMPDIR/tolaria-ui-tree-$(pgrep -f "target/debug/tolaria --vault").json"
 ```
 
-### `click-id` — click an element by name
+### `click --id` — click an element by name
 
 ```sh
-cargo run -q -p periscope -- click-id \
+cargo run -q -p periscope -- click \
     --title Tolaria --raise --id status-bar-theme-toggle
 ```
 
@@ -259,7 +259,7 @@ reflects the most recent layout, no cleanup story.
 
 Pick names that survive layout shuffles: prefer
 `"status-bar-theme-toggle"` over `"toggle-3"`.  Periscope's
-`click-id` is a string lookup; renaming a registered element breaks
+`click --id` is a string lookup; renaming a registered element breaks
 every harness call site that depended on it.
 
 ### Why SIGUSR1?
@@ -355,3 +355,55 @@ A capture missing the editor body (black rectangle in the middle of
 the screenshot) usually means the harness pivoted to in-process
 capture by mistake; check that `xcap::Window::capture_image()` is
 still the capture path in `crates/periscope/src/capture.rs`.
+
+---
+
+## Screenshots by element id
+
+Both `screenshot` and `watch` accept `--id <name>` to crop the output to
+the bounds of the named element.  The full window is captured first, then
+sliced in-memory before writing to disk — no intermediate full-window PNG
+is stored.
+
+```sh
+# Crop to a single element — great for tight regression captures:
+cargo run -q -p periscope -- screenshot \
+    --title Tolaria --raise \
+    --id status-bar-theme-toggle \
+    --out /tmp/toggle.png
+
+# Same in watch mode — latest.png stays cropped on every tick:
+cargo run -q -p periscope -- watch \
+    --title Tolaria --dir target/e2e/ --interval-secs 3 \
+    --id status-bar-theme-toggle
+```
+
+The element bounds come from the same `tree_dump` SIGUSR1 IPC as
+`click --id`.  A fresh refresh is triggered before the first capture
+(skip with `--no-refresh`); `--timeout-ms` controls the wait.
+
+Device-pixel scaling (Retina 2×) is derived automatically from the ratio
+of the captured image's pixel dimensions to the window's logical-point
+size as reported by `xcap`.  If the element bounds clamp to an empty
+rectangle (element off-screen or occluded), the command exits with a
+clear error rather than writing a zero-byte PNG.
+
+### `click` — coordinate or element id
+
+The `click` subcommand accepts either `--x`/`--y` (absolute window-local
+coordinates) or `--id` (element lookup).  The two modes are mutually
+exclusive and enforced by the argument parser.
+
+```
+Usage: periscope click [OPTIONS]
+
+Options:
+      --title <TITLE>     Match by window title (e.g. `Tolaria`)
+      --pid <PID>         Match by owning process id
+      --raise             Raise the window via the Accessibility API before clicking
+      --x <X>             X coordinate, window-local (origin at top-left, in window points)
+      --y <Y>             Y coordinate, window-local (origin at top-left, in window points)
+      --id <ID>           Search for element by id. --id and --x/y are mutually exclusive.
+      --no-refresh        Skip SIGUSR1 refresh (--id mode only)
+      --timeout-ms <MS>   Max wait for fresh dump in ms [default: 2000] (--id mode only)
+```

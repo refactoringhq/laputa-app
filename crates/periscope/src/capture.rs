@@ -35,6 +35,75 @@ pub(crate) fn screenshot_macos(target: &WindowTarget, out: &Path) -> Result<Path
         ));
     }
 
+    write_png(&image, out)
+}
+
+/// Capture the window and write a PNG cropped to the bounds of the element
+/// identified by `id` in the most recent `tree_dump` JSON for `pid`.
+///
+/// `bounds` are in **window-frame logical points** as reported by the
+/// `tree_dump` JSON.  The captured image is in device pixels (2× on Retina),
+/// so `bounds` are scaled by `image_pixel_width / window_logical_width`
+/// before the crop.
+pub(crate) fn screenshot_cropped_macos(
+    target: &WindowTarget,
+    bounds: crate::tree_dump::NamedBounds,
+    out: &Path,
+) -> Result<PathBuf> {
+    let window = find_window(target)?;
+    let image = window
+        .capture_image()
+        .context("xcap::Window::capture_image failed")?;
+
+    if is_black_frame(&image) {
+        let terminal = std::env::var("TERM_PROGRAM").unwrap_or_else(|_| "<unknown>".into());
+        return Err(anyhow!(
+            "captured frame is all black — likely Screen Recording permission \
+             missing for {terminal} (System Settings → Privacy & Security → \
+             Screen Recording).  Other causes: the window is off-screen, \
+             minimized, or covered by an opaque overlay."
+        ));
+    }
+
+    // Derive the device pixel ratio from the logical window size reported
+    // by the OS vs the pixel dimensions of the captured image.
+    let (img_w, img_h) = image.dimensions();
+    let scale = {
+        let logical_w = window.width().unwrap_or(0);
+        if logical_w == 0 || img_w == 0 {
+            1.0_f64
+        } else {
+            f64::from(img_w) / f64::from(logical_w)
+        }
+    };
+
+    // Convert logical-point bounds → pixel rect, then clamp to image dims.
+    let px = (f64::from(bounds.x) * scale).round() as u32;
+    let py = (f64::from(bounds.y) * scale).round() as u32;
+    let pw = (f64::from(bounds.width) * scale).round() as u32;
+    let ph = (f64::from(bounds.height) * scale).round() as u32;
+
+    let clamped_x = px.min(img_w);
+    let clamped_y = py.min(img_h);
+    let clamped_w = pw.min(img_w.saturating_sub(clamped_x));
+    let clamped_h = ph.min(img_h.saturating_sub(clamped_y));
+
+    if clamped_w == 0 || clamped_h == 0 {
+        return Err(anyhow!(
+            "element bounds ({px},{py} {pw}×{ph} px at scale {scale:.2}×) \
+             fall entirely outside the captured image ({img_w}×{img_h} px) — \
+             element may be off-screen or occluded"
+        ));
+    }
+
+    let cropped =
+        xcap::image::imageops::crop_imm(&image, clamped_x, clamped_y, clamped_w, clamped_h)
+            .to_image();
+
+    write_png(&cropped, out)
+}
+
+fn write_png(image: &xcap::image::RgbaImage, out: &Path) -> Result<PathBuf> {
     if let Some(parent) = out.parent() {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("creating parent dir {parent:?} for screenshot output"))?;

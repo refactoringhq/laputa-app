@@ -39,7 +39,7 @@ pub struct NamedBounds {
 
 impl NamedBounds {
     /// Geometric centre of the rectangle, in window-local logical
-    /// points.  This is the point the `click-id` subcommand sends
+    /// points.  This is the point the `click --id` subcommand sends
     /// `CGEvent` mouse-down at.
     ///
     /// Computed in `f64` (with lossless `f32 -> f64` widening) so the
@@ -77,7 +77,7 @@ pub fn default_dump_path_for_pid(pid: u32) -> PathBuf {
 }
 
 /// Read and deserialise the dump file at `path`.  Used by both the
-/// `click-id` subcommand and by integration tests that want to read
+/// `click --id` subcommand and by integration tests that want to read
 /// the bounds map directly.
 pub fn load(path: &Path) -> Result<DumpFile> {
     let raw = std::fs::read_to_string(path).with_context(|| format!("reading dump {path:?}"))?;

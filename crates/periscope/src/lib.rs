@@ -105,6 +105,37 @@ pub fn screenshot(target: &WindowTarget, out: &Path) -> Result<PathBuf> {
     }
 }
 
+/// Capture one matching window, crop to the bounds of the named element, and
+/// write a PNG to `out`.  Returns the canonical path on success.
+///
+/// `bounds` are in **window-frame logical points** as reported by the
+/// `tree_dump` JSON.  The function derives the device pixel ratio from the
+/// captured image's pixel dimensions vs the window's logical size, then crops
+/// accordingly.  The crop is clamped to the image bounds — if the element is
+/// fully off-screen this returns an error rather than writing an empty file.
+///
+/// # Errors
+///
+/// - No window matches `target`.
+/// - Screen Recording permission missing (all-black frame).
+/// - Element bounds clamp to an empty rectangle (element off-screen).
+/// - `out` cannot be written.
+pub fn screenshot_cropped(
+    target: &WindowTarget,
+    bounds: tree_dump::NamedBounds,
+    out: &Path,
+) -> Result<PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        capture::screenshot_cropped_macos(target, bounds, out)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (target, bounds, out);
+        anyhow::bail!("periscope screenshots are macOS-only (Phase 6-MVP)")
+    }
+}
+
 /// Bring `target` to the foreground before capture.  Uses the macOS
 /// Accessibility API so it works on cross-process windows.
 ///
@@ -158,7 +189,7 @@ pub fn click(target: &WindowTarget, x: f64, y: f64) -> Result<()> {
 /// `ByPid` returns the pid directly; `ByTitle` looks up the first
 /// visible window whose title equals the requested string.
 ///
-/// Used by the `click-id` CLI subcommand so it can derive the
+/// Used by the `click --id` CLI subcommand so it can derive the
 /// `tree_dump` JSON path even when the caller only knows the
 /// window title.
 ///

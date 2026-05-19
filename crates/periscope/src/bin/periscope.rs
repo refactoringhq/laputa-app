@@ -3,11 +3,12 @@
 //! Subcommands:
 //!
 //! - `screenshot` — one-shot capture, optionally `--raise`-ing first.
+//!   With `--id` the output is cropped to the named element's bounds.
 //! - `watch`      — periodic capture loop with `latest.png` symlink.
-//! - `click`      — synthesize a left-click at window-local `(x, y)`.
-//! - `click-id`   — click an element by its `.dump_as("name")` ID:
-//!   sends SIGUSR1 to the target, waits for a fresh `tree_dump` JSON
-//!   snapshot, then clicks the centre of the recorded bounds.
+//!   With `--id` each frame is cropped to the named element's bounds.
+//! - `click`      — synthesize a left-click at window-local `(x, y)` OR
+//!   at the centre of an element looked up by `--id` from the `tree_dump`
+//!   JSON.  `--x`/`--y` and `--id` are mutually exclusive.
 //! - `dump-tree`  — refresh + print the target's `tree_dump` JSON.
 //! - `list`       — diagnostic dump of every visible window.
 
@@ -34,20 +35,21 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     /// Capture one PNG of the matching window.
+    /// With `--id` the output is cropped to the named element's bounds.
     Screenshot(ScreenshotArgs),
     /// Capture every N seconds; maintain a `latest.png` symlink.
+    /// With `--id` each frame is cropped to the named element's bounds.
     Watch(WatchArgs),
-    /// Synthesize a left-click at the given window-local point.
+    /// Synthesize a left-click inside the window.
+    ///
+    /// Pass either `--x`/`--y` for absolute window-local coordinates, or
+    /// `--id` to click the geometric centre of a named element from the
+    /// `tree_dump` JSON.  The two modes are mutually exclusive.
     Click(ClickArgs),
-    /// Click an element by its `.dump_as("name")` ID.  Triggers a
-    /// SIGUSR1 refresh of the target's `tree_dump` JSON, looks up
-    /// the name, and clicks the geometric centre of the recorded
-    /// bounds.
-    ClickId(ClickIdArgs),
     /// Read the most recent `tree_dump` JSON for the target window
     /// (optionally triggering a fresh dump first) and pretty-print
     /// every registered element name + bounds.  Diagnostic aid for
-    /// `click-id name not found`.
+    /// `click --id name not found`.
     DumpTree(DumpTreeArgs),
     /// Dump every visible window with title / pid / app name.
     List,
@@ -83,6 +85,18 @@ struct ScreenshotArgs {
     /// Raise the window via the Accessibility API before capture.
     #[arg(long, default_value_t = false)]
     raise: bool,
+    /// Search for element by id and crop the output to its bounds.
+    /// Triggers a SIGUSR1 refresh (unless `--no-refresh`) and waits for
+    /// a fresh `tree_dump` snapshot before cropping.
+    #[arg(long)]
+    id: Option<String>,
+    /// Skip the SIGUSR1 refresh when `--id` is given; crop against whatever
+    /// dump already exists on disk.
+    #[arg(long, default_value_t = false, requires = "id")]
+    no_refresh: bool,
+    /// Max time to wait for a fresh dump file when `--id` is given (ms).
+    #[arg(long, default_value_t = 2000, requires = "id")]
+    timeout_ms: u64,
 }
 
 #[derive(Args)]
@@ -90,35 +104,26 @@ struct ClickArgs {
     #[command(flatten)]
     target: TargetArgs,
     /// X coordinate, window-local (origin at top-left, in window points).
-    #[arg(long)]
-    x: f64,
+    /// Mutually exclusive with `--id`.
+    #[arg(long, conflicts_with = "id", required_unless_present = "id")]
+    x: Option<f64>,
     /// Y coordinate, window-local (origin at top-left, in window points).
-    #[arg(long)]
-    y: f64,
+    /// Mutually exclusive with `--id`.
+    #[arg(long, conflicts_with = "id", required_unless_present = "id")]
+    y: Option<f64>,
+    /// Search for element by id. `--id` and `--x`/`--y` are mutually exclusive.
+    #[arg(long, conflicts_with_all = ["x", "y"])]
+    id: Option<String>,
     /// Raise the window via the Accessibility API before clicking.
     #[arg(long, default_value_t = false)]
     raise: bool,
-}
-
-#[derive(Args)]
-struct ClickIdArgs {
-    #[command(flatten)]
-    target: TargetArgs,
-    /// `.dump_as("name")` identifier from the target process's
-    /// `tree_dump` JSON registry.  Use `dump-tree` to discover what
-    /// names are available.
-    #[arg(long = "id")]
-    id: String,
-    /// Raise the window via the Accessibility API before clicking.
-    #[arg(long, default_value_t = false)]
-    raise: bool,
-    /// Skip the SIGUSR1 refresh and click against whatever dump
-    /// already exists on disk.  Faster, but stale if the layout
-    /// changed since the last dump.
-    #[arg(long, default_value_t = false)]
+    /// Skip the SIGUSR1 refresh when `--id` is given; click against whatever
+    /// dump already exists on disk.  Faster, but stale if the layout changed
+    /// since the last dump.
+    #[arg(long, default_value_t = false, requires = "id")]
     no_refresh: bool,
-    /// Max time to wait for a fresh dump file (milliseconds).
-    #[arg(long, default_value_t = 2000)]
+    /// Max time to wait for a fresh dump file when `--id` is given (ms).
+    #[arg(long, default_value_t = 2000, requires = "id")]
     timeout_ms: u64,
 }
 
@@ -148,6 +153,17 @@ struct WatchArgs {
     /// Stop after this many frames; `0` means loop until Ctrl-C.
     #[arg(long, default_value_t = 0)]
     max_frames: u32,
+    /// Search for element by id and crop each frame to its bounds.
+    /// Triggers a SIGUSR1 refresh (unless `--no-refresh`) before the
+    /// first capture and re-reads the dump on every subsequent frame.
+    #[arg(long)]
+    id: Option<String>,
+    /// Skip the SIGUSR1 refresh when `--id` is given.
+    #[arg(long, default_value_t = false, requires = "id")]
+    no_refresh: bool,
+    /// Max time to wait for a fresh dump file when `--id` is given (ms).
+    #[arg(long, default_value_t = 2000, requires = "id")]
+    timeout_ms: u64,
 }
 
 fn main() -> Result<()> {
@@ -160,7 +176,6 @@ fn main() -> Result<()> {
         Cmd::Screenshot(a) => screenshot(a),
         Cmd::Watch(a) => watch(a),
         Cmd::Click(a) => click(a),
-        Cmd::ClickId(a) => click_id(a),
         Cmd::DumpTree(a) => dump_tree(a),
         Cmd::List => list(),
     }
@@ -172,7 +187,28 @@ fn screenshot(args: ScreenshotArgs) -> Result<()> {
         periscope::raise(&target).context("raise before screenshot")?;
         std::thread::sleep(RAISE_SETTLE);
     }
-    let path = periscope::screenshot(&target, &args.out)?;
+    let path = if let Some(ref id) = args.id {
+        let pid = periscope::resolve_pid(&target)?;
+        let dump_path = periscope::tree_dump::default_dump_path_for_pid(pid);
+        let dump = refresh_dump(
+            pid,
+            &dump_path,
+            !args.no_refresh,
+            Duration::from_millis(args.timeout_ms),
+        )?;
+        let bounds = lookup_element(&dump, id, pid, &dump_path)?;
+        log::info!(
+            "screenshot --id {:?}: bounds=({:.1},{:.1} {:.1}×{:.1})",
+            id,
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+        );
+        periscope::screenshot_cropped(&target, bounds, &args.out)?
+    } else {
+        periscope::screenshot(&target, &args.out)?
+    };
     log::info!("wrote {}", path.display());
     Ok(())
 }
@@ -183,7 +219,36 @@ fn click(args: ClickArgs) -> Result<()> {
         periscope::raise(&target).context("raise before click")?;
         std::thread::sleep(RAISE_SETTLE);
     }
-    periscope::click(&target, args.x, args.y)
+    if let Some(ref id) = args.id {
+        let pid = periscope::resolve_pid(&target)?;
+        let dump_path = periscope::tree_dump::default_dump_path_for_pid(pid);
+        let dump = refresh_dump(
+            pid,
+            &dump_path,
+            !args.no_refresh,
+            Duration::from_millis(args.timeout_ms),
+        )?;
+        let bounds = lookup_element(&dump, id, pid, &dump_path)?;
+        let (x, y) = bounds.center();
+        log::info!(
+            "click --id {:?} pid={pid} bounds=({:.1},{:.1} {:.1}×{:.1}) → click ({x:.1},{y:.1})",
+            id,
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+        );
+        periscope::click(&target, x, y)
+    } else {
+        // clap's required_unless_present("id") guarantees both x and y are Some here.
+        let x = args
+            .x
+            .expect("clap required_unless_present(\"id\") guarantees --x is set");
+        let y = args
+            .y
+            .expect("clap required_unless_present(\"id\") guarantees --y is set");
+        periscope::click(&target, x, y)
+    }
 }
 
 fn watch(args: WatchArgs) -> Result<()> {
@@ -207,7 +272,14 @@ fn watch(args: WatchArgs) -> Result<()> {
         frame += 1;
         let started = Instant::now();
         let path = args.dir.join(format!("frame-{frame:04}.png"));
-        match periscope::screenshot(&target, &path) {
+
+        let result = if let Some(ref id) = args.id {
+            capture_cropped_frame(&target, id, &path, !args.no_refresh, args.timeout_ms)
+        } else {
+            periscope::screenshot(&target, &path)
+        };
+
+        match result {
             Ok(_) => {
                 update_latest_symlink(&args.dir, &path)?;
                 log::info!("frame {frame} → {}", path.display());
@@ -226,6 +298,23 @@ fn watch(args: WatchArgs) -> Result<()> {
     }
 }
 
+/// Capture a single watch frame cropped to the element identified by `id`.
+/// Each frame triggers a fresh dump refresh so bounds stay current across
+/// layout changes during a long watch session.
+fn capture_cropped_frame(
+    target: &WindowTarget,
+    id: &str,
+    out: &std::path::Path,
+    refresh: bool,
+    timeout_ms: u64,
+) -> Result<PathBuf> {
+    let pid = periscope::resolve_pid(target)?;
+    let dump_path = periscope::tree_dump::default_dump_path_for_pid(pid);
+    let dump = refresh_dump(pid, &dump_path, refresh, Duration::from_millis(timeout_ms))?;
+    let bounds = lookup_element(&dump, id, pid, &dump_path)?;
+    periscope::screenshot_cropped(target, bounds, out)
+}
+
 fn list() -> Result<()> {
     for w in periscope::list_windows()? {
         println!("pid={:<8} app={:<32} title={}", w.pid, w.app_name, w.title);
@@ -236,7 +325,7 @@ fn list() -> Result<()> {
 /// Send SIGUSR1 to `pid` and block until the dump file's sequence
 /// counter has strictly increased past the previous value.  Returns
 /// the freshly loaded `DumpFile`, or whatever exists on disk when
-/// `refresh` is `false`.  Shared between `click-id` and `dump-tree`
+/// `refresh` is `false`.  Shared between `click --id` and `dump-tree`
 /// to keep the IPC handshake in one place.
 fn refresh_dump(
     pid: u32,
@@ -257,42 +346,20 @@ fn refresh_dump(
         .context("wait for fresh tree_dump")
 }
 
-/// Click an element by its `.dump_as("name")` ID.  Sends SIGUSR1 to
-/// the target so its `tree_dump` writes a fresh JSON snapshot, polls
-/// the embedded sequence counter, then clicks the geometric centre of
-/// the bounds recorded under `args.id`.
-fn click_id(args: ClickIdArgs) -> Result<()> {
-    let target = args.target.to_target()?;
-    let pid = periscope::resolve_pid(&target)?;
-    let dump_path = periscope::tree_dump::default_dump_path_for_pid(pid);
-    let dump = refresh_dump(
-        pid,
-        &dump_path,
-        !args.no_refresh,
-        Duration::from_millis(args.timeout_ms),
-    )?;
-    let bounds = dump.entries.get(&args.id).ok_or_else(|| {
+/// Look up `id` in a loaded `DumpFile`, returning a copy of the bounds or a
+/// clear error pointing at `dump-tree` for discovery when the name is absent.
+fn lookup_element(
+    dump: &periscope::tree_dump::DumpFile,
+    id: &str,
+    pid: u32,
+    dump_path: &std::path::Path,
+) -> Result<periscope::tree_dump::NamedBounds> {
+    dump.entries.get(id).copied().ok_or_else(|| {
         anyhow!(
-            "no element registered as {:?} in {dump_path:?} \
-             (run `periscope dump-tree --pid {pid}` to list known names)",
-            args.id
+            "no element registered as {id:?} in {dump_path:?} \
+             (run `periscope dump-tree --pid {pid}` to list known names)"
         )
-    })?;
-    let (x, y) = bounds.center();
-    log::info!(
-        "click-id id={:?} pid={pid} bounds=({:.1},{:.1} {:.1}x{:.1}) → click ({x:.1},{y:.1})",
-        args.id,
-        bounds.x,
-        bounds.y,
-        bounds.width,
-        bounds.height,
-    );
-
-    if args.raise {
-        periscope::raise(&target).context("raise before click-id")?;
-        std::thread::sleep(RAISE_SETTLE);
-    }
-    periscope::click(&target, x, y)
+    })
 }
 
 /// Read the most recent dump for the target and print every

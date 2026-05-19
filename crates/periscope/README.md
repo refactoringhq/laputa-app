@@ -41,6 +41,22 @@ cargo run -q -p periscope -- click \
     --title Tolaria --raise --x 200 --y 100
 ```
 
+Click by element name (looks up bounds from the `tree_dump` JSON):
+
+```sh
+cargo run -q -p periscope -- click \
+    --title Tolaria --raise --id status-bar-theme-toggle
+```
+
+Capture a screenshot cropped to a named element:
+
+```sh
+cargo run -q -p periscope -- screenshot \
+    --title Tolaria --raise \
+    --id status-bar-theme-toggle \
+    --out /tmp/toggle.png
+```
+
 Diagnostic:
 
 ```sh
