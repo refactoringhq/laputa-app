@@ -21,8 +21,8 @@
 //! placeholders, wired in a later iteration alongside their actions.
 
 use gpui::{
-    div, px, AnyElement, App, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    SharedString, StatefulInteractiveElement as _, Styled, Window,
+    div, px, App, Context, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
+    StatefulInteractiveElement as _, Styled, Window,
 };
 use gpui_component::{ActiveTheme, IconName};
 use mock_fixtures::{FileStatus, MockGit, MockVault};
@@ -48,13 +48,29 @@ pub enum ServiceSeverity {
     Error,
 }
 
-/// A single service-status chip rendered in the middle cluster.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A single service-status chip rendered alongside the vault name in
+/// the left cluster (visual-issue #017).
+///
+/// The icon mirrors the React `StatusBarBadges.tsx` mapping:
+/// - `Git disabled` → `GitBranch` (no `git-branch.svg` in
+///   `gpui_component`'s icon pack — closest topological match is
+///   [`IconName::Network`]).
+/// - `MCP` → `Cpu` ([`IconName::Cpu`]).
+/// - `Claude` → `Terminal` ([`IconName::SquareTerminal`]; the React
+///   source uses Phosphor's `Terminal`).
+// `IconName` does not implement `Debug`/`Eq` (it's a generated
+// enum of asset paths in `gpui_component`), so we can't derive
+// either here — `Clone` is the only one we genuinely need.
+#[derive(Clone)]
 pub struct ServiceChip {
     /// Short label, e.g. `Git disabled` / `MCP` / `Claude`.
     pub label: SharedString,
     /// Severity colouring; see [`ServiceSeverity`].
     pub severity: ServiceSeverity,
+    /// Leading-glyph icon, drawn 13×13 immediately to the left of the
+    /// label (matches React's `<Icon size={13} />` in
+    /// `StatusBarBadges.tsx`).
+    pub icon: IconName,
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +179,63 @@ impl StatusBar {
     }
 }
 
+/// Left-cluster status chip — 13-pt leading icon + label, optionally
+/// followed by a 10-pt amber `triangle-alert` (issue 017).  Mirrors
+/// React's `CompactStatusActionBadge` body in
+/// `src/components/status-bar/StatusBarBadges.tsx`:
+///
+/// - `ICON_STYLE.gap = 4` → `.gap(px(4.0))`.
+/// - `<Icon size={13} />` → 13 × 13 icon cell.
+/// - `<AlertTriangle size={10} style={{ marginLeft: 2 }} />` → 10 × 10
+///   trailing cell painted in `theme.warning`.
+fn status_chip(
+    label: SharedString,
+    icon: IconName,
+    color: gpui::Hsla,
+    trailing_warning: bool,
+    warning: gpui::Hsla,
+) -> gpui::AnyElement {
+    let mut chip = div()
+        .flex()
+        .items_center()
+        .gap(px(4.0))
+        .text_color(color)
+        .child(
+            div()
+                .w(px(13.0))
+                .h(px(13.0))
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(icon),
+        )
+        .child(label);
+    if trailing_warning {
+        chip = chip.child(
+            div()
+                .ml(px(2.0))
+                .w(px(10.0))
+                .h(px(10.0))
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_color(warning)
+                .child(IconName::TriangleAlert),
+        );
+    }
+    chip.into_any_element()
+}
+
+/// Thin vertical `|` separator drawn in `theme.border`.  Mirrors
+/// React's `StatusBarSeparator` (`SEP_STYLE` from
+/// `src/components/status-bar/styles.ts`, `color: var(--border)`).
+fn status_separator(border: gpui::Hsla) -> gpui::AnyElement {
+    div()
+        .text_color(border)
+        .child(SharedString::new_static("|"))
+        .into_any_element()
+}
+
 /// Status-bar link cell — a 14-pt icon + label combo (Contribute,
 /// Docs).  Tagged via `dump_as` so periscope can target the
 /// labelled cells alongside the icon-only ones.
@@ -198,14 +271,22 @@ fn placeholder_services() -> Vec<ServiceChip> {
         ServiceChip {
             label: "Git disabled".into(),
             severity: ServiceSeverity::Warning,
+            // React: `<GitBranch />` (Phosphor).  `gpui_component`'s
+            // icon pack has no `git-branch.svg`; `Network` is the
+            // closest tree-of-nodes topology.
+            icon: IconName::Network,
         },
         ServiceChip {
             label: "MCP".into(),
             severity: ServiceSeverity::Warning,
+            // React: `<Cpu />` — direct match.
+            icon: IconName::Cpu,
         },
         ServiceChip {
             label: "Claude".into(),
             severity: ServiceSeverity::Warning,
+            // React: `<Terminal />` — closest in pack is `SquareTerminal`.
+            icon: IconName::SquareTerminal,
         },
     ]
 }
@@ -234,52 +315,52 @@ impl Render for StatusBar {
             IconName::Moon
         };
 
-        let left = div()
+        // Left cluster — vault chip · version chip · service chips,
+        // all separated by `|` glyphs (visual-issue #017, mirrors
+        // React's `StatusBarSeparator` in
+        // `src/components/status-bar/StatusBarBadges.tsx`).
+        let mut left = div()
             .flex()
             .flex_row()
             .items_center()
-            .gap(px(8.0))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(4.0))
-                    .text_color(fg)
-                    .child(self.vault_name.clone())
-                    .child(
-                        div()
-                            .w(px(12.0))
-                            .h(px(12.0))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .text_color(muted)
-                            .child(IconName::ChevronDown),
-                    )
-                    .into_any_element(),
-            )
-            .child(
-                div()
-                    .text_color(muted)
-                    .child(self.version.clone())
-                    .into_any_element(),
-            );
-
-        let service_chips: Vec<AnyElement> = self
-            .services
-            .iter()
-            .map(|chip| {
-                let color = match chip.severity {
-                    ServiceSeverity::Ok => fg,
-                    ServiceSeverity::Warning => warning,
-                    ServiceSeverity::Error => danger,
-                };
-                div()
-                    .text_color(color)
-                    .child(chip.label.clone())
-                    .into_any_element()
-            })
-            .collect();
+            .gap(px(10.0))
+            .child(status_chip(
+                self.vault_name.clone(),
+                IconName::HardDrive,
+                fg,
+                false,
+                warning,
+            ))
+            .child(status_separator(border))
+            // The user's issue-017 reference crop shows the same
+            // cube-style glyph on both the vault and version chips,
+            // even though the React source carries no icon on the
+            // version label.  Mirror the screenshot, not the React
+            // source, here.
+            .child(status_chip(
+                self.version.clone(),
+                IconName::HardDrive,
+                muted,
+                false,
+                warning,
+            ));
+        for chip in &self.services {
+            let color = match chip.severity {
+                ServiceSeverity::Ok => fg,
+                ServiceSeverity::Warning => warning,
+                ServiceSeverity::Error => danger,
+            };
+            left = left.child(status_separator(border)).child(status_chip(
+                chip.label.clone(),
+                chip.icon.clone(),
+                color,
+                // React mirrors the warning glyph on every chip whose
+                // severity is non-Ok (`trailingWarning: true` in
+                // `StatusBarBadges.tsx`).  Keep the same rule.
+                chip.severity != ServiceSeverity::Ok,
+                warning,
+            ));
+        }
 
         let right = div()
             .flex()
@@ -287,7 +368,6 @@ impl Render for StatusBar {
             .items_center()
             .gap(px(12.0))
             .text_color(muted)
-            .children(service_chips)
             .child(status_link("Contribute", IconName::Bell, muted))
             .child(status_link("Docs", IconName::BookOpen, muted))
             // Theme switcher — clickable.  Calls `theme::cycle` which
@@ -380,6 +460,40 @@ mod tests {
                     .iter()
                     .all(|c| c.severity == ServiceSeverity::Warning),
                 "all placeholder chips must use ServiceSeverity::Warning until services land",
+            );
+        });
+    }
+
+    /// Issue 017 — every placeholder chip carries the icon the React
+    /// `StatusBarBadges.tsx` mapping assigns to it.  `IconName` has no
+    /// `PartialEq`, so we compare via the embedded asset path.
+    #[gpui::test]
+    fn placeholder_services_carry_react_matching_icons(cx: &mut TestAppContext) {
+        use gpui_component::IconNamed as _;
+        install_theme(cx);
+        cx.update(|cx| {
+            cx.set_global(MockVault::seeded());
+            cx.set_global(MockGit::seeded());
+            let bar = StatusBar::from_mock(cx);
+            let paths: Vec<String> = bar
+                .services()
+                .iter()
+                .map(|c| c.icon.clone().path().to_string())
+                .collect();
+            assert!(
+                paths[0].contains("network"),
+                "git chip icon must be `network` (closest to React's GitBranch); got {:?}",
+                paths[0],
+            );
+            assert!(
+                paths[1].contains("cpu"),
+                "mcp chip icon must be `cpu` (matches React); got {:?}",
+                paths[1],
+            );
+            assert!(
+                paths[2].contains("square-terminal"),
+                "claude chip icon must be `square-terminal` (closest to React's Terminal); got {:?}",
+                paths[2],
             );
         });
     }

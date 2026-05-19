@@ -534,3 +534,61 @@ consistency."
 **Status:** fixed in commit `fix(workspace): native title bar —
 Zed-matching dims (issue 016)`.  Screenshots skipped — no Screen
 Recording grant / display available in the CI environment.
+
+---
+
+### Issue 017 — status-bar icons + left-aligned services + separators
+
+**Reference:** ![issue 017 reference](live-snapshots/issue-017-reference.png)
+
+**Reporter:** "the status bar elements need to have icons, and item
+spacing similar to React component.  The placeholder_services items
+need to have icons and be left aligned."
+
+**Diagnosis:**
+
+- Left cluster carried only text (`demo-vault-v2  2026.5.18`), plus a
+  `ChevronDown` glyph next to the vault name.  React's
+  `StatusBarBadges.tsx` shows each chip as `<Icon size={13} />` + label.
+- Service chips (`Git disabled`, `MCP`, `Claude`) were rendered as
+  bare text in the **right** cluster — opposite of the React layout
+  where they hang off the left cluster with `<StatusBarSeparator />`
+  glyphs between every chip.
+
+**Fix** (`crates/status_bar/src/lib.rs`):
+
+- Added `icon: IconName` field to `ServiceChip`.
+- `placeholder_services()` now seeds the three placeholders with
+  React-matching icons (Phosphor → gpui-component pack):
+  - Git → `Network` (no `git-branch.svg` in the pack; topological
+    closest).
+  - MCP → `Cpu` (direct match).
+  - Claude → `SquareTerminal` (closest in pack to Phosphor's
+    `Terminal`).
+- New `status_chip(label, icon, color, trailing_warning, warning)`
+  helper renders `<icon 13×13> · label · [warning 10×10]?` mirroring
+  the body of React's `CompactStatusActionBadge`.
+- New `status_separator(border)` helper renders the `|` glyph in
+  `theme.border` (mirrors React's `StatusBarSeparator` /
+  `SEP_STYLE`).
+- Left cluster rebuilt as `[vault chip] | [version chip] | [service
+  chips, each preceded by `|`]`.  Both vault name and version carry
+  the same `HardDrive` icon (closest geometric match to React's
+  `<Cube />` — no `cube.svg` in the pack).
+- The previous `ChevronDown` next to vault name is dropped to match
+  the reference crop, which shows no chevron.
+- Service chips moved off the right cluster; the right cluster now
+  holds only `Contribute`, `Docs`, the theme toggle, and `Settings`.
+
+**Tests:**
+
+- Extended `from_mock_populates_placeholder_services` (label + severity
+  unchanged).
+- New `placeholder_services_carry_react_matching_icons` asserts each
+  chip's `IconName::path()` resolves to `network` / `cpu` /
+  `square-terminal` — guards against a future asset rename.
+
+**Status:** fixed in commit `fix(status_bar): visual-issue #017 —
+icons + left-aligned services + separators`.  5/5 status_bar tests
+pass; clippy clean for `-p status_bar -p tolaria --all-targets -D
+warnings`.
