@@ -63,6 +63,50 @@ pub struct OpenNoteEvent {
 }
 
 // ---------------------------------------------------------------------------
+// Scope
+// ---------------------------------------------------------------------------
+
+/// Which slice of the vault the note list is showing.
+///
+/// Driven by the sidebar panel's selection via the workspace's
+/// `SidebarSelectionChangedEvent` subscription (Phase 8.1), combined
+/// with the text filter in [`NoteListPane::visible_entries`].
+///
+/// `Inbox`, `AllNotes`, and `View(_)` all pass through every entry for
+/// now — the underlying vault has no triage / saved-view metadata
+/// yet, so until Phase 10.9 (`vault_registry`) and Phase 8.18
+/// (`filter_builder`) land, these scopes show the full list rather
+/// than risk hiding everything behind an empty predicate.  `Archive`
+/// returns no entries (no archive flag on `Note` yet).  `Type` and
+/// `Folder` are the load-bearing filters and narrow the list to
+/// matching entries.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum NoteListScope {
+    /// Inbox row in the sidebar.  Treated as a pass-through until
+    /// the vault surfaces a triage flag (matches the Phase 7
+    /// inbox-count = total-count contract in `sidebar_panel`).
+    #[default]
+    Inbox,
+    /// "All Notes" — every entry that is not archived.  Pass-through.
+    AllNotes,
+    /// "Archive" — only archived entries.  Returns an empty list
+    /// until the vault surfaces an archive flag.
+    Archive,
+    /// Show only notes whose type label matches.  Display label is
+    /// filename-prefix-derived (`event-…` → "Events") and mirrors the
+    /// sidebar's [`crate::OpenNoteEvent`]-adjacent
+    /// `SidebarSelection::Type` payload.
+    Type(SharedString),
+    /// Show only notes that live in `path` (vault-root-relative).
+    /// `""` matches the vault root.  Folder matching is recursive —
+    /// descendants of the named folder are included.
+    Folder(SharedString),
+    /// Show notes flagged by `name`'s saved view.  Phase 9 work; for
+    /// the visual-fidelity pass this passes through unchanged.
+    View(SharedString),
+}
+
+// ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
 
@@ -137,6 +181,18 @@ pub struct NoteEntry {
     /// Drives the trailing icon tint and the selected-row light
     /// background.
     pub type_color: Hsla,
+    /// Display label of this note's type, used by
+    /// [`NoteListScope::Type`] to narrow the visible list.  Mirrors
+    /// the sidebar's `SidebarSelection::Type` payload — derived from
+    /// the filename prefix (`event-foo.md` → `"Events"`), defaults to
+    /// `"Notes"` for anything that doesn't match a known prefix.
+    pub type_label: SharedString,
+    /// Vault-root-relative parent directory, used by
+    /// [`NoteListScope::Folder`] to narrow the visible list.  `""`
+    /// means the vault root.  For the mock-fixture launch path
+    /// (`MockVault`, no vault root) this is left empty so the
+    /// folder-scope filter is a no-op.
+    pub parent_path: SharedString,
 }
 
 /// Extract a display title from a note body — first H1 heading,
@@ -269,6 +325,58 @@ fn type_stem_for_path(path: &StdPath) -> Option<String> {
     Some(prefix.to_ascii_lowercase())
 }
 
+/// Map a filename's prefix to its display TYPES label.  Mirrors
+/// `sidebar_panel::type_label_for` so the sidebar's
+/// `SidebarSelection::Type` payloads round-trip cleanly into
+/// [`NoteListScope::Type`] without a cross-crate dep — kept inline
+/// while the Phase 9 cross-cutting `view_state` extraction is still
+/// pending.  Returns `"Notes"` for anything that doesn't match a
+/// known prefix, matching the sidebar's fallback bucket.
+fn type_label_for(path: &StdPath) -> &'static str {
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default();
+    let prefix = stem
+        .split_once('-')
+        .map(|(p, _)| p)
+        .unwrap_or(stem)
+        .to_ascii_lowercase();
+    match prefix.as_str() {
+        "area" => "Areas",
+        "event" => "Events",
+        "measure" => "Measures",
+        "person" => "People",
+        "procedure" => "Procedures",
+        "responsibility" => "Responsibilities",
+        "topic" => "Topics",
+        "project" => "Projects",
+        "quarter" => "Quarters",
+        _ => "Notes",
+    }
+}
+
+/// Project `path`'s parent onto a vault-root-relative string.  `""`
+/// means the vault root.  When `vault_root` is `None` (mock-fixture
+/// path with no real on-disk vault) the parent is left empty so the
+/// folder-scope filter is a no-op rather than narrowing against
+/// fictional absolute paths.
+fn vault_relative_parent(path: &StdPath, vault_root: Option<&StdPath>) -> SharedString {
+    let Some(parent) = path.parent() else {
+        return SharedString::default();
+    };
+    let rel = match vault_root {
+        Some(root) => parent.strip_prefix(root).unwrap_or(parent),
+        None => return SharedString::default(),
+    };
+    let s = rel.to_string_lossy();
+    if s.is_empty() {
+        SharedString::default()
+    } else {
+        SharedString::from(s.into_owned())
+    }
+}
+
 /// Walk `<vault_root>/type/*.md` and build a (stem → style) map.
 /// Empty when the directory is missing or unreadable; render-side
 /// callers fall back to [`NoteTypeStyle::fallback`].
@@ -354,6 +462,32 @@ fn icon_for_frontmatter_name(name: &str) -> IconName {
     }
 }
 
+/// Per-entry scope predicate — returns whether `entry` belongs in the
+/// list when the active scope is `scope`.  Lifted out of
+/// [`NoteListPane::visible_entries`] so the row-level rule is easy to
+/// scan independently of the closure plumbing.
+///
+/// Recursive folder match: `Folder("foo")` includes everything under
+/// `foo/` plus the folder itself (`parent_path` == `"foo"`), so
+/// selecting a non-leaf in the sidebar yields the union of every
+/// descendant.  Matches the React tree's "click folder = show
+/// everything inside" semantics.
+fn scope_matches(scope: &NoteListScope, entry: &NoteEntry) -> bool {
+    match scope {
+        NoteListScope::Inbox | NoteListScope::AllNotes | NoteListScope::View(_) => true,
+        NoteListScope::Archive => false,
+        NoteListScope::Type(label) => entry.type_label.as_ref() == label.as_ref(),
+        NoteListScope::Folder(path) => {
+            // Empty path = vault root = every entry passes.
+            if path.is_empty() {
+                return true;
+            }
+            let ep = entry.parent_path.as_ref();
+            ep == path.as_ref() || ep.starts_with(&format!("{path}/"))
+        }
+    }
+}
+
 fn color_for_frontmatter_name(name: &str) -> Hsla {
     let rgb_u32: u32 = match name.to_ascii_lowercase().as_str() {
         "amber" => 0xF59E0B,
@@ -394,6 +528,11 @@ fn color_for_frontmatter_name(name: &str) -> Hsla {
 pub struct NoteListPane {
     entries: Vec<NoteEntry>,
     filter: SharedString,
+    /// Slice of the vault the list is currently scoped to.  Defaults
+    /// to [`NoteListScope::Inbox`] — pass-through until the workspace
+    /// routes a different scope in via the sidebar's selection event
+    /// (Phase 8.1).
+    scope: NoteListScope,
     selected: HashSet<NoteId>,
     /// Id of the note currently shown in the editor.  Drives the
     /// pale-accent background on the matching row — mirrors the
@@ -408,6 +547,7 @@ impl NoteListPane {
         Self {
             entries: Vec::new(),
             filter: SharedString::default(),
+            scope: NoteListScope::default(),
             selected: HashSet::new(),
             selected_id: None,
             position: DockPosition::Left,
@@ -443,6 +583,16 @@ impl NoteListPane {
                     snippet: SharedString::default(),
                     type_icon: style.icon,
                     type_color: style.color,
+                    // `type_label_for` only consumes the filename
+                    // prefix, so MockVault paths (which lack a real
+                    // vault root) round-trip the sidebar's
+                    // `SidebarSelection::Type` payloads correctly.
+                    type_label: SharedString::new_static(type_label_for(&note.path)),
+                    // Mock paths aren't rooted at a real vault, so
+                    // we leave `parent_path` empty — the folder-scope
+                    // filter then no-ops, which matches what users
+                    // expect in `TOLARIA_MOCK=1`.
+                    parent_path: vault_relative_parent(&note.path, None),
                 });
             }
         }
@@ -450,6 +600,7 @@ impl NoteListPane {
         Self {
             entries,
             filter: SharedString::default(),
+            scope: NoteListScope::default(),
             selected: HashSet::new(),
             selected_id,
             position: DockPosition::Left,
@@ -464,7 +615,8 @@ impl NoteListPane {
     pub fn from_vault(cx: &mut App) -> Self {
         let executor = cx.foreground_executor().clone();
         let vault = cx.global::<Vault>();
-        let type_styles = load_note_type_styles(vault.root());
+        let vault_root = vault.root().to_path_buf();
+        let type_styles = load_note_type_styles(&vault_root);
         let ids = executor.block_on(vault.notes());
         let mut entries = Vec::with_capacity(ids.len());
         for id in ids {
@@ -496,6 +648,8 @@ impl NoteListPane {
                     snippet,
                     type_icon: style.icon,
                     type_color: style.color,
+                    type_label: SharedString::new_static(type_label_for(&note.path)),
+                    parent_path: vault_relative_parent(&note.path, Some(&vault_root)),
                 });
             }
         }
@@ -503,6 +657,7 @@ impl NoteListPane {
         Self {
             entries,
             filter: SharedString::default(),
+            scope: NoteListScope::default(),
             selected: HashSet::new(),
             selected_id,
             position: DockPosition::Left,
@@ -530,6 +685,23 @@ impl NoteListPane {
         cx.notify();
     }
 
+    /// Switch the active [`NoteListScope`] — re-renders if the scope
+    /// actually changes.  Workspace consumers call this from the
+    /// `SidebarSelectionChangedEvent` subscription (Phase 8.1) so
+    /// clicking a sidebar row narrows the visible list immediately.
+    pub fn set_scope(&mut self, scope: NoteListScope, cx: &mut Context<Self>) {
+        if self.scope != scope {
+            self.scope = scope;
+            cx.notify();
+        }
+    }
+
+    /// Active [`NoteListScope`].  Test / debugging hook.
+    #[must_use]
+    pub fn scope(&self) -> &NoteListScope {
+        &self.scope
+    }
+
     /// Toggle selection of `id`: adds if absent, removes if present.
     pub fn toggle_selection(&mut self, id: NoteId, cx: &mut Context<Self>) {
         if !self.selected.remove(&id) {
@@ -549,16 +721,23 @@ impl NoteListPane {
         self.selected.len()
     }
 
-    /// Entries that pass the current filter, in original insertion order.
+    /// Entries that pass the current filter AND scope, in original
+    /// insertion order.
     ///
-    /// Returns all entries when the filter is empty.  Lazy: no
-    /// allocation per render — the consumer (`render`) drives the
-    /// filter inline.  `S-2` follow-up of the Phase 7 review.
+    /// Returns every entry when both filter and scope are
+    /// pass-throughs (the default — empty filter, scope =
+    /// [`NoteListScope::Inbox`]).  Lazy: no allocation per render —
+    /// the consumer (`render`) drives the filter inline.  `S-2`
+    /// follow-up of the Phase 7 review.
     pub fn visible_entries(&self) -> impl Iterator<Item = &NoteEntry> + '_ {
         // MSRV is 1.77 — `Option::is_none_or` (1.82) is not available,
         // so we keep the `map_or(true, …)` predicate.
         let q = (!self.filter.is_empty()).then(|| self.filter.to_lowercase());
+        let scope = self.scope.clone();
         self.entries.iter().filter(move |e| {
+            if !scope_matches(&scope, e) {
+                return false;
+            }
             q.as_deref()
                 .map_or(true, |q| e.title.to_lowercase().contains(q))
         })
@@ -1352,6 +1531,120 @@ mod tests {
     fn extract_title_returns_none_when_absent() {
         let body = "no title here\nbody text\n";
         assert_eq!(extract_title(body), None);
+    }
+
+    /// Phase 8.1 — `set_scope(Type("Events"))` narrows the visible
+    /// list to entries whose filename prefix is `event-…`.  Mirrors
+    /// the end-to-end click path: sidebar Areas row click →
+    /// SidebarSelectionChangedEvent → workspace → note_list.set_scope.
+    #[gpui::test]
+    fn set_scope_type_narrows_visible_entries(cx: &mut TestAppContext) {
+        use std::fs;
+        install_theme(cx);
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(dir.path().join("event-one.md"), "# Event One\nbody").unwrap();
+        fs::write(dir.path().join("event-two.md"), "# Event Two\nbody").unwrap();
+        fs::write(dir.path().join("area-x.md"), "# Area X\nbody").unwrap();
+        fs::write(dir.path().join("untyped.md"), "# Untyped\nbody").unwrap();
+        let vault = vault::Vault::open_at(dir.path()).expect("open vault");
+        cx.update(|cx| cx.set_global(vault));
+
+        let window = cx.add_window(|_window, cx| NoteListPane::from_vault(cx));
+
+        window
+            .update(cx, |pane, _window, cx| {
+                assert_eq!(
+                    pane.visible_entries().count(),
+                    4,
+                    "default Inbox scope passes every entry through",
+                );
+                pane.set_scope(NoteListScope::Type("Events".into()), cx);
+                let titles: Vec<&str> = pane.visible_entries().map(|e| e.title.as_ref()).collect();
+                assert_eq!(
+                    titles,
+                    vec!["Event One", "Event Two"],
+                    "Type(Events) scope must narrow to event-prefixed notes",
+                );
+                pane.set_scope(NoteListScope::Type("Areas".into()), cx);
+                let titles: Vec<&str> = pane.visible_entries().map(|e| e.title.as_ref()).collect();
+                assert_eq!(titles, vec!["Area X"]);
+                pane.set_scope(NoteListScope::AllNotes, cx);
+                assert_eq!(
+                    pane.visible_entries().count(),
+                    4,
+                    "AllNotes scope returns to pass-through",
+                );
+            })
+            .unwrap();
+    }
+
+    /// Phase 8.1 — `set_scope(Folder(path))` narrows to entries whose
+    /// vault-relative parent is `path` or a descendant.  Empty path
+    /// matches the vault root and passes every entry through.
+    #[gpui::test]
+    fn set_scope_folder_narrows_visible_entries(cx: &mut TestAppContext) {
+        use std::fs;
+        install_theme(cx);
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(dir.path().join("root.md"), "# Root\nbody").unwrap();
+        fs::create_dir(dir.path().join("inbox")).unwrap();
+        fs::write(dir.path().join("inbox").join("a.md"), "# A\nbody").unwrap();
+        fs::write(dir.path().join("inbox").join("b.md"), "# B\nbody").unwrap();
+        fs::create_dir(dir.path().join("inbox").join("nested")).unwrap();
+        fs::write(
+            dir.path().join("inbox").join("nested").join("c.md"),
+            "# C\nbody",
+        )
+        .unwrap();
+        let vault = vault::Vault::open_at(dir.path()).expect("open vault");
+        cx.update(|cx| cx.set_global(vault));
+
+        let window = cx.add_window(|_window, cx| NoteListPane::from_vault(cx));
+
+        window
+            .update(cx, |pane, _window, cx| {
+                pane.set_scope(NoteListScope::Folder("inbox".into()), cx);
+                let titles: std::collections::BTreeSet<&str> =
+                    pane.visible_entries().map(|e| e.title.as_ref()).collect();
+                assert_eq!(
+                    titles,
+                    ["A", "B", "C"].into_iter().collect(),
+                    "Folder(inbox) must include descendants recursively",
+                );
+                pane.set_scope(NoteListScope::Folder("".into()), cx);
+                assert_eq!(
+                    pane.visible_entries().count(),
+                    4,
+                    "Folder('') means vault root and passes every entry through",
+                );
+                pane.set_scope(NoteListScope::Archive, cx);
+                assert_eq!(
+                    pane.visible_entries().count(),
+                    0,
+                    "Archive scope returns 0 until the vault surfaces an archive flag",
+                );
+            })
+            .unwrap();
+    }
+
+    /// Phase 8.1 — `from_vault` populates `type_label` and
+    /// `parent_path` on every entry so the scope filter can match
+    /// against them without re-walking the path on each call.
+    #[gpui::test]
+    fn from_vault_populates_type_label_and_parent_path(cx: &mut TestAppContext) {
+        use std::fs;
+        install_theme(cx);
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::create_dir(dir.path().join("sub")).unwrap();
+        fs::write(dir.path().join("sub").join("event-x.md"), "# Event\nx").unwrap();
+        let vault = vault::Vault::open_at(dir.path()).expect("open vault");
+        cx.update(|cx| {
+            cx.set_global(vault);
+            let pane = NoteListPane::from_vault(cx);
+            let e = pane.entries.first().expect("one entry");
+            assert_eq!(e.type_label.as_ref(), "Events");
+            assert_eq!(e.parent_path.as_ref(), "sub");
+        });
     }
 
     /// `clear_selection` must reset selection count to zero.

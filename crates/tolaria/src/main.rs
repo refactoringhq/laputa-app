@@ -391,10 +391,11 @@ mod macos {
                 };
 
                 if let Err(err) = cx.open_window(opts, |window, cx| {
-                    use note_list_pane::{NoteListPane, OpenNoteEvent};
+                    use note_list_pane::{NoteListPane, NoteListScope, OpenNoteEvent};
+                    use sidebar_panel::{
+                        SidebarPanel, SidebarSelection, SidebarSelectionChangedEvent,
+                    };
                     use workspace::TolariaWorkspace;
-
-                    use sidebar_panel::SidebarPanel;
 
                     let sidebar = cx.new(|cx| SidebarPanel::from_or_empty(cx));
                     let note_list = cx.new(|cx| NoteListPane::from_or_empty(cx));
@@ -431,6 +432,40 @@ mod macos {
                         // subscription lifetime tracks the workspace entity.
                         let slot = active_note_item.clone();
                         let active_handle = note_list.clone();
+                        // Phase 8.1 — route every sidebar selection
+                        // change to the note-list pane's scope filter.
+                        // `Inbox` / `AllNotes` / `Archive` / `View(...)`
+                        // map to the same-named scopes; `Type(label)`
+                        // and `Folder(path)` narrow the list to
+                        // matching entries.  Re-selecting the same row
+                        // is a no-op in the sidebar (`select` only
+                        // emits on change), so this subscription
+                        // doesn't churn on idempotent clicks.
+                        let scoped_list = note_list.clone();
+                        model_cx
+                            .subscribe_in(
+                                &sidebar,
+                                window,
+                                move |_ws,
+                                      _side,
+                                      event: &SidebarSelectionChangedEvent,
+                                      _window,
+                                      cx| {
+                                    let scope = match event.selection.clone() {
+                                        SidebarSelection::Inbox => NoteListScope::Inbox,
+                                        SidebarSelection::AllNotes => NoteListScope::AllNotes,
+                                        SidebarSelection::Archive => NoteListScope::Archive,
+                                        SidebarSelection::Type(label) => NoteListScope::Type(label),
+                                        SidebarSelection::Folder(path) => {
+                                            NoteListScope::Folder(path)
+                                        }
+                                        SidebarSelection::View(name) => NoteListScope::View(name),
+                                    };
+                                    scoped_list.update(cx, |list, cx| list.set_scope(scope, cx));
+                                },
+                            )
+                            .detach();
+
                         model_cx
                             .subscribe_in(
                                 &note_list,

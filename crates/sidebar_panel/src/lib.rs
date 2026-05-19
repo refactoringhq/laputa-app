@@ -23,18 +23,18 @@
 //! └────────────────────────────┘
 //! ```
 //!
-//! Selection is internal-state-only: clicking a row updates
-//! [`SidebarPanel::selected`] and emits the row with the full-width
-//! primary-accent fill.  Wiring the selection to a workspace-level
-//! "current view" model is Phase 9 work (real services), so for the
-//! visual-fidelity pass we keep the highlight local.
+//! Selection is internal-state-only at this layer: clicking a row
+//! updates [`SidebarPanel::selected`] and emits a
+//! [`SidebarSelectionChangedEvent`] so the workspace can route the
+//! new selection to dependent views (e.g. the note-list pane's scope
+//! filter).  The sidebar itself does not know about other panels.
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use gpui::{
-    div, px, rgb, AnyElement, App, Context, Hsla, InteractiveElement, IntoElement, ParentElement,
-    Pixels, Render, SharedString, StatefulInteractiveElement as _, Styled, Window,
+    div, px, rgb, AnyElement, App, Context, EventEmitter, Hsla, InteractiveElement, IntoElement,
+    ParentElement, Pixels, Render, SharedString, StatefulInteractiveElement as _, Styled, Window,
 };
 use gpui_component::{ActiveTheme, IconName, StyledExt as _};
 use mock_fixtures::{MockVault, NoteKind};
@@ -46,6 +46,20 @@ use workspace::panel::{DockPosition, Panel};
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
+
+/// Emitted when [`SidebarPanel::select`] changes the highlighted row.
+///
+/// The workspace (`crates/tolaria/src/main.rs`) subscribes to this
+/// event and routes the new selection to dependent views — the
+/// note-list pane's scope filter in Phase 8.1, plus future consumers
+/// (status bar workspace chip, breadcrumb bar, etc.).  Re-selecting
+/// the already-selected row is a no-op: no event fires and no
+/// observers are notified.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SidebarSelectionChangedEvent {
+    /// The newly-selected row.
+    pub selection: SidebarSelection,
+}
 
 /// Which sidebar row is currently highlighted with the full-width
 /// primary-accent fill.  Defaults to [`SidebarSelection::Inbox`] so the
@@ -348,10 +362,14 @@ impl SidebarPanel {
         }
     }
 
-    /// Switch the highlighted row and trigger a redraw.
+    /// Switch the highlighted row, trigger a redraw, and emit a
+    /// [`SidebarSelectionChangedEvent`].  Re-selecting the already
+    /// selected row is a no-op (no event, no notify) so workspace
+    /// observers don't churn on idempotent clicks.
     pub fn select(&mut self, sel: SidebarSelection, cx: &mut Context<Self>) {
         if self.selected != sel {
-            self.selected = sel;
+            self.selected = sel.clone();
+            cx.emit(SidebarSelectionChangedEvent { selection: sel });
             cx.notify();
         }
     }
@@ -373,6 +391,8 @@ impl Default for SidebarPanel {
         Self::new()
     }
 }
+
+impl EventEmitter<SidebarSelectionChangedEvent> for SidebarPanel {}
 
 // ---------------------------------------------------------------------------
 // Panel impl
@@ -1191,7 +1211,7 @@ fn sidebar_folder_row(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::TestAppContext;
+    use gpui::{AppContext as _, TestAppContext};
     use mock_fixtures::MockVault;
 
     fn install_theme(cx: &mut TestAppContext) {
@@ -1330,5 +1350,62 @@ mod tests {
                 assert_eq!(panel.selected(), &SidebarSelection::Type("Areas".into()));
             })
             .unwrap();
+    }
+
+    /// Phase 8.1 — `select` emits a [`SidebarSelectionChangedEvent`]
+    /// when (and only when) the highlighted row actually changes.
+    /// Workspace consumers subscribe to this event to drive dependent
+    /// views; idempotent clicks must NOT churn the workspace.
+    ///
+    /// GPUI activates `cx.subscribe`'s subscription on the next
+    /// `cx.flush_effects()` — see `App::new_subscription` in
+    /// `crates/gpui/src/app.rs` (`self.defer(move |_| activate())`).
+    /// Splitting subscribe + emit into separate `cx.update` blocks
+    /// with a `run_until_parked` in between gives the deferred
+    /// activate a chance to fire BEFORE the first emit.  Co-locating
+    /// the two in one update silently swallows every event.
+    #[gpui::test]
+    fn select_emits_event_only_on_change(cx: &mut TestAppContext) {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        let received: Rc<RefCell<Vec<SidebarSelection>>> = Rc::new(RefCell::new(Vec::new()));
+
+        let panel = cx.update(|cx| cx.new(|_| SidebarPanel::new()));
+
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(
+                &panel,
+                move |_panel, event: &SidebarSelectionChangedEvent, _cx| {
+                    recv.borrow_mut().push(event.selection.clone());
+                },
+            )
+            .detach();
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            panel.update(cx, |panel, cx| {
+                panel.select(SidebarSelection::AllNotes, cx);
+                panel.select(SidebarSelection::Type("Areas".into()), cx);
+                // Re-selecting the same row must NOT emit.
+                panel.select(SidebarSelection::Type("Areas".into()), cx);
+                panel.select(SidebarSelection::Folder("attachments".into()), cx);
+            });
+        });
+        cx.run_until_parked();
+
+        let got: Vec<SidebarSelection> = received.borrow().clone();
+        assert_eq!(
+            got,
+            vec![
+                SidebarSelection::AllNotes,
+                SidebarSelection::Type("Areas".into()),
+                SidebarSelection::Folder("attachments".into()),
+            ],
+            "select must emit on change and skip redundant re-selects",
+        );
     }
 }
