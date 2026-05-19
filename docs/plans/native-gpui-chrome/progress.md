@@ -34,7 +34,8 @@ spec lives in [`components.md`](components.md).
 | 7.7 — Note-list visual parity | ✅ done | `897091bf` | +3 (221) | `NoteListPane`: `MMM D · Created MMM D` metadata line, `selected_id` field + `open` / `set_active` helpers, `theme.list_active` pale-accent on the active row, `visible_entries` returns `impl Iterator`. |
 | 7.8 — Custom title-bar strip | ✅ done | `897091bf` | +1 (222) | `workspace::title_bar::TitleBar` view + `TRAFFIC_LIGHTS_PADDING_PT = 72.0`; mounted by `TolariaWorkspace::empty`; `TitlebarOptions::appears_transparent` lets GPUI draw under the macOS chrome.  Each cell is `id()`-tagged + `dump_as`-registered. |
 | 7.9 — WKWebView editor-body dark-mode CSS | ✅ done | `897091bf` | (222) | `editor-host/style.css` gains `--fg-muted`, `caret-color`, italic placeholder, `color-mix(...)` selection; `NoteItem::set_theme` propagates via `document.documentElement.dataset.theme` (no `tolariaBridge` Ready dependency); `tolaria/main.rs` observes `gpui_component::theme::Theme` and broadcasts. |
-| **Phase 7 visual fidelity complete** | shipped at `897091bf` | 222 | Live chrome matches `tolaria-demo-vault-v2-{light,dark}.png` row-by-row in both themes. |
+| 7.10 — Visual-issue QA wave | ✅ done | `6b92a6ba` → `3c70b6b9` | (~234) | Periscope-driven interactive QA loop catalogued and closed visual deltas #001–#021 in their own per-issue commits.  Final per-issue rundown in the [Phase 7 follow-up](#phase-7-follow-up--visual-issue-qa-wave) table below; full diagnostic notes in [`visual-issues.md`](visual-issues.md). |
+| **✅ Phase 7 complete** | shipped at `3c70b6b9` | ~234 | Visual fidelity baseline (`897091bf`) plus 21 closed visual issues.  The `embed_poc` spike is no longer load-bearing — schedule removal under Phase 7 close-out. |
 | 8.x — Modal chrome surfaces | ⏳ planned | — | — | `command_palette`, `quick_open`, `dialogs`, `wikilink_inputs`, `image_lightbox`, `emoji_picker`, `startup` (one task per crate). |
 | 9.x — Service expansion | ⏳ planned | — | — | `git_provider`, `vault_search`, `vault_watcher` (advanced), `cli_agents`, `mcp_bridge`, `telemetry`, `app_updater`, `localization`, `settings_panel` persistence. |
 | 10.x — Parity hardening | ⏳ planned | — | — | Multi-tab `Pane`; autogit + conflict resolver; onboarding; measurement gate. |
@@ -322,6 +323,9 @@ after captures referenced by individual entries.
 | #016 | `c1c1aaba` | `workspace` | Zed-matching native title bar dims |
 | #017 | `b9fd4e91` | `status_bar` | Icons + left-aligned services + separators |
 | #018 | `207da697` + `5b3e475d` | `embed_poc`, `workspace`, `note_item` | WKWebView resize artifact — remove obscuring opaque paint; port four Tauri-mirrored fixes to production |
+| #019 | `951d5ea2` (+ `54748e81`, `382b6577`) | `note_item`, `workspace` | Top per-note toolbar row mirroring React's `BreadcrumbBar`; removed redundant note-list right border (double-line with resize handle); sync glyph switched to `IconName::Redo` |
+| #020 | `09ecd907` (+ `94e94a32`, `eff7521d`, `66301216`, `c056bfef`, `bbf31abf`, `3c70b6b9`) | `workspace`, `theme` | Sidebar show/hide button; column collapses on toggle; sized siblings keep widths via `.flex_none()` + `.visible(false)` stable slots; resize-handle colour matches sidebar right border in every state |
+| #021 | `738c8762` | `workspace`, `sidebar_panel`, `note_list_pane`, `status_bar` | Consistent `.dump_as(...)` element-ID hierarchy from `workspace` root through every chrome container; see [`tree-dump-ids.md`](tree-dump-ids.md) |
 
 **Issue #018 — WKWebView resize artifact.**  WebKit's remote-layer
 IPC lags AppKit geometry during resize; GPUI's Metal surface

@@ -43,8 +43,6 @@ expansion, and cross-platform.  Effect:
 **✅ MVP cut shipped at `9509f092`** — app opens a local vault,
 navigates, renders + saves notes.  Tauri stack still parallel.
 
-## Active
-
 ### Phase 7 — Visual fidelity pass
 
 Polish the shipped chrome until the live capture matches
@@ -63,12 +61,18 @@ row-by-row in both themes.  Each sub-task ships its own commit.
 | 7.7 | Note-list visual parity — `MMM D · Created MMM D` metadata line; `selected_id` + `theme.list_active` pale-accent row | ✅ shipped (`897091bf`) |
 | 7.8 | Custom title-bar strip — `workspace::title_bar::TitleBar` + `TRAFFIC_LIGHTS_PADDING_PT`; `TitlebarOptions::appears_transparent` | ✅ shipped (`897091bf`) |
 | 7.9 | WKWebView editor-body dark-mode CSS — `editor-host/style.css` palette + `NoteItem::set_theme` + theme-observer broadcast | ✅ shipped (`897091bf`) |
+| 7.10 | Visual-issue QA wave — interactive periscope-driven catalogue + per-issue commits (#001–#021); see [`visual-issues.md`](visual-issues.md) and `progress.md` § Phase 7 follow-up | ✅ shipped |
 
-**Phase 7 visual-fidelity pass complete** at `897091bf` — live chrome
-matches `tolaria-demo-vault-v2-{light,dark}.png` row-by-row in both
-themes.
+**✅ Phase 7 complete.**  Live chrome matches
+`tolaria-demo-vault-v2-{light,dark}.png` row-by-row in both themes
+(`897091bf` baseline), and every reported visual delta in
+`visual-issues.md` (#001 through #021) has shipped its own per-issue
+commit.  The `embed_poc` spike that validated the WKWebView-in-GPUI
+approach in Phase 0 is no longer load-bearing now that the resize
+artifact fixes have been ported into the production `note_item`
+path — schedule its removal under Phase 7 close-out.
 
-## Planned
+## Active
 
 ### Phase 8 — Modal chrome surfaces
 
@@ -85,6 +89,8 @@ carried over; behavioural reference in
 | 8.5 | `image_lightbox` — full-screen image viewer | `ImageLightbox.tsx` |
 | 8.6 | `emoji_picker` — popover grid | `EmojiPicker.tsx`, `TagsDropdown.tsx` |
 | 8.7 | `startup` — Welcome + Startup screens | `WelcomeScreen.tsx`, `StartupScreen.tsx` |
+
+## Planned
 
 ### Phase 9 — Service expansion
 
