@@ -42,7 +42,7 @@ use toasts::Toast;
 /// Bumping this constant requires bumping the offset wired in
 /// `main.rs` too; keeping it as a single named constant avoids two
 /// magic numbers drifting apart.
-pub const NATIVE_TITLE_BAR_HEIGHT_PT: f32 = 28.0;
+pub const NATIVE_TITLE_BAR_HEIGHT_PT: f32 = 38.0;
 
 use crate::{
     dock::Dock,

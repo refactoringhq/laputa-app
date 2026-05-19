@@ -159,3 +159,24 @@ clickable row so the hover paint is the neutral
 `sidebar_folder_row` paints it via
 `.hover(|this| this.bg(hover_bg))`.  Selected rows skip the
 hover paint so the selection fill stays stable.
+
+### 005 — Title-bar strip is cramped against the top edge
+
+| Current |
+|---------|
+| [issue-005-current.png](live-snapshots/issue-005-current.png) |
+
+**Reporter:** "The title area is a bit cramped.  Make sure there is
+the same padding from the top edge of the window as from the bottom
+of the title elements."
+
+**Diagnosis** — `NATIVE_TITLE_BAR_HEIGHT_PT = 28.0` and the action
+cells are 20-pt tall, leaving 4 pt above and below.  macOS places
+the traffic lights at `(7, 6)` with a 12-pt diameter so their
+visible top edge starts at 6 pt and bottom at 18 pt — fine in
+isolation, but combined with the small surrounding strip the cluster
+reads as glued to the window edge.  Bumping the strip's height to
+38 pt gives 9 pt top / 9 pt bottom around the cells and lets the
+traffic lights breathe symmetrically.
+
+**Status:** open.
