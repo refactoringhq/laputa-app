@@ -22,6 +22,7 @@ path = "src/main.rs"
 gpui.workspace = true
 gpui_platform.workspace = true
 gpui-component.workspace = true
+gpui-component-assets.workspace = true
 actions = { path = "../actions" }
 mock_fixtures = { path = "../mock_fixtures" }
 note_item = { path = "../note_item" }

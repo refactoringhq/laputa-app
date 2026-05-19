@@ -53,6 +53,11 @@ gpui = { git = "https://github.com/zed-industries/zed" }
 # verification — see `docs/plans/native-gpui-chrome/progress.md`.
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["runtime_shaders", "font-kit"] }
 gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "a5268cd640da080d9d383856ee62990dfb23d6f0" }
+# Bundled icon assets exposed via `gpui_component::IconName` — must be wired
+# into `gpui_platform::application().with_assets(Assets)` for any chrome
+# code that constructs an `IconName::Foo`-typed element to render
+# (otherwise svg() silently shows a blank rect).
+gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "a5268cd640da080d9d383856ee62990dfb23d6f0", package = "gpui-component-assets" }
 gpui-wry = { git = "https://github.com/longbridge/gpui-component", rev = "a5268cd640da080d9d383856ee62990dfb23d6f0", package = "gpui-wry" }
 # `gpui-wry` internally depends on `wry = { version = "0.53.3", package = "lb-wry" }`
 # (longbridge's fork that adds GPUI-friendly bounds tracking). We MUST pin the

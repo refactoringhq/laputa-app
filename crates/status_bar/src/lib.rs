@@ -24,7 +24,7 @@ use gpui::{
     div, px, AnyElement, App, Context, InteractiveElement, IntoElement, ParentElement, Render,
     SharedString, StatefulInteractiveElement as _, Styled, Window,
 };
-use gpui_component::ActiveTheme;
+use gpui_component::{ActiveTheme, IconName};
 use mock_fixtures::{FileStatus, MockGit, MockVault};
 use ui::tree_dump::DumpAsExt as _;
 use vault::Vault;
@@ -163,6 +163,32 @@ impl StatusBar {
     }
 }
 
+/// Status-bar link cell — a 14-pt icon + label combo (Contribute,
+/// Docs).  Tagged via `dump_as` so periscope can target the
+/// labelled cells alongside the icon-only ones.
+fn status_link(label: &'static str, icon: IconName, muted: gpui::Hsla) -> gpui::AnyElement {
+    use gpui::IntoElement as _;
+    div()
+        .id(label)
+        .flex()
+        .items_center()
+        .gap(px(4.0))
+        .text_color(muted)
+        .cursor_pointer()
+        .child(
+            div()
+                .w(px(14.0))
+                .h(px(14.0))
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(icon),
+        )
+        .child(SharedString::new_static(label))
+        .dump_as(label)
+        .into_any_element()
+}
+
 /// Three legacy placeholder service chips that mirror the
 /// `Git disabled / MCP / Claude` warnings in the reference
 /// screenshots.  When the real services land they replace this
@@ -199,14 +225,13 @@ impl Render for StatusBar {
         let muted = theme.muted_foreground;
         let warning = theme.warning;
         let danger = theme.danger;
-        // Theme-switcher label reflects the target appearance — clicking
-        // "Dark" flips to dark, clicking "Light" flips back.  Mirrors
-        // the moon-icon ↔ sun-icon behaviour in the reference status
-        // bar.
-        let theme_toggle_label: SharedString = if theme.is_dark() {
-            SharedString::new_static("Light")
+        // Theme-switcher icon — sun in dark mode (clicking flips to
+        // light), moon in light mode (clicking flips to dark).
+        // Matches the React `<Sun />` / `<Moon />` lucide swap.
+        let theme_toggle_icon: IconName = if theme.is_dark() {
+            IconName::Sun
         } else {
-            SharedString::new_static("Dark")
+            IconName::Moon
         };
 
         let left = div()
@@ -216,8 +241,21 @@ impl Render for StatusBar {
             .gap(px(8.0))
             .child(
                 div()
+                    .flex()
+                    .items_center()
+                    .gap(px(4.0))
                     .text_color(fg)
                     .child(self.vault_name.clone())
+                    .child(
+                        div()
+                            .w(px(12.0))
+                            .h(px(12.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(muted)
+                            .child(IconName::ChevronDown),
+                    )
                     .into_any_element(),
             )
             .child(
@@ -250,26 +288,41 @@ impl Render for StatusBar {
             .gap(px(12.0))
             .text_color(muted)
             .children(service_chips)
-            .child(div().child(SharedString::new_static("Contribute")))
-            .child(div().child(SharedString::new_static("Docs")))
+            .child(status_link("Contribute", IconName::Bell, muted))
+            .child(status_link("Docs", IconName::BookOpen, muted))
             // Theme switcher — clickable.  Calls `theme::cycle` which
             // flips between [`ThemeChoice::Light`] and `Dark`.  The
-            // label shows the target mode so the click affordance is
-            // obvious (matches the moon/sun icon behaviour in the
-            // reference status bar).  `.dump_as` registers the laid-out
+            // icon shows the *target* mode so the click affordance is
+            // obvious (sun=switch-to-light, moon=switch-to-dark) —
+            // matches the lucide `<Sun />` / `<Moon />` swap in the
+            // React status bar.  `.dump_as` registers the laid-out
             // bounds under `"status-bar-theme-toggle"` so periscope can
-            // target it by name (`click-id status-bar-theme-toggle`)
-            // instead of by hand-picked pixel coordinates.
+            // target it by name.
             .child(
                 div()
                     .id("status-bar-theme-toggle")
                     .cursor_pointer()
+                    .w(px(20.0))
+                    .h(px(20.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
                     .on_click(|_, _window, cx| theme::cycle(cx))
-                    .child(theme_toggle_label)
+                    .child(theme_toggle_icon)
                     .dump_as("status-bar-theme-toggle"),
             )
-            // Settings glyph — placeholder until the action lands.
-            .child(div().child(SharedString::new_static("Settings")));
+            .child(
+                div()
+                    .id("status-bar-settings")
+                    .w(px(20.0))
+                    .h(px(20.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .cursor_pointer()
+                    .child(IconName::Settings)
+                    .dump_as("status-bar-settings"),
+            );
 
         div()
             .flex()

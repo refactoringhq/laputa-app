@@ -32,7 +32,7 @@ use chrono::{DateTime, Datelike, Utc};
 use gpui::prelude::FluentBuilder as _;
 use gpui::EventEmitter;
 use gpui::{
-    div, px, rems, AnyElement, App, Context, InteractiveElement, IntoElement, ParentElement,
+    div, px, rems, AnyElement, App, Context, Hsla, InteractiveElement, IntoElement, ParentElement,
     Render, SharedString, StatefulInteractiveElement, Styled, Window,
 };
 use gpui_component::{
@@ -40,9 +40,10 @@ use gpui_component::{
     checkbox::Checkbox,
     h_flex,
     scroll::ScrollableElement as _,
-    v_flex, ActiveTheme, StyledExt as _,
+    v_flex, ActiveTheme, IconName, StyledExt as _,
 };
 use mock_fixtures::{MockVault, NoteId, NoteKind};
+use ui::tree_dump::DumpAsExt as _;
 use vault::Vault;
 use workspace::panel::{DockPosition, Panel};
 
@@ -78,15 +79,16 @@ struct RowData {
 }
 
 /// Render the metadata line shown below the snippet — mirrors the
-/// reference screenshots' `May 17 · Created May 17` pattern.  Phase 7
-/// uses the on-disk modified timestamp for both halves until the vault
-/// surfaces a separate created-at field (Phase 9 vault rewrite — see
-/// `TODO(visual-parity)`).
+/// reference screenshots' `May 2, 2026 · Created May 2, 2026`
+/// pattern.  Phase 7 uses the on-disk modified timestamp for both
+/// halves until the vault surfaces a separate created-at field
+/// (Phase 9 vault rewrite — see `TODO(visual-parity)`).
 fn metadata_line(modified: DateTime<Utc>) -> SharedString {
     let label = format!(
-        "{month} {day} \u{00B7} Created {month} {day}",
+        "{month} {day}, {year} \u{00B7} Created {month} {day}, {year}",
         month = month_abbr(modified.month()),
         day = modified.day(),
+        year = modified.year(),
     );
     SharedString::from(label)
 }
@@ -128,6 +130,50 @@ pub struct NoteEntry {
     /// truncated to fit the row.  Empty when the body is empty or
     /// the loader did not populate it.
     pub snippet: SharedString,
+}
+
+/// Extract a display title from a note body — first H1 heading,
+/// else a YAML frontmatter `title:` field, else `None`.  Mirrors the
+/// `extractH1TitleFromContent` / `extractFrontmatterTitleFromContent`
+/// pair in `src/utils/noteTitle.ts` so the native chrome surfaces
+/// the same display string as the Tauri-era app.
+fn extract_title(body: &str) -> Option<String> {
+    let mut frontmatter_title: Option<String> = None;
+    let mut lines = body.lines().peekable();
+
+    if lines.peek().map(|l| l.trim()) == Some("---") {
+        let _ = lines.next();
+        for line in lines.by_ref() {
+            let trimmed = line.trim();
+            if trimmed == "---" {
+                break;
+            }
+            if frontmatter_title.is_none() {
+                if let Some(rest) = trimmed.strip_prefix("title:") {
+                    let v = rest.trim().trim_matches(|c| c == '"' || c == '\'');
+                    if !v.is_empty() {
+                        frontmatter_title = Some(v.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    for line in lines {
+        let t = line.trim();
+        if t.is_empty() {
+            continue;
+        }
+        if let Some(rest) = t.strip_prefix("# ") {
+            let h1 = rest.trim();
+            if !h1.is_empty() {
+                return Some(h1.to_string());
+            }
+        }
+        break;
+    }
+
+    frontmatter_title
 }
 
 /// Extract a one-line preview from a note's raw markdown body.
@@ -234,11 +280,12 @@ impl NoteListPane {
                 });
             }
         }
+        let selected_id = entries.first().map(|e| e.id);
         Self {
             entries,
             filter: SharedString::default(),
             selected: HashSet::new(),
-            selected_id: None,
+            selected_id,
             position: DockPosition::Left,
         }
     }
@@ -255,30 +302,37 @@ impl NoteListPane {
         let mut entries = Vec::with_capacity(ids.len());
         for id in ids {
             if let Some(note) = executor.block_on(vault.note(id)) {
-                // Load the body to derive a one-line preview.  Cheap
-                // for the demo vault (~30 files); future work can
-                // batch this through a vault-side snippet cache.
-                let snippet = executor
-                    .block_on(vault.note_content(id))
-                    .ok()
+                // Load the body to derive a one-line preview AND the
+                // display title (H1 / frontmatter, falling back to the
+                // filename stem).  Cheap for the demo vault (~30
+                // files); future work can batch this through a
+                // vault-side snippet cache.
+                let body = executor.block_on(vault.note_content(id)).ok();
+                let title: SharedString = body
+                    .as_deref()
+                    .and_then(extract_title)
+                    .map(SharedString::from)
+                    .unwrap_or_else(|| note.title.clone());
+                let snippet = body
                     .as_deref()
                     .map(extract_snippet)
                     .unwrap_or_default()
                     .into();
                 entries.push(NoteEntry {
                     id: note.id,
-                    title: note.title.clone(),
+                    title,
                     kind: note.kind,
                     modified: note.modified,
                     snippet,
                 });
             }
         }
+        let selected_id = entries.first().map(|e| e.id);
         Self {
             entries,
             filter: SharedString::default(),
             selected: HashSet::new(),
-            selected_id: None,
+            selected_id,
             position: DockPosition::Left,
         }
     }
@@ -422,34 +476,44 @@ impl NoteListPane {
 // Render
 // ---------------------------------------------------------------------------
 
+/// Header-strip icon action — a 16-pt icon, optionally paired with a
+/// short text label (used by the "Modified" sort indicator).  Tagged
+/// via `dump_as` so periscope can target it by id.
+fn header_icon_action(
+    id: &'static str,
+    icon: IconName,
+    label: Option<&'static str>,
+    muted: Hsla,
+    hover: Hsla,
+) -> AnyElement {
+    let mut row = h_flex()
+        .id(id)
+        .items_center()
+        .gap(px(4.0))
+        .text_xs()
+        .text_color(muted)
+        .cursor_pointer()
+        .hover(|this| this.text_color(hover));
+    if let Some(text) = label {
+        row = row.child(SharedString::new_static(text));
+    }
+    row.child(icon).dump_as(id).into_any_element()
+}
+
 impl Render for NoteListPane {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Pre-extract theme colours to avoid repeated borrows inside closures.
         let border_color = cx.theme().border;
         let muted = cx.theme().muted_foreground;
         let fg = cx.theme().foreground;
-        // Explicit fill — the workspace root paints
-        // `theme.background`, but with the resizable panel's content
-        // div composited above, dark mode otherwise shows the previous
-        // light fill where the children leave gaps (filter-strip gap
-        // between rows, empty-state stretch).  Without this the
-        // note-list column stays light when the user toggles to dark.
         let bg = cx.theme().background;
-        // Pale-accent background for the active row — matches the
-        // reference's "selected note" highlight (`Q2 2025` row in
-        // `tolaria-demo-vault-v2-light.png`).  `theme.list_active`
-        // already resolves to `--state-selected` in both modes.
         let active_row_bg = cx.theme().list_active;
 
         let entity = cx.entity();
         let n_selected = self.selection_count();
         let has_selection = n_selected > 0;
-        let filter_text = self.filter.clone();
         let selected_id = self.selected_id;
 
-        // Pre-collect display data before building the element tree so that
-        // the immutable borrow of `self.entries` (from visible_entries) does
-        // not conflict with simultaneous borrows of other fields.
         let rows: Vec<RowData> = self
             .visible_entries()
             .map(|e| RowData {
@@ -462,22 +526,51 @@ impl Render for NoteListPane {
             })
             .collect();
 
-        // --- Filter strip ---
-        let filter_strip = h_flex()
-            .h(px(32.0))
-            .px(px(8.0))
+        // --- Header strip: title + sort indicator + action glyphs ---
+        // Mirrors `NoteListHeader.tsx` — 52-pt tall, left-aligned
+        // "Inbox" title, right-aligned cluster of icon actions
+        // (ChevronsUpDown sort + Search + Plus).
+        let header_strip = h_flex()
+            .h(px(52.0))
+            .items_center()
+            .justify_between()
+            .px(px(16.0))
             .border_b_1()
             .border_color(border_color)
             .child(
                 div()
-                    .flex_1()
                     .text_sm()
-                    .text_color(if filter_text.is_empty() { muted } else { fg })
-                    .child(if filter_text.is_empty() {
-                        SharedString::new_static("Filter notes\u{2026}")
-                    } else {
-                        filter_text
-                    }),
+                    .font_semibold()
+                    .text_color(fg)
+                    .child(SharedString::new_static("Inbox"))
+                    .into_any_element(),
+            )
+            .child(
+                h_flex()
+                    .items_center()
+                    .gap(px(12.0))
+                    .text_color(muted)
+                    .child(header_icon_action(
+                        "note-list-sort",
+                        IconName::ChevronsUpDown,
+                        Some("Modified"),
+                        muted,
+                        fg,
+                    ))
+                    .child(header_icon_action(
+                        "note-list-search",
+                        IconName::Search,
+                        None,
+                        muted,
+                        fg,
+                    ))
+                    .child(header_icon_action(
+                        "note-list-new",
+                        IconName::Plus,
+                        None,
+                        muted,
+                        fg,
+                    )),
             );
 
         // --- Scrollable list ---
@@ -547,6 +640,20 @@ impl Render for NoteListPane {
                         })
                         .child(div().text_xs().text_color(muted).child(metadata));
 
+                    // Trailing status glyph — mirrors the reference's
+                    // right-side "type marker" (chart icon, blue
+                    // circle).  Phase 7 stub: a small file glyph in
+                    // muted-fg until per-type icons land in Phase 9.
+                    let trailing = div()
+                        .flex_shrink_0()
+                        .w(px(16.0))
+                        .h(px(16.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .text_color(muted)
+                        .child(IconName::File);
+
                     let row_div = h_flex()
                         .id(("nlp-row", ix as u64))
                         .w_full()
@@ -561,7 +668,8 @@ impl Render for NoteListPane {
                             open_handle.update(cx, |this, cx| this.open(note_id, cx));
                         })
                         .child(checkbox)
-                        .child(content);
+                        .child(content)
+                        .child(trailing);
                     if is_selected {
                         row_div.bg(active_row_bg)
                     } else {
@@ -599,7 +707,7 @@ impl Render for NoteListPane {
         v_flex()
             .size_full()
             .bg(bg)
-            .child(filter_strip)
+            .child(header_strip)
             .child(list)
             .children(bulk_bar)
     }
@@ -865,12 +973,41 @@ mod tests {
     }
 
     /// `metadata_line` formats a UTC modified timestamp as the
-    /// `MMM D · Created MMM D` line shown below each row's snippet.
+    /// `MMM D, YYYY · Created MMM D, YYYY` line shown below each row's
+    /// snippet.  Year is added in Phase 7 visual-fidelity to match the
+    /// reference screenshots exactly.
     #[test]
     fn metadata_line_format() {
         use chrono::TimeZone as _;
         let m = chrono::Utc.with_ymd_and_hms(2026, 5, 17, 12, 0, 0).unwrap();
-        assert_eq!(metadata_line(m).as_ref(), "May 17 \u{00B7} Created May 17");
+        assert_eq!(
+            metadata_line(m).as_ref(),
+            "May 17, 2026 \u{00B7} Created May 17, 2026"
+        );
+    }
+
+    #[test]
+    fn extract_title_prefers_h1() {
+        let body = "# My Note Title\n\nbody text";
+        assert_eq!(extract_title(body), Some("My Note Title".to_string()));
+    }
+
+    #[test]
+    fn extract_title_falls_back_to_frontmatter() {
+        let body = "---\ntitle: Frontmatter Title\n---\n\nbody";
+        assert_eq!(extract_title(body), Some("Frontmatter Title".to_string()));
+    }
+
+    #[test]
+    fn extract_title_h1_beats_frontmatter_when_both_present() {
+        let body = "---\ntitle: From Frontmatter\n---\n\n# From H1\n";
+        assert_eq!(extract_title(body), Some("From H1".to_string()));
+    }
+
+    #[test]
+    fn extract_title_returns_none_when_absent() {
+        let body = "no title here\nbody text\n";
+        assert_eq!(extract_title(body), None);
     }
 
     /// `clear_selection` must reset selection count to zero.

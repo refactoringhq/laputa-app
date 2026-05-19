@@ -199,6 +199,11 @@ mod macos {
         // and `Cmd+W` behave the same as `Cmd+Q`.
         application()
             .with_quit_mode(QuitMode::LastWindowClosed)
+            // Bundle gpui-component's icon SVGs so the sidebar / note
+            // list / status bar / title bar can render `IconName::*`
+            // elements.  Without an `AssetSource`, `svg()` falls back to
+            // a blank rect and every chrome glyph disappears.
+            .with_assets(gpui_component_assets::Assets)
             .run(move |cx: &mut App| {
                 // 3. Theme / gpui-component global (must precede any primitive render).
                 //    `theme::init` always lands the theme on Light; `apply_choice`

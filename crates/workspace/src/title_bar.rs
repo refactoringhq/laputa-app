@@ -17,10 +17,10 @@
 //! returns, so clicking is harmless.
 
 use gpui::{
-    div, px, Context, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
+    div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement as _, Styled, Window,
 };
-use gpui_component::ActiveTheme;
+use gpui_component::{ActiveTheme, IconName};
 use ui::tree_dump::DumpAsExt as _;
 
 use crate::workspace::NATIVE_TITLE_BAR_HEIGHT_PT;
@@ -70,21 +70,20 @@ impl Render for TitleBar {
             .flex_row()
             .items_center()
             .gap(px(2.0))
-            .child(title_bar_cell("title-bar-back", "\u{2039}"))
-            .child(title_bar_cell("title-bar-forward", "\u{203A}"))
-            .child(title_bar_cell("title-bar-new-note", "\u{002B}"));
+            .child(title_bar_cell("title-bar-back", IconName::ArrowLeft))
+            .child(title_bar_cell("title-bar-forward", IconName::ArrowRight))
+            .child(title_bar_cell("title-bar-new-note", IconName::Plus));
 
         let right = div()
             .flex()
             .flex_row()
             .items_center()
             .gap(px(2.0))
-            .child(title_bar_cell("title-bar-search", "\u{2315}"))
-            .child(title_bar_cell("title-bar-star", "\u{2606}"))
-            .child(title_bar_cell("title-bar-lock", "\u{1F512}"))
-            .child(title_bar_cell("title-bar-language", "Aa"))
-            .child(title_bar_cell("title-bar-more", "\u{22EF}"))
-            .child(title_bar_cell("title-bar-profile", "\u{25CB}"));
+            .child(title_bar_cell("title-bar-search", IconName::Search))
+            .child(title_bar_cell("title-bar-star", IconName::Star))
+            .child(title_bar_cell("title-bar-language", IconName::Globe))
+            .child(title_bar_cell("title-bar-more", IconName::Ellipsis))
+            .child(title_bar_cell("title-bar-profile", IconName::CircleUser));
 
         div()
             .flex()
@@ -106,9 +105,10 @@ impl Render for TitleBar {
 }
 
 /// One title-bar action cell: a square click target with a single
-/// glyph centred inside.  Logs the action id on click — Phase 8
-/// modal-chrome work replaces the stub with the real action dispatch.
-fn title_bar_cell(id: &'static str, glyph: &'static str) -> gpui::AnyElement {
+/// [`IconName`] glyph centred inside.  Logs the action id on click —
+/// Phase 8 modal-chrome work replaces the stub with the real action
+/// dispatch.
+fn title_bar_cell(id: &'static str, icon: IconName) -> AnyElement {
     div()
         .id(id)
         .flex()
@@ -122,7 +122,7 @@ fn title_bar_cell(id: &'static str, glyph: &'static str) -> gpui::AnyElement {
         .on_click(move |_, _window, _cx| {
             log::info!("title bar action stub: {id}");
         })
-        .child(SharedString::new_static(glyph))
+        .child(icon)
         .dump_as(id)
         .into_any_element()
 }

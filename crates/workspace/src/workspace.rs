@@ -206,7 +206,17 @@ impl Render for TolariaWorkspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let title_bar = self.title_bar.clone();
         let left_dock = self.left_dock.clone();
-        let right_dock = self.right_dock.clone();
+        // Phase 7 visual-fidelity: hide the right dock entirely when
+        // nothing is attached to it — the reference shows the editor
+        // extending to the right edge of the window, and until
+        // `inspector_panel` lands the dock is just an empty 240-pt
+        // blank vertical bar that eats editor width.
+        let right_dock = self
+            .right_dock
+            .read(cx)
+            .active_panel()
+            .is_some()
+            .then(|| self.right_dock.clone());
         let center_group = self.center_group.clone();
         let note_list_column = self.note_list_column.clone();
         // Paint our own `theme.background` instead of relying on
@@ -260,7 +270,9 @@ impl Render for TolariaWorkspace {
                     panels.push(resizable_panel().size(px(300.0)).child(view));
                 }
                 panels.push(resizable_panel().child(center_group));
-                panels.push(resizable_panel().size(px(240.0)).child(right_dock));
+                if let Some(right_dock) = right_dock {
+                    panels.push(resizable_panel().size(px(240.0)).child(right_dock));
+                }
                 // `min_h_0` + `overflow_hidden` is the classic flex
                 // trick that lets this row shrink below its content's
                 // natural height.  Without it, an overflowing panel
