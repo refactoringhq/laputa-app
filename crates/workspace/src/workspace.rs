@@ -222,18 +222,21 @@ impl TolariaWorkspace {
 impl Render for TolariaWorkspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let title_bar = self.title_bar.clone();
-        // Visual-issue #020: drop the left-dock column entirely when
-        // the dock is closed, so the sidebar toggle collapses the
-        // resizable column instead of merely emptying its contents.
-        // The workspace's `cx.observe(&left_dock, …)` in
-        // [`TolariaWorkspace::empty`] triggers a re-render when
-        // `Dock::toggle` flips state, so this `is_open()` snapshot
-        // always reflects the latest toggle.
-        let left_dock = self
-            .left_dock
-            .read(cx)
-            .is_open()
-            .then(|| self.left_dock.clone());
+        // Visual-issue #020: collapse the left-dock column when the
+        // sidebar toggle closes it.  The panel slot must stay in the
+        // resizable group at the same index — gpui-component's
+        // `ResizableState::sync_panels_count` truncates per-panel
+        // sizes from the *end* when the count drops, so removing the
+        // first panel would shift the saved widths down one slot and
+        // squash the note-list to the sidebar's width.  Using
+        // `.visible(false)` keeps the slot ordering stable; the panel
+        // renders as a zero-width div and the freed space flows to
+        // the flex (center) panel.  The workspace's
+        // `cx.observe(&left_dock, …)` in [`TolariaWorkspace::empty`]
+        // triggers a re-render when `Dock::toggle` flips state, so
+        // this `is_open()` snapshot always reflects the latest toggle.
+        let left_dock = self.left_dock.clone();
+        let left_dock_visible = self.left_dock.read(cx).is_open();
         // Phase 7 visual-fidelity: hide the right dock entirely when
         // nothing is attached to it — the reference shows the editor
         // extending to the right edge of the window, and until
@@ -296,16 +299,17 @@ impl Render for TolariaWorkspace {
             // can crop to e.g. `workspace-left-dock` via `screenshot --id`.
             .child({
                 let mut panels: Vec<gpui_component::resizable::ResizablePanel> = Vec::new();
-                if let Some(left_dock) = left_dock {
-                    panels.push(
-                        resizable_panel().size(px(200.0)).child(
+                panels.push(
+                    resizable_panel()
+                        .size(px(200.0))
+                        .visible(left_dock_visible)
+                        .child(
                             div()
                                 .size_full()
                                 .child(left_dock)
                                 .dump_as("workspace-left-dock"),
                         ),
-                    );
-                }
+                );
                 if let Some(view) = note_list_column {
                     panels.push(
                         resizable_panel()
