@@ -973,6 +973,14 @@ impl Render for NoteListPane {
         v_flex()
             .size_full()
             .bg(bg)
+            // Visual-issue #019 follow-up: paint a 1-pt right border
+            // so the note-list column is visually separated from the
+            // note container (editor) on its right.  Matches the
+            // `border-r` divider React draws between
+            // `NoteListPane` and the `BreadcrumbBar` + editor
+            // (`src/components/NoteListPane.tsx`).
+            .border_r_1()
+            .border_color(border_color)
             .child(header_strip)
             .child(list)
             .children(bulk_bar)
