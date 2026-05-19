@@ -85,11 +85,21 @@ pub struct SavedView {
     pub count: usize,
 }
 
-/// A folder path entry derived from note file paths.
+/// A folder row derived from note file paths.  `path` stays stable
+/// regardless of presentation so it can key
+/// [`SidebarSelection::Folder`]; `display` and `depth` are derived
+/// from the path *relative to the vault root* so the visual indent
+/// starts at the vault root (depth 0) rather than the filesystem
+/// root.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FolderEntry {
+    /// Stable identifier — relative to the vault root (`""` for the
+    /// vault root itself).
     pub path: SharedString,
-    /// Nesting depth, derived from the number of `/` separators in the path.
+    /// Display label — the trailing path segment, or the vault root's
+    /// file_name when `path == ""`.
+    pub display: SharedString,
+    /// Indent depth (0 = vault root, 1 = its direct children, …).
     pub depth: u8,
 }
 
@@ -158,6 +168,7 @@ impl SidebarPanel {
     pub fn from_vault(cx: &mut App) -> Self {
         let executor = cx.foreground_executor().clone();
         let vault = cx.global::<Vault>();
+        let root = Some(vault.root().to_path_buf());
         let note_ids = executor.block_on(vault.notes());
         let mut samples = Vec::with_capacity(note_ids.len());
         for id in note_ids {
@@ -165,7 +176,7 @@ impl SidebarPanel {
                 samples.push((note.kind, note.path));
             }
         }
-        Self::build_from_samples(samples)
+        Self::build_from_samples(samples, root)
     }
 
     /// Build a sidebar panel populated from the [`MockVault`] global.
@@ -180,13 +191,22 @@ impl SidebarPanel {
                 samples.push((note.kind, note.path));
             }
         }
-        Self::build_from_samples(samples)
+        Self::build_from_samples(samples, None)
     }
 
     /// Common post-processing for both [`from_mock`] and [`from_vault`].
-    fn build_from_samples(samples: Vec<(NoteKind, PathBuf)>) -> Self {
+    ///
+    /// `vault_root`, when supplied, is the on-disk path Vault::open_at
+    /// was rooted at.  We strip it from every note's parent path so
+    /// folder rows are indented relative to the vault root rather than
+    /// the filesystem root — see issue 002 in
+    /// `docs/plans/native-gpui-chrome/visual-issues.md`.
+    fn build_from_samples(samples: Vec<(NoteKind, PathBuf)>, vault_root: Option<PathBuf>) -> Self {
         let mut counts: BTreeMap<&'static str, usize> = BTreeMap::new();
-        let mut folder_paths: BTreeSet<SharedString> = BTreeSet::new();
+        // Set of relative paths from the vault root.  `""` is the
+        // root itself.  Notes that live in the root are recorded as
+        // belonging to the root folder so the root row always exists.
+        let mut folder_rels: BTreeSet<String> = BTreeSet::new();
         let total_count = samples.len();
 
         for (kind, path) in samples {
@@ -197,11 +217,25 @@ impl SidebarPanel {
             };
             *counts.entry(label).or_insert(0) += 1;
 
-            if let Some(parent) = path.parent() {
-                let s = parent.to_string_lossy();
-                if !s.is_empty() {
-                    folder_paths.insert(SharedString::from(s.into_owned()));
-                }
+            let Some(parent) = path.parent() else {
+                continue;
+            };
+            let rel = match vault_root.as_deref() {
+                Some(root) => parent.strip_prefix(root).unwrap_or(parent),
+                None => parent,
+            };
+            // `strip_prefix` of an exactly-matching root returns the
+            // empty path; treat it as the vault root.  Skip any
+            // path that we could not normalise to a vault-relative
+            // form (e.g. absolute paths outside the vault).
+            let rel_str = rel.to_string_lossy();
+            if rel_str.is_empty() {
+                folder_rels.insert(String::new());
+            } else if !rel.is_absolute() {
+                // Every ancestor needs a row so children render
+                // visually nested under their parent.
+                folder_rels.insert(String::new());
+                folder_rels.insert(rel_str.into_owned());
             }
         }
 
@@ -223,12 +257,36 @@ impl SidebarPanel {
             count: 3,
         }];
 
-        let folders: Vec<FolderEntry> = folder_paths
+        let root_display: SharedString = vault_root
+            .as_deref()
+            .and_then(|r| r.file_name())
+            .and_then(|n| n.to_str())
+            .map(|s| SharedString::from(s.to_owned()))
+            .unwrap_or_else(|| SharedString::new_static("Vault"));
+
+        let folders: Vec<FolderEntry> = folder_rels
             .into_iter()
-            .map(|path| {
-                let depth =
-                    u8::try_from(path.bytes().filter(|&b| b == b'/').count()).unwrap_or(u8::MAX);
-                FolderEntry { path, depth }
+            .map(|rel| {
+                if rel.is_empty() {
+                    FolderEntry {
+                        path: SharedString::default(),
+                        display: root_display.clone(),
+                        depth: 0,
+                    }
+                } else {
+                    let depth = u8::try_from(rel.bytes().filter(|&b| b == b'/').count() + 1)
+                        .unwrap_or(u8::MAX);
+                    let display = Path::new(&rel)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|s| SharedString::from(s.to_owned()))
+                        .unwrap_or_else(|| SharedString::from(rel.clone()));
+                    FolderEntry {
+                        path: SharedString::from(rel),
+                        display,
+                        depth,
+                    }
+                }
             })
             .collect();
 
@@ -365,14 +423,30 @@ fn type_color(label: &str) -> Hsla {
 
 /// Colour palette used by every row builder — extracted once per render
 /// so the row helpers can stay pure functions.
+///
+/// Selection treatment mirrors `src/index.css` — `--state-selected`
+/// (pale-blue, [`theme.list_active`]) on the row body with
+/// `--accent-blue` ([`theme.primary`]) text and icon.  The dark-blue
+/// fill is reserved for the count pill on the *selected* row, where it
+/// inverts to white text.  Unselected count pills get the muted
+/// surface treatment from `NavItemCount` in `SidebarParts.tsx`.
 struct Palette {
     bg: Hsla,
     border: Hsla,
     fg: Hsla,
     muted_fg: Hsla,
-    accent_bg: Hsla,
-    accent_fg: Hsla,
+    /// Row fill on the selected row — pale-blue (`--state-selected`).
+    selection_bg: Hsla,
+    /// Label + leading-icon colour on the selected row — accent-blue
+    /// (`--accent-blue`).
+    selection_fg: Hsla,
+    /// Count-pill fill when the row is *not* selected — `--muted`.
     pill_bg: Hsla,
+    /// Count-pill fill when the row *is* selected — `--accent-blue`.
+    pill_selected_bg: Hsla,
+    /// Count-pill text when the row is selected — `--text-inverse`
+    /// (white).
+    pill_selected_fg: Hsla,
 }
 
 impl Palette {
@@ -383,27 +457,25 @@ impl Palette {
             border: theme.sidebar_border,
             fg: theme.sidebar_foreground,
             muted_fg: theme.muted_foreground,
-            accent_bg: theme.primary,
-            accent_fg: theme.primary_foreground,
+            selection_bg: theme.list_active,
+            selection_fg: theme.primary,
             pill_bg: theme.muted,
+            pill_selected_bg: theme.primary,
+            pill_selected_fg: theme.primary_foreground,
         }
     }
 }
 
-/// Pill-shaped count badge — `bg(theme.muted)` when unselected,
-/// `bg(theme.primary_foreground / 18%)` when the row is selected so
-/// the badge stays legible against the accent fill.
+/// Pill-shaped count badge.  Unselected rows get the muted surface
+/// from `NavItemCount` in `SidebarParts.tsx`; the selected row
+/// inverts to accent-blue on white so it reads as a strong indicator
+/// against the pale-blue row fill.
 fn count_pill(count: usize, selected: bool, p: &Palette) -> Option<AnyElement> {
     if count == 0 {
         return None;
     }
     let (bg_color, text_color) = if selected {
-        // On the accent fill, the badge needs its own colour pair so
-        // it doesn't disappear into the background.  18 % alpha on the
-        // primary_foreground reads as a translucent chip.
-        let mut tint = p.accent_fg;
-        tint.a = 0.2;
-        (tint, p.accent_fg)
+        (p.pill_selected_bg, p.pill_selected_fg)
     } else {
         (p.pill_bg, p.muted_fg)
     };
@@ -453,6 +525,25 @@ fn icon_glyph(icon: IconName, color: Hsla) -> AnyElement {
 /// Section header — small-caps muted label with optional trailing
 /// action glyphs (`+` / `⇅`).  Mirrors `SidebarGroupHeader.tsx`.
 fn section_header(label: &'static str, p: &Palette, actions: Vec<AnyElement>) -> gpui::AnyElement {
+    section_header_with_leading(label, None, p, actions)
+}
+
+/// Section header with an optional leading caret/icon — used by the
+/// FOLDERS group, which exposes a chevron-down on the left so the
+/// whole section can collapse (mirrors the React `<FolderTree />`
+/// section toggle).
+fn section_header_with_leading(
+    label: &'static str,
+    leading: Option<AnyElement>,
+    p: &Palette,
+    actions: Vec<AnyElement>,
+) -> gpui::AnyElement {
+    let mut leading_box = div().flex().flex_row().items_center().gap(px(6.0));
+    if let Some(leading) = leading {
+        leading_box = leading_box.child(leading);
+    }
+    leading_box = leading_box.child(SharedString::new_static(label));
+
     let mut row = div()
         .flex()
         .flex_row()
@@ -465,7 +556,7 @@ fn section_header(label: &'static str, p: &Palette, actions: Vec<AnyElement>) ->
         .text_color(p.muted_fg)
         .text_xs()
         .font_semibold()
-        .child(SharedString::new_static(label));
+        .child(leading_box);
     if !actions.is_empty() {
         let actions_box = div()
             .flex()
@@ -511,7 +602,7 @@ fn build_row(
 ) -> AnyElement {
     let label = SharedString::from(label.to_string());
     let (row_bg, label_color) = if selected {
-        (Some(p.accent_bg), p.accent_fg)
+        (Some(p.selection_bg), p.selection_fg)
     } else {
         (None, p.fg)
     };
@@ -656,8 +747,13 @@ impl Render for SidebarPanel {
                 ],
             ))
             .children(type_rows)
-            .child(section_header(
+            .child(section_header_with_leading(
                 "FOLDERS",
+                Some(header_action(
+                    "sidebar-folders-caret",
+                    IconName::ChevronDown,
+                    p,
+                )),
                 p,
                 vec![header_action("sidebar-folders-add", IconName::Plus, p)],
             ))
@@ -680,7 +776,7 @@ fn sidebar_top_row(
     entity: &gpui::Entity<SidebarPanel>,
     sel: SidebarSelection,
 ) -> AnyElement {
-    let leading = icon_glyph(icon, if selected { p.accent_fg } else { p.muted_fg });
+    let leading = icon_glyph(icon, if selected { p.selection_fg } else { p.muted_fg });
     let sel_clone = sel.clone();
     let handle = entity.clone();
     build_row(
@@ -707,7 +803,7 @@ fn sidebar_view_row(
 ) -> AnyElement {
     let leading = icon_glyph(
         IconName::Star,
-        if selected { p.accent_fg } else { p.muted_fg },
+        if selected { p.selection_fg } else { p.muted_fg },
     );
     let name = view.name.clone();
     let handle = entity.clone();
@@ -769,38 +865,30 @@ fn sidebar_folder_row(
     p: &Palette,
     entity: &gpui::Entity<SidebarPanel>,
 ) -> AnyElement {
-    let leaf = Path::new(folder.path.as_ref())
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or(folder.path.as_ref());
     let is_selected = matches!(selected, SidebarSelection::Folder(path) if path == &folder.path);
-    let is_root = folder.depth == 0;
-    let leading_color = if is_selected { p.accent_fg } else { p.muted_fg };
-    let leading = if is_root {
-        div()
-            .flex()
-            .flex_row()
-            .items_center()
-            .gap(px(4.0))
-            .child(icon_glyph(IconName::ChevronDown, leading_color))
-            .child(icon_glyph(IconName::FolderClosed, leading_color))
-            .into_any_element()
+    let leading_color = if is_selected {
+        p.selection_fg
     } else {
-        icon_glyph(IconName::FolderClosed, leading_color)
+        p.muted_fg
     };
+    // The collapse caret for the whole FOLDERS group lives on the
+    // section header (`sidebar-folders-caret`).  Every folder row —
+    // root included — gets the closed-folder glyph as its only
+    // leading icon, mirroring `FolderTree` in the React source.
+    let leading = icon_glyph(IconName::FolderClosed, leading_color);
 
     let path = folder.path.clone();
     let handle = entity.clone();
-    let id: &'static str = if is_root {
+    let id: &'static str = if folder.depth == 0 {
         "sidebar-folder-root"
     } else {
         "sidebar-folder-child"
     };
     let pad_left = px(12.0 + f32::from(folder.depth) * 16.0);
 
-    let label = SharedString::from(leaf.to_string());
+    let label = folder.display.clone();
     let (row_bg, label_color) = if is_selected {
-        (Some(p.accent_bg), p.accent_fg)
+        (Some(p.selection_bg), p.selection_fg)
     } else {
         (None, p.fg)
     };
@@ -941,7 +1029,7 @@ mod tests {
             (NoteKind::Markdown, PathBuf::from("event-launch.md")),
             (NoteKind::Markdown, PathBuf::from("untyped.md")),
         ];
-        let panel = SidebarPanel::build_from_samples(samples);
+        let panel = SidebarPanel::build_from_samples(samples, None);
         let pairs: Vec<(&str, usize)> = panel
             .types()
             .iter()
