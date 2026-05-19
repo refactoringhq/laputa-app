@@ -679,6 +679,7 @@ impl Render for NoteListPane {
         let muted = cx.theme().muted_foreground;
         let fg = cx.theme().foreground;
         let bg = cx.theme().background;
+        let hover_bg = cx.theme().list_hover;
 
         let entity = cx.entity();
         let n_selected = self.selection_count();
@@ -922,9 +923,20 @@ impl Render for NoteListPane {
                                 .child(content),
                         );
                     if is_selected {
+                        // Selected rows already paint the type-accent
+                        // tint — skip the hover overlay so the
+                        // selection fill stays stable (mirrors
+                        // `sidebar_panel`'s behaviour where the row
+                        // hover is only drawn on unselected rows).
                         row_div.bg(selection_bg)
                     } else {
-                        row_div
+                        // Issue 015 — match the sidebar's hover
+                        // treatment: paint `theme.list_hover`
+                        // (= `--state-hover-subtle`) under the cursor
+                        // so the platform's default cursor-pointer
+                        // tint doesn't surface as a greenish glow on
+                        // the warm note-list palette.
+                        row_div.hover(move |this| this.bg(hover_bg))
                     }
                 }))
                 .into_any_element()

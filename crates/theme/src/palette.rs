@@ -95,11 +95,22 @@ pub fn apply_light(theme: &mut Theme) {
     c.tab_active_foreground = h(0x37352F);
     c.list = h(0xFFFFFF);
     c.list_active = h(0xE8F4FE);
+    // `list_hover` is the row-hover paint used by both `sidebar_panel`
+    // and `note_list_pane`.  It mirrors React's `hover:bg-muted` →
+    // `--muted` → `--state-hover-subtle` (`#F0F0EF`, see
+    // `src/index.css:56`), so the native chrome's hover state stays
+    // in lockstep with the Tauri build (issue 015).
     c.list_hover = h(0xF0F0EF);
     c.list_even = h(0xFFFFFF);
     c.list_head = h(0xF7F6F3);
     c.list_active_border = h(0x155DFF);
-    c.scrollbar = h(0xF7F6F3);
+    // Transparent track (issue 014): the gpui-component scrollbar
+    // paints `theme.scrollbar` as the strip BEHIND the thumb when
+    // visible.  An opaque pale-grey strip obscured the right edge
+    // of the note-list rows during scroll.  Making the track itself
+    // transparent gives an overlay-style scrollbar — thumb visible
+    // against the row content, no rectangular track painted.
+    c.scrollbar = ha(0x00000000);
     c.scrollbar_thumb = h(0xD9D9D6);
     c.scrollbar_thumb_hover = h(0xB4B4B4);
     c.drag_border = h(0x155DFF);
@@ -174,11 +185,20 @@ pub fn apply_dark(theme: &mut Theme) {
     c.tab_active_foreground = h(0xE6E1D8);
     c.list = h(0x23221F);
     c.list_active = h(0x1E344C);
-    c.list_hover = h(0x2D2B27);
+    // `list_hover` mirrors React's `hover:bg-muted` (issue 015):
+    // `--muted` resolves to `--state-hover-subtle`, which is
+    // `#262520` in the dark palette of `src/index.css:207`.  The
+    // previous value (`#2D2B27`, i.e. `--state-hover`) was the
+    // non-subtle hover and read as too contrasted on dark rows.
+    c.list_hover = h(0x262520);
     c.list_even = h(0x1F1E1B);
     c.list_head = h(0x191814);
     c.list_active_border = h(0x78A4FF);
-    c.scrollbar = h(0x191814);
+    // Transparent track (issue 014) — see the light-palette comment
+    // for the rationale.  Dark theme uses the same overlay style so
+    // the gutter to the right of the note list reads as a single
+    // continuous column, not a stripe.
+    c.scrollbar = ha(0x00000000);
     c.scrollbar_thumb = h(0x46433B);
     c.scrollbar_thumb_hover = h(0x625B53);
     c.drag_border = h(0x78A4FF);

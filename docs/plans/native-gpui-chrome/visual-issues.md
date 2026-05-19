@@ -427,3 +427,68 @@ Verified in
 "Created May 3, 2026" renders fully, trailing per-type icons are
 flush with the right inset, and the selected Sponsorships row's
 green accent strip + tint reads cleanly.
+
+### 014 — Note-list scrollbar paints an opaque track over the right column
+
+**Reporter:** "The item list vertical scroll bar area is not
+transparent when visible."
+
+**Diagnosis** — `note_list_pane`'s scroll wrapper uses
+`gpui_component`'s `overflow_y_scrollbar()` adapter, which renders
+a `Scrollbar` whose default `style_for_normal` paints
+`cx.theme().scrollbar` as the strip *behind* the thumb (see
+`gpui-component/.../scroll/scrollbar.rs:431-438`).  Tolaria's
+palette wired `c.scrollbar = h(0xF7F6F3)` (light) / `h(0x191814)`
+(dark) — both opaque — so the visible scrollbar drew a solid
+rectangular gutter on the right edge of the rows.
+
+**Status:** fixed.  `crates/theme/src/palette.rs` sets
+`c.scrollbar = ha(0x00000000)` for both light and dark; the
+gpui-component `style_for_normal` now resolves to a fully
+transparent track while the thumb still paints with
+`scrollbar_thumb` (`#D9D9D6` light / `#46433B` dark).  Result is
+an overlay-style scrollbar — thumb visible against the row
+content, no rectangular track painted.  Verified in
+[after-014-015-scrollbar-hover.png](live-snapshots/after-014-015-scrollbar-hover.png).
+
+### 015 — Note-list rows miss the sidebar's hover treatment; dark `list_hover` not subtle
+
+**Reporter:** "Note list items must have same hover highlight
+behavior as sidebar items." …followed by: "Match hover highlight
+color to React equivalent.  Add hover color to the theme to ensure
+consistency."
+
+**Diagnosis** — two problems:
+
+1. `note_list_pane` didn't attach a `.hover(...)` paint to its rows
+   (issue 004 fixed the sidebar but not the note list), so cursor
+   feedback fell back to the platform default — same greenish tint
+   that prompted issue 004.
+2. The dark-theme `list_hover` was `#2D2B27`, which is
+   `--state-hover` in `src/index.css:207`.  React's
+   `NoteItem` (`src/components/NoteItem.tsx:106-107`) uses
+   `hover:bg-muted`, and `--muted` resolves to
+   `--state-hover-subtle` (`#262520` in dark).  The native chrome's
+   hover was therefore *more contrasted* than the Tauri build.
+
+**Status:** fixed.
+
+- `note_list_pane` reads `cx.theme().list_hover` at render-time and
+  paints `.hover(move |this| this.bg(hover_bg))` on unselected
+  rows only — selected rows keep the type-accent tint dominant
+  (matches `sidebar_panel`'s `build_row` behaviour at
+  `crates/sidebar_panel/src/lib.rs:834`).
+- `crates/theme/src/palette.rs` documents the
+  `list_hover` ↔ `--state-hover-subtle` mapping in both palettes
+  and bumps the dark value from `#2D2B27` to `#262520` so the
+  native hover matches React's `hover:bg-muted` exactly.  Light
+  palette already used `#F0F0EF` (= `--state-hover-subtle` light),
+  so no value change there — just a clarifying comment.
+- Consistency contract (reinforced by follow-up reporter ask:
+  "sidebar hover color must match list hover color"): both
+  `sidebar_panel::Palette::hover_bg`
+  (`crates/sidebar_panel/src/lib.rs:662`) and the per-render
+  `let hover_bg = cx.theme().list_hover` in `note_list_pane`
+  (`crates/note_list_pane/src/lib.rs:682`) now read the same theme
+  field, so a single value drives both surfaces.  Any future
+  row-hover paint must follow the same rule — no hard-coded colours.
