@@ -707,6 +707,7 @@ impl Render for NoteListPane {
         // (ChevronsUpDown sort + Search + Plus).
         let header_strip = h_flex()
             .h(px(52.0))
+            .min_h(px(52.0))
             .items_center()
             .justify_between()
             .px(px(16.0))
@@ -714,6 +715,7 @@ impl Render for NoteListPane {
             .border_color(border_color)
             .child(
                 div()
+                    .items_center()
                     .text_sm()
                     .font_semibold()
                     .text_color(fg)
