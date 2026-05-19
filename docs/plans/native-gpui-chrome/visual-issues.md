@@ -246,4 +246,25 @@ share their vertical centre with the 12-pt traffic-light buttons
 (both at y ≈ 12).  The bottom of the strip retains its visual
 padding via the unchanged 38-pt height.
 
-**Status:** open.
+**Status:** superseded by issue 009.  Aligning the action cluster
+with the traffic lights left a tall empty band below the cluster
+and the user preferred the cluster centred within the strip.
+
+### 009 — Title-bar action items not vertically centred in the strip
+
+| Current |
+|---------|
+| [issue-009-current.png](live-snapshots/issue-009-current.png) |
+
+**Reporter:** "Traffic lights are positioned correctly.  But title
+bar items are not centred vertically."
+
+**Diagnosis** — issue 008 top-anchored the action cluster to share
+the traffic-light baseline, which left a noticeable empty band
+below the icons.  Revert to `items_center` so the cluster sits in
+the middle of the 38-pt strip; traffic lights remain at their OS-
+default top position.
+
+**Status:** fixed.  `title_bar` swaps `items_start` →
+`items_center` and drops the `pt(2.0)` inset.  Verified in
+[after-009-cluster-centered.png](live-snapshots/after-009-cluster-centered.png).
