@@ -99,6 +99,12 @@ impl Render for TitleBar {
         // `titlebar_double_click` — neither present in the workspace
         // today.
 
+        // The title bar is workspace-wide chrome only.  Per-note
+        // commands (favourite, organised, raw, AI, …) live on the
+        // per-note toolbar in `note_item::note_toolbar` (visual-issue
+        // #019); new-note creation lives on the `note_list_pane`
+        // header alongside its sort + search controls.  Anything that
+        // depends on the *currently open note* must not appear here.
         let left = div()
             .flex()
             .flex_row()
@@ -107,8 +113,7 @@ impl Render for TitleBar {
             // (`crates/title_bar/src/title_bar.rs:244`).
             .gap(px(2.0))
             .child(title_bar_cell("title-bar-back", IconName::ArrowLeft))
-            .child(title_bar_cell("title-bar-forward", IconName::ArrowRight))
-            .child(title_bar_cell("title-bar-new-note", IconName::Plus));
+            .child(title_bar_cell("title-bar-forward", IconName::ArrowRight));
 
         let right = div()
             .flex()
@@ -118,9 +123,7 @@ impl Render for TitleBar {
             // (`crates/title_bar/src/title_bar.rs:316`).
             .gap(px(4.0))
             .child(title_bar_cell("title-bar-search", IconName::Search))
-            .child(title_bar_cell("title-bar-star", IconName::Star))
             .child(title_bar_cell("title-bar-language", IconName::Globe))
-            .child(title_bar_cell("title-bar-more", IconName::Ellipsis))
             .child(title_bar_cell("title-bar-profile", IconName::CircleUser));
 
         // Vertically centre the action clusters within the strip

@@ -9,14 +9,16 @@ description = "Per-note WKWebView Item hosting the embedded editor (ADR-0115 Pha
 
 [dependencies]
 anyhow.workspace = true
-editor_bridge = { path = "../editor_bridge" }
 flume.workspace = true
-log.workspace = true
-serde_json.workspace = true
-vault = { path = "../vault" }
-workspace = { path = "../workspace" }
 gpui.workspace = true
 gpui-component.workspace = true
+log.workspace = true
+serde_json.workspace = true
+
+editor_bridge = { path = "../editor_bridge" }
+ui = { path = "../ui" }
+vault = { path = "../vault" }
+workspace = { path = "../workspace" }
 
 # WKWebView graph is macOS-only; on other platforms the crate ships a
 # stub `NoteItem` without a `WebView` so workspace builds stay clean.

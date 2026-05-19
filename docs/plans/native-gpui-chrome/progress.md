@@ -298,6 +298,72 @@ Periscope captures (`/tmp/phase7-light.png`,
 `/tmp/phase7-final-dark.png`) confirm row-by-row parity against the
 reference in both modes.
 
+### Phase 7 follow-up — visual-issue QA wave
+
+After the `897091bf` baseline, an interactive QA loop catalogued
+each remaining visual delta in
+[`visual-issues.md`](visual-issues.md); each entry was fixed in
+its own commit using the `fix(<crate>): visual-issue #NNN — <one-liner>`
+style.  See [`live-snapshots/`](live-snapshots/) for the before /
+after captures referenced by individual entries.
+
+| Issue(s) | Commit | Crate(s) | Summary |
+|----------|--------|----------|---------|
+| #001 #002 | `6b92a6ba` | `sidebar_panel` | Selection palette + folder indent |
+| #003 #004 | `218fab16` | `sidebar_panel` | Type frontmatter + hover bg |
+| #005 | `f7555520` | `workspace` | Title-bar height for symmetric padding |
+| #006 | `0b3be620` | `sidebar_panel` | VIEWS / TYPES collapse carets |
+| #007 | `4f6c6e07` | `tolaria` | Vertically centre traffic lights |
+| #008 | `9cb25da7` | `workspace` | Align title cluster with traffic lights |
+| #009 | `238121da` | `workspace` | Centre title-bar action cluster |
+| #010 #011 #012 | `b8b8282a` | `note_list_pane` | Per-type accents, tighter row, native word-wrap |
+| #013 | `29d8e5f4` | `note_list_pane` | Symmetric row padding |
+| #014 #015 | `dad72e19` | `theme`, `note_list_pane` | Transparent scrollbar track + sidebar-style hover |
+| #016 | `c1c1aaba` | `workspace` | Zed-matching native title bar dims |
+| #017 | `b9fd4e91` | `status_bar` | Icons + left-aligned services + separators |
+| #018 | `207da697` + `5b3e475d` | `embed_poc`, `workspace`, `note_item` | WKWebView resize artifact — remove obscuring opaque paint; port four Tauri-mirrored fixes to production |
+
+**Issue #018 — WKWebView resize artifact.**  WebKit's remote-layer
+IPC lags AppKit geometry during resize; GPUI's Metal surface
+painted opaque `theme.background` quads from
+`crates/workspace/src/pane_group.rs:75` and
+`crates/workspace/src/pane.rs:128` over the WebView region while
+the layer caught up, producing a trailing strip.
+
+Two design docs landed alongside the fix:
+
+- [`docs/plans/wkwebview-seamless-resize.md`](../wkwebview-seamless-resize.md) —
+  research on Tauri's seamless resize (autoresize mask,
+  `drawsBackground=NO`, `setUnderPageBackgroundColor`, matched
+  `NSWindow` background colour).  First implementation in
+  `embed_poc` (`207da697`).
+- [`docs/plans/wkwebview-seamless-resize-followup.md`](../wkwebview-seamless-resize-followup.md) —
+  post-mortem after `207da697` failed to remove the artifact in
+  the production runtime.  Identified the production tree's
+  `pane_group` + `pane` ancestor paints, not the WebView itself,
+  as the obscuring layer.  Listed Path A (transparent GPUI window
+  + per-leaf `.bg`) as the next probe if Path B failed.
+
+Final fix `5b3e475d`:
+
+- Removed `.bg(theme.background)` from the active-pane branch in
+  `pane_group.rs:75` and the active-item branch in `pane.rs:128`;
+  empty-state fallbacks keep their paint.
+- Ported all four WebView-side fixes from `embed_poc` to the
+  production `note_item` path (`autoresizingMask`,
+  `drawsBackground=false`, matching `NSWindow` background,
+  `setUnderPageBackgroundColor`).
+- `objc2` / `objc2-app-kit` / `objc2-foundation` added to
+  `crates/note_item/Cargo.toml` macOS deps; `unsafe_code` policy
+  remains `deny` crate-wide with `#[allow(unsafe_code)]` scoped
+  to `mod macos` only; every `unsafe { … }` carries a `// SAFETY:`
+  comment per the idiomatic-rust-review skill.
+- Two `gpui::test` regression guards added to `workspace` so the
+  ancestor paints can't silently return.
+
+Runtime verified — live window resize and splitter drag no longer
+expose the trailing `theme.background` strip.
+
 ---
 
 ## Durable feedback memories applied throughout

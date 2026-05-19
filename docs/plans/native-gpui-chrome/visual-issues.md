@@ -592,3 +592,144 @@ need to have icons and be left aligned."
 icons + left-aligned services + separators`.  5/5 status_bar tests
 pass; clippy clean for `-p status_bar -p tolaria --all-targets -D
 warnings`.
+
+### 018 — WKWebView shows a trailing strip during window / splitter resize
+
+**Reporter:** "the embedded web view is showing background painting
+artifacts on window and panel resizing operations."
+
+**Diagnosis** — the embedded `WKWebView` lives in WebKit's GPU
+process and reaches the screen via remote-layer IPC.  AppKit's
+geometry phase updates the host `NSView` instantly; the remote
+layer follows on the next IPC turn, so for a frame or two the
+GPUI Metal surface is the only thing painting the WebView region.
+GPUI clears its `CAMetalLayer` to opaque every frame and then
+paints any `.bg(...)` quads above it, so during resize a strip of
+`theme.background` covered the area where the WebView hadn't
+caught up yet.
+
+Two layers fed the artifact:
+
+1. **Production tree paints obscuring backgrounds.**
+   `crates/workspace/src/pane_group.rs:75` and
+   `crates/workspace/src/pane.rs:128` each had a
+   `.bg(theme.background)` on the *active* branch, on top of the
+   editor — exactly the surface the WebView lives behind.
+2. **WebView itself drew an opaque fill, didn't track host
+   geometry, and the GPUI window background didn't match the
+   editor body.**  Three Tauri-mirrored fixes
+   ([`wkwebview-seamless-resize.md`](../wkwebview-seamless-resize.md))
+   were prototyped in `embed_poc` (`207da697`).
+
+First production attempt only landed the embed_poc changes and
+the artifact persisted — the followup post-mortem
+([`wkwebview-seamless-resize-followup.md`](../wkwebview-seamless-resize-followup.md))
+identified the ancestor `.bg(...)` paints in
+`pane_group` + `pane` as the real culprit.
+
+**Status:** fixed in commit
+`fix(workspace,note_item): WKWebView resize artifact — remove
+obscuring opaque paint`:
+
+- Dropped `.bg(theme.background)` from the active-pane branch in
+  `pane_group.rs:75` and the active-item branch in `pane.rs:128`;
+  empty-state fallbacks keep their paint so the chrome still
+  reads correctly when no editor is mounted.
+- Ported all four WebView-side fixes from `embed_poc` into the
+  production `note_item` path:
+  - `setAutoresizingMask(NSViewWidthSizable | NSViewHeightSizable)`
+    on the host `NSView` after `build_as_child`.
+  - `setValue("drawsBackground", false)` on the `WKWebView`.
+  - Walk `ns_view → window() → setBackgroundColor` to match the
+    editor body colour byte-identical.
+  - `setUnderPageBackgroundColor` for completeness.
+- `objc2`, `objc2-app-kit`, `objc2-foundation` added to
+  `crates/note_item/Cargo.toml` macOS deps; module-level
+  `#[allow(unsafe_code)]` on `mod macos` (crate keeps `deny`
+  elsewhere); every `unsafe { … }` carries a `// SAFETY:` comment
+  per the idiomatic-rust-review skill.
+- Two `gpui::test` regression guards added to `workspace` so the
+  ancestor paints can't silently come back.
+
+Runtime verified by the reporter: live window resize and
+splitter drag no longer expose the trailing `theme.background`
+strip.
+
+### 019 — Top Note toolbar row
+
+**Reference:** ![issue 019 reference](live-snapshots/issue-019-reference.png)
+
+**Reporter:** "Implement top Note toolbar row.  Some commands
+mistakenly were placed in to the title bar.  Use React code as a
+reference for all commands and display elements.  The note toolbar
+is the same height as note item top bar."
+
+**Diagnosis** — Phase 7.8 placed per-note actions (favourite,
+"more") in the workspace-wide title-bar strip.  The React tree
+(`src/components/BreadcrumbBar.tsx`) renders these on a
+per-note 52-pt toolbar pinned above each editor body, with a
+breadcrumb on the left (type · `›` · filename · sync) and an
+11-button cluster on the right (favourite, organised,
+neighbourhood, raw, width, AI, TOC, reveal, copy-path, more,
+inspector).  Two consequences:
+
+1. The native chrome had per-note commands acting on whatever
+   note happened to be open; selecting a different note left the
+   buttons rendering as if they applied to the old context.
+2. The 52-pt baseline between the note-list-pane header (`Inbox …`)
+   and the note's own toolbar was broken — the React app aligns
+   both rows row-for-row.
+
+**Status:** fixed.
+
+- New `crates/note_item/src/note_toolbar.rs` module renders the
+  per-note row.  Public `NOTE_TOOLBAR_HEIGHT_PT = 52.0` mirrors
+  `BreadcrumbBar.tsx:1061`.  The cluster order matches React's
+  `BreadcrumbActions` (L811-890) plus the trailing inspector
+  toggle (L987-994):
+
+  | # | id | IconName | React |
+  |---|----|----|----|
+  | 1 | `note-toolbar-star` | `Star` | Star |
+  | 2 | `note-toolbar-organized` | `CircleCheck` | CheckCircle |
+  | 3 | `note-toolbar-neighborhood` | `Map` | MapTrifold |
+  | 4 | `note-toolbar-raw` | `SquareTerminal` | Code |
+  | 5 | `note-toolbar-width` | `Maximize` | ArrowsOutLineHorizontal |
+  | 6 | `note-toolbar-ai` | `Asterisk` | Sparkle |
+  | 7 | `note-toolbar-toc` | `Menu` | ListBullets |
+  | 8 | `note-toolbar-reveal` | `FolderOpen` | FolderOpen |
+  | 9 | `note-toolbar-copy-path` | `Copy` | ClipboardText |
+  | 10 | `note-toolbar-more` | `Ellipsis` | DotsThree |
+  | 11 | `note-toolbar-inspector` | `PanelRight` | SidebarSimple |
+
+  Icons that aren't in the gpui-component pack fall back to the
+  closest geometric match (Code → SquareTerminal, Sparkle →
+  Asterisk, ArrowsClockwise sync → Replace, etc.) — same fallback
+  convention as the status-bar work (issue #017).
+- `note_toolbar::type_label_singular` derives the breadcrumb's
+  type segment from the filename prefix (`procedure-foo.md` →
+  "Procedure"), mirroring `sidebar_panel::type_label_for` but
+  returning the singular form.  Duplicated deliberately (singular
+  vs plural drift).
+- `NoteItem::render` wraps the WebView in a `v_flex` with the
+  toolbar on top.  The toolbar is omitted when `path` is empty
+  (i.e. the blank placeholder WebView from
+  `new_blank_with_webview`).
+- `crates/workspace/src/title_bar.rs` pruned: removed
+  `IconName::Plus` from the left cluster (duplicated the
+  `NoteListPane` new-note action) and `IconName::Star` +
+  `IconName::Ellipsis` from the right cluster (per-note commands
+  that now live on the new toolbar).  A new module-level comment
+  documents the workspace-wide-only contract so future additions
+  can't drift back into the title bar.
+- Every cell is a log-only stub today, matching the precedent set
+  by `title_bar.rs`; cells are `id()`-tagged + `dump_as`-registered
+  so periscope can target them by name once Phase 8 modal-chrome
+  wiring lands.
+
+**Tests:** `note_toolbar::tests::type_label_singular_extracts_known_prefixes`
+(table-driven over all known prefixes + the "Note" fallback) and
+`note_toolbar::tests::toolbar_height_matches_react_breadcrumb_bar`
+(pins `NOTE_TOOLBAR_HEIGHT_PT = 52.0` to `BreadcrumbBar.tsx:1061`).
+2/2 toolbar tests pass; 23/23 workspace tests pass; clippy clean
+for `-p note_item -p workspace --all-targets -D warnings`.

@@ -41,8 +41,12 @@ use editor_bridge::{encode_to_host, FromHost, NoteOpen, ToHost};
 use gpui::{
     div, App, Context, IntoElement, ParentElement, Render, SharedString, Styled, Task, Window,
 };
+use gpui_component::v_flex;
 use vault::{Note, NoteId};
 use workspace::Item;
+
+mod note_toolbar;
+pub use note_toolbar::NOTE_TOOLBAR_HEIGHT_PT;
 
 #[cfg(target_os = "macos")]
 pub use macos::FRAME_EPSILON;
@@ -437,15 +441,23 @@ impl Item for NoteItem {
 }
 
 impl Render for NoteItem {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let container = div().size_full();
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Skip the breadcrumb + action row when the blank placeholder
+        // WebView is mounted — `new_blank_with_webview` constructs the
+        // entity with `path = PathBuf::new()`, and neither cluster has
+        // meaningful state to render until a note swaps in.
+        let toolbar =
+            (!self.path.as_os_str().is_empty()).then(|| note_toolbar::render(&self.path, cx));
+
+        let container = v_flex().size_full().children(toolbar);
+
         #[cfg(target_os = "macos")]
         {
             if let Some(webview) = self.macos.webview.clone() {
-                return container.child(InstrumentedWebView::new(
+                return container.child(div().flex_1().child(InstrumentedWebView::new(
                     webview,
                     self.macos.last_bounds.clone(),
-                ));
+                )));
             }
         }
         container

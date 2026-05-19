@@ -4768,6 +4768,7 @@ dependencies = [
  "raw-window-handle",
  "serde_json",
  "tempfile",
+ "ui",
  "vault",
  "workspace",
 ]
