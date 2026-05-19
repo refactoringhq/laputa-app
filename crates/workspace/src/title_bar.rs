@@ -188,6 +188,7 @@ impl Render for TitleBar {
             .border_color(border)
             .child(left)
             .child(right)
+            .dump_as("workspace-title-bar")
     }
 }
 

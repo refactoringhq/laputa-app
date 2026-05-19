@@ -239,10 +239,15 @@ fn status_separator(border: gpui::Hsla) -> gpui::AnyElement {
 /// Status-bar link cell — a 14-pt icon + label combo (Contribute,
 /// Docs).  Tagged via `dump_as` so periscope can target the
 /// labelled cells alongside the icon-only ones.
-fn status_link(label: &'static str, icon: IconName, muted: gpui::Hsla) -> gpui::AnyElement {
+fn status_link(
+    id: &'static str,
+    label: &'static str,
+    icon: IconName,
+    muted: gpui::Hsla,
+) -> gpui::AnyElement {
     use gpui::IntoElement as _;
     div()
-        .id(label)
+        .id(id)
         .flex()
         .items_center()
         .gap(px(4.0))
@@ -258,7 +263,7 @@ fn status_link(label: &'static str, icon: IconName, muted: gpui::Hsla) -> gpui::
                 .child(icon),
         )
         .child(SharedString::new_static(label))
-        .dump_as(label)
+        .dump_as(id)
         .into_any_element()
 }
 
@@ -368,8 +373,18 @@ impl Render for StatusBar {
             .items_center()
             .gap(px(12.0))
             .text_color(muted)
-            .child(status_link("Contribute", IconName::Bell, muted))
-            .child(status_link("Docs", IconName::BookOpen, muted))
+            .child(status_link(
+                "status-bar-contribute",
+                "Contribute",
+                IconName::Bell,
+                muted,
+            ))
+            .child(status_link(
+                "status-bar-docs",
+                "Docs",
+                IconName::BookOpen,
+                muted,
+            ))
             // Theme switcher — clickable.  Calls `theme::cycle` which
             // flips between [`ThemeChoice::Light`] and `Dark`.  The
             // icon shows the *target* mode so the click affordance is
@@ -418,6 +433,7 @@ impl Render for StatusBar {
             .text_xs()
             .child(left)
             .child(right)
+            .dump_as("workspace-status-bar")
     }
 }
 

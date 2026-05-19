@@ -748,7 +748,8 @@ impl Render for NoteListPane {
                         muted,
                         fg,
                     )),
-            );
+            )
+            .dump_as("note-list-header");
 
         // --- Scrollable list ---
         let list: AnyElement = if rows.is_empty() {
@@ -975,6 +976,7 @@ impl Render for NoteListPane {
             .child(header_strip)
             .child(list)
             .children(bulk_bar)
+            .dump_as("note-list")
     }
 }
 

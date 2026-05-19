@@ -918,19 +918,10 @@ impl Render for SidebarPanel {
             .map(|(ix, folder)| sidebar_folder_row(ix, folder, &self.selected, p, &entity))
             .collect();
 
-        div()
+        let views_section = div()
             .flex()
             .flex_col()
-            .h_full()
             .w_full()
-            .bg(p.bg)
-            .text_color(p.fg)
-            .border_r_1()
-            .border_color(p.border)
-            .py(px(8.0))
-            .child(row_inbox)
-            .child(row_all)
-            .child(row_arch)
             .child(section_header_with_leading(
                 "VIEWS",
                 Some(header_action(
@@ -942,6 +933,12 @@ impl Render for SidebarPanel {
                 vec![header_action("sidebar-views-add", IconName::Plus, p)],
             ))
             .children(view_rows)
+            .dump_as("sidebar-section-views");
+
+        let types_section = div()
+            .flex()
+            .flex_col()
+            .w_full()
             .child(section_header_with_leading(
                 "TYPES",
                 Some(header_action(
@@ -956,6 +953,12 @@ impl Render for SidebarPanel {
                 ],
             ))
             .children(type_rows)
+            .dump_as("sidebar-section-types");
+
+        let folders_section = div()
+            .flex()
+            .flex_col()
+            .w_full()
             .child(section_header_with_leading(
                 "FOLDERS",
                 Some(header_action(
@@ -967,6 +970,25 @@ impl Render for SidebarPanel {
                 vec![header_action("sidebar-folders-add", IconName::Plus, p)],
             ))
             .children(folder_rows)
+            .dump_as("sidebar-section-folders");
+
+        div()
+            .flex()
+            .flex_col()
+            .h_full()
+            .w_full()
+            .bg(p.bg)
+            .text_color(p.fg)
+            .border_r_1()
+            .border_color(p.border)
+            .py(px(8.0))
+            .child(row_inbox)
+            .child(row_all)
+            .child(row_arch)
+            .child(views_section)
+            .child(types_section)
+            .child(folders_section)
+            .dump_as("sidebar")
     }
 }
 
@@ -1117,7 +1139,7 @@ fn sidebar_folder_row(
     let path = folder.path.clone();
     let handle = entity.clone();
     let dump_id: &'static str = if folder.depth == 0 {
-        "sidebar-folder-root"
+        "sidebar-folder"
     } else {
         "sidebar-folder-child"
     };

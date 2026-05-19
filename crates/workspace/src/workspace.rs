@@ -32,6 +32,7 @@ use gpui_component::{
 };
 use status_bar::StatusBar;
 use toasts::Toast;
+use ui::tree_dump::DumpAsExt as _;
 
 /// Height of the macOS native title-bar spacer inserted at the top
 /// of the workspace render tree, in logical points.
@@ -266,15 +267,41 @@ impl Render for TolariaWorkspace {
             // and the center group when one is attached
             // (`attach_note_list_column`) — matches the two-column
             // sidebar + note-list layout in `tolaria-demo-vault-v2.png`.
+            //
+            // Each panel child is wrapped in a tagged div so periscope
+            // can crop to e.g. `workspace-left-dock` via `screenshot --id`.
             .child({
                 let mut panels: Vec<gpui_component::resizable::ResizablePanel> =
-                    vec![resizable_panel().size(px(200.0)).child(left_dock)];
+                    vec![resizable_panel().size(px(200.0)).child(
+                        div()
+                            .size_full()
+                            .child(left_dock)
+                            .dump_as("workspace-left-dock"),
+                    )];
                 if let Some(view) = note_list_column {
-                    panels.push(resizable_panel().size(px(300.0)).child(view));
+                    panels.push(
+                        resizable_panel()
+                            .size(px(300.0))
+                            .child(div().size_full().child(view).dump_as("workspace-note-list")),
+                    );
                 }
-                panels.push(resizable_panel().child(center_group));
+                panels.push(
+                    resizable_panel().child(
+                        div()
+                            .size_full()
+                            .child(center_group)
+                            .dump_as("workspace-center"),
+                    ),
+                );
                 if let Some(right_dock) = right_dock {
-                    panels.push(resizable_panel().size(px(240.0)).child(right_dock));
+                    panels.push(
+                        resizable_panel().size(px(240.0)).child(
+                            div()
+                                .size_full()
+                                .child(right_dock)
+                                .dump_as("workspace-right-dock"),
+                        ),
+                    );
                 }
                 // `min_h_0` + `overflow_hidden` is the classic flex
                 // trick that lets this row shrink below its content's
@@ -290,11 +317,16 @@ impl Render for TolariaWorkspace {
                     .child(h_resizable("workspace-main-layout").children(panels))
             })
             // Bottom dock (empty placeholder in Phase 2a).
-            .child(self.bottom_dock.clone())
+            .child(
+                div()
+                    .child(self.bottom_dock.clone())
+                    .dump_as("workspace-bottom-dock"),
+            )
             // Status bar (Phase 2c — empty unless mock globals installed).
             .child(self.status_bar.clone())
             // Overlay layers rendered on top (absolute-positioned internally).
             .child(self.modal_layer.clone())
             .child(self.toast_layer.clone())
+            .dump_as("workspace")
     }
 }
