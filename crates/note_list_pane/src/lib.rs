@@ -853,7 +853,6 @@ impl Render for NoteListPane {
                                     .text_xs()
                                     .text_color(muted)
                                     .line_height(rems(1.4))
-                                    .overflow_hidden()
                                     .text_overflow(TextOverflow::Truncate("...".into()))
                                     .line_clamp(2)
                                     .child(snippet),
@@ -901,18 +900,23 @@ impl Render for NoteListPane {
                         .child(accent_strip)
                         .child(
                             // Horizontal padding halved (issue 012):
-                            // the React `NoteItem.tsx:334` uses
-                            // `padding: '14px 16px'`, but the user
-                            // wants the native row to read tighter.
-                            // Combined with the 2-pt accent strip
-                            // the visible text inset is 2 + 6 = 8 pt
-                            // from the row's left edge.
+                            // React `NoteItem.tsx:334` uses
+                            // `padding: '14px 16px'`, but the native
+                            // chrome target reads tighter.
+                            //
+                            // Split into `pl(6) / pr(8)` (issue 013)
+                            // so the visible text inset stays
+                            // symmetric across the row: the 2-pt
+                            // accent strip sits *outside* this
+                            // padded area, so left inset = 2 + 6 = 8
+                            // pt matches the right inset = 8 pt.
                             h_flex()
                                 .flex_1()
                                 .min_w_0()
                                 .items_start()
                                 .gap_2()
-                                .px(px(6.0))
+                                .pl(px(6.0))
+                                .pr(px(16.0))
                                 .py(px(10.0))
                                 .child(checkbox)
                                 .child(content),

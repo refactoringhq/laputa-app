@@ -407,3 +407,23 @@ each visible snippet wraps at a word boundary ("Areas are ongoing
 domains of responsibility / with no fixed end date.", "Owns sponsor
 outreach and makes the / responsibility/procedure relationships feel
 like r…") and the row text starts closer to the left edge.
+
+### 013 — Note row right padding clips trailing icons and date label
+
+**Reporter:** "Update note item right padding to match the left
+padding."
+
+**Diagnosis** — the issue 012 `px(6)` row padding is symmetric *inside*
+the inner h_flex, but the 2-pt leading accent strip sits *outside*
+it.  So the visible insets came out asymmetric: left = 2 + 6 = 8 pt,
+right = 6 pt.  The 2-pt deficit on the right clipped the last
+character of "Created May 3, 2026" and chopped the trailing 14-pt
+type icon on every row.
+
+**Status:** fixed.  Inner row padding split into `pl(6)` / `pr(8)`
+so the visible text inset is symmetric 8 / 8 across the row.
+Verified in
+[after-013-symmetric-padding.png](live-snapshots/after-013-symmetric-padding.png) —
+"Created May 3, 2026" renders fully, trailing per-type icons are
+flush with the right inset, and the selected Sponsorships row's
+green accent strip + tint reads cleanly.
