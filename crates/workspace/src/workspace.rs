@@ -99,6 +99,19 @@ impl TolariaWorkspace {
         // `StatusBar::from_or_empty` populates from mock globals if installed
         // (TOLARIA_MOCK=1 launches), or returns an empty bar otherwise.
         let status_bar = cx.new(|cx| StatusBar::from_or_empty(cx));
+
+        // Observe the left dock so the workspace re-renders when the
+        // sidebar toggle (visual-issue #020) flips
+        // `DockState::Open` ↔ `DockState::Closed`.  Without this, the
+        // dock's own `cx.notify()` only re-runs `Dock::render` (which
+        // returns an empty `div()` when closed) — the workspace's
+        // outer `render` is never called, so the resizable column
+        // stays 200 pt wide even though the sidebar contents
+        // disappeared.  Re-rendering the workspace lets the panels
+        // vec skip the left-dock entry entirely when `is_open()` is
+        // false, collapsing the column.
+        cx.observe(&left_dock, |_, _, cx| cx.notify()).detach();
+
         Self {
             title_bar,
             modal_layer,
@@ -209,7 +222,18 @@ impl TolariaWorkspace {
 impl Render for TolariaWorkspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let title_bar = self.title_bar.clone();
-        let left_dock = self.left_dock.clone();
+        // Visual-issue #020: drop the left-dock column entirely when
+        // the dock is closed, so the sidebar toggle collapses the
+        // resizable column instead of merely emptying its contents.
+        // The workspace's `cx.observe(&left_dock, …)` in
+        // [`TolariaWorkspace::empty`] triggers a re-render when
+        // `Dock::toggle` flips state, so this `is_open()` snapshot
+        // always reflects the latest toggle.
+        let left_dock = self
+            .left_dock
+            .read(cx)
+            .is_open()
+            .then(|| self.left_dock.clone());
         // Phase 7 visual-fidelity: hide the right dock entirely when
         // nothing is attached to it — the reference shows the editor
         // extending to the right edge of the window, and until
@@ -271,13 +295,17 @@ impl Render for TolariaWorkspace {
             // Each panel child is wrapped in a tagged div so periscope
             // can crop to e.g. `workspace-left-dock` via `screenshot --id`.
             .child({
-                let mut panels: Vec<gpui_component::resizable::ResizablePanel> =
-                    vec![resizable_panel().size(px(200.0)).child(
-                        div()
-                            .size_full()
-                            .child(left_dock)
-                            .dump_as("workspace-left-dock"),
-                    )];
+                let mut panels: Vec<gpui_component::resizable::ResizablePanel> = Vec::new();
+                if let Some(left_dock) = left_dock {
+                    panels.push(
+                        resizable_panel().size(px(200.0)).child(
+                            div()
+                                .size_full()
+                                .child(left_dock)
+                                .dump_as("workspace-left-dock"),
+                        ),
+                    );
+                }
                 if let Some(view) = note_list_column {
                     panels.push(
                         resizable_panel()
