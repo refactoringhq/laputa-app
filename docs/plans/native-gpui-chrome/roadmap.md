@@ -97,15 +97,30 @@ Two strands run in parallel:
   roadmap.  Each Strand B row adds the missing crate, shape-mirrored
   from the React component(s); `from_or_empty` is preserved so
   chrome continues to run on `TOLARIA_MOCK=1`.
+- **Strand C — editor-host body parity.** Phase 4b shipped the
+  editor-host (`editor-host/`, Vite single-file bundle embedded by
+  `note_item`) as a `<textarea>` MVP and explicitly deferred the
+  BlockNote + CodeMirror carry-over from the Tauri-era
+  `src/components/blockNote*.ts` / `src/extensions/*` /
+  `src/components/useEditor*.ts` modules to post-MVP.  No later
+  phase had picked this work up, so it lands here in Phase 8 as a
+  dedicated strand: the editor-host gains a real rich editor body
+  (BlockNote with the existing slash-menu, side-menu, formatting
+  toolbar, link-click, suggestion-menu, code-block control, table
+  handles, copy compatibility, and IME composition behavior) plus
+  the CodeMirror fallback for non-Markdown files.  Wiring stays on
+  the existing `editor_bridge` envelope — no new `ToHost` /
+  `FromHost` variants land here unless an existing React behavior
+  demonstrably requires one.
 
-Lands as commit-per-row.  Strand A and Strand B can interleave —
-they share no merge dependencies.  Several Strand A rows depend on
-crates from **Phase 9** (the behavioral-layer extraction): e.g.
-`actions` (8.13) consumes Phase 9.1 `command_registry`;
-`note_list_pane` (8.2) and `folder_tree` (8.17) both consume Phase
-9.3 `multi_select`.  For those rows, stub the Phase 9 dependency
-locally in Phase 8 and back-fill in Phase 9 — or land the Phase 9
-row first.
+Lands as commit-per-row.  Strand A, Strand B, and Strand C can
+interleave — they share no merge dependencies.  Several Strand A
+rows depend on crates from **Phase 9** (the behavioral-layer
+extraction): e.g. `actions` (8.13) consumes Phase 9.1
+`command_registry`; `note_list_pane` (8.2) and `folder_tree` (8.17)
+both consume Phase 9.3 `multi_select`.  For those rows, stub the
+Phase 9 dependency locally in Phase 8 and back-fill in Phase 9 —
+or land the Phase 9 row first.
 
 #### Strand A — stub completion (existing crates → wired)
 
@@ -139,6 +154,54 @@ row first.
 | 8.21 | `rendering_primitives` — non-editor rendering surfaces | `MarkdownContent.tsx`, `SafeMarkup.tsx`, `MermaidDiagram.tsx`, `TldrawWhiteboard.tsx`, `FilePreview.tsx` |
 | 8.22 | `onboarding_prompts` — in-app prompts (distinct from Phase 11.7 `startup` first-run screens) | `AiAgentsOnboardingPrompt.tsx`, `ClaudeCodeOnboardingPrompt.tsx`, `OnboardingShell.tsx`, `TelemetryConsentDialog.tsx` |
 | 8.23 | `ai_panel` | Mutable input buffer + send dispatch; thread mutation; tool-call rendering | `AiPanel.tsx`, `AiMessage.tsx` |
+
+#### Strand C — editor-host body parity (BlockNote + CodeMirror carry-over)
+
+Lifts the rich-editor body from the Tauri-era TypeScript into the
+`editor-host/` Vite project introduced in Phase 4b.  Phase 4b
+intentionally shipped a `<textarea>` MVP and deferred this work as
+"BlockNote+CodeMirror carry-over from `src/` deferred to post-MVP"
+([`progress.md` Phase 4 entry](progress.md#phase-4--editor-host-integration));
+no later phase had picked it up before this revision.  Each row
+lands as its own commit; all share the existing `editor_bridge`
+envelope (no new `ToHost` / `FromHost` variants unless an existing
+React behavior demonstrably requires one).
+
+| # | Editor-host slice | What gets ported (from `src/` Tauri-era) | TypeScript reference |
+|---|-------------------|------------------------------------------|----------------------|
+| 8.24 | BlockNote core mount | Replace the Phase-4b `<textarea>` with a real BlockNote editor instance bound to the `editor_bridge` envelope (`NoteOpen` → `editor.replaceBlocks(...)`, content change → `Dirty`, `SaveRequest` → markdown serialization → `Save`) | `App.tsx` (`@blocknote/*` mount), `src/utils/richEditorMarkdown.ts`, `src/components/tolariaEditorFormattingConfig.ts` |
+| 8.25 | Slash menu + side menu + formatting toolbar | Port the suggestion / side / formatting menus, including the hover-guard fixes that suppress menus when the cursor leaves the block | `blockNoteSideMenuHoverGuard.{ts,test.ts}`, `blockNoteFormattingToolbarHoverGuard.{ts,test.ts,extra.test.ts}`, `tolariaBlockNoteSideMenu.test.tsx`, `blockNoteSideMenu.regression.test.ts` |
+| 8.26 | Wikilink suggestion menu + link-click + cursor target | Wikilink autocomplete, click-to-navigate (routes through `editor_bridge::FromHost::LinkClick` already wired in Phase 8.3), cursor-target restoration after edit | `blockNoteCursorTarget.ts`, `blockNoteSuggestionMenu.regression.test.ts`, `blockNoteSuggestionWrapper.regression.test.tsx`, `blockNoteLinkClick.regression.test.ts`, `useEditorLinkActivation.{ts,test.tsx}`, `src/utils/suggestionEnrichment.{ts,test.ts}` |
+| 8.27 | IME composition + render-recovery + transform-error guard | macOS IME mid-composition handling (Phase 0 §6 trigger #2), render-recovery for prosemirror state corruption, ProseMirror transform-error recovery extension | `useEditorComposing.ts`, `imeCompositionKeyGuardExtension.ts`, `blockNoteRenderRecovery.{ts,test.ts}`, `richEditorTransformErrorRecoveryExtension.ts` |
+| 8.28 | Code-block control, table handles, copy compatibility, checklist | Carry over the four BlockNote behavior regressions locked in by `src/lib/blockNote*.regression.test.ts` so the GPUI port doesn't regress against React parity | `blockNoteCodeBlockControl.regression.test.ts`, `blockNoteTableHandles.regression.test.ts`, `blockNoteCopyCompatibility.regression.test.ts`, `blockNoteChecklist.regression.test.ts`, `blockNotePopover.regression.test.ts` |
+| 8.29 | CodeMirror raw-mode fallback inside the editor-host | Port the CodeMirror raw-editor pipeline (markdown + frontmatter highlight, zoom cursor fix, raw-editor utilities) into the editor-host so non-BlockNote-shaped notes render with the same behavior as the React `RawEditorView`.  Coordinates with Strand B 8.16 `raw_editor`: 8.29 owns the embedded WKWebView path; 8.16 covers any chrome glue / find-bar that lives on the GPUI side | `src/extensions/markdownHighlight.{ts,test.ts}`, `src/extensions/frontmatterHighlight.{ts,test.ts}`, `src/extensions/zoomCursorFix.{ts,behavior.test.ts,extra.test.ts}`, `src/utils/rawEditorUtils.ts`, `RawEditorView.{tsx,test.tsx}`, `RawEditorFindBar.tsx` |
+| 8.30 | Editor mode / tab-swap / focus / save hand-offs | Port the editor lifecycle hooks that coordinate BlockNote ↔ raw-mode switching, tab-swap state preservation, focus restoration, save-with-links rename ripple, and the memory-probe controller used to detect WebView OOMs | `useEditorModePositionSync.{ts,test.tsx}`, `useEditorTabSwap.{ts,test.ts,selection.test.ts,rename.test.ts,performance.test.ts}`, `useEditorFocus.{ts,test.ts}`, `useEditorSave.{ts,test.ts}`, `useEditorSaveWithLinks.{ts,test.ts}`, `useEditorMemoryProbeController.ts`, `src/components/editor-content/useEditorContentModel.ts` |
+
+**Strand C verification (in addition to the global Phase 8 exit
+criteria):**
+
+- Each editor-host slice ships **Vitest** coverage inside
+  `editor-host/` mirroring the React tests it replaces.  No test is
+  allowed to be dropped silently — if a React test does not port
+  (e.g., because the underlying behavior is now natively handled
+  by GPUI instead of the WebView), `progress.md` records the
+  rationale in the per-row entry.
+- Each slice ships at least one **periscope smoke** capture that
+  exercises the behavior end-to-end through a real WKWebView
+  (slash-menu open + insert, side-menu drag, formatting toolbar
+  bold, wikilink suggestion + click, IME composition, raw-mode
+  switch, save round-trip).  These are explicitly the kind of
+  paths the global criteria reserves for periscope (round-trip
+  through the embedded WebView).
+- The `editor-host/` single-file bundle stays embedded by
+  `note_item` via `include_str!()`.  If the bundle grows past the
+  Phase 4b size of ~3.95 kB by more than 5× (i.e., past ~20 kB),
+  record the new size in `progress.md` alongside the commit so
+  startup-cost regressions are visible.
+- Bridge-envelope churn is logged: if a slice forces a new
+  `ToHost` / `FromHost` variant, the row's entry calls it out and
+  links the `editor_bridge` test that locks in the snake_case wire
+  shape.
 
 **Exit criteria:**
 
