@@ -9,9 +9,9 @@ export interface ParsedNoteBlockCacheEntry {
   vaultPath?: string
 }
 
-export const PARSED_NOTE_BLOCK_CACHE_LIMIT = 16
-export const PARSED_NOTE_BLOCK_ENTRY_MAX_BYTES = 2 * 1024 * 1024
-export const PARSED_NOTE_BLOCK_CACHE_MAX_SOURCE_BYTES = 12 * 1024 * 1024
+export const PARSED_NOTE_BLOCK_CACHE_LIMIT = 6
+export const PARSED_NOTE_BLOCK_ENTRY_MAX_BYTES = 768 * 1024
+export const PARSED_NOTE_BLOCK_CACHE_MAX_SOURCE_BYTES = 3 * 1024 * 1024
 
 const parsedBlockCache = new Map<string, ParsedNoteBlockCacheEntry>()
 const sourceSizeEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null

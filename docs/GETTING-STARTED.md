@@ -151,7 +151,7 @@ tolaria/
 │   │   ├── useNoteRename.ts     # Note renaming + wikilink updates
 │   │   ├── useCliAiAgent.ts      # Selected AI agent state + normalized session pipeline
 │   │   ├── aiAgentPermissionMode.ts # Safe/Power User mode normalization + labels
-│   │   ├── useAiAgentsStatus.ts  # Claude/Codex/OpenCode/Pi/Gemini availability polling
+│   │   ├── useAiAgentsStatus.ts  # Claude/Codex/OpenCode/Pi/Gemini/Kiro availability polling
 │   │   ├── useAiAgentPreferences.ts # Default-agent persistence + cycling
 │   │   ├── useAiActivity.ts      # MCP UI bridge listener
 │   │   ├── useAutoSync.ts        # Auto git pull/push
@@ -231,6 +231,7 @@ tolaria/
 │   │   ├── claude_cli.rs         # Claude CLI adapter
 │   │   ├── codex_cli.rs          # Codex CLI adapter
 │   │   ├── pi_cli.rs             # Pi CLI adapter
+│   │   ├── kiro_cli.rs           # Kiro CLI adapter
 │   │   ├── mcp.rs                # MCP server lifecycle + explicit config registration/removal
 │   │   ├── app_updater.rs        # Alpha/stable updater metadata resolution
 │   │   ├── settings.rs           # App settings persistence
@@ -239,7 +240,7 @@ tolaria/
 │   │   └── menu.rs               # Native macOS menu bar
 │   └── icons/                    # App icons
 │
-├── mcp-server/                   # MCP bridge (Node.js)
+├── mcp-server/                   # MCP bridge (Node.js or Bun)
 │   ├── index.js                  # MCP server entry (stdio, 14 tools)
 │   ├── vault.js                  # Vault file operations
 │   ├── ws-bridge.js              # WebSocket bridge (ports 9710, 9711)
@@ -307,7 +308,7 @@ tolaria/
 | `src-tauri/src/search.rs` | Keyword search — scans vault files with walkdir. |
 | `src-tauri/src/ai_agents.rs` | CLI-agent request normalization, availability aggregation, adapter dispatch, and Claude event mapping. |
 | `src-tauri/src/cli_agent_runtime.rs` | Shared CLI-agent request shape, prompt wrapping, JSON subprocess lifecycle, version probing, and MCP path helpers. |
-| `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/pi_cli.rs`, `src-tauri/src/gemini_cli.rs` | Per-agent command, config, discovery, and JSON event adapters. |
+| `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/pi_cli.rs`, `src-tauri/src/gemini_cli.rs`, `src-tauri/src/kiro_cli.rs` | Per-agent command, config, discovery, and event adapters. |
 | `src-tauri/src/app_updater.rs` | Desktop updater bridge — resolves alpha/stable manifests and streams install progress. |
 
 ### Editor
@@ -467,12 +468,12 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 3. **Tool action display**: Edit `src/components/AiActionCard.tsx`
 4. **Permission-mode UI and request plumbing**: Edit `src/lib/aiAgentPermissionMode.ts`, `src/components/AiPanel*.tsx`, `src/hooks/useCliAiAgent.ts`, and `src/utils/streamAiAgent.ts`
 5. **Shared CLI runtime behavior**: Edit `src-tauri/src/cli_agent_runtime.rs` for process lifecycle, prompt wrapping, version probing, and common Tolaria MCP path handling.
-6. **Agent-specific arguments/events**: Edit the per-agent adapter modules (`claude_cli.rs`, `codex_cli.rs`, `opencode_*`, `pi_*`, `gemini_*`). Keep Codex Safe on `read-only` + `untrusted` and Codex Power User on active-vault `workspace-write` + `never`, keep Pi and Gemini on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode. Pi's transient agent directory must be seeded from the user's existing Pi agent directory before Tolaria MCP is merged so standalone provider/auth setup keeps working. Gemini Power User intentionally uses Gemini's `yolo` mode per ADR-0103.
+6. **Agent-specific arguments/events**: Edit the per-agent adapter modules (`claude_cli.rs`, `codex_cli.rs`, `opencode_*`, `pi_*`, `gemini_*`, `kiro_*`). Keep Codex Safe on `read-only` + `untrusted` and Codex Power User on active-vault `workspace-write` + `never`, keep Pi, Gemini, and Kiro on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode. Pi's transient agent directory must be seeded from the user's existing Pi agent directory before Tolaria MCP is merged so standalone provider/auth setup keeps working. Gemini Power User intentionally uses Gemini's `yolo` mode per ADR-0103. Kiro receives prompt content over stdin and writes Tolaria MCP config into `.kiro/settings/mcp.json` in the active vault.
 
 ### Work with external MCP setup
 
-1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs` and its `src-tauri/src/mcp/` helpers; registration and manual config generation must verify Node.js first, resolve the packaged `mcp-server/` for macOS, Windows executable-adjacent installs such as `%LOCALAPPDATA%\Tolaria`, Linux package roots (`/usr/local/Tolaria`, `/usr/local/lib/tolaria`, `/usr/lib/tolaria`, `/usr/lib/tolaria/resources`), and AppImage installs, and use a vault-neutral entry with `WS_UI_PORT=9711`. Linux AppImage startup must extract `mcp-server/` to `~/.local/share/tolaria/mcp-server/` before durable registration uses that stable path. App-owned bridge launches still pass `VAULT_PATH`/`VAULT_PATHS`; durable external registrations rely on the Node MCP server reading `vaults.json` at tool-call time.
-2. **Setup dialog copy/actions**: Edit `src/components/McpSetupDialog.tsx` and `src/hooks/useMcpStatus.ts`; users should see the Node.js prerequisite, the exact generated manual config, and a copy action before Tolaria writes third-party config files
+1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs` and its `src-tauri/src/mcp/` helpers; registration and manual config generation must resolve an MCP runtime via `find_mcp_runtime` (Node.js 18+ preferred, Bun 1+ fallback) first, resolve the packaged `mcp-server/` for macOS, Windows executable-adjacent installs such as `%LOCALAPPDATA%\Tolaria`, Linux package roots (`/usr/local/Tolaria`, `/usr/local/lib/tolaria`, `/usr/lib/tolaria`, `/usr/lib/tolaria/resources`), and AppImage installs, and use a vault-neutral entry with `WS_UI_PORT=9711`. Linux AppImage startup must extract `mcp-server/` to `~/.local/share/tolaria/mcp-server/` before durable registration uses that stable path. App-owned bridge launches still pass `VAULT_PATH`/`VAULT_PATHS`; durable external registrations rely on the MCP server reading `vaults.json` at tool-call time.
+2. **Setup dialog copy/actions**: Edit `src/components/McpSetupDialog.tsx` and `src/hooks/useMcpStatus.ts`; users should see the runtime prerequisite (Node.js 18+ or Bun 1+), the exact generated manual config, and a copy action before Tolaria writes third-party config files
 3. **Status hook/toasts**: Edit `src/hooks/useMcpStatus.ts` when setup, reconnect, disconnect, or failure messaging changes
 4. **Gemini CLI compatibility**: Keep `~/.gemini/settings.json` in the registration path list and keep optional `GEMINI.md` generation behind `restore_vault_ai_guidance`; app-managed Gemini sessions still require the user to install and sign in to Gemini CLI, but Tolaria supplies transient MCP settings when Gemini is selected as the default AI agent
 5. **OpenCode compatibility**: Keep `~/.config/opencode/opencode.json` in durable registration. OpenCode uses the top-level `mcp` key, `command` as an array, `environment` for env vars, `type: "local"`, and `enabled: true`; it must remain vault-neutral like the standard `mcpServers` entry.

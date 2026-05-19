@@ -74,6 +74,7 @@ import {
 import { createViewFilename } from './utils/viewFilename'
 import { nextViewOrder } from './utils/viewOrdering'
 import { viewMatchesSelection, viewVaultPath } from './utils/viewIdentity'
+import { viewCreationVaultPath } from './utils/viewTargetVault'
 import { ConflictResolverModal } from './components/ConflictResolverModal'
 import { ConfirmDeleteDialog } from './components/ConfirmDeleteDialog'
 import { DeleteProgressNotice } from './components/DeleteProgressNotice'
@@ -129,6 +130,7 @@ import { useVaultRenameDetection } from './hooks/useVaultRenameDetection'
 import { useVaultOpenedTelemetry } from './hooks/useVaultOpenedTelemetry'
 import { useStartupScreenState } from './hooks/useStartupScreenState'
 import { useGitFileWorkflows } from './hooks/useGitFileWorkflows'
+import { useAutoGitWork } from './hooks/useAutoGitWork'
 import './App.css'
 
 const ACTIVE_EDITOR_SURFACE_SELECTOR = '.editor__blocknote-container, .raw-editor-codemirror'
@@ -481,6 +483,7 @@ function App() {
   const loadDefaultVaultModifiedFiles = vault.loadModifiedFiles
   const loadAllGitModifiedFiles = gitSurfaces.loadAllModifiedFiles
   const loadModifiedFilesForRepository = gitSurfaces.loadModifiedFilesForRepository
+  const refreshAllGitRemoteStatuses = gitSurfaces.refreshAllRemoteStatuses
   const refreshRemoteStatusForRepository = gitSurfaces.refreshRemoteStatusForRepository
   const refreshGitRemoteStatus = useCallback(
     () => refreshRemoteStatusForRepository(resolvedPath),
@@ -500,7 +503,8 @@ function App() {
     if (gitRepoState !== 'ready') return
     void loadVaultModifiedFiles()
     void refreshGitRemoteStatus()
-  }, [gitFeaturesEnabled, gitRepoState, loadVaultModifiedFiles, refreshGitRemoteStatus])
+    void refreshAllGitRemoteStatuses()
+  }, [gitFeaturesEnabled, gitRepoState, loadVaultModifiedFiles, refreshAllGitRemoteStatuses, refreshGitRemoteStatus])
 
   const openMcpSetupDialog = useCallback(() => {
     setShowMcpSetupDialog(true)
@@ -985,17 +989,22 @@ function App() {
   })
   const suggestedCommitMessage = useMemo(() => generateCommitMessage(commitModifiedFiles), [commitModifiedFiles])
   const isGitVault = gitFeaturesEnabled && gitRepoState !== 'missing'
-  const modifiedFilesSignature = useMemo(
-    () => allGitModifiedFiles.map((file) => `${file.vaultPath ?? ''}:${file.relativePath}:${file.status}`).sort().join('|'),
-    [allGitModifiedFiles],
-  )
+  const {
+    activitySignature: autoGitActivitySignature,
+    hasPendingWork: autoGitHasPendingWork,
+  } = useAutoGitWork({
+    activeRemoteStatus: autoSync.remoteStatus,
+    activeVaultPath: resolvedPath,
+    modifiedFiles: allGitModifiedFiles,
+    repositoryPaths: activeGitRepositoryPaths,
+    remoteStatusForRepository: gitSurfaces.remoteStatusForRepository,
+  })
   const autoGit = useAutoGit({
     enabled: settings.autogit_enabled === true,
     idleThresholdSeconds: settings.autogit_idle_threshold_seconds ?? 90,
     inactiveThresholdSeconds: settings.autogit_inactive_threshold_seconds ?? 30,
     isGitVault,
-    hasPendingChanges: gitModifiedCount > 0
-      || ((autoSync.remoteStatus?.hasRemote ?? false) && (autoSync.remoteStatus?.ahead ?? 0) > 0),
+    hasPendingChanges: autoGitHasPendingWork,
     hasUnsavedChanges: vault.unsavedPaths.size > 0,
     onCheckpoint: () => commitFlow.runAutomaticCheckpoint(),
   })
@@ -1013,9 +1022,9 @@ function App() {
   }, [changesRepositoryPath, gitFeaturesEnabled, isChangesSelection, loadModifiedFilesForRepository])
 
   useEffect(() => {
-    if (modifiedFilesSignature.length === 0) return
+    if (autoGitActivitySignature.length === 0) return
     recordAutoGitActivity()
-  }, [modifiedFilesSignature, recordAutoGitActivity])
+  }, [autoGitActivitySignature, recordAutoGitActivity])
 
   const handleCommitPush = useCallback(() => {
     if (!gitFeaturesEnabled) return
@@ -1168,8 +1177,13 @@ function App() {
 
   const handleCreateOrUpdateView = useCallback(async (definition: ViewDefinition) => {
     const editing = dialogs.editingView
-    const activeVaultViews = viewsForVault(vault.views, resolvedPath)
-    const targetVaultPath = editing?.rootPath ?? resolvedPath
+    const targetVaultPath = viewCreationVaultPath({
+      editingRootPath: editing?.rootPath,
+      fallbackVaultPath: resolvedPath,
+      graphDefaultWorkspacePath,
+      multiWorkspaceEnabled,
+    })
+    const activeVaultViews = viewsForVault(vault.views, targetVaultPath)
     const filename = savedViewFilename(definition, editing, activeVaultViews)
     const nextDefinition = savedViewDefinition(definition, editing, activeVaultViews)
     const target = isTauri() ? invoke : mockInvoke
@@ -1190,7 +1204,7 @@ function App() {
       setToastMessage(`Could not save view: ${message}`)
       return false
     }
-  }, [resolvedPath, vault, handleSetSelection, dialogs.editingView, setToastMessage])
+  }, [graphDefaultWorkspacePath, multiWorkspaceEnabled, resolvedPath, vault, handleSetSelection, dialogs.editingView, setToastMessage])
 
   const handleUpdateViewDefinition = useCallback(async (filename: string, patch: Partial<ViewDefinition>, rootPath?: string) => {
     const existing = vault.views.find((view) => viewMatchesSelection(view, viewSelection(filename, rootPath)))

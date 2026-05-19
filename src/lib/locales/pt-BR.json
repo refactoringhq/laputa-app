@@ -313,7 +313,7 @@
   "mcp.setup.disconnect": "Desconectar",
   "mcp.setup.connecting": "Conectando…",
   "mcp.setup.disconnecting": "Desconectando…",
-  "mcp.setup.nodeRequirement": "Esta configuração requer o Node.js 18 ou superior no PATH e uma ferramenta de desktop compatível com MCP. O Tolaria verifica o Node.js antes de gravar a configuração para que a ferramenta não fique apontando para um comando inválido.",
+  "mcp.setup.runtimeRequirement": "Esta configuração requer o Node.js 18+ ou o Bun 1+ no PATH e uma ferramenta de desktop compatível com MCP. O Tolaria verifica o runtime antes de gravar a configuração para que a ferramenta não fique apontando para um comando inválido.",
   "mcp.setup.writeEntryDescription": "Ao confirmar esta ação, a única entrada MCP {entry} do Tolaria será gravada ou atualizada em:",
   "mcp.setup.clientPathsDescription": "A CLI do Claude Code lê ~/.claude.json, a CLI do Gemini lê ~/.gemini/settings.json, o Cursor lê ~/.cursor/mcp.json e o caminho genérico ~/.config/mcp/mcp.json é usado por outras ferramentas compatíveis com MCP. Ao fechar o aplicativo, todos os arquivos permanecem inalterados, a menos que você se conecte ou se desconecte. A reconexão é idempotente, e a desconexão remove novamente a entrada do Tolaria.",
   "mcp.setup.geminiGuidanceDescription": "A CLI do Gemini precisa de instalação e login próprios. Use Restore Tolaria AI Guidance quando quiser um shim de compatibilidade com GEMINI.md na raiz do cofre que direcione o Gemini de volta para as instruções compartilhadas do AGENTS.md sem substituir a orientação personalizada.",
@@ -658,5 +658,7 @@
   "locale.jaJP": "Japonês",
   "locale.koKR": "Coreano",
   "locale.vi": "Vietnamita",
-  "locale.plPL": "Polonês"
+  "locale.plPL": "Polonês",
+  "locale.beBY": "Bielorrusso",
+  "locale.beLatn": "Bielorrusso (Latim)"
 }

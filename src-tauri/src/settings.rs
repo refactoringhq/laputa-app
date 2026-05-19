@@ -6,7 +6,8 @@ use crate::ai_models::{normalize_ai_model_providers, AiModelProvider};
 
 const APP_CONFIG_DIR: &str = "com.tolaria.app";
 const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
-const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &["claude_code", "codex", "opencode", "pi", "gemini"];
+const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] =
+    &["claude_code", "codex", "opencode", "pi", "gemini", "kiro"];
 pub const DEFAULT_HIDE_GITIGNORED_FILES: bool = true;
 const SUPPORTED_NOTE_WIDTH_MODES: &[&str] = &["normal", "wide"];
 const SUPPORTED_DATE_DISPLAY_FORMATS: &[&str] = &["us", "european", "friendly", "iso"];

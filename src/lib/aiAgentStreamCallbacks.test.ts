@@ -116,6 +116,35 @@ describe('aiAgentStreamCallbacks', () => {
     ])
   })
 
+  it('truncates large tool output retained in message history', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Question',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onToolStart('Bash', 'tool-1')
+    callbacks.onToolDone('tool-1', 'x'.repeat(20_050))
+
+    const output = messages.getMessages()[0].actions[0].output
+    expect(output?.length).toBeLessThan(20_050)
+    expect(output).toContain('[Tool output truncated: 50 chars omitted]')
+  })
+
   it('marks pending actions as failed when the stream errors', () => {
     const messages = createMessageStore([
       {

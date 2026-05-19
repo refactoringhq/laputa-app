@@ -13,6 +13,7 @@ describe('aiAgents helpers', () => {
     expect(normalizeStoredAiAgent('opencode')).toBe('opencode')
     expect(normalizeStoredAiAgent('pi')).toBe('pi')
     expect(normalizeStoredAiAgent('gemini')).toBe('gemini')
+    expect(normalizeStoredAiAgent('kiro')).toBe('kiro')
     expect(normalizeStoredAiAgent('cursor')).toBeNull()
   })
 
@@ -42,6 +43,7 @@ describe('aiAgents helpers', () => {
     expect(getNextAiAgentId('codex')).toBe('opencode')
     expect(getNextAiAgentId('opencode')).toBe('pi')
     expect(getNextAiAgentId('pi')).toBe('gemini')
-    expect(getNextAiAgentId('gemini')).toBe('claude_code')
+    expect(getNextAiAgentId('gemini')).toBe('kiro')
+    expect(getNextAiAgentId('kiro')).toBe('claude_code')
   })
 })

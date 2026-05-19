@@ -47,9 +47,9 @@ const prefetchQueue: NoteContentCacheEntry[] = []
 const resolvedListeners = new Set<NoteContentResolvedListener>()
 const contentSizeEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null
 
-export const NOTE_CONTENT_CACHE_LIMIT = 48
-export const NOTE_CONTENT_ENTRY_MAX_BYTES = 2 * 1024 * 1024
-export const NOTE_CONTENT_CACHE_MAX_BYTES = 24 * 1024 * 1024
+export const NOTE_CONTENT_CACHE_LIMIT = 24
+export const NOTE_CONTENT_ENTRY_MAX_BYTES = 1024 * 1024
+export const NOTE_CONTENT_CACHE_MAX_BYTES = 8 * 1024 * 1024
 export const NOTE_CONTENT_PREFETCH_CONCURRENCY = 4
 const NOTE_CONTENT_REQUEST_CANCELED = 'Note content request canceled'
 const NOTE_CONTENT_LOAD_RETRY_DELAYS_MS = [120, 320, 800] as const

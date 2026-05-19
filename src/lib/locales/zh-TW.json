@@ -313,7 +313,7 @@
   "mcp.setup.disconnect": "中斷連線",
   "mcp.setup.connecting": "正在連線…",
   "mcp.setup.disconnecting": "正在中斷連線…",
-  "mcp.setup.nodeRequirement": "此設定需要在 PATH 中設定 Node.js 18 以上版本，並使用與 MCP 相容的桌面工具。Tolaria 會在寫入設定之前檢查 Node.js，以確保工具不會指向無效的命令。",
+  "mcp.setup.runtimeRequirement": "此設定需要在 PATH 中設定 Node.js 18+ 或 Bun 1+，並使用與 MCP 相容的桌面工具。Tolaria 會在寫入設定之前檢查執行階段，以確保工具不會指向無效的命令。",
   "mcp.setup.writeEntryDescription": "確認此操作將寫入或更新 Tolaria 在以下位置的單一 {entry} MCP 條目：",
   "mcp.setup.clientPathsDescription": "Claude Code CLI 會讀取 ~/.claude.json，Gemini CLI 會讀取 ~/.gemini/settings.json，Cursor 會讀取 ~/.cursor/mcp.json，而其他與 MCP 相容的工具則會讀取通用的 ~/.config/mcp/mcp.json 路徑。關閉後，除非您連線或中斷連線，否則所有檔案都不會受到影響。重新連線是等同於初始狀態的操作，而中斷連線會再次移除 Tolaria 的條目。",
   "mcp.setup.geminiGuidanceDescription": "Gemini CLI 需要單獨安裝並登入。當您希望有一個 Vault 根目錄的 GEMINI.md 相容性輔助層，能夠在不覆寫自訂指南的情況下將 Gemini 重新導向至共享的 AGENTS.md 指示時，請使用「Restore Tolaria AI Guidance」。",
@@ -658,5 +658,7 @@
   "locale.jaJP": "日語",
   "locale.koKR": "韓語",
   "locale.vi": "越南文",
-  "locale.plPL": "波蘭語"
+  "locale.plPL": "波蘭語",
+  "locale.beBY": "白俄羅斯語",
+  "locale.beLatn": "白俄羅斯語（拉丁語）"
 }

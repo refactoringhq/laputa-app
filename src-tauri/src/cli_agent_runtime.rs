@@ -455,6 +455,97 @@ where
     Ok(run.session_id)
 }
 
+/// Shared binary discovery: look up a CLI command by name using PATH, login shell, then candidates.
+pub(crate) fn find_cli_binary(
+    name: &str,
+    candidates: Vec<PathBuf>,
+    label: &str,
+    install_hint: &str,
+) -> Result<PathBuf, String> {
+    if let Some(binary) = find_binary_on_path(name) {
+        return Ok(binary);
+    }
+    if let Some(binary) = find_binary_in_user_shell(name) {
+        return Ok(binary);
+    }
+    if let Some(binary) = find_executable_binary_candidate(candidates, label)? {
+        return Ok(binary);
+    }
+    Err(format!("{label} not found. Install it: {install_hint}"))
+}
+
+fn find_binary_on_path(name: &str) -> Option<PathBuf> {
+    let cmd = if cfg!(windows) { "where" } else { "which" };
+    crate::hidden_command(cmd)
+        .arg(name)
+        .output()
+        .ok()
+        .and_then(|output| path_from_successful_output(&output))
+}
+
+fn find_binary_in_user_shell(name: &str) -> Option<PathBuf> {
+    shell_candidates()
+        .into_iter()
+        .filter(|shell| shell.exists())
+        .find_map(|shell| command_path_from_shell(&shell, name))
+}
+
+fn shell_candidates() -> Vec<PathBuf> {
+    let mut shells = Vec::new();
+    if let Some(shell) = std::env::var_os("SHELL") {
+        if !shell.is_empty() {
+            shells.push(PathBuf::from(shell));
+        }
+    }
+    shells.push(PathBuf::from("/bin/zsh"));
+    shells.push(PathBuf::from("/bin/bash"));
+    shells
+}
+
+fn command_path_from_shell(shell: &Path, command: &str) -> Option<PathBuf> {
+    crate::hidden_command(shell)
+        .arg("-lc")
+        .arg(format!("command -v {command}"))
+        .output()
+        .ok()
+        .and_then(|output| path_from_successful_output(&output))
+}
+
+fn path_from_successful_output(output: &std::process::Output) -> Option<PathBuf> {
+    if output.status.success() {
+        first_existing_path(&String::from_utf8_lossy(&output.stdout))
+    } else {
+        None
+    }
+}
+
+pub(crate) fn first_existing_path(stdout: &str) -> Option<PathBuf> {
+    stdout.lines().find_map(|line| {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let candidate = PathBuf::from(trimmed);
+        candidate.exists().then_some(candidate)
+    })
+}
+
+/// Shared check_cli pattern for CLI agents.
+pub(crate) fn check_cli_availability(
+    find_binary: impl FnOnce() -> Result<PathBuf, String>,
+) -> crate::ai_agents::AiAgentAvailability {
+    match find_binary() {
+        Ok(binary) => crate::ai_agents::AiAgentAvailability {
+            installed: true,
+            version: version_for_binary(&binary),
+        },
+        Err(_) => crate::ai_agents::AiAgentAvailability {
+            installed: false,
+            version: None,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

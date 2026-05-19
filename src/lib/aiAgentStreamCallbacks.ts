@@ -13,6 +13,8 @@ import {
   trackAiAgentResponseFailed,
 } from './productAnalytics'
 
+const MAX_RETAINED_TOOL_OUTPUT_CHARS = 20_000
+
 export interface StreamMutationContext {
   agent: AiAgentId
   messageId: string
@@ -37,6 +39,16 @@ function finalResponseText(response: string, agent: AiAgentId): string {
   }
 
   return `${getAiAgentDefinition(agent).label} finished without returning a reply.`
+}
+
+function retainedToolOutput(output: string | undefined): string | undefined {
+  if (!output || output.length <= MAX_RETAINED_TOOL_OUTPUT_CHARS) return output
+
+  const omitted = output.length - MAX_RETAINED_TOOL_OUTPUT_CHARS
+  return [
+    output.slice(0, MAX_RETAINED_TOOL_OUTPUT_CHARS),
+    `[Tool output truncated: ${omitted} chars omitted]`,
+  ].join('\n\n')
 }
 
 export function createStreamCallbacks(context: StreamMutationContext) {
@@ -97,7 +109,9 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       updateMessage(setMessages, messageId, (message) => ({
         ...message,
         actions: message.actions.map((action) => (
-          action.toolId === toolId ? { ...action, status: 'done' as const, output } : action
+          action.toolId === toolId
+            ? { ...action, status: 'done' as const, output: retainedToolOutput(output) }
+            : action
         )),
       }))
     },

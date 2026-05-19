@@ -813,7 +813,7 @@ Vault guidance is intentionally short and vault-specific. General Tolaria produc
 `useAiAgentsOnboarding(enabled)` adds a separate first-launch agent step:
 - Reads a local dismissal flag for the AI agents prompt (with a legacy fallback to the older Claude-only key)
 - Only shows after vault onboarding has already resolved to a ready state
-- Uses `get_ai_agents_status`, whose backend treats the app process path, login-shell path, and supported local/toolchain/app install locations, including nvm-managed Node installs plus Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
+- Uses `get_ai_agents_status`, whose backend checks Claude Code, Codex, OpenCode, Pi, Gemini, and Kiro by treating the app process path, login-shell path, and supported local/toolchain/app install locations, including nvm-managed Node installs plus Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
 - Persists dismissal locally once the user continues
 
 ### Remote Git Operations
@@ -822,7 +822,7 @@ Tolaria delegates remote auth to the user's system git setup:
 - `CloneVaultModal` captures a remote URL and local destination
 - `clone_git_repo` and `create_getting_started_vault` both run system git clone work in blocking Tokio tasks so clone UIs stay responsive
 - On macOS, system-git commands prefer the user's login-shell `git` and `PATH`, and `git_add_remote` preflights HTTPS remotes through `git credential fill` so Keychain can prompt/grant access before the first fetch or push
-- On Linux AppImage launches, every system-git command and MCP Node subprocess removes AppImage loader overrides such as `LD_LIBRARY_PATH`, `LD_PRELOAD`, and `GIT_EXEC_PATH` before spawning, so helpers like `git-remote-https` and system `node` bind against the host library stack instead of Tolaria's bundled WebKit/AppImage libraries
+- On Linux AppImage launches, every system-git command and MCP runtime subprocess (Node.js or Bun) removes AppImage loader overrides such as `LD_LIBRARY_PATH`, `LD_PRELOAD`, and `GIT_EXEC_PATH` before spawning, so helpers like `git-remote-https` and the system MCP runtime bind against the host library stack instead of Tolaria's bundled WebKit/AppImage libraries
 - On native Linux Wayland launches and Linux AppImage launches, startup environment safeguards set `WEBKIT_DISABLE_DMABUF_RENDERER=1` and `WEBKIT_DISABLE_COMPOSITING_MODE=1` unless the user already provided either variable, keeping WebKitGTK rendering crashes out of the app startup path while leaving native X11 launches unchanged.
 - On Linux AppImage launches, release packaging bundles the GTK3 fcitx immodule into the AppImage and startup environment safeguards write a cache-local `GTK_IM_MODULE_FILE` that points GTK at the mounted module whenever fcitx is configured. If the user has not explicitly chosen a GTK IM module, Tolaria also sets `GTK_IM_MODULE=fcitx`, allowing WebKitGTK editor input to reach fcitx5 on both Wayland and X11 fallback launches without relying on host GTK module cache paths.
 - `git_add_remote` uses the same system git path and refuses remotes whose history is unrelated or ahead of the local vault
@@ -851,7 +851,7 @@ interface Settings {
   sidebar_type_pluralization_enabled: boolean | null // null = default true
   ai_features_enabled: boolean | null // null = default true
   git_enabled: boolean | null // null = default true
-  default_ai_agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | 'gemini' | null
+  default_ai_agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | 'gemini' | 'kiro' | null
   default_ai_target: string | null // "agent:codex" or "model:<provider>/<model>"
   ai_model_providers: AiModelProvider[] | null
   hide_gitignored_files: boolean | null // null = default true

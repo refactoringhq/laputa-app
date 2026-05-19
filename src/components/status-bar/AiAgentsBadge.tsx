@@ -2,6 +2,7 @@ import { CaretUpDown as ChevronsUpDown, Sparkle, Warning as AlertTriangle } from
 import { Button } from '@/components/ui/button'
 import {
   AI_AGENT_DEFINITIONS,
+  getAiAgentAvailability,
   getAiAgentDefinition,
   hasAnyInstalledAiAgent,
   isAiAgentInstalled,
@@ -65,7 +66,7 @@ function badgeTooltip(
   if (!isAiAgentInstalled(statuses, defaultAgent)) {
     return translate(locale, 'status.ai.selectedMissing', { agent: definition.label })
   }
-  const version = (Reflect.get(statuses, defaultAgent) as AiAgentsStatus[AiAgentId]).version
+  const version = getAiAgentAvailability(statuses, defaultAgent).version
   const base = translate(locale, 'status.ai.defaultAgent', { agent: definition.label, version: version ? ` ${version}` : '' })
   if (!guidanceSummary) return base
   if (vaultAiGuidanceNeedsRestore(guidanceStatus!)) {
@@ -101,7 +102,7 @@ function menuHeading(locale: AppLocale, selectedTarget: AiTarget, selectedAgentR
 }
 
 function statusText(statuses: AiAgentsStatus, definition: AiAgentDefinition): string {
-  const version = statuses[definition.id].version
+  const version = getAiAgentAvailability(statuses, definition.id).version
   return version ? `${definition.label} ${version}` : definition.label
 }
 
