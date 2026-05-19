@@ -202,4 +202,25 @@ actions; switching them to `section_header_with_leading(...)` with a
 `ChevronDown` glyph in the leading slot makes the collapse
 affordance uniform across all three groups.
 
+**Status:** fixed.  Both VIEWS and TYPES headers now call
+`section_header_with_leading(...)` with a chevron-down leading
+glyph (`sidebar-views-caret`, `sidebar-types-caret`).  Verified in
+[after-006-section-carets.png](live-snapshots/after-006-section-carets.png).
+
+### 007 — Traffic lights glued to the top of the title-bar strip
+
+| Current |
+|---------|
+| [issue-007-current.png](live-snapshots/issue-007-current.png) |
+
+**Reporter:** "The title bar system icons are misaligned.  Those
+should be vertically centered over the title bar."
+
+**Diagnosis** — macOS places the traffic lights at `(7, 6)` by
+default.  After issue 005 bumped the strip to 38 pt the buttons
+ended up flush against the top edge instead of centred.
+`TitlebarOptions::traffic_light_position` accepts a custom point;
+shifting the buttons down by `(height - 12) / 2 ≈ 13 pt` centres
+the 12-pt-diameter buttons vertically on the new strip.
+
 **Status:** open.

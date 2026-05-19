@@ -42,8 +42,8 @@ mod macos {
     use std::path::PathBuf;
 
     use gpui::{
-        px, size, App, AppContext, Bounds, QuitMode, SharedString, TitlebarOptions, WindowBounds,
-        WindowOptions,
+        point, px, size, App, AppContext, Bounds, QuitMode, SharedString, TitlebarOptions,
+        WindowBounds, WindowOptions,
     };
     use gpui_platform::application;
     use mock_fixtures::{MockAi, MockGit, MockSearch, MockVault};
@@ -378,7 +378,18 @@ mod macos {
                         // `TRAFFIC_LIGHTS_PADDING_PT` so the action
                         // triplet doesn't collide with them.
                         appears_transparent: true,
-                        ..Default::default()
+                        // Vertically centre the traffic lights within
+                        // the workspace's custom title-bar strip.  The
+                        // buttons are ~12 pt tall, so for a strip of
+                        // `NATIVE_TITLE_BAR_HEIGHT_PT` we shift them
+                        // down by `(height - 12) / 2`.  Without this
+                        // macOS defaults to `(7, 6)` (top-left), which
+                        // looks glued to the upper edge once the strip
+                        // grew to 38 pt — see issue 007.
+                        traffic_light_position: Some(point(
+                            px(7.0),
+                            px((workspace::NATIVE_TITLE_BAR_HEIGHT_PT - 12.0) / 2.0),
+                        )),
                     }),
                     ..Default::default()
                 };
