@@ -113,7 +113,14 @@ pub fn apply_light(theme: &mut Theme) {
     c.scrollbar = ha(0x00000000);
     c.scrollbar_thumb = h(0xD9D9D6);
     c.scrollbar_thumb_hover = h(0xB4B4B4);
-    c.drag_border = h(0x155DFF);
+    // `drag_border` doubles as the active-state colour for
+    // gpui-component's `ResizeHandle` (`crates/ui/src/resizable/
+    // resize_handle.rs`).  Setting it to the same value as `c.border`
+    // keeps the resize divider visually consistent across idle,
+    // hover, and drag — the user-reported "thicker / darker grey
+    // when hovered and dragged" was the accent-blue active flash.
+    // `c.drop_target` keeps its translucent blue tint independently.
+    c.drag_border = c.border;
     c.drop_target = ha(0x155DFF24); // --state-drag-target
     c.caret = h(0x155DFF);
     c.link = h(0x155DFF);
@@ -201,7 +208,11 @@ pub fn apply_dark(theme: &mut Theme) {
     c.scrollbar = ha(0x00000000);
     c.scrollbar_thumb = h(0x46433B);
     c.scrollbar_thumb_hover = h(0x625B53);
-    c.drag_border = h(0x78A4FF);
+    // See light-palette comment — keep `ResizeHandle`'s active-state
+    // colour identical to its idle colour by routing both through
+    // `c.border`.  `c.drop_target` retains its translucent accent
+    // for drag-and-drop targets.
+    c.drag_border = c.border;
     c.drop_target = ha(0x78A4FF33);
     c.caret = h(0x78A4FF);
     c.link = h(0x78A4FF);
