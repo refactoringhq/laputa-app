@@ -115,23 +115,16 @@ pub fn apply_light(theme: &mut Theme) {
     c.scrollbar_thumb_hover = h(0xB4B4B4);
     // `drag_border` doubles as the active-state colour for
     // gpui-component's `ResizeHandle` (`crates/ui/src/resizable/
-    // resize_handle.rs`).  We route it through `c.muted_foreground`
-    // (a neutral darker grey, `#787774` light / `#B8B1A6` dark)
-    // instead of the original accent blue so the resize divider
-    // reads as a darker grey while the user drags — matching the
-    // React resize-handle `:hover` paint
-    // (`src/components/ResizeHandle.tsx:70`,
-    // `hover:bg-[var(--border)]`).
-    //
-    // Hover-only feedback (without an active drag) is not separately
-    // styleable today — gpui-component's `group_hover` closure
-    // reuses the same `bg_color` as idle.  Patching upstream would
-    // unlock distinct hover colour + the 3-pt thicker bar React
-    // shows on hover; until that lands, drag is the only state
-    // that visually differs from idle.
+    // resize_handle.rs`).  Route it through `c.border` so the
+    // resize divider paints the same neutral grey as the sidebar
+    // panel's right border (`c.sidebar_border`, which equals
+    // `c.border` byte-identically in both palettes) — idle, hover,
+    // and drag share the exact same colour, which is the user's
+    // explicit ask: "make resize handle color the same as sidebar
+    // panel right border."
     //
     // `c.drop_target` keeps its translucent blue tint independently.
-    c.drag_border = c.muted_foreground;
+    c.drag_border = c.border;
     c.drop_target = ha(0x155DFF24); // --state-drag-target
     c.caret = h(0x155DFF);
     c.link = h(0x155DFF);
@@ -219,13 +212,10 @@ pub fn apply_dark(theme: &mut Theme) {
     c.scrollbar = ha(0x00000000);
     c.scrollbar_thumb = h(0x46433B);
     c.scrollbar_thumb_hover = h(0x625B53);
-    // See light-palette comment — route `ResizeHandle`'s active
-    // colour through `c.muted_foreground` (`#B8B1A6`) so the
-    // divider reads as a distinct neutral grey during drag.
-    // gpui-component reuses the same colour for hover today, so
-    // hover-only feedback is identical to idle until upstream
-    // grows a distinct hover colour + 3-pt width.
-    c.drag_border = c.muted_foreground;
+    // See light-palette comment — `c.drag_border = c.border` makes
+    // the resize divider paint the same colour as the sidebar
+    // panel's right border in every state.
+    c.drag_border = c.border;
     c.drop_target = ha(0x78A4FF33);
     c.caret = h(0x78A4FF);
     c.link = h(0x78A4FF);
