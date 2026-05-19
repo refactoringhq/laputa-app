@@ -185,7 +185,7 @@ it later.
 
 - `ModalView` (matches the React `Dialog`-based pattern).
 - Multi-tab settings UI: General, Editor, Git, AI, Vault.
-- Each tab reads from MockSettings; Phase 10.9 wires to real
+- Each tab reads from MockSettings; Phase 10.12 wires to real
   `settings_store`.
 
 ### `diff_view`

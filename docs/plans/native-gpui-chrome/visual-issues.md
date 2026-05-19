@@ -82,7 +82,8 @@ wrong.  Selection background is incorrect."
 `demo-vault-v2` sits at depth 0 (flush left), `type` at depth 1, and
 the FOLDERS section header carries the chevron-down on the left.
 Outstanding polish: thin vertical connector line under nested
-folders, deferred until a real folder dataset surfaces in Phase 9.
+folders, deferred until a real folder dataset surfaces in Phase 8.12
+(`vault` crate folders / assets) or Phase 10.3 (`vault_watcher`).
 
 ### 003 — TYPES rows ignore each type's frontmatter icon / colour / label
 
@@ -724,7 +725,7 @@ inspector).  Two consequences:
   can't drift back into the title bar.
 - Every cell is a log-only stub today, matching the precedent set
   by `title_bar.rs`; cells are `id()`-tagged + `dump_as`-registered
-  so periscope can target them by name once Phase 8 modal-chrome
+  so periscope can target them by name once Phase 11 modal-chrome
   wiring lands.
 
 **Tests:** `note_toolbar::tests::type_label_singular_extracts_known_prefixes`
@@ -779,7 +780,7 @@ in the implementation:
   workspace's left dock entity into the new title bar.
 - The toggle is the first title-bar action wired to real
   workspace state (the rest remain log-only stubs per the Phase
-  7.8 precedent until the Phase 8 modal-chrome wiring lands).
+  7.8 precedent until the Phase 11 modal-chrome wiring lands).
 
 **Tests:**
 

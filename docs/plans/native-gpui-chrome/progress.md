@@ -122,8 +122,8 @@ First service crate.  Public API mirrors `mock_fixtures::MockVault` so chrome pa
 - `NoteId(u64)` newtype: monotonically increasing within a single `Vault` instance, never reused after delete+rescan, not persisted (restart at 0 on reopen)
 - `VaultError::{NotFound(NoteId), Io { path, source }}` via `thiserror`
 - Methods: `notes() -> Task<Vec<NoteId>>`, `note(id) -> Task<Option<Note>>`, `note_content(id) -> Task<Result<String, VaultError>>`, `save(id, &str) -> Task<Result<(), VaultError>>`, `search_titles(query) -> Task<Vec<NoteId>>`, `rescan() -> Result<()>`
-- Recursive markdown walker, depth cap 32, skips hidden directories (`.git/`, `.obsidian/`), markdown-only (assets + folders deferred to Phase 9.3)
-- Synchronous IO inside `Task::ready(...)` for MVP; Phase 9.3 moves long ops to `cx.background_executor().spawn(...)` + adds the FS watcher
+- Recursive markdown walker, depth cap 32, skips hidden directories (`.git/`, `.obsidian/`), markdown-only (assets + folders deferred to Phase 10.3)
+- Synchronous IO inside `Task::ready(...)` for MVP; Phase 10.3 moves long ops to `cx.background_executor().spawn(...)` + adds the FS watcher
 - 9 tests cover the core contract.
 
 Review pass: 1 MUST + 4 SHOULD applied (metadata-refresh failure now `log::warn!` instead of silent swallow; `NoteId` docstring spells out monotonic-never-reused-not-persisted contract; `save_sync` test backdoor; `save` takes `&str`; `note_ids_vec()` dedups).
