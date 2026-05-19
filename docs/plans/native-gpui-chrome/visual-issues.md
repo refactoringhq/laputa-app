@@ -268,3 +268,142 @@ default top position.
 **Status:** fixed.  `title_bar` swaps `items_start` →
 `items_center` and drops the `pt(2.0)` inset.  Verified in
 [after-009-cluster-centered.png](live-snapshots/after-009-cluster-centered.png).
+
+### 010 — Note-list row treatment misses type accent, layout, and dates
+
+| Current | Reference |
+|---------|-----------|
+| [issue-010-current.png](live-snapshots/issue-010-current.png) | [issue-010-reference.png](live-snapshots/issue-010-reference.png) |
+
+**Reporter:** "The note highlight needs to use the note type accent
+colour similar to the sidebar.  The top-right corner has the note
+type icon.  The title is bold text.  The description should be
+wrapped, but have at most 2 lines.  Ellipsis if the description is
+longer than two lines.  Last row with dates should use a smaller
+font size.  Created date should be right-aligned."
+
+**Diagnosis** — six independent gaps in `crates/note_list_pane`:
+
+1. Each `NoteEntry` carries no type metadata; the renderer can't
+   tint the row or pick a type icon.
+2. Title is `font_medium`; reference uses `font_semibold` / bolder
+   text.
+3. Snippet is single-line truncated at 120 chars; reference wraps
+   to two visual lines with an ellipsis.
+4. Metadata `MMM D, YYYY · Created MMM D, YYYY` is one centred
+   string; reference splits modified (left) / created (right) with
+   `justify_between`, and shrinks the type slightly.
+5. Selected row paints `theme.list_active` (pale blue); reference
+   tints with the row's type accent colour.
+6. Top-right per-row icon is currently a placeholder `File`
+   glyph; reference draws the type's own icon in its accent
+   colour.
+
+**Status:** fixed.  `NoteEntry` now carries `type_icon: IconName` and
+`type_color: Hsla`; `from_vault` walks `<root>/type/*.md` once via
+`load_note_type_styles`, then looks each note up by filename-stem
+prefix (`event-team-sync.md` → `event` → calendar / orange).  Render
+changes: title `font_semibold`, snippet wrapped to two lines with
+`line_clamp(2)` + 1.4 line-height, metadata row splits modified
+(left) / created (right) with `justify_between`, selected-row bg
+paints `light_tint(type_color, 0.14)`, top-right corner draws the
+type's own icon in its full accent colour.  Verified in
+[after-010-note-row-redesign.png](live-snapshots/after-010-note-row-redesign.png).
+
+### 011 — Note row: oversized padding, Unicode ellipsis, icon-clipped snippet width, missing left accent bar
+
+| Current | Reference |
+|---------|-----------|
+| [issue-011-current.png](live-snapshots/issue-011-current.png) | [issue-011-reference.png](live-snapshots/issue-011-reference.png) |
+
+**Reporter:** "Decrease note text padding to match original React.
+Trimmed description needs to end with `...`.  Text box should span to
+the right edge minus padding (not to the icon edge).  The type icon
+should be smaller.  The selected item should render a left border in
+the note-type colour."
+
+**Diagnosis** — five independent regressions on top of the issue 010
+shape:
+
+1. Row padding `px(16) / py(14)` is too generous; the React
+   `NoteListItem` uses ~12 / 10 and the reference shows a tighter
+   card stack.
+2. `extract_snippet` appends a Unicode `…` glyph; the React build
+   uses three ASCII dots.
+3. The trailing type icon sits as a sibling of the content column,
+   so the snippet / metadata wrap to **content width minus icon
+   width** even on lines that never collide with the icon — the
+   reference flows the snippet to the row's right edge and only the
+   title row sacrifices width for the icon.
+4. The type icon container is 20 × 20 pt; reference renders ~14 pt.
+5. Selected rows highlight with a light tint only — no left accent
+   strip in the type's colour.  GPUI's `Styled` exposes a single
+   per-element `border_color`, so the accent has to render as a
+   leading flex-sibling rather than a CSS-style `border-left-color`.
+
+**Status:** fixed.  `extract_snippet` now appends `...`; the type
+icon moves inside the title row (so snippet / metadata get the full
+content width); icon container shrinks to 14 × 14 pt; row padding
+drops to `px(12) / py(10)`; selected rows render a 2-pt leading
+accent strip in `type_color` via an outer `items_stretch` h_flex.
+The truncation test asserts `chars().count() == 123` (120 graphemes
++ 3 dots) and `ends_with("...")`.  Verified in
+[after-011-row-layout.png](live-snapshots/after-011-row-layout.png) —
+selected Sponsorship MRR row shows the cyan accent bar + tinted bg,
+icons are visible at the title-row right edge, and `Created May 3,
+2026` is no longer clipped.
+
+### 012 — Snippet hard-truncates at 120 chars instead of native word-boundary wrap; horizontal padding too generous
+
+**Reporter:** "The note text snippet should NOT rely on
+`SNIPPET_MAX_CHARS`.  The text should be trimmed to the closest word
+boundary that fits the two-line box.  The note list width is
+resizable.  Investigate how Zed does that." …followed by: "The note
+list items' horizontal text padding needs to be reduced in half.
+Check React component layout values."
+
+**Diagnosis** — two regressions on top of issue 011:
+
+1. `extract_snippet` cuts at 120 graphemes then appends a literal
+   `...` (issue 011's MVP).  That ignores the resizable column
+   width — a wide column wastes vertical space (text fits on one
+   line then ends mid-word with `...`), and a narrow column still
+   shows two visible lines but with redundant trailing dots.  Zed's
+   `gpui/examples/text_wrapper.rs:73-94` is the canonical multi-line
+   wrap+ellipsis pattern: pair `.line_clamp(n)` with
+   `.overflow_hidden().text_overflow(TextOverflow::Truncate("...".into()))`
+   so the layout engine picks the word-boundary cut at paint time.
+   `gpui/src/styled.rs:131-145` confirms the API:
+   `truncate()` = single-line, `line_clamp(n)` + `text_overflow(...)`
+   = multi-line.
+2. After the `px(12)` row padding from issue 011 the content still
+   reads as over-padded against the React reference
+   (`src/components/NoteItem.tsx:334` uses `'14px 16px'` but the
+   chrome target sits visually tighter than that).
+
+**Status:** fixed.
+
+- `extract_snippet` returns the first non-empty, non-heading line
+  verbatim (modulo a `SNIPPET_SOFT_MAX_CHARS = 2000` guard against
+  pathological mega-lines that would otherwise force GPUI's word-
+  wrap pass through every codepoint).  No manual `...` appended.
+- The snippet `div` now carries
+  `.overflow_hidden().text_overflow(TextOverflow::Truncate("...".into())).line_clamp(2)`
+  so GPUI word-wraps to the column width and inserts the ASCII
+  ellipsis at the last fitting boundary on overflow.
+- Inner row horizontal padding halved: `px(12)` → `px(6)` (vertical
+  unchanged at `py(10)`).  Combined with the 2-pt leading accent
+  strip the visible text inset is 8 pt from the row's left edge.
+- Tests updated: `extract_snippet_truncates_long_lines` replaced
+  with `extract_snippet_returns_full_line` (200-char input passes
+  through verbatim with no trailing `...`) and
+  `extract_snippet_caps_pathological_lines` (input
+  > `SNIPPET_SOFT_MAX_CHARS` gets cut at the cap).  22/22 tests
+  pass.
+
+Verified in
+[after-012-native-wrap-tighter-padding.png](live-snapshots/after-012-native-wrap-tighter-padding.png) —
+each visible snippet wraps at a word boundary ("Areas are ongoing
+domains of responsibility / with no fixed end date.", "Owns sponsor
+outreach and makes the / responsibility/procedure relationships feel
+like r…") and the row text starts closer to the left edge.

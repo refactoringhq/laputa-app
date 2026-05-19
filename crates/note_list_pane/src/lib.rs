@@ -27,13 +27,15 @@
 //! ```
 
 use std::collections::HashSet;
+use std::path::Path as StdPath;
 
-use chrono::{DateTime, Datelike, Utc};
+use chrono::{DateTime, Utc};
 use gpui::prelude::FluentBuilder as _;
+use gpui::rgb;
 use gpui::EventEmitter;
 use gpui::{
     div, px, rems, AnyElement, App, Context, Hsla, InteractiveElement, IntoElement, ParentElement,
-    Render, SharedString, StatefulInteractiveElement, Styled, Window,
+    Render, SharedString, StatefulInteractiveElement, Styled, TextOverflow, Window,
 };
 use gpui_component::{
     button::{Button, ButtonVariants as _},
@@ -68,55 +70,53 @@ pub struct OpenNoteEvent {
 ///
 /// Projected from [`NoteEntry`] during `render()` so that the element-tree
 /// closures can be `move` without borrowing `self`.
-#[derive(Debug)]
 struct RowData {
     id: NoteId,
     title: SharedString,
     snippet: SharedString,
-    metadata: SharedString,
+    modified_label: SharedString,
+    created_label: SharedString,
+    type_icon: IconName,
+    type_color: Hsla,
     checked: bool,
     selected: bool,
 }
 
-/// Render the metadata line shown below the snippet — mirrors the
-/// reference screenshots' `May 2, 2026 · Created May 2, 2026`
-/// pattern.  Phase 7 uses the on-disk modified timestamp for both
-/// halves until the vault surfaces a separate created-at field
-/// (Phase 9 vault rewrite — see `TODO(visual-parity)`).
-fn metadata_line(modified: DateTime<Utc>) -> SharedString {
-    let label = format!(
-        "{month} {day}, {year} \u{00B7} Created {month} {day}, {year}",
-        month = month_abbr(modified.month()),
-        day = modified.day(),
-        year = modified.year(),
-    );
-    SharedString::from(label)
-}
-
-/// 3-letter English month abbreviation (Jan, Feb, …) used by the
-/// metadata line.  Avoids pulling in a localisation crate for the
-/// Phase 7 visual-fidelity pass — Phase 9.8 (`localization`) will
-/// route this through `lara`.
-fn month_abbr(month: u32) -> &'static str {
-    match month {
-        1 => "Jan",
-        2 => "Feb",
-        3 => "Mar",
-        4 => "Apr",
-        5 => "May",
-        6 => "Jun",
-        7 => "Jul",
-        8 => "Aug",
-        9 => "Sep",
-        10 => "Oct",
-        11 => "Nov",
-        12 => "Dec",
-        _ => "—",
+/// Mix `color` with `base` at the given alpha so it reads as a soft
+/// tinted background.  Mirrors `sidebar_panel::palette_tinted_with` —
+/// keeps the selected-row highlight at the type's accent hue without
+/// turning it into a saturated block.
+fn light_tint(color: Hsla, alpha: f32) -> Hsla {
+    Hsla {
+        h: color.h,
+        s: color.s,
+        l: color.l,
+        a: alpha,
     }
 }
 
+/// Format a UTC date as `MMM D, YYYY` — used for the modified /
+/// created labels in the note-row footer (issue 010).  Phase 9.8
+/// (`localization`) will route this through `lara`; until then the
+/// English-only `chrono` formatter is good enough.
+fn date_label(when: DateTime<Utc>) -> SharedString {
+    SharedString::from(when.format("%b %-d, %Y").to_string())
+}
+
+/// Format the "Created MMM D, YYYY" half of the metadata row.
+fn created_label(when: DateTime<Utc>) -> SharedString {
+    SharedString::from(format!("Created {}", date_label(when)))
+}
+
 /// Snapshot of one note's list-view metadata.
-#[derive(Debug, Clone)]
+///
+/// `type_*` fields carry the per-note typography accents used by the
+/// reference (issue 010) — the row tint, the trailing icon, and the
+/// selected-state highlight all draw from these.  Built once at
+/// `from_vault` time by looking up the note's filename prefix in a
+/// vault-level type-style table; falls back to neutral defaults when
+/// no matching `type/<stem>.md` exists.
+#[derive(Clone)]
 pub struct NoteEntry {
     /// Stable identifier for the underlying note.
     pub id: NoteId,
@@ -130,6 +130,13 @@ pub struct NoteEntry {
     /// truncated to fit the row.  Empty when the body is empty or
     /// the loader did not populate it.
     pub snippet: SharedString,
+    /// Trailing-corner icon for this note's type (e.g. `Calendar`
+    /// for Events).  Falls back to `IconName::File`.
+    pub type_icon: IconName,
+    /// Accent colour for this note's type (orange for Events, …).
+    /// Drives the trailing icon tint and the selected-row light
+    /// background.
+    pub type_color: Hsla,
 }
 
 /// Extract a display title from a note body — first H1 heading,
@@ -176,14 +183,26 @@ fn extract_title(body: &str) -> Option<String> {
     frontmatter_title
 }
 
-/// Extract a one-line preview from a note's raw markdown body.
+/// Soft upper bound on the length of a single snippet line passed to
+/// GPUI's text layout (in graphemes).  GPUI wraps at word boundaries
+/// and `line_clamp(2)` decides which line to cut on, so the *visible*
+/// truncation point depends on the resizable note-list column width
+/// at paint time — not on this constant.  We only cap the source
+/// string so a pathological 100-kB single-line note doesn't force
+/// the layout engine through every codepoint just to discard 99% of
+/// the resulting wrapped output.  Generous enough that any realistic
+/// preview fits before the cap kicks in.
+const SNIPPET_SOFT_MAX_CHARS: usize = 2000;
+
+/// Extract a multi-line preview from a note's raw markdown body.
 ///
 /// Strips a YAML frontmatter block (when present), then returns the
-/// first non-empty, non-heading line truncated to `SNIPPET_MAX_CHARS`
-/// graphemes with a trailing ellipsis if the line was longer.
+/// first non-empty, non-heading line **verbatim** (modulo whitespace
+/// trim).  Visual truncation — including the wrap point and the
+/// trailing `...` ellipsis — is done by GPUI at paint time via
+/// `line_clamp(2) + text_overflow(Truncate("..."))`, so the snippet
+/// reflows when the user resizes the note-list column.
 fn extract_snippet(body: &str) -> String {
-    const SNIPPET_MAX_CHARS: usize = 120;
-
     let mut lines = body.lines().peekable();
 
     // Skip a leading YAML frontmatter block: `---` ... `---`.
@@ -206,15 +225,157 @@ fn extract_snippet(body: &str) -> String {
         if t.is_empty() || t.starts_with('#') {
             continue;
         }
-        let count = t.chars().count();
-        if count <= SNIPPET_MAX_CHARS {
-            return t.to_string();
+        // Guard against pathological single-line megabytes — the
+        // word-wrap pass would visit every codepoint otherwise.
+        // Cut at a UTF-8 char boundary, not a byte boundary.
+        if t.chars().count() > SNIPPET_SOFT_MAX_CHARS {
+            return t.chars().take(SNIPPET_SOFT_MAX_CHARS).collect();
         }
-        let mut out: String = t.chars().take(SNIPPET_MAX_CHARS).collect();
-        out.push('…');
-        return out;
+        return t.to_string();
     }
     String::new()
+}
+
+// ---------------------------------------------------------------------------
+// Type-style lookup
+// ---------------------------------------------------------------------------
+
+/// Visual contract for one note type, sourced from the
+/// `<vault_root>/type/<stem>.md` frontmatter.  Mirrors the per-type
+/// resolution `sidebar_panel` does for its TYPES rows — kept inline
+/// here (rather than pulled from a shared crate) so the note-list
+/// rewrite stays self-contained while the wider chrome lands.
+#[derive(Clone)]
+struct NoteTypeStyle {
+    icon: IconName,
+    color: Hsla,
+}
+
+impl NoteTypeStyle {
+    fn fallback() -> Self {
+        Self {
+            icon: IconName::File,
+            color: rgb(0x6B7280).into(),
+        }
+    }
+}
+
+/// Map a note's filename stem prefix to the canonical type label that
+/// `<vault_root>/type/<stem>.md` is keyed by (`event-team-sync.md` →
+/// `Some("event")`).
+fn type_stem_for_path(path: &StdPath) -> Option<String> {
+    let stem = path.file_stem().and_then(|s| s.to_str())?;
+    let prefix = stem.split_once('-').map(|(p, _)| p).unwrap_or(stem);
+    Some(prefix.to_ascii_lowercase())
+}
+
+/// Walk `<vault_root>/type/*.md` and build a (stem → style) map.
+/// Empty when the directory is missing or unreadable; render-side
+/// callers fall back to [`NoteTypeStyle::fallback`].
+fn load_note_type_styles(vault_root: &StdPath) -> std::collections::HashMap<String, NoteTypeStyle> {
+    let mut out = std::collections::HashMap::new();
+    let dir = vault_root.join("type");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("md") {
+            continue;
+        }
+        let Some(stem) = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_ascii_lowercase())
+        else {
+            continue;
+        };
+        let Ok(body) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let frontmatter = parse_note_frontmatter(&body);
+        let icon = frontmatter
+            .get("icon")
+            .map(|s| icon_for_frontmatter_name(s))
+            .unwrap_or(IconName::File);
+        let color = frontmatter
+            .get("color")
+            .map(|s| color_for_frontmatter_name(s))
+            .unwrap_or_else(|| rgb(0x6B7280).into());
+        out.insert(stem, NoteTypeStyle { icon, color });
+    }
+    out
+}
+
+/// Minimal YAML frontmatter parser — `key: value` lines between two
+/// `---` markers, quotes stripped.  Same shape as
+/// `sidebar_panel::parse_frontmatter`; duplicated to avoid a
+/// cross-crate dep just for the visual-fidelity pass.
+fn parse_note_frontmatter(body: &str) -> std::collections::HashMap<String, String> {
+    let mut out = std::collections::HashMap::new();
+    let mut lines = body.lines();
+    let Some(first) = lines.next() else {
+        return out;
+    };
+    if first.trim() != "---" {
+        return out;
+    }
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed == "---" {
+            break;
+        }
+        let Some((key, value)) = trimmed.split_once(':') else {
+            continue;
+        };
+        let key = key.trim().to_ascii_lowercase();
+        let value = value.trim().trim_matches(|c| c == '"' || c == '\'').trim();
+        if !value.is_empty() {
+            out.insert(key, value.to_owned());
+        }
+    }
+    out
+}
+
+fn icon_for_frontmatter_name(name: &str) -> IconName {
+    match name.to_ascii_lowercase().as_str() {
+        "calendar" => IconName::Calendar,
+        "folder" | "folders" => IconName::FolderClosed,
+        "book" | "books" | "book-open" => IconName::BookOpen,
+        "chart" | "chart-line-up" | "chart-pie" => IconName::ChartPie,
+        "user" | "person" => IconName::User,
+        "rocket" => IconName::Frame,
+        "clock" | "clock-countdown" | "timer" => IconName::Calendar,
+        "note" | "note-pencil" => IconName::File,
+        "star" => IconName::Star,
+        "settings" | "gear" => IconName::Settings,
+        "globe" => IconName::Globe,
+        _ => IconName::File,
+    }
+}
+
+fn color_for_frontmatter_name(name: &str) -> Hsla {
+    let rgb_u32: u32 = match name.to_ascii_lowercase().as_str() {
+        "amber" => 0xF59E0B,
+        "orange" => 0xD9730D,
+        "yellow" => 0xD69E2E,
+        "red" => 0xE53E3E,
+        "rose" => 0xE11D48,
+        "pink" => 0xEC4899,
+        "violet" => 0x8B5CF6,
+        "purple" => 0x805AD5,
+        "indigo" => 0x6366F1,
+        "blue" => 0x155DFF,
+        "sky" => 0x38BDF8,
+        "cyan" => 0x06B6D4,
+        "teal" => 0x14B8A6,
+        "emerald" => 0x10B981,
+        "green" => 0x38A169,
+        "slate" => 0x64748B,
+        "gray" | "grey" => 0x6B7280,
+        _ => 0x6B7280,
+    };
+    rgb(rgb_u32).into()
 }
 
 // ---------------------------------------------------------------------------
@@ -268,6 +429,9 @@ impl NoteListPane {
         let mut entries = Vec::with_capacity(ids.len());
         for id in ids {
             if let Some(note) = executor.block_on(vault.note(id)) {
+                // MockVault has no on-disk `type/*.md`, so every row
+                // takes the neutral default (`File` glyph in slate).
+                let style = NoteTypeStyle::fallback();
                 entries.push(NoteEntry {
                     id: note.id,
                     title: note.title.clone(),
@@ -277,6 +441,8 @@ impl NoteListPane {
                     // empty for the demo-mode path.  Real bodies show
                     // up via `from_vault`.
                     snippet: SharedString::default(),
+                    type_icon: style.icon,
+                    type_color: style.color,
                 });
             }
         }
@@ -298,6 +464,7 @@ impl NoteListPane {
     pub fn from_vault(cx: &mut App) -> Self {
         let executor = cx.foreground_executor().clone();
         let vault = cx.global::<Vault>();
+        let type_styles = load_note_type_styles(vault.root());
         let ids = executor.block_on(vault.notes());
         let mut entries = Vec::with_capacity(ids.len());
         for id in ids {
@@ -318,12 +485,17 @@ impl NoteListPane {
                     .map(extract_snippet)
                     .unwrap_or_default()
                     .into();
+                let style = type_stem_for_path(&note.path)
+                    .and_then(|stem| type_styles.get(&stem).cloned())
+                    .unwrap_or_else(NoteTypeStyle::fallback);
                 entries.push(NoteEntry {
                     id: note.id,
                     title,
                     kind: note.kind,
                     modified: note.modified,
                     snippet,
+                    type_icon: style.icon,
+                    type_color: style.color,
                 });
             }
         }
@@ -507,7 +679,6 @@ impl Render for NoteListPane {
         let muted = cx.theme().muted_foreground;
         let fg = cx.theme().foreground;
         let bg = cx.theme().background;
-        let active_row_bg = cx.theme().list_active;
 
         let entity = cx.entity();
         let n_selected = self.selection_count();
@@ -520,7 +691,10 @@ impl Render for NoteListPane {
                 id: e.id,
                 title: e.title.clone(),
                 snippet: e.snippet.clone(),
-                metadata: metadata_line(e.modified),
+                modified_label: date_label(e.modified),
+                created_label: created_label(e.modified),
+                type_icon: e.type_icon.clone(),
+                type_color: e.type_color,
                 checked: self.selected.contains(&e.id),
                 selected: selected_id == Some(e.id),
             })
@@ -603,75 +777,148 @@ impl Render for NoteListPane {
                     };
 
                     let open_handle = entity.clone();
-                    // Card-style row matching `component/NoteListItem`
-                    // in `ui-design.pen`: padding [14, 16], gap 8,
-                    // title-row (Inter 13/500) above a snippet line
-                    // (Inter 12, muted, line-height 1.5), then an
-                    // 11-px muted metadata line mirroring the
-                    // `May 17 · Created May 17` pattern in the
-                    // reference screenshots.
+                    // Issue 011 — row layout matched to the Tauri/React
+                    // reference:
+                    //   - reduced row padding (px-3, py-2.5) so each
+                    //     card reads as tightly grouped block.
+                    //   - title row carries the trailing type icon at
+                    //     a small (14 pt) size so the snippet below
+                    //     spans the full content width.
+                    //   - snippet wraps to at most two lines with an
+                    //     ASCII `...` ellipsis on overflow.
+                    //   - metadata footer keeps the split (modified
+                    //     left / created right).
+                    //   - selected row picks up a 4-pt left accent
+                    //     bar in the type's full accent colour, with
+                    //     a lighter tint as the row background.
                     let is_selected = row.selected;
-                    let metadata = row.metadata.clone();
+                    let type_icon = row.type_icon;
+                    let type_color = row.type_color;
+                    let modified_label = row.modified_label.clone();
+                    let created_label = row.created_label.clone();
+                    let snippet = row.snippet.clone();
+
+                    // Trailing top-right type marker: small icon in
+                    // the type's accent colour, anchored alongside the
+                    // title row so the snippet/metadata rows below get
+                    // the row's full content width.  A `w()`/`h()`-
+                    // sized wrapper is required: a bare `IconName` has
+                    // no intrinsic size and otherwise renders zero-px.
+                    let trailing = div()
+                        .flex_shrink_0()
+                        .ml(px(8.0))
+                        .w(px(8.0))
+                        .h(px(8.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .text_color(type_color)
+                        .child(type_icon);
+
                     let content = v_flex()
                         .flex_1()
-                        .gap_1()
+                        .min_w_0()
+                        .gap(px(4.0))
                         .child(
                             h_flex()
                                 .w_full()
+                                .items_start()
                                 .justify_between()
-                                .items_center()
-                                .gap_2()
+                                .gap(px(8.0))
                                 .child(
                                     div()
+                                        .flex_1()
+                                        .min_w_0()
                                         .text_sm()
-                                        .font_medium()
+                                        .font_semibold()
                                         .text_color(fg)
                                         .child(row.title),
-                                ),
+                                )
+                                .child(trailing),
                         )
-                        .when(!row.snippet.is_empty(), |this| {
+                        .when(!snippet.is_empty(), |this| {
+                            // GPUI clamps the snippet to two visual
+                            // lines (`line_clamp(2)`) and word-wraps
+                            // against the resizable column width.
+                            // `text_overflow(Truncate("..."))` lets
+                            // the layout engine pick the ellipsis
+                            // insertion point at the last word
+                            // boundary that fits — no manual
+                            // character truncation in `extract_snippet`
+                            // (see `gpui/examples/text_wrapper.rs` for
+                            // the canonical multi-line+ellipsis
+                            // pattern).
                             this.child(
                                 div()
                                     .text_xs()
                                     .text_color(muted)
-                                    .line_height(rems(1.5))
-                                    .child(row.snippet),
+                                    .line_height(rems(1.4))
+                                    .overflow_hidden()
+                                    .text_overflow(TextOverflow::Truncate("...".into()))
+                                    .line_clamp(2)
+                                    .child(snippet),
                             )
                         })
-                        .child(div().text_xs().text_color(muted).child(metadata));
+                        .child(
+                            h_flex()
+                                .w_full()
+                                .items_center()
+                                .justify_between()
+                                .pt(px(2.0))
+                                .child(div().text_xs().text_color(muted).child(modified_label))
+                                .child(div().text_xs().text_color(muted).child(created_label)),
+                        );
 
-                    // Trailing status glyph — mirrors the reference's
-                    // right-side "type marker" (chart icon, blue
-                    // circle).  Phase 7 stub: a small file glyph in
-                    // muted-fg until per-type icons land in Phase 9.
-                    let trailing = div()
+                    let selection_bg = light_tint(type_color, 0.14);
+                    // 2-pt accent strip on the left edge — coloured
+                    // with the type's accent on the selected row and
+                    // transparent otherwise.  Rendered as a flex
+                    // sibling rather than a `border_l_color` because
+                    // GPUI's `Styled` exposes a single per-element
+                    // border colour (all four sides), so a coloured
+                    // left edge can't coexist with the muted bottom
+                    // row separator.
+                    let accent_color = if is_selected {
+                        type_color
+                    } else {
+                        gpui::transparent_black()
+                    };
+                    let accent_strip = div()
                         .flex_shrink_0()
-                        .w(px(16.0))
-                        .h(px(16.0))
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .text_color(muted)
-                        .child(IconName::File);
-
+                        .w(px(4.0))
+                        .self_stretch()
+                        .bg(accent_color);
                     let row_div = h_flex()
                         .id(("nlp-row", ix as u64))
                         .w_full()
-                        .items_start()
-                        .gap_2()
-                        .px(px(16.0))
-                        .py(px(14.0))
+                        .items_stretch()
                         .border_b_1()
                         .border_color(border_color)
                         .cursor_pointer()
                         .on_click(move |_, _window, cx| {
                             open_handle.update(cx, |this, cx| this.open(note_id, cx));
                         })
-                        .child(checkbox)
-                        .child(content)
-                        .child(trailing);
+                        .child(accent_strip)
+                        .child(
+                            // Horizontal padding halved (issue 012):
+                            // the React `NoteItem.tsx:334` uses
+                            // `padding: '14px 16px'`, but the user
+                            // wants the native row to read tighter.
+                            // Combined with the 2-pt accent strip
+                            // the visible text inset is 2 + 6 = 8 pt
+                            // from the row's left edge.
+                            h_flex()
+                                .flex_1()
+                                .min_w_0()
+                                .items_start()
+                                .gap_2()
+                                .px(px(6.0))
+                                .py(px(10.0))
+                                .child(checkbox)
+                                .child(content),
+                        );
                     if is_selected {
-                        row_div.bg(active_row_bg)
+                        row_div.bg(selection_bg)
                     } else {
                         row_div
                     }
@@ -884,13 +1131,38 @@ mod tests {
         );
     }
 
-    /// Long lines must be truncated with an ellipsis.
+    /// `extract_snippet` no longer hard-truncates at a character
+    /// limit — GPUI's `line_clamp(2) + text_overflow(Truncate("..."))`
+    /// handles word-boundary wrapping + ellipsis at paint time, so the
+    /// resizable note-list column drives the visible cut.  Issue 012:
+    /// the extractor returns the full first content line, modulo the
+    /// `SNIPPET_SOFT_MAX_CHARS` guard against pathological inputs.
     #[test]
-    fn extract_snippet_truncates_long_lines() {
+    fn extract_snippet_returns_full_line() {
         let long: String = "x".repeat(200);
         let snippet = extract_snippet(&long);
-        assert_eq!(snippet.chars().count(), 121, "120 chars + 1 ellipsis");
-        assert!(snippet.ends_with('…'));
+        assert_eq!(
+            snippet.chars().count(),
+            200,
+            "short-enough lines pass through verbatim"
+        );
+        assert!(
+            !snippet.ends_with("..."),
+            "extractor must not append an ellipsis"
+        );
+    }
+
+    /// Pathological mega-lines must still be capped to bound the cost
+    /// of the GPUI word-wrap pass (which visits every codepoint).
+    #[test]
+    fn extract_snippet_caps_pathological_lines() {
+        let huge: String = "x".repeat(SNIPPET_SOFT_MAX_CHARS * 2);
+        let snippet = extract_snippet(&huge);
+        assert_eq!(
+            snippet.chars().count(),
+            SNIPPET_SOFT_MAX_CHARS,
+            "lines longer than the soft cap get cut at the cap"
+        );
     }
 
     /// An unterminated frontmatter must yield an empty snippet rather
@@ -972,18 +1244,62 @@ mod tests {
             .unwrap();
     }
 
-    /// `metadata_line` formats a UTC modified timestamp as the
-    /// `MMM D, YYYY · Created MMM D, YYYY` line shown below each row's
-    /// snippet.  Year is added in Phase 7 visual-fidelity to match the
-    /// reference screenshots exactly.
+    /// `date_label` / `created_label` format a UTC timestamp as the
+    /// split modified-left / created-right pair shown in each row's
+    /// metadata footer (issue 010).
     #[test]
-    fn metadata_line_format() {
+    fn date_labels_format() {
         use chrono::TimeZone as _;
         let m = chrono::Utc.with_ymd_and_hms(2026, 5, 17, 12, 0, 0).unwrap();
-        assert_eq!(
-            metadata_line(m).as_ref(),
-            "May 17, 2026 \u{00B7} Created May 17, 2026"
-        );
+        assert_eq!(date_label(m).as_ref(), "May 17, 2026");
+        assert_eq!(created_label(m).as_ref(), "Created May 17, 2026");
+    }
+
+    /// `from_vault` must pick up per-note type styles from
+    /// `<vault_root>/type/<stem>.md` frontmatter — proves that the
+    /// row's trailing icon and selection tint will receive the
+    /// per-type accent rather than the neutral fallback (issue 010).
+    #[gpui::test]
+    fn from_vault_loads_per_note_type_styles(cx: &mut TestAppContext) {
+        use std::fs;
+        install_theme(cx);
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::create_dir(dir.path().join("type")).expect("create type dir");
+        fs::write(
+            dir.path().join("type").join("event.md"),
+            "---\nicon: calendar\ncolor: orange\n---\n",
+        )
+        .expect("write type/event.md");
+        fs::write(
+            dir.path().join("event-kickoff.md"),
+            "# Kickoff\nFirst event line.\n",
+        )
+        .expect("write event-kickoff.md");
+        fs::write(dir.path().join("misc.md"), "# Misc\nUntyped body line.\n")
+            .expect("write misc.md");
+        let vault = vault::Vault::open_at(dir.path()).expect("open vault");
+        cx.update(|cx| {
+            cx.set_global(vault);
+            let pane = NoteListPane::from_vault(cx);
+            let event = pane
+                .entries
+                .iter()
+                .find(|e| e.title.as_ref() == "Kickoff")
+                .expect("event row");
+            assert!(
+                matches!(event.type_icon, IconName::Calendar),
+                "event-prefixed note must pick up the calendar icon from type/event.md"
+            );
+            let misc = pane
+                .entries
+                .iter()
+                .find(|e| e.title.as_ref() == "Misc")
+                .expect("misc row");
+            assert!(
+                matches!(misc.type_icon, IconName::File),
+                "note with no matching type/<stem>.md must fall back to the neutral File icon"
+            );
+        });
     }
 
     #[test]
