@@ -85,15 +85,24 @@ impl Render for TitleBar {
             .child(title_bar_cell("title-bar-more", IconName::Ellipsis))
             .child(title_bar_cell("title-bar-profile", IconName::CircleUser));
 
+        // The macOS traffic lights are constrained to the system
+        // titlebar region and default to a top offset of ~6 pt.
+        // Top-anchoring our action clusters with a 2-pt inset puts
+        // the 16-pt icon glyph's vertical centre at y = 2 + 10 = 12,
+        // which matches the traffic-light centre (top 6 + half-
+        // height 6).  Without this they vertically-centre inside the
+        // 38-pt strip and read as misaligned with the system buttons
+        // — see issue 008.
         div()
             .flex()
             .flex_row()
-            .items_center()
+            .items_start()
             .justify_between()
             .flex_shrink_0()
             .h(px(NATIVE_TITLE_BAR_HEIGHT_PT))
             .pl(px(TRAFFIC_LIGHTS_PADDING_PT))
             .pr(px(8.0))
+            .pt(px(2.0))
             .bg(bg)
             .text_color(fg)
             .text_xs()

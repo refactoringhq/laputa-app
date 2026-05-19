@@ -42,8 +42,8 @@ mod macos {
     use std::path::PathBuf;
 
     use gpui::{
-        point, px, size, App, AppContext, Bounds, QuitMode, SharedString, TitlebarOptions,
-        WindowBounds, WindowOptions,
+        px, size, App, AppContext, Bounds, QuitMode, SharedString, TitlebarOptions, WindowBounds,
+        WindowOptions,
     };
     use gpui_platform::application;
     use mock_fixtures::{MockAi, MockGit, MockSearch, MockVault};
@@ -378,18 +378,18 @@ mod macos {
                         // `TRAFFIC_LIGHTS_PADDING_PT` so the action
                         // triplet doesn't collide with them.
                         appears_transparent: true,
-                        // Vertically centre the traffic lights within
-                        // the workspace's custom title-bar strip.  The
-                        // buttons are ~12 pt tall, so for a strip of
-                        // `NATIVE_TITLE_BAR_HEIGHT_PT` we shift them
-                        // down by `(height - 12) / 2`.  Without this
-                        // macOS defaults to `(7, 6)` (top-left), which
-                        // looks glued to the upper edge once the strip
-                        // grew to 38 pt — see issue 007.
-                        traffic_light_position: Some(point(
-                            px(7.0),
-                            px((workspace::NATIVE_TITLE_BAR_HEIGHT_PT - 12.0) / 2.0),
-                        )),
+                        // The traffic lights are constrained to live
+                        // inside the system titlebar (~28 pt regardless
+                        // of `appears_transparent`), so we cannot
+                        // simply centre them in our taller custom
+                        // strip via `traffic_light_position`.  Instead
+                        // the title-bar view aligns its own action
+                        // cluster to the traffic-light baseline (see
+                        // `workspace::title_bar`'s top-anchored
+                        // layout) — keeping the lights at their
+                        // default `(7, 6)` and matching the action
+                        // icons to the same y.
+                        ..Default::default()
                     }),
                     ..Default::default()
                 };

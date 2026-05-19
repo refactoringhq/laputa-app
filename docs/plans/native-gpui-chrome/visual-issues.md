@@ -223,4 +223,27 @@ ended up flush against the top edge instead of centred.
 shifting the buttons down by `(height - 12) / 2 ≈ 13 pt` centres
 the 12-pt-diameter buttons vertically on the new strip.
 
+**Status:** superseded by issue 008.  `traffic_light_position`
+only relocates the buttons *inside* the system titlebar region
+(~28 pt regardless of `appears_transparent`), so the lights stayed
+near the top of our 38-pt custom strip.  The follow-up fix moves
+the action cluster up to match the lights instead.
+
+### 008 — Title-bar action cluster still misaligned with traffic lights
+
+| Current |
+|---------|
+| [issue-008-current.png](live-snapshots/issue-008-current.png) |
+
+**Reporter:** "Is not properly vertically centred."
+
+**Diagnosis** — macOS pins the traffic lights inside the system
+titlebar region (~28 pt) regardless of `appears_transparent`, so
+`TitlebarOptions::traffic_light_position` cannot push them into our
+taller 38-pt custom strip.  Instead, anchor the action clusters to
+the top of the strip with a 2-pt inset so the 16-pt Phosphor glyphs
+share their vertical centre with the 12-pt traffic-light buttons
+(both at y ≈ 12).  The bottom of the strip retains its visual
+padding via the unchanged 38-pt height.
+
 **Status:** open.
