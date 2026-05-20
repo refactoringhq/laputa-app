@@ -6371,6 +6371,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raw_editor"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "gpui_platform",
+ "mock_fixtures",
+ "vault",
+]
+
+[[package]]
 name = "rayon"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
