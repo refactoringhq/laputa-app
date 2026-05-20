@@ -216,17 +216,22 @@ mod macos {
         }
     }
 
-    /// Run `f` against any live Tolaria window — prefers
-    /// [`App::active_window`] but falls through to the first entry in
-    /// [`App::windows`] when the active handle no longer resolves.
-    /// Used by action handlers (e.g. `ToggleInspector`) whose dispatch
-    /// must not silently fail just because AppKit's focus tracker is
-    /// briefly out of sync with the App's live-window list (typically
-    /// right after a close-and-reopen cycle, which is what produced
-    /// the "ToggleInspector update failed: window not found" reports).
+    /// Run `f` against any live Tolaria window — prefers the first
+    /// entry in [`App::windows`] (the App's live-window registry,
+    /// always live) over [`App::active_window`] (AppKit focus tracker,
+    /// occasionally stale right after a close-and-reopen cycle —
+    /// which is what produced the "ToggleInspector update failed:
+    /// window not found" reports).
     ///
     /// `f` runs in the window's update context, so `Window`-typed
     /// methods such as `Window::toggle_inspector` work directly.
+    ///
+    /// Gated by `cfg(debug_assertions)` because the only current
+    /// caller (`ToggleInspector`) is itself debug-only — gpui's
+    /// `Window::toggle_inspector` is gated by
+    /// `cfg(any(feature = "inspector", debug_assertions))`.  Un-gate
+    /// the helper if a release-path action handler needs it later.
+    #[cfg(debug_assertions)]
     fn dispatch_to_any_window<F>(label: &'static str, cx: &mut App, f: F)
     where
         F: FnOnce(gpui::AnyView, &mut gpui::Window, &mut App),
@@ -389,9 +394,26 @@ mod macos {
                 // the staleness window without depending on AppKit's
                 // focus tracking.
                 cx.on_action(|_: &actions::ToggleInspector, cx| {
+                    // `Window::toggle_inspector` is only compiled when
+                    // gpui's `inspector` feature is on, which our
+                    // workspace gets implicitly from `debug_assertions`
+                    // — present in debug builds, absent in release.
+                    // Gate the call with the same predicate so the
+                    // action handler still compiles in release; in
+                    // release it logs and no-ops rather than failing
+                    // the build.
+                    #[cfg(debug_assertions)]
                     dispatch_to_any_window("ToggleInspector", cx, |_, window, app_cx| {
-                        window.toggle_inspector(app_cx)
+                        window.toggle_inspector(app_cx);
                     });
+                    #[cfg(not(debug_assertions))]
+                    {
+                        let _ = cx;
+                        log::debug!(
+                            "ToggleInspector: gpui inspector is not available in release \
+                             builds (debug_assertions disabled)"
+                        );
+                    }
                 });
 
                 // 7. Native menu bar (installed before window open so AppKit picks
