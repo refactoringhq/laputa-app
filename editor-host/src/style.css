@@ -40,6 +40,18 @@ body {
     color: var(--fg);
 }
 
+/* The EditorApp wraps `<BlockNoteViewRaw>` in this container so the
+   link-activation listeners (`linkActivation.ts`) and the eventual
+   image-drop / lightbox / copy-target overlays (8.28+) have a stable
+   DOM seat.  Fill the parent so the BlockNote surface still owns the
+   full WKWebView viewport. */
+.editor-host-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
 /* The BlockNote-supplied editor wrapper fills the host element so the
    ProseMirror surface picks up the full WKWebView viewport. */
 #editor-root > .bn-container,

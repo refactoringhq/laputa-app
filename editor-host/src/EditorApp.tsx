@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BlockNoteEditor } from "@blocknote/core";
-import { BlockNoteViewRaw } from "@blocknote/react";
+import { BlockNoteViewRaw, SuggestionMenuController } from "@blocknote/react";
 import { onReceive, send, type ThemeMode, type ToHost } from "./bridge.ts";
 import { createEditor } from "./setupEditor.ts";
 import { blocksToMarkdown, markdownToBlocks, replaceDocument } from "./richEditorMarkdown.ts";
+import { EditorMenus } from "./menus.tsx";
+import { attachEditorLinkActivation } from "./linkActivation.ts";
+import {
+    WIKILINK_MIN_QUERY_LENGTH,
+    buildWikilinkGetItems,
+} from "./wikilinkSuggestion.ts";
 
 // ---------------------------------------------------------------------------
 // Bridge dispatch (pure-logic helper, exported for tests)
@@ -88,11 +94,15 @@ const DIRTY_DEBOUNCE_MS = 150;
  *   stale closures across `NoteOpen` swaps).
  * - The theme state (drives the `theme` prop on `BlockNoteViewRaw`).
  * - The bridge handler installed on `window.tolariaBridge.receive`.
+ * - The editor container ref consumed by `attachEditorLinkActivation`
+ *   so Cmd+click on a wikilink / URL routes through the bridge.
  *
- * Phase 8.25–8.30 hang menus / wikilinks / IME / lifecycle hooks off
- * this component.  Keep state additions in the existing module shape:
- * editor construction in `setupEditor.ts`, markdown helpers in
- * `richEditorMarkdown.ts`, dispatch logic in `dispatchToHost`.
+ * Phase 8.27–8.30 hang IME / lifecycle hooks off this component.
+ * Keep state additions in the existing module shape: editor
+ * construction in `setupEditor.ts`, markdown helpers in
+ * `richEditorMarkdown.ts`, dispatch logic in `dispatchToHost`,
+ * wikilink suggestion machinery in `wikilinkSuggestion.ts`, link
+ * activation in `linkActivation.ts`.
  */
 export function EditorApp() {
     // Editor lifecycle is *deliberately* independent of prop changes
@@ -104,6 +114,7 @@ export function EditorApp() {
     const activeIdRef = useRef<number | null>(null);
     const dirtyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const dirtyAnnouncedForIdRef = useRef<number | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const cancelDirty = (): void => {
         if (dirtyTimerRef.current !== null) {
@@ -141,6 +152,17 @@ export function EditorApp() {
         onReceive((msg: ToHost) => dispatchToHost(editor, msg, handlers));
     }, [editor, handlers]);
 
+    // Install link-activation listeners on the editor container.
+    // Cmd+click on a wikilink span or anchor posts
+    // `FromHost::LinkClick { target }` over the bridge; the native
+    // shell handles wikilink lookup / URL routing.  Cleanup runs on
+    // unmount so StrictMode double-mount doesn't leak listeners.
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        return attachEditorLinkActivation(container);
+    }, []);
+
     // Wire the BlockNote `onChange` -> debounced `Dirty`.  Subscribe in
     // an effect so the subscription tears down with the component (and
     // so React StrictMode double-mount doesn't leak two listeners).
@@ -165,21 +187,49 @@ export function EditorApp() {
         };
     }, [editor]);
 
+    // Wikilink suggestion menu (Phase 8.26).  Stable `getItems`
+    // closure for the editor's lifetime — the underlying provider
+    // currently returns an empty list because the native bridge does
+    // not yet expose `FromHost::WikilinkQuery` /
+    // `ToHost::WikilinkSuggestions` (TODO 8.26-bridge).  The menu
+    // surface still opens on `[[` so 8.27+ regressions don't have to
+    // re-add the controller.
+    const getWikilinkItems = useMemo(
+        () => buildWikilinkGetItems(editor),
+        [editor],
+    );
+
     return (
-        <BlockNoteViewRaw
-            editor={editor}
-            theme={theme}
-            // 8.25 will replace these with real menus.  Disable for
-            // 8.24 so the bare mount doesn't render unstyled floating
-            // popovers (the default UI assumes Mantine).
-            formattingToolbar={false}
-            linkToolbar={false}
-            slashMenu={false}
-            sideMenu={false}
-            filePanel={false}
-            tableHandles={false}
-            emojiPicker={false}
-            comments={false}
-        />
+        // The wrapper div hosts the link-activation listeners and
+        // gives 8.28+ a natural seat for image-drop / lightbox /
+        // copy-target overlays.  Sized to fill the WKWebView via the
+        // existing `style.css` rules.
+        <div ref={containerRef} className="editor-host-container">
+            <BlockNoteViewRaw
+                editor={editor}
+                theme={theme}
+                // Default menu surfaces are *disabled* on the host —
+                // `EditorMenus` mounts the three controllers explicitly
+                // so we can attach the hover guards (see `menus.tsx`).
+                // Link toolbar / file panel / table handles / emoji
+                // picker / comments stay off until later rows wire
+                // them.
+                formattingToolbar={false}
+                linkToolbar={false}
+                slashMenu={false}
+                sideMenu={false}
+                filePanel={false}
+                tableHandles={false}
+                emojiPicker={false}
+                comments={false}
+            >
+                <EditorMenus editor={editor} />
+                <SuggestionMenuController
+                    triggerCharacter="[["
+                    getItems={getWikilinkItems}
+                    minQueryLength={WIKILINK_MIN_QUERY_LENGTH}
+                />
+            </BlockNoteViewRaw>
+        </div>
     );
 }
