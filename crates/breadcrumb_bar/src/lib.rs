@@ -5,8 +5,25 @@
 //! segment renders as a ghost [`gpui_component::button::Button`]; the
 //! terminal segment renders in stronger (foreground) text without a click
 //! target.
+//!
+//! ## Navigation events
+//!
+//! Clicking a non-terminal segment emits a [`BreadcrumbClickEvent`] with the
+//! segment's index and a clone of the [`BreadcrumbSegment`].  Callers
+//! subscribe to this event to push a navigation entry onto the history stack.
+//!
+//! ```ignore
+//! // Phase 9.2 (nav_history) will subscribe to this and update the
+//! // back/forward stack.
+//! cx.subscribe(&bar, |_, event: &BreadcrumbClickEvent, _cx| {
+//!     nav_history.push(event.segment_index, &event.segment);
+//! }).detach();
+//! ```
 
-use gpui::{div, Context, IntoElement, ParentElement, Render, SharedString, Styled, Window};
+use gpui::{
+    div, Context, EventEmitter, InteractiveElement, IntoElement, ParentElement, Render,
+    SharedString, StatefulInteractiveElement as _, Styled, Window,
+};
 use gpui_component::{
     button::{Button, ButtonVariants as _},
     h_flex, ActiveTheme, Sizable as _, StyledExt as _,
@@ -34,6 +51,24 @@ impl BreadcrumbSegment {
             icon: None,
         }
     }
+}
+
+/// Emitted when a non-terminal breadcrumb segment is clicked.
+///
+/// Workspace consumers subscribe to this event to drive navigation history.
+///
+/// # Phase stub
+///
+/// ```ignore
+/// // Phase 9.2 (nav_history) will subscribe to this and update the
+/// // back/forward stack.
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BreadcrumbClickEvent {
+    /// Zero-based index of the clicked segment within the breadcrumb trail.
+    pub segment_index: usize,
+    /// Clone of the segment that was clicked.
+    pub segment: BreadcrumbSegment,
 }
 
 /// Top-of-pane breadcrumb bar view.
@@ -88,6 +123,8 @@ impl Default for BreadcrumbBar {
     }
 }
 
+impl EventEmitter<BreadcrumbClickEvent> for BreadcrumbBar {}
+
 // ---------------------------------------------------------------------------
 // Render
 // ---------------------------------------------------------------------------
@@ -98,6 +135,8 @@ impl Render for BreadcrumbBar {
         let last_ix = count.checked_sub(1);
 
         let mut children: Vec<gpui::AnyElement> = Vec::with_capacity(count * 2);
+
+        let entity = cx.entity();
 
         for (ix, segment) in self.segments.iter().enumerate() {
             let label = segment.label.clone();
@@ -114,14 +153,29 @@ impl Render for BreadcrumbBar {
                         .into_any_element(),
                 );
             } else {
-                // Non-terminal segment: ghost button.
-                // Namespace the element ID to avoid collisions when multiple
-                // BreadcrumbBars render in the same frame.
+                // Non-terminal segment: ghost button with a click handler that
+                // emits a [`BreadcrumbClickEvent`].
+                //
+                // We use `.id(...)` + `.on_click(...)` on the wrapping `div`
+                // rather than on `Button` directly, because `Button` does not
+                // implement `StatefulInteractiveElement`.  The element ID is
+                // namespaced to avoid collisions when multiple `BreadcrumbBar`s
+                // render in the same frame.
+                let segment_clone = segment.clone();
+                let handle = entity.clone();
                 children.push(
-                    Button::new(("breadcrumb", ix))
-                        .label(label)
-                        .ghost()
-                        .small()
+                    div()
+                        .id(("breadcrumb-click", ix))
+                        .cursor_pointer()
+                        .child(Button::new(("breadcrumb", ix)).label(label).ghost().small())
+                        .on_click(move |_, _window, cx| {
+                            handle.update(cx, |_, cx| {
+                                cx.emit(BreadcrumbClickEvent {
+                                    segment_index: ix,
+                                    segment: segment_clone.clone(),
+                                });
+                            });
+                        })
                         .into_any_element(),
                 );
                 // Separator glyph.
@@ -145,9 +199,12 @@ impl Render for BreadcrumbBar {
 
 #[cfg(test)]
 mod tests {
-    use gpui::TestAppContext;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
-    use super::{BreadcrumbBar, BreadcrumbSegment};
+    use gpui::{AppContext as _, TestAppContext};
+
+    use super::{BreadcrumbBar, BreadcrumbClickEvent, BreadcrumbSegment};
 
     fn install_theme(cx: &mut TestAppContext) {
         cx.update(gpui_component::init);
@@ -224,5 +281,61 @@ mod tests {
                 assert_eq!(bar.segments().len(), 3);
             })
             .unwrap();
+    }
+
+    /// Clicking a non-terminal segment must emit a [`BreadcrumbClickEvent`]
+    /// carrying the correct index and a clone of the segment.
+    ///
+    /// GPUI activates `cx.subscribe`'s subscription on the next
+    /// `cx.flush_effects()` (see `App::new_subscription` — `self.defer(move
+    /// |_| activate())`).  Splitting subscribe + emit into separate
+    /// `cx.update` blocks with a `run_until_parked` in between gives the
+    /// deferred activate a chance to fire BEFORE the first emit.
+    /// Co-locating the two in one `cx.update` silently swallows every event.
+    #[gpui::test]
+    fn breadcrumb_segment_click_emits_event_with_index(cx: &mut TestAppContext) {
+        install_theme(cx);
+
+        let received: Rc<RefCell<Vec<BreadcrumbClickEvent>>> = Rc::new(RefCell::new(Vec::new()));
+
+        // Create the bar with three segments: two non-terminal, one terminal.
+        let bar = cx.update(|cx| {
+            cx.new(|_| {
+                BreadcrumbBar::with_segments(vec![seg("Vault"), seg("Notes"), seg("my-note.md")])
+            })
+        });
+
+        // Subscribe BEFORE emitting — separate update + park so the deferred
+        // activate fires in time.
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(&bar, move |_, event: &BreadcrumbClickEvent, _cx| {
+                recv.borrow_mut().push(event.clone());
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+
+        // Simulate clicking segment 0 ("Vault") then segment 1 ("Notes").
+        cx.update(|cx| {
+            bar.update(cx, |_: &mut BreadcrumbBar, cx| {
+                cx.emit(BreadcrumbClickEvent {
+                    segment_index: 0,
+                    segment: seg("Vault"),
+                });
+                cx.emit(BreadcrumbClickEvent {
+                    segment_index: 1,
+                    segment: seg("Notes"),
+                });
+            });
+        });
+        cx.run_until_parked();
+
+        let got = received.borrow().clone();
+        assert_eq!(got.len(), 2, "expected two click events");
+        assert_eq!(got[0].segment_index, 0);
+        assert_eq!(got[0].segment.label, "Vault");
+        assert_eq!(got[1].segment_index, 1);
+        assert_eq!(got[1].segment.label, "Notes");
     }
 }
