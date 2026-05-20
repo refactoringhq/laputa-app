@@ -32,6 +32,8 @@
 2.23. The sidebar-types-sort button does not work
 2.24. Install @blocknote/shadcn and restore BlockNote menu UI primitives (SideMenu drag handle, etc. — depends on a ComponentsContext.Provider that only the UI subpackages install; tracked here so the 1.2 quick fix can land)
 2.25. ✅ Redirect WebView console logs to the tolaria in-process simple logger
+2.26. ✅ Round-tripping open/save reformats frontmatter (YAML round-trips byte-for-byte; body whitespace normalisation under `blocksToMarkdownLossy` deferred to a follow-up row mirroring React's `compactMarkdown` + `serializeDurableEditorBlocks` chain)
+2.27. Frontmatter is not rendered in preview mode (React variant renders a properties panel above the editor body — the native variant shows nothing for the YAML block at all)
 
 ## 3. Low Priority
 

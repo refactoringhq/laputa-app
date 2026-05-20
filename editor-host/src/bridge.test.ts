@@ -25,10 +25,13 @@ function makeHandlers(initial?: {
     cancelCalls: number;
     setActiveIdCalls: Array<number | null>;
     rawNoteCalls: Array<{ id: number; path: string; body: string } | null>;
+    frontmatterCalls: string[];
 } {
     let activeId: number | null = initial?.activeId ?? null;
     const setActiveIdCalls: Array<number | null> = [];
     const rawNoteCalls: Array<{ id: number; path: string; body: string } | null> = [];
+    const frontmatterCalls: string[] = [];
+    let frontmatter = "";
     let rawBuffer: string | null = initial?.rawBuffer ?? null;
     let cancelCalls = 0;
     return {
@@ -50,6 +53,13 @@ function makeHandlers(initial?: {
         getRawBuffer() {
             return rawBuffer;
         },
+        setFrontmatter(prefix) {
+            frontmatterCalls.push(prefix);
+            frontmatter = prefix;
+        },
+        getFrontmatter() {
+            return frontmatter;
+        },
         get cancelCalls() {
             return cancelCalls;
         },
@@ -58,6 +68,9 @@ function makeHandlers(initial?: {
         },
         get rawNoteCalls() {
             return rawNoteCalls;
+        },
+        get frontmatterCalls() {
+            return frontmatterCalls;
         },
     };
 }
@@ -227,6 +240,163 @@ describe("dispatchToHost", () => {
         // Body must match the raw buffer literally — no markdown
         // serialisation could turn a JSON payload into the same string.
         expect(decoded.v.body).toBe('{"a":1}');
+    });
+
+    // -----------------------------------------------------------------
+    // Frontmatter round-trip (worklist 2.26)
+    // -----------------------------------------------------------------
+    //
+    // BlockNote's parser/serialiser pair is lossy on YAML — feeding the
+    // raw frontmatter through `tryParseMarkdownToBlocks` reformats it
+    // as paragraph text and `blocksToMarkdownLossy` cannot reconstruct
+    // the original.  `dispatchToHost` peels the YAML off on `note_open`
+    // and prepends it back on `save_request` so the on-disk block
+    // survives byte-for-byte.
+
+    it("note_open with frontmatter stashes it via setFrontmatter", () => {
+        const handlers = makeHandlers();
+        dispatchToHost(
+            editor,
+            {
+                k: "note_open",
+                v: {
+                    id: 1,
+                    path: "/v/a.md",
+                    body: "---\ntitle: T\ntags: [a, b]\n---\n\n# Heading\n\nBody text\n",
+                },
+            },
+            handlers,
+        );
+        expect(handlers.frontmatterCalls).toEqual([
+            "---\ntitle: T\ntags: [a, b]\n---\n",
+        ]);
+        expect(handlers.getFrontmatter()).toBe(
+            "---\ntitle: T\ntags: [a, b]\n---\n",
+        );
+    });
+
+    it("save_request prepends the stashed frontmatter to BlockNote's body", () => {
+        const handlers = makeHandlers();
+        dispatchToHost(
+            editor,
+            {
+                k: "note_open",
+                v: {
+                    id: 1,
+                    path: "/v/a.md",
+                    body: "---\ntitle: T\ntags: [a, b]\n---\n\n# Heading\n\nBody text\n",
+                },
+            },
+            handlers,
+        );
+
+        const posted: string[] = [];
+        const w = window as unknown as { ipc?: { postMessage(m: string): void } };
+        const prev = w.ipc;
+        w.ipc = { postMessage: (m: string) => posted.push(m) };
+        try {
+            dispatchToHost(editor, { k: "save_request" }, handlers);
+        } finally {
+            w.ipc = prev;
+        }
+
+        expect(posted).toHaveLength(1);
+        const decoded = JSON.parse(posted[0] ?? "") as {
+            k: string;
+            v: { id: number; body: string };
+        };
+        expect(decoded.k).toBe("save");
+        // Body must START with the YAML block byte-for-byte.  We don't
+        // assert the trailing body slice — BlockNote is lossy on body
+        // whitespace; that's a separate worklist row.
+        expect(decoded.v.body.startsWith("---\ntitle: T\ntags: [a, b]\n---\n"))
+            .toBe(true);
+    });
+
+    it("save_request does not invent a frontmatter prefix when none was stashed", () => {
+        const handlers = makeHandlers();
+        dispatchToHost(
+            editor,
+            {
+                k: "note_open",
+                v: { id: 1, path: "/v/a.md", body: "# Heading\n\nBody text\n" },
+            },
+            handlers,
+        );
+        // The split returns an empty prefix for body-only content; the
+        // stash must therefore be "" and the saved body must not start
+        // with `---`.
+        expect(handlers.getFrontmatter()).toBe("");
+
+        const posted: string[] = [];
+        const w = window as unknown as { ipc?: { postMessage(m: string): void } };
+        const prev = w.ipc;
+        w.ipc = { postMessage: (m: string) => posted.push(m) };
+        try {
+            dispatchToHost(editor, { k: "save_request" }, handlers);
+        } finally {
+            w.ipc = prev;
+        }
+
+        const decoded = JSON.parse(posted[0] ?? "") as {
+            k: string;
+            v: { id: number; body: string };
+        };
+        expect(decoded.v.body.startsWith("---")).toBe(false);
+        // The heading must still be there — we only stripped a (missing)
+        // frontmatter prefix, not the body itself.
+        expect(decoded.v.body).toMatch(/^#\s+Heading/m);
+    });
+
+    it("raw-mode note_open does not disturb the stashed frontmatter, and save_request bypasses the prepend", () => {
+        const handlers = makeHandlers();
+        // Open a markdown note with frontmatter so the stash is set.
+        dispatchToHost(
+            editor,
+            {
+                k: "note_open",
+                v: {
+                    id: 1,
+                    path: "/v/a.md",
+                    body: "---\ntitle: Stashed\n---\n\nbody\n",
+                },
+            },
+            handlers,
+        );
+        expect(handlers.getFrontmatter()).toBe("---\ntitle: Stashed\n---\n");
+
+        // Now open a raw note — the raw branch must not touch the
+        // frontmatter stash (it doesn't apply to .yaml / .json / …).
+        dispatchToHost(
+            editor,
+            {
+                k: "note_open",
+                v: { id: 2, path: "/v/cfg.yaml", body: "key: value\n" },
+            },
+            handlers,
+        );
+        // The frontmatter stash is still the markdown note's prefix.
+        // The save path won't use it on the raw branch — `getRawBuffer`
+        // short-circuits — but the value must persist regardless.
+        expect(handlers.getFrontmatter()).toBe("---\ntitle: Stashed\n---\n");
+
+        const posted: string[] = [];
+        const w = window as unknown as { ipc?: { postMessage(m: string): void } };
+        const prev = w.ipc;
+        w.ipc = { postMessage: (m: string) => posted.push(m) };
+        try {
+            dispatchToHost(editor, { k: "save_request" }, handlers);
+        } finally {
+            w.ipc = prev;
+        }
+
+        const decoded = JSON.parse(posted[0] ?? "") as {
+            k: string;
+            v: { id: number; body: string };
+        };
+        // Raw save: body is the raw buffer verbatim, the stashed YAML
+        // prefix must NOT be glued onto a .yaml note.
+        expect(decoded.v.body).toBe("key: value\n");
     });
 
     it("theme_set calls handlers.setTheme with the parsed mode", () => {

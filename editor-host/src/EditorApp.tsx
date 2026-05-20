@@ -4,6 +4,7 @@ import { BlockNoteViewRaw, SuggestionMenuController } from "@blocknote/react";
 import { onReceive, send, type ThemeMode, type ToHost } from "./bridge.ts";
 import { createEditor } from "./setupEditor.ts";
 import { blocksToMarkdown, markdownToBlocks, replaceDocument } from "./richEditorMarkdown.ts";
+import { splitFrontmatter } from "./frontmatter.ts";
 import { EditorMenus } from "./menus.tsx";
 import { attachEditorLinkActivation } from "./linkActivation.ts";
 import {
@@ -65,6 +66,12 @@ export interface EditorBridgeHandlers {
      *  string the CodeMirror editor has flushed to React, or `null`
      *  when the active note is markdown-shaped. */
     getRawBuffer(): string | null;
+    /** Stash the frontmatter prefix from the current note so a
+     *  subsequent `save_request` can prepend it byte-for-byte and
+     *  avoid BlockNote's lossy YAML reformat (worklist 2.26). */
+    setFrontmatter(prefix: string): void;
+    /** Read the stashed frontmatter prefix at save time. */
+    getFrontmatter(): string;
 }
 
 /**
@@ -107,7 +114,16 @@ export function dispatchToHost(
                 });
             } else {
                 handlers.setRawNote(null);
-                const parsed = markdownToBlocks(editor, msg.v.body);
+                // Peel YAML frontmatter off before handing the body to
+                // BlockNote — the parser/serialiser pair is lossy on
+                // YAML and would reformat the block as paragraph text
+                // on save.  We stash the original prefix and prepend
+                // it back on `save_request` (worklist 2.26).  Raw-mode
+                // notes ship the buffer as-is, so this branch is the
+                // only one that needs the split.
+                const [frontmatter, body] = splitFrontmatter(msg.v.body);
+                handlers.setFrontmatter(frontmatter);
+                const parsed = markdownToBlocks(editor, body);
                 replaceDocument(editor, parsed);
             }
             break;
@@ -124,7 +140,11 @@ export function dispatchToHost(
             // paths emit the same `Save` envelope so the native
             // shell doesn't need a discriminant.
             const rawBody = handlers.getRawBuffer();
-            const body = rawBody ?? blocksToMarkdown(editor);
+            // Markdown notes prepend the stashed YAML prefix (worklist
+            // 2.26) so the frontmatter block survives byte-for-byte;
+            // raw notes already ship the original buffer untouched.
+            const body =
+                rawBody ?? `${handlers.getFrontmatter()}${blocksToMarkdown(editor)}`;
             // `Saved` vs `Save` discrimination would require a clean-body
             // ledger; for 8.24 we always emit `Save` (matches the React
             // app's "every save is a write" semantics). Cheap dirty
@@ -187,6 +207,14 @@ export function EditorApp() {
     // on `save_request`.  Kept as a ref instead of state so the save
     // path doesn't suffer a re-render of the (potentially-large) doc.
     const rawBufferRef = useRef<string | null>(null);
+    // Stashed YAML frontmatter prefix from the current markdown note.
+    // Set on every `note_open` (markdown branch) by `splitFrontmatter`
+    // and prepended back on `save_request` so the on-disk YAML
+    // survives BlockNote's lossy round-trip (worklist 2.26).  Empty
+    // string when the note has no frontmatter.  A ref (not state) so
+    // the save path doesn't churn through React for a non-rendered
+    // value.
+    const frontmatterRef = useRef<string>("");
     // Tracks the raw-vs-rich mode of the *previous* note so the
     // position-sync hook can capture the outgoing snapshot on the
     // correct surface during a mode flip.
@@ -288,6 +316,12 @@ export function EditorApp() {
             },
             getRawBuffer() {
                 return rawBufferRef.current;
+            },
+            setFrontmatter(prefix) {
+                frontmatterRef.current = prefix;
+            },
+            getFrontmatter() {
+                return frontmatterRef.current;
             },
         }),
         [tabSwap],
