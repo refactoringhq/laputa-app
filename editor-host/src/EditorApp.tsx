@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BlockNoteEditor } from "@blocknote/core";
-import { BlockNoteViewRaw, SuggestionMenuController } from "@blocknote/react";
+import { SuggestionMenuController } from "@blocknote/react";
+// `@blocknote/shadcn`'s `BlockNoteView` wraps `BlockNoteViewRaw` with a
+// real `ComponentsContext.Provider` (shadcn components map).  The Raw
+// variant exported by `@blocknote/react` is headless and does NOT
+// install that provider — which is why mounting `<SideMenuController />`
+// against Raw threw `Cannot read properties of undefined (reading
+// 'Button')` on the first mousemove (worklist 1.2 → 2.24).
+import { BlockNoteView } from "@blocknote/shadcn";
 import { onReceive, send, type ThemeMode, type ToHost } from "./bridge.ts";
 import { createEditor } from "./setupEditor.ts";
 import { blocksToMarkdown, markdownToBlocks, replaceDocument } from "./richEditorMarkdown.ts";
@@ -502,7 +509,7 @@ export function EditorApp() {
                     latestContentRef={rawBufferRef}
                 />
             ) : (
-                <BlockNoteViewRaw
+                <BlockNoteView
                     editor={editor}
                     theme={theme}
                     // Default menu surfaces are *disabled* on the host —
@@ -526,7 +533,7 @@ export function EditorApp() {
                         getItems={getWikilinkItems}
                         minQueryLength={WIKILINK_MIN_QUERY_LENGTH}
                     />
-                </BlockNoteViewRaw>
+                </BlockNoteView>
             )}
         </div>
     );

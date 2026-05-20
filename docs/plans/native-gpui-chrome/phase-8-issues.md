@@ -30,7 +30,7 @@
 2.21. ✅ Notes list sort dropdown appears under the web view pannel
 2.22. ✅ Notes list top bar search: Esc button shodu close the search line and clear the search query
 2.23. The sidebar-types-sort button should be Types Filter button
-2.24. Install @blocknote/shadcn and restore BlockNote menu UI primitives
+2.24. ✅ Install @blocknote/shadcn and restore BlockNote menu UI primitives
 2.25. ✅ Redirect WebView console logs to the tolaria in-process simple logger
 2.26. ✅ Round-tripping open/save reformats frontmatter
 2.27. Frontmatter is not rendered in preview mode
@@ -61,7 +61,7 @@ note-toolbar tooltips now render in a `WindowKind::PopUp` panel via `ui::Overlay
 
 #### 2.24
 
-SideMenu drag handle, etc. — depends on a ComponentsContext.Provider that only the UI subpackages install; tracked here so the 1.2 quick fix can land
+SideMenu drag handle, etc. — depends on a ComponentsContext.Provider that only the UI subpackages install; tracked here so the 1.2 quick fix can land. Now wired via `@blocknote/shadcn`'s `BlockNoteView` which installs the ComponentsContext.Provider; SideMenuController re-mounted in menus.tsx without the e.SideMenu.Button throw.
 
 #### 2.27
 

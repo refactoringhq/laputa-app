@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
-import { BlockNoteViewRaw } from "@blocknote/react";
+import { SideMenuController } from "@blocknote/react";
+import { BlockNoteView } from "@blocknote/shadcn";
 import { createEditor } from "./setupEditor.ts";
 import { EditorMenus } from "./menus.tsx";
 
@@ -19,10 +20,10 @@ afterEach(() => {
 });
 
 describe("EditorMenus", () => {
-    it("mounts inside BlockNoteViewRaw without throwing", () => {
+    it("mounts inside BlockNoteView without throwing", () => {
         const editor = createEditor();
         const { container, unmount } = render(
-            <BlockNoteViewRaw
+            <BlockNoteView
                 editor={editor}
                 formattingToolbar={false}
                 linkToolbar={false}
@@ -34,7 +35,7 @@ describe("EditorMenus", () => {
                 comments={false}
             >
                 <EditorMenus editor={editor} />
-            </BlockNoteViewRaw>,
+            </BlockNoteView>,
         );
 
         // BlockNote always renders a `.bn-container` wrapper, regardless
@@ -49,7 +50,7 @@ describe("EditorMenus", () => {
     it("re-renders when the editor selection changes without throwing", () => {
         const editor = createEditor();
         const { rerender, unmount } = render(
-            <BlockNoteViewRaw
+            <BlockNoteView
                 editor={editor}
                 formattingToolbar={false}
                 linkToolbar={false}
@@ -61,12 +62,12 @@ describe("EditorMenus", () => {
                 comments={false}
             >
                 <EditorMenus editor={editor} />
-            </BlockNoteViewRaw>,
+            </BlockNoteView>,
         );
 
         // Force a re-render to exercise the hover-guard hook deps.
         rerender(
-            <BlockNoteViewRaw
+            <BlockNoteView
                 editor={editor}
                 formattingToolbar={false}
                 linkToolbar={false}
@@ -78,9 +79,39 @@ describe("EditorMenus", () => {
                 comments={false}
             >
                 <EditorMenus editor={editor} />
-            </BlockNoteViewRaw>,
+            </BlockNoteView>,
         );
 
+        unmount();
+    });
+
+    // -----------------------------------------------------------------
+    // Worklist 1.2 / 2.24 regression — SideMenuController mounted
+    // against the headless `BlockNoteViewRaw` blew up on first mousemove
+    // because the default AddBlockButton dereferences `e.SideMenu.Button`
+    // off an undefined components map.  Once `@blocknote/shadcn` is
+    // wrapped around the view, that map is populated.  happy-dom
+    // doesn't fire BlockNote's mousemove-driven menu opening, so this
+    // test asserts only the *mount* path; the hover throw is what
+    // worklist-2.25 console redirection surfaces in the live app.
+    // -----------------------------------------------------------------
+    it("SideMenuController mounts inside shadcn BlockNoteView without throwing", () => {
+        const editor = createEditor();
+        const { unmount } = render(
+            <BlockNoteView
+                editor={editor}
+                formattingToolbar={false}
+                linkToolbar={false}
+                slashMenu={false}
+                sideMenu={false}
+                filePanel={false}
+                tableHandles={false}
+                emojiPicker={false}
+                comments={false}
+            >
+                <SideMenuController />
+            </BlockNoteView>,
+        );
         unmount();
     });
 });

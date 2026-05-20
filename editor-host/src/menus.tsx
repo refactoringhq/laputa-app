@@ -3,6 +3,7 @@ import type { BlockNoteEditor } from "@blocknote/core";
 import { filterSuggestionItems } from "@blocknote/core/extensions";
 import {
     FormattingToolbarController,
+    SideMenuController,
     SuggestionMenuController,
     getDefaultReactSlashMenuItems,
 } from "@blocknote/react";
@@ -128,16 +129,15 @@ export function EditorMenus({ editor }: EditorMenusProps) {
     return (
         <>
             {/*
-             * SideMenuController removed (worklist 1.2): without a
-             * BlockNote UI package (e.g. @blocknote/shadcn) supplying a
-             * ComponentsContext.Provider, the default AddBlockButton
-             * inside SideMenuController dereferences `e.SideMenu.Button`
-             * where `e` is the (missing) components map.  That throws on
-             * the first mousemove over the editor — which AppKit reports
-             * as the WKWebView going "blank on hover".  Restoring the
-             * drag-handle gutter is tracked as worklist 2.24 (install
-             * @blocknote/shadcn + ComponentsContext.Provider wiring).
+             * Worklist 2.24: SideMenuController re-mounted now that
+             * `@blocknote/shadcn` installs a real ComponentsContext.Provider
+             * upstream (see `EditorApp.tsx`'s `<BlockNoteView>` mount).
+             * The default AddBlockButton dereferences `e.SideMenu.Button`
+             * against that provider's components map instead of `undefined`,
+             * so the first mousemove no longer throws and the WKWebView
+             * keeps its drag-handle gutter.
              */}
+            <SideMenuController />
             <FormattingToolbarController />
             <SuggestionMenuController
                 triggerCharacter="/"
