@@ -32,17 +32,20 @@ use std::path::Path as StdPath;
 use chrono::{DateTime, Utc};
 use gpui::prelude::FluentBuilder as _;
 use gpui::rgb;
+use gpui::AppContext as _;
 use gpui::EventEmitter;
 use gpui::{
-    div, px, rems, AnyElement, App, Context, Hsla, InteractiveElement, IntoElement, ParentElement,
-    Render, SharedString, StatefulInteractiveElement, Styled, TextOverflow, Window,
+    div, px, rems, AnyElement, App, Context, Entity, Hsla, InteractiveElement, IntoElement,
+    ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, TextOverflow, Window,
 };
 use gpui_component::{
     button::{Button, ButtonVariants as _},
     checkbox::Checkbox,
     h_flex,
+    input::{Input, InputEvent, InputState},
+    menu::DropdownMenu as _,
     scroll::ScrollableElement as _,
-    v_flex, ActiveTheme, IconName, StyledExt as _,
+    v_flex, ActiveTheme, IconName, Sizable as _, StyledExt as _,
 };
 use mock_fixtures::{MockVault, NoteId, NoteKind};
 use ui::tree_dump::DumpAsExt as _;
@@ -60,6 +63,111 @@ use workspace::panel::{DockPosition, Panel};
 pub struct OpenNoteEvent {
     /// Identifier of the note the user wants to open.
     pub id: NoteId,
+}
+
+/// Emitted when the user clicks Delete or Archive in the bulk action bar.
+///
+/// The subscriber (typically `TolariaWorkspace`) performs the vault mutation.
+/// `NoteListPane` itself immediately calls `clear_selection` after emitting so
+/// the bulk bar collapses and the count chip resets without waiting for the
+/// workspace round-trip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BulkActionEvent {
+    /// Permanently delete every currently-selected note.
+    DeleteSelected,
+    /// Move every currently-selected note to the archive.
+    ArchiveSelected,
+}
+
+/// Sort order applied to the visible note rows.
+///
+/// Defaults to [`NoteListSort::ModifiedDesc`] — newest-modified first,
+/// matching the React reference.  Persisted on `NoteListPane` and toggled
+/// via the sort glyph in the header.
+///
+/// `Created` (asc/desc) sort variants intentionally absent — neither
+/// `vault::Note` nor `mock_fixtures::MockNote` exposes a created-time
+/// distinct from modified-time through the shared [`NoteEntry`] shape,
+/// so a `Created` variant would silently alias `Modified` and surprise
+/// the user.  The variants land when the vault wires a real created
+/// timestamp through to `NoteEntry::created`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NoteListSort {
+    /// Most recently modified first (default).
+    #[default]
+    ModifiedDesc,
+    /// Oldest modified first.
+    ModifiedAsc,
+    /// Alphabetical by title, A → Z.
+    TitleAsc,
+    /// Alphabetical by title, Z → A.
+    TitleDesc,
+}
+
+impl NoteListSort {
+    /// Short label shown in the sort glyph button (mirrors the React header).
+    fn label(self) -> &'static str {
+        match self {
+            Self::ModifiedDesc | Self::ModifiedAsc => "Modified",
+            Self::TitleAsc | Self::TitleDesc => "Title",
+        }
+    }
+}
+
+/// Small status glyph rendered at the right edge of certain note rows.
+///
+/// Mirrors the React `NoteList.tsx` status indicators.  `None` is the
+/// common case; non-`None` variants signal structured-content notes
+/// (e.g. a note that contains a chart, a linked contact, etc.).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RowStatus {
+    /// No status glyph.
+    #[default]
+    None,
+    /// Note contains a chart / metric.
+    Chart,
+    /// Note is a person / contact record.
+    Person,
+    /// Note is calendar-linked (an event).
+    Calendar,
+    /// Note is a project or task tracker.
+    Project,
+}
+
+impl RowStatus {
+    /// Derive a row status from a note entry's type icon.  This is a
+    /// best-effort heuristic: in Phase 8 the vault has no explicit
+    /// status flag, so we mirror the type icon that was already computed
+    /// from the `type/<stem>.md` frontmatter during `from_vault`.
+    ///
+    /// TODO(Phase 10.x): drive `RowStatus` from the note's
+    /// `properties["type"]` string instead of the icon.  The icon is a
+    /// presentation choice and a user remapping (e.g. `Person → IconName::Star`)
+    /// would silently coerce every Person row to `RowStatus::None`.  The
+    /// vault's `type/<stem>.md` frontmatter is the load-bearing source of
+    /// truth; the icon is just one projection of it.
+    fn from_type_icon(icon: IconName) -> Self {
+        match icon {
+            IconName::ChartPie => Self::Chart,
+            IconName::User => Self::Person,
+            IconName::Calendar => Self::Calendar,
+            IconName::Frame => Self::Project,
+            _ => Self::None,
+        }
+    }
+
+    /// Returns the icon name used to render this status, or `None` when
+    /// no glyph should be drawn.  Used by the row render to pick a
+    /// right-edge status glyph for structured-content notes.
+    pub fn icon(self) -> Option<IconName> {
+        match self {
+            Self::None => None,
+            Self::Chart => Some(IconName::ChartPie),
+            Self::Person => Some(IconName::User),
+            Self::Calendar => Some(IconName::Calendar),
+            Self::Project => Some(IconName::Frame),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +232,8 @@ struct RowData {
     type_color: Hsla,
     checked: bool,
     selected: bool,
+    /// Status glyph derived from the note's type at projection time.
+    row_status: RowStatus,
 }
 
 /// Mix `color` with `base` at the given alpha so it reads as a soft
@@ -539,6 +649,15 @@ pub struct NoteListPane {
     /// "active note" highlight in the reference screenshots.
     selected_id: Option<NoteId>,
     position: DockPosition,
+    /// Current sort order applied to [`Self::visible_entries`].
+    /// Defaults to [`NoteListSort::ModifiedDesc`].
+    sort_order: NoteListSort,
+    /// Whether the inline filter text strip is visible below the header.
+    filter_open: bool,
+    /// GPUI input state for the filter text strip.  Created lazily when
+    /// the user first opens the strip and retained afterwards so the
+    /// query survives open/close toggles without being wiped.
+    filter_input: Option<Entity<InputState>>,
 }
 
 impl NoteListPane {
@@ -551,6 +670,9 @@ impl NoteListPane {
             selected: HashSet::new(),
             selected_id: None,
             position: DockPosition::Left,
+            sort_order: NoteListSort::default(),
+            filter_open: false,
+            filter_input: None,
         }
     }
 
@@ -604,6 +726,9 @@ impl NoteListPane {
             selected: HashSet::new(),
             selected_id,
             position: DockPosition::Left,
+            sort_order: NoteListSort::default(),
+            filter_open: false,
+            filter_input: None,
         }
     }
 
@@ -661,6 +786,9 @@ impl NoteListPane {
             selected: HashSet::new(),
             selected_id,
             position: DockPosition::Left,
+            sort_order: NoteListSort::default(),
+            filter_open: false,
+            filter_input: None,
         }
     }
 
@@ -721,26 +849,101 @@ impl NoteListPane {
         self.selected.len()
     }
 
-    /// Entries that pass the current filter AND scope, in original
-    /// insertion order.
+    /// Entries that pass the current filter AND scope, sorted by
+    /// [`Self::sort_order`].
     ///
     /// Returns every entry when both filter and scope are
     /// pass-throughs (the default — empty filter, scope =
-    /// [`NoteListScope::Inbox`]).  Lazy: no allocation per render —
-    /// the consumer (`render`) drives the filter inline.  `S-2`
-    /// follow-up of the Phase 7 review.
+    /// [`NoteListScope::Inbox`]).  Allocates a `Vec` for the sort
+    /// step; the unsorted path (no filter, no scope) just iterates.
     pub fn visible_entries(&self) -> impl Iterator<Item = &NoteEntry> + '_ {
         // MSRV is 1.77 — `Option::is_none_or` (1.82) is not available,
         // so we keep the `map_or(true, …)` predicate.
         let q = (!self.filter.is_empty()).then(|| self.filter.to_lowercase());
         let scope = self.scope.clone();
-        self.entries.iter().filter(move |e| {
-            if !scope_matches(&scope, e) {
-                return false;
-            }
-            q.as_deref()
-                .map_or(true, |q| e.title.to_lowercase().contains(q))
-        })
+        let mut out: Vec<&NoteEntry> = self
+            .entries
+            .iter()
+            .filter(move |e| {
+                if !scope_matches(&scope, e) {
+                    return false;
+                }
+                q.as_deref()
+                    .map_or(true, |q| e.title.to_lowercase().contains(q))
+            })
+            .collect();
+        // Title is used as a stable tie-breaker for the time-based sorts so
+        // notes with identical `modified` timestamps (e.g. files written
+        // back-to-back in a test fixture) produce a deterministic order
+        // instead of leaking filesystem-walk order through to the UI.
+        match self.sort_order {
+            NoteListSort::ModifiedDesc => out.sort_by(|a, b| {
+                b.modified
+                    .cmp(&a.modified)
+                    .then_with(|| a.title.cmp(&b.title))
+            }),
+            NoteListSort::ModifiedAsc => out.sort_by(|a, b| {
+                a.modified
+                    .cmp(&b.modified)
+                    .then_with(|| a.title.cmp(&b.title))
+            }),
+            NoteListSort::TitleAsc => out.sort_by(|a, b| a.title.cmp(&b.title)),
+            NoteListSort::TitleDesc => out.sort_by(|a, b| b.title.cmp(&a.title)),
+        }
+        out.into_iter()
+    }
+
+    /// Current sort order.  Test / debugging hook.
+    #[must_use]
+    pub fn sort_order(&self) -> NoteListSort {
+        self.sort_order
+    }
+
+    /// Update the sort order and re-render.
+    pub fn set_sort_order(&mut self, order: NoteListSort, cx: &mut Context<Self>) {
+        if self.sort_order != order {
+            self.sort_order = order;
+            cx.notify();
+        }
+    }
+
+    /// Whether the inline filter strip is currently open.
+    #[must_use]
+    pub fn filter_open(&self) -> bool {
+        self.filter_open
+    }
+
+    /// Toggle the inline filter strip.  Opening it lazily creates
+    /// (or reuses) the [`InputState`] and subscribes to its
+    /// [`InputEvent::Change`] so every keystroke calls [`Self::set_filter`].
+    pub fn toggle_filter_open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.filter_open = !self.filter_open;
+        if self.filter_open && self.filter_input.is_none() {
+            let input = cx.new(|cx| InputState::new(window, cx).placeholder("Filter notes…"));
+            let entity = cx.entity();
+            cx.subscribe(
+                &input,
+                move |_pane, input: Entity<InputState>, event: &InputEvent, cx| {
+                    if matches!(event, InputEvent::Change) {
+                        // Re-read the text from the input model synchronously.
+                        // We close over `entity` (the pane handle) so we can
+                        // call `set_filter` on ourselves.
+                        let text = input.read(cx).value();
+                        entity.update(cx, |pane, cx| pane.set_filter(text, cx));
+                    }
+                },
+            )
+            .detach();
+            self.filter_input = Some(input);
+        }
+        cx.notify();
+    }
+
+    /// Emit a [`BulkActionEvent`] and immediately clear the selection so
+    /// the bulk bar collapses without waiting for the workspace round-trip.
+    pub fn bulk_action(&mut self, action: BulkActionEvent, cx: &mut Context<Self>) {
+        cx.emit(action);
+        self.clear_selection(cx);
     }
 }
 
@@ -751,6 +954,7 @@ impl Default for NoteListPane {
 }
 
 impl EventEmitter<OpenNoteEvent> for NoteListPane {}
+impl EventEmitter<BulkActionEvent> for NoteListPane {}
 
 impl Panel for NoteListPane {
     fn persistent_name(&self) -> &str {
@@ -877,6 +1081,7 @@ impl Render for NoteListPane {
                 type_color: e.type_color,
                 checked: self.selected.contains(&e.id),
                 selected: selected_id == Some(e.id),
+                row_status: RowStatus::from_type_icon(e.type_icon.clone()),
             })
             .collect();
 
@@ -884,6 +1089,67 @@ impl Render for NoteListPane {
         // Mirrors `NoteListHeader.tsx` — 52-pt tall, left-aligned
         // "Inbox" title, right-aligned cluster of icon actions
         // (ChevronsUpDown sort + Search + Plus).
+        let sort_label = self.sort_order.label();
+        let sort_entity = cx.entity();
+        let search_entity = cx.entity();
+
+        // Sort button — `Button` implements `DropdownMenu` so we can
+        // call `.dropdown_menu(...)` directly on a `Button`.
+        let sort_button = Button::new("note-list-sort")
+            .ghost()
+            .small()
+            .label(SharedString::new_static(sort_label))
+            .icon(IconName::ChevronsUpDown)
+            .dropdown_menu(move |menu: gpui_component::menu::PopupMenu, _window, _cx| {
+                let e = sort_entity.clone();
+                menu.item(
+                    gpui_component::menu::PopupMenuItem::new("Modified (newest first)").on_click(
+                        move |_, _, cx| {
+                            e.update(cx, |p, cx| p.set_sort_order(NoteListSort::ModifiedDesc, cx));
+                        },
+                    ),
+                )
+                .item(
+                    gpui_component::menu::PopupMenuItem::new("Modified (oldest first)").on_click({
+                        let e = sort_entity.clone();
+                        move |_, _, cx| {
+                            e.update(cx, |p, cx| p.set_sort_order(NoteListSort::ModifiedAsc, cx));
+                        }
+                    }),
+                )
+                .item(
+                    gpui_component::menu::PopupMenuItem::new("Title A → Z").on_click({
+                        let e = sort_entity.clone();
+                        move |_, _, cx| {
+                            e.update(cx, |p, cx| p.set_sort_order(NoteListSort::TitleAsc, cx));
+                        }
+                    }),
+                )
+                .item(
+                    gpui_component::menu::PopupMenuItem::new("Title Z → A").on_click({
+                        let e = sort_entity.clone();
+                        move |_, _, cx| {
+                            e.update(cx, |p, cx| p.set_sort_order(NoteListSort::TitleDesc, cx));
+                        }
+                    }),
+                )
+            });
+
+        // Search glyph — clicking toggles the inline filter strip.
+        let search_button = h_flex()
+            .id("note-list-search")
+            .items_center()
+            .gap(px(4.0))
+            .text_xs()
+            .text_color(muted)
+            .cursor_pointer()
+            .hover(|this| this.text_color(fg))
+            .child(IconName::Search)
+            .on_click(move |_, window, cx| {
+                search_entity.update(cx, |pane, cx| pane.toggle_filter_open(window, cx));
+            })
+            .dump_as("note-list-search");
+
         let header_strip = h_flex()
             .h(px(52.0))
             .min_h(px(52.0))
@@ -906,20 +1172,8 @@ impl Render for NoteListPane {
                     .items_center()
                     .gap(px(12.0))
                     .text_color(muted)
-                    .child(header_icon_action(
-                        "note-list-sort",
-                        IconName::ChevronsUpDown,
-                        Some("Modified"),
-                        muted,
-                        fg,
-                    ))
-                    .child(header_icon_action(
-                        "note-list-search",
-                        IconName::Search,
-                        None,
-                        muted,
-                        fg,
-                    ))
+                    .child(sort_button)
+                    .child(search_button)
                     .child(header_icon_action(
                         "note-list-new",
                         IconName::Plus,
@@ -929,6 +1183,23 @@ impl Render for NoteListPane {
                     )),
             )
             .dump_as("note-list-header");
+
+        // --- Filter strip (shown when filter_open) ---
+        let filter_strip: Option<AnyElement> = if self.filter_open {
+            self.filter_input.as_ref().map(|input_state| {
+                h_flex()
+                    .h(px(36.0))
+                    .items_center()
+                    .px(px(8.0))
+                    .border_b_1()
+                    .border_color(border_color)
+                    .child(Input::new(input_state))
+                    .dump_as("note-list-filter-strip")
+                    .into_any_element()
+            })
+        } else {
+            None
+        };
 
         // --- Scrollable list ---
         let list: AnyElement = if rows.is_empty() {
@@ -975,7 +1246,14 @@ impl Render for NoteListPane {
                     //     bar in the type's full accent colour, with
                     //     a lighter tint as the row background.
                     let is_selected = row.selected;
-                    let type_icon = row.type_icon;
+                    // Phase 8.2 status icons — `row_status` drives the
+                    // trailing-icon slot.  `RowStatus::None` falls back
+                    // to the bare type glyph so untyped notes still
+                    // show a minimal marker; the variants that do map
+                    // to a structured-content status (Chart/Person/
+                    // Calendar/Project) pick up their dedicated icon
+                    // via `RowStatus::icon`.
+                    let trailing_icon = row.row_status.icon().unwrap_or(row.type_icon);
                     let type_color = row.type_color;
                     let modified_label = row.modified_label.clone();
                     let created_label = row.created_label.clone();
@@ -996,7 +1274,7 @@ impl Render for NoteListPane {
                         .items_center()
                         .justify_center()
                         .text_color(type_color)
-                        .child(type_icon);
+                        .child(trailing_icon);
 
                     let content = v_flex()
                         .flex_1()
@@ -1161,6 +1439,7 @@ impl Render for NoteListPane {
             // border between top note panel and top note list
             // panel").
             .child(header_strip)
+            .children(filter_strip)
             .child(list)
             .children(bulk_bar)
             .dump_as("note-list")
@@ -1559,7 +1838,13 @@ mod tests {
                     "default Inbox scope passes every entry through",
                 );
                 pane.set_scope(NoteListScope::Type("Events".into()), cx);
-                let titles: Vec<&str> = pane.visible_entries().map(|e| e.title.as_ref()).collect();
+                // Sort titles for the membership assertion so the test is
+                // not sensitive to the default ModifiedDesc ordering, which
+                // depends on filesystem mtime ordering of files written
+                // back-to-back in this temp dir.
+                let mut titles: Vec<&str> =
+                    pane.visible_entries().map(|e| e.title.as_ref()).collect();
+                titles.sort();
                 assert_eq!(
                     titles,
                     vec!["Event One", "Event Two"],
