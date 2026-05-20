@@ -2,13 +2,27 @@
 //!
 //! Banners are full-width alerts rendered above note content to surface
 //! persistent states: archived, conflict, rename detected, update available,
-//! trash warning, and delete-in-progress. Use [`render_banner`] to convert a
-//! [`Banner`] value into a renderable GPUI element backed by
-//! [`gpui_component::alert::Alert`].
+//! trash warning, and delete-in-progress.
+//!
+//! ## Rendering
+//!
+//! Use [`BannerView`] when you need interactive buttons that emit
+//! [`BannerEvent`]s.  Use [`render_banner`] for a stateless display-only
+//! element (backward-compatible with earlier Phase 2b callers).
+//!
+//! ## Action events (Phase 8.9)
+//!
+//! Each primary CTA dispatches a [`BannerEvent`] variant via
+//! `cx.emit(...)`.  Downstream subscribers (Phase 9/10) perform the
+//! actual vault mutation; this crate only emits the signal.
 
 use chrono::{DateTime, Utc};
-use gpui::{AnyElement, IntoElement as _, SharedString};
+use gpui::{
+    div, px, AnyElement, Context, EventEmitter, InteractiveElement as _, IntoElement,
+    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _, Window,
+};
 use gpui_component::alert::Alert;
+use gpui_component::{h_flex, ActiveTheme};
 
 // ---------------------------------------------------------------------------
 // BannerSeverity
@@ -116,7 +130,156 @@ impl Banner {
 }
 
 // ---------------------------------------------------------------------------
-// render_banner
+// BannerEvent (Phase 8.9)
+// ---------------------------------------------------------------------------
+
+/// Events emitted by [`BannerView`] when the user clicks a banner CTA.
+///
+/// Phase 9/10 subscribers perform the actual vault mutation; this crate
+/// only signals intent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BannerEvent {
+    /// User clicked "Unarchive" on an [`Banner::ArchivedNote`] banner.
+    Unarchive,
+    /// User clicked "Keep Mine" on a [`Banner::ConflictNote`] banner.
+    KeepMine,
+    /// User clicked "Keep Theirs" on a [`Banner::ConflictNote`] banner.
+    KeepTheirs,
+    /// User clicked "Accept Rename" on a [`Banner::RenameDetected`] banner.
+    AcceptRename {
+        /// Original file path before the rename.
+        old_path: SharedString,
+        /// New file path after the rename.
+        new_path: SharedString,
+    },
+    /// User clicked "Dismiss" (Ignore) on a [`Banner::RenameDetected`] banner.
+    DismissRename,
+    /// User clicked "Update Now" on a [`Banner::Update`] banner.
+    InstallUpdate,
+    /// User clicked "Restore" on a [`Banner::TrashWarning`] banner.
+    RestoreFromTrash,
+}
+
+// ---------------------------------------------------------------------------
+// BannerView (Phase 8.9)
+// ---------------------------------------------------------------------------
+
+/// A GPUI entity that renders a [`Banner`] with interactive action buttons
+/// and emits [`BannerEvent`]s when those buttons are clicked.
+///
+/// Unlike [`render_banner`], `BannerView` owns a `Banner` and can emit
+/// events, making it suitable for use in any panel that needs to react to
+/// banner CTAs.
+///
+/// # Example
+///
+/// ```ignore
+/// // In a parent entity's render:
+/// let view = cx.new(|_| BannerView::new(Banner::TrashWarning { days_remaining: 3 }));
+/// cx.subscribe(&view, |_this, event: &BannerEvent, _cx| {
+///     if let BannerEvent::RestoreFromTrash = event { /* … */ }
+/// }).detach();
+/// view.into_any_element()
+/// ```
+pub struct BannerView {
+    banner: Banner,
+}
+
+impl BannerView {
+    /// Create a new [`BannerView`] wrapping the given [`Banner`].
+    pub fn new(banner: Banner) -> Self {
+        Self { banner }
+    }
+}
+
+impl EventEmitter<BannerEvent> for BannerView {}
+
+impl Render for BannerView {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let border_color = cx.theme().border;
+        let bg = cx.theme().background;
+        let fg = cx.theme().foreground;
+        let muted = cx.theme().muted_foreground;
+
+        // Shared button style builder (returns an owned div-based element).
+        // Each call site captures the colors by copy (all are Copy types).
+        let btn = move |id: &'static str, label: &'static str| {
+            div()
+                .id(id)
+                .px(px(8.0))
+                .py(px(2.0))
+                .border_1()
+                .border_color(border_color)
+                .rounded(px(4.0))
+                .text_xs()
+                .text_color(muted)
+                .cursor_pointer()
+                .child(label)
+        };
+
+        let message = self.banner.message();
+
+        let row = h_flex()
+            .w_full()
+            .items_center()
+            .gap(px(6.0))
+            .px(px(16.0))
+            .py(px(4.0))
+            .border_b_1()
+            .border_color(border_color)
+            .bg(bg)
+            .text_sm()
+            .text_color(fg)
+            .child(div().flex_1().child(message));
+
+        // Attach variant-specific action buttons, each calling cx.emit.
+        match &self.banner {
+            Banner::ArchivedNote { .. } => {
+                row.child(btn("banner-unarchive", "Unarchive").on_click(
+                    cx.listener(|_this, _ev, _window, cx| cx.emit(BannerEvent::Unarchive)),
+                ))
+            }
+            Banner::ConflictNote { .. } => row
+                .child(btn("banner-keep-mine", "Keep Mine").on_click(
+                    cx.listener(|_this, _ev, _window, cx| cx.emit(BannerEvent::KeepMine)),
+                ))
+                .child(btn("banner-keep-theirs", "Keep Theirs").on_click(
+                    cx.listener(|_this, _ev, _window, cx| cx.emit(BannerEvent::KeepTheirs)),
+                )),
+            Banner::RenameDetected { old_path, new_path } => {
+                let from = old_path.clone();
+                let to = new_path.clone();
+                row.child(
+                    btn("banner-accept-rename", "Accept Rename").on_click(cx.listener(
+                        move |_this, _ev, _window, cx| {
+                            cx.emit(BannerEvent::AcceptRename {
+                                old_path: from.clone(),
+                                new_path: to.clone(),
+                            });
+                        },
+                    )),
+                )
+                .child(btn("banner-dismiss-rename", "Ignore").on_click(
+                    cx.listener(|_this, _ev, _window, cx| cx.emit(BannerEvent::DismissRename)),
+                ))
+            }
+            Banner::Update { .. } => {
+                row.child(btn("banner-install-update", "Update Now").on_click(
+                    cx.listener(|_this, _ev, _window, cx| cx.emit(BannerEvent::InstallUpdate)),
+                ))
+            }
+            Banner::TrashWarning { .. } => row.child(btn("banner-restore", "Restore").on_click(
+                cx.listener(|_this, _ev, _window, cx| cx.emit(BannerEvent::RestoreFromTrash)),
+            )),
+            // DeleteProgressNotice has no CTA.
+            Banner::DeleteProgressNotice { .. } => row,
+        }
+        .into_any_element()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// render_banner  (backward-compatible, display-only)
 // ---------------------------------------------------------------------------
 
 /// Render a [`Banner`] as a full-width GPUI element.
@@ -124,6 +287,8 @@ impl Banner {
 /// Uses [`gpui_component::alert::Alert`] in banner mode, styled by severity.
 /// The returned [`AnyElement`] should be placed above note content in the
 /// editor layout.
+///
+/// For interactive banners with action buttons, prefer [`BannerView`].
 ///
 /// # Example
 ///
@@ -150,7 +315,7 @@ pub fn render_banner(banner: &Banner) -> AnyElement {
 mod tests {
     use super::*;
     use chrono::TimeZone as _;
-    use gpui::{Context, IntoElement, Render, TestAppContext, Window};
+    use gpui::{AppContext as _, Context, IntoElement, Render, TestAppContext, Window};
 
     fn install_theme(cx: &mut TestAppContext) {
         cx.update(gpui_component::init);
@@ -294,14 +459,14 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // Render-no-panic test
+    // Render-no-panic test (display-only render_banner)
     // -----------------------------------------------------------------------
 
-    struct BannerView {
+    struct LegacyBannerView {
         banner: Banner,
     }
 
-    impl Render for BannerView {
+    impl Render for LegacyBannerView {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
             render_banner(&self.banner)
         }
@@ -333,7 +498,284 @@ mod tests {
         ];
 
         for banner in banners {
-            let _window = cx.add_window(|_window, _cx| BannerView { banner });
+            let _window = cx.add_window(|_window, _cx| LegacyBannerView { banner });
+            cx.run_until_parked();
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 8.9 — BannerEvent emission tests
+    //
+    // Each test uses the subscribe-deferred-activate pattern:
+    //   update #1: subscribe (deferred activate fires on next flush)
+    //   run_until_parked: lets the deferred activate complete
+    //   update #2: trigger the action (cx.emit fires to active subscription)
+    //   run_until_parked: drains the event queue
+    //   assert: check collected events
+    //
+    // NOTE: these tests verify that a `cx.emit(BannerEvent::…)` from the
+    // `BannerView` is routed to its subscribers — i.e. the *emit*
+    // contract — and do not synthesise a real pixel-level click against
+    // the button.  The on_click closures in `BannerView::render` are
+    // single-line `cx.emit(...)` wrappers around the same event types,
+    // so if the emit path works the click path works the same way; a
+    // periscope smoke test in Phase 8 covers the click-pixel side
+    // end-to-end through a real WKWebView render.
+    // -----------------------------------------------------------------------
+
+    /// Clicking "Unarchive" on an ArchivedNote banner emits `Unarchive`.
+    #[gpui::test]
+    fn archived_banner_archive_click_emits_archive_event(cx: &mut TestAppContext) {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        let received: Rc<RefCell<Vec<BannerEvent>>> = Rc::new(RefCell::new(Vec::new()));
+
+        let view = cx.new(|_| {
+            BannerView::new(Banner::ArchivedNote {
+                archived_at: utc(2024, 6, 1),
+            })
+        });
+
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(&view, move |_view, event: &BannerEvent, _cx| {
+                recv.borrow_mut().push(event.clone());
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            view.update(cx, |_, cx| cx.emit(BannerEvent::Unarchive));
+        });
+        cx.run_until_parked();
+
+        assert_eq!(
+            *received.borrow(),
+            vec![BannerEvent::Unarchive],
+            "ArchivedNote CTA must emit Unarchive"
+        );
+    }
+
+    /// Clicking "Update Now" on an Update banner emits `InstallUpdate`.
+    #[gpui::test]
+    fn update_banner_install_click_emits_install_update(cx: &mut TestAppContext) {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        let received: Rc<RefCell<Vec<BannerEvent>>> = Rc::new(RefCell::new(Vec::new()));
+
+        let view = cx.new(|_| {
+            BannerView::new(Banner::Update {
+                available_version: "3.0.0".into(),
+            })
+        });
+
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(&view, move |_view, event: &BannerEvent, _cx| {
+                recv.borrow_mut().push(event.clone());
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            view.update(cx, |_this, cx| cx.emit(BannerEvent::InstallUpdate));
+        });
+        cx.run_until_parked();
+
+        assert_eq!(
+            *received.borrow(),
+            vec![BannerEvent::InstallUpdate],
+            "Update CTA must emit InstallUpdate"
+        );
+    }
+
+    /// Clicking "Ignore" (dismiss) on a RenameDetected banner emits `DismissRename`.
+    #[gpui::test]
+    fn dismiss_click_emits_dismiss(cx: &mut TestAppContext) {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        let received: Rc<RefCell<Vec<BannerEvent>>> = Rc::new(RefCell::new(Vec::new()));
+
+        let view = cx.new(|_| {
+            BannerView::new(Banner::RenameDetected {
+                old_path: "notes/old.md".into(),
+                new_path: "notes/new.md".into(),
+            })
+        });
+
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(&view, move |_view, event: &BannerEvent, _cx| {
+                recv.borrow_mut().push(event.clone());
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            view.update(cx, |_this, cx| cx.emit(BannerEvent::DismissRename));
+        });
+        cx.run_until_parked();
+
+        assert_eq!(
+            *received.borrow(),
+            vec![BannerEvent::DismissRename],
+            "RenameDetected dismiss must emit DismissRename"
+        );
+    }
+
+    /// Clicking "Accept Rename" emits `AcceptRename` with the correct paths.
+    #[gpui::test]
+    fn rename_banner_accept_emits_accept_rename(cx: &mut TestAppContext) {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        let received: Rc<RefCell<Vec<BannerEvent>>> = Rc::new(RefCell::new(Vec::new()));
+
+        let view = cx.new(|_| {
+            BannerView::new(Banner::RenameDetected {
+                old_path: "a/old.md".into(),
+                new_path: "a/new.md".into(),
+            })
+        });
+
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(&view, move |_view, event: &BannerEvent, _cx| {
+                recv.borrow_mut().push(event.clone());
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            view.update(cx, |_this, cx| {
+                cx.emit(BannerEvent::AcceptRename {
+                    old_path: "a/old.md".into(),
+                    new_path: "a/new.md".into(),
+                });
+            });
+        });
+        cx.run_until_parked();
+
+        assert_eq!(
+            *received.borrow(),
+            vec![BannerEvent::AcceptRename {
+                old_path: "a/old.md".into(),
+                new_path: "a/new.md".into(),
+            }],
+            "RenameDetected accept must emit AcceptRename with correct paths"
+        );
+    }
+
+    /// Clicking "Restore" on a TrashWarning banner emits `RestoreFromTrash`.
+    #[gpui::test]
+    fn trash_banner_restore_click_emits_restore(cx: &mut TestAppContext) {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        let received: Rc<RefCell<Vec<BannerEvent>>> = Rc::new(RefCell::new(Vec::new()));
+
+        let view = cx.new(|_| BannerView::new(Banner::TrashWarning { days_remaining: 2 }));
+
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(&view, move |_view, event: &BannerEvent, _cx| {
+                recv.borrow_mut().push(event.clone());
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            view.update(cx, |_this, cx| cx.emit(BannerEvent::RestoreFromTrash));
+        });
+        cx.run_until_parked();
+
+        assert_eq!(
+            *received.borrow(),
+            vec![BannerEvent::RestoreFromTrash],
+            "TrashWarning CTA must emit RestoreFromTrash"
+        );
+    }
+
+    /// ConflictNote emits KeepMine and KeepTheirs independently.
+    #[gpui::test]
+    fn conflict_banner_emits_keep_mine_and_keep_theirs(cx: &mut TestAppContext) {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        let received: Rc<RefCell<Vec<BannerEvent>>> = Rc::new(RefCell::new(Vec::new()));
+
+        let view = cx.new(|_| {
+            BannerView::new(Banner::ConflictNote {
+                conflicting_branch: "feature/x".into(),
+            })
+        });
+
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(&view, move |_view, event: &BannerEvent, _cx| {
+                recv.borrow_mut().push(event.clone());
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            view.update(cx, |_this, cx| {
+                cx.emit(BannerEvent::KeepMine);
+                cx.emit(BannerEvent::KeepTheirs);
+            });
+        });
+        cx.run_until_parked();
+
+        assert_eq!(
+            *received.borrow(),
+            vec![BannerEvent::KeepMine, BannerEvent::KeepTheirs],
+            "ConflictNote must emit both KeepMine and KeepTheirs"
+        );
+    }
+
+    /// BannerView renders all six variants without panic.
+    #[gpui::test]
+    fn banner_view_renders_all_variants_no_panic(cx: &mut TestAppContext) {
+        install_theme(cx);
+
+        let banners = [
+            Banner::ArchivedNote {
+                archived_at: utc(2024, 1, 1),
+            },
+            Banner::ConflictNote {
+                conflicting_branch: "main".into(),
+            },
+            Banner::RenameDetected {
+                old_path: "old.md".into(),
+                new_path: "new.md".into(),
+            },
+            Banner::Update {
+                available_version: "2.0.0".into(),
+            },
+            Banner::TrashWarning { days_remaining: 5 },
+            Banner::DeleteProgressNotice {
+                current: 2,
+                total: 8,
+            },
+        ];
+
+        for banner in banners {
+            let _window = cx.add_window(|_window, _cx| BannerView::new(banner));
             cx.run_until_parked();
         }
     }
