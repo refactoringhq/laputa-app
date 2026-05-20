@@ -23,12 +23,13 @@ The sweep is split into two pieces:
    agent can pick up at any scenario as long as the harness is up.
 
 `osascript keystroke` is blocked inside the WKWebView editor body
-(AGENTS.md §4 macOS / Tauri gotchas), so five of the ten scenarios
-depend on human gestures.  Each such scenario is flagged with an
-"Expected gap" note — without synthetic input the PNG will look
-identical to the preceding baseline, and that's the documented
-behavior of this sweep until periscope grows `type-text` / `key` /
-`hover` / `double-click` primitives (see §6 wish list).
+(AGENTS.md §4 macOS / Tauri gotchas), but periscope's `type-text`,
+`key`, `hover`, and `double-click` primitives send raw `CGEvent`
+input that does reach the editor body.  Four of the five previously
+gesture-dependent scenarios (03, 04, 05, 06) are now fully scripted;
+only 1 of 10 (Scenario 09 — IME composition) remains gesture-dependent
+because `CGEventKeyboardSetUnicodeString` bypasses the macOS IME layer
+entirely (see §6 and Scenario 09 for the full explanation).
 
 ---
 
@@ -226,23 +227,29 @@ export OUT_DIR=target/periscope/phase-8-sweep
   click `workspace-note-list` then the first row, then click into
   the editor body to focus a block).
 - **Steps:**
-  - **Human action required.**  `osascript keystroke` is blocked
-    inside the WKWebView editor body — type the gesture by hand:
-    1. Click into the editor body (any block).
-    2. Type `/`.
-    3. Keep the slash menu open (don't dismiss with Escape).
-- **Capture command:** (run from another shell while the menu is
-  still on screen)
   ```sh
-  ./target/debug/periscope -- screenshot --pid $BIN_PID --raise \
+  # Focus the editor body (reuse Scenario 02's focus step — adjust
+  # coords if the window layout has shifted since calibration).
+  ./target/debug/periscope click --pid $BIN_PID --raise --x 880 --y 500
+
+  # Type the slash trigger via CGEvent keyboard input (reaches the
+  # WKWebView editor body — osascript keystroke does not).
+  ./target/debug/periscope type-text --pid $BIN_PID --raise --text "/"
+  sleep 0.25
+
+  # Capture with the slash menu visible.
+  ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/03-slash-menu-open.png
+
+  # Close the menu so subsequent scenarios start clean.
+  ./target/debug/periscope key --pid $BIN_PID --raise --key "Escape"
   ```
+- **Coordinate calibration note:** `--x 880 --y 500` targets the
+  editor body at the pinned 1516×1052 window size.  If the slash
+  menu does not appear, run `dump-tree` to find the current editor
+  area bounds and adjust.
 - **Verify:** slash menu visible below the cursor showing the
   default item list.
-- **Expected gap:** if no human types `/`, the PNG is byte-identical
-  to `02-blocknote-mount.png`.  That's the documented behavior of
-  this sweep — `--raise` settles focus but cannot synthesize the
-  keystroke.
 
 ### Scenario 04 — side-menu handle
 
@@ -251,21 +258,25 @@ export OUT_DIR=target/periscope/phase-8-sweep
 - **Preconditions:** BlockNote editor mounted (Scenario 02
   precondition).
 - **Steps:**
-  - **Human action required.**  Hovering doesn't have a periscope
-    primitive yet — the cursor must be over a block when the
-    capture fires:
-    1. Move the mouse cursor over any block in the editor body.
-    2. The `⋮⋮` side-menu handle fades in on the left edge.
-    3. Keep the mouse hovering.
-- **Capture command:**
   ```sh
-  ./target/debug/periscope -- screenshot --pid $BIN_PID --raise \
+  # Hover over a block to surface the ⋮⋮ side-menu handle.
+  # CGEvent MouseMoved reaches the WKWebView, triggering BlockNote's
+  # hover state without requiring a human cursor movement.
+  ./target/debug/periscope hover --pid $BIN_PID --raise --x 880 --y 540
+  sleep 0.25
+
+  ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/04-side-menu-handle.png
+
+  # Move the cursor away so the handle doesn't bleed into the next capture.
+  ./target/debug/periscope hover --pid $BIN_PID --raise --x 100 --y 100
   ```
+- **Coordinate calibration note:** `--x 880 --y 540` targets a block
+  row in the editor body at the pinned 1516×1052 window size.  The
+  `⋮⋮` handle appears at the left edge of the hovered block; if the
+  handle is not visible, adjust `--y` to land on a rendered block
+  (run `dump-tree` to see the current layout).
 - **Verify:** `⋮⋮` handle visible at the left edge of a block.
-- **Expected gap:** without a human cursor over a block, the handle
-  fades out and the PNG looks identical to `02-blocknote-mount.png`.
-  `--raise` brings the window forward but doesn't move the cursor.
 
 ### Scenario 05 — formatting toolbar
 
@@ -275,46 +286,58 @@ export OUT_DIR=target/periscope/phase-8-sweep
 - **Preconditions:** BlockNote editor mounted with at least one
   block of text content.
 - **Steps:**
-  - **Human action required.**  No `double-click` primitive in
-    periscope yet:
-    1. Double-click a word in the editor body (selects it).
-    2. The floating formatting toolbar appears above the
-       selection.
-    3. Don't click elsewhere.
-- **Capture command:**
   ```sh
+  # Focus the editor body and type a sentence so there is something
+  # to double-click-select.
+  ./target/debug/periscope click --pid $BIN_PID --raise --x 880 --y 500
+  ./target/debug/periscope type-text --pid $BIN_PID --raise \
+      --text "Phase eight smoke "
+
+  # Double-click on the word "eight" (~x 925) to trigger BlockNote's
+  # word selection and surface the floating formatting toolbar.
+  # CALIBRATION FRAGILITY: the exact x coordinate of "eight" depends
+  # on BlockNote's font metrics at the pinned window size.  If the
+  # toolbar does not appear, adjust --x to land inside the word
+  # (run dump-tree or tune empirically: try 910–945).
+  ./target/debug/periscope double-click --pid $BIN_PID --raise --x 925 --y 500
+  sleep 0.25
+
   ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/05-formatting-toolbar.png
+
+  # Dismiss the toolbar cleanly.
+  ./target/debug/periscope key --pid $BIN_PID --raise --key "Escape"
   ```
 - **Verify:** floating toolbar visible above a highlighted word
   (bold / italic / etc. controls).
-- **Expected gap:** without the human double-click the PNG is
-  byte-identical to `02-blocknote-mount.png`.
 
 ### Scenario 06 — wikilink suggestion
 
 - **Captures:** `target/periscope/phase-8-sweep/06-wikilink-suggestion.png`
 - **Covers:** Phase 8.26 (wikilink suggestion popup) — list will be
   empty until bridge variants land (`phase-8-issues.md` "Bridge
-  gaps" §1).
+  gaps" §1; no `FromHost::WikilinkQuery` variant yet).  The capture
+  shows the menu chrome — that is the Phase 8 evidence we want.
 - **Preconditions:** BlockNote editor focused with cursor in a
-  block.
+  block (Scenario 05 cleanup left the cursor there; if not, click
+  `--x 880 --y 500` to re-focus).
 - **Steps:**
-  - **Human action required:**
-    1. Click into the editor body.
-    2. Type `[[`.
-    3. Wikilink suggestion popup opens (empty list expected,
-       pending 8.26 bridge work).
-- **Capture command:**
   ```sh
+  # Type the wikilink trigger via CGEvent keyboard input.
+  ./target/debug/periscope type-text --pid $BIN_PID --raise --text "[["
+  sleep 0.25
+
   ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/06-wikilink-suggestion.png
+
+  # Close the popup and clean up the two bracket characters.
+  ./target/debug/periscope key --pid $BIN_PID --raise --key "Escape"
+  ./target/debug/periscope key --pid $BIN_PID --raise --key "Backspace"
+  ./target/debug/periscope key --pid $BIN_PID --raise --key "Backspace"
   ```
 - **Verify:** popup visible at the cursor, list empty — caption the
   capture "popup open, empty list expected (pending 8.26 bridge
   work)" when filing the evidence.
-- **Expected gap:** without the human `[[` keystroke the PNG is
-  byte-identical to `02-blocknote-mount.png`.
 
 ### Scenario 07 — raw-mode yaml
 
@@ -389,8 +412,13 @@ export OUT_DIR=target/periscope/phase-8-sweep
 - **Preconditions:** a markdown note is open (Scenario 08 ended
   there).
 - **Steps:**
-  - **Human action required, fully manual.**  No scripted IME
-    driver works reliably inside a WKWebView:
+  - **Human action required, fully manual.**  `periscope type-text`
+    uses `CGEventKeyboardSetUnicodeString`, which **bypasses the
+    macOS IME layer entirely**.  That API posts Unicode scalars
+    directly to the system event queue, skipping the `TSMDocument`
+    / `NSInputContext` infrastructure that the IME hooks into.  As a
+    result, no CGEvent-based synthetic input can enter the underlined
+    composition state that BlockNote's IME guard intercepts.
     1. Switch the macOS input source to a composition IME (Pinyin
        Simplified, Japanese – Romaji, or Korean).  System Settings
        → Keyboard → Text Input → Input Sources.
@@ -398,6 +426,13 @@ export OUT_DIR=target/periscope/phase-8-sweep
     3. Type a composition glyph (e.g. `ni` for Pinyin → 你, or
        `konn` for Japanese → こん).
     4. Keep the underlined composition preview on screen.
+  - The behavior that this capture exercises IS covered by
+    automated Vitest tests — see
+    `editor-host/src/imeCompositionKeyGuardExtension.test.ts` for
+    the unit-level coverage of the composition key guard logic.
+    The periscope capture serves as a visual/integration witness
+    that the WKWebView surface renders the composition preview
+    correctly end-to-end.
 - **Capture command:**
   ```sh
   ./target/debug/periscope screenshot --pid $BIN_PID --raise \
@@ -410,7 +445,9 @@ export OUT_DIR=target/periscope/phase-8-sweep
   the editor.  Switch back to the U.S. keyboard layout when the
   sweep finishes.
 - **Expected gap:** without the human IME composition the PNG is
-  byte-identical to the previous markdown-note state.
+  byte-identical to the previous markdown-note state.  This is the
+  one irreducible manual step in the sweep — the CGEvent / IME-layer
+  mismatch cannot be resolved by periscope primitives alone (see §6).
 
 ---
 
@@ -439,13 +476,19 @@ Also confirm by eye in Preview / `qlmanage -p`:
 - [ ] Baselines (`00`, `01`): window decoration matches the
       reference, no missing-glyph rectangles, no black editor area.
 - [ ] `02`: BlockNote text rendered (not black).
+- [ ] `03`: slash menu visible below the cursor.
+- [ ] `04`: `⋮⋮` side-menu handle visible at the left edge of a block.
+- [ ] `05`: floating formatting toolbar visible above a highlighted word.
+- [ ] `06`: wikilink suggestion popup visible (empty list is expected
+      pending 8.26 bridge work — caption accordingly).
 - [ ] `08`: dirty glyph on `note-toolbar-sync` is *cleared* (the
       round-trip succeeded), not present.
-- [ ] Gesture scenarios (`03`, `04`, `05`, `06`, `09`): if the
-      human gesture happened, the gesture-specific affordance is
-      visible.  If not, the PNG matches the preceding non-gesture
-      capture — flag it as "expected gap" in the evidence comment
-      rather than treating it as a failed capture.
+- [ ] Scenario `09` (IME composition): if the human gesture happened,
+      the composition preview (underlined text + candidate glyphs) is
+      visible.  If not, the PNG matches the preceding markdown-note
+      state — flag it as "expected gap (IME / CGEvent layer mismatch)"
+      in the evidence comment rather than treating it as a failed
+      capture.
 
 ---
 
@@ -469,20 +512,19 @@ git clean -fd demo-vault-v2/
 git status --short -- demo-vault-v2
 ```
 
-The harness itself does not modify the vault.  Dirt only appears
-when the gesture scenarios (slash menu, formatting toolbar, wikilink
-popup, IME composition) involve typing into an opened note before the
-screenshot fires.
+The harness itself does not modify the vault.  Dirt can appear when
+the scripted scenarios (slash menu, formatting toolbar, wikilink
+popup) or the manual IME scenario type into an opened note before the
+screenshot fires.  The cleanup commands above reset any such state.
 
 ---
 
-## 6. Wish list — stable ids + synthetic input
+## 6. Wish list — stable ids + remaining gaps
 
-The sweep currently uses coordinate clicks (or manual gestures) for
-anything that doesn't have a `.dump_as("name")` registration, and
-falls back to "human types this" for everything inside the WKWebView
-editor body.  Both gaps are addressable; neither is a blocker for
-Phase 8 close-out.
+The sweep uses coordinate clicks for anything that doesn't have a
+`.dump_as("name")` registration.  Synthetic input for editor-body
+gestures is now fully implemented (commit `f3f65a26`) — Scenarios
+03 / 04 / 05 / 06 are scripted end-to-end.  One gap remains.
 
 ### Stable element ids the sweep would use
 
@@ -497,9 +539,8 @@ instead of by coordinate:
   `Views` / `Types` / `Folders`.  Currently Scenario 07 uses a
   coordinate.
 - `editor-body` — a stable id on the BlockNote root so the sweep
-  can `periscope click --id editor-body` to focus the editor
-  before manual fallbacks.  Currently Scenario 02 clicks
-  `workspace-note-list` as a proxy.
+  can `periscope click --id editor-body` to focus the editor.
+  Currently Scenarios 03 / 05 / 06 click a hard-coded coordinate.
 - `note-toolbar-save` (if a save button lands) — would let
   Scenario 08 drive Save entirely by `--id` instead of AppKit
   menu scripting.
@@ -508,7 +549,7 @@ instead of by coordinate:
   not the GPUI tree, so `dump_as` can't reach them directly.  A
   future enhancement would route a query through the
   `editor_bridge` envelope and surface the popup bounds back into
-  the dump file.  Until then Scenarios 03–06 / 09 stay manual.
+  the dump file.
 
 The current registered set the sweep depends on:
 
@@ -519,28 +560,34 @@ The current registered set the sweep depends on:
 
 ### Synthetic-input periscope primitives
 
-These would close the five gesture gaps that currently print
-"expected gap" notes:
+As of commit `f3f65a26`, all four planned primitives are
+implemented in `crates/periscope/`:
 
-- `periscope type-text --pid $BIN_PID "/"` — synthesize a
-  printable-key sequence via `CGEvent` keyboard events, mirroring
-  the `click` subcommand's `CGEvent` mouse path.  Closes Scenarios
-  03 / 06 once it reaches the WKWebView editor body (needs
-  verification — `keystroke` via AppleEvent doesn't, but raw
-  `CGEvent` keyboard input *should*, because WKWebView listens on
-  the system event queue the same way GPUI does).
-- `periscope key --pid $BIN_PID escape` / `enter` / `tab` — same
-  primitive, named key.  Closes Scenario 03's "dismiss menu"
-  cleanup and would let Scenario 09 abort the IME composition
-  without a human keypress.
-- `periscope hover --pid $BIN_PID --x N --y M` — move the cursor
-  without clicking.  Closes Scenario 04 (side-menu handle hover).
-- `periscope double-click --pid $BIN_PID --x N --y M` — synthesize
-  two `CGEvent` mouse-down/up pairs at the AppKit double-click
-  interval.  Closes Scenario 05 (formatting toolbar over selection).
+- ~~`periscope type-text` — synthesize text input via `CGEvent`
+  keyboard events.~~  **Implemented.**  Closes Scenarios 03 / 06.
+- ~~`periscope key` — single named key press with optional
+  modifiers.~~  **Implemented.**  Used for menu cleanup (`Escape`)
+  and bracket cleanup (`Backspace`) across Scenarios 03 / 05 / 06.
+- ~~`periscope hover` — move the cursor without clicking.~~
+  **Implemented.**  Closes Scenario 04 (side-menu handle hover).
+- ~~`periscope double-click` — synthesize a double-click gesture.~~
+  **Implemented.**  Closes Scenario 05 (formatting toolbar over
+  selection).
 
-None of the four require new GPUI work — they're pure
-`crates/periscope/src/click.rs`-style additions on top of the
-existing `CGEvent` path.  Scoped out of this refactor (per the
-task spec, the sweep landing the harness/scenarios split does
-*not* modify `crates/periscope/`).
+### Remaining gap — IME composition (Scenario 09)
+
+`periscope type-text` uses `CGEventKeyboardSetUnicodeString`, which
+bypasses the macOS IME layer (`TSMDocument` / `NSInputContext`)
+entirely.  Unicode scalars are posted directly onto the system event
+queue, so the IME never enters composition state and no underlined
+preview is generated.
+
+This is a fundamental constraint of the CGEvent API, not a missing
+primitive — adding another periscope subcommand wouldn't fix it.
+Scenario 09 therefore remains fully manual.
+
+The composition key guard behavior that Scenario 09 visually
+witnesses IS covered by automated Vitest tests:
+`editor-host/src/imeCompositionKeyGuardExtension.test.ts`.  The
+periscope capture is supplementary visual evidence, not the primary
+correctness signal.
