@@ -69,12 +69,14 @@ fn user_shell_candidates() -> Vec<PathBuf> {
 }
 
 fn command_path_from_shell(shell: &Path, command: &str) -> Option<PathBuf> {
-    crate::hidden_command(shell)
-        .arg("-lc")
-        .arg(format!("command -v {command}"))
-        .output()
-        .ok()
-        .and_then(|output| path_from_successful_output(&output))
+    ["-lc", "-lic"].into_iter().find_map(|flags| {
+        crate::hidden_command(shell)
+            .arg(flags)
+            .arg(format!("command -v {command}"))
+            .output()
+            .ok()
+            .and_then(|output| path_from_successful_output(&output))
+    })
 }
 
 fn path_from_successful_output(output: &std::process::Output) -> Option<PathBuf> {
@@ -118,12 +120,21 @@ fn pi_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".local/share/mise/shims/pi.exe"),
         home.join(".asdf/shims/pi"),
         home.join(".asdf/shims/pi.exe"),
+        home.join(".volta/bin/pi"),
+        home.join(".volta/bin/pi.cmd"),
+        home.join(".volta/bin/pi.exe"),
         home.join(".npm-global/bin/pi"),
         home.join(".npm-global/bin/pi.cmd"),
         home.join(".npm-global/bin/pi.exe"),
         home.join(".npm/bin/pi"),
         home.join(".npm/bin/pi.cmd"),
         home.join(".npm/bin/pi.exe"),
+        home.join(".local/share/pnpm/pi"),
+        home.join(".local/share/pnpm/pi.cmd"),
+        home.join(".local/share/pnpm/pi.exe"),
+        home.join("Library/pnpm/pi"),
+        home.join("Library/pnpm/pi.cmd"),
+        home.join("Library/pnpm/pi.exe"),
         home.join(".bun/bin/pi"),
         home.join(".bun/bin/pi.exe"),
         home.join(".linuxbrew/bin/pi"),
@@ -148,14 +159,21 @@ fn pi_binary_candidates_from_env() -> Vec<PathBuf> {
     let nvm_bin = std::env::var_os("NVM_BIN").map(PathBuf::from);
     let npm_config_prefix = std::env::var_os("npm_config_prefix").map(PathBuf::from);
     let npm_config_prefix_upper = std::env::var_os("NPM_CONFIG_PREFIX").map(PathBuf::from);
+    let pnpm_home = std::env::var_os("PNPM_HOME").map(PathBuf::from);
 
-    pi_binary_candidates_from_prefixes(nvm_bin, npm_config_prefix, npm_config_prefix_upper)
+    pi_binary_candidates_from_prefixes(
+        nvm_bin,
+        npm_config_prefix,
+        npm_config_prefix_upper,
+        pnpm_home,
+    )
 }
 
 fn pi_binary_candidates_from_prefixes(
     nvm_bin: Option<PathBuf>,
     npm_config_prefix: Option<PathBuf>,
     npm_config_prefix_upper: Option<PathBuf>,
+    pnpm_home: Option<PathBuf>,
 ) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
@@ -167,6 +185,9 @@ fn pi_binary_candidates_from_prefixes(
     }
     if let Some(path) = npm_config_prefix_upper.filter(|path| !path.as_os_str().is_empty()) {
         candidates.push(path.join("bin/pi"));
+    }
+    if let Some(path) = pnpm_home.filter(|path| !path.as_os_str().is_empty()) {
+        candidates.push(path.join("pi"));
     }
 
     candidates
@@ -203,7 +224,10 @@ mod tests {
             home.join(".pi/bin/pi"),
             home.join(".local/share/mise/shims/pi"),
             home.join(".asdf/shims/pi"),
+            home.join(".volta/bin/pi"),
             home.join(".npm-global/bin/pi"),
+            home.join(".local/share/pnpm/pi"),
+            home.join("Library/pnpm/pi"),
             home.join(".bun/bin/pi"),
         ];
 
@@ -245,6 +269,10 @@ mod tests {
             home.join(".npm-global/bin/pi.exe"),
             home.join(".npm/bin/pi.cmd"),
             home.join(".npm/bin/pi.exe"),
+            home.join(".local/share/pnpm/pi.cmd"),
+            home.join(".local/share/pnpm/pi.exe"),
+            home.join("Library/pnpm/pi.cmd"),
+            home.join("Library/pnpm/pi.exe"),
             home.join("AppData/Roaming/npm/pi.cmd"),
             home.join("AppData/Roaming/npm/pi.exe"),
             home.join("AppData/Local/pnpm/pi.cmd"),
@@ -298,11 +326,13 @@ mod tests {
         let nvm_bin = PathBuf::from("/Users/alex/.nvm/versions/node/v22.20.0/bin");
         let npm_config_prefix = PathBuf::from("/Users/alex/.npm-global");
         let npm_config_prefix_upper = PathBuf::from("/Users/alex/.npm");
+        let pnpm_home = PathBuf::from("/Users/alex/Library/pnpm");
 
         let candidates = pi_binary_candidates_from_prefixes(
             Some(nvm_bin.clone()),
             Some(npm_config_prefix.clone()),
             Some(npm_config_prefix_upper.clone()),
+            Some(pnpm_home.clone()),
         );
 
         assert_eq!(
@@ -311,6 +341,7 @@ mod tests {
                 nvm_bin.join("pi"),
                 npm_config_prefix.join("bin/pi"),
                 npm_config_prefix_upper.join("bin/pi"),
+                pnpm_home.join("pi"),
             ]
         );
     }
@@ -325,5 +356,29 @@ mod tests {
         let stdout = format!("\n{}\n{}\n", missing.display(), pi.display());
 
         assert_eq!(first_existing_path(&stdout), Some(pi));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn command_path_from_shell_finds_pi_from_interactive_login_shell() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let pi = dir.path().join("pi");
+        std::fs::write(&pi, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&pi, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let shell = dir.path().join("shell");
+        std::fs::write(
+            &shell,
+            format!(
+                "#!/bin/sh\nif [ \"$1\" = \"-lic\" ]; then echo '{}'; fi\n",
+                pi.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert_eq!(command_path_from_shell(&shell, "pi"), Some(pi));
     }
 }
