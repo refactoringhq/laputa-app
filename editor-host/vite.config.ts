@@ -29,11 +29,11 @@ export default defineConfig({
             },
         },
     },
-    define: {
-        // Lock React into production mode so `vite build` strips the
-        // dev-only warning machinery (saves ~80 kB minified + tree).
-        "process.env.NODE_ENV": JSON.stringify("production"),
-    },
+    // `vite build` already sets `process.env.NODE_ENV='production'` so
+    // React's prod build is selected for the embedded bundle.  We avoid
+    // a hardcoded `define` here because vitest reuses the same config
+    // and the production React build strips `act`, which
+    // `@testing-library/react@^16` calls into.
     test: {
         environment: "happy-dom",
         globals: false,
