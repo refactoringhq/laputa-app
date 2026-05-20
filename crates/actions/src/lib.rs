@@ -36,6 +36,12 @@ gpui::actions!(
         ToggleSidebar,
         ToggleInspector,
         CloseTab,
+        /// Phase 8.13 — dismiss the active modal in `TolariaWorkspace`'s
+        /// `ModalLayer`.  Bound to `escape` in the modal-active context
+        /// (Phase 9.4 `dialog_stack` will publish the context predicate);
+        /// for now the keymap binds it globally to a workspace handler
+        /// that no-ops when no modal is active.
+        Dismiss,
         // Edit-menu OsAction placeholders — actions!() only declares the Rust
         // types; the actual AppKit selectors are wired via MenuItem::os_action
         // in menus.rs so they route into the focused WKWebView unchanged.

@@ -367,6 +367,16 @@ mod macos {
                     dispatch_to_workspace("CloseTab", cx, |ws, cx| ws.close_active_tab(cx));
                 });
 
+                // Dismiss — close the active modal (Phase 8.13).
+                // No-op when no modal is shown, so binding `escape` to
+                // this action globally doesn't interfere with input
+                // fields that have their own Escape semantics — the
+                // workspace's `dismiss_active_modal` gates on
+                // `has_active_modal` before touching the modal layer.
+                cx.on_action(|_: &actions::Dismiss, cx| {
+                    dispatch_to_workspace("Dismiss", cx, |ws, cx| ws.dismiss_active_modal(cx));
+                });
+
                 // Save / NewNote / QuickOpen / CommandPalette stay as
                 // log stubs.  `Save` needs the active `NoteItem` entity
                 // (Phase 8.3 wired the editor-host SaveRequest path but

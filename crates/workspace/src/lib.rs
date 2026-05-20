@@ -166,6 +166,56 @@ mod tests {
         assert!(!is_active_after, "modal should not be active after dismiss");
     }
 
+    /// Phase 8.13 — `dismiss_active_modal` is the action-handler form
+    /// of `dismiss_modal`.  Pushing a modal and then routing through
+    /// the new helper must leave the active-modal flag false, and
+    /// calling it when no modal is shown must be a no-op (so binding
+    /// `escape` globally doesn't interfere with input focus paths).
+    #[gpui::test]
+    fn dismiss_active_modal_round_trips_and_no_ops_when_empty(cx: &mut TestAppContext) {
+        install_theme(cx);
+
+        let window = cx.add_window(TolariaWorkspace::empty);
+
+        // No-op path: dismissing with no modal active.
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.dismiss_active_modal(cx)
+            })
+            .unwrap();
+        let still_empty = window
+            .update(cx, |workspace, _window, cx| workspace.has_active_modal(cx))
+            .unwrap();
+        assert!(
+            !still_empty,
+            "dismiss_active_modal must be a no-op when no modal is active"
+        );
+
+        // Round-trip: push, confirm active, dismiss via helper, confirm inactive.
+        window
+            .update(cx, |workspace, window, cx| {
+                workspace.toggle_modal::<DummyModal, _>(window, cx, |_window, _cx| DummyModal);
+            })
+            .unwrap();
+        let is_active = window
+            .update(cx, |workspace, _window, cx| workspace.has_active_modal(cx))
+            .unwrap();
+        assert!(is_active, "modal must be active after toggle_modal");
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.dismiss_active_modal(cx)
+            })
+            .unwrap();
+        let is_active_after = window
+            .update(cx, |workspace, _window, cx| workspace.has_active_modal(cx))
+            .unwrap();
+        assert!(
+            !is_active_after,
+            "dismiss_active_modal must clear the active modal"
+        );
+    }
+
     /// Pushing a toast message must enqueue it on the `ToastLayer`.
     #[gpui::test]
     fn toast_layer_push_does_not_panic(cx: &mut TestAppContext) {

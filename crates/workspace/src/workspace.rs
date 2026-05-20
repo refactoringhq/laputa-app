@@ -147,6 +147,18 @@ impl TolariaWorkspace {
         self.modal_layer.update(cx, |layer, cx| layer.dismiss(cx));
     }
 
+    /// Phase 8.13 — handler form of [`Self::dismiss_modal`] callable
+    /// from `cx.on_action(|_: &Dismiss, cx| ...)` paths via
+    /// `dispatch_to_workspace`.  No-op when no modal is shown so the
+    /// action can be bound globally without interfering with input
+    /// fields that have their own Escape semantics.
+    pub fn dismiss_active_modal(&self, cx: &mut Context<Self>) {
+        if !self.has_active_modal(cx) {
+            return;
+        }
+        self.modal_layer.update(cx, |layer, cx| layer.dismiss(cx));
+    }
+
     /// Enqueue a typed [`Toast`] in the workspace's [`ToastLayer`].
     ///
     /// Construct toasts via `Toast::info(...)` / `success` / `warning` /
