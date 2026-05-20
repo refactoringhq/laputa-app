@@ -78,3 +78,35 @@ later.
 [`components.md`](components.md) holds the per-component visual
 contract; [`e2e-harness.md`](e2e-harness.md) is the verification
 loop.
+
+## Manual regression sweep process
+
+1. The user names the worklist document where regression issues are tracked.
+2. The worklist has three sections — Blockers / High Priority / Low Priority —
+   each with hierarchical numbering: `1.1.`, `1.2.`, `2.1.`, etc.
+
+   ```markdown
+   ## 1. Blockers
+   1.1. <issue description>
+   1.2. <issue description>
+
+   ## 2. High Priority
+   2.1. <issue description>
+
+   ## 3. Low Priority
+   3.1. <issue description>
+   ---
+   ```
+
+3. The only edit you may make to an existing item is to add ✅ after its number,
+   e.g. `1.1. ✅ <issue description>`, to mark it resolved.
+4. Never change issue numbers. They are stable references the user cites.
+5. When the user reports a regression — phrased as `[<issue number>] [optional note]`,
+   e.g. `[1.2] still broken in dark mode` — locate that item and remove its ✅.
+6. The user may ask you to add new items, phrased as `[<severity>] <description>`,
+   e.g. `[high] menu is broken`. Append the item to the matching section with the
+   next available `<section>.<n>` number; drop the bracketed severity (the section
+   already encodes it).
+7. The area after `---` is for your per-sweep observations (environment notes,
+   reproduction blockers, follow-up suggestions). Do not annotate individual
+   issue lines — keep those clean.
