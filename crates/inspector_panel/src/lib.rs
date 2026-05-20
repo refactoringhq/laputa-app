@@ -1,9 +1,28 @@
 #![forbid(unsafe_code)]
-//! Inspector panel for the Tolaria right dock (ADR-0115 Phase 2d).
+//! Inspector panel for the Tolaria right dock (ADR-0115 Phase 2d / 8.4).
 //!
 //! Shows contextual metadata for the active note in seven collapsible
 //! accordion sections: Properties, Outline, Backlinks, Instances,
 //! ReferencedBy, Relationships, and GitHistory.
+//!
+//! # Resolver strategy (Phase 8.4)
+//!
+//! All sub-panel data is derived from [`InspectorState`], which holds the
+//! active note's body plus a snapshot of every other note's body so wikilink
+//! scanning can run synchronously inside the render path.
+//!
+//! * **Outline** — line-scan of the active note's markdown body for H1/H2/H3
+//!   headings (`# …`, `## …`, `### …`).
+//! * **Backlinks** — scan every other note's body for `[[stem]]` tokens that
+//!   resolve to the active note's file-stem.
+//! * **Instances** — list every other note that shares the same `type`
+//!   property value as the active note (sibling notes of the same type).
+//! * **Referenced By** — alias of Backlinks for now; diverges once
+//!   `frontmatter references:` lists land (Phase 10.x).
+//!   TODO(Phase 10.x): split ReferencedBy to use `frontmatter references:`
+//! * **Relationships** — `[[wikilinks]]` that go *out* of the active note
+//!   (inverse of backlinks; empty when the note has no outbound links).
+//! * **Git History** — still uses [`MockGit`] (Phase 10.1 swaps to real).
 //!
 //! # Usage
 //!
@@ -22,6 +41,33 @@ use gpui::{
 use gpui_component::{ActiveTheme, StyledExt as _};
 use mock_fixtures::{MockCommit, MockGit, MockNote, MockVault, NoteId};
 use workspace::panel::{DockPosition, Panel};
+
+// ---------------------------------------------------------------------------
+// Wikilink scanner
+// ---------------------------------------------------------------------------
+
+/// Extract all `[[target]]` stems from `text`.
+///
+/// Handles the common `[[stem]]` and `[[stem|alias]]` forms; returns the
+/// part before the first `|` (if present) so that aliased links still
+/// resolve to the correct note.
+fn scan_wikilinks(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = text;
+    while let Some(open) = rest.find("[[") {
+        rest = &rest[open + 2..];
+        let Some(close) = rest.find("]]") else {
+            break;
+        };
+        let inner = &rest[..close];
+        let stem = inner.split('|').next().unwrap_or(inner).trim();
+        if !stem.is_empty() {
+            out.push(stem.to_string());
+        }
+        rest = &rest[close + 2..];
+    }
+    out
+}
 
 // ---------------------------------------------------------------------------
 // InspectorSection
@@ -66,6 +112,150 @@ impl InspectorSection {
 }
 
 // ---------------------------------------------------------------------------
+// InspectorState
+// ---------------------------------------------------------------------------
+
+/// Resolved data for the currently active note, pre-computed so all
+/// `render_*_body` methods are pure reads with no async I/O.
+///
+/// Build via [`InspectorState::resolve`] or [`InspectorState::empty`].
+#[derive(Debug, Clone, Default)]
+pub struct InspectorState {
+    /// The active note (if any).
+    pub note: Option<MockNote>,
+    /// H1/H2/H3 heading text extracted from the active note's body.
+    pub outline: Vec<String>,
+    /// Titles of notes whose body contains a `[[wikilink]]` pointing at
+    /// the active note (by file-stem).
+    pub backlinks: Vec<String>,
+    /// Titles of notes that share the active note's `type` property value.
+    pub instances: Vec<String>,
+    /// Stems from `[[wikilinks]]` going *out* of the active note.
+    /// TODO(Phase 10.x): split ReferencedBy to use `frontmatter references:`
+    pub outbound_links: Vec<String>,
+}
+
+impl InspectorState {
+    /// Empty state — no note selected.
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Build resolved state for `active_id` by fetching every note from the
+    /// [`MockVault`] global installed on `cx` and delegating to
+    /// [`InspectorState::resolve_from_notes`].
+    ///
+    /// Returns [`InspectorState::empty`] when no `MockVault` global is
+    /// installed, so callers don't need to gate the call themselves.
+    ///
+    /// TODO(Phase 10.x): swap the synchronous `block_on` pump for an async
+    /// path that drives resolution via `cx.spawn` and re-renders through
+    /// `cx.notify()` once the backing service settles.  Today the calls are
+    /// always-ready (`Task::ready(...)`) so the UI thread isn't actually
+    /// pinned, but the same shape against a real vault service would hang
+    /// the foreground executor.
+    pub fn resolve(active_id: NoteId, cx: &mut App) -> Self {
+        let Some(notes) = collect_mock_notes(cx) else {
+            return Self::empty();
+        };
+        Self::resolve_from_notes(active_id, &notes)
+    }
+
+    /// Build resolved state for `active_id` from a pre-fetched slice of all
+    /// vault notes.
+    ///
+    /// The caller must extract `notes` from the vault *before* calling this
+    /// function so that no `cx` borrow is held across the call.
+    pub fn resolve_from_notes(active_id: NoteId, notes: &[MockNote]) -> Self {
+        let Some(active) = notes.iter().find(|n| n.id == active_id) else {
+            return Self::empty();
+        };
+
+        let outline = extract_outline(&active.content);
+        let outbound_links = scan_wikilinks(&active.content);
+
+        let active_stem = active
+            .path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+
+        let active_type = note_type(active).map(str::to_owned);
+
+        let mut backlinks: Vec<String> = Vec::new();
+        let mut instances: Vec<String> = Vec::new();
+
+        for other in notes {
+            if other.id == active_id {
+                continue;
+            }
+
+            // Backlinks: does `other` link to the active note?  Lowercase
+            // each scanned stem exactly once and reuse the result for the
+            // direct-match and trailing-segment checks — the original code
+            // allocated two `String`s per stem per scan.
+            let links = scan_wikilinks(&other.content);
+            let points_here = links.iter().any(|stem| {
+                let key = stem.trim().to_ascii_lowercase();
+                key == active_stem || key.rsplit('/').next().unwrap_or(key.as_str()) == active_stem
+            });
+            if points_here {
+                backlinks.push(other.title.to_string());
+            }
+
+            // Instances: same `type` property value.
+            if let Some(ref target_type) = active_type {
+                if note_type(other) == Some(target_type.as_str()) {
+                    instances.push(other.title.to_string());
+                }
+            }
+        }
+
+        Self {
+            note: Some(active.clone()),
+            outline,
+            backlinks,
+            instances,
+            outbound_links,
+        }
+    }
+}
+
+/// Extract the `"type"` property value from a note as a `&str`, if present.
+fn note_type(note: &MockNote) -> Option<&str> {
+    note.properties.get("type")?.as_str()
+}
+
+/// Drain every note out of the [`MockVault`] global, if one is installed.
+///
+/// Returns `None` when no `MockVault` global is present so callers can
+/// distinguish "no vault" from "empty vault" without re-checking
+/// `cx.try_global` themselves.
+fn collect_mock_notes(cx: &mut App) -> Option<Vec<MockNote>> {
+    let vault = cx.try_global::<MockVault>()?.clone();
+    let ids = cx.foreground_executor().block_on(vault.notes());
+    let mut notes = Vec::with_capacity(ids.len());
+    for id in ids {
+        if let Some(note) = cx.foreground_executor().block_on(vault.note(id)) {
+            notes.push(note);
+        }
+    }
+    Some(notes)
+}
+
+/// Scan `body` for H1/H2/H3 heading lines; return the heading text without
+/// the leading `#` characters.
+fn extract_outline(body: &str) -> Vec<String> {
+    body.lines()
+        .filter(|line| {
+            line.starts_with("# ") || line.starts_with("## ") || line.starts_with("### ")
+        })
+        .map(|line| line.trim_start_matches('#').trim().to_owned())
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // InspectorPanel
 // ---------------------------------------------------------------------------
 
@@ -77,17 +267,10 @@ pub struct InspectorPanel {
     expanded: HashSet<InspectorSection>,
     note_id: Option<NoteId>,
     position: DockPosition,
-    /// Cached active note (Phase 3 wires a live subscription).
-    note: Option<MockNote>,
-    /// Cached git history — up to 5 commits shown (Phase 3 wires live data).
+    /// Resolved data for the active note.
+    state: InspectorState,
+    /// Cached git history — up to 5 commits shown (Phase 10.1 wires live data).
     git_history: Vec<MockCommit>,
-    /// Count of vault notes sharing the same `type` property value.
-    same_kind_count: usize,
-}
-
-/// Extract the `"type"` property value from a note as a `&str`, if present.
-fn note_type(note: &MockNote) -> Option<&str> {
-    note.properties.get("type")?.as_str()
 }
 
 impl InspectorPanel {
@@ -97,9 +280,8 @@ impl InspectorPanel {
             expanded: HashSet::new(),
             note_id: None,
             position: DockPosition::Right,
-            note: None,
+            state: InspectorState::empty(),
             git_history: Vec::new(),
-            same_kind_count: 0,
         }
     }
 
@@ -109,7 +291,7 @@ impl InspectorPanel {
     /// # Panics
     ///
     /// Panics if either the [`MockVault`] or [`MockGit`] global is not installed
-    /// on `cx`, or if either service returns a non-ready task (Phase 3 will
+    /// on `cx`, or if either service returns a non-ready task (Phase 10 will
     /// replace this with async service injection).
     pub fn from_mock(cx: &mut App) -> Self {
         let ids_task = cx.global::<MockVault>().notes();
@@ -117,25 +299,9 @@ impl InspectorPanel {
 
         let note_id = ids.first().copied();
 
-        let note: Option<MockNote> = note_id.and_then(|id| {
-            let task = cx.global::<MockVault>().note(id);
-            cx.foreground_executor().block_on(task)
-        });
-
-        // Count notes that share the same `type` property value.
-        let same_kind_count = {
-            let target_type = note.as_ref().and_then(note_type).map(str::to_owned);
-            match target_type.as_deref() {
-                None | Some("") => 0,
-                Some(target) => ids
-                    .iter()
-                    .filter_map(|&id| {
-                        let task = cx.global::<MockVault>().note(id);
-                        cx.foreground_executor().block_on(task)
-                    })
-                    .filter(|other| note_type(other) == Some(target))
-                    .count(),
-            }
+        let state = match note_id {
+            Some(id) => InspectorState::resolve(id, cx),
+            None => InspectorState::empty(),
         };
 
         let history_task = cx.global::<MockGit>().history();
@@ -145,9 +311,8 @@ impl InspectorPanel {
             expanded: HashSet::new(),
             note_id,
             position: DockPosition::Right,
-            note,
+            state,
             git_history,
-            same_kind_count,
         }
     }
 
@@ -159,6 +324,21 @@ impl InspectorPanel {
         } else {
             Self::new()
         }
+    }
+
+    /// Update the active note and recompute all resolved state.
+    ///
+    /// Called by the workspace whenever the focused note changes.
+    pub fn set_active(&mut self, note_id: Option<NoteId>, cx: &mut Context<Self>) {
+        if self.note_id == note_id {
+            return;
+        }
+        self.note_id = note_id;
+        self.state = match note_id {
+            Some(id) if cx.try_global::<MockVault>().is_some() => InspectorState::resolve(id, cx),
+            _ => InspectorState::empty(),
+        };
+        cx.notify();
     }
 
     /// The ID of the currently active note, if any.
@@ -187,7 +367,7 @@ impl InspectorPanel {
 
     fn render_properties_body(&self, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
-        let Some(note) = &self.note else {
+        let Some(note) = &self.state.note else {
             return div()
                 .text_sm()
                 .text_color(muted)
@@ -234,84 +414,135 @@ impl InspectorPanel {
 
     fn render_outline_body(&self, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
-        let Some(note) = &self.note else {
+
+        if self.state.note.is_none() {
             return div()
                 .text_sm()
                 .text_color(muted)
                 .child("No note selected.")
                 .into_any_element();
-        };
+        }
 
-        let mut headings = note
-            .content
-            .lines()
-            .filter(|line| {
-                line.starts_with("# ") || line.starts_with("## ") || line.starts_with("### ")
-            })
-            .peekable();
-
-        if headings.peek().is_none() {
-            div()
+        if self.state.outline.is_empty() {
+            return div()
                 .text_sm()
                 .text_color(muted)
                 .child("No headings.")
-                .into_any_element()
-        } else {
-            div()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .children(headings.map(|line| {
-                    let label: SharedString =
-                        line.trim_start_matches('#').trim().to_string().into();
-                    div().text_sm().child(label).into_any_element()
-                }))
-                .into_any_element()
+                .into_any_element();
         }
-    }
 
-    fn render_backlinks_body(&self, cx: &mut Context<Self>) -> AnyElement {
-        let muted = cx.theme().muted_foreground;
         div()
             .flex()
             .flex_col()
             .gap_1()
-            .child(div().text_sm().text_color(muted).child("Note B"))
-            .child(div().text_sm().text_color(muted).child("Note C"))
+            .children(self.state.outline.iter().map(|heading| {
+                div()
+                    .text_sm()
+                    .child(SharedString::from(heading.clone()))
+                    .into_any_element()
+            }))
+            .into_any_element()
+    }
+
+    fn render_backlinks_body(&self, cx: &mut Context<Self>) -> AnyElement {
+        let muted = cx.theme().muted_foreground;
+
+        if self.state.note.is_none() {
+            return div()
+                .text_sm()
+                .text_color(muted)
+                .child("No note selected.")
+                .into_any_element();
+        }
+
+        if self.state.backlinks.is_empty() {
+            return div()
+                .text_sm()
+                .text_color(muted)
+                .child("No backlinks.")
+                .into_any_element();
+        }
+
+        div()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .children(self.state.backlinks.iter().map(|title| {
+                div()
+                    .text_sm()
+                    .child(SharedString::from(title.clone()))
+                    .into_any_element()
+            }))
             .into_any_element()
     }
 
     fn render_instances_body(&self, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
-        let count = self.same_kind_count;
-        let label: SharedString = format!(
-            "{count} note{} of this type.",
-            if count == 1 { "" } else { "s" }
-        )
-        .into();
-        div()
-            .text_sm()
-            .text_color(muted)
-            .child(label)
-            .into_any_element()
-    }
 
-    fn render_referenced_by_body(&self, cx: &mut Context<Self>) -> AnyElement {
-        let muted = cx.theme().muted_foreground;
+        if self.state.note.is_none() {
+            return div()
+                .text_sm()
+                .text_color(muted)
+                .child("No note selected.")
+                .into_any_element();
+        }
+
+        if self.state.instances.is_empty() {
+            return div()
+                .text_sm()
+                .text_color(muted)
+                .child("No other notes of this type.")
+                .into_any_element();
+        }
+
         div()
             .flex()
             .flex_col()
             .gap_1()
-            .child(div().text_sm().text_color(muted).child("Note A"))
+            .children(self.state.instances.iter().map(|title| {
+                div()
+                    .text_sm()
+                    .child(SharedString::from(title.clone()))
+                    .into_any_element()
+            }))
             .into_any_element()
+    }
+
+    fn render_referenced_by_body(&self, cx: &mut Context<Self>) -> AnyElement {
+        // TODO(Phase 10.x): split ReferencedBy to use `frontmatter references:`
+        // lists once they land; for now it mirrors the backlinks resolver.
+        self.render_backlinks_body(cx)
     }
 
     fn render_relationships_body(&self, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
+
+        if self.state.note.is_none() {
+            return div()
+                .text_sm()
+                .text_color(muted)
+                .child("No note selected.")
+                .into_any_element();
+        }
+
+        if self.state.outbound_links.is_empty() {
+            return div()
+                .text_sm()
+                .text_color(muted)
+                .child("No outbound links.")
+                .into_any_element();
+        }
+
         div()
-            .text_sm()
-            .text_color(muted)
-            .child("Relationships (Phase 3 wires the graph)")
+            .flex()
+            .flex_col()
+            .gap_1()
+            .children(self.state.outbound_links.iter().map(|stem| {
+                div()
+                    .text_sm()
+                    .child(SharedString::from(stem.clone()))
+                    .into_any_element()
+            }))
             .into_any_element()
     }
 
@@ -478,7 +709,9 @@ mod tests {
     use gpui::TestAppContext;
     use mock_fixtures::{MockGit, MockVault, NoteId};
 
-    use super::{InspectorPanel, InspectorSection};
+    use super::{
+        extract_outline, scan_wikilinks, InspectorPanel, InspectorSection, InspectorState,
+    };
     use workspace::panel::{DockPosition, Panel};
 
     fn install_theme(cx: &mut TestAppContext) {
@@ -575,5 +808,133 @@ mod tests {
 
         // Drive the render pass — must not panic.
         cx.run_until_parked();
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 8.4 resolver tests
+    // -----------------------------------------------------------------------
+
+    /// Backlinks resolver: note A contains `[[B]]` in its body →
+    /// `InspectorState` for note B must list A in `backlinks`.
+    #[gpui::test]
+    fn inspector_panel_backlinks_resolver_returns_seeded_links(cx: &mut TestAppContext) {
+        use chrono::Utc;
+        use mock_fixtures::MockNote;
+        use mock_fixtures::NoteKind;
+        use serde_json::Value;
+        use std::path::PathBuf;
+
+        cx.update(|cx| {
+            // Build a minimal 2-note vault:
+            //   note A (id=1) body links to [[note-b]]
+            //   note B (id=2) body has no links
+            let now = Utc::now();
+            let notes = vec![
+                MockNote {
+                    id: NoteId::from_raw(1),
+                    title: "Note A".into(),
+                    path: PathBuf::from("note-a.md"),
+                    content: "# Note A\n\nSee also [[note-b]].\n".to_string(),
+                    kind: NoteKind::Markdown,
+                    created: now,
+                    modified: now,
+                    properties: [("type".to_string(), Value::String("Note".to_string()))]
+                        .into_iter()
+                        .collect(),
+                },
+                MockNote {
+                    id: NoteId::from_raw(2),
+                    title: "Note B".into(),
+                    path: PathBuf::from("note-b.md"),
+                    content: "# Note B\n\nStand-alone note.\n".to_string(),
+                    kind: NoteKind::Markdown,
+                    created: now,
+                    modified: now,
+                    properties: [("type".to_string(), Value::String("Note".to_string()))]
+                        .into_iter()
+                        .collect(),
+                },
+            ];
+
+            cx.set_global(MockVault::from_notes(notes));
+            let state = InspectorState::resolve(NoteId::from_raw(2), cx);
+
+            assert_eq!(
+                state.backlinks,
+                vec!["Note A".to_string()],
+                "inspector for note B must list note A as a backlink"
+            );
+        });
+    }
+
+    /// Outline resolver extracts H1, H2, and H3 headings and ignores H4+.
+    #[gpui::test]
+    fn inspector_panel_outline_extracts_h1_h2_h3(_cx: &mut TestAppContext) {
+        let body = "# Top\n\n## Section\n\n### Subsection\n\n#### Deep (ignored)\n\nParagraph.\n";
+        let outline = extract_outline(body);
+        assert_eq!(
+            outline,
+            vec!["Top", "Section", "Subsection"],
+            "outline must include H1/H2/H3 and skip H4+"
+        );
+    }
+
+    /// Instances resolver: notes with the same `type` property appear in
+    /// `InspectorState::instances` for the active note.
+    #[gpui::test]
+    fn inspector_panel_instances_returns_same_type_siblings(cx: &mut TestAppContext) {
+        use chrono::Utc;
+        use mock_fixtures::MockNote;
+        use mock_fixtures::NoteKind;
+        use serde_json::Value;
+        use std::path::PathBuf;
+
+        cx.update(|cx| {
+            let now = Utc::now();
+            let make =
+                |id: u64, title: &'static str, path: &'static str, ty: &'static str| MockNote {
+                    id: NoteId::from_raw(id),
+                    title: title.into(),
+                    path: PathBuf::from(path),
+                    content: String::new(),
+                    kind: NoteKind::Markdown,
+                    created: now,
+                    modified: now,
+                    properties: [("type".to_string(), Value::String(ty.to_string()))]
+                        .into_iter()
+                        .collect(),
+                };
+
+            cx.set_global(MockVault::from_notes(vec![
+                make(1, "Alpha", "alpha.md", "Person"),
+                make(2, "Beta", "beta.md", "Person"),
+                make(3, "Gamma", "gamma.md", "Topic"), // different type
+                make(4, "Delta", "delta.md", "Person"),
+            ]));
+
+            // Inspect note 1 (Alpha, type=Person):
+            // siblings should be Beta and Delta (not Gamma).
+            let state = InspectorState::resolve(NoteId::from_raw(1), cx);
+
+            let mut instances = state.instances.clone();
+            instances.sort();
+            assert_eq!(
+                instances,
+                vec!["Beta".to_string(), "Delta".to_string()],
+                "instances must list same-type siblings, excluding active note and different types"
+            );
+        });
+    }
+
+    /// `scan_wikilinks` must extract both plain and aliased link stems.
+    #[gpui::test]
+    fn scan_wikilinks_extracts_plain_and_aliased(_cx: &mut TestAppContext) {
+        let text = "See [[note-a]] and [[note-b|Alias for B]] and [[dir/note-c]].\n";
+        let links = scan_wikilinks(text);
+        assert_eq!(
+            links,
+            vec!["note-a", "note-b", "dir/note-c"],
+            "scan_wikilinks must return stems for plain, aliased, and path links"
+        );
     }
 }
