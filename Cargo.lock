@@ -82,6 +82,7 @@ dependencies = [
  "gpui-component",
  "gpui_platform",
  "mock_fixtures",
+ "serde_json",
  "workspace",
 ]
 
@@ -3759,10 +3760,14 @@ name = "inspector_panel"
 version = "0.1.0"
 dependencies = [
  "actions",
+ "chrono",
  "gpui",
  "gpui-component",
  "gpui_platform",
  "mock_fixtures",
+ "serde_json",
+ "tempfile",
+ "vault",
  "workspace",
 ]
 
@@ -6857,6 +6862,7 @@ dependencies = [
  "gpui-component",
  "gpui_platform",
  "mock_fixtures",
+ "note_list_pane",
  "workspace",
 ]
 
@@ -7375,6 +7381,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "status_bar"
 version = "0.1.0"
 dependencies = [
+ "actions",
  "gpui",
  "gpui-component",
  "gpui_platform",

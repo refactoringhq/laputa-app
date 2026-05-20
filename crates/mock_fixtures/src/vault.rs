@@ -61,6 +61,7 @@ pub enum VaultError {
 /// Chrome crates read notes via `cx.global::<MockVault>()` and mutate via
 /// `cx.global_mut::<MockVault>()`, which automatically fires observer
 /// callbacks registered with `cx.observe_global::<MockVault>`.
+#[derive(Clone)]
 pub struct MockVault {
     pub(crate) notes: Vec<MockNote>,
 }
@@ -73,6 +74,13 @@ impl MockVault {
         Self {
             notes: seed_notes(),
         }
+    }
+
+    /// Build a [`MockVault`] from an explicit note list — primarily a
+    /// test helper so unit tests can exercise the resolver against
+    /// minimal hand-crafted fixtures without touching the seeded set.
+    pub fn from_notes(notes: Vec<MockNote>) -> Self {
+        Self { notes }
     }
 
     /// IDs of every note currently in the vault.
