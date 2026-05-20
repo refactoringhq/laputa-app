@@ -10034,6 +10034,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "beffa227304dbaea3ad6a06ac674f9bc83a3dec3b7f63eeb442de37e7cb6bb01"
 
 [[package]]
+name = "workspace_switcher"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "gpui_platform",
+ "mock_fixtures",
+ "vault",
+]
+
+[[package]]
 name = "writeable"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

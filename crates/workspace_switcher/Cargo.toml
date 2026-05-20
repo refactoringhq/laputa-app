@@ -1,0 +1,17 @@
+[package]
+name = "workspace_switcher"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+description = "Vault picker + multi-vault management surface (ADR-0115 Phase 8.19, Strand B)."
+
+[dependencies]
+gpui.workspace = true
+gpui-component.workspace = true
+mock_fixtures = { path = "../mock_fixtures" }
+vault = { path = "../vault" }
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+gpui_platform = { workspace = true, features = ["test-support"] }
