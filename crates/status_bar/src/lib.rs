@@ -30,8 +30,8 @@
 //! [`tolaria-demo-vault-v2-light.png` / `…-dark.png`].
 
 use gpui::{
-    div, px, App, Context, EventEmitter, InteractiveElement, IntoElement, ParentElement, Render,
-    SharedString, StatefulInteractiveElement as _, Styled, Window,
+    div, px, Context, EventEmitter, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Render, SharedString, StatefulInteractiveElement as _, Styled, Subscription, Window,
 };
 use gpui_component::{ActiveTheme, IconName};
 use mock_fixtures::{FileStatus, MockGit, MockVault};
@@ -145,12 +145,23 @@ pub struct StatusBar {
     /// Static stub list of recent vaults shown in the popup.
     /// Phase 8.6 uses a mock list; real vault history is Phase 9+.
     recent_vaults: Vec<SharedString>,
+    /// Window-activation observer — dismisses the vault menu when the
+    /// Tolaria window loses focus (worklist 2.4).  Held to keep the
+    /// subscription alive for the lifetime of the status bar; `None`
+    /// in test fixtures that construct the bar without a window.
+    _window_activation: Option<Subscription>,
 }
 
 impl StatusBar {
     /// An empty status bar (no vault, no chips).  Still paints the
     /// background + border so the bottom of the window has a status
     /// strip instead of a bare void.
+    ///
+    /// This window-less variant skips the focus-loss observer that
+    /// dismisses the vault menu on window blur — it exists primarily
+    /// for tests that construct the bar without an active window.
+    /// Production code paths go through
+    /// [`from_or_empty`](Self::from_or_empty) which wires the observer.
     #[must_use]
     pub fn empty() -> Self {
         Self {
@@ -159,6 +170,7 @@ impl StatusBar {
             services: Vec::new(),
             vault_menu_open: false,
             recent_vaults: stub_recent_vaults(),
+            _window_activation: None,
         }
     }
 
@@ -167,14 +179,19 @@ impl StatusBar {
     /// chips are always populated with the legacy "Git disabled / MCP
     /// / Claude" placeholder set — wiring them to real services is
     /// Phase 7+ work but the visual is in place today.
-    pub fn from_or_empty(cx: &mut App) -> Self {
+    ///
+    /// `window` is the host window — used to register the focus-loss
+    /// observer that dismisses the vault menu when the user clicks
+    /// away to another app (worklist 2.4).
+    pub fn from_or_empty(window: &mut Window, cx: &mut Context<Self>) -> Self {
         if cx.try_global::<Vault>().is_some() {
-            Self::from_vault(cx)
+            Self::from_vault(window, cx)
         } else if cx.try_global::<MockVault>().is_some() {
-            Self::from_mock(cx)
+            Self::from_mock(window, cx)
         } else {
             Self {
                 services: placeholder_services(),
+                _window_activation: Some(Self::observe_window_blur(window, cx)),
                 ..Self::empty()
             }
         }
@@ -185,7 +202,7 @@ impl StatusBar {
     /// # Panics
     ///
     /// Panics if the [`Vault`] global is not installed on `cx`.
-    pub fn from_vault(cx: &mut App) -> Self {
+    pub fn from_vault(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let vault = cx.global::<Vault>();
         let vault_name = vault
             .root()
@@ -199,6 +216,7 @@ impl StatusBar {
             services: placeholder_services(),
             vault_menu_open: false,
             recent_vaults: stub_recent_vaults(),
+            _window_activation: Some(Self::observe_window_blur(window, cx)),
         }
     }
 
@@ -208,7 +226,7 @@ impl StatusBar {
     /// # Panics
     ///
     /// Panics if the [`MockVault`] or [`MockGit`] globals are not installed.
-    pub fn from_mock(cx: &mut App) -> Self {
+    pub fn from_mock(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // MockVault has no name field — synthesise the demo vault id.
         let vault_name: SharedString = "demo-vault-v2".into();
         // Eagerly resolve dirty count from MockGit so the placeholder
@@ -227,7 +245,33 @@ impl StatusBar {
             services: placeholder_services(),
             vault_menu_open: false,
             recent_vaults: stub_recent_vaults(),
+            _window_activation: Some(Self::observe_window_blur(window, cx)),
         }
+    }
+
+    /// Register the focus-loss observer that closes the vault menu
+    /// when the host window deactivates (user clicks to another app).
+    /// Re-activation is a silent no-op — the menu stays closed and
+    /// the user can re-open it explicitly.
+    fn observe_window_blur(window: &mut Window, cx: &mut Context<Self>) -> Subscription {
+        cx.observe_window_activation(window, |this, window, cx| {
+            if !window.is_window_active() {
+                this.dismiss_vault_menu(cx);
+            }
+        })
+    }
+
+    /// Close the vault-switcher popup if it's open.  Shared by the
+    /// click-outside handler on the popup div and the focus-loss
+    /// observer so dismissal stays in one place.  No-op when the menu
+    /// is already closed so we don't churn subscribers with an empty
+    /// `cx.notify`.
+    pub fn dismiss_vault_menu(&mut self, cx: &mut Context<Self>) {
+        if !self.vault_menu_open {
+            return;
+        }
+        self.vault_menu_open = false;
+        cx.notify();
     }
 
     /// Route a service-chip activation: emit [`StatusBarServiceClick`]
@@ -375,13 +419,23 @@ fn stub_recent_vaults() -> Vec<SharedString> {
 /// Vault-switcher popup — a minimal list of recent vault names
 /// rendered above the status bar when `vault_menu_open` is true.
 /// Phase 8.6 uses a static stub list; real vault history is Phase 9+.
+///
+/// `bar` is the host `StatusBar` entity; the popup wires
+/// `on_mouse_down_out` to call [`StatusBar::dismiss_vault_menu`] so a
+/// click anywhere outside the menu (or its toggle trigger, which uses
+/// the gpui-component `Popover` snapshot-restore idiom — see the
+/// `vault_chip` block in [`StatusBar::render`]) closes the popup.
+const VAULT_MENU_ID: &str = "status-bar-vault-menu";
+
 fn vault_menu_popup(
+    bar: gpui::Entity<StatusBar>,
     vaults: &[SharedString],
     bg: gpui::Hsla,
     border: gpui::Hsla,
     fg: gpui::Hsla,
 ) -> gpui::AnyElement {
     let mut list = div()
+        .id(VAULT_MENU_ID)
         .absolute()
         .bottom(px(30.0))
         .left(px(0.0))
@@ -391,7 +445,10 @@ fn vault_menu_popup(
         .border_color(border)
         .rounded(px(6.0))
         .p(px(4.0))
-        .shadow_lg();
+        .shadow_lg()
+        .on_mouse_down_out(move |_, _window, cx| {
+            bar.update(cx, |this, cx| this.dismiss_vault_menu(cx));
+        });
 
     for name in vaults {
         list = list.child(
@@ -406,7 +463,7 @@ fn vault_menu_popup(
         );
     }
 
-    list.dump_as("status-bar-vault-menu").into_any_element()
+    list.dump_as(VAULT_MENU_ID).into_any_element()
 }
 
 // ---------------------------------------------------------------------------
@@ -436,17 +493,29 @@ impl Render for StatusBar {
         let entity = cx.entity();
 
         // ---- Vault-name cluster (clickable — toggles vault menu) ----
+        //
+        // Listener mirrors the gpui-component `Popover` trigger idiom
+        // (worklist 2.4): the trigger uses `on_mouse_down` and the
+        // popup uses `on_mouse_down_out`, both in the capture phase.
+        // When the menu is open and the user clicks the trigger,
+        // `on_mouse_down_out` flips the state to closed *before*
+        // this handler runs.  We restore the render-time snapshot
+        // (`open_at_render`) so a single trigger click always
+        // observably toggles the menu instead of flickering closed-
+        // then-open across two listeners.
         let vault_name = self.vault_name.clone();
         let vault_entity = entity.clone();
+        let open_at_render = self.vault_menu_open;
         let vault_chip = div()
             .id("status-bar-vault-cluster")
             .flex()
             .items_center()
             .gap(px(4.0))
             .cursor_pointer()
-            .on_click(move |_, _window, cx| {
+            .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
+                cx.stop_propagation();
                 vault_entity.update(cx, |this, cx| {
-                    this.vault_menu_open = !this.vault_menu_open;
+                    this.vault_menu_open = !open_at_render;
                     cx.notify();
                 });
             })
@@ -524,7 +593,13 @@ impl Render for StatusBar {
         // Vault menu popup (rendered inside the left cluster so it
         // anchors to the left edge of the bar).
         if self.vault_menu_open {
-            left = left.child(vault_menu_popup(&self.recent_vaults, bg, border, fg));
+            left = left.child(vault_menu_popup(
+                entity.clone(),
+                &self.recent_vaults,
+                bg,
+                border,
+                fg,
+            ));
         }
 
         // ---- Right cluster ----
@@ -671,16 +746,20 @@ mod tests {
         cx.update(|cx| {
             cx.set_global(MockVault::seeded());
             cx.set_global(MockGit::seeded());
-            let bar = StatusBar::from_mock(cx);
-            let labels: Vec<&str> = bar.services().iter().map(|c| c.label.as_ref()).collect();
-            assert_eq!(labels, vec!["Git disabled", "MCP", "Claude"]);
-            assert!(
-                bar.services()
-                    .iter()
-                    .all(|c| c.severity == ServiceSeverity::Warning),
-                "all placeholder chips must use ServiceSeverity::Warning until services land",
-            );
         });
+        let window = cx.add_window(|window, cx| StatusBar::from_mock(window, cx));
+        window
+            .update(cx, |bar, _window, _cx| {
+                let labels: Vec<&str> = bar.services().iter().map(|c| c.label.as_ref()).collect();
+                assert_eq!(labels, vec!["Git disabled", "MCP", "Claude"]);
+                assert!(
+                    bar.services()
+                        .iter()
+                        .all(|c| c.severity == ServiceSeverity::Warning),
+                    "all placeholder chips must use ServiceSeverity::Warning until services land",
+                );
+            })
+            .unwrap();
     }
 
     /// Issue 017 — every placeholder chip carries the icon the React
@@ -693,28 +772,32 @@ mod tests {
         cx.update(|cx| {
             cx.set_global(MockVault::seeded());
             cx.set_global(MockGit::seeded());
-            let bar = StatusBar::from_mock(cx);
-            let paths: Vec<String> = bar
-                .services()
-                .iter()
-                .map(|c| c.icon.clone().path().to_string())
-                .collect();
-            assert!(
-                paths[0].contains("network"),
-                "git chip icon must be `network` (closest to React's GitBranch); got {:?}",
-                paths[0],
-            );
-            assert!(
-                paths[1].contains("cpu"),
-                "mcp chip icon must be `cpu` (matches React); got {:?}",
-                paths[1],
-            );
-            assert!(
-                paths[2].contains("square-terminal"),
-                "claude chip icon must be `square-terminal` (closest to React's Terminal); got {:?}",
-                paths[2],
-            );
         });
+        let window = cx.add_window(|window, cx| StatusBar::from_mock(window, cx));
+        window
+            .update(cx, |bar, _window, _cx| {
+                let paths: Vec<String> = bar
+                    .services()
+                    .iter()
+                    .map(|c| c.icon.clone().path().to_string())
+                    .collect();
+                assert!(
+                    paths[0].contains("network"),
+                    "git chip icon must be `network` (closest to React's GitBranch); got {:?}",
+                    paths[0],
+                );
+                assert!(
+                    paths[1].contains("cpu"),
+                    "mcp chip icon must be `cpu` (matches React); got {:?}",
+                    paths[1],
+                );
+                assert!(
+                    paths[2].contains("square-terminal"),
+                    "claude chip icon must be `square-terminal` (closest to React's Terminal); got {:?}",
+                    paths[2],
+                );
+            })
+            .unwrap();
     }
 
     /// `from_vault` must derive `vault_name` from the vault root path.
@@ -728,9 +811,13 @@ mod tests {
         let vault = vault::Vault::open_at(&nested).expect("open vault");
         cx.update(|cx| {
             cx.set_global(vault);
-            let bar = StatusBar::from_vault(cx);
-            assert_eq!(bar.vault_name().as_ref(), "vault-name");
         });
+        let window = cx.add_window(|window, cx| StatusBar::from_vault(window, cx));
+        window
+            .update(cx, |bar, _window, _cx| {
+                assert_eq!(bar.vault_name().as_ref(), "vault-name");
+            })
+            .unwrap();
     }
 
     /// `from_or_empty` must prefer the real `Vault` over `MockVault`.
@@ -746,13 +833,17 @@ mod tests {
             cx.set_global(MockVault::seeded());
             cx.set_global(MockGit::seeded());
             cx.set_global(vault);
-            let bar = StatusBar::from_or_empty(cx);
-            assert_eq!(
-                bar.vault_name().as_ref(),
-                "real-vault",
-                "real Vault must win over MockVault when both globals present"
-            );
         });
+        let window = cx.add_window(|window, cx| StatusBar::from_or_empty(window, cx));
+        window
+            .update(cx, |bar, _window, _cx| {
+                assert_eq!(
+                    bar.vault_name().as_ref(),
+                    "real-vault",
+                    "real Vault must win over MockVault when both globals present"
+                );
+            })
+            .unwrap();
     }
 
     /// Phase 8.6 — clicking a service chip emits `StatusBarServiceClick`
@@ -773,10 +864,8 @@ mod tests {
             cx.set_global(MockGit::seeded());
         });
 
-        let bar = cx.update(|cx| {
-            let sb = StatusBar::from_mock(cx);
-            cx.new(|_| sb)
-        });
+        let window = cx.add_window(|window, cx| StatusBar::from_mock(window, cx));
+        let bar = window.root(cx).unwrap();
 
         let received: Rc<RefCell<Vec<ServiceKind>>> = Rc::new(RefCell::new(Vec::new()));
 
@@ -886,6 +975,112 @@ mod tests {
             assert!(
                 !bar.read(cx).vault_menu_open,
                 "menu must be closed after second toggle",
+            );
+        });
+    }
+
+    /// Worklist 2.4 — `dismiss_vault_menu` is the dismissal path used
+    /// by both the click-outside handler on the popup div and the
+    /// focus-loss observer.  It must close an open menu and emit
+    /// exactly one `cx.notify` so subscribed parents re-render.
+    /// Calling it when the menu is already closed must be a silent
+    /// no-op (no notify churn).
+    #[gpui::test]
+    fn dismiss_vault_menu_closes_open_popup_and_no_ops_when_closed(cx: &mut TestAppContext) {
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        let bar = cx.update(|cx| cx.new(|_| StatusBar::empty()));
+
+        // Count `notify` calls via an `observe` subscription — each
+        // notify schedules one callback invocation in the test executor.
+        let notified = Rc::new(Cell::new(0u32));
+        cx.update(|cx| {
+            let counter = notified.clone();
+            cx.observe(&bar, move |_, _| counter.set(counter.get() + 1))
+                .detach();
+        });
+        cx.run_until_parked();
+
+        // No-op path: dismiss while already closed must not notify.
+        cx.update(|cx| {
+            bar.update(cx, |this, cx| this.dismiss_vault_menu(cx));
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            notified.get(),
+            0,
+            "dismiss_vault_menu must be a silent no-op when the menu is already closed",
+        );
+
+        // Open the menu, then dismiss — closes and notifies exactly once.
+        cx.update(|cx| {
+            bar.update(cx, |this, cx| {
+                this.vault_menu_open = true;
+                cx.notify();
+            });
+        });
+        cx.run_until_parked();
+        let baseline = notified.get();
+
+        cx.update(|cx| {
+            bar.update(cx, |this, cx| this.dismiss_vault_menu(cx));
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            assert!(
+                !bar.read(cx).vault_menu_open,
+                "dismiss_vault_menu must close an open menu",
+            );
+        });
+        assert_eq!(
+            notified.get() - baseline,
+            1,
+            "closing an open menu must emit exactly one notify",
+        );
+    }
+
+    /// Worklist 2.4 — when the host window loses focus to another
+    /// application, the vault menu must dismiss.  Construct the
+    /// `StatusBar` via `add_window_view` so the focus-loss observer
+    /// is wired through `from_or_empty`, activate the window so the
+    /// test platform tracks it as the foreground window, open the
+    /// menu, then drive `deactivate_window` to simulate the user
+    /// clicking another app.
+    #[gpui::test]
+    fn vault_menu_closes_on_window_blur(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let (bar, vcx) = cx.add_window_view(|window, cx| StatusBar::from_or_empty(window, cx));
+        // `add_window_view` opens the window but doesn't make it
+        // active.  Activate explicitly so `deactivate_window` later
+        // has an active window to clear — otherwise the helper is a
+        // no-op and the focus-loss observer never fires.
+        vcx.update(|window, _cx| window.activate_window());
+        vcx.run_until_parked();
+
+        vcx.update(|_window, cx| {
+            bar.update(cx, |this, cx| {
+                this.vault_menu_open = true;
+                cx.notify();
+            });
+        });
+        vcx.run_until_parked();
+        vcx.update(|_window, cx| {
+            assert!(
+                bar.read(cx).vault_menu_open,
+                "precondition: menu must be open before window blur",
+            );
+        });
+
+        vcx.deactivate_window();
+        vcx.run_until_parked();
+
+        vcx.update(|_window, cx| {
+            assert!(
+                !bar.read(cx).vault_menu_open,
+                "vault menu must dismiss when the host window loses focus",
             );
         });
     }

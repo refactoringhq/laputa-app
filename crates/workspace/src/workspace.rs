@@ -88,7 +88,7 @@ impl TolariaWorkspace {
     ///
     /// Called from inside the `cx.add_window(|window, cx| …)` closure in
     /// `crates/tolaria/src/main.rs`.
-    pub fn empty(_window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn empty(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let modal_layer = cx.new(|_| ModalLayer::default());
         let toast_layer = cx.new(|_| ToastLayer::default());
         let left_dock = cx.new(|_| Dock::new(DockPosition::Left));
@@ -98,7 +98,10 @@ impl TolariaWorkspace {
         let title_bar = cx.new(|_| TitleBar::new(left_dock.clone()));
         // `StatusBar::from_or_empty` populates from mock globals if installed
         // (TOLARIA_MOCK=1 launches), or returns an empty bar otherwise.
-        let status_bar = cx.new(|cx| StatusBar::from_or_empty(cx));
+        // `window` is forwarded so the status bar can register a
+        // focus-loss observer that dismisses the vault menu on window
+        // blur (worklist 2.4).
+        let status_bar = cx.new(|cx| StatusBar::from_or_empty(window, cx));
 
         // Observe the left dock so the workspace re-renders when the
         // sidebar toggle (visual-issue #020) flips
