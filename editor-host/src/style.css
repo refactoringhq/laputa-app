@@ -1,3 +1,8 @@
+/* BlockNote ships its own bundle of editor styles.  Importing it here
+   lets `vite-plugin-singlefile` inline the rules into the same
+   `<style>` block as our own theme variables. */
+@import "@blocknote/react/style.css";
+
 :root {
     color-scheme: light dark;
     /* Light defaults — must match `crates/theme/src/palette.rs::apply_light`. */
@@ -35,31 +40,13 @@ body {
     color: var(--fg);
 }
 
-.editor-textarea {
+/* The BlockNote-supplied editor wrapper fills the host element so the
+   ProseMirror surface picks up the full WKWebView viewport. */
+#editor-root > .bn-container,
+#editor-root .bn-editor {
     flex: 1;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 24px 32px;
-    border: 0;
-    outline: 0;
-    resize: none;
     background: var(--bg);
     color: var(--fg);
-    caret-color: var(--accent);
-    font: inherit;
-    font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono", monospace;
-    line-height: 1.6;
-    tab-size: 4;
-}
-
-.editor-textarea:disabled {
-    opacity: 0.55;
-}
-
-.editor-textarea::placeholder {
-    color: var(--fg-muted);
-    opacity: 1;
-    font-style: italic;
 }
 
 ::selection {

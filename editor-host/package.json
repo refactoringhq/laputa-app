@@ -1,18 +1,30 @@
 {
   "name": "editor-host",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Embedded editor for the Tolaria native shell (ADR-0115 Phase 4-MVP).",
+  "description": "Embedded BlockNote editor for the Tolaria native shell (ADR-0115 Phase 8.24).",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@blocknote/core": "0.46.2",
+    "@blocknote/react": "0.46.2",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "4.3.4",
+    "happy-dom": "15.11.7",
     "typescript": "5.5.4",
     "vite": "5.4.2",
-    "vite-plugin-singlefile": "2.0.2"
+    "vite-plugin-singlefile": "2.0.2",
+    "vitest": "2.1.9"
   }
 }
