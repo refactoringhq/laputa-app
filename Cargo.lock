@@ -4826,6 +4826,7 @@ dependencies = [
  "gpui",
  "gpui-component",
  "gpui_platform",
+ "log",
  "mock_fixtures",
  "tempfile",
  "ui",

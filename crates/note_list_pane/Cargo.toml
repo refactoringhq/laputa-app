@@ -12,6 +12,7 @@ actions = { path = "../actions" }
 chrono.workspace = true
 gpui.workspace = true
 gpui-component.workspace = true
+log.workspace = true
 mock_fixtures = { path = "../mock_fixtures" }
 ui = { path = "../ui" }
 vault = { path = "../vault" }

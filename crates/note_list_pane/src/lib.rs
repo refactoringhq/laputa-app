@@ -32,6 +32,7 @@ use std::path::Path as StdPath;
 use chrono::{DateTime, Utc};
 use gpui::prelude::FluentBuilder as _;
 use gpui::rgb;
+use gpui::Anchor;
 use gpui::AppContext as _;
 use gpui::EventEmitter;
 use gpui::{
@@ -42,7 +43,7 @@ use gpui_component::{
     button::{Button, ButtonVariants as _},
     checkbox::Checkbox,
     h_flex,
-    input::{Input, InputEvent, InputState},
+    input::{Escape, Input, InputEvent, InputState},
     menu::DropdownMenu as _,
     scroll::ScrollableElement as _,
     v_flex, ActiveTheme, IconName, Sizable as _, StyledExt as _,
@@ -79,6 +80,18 @@ pub enum BulkActionEvent {
     ArchiveSelected,
 }
 
+/// Emitted when the user clicks the `+` glyph in the note-list header
+/// (worklist 2.19).  The subscriber (typically `TolariaWorkspace`)
+/// performs the vault-side note creation and routes the resulting
+/// id through [`OpenNoteEvent`] so the editor surfaces the new note.
+///
+/// Carries no payload yet — the create-note flow currently has no
+/// caller-supplied options (the workspace decides the default name,
+/// template, and target folder).  A future revision will add scope /
+/// type hints once the cross-crate `create_note` API lands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CreateNoteRequested;
+
 /// Sort order applied to the visible note rows.
 ///
 /// Defaults to [`NoteListSort::ModifiedDesc`] — newest-modified first,
@@ -105,11 +118,19 @@ pub enum NoteListSort {
 }
 
 impl NoteListSort {
-    /// Short label shown in the sort glyph button (mirrors the React header).
+    /// Short label shown in the sort glyph button (mirrors the React
+    /// header).  Each variant gets its own glyph so the header reflects
+    /// the user's actual choice — worklist 2.20 reported that collapsing
+    /// `ModifiedAsc`/`ModifiedDesc` (and the `Title*` pair) onto the same
+    /// "Modified"/"Title" labels made the dropdown appear inert: the
+    /// menu correctly updated `sort_order`, but the visible button text
+    /// never changed because both arms rendered the same string.
     fn label(self) -> &'static str {
         match self {
-            Self::ModifiedDesc | Self::ModifiedAsc => "Modified",
-            Self::TitleAsc | Self::TitleDesc => "Title",
+            Self::ModifiedDesc => "Modified ↓",
+            Self::ModifiedAsc => "Modified ↑",
+            Self::TitleAsc => "Title A→Z",
+            Self::TitleDesc => "Title Z→A",
         }
     }
 }
@@ -1012,6 +1033,15 @@ impl NoteListPane {
         self.sort_order
     }
 
+    /// Label displayed in the sort dropdown's trigger button — the
+    /// `match` arm of [`NoteListSort::label`] for the active sort.
+    /// Exposed so worklist 2.20 can assert the button text directly
+    /// against the model without scraping the rendered element tree.
+    #[must_use]
+    pub fn current_sort_label(&self) -> SharedString {
+        SharedString::new_static(self.sort_order.label())
+    }
+
     /// Update the sort order and re-render.
     pub fn set_sort_order(&mut self, order: NoteListSort, cx: &mut Context<Self>) {
         if self.sort_order != order {
@@ -1060,6 +1090,47 @@ impl NoteListPane {
         cx.emit(action);
         self.clear_selection(cx);
     }
+
+    /// Emit a [`CreateNoteRequested`] event — the workspace subscribes
+    /// to drive the actual vault-side note creation.  Wired to the `+`
+    /// glyph in the header (worklist 2.19); also exposed publicly so
+    /// keymap actions / palette commands can trigger the same flow
+    /// without simulating a click.
+    ///
+    /// The handler logs the request even when no workspace is wired
+    /// (e.g. unit tests, the mock launch path) so the user sees an
+    /// observable signal that the click was received — replaces the
+    /// pre-2.19 silent no-op.
+    pub fn request_create_note(&mut self, cx: &mut Context<Self>) {
+        log::info!("note_list_pane: CreateNoteRequested emitted from header `+` button");
+        cx.emit(CreateNoteRequested);
+    }
+
+    /// Close the inline filter strip and reset the filter query
+    /// (worklist 2.22).  Idempotent — calling on an already-closed pane
+    /// is a no-op and skips the wasted `cx.notify()`.  Triggered by:
+    ///
+    /// - Esc keypress while the strip is focused (via the input's
+    ///   `Escape` action propagating up to the pane's `on_action`
+    ///   handler — mirrors the `Picker` pattern in `ui::picker`).
+    /// - Clicking the search glyph a second time (handled separately
+    ///   via [`Self::toggle_filter_open`]).
+    ///
+    /// Clears both the filter substring on `self.filter` AND the
+    /// underlying [`InputState`]'s text — leaving the input populated
+    /// would re-narrow the list on the next open even though the
+    /// chip-visible state says "no filter".
+    pub fn close_filter(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.filter_open && self.filter.is_empty() {
+            return;
+        }
+        self.filter_open = false;
+        self.filter = SharedString::default();
+        if let Some(input) = self.filter_input.as_ref() {
+            input.update(cx, |state, cx| state.set_value("", window, cx));
+        }
+        cx.notify();
+    }
 }
 
 impl Default for NoteListPane {
@@ -1070,6 +1141,7 @@ impl Default for NoteListPane {
 
 impl EventEmitter<OpenNoteEvent> for NoteListPane {}
 impl EventEmitter<BulkActionEvent> for NoteListPane {}
+impl EventEmitter<CreateNoteRequested> for NoteListPane {}
 
 impl Panel for NoteListPane {
     fn persistent_name(&self) -> &str {
@@ -1146,30 +1218,6 @@ impl NoteListPane {
 // Render
 // ---------------------------------------------------------------------------
 
-/// Header-strip icon action — a 16-pt icon, optionally paired with a
-/// short text label (used by the "Modified" sort indicator).  Tagged
-/// via `dump_as` so periscope can target it by id.
-fn header_icon_action(
-    id: &'static str,
-    icon: IconName,
-    label: Option<&'static str>,
-    muted: Hsla,
-    hover: Hsla,
-) -> AnyElement {
-    let mut row = h_flex()
-        .id(id)
-        .items_center()
-        .gap(px(4.0))
-        .text_xs()
-        .text_color(muted)
-        .cursor_pointer()
-        .hover(|this| this.text_color(hover));
-    if let Some(text) = label {
-        row = row.child(SharedString::new_static(text));
-    }
-    row.child(icon).dump_as(id).into_any_element()
-}
-
 impl Render for NoteListPane {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Pre-extract theme colours to avoid repeated borrows inside closures.
@@ -1209,48 +1257,69 @@ impl Render for NoteListPane {
         let sort_label = self.sort_order.label();
         let sort_entity = cx.entity();
         let search_entity = cx.entity();
+        let new_entity = cx.entity();
 
         // Sort button — `Button` implements `DropdownMenu` so we can
         // call `.dropdown_menu(...)` directly on a `Button`.
+        //
+        // Worklist 2.21 — anchor the popover to the trigger's
+        // *top-right* corner instead of the default top-left so the
+        // menu hangs down-and-leftward inside the note-list column.
+        // The editor pane to the right is a macOS WKWebView (an OS
+        // NSView painted *above* GPUI's Metal layer), and any element
+        // that crosses into its bounds disappears behind the web
+        // content.  TopRight keeps the dropdown's right edge flush
+        // with the trigger, so the menu's width grows leftward into
+        // the pane — never into the WebView column — at every
+        // reasonable pane width.  GPUI's `AnchoredFitMode::
+        // SnapToWindowWithMargin` still clamps the popup horizontally
+        // against the window edges as a fallback.
         let sort_button = Button::new("note-list-sort")
             .ghost()
             .small()
             .label(SharedString::new_static(sort_label))
             .icon(IconName::ChevronsUpDown)
-            .dropdown_menu(move |menu: gpui_component::menu::PopupMenu, _window, _cx| {
-                let e = sort_entity.clone();
-                menu.item(
-                    gpui_component::menu::PopupMenuItem::new("Modified (newest first)").on_click(
-                        move |_, _, cx| {
-                            e.update(cx, |p, cx| p.set_sort_order(NoteListSort::ModifiedDesc, cx));
-                        },
-                    ),
-                )
-                .item(
-                    gpui_component::menu::PopupMenuItem::new("Modified (oldest first)").on_click({
-                        let e = sort_entity.clone();
-                        move |_, _, cx| {
-                            e.update(cx, |p, cx| p.set_sort_order(NoteListSort::ModifiedAsc, cx));
-                        }
-                    }),
-                )
-                .item(
-                    gpui_component::menu::PopupMenuItem::new("Title A → Z").on_click({
-                        let e = sort_entity.clone();
-                        move |_, _, cx| {
-                            e.update(cx, |p, cx| p.set_sort_order(NoteListSort::TitleAsc, cx));
-                        }
-                    }),
-                )
-                .item(
-                    gpui_component::menu::PopupMenuItem::new("Title Z → A").on_click({
-                        let e = sort_entity.clone();
-                        move |_, _, cx| {
-                            e.update(cx, |p, cx| p.set_sort_order(NoteListSort::TitleDesc, cx));
-                        }
-                    }),
-                )
-            });
+            .dropdown_menu_with_anchor(
+                Anchor::TopRight,
+                move |menu: gpui_component::menu::PopupMenu, _window, _cx| {
+                    let e = sort_entity.clone();
+                    menu.item(
+                        gpui_component::menu::PopupMenuItem::new("Modified (newest first)")
+                            .on_click(move |_, _, cx| {
+                                e.update(cx, |p, cx| {
+                                    p.set_sort_order(NoteListSort::ModifiedDesc, cx)
+                                });
+                            }),
+                    )
+                    .item(
+                        gpui_component::menu::PopupMenuItem::new("Modified (oldest first)")
+                            .on_click({
+                                let e = sort_entity.clone();
+                                move |_, _, cx| {
+                                    e.update(cx, |p, cx| {
+                                        p.set_sort_order(NoteListSort::ModifiedAsc, cx)
+                                    });
+                                }
+                            }),
+                    )
+                    .item(
+                        gpui_component::menu::PopupMenuItem::new("Title A → Z").on_click({
+                            let e = sort_entity.clone();
+                            move |_, _, cx| {
+                                e.update(cx, |p, cx| p.set_sort_order(NoteListSort::TitleAsc, cx));
+                            }
+                        }),
+                    )
+                    .item(
+                        gpui_component::menu::PopupMenuItem::new("Title Z → A").on_click({
+                            let e = sort_entity.clone();
+                            move |_, _, cx| {
+                                e.update(cx, |p, cx| p.set_sort_order(NoteListSort::TitleDesc, cx));
+                            }
+                        }),
+                    )
+                },
+            );
 
         // Search glyph — clicking toggles the inline filter strip.
         let search_button = h_flex()
@@ -1298,13 +1367,29 @@ impl Render for NoteListPane {
                     .text_color(muted)
                     .child(sort_button)
                     .child(search_button)
-                    .child(header_icon_action(
-                        "note-list-new",
-                        IconName::Plus,
-                        None,
-                        muted,
-                        fg,
-                    )),
+                    // Worklist 2.19 — the `+` glyph emits a
+                    // `CreateNoteRequested` event so the workspace can
+                    // perform the vault-side create.  Pre-fix the
+                    // glyph was a styled-but-inert label.  Built
+                    // inline rather than through `header_icon_action`
+                    // because that helper produces a non-interactive
+                    // [`AnyElement`]; the plus glyph needs an
+                    // `on_click` listener.
+                    .child(
+                        h_flex()
+                            .id("note-list-new")
+                            .items_center()
+                            .gap(px(4.0))
+                            .text_xs()
+                            .text_color(muted)
+                            .cursor_pointer()
+                            .hover(|this| this.text_color(fg))
+                            .child(IconName::Plus)
+                            .on_click(move |_, _window, cx| {
+                                new_entity.update(cx, |pane, cx| pane.request_create_note(cx));
+                            })
+                            .dump_as("note-list-new"),
+                    ),
             )
             .dump_as("note-list-header");
 
@@ -1551,9 +1636,19 @@ impl Render for NoteListPane {
             None
         };
 
+        // Worklist 2.22 — Esc inside the filter input propagates from
+        // `InputState::escape` (single-line, no IME, `clean_on_escape`
+        // off → `cx.propagate()`) up the dispatch tree.  Catching it
+        // on the pane's root means a single handler covers Esc whether
+        // the input has focus or the user tabbed away while the strip
+        // is still open.  Mirrors `ui::picker`'s pattern.
+        let esc_entity = cx.entity();
         v_flex()
             .size_full()
             .bg(bg)
+            .on_action(move |_: &Escape, window, cx| {
+                esc_entity.update(cx, |pane, cx| pane.close_filter(window, cx));
+            })
             // The vertical divider between this column and the note
             // container is painted by gpui-component's
             // `ResizeHandle` (1 pt, `theme.border`).  An explicit
@@ -2240,6 +2335,172 @@ mod tests {
                     pane.selection_count(),
                     0,
                     "clear_selection must empty the selected set"
+                );
+            })
+            .unwrap();
+    }
+
+    /// Worklist 2.19 — calling `request_create_note` must emit a
+    /// `CreateNoteRequested` event so the workspace can perform the
+    /// vault-side create.  Pre-fix the `+` glyph was an inert label;
+    /// this test pins the new contract via the public entry point that
+    /// the click handler also drives.
+    #[gpui::test]
+    fn request_create_note_emits_event(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let window = cx.add_window(|_window, _cx| NoteListPane::new());
+
+        let observed: std::rc::Rc<std::cell::Cell<u32>> = std::rc::Rc::new(std::cell::Cell::new(0));
+        let counter = observed.clone();
+        window
+            .update(cx, |pane, _window, cx| {
+                let pane_entity = cx.entity();
+                cx.subscribe(
+                    &pane_entity,
+                    move |_p, _src, _ev: &CreateNoteRequested, _cx| {
+                        counter.set(counter.get() + 1);
+                    },
+                )
+                .detach();
+                pane.request_create_note(cx);
+                pane.request_create_note(cx);
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        assert_eq!(
+            observed.get(),
+            2,
+            "each request_create_note call must emit one CreateNoteRequested event",
+        );
+    }
+
+    /// Worklist 2.20 — `current_sort_label` must reflect the active
+    /// sort variant 1:1 so the header button text changes after every
+    /// dropdown selection (collapsing two variants onto the same
+    /// label was the reported visible-regression).
+    #[gpui::test]
+    fn current_sort_label_tracks_sort_order(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let window = cx.add_window(|_window, _cx| NoteListPane::new());
+
+        window
+            .update(cx, |pane, _window, cx| {
+                assert_eq!(
+                    pane.current_sort_label().as_ref(),
+                    "Modified ↓",
+                    "default sort renders the newest-first label",
+                );
+
+                pane.set_sort_order(NoteListSort::ModifiedAsc, cx);
+                assert_eq!(
+                    pane.current_sort_label().as_ref(),
+                    "Modified ↑",
+                    "ModifiedAsc must not alias ModifiedDesc on the trigger",
+                );
+
+                pane.set_sort_order(NoteListSort::TitleAsc, cx);
+                assert_eq!(pane.current_sort_label().as_ref(), "Title A→Z");
+
+                pane.set_sort_order(NoteListSort::TitleDesc, cx);
+                assert_eq!(
+                    pane.current_sort_label().as_ref(),
+                    "Title Z→A",
+                    "TitleDesc must not alias TitleAsc on the trigger",
+                );
+            })
+            .unwrap();
+    }
+
+    /// Worklist 2.20 — every [`NoteListSort`] variant maps to a
+    /// distinct label.  Without this guarantee the dropdown trigger
+    /// looks inert to the user when they switch between two variants
+    /// that share a string (the pre-fix regression).
+    #[test]
+    fn note_list_sort_labels_are_distinct() {
+        use std::collections::HashSet;
+        let labels: HashSet<&'static str> = [
+            NoteListSort::ModifiedDesc.label(),
+            NoteListSort::ModifiedAsc.label(),
+            NoteListSort::TitleAsc.label(),
+            NoteListSort::TitleDesc.label(),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            labels.len(),
+            4,
+            "each sort variant must render a unique header label",
+        );
+    }
+
+    /// Worklist 2.22 — `close_filter` must hide the strip *and* clear
+    /// the filter query so the visible list goes back to its
+    /// unfiltered shape.  Mirrors the user-observable contract for
+    /// the Esc keypress (the action handler on the pane root just
+    /// calls this method).
+    #[gpui::test]
+    fn close_filter_clears_query_and_hides_strip(cx: &mut TestAppContext) {
+        install_theme(cx);
+        cx.update(|cx| cx.set_global(MockVault::seeded()));
+
+        let window = cx.add_window(|_window, cx| NoteListPane::from_mock(cx));
+
+        window
+            .update(cx, |pane, window, cx| {
+                pane.toggle_filter_open(window, cx);
+                assert!(pane.filter_open(), "first toggle opens the strip");
+
+                pane.set_filter("laputa", cx);
+                assert_eq!(
+                    pane.visible_entries().count(),
+                    4,
+                    "filter must narrow the list before the Esc press",
+                );
+
+                pane.close_filter(window, cx);
+                assert!(
+                    !pane.filter_open(),
+                    "close_filter must hide the inline filter strip",
+                );
+                assert!(
+                    pane.filter.is_empty(),
+                    "close_filter must reset the filter substring",
+                );
+                assert_eq!(
+                    pane.visible_entries().count(),
+                    30,
+                    "close_filter must restore the unfiltered visible list",
+                );
+
+                // The cached InputState text must also be wiped — if it
+                // weren't, re-opening the strip would re-narrow the
+                // list even though the pane reports an empty filter.
+                if let Some(input) = pane.filter_input.as_ref() {
+                    assert!(
+                        input.read(cx).value().is_empty(),
+                        "close_filter must clear the underlying InputState text",
+                    );
+                }
+            })
+            .unwrap();
+        cx.run_until_parked();
+    }
+
+    /// Worklist 2.22 — `close_filter` on an already-closed, empty pane
+    /// must be a no-op (no spurious re-render, no panic).
+    #[gpui::test]
+    fn close_filter_is_idempotent(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let window = cx.add_window(|_window, _cx| NoteListPane::new());
+
+        window
+            .update(cx, |pane, window, cx| {
+                assert!(!pane.filter_open(), "fresh pane starts closed");
+                pane.close_filter(window, cx);
+                assert!(
+                    !pane.filter_open(),
+                    "close_filter on an already-closed pane stays closed",
                 );
             })
             .unwrap();
