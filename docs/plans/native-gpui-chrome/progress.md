@@ -381,3 +381,4 @@ expose the trailing `theme.background` strip.
 - **No prompt for grep bash commands** — `feedback_grep_no_prompt.md`
 - **After periscope visual investigation, add a `gpui::test`** — `feedback_periscope_followup_test.md`
 - **No `Co-Authored-By: Claude …` trailer** — `feedback_no_claude_coauthor.md`
+- **check for process instrictions** - `process.md`

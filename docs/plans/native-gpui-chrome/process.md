@@ -48,7 +48,7 @@ pnpm tauri dev                                        # legacy app still runs
 pnpm test                                             # editor-body Playwright suite
 ```
 
-## Hard rules (carry-over from Phase 2b)
+## Hard rules
 
 - Each chrome crate is **self-contained**; no cross-panel deps.
   Plumbing through `TolariaWorkspace` events lands in later phases.

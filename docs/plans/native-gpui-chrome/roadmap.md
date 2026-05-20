@@ -84,7 +84,7 @@ has no query field, and a dozen React-side surfaces (frontmatter
 editing, folder tree, filter builder, vault switcher, …) have no
 GPUI counterpart at all.  Phase 8 closes both gaps.
 
-Two strands run in parallel:
+Three strands run in parallel:
 
 - **Strand A — stub completion.** Every crate that ships visually
   today still carries log-only handlers, immutable buffers, or
