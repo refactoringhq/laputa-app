@@ -13,6 +13,21 @@ import {
 import { useEditorComposing } from "./useEditorComposing.ts";
 import { RawEditorView } from "./RawEditorView.tsx";
 import { shouldUseRawEditor } from "./rawEditorUtils.ts";
+import { useEditorSave } from "./useEditorSave.ts";
+import { useEditorTabSwap, type TabSwapSnapshot } from "./useEditorTabSwap.ts";
+import { useEditorFocus } from "./useEditorFocus.ts";
+import { useEditorMemoryProbeController } from "./useEditorMemoryProbeController.ts";
+import {
+    captureRawCodeMirrorRestoreState,
+    captureRichEditorPositionSnapshot,
+    type CodeMirrorRestoreState,
+    type RichEditorPositionSnapshot,
+    restoreCodeMirrorView,
+} from "./editorModePosition.ts";
+import {
+    createEditorModeRestoreTransition,
+    useEditorModePositionSync,
+} from "./useEditorModePositionSync.ts";
 
 // ---------------------------------------------------------------------------
 // Bridge dispatch (pure-logic helper, exported for tests)
@@ -156,8 +171,9 @@ const DIRTY_DEBOUNCE_MS = 150;
 export function EditorApp() {
     // Editor lifecycle is *deliberately* independent of prop changes
     // — re-creating the editor would lose cursor / history state every
-    // time React re-renders.  See 8.30 for a planned tab-swap-aware
-    // lifecycle reset.
+    // time React re-renders.  The 8.30 tab-swap snapshot LRU handles
+    // selection / scroll preservation across `NoteOpen` envelopes
+    // without recreating the editor instance.
     const editor = useMemo(() => createEditor(), []);
     const [theme, setTheme] = useState<ThemeMode>("light");
     const [rawNote, setRawNote] = useState<RawNoteState | null>(null);
@@ -165,11 +181,17 @@ export function EditorApp() {
     const dirtyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const dirtyAnnouncedForIdRef = useRef<number | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const editorMountedRef = useRef(true);
     // Raw-mode latest-content mirror.  The CodeMirror view updates this
     // every keystroke through `latestContentRef`; the bridge reads it
     // on `save_request`.  Kept as a ref instead of state so the save
     // path doesn't suffer a re-render of the (potentially-large) doc.
     const rawBufferRef = useRef<string | null>(null);
+    // Tracks the raw-vs-rich mode of the *previous* note so the
+    // position-sync hook can capture the outgoing snapshot on the
+    // correct surface during a mode flip.
+    const previousRawModeRef = useRef<boolean>(false);
+    const restoreTransitionRef = useRef(createEditorModeRestoreTransition());
 
     const cancelDirty = (): void => {
         if (dirtyTimerRef.current !== null) {
@@ -178,9 +200,76 @@ export function EditorApp() {
         }
     };
 
+    // ----------------------------------------------------------------
+    // Save lifecycle (Phase 8.30) — delegated to `useEditorSave`.
+    // The bridge handler still owns the `save_request` envelope, but
+    // the actual persist call now flows through one canonical path so
+    // the auto-save debounce + dirty bookkeeping live in one place.
+    // ----------------------------------------------------------------
+    const persistSave = useCallback((id: number, body: string): void => {
+        send({ k: "save", v: { id, body } });
+    }, []);
+    const saveLifecycle = useEditorSave({ persistSave });
+
+    // ----------------------------------------------------------------
+    // Tab-swap snapshot LRU (Phase 8.30).  `useEditorTabSwap` captures
+    // the outgoing note's cursor + scroll position and restores the
+    // incoming note's state when the bridge re-opens a note we've
+    // already seen.
+    // ----------------------------------------------------------------
+    const captureSnapshot = useCallback((id: number): TabSwapSnapshot | null => {
+        // Read the *current* (about-to-be-replaced) mode from the
+        // previous-render mirror — by the time recordSwap runs the
+        // React state has already flipped to the incoming note's
+        // mode, so we cannot use `rawNote` directly here.
+        const wasRawMode = previousRawModeRef.current;
+        if (wasRawMode) {
+            const cmState = captureRawCodeMirrorRestoreState(document);
+            if (cmState === null) return null;
+            return {
+                anchor: cmState.anchor,
+                head: cmState.head,
+                scrollTop: cmState.scrollTop,
+                extra: { kind: "raw", state: cmState },
+            };
+        }
+        const snapshot = captureRichEditorPositionSnapshot(editor as never, document);
+        if (snapshot === null) return null;
+        return {
+            anchor: snapshot.anchorBlockIndex,
+            head: snapshot.headBlockIndex,
+            scrollTop: snapshot.scrollTop,
+            extra: { kind: "rich", snapshot, id },
+        };
+    }, [editor]);
+
+    const restoreSnapshot = useCallback((_id: number, snapshot: TabSwapSnapshot): void => {
+        const extra = snapshot.extra as
+            | { kind: "raw"; state: CodeMirrorRestoreState }
+            | { kind: "rich"; snapshot: RichEditorPositionSnapshot }
+            | undefined;
+        if (!extra) return;
+        if (extra.kind === "raw") {
+            restoreCodeMirrorView(document, extra.state);
+        }
+        // Rich-mode restoration is driven by `useEditorModePositionSync`'s
+        // own `richRestore` slot, which fires off the
+        // `laputa:editor-tab-swapped` event the tab-swap hook emits.
+    }, []);
+
+    const tabSwap = useEditorTabSwap({
+        activeIdRef,
+        captureSnapshot,
+        restoreSnapshot,
+    });
+
     const handlers = useMemo<EditorBridgeHandlers>(
         () => ({
             setActiveId(id) {
+                if (id !== null && activeIdRef.current !== id) {
+                    // Cache outgoing + restore incoming snapshot.
+                    tabSwap.recordSwap(id);
+                }
                 activeIdRef.current = id;
                 dirtyAnnouncedForIdRef.current = null;
             },
@@ -194,14 +283,44 @@ export function EditorApp() {
                 // markdown-driven clear doesn't accidentally save the
                 // previous raw buffer.
                 rawBufferRef.current = note?.body ?? null;
+                previousRawModeRef.current = note !== null;
                 setRawNote(note);
             },
             getRawBuffer() {
                 return rawBufferRef.current;
             },
         }),
-        [],
+        [tabSwap],
     );
+
+    // ----------------------------------------------------------------
+    // Focus lifecycle — listens for `laputa:focus-editor` events.  The
+    // native shell can dispatch them via `evaluate_script` after a
+    // tab swap that originated outside the editor (e.g. quick-open).
+    // ----------------------------------------------------------------
+    useEditorFocus(editor as never, editorMountedRef);
+
+    // ----------------------------------------------------------------
+    // Memory probe — runs while the editor is mounted.  Telemetry
+    // forwarding to native lands in Phase 10.6; today the probe just
+    // logs through the `telemetry.ts` shim.
+    // ----------------------------------------------------------------
+    const memoryProbe = useEditorMemoryProbeController();
+    useEffect(() => {
+        memoryProbe.start();
+        return () => memoryProbe.stop();
+    }, [memoryProbe]);
+
+    // ----------------------------------------------------------------
+    // Mode-position sync — restores cursor/scroll across rich ↔ raw
+    // flips.  The transition ref carries the pending restore slot.
+    // ----------------------------------------------------------------
+    useEditorModePositionSync({
+        activeTabPath: rawNote ? rawNote.path : (activeIdRef.current === null ? null : String(activeIdRef.current)),
+        editor: editor as never,
+        restoreTransitionRef,
+        rawMode: rawNote !== null,
+    });
 
     // Theme also mirrored onto `document.documentElement.dataset.theme`
     // so background CSS variables in `style.css` flip in lockstep with
@@ -228,13 +347,25 @@ export function EditorApp() {
         return attachEditorLinkActivation(container);
     }, []);
 
-    // Wire the BlockNote `onChange` -> debounced `Dirty`.  Subscribe in
-    // an effect so the subscription tears down with the component (and
-    // so React StrictMode double-mount doesn't leak two listeners).
+    // Wire the BlockNote `onChange` -> debounced `Dirty` + save
+    // lifecycle pending buffer.  Subscribe in an effect so the
+    // subscription tears down with the component (and so React
+    // StrictMode double-mount doesn't leak two listeners).
+    //
+    // Phase 8.30: in addition to the dirty signal, every change is
+    // recorded in `saveLifecycle` so the auto-save debounce sees the
+    // latest buffer.  The lifecycle hook owns the 1.5 s flush window;
+    // the inline `Dirty` debounce above is purely a UI signal.
     useEffect(() => {
         const unsubscribe = editor.onChange(() => {
             const id = activeIdRef.current;
             if (id === null) return;
+            // Hand the latest buffer to the save lifecycle.  Skipped
+            // for raw notes — the raw branch wires `handleContentChange`
+            // directly off the CodeMirror change handler below.
+            if (!rawNote) {
+                saveLifecycle.handleContentChange(id, blocksToMarkdown(editor));
+            }
             // Coalesce rapid edits — `Dirty` is purely a UI signal, the
             // native side debounces its own state on top of this.
             cancelDirty();
@@ -250,7 +381,7 @@ export function EditorApp() {
             cancelDirty();
             unsubscribe?.();
         };
-    }, [editor]);
+    }, [editor, rawNote, saveLifecycle]);
 
     // IME composition tracking (Phase 8.27).  The hook installs
     // capture-phase listeners on `document` so composition events
@@ -279,10 +410,14 @@ export function EditorApp() {
     // Raw-mode change handler — debounce `Dirty` the same way the
     // BlockNote subscription does, and keep the latest-content mirror
     // current so `save_request` can ship the live buffer.
+    //
+    // Phase 8.30: also hand the buffer to `saveLifecycle.handleContentChange`
+    // so the auto-save debounce fires on raw notes too.
     const handleRawContentChange = useCallback((_path: string, body: string): void => {
         rawBufferRef.current = body;
         const id = activeIdRef.current;
         if (id === null) return;
+        saveLifecycle.handleContentChange(id, body);
         cancelDirty();
         dirtyTimerRef.current = setTimeout(() => {
             dirtyTimerRef.current = null;
@@ -291,7 +426,7 @@ export function EditorApp() {
             dirtyAnnouncedForIdRef.current = id;
             send({ k: "dirty", v: { id } });
         }, DIRTY_DEBOUNCE_MS);
-    }, []);
+    }, [saveLifecycle]);
 
     // Raw-mode `Cmd+S` handler — flushes the current buffer to a
     // `Save` envelope.  Mirrors the `save_request` branch in
