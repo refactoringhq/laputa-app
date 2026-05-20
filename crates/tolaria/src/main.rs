@@ -216,15 +216,25 @@ mod macos {
         }
     }
 
-    /// Run `f` against any live Tolaria window — prefers the first
-    /// entry in [`App::windows`] (the App's live-window registry,
-    /// always live) over [`App::active_window`] (AppKit focus tracker,
-    /// occasionally stale right after a close-and-reopen cycle —
-    /// which is what produced the "ToggleInspector update failed:
-    /// window not found" reports).
+    /// Run `f` against any live Tolaria window — deferred to the
+    /// next event-loop tick so the current update has fully unwound
+    /// before the window-update borrow is acquired.
     ///
-    /// `f` runs in the window's update context, so `Window`-typed
-    /// methods such as `Window::toggle_inspector` work directly.
+    /// Root cause of the "ToggleInspector dispatch failed: window not
+    /// found" reports: when an action fires from inside a window's
+    /// dispatch tree (menu click, keybinding routed through the
+    /// element tree), the action handler runs while the window's
+    /// `Option<Box<Window>>` slot in `App::windows` is already taken
+    /// by the current update.  `gpui::AnyWindowHandle::update` then
+    /// hits the `cx.windows.get_mut(id)?.take()?` branch with `None`
+    /// on the `.take()`, surfacing as `anyhow!("window not found")`.
+    ///
+    /// `cx.defer` queues the closure to run after the current update
+    /// completes — by that point the window slot is restored, so the
+    /// follow-up `handle.update` succeeds.  Picks the window handle
+    /// at dispatch time (deferred), not at registration time, so the
+    /// path is also safe to call from cold start-up contexts where
+    /// no window exists yet.
     ///
     /// Gated by `cfg(debug_assertions)` because the only current
     /// caller (`ToggleInspector`) is itself debug-only — gpui's
@@ -234,28 +244,25 @@ mod macos {
     #[cfg(debug_assertions)]
     fn dispatch_to_any_window<F>(label: &'static str, cx: &mut App, f: F)
     where
-        F: FnOnce(gpui::AnyView, &mut gpui::Window, &mut App),
+        F: FnOnce(gpui::AnyView, &mut gpui::Window, &mut App) + 'static,
     {
-        // Prefer the App's live-window registry over `active_window()`
-        // — the focus tracker can return a stale handle right after a
-        // close/reopen cycle (where `handle.update` returns `Err(
-        // "window not found")`), but `App::windows()` only holds the
-        // handles the App itself still considers live.  Fall back to
-        // the focus-tracker handle when the registry happens to be
-        // empty (shouldn't happen in normal Tolaria operation, but
-        // keeps the helper usable from tests or transient states).
-        let handle = cx
-            .windows()
-            .into_iter()
-            .next()
-            .or_else(|| cx.active_window());
-        let Some(handle) = handle else {
-            log::debug!("{label}: no live window available");
-            return;
-        };
-        if let Err(err) = handle.update(cx, f) {
-            log::error!("{label} dispatch failed: {err:#}");
-        }
+        cx.defer(move |cx| {
+            // Prefer the live-window registry over `active_window()` —
+            // both are checked at deferred-dispatch time so a stale
+            // focus handle can't slip through.
+            let handle = cx
+                .windows()
+                .into_iter()
+                .next()
+                .or_else(|| cx.active_window());
+            let Some(handle) = handle else {
+                log::debug!("{label}: no live window available");
+                return;
+            };
+            if let Err(err) = handle.update(cx, f) {
+                log::error!("{label} dispatch failed: {err:#}");
+            }
+        });
     }
 
     pub fn run() {
