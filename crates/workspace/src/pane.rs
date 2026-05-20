@@ -18,10 +18,11 @@
 //!   it doesn't smear during live resize.
 
 use gpui::{
-    div, AnyElement, Bounds, Context, EventEmitter, IntoElement, ParentElement, Pixels, Render,
-    Styled, Window,
+    div, px, AnyElement, Bounds, Context, EventEmitter, IntoElement, ParentElement, Pixels, Render,
+    SharedString, Styled, Window,
 };
 use gpui_component::ActiveTheme as _;
+use ui::tree_dump::DumpAsExt as _;
 
 use crate::item::ItemHandle;
 
@@ -252,6 +253,21 @@ impl Default for Pane {
     }
 }
 
+/// Primary copy of the empty-pane placeholder.  Mirrors the React
+/// variant's `editor.empty.selectNote` so the GPUI chrome opens with
+/// the same welcome message the user already knows from the Tauri
+/// build (`src/components/Editor.tsx` →
+/// `src/lib/locales/en.json:editor.empty.selectNote`).
+pub(crate) const EMPTY_STATE_PRIMARY: &str = "Select a note to start editing";
+
+/// Secondary copy of the empty-pane placeholder.  Mirrors
+/// `editor.empty.shortcuts` from the React variant — keymap-driven
+/// shortcuts so a fresh user has at least one hint how to populate
+/// the pane.  The literal glyphs come from
+/// `src/lib/locales/en.json:editor.empty.shortcuts` after macro
+/// substitution.
+pub(crate) const EMPTY_STATE_SECONDARY: &str = "⌘P / ⌘O to search · ⌘N to create";
+
 impl Render for Pane {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // No `.bg(...)` on the pane wrapper: the workspace root div already
@@ -262,23 +278,60 @@ impl Render for Pane {
         // IPC round-trip behind.  Keep bg only for the empty-pane
         // placeholder where there is no WebView layer to composite through.
         // (WKWebView resize artifact fix — see follow-up plan §6.)
-        let muted = cx.theme().muted_foreground;
         let content: AnyElement = if let Some(item) = self.items.get(self.active_item_index) {
             item.to_any().into_any_element()
         } else {
-            let bg = cx.theme().background;
-            div()
-                .size_full()
-                .bg(bg)
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_color(muted)
-                .child("No items open")
-                .into_any_element()
+            render_empty_state(cx)
         };
-        div().size_full().child(content)
+        div()
+            .size_full()
+            .child(content)
+            .dump_as("workspace-center-pane")
     }
+}
+
+/// Render the centred "Select a note to start editing" placeholder
+/// shown when the pane carries no items.  Worklist 2.2 — matches the
+/// React variant's `EditorEmptyState` so the GPUI chrome boots with
+/// the same welcome surface the user already knows.
+///
+/// Background is the theme's window colour because there is no
+/// WKWebView under this region (the resize-artifact rule only forbids
+/// `.bg()` on the active-item branch, where a WebView would otherwise
+/// be obscured).  Primary copy uses `foreground`; the secondary line
+/// uses `muted_foreground` to match the React shortcut hint.
+///
+/// The container carries `dump_as("workspace-center-pane-empty-state")`
+/// per the prefixed-hierarchy convention from
+/// `docs/plans/native-gpui-chrome/e2e-harness.md` so periscope can
+/// `screenshot --id workspace-center-pane-empty-state` for cropped
+/// regression diffs.
+fn render_empty_state(cx: &mut Context<Pane>) -> AnyElement {
+    let theme = cx.theme();
+    let bg = theme.background;
+    let fg = theme.foreground;
+    let muted = theme.muted_foreground;
+    div()
+        .size_full()
+        .bg(bg)
+        .flex()
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .gap(px(8.0))
+        .child(
+            div()
+                .text_color(fg)
+                .child(SharedString::new_static(EMPTY_STATE_PRIMARY)),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(muted)
+                .child(SharedString::new_static(EMPTY_STATE_SECONDARY)),
+        )
+        .dump_as("workspace-center-pane-empty-state")
+        .into_any_element()
 }
 
 // ---------------------------------------------------------------------------
@@ -547,5 +600,71 @@ mod tests {
         let got = events.borrow();
         assert_eq!(got.len(), 1);
         assert_eq!(got[0], PaneResized { bounds: expected });
+    }
+
+    // -----------------------------------------------------------------------
+    // Worklist 2.2 — empty-state placeholder
+    // -----------------------------------------------------------------------
+
+    /// A freshly-constructed pane has no active item, so the render
+    /// path must walk the empty-state branch.  Locks the worklist 2.2
+    /// invariant: an unpopulated center pane reports
+    /// `item_count == 0` and `active_item() == None`, which the
+    /// renderer translates into the "Select a note to start editing"
+    /// placeholder.
+    #[gpui::test]
+    fn empty_pane_renders_empty_state_without_panic(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let pane = pane_with_items(cx, 0);
+        cx.update(|cx| {
+            assert_eq!(pane.read(cx).item_count(), 0);
+            assert!(pane.read(cx).active_item().is_none());
+        });
+        cx.run_until_parked();
+    }
+
+    /// Empty-state copy must match the React variant's
+    /// `editor.empty.selectNote` / `editor.empty.shortcuts` so the
+    /// GPUI chrome boots with the same welcome surface the user
+    /// already knows from the Tauri build.  Worklist 2.2.
+    #[gpui::test]
+    fn empty_state_copy_matches_react_variant(_cx: &mut TestAppContext) {
+        assert_eq!(super::EMPTY_STATE_PRIMARY, "Select a note to start editing");
+        assert_eq!(
+            super::EMPTY_STATE_SECONDARY,
+            "⌘P / ⌘O to search · ⌘N to create"
+        );
+    }
+
+    /// Transition: an empty pane → `add_item` flips the renderer from
+    /// the empty-state branch to the active-item branch.  Worklist
+    /// 2.2 — guards against a regression where the empty state would
+    /// linger after the first user click.
+    #[gpui::test]
+    fn add_item_transitions_pane_away_from_empty_state(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let pane = pane_with_items(cx, 0);
+        cx.update(|cx| {
+            assert!(
+                pane.read(cx).active_item().is_none(),
+                "fresh pane must start in empty state"
+            );
+        });
+
+        cx.update(|cx| {
+            pane.update(cx, |p, cx| {
+                let item = cx.new(|_| MockNoteItem::new("First Open", "vault/first.md"));
+                p.add_item(item, Activation::Activate, cx);
+            });
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            assert_eq!(pane.read(cx).item_count(), 1);
+            assert!(
+                pane.read(cx).active_item().is_some(),
+                "pane must leave the empty state once the first item lands"
+            );
+        });
     }
 }

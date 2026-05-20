@@ -735,7 +735,13 @@ impl NoteListPane {
                 });
             }
         }
-        let selected_id = entries.first().map(|e| e.id);
+        // Worklist 2.2 — startup must mirror the React variant, which
+        // opens with no row highlighted and the center pane in its
+        // empty state.  Auto-selecting the first entry would route a
+        // click-equivalent through `selected_id` and surface the
+        // pale-accent highlight before the user has touched anything.
+        // The first user click flips this via `open()` / `set_active`.
+        let selected_id: Option<NoteId> = None;
         Self {
             entries,
             filter: SharedString::default(),
@@ -796,7 +802,10 @@ impl NoteListPane {
                 });
             }
         }
-        let selected_id = entries.first().map(|e| e.id);
+        // Worklist 2.2 — see comment in `from_mock`.  No row is
+        // pre-selected at startup so the workspace boots into the
+        // empty-note placeholder, matching the React variant.
+        let selected_id: Option<NoteId> = None;
         Self {
             entries,
             filter: SharedString::default(),

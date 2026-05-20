@@ -612,7 +612,6 @@ mod macos {
                         // "Select a note…" placeholder until a click
                         // swaps real content in.
                         if let Err(e) = crate::open_note::preload_blank_webview(
-                            &workspace,
                             &active_note_item,
                             window,
                             model_cx,

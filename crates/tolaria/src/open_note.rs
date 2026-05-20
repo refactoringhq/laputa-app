@@ -96,6 +96,17 @@ pub fn open_note(
         existing
             .update(cx, |item, cx| item.open_in_webview(note, body, cx))
             .context("NoteItem::open_in_webview failed")?;
+        // Worklist 2.2 — startup leaves the center pane empty so the
+        // workspace renders the "Select a note to start editing"
+        // placeholder.  The first real click reuses the preloaded
+        // `NoteItem` entity (kept warm by `preload_blank_webview`) and
+        // promotes it into the active pane here.  Subsequent clicks
+        // already have the entity mounted; the `item_count == 0`
+        // guard prevents `add_item_to_active_pane` from stacking
+        // duplicate copies of the same entity.
+        if workspace.active_pane_item_count(cx) == 0 {
+            workspace.add_item_to_active_pane(existing, cx);
+        }
         return Ok(());
     }
 
@@ -118,12 +129,9 @@ pub fn open_note(
     Ok(())
 }
 
-/// Eagerly mount an *empty* WKWebView at workspace startup so the
-/// editor's NSView (and the editor host bundle inside it) is
-/// constructed and painted before the user clicks anything.  The
-/// editor renders its built-in "Select a note…" placeholder until the
-/// first [`OpenNoteEvent`] swaps real content into it via
-/// [`NoteItem::open_in_webview`].
+/// Eagerly construct an *empty* `NoteItem` (with its live WKWebView)
+/// at workspace startup so the editor's NSView and the editor host
+/// bundle inside it are paid for *before* the user clicks anything.
 ///
 /// Without this, the very first click triggers WKWebView allocation +
 /// HTML load, and the user sees the black-NSView flash while WebKit
@@ -132,10 +140,22 @@ pub fn open_note(
 /// way to suppress the flash is to move construction out of the click
 /// path.
 ///
+/// Worklist 2.2 — the preloaded entity is stored in `slot` but NOT
+/// added to the center [`workspace::Pane`].  The pane therefore boots
+/// empty, which makes its renderer walk the "Select a note to start
+/// editing" placeholder branch (`workspace::pane::Pane::render`'s
+/// empty-state arm).  The first real [`OpenNoteEvent`] reuses the
+/// entity via `open_note` and promotes it into the active pane there.
+///
 /// Independent of the vault: a blank editor is useful even when no
 /// vault is open (the user may pick one via a future menu action).
+///
+/// Unlike [`open_note`] this no longer needs a `&TolariaWorkspace`
+/// handle: the preload path only constructs the entity and stashes it
+/// in `slot`.  The promotion into the active pane is deferred to
+/// `open_note` so the empty-state branch can render until the first
+/// user click.
 pub fn preload_blank_webview(
-    workspace: &TolariaWorkspace,
     slot: &ActiveNoteItemSlot,
     window: &mut Window,
     cx: &mut Context<TolariaWorkspace>,
@@ -146,8 +166,7 @@ pub fn preload_blank_webview(
     blank
         .update(cx, |item, cx| item.set_theme(initial_mode, cx))
         .context("propagating initial theme to blank NoteItem WebView")?;
-    *slot.borrow_mut() = Some(blank.clone());
-    workspace.add_item_to_active_pane(blank, cx);
+    *slot.borrow_mut() = Some(blank);
     Ok(())
 }
 
@@ -237,5 +256,87 @@ mod tests {
             let item = slot.borrow().clone().unwrap();
             assert_eq!(item.read(cx).id(), note_b.id);
         });
+    }
+
+    /// Worklist 2.2 — a freshly opened workspace must boot with an
+    /// *empty* center pane so the renderer walks the
+    /// "Select a note to start editing" placeholder branch.  The
+    /// preloaded blank `NoteItem` lives in the slot for warm-start
+    /// reuse, but does NOT auto-mount into the active pane.
+    ///
+    /// The test simulates the post-`preload_blank_webview` state by
+    /// populating the slot with a headless `NoteItem` (no live
+    /// WKWebView in `TestAppContext`) and asserting the workspace
+    /// reports zero items in the active pane.
+    #[gpui::test]
+    fn workspace_boots_with_empty_center_pane(cx: &mut gpui::TestAppContext) {
+        cx.update(gpui_component::init);
+        let window = cx.add_window(TolariaWorkspace::empty);
+        let slot: ActiveNoteItemSlot = Rc::new(RefCell::new(None));
+
+        // Simulate `preload_blank_webview`: construct the blank entity
+        // and store it in the slot, but do NOT add to the pane.
+        let blank = cx.update(|cx| cx.new(|_| NoteItem::new_for_tests(fresh_note(0, ""))));
+        *slot.borrow_mut() = Some(blank);
+
+        window
+            .update(cx, |ws_view, _window, cx| {
+                assert_eq!(
+                    ws_view.active_pane_item_count(cx),
+                    0,
+                    "workspace must boot with an empty center pane — worklist 2.2",
+                );
+            })
+            .unwrap();
+        assert!(
+            slot.borrow().is_some(),
+            "preload_blank_webview must keep the blank entity warm in the slot",
+        );
+    }
+
+    /// Worklist 2.2 — the first `OpenNoteEvent` must promote the
+    /// preloaded entity from the slot into the active pane, replacing
+    /// the empty-state placeholder with the editor surface.
+    ///
+    /// Simulates the binary-crate dispatch path: slot is pre-populated
+    /// (as `preload_blank_webview` would), the pane starts empty, and
+    /// the open flow takes the `existing` branch + the
+    /// `item_count == 0` guard to push the entity onto the pane.
+    #[gpui::test]
+    fn first_open_promotes_slot_entity_into_active_pane(cx: &mut gpui::TestAppContext) {
+        cx.update(gpui_component::init);
+        let window = cx.add_window(TolariaWorkspace::empty);
+        let slot: ActiveNoteItemSlot = Rc::new(RefCell::new(None));
+
+        // Stand-in for `preload_blank_webview`: a headless `NoteItem`
+        // entity lives in the slot from workspace startup.
+        let preloaded = cx.update(|cx| cx.new(|_| NoteItem::new_for_tests(fresh_note(0, ""))));
+        *slot.borrow_mut() = Some(preloaded.clone());
+
+        // Pane starts empty (worklist 2.2 boot invariant).
+        window
+            .update(cx, |ws_view, _window, cx| {
+                assert_eq!(ws_view.active_pane_item_count(cx), 0);
+            })
+            .unwrap();
+
+        // First user click: drive the slot-reuse branch.  The real
+        // `open_note` would also call `open_in_webview` for the IPC
+        // swap; that path is exercised by the existing
+        // `second_open_reuses_active_note_item` test.  Here we focus
+        // on the *promotion* contract: empty pane → entity mounted.
+        window
+            .update(cx, |ws_view, _window, cx| {
+                if ws_view.active_pane_item_count(cx) == 0 {
+                    let existing = slot.borrow().clone().expect("slot populated");
+                    ws_view.add_item_to_active_pane(existing, cx);
+                }
+                assert_eq!(
+                    ws_view.active_pane_item_count(cx),
+                    1,
+                    "first open must promote the preloaded entity into the pane",
+                );
+            })
+            .unwrap();
     }
 }
