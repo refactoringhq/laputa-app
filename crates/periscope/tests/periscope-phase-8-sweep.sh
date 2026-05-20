@@ -48,7 +48,10 @@ VAULT="demo-vault-v2"
 WIDTH=1516
 HEIGHT=1052
 MIN_BYTES=$((10 * 1024)) # 10 kB — matches periscope's black-frame floor.
-WINDOW_TITLE="Tolaria"
+# tolaria sets `title: None` on the window (custom titlebar strip — see
+# crates/tolaria/src/main.rs around the TitlebarOptions block), so we
+# target the spawned process by pid instead of by window title.
+BIN_PID=""
 
 # --- Child-process management ---------------------------------------------
 
@@ -56,7 +59,7 @@ TOLARIA_PID=""
 cleanup() {
   if [[ -n "$TOLARIA_PID" ]] && kill -0 "$TOLARIA_PID" 2>/dev/null; then
     echo ""
-    echo "==> Tearing down Tolaria (pid=$TOLARIA_PID)"
+    echo "==> Tearing down Tolaria (cargo pid=$TOLARIA_PID, bin pid=$BIN_PID)"
     kill "$TOLARIA_PID" 2>/dev/null || true
     wait "$TOLARIA_PID" 2>/dev/null || true
   fi
@@ -71,12 +74,17 @@ cargo run -q -p tolaria "${PROFILE_FLAGS[@]}" -- \
   >"$OUT_DIR/tolaria.stdout.log" 2>"$OUT_DIR/tolaria.stderr.log" &
 TOLARIA_PID=$!
 
-# Poll for the window to appear in `periscope list`. Caps at 30 s so a
-# silent build / link failure surfaces fast instead of hanging the sweep.
-echo "==> Waiting up to 30s for window titled \"$WINDOW_TITLE\""
+# `cargo run` execs the binary as a child; the binary pid is what
+# periscope's window-list reports, not the cargo wrapper pid.  Poll
+# `periscope list` for an `app=tolaria` entry and capture its pid for
+# the rest of the sweep.  Caps at 30 s so a silent build / link failure
+# surfaces fast instead of hanging the sweep.
+echo "==> Waiting up to 30s for the tolaria window"
 window_found=0
 for _ in $(seq 1 60); do
-  if cargo run -q -p periscope -- list 2>/dev/null | grep -q "title=$WINDOW_TITLE\$"; then
+  BIN_PID="$(cargo run -q -p periscope -- list 2>/dev/null \
+    | awk -F'[= ]' '/^pid=.* app=tolaria/ {print $2; exit}')"
+  if [[ -n "$BIN_PID" ]]; then
     window_found=1
     break
   fi
@@ -92,6 +100,8 @@ if [[ "$window_found" -ne 1 ]]; then
   echo "==> Timed out waiting for Tolaria window (Screen Recording / Accessibility granted?)" >&2
   exit 1
 fi
+
+echo "==> Window found (bin pid=$BIN_PID)"
 
 # Give the window one more half-second to paint its initial frame so the
 # baseline captures aren't blank.
@@ -110,7 +120,7 @@ capture() {
   echo ""
   echo "==> [$slot] periscope screenshot $* --out $OUT_DIR/$filename"
   if cargo run -q -p periscope -- screenshot \
-      --title "$WINDOW_TITLE" --raise \
+      --pid "$BIN_PID" --raise \
       --out "$OUT_DIR/$filename" \
       "$@" 2>"$stderr_log"; then
     echo "    wrote $filename ($(stat -f%z "$OUT_DIR/$filename") bytes)"
@@ -125,7 +135,7 @@ click_id() {
   local id="$1"
   echo "==> periscope click --id $id"
   if ! cargo run -q -p periscope -- click \
-      --title "$WINDOW_TITLE" --raise --id "$id" 2>"$OUT_DIR/click-$id.stderr.log"; then
+      --pid "$BIN_PID" --raise --id "$id" 2>"$OUT_DIR/click-$id.stderr.log"; then
     echo "    click --id $id FAILED — see $OUT_DIR/click-$id.stderr.log" >&2
   fi
   # Settle for layout / dump refresh.
@@ -138,7 +148,7 @@ click_xy() {
   local y="$2"
   echo "==> periscope click --x $x --y $y"
   if ! cargo run -q -p periscope -- click \
-      --title "$WINDOW_TITLE" --raise --x "$x" --y "$y" \
+      --pid "$BIN_PID" --raise --x "$x" --y "$y" \
       2>"$OUT_DIR/click-${x}-${y}.stderr.log"; then
     echo "    click ($x,$y) FAILED — see $OUT_DIR/click-${x}-${y}.stderr.log" >&2
   fi
