@@ -710,6 +710,12 @@ mod macos {
 
         let webview_raw = WebViewBuilder::new()
             .with_html(EDITOR_HOST_HTML)
+            // Worklist 1.2 diagnostic — enable Safari Web Inspector so
+            // the user can attach via Safari → Develop → Tolaria → the
+            // WebView and observe DOM/console state on hover.  Cheap
+            // to leave on in dogfood builds; remove or feature-gate
+            // before any production cut.
+            .with_devtools(true)
             .with_ipc_handler(move |req| {
                 let body = req.body();
                 match editor_bridge::decode_from_host(body) {
