@@ -280,7 +280,7 @@ mod macos {
             .filter_module("tolaria", log::LevelFilter::Info)
             .parse_default_env()
             .init();
-        log::info!("tolaria starting (ADR-0115 Phase 5-MVP)");
+        log::info!("tolaria starting");
 
         let args = parse_args();
 
