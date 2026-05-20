@@ -18,6 +18,9 @@ overrides:
   rollup: 4.59.0
 
 patchedDependencies:
+  '@blocknote/code-block@0.46.2':
+    hash: c006cad64c22a2efc10299d85bf72407150fd29a1f16d497b8db0faa071535f8
+    path: patches/@blocknote__code-block@0.46.2.patch
   '@blocknote/core@0.46.2':
     hash: 9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2
     path: patches/@blocknote__core@0.46.2.patch
@@ -40,7 +43,7 @@ importers:
         version: 0.78.0(zod@4.3.6)
       '@blocknote/code-block':
         specifier: ^0.46.2
-        version: 0.46.2(@blocknote/core@0.46.2(patch_hash=9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2)(@types/hast@3.0.4)(highlight.js@11.11.1)(lowlight@3.3.0))
+        version: 0.46.2(patch_hash=c006cad64c22a2efc10299d85bf72407150fd29a1f16d497b8db0faa071535f8)(@blocknote/core@0.46.2(patch_hash=9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2)(@types/hast@3.0.4)(highlight.js@11.11.1)(lowlight@3.3.0))
       '@blocknote/core':
         specifier: ^0.46.2
         version: 0.46.2(patch_hash=9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2)(@types/hast@3.0.4)(highlight.js@11.11.1)(lowlight@3.3.0)
@@ -6211,7 +6214,7 @@ snapshots:
 
   '@bcoe/v8-coverage@1.0.2': {}
 
-  '@blocknote/code-block@0.46.2(@blocknote/core@0.46.2(patch_hash=9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2)(@types/hast@3.0.4)(highlight.js@11.11.1)(lowlight@3.3.0))':
+  '@blocknote/code-block@0.46.2(patch_hash=c006cad64c22a2efc10299d85bf72407150fd29a1f16d497b8db0faa071535f8)(@blocknote/core@0.46.2(patch_hash=9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2)(@types/hast@3.0.4)(highlight.js@11.11.1)(lowlight@3.3.0))':
     dependencies:
       '@blocknote/core': 0.46.2(patch_hash=9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2)(@types/hast@3.0.4)(highlight.js@11.11.1)(lowlight@3.3.0)
       '@shikijs/core': 3.23.0
