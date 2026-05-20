@@ -8,8 +8,8 @@ interface AutoGitWorkInput {
   remoteStatusForRepository: (path: string) => GitRemoteStatus | null
 }
 
-function hasPushableCommits(status: GitRemoteStatus | null | undefined): boolean {
-  return status?.hasRemote === true && status.ahead > 0
+function pushableAhead(status: GitRemoteStatus | null | undefined): number | null {
+  return status?.hasRemote === true && status.ahead > 0 ? status.ahead : null
 }
 
 function modifiedFileSignature(file: ModifiedFile): string {
@@ -21,7 +21,8 @@ function pushableRepositorySignature(
   remoteStatusForRepository: (path: string) => GitRemoteStatus | null,
 ): string | null {
   const status = remoteStatusForRepository(path)
-  return hasPushableCommits(status) ? `${path}:${status.ahead}` : null
+  const ahead = pushableAhead(status)
+  return ahead === null ? null : `${path}:${ahead}`
 }
 
 function activeRemoteSignature({
@@ -29,9 +30,10 @@ function activeRemoteSignature({
   activeVaultPath,
   repositoryPaths,
 }: Pick<AutoGitWorkInput, 'activeRemoteStatus' | 'activeVaultPath' | 'repositoryPaths'>): string | null {
-  if (!hasPushableCommits(activeRemoteStatus)) return null
+  const ahead = pushableAhead(activeRemoteStatus)
+  if (ahead === null) return null
   if (repositoryPaths.includes(activeVaultPath)) return null
-  return `${activeVaultPath}:${activeRemoteStatus.ahead}`
+  return `${activeVaultPath}:${ahead}`
 }
 
 export function autoGitWorkSignature({
