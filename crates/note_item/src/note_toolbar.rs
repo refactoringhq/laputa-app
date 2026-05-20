@@ -65,7 +65,18 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
             div()
                 .id("note-toolbar-type")
                 .child(type_label)
-                .tooltip(|window, cx| Tooltip::new("Note type — click to change").build(window, cx))
+                .tooltip(|window, cx| {
+                    // `.m_1()` shrinks the tooltip's outer margin from the
+                    // default 12 px to 4 px so the rendered body fits
+                    // *above* the toolbar in the 34 pt native title-bar
+                    // region.  Without it, gpui_component's auto-placement
+                    // picks Below — and Below puts the tooltip inside the
+                    // WKWebView's frame, where the sibling NSView paints
+                    // over it (ADR-0115 §6 z-order).
+                    Tooltip::new("Note type — click to change")
+                        .m_1()
+                        .build(window, cx)
+                })
                 .dump_as("note-toolbar-type"),
         )
         .child(div().text_color(muted).child(IconName::ChevronRight))
@@ -87,7 +98,7 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
                 // — single curved stroke matching the React reference rather
                 // than the two-straight-arrows shape of `IconName::Replace`.
                 .child(IconName::Undo)
-                .tooltip(|window, cx| Tooltip::new("Sync status").build(window, cx))
+                .tooltip(|window, cx| Tooltip::new("Sync status").m_1().build(window, cx))
                 .dump_as("note-toolbar-sync")
                 .into_any_element(),
         );
@@ -189,7 +200,7 @@ fn toolbar_cell(id: &'static str, icon: IconName, tooltip: &'static str) -> AnyE
         .on_click(move |_, _window, _cx| {
             log::info!("note toolbar action stub: {id}");
         })
-        .tooltip(move |window, cx| Tooltip::new(tooltip).build(window, cx))
+        .tooltip(move |window, cx| Tooltip::new(tooltip).m_1().build(window, cx))
         .child(icon)
         .dump_as(id)
         .into_any_element()

@@ -14,7 +14,7 @@
 2.5. ✅ Vault picker popup does not close on focs loss
 2.6. ✅ Side bar Types, Views, Folder are not collpsable
 2.7. ✅ System menu is missing items for File, View, Help
-2.8. Note web view lacks any styling present in React variant
+2.8. ✅ Note web view lacks any styling present in React variant
 2.9. note-toolbar-star element is not wired
 2.10. note-toolbar-organized element is not wired
 2.11. note-toolbar-neighborhood element is not wired
