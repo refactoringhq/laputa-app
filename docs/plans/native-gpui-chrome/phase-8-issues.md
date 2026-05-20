@@ -3,7 +3,7 @@
 ## 1. Blockers
 
 1.1. ✅ Clicking on the notes search crashes with paniic
-1.2. ✅ Note web view renders and goes blank once the mouse moved over it
+1.2. Note web view renders and goes blank once the mouse moved over it
 
 ## 2. High Priority
 
@@ -25,10 +25,10 @@
 2.16. note-toolbar-copy-path element is not wired
 2.17. note-toolbar-more element is not wired
 2.18. note-toolbar-inspector element is not wired
-2.19. Notes list top bar Add bottom does nothing
-2.20. Notes list sort dropdown does not update the title after the user selects an option
-2.21. Notes list sort dropdown appears under the web view pannel
-2.22. Notes list top bar search: Esc button shodu close the search line and clear the search query
+2.19. ✅ Notes list top bar Add bottom does nothing
+2.20. ✅ Notes list sort dropdown does not update the title after the user selects an option
+2.21. ✅ Notes list sort dropdown appears under the web view pannel
+2.22. ✅ Notes list top bar search: Esc button shodu close the search line and clear the search query
 2.23. The sidebar-types-sort button does not work
 
 ## 3. Low Priority
