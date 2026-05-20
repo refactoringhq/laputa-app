@@ -2098,6 +2098,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "filter_builder"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "gpui_platform",
+ "mock_fixtures",
+ "workspace",
+]
+
+[[package]]
 name = "find-msvc-tools"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
