@@ -2,14 +2,14 @@
 
 ## 1. Blockers
 
-1.1. ⏳ Clicking on the notes search crashes with paniic
+1.1. ✅ Clicking on the notes search crashes with paniic
 1.2. ✅ Note web view renders and goes blank once the mouse moved over it
 
 ## 2. High Priority
 
 2.1. ✅ Note list top bar title need to reflect the title of the iems selected in the side bar
 2.2. ✅ On startup Note List shows some note is slected. The note view should show an empty note state. It is the same as in React variant.
-2.3. Active Projects view filer does not work
+2.3. ✅ Active Projects view filer does not work
 2.4. All clikable buttons lack the hints
 2.5. Vault picker popup does not close on focs loss
 2.6. Side bar Types, Views, Folder are not collpsable
