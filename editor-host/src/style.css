@@ -11,6 +11,162 @@
     --fg-muted: #787774;
     --border: #e9e9e7;
     --accent: #155dff;
+
+    /* ---------------------------------------------------------------
+       Editor theme variables — consumed by the BlockNote overrides
+       ported below from React's `EditorTheme.css`.  Values mirror the
+       React `src/theme.json` defaults; chrome-side palette tokens are
+       aliased onto the four cross-process tokens above (`--bg`,
+       `--fg`, `--fg-muted`, `--border`, `--accent`) so editor-host
+       has a single source of truth from `crates/theme/src/palette.rs`.
+       --------------------------------------------------------------- */
+
+    /* Editor body */
+    --editor-font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+    --editor-font-size: 15px;
+    --editor-line-height: 1.625;
+    --editor-max-width: 720px;
+    --editor-padding-vertical: 48px;
+    --editor-padding-horizontal: 56px;
+    --editor-paragraph-spacing: 8px;
+
+    /* Colors (aliased onto the cross-process palette) */
+    --colors-bg: var(--bg);
+    --colors-text: var(--fg);
+    --colors-text-secondary: var(--fg-muted);
+    --colors-text-muted: var(--fg-muted);
+    --colors-heading: var(--fg);
+    --colors-accent: var(--accent);
+    --colors-selection: color-mix(in srgb, var(--accent) 25%, transparent);
+    --colors-cursor: var(--accent);
+    --colors-border: var(--border);
+    --colors-muted: var(--fg-muted);
+
+    /* Chrome-level tokens that the BlockNote overrides reference.
+       These existed on `:root` in React's `src/index.css`; here we
+       collapse them onto the four cross-process tokens. */
+    --bg-primary: var(--bg);
+    --text-primary: var(--fg);
+    --text-secondary: var(--fg-muted);
+    --text-tertiary: var(--fg-muted);
+    --text-muted: var(--fg-muted);
+    --text-faint: var(--fg-muted);
+    --text-heading: var(--fg);
+    --border-primary: var(--border);
+    --border-dialog: var(--border);
+    --border-focus: var(--accent);
+    --border-subtle: var(--border);
+    --surface-popover: var(--bg);
+    --surface-editor: var(--bg);
+    --surface-card: var(--bg);
+    --surface-sidebar: var(--bg);
+    --bg-card: var(--bg);
+    --bg-hover-subtle: color-mix(in srgb, var(--fg) 6%, transparent);
+    --bg-selected: color-mix(in srgb, var(--accent) 20%, transparent);
+    --state-hover: color-mix(in srgb, var(--fg) 8%, transparent);
+    --state-hover-subtle: color-mix(in srgb, var(--fg) 6%, transparent);
+    --state-drag-target: color-mix(in srgb, var(--accent) 12%, transparent);
+    --shadow-dialog: rgba(0, 0, 0, 0.15);
+    --accent-blue: var(--accent);
+    --foreground: var(--fg);
+    --card: var(--bg);
+    --popover: var(--bg);
+    --primary: var(--accent);
+    --destructive: #e53e3e;
+
+    /* Headings (React theme.json defaults) */
+    --headings-h1-font-size: 32px;
+    --headings-h1-font-weight: 700;
+    --headings-h1-line-height: 1.2;
+    --headings-h1-margin-top: 32px;
+    --headings-h1-margin-bottom: 12px;
+    --headings-h1-color: var(--text-heading);
+    --headings-h1-letter-spacing: -0.5px;
+
+    --headings-h2-font-size: 27px;
+    --headings-h2-font-weight: 600;
+    --headings-h2-line-height: 1.4;
+    --headings-h2-margin-top: 28px;
+    --headings-h2-margin-bottom: 10px;
+    --headings-h2-color: var(--text-heading);
+    --headings-h2-letter-spacing: -0.5px;
+
+    --headings-h3-font-size: 20px;
+    --headings-h3-font-weight: 600;
+    --headings-h3-line-height: 1.4;
+    --headings-h3-margin-top: 24px;
+    --headings-h3-margin-bottom: 8px;
+    --headings-h3-color: var(--text-heading);
+    --headings-h3-letter-spacing: -0.5px;
+
+    --headings-h4-font-size: 20px;
+    --headings-h4-font-weight: 600;
+    --headings-h4-line-height: 1.4;
+    --headings-h4-margin-top: 20px;
+    --headings-h4-margin-bottom: 6px;
+    --headings-h4-color: var(--text-heading);
+    --headings-h4-letter-spacing: 0;
+
+    /* Lists */
+    --lists-bullet-size: 24px;
+    --lists-bullet-color: var(--accent);
+    --lists-indent-size: 24px;
+    --lists-item-spacing: 4px;
+    --lists-padding-left: 8px;
+    --lists-bullet-gap: 6px;
+
+    /* Checkboxes */
+    --checkboxes-size: 18px;
+    --checkboxes-border-radius: 3px;
+    --checkboxes-checked-color: var(--accent);
+    --checkboxes-unchecked-border-color: var(--fg-muted);
+    --checkboxes-gap: 8px;
+
+    /* Inline styles */
+    --inline-styles-bold-font-weight: 700;
+    --inline-styles-bold-color: var(--text-primary);
+    --inline-styles-italic-font-style: italic;
+    --inline-styles-italic-color: var(--text-primary);
+    --inline-styles-strikethrough-color: var(--text-tertiary);
+    --inline-styles-strikethrough-text-decoration: line-through;
+    --inline-styles-code-font-family: "SF Mono", "Fira Code", monospace;
+    --inline-styles-code-font-size: 14px;
+    --inline-styles-code-background-color: var(--bg-hover-subtle);
+    --inline-styles-code-padding-horizontal: 4px;
+    --inline-styles-code-padding-vertical: 2px;
+    --inline-styles-code-border-radius: 3px;
+    --inline-styles-code-color: var(--text-secondary);
+    --inline-styles-link-color: var(--accent);
+    --inline-styles-link-text-decoration: underline;
+    --inline-styles-wikilink-color: var(--accent);
+    --inline-styles-wikilink-text-decoration: none;
+    --inline-styles-wikilink-border-bottom: 1px dotted currentColor;
+
+    /* Blockquote */
+    --blockquote-border-left-width: 3px;
+    --blockquote-border-left-color: var(--accent);
+    --blockquote-padding-left: 16px;
+    --blockquote-margin-vertical: 12px;
+    --blockquote-color: var(--text-secondary);
+    --blockquote-font-style: italic;
+
+    /* Table */
+    --table-border-color: var(--border-primary);
+    --table-header-background: var(--bg-card);
+    --table-cell-padding-horizontal: 12px;
+    --table-cell-padding-vertical: 8px;
+    --table-font-size: 14px;
+
+    /* Horizontal rule */
+    --horizontal-rule-color: var(--border-primary);
+    --horizontal-rule-margin-vertical: 24px;
+    --horizontal-rule-thickness: 1px;
+
+    /* Code block (chrome-level in React; aliased here) */
+    --editor-code-block-background: var(--bg-hover-subtle);
+    --editor-code-block-border: var(--border);
+    --editor-code-block-text: var(--text-primary);
+    --editor-code-block-language: var(--text-secondary);
 }
 
 :root[data-theme="dark"] {
@@ -63,4 +219,690 @@ body {
 
 ::selection {
     background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* === Editor body theme — ported from React variant (worklist 2.8) === */
+
+/* Wikilink inline content — color defaults to var(--accent) here.
+   Per-type wikilink color is set as inline style by the wikilink
+   extension when type metadata is available; var(--accent) is the
+   unstyled default. */
+.wikilink {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.wikilink:hover {
+  text-decoration-style: solid;
+  opacity: 0.85;
+}
+
+/* Broken wikilink: dashed underline + lower opacity */
+.wikilink--broken {
+  text-decoration-style: dashed;
+  opacity: 0.7;
+}
+
+.wikilink--broken:hover {
+  opacity: 0.55;
+}
+
+/* BlockNote container */
+.editor-host-container .bn-container {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 15px;
+  /* Override BlockNote's internal color variables so .bn-editor background
+     matches our vault theme instead of BlockNote's hardcoded light/dark defaults. */
+  --bn-colors-editor-background: var(--bg-primary);
+  --bn-colors-editor-text: var(--text-primary);
+  --bn-colors-menu-background: var(--surface-popover);
+  --bn-colors-menu-text: var(--text-primary);
+  --bn-colors-tooltip-background: var(--state-hover-subtle);
+  --bn-colors-tooltip-text: var(--text-primary);
+  --bn-colors-hovered-background: var(--state-hover);
+  --bn-colors-hovered-text: var(--text-primary);
+  --bn-colors-selected-background: var(--bg-selected);
+  --bn-colors-selected-text: var(--text-primary);
+  --bn-colors-border: var(--border-dialog);
+  --bn-colors-shadow: var(--shadow-dialog);
+  --bn-colors-side-menu: var(--text-muted);
+}
+
+.editor-host-container .bn-editor {
+  width: 100%;
+  padding: 20px 0;
+}
+
+.editor-host-container .bn-suggestion-menu {
+  border: 1px solid var(--border-dialog) !important;
+  background: var(--surface-popover) !important;
+  box-shadow: 0 8px 32px var(--shadow-dialog) !important;
+}
+
+.editor-host-container .bn-suggestion-menu-label {
+  color: var(--text-secondary) !important;
+}
+
+.editor-host-container .bn-suggestion-menu-item {
+  color: var(--text-primary) !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 3px 8px !important;
+}
+
+.editor-host-container .bn-mt-suggestion-menu-item-section[data-position="left"] {
+  width: 28px;
+  min-width: 28px;
+  margin-inline-end: 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  color: var(--text-primary) !important;
+}
+
+.editor-host-container .bn-mt-suggestion-menu-item-section[data-position="right"] {
+  margin-inline-start: 12px !important;
+  color: var(--text-muted) !important;
+}
+
+.editor-host-container .bn-mt-suggestion-menu-item-section[data-position="right"] .mantine-Badge-root {
+  min-width: 0 !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  text-transform: none !important;
+}
+
+.editor-host-container .bn-mt-suggestion-menu-item-body {
+  justify-content: center !important;
+  padding-right: 0 !important;
+}
+
+.editor-host-container .bn-mt-suggestion-menu-item-subtitle {
+  display: none !important;
+}
+
+.editor-host-container .tolaria-slash-menu-icon {
+  position: relative;
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor-host-container .tolaria-slash-menu-icon__fill {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.editor-host-container .bn-suggestion-menu-item:is(:hover, [aria-selected="true"]) .tolaria-slash-menu-icon__regular {
+  opacity: 0;
+}
+
+.editor-host-container .bn-suggestion-menu-item:is(:hover, [aria-selected="true"]) .tolaria-slash-menu-icon__fill {
+  opacity: 1;
+}
+
+/* =============================================
+   Disable BlockNote/Mantine editor animations
+   =============================================
+   Scoped to .editor-host-container so app-wide
+   components (dialogs, sidebar, etc.) are unaffected.
+   Preserves cursor blink and text selection. */
+.editor-host-container *,
+.editor-host-container *::before,
+.editor-host-container *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* ==============================================
+   EditorTheme.css — BlockNote theme overrides
+   Driven by CSS custom properties from theme.json
+   ============================================== */
+
+/* --- Editor root --- */
+.editor-host-container {
+  position: relative;
+}
+
+.editor-host-container .bn-editor {
+  font-family: var(--editor-font-family);
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
+  max-width: var(--editor-max-width);
+  margin: 0 auto;  /* Center the editor body */
+  padding: var(--editor-padding-vertical) var(--editor-padding-horizontal);
+  color: var(--colors-text);
+  caret-color: var(--colors-cursor);
+}
+
+/* Let each rich-text block resolve its own base direction for mixed LTR/RTL notes. */
+.editor-host-container .bn-block-content {
+  text-align: start;
+}
+
+.editor-host-container .bn-inline-content {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
+/* Override BlockNote's default line-height on block-outer so our theme controls it */
+.editor-host-container .bn-block-outer {
+  line-height: var(--editor-line-height) !important;
+}
+
+/* Stack handle buttons horizontally instead of vertically to reduce height,
+   so they fit within a single text line for headings and paragraphs. */
+.editor-host-container .bn-side-menu {
+  --group-wrap: nowrap !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 0 !important;
+}
+
+.editor-host-container .bn-side-menu button,
+.editor-host-container .tolaria-block-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor-host-container .bn-side-menu [draggable="true"] * {
+  pointer-events: none;
+}
+
+/* More horizontal space between drag handle and content */
+.editor-host-container .bn-side-menu ~ * ,
+.editor-host-container [class*="bn-side-menu"] {
+  /* The side menu is positioned via transform — we shift it further left */
+}
+.editor-host-container .bn-block-content {
+  margin-inline-start: 8px;
+}
+
+.editor-host-container .bn-editor ::selection {
+  background: var(--colors-selection);
+}
+
+/* Keep BlockNote toolbar/menu icons at a stable size.
+   Some default React Icons-based controls inherit `1em` sizing and can blow up
+   when upstream toolbar styling changes. */
+.editor-host-container :is(.bn-toolbar, .bn-formatting-toolbar, .bn-menu-dropdown, .bn-grid-suggestion-menu) button svg {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0;
+}
+
+/* --- Paragraph spacing --- */
+.editor-host-container .bn-block-content[data-content-type="paragraph"] {
+  margin-bottom: var(--editor-paragraph-spacing);
+}
+
+/* --- Headings --- */
+/* Heading spacing: use margin-top on .bn-block-outer (creates space between blocks)
+   and ensure the handle aligns by NOT adding padding/margin on inner elements.
+   BlockNote positions handles via JS based on .bn-block-content bounding rect. */
+
+/* Title (H1) — visually separated from content.
+   BlockNote renders H1 without data-level, so we target :has(h1) */
+.editor-host-container .bn-block-outer:has(h1) {
+  margin-top: var(--headings-h1-margin-top) !important;
+  margin-bottom: var(--headings-h1-margin-bottom) !important;
+  padding-bottom: 16px !important;
+  border-bottom: 1px solid var(--border-primary);
+}
+.editor-host-container [data-content-type="heading"]:not([data-level]) .bn-inline-content,
+.editor-host-container [data-content-type="heading"][data-level="1"] .bn-inline-content {
+  font-size: var(--headings-h1-font-size);
+  font-weight: var(--headings-h1-font-weight);
+  line-height: var(--headings-h1-line-height);
+  color: var(--headings-h1-color);
+  letter-spacing: var(--headings-h1-letter-spacing);
+}
+.editor-host-container [data-content-type="heading"]:not([data-level])[data-is-empty-and-focused] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before,
+.editor-host-container [data-content-type="heading"]:not([data-level])[data-is-only-empty-block] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before,
+.editor-host-container [data-content-type="heading"][data-level="1"][data-is-empty-and-focused] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before,
+.editor-host-container [data-content-type="heading"][data-level="1"][data-is-only-empty-block] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before {
+  content: "Title" !important;
+}
+
+.editor-host-container .bn-block-outer:has(> .bn-block > [data-content-type="heading"][data-level="2"]) {
+  margin-top: var(--headings-h2-margin-top) !important;
+  margin-bottom: var(--headings-h2-margin-bottom) !important;
+}
+.editor-host-container [data-content-type="heading"][data-level="2"] .bn-inline-content {
+  font-size: var(--headings-h2-font-size);
+  font-weight: var(--headings-h2-font-weight);
+  line-height: var(--headings-h2-line-height);
+  color: var(--headings-h2-color);
+  letter-spacing: var(--headings-h2-letter-spacing);
+}
+
+.editor-host-container .bn-block-outer:has(> .bn-block > [data-content-type="heading"][data-level="3"]) {
+  margin-top: var(--headings-h3-margin-top) !important;
+  margin-bottom: var(--headings-h3-margin-bottom) !important;
+}
+.editor-host-container [data-content-type="heading"][data-level="3"] .bn-inline-content {
+  font-size: var(--headings-h3-font-size);
+  font-weight: var(--headings-h3-font-weight);
+  line-height: var(--headings-h3-line-height);
+  color: var(--headings-h3-color);
+  letter-spacing: var(--headings-h3-letter-spacing);
+}
+
+.editor-host-container .bn-block-outer:has(> .bn-block > [data-content-type="heading"][data-level="4"]) {
+  margin-top: var(--headings-h4-margin-top) !important;
+  margin-bottom: var(--headings-h4-margin-bottom) !important;
+}
+.editor-host-container [data-content-type="heading"][data-level="4"] .bn-inline-content {
+  font-size: var(--headings-h4-font-size);
+  font-weight: var(--headings-h4-font-weight);
+  line-height: var(--headings-h4-line-height);
+  color: var(--headings-h4-color);
+  letter-spacing: var(--headings-h4-letter-spacing);
+}
+
+/* --- Bullet lists --- */
+/* BlockNote renders bullet as ::before on [data-content-type="bulletListItem"]
+   with content: "•", display: flex, width: 24px */
+.editor-host-container [data-content-type="bulletListItem"] {
+  padding-inline-start: var(--lists-padding-left);
+  margin-bottom: var(--lists-item-spacing);
+  gap: var(--lists-bullet-gap) !important;
+}
+
+.editor-host-container [data-content-type="bulletListItem"]::before {
+  font-size: var(--lists-bullet-size) !important;
+  color: var(--lists-bullet-color) !important;
+  min-width: var(--lists-indent-size) !important;
+  width: var(--lists-indent-size) !important;
+  /* Align bullet with first line of text */
+  height: calc(var(--editor-font-size) * var(--editor-line-height)) !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* Nested list indentation */
+.editor-host-container .bn-block-group .bn-block-group {
+  margin-inline-start: var(--lists-indent-size);
+}
+
+/* Hide the vertical nesting lines — cleaner without them */
+.editor-host-container .bn-block-group .bn-block-group .bn-block-outer::before {
+  border-inline-start: none !important;
+}
+
+/* --- Numbered lists --- */
+.editor-host-container [data-content-type="numberedListItem"] {
+  padding-inline-start: var(--lists-padding-left);
+  margin-bottom: var(--lists-item-spacing);
+  gap: var(--lists-bullet-gap) !important;
+}
+
+.editor-host-container [data-content-type="numberedListItem"]::before {
+  color: var(--lists-bullet-color) !important;
+  font-size: var(--editor-font-size) !important;
+  min-width: var(--lists-indent-size) !important;
+  width: var(--lists-indent-size) !important;
+  height: calc(var(--editor-font-size) * var(--editor-line-height)) !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* --- Checkbox / check list items --- */
+/* BlockNote renders checkbox as: div > input[type=checkbox] inside .bn-block-content */
+.editor-host-container [data-content-type="checkListItem"] {
+  margin-bottom: var(--lists-item-spacing);
+  gap: var(--checkboxes-gap) !important;
+}
+
+.editor-host-container [data-content-type="checkListItem"] input[type="checkbox"] {
+  width: var(--checkboxes-size) !important;
+  height: var(--checkboxes-size) !important;
+  min-width: var(--checkboxes-size) !important;
+  min-height: var(--checkboxes-size) !important;
+  border-radius: var(--checkboxes-border-radius) !important;
+  accent-color: var(--checkboxes-checked-color) !important;
+  border-color: var(--checkboxes-unchecked-border-color) !important;
+  cursor: pointer;
+}
+
+/* Checkbox container div — control spacing, align to first line */
+.editor-host-container [data-content-type="checkListItem"] > div[contenteditable="false"] {
+  width: var(--lists-indent-size) !important;
+  min-width: var(--lists-indent-size) !important;
+  height: calc(var(--editor-font-size) * var(--editor-line-height)) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* --- Inline: bold --- */
+.editor-host-container .bn-editor strong {
+  font-weight: var(--inline-styles-bold-font-weight);
+  color: var(--inline-styles-bold-color);
+}
+
+/* --- Inline: italic --- */
+.editor-host-container .bn-editor em {
+  font-style: var(--inline-styles-italic-font-style);
+  color: var(--inline-styles-italic-color);
+}
+
+/* --- Inline: strikethrough --- */
+.editor-host-container .bn-editor s,
+.editor-host-container .bn-editor del {
+  color: var(--inline-styles-strikethrough-color);
+  text-decoration: var(--inline-styles-strikethrough-text-decoration);
+}
+
+/* --- Inline: code --- */
+.editor-host-container .bn-inline-content code {
+  font-family: var(--inline-styles-code-font-family);
+  font-size: var(--inline-styles-code-font-size);
+  background-color: var(--inline-styles-code-background-color);
+  padding: var(--inline-styles-code-padding-vertical) var(--inline-styles-code-padding-horizontal);
+  border-radius: var(--inline-styles-code-border-radius);
+  color: var(--inline-styles-code-color);
+}
+
+/* --- Inline: links --- */
+.editor-host-container .bn-editor a {
+  color: var(--inline-styles-link-color);
+  text-decoration: var(--inline-styles-link-text-decoration);
+  cursor: text;
+}
+
+/* --- Wikilinks (override from Editor.css with theme vars) --- */
+.editor-host-container .wikilink {
+  color: var(--inline-styles-wikilink-color);
+  text-decoration: var(--inline-styles-wikilink-text-decoration);
+  border-bottom: var(--inline-styles-wikilink-border-bottom);
+  cursor: text;
+}
+
+.editor-host-container .math {
+  color: var(--colors-text);
+  cursor: text;
+}
+
+.editor-host-container .math--inline {
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: -0.15em;
+}
+
+.editor-host-container .math-block-shell {
+  width: 100%;
+  overflow-x: auto;
+  padding: 6px 0;
+}
+
+.editor-host-container .math--block {
+  display: block;
+  min-width: max-content;
+  text-align: center;
+}
+
+.editor-host-container .math .katex-error {
+  color: var(--destructive) !important;
+  white-space: pre-wrap;
+}
+
+.editor-host-container .mermaid-diagram {
+  position: relative;
+  width: 100%;
+  margin: 10px 0;
+  color: var(--colors-text);
+}
+
+.editor-host-container .mermaid-diagram__viewport {
+  max-width: 100%;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--surface-editor);
+}
+
+.editor-host-container .mermaid-diagram__expand-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  opacity: 0;
+  background: var(--surface-editor);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 0.14);
+}
+
+.editor-host-container .mermaid-diagram:is(:hover, :focus-within) .mermaid-diagram__expand-button {
+  opacity: 1;
+}
+
+.editor-host-container .mermaid-diagram__viewport:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.editor-host-container .mermaid-diagram__viewport svg {
+  display: block;
+  max-width: none;
+  min-width: min-content;
+  height: auto;
+  margin: 0 auto;
+}
+
+@media (hover: none) {
+  .editor-host-container .mermaid-diagram__expand-button {
+    opacity: 1;
+  }
+}
+
+.editor-host-container .mermaid-diagram--error {
+  padding: 12px;
+  border: 1px solid var(--destructive);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+.editor-host-container .mermaid-diagram--error figcaption {
+  margin-bottom: 8px;
+  color: var(--destructive);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.editor-host-container .mermaid-diagram--error pre {
+  max-width: 100%;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--inline-styles-code-background-color);
+  color: var(--inline-styles-code-color);
+  font-size: 0.85rem;
+}
+
+.editor-host-container .tldraw-whiteboard {
+  position: relative;
+  width: min(var(--tldraw-whiteboard-width, 100%), 100%);
+  max-width: 100%;
+  height: var(--tldraw-whiteboard-height, 520px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  user-select: none;
+}
+
+.editor-host-container .tldraw-whiteboard .tl-container {
+  --color-background: var(--card);
+  --tl-layer-menu-click-capture: 25;
+  --tl-layer-panels: 30;
+  --tl-layer-menus: 40;
+  --tl-layer-toasts: 50;
+  --tl-layer-cursor: 60;
+  --tl-layer-header-footer: 70;
+  --tl-layer-following-indicator: 80;
+}
+
+.editor-host-container .tldraw-whiteboard [data-radix-popper-content-wrapper] {
+  position: absolute !important;
+}
+
+.editor-host-container .mantine-Popover-dropdown,
+.editor-host-container .bn-menu,
+.editor-host-container .bn-suggestion-menu {
+  z-index: 1000 !important;
+}
+
+.editor-host-container .tldraw-whiteboard__resize-handle {
+  position: absolute;
+  z-index: 2;
+  background: transparent;
+  touch-action: none;
+}
+
+.editor-host-container .tldraw-whiteboard__resize-handle--width {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 100%;
+  cursor: ew-resize;
+}
+
+.editor-host-container .tldraw-whiteboard__resize-handle--height {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 12px;
+  cursor: ns-resize;
+}
+
+.editor-host-container .tldraw-whiteboard__resize-handle--corner {
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+}
+
+.editor-host-container .tldraw-whiteboard__resize-handle--corner::after {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid color-mix(in srgb, var(--foreground) 42%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--foreground) 42%, transparent);
+  content: '';
+}
+
+.editor-host-container[data-follow-links] .bn-editor a,
+.editor-host-container[data-follow-links] .wikilink {
+  cursor: pointer;
+}
+
+/* Code blocks follow Tolaria's theme instead of BlockNote's fixed dark shell. */
+.editor-host-container .bn-block-content[data-content-type="codeBlock"] {
+  background-color: var(--editor-code-block-background) !important;
+  border: 1px solid var(--editor-code-block-border);
+  color: var(--editor-code-block-text) !important;
+  position: relative;
+}
+
+.editor__code-block-copy {
+  position: absolute;
+  z-index: 4;
+}
+
+.editor__code-block-copy [data-editor-code-copy-button] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--editor-code-block-language);
+  padding: 0;
+}
+
+.editor__code-block-copy [data-editor-code-copy-button]:hover,
+.editor__code-block-copy [data-editor-code-copy-button]:focus-visible {
+  background: transparent !important;
+  color: var(--editor-code-block-text);
+}
+
+.editor-host-container .bn-block-content[data-content-type="codeBlock"] > pre {
+  color: inherit;
+}
+
+.editor-host-container .bn-block-content[data-content-type="codeBlock"] > div > select {
+  color: var(--editor-code-block-language) !important;
+}
+
+.editor-host-container .bn-block-content[data-content-type="codeBlock"] > div > select > option {
+  background: var(--popover);
+  color: var(--foreground);
+}
+
+.editor-host-container .bn-block-content[data-content-type="codeBlock"] pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+}
+
+.editor-host-container .bn-block-content[data-content-type="codeBlock"] pre code .shiki {
+  background-color: transparent !important;
+}
+
+/* --- Blockquote --- */
+.editor-host-container [data-content-type="blockquote"],
+.editor-host-container blockquote {
+  border-inline-start: var(--blockquote-border-left-width) solid var(--blockquote-border-left-color);
+  padding-inline-start: var(--blockquote-padding-left);
+  margin-top: var(--blockquote-margin-vertical);
+  margin-bottom: var(--blockquote-margin-vertical);
+  color: var(--blockquote-color);
+  font-style: var(--blockquote-font-style);
+}
+
+/* --- Table --- */
+.editor-host-container [data-content-type="table"] table {
+  border-color: var(--table-border-color);
+  font-size: var(--table-font-size);
+}
+
+.editor-host-container [data-content-type="table"] th {
+  background: var(--table-header-background);
+  padding: var(--table-cell-padding-vertical) var(--table-cell-padding-horizontal);
+}
+
+.editor-host-container [data-content-type="table"] td {
+  padding: var(--table-cell-padding-vertical) var(--table-cell-padding-horizontal);
+  border-color: var(--table-border-color);
+  text-align: start;
+}
+
+/* --- Horizontal rule --- */
+.editor-host-container hr {
+  border: none;
+  border-top: var(--horizontal-rule-thickness) solid var(--horizontal-rule-color);
+  margin: var(--horizontal-rule-margin-vertical) 0;
 }
