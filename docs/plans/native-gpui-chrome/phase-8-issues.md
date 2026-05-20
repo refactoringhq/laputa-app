@@ -1,23 +1,41 @@
 # User reported issues from Phase 8 implmentaion
 
-## Blockers
+## 1. Blockers
 
-1. Clicking on the notes search crashes with paniic
-2. Note web view renders and goes blank once the mouse moved over it
+1.1. ⏳ Clicking on the notes search crashes with paniic
+1.2. ✅ Note web view renders and goes blank once the mouse moved over it
 
-## High Priority
+## 2. High Priority
 
-1. Note list top bar title need to reflect the title of the iems selected in the side bar
-2. Active Projects view filer does not work
-3. All clikable buttons lack the hints
-4. Vault picker popup does not close on focs loss
-5. Side bar Types, Views, Folder are not collpsable
-6. System menu is missing items for File, View, Help
+2.1. ✅ Note list top bar title need to reflect the title of the iems selected in the side bar
+2.2. ✅ On startup Note List shows some note is slected. The note view should show an empty note state. It is the same as in React variant.
+2.3. Active Projects view filer does not work
+2.4. All clikable buttons lack the hints
+2.5. Vault picker popup does not close on focs loss
+2.6. Side bar Types, Views, Folder are not collpsable
+2.7. System menu is missing items for File, View, Help
+2.8. Note web view lacks any styling present in React variant
+2.9. note-toolbar-star element is not wired
+2.10. note-toolbar-organized element is not wired
+2.11. note-toolbar-neighborhood element is not wired
+2.12. note-toolbar-raw element is not wired
+2.13. note-toolbar-ai element is not wired
+2.14. note-toolbar-toc element is not wired
+2.15. note-toolbar-reveal element is not wired
+2.16. note-toolbar-copy-path element is not wired
+2.17. note-toolbar-more element is not wired
+2.18. note-toolbar-inspector element is not wired
+2.19. Notes list top bar Add bottom does nothing
+2.20. Notes list sort dropdown does not update the title after the user selects an option
+2.21. Notes list sort dropdown appears under the web view pannel
+2.22. Notes list top bar search: Esc button shodu close the search line and clear the search query
 
-## Low Priority
+## 3. Low Priority
 
-1. Inspector view should be opened in a separate windows, not a pannel
-2. System window menu shoud display Show Sidebar|Hide Sidebar, Show Inspector|Hide Inspector depending on the current state
+3.1. Inspector view should be opened in a separate windows, not a pannel
+3.2. System window menu shoud display Show Sidebar|Hide Sidebar, Show Inspector|Hide Inspector depending on the current state
+
+---
 
 ### Periscope Phase 8 smoke sweep
 

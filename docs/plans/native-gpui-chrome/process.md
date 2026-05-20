@@ -98,10 +98,14 @@ loop.
    ---
    ```
 
-3. The only edit you may make to an existing item is to add ✅ after its number,
+3. Mark the item as in progress with ⏳ e.g. `1.1. ⏳ <issue description>`.
+   IMPORTANT! be aware that multiple subagents might be working on the same area. Instruct 
+   subagents to quickly bail out and report back the names of files that are changing
+   unexpectedly.
+4. The only edit you may make to an existing item is to add ✅ after its number,
    e.g. `1.1. ✅ <issue description>`, to mark it resolved.
-4. Never change issue numbers. They are stable references the user cites.
-5. When the user reports a regression — phrased as `[<issue number>] [optional note]`,
+5. Never change issue numbers. They are stable references the user cites.
+6. When the user reports a regression — phrased as `[<issue number>] [optional note]`,
    e.g. `[1.2] still broken in dark mode` — locate that item and remove its ✅.
 6. The user may ask you to add new items, phrased as `[<severity>] <description>`,
    e.g. `[high] menu is broken`. Append the item to the matching section with the
