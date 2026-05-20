@@ -72,6 +72,16 @@ pub struct SidebarSelectionChangedEvent {
     pub display_label: SharedString,
 }
 
+/// Identifies one of the three collapsible sections in the sidebar.
+/// The top fixed group (Inbox / All Notes / Archive) has no header and
+/// is intentionally not addressable here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SidebarSection {
+    Views,
+    Types,
+    Folders,
+}
+
 /// Which sidebar row is currently highlighted with the full-width
 /// primary-accent fill.  Defaults to [`SidebarSelection::Inbox`] so the
 /// chrome opens with a visible highlight (matches the reference).
@@ -181,7 +191,41 @@ pub struct SidebarPanel {
     /// Currently-highlighted row.  Updated by row click handlers; the
     /// renderer paints the matching row with the primary-accent fill.
     selected: SidebarSelection,
+    /// Per-section collapse state.  `true` means the section is
+    /// collapsed (children hidden, chevron rotated).  Defaults to all
+    /// `false` (every section expanded), matching the visual baseline.
+    /// The top fixed group (Inbox / All Notes / Archive) has no header
+    /// and therefore is not collapsible.
+    collapsed: SectionCollapseState,
     position: DockPosition,
+}
+
+/// Per-section collapse bookkeeping.  Three booleans rather than a
+/// `HashSet` so we sidestep an allocation in the common (empty) case
+/// and keep the struct trivially `Default`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct SectionCollapseState {
+    views: bool,
+    types: bool,
+    folders: bool,
+}
+
+impl SectionCollapseState {
+    fn get(self, section: SidebarSection) -> bool {
+        match section {
+            SidebarSection::Views => self.views,
+            SidebarSection::Types => self.types,
+            SidebarSection::Folders => self.folders,
+        }
+    }
+
+    fn toggle(&mut self, section: SidebarSection) {
+        match section {
+            SidebarSection::Views => self.views = !self.views,
+            SidebarSection::Types => self.types = !self.types,
+            SidebarSection::Folders => self.folders = !self.folders,
+        }
+    }
 }
 
 impl SidebarPanel {
@@ -196,6 +240,7 @@ impl SidebarPanel {
             views: Vec::new(),
             folders: Vec::new(),
             selected: SidebarSelection::default(),
+            collapsed: SectionCollapseState::default(),
             position: DockPosition::Left,
         }
     }
@@ -369,6 +414,7 @@ impl SidebarPanel {
             views,
             folders,
             selected: SidebarSelection::default(),
+            collapsed: SectionCollapseState::default(),
             position: DockPosition::Left,
         }
     }
@@ -420,6 +466,21 @@ impl SidebarPanel {
     #[must_use]
     pub fn selected(&self) -> &SidebarSelection {
         &self.selected
+    }
+
+    /// Whether `section` is currently collapsed (children hidden).
+    /// `false` means the section is expanded (rows visible).
+    #[must_use]
+    pub fn is_section_collapsed(&self, section: SidebarSection) -> bool {
+        self.collapsed.get(section)
+    }
+
+    /// Flip the collapse state of `section` and request a redraw.
+    /// Worklist 2.6: clicking a section header toggles the visibility
+    /// of its rows.
+    pub fn toggle_section(&mut self, section: SidebarSection, cx: &mut Context<Self>) {
+        self.collapsed.toggle(section);
+        cx.notify();
     }
 
     #[cfg(test)]
@@ -787,23 +848,43 @@ fn icon_glyph(icon: IconName, color: Hsla) -> AnyElement {
         .into_any_element()
 }
 
-/// Section header with an optional leading caret/icon — used by the
-/// FOLDERS group, which exposes a chevron-down on the left so the
-/// whole section can collapse (mirrors the React `<FolderTree />`
-/// section toggle).
-fn section_header_with_leading(
+/// Section header — the whole row is a click target that toggles the
+/// section's collapse state.  The leading chevron rotates between
+/// `ChevronDown` (expanded) and `ChevronRight` (collapsed) so the
+/// affordance is visually obvious.  Trailing `actions` (e.g. `+`,
+/// `⇅`) stay separate so their own click handlers (when wired) don't
+/// bubble into the toggle.
+///
+/// `id` doubles as the stateful GPUI element id and the periscope
+/// `dump_as` tag (e.g. `sidebar-section-views-header`).  The convention
+/// permits container-leaf overlap and every call site uses the same
+/// string for both, so collapsing them keeps the signature lean.
+fn section_header(
+    id: &'static str,
     label: &'static str,
-    leading: Option<AnyElement>,
+    collapsed: bool,
     p: &Palette,
     actions: Vec<AnyElement>,
+    on_toggle: impl Fn(&mut App) + 'static,
 ) -> gpui::AnyElement {
-    let mut leading_box = div().flex().flex_row().items_center().gap(px(6.0));
-    if let Some(leading) = leading {
-        leading_box = leading_box.child(leading);
-    }
-    leading_box = leading_box.child(SharedString::new_static(label));
+    let chevron = icon_glyph(
+        if collapsed {
+            IconName::ChevronRight
+        } else {
+            IconName::ChevronDown
+        },
+        p.muted_fg,
+    );
+    let leading_box = div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap(px(6.0))
+        .child(chevron)
+        .child(SharedString::new_static(label));
 
     let mut row = div()
+        .id(SharedString::new_static(id))
         .flex()
         .flex_row()
         .items_center()
@@ -815,6 +896,7 @@ fn section_header_with_leading(
         .text_color(p.muted_fg)
         .text_xs()
         .font_semibold()
+        .cursor_pointer()
         .child(leading_box);
     if !actions.is_empty() {
         let actions_box = div()
@@ -825,11 +907,18 @@ fn section_header_with_leading(
             .children(actions);
         row = row.child(actions_box);
     }
-    row.into_any_element()
+    row.on_click(move |_, _window, cx| on_toggle(cx))
+        .dump_as(id)
+        .into_any_element()
 }
 
 /// Trailing-action glyph in a section header (`+`, `⇅`, …).  Tagged via
 /// `dump_as` so periscope can target it by id.
+///
+/// Swallows mouse-down events so clicks on the action don't bubble up
+/// to the parent section header's collapse toggle (worklist 2.6).
+/// When a real `on_click` handler is wired for the action later, it
+/// can be installed alongside this guard.
 fn header_action(id: &'static str, icon: IconName, p: &Palette) -> AnyElement {
     div()
         .id(id)
@@ -842,6 +931,9 @@ fn header_action(id: &'static str, icon: IconName, p: &Palette) -> AnyElement {
         .cursor_pointer()
         .text_color(p.muted_fg)
         .hover(|this| this.text_color(p.fg))
+        .on_mouse_down(gpui::MouseButton::Left, |_, _window, cx| {
+            cx.stop_propagation();
+        })
         .child(icon)
         .dump_as(id)
         .into_any_element()
@@ -959,91 +1051,101 @@ impl Render for SidebarPanel {
             SidebarSelection::Archive,
         );
 
+        let views_collapsed = self.collapsed.get(SidebarSection::Views);
+        let types_collapsed = self.collapsed.get(SidebarSection::Types);
+        let folders_collapsed = self.collapsed.get(SidebarSection::Folders);
+
         // --- VIEWS section ---
-        let view_rows: Vec<AnyElement> = self
-            .views
-            .iter()
-            .map(|view| {
-                let selected = matches!(
-                    &self.selected,
-                    SidebarSelection::View(name) if name == &view.name
-                );
-                sidebar_view_row(view, selected, p, &entity)
-            })
-            .collect();
+        let view_rows: Vec<AnyElement> = if views_collapsed {
+            Vec::new()
+        } else {
+            self.views
+                .iter()
+                .map(|view| {
+                    let selected = matches!(
+                        &self.selected,
+                        SidebarSelection::View(name) if name == &view.name
+                    );
+                    sidebar_view_row(view, selected, p, &entity)
+                })
+                .collect()
+        };
 
         // --- TYPES section ---
-        let type_rows: Vec<AnyElement> = self
-            .types
-            .iter()
-            .map(|entry| {
-                let selected = matches!(
-                    &self.selected,
-                    SidebarSelection::Type(label) if label == &entry.label
-                );
-                sidebar_type_row(entry, selected, p, &entity)
-            })
-            .collect();
+        let type_rows: Vec<AnyElement> = if types_collapsed {
+            Vec::new()
+        } else {
+            self.types
+                .iter()
+                .map(|entry| {
+                    let selected = matches!(
+                        &self.selected,
+                        SidebarSelection::Type(label) if label == &entry.label
+                    );
+                    sidebar_type_row(entry, selected, p, &entity)
+                })
+                .collect()
+        };
 
         // --- FOLDERS section ---
-        let folder_rows: Vec<AnyElement> = self
-            .folders
-            .iter()
-            .enumerate()
-            .map(|(ix, folder)| sidebar_folder_row(ix, folder, &self.selected, p, &entity))
-            .collect();
+        let folder_rows: Vec<AnyElement> = if folders_collapsed {
+            Vec::new()
+        } else {
+            self.folders
+                .iter()
+                .enumerate()
+                .map(|(ix, folder)| sidebar_folder_row(ix, folder, &self.selected, p, &entity))
+                .collect()
+        };
 
+        let views_header = section_header(
+            "sidebar-section-views-header",
+            "VIEWS",
+            views_collapsed,
+            p,
+            vec![header_action("sidebar-views-add", IconName::Plus, p)],
+            toggle_section_handler(&entity, SidebarSection::Views),
+        );
         let views_section = div()
             .flex()
             .flex_col()
             .w_full()
-            .child(section_header_with_leading(
-                "VIEWS",
-                Some(header_action(
-                    "sidebar-views-caret",
-                    IconName::ChevronDown,
-                    p,
-                )),
-                p,
-                vec![header_action("sidebar-views-add", IconName::Plus, p)],
-            ))
+            .child(views_header)
             .children(view_rows)
             .dump_as("sidebar-section-views");
 
+        let types_header = section_header(
+            "sidebar-section-types-header",
+            "TYPES",
+            types_collapsed,
+            p,
+            vec![
+                header_action("sidebar-types-sort", IconName::ChevronsUpDown, p),
+                header_action("sidebar-types-add", IconName::Plus, p),
+            ],
+            toggle_section_handler(&entity, SidebarSection::Types),
+        );
         let types_section = div()
             .flex()
             .flex_col()
             .w_full()
-            .child(section_header_with_leading(
-                "TYPES",
-                Some(header_action(
-                    "sidebar-types-caret",
-                    IconName::ChevronDown,
-                    p,
-                )),
-                p,
-                vec![
-                    header_action("sidebar-types-sort", IconName::ChevronsUpDown, p),
-                    header_action("sidebar-types-add", IconName::Plus, p),
-                ],
-            ))
+            .child(types_header)
             .children(type_rows)
             .dump_as("sidebar-section-types");
 
+        let folders_header = section_header(
+            "sidebar-section-folders-header",
+            "FOLDERS",
+            folders_collapsed,
+            p,
+            vec![header_action("sidebar-folders-add", IconName::Plus, p)],
+            toggle_section_handler(&entity, SidebarSection::Folders),
+        );
         let folders_section = div()
             .flex()
             .flex_col()
             .w_full()
-            .child(section_header_with_leading(
-                "FOLDERS",
-                Some(header_action(
-                    "sidebar-folders-caret",
-                    IconName::ChevronDown,
-                    p,
-                )),
-                p,
-                vec![header_action("sidebar-folders-add", IconName::Plus, p)],
-            ))
+            .child(folders_header)
             .children(folder_rows)
             .dump_as("sidebar-section-folders");
 
@@ -1064,6 +1166,19 @@ impl Render for SidebarPanel {
             .child(types_section)
             .child(folders_section)
             .dump_as("sidebar")
+    }
+}
+
+/// Build the `on_click` closure that toggles a section's collapse
+/// state, capturing a strong handle to the panel so the click lands
+/// on the same entity even after re-renders.
+fn toggle_section_handler(
+    entity: &gpui::Entity<SidebarPanel>,
+    section: SidebarSection,
+) -> impl Fn(&mut App) + 'static {
+    let handle = entity.clone();
+    move |cx: &mut App| {
+        handle.update(cx, |this, cx| this.toggle_section(section, cx));
     }
 }
 
@@ -1544,5 +1659,92 @@ mod tests {
                 (SidebarSelection::Inbox, "Inbox".to_string()),
             ],
         );
+    }
+
+    /// Worklist 2.6 — every collapsible section defaults to expanded
+    /// so the chrome opens with full visibility (matches the
+    /// reference baseline).  The top fixed group has no header and is
+    /// intentionally not part of the collapse API.
+    #[gpui::test]
+    fn sections_default_expanded(cx: &mut TestAppContext) {
+        install_theme(cx);
+        cx.update(|_cx| {
+            let panel = SidebarPanel::new();
+            for section in [
+                SidebarSection::Views,
+                SidebarSection::Types,
+                SidebarSection::Folders,
+            ] {
+                assert!(
+                    !panel.is_section_collapsed(section),
+                    "{section:?} must default to expanded",
+                );
+            }
+        });
+    }
+
+    /// Worklist 2.6 — `toggle_section` flips collapse state per
+    /// section without touching the others, and is idempotent across
+    /// pairs (toggle twice → back to original).
+    #[gpui::test]
+    fn toggle_section_flips_only_target(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let window = cx.add_window(|_window, _cx| SidebarPanel::new());
+        for section in [
+            SidebarSection::Views,
+            SidebarSection::Types,
+            SidebarSection::Folders,
+        ] {
+            window
+                .update(cx, |panel, _window, cx| {
+                    panel.toggle_section(section, cx);
+                    assert!(
+                        panel.is_section_collapsed(section),
+                        "{section:?} should be collapsed after first toggle",
+                    );
+                    for other in [
+                        SidebarSection::Views,
+                        SidebarSection::Types,
+                        SidebarSection::Folders,
+                    ] {
+                        if other != section {
+                            assert!(
+                                !panel.is_section_collapsed(other),
+                                "{other:?} must not be touched when toggling {section:?}",
+                            );
+                        }
+                    }
+                    panel.toggle_section(section, cx);
+                    assert!(
+                        !panel.is_section_collapsed(section),
+                        "{section:?} should expand again after second toggle",
+                    );
+                })
+                .unwrap();
+        }
+    }
+
+    /// Worklist 2.6 — clicking the section header (simulated via
+    /// `toggle_section`) drives a redraw + render cycle without
+    /// panicking when child rows are populated but hidden.
+    #[gpui::test]
+    fn toggle_section_renders_after_collapse(cx: &mut TestAppContext) {
+        install_theme(cx);
+        cx.update(|cx| cx.set_global(MockVault::seeded()));
+        let window = cx.update(|cx| {
+            let panel = SidebarPanel::from_mock(cx);
+            cx.open_window(Default::default(), |_window, cx| cx.new(|_| panel))
+                .unwrap()
+        });
+        cx.run_until_parked();
+        window
+            .update(cx, |panel, _window, cx| {
+                assert!(!panel.types.is_empty(), "fixture must seed TYPES rows");
+                panel.toggle_section(SidebarSection::Types, cx);
+                panel.toggle_section(SidebarSection::Views, cx);
+                panel.toggle_section(SidebarSection::Folders, cx);
+            })
+            .unwrap();
+        cx.run_until_parked();
     }
 }
