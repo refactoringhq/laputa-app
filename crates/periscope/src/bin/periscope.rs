@@ -57,7 +57,8 @@ enum Cmd {
 
 #[derive(Args)]
 struct TargetArgs {
-    /// Match by window title (e.g. `Tolaria`).
+    /// Match by exact window title.  Note: Tolaria's window has
+    /// `title: None`, so target it by `--pid` instead.
     #[arg(long, conflicts_with = "pid")]
     title: Option<String>,
     /// Match by owning process id.

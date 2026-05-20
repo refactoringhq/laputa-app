@@ -38,6 +38,13 @@ ran the test.
 
 ## One-shot screenshot (the common case)
 
+> **Targeting note.**  Tolaria's NSWindow has `title: None` (the
+> custom titlebar strip lives inside the GPUI workspace), so
+> `--title Tolaria` no longer resolves.  Every periscope invocation
+> below uses `--pid` instead.  Resolve the pid with `pgrep` (one-shot)
+> or from the spawn harness banner (multi-capture sessions — see
+> [§Long debug session](#long-debug-session--spawn-harness)).
+
 ```sh
 # Terminal A — user starts the app once.  `--width` / `--height`
 # pin the window to the logical-point size of the Tauri-era
@@ -48,9 +55,11 @@ cargo run -p tolaria -- \
     --vault demo-vault-v2 \
     --width 1516 --height 1052
 
-# Terminal B — Claude (via the Bash tool) captures the current state
+# Terminal B — Claude (via the Bash tool) captures the current state.
+# `pgrep -nf` picks the newest matching process.
+BIN_PID=$(pgrep -nf 'target/debug/tolaria --vault')
 cargo run -q -p periscope -- screenshot \
-    --title Tolaria --raise --out /tmp/tolaria-now.png
+    --pid $BIN_PID --raise --out /tmp/tolaria-now.png
 ```
 
 Then Claude calls `Read /tmp/tolaria-now.png` — the multimodal Read
@@ -76,7 +85,7 @@ left-click at a window-local coordinate:
 
 ```sh
 cargo run -q -p periscope -- click \
-    --title Tolaria --raise --x 200 --y 100
+    --pid $BIN_PID --raise --x 200 --y 100
 ```
 
 Coordinates are in window points with the origin at the window's
@@ -110,11 +119,11 @@ Typical loop:
 
 ```sh
 # 1. Discover what's available (refreshes the dump first):
-cargo run -q -p periscope -- dump-tree --title Tolaria
+cargo run -q -p periscope -- dump-tree --pid $BIN_PID
 
 # 2. Drive a click by name:
 cargo run -q -p periscope -- click \
-    --title Tolaria --raise --id status-bar-theme-toggle
+    --pid $BIN_PID --raise --id status-bar-theme-toggle
 ```
 
 ### `dump-tree` — discover + diagnose
@@ -127,7 +136,7 @@ change, or diagnose `click --id: no element registered as "..."`
 errors.
 
 ```sh
-cargo run -q -p periscope -- dump-tree --title Tolaria
+cargo run -q -p periscope -- dump-tree --pid $BIN_PID
 ```
 
 Output is one header line plus one row per registered element,
@@ -138,7 +147,7 @@ aligned for legibility:
 status-bar-theme-toggle                  x= 1422.0 y= 1056.5 w=  27.0 h=  19.5
 ```
 
-- `pid` — owning process id (resolved from `--title` or passed via `--pid`).
+- `pid` — owning process id (passed via `--pid`).
 - `path` — JSON file the dump was written to (under `$TMPDIR`,
   falls back to `/tmp/`).
 - `sequence` — monotonic counter bumped by every successful dump.
@@ -152,7 +161,7 @@ Flags:
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--title <s>` *or* `--pid <u32>` | — | Exactly one is required; `--title` looks the PID up via `xcap::Window::all()`. |
+| `--title <s>` *or* `--pid <u32>` | — | Exactly one is required.  `--title` is exact-match against the OS window title and **does not resolve for Tolaria** (the window has `title: None`); use `--pid` for any Tolaria target. |
 | `--no-refresh` | off | Skip the SIGUSR1 trigger; print whatever's on disk.  Useful when the target is paused under `lldb` or you want to see the snapshot from a previous run. |
 | `--timeout-ms <ms>` | `2000` | How long to wait for the writer to bump the sequence counter before erroring out. |
 
@@ -196,7 +205,7 @@ cat "$TMPDIR/tolaria-ui-tree-$(pgrep -f "target/debug/tolaria --vault").json"
 
 ```sh
 cargo run -q -p periscope -- click \
-    --title Tolaria --raise --id status-bar-theme-toggle
+    --pid $BIN_PID --raise --id status-bar-theme-toggle
 ```
 
 Same flags as `dump-tree` (`--title`/`--pid`, `--no-refresh`,
@@ -276,16 +285,65 @@ the developer-facing IPC channel never ships.
 
 ---
 
+## Long debug session — spawn harness
+
+For multi-turn debugging where Claude drives several captures /
+clicks against the same Tolaria instance, prefer the **spawn
+harness** over re-resolving the pid each turn:
+
+```sh
+# Terminal A — bring Tolaria up and print BIN_PID.
+bash crates/periscope/tests/harness.sh
+# ==> Harness ready.
+#     BIN_PID=15654
+#     OUT_DIR=/Users/you/tolaria/target/periscope/sweep
+#
+#     Drive captures from another shell, e.g.:
+#       cargo run -q -p periscope -- screenshot --pid 15654 --raise \
+#           --out /Users/you/tolaria/target/periscope/sweep/foo.png
+#
+# ==> Press <enter> in this terminal to tear down.
+```
+
+The harness:
+
+- Spawns `cargo run -q -p tolaria -- --vault demo-vault-v2 --width 1516 --height 1052`
+  (override with `VAULT`, `WIDTH`, `HEIGHT`, `TOLARIA_PROFILE` env vars).
+- Polls `periscope list` for an `app=tolaria` row, picks its pid, and
+  prints the banner above.
+- Blocks on stdin (Foreground / interactive teardown) by default.
+  Pass `--no-block` (or `BLOCK=0`) for an agent-driven flow that
+  keeps Tolaria alive until SIGINT.
+- Sends SIGTERM + waits on the cargo child via a `trap` on exit / INT
+  / TERM.
+
+The agent then drives captures + clicks from a separate shell using
+the printed `BIN_PID`:
+
+```sh
+export BIN_PID=15654   # from the harness banner
+cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+    --out target/periscope/sweep/00-light.png
+```
+
+`OUT_DIR` defaults to `target/periscope/sweep`; sweep docs override
+it per their own conventions (e.g. `target/periscope/phase-8-sweep`
+for `phase-8-sweep.md`).
+
+`TOLARIA_PROFILE=release` skips the SIGUSR1 `tree_dump` handler —
+`--id` lookups won't resolve.  Use `debug` (the default) for any
+sweep that calls `click --id` or `dump-tree`.
+
 ## Long debug session — `watch` mode
 
-For multi-turn debugging where Claude inspects the UI repeatedly,
-run the watcher in the background and read `latest.png` between
-turns:
+For passive monitoring where Claude just inspects the UI between
+turns (no clicks, no scripted captures), `watch` polls and writes
+`latest.png` on each tick:
 
 ```sh
 # Background watch — kill with Ctrl-C or `pkill periscope`
 cargo run -q -p periscope -- watch \
-    --title Tolaria --dir target/e2e/ --interval-secs 3
+    --pid $BIN_PID --dir target/e2e/ --interval-secs 3
 ```
 
 The harness writes `target/e2e/frame-0001.png`, `frame-0002.png`, …
@@ -306,8 +364,9 @@ rm -rf target/e2e/
 
 ## Diagnostics
 
-`window not found` errors are usually a title mismatch.  Dump every
-visible window to confirm:
+`window not found` errors against Tolaria are *expected* if `--title`
+was used: the window has `title: None` and only resolves by `--pid`.
+Dump every visible window to find the pid:
 
 ```sh
 cargo run -q -p periscope -- list
@@ -316,15 +375,15 @@ cargo run -q -p periscope -- list
 Expected output looks like:
 
 ```
-pid=12345    app=Tolaria                          title=Tolaria
+pid=12345    app=tolaria                          title=
 pid=67890    app=Terminal                         title=Terminal — bash …
 pid=11111    app=Finder                           title=
 ```
 
-If the Tolaria row is missing, the app isn't running.  If the title
-column for Tolaria isn't exactly `Tolaria`, something changed in
-`crates/tolaria/src/main.rs:214` and the harness needs the new value
-(or use `--pid` instead of `--title`).
+If the Tolaria row is missing, the app isn't running.  The `title=`
+column is empty for Tolaria by design; match on `app=tolaria` and
+take the `pid=` value, then pass it via `--pid` (or use the harness
+banner; see [§Long debug session](#long-debug-session--spawn-harness)).
 
 `list` requires Accessibility permission — same panel as `--raise`.
 
@@ -336,9 +395,9 @@ column for Tolaria isn't exactly `Tolaria`, something changed in
 |---|---|---|
 | Error: `PNG too small (X bytes) — Screen Recording permission missing for $TERM_PROGRAM` | Screen Recording not granted | System Settings → Privacy & Security → Screen Recording; toggle on for the terminal app |
 | Error: `AXUIElement.windows attribute fetch failed` | Accessibility not granted | … → Accessibility; toggle on for the terminal app |
-| Error: `no window with title "Tolaria"` | Tolaria not running, or title changed | `cargo run -p periscope -- list` to inspect; relaunch Tolaria if needed |
+| Error: `no visible window with title "Tolaria"` | Used `--title Tolaria`; Tolaria's window has `title: None` | Switch to `--pid $BIN_PID`; resolve the pid via `pgrep -nf 'target/debug/tolaria --vault'` or read it from the harness banner |
 | Smoke test hangs / times out at 15s | Cold debug build, WKWebView slow to init | Run `cargo build -p tolaria` first; retry; bump deadline in `tests/screenshot_smoke.rs` if persistent |
-| `list` shows Tolaria but `screenshot --title Tolaria` says not found | Title comparison is exact-match including whitespace | Copy the exact title from `list` output |
+| `list` shows `app=tolaria title=` (empty) | This is the shipped behaviour | Match on `app=tolaria` to find the pid; do not try to match the title column |
 
 ---
 
@@ -368,13 +427,13 @@ is stored.
 ```sh
 # Crop to a single element — great for tight regression captures:
 cargo run -q -p periscope -- screenshot \
-    --title Tolaria --raise \
+    --pid $BIN_PID --raise \
     --id status-bar-theme-toggle \
     --out /tmp/toggle.png
 
 # Same in watch mode — latest.png stays cropped on every tick:
 cargo run -q -p periscope -- watch \
-    --title Tolaria --dir target/e2e/ --interval-secs 3 \
+    --pid $BIN_PID --dir target/e2e/ --interval-secs 3 \
     --id status-bar-theme-toggle
 ```
 
@@ -398,7 +457,7 @@ exclusive and enforced by the argument parser.
 Usage: periscope click [OPTIONS]
 
 Options:
-      --title <TITLE>     Match by window title (e.g. `Tolaria`)
+      --title <TITLE>     Match by exact window title.  Note: Tolaria's window has `title: None`, so target it by --pid instead.
       --pid <PID>         Match by owning process id
       --raise             Raise the window via the Accessibility API before clicking
       --x <X>             X coordinate, window-local (origin at top-left, in window points)
