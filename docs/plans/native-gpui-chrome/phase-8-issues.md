@@ -21,18 +21,18 @@
 2.12. note-toolbar-raw element is not wired
 2.13. note-toolbar-ai element is not wired
 2.14. note-toolbar-toc element is not wired
-2.15. note-toolbar-reveal element is not wired
-2.16. note-toolbar-copy-path element is not wired
+2.15. ✅ note-toolbar-reveal element is not wired
+2.16. ✅ note-toolbar-copy-path element is not wired
 2.17. note-toolbar-more element is not wired
-2.18. note-toolbar-inspector element is not wired
+2.18. ✅ note-toolbar-inspector element is not wired
 2.19. Notes list top bar Add bottom does nothing
 2.20. ✅ Notes list sort dropdown does not update the title after the user selects an option
 2.21. ✅ Notes list sort dropdown appears under the web view pannel
 2.22. ✅ Notes list top bar search: Esc button shodu close the search line and clear the search query
-2.23. The sidebar-types-sort button does not work
+2.23. The sidebar-types-sort button should be Types Filter button
 2.24. Install @blocknote/shadcn and restore BlockNote menu UI primitives (SideMenu drag handle, etc. — depends on a ComponentsContext.Provider that only the UI subpackages install; tracked here so the 1.2 quick fix can land)
 2.25. ✅ Redirect WebView console logs to the tolaria in-process simple logger
-2.26. ✅ Round-tripping open/save reformats frontmatter (YAML round-trips byte-for-byte; body whitespace normalisation under `blocksToMarkdownLossy` deferred to a follow-up row mirroring React's `compactMarkdown` + `serializeDurableEditorBlocks` chain)
+2.26. ✅ Round-tripping open/save reformats frontmatter
 2.27. Frontmatter is not rendered in preview mode (React variant renders a properties panel above the editor body — the native variant shows nothing for the YAML block at all)
 
 ## 3. Low Priority

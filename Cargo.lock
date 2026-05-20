@@ -4796,6 +4796,7 @@ dependencies = [
 name = "note_item"
 version = "0.1.0"
 dependencies = [
+ "actions",
  "anyhow",
  "chrono",
  "editor_bridge",

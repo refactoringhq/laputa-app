@@ -23,8 +23,8 @@
 use std::path::Path;
 
 use gpui::{
-    div, px, AnyElement, App, InteractiveElement, IntoElement, ParentElement, SharedString,
-    StatefulInteractiveElement as _, Styled,
+    div, px, AnyElement, App, ClipboardItem, InteractiveElement, IntoElement, ParentElement,
+    SharedString, StatefulInteractiveElement as _, Styled, Window,
 };
 use gpui_component::{h_flex, ActiveTheme, IconName};
 use ui::{tree_dump::DumpAsExt as _, OverlayTooltipExt as _};
@@ -94,43 +94,46 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
 
     // Action cluster — mirrors `BreadcrumbActions` (BreadcrumbBar.tsx
     // L811-890) left-to-right, plus the trailing inspector toggle
-    // (L987-994).  Each entry is a log-only stub matching `title_bar.rs`
-    // — Phase 8 modal-chrome wiring replaces the stub bodies.
+    // (L987-994).  Unwired cells (worklist 2.9-2.14, 2.17) keep a
+    // log-only stub; reveal / copy-path / inspector (2.15 / 2.16 /
+    // 2.18) dispatch real handlers.
+    let reveal_path = path.to_path_buf();
+    let copy_path = path.to_path_buf();
     let actions = h_flex()
         .items_center()
         .gap(px(4.0))
         .text_color(muted)
-        .child(toolbar_cell(
+        .child(stub_cell(
             "note-toolbar-star",
             IconName::Star,
             "Star this note",
         ))
-        .child(toolbar_cell(
+        .child(stub_cell(
             "note-toolbar-organized",
             IconName::CircleCheck,
             "Show in Organized view",
         ))
-        .child(toolbar_cell(
+        .child(stub_cell(
             "note-toolbar-neighborhood",
             IconName::Map,
             "Show neighborhood graph",
         ))
-        .child(toolbar_cell(
+        .child(stub_cell(
             "note-toolbar-raw",
             IconName::SquareTerminal,
             "Toggle raw markdown",
         ))
-        .child(toolbar_cell(
+        .child(stub_cell(
             "note-toolbar-width",
             IconName::Maximize,
             "Toggle note width",
         ))
-        .child(toolbar_cell(
+        .child(stub_cell(
             "note-toolbar-ai",
             IconName::Asterisk,
             "Open AI assistant",
         ))
-        .child(toolbar_cell(
+        .child(stub_cell(
             "note-toolbar-toc",
             IconName::Menu,
             "Table of contents",
@@ -139,13 +142,15 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
             "note-toolbar-reveal",
             IconName::FolderOpen,
             "Reveal in Finder",
+            move |_window, _cx| reveal_in_finder(&reveal_path),
         ))
         .child(toolbar_cell(
             "note-toolbar-copy-path",
             IconName::Copy,
             "Copy note path",
+            move |_window, cx| copy_path_to_clipboard(&copy_path, cx),
         ))
-        .child(toolbar_cell(
+        .child(stub_cell(
             "note-toolbar-more",
             IconName::Ellipsis,
             "More actions",
@@ -154,6 +159,13 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
             "note-toolbar-inspector",
             IconName::PanelRight,
             "Toggle inspector",
+            |_window, cx| {
+                cx.dispatch_action(&actions::ToggleInspector);
+                log::info!(
+                    target: "note_item::toolbar",
+                    "inspector: dispatched ToggleInspector"
+                );
+            },
         ));
 
     h_flex()
@@ -172,10 +184,19 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
 }
 
 /// One toolbar action cell — square click target with a single
-/// [`IconName`] glyph centred inside.  Logs the action id on click;
-/// Phase 8 wires the real dispatch.  `tooltip` is the verb-noun label
-/// shown on hover (worklist 2.4).
-fn toolbar_cell(id: &'static str, icon: IconName, tooltip: &'static str) -> AnyElement {
+/// [`IconName`] glyph centred inside.  `tooltip` is the verb-noun
+/// label shown on hover (worklist 2.4); `on_click` is invoked when
+/// the cell is clicked.
+///
+/// Single source of truth for the cell's visual chain (size, hover
+/// background, `dump_as`, `overlay_tooltip`) — see [`stub_cell`] for
+/// the log-only default used by the seven still-unwired cells.
+fn toolbar_cell(
+    id: &'static str,
+    icon: IconName,
+    tooltip: &'static str,
+    on_click: impl Fn(&mut Window, &mut App) + 'static,
+) -> AnyElement {
     div()
         .id(id)
         .flex()
@@ -186,13 +207,67 @@ fn toolbar_cell(id: &'static str, icon: IconName, tooltip: &'static str) -> AnyE
         .rounded_sm()
         .cursor_pointer()
         .hover(|this| this.bg(gpui::hsla(0.0, 0.0, 0.5, 0.12)))
-        .on_click(move |_, _window, _cx| {
-            log::info!("note toolbar action stub: {id}");
-        })
+        .on_click(move |_, window, cx| on_click(window, cx))
         .overlay_tooltip(tooltip)
         .child(icon)
         .dump_as(id)
         .into_any_element()
+}
+
+/// Convenience wrapper around [`toolbar_cell`] for cells whose
+/// behaviour hasn't been wired yet — logs the stub message on click,
+/// matching the previous helper's body.  Used by the seven worklist
+/// rows (2.9-2.14, 2.17) that need real product work (frontmatter
+/// mutation, new panels, AI integration) before they can dispatch.
+fn stub_cell(id: &'static str, icon: IconName, tooltip: &'static str) -> AnyElement {
+    toolbar_cell(id, icon, tooltip, move |_, _| {
+        log::info!("note toolbar action stub: {id}");
+    })
+}
+
+/// Reveal-in-Finder handler for the `note-toolbar-reveal` cell
+/// (worklist 2.15).  Spawns `open -R <path>` so Finder selects the
+/// note in its containing folder — `open -R` is the macOS-idiomatic
+/// "select" verb, distinct from `open <path>` which would open the
+/// note in its default application.  We discard the [`Child`] handle
+/// rather than waiting on it; Finder owns user feedback from here.
+///
+/// [`Child`]: std::process::Child
+fn reveal_in_finder(path: &Path) {
+    let path_str = path.to_string_lossy();
+    #[cfg(target_os = "macos")]
+    {
+        match std::process::Command::new("open")
+            .args(["-R", path_str.as_ref()])
+            .spawn()
+        {
+            Ok(_) => log::info!(
+                target: "note_item::toolbar",
+                "reveal: spawned open -R {path_str}"
+            ),
+            Err(e) => log::warn!(
+                target: "note_item::toolbar",
+                "reveal: open -R failed: {e:#}"
+            ),
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        log::warn!(
+            target: "note_item::toolbar",
+            "reveal: select-in-file-manager not yet implemented on this platform ({path_str})"
+        );
+    }
+}
+
+/// Copy-path handler for the `note-toolbar-copy-path` cell (worklist
+/// 2.16).  Writes the note's absolute path to the system clipboard
+/// via [`App::write_to_clipboard`] — no toast required because the
+/// user confirms the copy by pasting elsewhere.
+fn copy_path_to_clipboard(path: &Path, cx: &App) {
+    let path_str = path.to_string_lossy().into_owned();
+    log::info!(target: "note_item::toolbar", "copy-path: copied {path_str}");
+    cx.write_to_clipboard(ClipboardItem::new_string(path_str));
 }
 
 /// Singular type label for the breadcrumb (`procedure-foo.md` →
@@ -255,6 +330,47 @@ mod tests {
             let label = type_label_singular(&PathBuf::from(input));
             assert_eq!(label, *expected, "input={input}");
         }
+    }
+
+    #[test]
+    fn toolbar_cell_builds_reveal_button() {
+        // Worklist 2.15 — the reveal cell must construct successfully
+        // with a non-stub handler.  Click behaviour goes through `open
+        // -R`, which we can't drive headlessly, so we only assert the
+        // builder returns an element.
+        let _cell = toolbar_cell(
+            "note-toolbar-reveal",
+            IconName::FolderOpen,
+            "Reveal in Finder",
+            |_window, _cx| {},
+        );
+    }
+
+    #[test]
+    fn toolbar_cell_builds_copy_path_button() {
+        // Worklist 2.16 — same shape assertion as the reveal cell.
+        // The clipboard write needs a live `App`, so the handler body
+        // here is a no-op; the wired call site in `render` passes the
+        // real `copy_path_to_clipboard` invocation.
+        let _cell = toolbar_cell(
+            "note-toolbar-copy-path",
+            IconName::Copy,
+            "Copy note path",
+            |_window, _cx| {},
+        );
+    }
+
+    #[test]
+    fn toolbar_cell_builds_inspector_button() {
+        // Worklist 2.18 — same shape assertion as the other wired
+        // cells.  The real handler dispatches `actions::ToggleInspector`
+        // via `cx.dispatch_action`, which requires a live `App`.
+        let _cell = toolbar_cell(
+            "note-toolbar-inspector",
+            IconName::PanelRight,
+            "Toggle inspector",
+            |_window, _cx| {},
+        );
     }
 
     #[test]
