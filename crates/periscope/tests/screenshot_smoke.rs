@@ -193,6 +193,97 @@ fn screenshot_smoke() {
     // GPUI window regardless of test outcome.
 }
 
+/// Exercise the synthetic-input primitives (`type-text`, `key`, `hover`,
+/// `double-click`) against the live app.  Like [`screenshot_smoke`],
+/// requires Screen Recording + Accessibility on the cargo-launching
+/// terminal — opt in with `TOLARIA_E2E_SMOKE=1`.
+///
+/// The assertion is intentionally weak ("primitives don't error out");
+/// the value here is catching the obvious wiring breakage where a new
+/// CLI subcommand can't even resolve the target window or compose the
+/// CGEvent.  Visual verification (did the keystrokes land in the
+/// editor?) is the job of the phase-8 sweep, not this smoke pass.
+#[test]
+fn synthetic_input_smoke() {
+    if std::env::var("TOLARIA_E2E_SMOKE").is_err() {
+        eprintln!("periscope::synthetic_input_smoke skipped (TOLARIA_E2E_SMOKE not set)");
+        return;
+    }
+
+    let vault_path = repo_root().join("demo-vault-v2");
+    assert!(
+        vault_path.is_dir(),
+        "demo-vault-v2 missing at {vault_path:?}"
+    );
+
+    let build_status = Command::new("cargo")
+        .args(["build", "-p", "tolaria"])
+        .current_dir(repo_root())
+        .status()
+        .expect("cargo build -p tolaria");
+    assert!(build_status.success(), "cargo build -p tolaria failed");
+
+    let bin = repo_root().join("target").join("debug").join("tolaria");
+    let child = Command::new(&bin)
+        .arg("--vault")
+        .arg(&vault_path)
+        .arg("--width")
+        .arg(REFERENCE_WIDTH.to_string())
+        .arg("--height")
+        .arg(REFERENCE_HEIGHT.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn tolaria");
+    let guard = ChildGuard(child);
+
+    let pid = guard.id();
+    let target = periscope::WindowTarget::ByPid(pid);
+    let deadline = Instant::now() + Duration::from_secs(SMOKE_TIMEOUT_SECS);
+    let tmp_dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    let warmup_path = tmp_dir.join("periscope-synthetic-warmup.png");
+
+    // Phase 1 — wait for the window to appear (reusing the screenshot
+    // poll as the readiness signal so the test doesn't race the startup).
+    loop {
+        match periscope::screenshot(&target, &warmup_path) {
+            Ok(_) => break,
+            Err(err) if Instant::now() < deadline => {
+                eprintln!("synthetic_input_smoke: waiting for window ({err:#})");
+                thread::sleep(Duration::from_millis(SMOKE_POLL_INTERVAL_MS));
+            }
+            Err(err) => panic!("window never appeared: {err:#}"),
+        }
+    }
+
+    periscope::raise(&target).expect("raise tolaria");
+    thread::sleep(Duration::from_millis(250));
+
+    // Hover over the centre of the window — should never error even if
+    // nothing is there to react.
+    periscope::hover(&target, 400.0, 200.0).expect("hover should not error");
+
+    // Synthesize Escape — a no-op when no modal is open, but proves the
+    // key-press path resolves the keycode and posts the event.
+    periscope::press_named_key(&target, "Escape", "").expect("key Escape should not error");
+
+    // Type a short ASCII string into focus.  We don't assert anything
+    // about the editor body here — that's the job of the sweep doc —
+    // just that the primitive doesn't error and the burst doesn't crash
+    // the app.  Use a tiny delay so the test isn't slow.
+    periscope::type_text(&target, "abc", 4).expect("type-text should not error");
+
+    // Synthesize a double-click somewhere safe (top-left of the workspace
+    // chrome, well above the editor body).  Should not crash the target.
+    periscope::double_click(&target, 50.0, 50.0).expect("double-click should not error");
+
+    // Final settle + capture so a future regression investigation has a
+    // post-state PNG to look at.
+    thread::sleep(Duration::from_millis(250));
+    let final_path = tmp_dir.join("periscope-synthetic-after.png");
+    periscope::screenshot(&target, &final_path).expect("post-sequence screenshot");
+}
+
 /// Repo root deduced from `CARGO_MANIFEST_DIR`, which Cargo sets to
 /// `crates/periscope/`.  Going up two levels lands on the workspace
 /// root that owns `demo-vault-v2/`.

@@ -2,15 +2,26 @@
 //!
 //! Subcommands:
 //!
-//! - `screenshot` — one-shot capture, optionally `--raise`-ing first.
+//! - `screenshot`   — one-shot capture, optionally `--raise`-ing first.
 //!   With `--id` the output is cropped to the named element's bounds.
-//! - `watch`      — periodic capture loop with `latest.png` symlink.
+//! - `watch`        — periodic capture loop with `latest.png` symlink.
 //!   With `--id` each frame is cropped to the named element's bounds.
-//! - `click`      — synthesize a left-click at window-local `(x, y)` OR
+//! - `click`        — synthesize a left-click at window-local `(x, y)` OR
 //!   at the centre of an element looked up by `--id` from the `tree_dump`
 //!   JSON.  `--x`/`--y` and `--id` are mutually exclusive.
-//! - `dump-tree`  — refresh + print the target's `tree_dump` JSON.
-//! - `list`       — diagnostic dump of every visible window.
+//! - `double-click` — same coordinate / `--id` modes as `click`, but
+//!   posts two `CGEvent` mouse pairs tagged with click-state `2` so
+//!   AppKit treats them as a single double-click gesture.
+//! - `hover`        — move the cursor to a point (coordinate or `--id`)
+//!   without clicking.  Used for hover-only UI like BlockNote's
+//!   side-menu handle.
+//! - `type-text`    — synthesize keyboard input via `CGEvent` so it
+//!   reaches the WKWebView editor body (where `osascript keystroke` is
+//!   blocked).
+//! - `key`          — synthesize one named key press, with optional
+//!   modifier list (`cmd,shift,…`).
+//! - `dump-tree`    — refresh + print the target's `tree_dump` JSON.
+//! - `list`         — diagnostic dump of every visible window.
 
 use anyhow::{anyhow, Context as _, Result};
 use clap::{Args, Parser, Subcommand};
@@ -46,6 +57,24 @@ enum Cmd {
     /// `--id` to click the geometric centre of a named element from the
     /// `tree_dump` JSON.  The two modes are mutually exclusive.
     Click(ClickArgs),
+    /// Synthesize a double-click inside the window.  Same `--x`/`--y` vs
+    /// `--id` modes as `click`; the two `CGEvent` mouse pairs are tagged
+    /// with click-state `1` then `2` so AppKit treats them as one gesture.
+    DoubleClick(ClickArgs),
+    /// Move the cursor inside the window without clicking.  Same
+    /// `--x`/`--y` vs `--id` modes as `click`.  Useful for hover-only UI
+    /// (e.g. BlockNote's side-menu handle).
+    Hover(ClickArgs),
+    /// Synthesize keyboard input by posting one `CGEvent` per character
+    /// with the Unicode scalar attached via
+    /// `CGEventKeyboardSetUnicodeString`.  `\n`/`\t` become Return/Tab
+    /// virtual-key events.
+    TypeText(TypeTextArgs),
+    /// Synthesize a single named key press, with optional modifiers.
+    /// Key names: `Return`, `Tab`, `Escape`, …, `F1`–`F20`, or any
+    /// single character.  Modifiers: comma-separated `cmd`/`shift`/`opt`/
+    /// `ctrl`/`fn`.
+    Key(KeyArgs),
     /// Read the most recent `tree_dump` JSON for the target window
     /// (optionally triggering a fresh dump first) and pretty-print
     /// every registered element name + bounds.  Diagnostic aid for
@@ -129,6 +158,47 @@ struct ClickArgs {
 }
 
 #[derive(Args)]
+struct TypeTextArgs {
+    #[command(flatten)]
+    target: TargetArgs,
+    /// String to type.  `\n` becomes a Return keystroke, `\t` a Tab
+    /// keystroke; every other character is dispatched as a single
+    /// `CGEvent` keyboard pair with the scalar attached via
+    /// `CGEventKeyboardSetUnicodeString`.
+    #[arg(long)]
+    text: String,
+    /// Raise the window via the Accessibility API before typing so the
+    /// keyboard events reach the right process.
+    #[arg(long, default_value_t = false)]
+    raise: bool,
+    /// Per-character delay in milliseconds.  `0` is allowed but
+    /// practically unstable on busy machines.
+    #[arg(long, default_value_t = periscope::DEFAULT_TYPE_DELAY_MS)]
+    delay_ms: u64,
+}
+
+#[derive(Args)]
+struct KeyArgs {
+    #[command(flatten)]
+    target: TargetArgs,
+    /// Key name: `Return`, `Tab`, `Escape`, `Space`, `Delete`,
+    /// `Backspace`, `Up`/`Down`/`Left`/`Right`, `Home`, `End`,
+    /// `PageUp`, `PageDown`, `F1`–`F20`, or any single character
+    /// (case-insensitive — add `--modifiers shift` for capitals).
+    #[arg(long)]
+    key: String,
+    /// Comma-separated modifier list.  Recognised: `cmd`/`command`/`meta`,
+    /// `shift`, `opt`/`option`/`alt`, `ctrl`/`control`, `fn`/`function`.
+    /// Empty / omitted means no modifiers.
+    #[arg(long, default_value = "")]
+    modifiers: String,
+    /// Raise the window via the Accessibility API before pressing so the
+    /// keyboard event reaches the right process.
+    #[arg(long, default_value_t = false)]
+    raise: bool,
+}
+
+#[derive(Args)]
 struct DumpTreeArgs {
     #[command(flatten)]
     target: TargetArgs,
@@ -177,9 +247,24 @@ fn main() -> Result<()> {
         Cmd::Screenshot(a) => screenshot(a),
         Cmd::Watch(a) => watch(a),
         Cmd::Click(a) => click(a),
+        Cmd::DoubleClick(a) => mouse_gesture(a, MouseGesture::DoubleClick),
+        Cmd::Hover(a) => mouse_gesture(a, MouseGesture::Hover),
+        Cmd::TypeText(a) => type_text(a),
+        Cmd::Key(a) => key(a),
         Cmd::DumpTree(a) => dump_tree(a),
         Cmd::List => list(),
     }
+}
+
+/// Which non-click mouse gesture [`mouse_gesture`] should dispatch.  The
+/// resolve / `--id` lookup / raise logic is identical between hover and
+/// double-click; only the final `periscope::*` call differs.
+#[derive(Clone, Copy)]
+enum MouseGesture {
+    /// Two `CGEvent` mouse pairs at click-state `1` then `2`.
+    DoubleClick,
+    /// Single `MouseMoved` event.
+    Hover,
 }
 
 fn screenshot(args: ScreenshotArgs) -> Result<()> {
@@ -250,6 +335,72 @@ fn click(args: ClickArgs) -> Result<()> {
             .expect("clap required_unless_present(\"id\") guarantees --y is set");
         periscope::click(&target, x, y)
     }
+}
+
+/// Resolve `args` to a window-local `(x, y)` (either `--x`/`--y` or the
+/// centre of `--id`) and dispatch the requested non-click gesture.
+fn mouse_gesture(args: ClickArgs, gesture: MouseGesture) -> Result<()> {
+    let target = args.target.to_target()?;
+    let label = match gesture {
+        MouseGesture::DoubleClick => "double-click",
+        MouseGesture::Hover => "hover",
+    };
+    if args.raise {
+        periscope::raise(&target).with_context(|| format!("raise before {label}"))?;
+        std::thread::sleep(RAISE_SETTLE);
+    }
+    let (x, y) = if let Some(ref id) = args.id {
+        let pid = periscope::resolve_pid(&target)?;
+        let dump_path = periscope::tree_dump::default_dump_path_for_pid(pid);
+        let dump = refresh_dump(
+            pid,
+            &dump_path,
+            !args.no_refresh,
+            Duration::from_millis(args.timeout_ms),
+        )?;
+        let bounds = lookup_element(&dump, id, pid, &dump_path)?;
+        let (cx, cy) = bounds.center();
+        log::info!(
+            "{label} --id {id:?} pid={pid} bounds=({:.1},{:.1} {:.1}×{:.1}) → ({cx:.1},{cy:.1})",
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+        );
+        (cx, cy)
+    } else {
+        let x = args
+            .x
+            .expect("clap required_unless_present(\"id\") guarantees --x is set");
+        let y = args
+            .y
+            .expect("clap required_unless_present(\"id\") guarantees --y is set");
+        (x, y)
+    };
+    match gesture {
+        MouseGesture::DoubleClick => periscope::double_click(&target, x, y),
+        MouseGesture::Hover => periscope::hover(&target, x, y),
+    }
+}
+
+fn type_text(args: TypeTextArgs) -> Result<()> {
+    let target = args.target.to_target()?;
+    if args.raise {
+        periscope::raise(&target).context("raise before type-text")?;
+        std::thread::sleep(RAISE_SETTLE);
+    }
+    periscope::type_text(&target, &args.text, args.delay_ms)
+}
+
+fn key(args: KeyArgs) -> Result<()> {
+    let target = args.target.to_target()?;
+    if args.raise {
+        periscope::raise(&target).context("raise before key")?;
+        std::thread::sleep(RAISE_SETTLE);
+    }
+    let keycode = periscope::keyboard::key_name_to_keycode(&args.key)?;
+    let flags = periscope::keyboard::parse_modifier_list(&args.modifiers)?;
+    periscope::key_press(&target, keycode, flags)
 }
 
 fn watch(args: WatchArgs) -> Result<()> {

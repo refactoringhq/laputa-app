@@ -477,3 +477,78 @@ Options:
       --no-refresh        Skip SIGUSR1 refresh (--id mode only)
       --timeout-ms <MS>   Max wait for fresh dump in ms [default: 2000] (--id mode only)
 ```
+
+---
+
+## Synthetic input — `type-text`, `key`, `hover`, `double-click`
+
+These four primitives extend the `click` path so the editor-body
+gesture scenarios in `docs/plans/native-gpui-chrome/phase-8-sweep.md`
+can run without a human in the loop.  `osascript keystroke` is blocked
+inside the WKWebView editor body (`AGENTS.md` §4 macOS gotchas), but
+raw `CGEvent` keyboard / mouse events go through the system queue
+WKWebView listens on.
+
+See `crates/periscope/README.md` § *Synthetic input* for the full key /
+modifier name tables.  Quick reference:
+
+### `type-text` — synthesize text input
+
+```sh
+# Trigger the slash menu (Scenarios 3 / 6).  The `/` reaches the
+# BlockNote editor because CGEvent posts straight to the system queue:
+./target/debug/periscope type-text \
+    --pid $BIN_PID --raise --text "/"
+
+# Multi-character input (e.g. wikilink suggestion in Scenario 6):
+./target/debug/periscope type-text \
+    --pid $BIN_PID --raise --text "[[Note"
+```
+
+`\n` becomes a `Return` keystroke, `\t` a `Tab` keystroke; every other
+character is dispatched as a single `CGEvent` pair with the Unicode
+scalar attached via `CGEventKeyboardSetUnicodeString`.  Tune the burst
+rate with `--delay-ms` (default `8` ms).
+
+### `key` — synthesize a single named key press
+
+```sh
+# Dismiss a menu / modal (Scenario 03 cleanup, Scenario 09 IME abort):
+./target/debug/periscope key --pid $BIN_PID --raise --key Escape
+
+# Save via Cmd+S:
+./target/debug/periscope key --pid $BIN_PID --raise --key s --modifiers cmd
+```
+
+`--key` accepts named keys (`Return`, `Tab`, `Escape`, …, `F1`–`F20`)
+or any single character.  `--modifiers` is a comma-separated list
+(`cmd,shift,opt,ctrl,fn`).  See the README for synonyms.
+
+### `hover` — move the cursor without clicking
+
+```sh
+# Surface the BlockNote side-menu `⋮⋮` handle (Scenario 04):
+./target/debug/periscope hover --pid $BIN_PID --raise --x 320 --y 240
+
+# Or by element name:
+./target/debug/periscope hover --pid $BIN_PID --raise --id note-list-row-0
+```
+
+Posts a single `MouseMoved` `CGEvent`.  Same `--x`/`--y` vs `--id`
+modes as `click`.
+
+### `double-click` — synthesize a double-click
+
+```sh
+# Open the formatting toolbar over a word selection (Scenario 05):
+./target/debug/periscope double-click \
+    --pid $BIN_PID --raise --x 420 --y 380
+
+# Or by element name:
+./target/debug/periscope double-click \
+    --pid $BIN_PID --raise --id editor-block-body
+```
+
+Two `LeftMouseDown`/`LeftMouseUp` pairs separated by ~60 ms with
+`MOUSE_EVENT_CLICK_STATE` set to `1` then `2`, so AppKit recognises the
+pair as a single double-click gesture.
