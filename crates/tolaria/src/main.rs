@@ -182,11 +182,11 @@ mod macos {
         cx.on_action(move |_: &A, _| log::info!("{label}: {note}"));
     }
 
-    /// Resolve the active window's root view, downcast to
-    /// [`workspace::TolariaWorkspace`], and run `f` against it.  No-op
-    /// (with a debug log) when there is no active window or the root
-    /// view is not a `TolariaWorkspace` (e.g. a Phase 11 modal-only
-    /// window in the future).
+    /// Resolve the active window's root view (a `gpui_component::Root`
+    /// wrapper around `TolariaWorkspace`), unwrap the inner workspace
+    /// entity, and run `f` against it.  No-op (with a debug log) when
+    /// no active window resolves or the root view is not the expected
+    /// `Root → TolariaWorkspace` pair.
     ///
     /// Centralises the active-window → workspace-entity hop so each
     /// new workspace-level action handler stays a single-line
@@ -194,26 +194,36 @@ mod macos {
     fn dispatch_to_workspace<F>(label: &'static str, cx: &mut App, f: F)
     where
         F: FnOnce(
-            &mut workspace::TolariaWorkspace,
-            &mut gpui::Context<workspace::TolariaWorkspace>,
-        ),
+                &mut workspace::TolariaWorkspace,
+                &mut gpui::Context<workspace::TolariaWorkspace>,
+            ) + 'static,
     {
-        let Some(handle) = cx.active_window() else {
-            log::debug!("{label}: no active window");
-            return;
-        };
-        if let Err(err) =
-            handle.update(cx, |root, _window, app_cx| match root
-                .downcast::<workspace::TolariaWorkspace>()
-            {
-                Ok(workspace) => workspace.update(app_cx, f),
-                Err(_) => {
-                    log::debug!("{label}: active window root is not TolariaWorkspace");
-                }
-            })
-        {
-            log::error!("{label} dispatch failed: {err:#}");
-        }
+        // Defer for the same re-entrancy reason as `dispatch_to_any_window`:
+        // when an action is dispatched from inside the window's own
+        // dispatch tree (menu click, keybinding routed through the
+        // element tree), the window slot in `App::windows` is already
+        // taken by the current update.  `cx.defer` queues the inner
+        // `handle.update` for after the current update unwinds.
+        cx.defer(move |cx| {
+            let Some(handle) = cx.active_window() else {
+                log::debug!("{label}: no active window");
+                return;
+            };
+            if let Err(err) = handle.update(cx, |root, _window, app_cx| {
+                let Ok(root_entity) = root.downcast::<gpui_component::Root>() else {
+                    log::debug!("{label}: window root is not gpui_component::Root");
+                    return;
+                };
+                let inner = root_entity.read(app_cx).view().clone();
+                let Ok(workspace) = inner.downcast::<workspace::TolariaWorkspace>() else {
+                    log::debug!("{label}: Root inner view is not TolariaWorkspace");
+                    return;
+                };
+                workspace.update(app_cx, f);
+            }) {
+                log::error!("{label} dispatch failed: {err:#}");
+            }
+        });
     }
 
     /// Run `f` against any live Tolaria window — deferred to the
@@ -570,7 +580,7 @@ mod macos {
                     // observe-global theme broadcaster (Phase 7.9) and
                     // the open-note subscription can share the same handle.
                     let active_note_item = active_note_item.clone();
-                    cx.new(|model_cx| {
+                    let workspace = cx.new(|model_cx| {
                         let mut workspace = TolariaWorkspace::empty(window, model_cx);
                         // Sidebar (vault tree) on the left, note list in
                         // its own column between sidebar and editor —
@@ -658,7 +668,16 @@ mod macos {
                             )
                             .detach();
                         workspace
-                    })
+                    });
+                    // Wrap the workspace entity in `gpui_component::Root` —
+                    // gpui-component's Dialog / Sheet / Notification / Tooltip
+                    // overlays *and* `Window::toggle_inspector` all assume the
+                    // window's first view is `Root`.  Skipping the wrapper
+                    // panics inside `gpui_component::Root::read` at the first
+                    // overlay call (root.rs:118, `Option::unwrap()` on `None`)
+                    // — observed via `ToggleInspector` triggering the
+                    // inspector overlay.
+                    cx.new(|cx| gpui_component::Root::new(workspace, window, cx))
                 }) {
                     log::error!("failed to open Tolaria window: {err:#}");
                 }
