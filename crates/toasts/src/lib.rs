@@ -12,10 +12,15 @@
 //! [`render_toast`] constructs a GPUI element tree. Phase 2c will upgrade this
 //! to a proper `Notification` view hosted in a `ToastLayer` entity.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
+use std::time::Duration;
 
 use gpui::{
-    prelude::FluentBuilder as _, AnyElement, IntoElement as _, ParentElement as _, SharedString,
+    prelude::FluentBuilder as _, AnyElement, App, IntoElement as _, ParentElement as _,
+    SharedString,
 };
 use gpui_component::notification::NotificationType;
 
@@ -73,19 +78,33 @@ impl From<ToastSeverity> for NotificationType {
 // Toast
 // ---------------------------------------------------------------------------
 
+/// Reference-counted click handler invoked when the user activates a toast.
+///
+/// Pulled out into a named alias so the closure-shaped `Arc<dyn Fn(...)>`
+/// type doesn't leak through Toast's stored field and accessor signatures
+/// (clippy::type_complexity).  Bound `Send + Sync` so background tasks can
+/// drop a toast (and indirectly drop the `Arc`) without the auto-traits
+/// becoming a compile error at the wrong layer.
+pub type ToastClickHandler = Arc<dyn Fn(&mut App) + Send + Sync + 'static>;
+
 /// A single ephemeral toast notification.
 ///
 /// Construct via [`Toast::info`], [`Toast::success`], [`Toast::warning`], or
-/// [`Toast::error`]. Chain [`Toast::with_title`] to attach an optional title.
+/// [`Toast::error`]. Chain [`Toast::with_title`] to attach an optional title,
+/// and [`Toast::on_click`] to register a callback fired when the user clicks.
 ///
 /// Fields are private to preserve constructor invariants (e.g. monotonic IDs).
-/// Access values through the provided accessor methods.
+/// Access values through the provided accessor methods.  Also `#[non_exhaustive]`
+/// so future fields don't require a SemVer-breaking constructor update at
+/// every call-site.
 #[non_exhaustive]
 pub struct Toast {
     id: ToastId,
     severity: ToastSeverity,
     title: Option<SharedString>,
     message: SharedString,
+    /// Optional action invoked (and the toast dismissed) when the user clicks.
+    on_click: Option<ToastClickHandler>,
 }
 
 impl Toast {
@@ -95,6 +114,7 @@ impl Toast {
             severity,
             title: None,
             message: message.into(),
+            on_click: None,
         }
     }
 
@@ -124,6 +144,28 @@ impl Toast {
         self
     }
 
+    /// Register a click handler.  When the user clicks this toast the callback
+    /// is invoked and the toast is dismissed.
+    pub fn on_click(mut self, f: impl Fn(&mut App) + Send + Sync + 'static) -> Self {
+        self.on_click = Some(Arc::new(f));
+        self
+    }
+
+    /// How long this toast should remain visible before auto-dismissing.
+    ///
+    /// | Severity | Duration |
+    /// |----------|----------|
+    /// | Info / Success | 5 s |
+    /// | Warning        | 8 s |
+    /// | Error          | 10 s |
+    pub fn auto_dismiss_duration(&self) -> Duration {
+        match self.severity {
+            ToastSeverity::Info | ToastSeverity::Success => Duration::from_secs(5),
+            ToastSeverity::Warning => Duration::from_secs(8),
+            ToastSeverity::Error => Duration::from_secs(10),
+        }
+    }
+
     /// The unique identifier for this toast.
     pub fn id(&self) -> ToastId {
         self.id
@@ -142,6 +184,11 @@ impl Toast {
     /// The body message.
     pub fn message(&self) -> &SharedString {
         &self.message
+    }
+
+    /// The optional click handler registered via [`Toast::on_click`].
+    pub fn click_handler(&self) -> Option<&ToastClickHandler> {
+        self.on_click.as_ref()
     }
 }
 
