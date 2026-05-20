@@ -29,7 +29,7 @@
 2.20. ✅ Notes list sort dropdown does not update the title after the user selects an option
 2.21. ✅ Notes list sort dropdown appears under the web view pannel
 2.22. ✅ Notes list top bar search: Esc button shodu close the search line and clear the search query
-2.23. The sidebar-types-sort button should be Types Filter button
+2.23. ✅ The sidebar-types-sort button should be Types Filter button
 2.24. ✅ Install @blocknote/shadcn and restore BlockNote menu UI primitives
 2.25. ✅ Redirect WebView console logs to the tolaria in-process simple logger
 2.26. ✅ Round-tripping open/save reformats frontmatter

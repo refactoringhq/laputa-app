@@ -1135,9 +1135,9 @@ impl Render for SidebarPanel {
             p,
             vec![
                 header_action(
-                    "sidebar-types-sort",
-                    IconName::ChevronsUpDown,
-                    "Sort types",
+                    "sidebar-types-filter",
+                    IconName::Settings2,
+                    "Filter types",
                     p,
                 ),
                 header_action("sidebar-types-add", IconName::Plus, "New type", p),
