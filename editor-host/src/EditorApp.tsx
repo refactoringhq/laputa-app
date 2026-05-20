@@ -12,6 +12,7 @@ import { onReceive, send, type ThemeMode, type ToHost } from "./bridge.ts";
 import { createEditor } from "./setupEditor.ts";
 import { blocksToMarkdown, markdownToBlocks, replaceDocument } from "./richEditorMarkdown.ts";
 import { splitFrontmatter } from "./frontmatter.ts";
+import { parseFrontmatterEntries, PropertiesPanel } from "./propertiesPanel.tsx";
 import { EditorMenus } from "./menus.tsx";
 import { attachEditorLinkActivation } from "./linkActivation.ts";
 import {
@@ -222,6 +223,11 @@ export function EditorApp() {
     // the save path doesn't churn through React for a non-rendered
     // value.
     const frontmatterRef = useRef<string>("");
+    // Reactive mirror of `frontmatterRef` so the read-only properties
+    // panel (worklist 2.27) re-renders on every `note_open`.  The ref
+    // stays as the canonical save-path source (no React churn for the
+    // hot save loop); state is kept in lockstep via `setFrontmatter`.
+    const [frontmatter, setFrontmatterState] = useState<string>("");
     // Tracks the raw-vs-rich mode of the *previous* note so the
     // position-sync hook can capture the outgoing snapshot on the
     // correct surface during a mode flip.
@@ -326,6 +332,9 @@ export function EditorApp() {
             },
             setFrontmatter(prefix) {
                 frontmatterRef.current = prefix;
+                // Drive the React mirror so the properties panel
+                // (worklist 2.27) refreshes on the next render.
+                setFrontmatterState(prefix);
             },
             getFrontmatter() {
                 return frontmatterRef.current;
@@ -436,6 +445,14 @@ export function EditorApp() {
     // higher-level state signal used by the React side.
     const isComposing = useEditorComposing(editor);
 
+    // Parsed frontmatter entries for the read-only properties panel
+    // (worklist 2.27).  Memoised so unrelated re-renders skip the
+    // parse cost; refreshes when the bridge stashes a new prefix.
+    const frontmatterEntries = useMemo(
+        () => parseFrontmatterEntries(frontmatter),
+        [frontmatter],
+    );
+
     // Wikilink suggestion menu (Phase 8.26).  Stable `getItems`
     // closure for the editor's lifetime — the underlying provider
     // currently returns an empty list because the native bridge does
@@ -509,31 +526,34 @@ export function EditorApp() {
                     latestContentRef={rawBufferRef}
                 />
             ) : (
-                <BlockNoteView
-                    editor={editor}
-                    theme={theme}
-                    // Default menu surfaces are *disabled* on the host —
-                    // `EditorMenus` mounts the three controllers explicitly
-                    // so we can attach the hover guards (see `menus.tsx`).
-                    // Link toolbar / file panel / table handles / emoji
-                    // picker / comments stay off until later rows wire
-                    // them.
-                    formattingToolbar={false}
-                    linkToolbar={false}
-                    slashMenu={false}
-                    sideMenu={false}
-                    filePanel={false}
-                    tableHandles={false}
-                    emojiPicker={false}
-                    comments={false}
-                >
-                    <EditorMenus editor={editor} />
-                    <SuggestionMenuController
-                        triggerCharacter="[["
-                        getItems={getWikilinkItems}
-                        minQueryLength={WIKILINK_MIN_QUERY_LENGTH}
-                    />
-                </BlockNoteView>
+                <>
+                    <PropertiesPanel entries={frontmatterEntries} />
+                    <BlockNoteView
+                        editor={editor}
+                        theme={theme}
+                        // Default menu surfaces are *disabled* on the host —
+                        // `EditorMenus` mounts the three controllers explicitly
+                        // so we can attach the hover guards (see `menus.tsx`).
+                        // Link toolbar / file panel / table handles / emoji
+                        // picker / comments stay off until later rows wire
+                        // them.
+                        formattingToolbar={false}
+                        linkToolbar={false}
+                        slashMenu={false}
+                        sideMenu={false}
+                        filePanel={false}
+                        tableHandles={false}
+                        emojiPicker={false}
+                        comments={false}
+                    >
+                        <EditorMenus editor={editor} />
+                        <SuggestionMenuController
+                            triggerCharacter="[["
+                            getItems={getWikilinkItems}
+                            minQueryLength={WIKILINK_MIN_QUERY_LENGTH}
+                        />
+                    </BlockNoteView>
+                </>
             )}
         </div>
     );

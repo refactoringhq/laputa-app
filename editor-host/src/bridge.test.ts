@@ -5,6 +5,7 @@ import {
     type EditorBridgeHandlers,
 } from "./EditorApp.tsx";
 import { blocksToMarkdown } from "./richEditorMarkdown.ts";
+import { parseFrontmatterEntries } from "./propertiesPanel.tsx";
 import type { ToHost } from "./bridge.ts";
 
 // ---------------------------------------------------------------------------
@@ -397,6 +398,33 @@ describe("dispatchToHost", () => {
         // Raw save: body is the raw buffer verbatim, the stashed YAML
         // prefix must NOT be glued onto a .yaml note.
         expect(decoded.v.body).toBe("key: value\n");
+    });
+
+    it("stashed frontmatter parses into the properties-panel entries (worklist 2.27)", () => {
+        // Integration check between the 2.26 stash and the 2.27 display
+        // parser: an open envelope with frontmatter must produce a
+        // stash whose `parseFrontmatterEntries` output matches the
+        // user-visible key/value pairs.  The render side is covered in
+        // `propertiesPanel.test.tsx`; here we only assert the bridge
+        // hand-off feeds the parser correctly.
+        const handlers = makeHandlers();
+        dispatchToHost(
+            editor,
+            {
+                k: "note_open",
+                v: {
+                    id: 1,
+                    path: "/v/a.md",
+                    body: "---\ntitle: T\ntags:\n  - a\n  - b\n---\n\n# Heading\n",
+                },
+            },
+            handlers,
+        );
+        const entries = parseFrontmatterEntries(handlers.getFrontmatter());
+        expect(entries).toEqual([
+            { key: "title", value: "T" },
+            { key: "tags", value: "  - a\n  - b" },
+        ]);
     });
 
     it("theme_set calls handlers.setTheme with the parsed mode", () => {

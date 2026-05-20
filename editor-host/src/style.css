@@ -906,3 +906,44 @@ body {
   border-top: var(--horizontal-rule-thickness) solid var(--horizontal-rule-color);
   margin: var(--horizontal-rule-margin-vertical) 0;
 }
+
+/* === Properties panel — read-only frontmatter display (worklist 2.27) === */
+/*
+ * Renders above the BlockNote editor body for any markdown note that
+ * carries YAML frontmatter.  Pure display: editing controls (type-aware
+ * editors, add/remove/reorder) live in a separate worklist row.
+ */
+.editor-host-container .properties-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px max(24px, calc((100% - var(--editor-max-width)) / 2 + var(--editor-padding-horizontal)));
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.editor-host-container .properties-panel__row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.editor-host-container .properties-panel__key {
+  flex: 0 0 auto;
+  min-width: 120px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.editor-host-container .properties-panel__value {
+  flex: 1 1 auto;
+  color: var(--fg);
+  font-family: var(--inline-styles-code-font-family);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
