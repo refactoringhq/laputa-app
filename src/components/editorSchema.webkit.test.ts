@@ -70,6 +70,28 @@ describe('editor schema code block highlighting', () => {
     expect(highlighter?.getLoadedThemes()[0]).toBe('github-dark')
   })
 
+  it('registers Go as a selectable Shiki code block language', async () => {
+    vi.resetModules()
+
+    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
+    const options = createTolariaCodeBlockOptions()
+
+    expect(options.supportedLanguages?.go).toMatchObject({
+      name: 'Go',
+      aliases: ['go', 'golang'],
+    })
+  })
+
+  it('loads the Go Shiki grammar for Go code blocks', async () => {
+    vi.resetModules()
+
+    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
+    const highlighter = await createTolariaCodeBlockOptions().createHighlighter?.()
+
+    await expect(highlighter?.loadLanguage('go')).resolves.toBeUndefined()
+    expect(highlighter?.getLoadedLanguages()).toContain('go')
+  })
+
   it('omits the Shiki highlighter when WebKit lacks precompiled regex flags', async () => {
     installLegacyWebKitRegExp()
     vi.resetModules()
