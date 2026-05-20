@@ -26,7 +26,7 @@ use gpui::{
     div, px, AnyElement, App, InteractiveElement, IntoElement, ParentElement, SharedString,
     StatefulInteractiveElement as _, Styled,
 };
-use gpui_component::{h_flex, ActiveTheme, IconName};
+use gpui_component::{h_flex, tooltip::Tooltip, ActiveTheme, IconName};
 use ui::tree_dump::DumpAsExt as _;
 
 /// Height of the note toolbar strip, in logical points.
@@ -61,7 +61,13 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
         .gap(px(6.0))
         .text_sm()
         .text_color(muted)
-        .child(div().child(type_label).dump_as("note-toolbar-type"))
+        .child(
+            div()
+                .id("note-toolbar-type")
+                .child(type_label)
+                .tooltip(|window, cx| Tooltip::new("Note type — click to change").build(window, cx))
+                .dump_as("note-toolbar-type"),
+        )
         .child(div().text_color(muted).child(IconName::ChevronRight))
         .child(
             div()
@@ -81,6 +87,7 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
                 // — single curved stroke matching the React reference rather
                 // than the two-straight-arrows shape of `IconName::Replace`.
                 .child(IconName::Undo)
+                .tooltip(|window, cx| Tooltip::new("Sync status").build(window, cx))
                 .dump_as("note-toolbar-sync")
                 .into_any_element(),
         );
@@ -93,20 +100,61 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
         .items_center()
         .gap(px(4.0))
         .text_color(muted)
-        .child(toolbar_cell("note-toolbar-star", IconName::Star))
+        .child(toolbar_cell(
+            "note-toolbar-star",
+            IconName::Star,
+            "Star this note",
+        ))
         .child(toolbar_cell(
             "note-toolbar-organized",
             IconName::CircleCheck,
+            "Show in Organized view",
         ))
-        .child(toolbar_cell("note-toolbar-neighborhood", IconName::Map))
-        .child(toolbar_cell("note-toolbar-raw", IconName::SquareTerminal))
-        .child(toolbar_cell("note-toolbar-width", IconName::Maximize))
-        .child(toolbar_cell("note-toolbar-ai", IconName::Asterisk))
-        .child(toolbar_cell("note-toolbar-toc", IconName::Menu))
-        .child(toolbar_cell("note-toolbar-reveal", IconName::FolderOpen))
-        .child(toolbar_cell("note-toolbar-copy-path", IconName::Copy))
-        .child(toolbar_cell("note-toolbar-more", IconName::Ellipsis))
-        .child(toolbar_cell("note-toolbar-inspector", IconName::PanelRight));
+        .child(toolbar_cell(
+            "note-toolbar-neighborhood",
+            IconName::Map,
+            "Show neighborhood graph",
+        ))
+        .child(toolbar_cell(
+            "note-toolbar-raw",
+            IconName::SquareTerminal,
+            "Toggle raw markdown",
+        ))
+        .child(toolbar_cell(
+            "note-toolbar-width",
+            IconName::Maximize,
+            "Toggle note width",
+        ))
+        .child(toolbar_cell(
+            "note-toolbar-ai",
+            IconName::Asterisk,
+            "Open AI assistant",
+        ))
+        .child(toolbar_cell(
+            "note-toolbar-toc",
+            IconName::Menu,
+            "Table of contents",
+        ))
+        .child(toolbar_cell(
+            "note-toolbar-reveal",
+            IconName::FolderOpen,
+            "Reveal in Finder",
+        ))
+        .child(toolbar_cell(
+            "note-toolbar-copy-path",
+            IconName::Copy,
+            "Copy note path",
+        ))
+        .child(toolbar_cell(
+            "note-toolbar-more",
+            IconName::Ellipsis,
+            "More actions",
+        ))
+        .child(toolbar_cell(
+            "note-toolbar-inspector",
+            IconName::PanelRight,
+            "Toggle inspector",
+        ));
 
     h_flex()
         .h(px(NOTE_TOOLBAR_HEIGHT_PT))
@@ -125,8 +173,9 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
 
 /// One toolbar action cell — square click target with a single
 /// [`IconName`] glyph centred inside.  Logs the action id on click;
-/// Phase 8 wires the real dispatch.
-fn toolbar_cell(id: &'static str, icon: IconName) -> AnyElement {
+/// Phase 8 wires the real dispatch.  `tooltip` is the verb-noun label
+/// shown on hover (worklist 2.4).
+fn toolbar_cell(id: &'static str, icon: IconName, tooltip: &'static str) -> AnyElement {
     div()
         .id(id)
         .flex()
@@ -140,6 +189,7 @@ fn toolbar_cell(id: &'static str, icon: IconName) -> AnyElement {
         .on_click(move |_, _window, _cx| {
             log::info!("note toolbar action stub: {id}");
         })
+        .tooltip(move |window, cx| Tooltip::new(tooltip).build(window, cx))
         .child(icon)
         .dump_as(id)
         .into_any_element()

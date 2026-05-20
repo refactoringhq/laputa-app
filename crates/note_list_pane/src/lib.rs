@@ -46,6 +46,7 @@ use gpui_component::{
     input::{Escape, Input, InputEvent, InputState},
     menu::DropdownMenu as _,
     scroll::ScrollableElement as _,
+    tooltip::Tooltip,
     v_flex, ActiveTheme, IconName, Sizable as _, StyledExt as _,
 };
 use mock_fixtures::{MockVault, NoteId, NoteKind};
@@ -1279,6 +1280,7 @@ impl Render for NoteListPane {
             .small()
             .label(SharedString::new_static(sort_label))
             .icon(IconName::ChevronsUpDown)
+            .tooltip("Sort")
             .dropdown_menu_with_anchor(
                 Anchor::TopRight,
                 move |menu: gpui_component::menu::PopupMenu, _window, _cx| {
@@ -1322,6 +1324,14 @@ impl Render for NoteListPane {
             );
 
         // Search glyph — clicking toggles the inline filter strip.
+        // The icon doesn't swap, but the tooltip mirrors the next
+        // click's effect: "Close search" when the strip is already
+        // open, "Search notes" otherwise.
+        let search_tooltip = if self.filter_open {
+            "Close search"
+        } else {
+            "Search notes"
+        };
         let search_button = h_flex()
             .id("note-list-search")
             .items_center()
@@ -1334,6 +1344,7 @@ impl Render for NoteListPane {
             .on_click(move |_, window, cx| {
                 search_entity.update(cx, |pane, cx| pane.toggle_filter_open(window, cx));
             })
+            .tooltip(move |window, cx| Tooltip::new(search_tooltip).build(window, cx))
             .dump_as("note-list-search");
 
         let header_strip = h_flex()
@@ -1388,6 +1399,7 @@ impl Render for NoteListPane {
                             .on_click(move |_, _window, cx| {
                                 new_entity.update(cx, |pane, cx| pane.request_create_note(cx));
                             })
+                            .tooltip(|window, cx| Tooltip::new("New note").build(window, cx))
                             .dump_as("note-list-new"),
                     ),
             )

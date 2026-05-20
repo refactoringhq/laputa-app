@@ -25,7 +25,7 @@ use gpui::{
     div, px, AnyElement, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement as _, Styled, Window,
 };
-use gpui_component::{ActiveTheme, IconName};
+use gpui_component::{tooltip::Tooltip, ActiveTheme, IconName};
 use ui::tree_dump::DumpAsExt as _;
 
 use crate::dock::Dock;
@@ -141,6 +141,7 @@ impl Render for TitleBar {
             .on_click(move |_, _window, cx| {
                 sidebar_toggle_target.update(cx, |dock, cx| dock.toggle(cx));
             })
+            .tooltip(|window, cx| Tooltip::new("Toggle sidebar").build(window, cx))
             .child(IconName::PanelLeft)
             .dump_as("title-bar-toggle-sidebar")
             .into_any_element();
@@ -153,8 +154,16 @@ impl Render for TitleBar {
             // (`crates/title_bar/src/title_bar.rs:244`).
             .gap(px(2.0))
             .child(toggle_sidebar)
-            .child(title_bar_cell("title-bar-back", IconName::ArrowLeft))
-            .child(title_bar_cell("title-bar-forward", IconName::ArrowRight));
+            .child(title_bar_cell(
+                "title-bar-back",
+                IconName::ArrowLeft,
+                "Go back",
+            ))
+            .child(title_bar_cell(
+                "title-bar-forward",
+                IconName::ArrowRight,
+                "Go forward",
+            ));
 
         let right = div()
             .flex()
@@ -163,9 +172,21 @@ impl Render for TitleBar {
             // gap_1 = 4 px, matching Zed's right-cluster gap
             // (`crates/title_bar/src/title_bar.rs:316`).
             .gap(px(4.0))
-            .child(title_bar_cell("title-bar-search", IconName::Search))
-            .child(title_bar_cell("title-bar-language", IconName::Globe))
-            .child(title_bar_cell("title-bar-profile", IconName::CircleUser));
+            .child(title_bar_cell(
+                "title-bar-search",
+                IconName::Search,
+                "Search",
+            ))
+            .child(title_bar_cell(
+                "title-bar-language",
+                IconName::Globe,
+                "Language",
+            ))
+            .child(title_bar_cell(
+                "title-bar-profile",
+                IconName::CircleUser,
+                "Profile",
+            ));
 
         // Vertically centre the action clusters within the strip
         // (issue 009 / issue 016).  Traffic lights are pinned to
@@ -195,8 +216,8 @@ impl Render for TitleBar {
 /// One title-bar action cell: a square click target with a single
 /// [`IconName`] glyph centred inside.  Logs the action id on click —
 /// Phase 8 modal-chrome work replaces the stub with the real action
-/// dispatch.
-fn title_bar_cell(id: &'static str, icon: IconName) -> AnyElement {
+/// dispatch.  `tooltip` is the hover hint shown on the cell (worklist 2.4).
+fn title_bar_cell(id: &'static str, icon: IconName, tooltip: &'static str) -> AnyElement {
     div()
         .id(id)
         .flex()
@@ -210,6 +231,7 @@ fn title_bar_cell(id: &'static str, icon: IconName) -> AnyElement {
         .on_click(move |_, _window, _cx| {
             log::info!("title bar action stub: {id}");
         })
+        .tooltip(move |window, cx| Tooltip::new(tooltip).build(window, cx))
         .child(icon)
         .dump_as(id)
         .into_any_element()

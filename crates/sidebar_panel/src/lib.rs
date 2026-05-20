@@ -36,7 +36,7 @@ use gpui::{
     div, px, rgb, AnyElement, App, Context, EventEmitter, Hsla, InteractiveElement, IntoElement,
     ParentElement, Pixels, Render, SharedString, StatefulInteractiveElement as _, Styled, Window,
 };
-use gpui_component::{ActiveTheme, IconName, StyledExt as _};
+use gpui_component::{tooltip::Tooltip, ActiveTheme, IconName, StyledExt as _};
 use mock_fixtures::{MockVault, NoteKind};
 use std::path::{Path, PathBuf};
 use ui::tree_dump::DumpAsExt as _;
@@ -883,6 +883,7 @@ fn section_header(
         .child(chevron)
         .child(SharedString::new_static(label));
 
+    let tooltip_text: &'static str = if collapsed { "Expand" } else { "Collapse" };
     let mut row = div()
         .id(SharedString::new_static(id))
         .flex()
@@ -908,6 +909,7 @@ fn section_header(
         row = row.child(actions_box);
     }
     row.on_click(move |_, _window, cx| on_toggle(cx))
+        .tooltip(move |window, cx| Tooltip::new(tooltip_text).build(window, cx))
         .dump_as(id)
         .into_any_element()
 }
@@ -918,8 +920,14 @@ fn section_header(
 /// Swallows mouse-down events so clicks on the action don't bubble up
 /// to the parent section header's collapse toggle (worklist 2.6).
 /// When a real `on_click` handler is wired for the action later, it
-/// can be installed alongside this guard.
-fn header_action(id: &'static str, icon: IconName, p: &Palette) -> AnyElement {
+/// can be installed alongside this guard.  `tooltip` is the hover hint
+/// shown on the glyph (worklist 2.4).
+fn header_action(
+    id: &'static str,
+    icon: IconName,
+    tooltip: &'static str,
+    p: &Palette,
+) -> AnyElement {
     div()
         .id(id)
         .flex()
@@ -934,6 +942,7 @@ fn header_action(id: &'static str, icon: IconName, p: &Palette) -> AnyElement {
         .on_mouse_down(gpui::MouseButton::Left, |_, _window, cx| {
             cx.stop_propagation();
         })
+        .tooltip(move |window, cx| Tooltip::new(tooltip).build(window, cx))
         .child(icon)
         .dump_as(id)
         .into_any_element()
@@ -1103,7 +1112,12 @@ impl Render for SidebarPanel {
             "VIEWS",
             views_collapsed,
             p,
-            vec![header_action("sidebar-views-add", IconName::Plus, p)],
+            vec![header_action(
+                "sidebar-views-add",
+                IconName::Plus,
+                "New view",
+                p,
+            )],
             toggle_section_handler(&entity, SidebarSection::Views),
         );
         let views_section = div()
@@ -1120,8 +1134,13 @@ impl Render for SidebarPanel {
             types_collapsed,
             p,
             vec![
-                header_action("sidebar-types-sort", IconName::ChevronsUpDown, p),
-                header_action("sidebar-types-add", IconName::Plus, p),
+                header_action(
+                    "sidebar-types-sort",
+                    IconName::ChevronsUpDown,
+                    "Sort types",
+                    p,
+                ),
+                header_action("sidebar-types-add", IconName::Plus, "New type", p),
             ],
             toggle_section_handler(&entity, SidebarSection::Types),
         );
@@ -1138,7 +1157,12 @@ impl Render for SidebarPanel {
             "FOLDERS",
             folders_collapsed,
             p,
-            vec![header_action("sidebar-folders-add", IconName::Plus, p)],
+            vec![header_action(
+                "sidebar-folders-add",
+                IconName::Plus,
+                "New folder",
+                p,
+            )],
             toggle_section_handler(&entity, SidebarSection::Folders),
         );
         let folders_section = div()
