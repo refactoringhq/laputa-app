@@ -356,6 +356,7 @@
   max-height: calc(100dvh - 32px);
   overflow: hidden;
   padding: 0;
+  zoom: var(--tolaria-overlay-zoom-inverse, 1);
 }
 
 .mermaid-diagram__dialog-viewport {
