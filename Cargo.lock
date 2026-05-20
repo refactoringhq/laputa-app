@@ -2279,6 +2279,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "frontmatter_panel"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "gpui_platform",
+ "mock_fixtures",
+ "vault",
+]
+
+[[package]]
 name = "fsevent-sys"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
