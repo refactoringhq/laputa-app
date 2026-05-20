@@ -3,7 +3,7 @@
 ## 1. Blockers
 
 1.1. ✅ Clicking on the notes search crashes with paniic
-1.2. Note web view renders and goes blank once the mouse moved over it
+1.2. ✅ Note web view renders and goes blank once the mouse moved over it
 
 ## 2. High Priority
 
@@ -30,6 +30,7 @@
 2.21. ✅ Notes list sort dropdown appears under the web view pannel
 2.22. ✅ Notes list top bar search: Esc button shodu close the search line and clear the search query
 2.23. The sidebar-types-sort button does not work
+2.24. Install @blocknote/shadcn and restore BlockNote menu UI primitives (SideMenu drag handle, etc. — depends on a ComponentsContext.Provider that only the UI subpackages install; tracked here so the 1.2 quick fix can land)
 
 ## 3. Low Priority
 
