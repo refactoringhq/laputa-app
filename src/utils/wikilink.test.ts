@@ -119,6 +119,20 @@ describe('resolveEntry', () => {
     expect(resolveEntry([alpha, alphaArchived], 'archive/alpha')).toBe(alphaArchived)
   })
 
+  it('resolves full-path wikilinks to non-Markdown duplicate filenames', () => {
+    const yamlA = makeEntry({ path: '/vault/a/file.yml', filename: 'file.yml', title: 'file.yml', fileKind: 'text' })
+    const yamlB = makeEntry({ path: '/vault/b/file.yml', filename: 'file.yml', title: 'file.yml', fileKind: 'text' })
+    const pdfA = makeEntry({ path: '/vault/a/document.pdf', filename: 'document.pdf', title: 'document.pdf', fileKind: 'binary' })
+    const pdfB = makeEntry({ path: '/vault/b/document.pdf', filename: 'document.pdf', title: 'document.pdf', fileKind: 'binary' })
+    const targetA = makeEntry({ path: '/vault/a/target.md', filename: 'target.md', title: 'Target' })
+    const targetB = makeEntry({ path: '/vault/b/target.md', filename: 'target.md', title: 'Target' })
+    const duplicateEntries = [yamlA, yamlB, pdfA, pdfB, targetA, targetB]
+
+    expect(resolveEntry(duplicateEntries, 'b/file.yml')).toBe(yamlB)
+    expect(resolveEntry(duplicateEntries, 'b/document.pdf')).toBe(pdfB)
+    expect(resolveEntry(duplicateEntries, 'b/target.md')).toBe(targetB)
+  })
+
   it('resolves workspace-prefixed targets inside the matching mounted workspace', () => {
     const personal = makeEntry({
       path: '/personal/projects/alpha.md',

@@ -101,7 +101,7 @@ interface ResolutionKey {
   workspaceAlias: string | null
   targetWithoutWorkspace: string
   lastSegment: string
-  pathSuffix: string | null
+  pathSuffixes: string[]
   humanizedTarget: string | null
 }
 
@@ -115,6 +115,10 @@ function buildResolutionKey(rawTarget: WikilinkTarget, knownWorkspaceAliases: Se
     : null
   const targetWithoutWorkspace = workspaceAlias ? segments.slice(1).join('/') : exactTarget
   const normalizedLocalTarget = targetWithoutWorkspace.toLowerCase()
+  const normalizedPathTarget = normalizedLocalTarget.replace(/^\/+/, '')
+  const pathSuffixes = normalizedPathTarget.includes('/')
+    ? [`/${normalizedPathTarget}`, ...normalizedPathTarget.endsWith('.md') ? [] : [`/${normalizedPathTarget}.md`]]
+    : []
   const lastSegment = targetWithoutWorkspace.includes('/') ? (targetWithoutWorkspace.split('/').pop() ?? targetWithoutWorkspace).toLowerCase() : normalizedLocalTarget
   const humanizedTarget = lastSegment.replace(/-/g, ' ')
 
@@ -123,7 +127,7 @@ function buildResolutionKey(rawTarget: WikilinkTarget, knownWorkspaceAliases: Se
     workspaceAlias,
     targetWithoutWorkspace: normalizedLocalTarget,
     lastSegment,
-    pathSuffix: targetWithoutWorkspace.includes('/') ? `/${normalizedLocalTarget}.md` : null,
+    pathSuffixes,
     humanizedTarget: humanizedTarget === normalizedLocalTarget ? null : humanizedTarget,
   }
 }
@@ -143,9 +147,8 @@ function prioritizeSourceWorkspace(entries: VaultEntry[], sourceEntry?: VaultEnt
 }
 
 function findEntryByPathSuffix(entries: VaultEntry[], resolutionKey: ResolutionKey): VaultEntry | undefined {
-  if (!resolutionKey.pathSuffix) return undefined
-  const { pathSuffix } = resolutionKey
-  return entries.find(entry => entry.path.toLowerCase().endsWith(pathSuffix))
+  if (resolutionKey.pathSuffixes.length === 0) return undefined
+  return entries.find(entry => resolutionKey.pathSuffixes.some(pathSuffix => entry.path.toLowerCase().endsWith(pathSuffix)))
 }
 
 function findEntryByFilename(entries: VaultEntry[], { exactTarget, targetWithoutWorkspace, lastSegment }: ResolutionKey): VaultEntry | undefined {
