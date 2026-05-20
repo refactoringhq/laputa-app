@@ -920,16 +920,18 @@ impl NoteListPane {
         self.filter_open = !self.filter_open;
         if self.filter_open && self.filter_input.is_none() {
             let input = cx.new(|cx| InputState::new(window, cx).placeholder("Filter notes…"));
-            let entity = cx.entity();
+            // GPUI's `Context::subscribe` wraps the event dispatch in
+            // `pane.update(cx, …)`, so the closure receives the pane
+            // as `&mut Self` *inside* the borrow.  Operate on that
+            // borrow directly — `cx.entity().update(…)` here would
+            // re-enter the slot lease and panic on the first
+            // keystroke (worklist 1.1 regression).
             cx.subscribe(
                 &input,
-                move |_pane, input: Entity<InputState>, event: &InputEvent, cx| {
+                move |pane, input: Entity<InputState>, event: &InputEvent, cx| {
                     if matches!(event, InputEvent::Change) {
-                        // Re-read the text from the input model synchronously.
-                        // We close over `entity` (the pane handle) so we can
-                        // call `set_filter` on ourselves.
                         let text = input.read(cx).value();
-                        entity.update(cx, |pane, cx| pane.set_filter(text, cx));
+                        pane.set_filter(text, cx);
                     }
                 },
             )
@@ -1594,6 +1596,65 @@ mod tests {
             .unwrap();
 
         // Trigger a render cycle to exercise the bulk-bar branch.
+        cx.run_until_parked();
+    }
+
+    /// Worklist 1.1 regression: clicking the search glyph and then
+    /// typing into the filter input must not panic.
+    ///
+    /// Root cause of the original crash: the subscription closure
+    /// installed by [`NoteListPane::toggle_filter_open`] used to
+    /// reach back to the pane handle via `cx.entity().update(…)`.
+    /// GPUI's [`gpui::Context::subscribe`] already wraps the event
+    /// dispatch in `pane.update(cx, …)`, so the closure ran *inside*
+    /// a mutable borrow of the pane entity — the nested
+    /// `entity.update(cx, …)` then re-borrowed the same slot and the
+    /// `EntityMap` slot-lease assertion panicked on the first
+    /// keystroke after opening the filter.  The fix is to operate
+    /// on the `&mut Self` the closure already receives.
+    #[gpui::test]
+    fn toggle_filter_open_then_type_does_not_panic(cx: &mut TestAppContext) {
+        install_theme(cx);
+        cx.update(|cx| cx.set_global(MockVault::seeded()));
+
+        let window = cx.add_window(|_window, cx| NoteListPane::from_mock(cx));
+
+        let input_entity = window
+            .update(cx, |pane, window, cx| {
+                pane.toggle_filter_open(window, cx);
+                assert!(pane.filter_open(), "first toggle must open the strip");
+                pane.filter_input
+                    .clone()
+                    .expect("toggle_filter_open must construct the filter input")
+            })
+            .unwrap();
+
+        // Simulate a keystroke by emitting `InputEvent::Change`
+        // directly from the input entity.  This is exactly what the
+        // live `InputState::replace_text_in_range` path does after a
+        // typed character, and it is the live panic trigger.
+        window
+            .update(cx, |_pane, _window, cx| {
+                input_entity.update(cx, |_state, cx| cx.emit(InputEvent::Change));
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        // Second toggle closes the strip; the cached input entity
+        // and its subscription must survive a close/reopen cycle.
+        window
+            .update(cx, |pane, window, cx| {
+                pane.toggle_filter_open(window, cx);
+                assert!(!pane.filter_open(), "second toggle must close the strip");
+                pane.toggle_filter_open(window, cx);
+                assert!(pane.filter_open(), "third toggle must reopen the strip");
+            })
+            .unwrap();
+        window
+            .update(cx, |_pane, _window, cx| {
+                input_entity.update(cx, |_state, cx| cx.emit(InputEvent::Change));
+            })
+            .unwrap();
         cx.run_until_parked();
     }
 
