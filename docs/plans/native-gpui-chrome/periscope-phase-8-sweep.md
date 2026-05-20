@@ -51,7 +51,7 @@ re-checks the windowed-app prerequisite; the permissions are on you.
 ## 2. One-command invocation
 
 ```sh
-bash scripts/periscope-phase-8-sweep.sh
+bash crates/periscope/tests/periscope-phase-8-sweep.sh
 ```
 
 The script:

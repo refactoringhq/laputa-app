@@ -15,7 +15,7 @@
 # (AGENTS.md §4 macOS / Tauri gotchas), so these stay manual.
 #
 # Usage:
-#   bash scripts/periscope-phase-8-sweep.sh
+#   bash crates/periscope/tests/periscope-phase-8-sweep.sh
 #
 # Env vars:
 #   TOLARIA_PROFILE   debug (default) or release. Release builds skip
