@@ -7,8 +7,8 @@
 //! WKWebView unchanged (ADR-0115 §6).
 
 use actions::{
-    EditCopy, EditCut, EditPaste, EditRedo, EditSelectAll, EditUndo, NewNote, OpenSettings, Quit,
-    Save,
+    CloseTab, CloseWindow, EditCopy, EditCut, EditPaste, EditRedo, EditSelectAll, EditUndo,
+    NewNote, OpenSettings, Quit, Save, ToggleInspector, ToggleSidebar,
 };
 use gpui::{Menu, MenuItem, OsAction};
 
@@ -47,6 +47,26 @@ pub fn app_menus() -> Vec<Menu> {
                 MenuItem::os_action("Select All", EditSelectAll, OsAction::SelectAll),
             ],
         },
+        // Standard macOS Window menu.  Routes window-affecting actions
+        // through AppKit's menu system so the dispatch reaches the
+        // focused window's first responder directly — avoids the
+        // `cx.active_window() → handle.update` lookup that occasionally
+        // races with a stale handle when the keymap fires before the
+        // window claims focus.  The same actions are also bound in the
+        // keymap (assets/default.json); both code paths share the
+        // global `cx.on_action` handlers installed in `main.rs`.
+        Menu {
+            name: "Window".into(),
+            disabled: false,
+            items: vec![
+                MenuItem::action("Close Window", CloseWindow),
+                MenuItem::action("Close Tab", CloseTab),
+                MenuItem::separator(),
+                MenuItem::action("Toggle Sidebar", ToggleSidebar),
+                MenuItem::separator(),
+                MenuItem::action("Toggle Inspector", ToggleInspector),
+            ],
+        },
     ]
 }
 
@@ -54,13 +74,14 @@ pub fn app_menus() -> Vec<Menu> {
 mod tests {
     use super::*;
 
-    /// Sanity-check the menu skeleton: three top-level menus with the expected
-    /// item counts. Mirrors `embed_poc/src/menus.rs` test.
+    /// Sanity-check the menu skeleton: four top-level menus with the expected
+    /// item counts.  Tolaria / File / Edit / Window — matches the standard
+    /// macOS menu-bar layout for a single-window editor.
     #[test]
-    fn app_menus_lists_app_file_and_edit_with_save_and_quit() {
+    fn app_menus_lists_app_file_edit_and_window_with_save_and_quit() {
         let menus = app_menus();
         let names: Vec<_> = menus.iter().map(|m| m.name.to_string()).collect();
-        assert_eq!(names, vec!["Tolaria", "File", "Edit"]);
+        assert_eq!(names, vec!["Tolaria", "File", "Edit", "Window"]);
 
         // App menu: just Quit.
         let app_menu = menus
@@ -89,6 +110,19 @@ mod tests {
             edit.items.len(),
             8,
             "Edit menu should hold Undo/Redo/sep/Cut/Copy/Paste/sep/SelectAll (8 entries)"
+        );
+
+        // Window menu: Close Window / Close Tab / sep / Toggle Sidebar /
+        // sep / Toggle Inspector = 6 entries.
+        let window = menus
+            .iter()
+            .find(|m| m.name == "Window")
+            .expect("app_menus() must include the Window menu");
+        assert_eq!(
+            window.items.len(),
+            6,
+            "Window menu should hold CloseWindow / CloseTab / sep / \
+             ToggleSidebar / sep / ToggleInspector (6 entries)"
         );
     }
 }

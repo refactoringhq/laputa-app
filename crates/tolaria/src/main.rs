@@ -216,6 +216,43 @@ mod macos {
         }
     }
 
+    /// Run `f` against any live Tolaria window — prefers
+    /// [`App::active_window`] but falls through to the first entry in
+    /// [`App::windows`] when the active handle no longer resolves.
+    /// Used by action handlers (e.g. `ToggleInspector`) whose dispatch
+    /// must not silently fail just because AppKit's focus tracker is
+    /// briefly out of sync with the App's live-window list (typically
+    /// right after a close-and-reopen cycle, which is what produced
+    /// the "ToggleInspector update failed: window not found" reports).
+    ///
+    /// `f` runs in the window's update context, so `Window`-typed
+    /// methods such as `Window::toggle_inspector` work directly.
+    fn dispatch_to_any_window<F>(label: &'static str, cx: &mut App, f: F)
+    where
+        F: FnOnce(gpui::AnyView, &mut gpui::Window, &mut App),
+    {
+        // Prefer the App's live-window registry over `active_window()`
+        // — the focus tracker can return a stale handle right after a
+        // close/reopen cycle (where `handle.update` returns `Err(
+        // "window not found")`), but `App::windows()` only holds the
+        // handles the App itself still considers live.  Fall back to
+        // the focus-tracker handle when the registry happens to be
+        // empty (shouldn't happen in normal Tolaria operation, but
+        // keeps the helper usable from tests or transient states).
+        let handle = cx
+            .windows()
+            .into_iter()
+            .next()
+            .or_else(|| cx.active_window());
+        let Some(handle) = handle else {
+            log::debug!("{label}: no live window available");
+            return;
+        };
+        if let Err(err) = handle.update(cx, f) {
+            log::error!("{label} dispatch failed: {err:#}");
+        }
+    }
+
     pub fn run() {
         env_logger::Builder::new()
             .filter_module("tolaria", log::LevelFilter::Info)
@@ -341,18 +378,20 @@ mod macos {
                 // inspector (always available in debug builds; in release
                 // builds gpui must be compiled with its `inspector` feature
                 // — see `~/.cargo/git/checkouts/zed-…/crates/gpui/Cargo.toml`).
-                //  No-op if the active window is gone (e.g. between close
-                //  and reopen), so dispatching the action is always safe.
+                //
+                // Robust dispatch: try `cx.active_window()` first, but
+                // fall back to iterating `cx.windows()` when the active
+                // handle no longer resolves.  Closing-and-reopening a
+                // window leaves `active_window()` briefly pointing at a
+                // stale handle that returns `Err("window not found")` on
+                // `handle.update`, which is what produced the spurious
+                // error reports.  Iterating the live window list bypasses
+                // the staleness window without depending on AppKit's
+                // focus tracking.
                 cx.on_action(|_: &actions::ToggleInspector, cx| {
-                    let Some(handle) = cx.active_window() else {
-                        log::warn!("ToggleInspector: no active window");
-                        return;
-                    };
-                    if let Err(err) =
-                        handle.update(cx, |_, window, app_cx| window.toggle_inspector(app_cx))
-                    {
-                        log::error!("ToggleInspector update failed: {err:#}");
-                    }
+                    dispatch_to_any_window("ToggleInspector", cx, |_, window, app_cx| {
+                        window.toggle_inspector(app_cx)
+                    });
                 });
 
                 // 7. Native menu bar (installed before window open so AppKit picks
