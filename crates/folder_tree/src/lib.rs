@@ -103,22 +103,71 @@ impl FolderTree {
 
     /// Build from the real `vault::Vault` global.
     ///
+    /// Consumes [`Vault::folders`] directly — Phase 8.11 surfaces a
+    /// pre-computed folder list on the vault so this builder no longer
+    /// has to `block_on` the per-note `Task` round-trips it previously
+    /// used to derive parent directories.
+    ///
     /// # Panics
     ///
     /// Panics if no `Vault` global is installed.  Use
     /// [`FolderTree::from_or_empty`] instead when uncertain.
     pub fn from_vault(cx: &mut App) -> Self {
-        let executor = cx.foreground_executor().clone();
         let vault = cx.global::<Vault>();
-        let vault_root = vault.root().to_path_buf();
-        let ids = executor.block_on(vault.notes());
-        let mut paths = Vec::with_capacity(ids.len());
-        for id in ids {
-            if let Some(note) = executor.block_on(vault.note(id)) {
-                paths.push(note.path.clone());
+        Self::from_folder_paths(vault.folders().iter().map(std::path::PathBuf::as_path))
+    }
+
+    /// Pure projection from an iterator of vault-root-relative folder
+    /// paths (no note paths needed).  Used by [`from_vault`] now that
+    /// the vault surfaces folder paths directly; exposed publicly so
+    /// tests can exercise the same shape without touching globals.
+    pub fn from_folder_paths<'a>(paths: impl IntoIterator<Item = &'a std::path::Path>) -> Self {
+        let mut unique: BTreeSet<String> = BTreeSet::new();
+        unique.insert(String::new());
+        for folder in paths {
+            // Add every prefix so a/b/c contributes ["a", "a/b", "a/b/c"].
+            let folder_str = folder.to_string_lossy();
+            let mut acc = String::new();
+            for segment in folder_str.split('/').filter(|s| !s.is_empty()) {
+                if !acc.is_empty() {
+                    acc.push('/');
+                }
+                acc.push_str(segment);
+                unique.insert(acc.clone());
             }
         }
-        Self::from_paths(paths.iter().map(std::path::PathBuf::as_path), &vault_root)
+        Self::from_unique_paths(unique)
+    }
+
+    /// Internal projection: take a sorted `BTreeSet` of folder paths
+    /// and produce the `FolderEntry` rows.  Shared by
+    /// [`from_paths`] and [`from_folder_paths`] so depth / label
+    /// derivation stays in one place.
+    fn from_unique_paths(unique: BTreeSet<String>) -> Self {
+        let folders = unique
+            .into_iter()
+            .map(|path| {
+                let depth = if path.is_empty() {
+                    0
+                } else {
+                    path.matches('/').count() + 1
+                };
+                let label = if path.is_empty() {
+                    SharedString::new_static("(root)")
+                } else {
+                    SharedString::from(path.rsplit('/').next().unwrap_or(&path).to_string())
+                };
+                FolderEntry {
+                    path: SharedString::from(path),
+                    depth,
+                    label,
+                }
+            })
+            .collect();
+        Self {
+            folders,
+            selected: None,
+        }
     }
 
     /// Build from the [`MockVault`] global.
@@ -144,13 +193,17 @@ impl FolderTree {
 
     /// Pure projection: take an iterator of note paths plus a vault
     /// root, and produce a sorted de-duplicated list of folder rows.
-    /// Used by [`from_vault`] / [`from_mock`] and exposed so tests can
-    /// drive the projection without touching globals.
+    /// Used by [`from_mock`] and exposed so tests can drive the
+    /// projection without touching globals.
+    ///
+    /// Prefer [`from_folder_paths`] when you already have the folder
+    /// list (e.g. from [`Vault::folders`]).
     pub fn from_paths<'a>(
         paths: impl IntoIterator<Item = &'a std::path::Path>,
         vault_root: &std::path::Path,
     ) -> Self {
         let mut unique: BTreeSet<String> = BTreeSet::new();
+        unique.insert(String::new());
         for note_path in paths {
             let relative = note_path
                 .strip_prefix(vault_root)
@@ -167,35 +220,8 @@ impl FolderTree {
                 acc.push_str(segment);
                 unique.insert(acc.clone());
             }
-            // The vault root itself is always present.
-            unique.insert(String::new());
         }
-
-        let folders = unique
-            .into_iter()
-            .map(|path| {
-                let depth = if path.is_empty() {
-                    0
-                } else {
-                    path.matches('/').count() + 1
-                };
-                let label = if path.is_empty() {
-                    SharedString::new_static("(root)")
-                } else {
-                    SharedString::from(path.rsplit('/').next().unwrap_or(&path).to_string())
-                };
-                FolderEntry {
-                    path: SharedString::from(path),
-                    depth,
-                    label,
-                }
-            })
-            .collect();
-
-        Self {
-            folders,
-            selected: None,
-        }
+        Self::from_unique_paths(unique)
     }
 
     /// All folder rows currently surfaced.  Test helper — production
@@ -324,6 +350,21 @@ mod tests {
             FolderTree::from_paths(paths.iter().map(PathBuf::as_path), std::path::Path::new(""));
         let paths: Vec<&str> = tree.folders().iter().map(|e| e.path.as_ref()).collect();
         assert_eq!(paths, ["", "a", "a/b", "a/c"]);
+    }
+
+    /// `from_folder_paths` accepts a vault-root-relative folder list
+    /// directly (Phase 8.11: `Vault::folders()` now provides this), so
+    /// `from_vault` doesn't have to `block_on` per-note `Task`s.
+    #[test]
+    fn from_folder_paths_builds_from_relative_folders() {
+        let folders = [
+            std::path::PathBuf::from("a"),
+            std::path::PathBuf::from("a/b"),
+            std::path::PathBuf::from("c"),
+        ];
+        let tree = FolderTree::from_folder_paths(folders.iter().map(std::path::PathBuf::as_path));
+        let paths: Vec<&str> = tree.folders().iter().map(|e| e.path.as_ref()).collect();
+        assert_eq!(paths, ["", "a", "a/b", "c"]);
     }
 
     /// Depth comes from segment count: `""` is depth 0, `"a"` is 1,

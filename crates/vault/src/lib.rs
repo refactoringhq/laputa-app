@@ -143,6 +143,13 @@ pub struct Vault {
     root: PathBuf,
     notes: HashMap<NoteId, Note>,
     next_id: u64,
+    /// Vault-root-relative paths of every directory below `root`,
+    /// sorted lexicographically.  Populated by `rescan_internal`.
+    folders: Vec<PathBuf>,
+    /// Vault-root-relative paths of every non-markdown file (images,
+    /// PDFs, plain catch-all).  Sorted lexicographically.  Populated by
+    /// `rescan_internal`.
+    assets: Vec<PathBuf>,
 }
 
 impl Global for Vault {}
@@ -163,6 +170,8 @@ impl Vault {
             root,
             notes: HashMap::new(),
             next_id: 0,
+            folders: Vec::new(),
+            assets: Vec::new(),
         };
         vault.rescan_internal()?;
         log::info!(
@@ -273,9 +282,40 @@ impl Vault {
         self.rescan_internal()
     }
 
+    /// Vault-root-relative directory paths discovered during the most
+    /// recent scan, in lexicographic order.  Empty for a freshly-opened
+    /// vault with no subdirectories.
+    ///
+    /// Cheap accessor over cached state — call freely.
+    #[must_use]
+    pub fn folders(&self) -> &[PathBuf] {
+        &self.folders
+    }
+
+    /// Vault-root-relative paths of every non-markdown file discovered
+    /// during the most recent scan, in lexicographic order.  Includes
+    /// recognised assets (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`,
+    /// `.svg`, `.pdf`) and any other arbitrary file the user keeps
+    /// alongside notes.
+    ///
+    /// Cheap accessor over cached state — call freely.
+    #[must_use]
+    pub fn assets(&self) -> &[PathBuf] {
+        &self.assets
+    }
+
     fn rescan_internal(&mut self) -> Result<()> {
-        let mut paths: Vec<PathBuf> = Vec::new();
-        walk_markdown(&self.root, 32, &mut |p| paths.push(p))?;
+        let mut scan = ScanResult::default();
+        walk_vault(&self.root, 32, &mut scan)?;
+        let ScanResult {
+            mut notes,
+            mut folders,
+            mut assets,
+        } = scan;
+        notes.sort();
+        folders.sort();
+        assets.sort();
+        let paths = notes;
 
         let mut old_by_path: HashMap<PathBuf, NoteId> = self
             .notes
@@ -324,6 +364,16 @@ impl Vault {
         }
 
         self.notes = new_notes;
+        // Make folder / asset paths vault-root-relative so consumers
+        // (folder_tree, asset browsers) don't have to strip the prefix.
+        self.folders = folders
+            .into_iter()
+            .filter_map(|p| p.strip_prefix(&self.root).ok().map(Path::to_path_buf))
+            .collect();
+        self.assets = assets
+            .into_iter()
+            .filter_map(|p| p.strip_prefix(&self.root).ok().map(Path::to_path_buf))
+            .collect();
         Ok(())
     }
 
@@ -345,13 +395,21 @@ impl Vault {
 // Internal: directory walker
 // ---------------------------------------------------------------------------
 
-fn walk_markdown(root: &Path, max_depth: usize, visit: &mut impl FnMut(PathBuf)) -> Result<()> {
-    fn recurse(
-        dir: &Path,
-        depth: usize,
-        max: usize,
-        visit: &mut impl FnMut(PathBuf),
-    ) -> Result<()> {
+/// Result of one [`walk_vault`] pass — keeps the three sibling lists
+/// in a single allocation so callers can destructure them cleanly.
+#[derive(Default)]
+struct ScanResult {
+    notes: Vec<PathBuf>,
+    folders: Vec<PathBuf>,
+    assets: Vec<PathBuf>,
+}
+
+/// Visit every entry under `root` (depth-limited).  Markdown files
+/// land in `out.notes`; subdirectories in `out.folders`; everything
+/// else in `out.assets`.  Hidden directories (`.git`, `.obsidian`, …)
+/// are skipped to avoid indexing tool metadata.
+fn walk_vault(root: &Path, max_depth: usize, out: &mut ScanResult) -> Result<()> {
+    fn recurse(dir: &Path, depth: usize, max: usize, out: &mut ScanResult) -> Result<()> {
         if depth > max {
             return Ok(());
         }
@@ -366,14 +424,32 @@ fn walk_markdown(root: &Path, max_depth: usize, visit: &mut impl FnMut(PathBuf))
                         continue;
                     }
                 }
-                recurse(&path, depth + 1, max, visit)?;
-            } else if file_type.is_file() && path.extension().is_some_and(|e| e == "md") {
-                visit(path);
+                out.folders.push(path.clone());
+                recurse(&path, depth + 1, max, out)?;
+            } else if file_type.is_file() {
+                if is_markdown_extension(&path) {
+                    out.notes.push(path);
+                } else {
+                    out.assets.push(path);
+                }
             }
         }
         Ok(())
     }
-    recurse(root, 0, max_depth, visit)
+    recurse(root, 0, max_depth, out)
+}
+
+/// Markdown extensions Tolaria treats as notes.  `.md` is the canonical
+/// form, `.markdown` is accepted so vaults imported from other editors
+/// don't lose entries.
+fn is_markdown_extension(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref(),
+        Some("md") | Some("markdown")
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -518,5 +594,56 @@ mod tests {
         let dir = tempdir().unwrap();
         let bogus = dir.path().join("does-not-exist");
         assert!(Vault::open_at(&bogus).is_err());
+    }
+
+    #[test]
+    fn surfaces_folders_and_assets() {
+        let dir = tempdir().unwrap();
+        write(dir.path(), "notes/a.md", "alpha");
+        write(dir.path(), "notes/sub/b.md", "beta");
+        write(dir.path(), "images/c.png", "fake-png");
+        write(dir.path(), "d.pdf", "fake-pdf");
+        write(dir.path(), "random.bin", "blob");
+        let v = Vault::open_at(dir.path()).unwrap();
+
+        let folders: Vec<&str> = v
+            .folders()
+            .iter()
+            .map(|p| p.to_str().unwrap_or_default())
+            .collect();
+        assert!(folders.contains(&"notes"), "folders: {folders:?}");
+        assert!(folders.contains(&"notes/sub"), "folders: {folders:?}");
+        assert!(folders.contains(&"images"), "folders: {folders:?}");
+
+        let assets: Vec<&str> = v
+            .assets()
+            .iter()
+            .map(|p| p.to_str().unwrap_or_default())
+            .collect();
+        assert!(assets.contains(&"images/c.png"), "assets: {assets:?}");
+        assert!(assets.contains(&"d.pdf"), "assets: {assets:?}");
+        assert!(assets.contains(&"random.bin"), "assets: {assets:?}");
+    }
+
+    #[test]
+    fn folders_and_assets_are_sorted() {
+        let dir = tempdir().unwrap();
+        write(dir.path(), "zeta/n.md", "x");
+        write(dir.path(), "alpha/n.md", "y");
+        write(dir.path(), "mango/n.md", "z");
+        write(dir.path(), "zzz.png", "p");
+        write(dir.path(), "aaa.pdf", "p");
+        let v = Vault::open_at(dir.path()).unwrap();
+        let mut folders = v.folders().to_vec();
+        let mut sorted_folders = folders.clone();
+        sorted_folders.sort();
+        assert_eq!(folders, sorted_folders, "folders must be sorted");
+        let mut assets = v.assets().to_vec();
+        let mut sorted_assets = assets.clone();
+        sorted_assets.sort();
+        assert_eq!(assets, sorted_assets, "assets must be sorted");
+        // Silence unused warnings on the `mut` bindings above.
+        folders.clear();
+        assets.clear();
     }
 }
