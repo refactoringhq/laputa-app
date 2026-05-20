@@ -464,7 +464,15 @@ mod macos {
                 //     empty workspace so the user can pick a vault later.
                 if let Some(path) = args.vault_path.as_ref() {
                     match Vault::open_at(path) {
-                        Ok(vault) => {
+                        Ok(mut vault) => {
+                            // Phase 8.11: wire the background executor so
+                            // subsequent reads / saves don't block the
+                            // foreground thread on disk IO.  The initial
+                            // scan above is intentionally sync — the app
+                            // can't render before the index exists, and
+                            // the scan cost is bounded by the demo vault
+                            // size (~30 notes).
+                            vault.set_executor(cx.background_executor().clone());
                             log::info!("--vault {path:?}: installed vault::Vault global");
                             cx.set_global(vault);
                         }

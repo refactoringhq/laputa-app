@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
-use gpui::{Global, SharedString, Task};
+use gpui::{App, BackgroundExecutor, Global, SharedString, Task};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -150,6 +150,13 @@ pub struct Vault {
     /// PDFs, plain catch-all).  Sorted lexicographically.  Populated by
     /// `rescan_internal`.
     assets: Vec<PathBuf>,
+    /// Background executor used by [`note_content`] and [`save`] to
+    /// move file IO off the foreground thread.  `None` for vaults
+    /// constructed through the legacy sync test path — those fall back
+    /// to inline synchronous IO via `Task::ready`.  Production builds
+    /// (`tolaria::main`) call [`set_executor`] before installing the
+    /// vault as a `Global` so chrome surfaces get true async reads.
+    background_executor: Option<BackgroundExecutor>,
 }
 
 impl Global for Vault {}
@@ -172,6 +179,7 @@ impl Vault {
             next_id: 0,
             folders: Vec::new(),
             assets: Vec::new(),
+            background_executor: None,
         };
         vault.rescan_internal()?;
         log::info!(
@@ -182,10 +190,42 @@ impl Vault {
         Ok(vault)
     }
 
+    /// Open a vault asynchronously, running the directory scan on
+    /// `cx.background_executor()` so the foreground thread isn't
+    /// blocked for large vaults.  The returned [`Task`] resolves to
+    /// the same shape as [`open_at`] — a ready [`Vault`] (already
+    /// equipped with the same background executor for subsequent
+    /// reads / saves) or an `anyhow::Error`.
+    ///
+    /// # Errors
+    ///
+    /// Resolves to an error if `root` cannot be canonicalised or
+    /// scanned.
+    pub fn open_at_async(root: PathBuf, cx: &App) -> Task<Result<Self>> {
+        let executor = cx.background_executor().clone();
+        let executor_for_vault = executor.clone();
+        executor.spawn(async move {
+            let mut vault = Self::open_at(&root)?;
+            vault.set_executor(executor_for_vault);
+            Ok(vault)
+        })
+    }
+
     /// Vault root directory (canonicalised).
     #[must_use]
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// Install a [`BackgroundExecutor`] so subsequent reads / saves
+    /// dispatch onto the background thread pool.
+    ///
+    /// Idempotent — overrides any executor set by a previous call.
+    /// `tolaria::main` calls this once at startup; tests typically
+    /// omit it so the legacy `Task::ready` shape keeps drive-by unit
+    /// tests deterministic.
+    pub fn set_executor(&mut self, executor: BackgroundExecutor) {
+        self.background_executor = Some(executor);
     }
 
     /// All note IDs in the vault.  Order is unspecified.
@@ -204,23 +244,50 @@ impl Vault {
         Task::ready(self.notes.get(&id).cloned())
     }
 
-    /// Read the on-disk body of a note.  Synchronous IO for MVP.
+    /// Read the on-disk body of a note.  When a background executor is
+    /// installed (see [`set_executor`]) the file read happens on the
+    /// background thread pool; otherwise it runs inline so legacy test
+    /// call sites continue to work without a `TestAppContext`.
     pub fn note_content(&self, id: NoteId) -> Task<Result<String, VaultError>> {
         let Some(note) = self.notes.get(&id) else {
             return Task::ready(Err(VaultError::NotFound(id)));
         };
         let path = note.path.clone();
-        let result = std::fs::read_to_string(&path).map_err(|source| VaultError::Io {
-            path: path.clone(),
-            source,
-        });
-        Task::ready(result)
+        match self.background_executor.as_ref() {
+            Some(executor) => executor.spawn(async move { read_to_string(&path) }),
+            None => Task::ready(read_to_string(&path)),
+        }
     }
 
     /// Persist `content` to a note's on-disk path and refresh its modified
-    /// timestamp + byte size.  Synchronous IO for MVP.
+    /// timestamp + byte size.  When a background executor is installed
+    /// the disk write runs on the background thread pool; otherwise it
+    /// runs inline so legacy test call sites continue to work.
+    ///
+    /// In the async path the in-memory metadata refresh is deferred to
+    /// the next [`rescan`] / fs-watcher tick — the disk write still
+    /// completes atomically before the returned [`Task`] resolves.
     pub fn save(&mut self, id: NoteId, content: &str) -> Task<Result<(), VaultError>> {
-        Task::ready(self.save_sync(id, content))
+        match self.background_executor.clone() {
+            Some(executor) => {
+                // Async path: schedule the write on the background
+                // pool.  Metadata refresh is deferred (the next
+                // rescan or the Phase 9.6 fs-watcher will pick up the
+                // new mtime / size).
+                let Some(note) = self.notes.get(&id) else {
+                    return Task::ready(Err(VaultError::NotFound(id)));
+                };
+                let path = note.path.clone();
+                let body = content.to_owned();
+                executor.spawn(async move { write_to_disk(&path, &body) })
+            }
+            None => {
+                // Sync path: write inline and refresh metadata
+                // immediately so tests that round-trip `save → read`
+                // see the new byte size without an extra rescan.
+                Task::ready(self.save_sync(id, content))
+            }
+        }
     }
 
     /// Synchronous body of [`save`] — exposed under `#[cfg(test)]` so unit
@@ -394,6 +461,28 @@ impl Vault {
 // ---------------------------------------------------------------------------
 // Internal: directory walker
 // ---------------------------------------------------------------------------
+
+/// Read a file's contents to a `String`, mapping IO failures into
+/// `VaultError::Io` with the path preserved for diagnostics.  Shared
+/// by the sync and async paths so both produce identical errors.
+fn read_to_string(path: &Path) -> Result<String, VaultError> {
+    std::fs::read_to_string(path).map_err(|source| VaultError::Io {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+/// Write a byte slice to `path`, mapping IO failures into
+/// `VaultError::Io` with the path preserved for diagnostics.  Used
+/// exclusively by the async [`Vault::save`] path; the sync path
+/// continues to call [`Vault::save_sync`] so it can also refresh
+/// in-memory metadata.
+fn write_to_disk(path: &Path, body: &str) -> Result<(), VaultError> {
+    std::fs::write(path, body).map_err(|source| VaultError::Io {
+        path: path.to_path_buf(),
+        source,
+    })
+}
 
 /// Result of one [`walk_vault`] pass — keeps the three sibling lists
 /// in a single allocation so callers can destructure them cleanly.
@@ -623,6 +712,62 @@ mod tests {
         assert!(assets.contains(&"images/c.png"), "assets: {assets:?}");
         assert!(assets.contains(&"d.pdf"), "assets: {assets:?}");
         assert!(assets.contains(&"random.bin"), "assets: {assets:?}");
+    }
+
+    #[gpui::test]
+    async fn open_at_async_runs_scan_off_thread(cx: &mut gpui::TestAppContext) {
+        let dir = tempdir().unwrap();
+        write(dir.path(), "a.md", "---\ntype: Note\n---\n# a\n");
+        write(dir.path(), "b.md", "no frontmatter");
+        let root = dir.path().to_path_buf();
+        let vault = cx
+            .update(|cx| Vault::open_at_async(root, cx))
+            .await
+            .expect("async open must succeed");
+        assert_eq!(vault.note_count(), 2);
+        // Async open installs the executor so subsequent reads go
+        // through the background pool.
+        assert!(
+            vault.background_executor.is_some(),
+            "open_at_async must set the background executor on the resolved vault"
+        );
+    }
+
+    #[gpui::test]
+    async fn async_note_content_round_trips(cx: &mut gpui::TestAppContext) {
+        let dir = tempdir().unwrap();
+        write(dir.path(), "n.md", "body content");
+        let root = dir.path().to_path_buf();
+        let vault = cx
+            .update(|cx| Vault::open_at_async(root, cx))
+            .await
+            .expect("async open must succeed");
+        let id = vault.note_ids_sync()[0];
+        let body = vault
+            .note_content(id)
+            .await
+            .expect("async read must succeed");
+        assert_eq!(body, "body content");
+    }
+
+    #[gpui::test]
+    async fn async_save_round_trips_through_disk(cx: &mut gpui::TestAppContext) {
+        let dir = tempdir().unwrap();
+        let path = write(dir.path(), "n.md", "old");
+        let root = dir.path().to_path_buf();
+        let mut vault = cx
+            .update(|cx| Vault::open_at_async(root, cx))
+            .await
+            .expect("async open must succeed");
+        let id = vault.note_ids_sync()[0];
+        vault
+            .save(id, "new content via async path")
+            .await
+            .expect("async save must succeed");
+        // Re-read directly off disk so we're not just observing the
+        // in-memory cache.
+        let on_disk = fs::read_to_string(&path).unwrap();
+        assert_eq!(on_disk, "new content via async path");
     }
 
     #[test]
