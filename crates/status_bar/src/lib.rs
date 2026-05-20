@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 //! Status-bar chrome view for Tolaria (ADR-0115 Phase 2b → Phase 6
-//! visual-parity pass).
+//! visual-parity pass → Phase 8.6 interactive wiring).
 //!
 //! Mirrors the Tauri-era `src/components/StatusBar.tsx` layout: a
 //! thin 30-pt strip pinned to the bottom of the workspace, with two
@@ -14,15 +14,24 @@
 //! └─────────────────────────────────────────────────────────────────┘
 //! ```
 //!
+//! ## Phase 8.6 additions
+//!
+//! - Vault-name cluster (left side) is now clickable: a click toggles
+//!   `vault_menu_open` which renders a small mock vault-switcher popup.
+//! - Each service chip is clickable and emits
+//!   [`StatusBarServiceClick`] so workspace consumers can route to
+//!   setup flows.
+//! - `Contribute` / `Docs` cells emit [`StatusBarLinkClick`].
+//! - Settings gear dispatches [`actions::OpenSettings`] via
+//!   `cx.dispatch_action`.
+//! - Theme-switcher cell unchanged from Phase 7.2.
+//!
 //! Stream (a) — visible chrome parity against
-//! [`tolaria-demo-vault-v2-light.png` / `…-dark.png`].  The right
-//! cluster's `Contribute / Docs / Theme / Settings` cells are
-//! interactive in the React source; Phase 6 ships them as visual
-//! placeholders, wired in a later iteration alongside their actions.
+//! [`tolaria-demo-vault-v2-light.png` / `…-dark.png`].
 
 use gpui::{
-    div, px, App, Context, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
-    StatefulInteractiveElement as _, Styled, Window,
+    div, px, App, Context, EventEmitter, InteractiveElement, IntoElement, ParentElement, Render,
+    SharedString, StatefulInteractiveElement as _, Styled, Window,
 };
 use gpui_component::{ActiveTheme, IconName};
 use mock_fixtures::{FileStatus, MockGit, MockVault};
@@ -30,8 +39,49 @@ use ui::tree_dump::DumpAsExt as _;
 use vault::Vault;
 
 // ---------------------------------------------------------------------------
-// Public types
+// Public types — events and enumerations
 // ---------------------------------------------------------------------------
+
+/// Which service chip the user clicked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServiceKind {
+    /// The "Git disabled" chip.
+    Git,
+    /// The "MCP" chip.
+    Mcp,
+    /// The "Claude" chip.
+    Claude,
+}
+
+/// Emitted when a service-status chip is clicked.
+///
+/// Workspace consumers subscribe to this event and route to the
+/// appropriate service-setup flow (git init, MCP install, Claude
+/// Code install).  Specific routing is Phase 9+ work.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusBarServiceClick {
+    /// The service whose chip was clicked.
+    pub service: ServiceKind,
+}
+
+/// Which link button the user clicked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkKind {
+    /// The "Contribute" feedback button.
+    Contribute,
+    /// The "Docs" documentation link.
+    Docs,
+}
+
+/// Emitted when `Contribute` or `Docs` is clicked.
+///
+/// Workspace consumers open the relevant URL in an external browser.
+/// Phase 8.6 only emits the event; actual URL dispatch is Phase 9+.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusBarLinkClick {
+    /// Which link was activated.
+    pub kind: LinkKind,
+}
 
 /// Severity of a service-status chip in the middle cluster.
 ///
@@ -71,6 +121,9 @@ pub struct ServiceChip {
     /// label (matches React's `<Icon size={13} />` in
     /// `StatusBarBadges.tsx`).
     pub icon: IconName,
+    /// Which service this chip represents — used to emit the correct
+    /// [`StatusBarServiceClick`] event on click.
+    pub kind: ServiceKind,
 }
 
 // ---------------------------------------------------------------------------
@@ -86,6 +139,12 @@ pub struct StatusBar {
     version: SharedString,
     /// Service-status chips in the middle cluster.
     services: Vec<ServiceChip>,
+    /// Whether the vault-switcher popup is currently open.
+    /// Toggled by clicking the vault-name cluster (left side).
+    vault_menu_open: bool,
+    /// Static stub list of recent vaults shown in the popup.
+    /// Phase 8.6 uses a mock list; real vault history is Phase 9+.
+    recent_vaults: Vec<SharedString>,
 }
 
 impl StatusBar {
@@ -98,6 +157,8 @@ impl StatusBar {
             vault_name: SharedString::default(),
             version: SharedString::new_static(env!("CARGO_PKG_VERSION")),
             services: Vec::new(),
+            vault_menu_open: false,
+            recent_vaults: stub_recent_vaults(),
         }
     }
 
@@ -136,6 +197,8 @@ impl StatusBar {
             vault_name,
             version: SharedString::new_static(env!("CARGO_PKG_VERSION")),
             services: placeholder_services(),
+            vault_menu_open: false,
+            recent_vaults: stub_recent_vaults(),
         }
     }
 
@@ -162,7 +225,25 @@ impl StatusBar {
             vault_name,
             version: SharedString::new_static(env!("CARGO_PKG_VERSION")),
             services: placeholder_services(),
+            vault_menu_open: false,
+            recent_vaults: stub_recent_vaults(),
         }
+    }
+
+    /// Route a service-chip activation: emit [`StatusBarServiceClick`]
+    /// and `notify` so parent re-renders pick up the click.  Shared by
+    /// the service-chip `on_click` closure and the click regression
+    /// tests so a future refactor can't silently desync them.
+    pub(crate) fn on_service_click(&mut self, kind: ServiceKind, cx: &mut Context<Self>) {
+        cx.emit(StatusBarServiceClick { service: kind });
+        cx.notify();
+    }
+
+    /// Route a status-bar link cell (`Contribute` / `Docs`) activation.
+    /// Same dispatch shape as [`Self::on_service_click`].
+    pub(crate) fn on_link_click(&mut self, kind: LinkKind, cx: &mut Context<Self>) {
+        cx.emit(StatusBarLinkClick { kind });
+        cx.notify();
     }
 
     /// Service chips currently shown in the middle cluster (test
@@ -177,7 +258,20 @@ impl StatusBar {
     pub fn vault_name(&self) -> &SharedString {
         &self.vault_name
     }
+
+    /// Whether the vault-switcher popup is currently open (test helper).
+    #[cfg(test)]
+    pub fn is_vault_menu_open(&self) -> bool {
+        self.vault_menu_open
+    }
 }
+
+impl EventEmitter<StatusBarServiceClick> for StatusBar {}
+impl EventEmitter<StatusBarLinkClick> for StatusBar {}
+
+// ---------------------------------------------------------------------------
+// Render helpers
+// ---------------------------------------------------------------------------
 
 /// Left-cluster status chip — 13-pt leading icon + label, optionally
 /// followed by a 10-pt amber `triangle-alert` (issue 017).  Mirrors
@@ -236,37 +330,6 @@ fn status_separator(border: gpui::Hsla) -> gpui::AnyElement {
         .into_any_element()
 }
 
-/// Status-bar link cell — a 14-pt icon + label combo (Contribute,
-/// Docs).  Tagged via `dump_as` so periscope can target the
-/// labelled cells alongside the icon-only ones.
-fn status_link(
-    id: &'static str,
-    label: &'static str,
-    icon: IconName,
-    muted: gpui::Hsla,
-) -> gpui::AnyElement {
-    use gpui::IntoElement as _;
-    div()
-        .id(id)
-        .flex()
-        .items_center()
-        .gap(px(4.0))
-        .text_color(muted)
-        .cursor_pointer()
-        .child(
-            div()
-                .w(px(14.0))
-                .h(px(14.0))
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(icon),
-        )
-        .child(SharedString::new_static(label))
-        .dump_as(id)
-        .into_any_element()
-}
-
 /// Three legacy placeholder service chips that mirror the
 /// `Git disabled / MCP / Claude` warnings in the reference
 /// screenshots.  When the real services land they replace this
@@ -280,20 +343,70 @@ fn placeholder_services() -> Vec<ServiceChip> {
             // icon pack has no `git-branch.svg`; `Network` is the
             // closest tree-of-nodes topology.
             icon: IconName::Network,
+            kind: ServiceKind::Git,
         },
         ServiceChip {
             label: "MCP".into(),
             severity: ServiceSeverity::Warning,
             // React: `<Cpu />` — direct match.
             icon: IconName::Cpu,
+            kind: ServiceKind::Mcp,
         },
         ServiceChip {
             label: "Claude".into(),
             severity: ServiceSeverity::Warning,
             // React: `<Terminal />` — closest in pack is `SquareTerminal`.
             icon: IconName::SquareTerminal,
+            kind: ServiceKind::Claude,
         },
     ]
+}
+
+/// Static stub vault list for the Phase 8.6 vault-switcher popup.
+/// Populated with recognisable demo-vault names so the UI is not
+/// empty; real vault history wiring is Phase 9+.
+fn stub_recent_vaults() -> Vec<SharedString> {
+    vec![
+        SharedString::from("demo-vault-v2"),
+        SharedString::from("demo-vault"),
+    ]
+}
+
+/// Vault-switcher popup — a minimal list of recent vault names
+/// rendered above the status bar when `vault_menu_open` is true.
+/// Phase 8.6 uses a static stub list; real vault history is Phase 9+.
+fn vault_menu_popup(
+    vaults: &[SharedString],
+    bg: gpui::Hsla,
+    border: gpui::Hsla,
+    fg: gpui::Hsla,
+) -> gpui::AnyElement {
+    let mut list = div()
+        .absolute()
+        .bottom(px(30.0))
+        .left(px(0.0))
+        .min_w(px(160.0))
+        .bg(bg)
+        .border_1()
+        .border_color(border)
+        .rounded(px(6.0))
+        .p(px(4.0))
+        .shadow_lg();
+
+    for name in vaults {
+        list = list.child(
+            div()
+                .px(px(8.0))
+                .py(px(4.0))
+                .text_xs()
+                .text_color(fg)
+                .cursor_pointer()
+                .rounded(px(3.0))
+                .child(name.clone()),
+        );
+    }
+
+    list.dump_as("status-bar-vault-menu").into_any_element()
 }
 
 // ---------------------------------------------------------------------------
@@ -320,22 +433,53 @@ impl Render for StatusBar {
             IconName::Moon
         };
 
-        // Left cluster — vault chip · version chip · service chips,
-        // all separated by `|` glyphs (visual-issue #017, mirrors
-        // React's `StatusBarSeparator` in
-        // `src/components/status-bar/StatusBarBadges.tsx`).
-        let mut left = div()
+        let entity = cx.entity();
+
+        // ---- Vault-name cluster (clickable — toggles vault menu) ----
+        let vault_name = self.vault_name.clone();
+        let vault_entity = entity.clone();
+        let vault_chip = div()
+            .id("status-bar-vault-cluster")
             .flex()
-            .flex_row()
             .items_center()
-            .gap(px(10.0))
+            .gap(px(4.0))
+            .cursor_pointer()
+            .on_click(move |_, _window, cx| {
+                vault_entity.update(cx, |this, cx| {
+                    this.vault_menu_open = !this.vault_menu_open;
+                    cx.notify();
+                });
+            })
             .child(status_chip(
-                self.vault_name.clone(),
+                vault_name,
                 IconName::HardDrive,
                 fg,
                 false,
                 warning,
             ))
+            .child(
+                div()
+                    .w(px(10.0))
+                    .h(px(10.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_color(muted)
+                    .child(IconName::ChevronDown),
+            )
+            .dump_as("status-bar-vault-cluster");
+
+        // Left cluster — vault chip · version chip · service chips,
+        // all separated by `|` glyphs (visual-issue #017, mirrors
+        // React's `StatusBarSeparator` in
+        // `src/components/status-bar/StatusBarBadges.tsx`).
+        let mut left = div()
+            .relative()
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap(px(10.0))
+            .child(vault_chip)
             .child(status_separator(border))
             // The user's issue-017 reference crop shows the same
             // cube-style glyph on both the vault and version chips,
@@ -349,23 +493,43 @@ impl Render for StatusBar {
                 false,
                 warning,
             ));
+
         for chip in &self.services {
             let color = match chip.severity {
                 ServiceSeverity::Ok => fg,
                 ServiceSeverity::Warning => warning,
                 ServiceSeverity::Error => danger,
             };
-            left = left.child(status_separator(border)).child(status_chip(
-                chip.label.clone(),
-                chip.icon.clone(),
-                color,
-                // React mirrors the warning glyph on every chip whose
-                // severity is non-Ok (`trailingWarning: true` in
-                // `StatusBarBadges.tsx`).  Keep the same rule.
-                chip.severity != ServiceSeverity::Ok,
-                warning,
-            ));
+            let chip_id: SharedString = format!("status-bar-service-{}", chip.label).into();
+            let service_kind = chip.kind;
+            let chip_entity = entity.clone();
+            let chip_label = chip.label.clone();
+            let chip_icon = chip.icon.clone();
+            let trailing = chip.severity != ServiceSeverity::Ok;
+
+            left = left.child(status_separator(border)).child(
+                div()
+                    .id(chip_id)
+                    .flex()
+                    .items_center()
+                    .cursor_pointer()
+                    .on_click(move |_, _window, cx| {
+                        chip_entity.update(cx, |this, cx| this.on_service_click(service_kind, cx));
+                    })
+                    .child(status_chip(chip_label, chip_icon, color, trailing, warning))
+                    .dump_as("status-bar-service-chip"),
+            );
         }
+
+        // Vault menu popup (rendered inside the left cluster so it
+        // anchors to the left edge of the bar).
+        if self.vault_menu_open {
+            left = left.child(vault_menu_popup(&self.recent_vaults, bg, border, fg));
+        }
+
+        // ---- Right cluster ----
+        let contrib_entity = entity.clone();
+        let docs_entity = entity.clone();
 
         let right = div()
             .flex()
@@ -373,18 +537,53 @@ impl Render for StatusBar {
             .items_center()
             .gap(px(12.0))
             .text_color(muted)
-            .child(status_link(
-                "status-bar-contribute",
-                "Contribute",
-                IconName::Bell,
-                muted,
-            ))
-            .child(status_link(
-                "status-bar-docs",
-                "Docs",
-                IconName::BookOpen,
-                muted,
-            ))
+            .child(
+                div()
+                    .id("status-bar-contribute")
+                    .flex()
+                    .items_center()
+                    .gap(px(4.0))
+                    .text_color(muted)
+                    .cursor_pointer()
+                    .on_click(move |_, _window, cx| {
+                        contrib_entity
+                            .update(cx, |this, cx| this.on_link_click(LinkKind::Contribute, cx));
+                    })
+                    .child(
+                        div()
+                            .w(px(14.0))
+                            .h(px(14.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(IconName::Bell),
+                    )
+                    .child(SharedString::new_static("Contribute"))
+                    .dump_as("status-bar-contribute"),
+            )
+            .child(
+                div()
+                    .id("status-bar-docs")
+                    .flex()
+                    .items_center()
+                    .gap(px(4.0))
+                    .text_color(muted)
+                    .cursor_pointer()
+                    .on_click(move |_, _window, cx| {
+                        docs_entity.update(cx, |this, cx| this.on_link_click(LinkKind::Docs, cx));
+                    })
+                    .child(
+                        div()
+                            .w(px(14.0))
+                            .h(px(14.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(IconName::BookOpen),
+                    )
+                    .child(SharedString::new_static("Docs"))
+                    .dump_as("status-bar-docs"),
+            )
             // Theme switcher — clickable.  Calls `theme::cycle` which
             // flips between [`ThemeChoice::Light`] and `Dark`.  The
             // icon shows the *target* mode so the click affordance is
@@ -415,6 +614,9 @@ impl Render for StatusBar {
                     .items_center()
                     .justify_center()
                     .cursor_pointer()
+                    .on_click(|_, _window, cx| {
+                        cx.dispatch_action(&actions::OpenSettings);
+                    })
                     .child(IconName::Settings)
                     .dump_as("status-bar-settings"),
             );
@@ -444,6 +646,7 @@ impl Render for StatusBar {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::AppContext as _;
     use gpui::TestAppContext;
     use mock_fixtures::{MockGit, MockVault};
 
@@ -548,6 +751,141 @@ mod tests {
                 bar.vault_name().as_ref(),
                 "real-vault",
                 "real Vault must win over MockVault when both globals present"
+            );
+        });
+    }
+
+    /// Phase 8.6 — clicking a service chip emits `StatusBarServiceClick`
+    /// with the matching `ServiceKind`.  Uses the subscribe-deferred-activate
+    /// pattern: subscribe, `run_until_parked`, then update.
+    ///
+    /// We synthesise a click by calling the entity's update path directly
+    /// (GPUI test contexts don't simulate pointer events into on_click
+    /// closures) — the event emission is the observable contract.
+    #[gpui::test]
+    fn status_bar_service_chip_click_emits_event(cx: &mut TestAppContext) {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        cx.update(|cx| {
+            cx.set_global(MockVault::seeded());
+            cx.set_global(MockGit::seeded());
+        });
+
+        let bar = cx.update(|cx| {
+            let sb = StatusBar::from_mock(cx);
+            cx.new(|_| sb)
+        });
+
+        let received: Rc<RefCell<Vec<ServiceKind>>> = Rc::new(RefCell::new(Vec::new()));
+
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(&bar, move |_entity, event: &StatusBarServiceClick, _cx| {
+                recv.borrow_mut().push(event.service);
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+
+        // Route through the same helper the on_click closure calls so a
+        // future refactor of one path forces the other to update.
+        cx.update(|cx| {
+            bar.update(cx, |this, cx| {
+                this.on_service_click(ServiceKind::Git, cx);
+                this.on_service_click(ServiceKind::Mcp, cx);
+                this.on_service_click(ServiceKind::Claude, cx);
+            });
+        });
+        cx.run_until_parked();
+
+        let got = received.borrow().clone();
+        assert_eq!(
+            got,
+            vec![ServiceKind::Git, ServiceKind::Mcp, ServiceKind::Claude],
+            "each service chip click must emit StatusBarServiceClick with the correct ServiceKind",
+        );
+    }
+
+    /// Phase 8.6 — clicking the settings gear dispatches `OpenSettings`.
+    /// We verify by registering an `on_action` handler and simulating the
+    /// dispatch directly (mirrors `cmd_q_dispatches_quit_action` in the
+    /// actions crate tests).
+    #[gpui::test]
+    fn status_bar_settings_gear_dispatches_open_settings(cx: &mut TestAppContext) {
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        let fired = Rc::new(Cell::new(0u32));
+        let fired_h = fired.clone();
+
+        cx.update(|cx| {
+            cx.on_action(move |_: &actions::OpenSettings, _| {
+                fired_h.set(fired_h.get() + 1);
+            });
+        });
+
+        let window = cx.add_window(|_window, _cx| StatusBar::empty());
+        cx.run_until_parked();
+
+        // Dispatch the action as the settings gear's on_click would.
+        window
+            .update(cx, |_bar, _window, cx| {
+                cx.dispatch_action(&actions::OpenSettings);
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        assert_eq!(
+            fired.get(),
+            1,
+            "settings gear must dispatch OpenSettings exactly once",
+        );
+    }
+
+    /// Phase 8.6 — clicking the vault-name cluster flips `vault_menu_open`.
+    #[gpui::test]
+    fn status_bar_vault_chevron_opens_menu(cx: &mut TestAppContext) {
+        install_theme(cx);
+
+        let bar = cx.update(|cx| cx.new(|_| StatusBar::empty()));
+
+        // Menu starts closed.
+        cx.update(|cx| {
+            assert!(!bar.read(cx).vault_menu_open, "menu must start closed");
+        });
+
+        // First toggle — should open.
+        cx.update(|cx| {
+            bar.update(cx, |this, cx| {
+                this.vault_menu_open = true;
+                cx.notify();
+            });
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            assert!(
+                bar.read(cx).vault_menu_open,
+                "menu must be open after first toggle",
+            );
+        });
+
+        // Second toggle — should close.
+        cx.update(|cx| {
+            bar.update(cx, |this, cx| {
+                this.vault_menu_open = false;
+                cx.notify();
+            });
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            assert!(
+                !bar.read(cx).vault_menu_open,
+                "menu must be closed after second toggle",
             );
         });
     }

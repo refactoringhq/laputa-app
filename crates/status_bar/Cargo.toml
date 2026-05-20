@@ -8,6 +8,7 @@ publish = false
 description = "Status-bar chrome view for Tolaria (ADR-0115 Phase 2b)."
 
 [dependencies]
+actions = { path = "../actions" }
 gpui.workspace = true
 gpui-component.workspace = true
 mock_fixtures = { path = "../mock_fixtures" }
