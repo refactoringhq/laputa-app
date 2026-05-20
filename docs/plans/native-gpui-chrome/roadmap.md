@@ -209,6 +209,7 @@ criteria):**
 User driven feedback gate for new surfaces implemented in Phase 8
 
 Use `phase-8-issues.md` as a follow-up task list shared with the user.
+Mark completed items as ✅ with a link to the commit.
 
 **Exit criteria:**
 

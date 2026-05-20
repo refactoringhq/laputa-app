@@ -16,9 +16,8 @@ across sessions.
 
 | File | Purpose |
 |------|---------|
-| [`roadmap.md`](roadmap.md) | **Single canonical phase order.**  Shipped phases 0–6 (MVP cut) + active Phase 7 (visual fidelity) + planned 8 (modal chrome) / 9 (services) / 10 (parity). |
+| [`roadmap.md`](roadmap.md) | Single canonical phase order |
 | [`progress.md`](progress.md) | Running ledger — per-phase commit refs, test counts, key API decisions.  Mirrors `roadmap.md`'s numbering. |
-| [`mvp-scope.md`](mvp-scope.md) | What "MVP" meant: open a local vault, navigate notes, render + save in the editor.  Now an immutable historical reference — MVP shipped at `9509f092`. |
 | [`components.md`](components.md) | Per-component visual + behavioural spec.  Reference screenshots, React-source mapping, per-crate visual contracts.  Authoritative for every chrome surface's look and behaviour in every phase. |
 | [`process.md`](process.md) | Crate naming, branch policy, per-iteration verification loop, phase-boundary sweep, hard rules.  Workflow invariants applied throughout. |
 | [`e2e-harness.md`](e2e-harness.md) | Periscope screenshot + click harness (`screenshot` / `watch` / `click` / `click-id` / `dump-tree` / `list`) plus the SIGUSR1 tree-dump IPC contract. |

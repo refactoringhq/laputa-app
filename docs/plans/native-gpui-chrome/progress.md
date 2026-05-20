@@ -36,9 +36,10 @@ spec lives in [`components.md`](components.md).
 | 7.9 — WKWebView editor-body dark-mode CSS | ✅ done | `897091bf` | (222) | `editor-host/style.css` gains `--fg-muted`, `caret-color`, italic placeholder, `color-mix(...)` selection; `NoteItem::set_theme` propagates via `document.documentElement.dataset.theme` (no `tolariaBridge` Ready dependency); `tolaria/main.rs` observes `gpui_component::theme::Theme` and broadcasts. |
 | 7.10 — Visual-issue QA wave | ✅ done | `6b92a6ba` → `3c70b6b9` | (~234) | Periscope-driven interactive QA loop catalogued and closed visual deltas #001–#021 in their own per-issue commits.  Final per-issue rundown in the [Phase 7 follow-up](#phase-7-follow-up--visual-issue-qa-wave) table below; full diagnostic notes in [`visual-issues.md`](visual-issues.md). |
 | **✅ Phase 7 complete** | shipped at `3c70b6b9` | ~234 | Visual fidelity baseline (`897091bf`) plus 21 closed visual issues.  The `embed_poc` spike is no longer load-bearing — schedule removal under Phase 7 close-out. |
-| 8.x — Behavioral fidelity pass (Strand A — stub completion) | ⏳ in progress (12 of 14 done) | `fa3267b4` (8.1), `2271f925` (8.2), `ce3af214` (8.3), `b830c42d` (8.4), `62b3beae` (8.5), `0fbe3568` (8.6), `3dad69ce` (8.7), `88afa9f7` (8.8), `c876ce8b` (8.9), `333bbc92` (8.10), `97487dce` (8.12), `95b1ee4b` (8.13 modal subset), `66014021` (8.14 scaffold), `a98cdfcd` (8.23) | (folded into 240+) | Wired interactions land per crate.  Pending: 8.11 vault async + fs-watcher; remaining 8.13 pieces (pane resize / tab close-drag); 8.14 real editable controls (Phase 9-blocked).  Action `Save` / `NewNote` / `OpenSettings` / `QuickOpen` / `CommandPalette` are still `log_stub` placeholders — wired by Phase 9.1 `command_registry` + Phase 8.11 + Phase 8.14 + Phase 11.x. |
-| 8.x — Behavioral fidelity pass (Strand B — missing surfaces) | ⏳ in progress (3 of 8 crates) | `13421226` (8.17), `481c89ab` (8.18), `3111ed89` (8.20) | (folded into 261) | New crates shipped: `folder_tree`, `filter_builder`, `note_retargeting`.  Pending: `frontmatter_panel` (8.15), `raw_editor` (8.16), `workspace_switcher` (8.19), `rendering_primitives` (8.21), `onboarding_prompts` (8.22).  Each follows the `from_or_empty` + `from_mock` pattern set by `folder_tree`. |
-| 8.x — Behavioral fidelity pass (Strand C — editor-host body parity) | ⏳ planned | — | — | Lift the BlockNote + CodeMirror carry-over from `src/components/blockNote*.ts` / `src/extensions/*` / `src/components/useEditor*.ts` into `editor-host/`, replacing the Phase-4b `<textarea>` MVP.  Rows 8.24 BlockNote core mount; 8.25 slash/side/formatting menus + hover guards; 8.26 wikilink suggestion + link-click + cursor target; 8.27 IME composition + render-recovery + transform-error guard; 8.28 code-block control / table handles / copy compatibility / checklist regression carry-over; 8.29 CodeMirror raw-mode fallback embedded in the host (coordinates with Strand B 8.16); 8.30 editor lifecycle hooks — mode/tab-swap/focus/save/memory-probe. |
+| 8.x — Behavioral fidelity pass (Strand A — stub completion) | ✅ done (14 of 14) | `fa3267b4` (8.1), `2271f925` (8.2), `ce3af214` (8.3), `b830c42d` (8.4), `62b3beae` (8.5), `0fbe3568` (8.6), `3dad69ce` (8.7), `88afa9f7` (8.8), `c876ce8b` (8.9), `333bbc92` (8.10), `07c7ec7f` / `dbf8c00f` / `c65ac9de` / `aad8dbbb` (8.11.1–8.11.4), `97487dce` (8.12), `95b1ee4b` + `6470e304` (8.13), `66014021` (8.14 scaffold), `a98cdfcd` (8.23) | (folded into 271+) | Wired interactions land per crate.  8.11 vault gains frontmatter parser, folder/asset surfacing, background executor, and notify-based fs-watcher (4 sub-rows).  8.13 completes with pane resize observer + tab close/reorder events.  8.14 ships the structured per-tab scaffold; real editable controls remain Phase 9-blocked.  Action `Save` / `NewNote` / `OpenSettings` / `QuickOpen` / `CommandPalette` stay `log_stub` placeholders — wired by Phase 9.1 `command_registry` + Phase 8.14 follow-ups + Phase 11.x. |
+| 8.x — Behavioral fidelity pass (Strand B — missing surfaces) | ✅ done (8 of 8 crates) | `13421226` (8.17), `ef520117` (8.15), `65d6ec71` (8.16), `481c89ab` (8.18), `af7d3e14` (8.19), `3111ed89` (8.20), `cfdfc5e4` (8.21), `6190d076` (8.22) | (folded into 271+) | New crates shipped: `folder_tree`, `frontmatter_panel`, `raw_editor`, `filter_builder`, `workspace_switcher`, `note_retargeting`, `rendering_primitives`, `onboarding_prompts`.  Each follows the `from_or_empty` + `from_mock` pattern set by `folder_tree`. |
+| 8.x — Behavioral fidelity pass (Strand C — editor-host body parity) | ✅ done (7 of 7) | `4c7998e7` (8.24), `fa1aae40` (8.25), `0d871de4` (8.26), `7afa7072` (8.27), `48cddd2b` (8.28), `63c79224` (8.29), `1e1f77ac` (8.30) | (folded into 271+; vitest 0 → 271) | BlockNote + CodeMirror carry-over from `src/components/blockNote*.ts` / `src/extensions/*` / `src/components/useEditor*.ts` into `editor-host/`, replacing the Phase-4b `<textarea>` MVP.  Bundle 3.95 kB → 2.26 MiB (~580× — see [Bundle-size record](#bundle-size-record-phase-8-close-out) below).  Two bridge gaps stubbed for Phase 9/10 follow-up — see [`phase-8-issues.md`](phase-8-issues.md#bridge-gaps).  Zero new `ToHost` / `FromHost` variants this phase. |
+| **✅ Phase 8 complete** | shipped at `1e1f77ac` (Strand C tail) + `6190d076` (Strand B tail) + `aad8dbbb` (Strand A tail) | 271+ | All 30 rows landed across Strand A (14), Strand B (8), Strand C (7), plus Strand A 8.13 modal subset and 8.14 scaffold.  Editor-host vitest suite grew from 0 → 271 over Strand C; workspace + crate tests grew from ~261 → ~271+ over Strand A.  Two bridge-envelope gaps logged for Phase 9/10 follow-up.  Phase 8 visual issues catalogued in [`phase-8-issues.md`](phase-8-issues.md). |
 | 9.x — Behavioral layers | ⏳ planned | — | — | `command_registry`, `nav_history`, `multi_select`, `dialog_stack`, `auto_git`, `vault_lifecycle`, `telemetry_pipeline` (9.1–9.7). |
 | 10.x — Service expansion | ⏳ planned | — | — | `git_provider`, `vault_search`, `vault_watcher` (advanced), `cli_agents`, `mcp_bridge`, `telemetry`, `app_updater`, `localization`, `vault_registry`, `window_state`, `native_text_assistance`, `settings_panel` persistence. |
 | 11.x — Modal chrome surfaces | ⏳ planned | — | — | `command_palette`, `quick_open`, `dialogs`, `wikilink_inputs`, `image_lightbox`, `emoji_picker`, `startup` (one task per crate). |
@@ -371,6 +372,313 @@ Final fix `5b3e475d`:
 
 Runtime verified — live window resize and splitter drag no longer
 expose the trailing `theme.background` strip.
+
+---
+
+### Phase 8 — Behavioral fidelity pass
+
+All 30 rows landed across three parallel strands (Strand A — stub
+completion; Strand B — missing surfaces; Strand C — editor-host body
+parity).  Per-row entries below.  Visual-issue follow-ups live in
+[`phase-8-issues.md`](phase-8-issues.md).
+
+#### Bundle-size record (Phase 8 close-out)
+
+The `editor-host/` single-file bundle is `include_str!()`-embedded by
+`crates/note_item`; every byte ships in the macOS app and is parsed
+on every fresh `WKWebView` instance.  Strand C lifts BlockNote +
+React 19 + ProseMirror + emoji-mart + CodeMirror 6 + yaml/json/css
+language packs into the bundle.
+
+| Milestone | Bundle (uncompressed) | Notes |
+|-----------|-----------------------|-------|
+| Phase 4b baseline | **~3.95 kB** | `<textarea>` MVP, `src/bridge.ts` + `src/editor.ts` only |
+| Phase 8.24 (BlockNote mount) | **1.79 MiB** | First real editor mount — past the ~20 kB heuristic from the [Strand C verification gate](roadmap.md#strand-c--editor-host-body-parity-blocknote--codemirror-carry-over); record per the roadmap rule |
+| Phase 8.25 | **~1.86 MiB** | Slash / side / formatting menus (+~70 KiB) |
+| Phase 8.26 | ~1.86 MiB | Wikilink suggestion + link activation (no measurable delta) |
+| Phase 8.27 | ~1.87 MiB | IME composition + render-recovery + transform-error guard (+6,979 B) |
+| Phase 8.28 | ~1.87 MiB | Byte-identical: regressions ship via pnpm `patchedDependencies` mirroring React-side BlockNote patches; no new runtime code |
+| Phase 8.29 | **2.17 MiB** | CodeMirror raw-mode fallback (+373 KiB: markdown/frontmatter highlight, zoom cursor fix, find bar, raw editor utils) |
+| Phase 8.30 | **2.26 MiB** | Editor lifecycle hooks (+88 KiB: mode/tab-swap/focus/save/memory-probe) |
+| **Phase 8 close** | **2.26 MiB** (gzip ~675 kB) | **~580× growth** over Phase 4b baseline |
+
+**Driver:** BlockNote core + React 19 + ProseMirror + emoji-mart +
+CodeMirror 6 + yaml/json/css language packs.  Every Strand C row
+records its bundle delta in the per-row entry below; future
+editor-host work must keep recording the delta so startup-cost
+regressions stay visible.
+
+#### Strand A — stub completion (this-session rows)
+
+Earlier-session Strand A rows (8.1–8.10, 8.12, 8.13 modal subset,
+8.14 scaffold, 8.23) are listed in the status table.  This-session
+ledger:
+
+- **8.11.1 — `vault` frontmatter parser (`07c7ec7f`).**
+  New `crates/vault/src/frontmatter.rs` (376 LOC) parses YAML-style
+  fence (`---\n…\n---`) on `Note` load; survives malformed input
+  without panic.  +13 tests on the parser contract (block detection,
+  empty body, mixed line endings, BOM, escaped sequences, unicode,
+  duplicate keys, trailing whitespace, missing close fence).
+- **8.11.2 — `vault` folders + assets surfacing (`dbf8c00f`).**
+  `Vault` now exposes `folders() -> Vec<FolderEntry>` and
+  `assets() -> Vec<AssetEntry>` so `folder_tree` (8.17) and future
+  attachment surfaces stop guessing at the on-disk shape.
+  `mock_fixtures::MockVault` keeps the same shape.  +3 tests
+  (folder enumeration, asset filter by extension, hidden-dir skip).
+- **8.11.3 — `vault` background executor (`c65ac9de`).**
+  Long-running reads / saves now route through
+  `cx.background_executor().spawn(...)` instead of synchronous IO
+  inside `Task::ready(...)`.  Public API unchanged — callers still
+  see `Task<...>`.  +3 tests (concurrent read does not block save;
+  save error propagates; cancellation drops the spawned future).
+- **8.11.4 — `vault` notify-based fs-watcher with debounce (`aad8dbbb`).**
+  New `crates/vault/src/watcher.rs` (241 LOC) using `notify` crate +
+  `flume` channel + 200 ms debounce window collapses bursty editor
+  saves into a single rescan.  Watcher runs on the background
+  executor.  `mock_fixtures::MockVault` gains a no-op `watcher()` so
+  TOLARIA_MOCK still boots.  +3 tests (single-file write triggers
+  one event; rapid bursts collapse; rename triggers both old+new
+  paths).
+- **8.13 — `workspace` pane resize observer + tab close/reorder
+  (`6470e304`).**  `crates/workspace/src/pane.rs` grows from a stub
+  PaneGroup to a real resize observer (+422 LOC).  Tab close emits
+  `Pane::TabClosed { id }`; drag-reorder emits `Pane::TabReordered
+  { from, to }`.  Modal subset previously landed at `95b1ee4b`.
+  +9 tests (pane resize event fires once per drag; tab close
+  removes item + restores activation to neighbour; reorder preserves
+  selection; close-last-tab keeps pane alive).  Workspace test
+  count 27 → 36.
+
+#### Strand B — missing surfaces (this-session rows)
+
+Earlier-session Strand B rows (8.17 `folder_tree`, 8.18
+`filter_builder`, 8.20 `note_retargeting`, 8.22 `onboarding_prompts`
+scaffold) are listed in the status table.  This-session ledger:
+
+- **8.15 — `frontmatter_panel` (`ef520117`).**  New crate (738 LOC)
+  mirroring `DynamicPropertiesPanel.tsx` + `AddPropertyForm.tsx` +
+  `EditableValue.tsx` + `PropertyValueCells.tsx` +
+  `TypeSelector.tsx` + `TypeCustomizePopover.tsx` +
+  `IconEditableValue.tsx` + `ColorInput.tsx` +
+  `AccentColorPicker.tsx` + `NoteIcon.tsx` + `NoteTitleIcon.tsx`.
+  `from_or_empty(cx)` + `from_mock(cx)` constructors preserved.
+  +10 tests (property add/remove, type swap, icon edit, accent swap,
+  empty-state, malformed value tolerated, ordering).
+- **8.16 — `raw_editor` (`65d6ec71`).**  New crate (919 LOC) mirroring
+  the GPUI-side chrome for `RawEditorView.tsx` + `RawEditorFindBar.tsx`
+  — note that the CodeMirror surface itself lives in the embedded
+  WKWebView (Phase 8.29 owns the editor-host pipeline; this crate
+  owns the GPUI chrome around it).  +11 tests (find-bar visibility
+  toggle, search-term echo, regex-mode flag, case-sensitive flag,
+  result-count chip, empty-query state, prev/next handlers,
+  shortcut dispatch).
+- **8.19 — `workspace_switcher` (`af7d3e14`).**  New crate (534 LOC)
+  mirroring `WorkspaceSelector.tsx` + `WorkspaceMoveButtons.tsx` +
+  `WorkspaceInitialsBadge.tsx` + `status-bar/VaultMenu.tsx` +
+  `WorkspaceSettingsRows.tsx`.  Vault list driven by mock fixtures
+  for now; real multi-vault state lands in Phase 10
+  `vault_registry`.  +8 tests (vault row click emits switch event,
+  initials badge derivation, move-up / move-down preserve focus,
+  empty list, single-vault hides reorder controls).
+- **8.21 — `rendering_primitives` (`cfdfc5e4`).**  New crate (518 LOC)
+  mirroring `MarkdownContent.tsx` + `SafeMarkup.tsx` +
+  `MermaidDiagram.tsx` + `TldrawWhiteboard.tsx` + `FilePreview.tsx`.
+  Non-editor rendering surfaces (preview tiles, embedded mermaid,
+  attachment thumbnails).  +7 tests (markdown render, safe-markup
+  drops `<script>`, mermaid placeholder, tldraw placeholder,
+  file-preview dispatch by mime, empty-state, oversize bail-out).
+
+#### Strand C — editor-host body parity
+
+The BlockNote + CodeMirror carry-over from
+`src/components/blockNote*.ts` / `src/extensions/*` /
+`src/components/useEditor*.ts` lands in `editor-host/` over seven
+commits.  All ship Vitest coverage inside `editor-host/`.  No new
+bridge-envelope variants this phase — the `editor_bridge` snake_case
+wire shape stays locked in by the Phase 4 `editor_bridge` tests.
+Two bridge gaps stubbed locally and logged in
+[`phase-8-issues.md`](phase-8-issues.md#bridge-gaps).
+
+- **8.24 — BlockNote core mount (`4c7998e7`).**  Replaces the
+  Phase-4b `<textarea>` with a real BlockNote editor bound to the
+  `editor_bridge` envelope.  `NoteOpen` → `editor.replaceBlocks(...)`;
+  content change → `Dirty`; `SaveRequest` → markdown serialization
+  → `Save`.  New: `EditorApp.tsx`, `setupEditor.ts`,
+  `richEditorMarkdown.ts`, `main.tsx` (React 19 mount), Vite config
+  bumped to a multi-entry build, vitest configured.
+
+  - **Bundle:** 4.18 kB → **1.79 MiB** (first BlockNote mount).
+    Past the ~20 kB roadmap heuristic — recorded per [Strand C
+    verification gate](roadmap.md#strand-c--editor-host-body-parity-blocknote--codemirror-carry-over).
+  - **Tests:** 0 → 16 vitest (bridge encode/decode, markdown
+    serialise round-trip, editor mount, NoteOpen replace, Dirty
+    emission, SaveRequest flush).
+  - **React tests not ported verbatim:** none for this row — the
+    React-side scaffolding is structural and was rewritten against
+    the new mount.
+  - **Bridge-envelope churn:** zero new variants.
+
+- **8.25 — Slash / side / formatting menus + hover guards
+  (`fa1aae40`).**  Ports the suggestion / side / formatting menus
+  plus the hover-guard fixes from
+  `blockNoteSideMenuHoverGuard.{ts,test.ts}` +
+  `blockNoteFormattingToolbarHoverGuard.{ts,test.ts,extra.test.ts}` +
+  `tolariaBlockNoteSideMenu.test.tsx` +
+  `blockNoteSideMenu.regression.test.ts`.
+
+  - **Bundle:** ~1.79 MiB → ~1.86 MiB (+~70 KiB).
+  - **Tests:** 16 → 49 vitest.
+  - **React tests not ported verbatim:** none — every hover-guard
+    test ported verbatim (the guards are pure DOM logic, no vault
+    coupling).
+  - **Bridge-envelope churn:** zero new variants.
+
+- **8.26 — Wikilink suggestion + link-click + cursor target
+  (`0d871de4`).**  Ports `blockNoteCursorTarget.ts` plus a thin
+  wikilink suggestion provider seam and link-activation routing.
+  Click on a `[[wikilink]]` routes through
+  `editor_bridge::FromHost::LinkClick` (already wired in Phase 8.3).
+
+  - **Bundle:** ~1.86 MiB (no measurable delta).
+  - **Tests:** 49 → 65 vitest (cursor-target restoration, link
+    activation, wikilink suggestion provider, link-click dispatch).
+  - **React tests not ported verbatim:**
+    - `blockNoteSuggestionMenu.regression.test.ts` +
+      `blockNoteSuggestionWrapper.regression.test.tsx` — both lock
+      in patches to BlockNote's internal `SuggestionMenu` plugin;
+      editor-host runs unmodified `@blocknote/react@0.46.2`, so the
+      patches do not apply.  Carry-over deferred — re-evaluate if
+      the host ever needs to patch BlockNote.
+    - `suggestionEnrichment.test.ts` — depends on `VaultEntry`,
+      `getTypeColor`, and other vault-side coupling.  Replaced by a
+      host-side `wikilinkSuggestion.test.ts` that pins the provider
+      contract instead of the React enrichment shape.
+    - `useEditorLinkActivation.test.tsx::it("opens relative
+      attachment links through the active vault path")` — **dropped.**
+      Editor host no longer resolves attachments locally; vault path
+      resolution moves to the native side (Phase 10).
+  - **Bridge-envelope churn:** zero new variants.  **Bridge gap
+    stubbed:** wikilink suggestion needs
+    `FromHost::WikilinkQuery { prefix }` /
+    `ToHost::WikilinkSuggestions { items }` to populate the menu
+    with real vault titles.  Stub: `wikilinkSuggestion.ts ::
+    defaultWikilinkItemsProvider` returns `[]`.  Logged in
+    [`phase-8-issues.md`](phase-8-issues.md#bridge-gaps); target
+    row Phase 10 (`vault_search`) or focused Phase 9 follow-up.
+
+- **8.27 — IME composition + render-recovery + transform-error
+  guard (`7afa7072`).**  Ports `useEditorComposing.ts` +
+  `imeCompositionKeyGuardExtension.ts` + `blockNoteRenderRecovery.ts`
+  + `richEditorTransformErrorRecoveryExtension.ts` + new
+  `editorBlockRepair.ts` + `telemetry.ts`.  macOS IME mid-composition
+  handling (Phase 0 §6 trigger #2) + ProseMirror state-corruption
+  recovery + transform-error guard.
+
+  - **Bundle:** ~1.86 MiB → ~1.87 MiB (+6,979 B).
+  - **Tests:** 65 → 88 vitest.
+  - **React tests not ported verbatim:**
+    - `richEditorTransformErrorRecoveryExtension.test.ts` — mock
+      dispatch signature adjusted to `(_transaction?: unknown)`
+      parameter due to the editor-host's strict tsconfig.  Behavior
+      identical; signature change is mechanical only.
+  - **Bridge-envelope churn:** zero new variants.
+
+- **8.28 — Code-block / table / copy / checklist regressions
+  (`48cddd2b`).**  Ports the four BlockNote behavior regressions
+  (`blockNoteCodeBlockControl.regression.test.ts`,
+  `blockNoteTableHandles.regression.test.ts`,
+  `blockNoteCopyCompatibility.regression.test.ts`,
+  `blockNoteChecklist.regression.test.ts`,
+  `blockNotePopover.regression.test.ts`).
+
+  - **Bundle:** byte-identical to 8.27.  Regressions ship via pnpm
+    `patchedDependencies` mirroring the React-side BlockNote
+    patches (`patches/@blocknote__core@0.46.2.patch` +
+    `patches/@blocknote__react@0.46.2.patch`); no new runtime code
+    in `editor-host/src/`.
+  - **Tests:** 88 → 109 vitest.
+  - **React tests not ported verbatim:** none — all 5 regression
+    test files ported verbatim, since pnpm `patchedDependencies`
+    makes the runtime equivalent.
+  - **Bridge-envelope churn:** zero new variants.
+
+- **8.29 — CodeMirror raw-mode fallback (`63c79224`).**  Ports
+  `markdownHighlight.{ts,test.ts}` +
+  `frontmatterHighlight.{ts,test.ts}` +
+  `zoomCursorFix.{ts,behavior.test.ts,extra.test.ts}` +
+  `rawEditorUtils.{ts,test.ts}` + `RawEditorView.{tsx,test.tsx}` +
+  `RawEditorFindBar.{tsx,test.tsx}` + new `useCodeMirror.ts` +
+  `editorFind.{ts,test.ts}` + `EditorApp.routing.test.tsx`.
+  Coordinates with Strand B 8.16 — 8.29 owns the editor-host /
+  WKWebView pipeline, 8.16 owns the GPUI-side chrome around it.
+
+  - **Bundle:** ~1.87 MiB → **2.17 MiB** (+373 KiB: CodeMirror 6 +
+    `@lezer/markdown` + frontmatter highlighter + zoom-cursor fix).
+  - **Tests:** 109 → 209 vitest (largest single jump in the strand).
+  - **React tests not ported verbatim:**
+    - `RawEditorView.behavior.test.tsx` +
+      `RawEditorView.coverage.test.tsx` — React mocks
+      `useCodeMirror`, `rawEditorUtils`, `typeColors`, `telemetry`,
+      `NoteSearchList`, `plainTextPaste` — all vault-side
+      concerns.  Host-side tests re-shaped to run against the real
+      CodeMirror plus the real `useCodeMirror` hook (no mocks).
+    - `RawEditorFindBar.test.tsx` — React uses shadcn `Input` +
+      `react-i18next` + `safe-regex2`.  Host uses native HTML
+      `<input>` + literal English copy + direct `new RegExp(...)`.
+      Same `data-testid` + `aria-label` selectors so the test
+      assertions stayed near-identical.
+    - The Cmd+F keymap-driven find-bar test was dropped:
+      happy-dom can't drive a CodeMirror keymap from a synthetic
+      `KeyboardEvent`.  Replaced by a test that exercises the
+      `findRequest` prop path directly — same behavior pinned via
+      a different seam.
+  - **Bridge-envelope churn:** zero new variants.
+
+- **8.30 — Editor lifecycle hooks (`1e1f77ac`).**  Ports the
+  mode / tab-swap / focus / save / memory hooks:
+  `useEditorModePositionSync.{ts,test.tsx}` +
+  `useEditorTabSwap.{ts,test.ts,selection.test.ts,rename.test.ts,performance.test.ts}` +
+  `useEditorFocus.{ts,test.ts}` + `useEditorSave.{ts,test.ts}` +
+  `useEditorSaveWithLinks.{ts,test.ts}` +
+  `useEditorMemoryProbeController.{ts,test.ts}` +
+  `editorFocusUtils.ts` + `editorModePosition.ts`.
+
+  - **Bundle:** 2.17 MiB → **2.26 MiB** (+88 KiB).  Phase 8 close.
+  - **Tests:** 209 → 271 vitest.
+  - **React tests not ported verbatim — synthesized instead:**
+    - `useEditorTabSwap.{test,selection.test,rename.test,performance.test}.ts`
+      — React versions depend on `VaultEntry`, `useSaveNote`,
+      BlockNote markdown parsing, and frontmatter helpers.
+      Synthesized tests pin the id-keyed snapshot LRU contract
+      (insert / hit / evict / cap, selection round-trip,
+      rename-keyed reseat, performance budget) without the React
+      coupling.
+    - `useEditorSave.test.ts` — React depends on
+      `invoke('save_note_content')`, `setTabs`, and toast i18n.
+      Synthesized tests cover debounce, dedup, immediate flush,
+      error path, cleanup-on-unmount.
+    - `useEditorSaveWithLinks.test.ts` — React depends on
+      `extractOutgoingLinks` + vault `updateEntry`.  Synthesized
+      tests pin the future rename-bridge seam (`onLinksChanged`
+      fires when outgoing-link set diverges; doesn't propagate
+      yet).
+    - `useEditorMemoryProbeController.test.ts` — React reference
+      orchestrates an N-note mount experiment.  Synthesized tests
+      cover passive sampling + OOM-threshold telemetry +
+      Safari/Firefox no-op.
+  - **Bridge-envelope churn:** zero new variants.  **Bridge gap
+    stubbed:** rename-ripple needs
+    `FromHost::RenameRequest { id, new_title }` /
+    `ToHost::RenameReady { id }` to propagate renames through
+    outgoing wikilinks.  Stub: `TODO(rename-bridge)` marker in
+    `editor-host/src/useEditorSaveWithLinks.ts` —
+    `useEditorSaveWithLinks` ships as a thin `useEditorSave`
+    wrapper whose `onLinksChanged` seam fires but doesn't
+    propagate.  Logged in
+    [`phase-8-issues.md`](phase-8-issues.md#bridge-gaps); target
+    row Phase 10.1 (`git_provider` rename pipeline) or Phase 9.6
+    (`vault_lifecycle`).
 
 ---
 

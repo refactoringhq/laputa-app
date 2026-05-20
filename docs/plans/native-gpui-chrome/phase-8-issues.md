@@ -26,3 +26,46 @@
 **Recipe:** see `periscope-phase-8-sweep.md`.
 
 **Why it's not automated yet:** periscope requires Screen Recording + Accessibility permissions on the parent terminal, plus a windowed Tolaria binary; the Anthropic agent sandbox can't satisfy either.
+
+### Bridge gaps
+
+Two `editor_bridge` envelope extensions surfaced during Strand C
+that the host stubs locally rather than landing new variants this
+phase.  Each carries a deferred follow-up row.  No new
+`ToHost` / `FromHost` variants land in Phase 8 — the snake_case wire
+shape stays locked in by the Phase 4 `editor_bridge` tests.
+
+1. **Wikilink suggestion bridge variants.**
+   - **Missing variants:** `FromHost::WikilinkQuery { prefix }` and
+     `ToHost::WikilinkSuggestions { items }` are not present in
+     `crates/editor_bridge/src/lib.rs`.
+   - **Effect:** the editor-host opens the wikilink suggestion menu
+     on `[[` but renders an empty list because the provider has no
+     way to ask the native side for vault titles.
+   - **Stub:** `editor-host/src/wikilinkSuggestion.ts ::
+     defaultWikilinkItemsProvider` returns `[]`.  Suggestion menu
+     UI is fully wired; only the data source is stubbed.
+   - **Source:** Phase 8.26 commit `0d871de4`.
+   - **Target row:** Phase 10 (`vault_search`) — vault-wide title
+     search lands the data side; the bridge variants ride along.
+     Could also land earlier as a focused Phase 9 follow-up if a
+     consumer needs it sooner.
+
+2. **Rename-ripple bridge variants.**
+   - **Missing variants:** `FromHost::RenameRequest { id, new_title }`
+     and `ToHost::RenameReady { id }` are not present in
+     `crates/editor_bridge/src/lib.rs`.
+   - **Effect:** `useEditorSaveWithLinks` ships as a thin
+     `useEditorSave` wrapper with an `onLinksChanged` seam that
+     fires when the outgoing-wikilink set diverges, but the host
+     has no way to ask the native side to rewrite inbound links to
+     a renamed note.
+   - **Stub:** `TODO(rename-bridge)` marker in
+     `editor-host/src/useEditorSaveWithLinks.ts`.  The `onLinksChanged`
+     callback fires correctly; it just doesn't propagate yet.
+   - **Source:** Phase 8.30 commit `1e1f77ac`.
+   - **Target row:** Phase 10.1 (`git_provider` rename pipeline) —
+     the rename ripple needs a transactional rewrite-and-commit
+     boundary that the git provider already owns.  Could also land
+     under Phase 9.6 (`vault_lifecycle`) if the rename pipeline
+     ships there first.

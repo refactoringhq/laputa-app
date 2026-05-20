@@ -23,7 +23,7 @@ logical sub-task within a phase), in this order:
 
 1. `cargo fmt -p <crate>` (or `--all` if multi-crate).
 2. `cargo test -p <crate>` — confirm green.
-3. **Spawn `oh-my-claudecode:code-reviewer` with the
+3. **Spawn `code-reviewer agent` with the
    `idiomatic-rust-review` skill** against the changed files.
    **Auto-apply every MUST and SHOULD finding** without prompting
    the user (MAY findings get surfaced separately for the user to
