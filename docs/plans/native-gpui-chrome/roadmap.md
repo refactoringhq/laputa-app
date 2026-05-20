@@ -203,6 +203,13 @@ criteria):**
   links the `editor_bridge` test that locks in the snake_case wire
   shape.
 
+**Visual fidelity pass (in addition to the global Phase 8 exit
+criteria):**
+
+User driven feedback gate for new surfaces implemented in Phase 8
+
+Use `phase-8-issues.md` as a follow-up task list shared with the user.
+
 **Exit criteria:**
 
 - Every Strand A row replaces its stub with a wired interaction; the
@@ -230,10 +237,9 @@ criteria):**
   regressions.  Kept under ~10 captures total so the smoke suite
   stays under ~60 s.  Anything verifiable in-process MUST land as
   `#[gpui::test]` instead.
+- Every `phase-8-issues.md` task should be resolved before moving on.
 
-**Visual fidelity pass:**
 
-User driven feedback phase for new surfaces implemented in Phase 8
 
 ## Planned
 

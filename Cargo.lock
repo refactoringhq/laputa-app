@@ -4799,6 +4799,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "note_retargeting"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "gpui_platform",
+ "mock_fixtures",
+ "vault",
+ "workspace",
+]
+
+[[package]]
 name = "notify"
 version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
