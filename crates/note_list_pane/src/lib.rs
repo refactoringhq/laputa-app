@@ -303,6 +303,16 @@ pub struct NoteEntry {
     /// (`MockVault`, no vault root) this is left empty so the
     /// folder-scope filter is a no-op.
     pub parent_path: SharedString,
+    /// YAML frontmatter `type` value (e.g. `"Project"`, `"Person"`),
+    /// used by [`NoteListScope::View`] to narrow the visible list to
+    /// entries that match a saved view's filter predicate.  Empty when
+    /// the note has no `type` frontmatter — those notes are excluded
+    /// from every view filter.  Distinct from [`Self::type_label`],
+    /// which is filename-prefix-derived and drives the sidebar's TYPES
+    /// section; the saved-view filter uses the frontmatter value
+    /// instead because it survives renames and matches the YAML
+    /// definition in `<vault>/views/*.yml`.
+    pub view_type: SharedString,
 }
 
 /// Default header-strip title — mirrors the sidebar's default
@@ -474,6 +484,34 @@ fn type_label_for(path: &StdPath) -> &'static str {
     }
 }
 
+/// Read the frontmatter `type` value as a [`SharedString`], or an
+/// empty string when the note has no `type` declaration.  Used to
+/// populate [`NoteEntry::view_type`] from a real `vault::Note` so
+/// [`NoteListScope::View`] can narrow the list to e.g. `type: Project`
+/// entries.  Only `FrontmatterValue::Text` participates — numeric /
+/// boolean / list values are treated as "no type" because a saved
+/// view's `value` field is always a string in the YAML schema.
+fn frontmatter_view_type(fm: &vault::Frontmatter) -> SharedString {
+    match fm.get("type") {
+        Some(vault::FrontmatterValue::Text(s)) => s.clone(),
+        _ => SharedString::default(),
+    }
+}
+
+/// Read the `MockNote::properties["type"]` value as a [`SharedString`].
+/// Mirrors [`frontmatter_view_type`] for the demo-mode launch path so
+/// `cargo run --bin tolaria` with `TOLARIA_MOCK=1` exercises the same
+/// saved-view filter as the real-vault path.  Falls back to an empty
+/// string for missing / non-string properties — the same "absent"
+/// signal we use for real notes.
+fn mock_view_type(note: &mock_fixtures::MockNote) -> SharedString {
+    note.properties
+        .get("type")
+        .and_then(|v| v.as_str())
+        .map(SharedString::from)
+        .unwrap_or_default()
+}
+
 /// Project `path`'s parent onto a vault-root-relative string.  `""`
 /// means the vault root.  When `vault_root` is `None` (mock-fixture
 /// path with no real on-disk vault) the parent is left empty so the
@@ -592,7 +630,7 @@ fn icon_for_frontmatter_name(name: &str) -> IconName {
 /// everything inside" semantics.
 fn scope_matches(scope: &NoteListScope, entry: &NoteEntry) -> bool {
     match scope {
-        NoteListScope::Inbox | NoteListScope::AllNotes | NoteListScope::View(_) => true,
+        NoteListScope::Inbox | NoteListScope::AllNotes => true,
         NoteListScope::Archive => false,
         NoteListScope::Type(label) => entry.type_label.as_ref() == label.as_ref(),
         NoteListScope::Folder(path) => {
@@ -603,6 +641,24 @@ fn scope_matches(scope: &NoteListScope, entry: &NoteEntry) -> bool {
             let ep = entry.parent_path.as_ref();
             ep == path.as_ref() || ep.starts_with(&format!("{path}/"))
         }
+        NoteListScope::View(name) => view_matches(name, entry),
+    }
+}
+
+/// Predicate for the built-in saved views shown in the sidebar's
+/// VIEWS section.  Each arm mirrors the YAML definition in
+/// `<vault>/views/*.yml` (e.g. `active-projects.yml` filters
+/// `type == Project`); the lookup is a small `match` rather than a
+/// runtime parse so the hot path on every entry stays branch-only.
+///
+/// Unknown view names fall back to "pass everything through" so a
+/// future user-defined view in the sidebar list doesn't silently empty
+/// the note list before Phase 8.18 (`filter_builder`) wires the real
+/// YAML-driven engine.
+fn view_matches(name: &SharedString, entry: &NoteEntry) -> bool {
+    match name.as_ref() {
+        "Active Projects" => entry.view_type.as_ref() == "Project",
+        _ => true,
     }
 }
 
@@ -732,6 +788,11 @@ impl NoteListPane {
                     // filter then no-ops, which matches what users
                     // expect in `TOLARIA_MOCK=1`.
                     parent_path: vault_relative_parent(&note.path, None),
+                    // `MockNote::properties` mirrors the on-disk YAML
+                    // frontmatter — the seed sets `properties["type"]`
+                    // for every fixture note, so saved-view filters
+                    // (e.g. Active Projects) work without a real vault.
+                    view_type: mock_view_type(&note),
                 });
             }
         }
@@ -799,6 +860,10 @@ impl NoteListPane {
                     type_color: style.color,
                     type_label: SharedString::new_static(type_label_for(&note.path)),
                     parent_path: vault_relative_parent(&note.path, Some(&vault_root)),
+                    // Pull the frontmatter `type` value so saved-view
+                    // filters (`NoteListScope::View`) can narrow to
+                    // notes whose YAML declares e.g. `type: Project`.
+                    view_type: frontmatter_view_type(note.frontmatter()),
                 });
             }
         }
@@ -2025,6 +2090,73 @@ mod tests {
                     pane.visible_entries().count(),
                     0,
                     "Archive scope returns 0 until the vault surfaces an archive flag",
+                );
+            })
+            .unwrap();
+    }
+
+    /// Worklist 2.3 — `set_scope(View("Active Projects"))` must narrow
+    /// the visible list to entries whose frontmatter declares
+    /// `type: Project`.  Mirrors the click path: sidebar VIEWS row →
+    /// `SidebarSelectionChangedEvent::View("Active Projects")` →
+    /// workspace → `note_list.set_scope(View(...))` →
+    /// `view_matches("Active Projects")` predicate.
+    ///
+    /// The seeded `MockVault` contains exactly three Project notes
+    /// (ids 14, 15, 16 — "Start Laputa App Project", "Laputa App V1",
+    /// "Laputa App V2"), matching the hardcoded sidebar count `3`.
+    #[gpui::test]
+    fn set_scope_view_active_projects_narrows_to_project_entries(cx: &mut TestAppContext) {
+        install_theme(cx);
+        cx.update(|cx| cx.set_global(MockVault::seeded()));
+
+        let window = cx.add_window(|_window, cx| NoteListPane::from_mock(cx));
+
+        window
+            .update(cx, |pane, _window, cx| {
+                assert_eq!(
+                    pane.visible_entries().count(),
+                    30,
+                    "default Inbox scope passes every seeded entry through",
+                );
+                pane.set_scope(NoteListScope::View("Active Projects".into()), cx);
+                let mut titles: Vec<&str> =
+                    pane.visible_entries().map(|e| e.title.as_ref()).collect();
+                titles.sort();
+                assert_eq!(
+                    titles,
+                    vec!["Laputa App V1", "Laputa App V2", "Start Laputa App Project"],
+                    "View(Active Projects) must narrow to the three type:Project notes",
+                );
+                pane.set_scope(NoteListScope::AllNotes, cx);
+                assert_eq!(
+                    pane.visible_entries().count(),
+                    30,
+                    "AllNotes scope returns to pass-through",
+                );
+            })
+            .unwrap();
+    }
+
+    /// Worklist 2.3 — unknown view names must not silently empty the
+    /// list while the Phase 8.18 `filter_builder` engine is still
+    /// pending.  Falling back to pass-through keeps any future
+    /// user-defined view in the sidebar harmless (an empty list would
+    /// look like a hang to the user).
+    #[gpui::test]
+    fn set_scope_view_unknown_name_passes_through(cx: &mut TestAppContext) {
+        install_theme(cx);
+        cx.update(|cx| cx.set_global(MockVault::seeded()));
+
+        let window = cx.add_window(|_window, cx| NoteListPane::from_mock(cx));
+
+        window
+            .update(cx, |pane, _window, cx| {
+                pane.set_scope(NoteListScope::View("Unknown View".into()), cx);
+                assert_eq!(
+                    pane.visible_entries().count(),
+                    30,
+                    "unknown view names must pass every entry through",
                 );
             })
             .unwrap();
