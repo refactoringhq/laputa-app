@@ -14,7 +14,7 @@ follow-up status entry.
 
 The sweep is split into two pieces:
 
-1. A thin harness script (`crates/periscope/tests/periscope-phase-8-sweep.sh`)
+1. A thin harness script (`crates/periscope/tests/tolaria-harness.sh`)
    that spawns `tolaria` against `demo-vault-v2` pinned to 1516×1052
    logical points, prints the binary pid + output directory, and
    blocks on stdin so the captures can be driven from a separate
@@ -72,10 +72,17 @@ re-checks the windowed-app prerequisite; permissions are on you.
 The harness is a spawn/teardown shell — it brings up the app and waits.
 Captures are driven against the live process from a separate shell.
 
+The harness defaults its `OUT_DIR` to `target/periscope/sweep` (generic
+across sweeps).  The Phase 8 sweep below references
+`target/periscope/phase-8-sweep/` throughout, so prefix every invocation
+with `OUT_DIR=$REPO_ROOT/target/periscope/phase-8-sweep` to make the
+captures land where §3 / §4 / §5 expect them.
+
 ### Foreground (block on stdin)
 
 ```sh
-bash crates/periscope/tests/periscope-phase-8-sweep.sh
+OUT_DIR=$REPO_ROOT/target/periscope/phase-8-sweep \
+    bash crates/periscope/tests/tolaria-harness.sh
 ```
 
 The script writes a banner like
@@ -89,7 +96,7 @@ The script writes a banner like
       cargo run -q -p periscope -- screenshot --pid 15654 --raise \
           --out /Users/you/tolaria/target/periscope/phase-8-sweep/00-light-baseline.png
 
-    Scenario list: docs/plans/native-gpui-chrome/periscope-phase-8-sweep.md
+    Scenario list: see the consuming doc (e.g. `docs/plans/native-gpui-chrome/phase-8-sweep.md`)
 
 ==> Press <enter> in this terminal to tear down.
 ```
@@ -102,9 +109,11 @@ cargo child and waits for it.
 ### Background (run in foreground until SIGINT)
 
 ```sh
-bash crates/periscope/tests/periscope-phase-8-sweep.sh --no-block
+OUT_DIR=$REPO_ROOT/target/periscope/phase-8-sweep \
+    bash crates/periscope/tests/tolaria-harness.sh --no-block
 # or
-BLOCK=0 bash crates/periscope/tests/periscope-phase-8-sweep.sh
+OUT_DIR=$REPO_ROOT/target/periscope/phase-8-sweep \
+    BLOCK=0 bash crates/periscope/tests/tolaria-harness.sh
 ```
 
 `--no-block` keeps Tolaria alive in the foreground without the
@@ -122,6 +131,7 @@ the agent reads `BIN_PID` from the first few lines).  Send SIGINT
 | `WIDTH`          | `1516`           | Logical points; matches the Tauri-era reference screenshots. |
 | `HEIGHT`         | `1052`           | Same. |
 | `BLOCK`          | `1`              | `0` equivalent to `--no-block`. |
+| `OUT_DIR`        | `$REPO_ROOT/target/periscope/sweep` | Override per consuming doc. The Phase 8 sweep uses `$REPO_ROOT/target/periscope/phase-8-sweep` (set above so §3 / §4 / §5 paths line up). |
 
 ---
 
