@@ -5,10 +5,20 @@
 //! `MenuItem::os_action` so AppKit's standard `cut:` / `copy:` / `paste:` /
 //! `undo:` / `redo:` / `selectAll:` selectors keep routing into the focused
 //! WKWebView unchanged (ADR-0115 §6).
+//!
+//! Worklist 2.7 expanded the menu bar to a six-submenu layout —
+//! Tolaria / File / Edit / View / Window / Help — that matches the
+//! standard macOS app convention so muscle-memory for File→Save,
+//! View→Toggle Sidebar, and Help→About lands without surprises.
+//! Stub-but-wired items (Open Vault…, Zoom In/Out, View Docs, Report
+//! Issue) dispatch through log-only handlers in `main.rs` and carry a
+//! `TODO(worklist-2.7)` comment beside their action declaration in
+//! `crates/actions/src/lib.rs`.
 
 use actions::{
-    CloseTab, CloseWindow, EditCopy, EditCut, EditPaste, EditRedo, EditSelectAll, EditUndo,
-    NewNote, OpenSettings, Quit, Save, ToggleInspector, ToggleSidebar,
+    About, CloseTab, CloseWindow, EditCopy, EditCut, EditPaste, EditRedo, EditSelectAll, EditUndo,
+    NewNote, OpenSettings, OpenVault, Quit, ReportIssue, ResetZoom, Save, ToggleInspector,
+    ToggleSidebar, ViewDocs, ZoomIn, ZoomOut,
 };
 use gpui::{Menu, MenuItem, OsAction};
 
@@ -18,111 +28,273 @@ use gpui::{Menu, MenuItem, OsAction};
 /// AppKit picks up the accelerators immediately.
 pub fn app_menus() -> Vec<Menu> {
     vec![
-        Menu {
-            name: "Tolaria".into(),
-            disabled: false,
-            items: vec![MenuItem::action("Quit Tolaria", Quit)],
-        },
-        Menu {
-            name: "File".into(),
-            disabled: false,
-            items: vec![
-                MenuItem::action("New Note", NewNote),
-                MenuItem::action("Save", Save),
-                MenuItem::separator(),
-                MenuItem::action("Open Settings…", OpenSettings),
-            ],
-        },
-        Menu {
-            name: "Edit".into(),
-            disabled: false,
-            items: vec![
-                MenuItem::os_action("Undo", EditUndo, OsAction::Undo),
-                MenuItem::os_action("Redo", EditRedo, OsAction::Redo),
-                MenuItem::separator(),
-                MenuItem::os_action("Cut", EditCut, OsAction::Cut),
-                MenuItem::os_action("Copy", EditCopy, OsAction::Copy),
-                MenuItem::os_action("Paste", EditPaste, OsAction::Paste),
-                MenuItem::separator(),
-                MenuItem::os_action("Select All", EditSelectAll, OsAction::SelectAll),
-            ],
-        },
-        // Standard macOS Window menu.  Routes window-affecting actions
-        // through AppKit's menu system so the dispatch reaches the
-        // focused window's first responder directly — avoids the
-        // `cx.active_window() → handle.update` lookup that occasionally
-        // races with a stale handle when the keymap fires before the
-        // window claims focus.  The same actions are also bound in the
-        // keymap (assets/default.json); both code paths share the
-        // global `cx.on_action` handlers installed in `main.rs`.
-        Menu {
-            name: "Window".into(),
-            disabled: false,
-            items: vec![
-                MenuItem::action("Close Window", CloseWindow),
-                MenuItem::action("Close Tab", CloseTab),
-                MenuItem::separator(),
-                MenuItem::action("Toggle Sidebar", ToggleSidebar),
-                MenuItem::separator(),
-                MenuItem::action("Toggle Inspector", ToggleInspector),
-            ],
-        },
+        app_menu(),
+        file_menu(),
+        edit_menu(),
+        view_menu(),
+        window_menu(),
+        help_menu(),
     ]
+}
+
+/// Standard macOS App menu — "Tolaria" — that owns About and Quit.
+///
+/// About sits at the top per AppKit convention; Quit lives at the
+/// bottom with the standard `Cmd+Q` accelerator (bound globally in
+/// `assets/default.json`).
+fn app_menu() -> Menu {
+    Menu {
+        name: "Tolaria".into(),
+        disabled: false,
+        items: vec![
+            MenuItem::action("About Tolaria", About),
+            MenuItem::separator(),
+            MenuItem::action("Settings…", OpenSettings),
+            MenuItem::separator(),
+            MenuItem::action("Quit Tolaria", Quit),
+        ],
+    }
+}
+
+/// File menu.  Houses note / vault lifecycle plus the standard "Close
+/// Window" exit affordance.  `Close Tab` keeps `Cmd+W` (mirroring the
+/// browser-tab convention used inside the workspace); `Close Window`
+/// gets `Cmd+Shift+W` so both verbs are reachable without ambiguity.
+fn file_menu() -> Menu {
+    Menu {
+        name: "File".into(),
+        disabled: false,
+        items: vec![
+            MenuItem::action("New Note", NewNote),
+            MenuItem::separator(),
+            MenuItem::action("Open Vault…", OpenVault),
+            MenuItem::separator(),
+            MenuItem::action("Save", Save),
+            MenuItem::separator(),
+            MenuItem::action("Close Tab", CloseTab),
+            MenuItem::action("Close Window", CloseWindow),
+        ],
+    }
+}
+
+/// Edit menu — wires AppKit's standard selectors so the focused
+/// WKWebView keeps receiving cut/copy/paste/undo/redo/selectAll
+/// directly (ADR-0115 §6).  Untouched by worklist 2.7.
+fn edit_menu() -> Menu {
+    Menu {
+        name: "Edit".into(),
+        disabled: false,
+        items: vec![
+            MenuItem::os_action("Undo", EditUndo, OsAction::Undo),
+            MenuItem::os_action("Redo", EditRedo, OsAction::Redo),
+            MenuItem::separator(),
+            MenuItem::os_action("Cut", EditCut, OsAction::Cut),
+            MenuItem::os_action("Copy", EditCopy, OsAction::Copy),
+            MenuItem::os_action("Paste", EditPaste, OsAction::Paste),
+            MenuItem::separator(),
+            MenuItem::os_action("Select All", EditSelectAll, OsAction::SelectAll),
+        ],
+    }
+}
+
+/// View menu — sidebar / inspector toggles plus the standard
+/// zoom-in / zoom-out / reset-zoom triplet.  Zoom commands are
+/// stub-but-wired (Phase 9.x will implement workspace font-size
+/// scaling); the menu entries are in place so the muscle-memory
+/// accelerators behave the same as any other macOS editor.
+fn view_menu() -> Menu {
+    Menu {
+        name: "View".into(),
+        disabled: false,
+        items: vec![
+            MenuItem::action("Toggle Sidebar", ToggleSidebar),
+            MenuItem::action("Toggle Inspector", ToggleInspector),
+            MenuItem::separator(),
+            MenuItem::action("Zoom In", ZoomIn),
+            MenuItem::action("Zoom Out", ZoomOut),
+            MenuItem::action("Actual Size", ResetZoom),
+        ],
+    }
+}
+
+/// Window menu — kept narrow (just `Close Window`) now that the tab
+/// / sidebar / inspector verbs have moved to File and View.  Leaving
+/// the menu in place preserves the macOS "Window" slot AppKit
+/// expects between View and Help.
+fn window_menu() -> Menu {
+    Menu {
+        name: "Window".into(),
+        disabled: false,
+        items: vec![MenuItem::action("Close Window", CloseWindow)],
+    }
+}
+
+/// Help menu — About reuses the standard AppKit panel via the same
+/// `About` action surfaced under the Tolaria menu; the documentation
+/// and issue-tracker links land as stub-but-wired log handlers
+/// (Phase 9.x replaces them with `open::that(...)` once the docs
+/// site and issue tracker have stable URLs).
+fn help_menu() -> Menu {
+    Menu {
+        name: "Help".into(),
+        disabled: false,
+        items: vec![
+            MenuItem::action("Tolaria Documentation", ViewDocs),
+            MenuItem::action("Report Issue…", ReportIssue),
+        ],
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// Sanity-check the menu skeleton: four top-level menus with the expected
-    /// item counts.  Tolaria / File / Edit / Window — matches the standard
-    /// macOS menu-bar layout for a single-window editor.
+    /// Sanity-check the menu skeleton: six top-level menus matching the
+    /// macOS convention App / File / Edit / View / Window / Help.  Each
+    /// helper owns its own item-count assertion below so regressions
+    /// pinpoint the affected submenu.
     #[test]
-    fn app_menus_lists_app_file_edit_and_window_with_save_and_quit() {
+    fn app_menus_lists_app_file_edit_view_window_help() {
         let menus = app_menus();
         let names: Vec<_> = menus.iter().map(|m| m.name.to_string()).collect();
-        assert_eq!(names, vec!["Tolaria", "File", "Edit", "Window"]);
-
-        // App menu: just Quit.
-        let app_menu = menus
-            .iter()
-            .find(|m| m.name == "Tolaria")
-            .expect("app_menus() must include the Tolaria menu");
-        assert_eq!(app_menu.items.len(), 1, "App menu should hold just Quit");
-
-        // File menu: New Note / Save / separator / Open Settings… = 4 entries.
-        let file = menus
-            .iter()
-            .find(|m| m.name == "File")
-            .expect("app_menus() must include the File menu");
         assert_eq!(
-            file.items.len(),
-            4,
-            "File menu should hold New Note/Save/sep/Open Settings (4 entries)"
+            names,
+            vec!["Tolaria", "File", "Edit", "View", "Window", "Help"]
         );
+    }
 
-        // Edit menu: Undo/Redo/sep/Cut/Copy/Paste/sep/SelectAll = 8 entries.
-        let edit = menus
-            .iter()
-            .find(|m| m.name == "Edit")
-            .expect("app_menus() must include the Edit menu");
-        assert_eq!(
-            edit.items.len(),
-            8,
-            "Edit menu should hold Undo/Redo/sep/Cut/Copy/Paste/sep/SelectAll (8 entries)"
-        );
+    use ItemKind::{Action, Separator};
 
-        // Window menu: Close Window / Close Tab / sep / Toggle Sidebar /
-        // sep / Toggle Inspector = 6 entries.
-        let window = menus
-            .iter()
-            .find(|m| m.name == "Window")
-            .expect("app_menus() must include the Window menu");
+    /// Expected shape of a menu item — single source of truth for
+    /// per-test schema assertions.  See [`assert_menu_schema`].
+    #[derive(Debug)]
+    enum ItemKind {
+        Separator,
+        Action(&'static str),
+    }
+
+    /// Assert the menu's name and item layout match `expected` exactly.
+    /// Length and per-position kind/name are checked together so a
+    /// reorder failure points at the divergent slot, not at a stale
+    /// count assertion further up.
+    #[track_caller]
+    fn assert_menu_schema(menu: &Menu, expected_name: &str, expected: &[ItemKind]) {
+        assert_eq!(menu.name.as_ref(), expected_name);
         assert_eq!(
-            window.items.len(),
-            6,
-            "Window menu should hold CloseWindow / CloseTab / sep / \
-             ToggleSidebar / sep / ToggleInspector (6 entries)"
+            menu.items.len(),
+            expected.len(),
+            "{expected_name} item count"
         );
+        for (i, (actual, want)) in menu.items.iter().zip(expected).enumerate() {
+            match (actual, want) {
+                (MenuItem::Separator, ItemKind::Separator) => {}
+                (MenuItem::Action { name, .. }, ItemKind::Action(label)) => {
+                    assert_eq!(name.as_ref(), *label, "{expected_name}[{i}]");
+                }
+                _ => {
+                    let actual_kind = match actual {
+                        MenuItem::Separator => "separator",
+                        MenuItem::Action { .. } => "action",
+                        MenuItem::Submenu(_) => "submenu",
+                        _ => "other",
+                    };
+                    panic!("{expected_name}[{i}]: mismatch (want {want:?}, got {actual_kind})");
+                }
+            }
+        }
+    }
+
+    /// App menu: About / sep / Settings / sep / Quit.
+    #[test]
+    fn app_menu_holds_about_settings_quit() {
+        assert_menu_schema(
+            &app_menu(),
+            "Tolaria",
+            &[
+                Action("About Tolaria"),
+                Separator,
+                Action("Settings…"),
+                Separator,
+                Action("Quit Tolaria"),
+            ],
+        );
+    }
+
+    /// File menu: New / sep / Open / sep / Save / sep / Close Tab / Close Window.
+    #[test]
+    fn file_menu_holds_new_open_save_close() {
+        assert_menu_schema(
+            &file_menu(),
+            "File",
+            &[
+                Action("New Note"),
+                Separator,
+                Action("Open Vault…"),
+                Separator,
+                Action("Save"),
+                Separator,
+                Action("Close Tab"),
+                Action("Close Window"),
+            ],
+        );
+    }
+
+    /// Edit menu unchanged from Phase 1: 8 entries.  Names are
+    /// AppKit-provided so we only pin the count here.
+    #[test]
+    fn edit_menu_holds_standard_os_actions() {
+        let menu = edit_menu();
+        assert_eq!(menu.name.as_ref(), "Edit");
+        assert_eq!(menu.items.len(), 8);
+    }
+
+    /// View menu: Sidebar / Inspector / sep / ZoomIn / ZoomOut / Actual Size.
+    #[test]
+    fn view_menu_holds_sidebar_inspector_and_zoom() {
+        assert_menu_schema(
+            &view_menu(),
+            "View",
+            &[
+                Action("Toggle Sidebar"),
+                Action("Toggle Inspector"),
+                Separator,
+                Action("Zoom In"),
+                Action("Zoom Out"),
+                Action("Actual Size"),
+            ],
+        );
+    }
+
+    /// Window menu trimmed to just Close Window now that the tab /
+    /// sidebar / inspector verbs live under File and View.
+    #[test]
+    fn window_menu_holds_close_window() {
+        assert_menu_schema(&window_menu(), "Window", &[Action("Close Window")]);
+    }
+
+    /// Help menu: View Docs / Report Issue.  About intentionally
+    /// lives only under the Tolaria menu per AppKit convention.
+    #[test]
+    fn help_menu_holds_docs_and_report_issue() {
+        assert_menu_schema(
+            &help_menu(),
+            "Help",
+            &[Action("Tolaria Documentation"), Action("Report Issue…")],
+        );
+    }
+
+    /// Tiny assertion helper — panics with a clear message when the
+    /// matched item is a separator/submenu instead of the expected
+    /// labelled action.  Kept for any future call site that wants to
+    /// assert a single item in isolation.
+    #[allow(dead_code)]
+    #[track_caller]
+    fn assert_action_named(item: &MenuItem, expected: &str) {
+        match item {
+            MenuItem::Action { name, .. } => assert_eq!(name.as_ref(), expected),
+            MenuItem::Separator => panic!("expected action {expected:?}, got separator"),
+            MenuItem::Submenu(_) => panic!("expected action {expected:?}, got submenu"),
+            MenuItem::SystemMenu(_) => panic!("expected action {expected:?}, got system menu"),
+        }
     }
 }

@@ -3,10 +3,19 @@
     "context": null,
     "bindings": {
       "cmd-q": "tolaria::Quit",
-      "cmd-w": "tolaria::CloseWindow",
+      "cmd-w": "tolaria::CloseTab",
+      "cmd-shift-w": "tolaria::CloseWindow",
       "cmd-,": "tolaria::OpenSettings",
       "cmd-shift-r": "tolaria::ReloadKeymap",
-      "cmd-alt-i": "tolaria::ToggleInspector"
+      "cmd-alt-i": "tolaria::ToggleInspector",
+      "cmd-n": "tolaria::NewNote",
+      "cmd-s": "tolaria::Save",
+      "cmd-o": "tolaria::OpenVault",
+      "cmd-1": "tolaria::ToggleSidebar",
+      "cmd-=": "tolaria::ZoomIn",
+      "cmd-+": "tolaria::ZoomIn",
+      "cmd--": "tolaria::ZoomOut",
+      "cmd-0": "tolaria::ResetZoom"
     }
   }
 ]

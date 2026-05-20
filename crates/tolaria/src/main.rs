@@ -406,6 +406,49 @@ mod macos {
                     "CommandPalette",
                     "Phase 11.1 (command_palette) will push the command palette as a modal",
                 );
+
+                // Worklist 2.7 — File / View / Help menu stubs.  Each
+                // surface (vault picker, zoom controls, About panel,
+                // docs / issue-tracker links) lands in a later phase;
+                // for now the menu entries route here so the keymap
+                // accelerators don't bounce off `unknown action`.
+                // TODO(worklist-2.7): replace with real handlers as the
+                // backing surfaces become available.
+                log_stub::<actions::OpenVault>(
+                    cx,
+                    "OpenVault",
+                    "Phase 8.11 (vault-picker) will surface NSOpenPanel and call Vault::open_at",
+                );
+                log_stub::<actions::ZoomIn>(
+                    cx,
+                    "ZoomIn",
+                    "Phase 9.x (view-zoom) will scale the workspace font-size global",
+                );
+                log_stub::<actions::ZoomOut>(
+                    cx,
+                    "ZoomOut",
+                    "Phase 9.x (view-zoom) will scale the workspace font-size global",
+                );
+                log_stub::<actions::ResetZoom>(
+                    cx,
+                    "ResetZoom",
+                    "Phase 9.x (view-zoom) will reset the workspace font-size global to 1.0",
+                );
+                log_stub::<actions::About>(
+                    cx,
+                    "About",
+                    "Phase 9.x will present the standard AppKit About panel",
+                );
+                log_stub::<actions::ViewDocs>(
+                    cx,
+                    "ViewDocs",
+                    "Phase 9.x will open https://tolaria.app/docs via open::that",
+                );
+                log_stub::<actions::ReportIssue>(
+                    cx,
+                    "ReportIssue",
+                    "Phase 9.x will open the GitHub issue tracker via open::that",
+                );
                 // `Cmd+Alt+I` toggles GPUI's built-in element-picker
                 // inspector (always available in debug builds; in release
                 // builds gpui must be compiled with its `inspector` feature

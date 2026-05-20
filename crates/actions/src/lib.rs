@@ -51,6 +51,25 @@ gpui::actions!(
         EditCopy,
         EditPaste,
         EditSelectAll,
+        // Worklist 2.7 — File / View / Help menu actions.  All currently
+        // dispatch through log-only stubs in `main.rs`; replace with real
+        // handlers as the underlying surfaces land.
+        //
+        //   * OpenVault — picks a vault path (Phase 8.11 vault-picker).
+        //   * ZoomIn / ZoomOut / ResetZoom — workspace font-size controls
+        //     (Phase 9.x view-zoom; today the workspace ships a single
+        //     fixed scale).
+        //   * About — opens the standard macOS About panel (Phase 9.x).
+        //   * ViewDocs / ReportIssue — open external URLs; placeholder
+        //     handlers log the target until the docs site and the issue
+        //     tracker land.
+        OpenVault,
+        ZoomIn,
+        ZoomOut,
+        ResetZoom,
+        About,
+        ViewDocs,
+        ReportIssue,
     ]
 );
 
