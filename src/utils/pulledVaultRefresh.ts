@@ -71,7 +71,6 @@ function shouldReplaceActiveEntry(options: {
   activePath: string
   movedEntry: VaultEntry | null
   refreshedEntry: VaultEntry | null
-  shouldKeepActiveEditorMounted?: () => boolean
   updatedFiles: string[]
   vaultPath: string
 }): boolean {
@@ -79,13 +78,11 @@ function shouldReplaceActiveEntry(options: {
     activePath,
     movedEntry,
     refreshedEntry,
-    shouldKeepActiveEditorMounted,
     updatedFiles,
     vaultPath,
   } = options
   if (movedEntry) return true
   if (!refreshedEntry) return false
-  if (shouldKeepActiveEditorMounted?.() === true) return false
   return didPullUpdateActiveNote({ updatedFiles, vaultPath, activeTabPath: activePath })
 }
 
@@ -99,7 +96,6 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
     closeAllTabs,
     getActiveTabPath,
     hasUnsavedChanges,
-    shouldKeepActiveEditorMounted,
     reloadFolders,
     reloadVault,
     reloadViews,
@@ -131,7 +127,6 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
     activePath,
     movedEntry,
     refreshedEntry,
-    shouldKeepActiveEditorMounted,
     updatedFiles,
     vaultPath,
   })) {
