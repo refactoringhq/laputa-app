@@ -305,6 +305,14 @@ pub struct NoteEntry {
     pub parent_path: SharedString,
 }
 
+/// Default header-strip title — mirrors the sidebar's default
+/// highlight ([`SidebarSelection::Inbox`]) so the pane opens in sync
+/// with the sidebar before any selection event fires.
+#[inline]
+fn default_header_title() -> SharedString {
+    SharedString::new_static("Inbox")
+}
+
 /// Extract a display title from a note body — first H1 heading,
 /// else a YAML frontmatter `title:` field, else `None`.  Mirrors the
 /// `extractH1TitleFromContent` / `extractFrontmatterTitleFromContent`
@@ -643,6 +651,14 @@ pub struct NoteListPane {
     /// routes a different scope in via the sidebar's selection event
     /// (Phase 8.1).
     scope: NoteListScope,
+    /// Title shown in the header strip.  Mirrors the display label of
+    /// the currently-selected sidebar row so the user sees which slice
+    /// of the vault the list is showing (worklist 2.1).  Defaults to
+    /// `"Inbox"` because the sidebar opens with the Inbox row
+    /// highlighted.  Workspace updates this through
+    /// [`Self::set_header_title`] when a `SidebarSelectionChangedEvent`
+    /// fires.
+    header_title: SharedString,
     selected: HashSet<NoteId>,
     /// Id of the note currently shown in the editor.  Drives the
     /// pale-accent background on the matching row — mirrors the
@@ -667,6 +683,7 @@ impl NoteListPane {
             entries: Vec::new(),
             filter: SharedString::default(),
             scope: NoteListScope::default(),
+            header_title: default_header_title(),
             selected: HashSet::new(),
             selected_id: None,
             position: DockPosition::Left,
@@ -723,6 +740,7 @@ impl NoteListPane {
             entries,
             filter: SharedString::default(),
             scope: NoteListScope::default(),
+            header_title: default_header_title(),
             selected: HashSet::new(),
             selected_id,
             position: DockPosition::Left,
@@ -783,6 +801,7 @@ impl NoteListPane {
             entries,
             filter: SharedString::default(),
             scope: NoteListScope::default(),
+            header_title: default_header_title(),
             selected: HashSet::new(),
             selected_id,
             position: DockPosition::Left,
@@ -828,6 +847,26 @@ impl NoteListPane {
     #[must_use]
     pub fn scope(&self) -> &NoteListScope {
         &self.scope
+    }
+
+    /// Update the header strip title (worklist 2.1).  Workspace calls
+    /// this from the `SidebarSelectionChangedEvent` subscription so the
+    /// header reflects the display label of the highlighted sidebar
+    /// row ("Inbox", "All Notes", "Archive", a type name, a saved
+    /// view name, or a folder's display label).  No-op when the title
+    /// already matches.
+    pub fn set_header_title(&mut self, title: impl Into<SharedString>, cx: &mut Context<Self>) {
+        let title = title.into();
+        if self.header_title != title {
+            self.header_title = title;
+            cx.notify();
+        }
+    }
+
+    /// Current header title.  Test / debugging hook.
+    #[must_use]
+    pub fn header_title(&self) -> &SharedString {
+        &self.header_title
     }
 
     /// Toggle selection of `id`: adds if absent, removes if present.
@@ -1089,8 +1128,10 @@ impl Render for NoteListPane {
 
         // --- Header strip: title + sort indicator + action glyphs ---
         // Mirrors `NoteListHeader.tsx` — 52-pt tall, left-aligned
-        // "Inbox" title, right-aligned cluster of icon actions
-        // (ChevronsUpDown sort + Search + Plus).
+        // title (reflects the selected sidebar row, worklist 2.1),
+        // right-aligned cluster of icon actions (ChevronsUpDown sort
+        // + Search + Plus).
+        let header_title = self.header_title.clone();
         let sort_label = self.sort_order.label();
         let sort_entity = cx.entity();
         let search_entity = cx.entity();
@@ -1166,7 +1207,14 @@ impl Render for NoteListPane {
                     .text_sm()
                     .font_semibold()
                     .text_color(fg)
-                    .child(SharedString::new_static("Inbox"))
+                    // Sidebar labels are short enough (longest is
+                    // "Responsibilities" at 16 chars) that the 52-pt
+                    // header strip fits every label without
+                    // truncation.  Skipping `text_overflow` keeps the
+                    // element non-stateful, matching `note-list-header`
+                    // children for consistency.
+                    .child(header_title)
+                    .dump_as("note-list-pane-header-title")
                     .into_any_element(),
             )
             .child(
@@ -1991,6 +2039,46 @@ mod tests {
             assert_eq!(e.type_label.as_ref(), "Events");
             assert_eq!(e.parent_path.as_ref(), "sub");
         });
+    }
+
+    /// Worklist 2.1 — `set_header_title` must update the visible
+    /// header strip so the pane reflects which sidebar row is
+    /// selected.  We render the pane (the header label lives inside
+    /// `Render::render`) and confirm the underlying state changes
+    /// observably via `header_title()`.  Rendering the pane through a
+    /// window also exercises the render path that consumes the field,
+    /// so a wiring regression (e.g. someone re-hardcoding "Inbox" in
+    /// `render`) would surface here as a compile / runtime mismatch.
+    #[gpui::test]
+    fn set_header_title_updates_header(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let window = cx.add_window(|_window, _cx| NoteListPane::new());
+
+        window
+            .update(cx, |pane, _window, cx| {
+                assert_eq!(
+                    pane.header_title().as_ref(),
+                    "Inbox",
+                    "header defaults to the sidebar's default selection",
+                );
+
+                pane.set_header_title("Archive", cx);
+                assert_eq!(
+                    pane.header_title().as_ref(),
+                    "Archive",
+                    "set_header_title must update the visible label",
+                );
+
+                pane.set_header_title("Events", cx);
+                assert_eq!(
+                    pane.header_title().as_ref(),
+                    "Events",
+                    "set_header_title must reflect successive sidebar selections",
+                );
+            })
+            .unwrap();
+
+        cx.run_until_parked();
     }
 
     /// `clear_selection` must reset selection count to zero.

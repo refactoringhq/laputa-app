@@ -55,10 +55,21 @@ use workspace::panel::{DockPosition, Panel};
 /// (status bar workspace chip, breadcrumb bar, etc.).  Re-selecting
 /// the already-selected row is a no-op: no event fires and no
 /// observers are notified.
+///
+/// `display_label` carries the row's visible label so consumers that
+/// want a human-readable string (e.g. the note-list-pane header in
+/// worklist 2.1) don't have to re-derive it.  For [`SidebarSelection::Folder`]
+/// the payload is the *path* (stable identifier), whereas the
+/// `display_label` is the folder's last segment — they are NOT the
+/// same string and consumers should prefer `display_label` for chrome.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SidebarSelectionChangedEvent {
     /// The newly-selected row.
     pub selection: SidebarSelection,
+    /// Visible label of the selected row (e.g. "Inbox", "All Notes",
+    /// "Archive", a type's `sidebar label`, a saved view's name, or a
+    /// folder's display segment).
+    pub display_label: SharedString,
 }
 
 /// Which sidebar row is currently highlighted with the full-width
@@ -368,9 +379,40 @@ impl SidebarPanel {
     /// observers don't churn on idempotent clicks.
     pub fn select(&mut self, sel: SidebarSelection, cx: &mut Context<Self>) {
         if self.selected != sel {
+            let display_label = self.display_label_for(&sel);
             self.selected = sel.clone();
-            cx.emit(SidebarSelectionChangedEvent { selection: sel });
+            cx.emit(SidebarSelectionChangedEvent {
+                selection: sel,
+                display_label,
+            });
             cx.notify();
+        }
+    }
+
+    /// Visible label for a [`SidebarSelection`].  Used to populate the
+    /// `display_label` field on [`SidebarSelectionChangedEvent`] so
+    /// downstream chrome (e.g. the note-list-pane header) can show a
+    /// human-readable name without re-deriving it.
+    ///
+    /// Inbox / AllNotes / Archive map to their fixed display strings.
+    /// View / Type carry their display name in the variant payload.
+    /// Folder selections carry a *path* in the payload, so we look the
+    /// matching [`FolderEntry::display`] up in `self.folders`; if no
+    /// match exists (vault tree rebuilt mid-flight), we fall back to
+    /// the trailing path segment to stay graceful.
+    fn display_label_for(&self, sel: &SidebarSelection) -> SharedString {
+        match sel {
+            SidebarSelection::Inbox => SharedString::new_static("Inbox"),
+            SidebarSelection::AllNotes => SharedString::new_static("All Notes"),
+            SidebarSelection::Archive => SharedString::new_static("Archive"),
+            SidebarSelection::View(name) => name.clone(),
+            SidebarSelection::Type(label) => label.clone(),
+            SidebarSelection::Folder(path) => self
+                .folders
+                .iter()
+                .find(|f| f.path == *path)
+                .map(|f| f.display.clone())
+                .unwrap_or_else(|| folder_display_fallback(path)),
         }
     }
 
@@ -436,6 +478,19 @@ impl Panel for SidebarPanel {
 // ---------------------------------------------------------------------------
 // Helpers — type extraction + colour palette
 // ---------------------------------------------------------------------------
+
+/// Fallback display label for a [`SidebarSelection::Folder`] whose
+/// path is not (yet) tracked by `self.folders` — picks the trailing
+/// path segment so consumers still get a human-readable string instead
+/// of the full relative path.  Empty path means the vault root and
+/// degrades to the literal `""` (only observable in tests where the
+/// panel is empty); `display_label_for` only takes this branch when
+/// the folder list and the selection have drifted apart.
+fn folder_display_fallback(path: &SharedString) -> SharedString {
+    path.rsplit_once('/')
+        .map(|(_, tail)| SharedString::from(tail.to_string()))
+        .unwrap_or_else(|| path.clone())
+}
 
 /// Map a `demo-vault-v2`-style filename prefix to its display type.
 fn type_label_for(path: &Path) -> &'static str {
@@ -1406,6 +1461,88 @@ mod tests {
                 SidebarSelection::Folder("attachments".into()),
             ],
             "select must emit on change and skip redundant re-selects",
+        );
+    }
+
+    /// Worklist 2.1 — every `select` carries the row's visible label
+    /// so consumers (note-list-pane header) don't have to re-derive
+    /// it.  Inbox / AllNotes / Archive map to fixed strings; type /
+    /// view labels round-trip from the variant payload; folder
+    /// payloads carry a path so the label is looked up from the
+    /// panel's folder list.
+    #[gpui::test]
+    fn select_emits_display_label(cx: &mut TestAppContext) {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        install_theme(cx);
+        let received: Rc<RefCell<Vec<(SidebarSelection, SharedString)>>> =
+            Rc::new(RefCell::new(Vec::new()));
+
+        // Build a panel with one synthesised folder so we exercise the
+        // folder lookup branch.  All other rows don't need any
+        // populated state.
+        let panel = cx.update(|cx| {
+            cx.new(|_| {
+                let mut p = SidebarPanel::new();
+                p.folders = vec![FolderEntry {
+                    path: SharedString::new_static("inbox"),
+                    display: SharedString::new_static("inbox"),
+                    depth: 1,
+                }];
+                p
+            })
+        });
+
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(
+                &panel,
+                move |_panel, event: &SidebarSelectionChangedEvent, _cx| {
+                    recv.borrow_mut()
+                        .push((event.selection.clone(), event.display_label.clone()));
+                },
+            )
+            .detach();
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            panel.update(cx, |panel, cx| {
+                panel.select(SidebarSelection::AllNotes, cx);
+                panel.select(SidebarSelection::Archive, cx);
+                panel.select(SidebarSelection::Type("Events".into()), cx);
+                panel.select(SidebarSelection::View("Active Projects".into()), cx);
+                panel.select(SidebarSelection::Folder("inbox".into()), cx);
+                panel.select(SidebarSelection::Inbox, cx);
+            });
+        });
+        cx.run_until_parked();
+
+        let got: Vec<(SidebarSelection, String)> = received
+            .borrow()
+            .iter()
+            .map(|(s, l)| (s.clone(), l.to_string()))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                (SidebarSelection::AllNotes, "All Notes".to_string()),
+                (SidebarSelection::Archive, "Archive".to_string()),
+                (
+                    SidebarSelection::Type("Events".into()),
+                    "Events".to_string()
+                ),
+                (
+                    SidebarSelection::View("Active Projects".into()),
+                    "Active Projects".to_string(),
+                ),
+                (
+                    SidebarSelection::Folder("inbox".into()),
+                    "inbox".to_string()
+                ),
+                (SidebarSelection::Inbox, "Inbox".to_string()),
+            ],
         );
     }
 }

@@ -652,7 +652,14 @@ mod macos {
                                         }
                                         SidebarSelection::View(name) => NoteListScope::View(name),
                                     };
-                                    scoped_list.update(cx, |list, cx| list.set_scope(scope, cx));
+                                    // Worklist 2.1 — keep the note-list-pane header in
+                                    // sync with the row label so users see which slice
+                                    // of the vault they're looking at.
+                                    let header = event.display_label.clone();
+                                    scoped_list.update(cx, |list, cx| {
+                                        list.set_scope(scope, cx);
+                                        list.set_header_title(header, cx);
+                                    });
                                 },
                             )
                             .detach();
@@ -802,5 +809,63 @@ mod tests {
              `gpui_platform` feature list in `Cargo.toml`.",
             names.len(),
         );
+    }
+
+    /// Worklist 2.1 — end-to-end check that a sidebar selection event
+    /// drives the note-list-pane header through the workspace event
+    /// subscription, exactly as the live app wires them in
+    /// `cx.open_window`.  We rebuild the subscription here in isolation
+    /// (the live `cx.open_window` path requires a real window) so the
+    /// contract — `SidebarPanel::select` → `SidebarSelectionChangedEvent`
+    /// → `NoteListPane::set_header_title` — stays guarded even if the
+    /// scope-routing block in `main` is refactored.
+    #[gpui::test]
+    fn sidebar_selection_updates_note_list_header(cx: &mut TestAppContext) {
+        use gpui::AppContext as _;
+        use note_list_pane::NoteListPane;
+        use sidebar_panel::{SidebarPanel, SidebarSelection, SidebarSelectionChangedEvent};
+
+        cx.update(gpui_component::init);
+
+        let sidebar = cx.update(|cx| cx.new(|_| SidebarPanel::new()));
+        let note_list = cx.update(|cx| cx.new(|_| NoteListPane::new()));
+
+        cx.update(|cx| {
+            let list = note_list.clone();
+            cx.subscribe(
+                &sidebar,
+                move |_panel, event: &SidebarSelectionChangedEvent, cx| {
+                    let label = event.display_label.clone();
+                    list.update(cx, |pane: &mut NoteListPane, cx| {
+                        pane.set_header_title(label, cx);
+                    });
+                },
+            )
+            .detach();
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            sidebar.update(cx, |panel: &mut SidebarPanel, cx| {
+                panel.select(SidebarSelection::Archive, cx);
+            });
+        });
+        cx.run_until_parked();
+
+        let header = cx.update(|cx| note_list.read(cx).header_title().clone());
+        assert_eq!(
+            header.as_ref(),
+            "Archive",
+            "sidebar Archive selection must propagate to the note-list header",
+        );
+
+        cx.update(|cx| {
+            sidebar.update(cx, |panel: &mut SidebarPanel, cx| {
+                panel.select(SidebarSelection::Type("Events".into()), cx);
+            });
+        });
+        cx.run_until_parked();
+        let header = cx.update(|cx| note_list.read(cx).header_title().clone());
+        assert_eq!(header.as_ref(), "Events");
     }
 }
