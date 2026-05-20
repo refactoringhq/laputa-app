@@ -20,6 +20,17 @@ For library / CLI reference see `crates/periscope/README.md`.
    **… → Accessibility**) — needed for the `--raise` flag and
    the `list` subcommand.
 
+> **Run the binary directly during a session.**  `cargo run -p
+> periscope -- …` re-walks the cargo metadata graph on every
+> invocation (~300 ms per call even when up-to-date), which compounds
+> badly across multi-capture sweeps and per-tick `watch` polls.  After
+> the initial `cargo build -p periscope`, invoke
+> `./target/debug/periscope …` directly — every example below uses
+> that path.  For a release build, `cargo build -p periscope --release`
+> then `./target/release/periscope …`.  Rebuild whenever the periscope
+> source changes (CI does this automatically; for local hacking,
+> re-run `cargo build -p periscope` after edits).
+
 Confirm with the smoke test (opt-in via env var so the default
 `cargo test` lane stays green on permission-less hosts):
 
@@ -58,7 +69,7 @@ cargo run -p tolaria -- \
 # Terminal B — Claude (via the Bash tool) captures the current state.
 # `pgrep -nf` picks the newest matching process.
 BIN_PID=$(pgrep -nf 'target/debug/tolaria --vault')
-cargo run -q -p periscope -- screenshot \
+./target/debug/periscope screenshot \
     --pid $BIN_PID --raise --out /tmp/tolaria-now.png
 ```
 
@@ -84,7 +95,7 @@ note-open flow lands an item in the center pane — synthesize a
 left-click at a window-local coordinate:
 
 ```sh
-cargo run -q -p periscope -- click \
+./target/debug/periscope click \
     --pid $BIN_PID --raise --x 200 --y 100
 ```
 
@@ -119,10 +130,10 @@ Typical loop:
 
 ```sh
 # 1. Discover what's available (refreshes the dump first):
-cargo run -q -p periscope -- dump-tree --pid $BIN_PID
+./target/debug/periscope dump-tree --pid $BIN_PID
 
 # 2. Drive a click by name:
-cargo run -q -p periscope -- click \
+./target/debug/periscope click \
     --pid $BIN_PID --raise --id status-bar-theme-toggle
 ```
 
@@ -136,7 +147,7 @@ change, or diagnose `click --id: no element registered as "..."`
 errors.
 
 ```sh
-cargo run -q -p periscope -- dump-tree --pid $BIN_PID
+./target/debug/periscope dump-tree --pid $BIN_PID
 ```
 
 Output is one header line plus one row per registered element,
@@ -204,7 +215,7 @@ cat "$TMPDIR/tolaria-ui-tree-$(pgrep -f "target/debug/tolaria --vault").json"
 ### `click --id` — click an element by name
 
 ```sh
-cargo run -q -p periscope -- click \
+./target/debug/periscope click \
     --pid $BIN_PID --raise --id status-bar-theme-toggle
 ```
 
@@ -299,7 +310,7 @@ bash crates/periscope/tests/harness.sh
 #     OUT_DIR=/Users/you/tolaria/target/periscope/sweep
 #
 #     Drive captures from another shell, e.g.:
-#       cargo run -q -p periscope -- screenshot --pid 15654 --raise \
+#       ./target/debug/periscope screenshot --pid 15654 --raise \
 #           --out /Users/you/tolaria/target/periscope/sweep/foo.png
 #
 # ==> Press <enter> in this terminal to tear down.
@@ -322,7 +333,7 @@ the printed `BIN_PID`:
 
 ```sh
 export BIN_PID=15654   # from the harness banner
-cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+./target/debug/periscope screenshot --pid $BIN_PID --raise \
     --out target/periscope/sweep/00-light.png
 ```
 
@@ -342,7 +353,7 @@ turns (no clicks, no scripted captures), `watch` polls and writes
 
 ```sh
 # Background watch — kill with Ctrl-C or `pkill periscope`
-cargo run -q -p periscope -- watch \
+./target/debug/periscope watch \
     --pid $BIN_PID --dir target/e2e/ --interval-secs 3
 ```
 
@@ -369,7 +380,7 @@ was used: the window has `title: None` and only resolves by `--pid`.
 Dump every visible window to find the pid:
 
 ```sh
-cargo run -q -p periscope -- list
+./target/debug/periscope list
 ```
 
 Expected output looks like:
@@ -426,13 +437,13 @@ is stored.
 
 ```sh
 # Crop to a single element — great for tight regression captures:
-cargo run -q -p periscope -- screenshot \
+./target/debug/periscope screenshot \
     --pid $BIN_PID --raise \
     --id status-bar-theme-toggle \
     --out /tmp/toggle.png
 
 # Same in watch mode — latest.png stays cropped on every tick:
-cargo run -q -p periscope -- watch \
+./target/debug/periscope watch \
     --pid $BIN_PID --dir target/e2e/ --interval-secs 3 \
     --id status-bar-theme-toggle
 ```

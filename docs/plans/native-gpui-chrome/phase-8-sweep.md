@@ -93,7 +93,7 @@ The script writes a banner like
     OUT_DIR=/Users/you/tolaria/target/periscope/phase-8-sweep
 
     Drive captures from another shell, e.g.:
-      cargo run -q -p periscope -- screenshot --pid 15654 --raise \
+       /Users/you/tolaria/target/periscope screenshot --pid 15654 --raise \
           --out /Users/you/tolaria/target/periscope/phase-8-sweep/00-light-baseline.png
 
     Scenario list: see the consuming doc (e.g. `docs/plans/native-gpui-chrome/phase-8-sweep.md`)
@@ -101,7 +101,7 @@ The script writes a banner like
 ==> Press <enter> in this terminal to tear down.
 ```
 
-Note the `BIN_PID` — every `cargo run -q -p periscope -- …` invocation
+Note the `BIN_PID` — every `/Users/you/tolaria/target/periscope …` invocation
 in §3 expects it as `--pid $BIN_PID`.  When you've finished the
 scenarios, hit `<enter>` in the harness terminal; the trap kills the
 cargo child and waits for it.
@@ -156,7 +156,7 @@ export OUT_DIR=target/periscope/phase-8-sweep
 - **Steps:** none (initial state).
 - **Capture command:**
   ```sh
-  cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+  ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/00-light-baseline.png
   ```
 - **Verify:** PNG matches the layout of
@@ -172,12 +172,12 @@ export OUT_DIR=target/periscope/phase-8-sweep
 - **Steps:**
   - Toggle the status-bar theme chip:
     ```sh
-    cargo run -q -p periscope -- click --pid $BIN_PID --raise \
+    ./target/debug/periscope click --pid $BIN_PID --raise \
         --id status-bar-theme-toggle
     ```
 - **Capture command:**
   ```sh
-  cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+  ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/01-dark-baseline.png
   ```
 - **Verify:** PNG matches
@@ -186,7 +186,7 @@ export OUT_DIR=target/periscope/phase-8-sweep
 - **After:** restore light theme for the rest of the sweep so the
   reviewer compares against the light reference:
   ```sh
-  cargo run -q -p periscope -- click --pid $BIN_PID --raise \
+  ./target/debug/periscope click --pid $BIN_PID --raise \
       --id status-bar-theme-toggle
   ```
 
@@ -198,19 +198,19 @@ export OUT_DIR=target/periscope/phase-8-sweep
 - **Steps:**
   - Focus the note-list pane:
     ```sh
-    cargo run -q -p periscope -- click --pid $BIN_PID --raise \
+    ./target/debug/periscope click --pid $BIN_PID --raise \
         --id workspace-note-list
     ```
   - Click the first row at the pinned size (no per-row `dump_as`
     yet — see §6 wish list).  Adjust the y coordinate if the list
     layout shifts; `dump-tree` shows current bounds:
     ```sh
-    cargo run -q -p periscope -- click --pid $BIN_PID --raise \
+    ./target/debug/periscope click --pid $BIN_PID --raise \
         --x 220 --y 220
     ```
 - **Capture command:**
   ```sh
-  cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+  ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/02-blocknote-mount.png
   ```
 - **Verify:** PNG shows BlockNote text content (not a black rectangle
@@ -234,7 +234,7 @@ export OUT_DIR=target/periscope/phase-8-sweep
 - **Capture command:** (run from another shell while the menu is
   still on screen)
   ```sh
-  cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+  ./target/debug/periscope -- screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/03-slash-menu-open.png
   ```
 - **Verify:** slash menu visible below the cursor showing the
@@ -259,7 +259,7 @@ export OUT_DIR=target/periscope/phase-8-sweep
     3. Keep the mouse hovering.
 - **Capture command:**
   ```sh
-  cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+  ./target/debug/periscope -- screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/04-side-menu-handle.png
   ```
 - **Verify:** `⋮⋮` handle visible at the left edge of a block.
@@ -283,7 +283,7 @@ export OUT_DIR=target/periscope/phase-8-sweep
     3. Don't click elsewhere.
 - **Capture command:**
   ```sh
-  cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+  ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/05-formatting-toolbar.png
   ```
 - **Verify:** floating toolbar visible above a highlighted word
@@ -307,7 +307,7 @@ export OUT_DIR=target/periscope/phase-8-sweep
        pending 8.26 bridge work).
 - **Capture command:**
   ```sh
-  cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+  ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/06-wikilink-suggestion.png
   ```
 - **Verify:** popup visible at the cursor, list empty — caption the
@@ -326,18 +326,18 @@ export OUT_DIR=target/periscope/phase-8-sweep
 - **Steps:**
   - Expand / focus the sidebar `Views` section:
     ```sh
-    cargo run -q -p periscope -- click --pid $BIN_PID --raise \
+    ./target/debug/periscope click --pid $BIN_PID --raise \
         --id sidebar-section-views
     ```
   - Click the `Active Projects` row.  Coordinate-driven until
     `sidebar-row-views-active-projects` lands (see §6 wish list):
     ```sh
-    cargo run -q -p periscope -- click --pid $BIN_PID --raise \
+    ./target/debug/periscope click --pid $BIN_PID --raise \
         --x 120 --y 360
     ```
 - **Capture command:**
   ```sh
-  cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+  ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/07-raw-mode-yaml.png
   ```
 - **Verify:** editor area shows yaml content of
@@ -354,9 +354,9 @@ export OUT_DIR=target/periscope/phase-8-sweep
   - Refocus the note-list and click the first row (same as
     Scenario 02):
     ```sh
-    cargo run -q -p periscope -- click --pid $BIN_PID --raise \
+    ./target/debug/periscope click --pid $BIN_PID --raise \
         --id workspace-note-list
-    cargo run -q -p periscope -- click --pid $BIN_PID --raise \
+    ./target/debug/periscope click --pid $BIN_PID --raise \
         --x 220 --y 220
     ```
   - Drive **File → Save** through the menu bar.  `Cmd+S` is *not*
@@ -375,7 +375,7 @@ export OUT_DIR=target/periscope/phase-8-sweep
     ```
 - **Capture command:**
   ```sh
-  cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+  ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/08-save-round-trip.png
   ```
 - **Verify:** dirty indicator on `note-toolbar-sync` is **cleared**
@@ -400,7 +400,7 @@ export OUT_DIR=target/periscope/phase-8-sweep
     4. Keep the underlined composition preview on screen.
 - **Capture command:**
   ```sh
-  cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \
+  ./target/debug/periscope screenshot --pid $BIN_PID --raise \
       --out $OUT_DIR/09-ime-composition.png
   ```
 - **Verify:** composition preview (underlined Latin sequence above

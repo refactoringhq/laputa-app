@@ -32,6 +32,7 @@ use std::path::{Path, PathBuf};
 pub(crate) mod capture;
 #[cfg(target_os = "macos")]
 pub(crate) mod input;
+pub mod keyboard;
 pub mod tree_dump;
 #[cfg(target_os = "macos")]
 pub(crate) mod windows;
