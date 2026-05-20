@@ -42,7 +42,6 @@ use gpui::{
     div, App, Context, EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled,
     Task, Window,
 };
-use gpui_component::v_flex;
 use vault::{Note, NoteId};
 use workspace::Item;
 
@@ -546,12 +545,18 @@ impl Render for NoteItem {
         let toolbar =
             (!self.path.as_os_str().is_empty()).then(|| note_toolbar::render(&self.path, cx));
 
-        let container = v_flex().size_full().children(toolbar);
+        // Block-level flex column instead of `gpui_component::v_flex()`:
+        // the helper bundles `align-items: center`, which we don't want
+        // for a full-bleed WKWebView host.  See the
+        // [`render_toolbar_spans_full_pane_width`] test for the full
+        // Phase 8 worklist 1.2 investigation and the invariant the test
+        // locks.
+        let container = div().size_full().flex().flex_col().children(toolbar);
 
         #[cfg(target_os = "macos")]
         {
             if let Some(webview) = self.macos.webview.clone() {
-                return container.child(div().flex_1().child(InstrumentedWebView::new(
+                return container.child(div().flex_1().w_full().child(InstrumentedWebView::new(
                     webview,
                     self.macos.last_bounds.clone(),
                 )));
@@ -1345,5 +1350,91 @@ mod tests {
         assert_eq!(got.len(), 1, "dispatch task must emit a KeydownEvent");
         assert_eq!(got[0].key.as_ref(), "s");
         assert!(got[0].mods.meta);
+    }
+
+    /// Phase 8 worklist 1.2 — the rendered toolbar must span the full
+    /// pane width, locking the block-level column shape that hosts the
+    /// per-note WKWebView.
+    ///
+    /// The worklist 1.2 symptom on the host was "WebView renders, then
+    /// goes blank as soon as the mouse moves over the WKWebView area".
+    /// We can't reproduce the WKWebView side in a headless
+    /// `TestAppContext` (no `wry::WebView` to spawn — `new_for_tests`
+    /// constructs the entity *without* the macOS WebView slot).  What
+    /// we *can* lock in here is the structural property the running app
+    /// depends on: the column wrapper around the toolbar + WebView
+    /// container is a block-level flex column (`align-items: stretch`,
+    /// Taffy's default) so the WebView slot spans the full pane width
+    /// on every render, including after a hover-induced re-render.  If
+    /// a future change re-introduces `gpui_component::v_flex()` (whose
+    /// `items_center` flips cross-axis alignment to centre-with-shrink
+    /// in some Taffy paths) or otherwise lets the toolbar collapse, the
+    /// width assert below trips.
+    ///
+    /// This catches the **render-shape** class of regressions; the
+    /// orchestrator drives a periscope visual verification on the host
+    /// (no Screen Recording grants in the sandbox) to confirm the
+    /// editor stays painted across hover events.
+    #[gpui::test]
+    fn render_toolbar_spans_full_pane_width(cx: &mut gpui::TestAppContext) {
+        cx.update(gpui_component::init);
+
+        // Mount a `NoteItem` whose path is non-empty so the toolbar
+        // branch fires (the blank-WebView preload uses an empty path).
+        // Hold the window handle for the duration of the snapshot so
+        // a sibling test's window can't fire a paint pass between our
+        // `run_until_parked` and the `dump_to` below — the registry is
+        // a process-global `Mutex<…>`, so we re-trigger a paint right
+        // before snapshotting to guarantee `note-toolbar` reflects
+        // *this* window.
+        let window = cx.add_window(|_window, _cx| NoteItem::new_for_tests(fresh_note(42)));
+        cx.run_until_parked();
+        window
+            .update(cx, |_view, _window, cx| cx.notify())
+            .expect("notify on the freshly mounted NoteItem window");
+        cx.run_until_parked();
+
+        // `tempfile::NamedTempFile` gives us a unique path per call
+        // (no `process::id()` collision when two render-shape tests
+        // run side-by-side) and removes the file on drop — including
+        // on panic, unlike the manual `remove_file` dance.
+        let dump_file =
+            tempfile::NamedTempFile::new().expect("create temp dump file (test fixture)");
+        ui::tree_dump::dump_to(dump_file.path())
+            .expect("tree_dump::dump_to writes to a freshly-created temp file");
+        let raw = std::fs::read_to_string(dump_file.path())
+            .expect("we just wrote this file — read must succeed");
+        let dump: ui::tree_dump::DumpFile = serde_json::from_str(&raw)
+            .expect("tree_dump emits a stable JSON shape; if this trips, the wire format drifted");
+        let toolbar = dump
+            .entries
+            .get("note-toolbar")
+            .copied()
+            .expect("note-toolbar must be registered after a paint pass");
+
+        // A column-wrapper regression that re-introduces a
+        // `align-items: center` (or similar shrink-to-fit) parent shows
+        // up as the toolbar collapsing to its intrinsic content width
+        // (icons + breadcrumb ≈ 200–400 pt, well below half the pane).
+        // The 800-pt lower bound stays well clear of that failure mode
+        // while remaining stable across icon-set tweaks.
+        assert!(
+            toolbar.width > 800.0,
+            "note-toolbar collapsed to width={:.1} (expected ~pane width); \
+             a flex helper that flips `align-items` away from the default \
+             `stretch` makes the WebView slot shrink-to-fit and breaks \
+             the per-note WKWebView layout — see Phase 8 worklist 1.2.",
+            toolbar.width,
+        );
+
+        // Sanity: the row's height is exactly the configured strip
+        // height — locking it in here means a layout-engine drift
+        // wouldn't sneak past the width assert above.
+        assert!(
+            (toolbar.height - note_toolbar::NOTE_TOOLBAR_HEIGHT_PT).abs() < 0.5,
+            "note-toolbar height={:.1} (expected {})",
+            toolbar.height,
+            note_toolbar::NOTE_TOOLBAR_HEIGHT_PT,
+        );
     }
 }
