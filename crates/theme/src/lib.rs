@@ -1,11 +1,14 @@
-//! Theme global for Tolaria (ADR-0115 Phase 1).
+//! Theme global for Tolaria (ADR-0115 Phase 1 + Phase 8.12).
 //!
 //! Thin wrapper around `gpui_component`'s `Theme` global. `init` is
 //! idempotent: calling it multiple times is safe because
 //! `gpui_component::init` is itself idempotent.
 //!
-//! `reload_from_settings` is a stub in Phase 1 — real light/dark switching
-//! wires into `settings_store`'s observer in Phase 2.
+//! Phase 8.12 lit up `reload_from_settings` and added
+//! [`observe_settings_store`] so the live theme tracks every
+//! `SettingsStore::update` — flipping `settings.theme` in any consumer
+//! (settings panel, future settings actions, direct mutation in tests)
+//! propagates to the chrome on the next event-loop tick.
 
 use std::fmt;
 use std::str::FromStr;
@@ -53,6 +56,16 @@ impl ThemeChoice {
 impl fmt::Display for ThemeChoice {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+impl From<settings_store::ThemeChoice> for ThemeChoice {
+    fn from(value: settings_store::ThemeChoice) -> Self {
+        match value {
+            settings_store::ThemeChoice::System => Self::System,
+            settings_store::ThemeChoice::Light => Self::Light,
+            settings_store::ThemeChoice::Dark => Self::Dark,
+        }
     }
 }
 
@@ -128,14 +141,41 @@ pub fn cycle(cx: &mut gpui::App) {
     apply_choice(cx, next);
 }
 
-/// Reload the active theme from the current `SettingsStore` global.
+/// Reload the active theme from the current `SettingsStore` global
+/// (Phase 8.12).
 ///
-/// Phase 1 stub — `cx` is accepted now so the Phase 2 wiring
-/// (`SettingsStore::get(cx).theme` → `gpui_component` theme-switch API)
-/// is a non-breaking change. Currently logs the request and returns.
+/// Reads `SettingsStore::get(cx).theme` and forwards through
+/// [`apply_choice`], which calls `gpui_component`'s theme-switch API
+/// and re-applies the CSS-derived palette so the native chrome
+/// tracks the new mode.
+///
+/// No-op (with a warning) when no `SettingsStore` global is
+/// installed — letting callers register the observer before
+/// `SettingsStore::load_and_install` runs without an order-of-init
+/// panic.
 pub fn reload_from_settings(cx: &mut gpui::App) {
-    let _ = cx; // reserved for Phase 2
-    log::info!("theme reload requested (stub — real switching in Phase 2)");
+    if cx.try_global::<settings_store::SettingsStore>().is_none() {
+        log::warn!(
+            "theme::reload_from_settings: no SettingsStore global; \
+             skipping reload"
+        );
+        return;
+    }
+    let choice: ThemeChoice = settings_store::SettingsStore::get(cx).theme.into();
+    apply_choice(cx, choice);
+}
+
+/// Register a `cx.observe_global::<SettingsStore>` callback that
+/// re-applies the persisted theme choice whenever the settings
+/// store fires `NotifyGlobalObservers` — typically the moment
+/// `SettingsStore::update` writes a new value to disk.
+///
+/// Returned subscription is detached internally so callers don't
+/// have to thread it through the workspace lifetime.  The observer
+/// stays alive for the lifetime of the `App`.
+pub fn observe_settings_store(cx: &mut gpui::App) {
+    cx.observe_global::<settings_store::SettingsStore>(reload_from_settings)
+        .detach();
 }
 
 #[cfg(test)]
@@ -207,6 +247,62 @@ mod tests {
             assert!(
                 !theme.is_dark(),
                 "Theme::is_dark() must be false after Light"
+            );
+        });
+    }
+
+    /// Phase 8.12 — `reload_from_settings` must read the current
+    /// `SettingsStore::theme` and apply it to the live theme global.
+    #[gpui::test]
+    fn reload_from_settings_applies_persisted_theme(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            init(cx);
+            settings_store::SettingsStore::load_and_install(cx).expect("install settings store");
+            // Start by forcing Light so we can prove `reload_from_settings`
+            // actually moves the theme to whatever the store holds.
+            apply_choice(cx, ThemeChoice::Light);
+            settings_store::SettingsStore::update(cx, |s| {
+                s.theme = settings_store::ThemeChoice::Dark;
+            });
+
+            reload_from_settings(cx);
+
+            let theme = cx
+                .try_global::<gpui_component::theme::Theme>()
+                .expect("Theme global");
+            assert!(
+                theme.is_dark(),
+                "reload_from_settings must flip the live theme to match settings.theme"
+            );
+        });
+    }
+
+    /// Phase 8.12 — installing the observer must re-apply the theme
+    /// every time `SettingsStore::update` fires its global notification.
+    #[gpui::test]
+    fn observe_settings_store_reacts_to_runtime_change(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            init(cx);
+            settings_store::SettingsStore::load_and_install(cx).expect("install settings store");
+            apply_choice(cx, ThemeChoice::Light);
+            observe_settings_store(cx);
+        });
+
+        // Drive a settings change and wait for observers to fire.
+        cx.update(|cx| {
+            settings_store::SettingsStore::update(cx, |s| {
+                s.theme = settings_store::ThemeChoice::Dark;
+            });
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            let theme = cx
+                .try_global::<gpui_component::theme::Theme>()
+                .expect("Theme global");
+            assert!(
+                theme.is_dark(),
+                "observer must re-apply Dark after SettingsStore::update writes it"
             );
         });
     }

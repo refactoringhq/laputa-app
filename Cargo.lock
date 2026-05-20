@@ -7795,6 +7795,7 @@ dependencies = [
  "gpui-component",
  "gpui_platform",
  "log",
+ "settings_store",
 ]
 
 [[package]]

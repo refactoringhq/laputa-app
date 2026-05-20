@@ -12,6 +12,7 @@ anyhow.workspace = true
 gpui.workspace = true
 gpui-component.workspace = true
 log.workspace = true
+settings_store = { path = "../settings_store" }
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 gpui_platform = { workspace = true, features = ["test-support"] }

@@ -414,11 +414,12 @@ mod macos {
                     }
                 }
 
-                // 9. Re-apply theme whenever settings change.
-                cx.observe_global::<SettingsStore>(|cx| {
-                    theme::reload_from_settings(cx);
-                })
-                .detach();
+                // 9. Re-apply theme whenever settings change.  The
+                //    crate-level helper hides the
+                //    `cx.observe_global::<SettingsStore>(...).detach()`
+                //    boilerplate so future settings-aware observers
+                //    follow the same pattern.
+                theme::observe_settings_store(cx);
 
                 // 9b. Phase 7.9 — broadcast every theme change to the
                 //     embedded WKWebView so the editor body's `<html>`
