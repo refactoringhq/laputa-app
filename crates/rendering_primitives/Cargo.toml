@@ -1,0 +1,15 @@
+[package]
+name = "rendering_primitives"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+description = "Non-editor rendering surfaces (markdown / mermaid / whiteboard / file preview) for Tolaria (ADR-0115 Phase 8.21, Strand B)."
+
+[dependencies]
+gpui.workspace = true
+gpui-component.workspace = true
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+gpui_platform = { workspace = true, features = ["test-support"] }
