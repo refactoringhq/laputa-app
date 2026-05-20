@@ -155,10 +155,7 @@ fi
 # ── 0. TypeScript + Vite build ──────────────────────────────────────────
 echo ""
 echo "📦 [0/5] TypeScript + Vite build..."
-pnpm exec tsc --noEmit
-# TypeScript is checked explicitly above; run Vite directly here to avoid
-# paying for the package build script's duplicate `tsc -b` pass.
-pnpm exec vite build
+pnpm build
 echo "  ✅ Build OK"
 
 # ── 1. Frontend coverage (≥70%) — includes all unit tests ───────────────
