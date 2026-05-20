@@ -669,8 +669,9 @@ mod macos {
     use super::{NoteId, EDITOR_HOST_HTML};
     use anyhow::{Context as _, Result};
     use gpui::{
-        App, AppContext, Bounds, Context, Element, ElementId, Entity, GlobalElementId, IntoElement,
-        LayoutId, Pixels, Size as GpuiSize, Style, Window,
+        App, AppContext, Bounds, ContentMask, Context, Element, ElementId, Entity, GlobalElementId,
+        Hitbox, HitboxBehavior, IntoElement, LayoutId, MouseDownEvent, Pixels, Size as GpuiSize,
+        Style, Window,
     };
     use gpui_wry::WebView;
     use objc2_app_kit::{NSAutoresizingMaskOptions, NSColor, NSView};
@@ -884,7 +885,16 @@ mod macos {
 
     impl Element for InstrumentedWebView {
         type RequestLayoutState = ();
-        type PrepaintState = ();
+        /// The hitbox registered in [`Self::prepaint`].  Mirrors the
+        /// upstream `gpui_wry::WebViewElement::PrepaintState` so the
+        /// WKWebView region participates in GPUI hit-testing.  Without
+        /// this, the WebView's pixels live in a "hole" the GPUI mouse
+        /// pipeline considers empty space — moving the cursor into it
+        /// fires hover-leave on the surrounding chrome, triggers a
+        /// pane re-render, and the resulting paint pass causes the
+        /// WKWebView's remote CALayer to vanish.  See Phase 8
+        /// worklist 1.2.
+        type PrepaintState = Option<Hitbox>;
 
         fn id(&self) -> Option<ElementId> {
             None
@@ -915,47 +925,74 @@ mod macos {
             _: Option<&gpui::InspectorElementId>,
             bounds: Bounds<Pixels>,
             _: &mut Self::RequestLayoutState,
-            _: &mut Window,
+            window: &mut Window,
             cx: &mut App,
         ) -> Self::PrepaintState {
+            // Epsilon-compare guard: skip the underlying `set_bounds`
+            // when the new layout is within FRAME_EPSILON of the last
+            // one.  This dedupes no-op IPC calls into the WKWebView
+            // and is the core of the frame-sync behaviour — DO NOT
+            // remove without re-reading ADR-0115 §4.
             let prev = self.last_bounds.get();
-            if prev.map(|p| close_enough(p, bounds)).unwrap_or(false) {
-                return;
+            let bounds_changed = !prev.is_some_and(|p| close_enough(p, bounds));
+            if bounds_changed {
+                let rect = Rect {
+                    size: dpi::Size::Logical(LogicalSize {
+                        width: bounds.size.width.into(),
+                        height: bounds.size.height.into(),
+                    }),
+                    position: dpi::Position::Logical(LogicalPosition::new(
+                        bounds.origin.x.into(),
+                        bounds.origin.y.into(),
+                    )),
+                };
+                // On Err do NOT advance `last_bounds` — the epsilon
+                // guard would suppress the next prepaint and the
+                // NSView would stay stuck at the pre-resize geometry.
+                // Log so the visual stutter has a paper trail.
+                match self.webview.read(cx).set_bounds(rect) {
+                    Ok(()) => self.last_bounds.set(Some(bounds)),
+                    Err(e) => log::warn!(
+                        target: "note_item::frame_sync",
+                        "set_bounds failed; geometry will retry on next prepaint err={e:?}",
+                    ),
+                }
             }
-            let rect = Rect {
-                size: dpi::Size::Logical(LogicalSize {
-                    width: bounds.size.width.into(),
-                    height: bounds.size.height.into(),
-                }),
-                position: dpi::Position::Logical(LogicalPosition::new(
-                    bounds.origin.x.into(),
-                    bounds.origin.y.into(),
-                )),
-            };
-            // On Err do NOT advance `last_bounds` — the epsilon guard
-            // would suppress the next prepaint and the NSView would
-            // stay stuck at the pre-resize geometry.  Log so the
-            // visual stutter has a paper trail.
-            if let Err(e) = self.webview.read(cx).set_bounds(rect) {
-                log::warn!(
-                    target: "note_item::frame_sync",
-                    "set_bounds failed; geometry will retry on next prepaint err={e:?}",
-                );
-                return;
-            }
-            self.last_bounds.set(Some(bounds));
+
+            // ALWAYS insert the hitbox — even when `set_bounds` was
+            // skipped or failed.  The hitbox must reflect the current
+            // paint bounds so the WebView region participates in
+            // hover/click hit-testing on every frame.  Mirrors the
+            // upstream `gpui_wry::WebViewElement::prepaint`.
+            Some(window.insert_hitbox(bounds, HitboxBehavior::Normal))
         }
 
         fn paint(
             &mut self,
             _: Option<&GlobalElementId>,
             _: Option<&gpui::InspectorElementId>,
-            _: Bounds<Pixels>,
+            bounds: Bounds<Pixels>,
             _: &mut Self::RequestLayoutState,
-            _: &mut Self::PrepaintState,
-            _: &mut Window,
+            hitbox: &mut Self::PrepaintState,
+            window: &mut Window,
             _: &mut App,
         ) {
+            // Prefer the hitbox bounds (already clipped to the visible
+            // window region) over the raw element bounds — matches the
+            // upstream `gpui_wry::WebViewElement::paint`.
+            let bounds = hitbox.as_ref().map_or(bounds, |h| h.bounds);
+            window.with_content_mask(Some(ContentMask { bounds }), |window| {
+                let webview = self.webview.clone();
+                window.on_mouse_event(move |event: &MouseDownEvent, _, _, cx| {
+                    if !bounds.contains(&event.position) {
+                        // Click outside the WebView blurs WKWebView
+                        // focus so the next keystroke routes back to
+                        // the native chrome.  `WebView` derefs to
+                        // `wry::WebView`, which exposes `focus_parent`.
+                        let _ = webview.read(cx).focus_parent();
+                    }
+                });
+            });
         }
     }
 
@@ -1436,5 +1473,36 @@ mod tests {
             toolbar.height,
             note_toolbar::NOTE_TOOLBAR_HEIGHT_PT,
         );
+    }
+
+    /// Phase 8 worklist 1.2 regression: the `InstrumentedWebView`
+    /// element MUST register a GPUI hitbox covering the WKWebView's
+    /// paint bounds.  Without it, GPUI's hit-test pipeline considers
+    /// the WebView region empty space, so the first mouse move into
+    /// that region fires hover-leave on the surrounding chrome,
+    /// triggers a pane re-render, and the resulting paint pass
+    /// causes the WKWebView's remote CALayer to vanish.
+    ///
+    /// Headless tests can't construct or drive a real WKWebView
+    /// (it's macOS-only and requires a foreground NSWindow), so this
+    /// pins the *type-level* invariant: `PrepaintState` must carry
+    /// the hitbox.  A refactor that flips it back to `()` — the
+    /// shape that caused worklist 1.2 — fails to compile.  The
+    /// human-driven visual sweep still verifies the runtime
+    /// behaviour (mouse-into-WebView no longer blanks the surface).
+    #[cfg(target_os = "macos")]
+    #[gpui::test]
+    fn instrumented_webview_prepaint_state_carries_hitbox(_cx: &mut gpui::TestAppContext) {
+        // Static type assertion: `<InstrumentedWebView as Element>
+        // ::PrepaintState` is `Option<Hitbox>`.  If a future change
+        // restores the empty-tuple `PrepaintState`, this fn fails to
+        // type-check and the test won't compile — exactly the
+        // protection we want against silent regressions of the
+        // hit-test contract.
+        fn _assert_prepaint_state_is_optional_hitbox(
+            state: <InstrumentedWebView as gpui::Element>::PrepaintState,
+        ) -> Option<gpui::Hitbox> {
+            state
+        }
     }
 }
