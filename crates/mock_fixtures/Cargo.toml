@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 chrono.workspace = true
+flume.workspace = true
 gpui.workspace = true
 thiserror.workspace = true
 log.workspace = true

@@ -19,7 +19,7 @@ use serde_json::Value;
 // `NoteId` and `NoteKind` are re-exported from the `vault` crate so chrome
 // panels can accept either a real `vault::Vault` or a `MockVault` without
 // type-juggling at the boundary.  See ADR-0115 Phase 5a.
-pub use vault::{NoteId, NoteKind};
+pub use vault::{NoteId, NoteKind, VaultChanged};
 
 /// A single in-memory note record.  Carries the real-vault fields plus
 /// `content`, `created`, and `properties` for mock-specific chrome surfaces
@@ -122,6 +122,19 @@ impl MockVault {
         } else {
             Task::ready(Err(VaultError::NotFound(id)))
         }
+    }
+
+    /// Mirror [`vault::Vault::watch_events`]: returns an inert receiver
+    /// that never emits.  Lets chrome surfaces consume the same shape
+    /// against the mock or the real vault without conditional code.
+    #[must_use]
+    pub fn watch_events(&self) -> flume::Receiver<VaultChanged> {
+        // Hand back the receiver from a fresh unbounded channel and
+        // drop the sender, so the receiver is closed cleanly the
+        // moment a subscriber tries to recv — same observable shape
+        // as a watcher that simply never saw any events.
+        let (_tx, rx) = flume::unbounded::<VaultChanged>();
+        rx
     }
 
     /// IDs of notes whose **titles** contain `query` (case-insensitive substring).

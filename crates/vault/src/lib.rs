@@ -1,27 +1,36 @@
 #![forbid(unsafe_code)]
-//! Minimal vault service for Tolaria (ADR-0115 Phase 3-MVP).
+//! Vault service for Tolaria.
 //!
 //! Provides read / list / save over a directory of Markdown files.  The
 //! public API mirrors [`mock_fixtures::MockVault`] so chrome panels can be
 //! swapped with minimal call-site changes (Phase 5-MVP wires the swap into
 //! `sidebar_panel` / `note_list_pane` / the `tolaria` binary).
 //!
-//! # Limitations (Phase 3-MVP)
+//! # Phase 8.11 capabilities
 //!
-//! - **Synchronous IO** on the calling thread.  All `Task<T>` returns are
-//!   currently `Task::ready(...)`.  Phase 8 ("Service expansion") will move
-//!   long-running operations onto `cx.background_executor().spawn(...)` and
-//!   wire a file-system watcher for live invalidation.
-//! - **No watcher**.  Callers invoke [`Vault::rescan`] after external
-//!   mutations until the watcher lands.
-//! - **No symlink traversal**.  Symlinked directories are skipped during
-//!   `rescan` to avoid loops.
-//! - **No frontmatter parsing**.  `Note` ships title + path + kind +
-//!   modified-time + byte-size only.  The `frontmatter` service in Phase 8
-//!   will add structured properties.
-//! - **Markdown only**.  Assets (`.png`, `.pdf`, …) and folders are not
-//!   surfaced through `notes()` for MVP; they arrive with the asset/folder
-//!   tree work in later phases.
+//! - **Background IO** — [`Vault::open_at_async`] runs the initial scan
+//!   on `cx.background_executor()`; once an executor is installed via
+//!   [`Vault::set_executor`] every [`Vault::note_content`] read and
+//!   [`Vault::save`] write dispatches off the foreground thread.
+//! - **Frontmatter** — every [`Note`] carries a parsed
+//!   [`Frontmatter`] populated during the directory scan.  See
+//!   [`frontmatter::parse`] for the shape.
+//! - **Folders + assets** — [`Vault::folders`] / [`Vault::assets`]
+//!   expose vault-root-relative paths discovered during the scan,
+//!   sorted lexicographically.
+//! - **fs-watcher** — [`Vault::watch_events`] hands out a
+//!   `flume::Receiver<VaultChanged>` that fires after a 200 ms
+//!   debounce window for any create / modify / delete under the
+//!   vault root.  Phase 9.6 (`vault_lifecycle`) consumes the
+//!   receiver and routes invalidation back into [`Vault::rescan`].
+//!
+//! # Known limitations
+//!
+//! - **No symlink traversal**.  Symlinked directories are skipped
+//!   during `rescan` to avoid loops.
+//! - **Best-effort watcher**.  When the OS layer can't install the
+//!   watcher (inotify quota exhausted, exotic platform), the vault
+//!   still opens — the receiver simply stays silent.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -33,7 +42,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub mod frontmatter;
+pub mod watcher;
 pub use frontmatter::{Frontmatter, FrontmatterValue};
+pub use watcher::VaultChanged;
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -157,6 +168,20 @@ pub struct Vault {
     /// (`tolaria::main`) call [`set_executor`] before installing the
     /// vault as a `Global` so chrome surfaces get true async reads.
     background_executor: Option<BackgroundExecutor>,
+    /// Optional fs-watcher.  When present, `notify` events arriving on
+    /// the watcher's dispatch thread are coalesced (200 ms debounce)
+    /// and forwarded through `watch_tx`.  Subscribers obtain a
+    /// receiver via [`watch_events`].  Dropped together with the
+    /// `Vault` so no watcher thread / OS handle leaks.
+    watcher: Option<watcher::VaultWatcher>,
+    /// Sender end of the `VaultChanged` channel — held so the watcher
+    /// thread keeps a valid receiver target for the lifetime of the
+    /// vault.  The receiver side is exposed via [`watch_events`].
+    watch_tx: flume::Sender<VaultChanged>,
+    /// Receiver template — `flume::Receiver` is `Clone`, so handing
+    /// out a clone lets each subscriber consume independently without
+    /// stealing events from the others.
+    watch_rx: flume::Receiver<VaultChanged>,
 }
 
 impl Global for Vault {}
@@ -173,6 +198,7 @@ impl Vault {
             .as_ref()
             .canonicalize()
             .with_context(|| format!("canonicalising vault root {:?}", root.as_ref()))?;
+        let (watch_tx, watch_rx) = flume::unbounded::<VaultChanged>();
         let mut vault = Self {
             root,
             notes: HashMap::new(),
@@ -180,8 +206,19 @@ impl Vault {
             folders: Vec::new(),
             assets: Vec::new(),
             background_executor: None,
+            watcher: None,
+            watch_tx,
+            watch_rx,
         };
         vault.rescan_internal()?;
+        // Best-effort: a watcher failure (inotify quota, exotic
+        // platform) shouldn't keep the vault from opening.  Log and
+        // continue with `watcher = None`; subscribers will receive
+        // no events but the rest of the vault stays functional.
+        match watcher::VaultWatcher::spawn(&vault.root, vault.watch_tx.clone()) {
+            Ok(watcher) => vault.watcher = Some(watcher),
+            Err(err) => log::warn!("vault watcher disabled: {err:#}"),
+        }
         log::info!(
             "opened vault at {:?} with {} note(s)",
             vault.root,
@@ -215,6 +252,23 @@ impl Vault {
     #[must_use]
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// Subscribe to vault filesystem change events.
+    ///
+    /// Returns a `flume::Receiver` cloned from the vault's internal
+    /// channel.  Multiple subscribers can each hold their own clone
+    /// and drain independently — flume's bus semantics broadcast to
+    /// every receiver clone.
+    ///
+    /// When the OS watcher couldn't be installed (e.g. exotic
+    /// platform, inotify quota), the receiver stays open forever
+    /// without delivering events.  Subscribers should treat it as a
+    /// best-effort signal — Phase 9.6 `vault_lifecycle` wires this to
+    /// a workspace-level rescan trigger.
+    #[must_use]
+    pub fn watch_events(&self) -> flume::Receiver<VaultChanged> {
+        self.watch_rx.clone()
     }
 
     /// Install a [`BackgroundExecutor`] so subsequent reads / saves
@@ -768,6 +822,52 @@ mod tests {
         // in-memory cache.
         let on_disk = fs::read_to_string(&path).unwrap();
         assert_eq!(on_disk, "new content via async path");
+    }
+
+    #[test]
+    fn watch_events_receives_external_changes() {
+        use std::time::{Duration, Instant};
+
+        let dir = tempdir().unwrap();
+        write(dir.path(), "seed.md", "seed");
+        let v = Vault::open_at(dir.path()).unwrap();
+        let rx = v.watch_events();
+
+        // Give the OS watcher time to attach before kicking events.
+        std::thread::sleep(Duration::from_millis(100));
+
+        // Create -> modify -> delete a file inside the vault.
+        let p = v.root().join("touched.md");
+        std::fs::write(&p, "create").unwrap();
+        std::thread::sleep(Duration::from_millis(60));
+        std::fs::write(&p, "modify").unwrap();
+        std::thread::sleep(Duration::from_millis(60));
+        std::fs::remove_file(&p).unwrap();
+
+        // Drain the channel for up to 2 s; timing-tolerant.
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut seen_touched = false;
+        while Instant::now() < deadline {
+            match rx.recv_timeout(Duration::from_millis(50)) {
+                Ok(VaultChanged { paths }) => {
+                    if paths
+                        .iter()
+                        .any(|p| p.file_name().is_some_and(|n| n == "touched.md"))
+                    {
+                        seen_touched = true;
+                        break;
+                    }
+                }
+                Err(_) => continue,
+            }
+        }
+        assert!(
+            seen_touched,
+            "watch_events() must surface events for touched.md within 2 s"
+        );
+        // Drop the vault explicitly so we can assert the watcher
+        // thread is cleaned up on the test path too.
+        drop(v);
     }
 
     #[test]

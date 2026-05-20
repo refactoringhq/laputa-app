@@ -4623,6 +4623,7 @@ name = "mock_fixtures"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "flume",
  "gpui",
  "gpui_platform",
  "log",
