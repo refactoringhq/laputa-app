@@ -982,6 +982,7 @@ mod tests {
             kind: vault::NoteKind::Markdown,
             modified: Utc::now(),
             byte_size: 0,
+            frontmatter: vault::Frontmatter::default(),
         }
     }
 

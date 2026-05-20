@@ -32,6 +32,9 @@ use gpui::{Global, SharedString, Task};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub mod frontmatter;
+pub use frontmatter::{Frontmatter, FrontmatterValue};
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -92,6 +95,11 @@ pub enum NoteKind {
 /// Metadata for a single note.  The body is fetched lazily via
 /// [`Vault::note_content`]; cache management belongs to the caller (the
 /// `editor_host` crate in Phase 4-MVP).
+///
+/// `frontmatter` carries the parsed YAML block (Phase 8.11).  Empty for
+/// notes that don't begin with `---\n…\n---\n`; populated during the
+/// initial scan + on rescan so chrome surfaces can render properties
+/// without re-reading the file.
 #[derive(Debug, Clone)]
 pub struct Note {
     pub id: NoteId,
@@ -100,6 +108,16 @@ pub struct Note {
     pub kind: NoteKind,
     pub modified: DateTime<Utc>,
     pub byte_size: u64,
+    pub frontmatter: Frontmatter,
+}
+
+impl Note {
+    /// Parsed YAML frontmatter for this note.  Empty `Frontmatter` when
+    /// the note doesn't begin with a `---\n…\n---\n` block.
+    #[must_use]
+    pub fn frontmatter(&self) -> &Frontmatter {
+        &self.frontmatter
+    }
 }
 
 /// Recoverable errors from vault operations.
@@ -287,6 +305,10 @@ impl Vault {
                 .and_then(|s| s.to_str())
                 .map(|s| SharedString::from(s.to_owned()))
                 .unwrap_or_default();
+            let fm = std::fs::read_to_string(&path)
+                .ok()
+                .map(|raw| frontmatter::parse(&raw).0)
+                .unwrap_or_default();
             new_notes.insert(
                 id,
                 Note {
@@ -296,6 +318,7 @@ impl Vault {
                     kind: NoteKind::Markdown,
                     modified,
                     byte_size,
+                    frontmatter: fm,
                 },
             );
         }
@@ -462,6 +485,32 @@ mod tests {
         fs::remove_file(&path).unwrap();
         v.rescan().unwrap();
         assert_eq!(v.note_count(), 1);
+    }
+
+    #[test]
+    fn note_frontmatter_populated_on_open() {
+        let dir = tempdir().unwrap();
+        write(
+            dir.path(),
+            "n.md",
+            "---\ntype: Note\nstatus: Done\n---\n\n# body\n",
+        );
+        let v = Vault::open_at(dir.path()).unwrap();
+        let id = v.note_ids_sync()[0];
+        let note = v.notes.get(&id).expect("note exists");
+        assert_eq!(note.frontmatter().len(), 2);
+        assert!(note.frontmatter().get("type").is_some());
+        assert!(note.frontmatter().get("status").is_some());
+    }
+
+    #[test]
+    fn note_frontmatter_empty_when_absent() {
+        let dir = tempdir().unwrap();
+        write(dir.path(), "n.md", "no frontmatter here\n");
+        let v = Vault::open_at(dir.path()).unwrap();
+        let id = v.note_ids_sync()[0];
+        let note = v.notes.get(&id).expect("note exists");
+        assert!(note.frontmatter().is_empty());
     }
 
     #[test]
