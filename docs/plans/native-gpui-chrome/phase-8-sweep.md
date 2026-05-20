@@ -14,7 +14,7 @@ follow-up status entry.
 
 The sweep is split into two pieces:
 
-1. A thin harness script (`crates/periscope/tests/tolaria-harness.sh`)
+1. A thin harness script (`crates/periscope/tests/harness.sh`)
    that spawns `tolaria` against `demo-vault-v2` pinned to 1516×1052
    logical points, prints the binary pid + output directory, and
    blocks on stdin so the captures can be driven from a separate
@@ -82,7 +82,7 @@ captures land where §3 / §4 / §5 expect them.
 
 ```sh
 OUT_DIR=$REPO_ROOT/target/periscope/phase-8-sweep \
-    bash crates/periscope/tests/tolaria-harness.sh
+    bash crates/periscope/tests/harness.sh
 ```
 
 The script writes a banner like
@@ -110,10 +110,10 @@ cargo child and waits for it.
 
 ```sh
 OUT_DIR=$REPO_ROOT/target/periscope/phase-8-sweep \
-    bash crates/periscope/tests/tolaria-harness.sh --no-block
+    bash crates/periscope/tests/harness.sh --no-block
 # or
 OUT_DIR=$REPO_ROOT/target/periscope/phase-8-sweep \
-    BLOCK=0 bash crates/periscope/tests/tolaria-harness.sh
+    BLOCK=0 bash crates/periscope/tests/harness.sh
 ```
 
 `--no-block` keeps Tolaria alive in the foreground without the

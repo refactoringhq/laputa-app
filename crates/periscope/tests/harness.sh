@@ -66,15 +66,31 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+echo "==> Building periscope ($PROFILE)"
+PERISCOPE_BIN="$REPO_ROOT/target/$PROFILE/periscope"
+cargo build -q -p periscope "${PROFILE_FLAGS[@]}" && {
+    echo "==> Built periscope successfully: $PERISCOPE_BIN" >&2;
+} || {
+    echo "failed to build periscope" >&2; exit 1;
+}
+
+echo "==> Building tolaria ($PROFILE)"
+TOLARIA_BIN="$REPO_ROOT/target/$PROFILE/tolaria"
+cargo build -q -p tolaria "${PROFILE_FLAGS[@]}" && {
+    echo "==> Built tolaria successfully: $TOLARIA_BIN" >&2;
+} || {
+    echo "failed to build tolaria" >&2; exit 1;
+}
+
 echo "==> Launching tolaria ($PROFILE) against $VAULT at ${WIDTH}x${HEIGHT}"
-cargo run -q -p tolaria "${PROFILE_FLAGS[@]}" -- \
+"$TOLARIA_BIN" \
   --vault "$VAULT" --width "$WIDTH" --height "$HEIGHT" \
   >"$OUT_DIR/tolaria.stdout.log" 2>"$OUT_DIR/tolaria.stderr.log" &
 TOLARIA_PID=$!
 
 echo "==> Waiting up to 30s for the tolaria window"
 for _ in $(seq 1 60); do
-  BIN_PID="$(cargo run -q -p periscope -- list 2>/dev/null \
+  BIN_PID="$($PERISCOPE_BIN list 2>/dev/null \
     | awk -F'[= ]' '/^pid=.* app=tolaria/ {print $2; exit}')"
   [[ -n "$BIN_PID" ]] && break
   if ! kill -0 "$TOLARIA_PID" 2>/dev/null; then
@@ -96,7 +112,7 @@ echo "    BIN_PID=$BIN_PID"
 echo "    OUT_DIR=$OUT_DIR"
 echo ""
 echo "    Drive captures from another shell, e.g.:"
-echo "      cargo run -q -p periscope -- screenshot --pid $BIN_PID --raise \\"
+echo "      $PERISCOPE_BIN screenshot --pid $BIN_PID --raise \\"
 echo "          --out $OUT_DIR/00-light-baseline.png"
 echo ""
 echo "    Scenario list: see the consuming doc (e.g. \`docs/plans/native-gpui-chrome/phase-8-sweep.md\`)"

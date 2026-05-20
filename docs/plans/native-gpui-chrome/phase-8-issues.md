@@ -23,7 +23,7 @@
 
 **Status:** ⏳ pending — run on host before Phase 8 close-out.
 
-**Recipe:** see `phase-8-sweep.md`.  The sweep is now split into a thin spawn/teardown harness (`crates/periscope/tests/tolaria-harness.sh` — spawns `tolaria`, prints `BIN_PID` + `OUT_DIR`, blocks on stdin) and ten self-contained scenarios in the companion doc that an agent drives from a separate shell.  Five scenarios (slash menu, side-menu hover, formatting toolbar, wikilink popup, IME) still depend on human gestures — the doc flags each with an "Expected gap" note because `osascript keystroke` can't reach the WKWebView editor body (AGENTS.md §4) and periscope doesn't have synthetic-input primitives yet (see the wish list in §6 of the companion doc).
+**Recipe:** see `phase-8-sweep.md`.  The sweep is now split into a thin spawn/teardown harness (`crates/periscope/tests/harness.sh` — spawns `tolaria`, prints `BIN_PID` + `OUT_DIR`, blocks on stdin) and ten self-contained scenarios in the companion doc that an agent drives from a separate shell.  Five scenarios (slash menu, side-menu hover, formatting toolbar, wikilink popup, IME) still depend on human gestures — the doc flags each with an "Expected gap" note because `osascript keystroke` can't reach the WKWebView editor body (AGENTS.md §4) and periscope doesn't have synthetic-input primitives yet (see the wish list in §6 of the companion doc).
 
 **Why it's not automated yet:** periscope requires Screen Recording + Accessibility permissions on the parent terminal, plus a windowed Tolaria binary; the Anthropic agent sandbox can't satisfy either.
 
