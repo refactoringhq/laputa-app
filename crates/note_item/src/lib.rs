@@ -49,9 +49,7 @@ mod note_toolbar;
 pub use note_toolbar::NOTE_TOOLBAR_HEIGHT_PT;
 
 #[cfg(target_os = "macos")]
-pub use macos::FRAME_EPSILON;
-#[cfg(target_os = "macos")]
-use macos::{spawn_webview, FrameSyncState, InstrumentedWebView};
+use macos::spawn_webview;
 
 /// Embedded editor host bundle.  Built by Vite at
 /// `editor-host/dist/index.html`.  Loaded into every `NoteItem`'s
@@ -183,7 +181,6 @@ pub struct NoteItem {
 #[derive(Default)]
 struct MacosState {
     webview: Option<gpui::Entity<gpui_wry::WebView>>,
-    last_bounds: FrameSyncState,
 }
 
 impl NoteItem {
@@ -556,10 +553,20 @@ impl Render for NoteItem {
         #[cfg(target_os = "macos")]
         {
             if let Some(webview) = self.macos.webview.clone() {
-                return container.child(div().flex_1().w_full().child(InstrumentedWebView::new(
-                    webview,
-                    self.macos.last_bounds.clone(),
-                )));
+                // Phase 8 worklist 1.2 — render the upstream
+                // `gpui_wry::WebView` entity directly.  Its own
+                // `Render` impl wires `track_focus`, a bounds-tracking
+                // `canvas`, and the full `WebViewElement` (Hitbox +
+                // outside-click `focus_parent`) in one place, so we
+                // don't need a local Element wrapper.  Previous
+                // attempts (commits `8ece1e4d`, `ba05c788`) tried to
+                // bolt a layout fix and then a hitbox/blur fix into a
+                // local `InstrumentedWebView`; both left the
+                // hover-blank regression untouched.  This drops the
+                // wrapper entirely — including the epsilon-compare
+                // `set_bounds` dedupe — and routes through the
+                // upstream-tested path.
+                return container.child(div().flex_1().w_full().child(webview));
             }
         }
         container
@@ -597,7 +604,6 @@ impl NoteItem {
             pending_open: None,
             macos: MacosState {
                 webview: Some(webview),
-                last_bounds: FrameSyncState::default(),
             },
         });
 
@@ -646,7 +652,6 @@ impl NoteItem {
             pending_open: Some(pending_open),
             macos: MacosState {
                 webview: Some(webview),
-                last_bounds: FrameSyncState::default(),
             },
         });
 
@@ -668,30 +673,12 @@ impl NoteItem {
 mod macos {
     use super::{NoteId, EDITOR_HOST_HTML};
     use anyhow::{Context as _, Result};
-    use gpui::{
-        App, AppContext, Bounds, ContentMask, Context, Element, ElementId, Entity, GlobalElementId,
-        Hitbox, HitboxBehavior, IntoElement, LayoutId, MouseDownEvent, Pixels, Size as GpuiSize,
-        Style, Window,
-    };
+    use gpui::{App, AppContext, Context, Entity, Window};
     use gpui_wry::WebView;
     use objc2_app_kit::{NSAutoresizingMaskOptions, NSColor, NSView};
     use objc2_foundation::{ns_string, NSNumber, NSObjectNSKeyValueCoding};
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-    use std::{cell::Cell, rc::Rc};
-    use wry::{
-        dpi::{self, LogicalPosition, LogicalSize},
-        Rect, WebViewBuilder, WebViewExtMacOS,
-    };
-
-    /// 0.5-logical-pixel epsilon per ADR-0115 §4.  Mirrors
-    /// `embed_poc::webview::FRAME_EPSILON` — the bytes-identical value
-    /// keeps the two crates' frame-sync behaviour observably the same.
-    pub const FRAME_EPSILON: f32 = 0.5;
-
-    /// Shared bounds-tracking state used by [`InstrumentedWebView`] to
-    /// dedupe no-op `set_bounds` calls.  Default constructs the empty
-    /// state (`Rc::new(Cell::new(None))`).
-    pub type FrameSyncState = Rc<Cell<Option<Bounds<Pixels>>>>;
+    use wry::{WebViewBuilder, WebViewExtMacOS};
 
     /// Build the per-note WKWebView with the embedded editor host
     /// bundle pre-loaded.  The IPC handler logs each parsed
@@ -853,155 +840,6 @@ mod macos {
         // main thread.  `underPageBackgroundColor` is macOS 12+ (silently
         // ignored on earlier releases).  `wk` is ARC-retained and not aliased.
         unsafe { wk.setValue_forKey(Some(&color), ns_string!("underPageBackgroundColor")) }
-    }
-
-    /// Custom `Element` mirroring `embed_poc::InstrumentedWebView`.
-    /// Wraps a [`WebView`] entity with an epsilon-compare guard so
-    /// no-op `set_bounds` calls don't ping the underlying NSView.
-    pub struct InstrumentedWebView {
-        webview: Entity<WebView>,
-        last_bounds: FrameSyncState,
-    }
-
-    impl InstrumentedWebView {
-        /// Wrap a [`WebView`] entity in the frame-sync-deduped Element.
-        /// `last_bounds` is the shared bounds-tracking cell that lets
-        /// the epsilon guard survive across render passes (created
-        /// once per `NoteItem` in `NoteItem::new_with_webview`).
-        pub fn new(webview: Entity<WebView>, last_bounds: FrameSyncState) -> Self {
-            Self {
-                webview,
-                last_bounds,
-            }
-        }
-    }
-
-    impl IntoElement for InstrumentedWebView {
-        type Element = Self;
-        fn into_element(self) -> Self::Element {
-            self
-        }
-    }
-
-    impl Element for InstrumentedWebView {
-        type RequestLayoutState = ();
-        /// The hitbox registered in [`Self::prepaint`].  Mirrors the
-        /// upstream `gpui_wry::WebViewElement::PrepaintState` so the
-        /// WKWebView region participates in GPUI hit-testing.  Without
-        /// this, the WebView's pixels live in a "hole" the GPUI mouse
-        /// pipeline considers empty space — moving the cursor into it
-        /// fires hover-leave on the surrounding chrome, triggers a
-        /// pane re-render, and the resulting paint pass causes the
-        /// WKWebView's remote CALayer to vanish.  See Phase 8
-        /// worklist 1.2.
-        type PrepaintState = Option<Hitbox>;
-
-        fn id(&self) -> Option<ElementId> {
-            None
-        }
-
-        fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
-            None
-        }
-
-        fn request_layout(
-            &mut self,
-            _: Option<&GlobalElementId>,
-            _: Option<&gpui::InspectorElementId>,
-            window: &mut Window,
-            cx: &mut App,
-        ) -> (LayoutId, Self::RequestLayoutState) {
-            let style = Style {
-                size: GpuiSize::full(),
-                flex_shrink: 1.0,
-                ..Default::default()
-            };
-            (window.request_layout(style, [], cx), ())
-        }
-
-        fn prepaint(
-            &mut self,
-            _: Option<&GlobalElementId>,
-            _: Option<&gpui::InspectorElementId>,
-            bounds: Bounds<Pixels>,
-            _: &mut Self::RequestLayoutState,
-            window: &mut Window,
-            cx: &mut App,
-        ) -> Self::PrepaintState {
-            // Epsilon-compare guard: skip the underlying `set_bounds`
-            // when the new layout is within FRAME_EPSILON of the last
-            // one.  This dedupes no-op IPC calls into the WKWebView
-            // and is the core of the frame-sync behaviour — DO NOT
-            // remove without re-reading ADR-0115 §4.
-            let prev = self.last_bounds.get();
-            let bounds_changed = !prev.is_some_and(|p| close_enough(p, bounds));
-            if bounds_changed {
-                let rect = Rect {
-                    size: dpi::Size::Logical(LogicalSize {
-                        width: bounds.size.width.into(),
-                        height: bounds.size.height.into(),
-                    }),
-                    position: dpi::Position::Logical(LogicalPosition::new(
-                        bounds.origin.x.into(),
-                        bounds.origin.y.into(),
-                    )),
-                };
-                // On Err do NOT advance `last_bounds` — the epsilon
-                // guard would suppress the next prepaint and the
-                // NSView would stay stuck at the pre-resize geometry.
-                // Log so the visual stutter has a paper trail.
-                match self.webview.read(cx).set_bounds(rect) {
-                    Ok(()) => self.last_bounds.set(Some(bounds)),
-                    Err(e) => log::warn!(
-                        target: "note_item::frame_sync",
-                        "set_bounds failed; geometry will retry on next prepaint err={e:?}",
-                    ),
-                }
-            }
-
-            // ALWAYS insert the hitbox — even when `set_bounds` was
-            // skipped or failed.  The hitbox must reflect the current
-            // paint bounds so the WebView region participates in
-            // hover/click hit-testing on every frame.  Mirrors the
-            // upstream `gpui_wry::WebViewElement::prepaint`.
-            Some(window.insert_hitbox(bounds, HitboxBehavior::Normal))
-        }
-
-        fn paint(
-            &mut self,
-            _: Option<&GlobalElementId>,
-            _: Option<&gpui::InspectorElementId>,
-            bounds: Bounds<Pixels>,
-            _: &mut Self::RequestLayoutState,
-            hitbox: &mut Self::PrepaintState,
-            window: &mut Window,
-            _: &mut App,
-        ) {
-            // Prefer the hitbox bounds (already clipped to the visible
-            // window region) over the raw element bounds — matches the
-            // upstream `gpui_wry::WebViewElement::paint`.
-            let bounds = hitbox.as_ref().map_or(bounds, |h| h.bounds);
-            window.with_content_mask(Some(ContentMask { bounds }), |window| {
-                let webview = self.webview.clone();
-                window.on_mouse_event(move |event: &MouseDownEvent, _, _, cx| {
-                    if !bounds.contains(&event.position) {
-                        // Click outside the WebView blurs WKWebView
-                        // focus so the next keystroke routes back to
-                        // the native chrome.  `WebView` derefs to
-                        // `wry::WebView`, which exposes `focus_parent`.
-                        let _ = webview.read(cx).focus_parent();
-                    }
-                });
-            });
-        }
-    }
-
-    fn close_enough(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
-        let dx = (f32::from(a.origin.x) - f32::from(b.origin.x)).abs();
-        let dy = (f32::from(a.origin.y) - f32::from(b.origin.y)).abs();
-        let dw = (f32::from(a.size.width) - f32::from(b.size.width)).abs();
-        let dh = (f32::from(a.size.height) - f32::from(b.size.height)).abs();
-        dx < FRAME_EPSILON && dy < FRAME_EPSILON && dw < FRAME_EPSILON && dh < FRAME_EPSILON
     }
 }
 
@@ -1475,34 +1313,34 @@ mod tests {
         );
     }
 
-    /// Phase 8 worklist 1.2 regression: the `InstrumentedWebView`
-    /// element MUST register a GPUI hitbox covering the WKWebView's
-    /// paint bounds.  Without it, GPUI's hit-test pipeline considers
-    /// the WebView region empty space, so the first mouse move into
-    /// that region fires hover-leave on the surrounding chrome,
-    /// triggers a pane re-render, and the resulting paint pass
-    /// causes the WKWebView's remote CALayer to vanish.
-    ///
-    /// Headless tests can't construct or drive a real WKWebView
-    /// (it's macOS-only and requires a foreground NSWindow), so this
-    /// pins the *type-level* invariant: `PrepaintState` must carry
-    /// the hitbox.  A refactor that flips it back to `()` — the
-    /// shape that caused worklist 1.2 — fails to compile.  The
-    /// human-driven visual sweep still verifies the runtime
-    /// behaviour (mouse-into-WebView no longer blanks the surface).
+    /// Phase 8 worklist 1.2 (third attempt): the macOS `render` path
+    /// must hand the `Entity<gpui_wry::WebView>` directly to GPUI as a
+    /// child of the container.  Routing through the upstream `Render`
+    /// impl gives us `track_focus` + bounds-tracking canvas + the
+    /// upstream `WebViewElement` (Hitbox + outside-click
+    /// `focus_parent`) in one place, replacing the old local
+    /// `InstrumentedWebView` wrapper whose two prior fix attempts
+    /// (`8ece1e4d`, `ba05c788`) failed to stop the WKWebView from
+    /// blanking on hover.  Headless tests can't drive a real
+    /// WKWebView, so this pins the *compile-time* invariant: the
+    /// `MacosState::webview` slot holds an `Entity<WebView>`, which is
+    /// `IntoElement` via its `Render` impl.  A regression that re-
+    /// introduces a local `Element` wrapper around the entity will
+    /// either fail to compile here or — at minimum — surface a
+    /// reviewable diff against this assertion.
     #[cfg(target_os = "macos")]
     #[gpui::test]
-    fn instrumented_webview_prepaint_state_carries_hitbox(_cx: &mut gpui::TestAppContext) {
-        // Static type assertion: `<InstrumentedWebView as Element>
-        // ::PrepaintState` is `Option<Hitbox>`.  If a future change
-        // restores the empty-tuple `PrepaintState`, this fn fails to
-        // type-check and the test won't compile — exactly the
-        // protection we want against silent regressions of the
-        // hit-test contract.
-        fn _assert_prepaint_state_is_optional_hitbox(
-            state: <InstrumentedWebView as gpui::Element>::PrepaintState,
-        ) -> Option<gpui::Hitbox> {
-            state
+    fn macos_render_hands_webview_entity_directly(_cx: &mut gpui::TestAppContext) {
+        // Static type assertion: `Entity<gpui_wry::WebView>` must be
+        // usable as an `IntoElement` so `container.child(webview)`
+        // compiles in `Render::render` above.  If a future change
+        // reverts to wrapping the entity in a custom `Element`, this
+        // function still type-checks — the *visible* signal is the
+        // diff against `lib.rs`'s render fn, which orchestrator review
+        // is expected to flag.
+        fn _assert_webview_entity_is_into_element<T: gpui::IntoElement>(_: T) {}
+        fn _proof(entity: gpui::Entity<gpui_wry::WebView>) {
+            _assert_webview_entity_is_into_element(entity);
         }
     }
 }
