@@ -110,7 +110,7 @@ loop.
 6. The user may ask you to add new items, phrased as `[<severity>] <description>`,
    e.g. `[high] menu is broken`. Append the item to the matching section with the
    next available `<section>.<n>` number; drop the bracketed severity (the section
-   already encodes it).
+   already encodes it); be very brief in item description; explanations must go to notes under `---`.
 7. The area after `---` is for your per-sweep observations (environment notes,
    reproduction blockers, follow-up suggestions). Do not annotate individual
    issue lines — keep those clean.
