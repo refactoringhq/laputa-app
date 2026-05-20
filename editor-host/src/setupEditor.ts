@@ -4,6 +4,8 @@ import {
     createInlineContentSpec,
     defaultInlineContentSpecs,
 } from "@blocknote/core";
+import { createImeCompositionKeyGuardExtension } from "./imeCompositionKeyGuardExtension.ts";
+import { createRichEditorTransformErrorRecoveryExtension } from "./richEditorTransformErrorRecoveryExtension.ts";
 
 // ---------------------------------------------------------------------------
 // Editor factory
@@ -77,8 +79,31 @@ export function buildEditorSchema() {
     });
 }
 
+/** The stability extensions installed by `createEditor`.  Factored
+ *  out so the unit-tests can introspect the list (and so any future
+ *  row can re-use the same set when building a ad-hoc test editor).
+ *
+ *  Order matters in principle (extensions mount in array order), but
+ *  these two are independent — the transform-error recovery wraps
+ *  `view.dispatch`, the IME guard installs a `keydown` capture
+ *  listener; neither affects the other. */
+export function buildStabilityExtensions() {
+    return [
+        // Wraps `view.dispatch` so the editor survives stale /
+        // mismatched / invalid-content transactions (Phase 8.27).
+        // First so it's the outermost handler — if the IME guard ever
+        // grows a dispatch hook in the future, recovery still wraps it.
+        createRichEditorTransformErrorRecoveryExtension(),
+        // Capture-phase `keydown` listener that swallows IME-composition
+        // Enter so BlockNote's list extension doesn't split items
+        // while the macOS candidate window is committing (Phase 8.27,
+        // Phase 0 §6 trigger #2).
+        createImeCompositionKeyGuardExtension(),
+    ];
+}
+
 /**
- * Build a BlockNoteEditor with the Phase 8.26 configuration.
+ * Build a BlockNoteEditor with the Phase 8.27 configuration.
  *
  * Subsequent Strand C rows extend this factory rather than the React
  * component so the editor-construction surface stays in one place.
@@ -103,5 +128,9 @@ export function createEditor(): BlockNoteEditor {
         // narrow return type avoids forcing every call site to thread
         // generic parameters through.
         schema: buildEditorSchema(),
+        // Stability extensions ported from the Tauri-era app.  Future
+        // Strand C rows (8.28 regressions, 8.29 raw-mode fallback)
+        // append to the array returned by `buildStabilityExtensions`.
+        extensions: buildStabilityExtensions(),
     }) as unknown as BlockNoteEditor;
 }

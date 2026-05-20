@@ -10,6 +10,7 @@ import {
     WIKILINK_MIN_QUERY_LENGTH,
     buildWikilinkGetItems,
 } from "./wikilinkSuggestion.ts";
+import { useEditorComposing } from "./useEditorComposing.ts";
 
 // ---------------------------------------------------------------------------
 // Bridge dispatch (pure-logic helper, exported for tests)
@@ -187,6 +188,18 @@ export function EditorApp() {
         };
     }, [editor]);
 
+    // IME composition tracking (Phase 8.27).  The hook installs
+    // capture-phase listeners on `document` so composition events
+    // from any descendant of the editor element register, then exposes
+    // an `isComposing` flag.  We surface the flag on the wrapper
+    // `data-` attribute so menus / future shortcut handlers can read
+    // it without prop-drilling through the menu controllers.
+    //
+    // The IME *key* guard (Enter-during-composition) is wired as a
+    // BlockNote extension in `setupEditor.ts`; this hook is the
+    // higher-level state signal used by the React side.
+    const isComposing = useEditorComposing(editor);
+
     // Wikilink suggestion menu (Phase 8.26).  Stable `getItems`
     // closure for the editor's lifetime — the underlying provider
     // currently returns an empty list because the native bridge does
@@ -204,7 +217,11 @@ export function EditorApp() {
         // gives 8.28+ a natural seat for image-drop / lightbox /
         // copy-target overlays.  Sized to fill the WKWebView via the
         // existing `style.css` rules.
-        <div ref={containerRef} className="editor-host-container">
+        <div
+            ref={containerRef}
+            className="editor-host-container"
+            data-composing={isComposing ? "true" : "false"}
+        >
             <BlockNoteViewRaw
                 editor={editor}
                 theme={theme}
