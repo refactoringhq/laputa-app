@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Settings panel modal for Tolaria (ADR-0115 Phase 2d).
+//! Settings panel modal for Tolaria (ADR-0115 Phase 2d → Phase 8.14).
 //!
 //! Implements `workspace::ModalView` so it can be mounted into `TolariaWorkspace`
 //! via `ModalLayer::toggle_modal`.
@@ -7,8 +7,8 @@
 //! Layout:
 //! ```text
 //! ┌──────────────────────────────────────────────────┐
-//! │ General  │  General settings (Phase 3 wires …)   │
-//! │ Editor   │                                        │
+//! │ General  │  Theme               Light             │
+//! │ Editor   │  Version             1                 │
 //! │ Git      │                                        │
 //! │ AI       │                                        │
 //! │ Vault    │                                        │
@@ -16,7 +16,11 @@
 //! ```
 //!
 //! The active tab is highlighted with the theme's `tab_active` background.
-//! Each right-pane content area is a placeholder pending Phase 3 controls.
+//! Each right-pane content area renders one row per known field, with
+//! `field_name` on the left and the current read-only value on the right.
+//! Fields that the schema does not yet expose are surfaced as a single
+//! "Phase 9 wires editing" placeholder row so the panel is a faithful
+//! scaffold rather than a live editor.
 //!
 //! # Usage
 //!
@@ -131,16 +135,103 @@ impl workspace::ModalView for SettingsPanel {} // marker impl — intentionally 
 // Render
 // ---------------------------------------------------------------------------
 
+/// One row in the settings-content pane: a left-aligned field name
+/// and a right-aligned value.  Pure helper — kept as a free function
+/// so each tab's renderer reads as a flat list of rows.
+fn settings_row(
+    name: &'static str,
+    value: SharedString,
+    fg: gpui::Hsla,
+    muted: gpui::Hsla,
+) -> gpui::AnyElement {
+    div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .justify_between()
+        .py(px(6.0))
+        .text_sm()
+        .child(
+            div()
+                .text_color(muted)
+                .child(SharedString::new_static(name)),
+        )
+        .child(div().text_color(fg).child(value))
+        .into_any_element()
+}
+
+/// Single-row note shown for a tab that hasn't been wired to an
+/// editable backing store yet.  Lands as a Phase 9 follow-up; the
+/// row keeps the layout consistent so the empty tabs aren't blank.
+fn pending_row(muted: gpui::Hsla) -> gpui::AnyElement {
+    div()
+        .py(px(6.0))
+        .text_sm()
+        .text_color(muted)
+        .child(SharedString::new_static(
+            "Phase 9 wires editing for this tab.",
+        ))
+        .into_any_element()
+}
+
 impl Render for SettingsPanel {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let active = self.active;
-        let tab_active_bg = cx.theme().tab_active;
-        let tab_active_fg = cx.theme().tab_active_foreground;
+        let theme = cx.theme();
+        let tab_active_bg = theme.tab_active;
+        let tab_active_fg = theme.tab_active_foreground;
+        let fg = theme.foreground;
+        let muted = theme.muted_foreground;
+        let settings = &self.settings;
 
-        let content_label = SharedString::from(format!(
-            "{} settings (Phase 3 wires controls)",
-            active.label(),
-        ));
+        // Right-pane content is a flat list of `settings_row` entries
+        // per tab.  Tabs with no live-readable fields fall through to
+        // a single "Phase 9 wires editing" placeholder.
+        let content: gpui::AnyElement = match active {
+            SettingsTab::General => div()
+                .flex()
+                .flex_col()
+                .child(settings_row(
+                    "Theme",
+                    SharedString::from(format!("{:?}", settings.theme)),
+                    fg,
+                    muted,
+                ))
+                .child(settings_row(
+                    "Schema version",
+                    SharedString::from(settings.version.to_string()),
+                    fg,
+                    muted,
+                ))
+                .into_any_element(),
+            SettingsTab::Editor | SettingsTab::Git | SettingsTab::Ai => pending_row(muted),
+            SettingsTab::Vault => div()
+                .flex()
+                .flex_col()
+                .child(settings_row(
+                    "Window width (pt)",
+                    SharedString::from(format!("{}", settings.window.width)),
+                    fg,
+                    muted,
+                ))
+                .child(settings_row(
+                    "Window height (pt)",
+                    SharedString::from(format!("{}", settings.window.height)),
+                    fg,
+                    muted,
+                ))
+                .child(settings_row(
+                    "Restore window position",
+                    SharedString::from(if settings.window.restore_position {
+                        "Yes"
+                    } else {
+                        "No"
+                    }),
+                    fg,
+                    muted,
+                ))
+                .into_any_element(),
+        };
 
         div()
             .flex()
@@ -152,9 +243,6 @@ impl Render for SettingsPanel {
                     let btn = Button::new(tab.element_id())
                         .label(SharedString::from(tab.label()))
                         .ghost();
-
-                    // Wrap in a container so we can apply the active-tab
-                    // background without reaching into the Button internals.
                     div()
                         .w_full()
                         .px(px(4.0))
@@ -166,7 +254,7 @@ impl Render for SettingsPanel {
                         .into_any_element()
                 }),
             ))
-            .child(div().flex_1().p(px(16.0)).child(content_label))
+            .child(div().flex_1().p(px(16.0)).child(content))
     }
 }
 
@@ -239,5 +327,21 @@ mod tests {
             5,
             "SettingsTab::ALL must contain exactly 5 tabs"
         );
+    }
+
+    /// Phase 8.14 — every tab must render without panicking under a
+    /// seeded `MockSettings` global, including the "Phase 9 wires
+    /// editing" placeholder tabs (Editor / Git / AI).
+    #[gpui::test]
+    fn every_tab_renders_under_seeded_settings(cx: &mut TestAppContext) {
+        install_theme(cx);
+        cx.update(|cx| cx.set_global(MockSettings::seeded()));
+        let window = cx.add_window(|_window, cx| SettingsPanel::new(cx));
+        for &tab in SettingsTab::ALL {
+            window
+                .update(cx, |panel, _window, cx| panel.set_active(tab, cx))
+                .expect("window must be alive");
+            cx.run_until_parked();
+        }
     }
 }
