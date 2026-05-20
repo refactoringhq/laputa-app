@@ -182,6 +182,40 @@ mod macos {
         cx.on_action(move |_: &A, _| log::info!("{label}: {note}"));
     }
 
+    /// Resolve the active window's root view, downcast to
+    /// [`workspace::TolariaWorkspace`], and run `f` against it.  No-op
+    /// (with a debug log) when there is no active window or the root
+    /// view is not a `TolariaWorkspace` (e.g. a Phase 11 modal-only
+    /// window in the future).
+    ///
+    /// Centralises the active-window → workspace-entity hop so each
+    /// new workspace-level action handler stays a single-line
+    /// dispatch.
+    fn dispatch_to_workspace<F>(label: &'static str, cx: &mut App, f: F)
+    where
+        F: FnOnce(
+            &mut workspace::TolariaWorkspace,
+            &mut gpui::Context<workspace::TolariaWorkspace>,
+        ),
+    {
+        let Some(handle) = cx.active_window() else {
+            log::debug!("{label}: no active window");
+            return;
+        };
+        if let Err(err) =
+            handle.update(cx, |root, _window, app_cx| match root
+                .downcast::<workspace::TolariaWorkspace>()
+            {
+                Ok(workspace) => workspace.update(app_cx, f),
+                Err(_) => {
+                    log::debug!("{label}: active window root is not TolariaWorkspace");
+                }
+            })
+        {
+            log::error!("{label} dispatch failed: {err:#}");
+        }
+    }
+
     pub fn run() {
         env_logger::Builder::new()
             .filter_module("tolaria", log::LevelFilter::Info)
@@ -228,20 +262,80 @@ mod macos {
 
                 // 6. Global action handlers.
                 cx.on_action(|_: &actions::Quit, cx| cx.quit());
-                log_stub::<actions::CloseWindow>(
-                    cx,
-                    "CloseWindow",
-                    "Phase 2 will close the focused window via cx.active_window()",
-                );
+
+                // CloseWindow — close the active window via its handle.
+                // No-op when there is no active window (e.g. between
+                // close and reopen).
+                cx.on_action(|_: &actions::CloseWindow, cx| {
+                    let Some(handle) = cx.active_window() else {
+                        log::debug!("CloseWindow: no active window");
+                        return;
+                    };
+                    if let Err(err) = handle.update(cx, |_, window, _| window.remove_window()) {
+                        log::error!("CloseWindow update failed: {err:#}");
+                    }
+                });
+
+                // ReloadKeymap — re-run `actions::init` so user-keymap
+                // edits land without restarting the app.  Logs a
+                // diagnostic so triage can see the reload happened.
+                cx.on_action(|_: &actions::ReloadKeymap, cx| {
+                    actions::init(cx);
+                    log::info!("ReloadKeymap: keymap reloaded");
+                });
+
+                // OpenSettings stays as a log stub until Phase 8.14
+                // lands the settings panel as a real workspace surface
+                // (today's `settings_panel` crate is shape-only).
                 log_stub::<actions::OpenSettings>(
                     cx,
                     "OpenSettings",
-                    "Phase 2 will push the settings panel onto TolariaWorkspace",
+                    "Phase 8.14 will push settings_panel onto TolariaWorkspace via toggle_modal",
                 );
-                log_stub::<actions::ReloadKeymap>(
+
+                // ToggleSidebar — flip the workspace's left dock open
+                // / closed.  Mirrors the title-bar sidebar-toggle
+                // button so the keymap shortcut and the visual
+                // affordance share one code path.
+                cx.on_action(|_: &actions::ToggleSidebar, cx| {
+                    dispatch_to_workspace("ToggleSidebar", cx, |ws, cx| ws.toggle_left_dock(cx));
+                });
+
+                // CloseTab — close the active item in the center
+                // pane group's active pane.  No-op when nothing is
+                // open.
+                cx.on_action(|_: &actions::CloseTab, cx| {
+                    dispatch_to_workspace("CloseTab", cx, |ws, cx| ws.close_active_tab(cx));
+                });
+
+                // Save / NewNote / QuickOpen / CommandPalette stay as
+                // log stubs.  `Save` needs the active `NoteItem` entity
+                // (Phase 8.3 wired the editor-host SaveRequest path but
+                // the workspace doesn't yet thread the active item to
+                // a global Save handler — that's Phase 9.1
+                // `command_registry` work).  `NewNote` needs a vault
+                // write path (Phase 8.11).  `QuickOpen` /
+                // `CommandPalette` need the modal surfaces (Phase 11.1
+                // / 11.2).
+                log_stub::<actions::Save>(
                     cx,
-                    "ReloadKeymap",
-                    "Phase 2 will re-run actions::init to reload the user keymap",
+                    "Save",
+                    "Phase 9.1 (command_registry) will route Save to the active NoteItem",
+                );
+                log_stub::<actions::NewNote>(
+                    cx,
+                    "NewNote",
+                    "Phase 8.11 (vault background executor) will create a fresh note via Vault",
+                );
+                log_stub::<actions::QuickOpen>(
+                    cx,
+                    "QuickOpen",
+                    "Phase 11.2 (quick_open) will push the quick-open palette as a modal",
+                );
+                log_stub::<actions::CommandPalette>(
+                    cx,
+                    "CommandPalette",
+                    "Phase 11.1 (command_palette) will push the command palette as a modal",
                 );
                 // `Cmd+Alt+I` toggles GPUI's built-in element-picker
                 // inspector (always available in debug builds; in release

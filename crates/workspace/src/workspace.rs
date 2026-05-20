@@ -175,6 +175,25 @@ impl TolariaWorkspace {
             .update(cx, |dock, cx| dock.set_panel(panel, cx));
     }
 
+    /// Flip the left [`Dock`] between `Open` and `Closed`.  Phase 8.8
+    /// `actions::ToggleSidebar` dispatches through this method so the
+    /// keymap-driven shortcut matches the title-bar toggle button
+    /// (which calls `Dock::toggle` directly).
+    pub fn toggle_left_dock(&self, cx: &mut App) {
+        self.left_dock.update(cx, |dock, cx| dock.toggle(cx));
+    }
+
+    /// Close the active item in the center pane group's active pane.
+    /// Phase 8.8 `actions::CloseTab` dispatches through this method so
+    /// the keymap-driven shortcut and any future tab-strip context
+    /// menu share one code path.  No-op when no pane is active.
+    pub fn close_active_tab(&self, cx: &mut App) {
+        let Some(active_pane) = self.center_group.read(cx).active_pane().cloned() else {
+            return;
+        };
+        active_pane.update(cx, |pane, cx| pane.close_active(cx));
+    }
+
     /// Mount `view` in the fixed-position column between the left
     /// [`Dock`] and the center [`PaneGroup`].  Used to host
     /// `note_list_pane::NoteListPane` next to the vault-tree sidebar,
