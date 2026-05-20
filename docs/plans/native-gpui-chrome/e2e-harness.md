@@ -461,6 +461,62 @@ banner; see [§Long debug session](#long-debug-session--spawn-harness)).
 
 ---
 
+## Observing editor-host logs
+
+Every `console.{log,info,warn,error,debug}` call inside the
+`editor-host/` bundle — plus every uncaught `Error` and unhandled
+promise rejection — is forwarded from the WKWebView to Tolaria's
+in-process `env_logger` stream under the **`webview`** target.
+(Worklist 2.25 wired this up via a `with_initialization_script` shim
+in `crates/note_item/src/lib.rs::macos::spawn_webview` that posts
+`{"__t":"console_log","level","msg"}` envelopes through the same
+`window.ipc.postMessage` channel as `editor_bridge`; the IPC handler
+discriminates the envelope before falling through to
+`editor_bridge::decode_from_host`.)
+
+Launch tolaria with `RUST_LOG` set to whichever slice you need:
+
+| Use case | `RUST_LOG=` | Effect |
+|---|---|---|
+| Just the WebView, every level | `webview=debug` | Only `target=webview` lines; `console.debug` included |
+| Normal Tolaria logs + verbose WebView | `info,webview=debug` | Rust at info; WebView at debug (recommended default for debugging) |
+| WebView only, drop the noise | `webview=info` | `console.log` / `info` / `warn` / `error` only; `console.debug` dropped |
+| Everything everywhere | `debug` | All targets at debug — loud, but useful when triaging cross-layer races |
+
+The JS `console.log` channel has no direct Rust level, so it maps to
+`Info`; unknown level strings map to `Info` too so typos upstream
+never silently drop a line.  Uncaught errors arrive as
+`level=error` with `[uncaught] <message> at <file>:<line>:<col>` and
+a stack trace; unhandled promise rejections arrive as `level=error`
+with `[unhandledrejection] <stack-or-string>`.
+
+Example session — observing the BlockNote `e.SideMenu.Button` throw
+that took worklist 1.2 three wrong-angle attempts to find without
+this hook:
+
+```sh
+RUST_LOG=info,webview=debug ./target/debug/tolaria --vault demo-vault-v2
+# ...open a note, mouse over the editor body...
+# [INFO  webview] id=NoteId(1) [editor-host:from_host] {"k":"ready"}
+# [ERROR webview] id=NoteId(1) [uncaught] TypeError: undefined is not an object (evaluating 'e.SideMenu.Button')
+#                 at index.html:1:12345
+#                 <stack lines>
+```
+
+When `tolaria` is already running under the spawn harness (see
+[§Long debug session](#long-debug-session--spawn-harness)) the
+inherited environment already includes whatever `RUST_LOG` the
+parent terminal had at launch.  To change levels mid-session, tear
+down (press `<enter>` in the harness terminal) and respawn with
+the desired `RUST_LOG` — there's no live-reload for `env_logger`.
+
+The shim is a no-op when `window.ipc?.postMessage` is missing, so
+the same bundle still works under `pnpm dev` / vitest / a plain
+browser tab; logs only flow to the host when the bundle is loaded
+inside the WKWebView.
+
+---
+
 ## Failure modes and what to do
 
 | Symptom | Likely cause | Fix |
