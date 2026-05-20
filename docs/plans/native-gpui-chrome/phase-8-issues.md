@@ -10,7 +10,7 @@
 2.1. ✅ Note list top bar title need to reflect the title of the iems selected in the side bar
 2.2. ✅ On startup Note List shows some note is slected. The note view should show an empty note state. It is the same as in React variant.
 2.3. ✅ Active Projects view filer does not work
-2.4. ✅ All clikable buttons lack the hints
+2.4. ✅ All clikable buttons lack the hints (note-toolbar tooltips now render in a `WindowKind::PopUp` panel via `ui::OverlayTooltipExt`, beating the WKWebView sibling-NSView z-order; remaining chrome crates keep gpui_component's inline tooltip for now)
 2.5. ✅ Vault picker popup does not close on focs loss
 2.6. ✅ Side bar Types, Views, Folder are not collpsable
 2.7. ✅ System menu is missing items for File, View, Help
