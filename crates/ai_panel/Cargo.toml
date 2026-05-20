@@ -13,6 +13,7 @@ gpui-component.workspace = true
 mock_fixtures = { path = "../mock_fixtures" }
 workspace = { path = "../workspace" }
 actions = { path = "../actions" }
+serde_json.workspace = true
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 gpui_platform = { workspace = true, features = ["test-support"] }
