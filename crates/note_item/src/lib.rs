@@ -37,9 +37,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
 pub use editor_bridge::ThemeMode;
-use editor_bridge::{encode_to_host, FromHost, NoteOpen, ToHost};
+use editor_bridge::{encode_to_host, FromHost, Mods, NoteOpen, ToHost};
 use gpui::{
-    div, App, Context, IntoElement, ParentElement, Render, SharedString, Styled, Task, Window,
+    div, App, Context, EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled,
+    Task, Window,
 };
 use gpui_component::v_flex;
 use vault::{Note, NoteId};
@@ -59,8 +60,36 @@ use macos::{spawn_webview, FrameSyncState, InstrumentedWebView};
 pub const EDITOR_HOST_HTML: &str = include_str!("../../../editor-host/dist/index.html");
 
 // ---------------------------------------------------------------------------
-// Outcome
+// Events (Phase 8.3)
 // ---------------------------------------------------------------------------
+
+/// Emitted by [`NoteItem`] when the embedded editor reports a click
+/// on a `[[wikilink]]` or external `<a>` tag.  Workspace subscribers
+/// (Phase 5d-followup + 8.13) route wikilinks through
+/// [`vault::Vault::search_titles`] and external URLs through
+/// `cx.open_url`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkClickEvent {
+    /// Classified target as produced by [`LinkTarget::classify`].
+    pub target: LinkTarget,
+}
+
+/// Emitted by [`NoteItem`] when the embedded editor relays a
+/// shortcut-shaped keydown (any of Cmd/Ctrl/Alt held).  Workspace
+/// subscribers route into the action registry so editor-side
+/// shortcuts reach the native keymap (Phase 9.1 `command_registry`).
+///
+/// Pre-Phase 9.1 the workspace can use the `key`+`mods` pair to
+/// dispatch a specific [`gpui::Action`] directly via
+/// `cx.dispatch_action`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeydownEvent {
+    /// Logical key name as reported by the editor (mirrors the DOM
+    /// `KeyboardEvent.key` value, e.g. `"s"`, `"Enter"`, `"ArrowDown"`).
+    pub key: SharedString,
+    /// Modifier mask in effect when the key was pressed.
+    pub mods: Mods,
+}
 
 /// Classified link target from [`Outcome::NavigateLink`].  Lets the
 /// caller dispatch into `vault::search_titles` (for wikilinks) or
@@ -90,6 +119,10 @@ impl LinkTarget {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Outcome
+// ---------------------------------------------------------------------------
+
 /// Outcome of [`NoteItem::apply_from_host`].  Lets the caller (the IPC
 /// dispatch loop) know what side-effects to schedule — the pure-logic
 /// handler itself never touches `vault` or the WebView.
@@ -109,6 +142,12 @@ pub enum Outcome {
     },
     /// Caller should resolve a wikilink target or open an external URL.
     NavigateLink(LinkTarget),
+    /// Caller should dispatch the relayed shortcut into the native
+    /// action registry.  Carries the canonical [`KeydownEvent`] shape
+    /// so the dispatch loop can emit it without re-allocating, and
+    /// keeps the public `Outcome` enum free of the `FromHost` transport
+    /// type that the pure-logic handler has already parsed.
+    DispatchKeydown(KeydownEvent),
     /// Editor just announced [`FromHost::Ready`] and a queued
     /// [`NoteOpen`] was waiting in `pending_open` — caller must inject
     /// it into the WebView.  Surfaces the drain as part of the
@@ -211,7 +250,10 @@ impl NoteItem {
                 Outcome::PersistSave { body: s.body }
             }
             FromHost::LinkClick(l) => Outcome::NavigateLink(LinkTarget::classify(l.target)),
-            FromHost::Keydown(_) => Outcome::None,
+            FromHost::Keydown(k) => Outcome::DispatchKeydown(KeydownEvent {
+                key: SharedString::from(k.key),
+                mods: k.mods,
+            }),
         }
     }
 
@@ -324,40 +366,75 @@ impl NoteItem {
         Ok(())
     }
 
-    /// Serialise `payload` and inject it into the WKWebView via
-    /// `tolariaBridge.receive(...)`.  No-op on non-macOS builds.
+    /// Serialise `msg` and inject it into the embedded WKWebView via
+    /// `tolariaBridge.receive(...)`.  `label` is included in every
+    /// `# Errors` context message so the failure point is identifiable
+    /// without backtracking through stack frames.  No-op on non-macOS
+    /// builds.  Shared by [`Self::send_note_open`] and
+    /// [`Self::send_save_request`] (and any future single-message
+    /// dispatch path) so the encode → JS-literal → `evaluate_script`
+    /// pipeline lives in exactly one place.
     ///
     /// # Errors
     ///
     /// - [`encode_to_host`] fails (should not happen for a typed
-    ///   [`NoteOpen`], but propagated rather than panicked).
+    ///   [`ToHost`], but propagated rather than panicked).
     /// - Re-encoding the JSON envelope as a JS string literal fails.
     /// - [`wry::WebView::evaluate_script`] fails (process crashed,
     ///   handle invalid, etc.).
     #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
-    fn send_note_open(&self, payload: NoteOpen, cx: &Context<Self>) -> Result<()> {
-        let json = encode_to_host(&ToHost::NoteOpen(payload))
-            .context("encode_to_host(NoteOpen) failed")?;
+    fn send_to_host(&self, msg: &ToHost, label: &'static str, cx: &Context<Self>) -> Result<()> {
+        let json =
+            encode_to_host(msg).with_context(|| format!("encode_to_host({label}) failed"))?;
         #[cfg(target_os = "macos")]
         if let Some(webview) = self.macos.webview.as_ref() {
-            // `tolariaBridge` is installed by editor-host's `onReceive`
-            // call once `ready` has been announced.  The dispatch loop
-            // only calls this after editor_ready is `true`, so the
-            // global is guaranteed to be present.
-            //
             // The second `to_string` re-encodes the JSON payload as a
             // properly-escaped JS string literal (quotes, backslashes,
             // control chars) — safe argument to `receive(...)`.
             let payload_js = serde_json::to_string(&json)
-                .context("re-encode NoteOpen JSON as JS string literal")?;
+                .with_context(|| format!("re-encode {label} JSON as JS string literal"))?;
             let js = format!("window.tolariaBridge && window.tolariaBridge.receive({payload_js});");
             webview
                 .read(cx)
                 .raw()
                 .evaluate_script(&js)
-                .context("wry::WebView::evaluate_script(NoteOpen) failed")?;
+                .with_context(|| format!("wry::WebView::evaluate_script({label}) failed"))?;
         }
         Ok(())
+    }
+
+    /// Dispatch [`ToHost::SaveRequest`] into the WKWebView.  No-op on
+    /// non-macOS builds.  Used by [`Item::save`] (Phase 8.3) so the
+    /// workspace's save action reaches the embedded editor over the
+    /// same bridge the local Cmd+S handler already uses.
+    ///
+    /// # Errors
+    ///
+    /// Same failure conditions as [`Self::send_to_host`]:
+    /// - [`encode_to_host`] failure,
+    /// - JSON-literal re-encode failure,
+    /// - [`wry::WebView::evaluate_script`] failure.
+    fn send_save_request(&self, cx: &Context<Self>) -> Result<()> {
+        self.send_to_host(&ToHost::SaveRequest, "SaveRequest", cx)
+    }
+
+    /// Serialise `payload` and inject it into the WKWebView via
+    /// `tolariaBridge.receive(...)`.  No-op on non-macOS builds.
+    ///
+    /// `tolariaBridge` is installed by editor-host's `onReceive` call
+    /// once `ready` has been announced.  The dispatch loop only calls
+    /// this after `editor_ready` is `true`, so the global is
+    /// guaranteed to be present.
+    ///
+    /// # Errors
+    ///
+    /// Same failure conditions as [`Self::send_to_host`]:
+    /// - [`encode_to_host`] failure (should not happen for a typed
+    ///   [`NoteOpen`], but propagated rather than panicked),
+    /// - JSON-literal re-encode failure,
+    /// - [`wry::WebView::evaluate_script`] failure.
+    fn send_note_open(&self, payload: NoteOpen, cx: &Context<Self>) -> Result<()> {
+        self.send_to_host(&ToHost::NoteOpen(payload), "NoteOpen", cx)
     }
 
     /// Spawn a detached foreground task that drains `rx` and routes
@@ -409,13 +486,20 @@ impl NoteItem {
                             );
                         }
                     }
-                    Outcome::None | Outcome::NavigateLink(_) => {}
+                    Outcome::NavigateLink(target) => {
+                        cx.emit(LinkClickEvent { target });
+                    }
+                    Outcome::DispatchKeydown(keydown) => cx.emit(keydown),
+                    Outcome::None => {}
                 });
             }
         })
         .detach();
     }
 }
+
+impl EventEmitter<LinkClickEvent> for NoteItem {}
+impl EventEmitter<KeydownEvent> for NoteItem {}
 
 impl Item for NoteItem {
     fn tab_content_text(&self, _cx: &App) -> SharedString {
@@ -430,13 +514,26 @@ impl Item for NoteItem {
         self.dirty
     }
 
-    fn save(&mut self, _cx: &mut Context<Self>) -> Task<Result<()>> {
-        // Phase 5-MVP: send `ToHost::SaveRequest` into the WebView,
-        // then resolve when the matching `FromHost::Save` arrives and
-        // `vault::Vault::save` resolves.  For Phase 4-MVP the editor
-        // already persists on Cmd+S autonomously, so a top-level save
-        // is a no-op.
-        Task::ready(Ok(()))
+    fn save(&mut self, cx: &mut Context<Self>) -> Task<Result<()>> {
+        // Phase 8.3: relay a `ToHost::SaveRequest` into the embedded
+        // editor.  The editor responds with `FromHost::Save { body }`
+        // (or `FromHost::Saved` if the buffer is already clean), the
+        // dispatch task picks that up via `apply_from_host`, and on
+        // `Outcome::PersistSave` calls `vault::Vault::save`.  This
+        // method completes once the request is dispatched — the
+        // editor's response drives the actual persistence
+        // asynchronously through the dispatch task already wired in
+        // Phase 5e.
+        //
+        // Returning `Task::ready(...)` here (rather than a real
+        // one-shot that observes `Outcome::PersistSave`) keeps the
+        // save flow non-blocking: the workspace's save action returns
+        // immediately, and the dirty-flag gets cleared the moment the
+        // editor's `FromHost::Save` arrives.  A blocking variant that
+        // awaits the round-trip is recorded in the Phase 9.5
+        // `auto_git` design as a follow-up if checkpoint flushes
+        // require synchronous completion.
+        Task::ready(self.send_save_request(cx))
     }
 }
 
@@ -955,13 +1052,25 @@ mod tests {
     }
 
     #[test]
-    fn apply_keydown_is_no_op_for_state_but_still_returns_none() {
+    fn apply_keydown_yields_dispatch_keydown_outcome() {
         let mut item = NoteItem::new_for_tests(fresh_note(1));
+        let mods = Mods {
+            meta: true,
+            ..Default::default()
+        };
         let outcome = item.apply_from_host(FromHost::Keydown(Keydown {
             key: "s".into(),
-            mods: Default::default(),
+            mods,
         }));
-        assert_eq!(outcome, Outcome::None);
+        assert_eq!(
+            outcome,
+            Outcome::DispatchKeydown(KeydownEvent {
+                key: SharedString::from("s"),
+                mods,
+            }),
+            "Keydown must surface as DispatchKeydown carrying the canonical event shape"
+        );
+        // Keydown is an out-of-band signal; it must not mutate dirty state.
         assert!(!item.is_dirty());
     }
 
@@ -1148,5 +1257,92 @@ mod tests {
             on_disk, "rewritten by dispatch task",
             "FromHost::Save must persist through the dispatch task into vault::Vault::save"
         );
+    }
+
+    /// Phase 8.3 — `FromHost::LinkClick` arriving on the channel must
+    /// surface as `LinkClickEvent` to entity subscribers, classified as
+    /// the appropriate `LinkTarget` variant.
+    #[gpui::test]
+    fn dispatch_task_emits_link_click_event(cx: &mut gpui::TestAppContext) {
+        use gpui::AppContext as _;
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let entity = cx.update(|cx| cx.new(|_| NoteItem::new_for_tests(fresh_note(1))));
+        let (tx, rx) = flume::unbounded::<FromHost>();
+        cx.update(|cx| NoteItem::install_dispatch_task(entity.downgrade(), rx, cx));
+
+        let received: Rc<RefCell<Vec<LinkClickEvent>>> = Rc::new(RefCell::new(Vec::new()));
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(&entity, move |_entity, event: &LinkClickEvent, _cx| {
+                recv.borrow_mut().push(event.clone());
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+
+        tx.send(FromHost::LinkClick(LinkClick {
+            target: "OtherNote".into(),
+        }))
+        .unwrap();
+        tx.send(FromHost::LinkClick(LinkClick {
+            target: "https://example.com".into(),
+        }))
+        .unwrap();
+        cx.run_until_parked();
+
+        let got = received.borrow().clone();
+        assert_eq!(
+            got,
+            vec![
+                LinkClickEvent {
+                    target: LinkTarget::Wikilink("OtherNote".into()),
+                },
+                LinkClickEvent {
+                    target: LinkTarget::Url("https://example.com".into()),
+                },
+            ],
+            "dispatch task must emit LinkClickEvent with the classified target"
+        );
+    }
+
+    /// Phase 8.3 — `FromHost::Keydown` arriving on the channel must
+    /// surface as `KeydownEvent` to entity subscribers, preserving the
+    /// key + mods reported by the editor.
+    #[gpui::test]
+    fn dispatch_task_emits_keydown_event(cx: &mut gpui::TestAppContext) {
+        use gpui::AppContext as _;
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let entity = cx.update(|cx| cx.new(|_| NoteItem::new_for_tests(fresh_note(1))));
+        let (tx, rx) = flume::unbounded::<FromHost>();
+        cx.update(|cx| NoteItem::install_dispatch_task(entity.downgrade(), rx, cx));
+
+        let received: Rc<RefCell<Vec<KeydownEvent>>> = Rc::new(RefCell::new(Vec::new()));
+        cx.update(|cx| {
+            let recv = received.clone();
+            cx.subscribe(&entity, move |_entity, event: &KeydownEvent, _cx| {
+                recv.borrow_mut().push(event.clone());
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+
+        tx.send(FromHost::Keydown(Keydown {
+            key: "s".into(),
+            mods: Mods {
+                meta: true,
+                ..Default::default()
+            },
+        }))
+        .unwrap();
+        cx.run_until_parked();
+
+        let got = received.borrow().clone();
+        assert_eq!(got.len(), 1, "dispatch task must emit a KeydownEvent");
+        assert_eq!(got[0].key.as_ref(), "s");
+        assert!(got[0].mods.meta);
     }
 }
