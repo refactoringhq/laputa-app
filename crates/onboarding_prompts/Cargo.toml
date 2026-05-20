@@ -1,16 +1,15 @@
 [package]
-name = "note_retargeting"
+name = "onboarding_prompts"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish = false
-description = "Note-rename wikilink ripple preview / confirm dialog (ADR-0115 Phase 8.20, Strand B)."
+description = "First-run onboarding prompts and telemetry consent dialog (ADR-0115 Phase 8.22, Strand B)."
 
 [dependencies]
 gpui.workspace = true
 gpui-component.workspace = true
-mock_fixtures = { path = "../mock_fixtures" }
 workspace = { path = "../workspace" }
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]

@@ -356,6 +356,26 @@ mod tests {
         });
     }
 
+    /// Phase 8.18 reviewer LOW — exercise the `from_or_empty → from_mock`
+    /// branch when a `MockVault` global is installed.  Currently
+    /// `from_mock` returns an empty builder (the mock launch path
+    /// doesn't seed filters), but the branch must still be live so
+    /// future changes that pre-populate fixture filters land with
+    /// test coverage already in place.
+    #[gpui::test]
+    fn from_or_empty_takes_mock_branch_when_global_present(cx: &mut TestAppContext) {
+        use mock_fixtures::MockVault;
+        install_theme(cx);
+        cx.update(|cx| {
+            cx.set_global(MockVault::seeded());
+            let builder = FilterBuilder::from_or_empty(cx);
+            assert!(
+                builder.filters().is_empty(),
+                "from_mock returns empty until Phase 9 seeds fixture filters"
+            );
+        });
+    }
+
     /// `FilterPredicate::label` renders the canonical "Field: value"
     /// shape that the pill chip uses verbatim.
     #[test]

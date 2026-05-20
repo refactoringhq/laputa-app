@@ -4806,7 +4806,6 @@ dependencies = [
  "gpui-component",
  "gpui_platform",
  "mock_fixtures",
- "vault",
  "workspace",
 ]
 
@@ -5344,6 +5343,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff76201f031d8863c38aa7f905eca4f53abbfa15f609db4277d44cd8938f33fe"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "onboarding_prompts"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "gpui_platform",
+ "workspace",
 ]
 
 [[package]]
