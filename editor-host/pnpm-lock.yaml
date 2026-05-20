@@ -4,16 +4,20 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@blocknote/core@0.46.2': 9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2
+  '@blocknote/react@0.46.2': 67ee7211dff79c50d821c3145b0c96b42bb9a614d508edafd65492b6b5ccb41e
+
 importers:
 
   .:
     dependencies:
       '@blocknote/core':
         specifier: 0.46.2
-        version: 0.46.2(@types/hast@3.0.4)
+        version: 0.46.2(patch_hash=9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2)(@types/hast@3.0.4)
       '@blocknote/react':
         specifier: 0.46.2
-        version: 0.46.2(@floating-ui/dom@1.7.6)(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+        version: 0.46.2(patch_hash=67ee7211dff79c50d821c3145b0c96b42bb9a614d508edafd65492b6b5ccb41e)(@floating-ui/dom@1.7.6)(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       react:
         specifier: 19.2.0
         version: 19.2.0
@@ -1583,7 +1587,7 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@blocknote/core@0.46.2(@types/hast@3.0.4)':
+  '@blocknote/core@0.46.2(patch_hash=9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2)(@types/hast@3.0.4)':
     dependencies:
       '@emoji-mart/data': 1.2.1
       '@handlewithcare/prosemirror-inputrules': 0.1.4(prosemirror-model@1.25.7)(prosemirror-state@1.4.4)(prosemirror-view@1.41.8)
@@ -1633,9 +1637,9 @@ snapshots:
       - sugar-high
       - supports-color
 
-  '@blocknote/react@0.46.2(@floating-ui/dom@1.7.6)(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
+  '@blocknote/react@0.46.2(patch_hash=67ee7211dff79c50d821c3145b0c96b42bb9a614d508edafd65492b6b5ccb41e)(@floating-ui/dom@1.7.6)(@types/hast@3.0.4)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
     dependencies:
-      '@blocknote/core': 0.46.2(@types/hast@3.0.4)
+      '@blocknote/core': 0.46.2(patch_hash=9a05ab63f78eff8887ea009f15116e0e7e70de00eaba31093f3f9584da364df2)(@types/hast@3.0.4)
       '@emoji-mart/data': 1.2.1
       '@floating-ui/react': 0.27.19(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@floating-ui/utils': 0.2.10

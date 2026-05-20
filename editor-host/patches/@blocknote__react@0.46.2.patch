@@ -1,0 +1,112 @@
+diff --git a/dist/blocknote-react.js b/dist/blocknote-react.js
+index d4d36cd..79dd4f0 100644
+--- a/dist/blocknote-react.js
++++ b/dist/blocknote-react.js
+@@ -154,8 +154,26 @@ const co = (e) => {
+ };
+ function so(e) {
+   let t = new DOMRect();
+-  const n = "getBoundingClientRect" in e ? () => e.getBoundingClientRect() : () => e.element.getBoundingClientRect();
+-  return () => "element" in e && (e.cacheMountedBoundingClientRect ?? !0) ? (e.element.isConnected && (t = n()), t) : n();
++  const n = () => "getBoundingClientRect" in e ? e.getBoundingClientRect() : e.element instanceof Element ? e.element.getBoundingClientRect() : t;
++  return () => {
++    if (!("element" in e) || !(e.cacheMountedBoundingClientRect ?? !0))
++      return n();
++    if (!(e.element instanceof Element))
++      return n();
++    if (e.element.isConnected)
++      t = n();
++    return t;
++  };
++}
++function __bnSafeDomAtPos(e, t) {
++  const n = e.prosemirrorView;
++  if (!n || n.isDestroyed)
++    return null;
++  try {
++    return n.domAtPos(t);
++  } catch {
++    return null;
++  }
+ }
+ const z = (e) => {
+   var h, b, p;
+@@ -193,6 +211,7 @@ const z = (e) => {
+     ...e.elementProps,
+     style: {
+       display: "flex",
++      pointerEvents: c === "close" ? "none" : void 0,
+       ...(h = e.elementProps) == null ? void 0 : h.style,
+       zIndex: `calc(var(--bn-ui-base-z-index) + ${((p = (b = e.elementProps) == null ? void 0 : b.style) == null ? void 0 : p.zIndex) || 0})`,
+       ...n,
+@@ -216,9 +235,7 @@ const z = (e) => {
+       const s = Ue(t, c.doc);
+       if (!s)
+         return;
+-      const { node: a } = r.prosemirrorView.domAtPos(
+-        s.posBeforeNode + 1
+-      );
++      const a = __bnSafeDomAtPos(r, s.posBeforeNode + 1)?.node;
+       if (a instanceof Element)
+         return {
+           element: a
+@@ -2499,7 +2516,14 @@ function Kr(e) {
+     columns: d
+   } = e, m = H(
+     (C) => {
+-      a(), s(), u == null || u(C);
++      a();
++      try {
++        s();
++      } catch (x) {
++        console.warn("Ignored stale suggestion menu query cleanup:", x);
++        return;
++      }
++      u == null || u(C);
+     },
+     [u, a, s]
+   ), { items: g, usedQuery: f, loadingState: h } = Yt(
+@@ -2734,7 +2758,14 @@ function ti(e) {
+     onItemClick: u
+   } = e, d = H(
+     (p) => {
+-      a(), s(), u == null || u(p);
++      a();
++      try {
++        s();
++      } catch (C) {
++        console.warn("Ignored stale suggestion menu query cleanup:", C);
++        return;
++      }
++      u == null || u(p);
+     },
+     [u, a, s]
+   ), { items: m, usedQuery: g, loadingState: f } = Yt(
+@@ -3306,14 +3337,15 @@ const ii = (e, t = 0.3) => {
+     );
+     if (!m)
+       return {};
+-    const g = m.posBeforeNode + 1, f = t.prosemirrorView.domAtPos(
++    const g = m.posBeforeNode + 1, f = __bnSafeDomAtPos(
++      t,
+       g + 1
+-    ).node;
++    )?.node;
+     if (!(f instanceof Element))
+       return {};
+     if (d.tableReference = { element: f }, r.rowIndex === void 0 || r.colIndex === void 0)
+       return d;
+-    const h = t.prosemirrorState.doc.resolve(g + 1).posAtIndex(r.rowIndex), b = t.prosemirrorState.doc.resolve(h + 1).posAtIndex(r.colIndex), p = t.prosemirrorView.domAtPos(b + 1).node;
++    const h = t.prosemirrorState.doc.resolve(g + 1).posAtIndex(r.rowIndex), b = t.prosemirrorState.doc.resolve(h + 1).posAtIndex(r.colIndex), p = __bnSafeDomAtPos(t, b + 1)?.node;
+     return p instanceof Element ? (d.cellReference = { element: p }, d.rowReference = {
+       element: f,
+       getBoundingClientRect: () => {
+@@ -4371,7 +4403,7 @@ const zi = (e) => {
+     const a = Ue(t, c.prosemirrorState.doc);
+     if (!a)
+       return;
+-    const u = a.posBeforeNode + 1, d = c.prosemirrorState.doc.resolve(u + 1).posAtIndex(o || 0), m = c.prosemirrorState.doc.resolve(d + 1).posAtIndex(n || 0), { node: g } = c.prosemirrorView.domAtPos(m + 1);
++    const u = a.posBeforeNode + 1, d = c.prosemirrorState.doc.resolve(u + 1).posAtIndex(o || 0), m = c.prosemirrorState.doc.resolve(d + 1).posAtIndex(n || 0), g = __bnSafeDomAtPos(c, m + 1)?.node;
+     if (g instanceof Element)
+       return g;
+   }, [c, t, n, o]);
