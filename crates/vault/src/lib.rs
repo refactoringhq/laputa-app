@@ -142,6 +142,12 @@ pub enum VaultError {
         #[source]
         source: std::io::Error,
     },
+    /// Errors surfaced by the post-create / post-mutation rescan.
+    /// Preserves the original `anyhow` chain so callers can walk it
+    /// instead of receiving a flattened string-coded `io::Error`.
+    /// Currently only surfaced by [`Vault::create_note`].
+    #[error("rescan failed: {0:#}")]
+    Rescan(#[source] anyhow::Error),
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +191,11 @@ pub struct Vault {
 }
 
 impl Global for Vault {}
+
+/// Maximum number of `{stem}-N.md` suffixes [`Vault::create_note`] will
+/// try before giving up.  A vault that already has 1000 untitled notes
+/// is a pathological case; failing loud beats spinning forever.
+const CREATE_NOTE_SUFFIX_LIMIT: u32 = 1000;
 
 impl Vault {
     /// Open a vault rooted at `root`.  Walks the directory tree (depth limit
@@ -378,6 +389,109 @@ impl Vault {
             }
         }
         Ok(())
+    }
+
+    /// Create a new markdown note in the vault root with an empty body.
+    ///
+    /// Picks a unique filename derived from `stem`: starts with
+    /// `{stem}.md`, falling back to `{stem}-1.md`, `{stem}-2.md`, … if
+    /// a file with the candidate name already exists.  The write goes
+    /// through `OpenOptions::create_new(true)` so concurrent
+    /// `create_note` callers (or external filesystem races) can't
+    /// stomp on each other — `create_new` returns `AlreadyExists` if
+    /// the path materialised between the existence check and the open.
+    ///
+    /// After the empty file lands on disk, `rescan` rebuilds the
+    /// in-memory index and the freshly-assigned [`NoteId`] is
+    /// returned so callers can route it through `OpenNoteEvent` (or
+    /// equivalent) to open the new note in the editor.
+    ///
+    /// Worklist 2.19 — wired to the notes-list `+` button and to
+    /// `actions::NewNote` (Cmd+N) so both code paths share the same
+    /// create-and-open flow.
+    ///
+    /// # Errors
+    ///
+    /// - The uniqueness loop exceeds [`CREATE_NOTE_SUFFIX_LIMIT`]
+    ///   iterations (returned as [`VaultError::Io`] with `AlreadyExists`).
+    ///   A vault with 1000+ `untitled-N.md` files is a pathological
+    ///   case; surfacing it as an error beats spinning forever.
+    /// - The disk write fails (permission denied, disk full, …) —
+    ///   surfaced as [`VaultError::Io`] with the candidate path.
+    /// - The post-create rescan fails (e.g. a subdirectory became
+    ///   unreadable) — surfaced as [`VaultError::Rescan`] preserving
+    ///   the underlying `anyhow` chain.
+    /// - The post-rescan index does not contain the freshly-written
+    ///   path — surfaced as [`VaultError::Io`] with `ErrorKind::NotFound`.
+    ///   Should not happen in practice (the file was just written)
+    ///   but defended against so the caller sees a clear diagnostic
+    ///   instead of a missing entry.
+    pub fn create_note(&mut self, stem: &str) -> Result<NoteId, VaultError> {
+        let path = self.allocate_note_path(stem)?;
+        // `create_new(true)` makes the open atomic w.r.t. the
+        // existence check — if a parallel writer materialised the
+        // file between `allocate_note_path` and here, the open errors
+        // out instead of silently truncating.  Empty body matches the
+        // React variant; users rename or populate the note next.
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|source| VaultError::Io {
+                path: path.clone(),
+                source,
+            })?;
+        // `rescan` errors out as `anyhow::Error`; surface through
+        // [`VaultError::Rescan`] so the chain stays walkable instead
+        // of being flattened into a string-coded `io::Error`.
+        self.rescan_internal().map_err(VaultError::Rescan)?;
+        // Find the id assigned to the freshly-created path.  The
+        // rescan above just walked the directory, so the entry must
+        // exist; surfacing `NotFound` here would mean the path
+        // vanished between the write and the rescan (e.g. an
+        // external delete), which is worth flagging instead of
+        // silently swallowing.
+        self.notes
+            .iter()
+            .find(|(_, note)| note.path == path)
+            .map(|(id, _)| *id)
+            .ok_or_else(|| {
+                log::error!("vault::create_note: wrote {path:?} but rescan did not surface it",);
+                VaultError::Io {
+                    path,
+                    source: std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "freshly-created note not found in post-rescan index",
+                    ),
+                }
+            })
+    }
+
+    /// Resolve a fresh, unique markdown path under [`Self::root`] for
+    /// a new note.  Tries `{stem}.md` first; on conflict appends
+    /// `-1`, `-2`, … up to [`CREATE_NOTE_SUFFIX_LIMIT`] before giving
+    /// up.  Pure path arithmetic — does not touch the in-memory note
+    /// index, so safe to call before any state mutation.
+    fn allocate_note_path(&self, stem: &str) -> Result<PathBuf, VaultError> {
+        let candidate = self.root.join(format!("{stem}.md"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+        for suffix in 1..=CREATE_NOTE_SUFFIX_LIMIT {
+            let candidate = self.root.join(format!("{stem}-{suffix}.md"));
+            if !candidate.exists() {
+                return Ok(candidate);
+            }
+        }
+        Err(VaultError::Io {
+            path: self.root.clone(),
+            source: std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                format!(
+                    "exhausted {CREATE_NOTE_SUFFIX_LIMIT} suffixes searching for unique {stem}-N.md"
+                ),
+            ),
+        })
     }
 
     /// Case-insensitive substring search over note titles.
@@ -677,6 +791,73 @@ mod tests {
         assert!(
             matches!(err, VaultError::NotFound(NoteId(99))),
             "expected NotFound(99), got {err:?}",
+        );
+    }
+
+    #[test]
+    fn create_note_returns_new_id_for_fresh_filename() {
+        let dir = tempdir().unwrap();
+        let mut v = Vault::open_at(dir.path()).unwrap();
+        assert_eq!(v.note_count(), 0);
+        let id = v
+            .create_note("untitled")
+            .expect("create_note must succeed for fresh stem");
+        let path = dir.path().join("untitled.md");
+        assert!(path.exists(), "create_note must write the file to disk");
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "",
+            "freshly-created notes start with an empty body",
+        );
+        let note = v.notes.get(&id).expect("freshly-created id must resolve");
+        // Path stored on the Note must match the on-disk write path
+        // (modulo symlink canonicalisation on macOS — `tempdir()` uses
+        // `/var/folders/...` which `canonicalize` resolves to
+        // `/private/var/...`).
+        assert_eq!(
+            note.path.canonicalize().unwrap(),
+            path.canonicalize().unwrap()
+        );
+    }
+
+    #[test]
+    fn create_note_appends_suffix_on_conflict() {
+        let dir = tempdir().unwrap();
+        write(dir.path(), "untitled.md", "pre-existing");
+        let mut v = Vault::open_at(dir.path()).unwrap();
+        let id = v
+            .create_note("untitled")
+            .expect("create_note must succeed when {stem}.md exists");
+        let new_path = dir.path().join("untitled-1.md");
+        assert!(
+            new_path.exists(),
+            "create_note must fall back to -1 suffix on conflict",
+        );
+        let note = v.notes.get(&id).expect("freshly-created id must resolve");
+        assert_eq!(
+            note.path.canonicalize().unwrap(),
+            new_path.canonicalize().unwrap()
+        );
+    }
+
+    #[test]
+    fn create_note_handles_existing_suffixed_files() {
+        let dir = tempdir().unwrap();
+        write(dir.path(), "untitled.md", "a");
+        write(dir.path(), "untitled-1.md", "b");
+        let mut v = Vault::open_at(dir.path()).unwrap();
+        let id = v
+            .create_note("untitled")
+            .expect("create_note must skip past -1 to -2");
+        let new_path = dir.path().join("untitled-2.md");
+        assert!(
+            new_path.exists(),
+            "create_note must skip past existing suffixes",
+        );
+        let note = v.notes.get(&id).expect("freshly-created id must resolve");
+        assert_eq!(
+            note.path.canonicalize().unwrap(),
+            new_path.canonicalize().unwrap()
         );
     }
 

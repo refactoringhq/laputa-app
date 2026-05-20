@@ -391,11 +391,13 @@ mod macos {
                     "Save",
                     "Phase 9.1 (command_registry) will route Save to the active NoteItem",
                 );
-                log_stub::<actions::NewNote>(
-                    cx,
-                    "NewNote",
-                    "Phase 8.11 (vault background executor) will create a fresh note via Vault",
-                );
+                // `NewNote` is wired inside `cx.open_window` below — the
+                // handler needs the `note_list` entity + the
+                // `ActiveNoteItemSlot`, both of which are only
+                // constructed once the window opens.  Worklist 2.19
+                // routes both `NewNote` (Cmd+N) and the notes-list `+`
+                // button through the same `create_and_open_untitled`
+                // helper in `open_note.rs`.
                 log_stub::<actions::QuickOpen>(
                     cx,
                     "QuickOpen",
@@ -633,6 +635,18 @@ mod macos {
 
                     let sidebar = cx.new(|cx| SidebarPanel::from_or_empty(cx));
                     let note_list = cx.new(|cx| NoteListPane::from_or_empty(cx));
+
+                    // Worklist 2.19 — Cmd+N (and any future palette /
+                    // menu entry) routes through the same
+                    // `CreateNoteRequested` event that the notes-list
+                    // `+` button emits.  Registering inside
+                    // `open_window` lets the closure capture the
+                    // `note_list` entity by clone; the subscriber set
+                    // up further down handles the actual create + open.
+                    let action_note_list = note_list.clone();
+                    cx.on_action(move |_: &actions::NewNote, cx| {
+                        action_note_list.update(cx, |pane, cx| pane.request_create_note(cx));
+                    });
                     // Slot holding the currently mounted `NoteItem` so
                     // successive `OpenNoteEvent`s reuse the same entity
                     // (and underlying WKWebView) instead of constructing a
@@ -665,6 +679,13 @@ mod macos {
                         // subscription lifetime tracks the workspace entity.
                         let slot = active_note_item.clone();
                         let active_handle = note_list.clone();
+                        // Worklist 2.19 — additional clones for the
+                        // `CreateNoteRequested` subscriber below.  Kept
+                        // alongside the existing slot/handle clones so
+                        // the create-and-open helper has the same
+                        // ergonomic surface as the open-note path.
+                        let create_slot = active_note_item.clone();
+                        let create_list = note_list.clone();
                         // Phase 8.1 — route every sidebar selection
                         // change to the note-list pane's scope filter.
                         // `Inbox` / `AllNotes` / `Archive` / `View(...)`
@@ -731,6 +752,36 @@ mod macos {
                                     active_handle.update(cx, |list, cx| {
                                         list.set_active(Some(event.id), cx);
                                     });
+                                },
+                            )
+                            .detach();
+
+                        // Worklist 2.19 — the notes-list `+` button
+                        // emits `CreateNoteRequested`; route it through
+                        // the shared create-and-open helper so the new
+                        // note lands on disk, the list re-renders, and
+                        // the editor mounts the note in one pass.  The
+                        // `actions::NewNote` (Cmd+N) handler below
+                        // dispatches the same event into this entity so
+                        // both entry points share a single code path.
+                        model_cx
+                            .subscribe_in(
+                                &note_list,
+                                window,
+                                move |ws_view,
+                                      _list,
+                                      _event: &note_list_pane::CreateNoteRequested,
+                                      window,
+                                      cx| {
+                                    if let Err(e) = crate::open_note::create_and_open_untitled(
+                                        ws_view,
+                                        &create_list,
+                                        &create_slot,
+                                        window,
+                                        cx,
+                                    ) {
+                                        log::error!("create_and_open_untitled failed: {e:#}");
+                                    }
                                 },
                             )
                             .detach();

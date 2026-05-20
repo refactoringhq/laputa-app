@@ -593,6 +593,65 @@ fn load_note_type_styles(vault_root: &StdPath) -> std::collections::HashMap<Stri
     out
 }
 
+/// Build [`NoteEntry`] rows for every note in the `Vault` global,
+/// reusing the same body-parse / type-style logic that
+/// [`NoteListPane::from_vault`] used to inline.  Shared with
+/// [`NoteListPane::refresh_from_vault`] so the create-and-refresh
+/// path (worklist 2.19) and the cold-start build path produce
+/// identical row shapes.
+///
+/// # Panics
+///
+/// Panics if the [`Vault`] global is not installed on `cx`.
+fn collect_vault_entries(cx: &mut App) -> Vec<NoteEntry> {
+    let executor = cx.foreground_executor().clone();
+    let vault = cx.global::<Vault>();
+    let vault_root = vault.root().to_path_buf();
+    let type_styles = load_note_type_styles(&vault_root);
+    let ids = executor.block_on(vault.notes());
+    let mut entries = Vec::with_capacity(ids.len());
+    for id in ids {
+        let Some(note) = executor.block_on(vault.note(id)) else {
+            continue;
+        };
+        // Load the body to derive a one-line preview AND the
+        // display title (H1 / frontmatter, falling back to the
+        // filename stem).  Cheap for the demo vault (~30
+        // files); future work can batch this through a
+        // vault-side snippet cache.
+        let body = executor.block_on(vault.note_content(id)).ok();
+        let title: SharedString = body
+            .as_deref()
+            .and_then(extract_title)
+            .map(SharedString::from)
+            .unwrap_or_else(|| note.title.clone());
+        let snippet = body
+            .as_deref()
+            .map(extract_snippet)
+            .unwrap_or_default()
+            .into();
+        let style = type_stem_for_path(&note.path)
+            .and_then(|stem| type_styles.get(&stem).cloned())
+            .unwrap_or_else(NoteTypeStyle::fallback);
+        entries.push(NoteEntry {
+            id: note.id,
+            title,
+            kind: note.kind,
+            modified: note.modified,
+            snippet,
+            type_icon: style.icon,
+            type_color: style.color,
+            type_label: SharedString::new_static(type_label_for(&note.path)),
+            parent_path: vault_relative_parent(&note.path, Some(&vault_root)),
+            // Pull the frontmatter `type` value so saved-view
+            // filters (`NoteListScope::View`) can narrow to
+            // notes whose YAML declares e.g. `type: Project`.
+            view_type: frontmatter_view_type(note.frontmatter()),
+        });
+    }
+    entries
+}
+
 /// Minimal YAML frontmatter parser — `key: value` lines between two
 /// `---` markers, quotes stripped.  Same shape as
 /// `sidebar_panel::parse_frontmatter`; duplicated to avoid a
@@ -845,50 +904,7 @@ impl NoteListPane {
     ///
     /// Panics if the [`Vault`] global is not installed on `cx`.
     pub fn from_vault(cx: &mut App) -> Self {
-        let executor = cx.foreground_executor().clone();
-        let vault = cx.global::<Vault>();
-        let vault_root = vault.root().to_path_buf();
-        let type_styles = load_note_type_styles(&vault_root);
-        let ids = executor.block_on(vault.notes());
-        let mut entries = Vec::with_capacity(ids.len());
-        for id in ids {
-            if let Some(note) = executor.block_on(vault.note(id)) {
-                // Load the body to derive a one-line preview AND the
-                // display title (H1 / frontmatter, falling back to the
-                // filename stem).  Cheap for the demo vault (~30
-                // files); future work can batch this through a
-                // vault-side snippet cache.
-                let body = executor.block_on(vault.note_content(id)).ok();
-                let title: SharedString = body
-                    .as_deref()
-                    .and_then(extract_title)
-                    .map(SharedString::from)
-                    .unwrap_or_else(|| note.title.clone());
-                let snippet = body
-                    .as_deref()
-                    .map(extract_snippet)
-                    .unwrap_or_default()
-                    .into();
-                let style = type_stem_for_path(&note.path)
-                    .and_then(|stem| type_styles.get(&stem).cloned())
-                    .unwrap_or_else(NoteTypeStyle::fallback);
-                entries.push(NoteEntry {
-                    id: note.id,
-                    title,
-                    kind: note.kind,
-                    modified: note.modified,
-                    snippet,
-                    type_icon: style.icon,
-                    type_color: style.color,
-                    type_label: SharedString::new_static(type_label_for(&note.path)),
-                    parent_path: vault_relative_parent(&note.path, Some(&vault_root)),
-                    // Pull the frontmatter `type` value so saved-view
-                    // filters (`NoteListScope::View`) can narrow to
-                    // notes whose YAML declares e.g. `type: Project`.
-                    view_type: frontmatter_view_type(note.frontmatter()),
-                });
-            }
-        }
+        let entries = collect_vault_entries(cx);
         // Worklist 2.2 — see comment in `from_mock`.  No row is
         // pre-selected at startup so the workspace boots into the
         // empty-note placeholder, matching the React variant.
@@ -905,6 +921,28 @@ impl NoteListPane {
             filter_open: false,
             filter_input: None,
         }
+    }
+
+    /// Refresh the visible entries from the `vault::Vault` global and
+    /// schedule a re-render.  Used by the create-note flow (worklist
+    /// 2.19) so the freshly-created note shows up in the list
+    /// immediately after [`Vault::create_note`] returns.
+    ///
+    /// Filter / scope / sort / selection are preserved — the only
+    /// thing this method touches is the underlying `entries` Vec.
+    /// Callers that need a totally fresh pane should reconstruct via
+    /// [`Self::from_vault`] instead.
+    ///
+    /// No-op (with a log) when the `Vault` global is absent — keeps
+    /// mock-launch paths safe to call into this method without
+    /// guarding at every call site.
+    pub fn refresh_from_vault(&mut self, cx: &mut Context<Self>) {
+        if !cx.has_global::<Vault>() {
+            log::debug!("note_list_pane: refresh_from_vault skipped — no Vault global");
+            return;
+        }
+        self.entries = collect_vault_entries(cx);
+        cx.notify();
     }
 
     /// Build from `vault::Vault` if installed, else [`MockVault`], else

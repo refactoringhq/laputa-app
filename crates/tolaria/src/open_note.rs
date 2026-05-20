@@ -129,6 +129,67 @@ pub fn open_note(
     Ok(())
 }
 
+/// Shared helper for the create-and-open flow (worklist 2.19).
+/// Calls [`Vault::create_note`] with the canonical `"untitled"` stem,
+/// triggers a re-render of the notes-list so the new row appears,
+/// and routes the freshly-assigned [`NoteId`] through the existing
+/// [`open_note`] machinery so the editor mounts the new note.
+///
+/// Both the notes-list `+` button (`CreateNoteRequested` event) and
+/// the `actions::NewNote` keyboard action dispatch here so the two
+/// entry points stay in lockstep — anyone touching the create flow
+/// only has to update one site.
+///
+/// Picks the **direct call** to [`open_note`] (rather than emitting
+/// a synthetic `OpenNoteEvent` for the existing subscriber to pick
+/// up) so the create + open pair stays a single in-flight unit of
+/// work — easier to follow when reading the diff, and avoids the
+/// risk of the synthetic event ordering oddly with respect to other
+/// queued events.
+///
+/// # Errors
+///
+/// - `Vault` global is not installed.
+/// - [`Vault::create_note`] fails (disk write / rescan / pathological
+///   suffix exhaustion — see the vault-side docs).
+/// - [`open_note`] fails (re-uses the same diagnostic surface as the
+///   click path).
+pub fn create_and_open_untitled(
+    workspace: &TolariaWorkspace,
+    note_list: &Entity<note_list_pane::NoteListPane>,
+    slot: &ActiveNoteItemSlot,
+    window: &mut Window,
+    cx: &mut Context<TolariaWorkspace>,
+) -> Result<()> {
+    if !cx.has_global::<Vault>() {
+        anyhow::bail!("Vault global is not installed; pass --vault <path> at startup");
+    }
+    // Single mutable borrow drives the create + logs the root path
+    // for diagnostics if the create fails further down.  The
+    // `has_global` guard above guarantees `global_mut` won't panic.
+    let new_id = {
+        let vault = cx.global_mut::<Vault>();
+        log::info!(
+            "create_and_open_untitled: creating note in vault {:?}",
+            vault.root(),
+        );
+        vault
+            .create_note("untitled")
+            .context("Vault::create_note failed")?
+    };
+    // Worklist 2.19 — refresh entries AND drive the selected-row
+    // highlight in a single entity update so the list re-renders
+    // once instead of twice.  Without the refresh the new row
+    // wouldn't appear; without the `set_active` the row would
+    // render but stay un-highlighted.
+    note_list.update(cx, |list, cx| {
+        list.refresh_from_vault(cx);
+        list.set_active(Some(new_id), cx);
+    });
+    open_note(workspace, new_id, slot, window, cx).context("opening freshly-created note")?;
+    Ok(())
+}
+
 /// Eagerly construct an *empty* `NoteItem` (with its live WKWebView)
 /// at workspace startup so the editor's NSView and the editor host
 /// bundle inside it are paid for *before* the user clicks anything.

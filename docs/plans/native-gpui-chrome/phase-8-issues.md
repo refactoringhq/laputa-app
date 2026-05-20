@@ -10,7 +10,7 @@
 2.1. ✅ Note list top bar title need to reflect the title of the iems selected in the side bar
 2.2. ✅ On startup Note List shows some note is slected. The note view should show an empty note state. It is the same as in React variant.
 2.3. ✅ Active Projects view filer does not work
-2.4. ✅ All clikable buttons lack the hints (note-toolbar tooltips now render in a `WindowKind::PopUp` panel via `ui::OverlayTooltipExt`, beating the WKWebView sibling-NSView z-order; remaining chrome crates keep gpui_component's inline tooltip for now)
+2.4. ✅ All clikable buttons lack the hints
 2.5. ✅ Vault picker popup does not close on focs loss
 2.6. ✅ Side bar Types, Views, Folder are not collpsable
 2.7. ✅ System menu is missing items for File, View, Help
@@ -25,15 +25,16 @@
 2.16. ✅ note-toolbar-copy-path element is not wired
 2.17. note-toolbar-more element is not wired
 2.18. ✅ note-toolbar-inspector element is not wired
-2.19. Notes list top bar Add bottom does nothing
+2.19. ✅ Notes list top bar Add bottom does nothing
 2.20. ✅ Notes list sort dropdown does not update the title after the user selects an option
 2.21. ✅ Notes list sort dropdown appears under the web view pannel
 2.22. ✅ Notes list top bar search: Esc button shodu close the search line and clear the search query
 2.23. The sidebar-types-sort button should be Types Filter button
-2.24. Install @blocknote/shadcn and restore BlockNote menu UI primitives (SideMenu drag handle, etc. — depends on a ComponentsContext.Provider that only the UI subpackages install; tracked here so the 1.2 quick fix can land)
+2.24. Install @blocknote/shadcn and restore BlockNote menu UI primitives
 2.25. ✅ Redirect WebView console logs to the tolaria in-process simple logger
 2.26. ✅ Round-tripping open/save reformats frontmatter
-2.27. Frontmatter is not rendered in preview mode (React variant renders a properties panel above the editor body — the native variant shows nothing for the YAML block at all)
+2.27. Frontmatter is not rendered in preview mode
+2.28. Match the note tollbar tolltips styles to the rest of the UI
 
 ## 3. Low Priority
 
@@ -49,6 +50,22 @@
 **Recipe:** see `phase-8-sweep.md`.  The sweep is now split into a thin spawn/teardown harness (`crates/periscope/tests/harness.sh` — spawns `tolaria`, prints `BIN_PID` + `OUT_DIR`, blocks on stdin) and ten self-contained scenarios in the companion doc that an agent drives from a separate shell.  Five scenarios (slash menu, side-menu hover, formatting toolbar, wikilink popup, IME) still depend on human gestures — the doc flags each with an "Expected gap" note because `osascript keystroke` can't reach the WKWebView editor body (AGENTS.md §4) and periscope doesn't have synthetic-input primitives yet (see the wish list in §6 of the companion doc).
 
 **Why it's not automated yet:** periscope requires Screen Recording + Accessibility permissions on the parent terminal, plus a windowed Tolaria binary; the Anthropic agent sandbox can't satisfy either.
+
+### Annotations and details
+
+Heading match the corresponding issues numbers:
+
+#### 2.4
+
+note-toolbar tooltips now render in a `WindowKind::PopUp` panel via `ui::OverlayTooltipExt`, beating the WKWebView sibling-NSView z-order; remaining chrome crates keep gpui_component's inline tooltip for now
+
+#### 2.24
+
+SideMenu drag handle, etc. — depends on a ComponentsContext.Provider that only the UI subpackages install; tracked here so the 1.2 quick fix can land
+
+#### 2.27
+
+React variant renders a properties panel above the editor body — the native variant shows nothing for the YAML block at all
 
 ### Bridge gaps
 
