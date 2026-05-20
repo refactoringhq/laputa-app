@@ -277,10 +277,71 @@ the `paint` lifecycle hook.  Names are `&'static str` (zero-alloc)
 and overwrite in place on every paint pass — the registry always
 reflects the most recent layout, no cleanup story.
 
-Pick names that survive layout shuffles: prefer
-`"status-bar-theme-toggle"` over `"toggle-3"`.  Periscope's
-`click --id` is a string lookup; renaming a registered element breaks
-every harness call site that depended on it.
+#### Naming convention — prefixed hierarchy
+
+Names follow `<container>-<child>-<leaf>` so the dump-tree output
+groups related elements next to each other and `--id` lookups read
+left-to-right from coarse to fine.  Examples:
+
+- `status-bar` — the whole bottom strip
+- `status-bar-theme-toggle` — the toggle inside the status bar
+- `status-bar-vault-menu` — the vault menu inside the status bar
+- `note-list-pane` — the note list container
+- `note-list-pane-row-0` — the first row in the list
+- `note-list-pane-row-0-status-icon` — the status icon inside that row
+- `editor-host` — the WKWebView wrapper
+- `editor-host-body` — the BlockNote / CodeMirror body
+- `editor-host-body-block-0` — the first BlockNote block
+
+Whenever you register a leaf, register its container too.  An
+unregistered container is a missed cropping opportunity later: e.g.
+without `status-bar` you can't `screenshot --id status-bar` to diff
+the whole strip in one go, even if every leaf inside is registered.
+
+This convention buys two things downstream:
+
+1. **Cropped captures by container.**  `periscope screenshot --id status-bar`
+   crops to the strip; `--id note-list-pane` crops to the list;
+   `--id editor-host` crops to the editor body.  Tighter captures
+   diff faster across runs and the image-bytes diff is much smaller
+   for an unrelated layout shift in another part of the chrome.
+   Prefer cropped baselines over full-window baselines whenever the
+   regression you're guarding is local to a container — a status-bar
+   colour change shouldn't churn the note-list and editor-body bytes.
+
+2. **Targeted clicks / hovers / typing without coordinates.**
+   `periscope click --id status-bar-theme-toggle` resolves the leaf
+   and clicks its center — no need for `--x 1422 --y 1057` that rots
+   the moment the title bar grows by a point.
+
+#### Prefer ids over screen coordinates
+
+`periscope click`, `screenshot`, `hover`, `double-click`, and
+`dump-tree` all accept `--id` in place of `--x`/`--y`.  Default to
+`--id` whenever the target has a registered name.  Reserve
+`--x`/`--y` for two cases:
+
+- One-off probes during interactive debugging where you don't want
+  to add a `.dump_as("...")` to the source just to click once.
+- Click points that genuinely don't correspond to a named element
+  (e.g. positioning the cursor inside the BlockNote body — the
+  body's `dump_as` bounds give you a region, not a glyph offset).
+  Even here, prefer `--id editor-host-body` to query the region,
+  then offset within those bounds rather than hard-coding a window-
+  relative pair.
+
+Pixel coordinates rot.  Names survive layout shuffles.  Pick names
+that describe semantics (`status-bar-theme-toggle`), not visual
+position (`toggle-3`, `top-right-button`).  Periscope's `click --id`
+is a string lookup; renaming a registered element breaks every
+harness call site that depended on it, so treat registered names
+as an API surface — add ADR-style discipline before renaming.
+
+The Phase 8 sweep scenarios in
+[`phase-8-sweep.md`](phase-8-sweep.md) follow this rule: scenarios
+that target a chrome element use `--id`; scenarios that target a
+point inside the editor body use coordinates but document the
+target region via the surrounding `--id` lookup.
 
 ### Why SIGUSR1?
 
