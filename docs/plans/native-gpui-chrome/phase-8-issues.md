@@ -31,11 +31,12 @@
 2.22. ✅ Notes list top bar search: Esc button shodu close the search line and clear the search query
 2.23. The sidebar-types-sort button does not work
 2.24. Install @blocknote/shadcn and restore BlockNote menu UI primitives (SideMenu drag handle, etc. — depends on a ComponentsContext.Provider that only the UI subpackages install; tracked here so the 1.2 quick fix can land)
+2.25. ✅ Redirect WebView console logs to the tolaria in-process simple logger
 
 ## 3. Low Priority
 
 3.1. Inspector view should be opened in a separate windows, not a pannel
-3.2. System window menu shoud display Show Sidebar|Hide Sidebar, Show Inspector|Hide Inspector depending on the current state
+3.2. System window menu should display Show Sidebar|Hide Sidebar, Show Inspector|Hide Inspector depending on the current state
 
 ---
 

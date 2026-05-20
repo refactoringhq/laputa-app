@@ -56,6 +56,138 @@ use macos::spawn_webview;
 /// WKWebView via `wry::WebViewBuilder::with_html`.
 pub const EDITOR_HOST_HTML: &str = include_str!("../../../editor-host/dist/index.html");
 
+/// JS shim injected via `wry::WebViewBuilder::with_initialization_script`
+/// **before** the editor host bundle boots.  It wraps
+/// `console.{log,info,warn,error,debug}` plus the global `error` /
+/// `unhandledrejection` listeners so every browser-side diagnostic is
+/// forwarded to the host through `window.ipc.postMessage` as a
+/// `{"__t":"console_log","level","msg"}` envelope.
+///
+/// The Rust IPC handler discriminates that envelope before falling
+/// through to [`editor_bridge::decode_from_host`], mapping each level
+/// to `log::log!(target: "webview", …)` so editor logs land in the
+/// same `env_logger` stream as Rust logs.
+///
+/// Design notes:
+///
+/// - The whole script is an IIFE so no globals leak.
+/// - If `window.ipc?.postMessage` is missing (e.g. running the bundle
+///   under `pnpm dev` in a plain browser tab) the shim is a no-op and
+///   the page behaves exactly as it would today.
+/// - The wrapper posts the envelope **before** invoking the original
+///   method so even if the original throws (rare, but possible inside
+///   devtools formatters) the host still sees the message.
+/// - Arguments are formatted by joining with a single space: `Error`
+///   instances expand to `stack || message`; objects/arrays go through
+///   `JSON.stringify` with a `String(a)` fallback for circular refs;
+///   everything else is `String(a)`.
+const WEBVIEW_CONSOLE_BRIDGE_JS: &str = r#"(function () {
+  if (!window.ipc || typeof window.ipc.postMessage !== "function") {
+    return;
+  }
+  var post = function (level, msg) {
+    try {
+      window.ipc.postMessage(JSON.stringify({ __t: "console_log", level: level, msg: msg }));
+    } catch (_e) {
+      // Last-resort: never let the bridge throw into user code.
+    }
+  };
+  var fmtArg = function (a) {
+    if (a instanceof Error) {
+      return a.stack || a.message || String(a);
+    }
+    if (a === null || a === undefined) {
+      return String(a);
+    }
+    if (typeof a === "object") {
+      try {
+        return JSON.stringify(a);
+      } catch (_e) {
+        return String(a);
+      }
+    }
+    return String(a);
+  };
+  var fmt = function (args) {
+    var out = [];
+    for (var i = 0; i < args.length; i++) {
+      out.push(fmtArg(args[i]));
+    }
+    return out.join(" ");
+  };
+  var levels = ["log", "info", "warn", "error", "debug"];
+  for (var i = 0; i < levels.length; i++) {
+    (function (lvl) {
+      var original = console[lvl] ? console[lvl].bind(console) : function () {};
+      console[lvl] = function () {
+        post(lvl, fmt(arguments));
+        try {
+          original.apply(console, arguments);
+        } catch (_e) {
+          // Swallow devtools formatter errors; the host already has the line.
+        }
+      };
+    })(levels[i]);
+  }
+  window.addEventListener("error", function (e) {
+    var stack = e && e.error && e.error.stack ? e.error.stack : "";
+    var loc = (e && e.filename ? e.filename : "?") +
+      ":" + (e && e.lineno ? e.lineno : 0) +
+      ":" + (e && e.colno ? e.colno : 0);
+    post("error", "[uncaught] " + (e && e.message ? e.message : "(no message)") +
+      " at " + loc + (stack ? "\n" + stack : ""));
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    var reason = e && e.reason;
+    var rendered;
+    if (reason instanceof Error) {
+      rendered = reason.stack || reason.message || String(reason);
+    } else if (reason && typeof reason === "object") {
+      try {
+        rendered = JSON.stringify(reason);
+      } catch (_err) {
+        rendered = String(reason);
+      }
+    } else {
+      rendered = String(reason);
+    }
+    post("error", "[unhandledrejection] " + rendered);
+  });
+})();
+"#;
+
+/// Cheap prefix shared by every console-bridge envelope.  Matched as a
+/// `starts_with` test in the wry IPC handler so editor_bridge frames
+/// (`{"k":…}`) skip the JSON parse path entirely.
+const CONSOLE_ENVELOPE_PREFIX: &str = r#"{"__t":"console_log""#;
+
+/// Parse a console-bridge envelope into `(level, message)`.
+///
+/// Returns `None` if `body` is not a console envelope, or is malformed
+/// JSON, or is missing required fields — the caller must fall through
+/// to [`editor_bridge::decode_from_host`] in that case.
+///
+/// Unknown `level` strings — including the bare `"log"` JS level — map
+/// to [`log::Level::Info`] so a typo upstream can never silently drop
+/// a line.
+fn parse_console_envelope(body: &str) -> Option<(log::Level, String)> {
+    if !body.starts_with(CONSOLE_ENVELOPE_PREFIX) {
+        return None;
+    }
+    let value: serde_json::Value = serde_json::from_str(body).ok()?;
+    let level = value.get("level")?.as_str()?;
+    let msg = value.get("msg")?.as_str()?.to_owned();
+    let level = match level {
+        "warn" => log::Level::Warn,
+        "error" => log::Level::Error,
+        "debug" => log::Level::Debug,
+        // "info", the JS-only "log" channel, and any unknown/typo
+        // value all map to Info so noisy upstream typos still show.
+        _ => log::Level::Info,
+    };
+    Some((level, msg))
+}
+
 // ---------------------------------------------------------------------------
 // Events (Phase 8.3)
 // ---------------------------------------------------------------------------
@@ -671,7 +803,7 @@ impl NoteItem {
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)]
 mod macos {
-    use super::{NoteId, EDITOR_HOST_HTML};
+    use super::{parse_console_envelope, NoteId, EDITOR_HOST_HTML, WEBVIEW_CONSOLE_BRIDGE_JS};
     use anyhow::{Context as _, Result};
     use gpui::{App, AppContext, Context, Entity, Window};
     use gpui_wry::WebView;
@@ -716,8 +848,23 @@ mod macos {
             // to leave on in dogfood builds; remove or feature-gate
             // before any production cut.
             .with_devtools(true)
+            // Worklist 2.25 — wrap console.{log,info,warn,error,debug}
+            // and global error / unhandledrejection listeners so every
+            // editor-side diagnostic flows through `window.ipc.postMessage`
+            // into our env_logger.  The IPC handler below discriminates
+            // the `{"__t":"console_log",…}` envelope before falling
+            // through to editor_bridge.
+            .with_initialization_script(WEBVIEW_CONSOLE_BRIDGE_JS)
             .with_ipc_handler(move |req| {
                 let body = req.body();
+                // Worklist 2.25 — console-bridge envelopes arrive on the
+                // same IPC channel as editor_bridge frames; discriminate
+                // them first so they never hit decode_from_host's
+                // error path (which would log them as "decode_failed").
+                if let Some((lvl, msg)) = parse_console_envelope(body) {
+                    log::log!(target: "webview", lvl, "id={id:?} {msg}");
+                    return;
+                }
                 match editor_bridge::decode_from_host(body) {
                     Ok(msg) => {
                         if tx.send(msg).is_err() {
@@ -1015,6 +1162,89 @@ mod tests {
             EDITOR_HOST_HTML.contains(r#"id="editor-root""#),
             "EDITOR_HOST_HTML must contain `<div id=\"editor-root\">`; \
              rebuild editor-host/dist with `pnpm --ignore-workspace build`"
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // Worklist 2.25 — console-bridge parse contract
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn parse_console_envelope_classifies_levels() {
+        use log::Level;
+        let cases = [
+            (
+                r#"{"__t":"console_log","level":"warn","msg":"w"}"#,
+                Level::Warn,
+                "w",
+            ),
+            (
+                r#"{"__t":"console_log","level":"error","msg":"e"}"#,
+                Level::Error,
+                "e",
+            ),
+            (
+                r#"{"__t":"console_log","level":"info","msg":"i"}"#,
+                Level::Info,
+                "i",
+            ),
+            (
+                r#"{"__t":"console_log","level":"debug","msg":"d"}"#,
+                Level::Debug,
+                "d",
+            ),
+            // The JS `console.log` channel has no direct Rust level;
+            // by contract it must map to Info, not be dropped.
+            (
+                r#"{"__t":"console_log","level":"log","msg":"l"}"#,
+                Level::Info,
+                "l",
+            ),
+            // Unknown level strings must also fall back to Info so a
+            // typo upstream never silently loses a line.
+            (
+                r#"{"__t":"console_log","level":"trace","msg":"t"}"#,
+                Level::Info,
+                "t",
+            ),
+        ];
+        for (body, want_lvl, want_msg) in cases {
+            let got = parse_console_envelope(body)
+                .unwrap_or_else(|| panic!("expected Some(..) for body={body}"));
+            assert_eq!(got.0, want_lvl, "level mismatch for body={body}");
+            assert_eq!(got.1, want_msg, "msg mismatch for body={body}");
+        }
+    }
+
+    #[test]
+    fn parse_console_envelope_rejects_editor_bridge() {
+        // editor_bridge frames must fall through unchanged so the
+        // existing decode path keeps running for them.
+        assert_eq!(parse_console_envelope(r#"{"k":"ready"}"#), None);
+        assert_eq!(
+            parse_console_envelope(r#"{"k":"dirty","v":{"id":1}}"#),
+            None
+        );
+    }
+
+    #[test]
+    fn parse_console_envelope_rejects_garbage() {
+        // Non-JSON body — must not panic, must return None.
+        assert_eq!(parse_console_envelope("not json"), None);
+        // Has the prefix but the JSON itself is malformed.
+        assert_eq!(
+            parse_console_envelope(r#"{"__t":"console_log","level":42"#),
+            None
+        );
+        // Has the prefix and is valid JSON but missing `msg`.
+        assert_eq!(
+            parse_console_envelope(r#"{"__t":"console_log","level":"warn"}"#),
+            None
+        );
+        // Has the prefix and is valid JSON but `level` is not a string.
+        assert_eq!(
+            parse_console_envelope(r#"{"__t":"console_log","level":42,"msg":"x"}"#),
+            None
         );
     }
 
