@@ -22,6 +22,10 @@ interface NoteListContextMenuParams {
   onOpenInNewWindow?: (entry: VaultEntry) => void
   onArchivePaths?: (paths: string[]) => void
   onDeletePaths?: (paths: string[]) => void
+  onToggleFavorite?: (path: string) => void
+  onToggleOrganized?: (path: string) => void
+  onRevealFile?: (path: string) => void
+  onCopyFilePath?: (path: string) => void
 }
 
 function hasNoteListContextActions({
@@ -30,13 +34,21 @@ function hasNoteListContextActions({
   onOpenInNewWindow,
   onArchivePaths,
   onDeletePaths,
+  onToggleFavorite,
+  onToggleOrganized,
+  onRevealFile,
+  onCopyFilePath,
 }: NoteListContextMenuParams & { entry: VaultEntry }) {
-  return Boolean(
-    onOpenInNewWindow
-      || (onEnterNeighborhood && entry.fileKind !== 'binary')
-      || (onArchivePaths && !entry.archived)
-      || onDeletePaths,
-  )
+  return [
+    onOpenInNewWindow,
+    onEnterNeighborhood && entry.fileKind !== 'binary',
+    onArchivePaths && !entry.archived,
+    onDeletePaths,
+    onToggleFavorite,
+    onToggleOrganized,
+    onRevealFile,
+    onCopyFilePath,
+  ].some(Boolean)
 }
 
 export function useNoteListContextMenu({
@@ -45,6 +57,10 @@ export function useNoteListContextMenu({
   onOpenInNewWindow,
   onArchivePaths,
   onDeletePaths,
+  onToggleFavorite,
+  onToggleOrganized,
+  onRevealFile,
+  onCopyFilePath,
 }: NoteListContextMenuParams) {
   const [ctxMenu, setCtxMenu] = useState<NoteListContextMenuState | null>(null)
   const ctxMenuRef = useRef<HTMLDivElement>(null)
@@ -69,12 +85,31 @@ export function useNoteListContextMenu({
   }, [ctxMenu, closeContextMenu])
 
   const handleNoteContextMenu = useCallback((entry: VaultEntry, event: ReactMouseEvent) => {
-    if (!hasNoteListContextActions({ entry, onEnterNeighborhood, onOpenInNewWindow, onArchivePaths, onDeletePaths })) return
+    if (!hasNoteListContextActions({
+      entry,
+      onEnterNeighborhood,
+      onOpenInNewWindow,
+      onArchivePaths,
+      onDeletePaths,
+      onToggleFavorite,
+      onToggleOrganized,
+      onRevealFile,
+      onCopyFilePath,
+    })) return
     event.preventDefault()
     event.stopPropagation()
     trackEvent('note_item_context_menu_opened')
     setCtxMenu({ x: event.clientX, y: event.clientY, entry })
-  }, [onArchivePaths, onDeletePaths, onEnterNeighborhood, onOpenInNewWindow])
+  }, [
+    onArchivePaths,
+    onCopyFilePath,
+    onDeletePaths,
+    onEnterNeighborhood,
+    onOpenInNewWindow,
+    onRevealFile,
+    onToggleFavorite,
+    onToggleOrganized,
+  ])
 
   const contextMenuNode = (
     <NoteListContextMenuNode
@@ -85,6 +120,10 @@ export function useNoteListContextMenu({
       onOpenInNewWindow={onOpenInNewWindow}
       onArchivePaths={onArchivePaths}
       onDeletePaths={onDeletePaths}
+      onToggleFavorite={onToggleFavorite}
+      onToggleOrganized={onToggleOrganized}
+      onRevealFile={onRevealFile}
+      onCopyFilePath={onCopyFilePath}
       onClose={closeContextMenu}
     />
   )
