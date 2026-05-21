@@ -385,6 +385,7 @@
   "noteList.searchPlaceholder": "Šukać natatki...",
   "noteList.searchAction": "Pošuk natatak",
   "noteList.clearSearch": "Ačyscić pošuk",
+  "noteList.quickOpenCreate": "Stvaryć natatku \"{title}\"",
   "noteList.createNote": "Stvaryć natatku",
   "noteList.empty.changesError": "Pamylka zahruzki: {error}",
   "noteList.empty.noChanges": "Niama zmien",

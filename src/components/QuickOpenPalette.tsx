@@ -1,33 +1,90 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import type { VaultEntry } from '../types'
 import { NoteSearchList } from './NoteSearchList'
 import { useNoteSearch } from '../hooks/useNoteSearch'
 import { translate, type AppLocale } from '../lib/i18n'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Plus } from '@phosphor-icons/react'
+import type { NoteSearchResult } from '../hooks/useNoteSearch'
 
 interface QuickOpenPaletteProps {
   open: boolean
   entries: VaultEntry[]
   isLoading?: boolean
   onSelect: (entry: VaultEntry) => void
+  onCreateNote?: (title: string) => unknown
   onClose: () => void
   locale?: AppLocale
 }
 
-export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, onClose, locale = 'en' }: QuickOpenPaletteProps) {
-  const [query, setQuery] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-  const { results, selectedIndex, setSelectedIndex, handleKeyDown } = useNoteSearch(entries, query)
+interface QuickOpenCreateActionProps {
+  title: string
+  onCreate: () => void
+  locale: AppLocale
+}
 
-  useEffect(() => {
-    if (open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on dialog open
-      setQuery('')
-      setSelectedIndex(0)
-      setTimeout(() => inputRef.current?.focus(), 50)
-    }
-  }, [open, setSelectedIndex])
+function quickOpenEmptyMessage(isLoading: boolean, locale: AppLocale): string {
+  return isLoading ? translate(locale, 'status.vault.reloading') : translate(locale, 'noteList.empty.noMatching')
+}
 
+function QuickOpenCreateAction({ title, onCreate, locale }: QuickOpenCreateActionProps) {
+  return (
+    <div className="border-t border-border p-2">
+      <Button
+        type="button"
+        variant="ghost"
+        className="h-9 w-full justify-start gap-2 px-2 text-sm"
+        onClick={onCreate}
+      >
+        <Plus size={14} className="shrink-0" />
+        <span className="truncate">{translate(locale, 'noteList.quickOpenCreate', { title })}</span>
+      </Button>
+    </div>
+  )
+}
+
+function useQuickOpenCreateAction({
+  query,
+  isLoading,
+  resultCount,
+  onCreateNote,
+  onClose,
+}: {
+  query: string
+  isLoading: boolean
+  resultCount: number
+  onCreateNote?: (title: string) => unknown
+  onClose: () => void
+}) {
+  const title = query.trim()
+  const canCreate = Boolean(onCreateNote && title && !isLoading && resultCount === 0)
+  const create = useCallback(() => {
+    if (!canCreate) return
+    onCreateNote?.(title)
+    onClose()
+  }, [canCreate, title, onCreateNote, onClose])
+
+  return { canCreate, create, title }
+}
+
+function useQuickOpenKeyboard({
+  open,
+  results,
+  selectedIndex,
+  onSelect,
+  onClose,
+  handleKeyDown,
+  createFromQuery,
+}: {
+  open: boolean
+  results: NoteSearchResult[]
+  selectedIndex: number
+  onSelect: (entry: VaultEntry) => void
+  onClose: () => void
+  handleKeyDown: (e: KeyboardEvent) => void
+  createFromQuery: () => void
+}) {
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
@@ -41,12 +98,32 @@ export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, o
         if (selected) {
           onSelect(selected.entry)
           onClose()
+        } else {
+          createFromQuery()
         }
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [open, results, selectedIndex, onSelect, onClose, handleKeyDown])
+  }, [open, results, selectedIndex, onSelect, onClose, handleKeyDown, createFromQuery])
+}
+
+export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, onCreateNote, onClose, locale = 'en' }: QuickOpenPaletteProps) {
+  const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const { results, selectedIndex, setSelectedIndex, handleKeyDown } = useNoteSearch(entries, query)
+  const createAction = useQuickOpenCreateAction({ query, isLoading, resultCount: results.length, onCreateNote, onClose })
+
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on dialog open
+      setQuery('')
+      setSelectedIndex(0)
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
+  }, [open, setSelectedIndex])
+
+  useQuickOpenKeyboard({ open, results, selectedIndex, onSelect, onClose, handleKeyDown, createFromQuery: createAction.create })
 
   if (!open) return null
 
@@ -77,9 +154,10 @@ export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, o
             onClose()
           }}
           onItemHover={(i) => setSelectedIndex(i)}
-          emptyMessage={isLoading ? translate(locale, 'status.vault.reloading') : translate(locale, 'noteList.empty.noMatching')}
+          emptyMessage={quickOpenEmptyMessage(isLoading, locale)}
           className="flex-1 overflow-y-auto"
         />
+        {createAction.canCreate && <QuickOpenCreateAction title={createAction.title} onCreate={createAction.create} locale={locale} />}
       </div>
     </div>
   )

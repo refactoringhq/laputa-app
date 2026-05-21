@@ -385,6 +385,7 @@
   "noteList.searchPlaceholder": "Buscar notas…",
   "noteList.searchAction": "Buscar notas",
   "noteList.clearSearch": "Borrar búsqueda",
+  "noteList.quickOpenCreate": "Crear nota «{title}»",
   "noteList.createNote": "Crear nueva nota",
   "noteList.empty.changesError": "Error al cargar los cambios: {error}",
   "noteList.empty.noChanges": "No hay cambios pendientes",

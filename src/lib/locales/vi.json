@@ -385,6 +385,7 @@
   "noteList.searchPlaceholder": "Tìm ghi chú...",
   "noteList.searchAction": "Tìm ghi chú",
   "noteList.clearSearch": "Xóa tìm kiếm",
+  "noteList.quickOpenCreate": "Tạo ghi chú \"{title}\"",
   "noteList.createNote": "Tạo ghi chú mới",
   "noteList.empty.changesError": "Không tải được thay đổi: {error}",
   "noteList.empty.noChanges": "Không có thay đổi chờ xử lý",

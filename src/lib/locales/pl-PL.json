@@ -385,6 +385,7 @@
   "noteList.searchPlaceholder": "Szukaj notatek...",
   "noteList.searchAction": "Szukaj notatek",
   "noteList.clearSearch": "Wyczyść wyszukiwanie",
+  "noteList.quickOpenCreate": "Utwórz notatkę „{title}”",
   "noteList.createNote": "Utwórz nową notatkę",
   "noteList.empty.changesError": "Nie udało się załadować zmian: {error}",
   "noteList.empty.noChanges": "Brak oczekujących zmian",

@@ -385,6 +385,7 @@
   "noteList.searchPlaceholder": "ノートを検索…",
   "noteList.searchAction": "メモを検索",
   "noteList.clearSearch": "検索をクリア",
+  "noteList.quickOpenCreate": "メモ「{title}」を作成",
   "noteList.createNote": "新しいノートを作成",
   "noteList.empty.changesError": "変更の読み込みに失敗しました：{error}",
   "noteList.empty.noChanges": "保留中の変更はありません",

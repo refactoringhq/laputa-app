@@ -385,6 +385,7 @@
   "noteList.searchPlaceholder": "搜尋筆記...",
   "noteList.searchAction": "搜尋筆記",
   "noteList.clearSearch": "清除搜尋",
+  "noteList.quickOpenCreate": "建立筆記「{title}」",
   "noteList.createNote": "新建筆記",
   "noteList.empty.changesError": "載入更改失敗：{error}",
   "noteList.empty.noChanges": "沒有待處理更改",

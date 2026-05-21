@@ -315,7 +315,7 @@ files:
     mcp.setup.disconnect: 42ae25231906c83927831e0ef7c317ac
     mcp.setup.connecting: 182e7eda4e721ad00737460b88701dee
     mcp.setup.disconnecting: 11de134aefe51cb4a5c545b5a057a871
-    mcp.setup.nodeRequirement: ac58a35cf21d2204fed548c227f77594
+    mcp.setup.runtimeRequirement: 1d7a8c99b2bc875b3601fa57860432fb
     mcp.setup.writeEntryDescription: 370aa4403d2ffc37f574503bc3cd00e6
     mcp.setup.clientPathsDescription: 94565852412051c799e78d2f4525ff53
     mcp.setup.geminiGuidanceDescription: 182cf5b84b2f56cb1cf41dcdb5e093d8
@@ -387,6 +387,7 @@ files:
     noteList.searchPlaceholder: 4857cd2689a0a40eb4a77cdc745c518e
     noteList.searchAction: 5012120fc480c67686dd22ee2f9493cd
     noteList.clearSearch: 9983381c21069a3d6e4432e0aaea0079
+    noteList.quickOpenCreate: a4e964a3bc5b25e7ae87163624731e05
     noteList.createNote: f1484bc40bd3fe3430c13fb89e2ce1af
     noteList.empty.changesError: 4fca500c4b70f61f7d9413c57c34bdc4
     noteList.empty.noChanges: ad82ac153532f5625760c29c176c5d5f

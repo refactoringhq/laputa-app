@@ -385,6 +385,7 @@
   "noteList.searchPlaceholder": "搜索笔记...",
   "noteList.searchAction": "搜索笔记",
   "noteList.clearSearch": "清除搜索",
+  "noteList.quickOpenCreate": "创建笔记“{title}”",
   "noteList.createNote": "新建笔记",
   "noteList.empty.changesError": "加载更改失败：{error}",
   "noteList.empty.noChanges": "没有待处理更改",

@@ -385,6 +385,7 @@
   "noteList.searchPlaceholder": "노트 검색...",
   "noteList.searchAction": "노트 검색",
   "noteList.clearSearch": "검색 지우기",
+  "noteList.quickOpenCreate": "메모 \"{title}\" 생성",
   "noteList.createNote": "새 노트 만들기",
   "noteList.empty.changesError": "변경 사항 로드 실패: {error}",
   "noteList.empty.noChanges": "대기 중인 변경 사항 없음",

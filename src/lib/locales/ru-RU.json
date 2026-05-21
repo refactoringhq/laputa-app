@@ -385,6 +385,7 @@
   "noteList.searchPlaceholder": "Поиск заметок...",
   "noteList.searchAction": "Поиск по заметкам",
   "noteList.clearSearch": "Очистить поиск",
+  "noteList.quickOpenCreate": "Создать заметку «{title}»",
   "noteList.createNote": "Создать новую заметку",
   "noteList.empty.changesError": "Не удалось загрузить изменения: {error}",
   "noteList.empty.noChanges": "Нет изменений, ожидающих подтверждения",

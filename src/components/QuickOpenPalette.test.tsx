@@ -82,6 +82,27 @@ describe('QuickOpenPalette', () => {
     expect(screen.getByText('No matching notes')).toBeInTheDocument()
   })
 
+  it('creates a note from an unmatched query when pressing Enter', () => {
+    const onCreateNote = vi.fn()
+    render(
+      <QuickOpenPalette
+        open={true}
+        entries={entries}
+        onSelect={onSelect}
+        onCreateNote={onCreateNote}
+        onClose={onClose}
+      />,
+    )
+    fireEvent.change(screen.getByPlaceholderText('Search notes...'), { target: { value: 'New Research Brief' } })
+
+    expect(screen.getByText('Create note "New Research Brief"')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(onCreateNote).toHaveBeenCalledWith('New Research Brief')
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalled()
+  })
+
   it('shows type badge for entries with isA', () => {
     render(<QuickOpenPalette open={true} entries={entries} onSelect={onSelect} onClose={onClose} />)
     expect(screen.getByText('Project')).toBeInTheDocument()

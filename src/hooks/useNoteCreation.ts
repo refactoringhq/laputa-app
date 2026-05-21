@@ -511,7 +511,7 @@ interface CreationDeps {
 interface NoteCreationRequest extends CreationDeps {
   title: string
   type: string
-  creationPath?: 'plus_button'
+  creationPath?: 'plus_button' | 'quick_open'
 }
 
 async function createNamedNote({
@@ -893,8 +893,8 @@ export function useNoteCreation(config: NoteCreationConfig, tabDeps: CreationTab
     }
   }, [openTabWithContent, addEntry, addPendingSave, removePendingSave, onNewNotePersisted, onTypeStateChanged, removeEntry])
 
-  const handleCreateNote = useCallback((title: string, type: string): Promise<boolean> =>
-    createNamedNote({ entries, vaultPath, defaultWorkspacePath, vaults, setToastMessage, persistResolvedEntry, title, type, creationPath: 'plus_button' }),
+  const handleCreateNote = useCallback((title: string, type: string, creationPath: 'plus_button' | 'quick_open' = 'plus_button'): Promise<boolean> =>
+    createNamedNote({ entries, vaultPath, defaultWorkspacePath, vaults, setToastMessage, persistResolvedEntry, title, type, creationPath }),
   [entries, vaultPath, defaultWorkspacePath, vaults, setToastMessage, persistResolvedEntry])
 
   const handleCreateType = useCallback((typeName: string): Promise<boolean> =>
