@@ -12,7 +12,7 @@ import { onReceive, send, type ThemeMode, type ToHost } from "./bridge.ts";
 import { createEditor } from "./setupEditor.ts";
 import { blocksToMarkdown, markdownToBlocks, replaceDocument } from "./richEditorMarkdown.ts";
 import { splitFrontmatter } from "./frontmatter.ts";
-import { parseFrontmatterEntries, PropertiesPanel } from "./propertiesPanel.tsx";
+import { compactMarkdown } from "./compactMarkdown.ts";
 import { EditorMenus } from "./menus.tsx";
 import { attachEditorLinkActivation } from "./linkActivation.ts";
 import {
@@ -80,6 +80,18 @@ export interface EditorBridgeHandlers {
     setFrontmatter(prefix: string): void;
     /** Read the stashed frontmatter prefix at save time. */
     getFrontmatter(): string;
+    /** Stash the original body's leading + trailing whitespace
+     *  (everything between the frontmatter close and the first
+     *  non-whitespace byte, plus the trailing newline tail).  Re-emitted
+     *  on save so BlockNote's parse+serialise pair — which strips the
+     *  leading blank line after frontmatter and normalises the trailing
+     *  newline shape — cannot regress byte-identity (worklist 2.26
+     *  follow-up). */
+    setBodyWhitespace(leading: string, trailing: string): void;
+    /** Read the stashed body leading whitespace at save time. */
+    getBodyLeadingWhitespace(): string;
+    /** Read the stashed body trailing whitespace at save time. */
+    getBodyTrailingWhitespace(): string;
 }
 
 /**
@@ -91,6 +103,30 @@ export interface RawNoteState {
     id: number;
     path: string;
     body: string;
+}
+
+/**
+ * Build the on-disk markdown body for a save: BlockNote-serialise the
+ * editor, run the buffer through `compactMarkdown` to undo the
+ * serialiser's bullet-marker / blank-line / HTML-entity normalisation
+ * (mirrors React's `serializeRichEditorDocumentToMarkdown`), strip the
+ * trailing newlines BlockNote always emits, then sandwich the result
+ * between the captured frontmatter prefix + body leading/trailing
+ * whitespace so the file round-trips byte-for-byte (worklist 2.26).
+ *
+ * Single helper shared by the explicit `save_request` branch and the
+ * `editor.onChange` auto-save path — divergence between the two was
+ * the bug 6b19ddf5 fixed, so they must keep going through one funnel.
+ */
+function buildMarkdownSaveBody(
+    editor: BlockNoteEditor,
+    handlers: Pick<
+        EditorBridgeHandlers,
+        "getFrontmatter" | "getBodyLeadingWhitespace" | "getBodyTrailingWhitespace"
+    >,
+): string {
+    const serialised = compactMarkdown(blocksToMarkdown(editor)).replace(/\n*$/, "");
+    return `${handlers.getFrontmatter()}${handlers.getBodyLeadingWhitespace()}${serialised}${handlers.getBodyTrailingWhitespace()}`;
 }
 
 /**
@@ -129,9 +165,34 @@ export function dispatchToHost(
                 // it back on `save_request` (worklist 2.26).  Raw-mode
                 // notes ship the buffer as-is, so this branch is the
                 // only one that needs the split.
-                const [frontmatter, body] = splitFrontmatter(msg.v.body);
+                const [frontmatter, rawBody] = splitFrontmatter(msg.v.body);
                 handlers.setFrontmatter(frontmatter);
-                const parsed = markdownToBlocks(editor, body);
+                // Capture body whitespace at both ends so we can re-emit
+                // it on save and beat BlockNote's normalisation (worklist
+                // 2.26 follow-up):
+                //   leading  -> newlines between the frontmatter close
+                //               and the first non-whitespace byte; the
+                //               parser strips this blank line.
+                //   trailing -> the trailing newline tail; the serialiser
+                //               normalises this to a single `\n`.
+                const leadingMatch = rawBody.match(/^(\n+)/);
+                const leadingBlanks = leadingMatch?.[1] ?? "";
+                const trailingMatch = rawBody.match(/(\n*)$/);
+                // Guard against the all-newline body case where the two
+                // regexes would overlap and double-count the newlines on
+                // save.  When the body is nothing but newlines, the
+                // leading capture already owns the whole string.
+                const trailingNewlines =
+                    leadingBlanks.length >= rawBody.length ? "" : trailingMatch?.[1] ?? "";
+                handlers.setBodyWhitespace(leadingBlanks, trailingNewlines);
+                // Strip both ends before handing the body to BlockNote so
+                // the parser sees a tight document — leaving the leading
+                // blank in would only make the lossy normalisation worse.
+                const trimmed = rawBody.slice(
+                    leadingBlanks.length,
+                    rawBody.length - trailingNewlines.length,
+                );
+                const parsed = markdownToBlocks(editor, trimmed);
                 replaceDocument(editor, parsed);
             }
             break;
@@ -149,10 +210,15 @@ export function dispatchToHost(
             // shell doesn't need a discriminant.
             const rawBody = handlers.getRawBuffer();
             // Markdown notes prepend the stashed YAML prefix (worklist
-            // 2.26) so the frontmatter block survives byte-for-byte;
-            // raw notes already ship the original buffer untouched.
-            const body =
-                rawBody ?? `${handlers.getFrontmatter()}${blocksToMarkdown(editor)}`;
+            // 2.26) so the frontmatter block survives byte-for-byte,
+            // sandwich the BlockNote-serialised body between the
+            // captured leading + trailing whitespace (worklist 2.26
+            // follow-up), and run the buffer through `compactMarkdown`
+            // to undo BlockNote's bullet-marker / blank-line / HTML-
+            // entity normalisation (ported verbatim from React's
+            // `src/utils/compact-markdown.ts`).  Raw notes already
+            // ship the original buffer untouched.
+            const body = rawBody ?? buildMarkdownSaveBody(editor, handlers);
             // `Saved` vs `Save` discrimination would require a clean-body
             // ledger; for 8.24 we always emit `Save` (matches the React
             // app's "every save is a write" semantics). Cheap dirty
@@ -222,12 +288,21 @@ export function EditorApp() {
     // string when the note has no frontmatter.  A ref (not state) so
     // the save path doesn't churn through React for a non-rendered
     // value.
+    //
+    // Worklist 2.27 reversal: the read-only PropertiesPanel that
+    // mirrored this prefix into React state was removed at the user's
+    // request — only the ref survives because there is no longer a
+    // render surface that needs to react to frontmatter changes.
     const frontmatterRef = useRef<string>("");
-    // Reactive mirror of `frontmatterRef` so the read-only properties
-    // panel (worklist 2.27) re-renders on every `note_open`.  The ref
-    // stays as the canonical save-path source (no React churn for the
-    // hot save loop); state is kept in lockstep via `setFrontmatter`.
-    const [frontmatter, setFrontmatterState] = useState<string>("");
+    // Captured leading/trailing body whitespace for byte-identical
+    // round-trip (worklist 2.26 follow-up).  Set on every `note_open`
+    // via `splitFrontmatter`+regex capture; sandwiched around the
+    // BlockNote-serialised body on every save (both explicit
+    // `save_request` and the `editor.onChange` auto-save).  Refs (not
+    // state) because the save path is hot and these values never
+    // drive a render.
+    const bodyLeadingRef = useRef<string>("");
+    const bodyTrailingRef = useRef<string>("");
     // Tracks the raw-vs-rich mode of the *previous* note so the
     // position-sync hook can capture the outgoing snapshot on the
     // correct surface during a mode flip.
@@ -332,12 +407,19 @@ export function EditorApp() {
             },
             setFrontmatter(prefix) {
                 frontmatterRef.current = prefix;
-                // Drive the React mirror so the properties panel
-                // (worklist 2.27) refreshes on the next render.
-                setFrontmatterState(prefix);
             },
             getFrontmatter() {
                 return frontmatterRef.current;
+            },
+            setBodyWhitespace(leading, trailing) {
+                bodyLeadingRef.current = leading;
+                bodyTrailingRef.current = trailing;
+            },
+            getBodyLeadingWhitespace() {
+                return bodyLeadingRef.current;
+            },
+            getBodyTrailingWhitespace() {
+                return bodyTrailingRef.current;
             },
         }),
         [tabSwap],
@@ -420,11 +502,18 @@ export function EditorApp() {
             // `dispatchToHost`.  The auto-save flush calls `persistSave`
             // straight through, so omitting the prefix here would strip
             // YAML frontmatter off disk every 1.5 s of typing.
+            //
+            // Worklist 2.26 follow-up: also re-emit the captured body
+            // leading/trailing whitespace and route through
+            // `compactMarkdown` so the auto-save buffer matches the
+            // explicit `save_request` byte-for-byte.  Divergence
+            // between these two save paths was the bug 6b19ddf5 fixed
+            // for frontmatter; this commit applies the same fix to the
+            // whole body.
             if (!rawNote) {
-                saveLifecycle.handleContentChange(
-                    id,
-                    `${frontmatterRef.current}${blocksToMarkdown(editor)}`,
-                );
+                // Same funnel as the explicit `save_request` branch in
+                // `dispatchToHost` — see `buildMarkdownSaveBody`.
+                saveLifecycle.handleContentChange(id, buildMarkdownSaveBody(editor, handlers));
             }
             // Coalesce rapid edits — `Dirty` is purely a UI signal, the
             // native side debounces its own state on top of this.
@@ -454,14 +543,6 @@ export function EditorApp() {
     // BlockNote extension in `setupEditor.ts`; this hook is the
     // higher-level state signal used by the React side.
     const isComposing = useEditorComposing(editor);
-
-    // Parsed frontmatter entries for the read-only properties panel
-    // (worklist 2.27).  Memoised so unrelated re-renders skip the
-    // parse cost; refreshes when the bridge stashes a new prefix.
-    const frontmatterEntries = useMemo(
-        () => parseFrontmatterEntries(frontmatter),
-        [frontmatter],
-    );
 
     // Wikilink suggestion menu (Phase 8.26).  Stable `getItems`
     // closure for the editor's lifetime — the underlying provider
@@ -536,34 +617,37 @@ export function EditorApp() {
                     latestContentRef={rawBufferRef}
                 />
             ) : (
-                <>
-                    <PropertiesPanel entries={frontmatterEntries} />
-                    <BlockNoteView
-                        editor={editor}
-                        theme={theme}
-                        // Default menu surfaces are *disabled* on the host —
-                        // `EditorMenus` mounts the three controllers explicitly
-                        // so we can attach the hover guards (see `menus.tsx`).
-                        // Link toolbar / file panel / table handles / emoji
-                        // picker / comments stay off until later rows wire
-                        // them.
-                        formattingToolbar={false}
-                        linkToolbar={false}
-                        slashMenu={false}
-                        sideMenu={false}
-                        filePanel={false}
-                        tableHandles={false}
-                        emojiPicker={false}
-                        comments={false}
-                    >
-                        <EditorMenus editor={editor} />
-                        <SuggestionMenuController
-                            triggerCharacter="[["
-                            getItems={getWikilinkItems}
-                            minQueryLength={WIKILINK_MIN_QUERY_LENGTH}
-                        />
-                    </BlockNoteView>
-                </>
+                // Worklist 2.27 reversal: the read-only PropertiesPanel
+                // that used to render frontmatter as a key/value table
+                // above the BlockNote body was removed at the user's
+                // request.  The data plumbing (split on open, prepend
+                // on save) still runs end-to-end so YAML round-trips
+                // byte-for-byte; only the display surface goes.
+                <BlockNoteView
+                    editor={editor}
+                    theme={theme}
+                    // Default menu surfaces are *disabled* on the host —
+                    // `EditorMenus` mounts the three controllers explicitly
+                    // so we can attach the hover guards (see `menus.tsx`).
+                    // Link toolbar / file panel / table handles / emoji
+                    // picker / comments stay off until later rows wire
+                    // them.
+                    formattingToolbar={false}
+                    linkToolbar={false}
+                    slashMenu={false}
+                    sideMenu={false}
+                    filePanel={false}
+                    tableHandles={false}
+                    emojiPicker={false}
+                    comments={false}
+                >
+                    <EditorMenus editor={editor} />
+                    <SuggestionMenuController
+                        triggerCharacter="[["
+                        getItems={getWikilinkItems}
+                        minQueryLength={WIKILINK_MIN_QUERY_LENGTH}
+                    />
+                </BlockNoteView>
             )}
         </div>
     );

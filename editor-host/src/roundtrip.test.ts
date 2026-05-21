@@ -49,6 +49,8 @@ function makeHandlers(): EditorBridgeHandlers {
     let activeId: number | null = null;
     let frontmatter = "";
     let rawBuffer: string | null = null;
+    let bodyLeading = "";
+    let bodyTrailing = "";
     return {
         setActiveId(id) {
             activeId = id;
@@ -69,6 +71,16 @@ function makeHandlers(): EditorBridgeHandlers {
         },
         getFrontmatter() {
             return frontmatter;
+        },
+        setBodyWhitespace(leading, trailing) {
+            bodyLeading = leading;
+            bodyTrailing = trailing;
+        },
+        getBodyLeadingWhitespace() {
+            return bodyLeading;
+        },
+        getBodyTrailingWhitespace() {
+            return bodyTrailing;
         },
     };
 }

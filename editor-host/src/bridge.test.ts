@@ -35,6 +35,8 @@ function makeHandlers(initial?: {
     let frontmatter = "";
     let rawBuffer: string | null = initial?.rawBuffer ?? null;
     let cancelCalls = 0;
+    let bodyLeading = "";
+    let bodyTrailing = "";
     return {
         setActiveId(id) {
             activeId = id;
@@ -60,6 +62,16 @@ function makeHandlers(initial?: {
         },
         getFrontmatter() {
             return frontmatter;
+        },
+        setBodyWhitespace(leading, trailing) {
+            bodyLeading = leading;
+            bodyTrailing = trailing;
+        },
+        getBodyLeadingWhitespace() {
+            return bodyLeading;
+        },
+        getBodyTrailingWhitespace() {
+            return bodyTrailing;
         },
         get cancelCalls() {
             return cancelCalls;
