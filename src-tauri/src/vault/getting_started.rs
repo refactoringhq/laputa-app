@@ -414,6 +414,7 @@ Use kebab-case: `my-note-title.md`. One note per file.
 - Create and edit saved views in `views/`.
 - Update `AGENTS.md` only when the user asks for vault-level guidance changes.
 - Search the bundled Tolaria docs when the user asks how Tolaria works or when you need product behavior beyond these base conventions.
+- Use Portent as the default best-practice model when the user asks how to improve, organize, or restructure the knowledge base. Combine Portent's types, relationships, and capture -> organize -> archive lifecycle with Tolaria's type documents, properties, Inbox, archive, and saved views.
 
 ## What agents should avoid
 

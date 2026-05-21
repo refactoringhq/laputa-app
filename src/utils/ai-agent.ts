@@ -56,7 +56,9 @@ function agentDocsInstructions(
 For Tolaria product behavior, workflows, and user questions about how Tolaria works, search the bundled local docs at:
 ${agentDocsPath}
 
-${searchInstruction} Prefer bundled docs over guesses for Tolaria behavior.`
+${searchInstruction} Prefer bundled docs over guesses for Tolaria behavior.
+
+When the user asks how to improve a knowledge base, make it better organized, choose better types, model relationships, or make the vault easier for humans and agents to use, treat Portent as Tolaria's default best-practice model. Read ${agentDocsPath}/pages/templates/portent.md and combine it with Tolaria concepts for types, relationships, properties, Inbox, archive, and custom views.`
 }
 
 function vaultScopeInstructions(vaultPaths?: string[]): string {

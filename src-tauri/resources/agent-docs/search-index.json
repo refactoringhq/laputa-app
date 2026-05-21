@@ -324,6 +324,21 @@
     ]
   },
   {
+    "title": "Portent",
+    "path": "pages/templates/portent.md",
+    "url": "/templates/portent",
+    "section": "templates",
+    "headings": [
+      "Core Questions",
+      "Types",
+      "Relationships",
+      "Lifecycle",
+      "Why Use It",
+      "Start From The Template",
+      "Learn More"
+    ]
+  },
+  {
     "title": "Contribute",
     "path": "pages/reference/contribute.md",
     "url": "/reference/contribute",

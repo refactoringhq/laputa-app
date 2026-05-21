@@ -27,6 +27,7 @@ export default defineConfig({
       { text: "Start", link: "/start/install" },
       { text: "Concepts", link: "/concepts/vaults" },
       { text: "Guides", link: "/guides/capture-a-note" },
+      { text: "Templates", link: "/templates/portent" },
       { text: "Downloads", link: "https://tolaria.md/download/", target: "_self", noIcon: true },
     ],
     search: {
@@ -73,6 +74,12 @@ export default defineConfig({
           { text: "Use Media Previews", link: "/guides/use-media-previews" },
           { text: "Manage Display Preferences", link: "/guides/manage-display-preferences" },
           { text: "Use The Command Palette", link: "/guides/use-command-palette" },
+        ],
+      },
+      {
+        text: "Templates",
+        items: [
+          { text: "Portent", link: "/templates/portent" },
         ],
       },
       {

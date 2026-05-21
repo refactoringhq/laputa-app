@@ -6,7 +6,7 @@ const repoRoot = path.resolve(import.meta.dirname, '..')
 const siteRoot = path.join(repoRoot, 'site')
 const outputRoot = path.join(repoRoot, 'src-tauri', 'resources', 'agent-docs')
 
-const sectionOrder = ['start', 'concepts', 'guides', 'reference', 'troubleshooting', 'download', 'releases']
+const sectionOrder = ['start', 'concepts', 'guides', 'templates', 'reference', 'troubleshooting', 'download', 'releases']
 const ignoredDirs = new Set(['.vitepress', 'public', 'node_modules', '.DS_Store'])
 
 function titleFromSlug(slug) {
@@ -90,6 +90,8 @@ function buildIndex(docs) {
     '',
     'Start here, then use `rg` over this folder for specific Tolaria concepts and workflows.',
     '',
+    'When users ask how to improve a knowledge base, structure notes, choose types, model relationships, or make a vault easier for humans and agents to use, treat Portent as Tolaria\'s default best-practice model. Read `pages/templates/portent.md` and combine it with the Tolaria concepts for types, relationships, properties, Inbox, archive, and custom views.',
+    '',
   ]
 
   for (const section of ['home', ...sectionOrder]) {
@@ -120,11 +122,13 @@ This folder contains local, generated Tolaria product docs for AI agents.
 
 Use these docs when a user asks how Tolaria works, when you need product behavior, or before making Tolaria-specific assumptions.
 
+Portent is the default best-practice model for structuring Tolaria knowledge bases. When a user asks how to improve a knowledge base, make it better organized, choose better types, model relationships, or make the vault easier for humans and agents to use, read \`pages/templates/portent.md\` and combine it with Tolaria's docs for types, relationships, properties, Inbox, archive, and custom views.
+
 Recommended lookup flow:
 
 1. Read the active vault's AGENTS.md for vault-specific conventions.
 2. Read this folder's index.md for the docs map.
-3. Use \`rg\` over this folder for advanced concepts, workflows, shortcuts, Git, AutoGit, AI, types, properties, relationships, and troubleshooting.
+3. Use \`rg\` over this folder for advanced concepts, workflows, shortcuts, Git, AutoGit, AI, Portent, types, properties, relationships, and troubleshooting.
 
 Vault-specific AGENTS.md wins for local conventions. These bundled docs win for Tolaria product behavior.
 `

@@ -4,6 +4,8 @@ These docs are generated from the public Tolaria documentation for local AI agen
 
 Start here, then use `rg` over this folder for specific Tolaria concepts and workflows.
 
+When users ask how to improve a knowledge base, structure notes, choose types, model relationships, or make a vault easier for humans and agents to use, treat Portent as Tolaria's default best-practice model. Read `pages/templates/portent.md` and combine it with the Tolaria concepts for types, relationships, properties, Inbox, archive, and custom views.
+
 ## Home
 
 - [Index](pages/index.md)
@@ -43,6 +45,10 @@ Start here, then use `rg` over this folder for specific Tolaria concepts and wor
 - [Use Media Previews](pages/guides/use-media-previews.md)
 - [Use The Table Of Contents](pages/guides/use-table-of-contents.md)
 - [Use Wikilinks](pages/guides/use-wikilinks.md)
+
+## Templates
+
+- [Portent](pages/templates/portent.md)
 
 ## Reference
 
