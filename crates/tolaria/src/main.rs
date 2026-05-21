@@ -45,8 +45,8 @@ mod macos {
     use std::path::PathBuf;
 
     use gpui::{
-        point, px, size, App, AppContext, Bounds, QuitMode, TitlebarOptions, WindowBounds,
-        WindowOptions,
+        point, px, size, App, AppContext, Bounds, QuitMode, TitlebarOptions,
+        WindowBackgroundAppearance, WindowBounds, WindowOptions,
     };
     use gpui_platform::application;
     use mock_fixtures::{MockAi, MockGit, MockSearch, MockVault};
@@ -702,6 +702,43 @@ mod macos {
                         // overlaps the lights.
                         traffic_light_position: Some(point(px(9.0), px(9.0))),
                     }),
+                    // Worklist 2.31 Phase 1 (Angle-C C2) — flip the
+                    // workspace window's GPUI Metal base layer to
+                    // non-opaque so a future commit can drop the
+                    // embedded WKWebView *behind* it and let GPUI
+                    // overlays composite above without sibling-NSView
+                    // occlusion (the problem `OverlayTooltipExt` works
+                    // around today by spawning a separate `NSPanel`).
+                    //
+                    // `WindowBackgroundAppearance::Transparent` routes
+                    // through `gpui_macos::window::set_background_appearance`
+                    // (window.rs:1401-1455) which:
+                    //  1. calls `renderer.update_transparency(true)` —
+                    //     flips the CAMetalLayer's `isOpaque` to NO
+                    //     so the renderer keeps an alpha channel and
+                    //     non-opaque chrome surfaces composite
+                    //     correctly,
+                    //  2. calls `NSWindow.setOpaque(NO)` +
+                    //     `setBackgroundColor:` to a near-clear black
+                    //     so AppKit doesn't paint an opaque fill
+                    //     behind the metal layer either.
+                    //
+                    // Every workspace chrome surface (title bar,
+                    // sidebar, note-list, note-toolbar, status bar,
+                    // `TolariaWorkspace::render` root) already paints
+                    // its own opaque `.bg(theme.background)` /
+                    // `.bg(theme.sidebar)`, so the chrome stays solid
+                    // — only the editor centre pane (which never
+                    // sets a bg) becomes see-through.  Phase 2 lands
+                    // the WKWebView behind the metal layer so that
+                    // transparency exposes the WebView instead of
+                    // the desktop.  Until then `note_item::macos::
+                    // fix_window_background` re-paints the NSWindow's
+                    // `backgroundColor` opaque dark `#1F1E1B`, so the
+                    // transient state is "centre pane shows dark fill"
+                    // not "centre pane shows the desktop" — visually
+                    // acceptable for Phase 1 acceptance testing.
+                    window_background: WindowBackgroundAppearance::Transparent,
                     ..Default::default()
                 };
 

@@ -37,7 +37,7 @@
 2.28. ✅ Match the note tollbar tolltips styles to the rest of the UI
 2.29. ✅ Properties panel — add/remove/edit controls (type-aware editors for date/boolean/wikilink/list)
 2.30. ✅ Notes list sort dropdown tooltip is out of place
-2.31. ⏳ Inline chrome overlays via transparent GPUI base layer (Angle C2)
+2.31. ⏳ Inline chrome overlays via transparent GPUI base layer (Angle C2) — Phase 1 (window transparency) landed; Phase 2 (WebView z-order reversal) + Phase 3 (revert OverlayTooltipExt fan-out) deferred
 
 ## 3. Low Priority
 
@@ -87,6 +87,31 @@ OverlayTooltipExt now used by every chrome surface; `gpui_component::Tooltip` is
 The platform glue lives in a `cfg(target_os = "macos") mod macos { … }` block inside `crates/ui/src/overlay_tooltip.rs`; non-macOS targets stub the helpers because the overlay primitive itself only exists to dodge an AppKit-specific z-order problem (sibling-NSView WebView occlusion).
 
 (c) **Deferred follow-up.**  Worklist row `2.31` tracks the proper architectural fix (Angle-C C2): a transparent GPUI base layer that lives below the WebView and hosts inline overlays so we no longer need a separate `NSPanel` at all.  C4 (this commit) is the cheapest lag fix that keeps the existing separate-window approach.
+
+#### 2.31
+
+**Angle-C C2 — transparent GPUI base layer.**  The proper architectural fix for the WKWebView z-order overlay problem (worklist 2.28 / 2.30 / `OverlayTooltipExt`).  Today the WKWebView is a sibling NSView painted *above* GPUI's Metal layer (ADR-0115), so any GPUI overlay extending into the WebView frame gets occluded.  C2 inverts the stacking: drop the WebView *behind* the metal layer, paint chrome surfaces opaquely above, leave the editor centre pane transparent so the WebView shows through, and let GPUI overlays composite naturally above everything.  Lands in three phases so chrome-bg regressions surface incrementally instead of all-at-once.
+
+**Phase 1 (this commit) — window transparency + chrome-bg audit.**  Flip the workspace window's `WindowOptions::window_background` from the default `Opaque` to `WindowBackgroundAppearance::Transparent`.  GPUI's `set_background_appearance` (gpui_macos `window.rs:1401-1455`) propagates that to two things: (a) `renderer.update_transparency(true)` flips the CAMetalLayer's `isOpaque` to NO so the renderer keeps an alpha channel; (b) `NSWindow.setOpaque(NO)` + `setBackgroundColor:` to a near-clear black so AppKit doesn't paint an opaque fill behind the metal layer either.
+
+Every chrome surface was audited and confirmed to already paint its own opaque background — no new `.bg(...)` calls were needed in this commit:
+
+| Surface | File | `bg` source |
+|---|---|---|
+| `TolariaWorkspace::render` outermost wrapper | `crates/workspace/src/workspace.rs:314` | `theme.background` |
+| Title bar strip | `crates/workspace/src/title_bar.rs:199` | `theme.sidebar` |
+| Status bar | `crates/status_bar/src/lib.rs:713` | `theme.sidebar` |
+| `SidebarPanel` root | `crates/sidebar_panel/src/lib.rs:1181` | `theme.sidebar` |
+| `NoteListPane` root | `crates/note_list_pane/src/lib.rs:1708` | `theme.background` |
+| `note_toolbar::render` root | `crates/note_item/src/note_toolbar.rs:177` | `theme.background` |
+
+Both `theme.background` and `theme.sidebar` are constructed via `palette::h(u32)` → `rgb(c).into()`, which yields a `Hsla { alpha: 1.0 }`, so every chrome surface is fully opaque.  The editor centre pane (`resizable_panel().child(div().size_full().child(center_group)…)` in `workspace.rs:376-383`) deliberately has no `.bg(...)` — that's the transparent window through which Phase 2 will expose the WebView.
+
+**Transient Phase-1 visual state.**  Until Phase 2 lands the WebView behind the metal layer, the centre pane region would expose the desktop directly.  However, `note_item::macos::fix_window_background` (`crates/note_item/src/lib.rs:925-971`) re-paints the *NSWindow's* `backgroundColor` to opaque dark `#1F1E1B` whenever the note WebView spawns — this fix runs after our `setOpaque(NO)` setup but doesn't touch `setOpaque`, so the metal layer stays transparent while the NSWindow underneath becomes opaque dark.  Net result: the centre pane shows a dark fill (matching the editor's "blank" colour), not the desktop.  Visually acceptable for Phase-1 acceptance testing.  Phase 2 reverses the WebView z-order so this fill is replaced by the live WebView.
+
+**Phase 2 (deferred) — WebView z-order reversal.**  Modify `crates/note_item/src/lib.rs::macos::spawn_webview` to attach the WKWebView via `addSubview:positioned:NSWindowBelow relativeTo:<metal_layer_view>` (objc2 / `NSView.add_subview_positioned`) instead of the current append-to-end attach.  After this lands, GPUI overlays composite above the WebView naturally — no separate `NSPanel` needed.
+
+**Phase 3 (deferred) — revert `OverlayTooltipExt` fan-out.**  With Phase 2 in place, the separate `NSPanel` workaround in `crates/ui/src/overlay_tooltip.rs` (worklist 2.4 / 2.28 / 2.30) is no longer needed: replace every `.overlay_tooltip(...)` call site with `gpui_component::Tooltip` inline.  Removes ~400 lines of platform glue and the hover-latency cache.
 
 #### 3.1
 
