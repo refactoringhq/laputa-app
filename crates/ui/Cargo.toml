@@ -19,6 +19,15 @@ serde_json.workspace = true
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3"
 
+# overlay_tooltip.rs uses AppKit primitives (NSWindow / NSPanel) to host
+# the tooltip in a PopUp window that beats the WKWebView z-order; the
+# crates below are macOS-only and gated accordingly.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2.workspace = true
+objc2-app-kit.workspace = true
+objc2-foundation.workspace = true
+raw-window-handle.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
 

@@ -807,7 +807,7 @@ mod macos {
     use anyhow::{Context as _, Result};
     use gpui::{App, AppContext, Context, Entity, Window};
     use gpui_wry::WebView;
-    use objc2_app_kit::{NSAutoresizingMaskOptions, NSColor, NSView};
+    use objc2_app_kit::{NSAutoresizingMaskOptions, NSColor, NSView, NSWindowOrderingMode};
     use objc2_foundation::{ns_string, NSNumber, NSObjectNSKeyValueCoding};
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
     use wry::{WebViewBuilder, WebViewExtMacOS};
@@ -890,6 +890,7 @@ mod macos {
         fix_draws_background(&webview_raw);
         fix_window_background(&handle);
         fix_under_page_background(&webview_raw);
+        fix_z_order_send_to_back(&webview_raw);
 
         Ok(cx.new(|cx: &mut Context<WebView>| WebView::new(webview_raw, window, cx)))
     }
@@ -922,12 +923,21 @@ mod macos {
         unsafe { wk.setValue_forKey(Some(&no), ns_string!("drawsBackground")) }
     }
 
-    /// Fix 3 — NSWindow background colour (mirrors `embed_poc::fix_window_background`).
+    /// Fix 3 — NSWindow background colour (Angle-C2 Phase 2).
     ///
-    /// Sets `NSWindow.backgroundColor` to `theme.background` (dark `#1F1E1B`,
-    /// light `#FFFFFF`) so any 1-frame gap between the Metal layer and the
-    /// WKWebView's remote CALayer is filled with the matching colour rather
-    /// than the default light-grey chrome.
+    /// Paints `NSWindow.backgroundColor` with `NSColor::clearColor()` so the
+    /// transparent workspace window (Phase 1,
+    /// `WindowBackgroundAppearance::Transparent`) does not mask the WKWebView
+    /// that Phase 2 z-orders *behind* GPUI's Metal layer via
+    /// [`fix_z_order_send_to_back`].
+    ///
+    /// Pre-Phase-2 this helper painted opaque `#1F1E1B` to hide the 1-frame
+    /// resize gap; with the WKWebView now sitting underneath the Metal layer
+    /// the gap is naturally covered by the WebView's own surface, and the
+    /// dark fill would instead occlude the WebView entirely in the centre
+    /// pane.  `underPageBackgroundColor` (see [`fix_under_page_background`])
+    /// still carries the dark fallback for WKWebView's *internal* resize
+    /// gap, which is the right surface for that colour.
     ///
     /// # Safety
     /// Unsafe pointer cast from `AppKitWindowHandle.ns_view` + objc2 retain.
@@ -953,19 +963,11 @@ mod macos {
                 log::warn!("note_item::fix_window_background: NSView.window() returned nil");
                 return;
             };
-            // Dark theme: `theme.palette::apply_dark` background = #1F1E1B.
-            // Light theme: #FFFFFF.  We cannot read the live theme here
-            // because this runs during WebView construction before any
-            // GPUI render pass.  Use the dark value as the safe default
-            // (matches the `drawsBackground = false` intent and is
-            // invisible under normal compositing).  A theme-change observer
-            // in `main.rs` can update this later if needed.
-            let color = NSColor::colorWithSRGBRed_green_blue_alpha(
-                0x1F_u8 as f64 / 255.0,
-                0x1E_u8 as f64 / 255.0,
-                0x1B_u8 as f64 / 255.0,
-                1.0,
-            );
+            // Transparent so GPUI's transparent base layer reveals the
+            // WKWebView through the Phase 2 z-order reversal.  Replacing
+            // this with an opaque fill would re-mask the WebView and
+            // re-introduce the dark centre-pane regression.
+            let color = NSColor::clearColor();
             ns_window.setBackgroundColor(Some(&color));
         }
     }
@@ -993,6 +995,54 @@ mod macos {
         // main thread.  `underPageBackgroundColor` is macOS 12+ (silently
         // ignored on earlier releases).  `wk` is ARC-retained and not aliased.
         unsafe { wk.setValue_forKey(Some(&color), ns_string!("underPageBackgroundColor")) }
+    }
+
+    /// Fix 5 — Send WKWebView to the back of its superview's z-order
+    /// (Angle-C2 Phase 2).
+    ///
+    /// `lb-wry`'s `WebViewBuilder::build_as_child` adds the WKWebView as a
+    /// sibling NSView under the GPUI window's contentView, *above* GPUI's
+    /// Metal layer in the subview stack.  That is why pre-Phase-2 every GPUI
+    /// surface that crossed the WebView rect (tooltips, popups, scrollbars,
+    /// note-toolbar) got occluded.
+    ///
+    /// This helper reorders the WKWebView to the bottom of its superview
+    /// via `[parent addSubview:wkWebView positioned:NSWindowBelow
+    /// relativeTo:nil]`, which AppKit interprets as "place this view below
+    /// every other sibling".  Combined with Phase 1's transparent NSWindow
+    /// (`WindowBackgroundAppearance::Transparent`) and the matching
+    /// `clearColor` fill in [`fix_window_background`], GPUI chrome composites
+    /// naturally on top of the WebView — no per-tooltip overlay machinery
+    /// required (Phase 3 reverts those call sites).
+    ///
+    /// If the WebView has no `superview` yet (would only happen during a
+    /// teardown race), the call is a no-op and logs a warning.
+    fn fix_z_order_send_to_back(webview: &wry::WebView) {
+        let wk: objc2::rc::Retained<wry::WryWebView> = webview.webview();
+        // SAFETY: Same threading and aliasing guarantees as the other
+        // `fix_*` helpers in this module: runs on the main thread during
+        // `spawn_webview` on a freshly-built WKWebView whose AppKit graph
+        // has just been mounted into the window contentView, and the
+        // returned `Retained` values are not aliased elsewhere.  `superview`
+        // is documented to return `nil` only when the view is unparented,
+        // which we handle explicitly.  `addSubview:positioned:relativeTo:`
+        // with `NSWindowOrderingMode::Below` and `relativeTo: nil` is the
+        // documented AppKit way to push a subview to the bottom of its
+        // sibling stack without removing/re-inserting it.
+        unsafe {
+            // `wry::WryWebView` derefs to `NSView` via the objc2 class
+            // hierarchy; pass it explicitly as an `&NSView` to keep the
+            // method signatures unambiguous.
+            let wk_view: &NSView = &wk;
+            let Some(parent) = wk_view.superview() else {
+                log::warn!(
+                    "note_item::fix_z_order_send_to_back: WKWebView has no superview; \
+                     skipping z-order reversal (Phase 2 effect will be absent)"
+                );
+                return;
+            };
+            parent.addSubview_positioned_relativeTo(wk_view, NSWindowOrderingMode::Below, None);
+        }
     }
 }
 
