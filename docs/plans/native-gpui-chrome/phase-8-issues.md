@@ -37,7 +37,7 @@
 2.28. ✅ Match the note tollbar tolltips styles to the rest of the UI
 2.29. ✅ Properties panel — add/remove/edit controls (type-aware editors for date/boolean/wikilink/list)
 2.30. ✅ Notes list sort dropdown tooltip is out of place
-2.31. ⏳ Inline chrome overlays via transparent GPUI base layer (Angle C2) — Phase 1 (window transparency) landed; Phase 2 (WebView z-order reversal) + Phase 3 (revert OverlayTooltipExt fan-out) deferred
+2.31. ✅ Inline chrome overlays via transparent GPUI base layer (Angle C2) — Phase 1 (window transparency, f0a38d84) + Phase 2 (WebView z-order reversal via NSWindowBelow, b4dd5efe) + Phase 3 (OverlayTooltipExt fan-out reverted to inline gpui_component::Tooltip, 649a686c)
 
 ## 3. Low Priority
 
