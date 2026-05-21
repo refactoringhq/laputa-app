@@ -632,6 +632,8 @@ impl Render for InspectorPanel {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let border_color = cx.theme().border;
         let muted = cx.theme().muted_foreground;
+        let background = cx.theme().background;
+        let foreground = cx.theme().foreground;
 
         // Snapshot expanded state so we can borrow `self` freely inside the loop.
         let section_states: Vec<(InspectorSection, bool)> = InspectorSection::ALL
@@ -696,6 +698,8 @@ impl Render for InspectorPanel {
             .flex_col()
             .h_full()
             .overflow_hidden()
+            .bg(background)
+            .text_color(foreground)
             .children(children)
     }
 }
@@ -707,6 +711,7 @@ impl Render for InspectorPanel {
 #[cfg(test)]
 mod tests {
     use gpui::TestAppContext;
+    use gpui_component::ActiveTheme as _;
     use mock_fixtures::{MockGit, MockVault, NoteId};
 
     use super::{
@@ -808,6 +813,28 @@ mod tests {
 
         // Drive the render pass — must not panic.
         cx.run_until_parked();
+    }
+
+    /// Regression for worklist 3.1: the Inspector window must paint a
+    /// real chrome surface, not render black-on-black.  Both the
+    /// theme tokens consumed by the root `div` (`background`,
+    /// `foreground`) must be fully-opaque fills — if either were ever
+    /// `transparent()` the standalone Inspector window would appear as
+    /// an all-black void with invisible section labels.
+    #[gpui::test]
+    fn root_uses_opaque_theme_background_and_foreground(cx: &mut TestAppContext) {
+        install_theme(cx);
+        cx.update(|cx| {
+            let theme = cx.theme();
+            assert!(
+                theme.background.a > 0.0,
+                "theme.background must be opaque so the Inspector window is not all-black"
+            );
+            assert!(
+                theme.foreground.a > 0.0,
+                "theme.foreground must be opaque so section labels are visible"
+            );
+        });
     }
 
     // -----------------------------------------------------------------------
