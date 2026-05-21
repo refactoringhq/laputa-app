@@ -33,9 +33,9 @@ use gpui::{
     div, px, Context, EventEmitter, InteractiveElement, IntoElement, MouseButton, ParentElement,
     Render, SharedString, StatefulInteractiveElement as _, Styled, Subscription, Window,
 };
-use gpui_component::{tooltip::Tooltip, ActiveTheme, IconName};
+use gpui_component::{ActiveTheme, IconName};
 use mock_fixtures::{FileStatus, MockGit, MockVault};
-use ui::tree_dump::DumpAsExt as _;
+use ui::{tree_dump::DumpAsExt as _, OverlayTooltipExt as _};
 use vault::Vault;
 
 // ---------------------------------------------------------------------------
@@ -536,7 +536,7 @@ impl Render for StatusBar {
                     .text_color(muted)
                     .child(IconName::ChevronDown),
             )
-            .tooltip(|window, cx| Tooltip::new("Switch vault").build(window, cx))
+            .overlay_tooltip("Switch vault")
             .dump_as("status-bar-vault-cluster");
 
         // Left cluster — vault chip · version chip · service chips,
@@ -586,7 +586,7 @@ impl Render for StatusBar {
                     .on_click(move |_, _window, cx| {
                         chip_entity.update(cx, |this, cx| this.on_service_click(service_kind, cx));
                     })
-                    .tooltip(|window, cx| Tooltip::new("Sync service status").build(window, cx))
+                    .overlay_tooltip("Sync service status")
                     .child(status_chip(chip_label, chip_icon, color, trailing, warning))
                     .dump_as("status-bar-service-chip"),
             );
@@ -626,7 +626,7 @@ impl Render for StatusBar {
                         contrib_entity
                             .update(cx, |this, cx| this.on_link_click(LinkKind::Contribute, cx));
                     })
-                    .tooltip(|window, cx| Tooltip::new("Contribute on GitHub").build(window, cx))
+                    .overlay_tooltip("Contribute on GitHub")
                     .child(
                         div()
                             .w(px(14.0))
@@ -650,7 +650,7 @@ impl Render for StatusBar {
                     .on_click(move |_, _window, cx| {
                         docs_entity.update(cx, |this, cx| this.on_link_click(LinkKind::Docs, cx));
                     })
-                    .tooltip(|window, cx| Tooltip::new("Open documentation").build(window, cx))
+                    .overlay_tooltip("Open documentation")
                     .child(
                         div()
                             .w(px(14.0))
@@ -681,7 +681,7 @@ impl Render for StatusBar {
                     .items_center()
                     .justify_center()
                     .on_click(|_, _window, cx| theme::cycle(cx))
-                    .tooltip(|window, cx| Tooltip::new("Toggle theme").build(window, cx))
+                    .overlay_tooltip("Toggle theme")
                     .child(theme_toggle_icon)
                     .dump_as("status-bar-theme-toggle"),
             )
@@ -697,7 +697,7 @@ impl Render for StatusBar {
                     .on_click(|_, _window, cx| {
                         cx.dispatch_action(&actions::OpenSettings);
                     })
-                    .tooltip(|window, cx| Tooltip::new("Settings").build(window, cx))
+                    .overlay_tooltip("Settings")
                     .child(IconName::Settings)
                     .dump_as("status-bar-settings"),
             );

@@ -25,8 +25,8 @@ use gpui::{
     div, px, AnyElement, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement as _, Styled, Window,
 };
-use gpui_component::{tooltip::Tooltip, ActiveTheme, IconName};
-use ui::tree_dump::DumpAsExt as _;
+use gpui_component::{ActiveTheme, IconName};
+use ui::{tree_dump::DumpAsExt as _, OverlayTooltipExt as _};
 
 use crate::dock::Dock;
 use crate::workspace::NATIVE_TITLE_BAR_HEIGHT_PT;
@@ -141,7 +141,7 @@ impl Render for TitleBar {
             .on_click(move |_, _window, cx| {
                 sidebar_toggle_target.update(cx, |dock, cx| dock.toggle(cx));
             })
-            .tooltip(|window, cx| Tooltip::new("Toggle sidebar").build(window, cx))
+            .overlay_tooltip("Toggle sidebar")
             .child(IconName::PanelLeft)
             .dump_as("title-bar-toggle-sidebar")
             .into_any_element();
@@ -231,7 +231,7 @@ fn title_bar_cell(id: &'static str, icon: IconName, tooltip: &'static str) -> An
         .on_click(move |_, _window, _cx| {
             log::info!("title bar action stub: {id}");
         })
-        .tooltip(move |window, cx| Tooltip::new(tooltip).build(window, cx))
+        .overlay_tooltip(tooltip)
         .child(icon)
         .dump_as(id)
         .into_any_element()

@@ -34,7 +34,7 @@
 2.25. ✅ Redirect WebView console logs to the tolaria in-process simple logger
 2.26. ✅ Round-tripping open/save reformats frontmatter
 2.27. ✅ Frontmatter is not rendered in preview mode
-2.28. Match the note tollbar tolltips styles to the rest of the UI
+2.28. ✅ Match the note tollbar tolltips styles to the rest of the UI
 2.29. Properties panel — add/remove/edit controls (type-aware editors for date/boolean/wikilink/list)
 
 ## 3. Low Priority
@@ -67,6 +67,10 @@ SideMenu drag handle, etc. — depends on a ComponentsContext.Provider that only
 #### 2.27
 
 Read-only MVP shipped: `editor-host/src/propertiesPanel.tsx` exposes a shallow YAML-prefix parser (`parseFrontmatterEntries`) plus a `<PropertiesPanel>` React component that renders each key/value as a row above `<BlockNoteView>`.  It is wired into the worklist-2.26 frontmatter stash via a `useState` mirror so the panel refreshes on every `note_open` without churning the save-path ref.  Raw-mode notes (`.yaml`, `.json`, …) skip the panel because the raw editor already shows the full YAML inline.  Add/remove/reorder + type-aware editors (date / boolean / wikilink / list) from the React `DynamicPropertiesPanel` are deliberately out of scope; tracked as a separate row `2.29`.
+
+#### 2.28
+
+OverlayTooltipExt now used by every chrome surface; `gpui_component::Tooltip` is no longer referenced by application code.  The note-list Sort `Button` is wrapped in a thin `div().id("note-list-sort-trigger")` so it satisfies the `StatefulInteractiveElement + ParentElement` bound the trait needs.
 
 ### Bridge gaps
 
