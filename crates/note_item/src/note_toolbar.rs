@@ -26,8 +26,8 @@ use gpui::{
     div, px, AnyElement, App, ClipboardItem, InteractiveElement, IntoElement, ParentElement,
     SharedString, StatefulInteractiveElement as _, Styled, Window,
 };
-use gpui_component::{h_flex, ActiveTheme, IconName};
-use ui::{tree_dump::DumpAsExt as _, OverlayTooltipExt as _};
+use gpui_component::{h_flex, tooltip::Tooltip, ActiveTheme, IconName};
+use ui::tree_dump::DumpAsExt as _;
 
 /// Height of the note toolbar strip, in logical points.
 ///
@@ -65,7 +65,7 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
             div()
                 .id("note-toolbar-type")
                 .child(type_label)
-                .overlay_tooltip("Note type — click to change")
+                .tooltip(|window, cx| Tooltip::new("Note type — click to change").build(window, cx))
                 .dump_as("note-toolbar-type"),
         )
         .child(div().text_color(muted).child(IconName::ChevronRight))
@@ -87,7 +87,7 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
                 // — single curved stroke matching the React reference rather
                 // than the two-straight-arrows shape of `IconName::Replace`.
                 .child(IconName::Undo)
-                .overlay_tooltip("Sync status")
+                .tooltip(|window, cx| Tooltip::new("Sync status").build(window, cx))
                 .dump_as("note-toolbar-sync")
                 .into_any_element(),
         );
@@ -189,8 +189,8 @@ pub(crate) fn render(path: &Path, cx: &App) -> AnyElement {
 /// the cell is clicked.
 ///
 /// Single source of truth for the cell's visual chain (size, hover
-/// background, `dump_as`, `overlay_tooltip`) — see [`stub_cell`] for
-/// the log-only default used by the seven still-unwired cells.
+/// background, `dump_as`, `tooltip`) — see [`stub_cell`] for the
+/// log-only default used by the seven still-unwired cells.
 fn toolbar_cell(
     id: &'static str,
     icon: IconName,
@@ -208,7 +208,7 @@ fn toolbar_cell(
         .cursor_pointer()
         .hover(|this| this.bg(gpui::hsla(0.0, 0.0, 0.5, 0.12)))
         .on_click(move |_, window, cx| on_click(window, cx))
-        .overlay_tooltip(tooltip)
+        .tooltip(move |window, cx| Tooltip::new(tooltip).build(window, cx))
         .child(icon)
         .dump_as(id)
         .into_any_element()

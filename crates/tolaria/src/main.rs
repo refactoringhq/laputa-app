@@ -707,8 +707,9 @@ mod macos {
                     // non-opaque so a future commit can drop the
                     // embedded WKWebView *behind* it and let GPUI
                     // overlays composite above without sibling-NSView
-                    // occlusion (the problem `OverlayTooltipExt` works
-                    // around today by spawning a separate `NSPanel`).
+                    // occlusion (the problem the now-removed
+                    // `OverlayTooltipExt` worked around by spawning a
+                    // separate `NSPanel`; Phase 3 deletes that fan-out).
                     //
                     // `WindowBackgroundAppearance::Transparent` routes
                     // through `gpui_macos::window::set_background_appearance`

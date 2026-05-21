@@ -46,10 +46,11 @@ use gpui_component::{
     input::{Escape, Input, InputEvent, InputState},
     menu::DropdownMenu as _,
     scroll::ScrollableElement as _,
+    tooltip::Tooltip,
     v_flex, ActiveTheme, IconName, Sizable as _, StyledExt as _,
 };
 use mock_fixtures::{MockVault, NoteId, NoteKind};
-use ui::{tree_dump::DumpAsExt as _, OverlayTooltipExt as _};
+use ui::tree_dump::DumpAsExt as _;
 use vault::Vault;
 use workspace::panel::{DockPosition, Panel};
 
@@ -1317,6 +1318,12 @@ impl Render for NoteListPane {
             .small()
             .label(SharedString::new_static(sort_label))
             .icon(IconName::ChevronsUpDown)
+            // `Button::tooltip` wires the hover hint through
+            // gpui-component's own `ManagedTooltipExt`.  Chain *before*
+            // `.dropdown_menu_with_anchor(...)` because that wrap
+            // returns `DropdownMenuPopover<Button>`, which doesn't
+            // re-expose `Button`'s builder methods.
+            .tooltip("Sort")
             .dropdown_menu_with_anchor(
                 Anchor::TopRight,
                 move |menu: gpui_component::menu::PopupMenu, _window, _cx| {
@@ -1380,7 +1387,7 @@ impl Render for NoteListPane {
             .on_click(move |_, window, cx| {
                 search_entity.update(cx, |pane, cx| pane.toggle_filter_open(window, cx));
             })
-            .overlay_tooltip(search_tooltip)
+            .tooltip(move |window, cx| Tooltip::new(search_tooltip).build(window, cx))
             .dump_as("note-list-search");
 
         let header_strip = h_flex()
@@ -1412,19 +1419,7 @@ impl Render for NoteListPane {
                     .items_center()
                     .gap(px(12.0))
                     .text_color(muted)
-                    // `gpui_component::Button` doesn't implement
-                    // `ParentElement`, so we route the overlay tooltip
-                    // through a thin wrapper `div` instead of attaching
-                    // it to the button itself.  This is the only chrome
-                    // tooltip target that needs a wrapper — every other
-                    // call site is already a `div(…).id(…)`.  See
-                    // worklist 2.28.
-                    .child(
-                        div()
-                            .id("note-list-sort-trigger")
-                            .child(sort_button)
-                            .overlay_tooltip("Sort"),
-                    )
+                    .child(sort_button)
                     .child(search_button)
                     // Worklist 2.19 — the `+` glyph emits a
                     // `CreateNoteRequested` event so the workspace can
@@ -1447,7 +1442,7 @@ impl Render for NoteListPane {
                             .on_click(move |_, _window, cx| {
                                 new_entity.update(cx, |pane, cx| pane.request_create_note(cx));
                             })
-                            .overlay_tooltip("New note")
+                            .tooltip(|window, cx| Tooltip::new("New note").build(window, cx))
                             .dump_as("note-list-new"),
                     ),
             )

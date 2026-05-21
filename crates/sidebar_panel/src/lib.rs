@@ -36,10 +36,10 @@ use gpui::{
     div, px, rgb, AnyElement, App, Context, EventEmitter, Hsla, InteractiveElement, IntoElement,
     ParentElement, Pixels, Render, SharedString, StatefulInteractiveElement as _, Styled, Window,
 };
-use gpui_component::{ActiveTheme, IconName, StyledExt as _};
+use gpui_component::{tooltip::Tooltip, ActiveTheme, IconName, StyledExt as _};
 use mock_fixtures::{MockVault, NoteKind};
 use std::path::{Path, PathBuf};
-use ui::{tree_dump::DumpAsExt as _, OverlayTooltipExt as _};
+use ui::tree_dump::DumpAsExt as _;
 use vault::Vault;
 use workspace::panel::{DockPosition, Panel};
 
@@ -909,7 +909,7 @@ fn section_header(
         row = row.child(actions_box);
     }
     row.on_click(move |_, _window, cx| on_toggle(cx))
-        .overlay_tooltip(tooltip_text)
+        .tooltip(move |window, cx| Tooltip::new(tooltip_text).build(window, cx))
         .dump_as(id)
         .into_any_element()
 }
@@ -942,7 +942,7 @@ fn header_action(
         .on_mouse_down(gpui::MouseButton::Left, |_, _window, cx| {
             cx.stop_propagation();
         })
-        .overlay_tooltip(tooltip)
+        .tooltip(move |window, cx| Tooltip::new(tooltip).build(window, cx))
         .child(icon)
         .dump_as(id)
         .into_any_element()

@@ -12,8 +12,6 @@
 //! - `ShortcutBadge` — small keyboard-shortcut label.
 //! - `FocusRing` — consistent focus indicator overlay.
 
-pub mod overlay_tooltip;
 pub mod picker;
 pub mod tree_dump;
-pub use overlay_tooltip::OverlayTooltipExt;
 pub use picker::{Picker, PickerDelegate};
