@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import {
   copyLocalPath,
+  isUrlValue,
   normalizeExternalUrl,
   openExternalUrl,
   openLocalFile,
@@ -24,8 +25,15 @@ function setClipboard(writeText: (value: string) => Promise<void>) {
 
 describe('normalizeExternalUrl', () => {
   it('keeps valid http URLs and normalizes bare domains', () => {
+    expect(normalizeExternalUrl('https://example.com')).toBe('https://example.com')
     expect(normalizeExternalUrl('https://example.com/docs')).toBe('https://example.com/docs')
     expect(normalizeExternalUrl('example.com/docs')).toBe('https://example.com/docs')
+  })
+
+  it('rejects pure numeric values instead of treating them as bare domains', () => {
+    expect(normalizeExternalUrl('2026')).toBeNull()
+    expect(normalizeExternalUrl('0')).toBeNull()
+    expect(isUrlValue('2026')).toBe(false)
   })
 
   it('rejects malformed or unsupported URLs', () => {

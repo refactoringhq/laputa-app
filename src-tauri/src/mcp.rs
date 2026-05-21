@@ -228,6 +228,9 @@ fn fallback_node_paths() -> Vec<PathBuf> {
         PathBuf::from("/usr/local/bin/node"),
     ];
 
+    #[cfg(not(windows))]
+    candidates.push(PathBuf::from("/home/linuxbrew/.linuxbrew/bin/node"));
+
     #[cfg(windows)]
     {
         if let Some(program_files) = std::env::var_os("ProgramFiles") {
@@ -267,6 +270,7 @@ fn node_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".mise").join("shims").join(node_binary_name()),
         home.join(".asdf").join("shims").join(node_binary_name()),
         home.join(".volta").join("bin").join(node_binary_name()),
+        home.join(".linuxbrew").join("bin").join(node_binary_name()),
     ];
 
     let nvm_dir = home.join(".nvm").join("versions").join("node");
@@ -999,6 +1003,7 @@ mod tests {
             home.join(".local/share/mise/shims/node"),
             home.join(".asdf/shims/node"),
             home.join(".volta/bin/node"),
+            home.join(".linuxbrew/bin/node"),
         ];
 
         for candidate in expected {

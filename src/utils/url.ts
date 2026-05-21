@@ -28,6 +28,7 @@ export function normalizeExternalUrl(value: string): string | null {
   }
 
   if (parseHttpUrl(trimmed)) return trimmed
+  if (!trimmed.includes('.')) return null
 
   const bareDomainCandidate = `https://${trimmed}`
   const parsedBareDomain = parseHttpUrl(bareDomainCandidate)

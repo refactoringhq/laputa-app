@@ -93,14 +93,25 @@ fn path_from_successful_output(output: &std::process::Output) -> Option<PathBuf>
 }
 
 fn first_existing_path(stdout: &str) -> Option<PathBuf> {
-    stdout.lines().find_map(|line| {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-        let candidate = PathBuf::from(trimmed);
-        candidate.exists().then_some(candidate)
-    })
+    first_existing_path_for_platform(stdout, cfg!(windows))
+}
+
+fn first_existing_path_for_platform(stdout: &str, windows: bool) -> Option<PathBuf> {
+    let mut paths = stdout.lines().filter_map(existing_path);
+    if windows {
+        return paths.find(|path| crate::cli_agent_runtime::has_windows_cli_extension(path));
+    }
+
+    paths.next()
+}
+
+fn existing_path(line: &str) -> Option<PathBuf> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let candidate = PathBuf::from(trimmed);
+    candidate.exists().then_some(candidate)
 }
 
 fn codex_binary_candidates() -> Vec<PathBuf> {
@@ -1001,6 +1012,22 @@ printf '%s\n' '{"type":"item.completed","item":{"id":"msg_1","type":"agent_messa
         let stdout = format!("\n{}\n{}\n", missing.display(), codex.display());
 
         assert_eq!(first_existing_path(&stdout), Some(codex));
+    }
+
+    #[test]
+    fn windows_path_lookup_prefers_cmd_shim_over_extensionless_npm_script() {
+        let dir = tempfile::tempdir().unwrap();
+        let shell_script = dir.path().join("codex");
+        let cmd_shim = dir.path().join("codex.cmd");
+        std::fs::write(&shell_script, "#!/bin/sh\n").unwrap();
+        std::fs::write(&cmd_shim, "@ECHO off\n").unwrap();
+
+        let stdout = format!("{}\n{}\n", shell_script.display(), cmd_shim.display());
+
+        assert_eq!(
+            first_existing_path_for_platform(&stdout, true),
+            Some(cmd_shim)
+        );
     }
 
     #[cfg(unix)]
