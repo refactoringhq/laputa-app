@@ -33,9 +33,10 @@
 2.24. ✅ Install @blocknote/shadcn and restore BlockNote menu UI primitives
 2.25. ✅ Redirect WebView console logs to the tolaria in-process simple logger
 2.26. ✅ Round-tripping open/save reformats frontmatter
-2.27. ✅ Frontmatter is not rendered in preview mode
-2.28. ✅ Match the note tollbar tolltips styles to the rest of the UI
-2.29. Properties panel — add/remove/edit controls (type-aware editors for date/boolean/wikilink/list)
+2.27. ⏳ Frontmatter is not rendered in preview mode — REGRESSION REPORT: frontmatter being removed from notes on save (data loss); body editor still rendering frontmatter
+2.28. ⏳ Match the note tollbar tolltips styles to the rest of the UI — REGRESSION REPORT: style does not match Zed; OverlayTooltip appearance is laggy
+2.29. ✅ Properties panel — add/remove/edit controls (type-aware editors for date/boolean/wikilink/list)
+2.30. Notes list sort dropdown tooltip is out of place
 
 ## 3. Low Priority
 

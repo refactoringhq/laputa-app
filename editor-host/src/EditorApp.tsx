@@ -413,8 +413,18 @@ export function EditorApp() {
             // Hand the latest buffer to the save lifecycle.  Skipped
             // for raw notes — the raw branch wires `handleContentChange`
             // directly off the CodeMirror change handler below.
+            //
+            // Worklist 2.27 regression fix: the buffer handed to
+            // `handleContentChange` MUST include the stashed frontmatter
+            // prefix, mirroring the explicit `save_request` branch in
+            // `dispatchToHost`.  The auto-save flush calls `persistSave`
+            // straight through, so omitting the prefix here would strip
+            // YAML frontmatter off disk every 1.5 s of typing.
             if (!rawNote) {
-                saveLifecycle.handleContentChange(id, blocksToMarkdown(editor));
+                saveLifecycle.handleContentChange(
+                    id,
+                    `${frontmatterRef.current}${blocksToMarkdown(editor)}`,
+                );
             }
             // Coalesce rapid edits — `Dirty` is purely a UI signal, the
             // native side debounces its own state on top of this.
