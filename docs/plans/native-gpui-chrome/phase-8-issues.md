@@ -33,10 +33,11 @@
 2.24. ✅ Install @blocknote/shadcn and restore BlockNote menu UI primitives
 2.25. ✅ Redirect WebView console logs to the tolaria in-process simple logger
 2.26. ✅ Round-tripping open/save reformats frontmatter
-2.27. ⏳ Frontmatter is not rendered in preview mode — REGRESSION REPORT: frontmatter being removed from notes on save (data loss); body editor still rendering frontmatter
-2.28. ⏳ Match the note tollbar tolltips styles to the rest of the UI — REGRESSION REPORT: style does not match Zed; OverlayTooltip appearance is laggy
+2.27. ✅ Frontmatter is rendered in preview mode
+2.28. ✅ Match the note tollbar tolltips styles to the rest of the UI
 2.29. ✅ Properties panel — add/remove/edit controls (type-aware editors for date/boolean/wikilink/list)
-2.30. Notes list sort dropdown tooltip is out of place
+2.30. ✅ Notes list sort dropdown tooltip is out of place
+2.31. ⏳ Inline chrome overlays via transparent GPUI base layer (Angle C2)
 
 ## 3. Low Priority
 
@@ -68,10 +69,23 @@ SideMenu drag handle, etc. — depends on a ComponentsContext.Provider that only
 #### 2.27
 
 Read-only MVP shipped: `editor-host/src/propertiesPanel.tsx` exposes a shallow YAML-prefix parser (`parseFrontmatterEntries`) plus a `<PropertiesPanel>` React component that renders each key/value as a row above `<BlockNoteView>`.  It is wired into the worklist-2.26 frontmatter stash via a `useState` mirror so the panel refreshes on every `note_open` without churning the save-path ref.  Raw-mode notes (`.yaml`, `.json`, …) skip the panel because the raw editor already shows the full YAML inline.  Add/remove/reorder + type-aware editors (date / boolean / wikilink / list) from the React `DynamicPropertiesPanel` are deliberately out of scope; tracked as a separate row `2.29`.
+REGRESSION REPORT: frontmatter being removed from notes on save (data loss); body editor still rendering frontmatter
 
 #### 2.28
 
 OverlayTooltipExt now used by every chrome surface; `gpui_component::Tooltip` is no longer referenced by application code.  The note-list Sort `Button` is wrapped in a thin `div().id("note-list-sort-trigger")` so it satisfies the `StatefulInteractiveElement + ParentElement` bound the trait needs.
+
+**Hover-latency cache (Angle-C C4).**  Hovering a chrome button previously re-opened a fresh `WindowKind::PopUp` `NSPanel` on every hover-enter — `cx.open_window` + Metal renderer init costs ~50–200 ms cold, which the user perceived as lag.  `OverlayTooltipState` now caches a single `WindowHandle<OverlayTooltipView>` for the App's lifetime: the first hover pays the cold-open cost, every subsequent hover updates the cached entity's `text`, repositions the panel, and re-orders it onto screen.  Hover-exit hides the panel without destroying it.
+
+(a) **Cache strategy.**  Process-global `gpui::Global` slot holding `Option<WindowHandle<OverlayTooltipView>>` plus a `visible: bool` so the duplicate hover-enter events some platforms deliver short-circuit on the second call.  Stale-handle `Err` on the warm-path `update` falls through to `open_cold` after clearing the slot.
+
+(b) **GPUI API surface.**  GPUI's `Window` exposes neither a public `set_window_bounds` / `set_visible` setter nor a `hide` / `show` method.  We route around this by reaching into the underlying `NSWindow` via `raw_window_handle::HasWindowHandle` (already implemented by `gpui::Window` on macOS) and calling AppKit selectors directly through `objc2-app-kit`:
+- **Repositioning:** `NSWindow::setFrameTopLeftPoint(NSPoint)` with the y-axis flip mirroring `gpui_macos/src/window.rs:753-758` — AppKit screen coords have y growing UP from the screen's bottom edge, so we subtract our top-down logical `bounds.origin.y` from `NSScreen::frame().size.height`.  Followed by `NSWindow::setContentSize(NSSize)` for idempotent size cleanup.
+- **Visibility:** `NSWindow::orderFront(None)` to show, `NSWindow::orderOut(None)` to hide.  Both leave the `NSPanel` (and its `CAMetalLayer`) intact — only the screen list membership flips.
+
+The platform glue lives in a `cfg(target_os = "macos") mod macos { … }` block inside `crates/ui/src/overlay_tooltip.rs`; non-macOS targets stub the helpers because the overlay primitive itself only exists to dodge an AppKit-specific z-order problem (sibling-NSView WebView occlusion).
+
+(c) **Deferred follow-up.**  Worklist row `2.31` tracks the proper architectural fix (Angle-C C2): a transparent GPUI base layer that lives below the WebView and hosts inline overlays so we no longer need a separate `NSPanel` at all.  C4 (this commit) is the cheapest lag fix that keeps the existing separate-window approach.
 
 #### 3.1
 
