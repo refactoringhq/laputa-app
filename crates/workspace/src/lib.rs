@@ -299,6 +299,59 @@ mod tests {
             .unwrap();
     }
 
+    /// Worklist 3.2 — `TolariaWorkspace::is_sidebar_open` mirrors the
+    /// left-dock state and must flip in lockstep with
+    /// `toggle_left_dock`.  Drives the dynamic
+    /// `"Show Sidebar"` / `"Hide Sidebar"` menu label in
+    /// `crates/tolaria/src/menus.rs`.
+    #[gpui::test]
+    fn workspace_is_sidebar_open_tracks_left_dock(cx: &mut TestAppContext) {
+        install_theme(cx);
+        let window = cx.add_window(TolariaWorkspace::empty);
+
+        // An empty workspace has no sidebar panel; the dock starts
+        // `Empty` (closed) so the accessor returns `false`.
+        let starts_closed = window
+            .update(cx, |ws, _window, cx| ws.is_sidebar_open(cx))
+            .unwrap();
+        assert!(!starts_closed, "empty workspace must report sidebar closed");
+
+        // Attach a panel that opens the dock, then assert the accessor.
+        window
+            .update(cx, |ws, _window, cx| {
+                let panel = cx.new(|_| MockPanel::left());
+                ws.attach_left_dock(panel, cx);
+            })
+            .unwrap();
+        let open_after_attach = window
+            .update(cx, |ws, _window, cx| ws.is_sidebar_open(cx))
+            .unwrap();
+        assert!(
+            open_after_attach,
+            "MockPanel reports starts_open=true, so attaching must open the dock"
+        );
+
+        // Toggling once closes it; toggling again reopens it.
+        window
+            .update(cx, |ws, _window, cx| ws.toggle_left_dock(cx))
+            .unwrap();
+        let closed_after_toggle = window
+            .update(cx, |ws, _window, cx| ws.is_sidebar_open(cx))
+            .unwrap();
+        assert!(!closed_after_toggle, "first toggle must close the sidebar");
+
+        window
+            .update(cx, |ws, _window, cx| ws.toggle_left_dock(cx))
+            .unwrap();
+        let open_after_second_toggle = window
+            .update(cx, |ws, _window, cx| ws.is_sidebar_open(cx))
+            .unwrap();
+        assert!(
+            open_after_second_toggle,
+            "second toggle must reopen the sidebar"
+        );
+    }
+
     // -----------------------------------------------------------------------
     // Phase 2a: Pane tests
     // -----------------------------------------------------------------------

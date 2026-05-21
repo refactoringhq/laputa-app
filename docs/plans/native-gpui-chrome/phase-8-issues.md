@@ -40,7 +40,7 @@
 ## 3. Low Priority
 
 3.1. ✅ Inspector view should be opened in a separate windows, not a pannel
-3.2. System window menu should display Show Sidebar|Hide Sidebar, Show Inspector|Hide Inspector depending on the current state
+3.2. ✅ System window menu should display Show Sidebar|Hide Sidebar, Show Inspector|Hide Inspector depending on the current state
 
 ---
 
@@ -75,6 +75,21 @@ OverlayTooltipExt now used by every chrome surface; `gpui_component::Tooltip` is
 #### 3.1
 
 The `actions::ToggleInspector` verb is now user-facing: it opens (or closes) a separate macOS `NSWindow` that hosts `inspector_panel::InspectorPanel` via `cx.open_window` with `WindowKind::Normal` (default), `is_movable / is_resizable / is_minimizable: true`, and a regular AppKit titlebar.  The GPUI built-in debug element-picker overlay moved to a new `actions::ToggleElementInspector` action bound to `Cmd+Alt+I` in `crates/actions/assets/default.json` — same `window.toggle_inspector(app_cx)` body, new name so the user-facing verb is freed up.  Lifecycle lives in a process-global slot `OnceLock<Mutex<Option<AnyWindowHandle>>>` in `crates/tolaria/src/inspector.rs`: each `ToggleInspector` dispatch consults the slot, calls `handle.update(..) |w| w.remove_window()` on close (stale-handle `Err`s are logged at `debug` and swallowed so the next toggle opens a fresh window), or `cx.open_window(..)` + stash on open.  Worklist 3.2 will read `is_inspector_open()` to drive dynamic menu labels — that read seam is exposed now but the menu rebuild is deferred to 3.2.
+
+#### 3.2
+
+The View menu's two toggle entries now pick their label from the current sidebar / inspector state instead of the static `"Toggle …"` verb.  `menus::app_menus` takes a small `MenuState { sidebar_open: bool, inspector_open: bool }` snapshot (a `Copy` value, not a `gpui::Global` — the menu data is derived, not stored): `sidebar_open` flips `"Show Sidebar"` ↔ `"Hide Sidebar"`, `inspector_open` flips `"Show Inspector"` ↔ `"Hide Inspector"`.
+
+(a) **`MenuState` parameter.** New `pub struct MenuState` in `crates/tolaria/src/menus.rs`; `app_menus(state: MenuState)` and `view_menu(state: MenuState)` consume it.  `MenuState::default()` (both `false`) renders the empty-app `"Show …"` labels, which is also the value used at the initial `cx.set_menus` site before any window opens.
+
+(b) **Three rebuild trigger points.**
+1. **Initial set + post-window-open re-sync.**  `cx.set_menus(menus::app_menus(MenuState::default()))` lands before window open; a follow-up `rebuild_menus(cx)` runs *after* `cx.open_window` returns so the View entry's label reflects whatever startup state the dock actually has.  Both calls live in `crates/tolaria/src/main.rs::macos::run`.
+2. **`ToggleSidebar` action handler.**  Rebuilds inside the same `dispatch_to_workspace` deferred closure as the dock toggle (`rebuild_menus_with_workspace(ws, cx)`), so the rebuild observes the *post-toggle* state — calling `rebuild_menus(cx)` at the outer scope would land before the deferred toggle executes.  Covers menu clicks, `Cmd`-keyed accelerators, and the title-bar toggle button (re-routed below) in one path.
+3. **`ToggleInspector` action handler.**  Rebuilds via the active-window-lookup `rebuild_menus(cx)` helper immediately after the slot mutation completes (open or close).  Covers menu clicks, `Cmd`-keyed accelerators, and the note-toolbar inspector button from worklist 2.18 — every entry point already dispatches through `actions::ToggleInspector`.
+
+(c) **Reach-the-workspace approach.**  Mirrors `dispatch_to_workspace`: `cx.active_window()` → `handle.update(cx, ...)` → `downcast::<gpui_component::Root>()` → `root.view().downcast::<TolariaWorkspace>()` → `workspace.read(cx).is_sidebar_open(cx)`.  No `gpui::Global` was introduced — the read uses the same active-window seam that the existing dispatcher uses, and `read_sidebar_open` returns `false` (the "Show …" default) when no window resolves so the menu falls back cleanly between window close and reopen.  Sidebar state is exposed via a new `TolariaWorkspace::is_sidebar_open(&App) -> bool` thin accessor over `left_dock.read(cx).is_open()`; inspector state continues to flow through `crate::inspector::is_inspector_open()`.
+
+The title-bar sidebar toggle button (`crates/workspace/src/title_bar.rs`) was re-routed from a direct `Dock::toggle` call to `cx.dispatch_action(&actions::ToggleSidebar)` so the click fires the action handler and the menu rebuild covers it too.  `TitleBar` no longer needs its cached `Entity<Dock>` field; the constructor is now `TitleBar::new()` and the workspace wires it without passing a dock handle.
 
 ### Bridge gaps
 

@@ -22,13 +22,12 @@
 //! returns, so clicking is harmless.
 
 use gpui::{
-    div, px, AnyElement, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
+    div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement as _, Styled, Window,
 };
 use gpui_component::{ActiveTheme, IconName};
 use ui::{tree_dump::DumpAsExt as _, OverlayTooltipExt as _};
 
-use crate::dock::Dock;
 use crate::workspace::NATIVE_TITLE_BAR_HEIGHT_PT;
 
 /// Horizontal padding (in pts) reserved on the left of the title-bar
@@ -59,34 +58,26 @@ const TITLE_BAR_REM_SCALE: f32 = 1.75;
 ///
 /// Mostly a visual surface — most cells are still log-only stubs.
 /// The sidebar toggle (visual-issue #020) is the first wired action:
-/// clicking it flips the left dock between open and closed via
-/// [`Dock::toggle`].  Wire-up for the remaining cells lands alongside
-/// the Phase 8 modal-chrome work (command palette, quick open, …).
-pub struct TitleBar {
-    /// Dock entity the sidebar toggle button flips via [`Dock::toggle`].
-    ///
-    /// Held by *role* rather than *position* — today the sidebar lives
-    /// in the workspace's left dock, but if a future setting parks the
-    /// sidebar in the right dock instead, this field still points at
-    /// "the thing the sidebar button toggles" without any rename.
-    /// Holding the entity directly keeps the click-to-action path
-    /// inside the workspace crate — no extra `Action` trip and no
-    /// `Global` lookup.
-    sidebar_toggle_target: Entity<Dock>,
-}
+/// clicking it dispatches [`actions::ToggleSidebar`] so the menu, the
+/// keymap accelerator, and this button all funnel through one
+/// handler (worklist 3.2).  Wire-up for the remaining cells lands
+/// alongside the Phase 8 modal-chrome work (command palette, quick
+/// open, …).
+#[derive(Default)]
+pub struct TitleBar;
 
 impl TitleBar {
-    /// Build a fresh title bar bound to the dock the sidebar button
-    /// should toggle.
+    /// Build a fresh title bar.
     ///
-    /// The dock entity is cached so the sidebar toggle (visual-issue
-    /// #020) can dispatch the toggle in one `update` call without a
-    /// workspace round-trip.
+    /// Worklist 3.2 — the sidebar toggle button dispatches
+    /// [`actions::ToggleSidebar`] via `cx.dispatch_action`, so the
+    /// title bar no longer needs to cache a dock handle.  The
+    /// constructor is kept as a thin alias for `Default::default` so
+    /// `cx.new(|_| TitleBar::new())` reads idiomatically alongside
+    /// the other entity constructors in this crate.
     #[must_use]
-    pub fn new(sidebar_toggle_target: Entity<Dock>) -> Self {
-        Self {
-            sidebar_toggle_target,
-        }
+    pub fn new() -> Self {
+        Self
     }
 }
 
@@ -124,10 +115,13 @@ impl Render for TitleBar {
         // traffic lights and the back / forward navigation cluster —
         // matching the reference's `[●●●] [▢] [←] [→]` ordering.
         //
-        // `Entity<Dock>` is a cheap refcounted handle; cloning into
-        // the `on_click` closure is the idiomatic GPUI pattern for
-        // entity wiring.
-        let sidebar_toggle_target = self.sidebar_toggle_target.clone();
+        // Worklist 3.2 — the click dispatches `actions::ToggleSidebar`
+        // (instead of calling `Dock::toggle` directly) so the menu,
+        // keymap accelerator, and title-bar button all funnel through
+        // the same action handler.  That handler lives in
+        // `crates/tolaria/src/main.rs`; it flips the dock *and*
+        // rebuilds the menu so the View entry's
+        // `"Show Sidebar"` / `"Hide Sidebar"` label stays in sync.
         let toggle_sidebar = div()
             .id("title-bar-toggle-sidebar")
             .flex()
@@ -138,8 +132,8 @@ impl Render for TitleBar {
             .rounded_sm()
             .cursor_pointer()
             .hover(|this| this.bg(gpui::hsla(0.0, 0.0, 0.5, 0.12)))
-            .on_click(move |_, _window, cx| {
-                sidebar_toggle_target.update(cx, |dock, cx| dock.toggle(cx));
+            .on_click(|_, _window, cx| {
+                cx.dispatch_action(&actions::ToggleSidebar);
             })
             .overlay_tooltip("Toggle sidebar")
             .child(IconName::PanelLeft)
@@ -244,73 +238,10 @@ fn title_bar_cell(id: &'static str, icon: IconName, tooltip: &'static str) -> An
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::panel::{DockPosition, Panel};
-    use gpui::{px, App, AppContext as _, Entity, IntoElement, Pixels, Render, TestAppContext};
+    use gpui::TestAppContext;
 
     fn install_theme(cx: &mut TestAppContext) {
         cx.update(gpui_component::init);
-    }
-
-    /// Build a fresh empty `Dock` entity for tests that need to
-    /// construct a `TitleBar`.  Dock starts in `DockState::Empty` —
-    /// `Dock::toggle` is a no-op on Empty, so tests that want
-    /// round-trip semantics attach the local `ToggleFixturePanel` via
-    /// [`attach_fixture`] first.
-    fn fresh_left_dock(cx: &mut TestAppContext) -> Entity<Dock> {
-        cx.update(|cx| cx.new(|_| Dock::new(DockPosition::Left)))
-    }
-
-    /// Minimal `Panel` impl used by `title_bar_left_dock_toggle_round_trip`
-    /// to give `Dock::toggle` a non-Empty state to flip.  Local to this
-    /// module so the title-bar tests don't depend on the `MockPanel`
-    /// defined inside `lib.rs::tests`.
-    struct ToggleFixturePanel;
-
-    impl Render for ToggleFixturePanel {
-        fn render(
-            &mut self,
-            _window: &mut gpui::Window,
-            _cx: &mut Context<Self>,
-        ) -> impl IntoElement {
-            gpui::div()
-        }
-    }
-
-    impl Panel for ToggleFixturePanel {
-        fn persistent_name(&self) -> &str {
-            "ToggleFixturePanel"
-        }
-
-        fn panel_key(&self) -> &str {
-            "toggle-fixture"
-        }
-
-        fn position(&self, _cx: &App) -> DockPosition {
-            DockPosition::Left
-        }
-
-        fn set_position(&mut self, _position: DockPosition, _cx: &mut Context<Self>) {}
-
-        fn default_size(&self, _cx: &App) -> Pixels {
-            px(200.0)
-        }
-
-        fn toggle_action(&self) -> Box<dyn gpui::Action> {
-            Box::new(actions::ToggleSidebar)
-        }
-
-        fn starts_open(&self, _cx: &App) -> bool {
-            false
-        }
-    }
-
-    /// Attach a `ToggleFixturePanel` to `dock` so the next `toggle`
-    /// call has a non-Empty state to flip between Open and Closed.
-    fn attach_fixture(cx: &mut TestAppContext, dock: &Entity<Dock>) {
-        cx.update(|cx| {
-            let panel = cx.new(|_| ToggleFixturePanel);
-            dock.update(cx, |d, cx| d.set_panel(panel, cx));
-        });
     }
 
     /// The title bar must render without panicking with the theme
@@ -318,8 +249,7 @@ mod tests {
     #[gpui::test]
     fn title_bar_renders(cx: &mut TestAppContext) {
         install_theme(cx);
-        let dock = fresh_left_dock(cx);
-        let _window = cx.add_window(|_window, _cx| TitleBar::new(dock));
+        let _window = cx.add_window(|_window, _cx| TitleBar::new());
         cx.run_until_parked();
     }
 
@@ -367,52 +297,7 @@ mod tests {
         );
 
         // Render succeeds with the new dims.
-        let dock = fresh_left_dock(cx);
-        let _window = cx.add_window(|_window, _cx| TitleBar::new(dock));
-        cx.run_until_parked();
-    }
-
-    /// Issue 020 — the sidebar toggle button must flip the left dock's
-    /// open/closed state on each click.  The button's `on_click` calls
-    /// `Dock::toggle` directly via the cached entity; this test
-    /// exercises the same call path to document the round-trip
-    /// contract (Empty → Open → Closed → Open …).  A real click
-    /// would need an `id`-resolved hit-test through the GPUI test
-    /// harness, but the round-trip via `Dock::toggle` is the
-    /// load-bearing behaviour: the toggle cell carries no extra
-    /// logic of its own.
-    #[gpui::test]
-    fn title_bar_left_dock_toggle_round_trip(cx: &mut TestAppContext) {
-        install_theme(cx);
-        let dock = fresh_left_dock(cx);
-        // Empty dock is closed by construction.
-        assert!(
-            !cx.update(|cx| dock.read(cx).is_open()),
-            "empty dock starts closed"
-        );
-
-        // Attaching `ToggleFixturePanel` (`starts_open == false`) must
-        // honour the panel's preference — i.e. the dock stays closed.
-        attach_fixture(cx, &dock);
-        assert!(
-            !cx.update(|cx| dock.read(cx).is_open()),
-            "fixture with starts_open=false leaves the dock closed"
-        );
-
-        // Two toggles must flip the dock open then closed again.
-        cx.update(|cx| dock.update(cx, |d, cx| d.toggle(cx)));
-        assert!(
-            cx.update(|cx| dock.read(cx).is_open()),
-            "first toggle opens the dock"
-        );
-        cx.update(|cx| dock.update(cx, |d, cx| d.toggle(cx)));
-        assert!(
-            !cx.update(|cx| dock.read(cx).is_open()),
-            "second toggle closes the dock again"
-        );
-
-        // Render still succeeds after the dock has toggled state.
-        let _window = cx.add_window(|_window, _cx| TitleBar::new(dock));
+        let _window = cx.add_window(|_window, _cx| TitleBar::new());
         cx.run_until_parked();
     }
 }

@@ -95,7 +95,7 @@ impl TolariaWorkspace {
         let right_dock = cx.new(|_| Dock::new(DockPosition::Right));
         let bottom_dock = cx.new(|_| Dock::new(DockPosition::Bottom));
         let center_group = cx.new(|_| PaneGroup::new());
-        let title_bar = cx.new(|_| TitleBar::new(left_dock.clone()));
+        let title_bar = cx.new(|_| TitleBar::new());
         // `StatusBar::from_or_empty` populates from mock globals if installed
         // (TOLARIA_MOCK=1 launches), or returns an empty bar otherwise.
         // `window` is forwarded so the status bar can register a
@@ -193,9 +193,19 @@ impl TolariaWorkspace {
     /// Flip the left [`Dock`] between `Open` and `Closed`.  Phase 8.8
     /// `actions::ToggleSidebar` dispatches through this method so the
     /// keymap-driven shortcut matches the title-bar toggle button
-    /// (which calls `Dock::toggle` directly).
+    /// (which routes through the same action — worklist 3.2).
     pub fn toggle_left_dock(&self, cx: &mut App) {
         self.left_dock.update(cx, |dock, cx| dock.toggle(cx));
+    }
+
+    /// Whether the sidebar (left [`Dock`]) is currently open.
+    ///
+    /// Read-only companion to [`Self::toggle_left_dock`].  Worklist 3.2
+    /// uses this seam to drive the dynamic `Show Sidebar` / `Hide
+    /// Sidebar` menu label without poking into the dock's internals
+    /// from outside the workspace crate.
+    pub fn is_sidebar_open(&self, cx: &App) -> bool {
+        self.left_dock.read(cx).is_open()
     }
 
     /// Close the active item in the center pane group's active pane.

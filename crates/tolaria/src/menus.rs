@@ -22,16 +22,36 @@ use actions::{
 };
 use gpui::{Menu, MenuItem, OsAction};
 
+/// Snapshot of the workspace state the menu labels depend on.
+///
+/// Worklist 3.2 — the View menu's two toggle entries pick their label
+/// from the current sidebar / inspector state (`"Show Sidebar"` vs
+/// `"Hide Sidebar"`, `"Show Inspector"` vs `"Hide Inspector"`) instead
+/// of the static `"Toggle …"` verbs.  Passed by value because both
+/// fields are `bool` and the struct lives only for the duration of one
+/// `cx.set_menus(...)` call — `MenuState` is intentionally not a
+/// `gpui::Global` (the workspace already owns sidebar state and the
+/// inspector slot already owns inspector state; this is derived).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MenuState {
+    /// Whether the workspace's left dock (sidebar) is currently open.
+    pub sidebar_open: bool,
+    /// Whether the inspector window is currently tracked as open.
+    pub inspector_open: bool,
+}
+
 /// Build the application menu bar.
 ///
-/// Call via `cx.set_menus(app_menus())` before the first window opens so
-/// AppKit picks up the accelerators immediately.
-pub fn app_menus() -> Vec<Menu> {
+/// Call via `cx.set_menus(app_menus(MenuState::default()))` before the
+/// first window opens so AppKit picks up the accelerators immediately;
+/// then re-call with a fresh [`MenuState`] from the action handlers
+/// whenever sidebar / inspector state changes (worklist 3.2).
+pub fn app_menus(state: MenuState) -> Vec<Menu> {
     vec![
         app_menu(),
         file_menu(),
         edit_menu(),
-        view_menu(),
+        view_menu(state),
         window_menu(),
         help_menu(),
     ]
@@ -102,13 +122,32 @@ fn edit_menu() -> Menu {
 /// stub-but-wired (Phase 9.x will implement workspace font-size
 /// scaling); the menu entries are in place so the muscle-memory
 /// accelerators behave the same as any other macOS editor.
-fn view_menu() -> Menu {
+///
+/// Worklist 3.2 — the sidebar / inspector entries flip between
+/// `"Show …"` and `"Hide …"` based on [`MenuState`] so the menu
+/// reflects the current visibility instead of the static
+/// `"Toggle …"` verb.  Three trigger points (initial set, sidebar
+/// action handler, inspector action handler in `main.rs`) rebuild the
+/// whole menu via `cx.set_menus(app_menus(...))` so the label tracks
+/// state across every dispatch vector (menu click, Cmd accelerator,
+/// title-bar / note-toolbar buttons).
+fn view_menu(state: MenuState) -> Menu {
+    let sidebar_label = if state.sidebar_open {
+        "Hide Sidebar"
+    } else {
+        "Show Sidebar"
+    };
+    let inspector_label = if state.inspector_open {
+        "Hide Inspector"
+    } else {
+        "Show Inspector"
+    };
     Menu {
         name: "View".into(),
         disabled: false,
         items: vec![
-            MenuItem::action("Toggle Sidebar", ToggleSidebar),
-            MenuItem::action("Toggle Inspector", ToggleInspector),
+            MenuItem::action(sidebar_label, ToggleSidebar),
+            MenuItem::action(inspector_label, ToggleInspector),
             MenuItem::separator(),
             MenuItem::action("Zoom In", ZoomIn),
             MenuItem::action("Zoom Out", ZoomOut),
@@ -155,7 +194,7 @@ mod tests {
     /// pinpoint the affected submenu.
     #[test]
     fn app_menus_lists_app_file_edit_view_window_help() {
-        let menus = app_menus();
+        let menus = app_menus(MenuState::default());
         let names: Vec<_> = menus.iter().map(|m| m.name.to_string()).collect();
         assert_eq!(
             names,
@@ -248,15 +287,63 @@ mod tests {
         assert_eq!(menu.items.len(), 8);
     }
 
-    /// View menu: Sidebar / Inspector / sep / ZoomIn / ZoomOut / Actual Size.
+    /// View menu (default state — both closed): "Show Sidebar" /
+    /// "Show Inspector" / sep / ZoomIn / ZoomOut / Actual Size.
+    /// Worklist 3.2 makes the first two labels state-driven.
     #[test]
-    fn view_menu_holds_sidebar_inspector_and_zoom() {
+    fn view_menu_shows_show_labels_when_state_closed() {
         assert_menu_schema(
-            &view_menu(),
+            &view_menu(MenuState::default()),
             "View",
             &[
-                Action("Toggle Sidebar"),
-                Action("Toggle Inspector"),
+                Action("Show Sidebar"),
+                Action("Show Inspector"),
+                Separator,
+                Action("Zoom In"),
+                Action("Zoom Out"),
+                Action("Actual Size"),
+            ],
+        );
+    }
+
+    /// View menu (both open): labels flip to "Hide Sidebar" / "Hide
+    /// Inspector".  Worklist 3.2 — the menu rebuild driven from the
+    /// action handlers in `main.rs` is what keeps these in sync with
+    /// the workspace + inspector slot state.
+    #[test]
+    fn view_menu_shows_hide_labels_when_state_open() {
+        assert_menu_schema(
+            &view_menu(MenuState {
+                sidebar_open: true,
+                inspector_open: true,
+            }),
+            "View",
+            &[
+                Action("Hide Sidebar"),
+                Action("Hide Inspector"),
+                Separator,
+                Action("Zoom In"),
+                Action("Zoom Out"),
+                Action("Actual Size"),
+            ],
+        );
+    }
+
+    /// Mixed state: sidebar open, inspector closed.  Guards the
+    /// independence of the two labels — flipping one must not bleed
+    /// into the other.
+    #[test]
+    fn view_menu_labels_track_each_axis_independently() {
+        let menu = view_menu(MenuState {
+            sidebar_open: true,
+            inspector_open: false,
+        });
+        assert_menu_schema(
+            &menu,
+            "View",
+            &[
+                Action("Hide Sidebar"),
+                Action("Show Inspector"),
                 Separator,
                 Action("Zoom In"),
                 Action("Zoom Out"),

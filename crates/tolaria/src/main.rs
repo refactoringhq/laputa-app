@@ -229,6 +229,42 @@ mod macos {
         });
     }
 
+    /// Rebuild the native menu bar from the current
+    /// sidebar / inspector state with the workspace already in scope.
+    ///
+    /// Worklist 3.2 — the View menu's two toggle entries flip between
+    /// `"Show …"` and `"Hide …"` based on the workspace's left-dock
+    /// state and the inspector slot.  Action handlers that already run
+    /// inside `dispatch_to_workspace` call this so the rebuild
+    /// observes the *post-toggle* state.
+    fn rebuild_menus_with_workspace(
+        workspace: &workspace::TolariaWorkspace,
+        cx: &mut gpui::Context<workspace::TolariaWorkspace>,
+    ) {
+        let state = menus::MenuState {
+            sidebar_open: workspace.is_sidebar_open(cx),
+            inspector_open: crate::inspector::is_inspector_open(),
+        };
+        cx.set_menus(menus::app_menus(state));
+    }
+
+    /// Rebuild the native menu bar by looking the workspace up through
+    /// the active window — for callers that don't already hold a
+    /// workspace handle (initial post-window-open sync,
+    /// `ToggleInspector`).
+    ///
+    /// Reuses [`dispatch_to_workspace`] so the active-window →
+    /// `gpui_component::Root` → `TolariaWorkspace` hop has one
+    /// definition.  When no live workspace is reachable (e.g. between
+    /// window close and reopen) `dispatch_to_workspace` is a no-op,
+    /// which leaves the previously-set labels in place — matching the
+    /// `"Show …"` default we lay down before window open.
+    fn rebuild_menus(cx: &mut App) {
+        dispatch_to_workspace("rebuild_menus", cx, |ws, cx| {
+            rebuild_menus_with_workspace(ws, cx);
+        });
+    }
+
     /// Run `f` against any live Tolaria window — deferred to the
     /// next event-loop tick so the current update has fully unwound
     /// before the window-update borrow is acquired.
@@ -357,10 +393,23 @@ mod macos {
 
                 // ToggleSidebar — flip the workspace's left dock open
                 // / closed.  Mirrors the title-bar sidebar-toggle
-                // button so the keymap shortcut and the visual
-                // affordance share one code path.
+                // button (worklist 3.2 routes that click through
+                // `cx.dispatch_action(&actions::ToggleSidebar)` so
+                // the keymap shortcut, the menu entry, and the
+                // visual affordance all share this one code path) and
+                // rebuilds the menu so the View entry's label
+                // (`"Show Sidebar"` ↔ `"Hide Sidebar"`) stays in sync.
+                //
+                // The rebuild runs *inside* the same deferred closure
+                // as the toggle so it observes the post-toggle dock
+                // state — `dispatch_to_workspace` is `cx.defer`-based,
+                // so calling `rebuild_menus(cx)` after it at the
+                // outer scope would land before the toggle executes.
                 cx.on_action(|_: &actions::ToggleSidebar, cx| {
-                    dispatch_to_workspace("ToggleSidebar", cx, |ws, cx| ws.toggle_left_dock(cx));
+                    dispatch_to_workspace("ToggleSidebar", cx, |ws, cx| {
+                        ws.toggle_left_dock(cx);
+                        rebuild_menus_with_workspace(ws, cx);
+                    });
                 });
 
                 // CloseTab — close the active item in the center
@@ -471,6 +520,10 @@ mod macos {
                     } else {
                         crate::inspector::open_inspector_window(cx);
                     }
+                    // Worklist 3.2 — keep the View menu's inspector
+                    // entry label (`"Show Inspector"` ↔ `"Hide
+                    // Inspector"`) in sync with the slot state.
+                    rebuild_menus(cx);
                 });
 
                 // `Cmd+Alt+I` toggles GPUI's built-in element-picker
@@ -511,8 +564,12 @@ mod macos {
                 });
 
                 // 7. Native menu bar (installed before window open so AppKit picks
-                //    up accelerators immediately — ADR-0115 §6).
-                cx.set_menus(menus::app_menus());
+                //    up accelerators immediately — ADR-0115 §6).  The default
+                //    `MenuState` (both `false`) renders the "Show Sidebar" /
+                //    "Show Inspector" labels; a follow-up `rebuild_menus` after
+                //    window open reflects whatever startup state the workspace
+                //    actually lands in (worklist 3.2).
+                cx.set_menus(menus::app_menus(menus::MenuState::default()));
 
                 // 8. Mock fixtures (TOLARIA_MOCK=1) — installs MockVault /
                 //    MockGit / MockAi / MockSearch as Globals so chrome views
@@ -821,6 +878,14 @@ mod macos {
                 }) {
                     log::error!("failed to open Tolaria window: {err:#}");
                 }
+
+                // Worklist 3.2 — refresh the menu now that the
+                // workspace window is live so the View entry's
+                // `"Show Sidebar"` / `"Hide Sidebar"` label reflects
+                // the dock's actual startup state.  Deferred inside
+                // `rebuild_menus`, so this lands after `open_window`'s
+                // updates have drained.
+                rebuild_menus(cx);
 
                 // 10. Bring application to foreground.
                 cx.activate(true);
