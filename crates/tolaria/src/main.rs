@@ -27,6 +27,9 @@ fn main() {
 }
 
 #[cfg(target_os = "macos")]
+mod inspector;
+
+#[cfg(target_os = "macos")]
 mod menus;
 
 #[cfg(target_os = "macos")]
@@ -247,7 +250,7 @@ mod macos {
     /// no window exists yet.
     ///
     /// Gated by `cfg(debug_assertions)` because the only current
-    /// caller (`ToggleInspector`) is itself debug-only — gpui's
+    /// caller (`ToggleElementInspector`) is itself debug-only — gpui's
     /// `Window::toggle_inspector` is gated by
     /// `cfg(any(feature = "inspector", debug_assertions))`.  Un-gate
     /// the helper if a release-path action handler needs it later.
@@ -451,6 +454,25 @@ mod macos {
                     "ReportIssue",
                     "Phase 9.x will open the GitHub issue tracker via open::that",
                 );
+                // Worklist 3.1 — `ToggleInspector` opens (or closes) a
+                // separate macOS `NSWindow` that hosts
+                // `inspector_panel::InspectorPanel`.  The user-facing
+                // verb (toolbar button + `View → Toggle Inspector`)
+                // dispatches this; the GPUI debug element-picker moves
+                // to `ToggleElementInspector` below so the `Cmd+Alt+I`
+                // muscle memory still works in debug builds.
+                //
+                // Lifecycle plumbing lives in `crate::inspector` so the
+                // process-global slot is the single source of truth for
+                // worklist 3.2 (dynamic menu labels).
+                cx.on_action(|_: &actions::ToggleInspector, cx| {
+                    if crate::inspector::is_inspector_open() {
+                        crate::inspector::close_inspector_window(cx);
+                    } else {
+                        crate::inspector::open_inspector_window(cx);
+                    }
+                });
+
                 // `Cmd+Alt+I` toggles GPUI's built-in element-picker
                 // inspector (always available in debug builds; in release
                 // builds gpui must be compiled with its `inspector` feature
@@ -465,7 +487,7 @@ mod macos {
                 // error reports.  Iterating the live window list bypasses
                 // the staleness window without depending on AppKit's
                 // focus tracking.
-                cx.on_action(|_: &actions::ToggleInspector, cx| {
+                cx.on_action(|_: &actions::ToggleElementInspector, cx| {
                     // `Window::toggle_inspector` is only compiled when
                     // gpui's `inspector` feature is on, which our
                     // workspace gets implicitly from `debug_assertions`
@@ -475,15 +497,15 @@ mod macos {
                     // release it logs and no-ops rather than failing
                     // the build.
                     #[cfg(debug_assertions)]
-                    dispatch_to_any_window("ToggleInspector", cx, |_, window, app_cx| {
+                    dispatch_to_any_window("ToggleElementInspector", cx, |_, window, app_cx| {
                         window.toggle_inspector(app_cx);
                     });
                     #[cfg(not(debug_assertions))]
                     {
                         let _ = cx;
                         log::debug!(
-                            "ToggleInspector: gpui inspector is not available in release \
-                             builds (debug_assertions disabled)"
+                            "ToggleElementInspector: gpui inspector is not available in \
+                             release builds (debug_assertions disabled)"
                         );
                     }
                 });

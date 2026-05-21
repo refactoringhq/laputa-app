@@ -34,7 +34,20 @@ gpui::actions!(
         QuickOpen,
         CommandPalette,
         ToggleSidebar,
+        /// User-facing inspector window toggle.  Opens (or closes) a
+        /// separate macOS `NSWindow` that hosts
+        /// `inspector_panel::InspectorPanel` — see worklist 3.1 in
+        /// `docs/plans/native-gpui-chrome/phase-8-issues.md`.  Dispatched
+        /// from the note-toolbar Inspector button (worklist 2.18) and
+        /// from `View → Toggle Inspector` (`menus.rs`).
         ToggleInspector,
+        /// GPUI built-in debug element-picker overlay.  Bound to
+        /// `Cmd+Alt+I` so the muscle-memory keystroke still reaches the
+        /// picker after worklist 3.1 repurposed `ToggleInspector` for
+        /// the user-facing chrome window.  Only meaningful in debug
+        /// builds — gpui's `Window::toggle_inspector` is gated on
+        /// `cfg(any(feature = "inspector", debug_assertions))`.
+        ToggleElementInspector,
         CloseTab,
         /// Phase 8.13 — dismiss the active modal in `TolariaWorkspace`'s
         /// `ModalLayer`.  Bound to `escape` in the modal-active context

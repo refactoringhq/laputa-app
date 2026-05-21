@@ -25,6 +25,7 @@ gpui_platform.workspace = true
 gpui-component.workspace = true
 gpui-component-assets.workspace = true
 actions = { path = "../actions" }
+inspector_panel = { path = "../inspector_panel" }
 mock_fixtures = { path = "../mock_fixtures" }
 note_item = { path = "../note_item" }
 note_list_pane = { path = "../note_list_pane" }

@@ -39,7 +39,7 @@
 
 ## 3. Low Priority
 
-3.1. Inspector view should be opened in a separate windows, not a pannel
+3.1. ✅ Inspector view should be opened in a separate windows, not a pannel
 3.2. System window menu should display Show Sidebar|Hide Sidebar, Show Inspector|Hide Inspector depending on the current state
 
 ---
@@ -71,6 +71,10 @@ Read-only MVP shipped: `editor-host/src/propertiesPanel.tsx` exposes a shallow Y
 #### 2.28
 
 OverlayTooltipExt now used by every chrome surface; `gpui_component::Tooltip` is no longer referenced by application code.  The note-list Sort `Button` is wrapped in a thin `div().id("note-list-sort-trigger")` so it satisfies the `StatefulInteractiveElement + ParentElement` bound the trait needs.
+
+#### 3.1
+
+The `actions::ToggleInspector` verb is now user-facing: it opens (or closes) a separate macOS `NSWindow` that hosts `inspector_panel::InspectorPanel` via `cx.open_window` with `WindowKind::Normal` (default), `is_movable / is_resizable / is_minimizable: true`, and a regular AppKit titlebar.  The GPUI built-in debug element-picker overlay moved to a new `actions::ToggleElementInspector` action bound to `Cmd+Alt+I` in `crates/actions/assets/default.json` — same `window.toggle_inspector(app_cx)` body, new name so the user-facing verb is freed up.  Lifecycle lives in a process-global slot `OnceLock<Mutex<Option<AnyWindowHandle>>>` in `crates/tolaria/src/inspector.rs`: each `ToggleInspector` dispatch consults the slot, calls `handle.update(..) |w| w.remove_window()` on close (stale-handle `Err`s are logged at `debug` and swallowed so the next toggle opens a fresh window), or `cx.open_window(..)` + stash on open.  Worklist 3.2 will read `is_inspector_open()` to drive dynamic menu labels — that read seam is exposed now but the menu rebuild is deferred to 3.2.
 
 ### Bridge gaps
 

@@ -7,7 +7,7 @@
       "cmd-shift-w": "tolaria::CloseWindow",
       "cmd-,": "tolaria::OpenSettings",
       "cmd-shift-r": "tolaria::ReloadKeymap",
-      "cmd-alt-i": "tolaria::ToggleInspector",
+      "cmd-alt-i": "tolaria::ToggleElementInspector",
       "cmd-n": "tolaria::NewNote",
       "cmd-s": "tolaria::Save",
       "cmd-o": "tolaria::OpenVault",
