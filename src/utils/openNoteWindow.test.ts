@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildNoteWindowUrl, openNoteInNewWindow } from './openNoteWindow'
+import { buildNoteWindowUrl, buildRuntimeNoteWindowUrl, openNoteInNewWindow } from './openNoteWindow'
 import { isTauri } from '../mock-tauri'
 import { shouldUseLinuxWindowChrome } from './platform'
 
@@ -38,6 +38,14 @@ vi.mock('@tauri-apps/api/dpi', () => ({
   },
 }))
 
+function expectNoteWindowRoute(parsed: URL): void {
+  expect(parsed.pathname).toBe('/')
+  expect(parsed.searchParams.get('window')).toBe('note')
+  expect(parsed.searchParams.get('path')).toBe('/vault/Folder/My Note.md')
+  expect(parsed.searchParams.get('vault')).toBe('/Users/luca/Laputa Vault')
+  expect(parsed.searchParams.get('title')).toBe('AI / ML')
+}
+
 describe('openNoteWindow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -52,11 +60,15 @@ describe('openNoteWindow', () => {
     const url = buildNoteWindowUrl('/vault/Folder/My Note.md', '/Users/luca/Laputa Vault', 'AI / ML')
     const parsed = new URL(url, 'https://tolaria.localhost')
 
-    expect(parsed.pathname).toBe('/')
-    expect(parsed.searchParams.get('window')).toBe('note')
-    expect(parsed.searchParams.get('path')).toBe('/vault/Folder/My Note.md')
-    expect(parsed.searchParams.get('vault')).toBe('/Users/luca/Laputa Vault')
-    expect(parsed.searchParams.get('title')).toBe('AI / ML')
+    expectNoteWindowRoute(parsed)
+  })
+
+  it('resolves the runtime route against the current app origin', () => {
+    const url = buildRuntimeNoteWindowUrl('/vault/Folder/My Note.md', '/Users/luca/Laputa Vault', 'AI / ML')
+    const parsed = new URL(url)
+
+    expect(parsed.origin).toBe(window.location.origin)
+    expectNoteWindowRoute(parsed)
   })
 
   it('does nothing outside Tauri', async () => {
@@ -69,11 +81,12 @@ describe('openNoteWindow', () => {
     vi.mocked(isTauri).mockReturnValue(true)
 
     await openNoteInNewWindow('/vault/Folder/My Note.md', '/Users/luca/Laputa Vault', 'AI / ML')
+    const expectedUrl = `${window.location.origin}/?window=note&path=%2Fvault%2FFolder%2FMy+Note.md&vault=%2FUsers%2Fluca%2FLaputa+Vault&title=AI+%2F+ML&windowLabel=note-1776182400000`
 
     expect(webviewWindowCalls).toHaveBeenCalledWith(
       'note-1776182400000',
       expect.objectContaining({
-        url: '/?window=note&path=%2Fvault%2FFolder%2FMy+Note.md&vault=%2FUsers%2Fluca%2FLaputa+Vault&title=AI+%2F+ML&windowLabel=note-1776182400000',
+        url: expectedUrl,
         title: 'AI / ML',
         width: 800,
         height: 700,
