@@ -152,38 +152,44 @@ if [ "$APP_CHANGED" = false ]; then
   exit 0
 fi
 
-# ── 0. TypeScript + Vite build ──────────────────────────────────────────
+# ── 0. Frontend lint ───────────────────────────────────────────────────
 echo ""
-echo "📦 [0/5] TypeScript + Vite build..."
+echo "🔎 [0/6] Frontend lint..."
+pnpm lint
+echo "  ✅ Lint OK"
+
+# ── 1. TypeScript + Vite build ──────────────────────────────────────────
+echo ""
+echo "📦 [1/6] TypeScript + Vite build..."
 pnpm build
 echo "  ✅ Build OK"
 
-# ── 1. Frontend coverage (≥70%) — includes all unit tests ───────────────
+# ── 2. Frontend coverage (≥70%) — includes all unit tests ───────────────
 echo ""
-echo "📊 [1/5] Frontend tests + coverage (≥70%)..."
+echo "📊 [2/6] Frontend tests + coverage (≥70%)..."
 pnpm test:coverage --silent
 echo "  ✅ Frontend coverage OK"
 
-# ── 2. Rust lint (clippy + fmt) — fast, run before coverage ─────────────
+# ── 3. Rust lint (clippy + fmt) — fast, run before coverage ─────────────
 echo ""
 if [ "$RUST_CHANGED" = true ]; then
-  echo "🔧 [2/5] Clippy + rustfmt..."
+  echo "🔧 [3/6] Clippy + rustfmt..."
   cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
   cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check
   echo "  ✅ Rust lint OK"
 else
-  echo "⏭️  [2/5] Rust lint — skipped (no src-tauri/ changes)"
+  echo "⏭️  [3/6] Rust lint — skipped (no src-tauri/ changes)"
 fi
 
-# ── 3. Rust coverage (≥85% lines) ──────────────────────────────────────
+# ── 4. Rust coverage (≥85% lines) ──────────────────────────────────────
 echo ""
 if [ "$RUST_CHANGED" = true ]; then
   LLVM_COV_FLAGS="--no-clean"
   if [ "${LAPUTA_FULL_COVERAGE:-0}" = "1" ]; then
     LLVM_COV_FLAGS=""
-    echo "🦀 [3/5] Rust coverage — FULL (LAPUTA_FULL_COVERAGE=1)..."
+    echo "🦀 [4/6] Rust coverage — FULL (LAPUTA_FULL_COVERAGE=1)..."
   else
-    echo "🦀 [3/5] Rust coverage (≥85%, incremental)..."
+    echo "🦀 [4/6] Rust coverage (≥85%, incremental)..."
   fi
   # Unset GIT_DIR so git tests create isolated repos without inheriting hook context
   unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
@@ -196,24 +202,24 @@ if [ "$RUST_CHANGED" = true ]; then
     -- --test-threads=1
   echo "  ✅ Rust coverage OK"
 else
-  echo "⏭️  [3/5] Rust coverage — skipped (no src-tauri/ changes)"
+  echo "⏭️  [4/6] Rust coverage — skipped (no src-tauri/ changes)"
 fi
 
-# ── 4. Playwright core smoke lane (if any exist) ──────────────────────
+# ── 5. Playwright core smoke lane (if any exist) ──────────────────────
 echo ""
 SMOKE_FILES=$(find tests/smoke tests/integration -name '*.spec.ts' 2>/dev/null | head -1)
 if [ -n "$SMOKE_FILES" ]; then
-  echo "🎭 [4/5] Playwright core smoke tests..."
+  echo "🎭 [5/6] Playwright core smoke tests..."
   if ! pnpm playwright:smoke; then
     echo "  ❌ Core smoke tests FAILED"
     exit 1
   fi
   echo "  ✅ Core smoke tests OK"
 else
-  echo "⏭️  [4/5] Playwright core smoke tests — skipped (no tests/**/*.spec.ts)"
+  echo "⏭️  [5/6] Playwright core smoke tests — skipped (no tests/**/*.spec.ts)"
 fi
 
-# ── 5. CodeScene code health gate (ratchet) ──────────────────────────────
+# ── 6. CodeScene code health gate (ratchet) ──────────────────────────────
 # Thresholds live in .codescene-thresholds and only ever go UP (ratchet).
 # If remote scores improved, the hook updates the file and stops so the new
 # floor is committed with normal verified hooks before the next push.
@@ -229,7 +235,7 @@ if [ -f "$THRESHOLDS_FILE" ]; then
 fi
 
 echo ""
-echo "🏥 [5/5] CodeScene code health (Hotspot ≥${HOTSPOT_MIN} + Average ≥${AVERAGE_MIN})..."
+echo "🏥 [6/6] CodeScene code health (Hotspot ≥${HOTSPOT_MIN} + Average ≥${AVERAGE_MIN})..."
 if [ -z "$CODESCENE_PAT" ] || [ -z "$CODESCENE_PROJECT_ID" ]; then
   echo "  ⚠️  CODESCENE_PAT or CODESCENE_PROJECT_ID not set — skipping"
 else
