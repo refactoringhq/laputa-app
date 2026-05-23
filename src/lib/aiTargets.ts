@@ -1,7 +1,7 @@
 import {
+  AI_AGENT_DEFINITIONS,
   DEFAULT_AI_AGENT,
   getAiAgentAvailability,
-  getAiAgentDefinition,
   normalizeStoredAiAgent,
   type AiAgentId,
   type AiAgentsStatus,
@@ -111,12 +111,11 @@ export function configuredModelTargets(providers: AiModelProvider[] | null | und
 }
 
 export function agentTargets(): AiTarget[] {
-  return (['claude_code', 'codex', 'opencode', 'pi', 'gemini'] as const).map((agent) => {
-    const definition = getAiAgentDefinition(agent)
+  return AI_AGENT_DEFINITIONS.map((definition) => {
     return {
       kind: 'agent' as const,
-      agent,
-      id: agentTargetId(agent),
+      agent: definition.id,
+      id: agentTargetId(definition.id),
       label: definition.label,
       shortLabel: definition.shortLabel,
     }

@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   LOCAL_AI_PROVIDER_KINDS,
+  agentTargetId,
+  agentTargets,
   aiModelProviderCatalog,
   aiModelProviderCatalogEntry,
   isLocalAiProvider,
   normalizeAiModelProviders,
+  resolveAiTarget,
   type AiModelProvider,
 } from './aiTargets'
+import { AI_AGENT_DEFINITIONS } from './aiAgents'
+import type { Settings } from '../types'
 
 function provider(kind: AiModelProvider['kind']): AiModelProvider {
   return {
@@ -34,6 +39,26 @@ function provider(kind: AiModelProvider['kind']): AiModelProvider {
 }
 
 describe('ai target provider contract', () => {
+  it('builds selectable targets for every supported coding agent', () => {
+    expect(agentTargets().map((target) => target.id)).toEqual(
+      AI_AGENT_DEFINITIONS.map((definition) => agentTargetId(definition.id)),
+    )
+  })
+
+  it('resolves Kiro as a persisted default agent target', () => {
+    const target = resolveAiTarget({
+      default_ai_agent: 'claude_code',
+      default_ai_target: 'agent:kiro',
+    } as Settings)
+
+    expect(target).toMatchObject({
+      kind: 'agent',
+      agent: 'kiro',
+      id: 'agent:kiro',
+      label: 'Kiro',
+    })
+  })
+
   it('keeps provider defaults in one catalog with stable grouping metadata', () => {
     const entries = aiModelProviderCatalog()
     const kinds = entries.map((entry) => entry.kind)
