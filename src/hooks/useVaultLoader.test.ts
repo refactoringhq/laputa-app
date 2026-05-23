@@ -143,10 +143,14 @@ async function enableTauriMode() {
   )
 }
 
-function buildMountedWorkspaceLoadMock() {
+function buildMountedWorkspaceLoadMock(options: {
+  pendingEntriesByPath?: Record<string, Promise<VaultEntry[]>>
+} = {}) {
   return ((cmd: string, args?: Record<string, unknown>) => {
     if (isVaultLoadCommand(cmd)) {
-      const path = args?.path
+      const path = typeof args?.path === 'string' ? args.path : ''
+      const pendingEntries = options.pendingEntriesByPath?.[path]
+      if (pendingEntries) return pendingEntries
       return Promise.resolve([{
         ...mockEntries[0],
         path: `${path}/note/hello.md`,
@@ -229,7 +233,7 @@ describe('useVaultLoader', () => {
     })
   })
 
-  it('does not re-add the base vault as a folder root after it is unmounted', async () => {
+  it('keeps the active vault folder root visible when it is absent from mounted folder vaults', async () => {
     const entryVaults = [
       { label: 'Brian', path: '/brian', alias: 'brian', available: true, mounted: false },
       { label: 'Laputa', path: '/laputa', alias: 'laputa', available: true, mounted: true },
@@ -260,6 +264,12 @@ describe('useVaultLoader', () => {
           path: '',
           rootPath: '/laputa',
           children: [{ name: 'laputa-projects', path: 'projects', rootPath: '/laputa', children: [] }],
+        },
+        {
+          name: 'brian',
+          path: '',
+          rootPath: '/brian',
+          children: [{ name: 'brian-projects', path: 'projects', rootPath: '/brian', children: [] }],
         },
       ])
     })
@@ -372,25 +382,15 @@ describe('useVaultLoader', () => {
   })
 
   it('adds each mounted workspace as soon as that workspace finishes loading', async () => {
-    let resolveLaputa: ((entries: VaultEntry[]) => void) | null = null
+    const laputaLoad = createDeferred<VaultEntry[]>()
     const brian = { label: 'Brian', path: '/brian', alias: 'brian', available: true, mounted: true }
     const laputa = { label: 'Laputa', path: '/laputa', alias: 'laputa', available: true, mounted: true }
     const team = { label: 'Team', path: '/team', alias: 'team', available: true, mounted: true }
     const vaults = [brian, laputa, team]
 
-    backendInvokeFn.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
-      const path = args?.path
-      if (isVaultLoadCommand(cmd)) {
-        if (path === '/laputa') {
-          return new Promise<VaultEntry[]>((resolve) => {
-            resolveLaputa = resolve
-          })
-        }
-        return Promise.resolve([{ ...mockEntries[0], path: `${path}/note/hello.md` }])
-      }
-      if (cmd === 'list_vault_folders' || cmd === 'list_views' || cmd === 'get_modified_files') return Promise.resolve([])
-      return Promise.resolve(null)
-    }) as typeof defaultMockInvoke)
+    backendInvokeFn.mockImplementation(buildMountedWorkspaceLoadMock({
+      pendingEntriesByPath: { '/laputa': laputaLoad.promise },
+    }))
 
     const { result } = renderHook(() => useVaultLoader('/brian', vaults, '/brian', vaults))
 
@@ -399,7 +399,7 @@ describe('useVaultLoader', () => {
     })
 
     await act(async () => {
-      resolveLaputa?.([{ ...mockEntries[0], path: '/laputa/note/hello.md' }])
+      laputaLoad.resolve([{ ...mockEntries[0], path: '/laputa/note/hello.md' }])
     })
 
     await waitFor(() => {
@@ -662,15 +662,17 @@ describe('useVaultLoader', () => {
     const brian = { label: 'Brian', path: '/brian', alias: 'brian', available: true, mounted: true }
     const laputa = { label: 'Laputa', path: '/laputa', alias: 'laputa', available: true, mounted: true }
     const vaults = [laputa, brian]
+    const laputaStartupResponses: Partial<Record<string, VaultEntry[]>> = {
+      reload_vault: [
+        { ...mockEntries[0], path: '/laputa/note/alpha.md', filename: 'alpha.md', title: 'Alpha' },
+      ],
+      list_vault: [],
+    }
 
     backendInvokeFn.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
-      if (cmd === 'reload_vault' && args?.path === '/laputa') {
-        return Promise.resolve([
-          { ...mockEntries[0], path: '/laputa/note/alpha.md', filename: 'alpha.md', title: 'Alpha' },
-        ])
-      }
-      if (cmd === 'list_vault' && args?.path === '/laputa') return Promise.resolve([])
-      if (cmd === 'list_vault_folders' || cmd === 'list_views' || cmd === 'get_modified_files') return Promise.resolve([])
+      const response = args?.path === '/laputa' ? laputaStartupResponses[cmd] : undefined
+      if (response) return Promise.resolve(response)
+      if (EMPTY_ARRAY_COMMANDS.has(cmd)) return Promise.resolve([])
       return Promise.resolve(null)
     }) as typeof defaultMockInvoke)
 

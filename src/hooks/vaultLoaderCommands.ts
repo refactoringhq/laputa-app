@@ -173,7 +173,7 @@ export function loadVaultFolders({ vaultPath }: VaultPathOptions): Promise<Folde
 }
 
 export async function loadMountedVaultFolders(options: MountedVaultFoldersOptions): Promise<FolderNode[]> {
-  const mountedVaults = uniqueMountedVaults({ ...options, includeFallbackVault: false })
+  const mountedVaults = uniqueMountedVaults(options)
   if (mountedVaults.length === 0) return []
   if (mountedVaults.length === 1) {
     const [vault] = mountedVaults
@@ -213,7 +213,7 @@ export function loadVaultViews({ vaultPath }: VaultPathOptions): Promise<ViewFil
 }
 
 export async function loadMountedVaultViews(options: MountedVaultViewsOptions): Promise<ViewFile[]> {
-  const mountedVaults = uniqueMountedVaults({ ...options, includeFallbackVault: false })
+  const mountedVaults = uniqueMountedVaults(options)
   if (mountedVaults.length === 0) return []
   if (mountedVaults.length === 1 && mountedVaults[0].path === options.vaultPath) {
     return loadVaultViews({ vaultPath: options.vaultPath })
