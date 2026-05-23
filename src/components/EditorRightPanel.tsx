@@ -8,7 +8,7 @@ import type { NoteListItem } from '../utils/ai-context'
 import { Inspector, type FrontmatterValue } from './Inspector'
 import type { FrontmatterOpOptions } from '../hooks/frontmatterOps'
 import { AiPanelView } from './AiPanel'
-import { useAiPanelController } from './useAiPanelController'
+import { useAiPanelController, type AiPanelController } from './useAiPanelController'
 import { NEW_AI_CHAT_EVENT } from '../utils/aiPromptBridge'
 import { TableOfContentsPanel } from './TableOfContentsPanel'
 
@@ -62,22 +62,15 @@ type AiPanelSectionProps = Pick<
   | 'inspectorEntry'
   | 'inspectorWidth'
   | 'locale'
-  | 'noteList'
-  | 'noteListFilter'
-  | 'onFileCreated'
-  | 'onFileModified'
   | 'onOpenNote'
   | 'onToggleAIChat'
   | 'onUnsupportedAiPaste'
-  | 'onVaultChanged'
-  | 'vaultPath'
-  | 'vaultPaths'
 > & {
-  activeNoteContent: string | null
+  controller: AiPanelController
 }
 
 function AiPanelSection({
-  activeNoteContent,
+  controller,
   defaultAiAgent = DEFAULT_AI_AGENT,
   defaultAiAgentReadiness,
   defaultAiAgentReady = true,
@@ -86,27 +79,115 @@ function AiPanelSection({
   inspectorEntry,
   inspectorWidth,
   locale,
-  noteList,
-  noteListFilter,
-  onFileCreated,
-  onFileModified,
   onOpenNote,
   onToggleAIChat,
   onUnsupportedAiPaste,
-  onVaultChanged,
+}: AiPanelSectionProps) {
+  return (
+    <div
+      className="shrink-0 flex flex-col min-h-0"
+      style={{ width: inspectorWidth, minWidth: 240, height: '100%' }}
+    >
+      <AiPanelView
+        controller={controller}
+        onClose={() => onToggleAIChat?.()}
+        onOpenNote={onOpenNote}
+        onUnsupportedAiPaste={onUnsupportedAiPaste}
+        defaultAiAgent={defaultAiAgent}
+        defaultAiTarget={defaultAiTarget}
+        defaultAiAgentReadiness={defaultAiAgentReadiness}
+        defaultAiAgentReady={defaultAiAgentReady}
+        locale={locale}
+        activeEntry={inspectorEntry}
+        entries={entries}
+      />
+    </div>
+  )
+}
+
+function usePersistentAiPanelController({
+  showAIChat,
+  defaultAiAgent = DEFAULT_AI_AGENT,
+  defaultAiTarget,
+  defaultAiAgentReadiness,
+  defaultAiAgentReady = true,
+  inspectorEntry,
+  inspectorContent,
+  entries,
   vaultPath,
   vaultPaths,
-}: AiPanelSectionProps) {
-  const aiPanelController = useAiPanelController({
+  noteList,
+  noteListFilter,
+  locale,
+  onOpenNote,
+  onFileCreated,
+  onFileModified,
+  onVaultChanged,
+}: Pick<
+  EditorRightPanelProps,
+  | 'showAIChat'
+  | 'defaultAiAgent'
+  | 'defaultAiTarget'
+  | 'defaultAiAgentReadiness'
+  | 'defaultAiAgentReady'
+  | 'inspectorEntry'
+  | 'inspectorContent'
+  | 'entries'
+  | 'vaultPath'
+  | 'vaultPaths'
+  | 'noteList'
+  | 'noteListFilter'
+  | 'locale'
+  | 'onOpenNote'
+  | 'onFileCreated'
+  | 'onFileModified'
+  | 'onVaultChanged'
+>): AiPanelController {
+  return useAiPanelController({
     vaultPath,
     vaultPaths,
     defaultAiAgent,
     defaultAiTarget,
     defaultAiAgentReady,
     defaultAiAgentReadiness,
-    activeEntry: inspectorEntry,
-    activeNoteContent,
+    activeEntry: showAIChat ? inspectorEntry : null,
+    activeNoteContent: showAIChat ? inspectorContent : null,
+    entries: showAIChat ? entries : undefined,
+    noteList: showAIChat ? noteList : undefined,
+    noteListFilter: showAIChat ? noteListFilter : undefined,
+    locale,
+    onOpenNote,
+    onFileCreated,
+    onFileModified,
+    onVaultChanged,
+  })
+}
+
+export function EditorRightPanel({
+  showAIChat, showTableOfContents, inspectorCollapsed, inspectorWidth,
+  editor,
+  defaultAiAgent = DEFAULT_AI_AGENT, defaultAiTarget, defaultAiAgentReadiness, defaultAiAgentReady = true,
+  onUnsupportedAiPaste,
+  inspectorEntry, inspectorContent, entries, gitHistory, vaultPath,
+  vaultPaths,
+  noteList, noteListFilter,
+  onToggleInspector, onToggleAIChat, onToggleTableOfContents, onNavigateWikilink, onViewCommitDiff,
+  onUpdateFrontmatter, onDeleteProperty, onAddProperty, onCreateMissingType, onCreateAndOpenNote, onChangeWorkspace, onInitializeProperties, onToggleRawEditor, onOpenNote,
+  onFileCreated, onFileModified, onVaultChanged,
+  workspaces,
+  locale,
+}: EditorRightPanelProps) {
+  const aiPanelController = usePersistentAiPanelController({
+    showAIChat,
+    defaultAiAgent,
+    defaultAiTarget,
+    defaultAiAgentReadiness,
+    defaultAiAgentReady,
+    inspectorEntry,
+    inspectorContent,
     entries,
+    vaultPath,
+    vaultPaths,
     noteList,
     noteListFilter,
     locale,
@@ -126,42 +207,6 @@ function AiPanelSection({
     return () => window.removeEventListener(NEW_AI_CHAT_EVENT, handleRequestedNewChat)
   }, [handleNewChat])
 
-  return (
-    <div
-      className="shrink-0 flex flex-col min-h-0"
-      style={{ width: inspectorWidth, minWidth: 240, height: '100%' }}
-    >
-      <AiPanelView
-        controller={aiPanelController}
-        onClose={() => onToggleAIChat?.()}
-        onOpenNote={onOpenNote}
-        onUnsupportedAiPaste={onUnsupportedAiPaste}
-        defaultAiAgent={defaultAiAgent}
-        defaultAiTarget={defaultAiTarget}
-        defaultAiAgentReadiness={defaultAiAgentReadiness}
-        defaultAiAgentReady={defaultAiAgentReady}
-        locale={locale}
-        activeEntry={inspectorEntry}
-        entries={entries}
-      />
-    </div>
-  )
-}
-
-export function EditorRightPanel({
-  showAIChat, showTableOfContents, inspectorCollapsed, inspectorWidth,
-  editor,
-  defaultAiAgent = DEFAULT_AI_AGENT, defaultAiTarget, defaultAiAgentReadiness, defaultAiAgentReady = true,
-  onUnsupportedAiPaste,
-  inspectorEntry, inspectorContent, entries, gitHistory, vaultPath,
-  vaultPaths,
-  noteList, noteListFilter,
-  onToggleInspector, onToggleAIChat, onToggleTableOfContents, onNavigateWikilink, onViewCommitDiff,
-  onUpdateFrontmatter, onDeleteProperty, onAddProperty, onCreateMissingType, onCreateAndOpenNote, onChangeWorkspace, onInitializeProperties, onToggleRawEditor, onOpenNote,
-  onFileCreated, onFileModified, onVaultChanged,
-  workspaces,
-  locale,
-}: EditorRightPanelProps) {
   if (!inspectorCollapsed) {
     return (
       <div
@@ -212,7 +257,7 @@ export function EditorRightPanel({
 
   if (showAIChat) {
     return <AiPanelSection
-      activeNoteContent={inspectorContent}
+      controller={aiPanelController}
       defaultAiAgent={defaultAiAgent}
       defaultAiAgentReadiness={defaultAiAgentReadiness}
       defaultAiAgentReady={defaultAiAgentReady}
@@ -221,16 +266,9 @@ export function EditorRightPanel({
       inspectorEntry={inspectorEntry}
       inspectorWidth={inspectorWidth}
       locale={locale}
-      noteList={noteList}
-      noteListFilter={noteListFilter}
-      onFileCreated={onFileCreated}
-      onFileModified={onFileModified}
       onOpenNote={onOpenNote}
       onToggleAIChat={onToggleAIChat}
       onUnsupportedAiPaste={onUnsupportedAiPaste}
-      onVaultChanged={onVaultChanged}
-      vaultPath={vaultPath}
-      vaultPaths={vaultPaths}
     />
   }
 
