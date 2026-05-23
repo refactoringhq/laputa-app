@@ -270,6 +270,7 @@ export interface FrontmatterOpOptions {
 export interface FrontmatterApplyCallbacks {
   updateTab: (path: VaultPath, content: MarkdownContent) => void
   updateEntry: (path: VaultPath, patch: Partial<VaultEntry>) => void
+  cacheContent?: (path: VaultPath, content: MarkdownContent) => void
   toast: (message: ToastMessage) => void
   getEntry?: (path: VaultPath) => VaultEntry | undefined
   onMissingNotePath?: (path: VaultPath, error: unknown) => void | Promise<void>
@@ -395,6 +396,7 @@ export async function runFrontmatterAndApply(request: FrontmatterRunRequest): Pr
   const { op, path, key, value, callbacks, options } = request
   try {
     const newContent = await executeFrontmatterOp(op, path, key, value)
+    callbacks.cacheContent?.(path, newContent)
     if (callbacks.shouldApply && !callbacks.shouldApply(path)) return undefined
     callbacks.updateTab(path, newContent)
     applyEntryPatch(path, callbacks, frontmatterToEntryPatch(op, key, value))

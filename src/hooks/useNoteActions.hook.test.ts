@@ -7,6 +7,7 @@ import { RAPID_CREATE_NOTE_SETTLE_MS } from './useNoteCreation'
 import { useNoteActions } from './useNoteActions'
 import type { NoteActionsConfig } from './useNoteActions'
 import { GITIGNORED_VISIBILITY_APPLIED_EVENT } from '../lib/gitignoredVisibilityEvents'
+import { clearNoteContentCache, getCachedNoteContentEntry } from './noteContentCache'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('../mock-tauri', () => ({
@@ -85,6 +86,7 @@ describe('useNoteActions hook', () => {
     vi.clearAllMocks()
     vi.mocked(invoke).mockReset()
     vi.mocked(isTauri).mockReturnValue(false)
+    clearNoteContentCache()
     vi.useRealTimers()
   })
 
@@ -281,6 +283,44 @@ describe('useNoteActions hook', () => {
 
     expect(updateEntry).not.toHaveBeenCalled()
     expect(setToastMessage).not.toHaveBeenCalled()
+  })
+
+  it('keeps property-only frontmatter writes in the note cache after a note switch wins the apply guard', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    const noteA = makeEntry({ path: '/vault/note-a.md', filename: 'note-a.md', title: 'Note A' })
+    const noteB = makeEntry({ path: '/vault/note-b.md', filename: 'note-b.md', title: 'Note B' })
+    const updatedContent = '---\nStatus: Done\n---\nBody'
+    let resolveFrontmatterWrite: ((content: string) => void) | null = null
+    vi.mocked(invoke).mockImplementation(() => new Promise((resolve) => {
+      resolveFrontmatterWrite = (content) => { resolve(content) }
+    }))
+
+    const { result } = renderHook(() => useNoteActions(makeConfig([noteA, noteB])))
+    act(() => {
+      result.current.handleSwitchTab(noteA.path)
+    })
+
+    let updatePromise: Promise<void> = Promise.resolve()
+    await act(async () => {
+      updatePromise = result.current.handleUpdateFrontmatter(
+        noteA.path,
+        'Status',
+        'Done',
+        { requireActivePath: noteA.path },
+      )
+      await Promise.resolve()
+    })
+    act(() => {
+      result.current.handleSwitchTab(noteB.path)
+    })
+    await act(async () => {
+      resolveFrontmatterWrite?.(updatedContent)
+      await updatePromise
+    })
+
+    expect(updateEntry).not.toHaveBeenCalled()
+    expect(setToastMessage).not.toHaveBeenCalled()
+    expect(getCachedNoteContentEntry(noteA.path)?.value).toBe(updatedContent)
   })
 
   it('handleCreateNoteImmediate creates note with timestamp-based title', async () => {

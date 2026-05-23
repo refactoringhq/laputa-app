@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 import type { VaultEntry } from '../types'
 import type { FrontmatterValue } from '../components/Inspector'
-import { useTabManagement } from './useTabManagement'
+import { cacheNoteContent, useTabManagement } from './useTabManagement'
 import {
   GITIGNORED_VISIBILITY_APPLIED_EVENT,
   type GitignoredVisibilityAppliedEvent,
@@ -474,6 +474,7 @@ function useFrontmatterRunner({
       key,
       value,
       callbacks: {
+        cacheContent: cacheNoteContent,
         updateTab: updateTabContent,
         updateEntry,
         toast: setToastMessage,
