@@ -30,6 +30,7 @@ vi.mock('@blocknote/react', () => ({
     children?: ReactNode
     editable?: boolean
     className?: string
+    emojiPicker?: boolean
     formattingToolbar?: boolean
     linkToolbar?: boolean
     slashMenu?: boolean
@@ -46,6 +47,7 @@ vi.mock('@blocknote/react', () => ({
       children,
       editable,
       className,
+      emojiPicker,
       formattingToolbar,
       linkToolbar,
       slashMenu,
@@ -53,6 +55,7 @@ vi.mock('@blocknote/react', () => ({
       ...restProps
     } = props
     state.capturedBlockNoteOnChange = props.onChange ?? null
+    void emojiPicker
     void formattingToolbar
     void slashMenu
     void sideMenu
@@ -82,6 +85,10 @@ vi.mock('@blocknote/react', () => ({
   SuggestionMenuController: (props: Record<string, unknown>) => {
     state.capturedSuggestionProps[String(props.triggerCharacter)] = props
     return <div data-testid={`suggestion-${String(props.triggerCharacter)}`} />
+  },
+  GridSuggestionMenuController: (props: Record<string, unknown>) => {
+    state.capturedSuggestionProps[String(props.triggerCharacter)] = props
+    return <div data-testid={`grid-suggestion-${String(props.triggerCharacter)}`} />
   },
   useComponentsContext: () => ({
     LinkToolbar: {
@@ -691,6 +698,34 @@ describe('SingleEditorView', () => {
     } finally {
       editor.domElement.remove()
     }
+  })
+
+  it('inserts the selected emoji from shortcode suggestions', async () => {
+    const editor = createEditor()
+
+    render(
+      <SingleEditorView
+        editor={editor as never}
+        entries={[makeEntry()]}
+        onNavigateWikilink={vi.fn()}
+      />,
+    )
+
+    const getEmojiItems = state.capturedSuggestionProps[':'].getItems as (
+      query: string
+    ) => Promise<Array<{ id: string; name: string; onItemClick: () => void }>>
+
+    const italyItems = await getEmojiItems(':it')
+    expect(italyItems[0]).toMatchObject({ id: '🇮🇹' })
+    expect(italyItems[0].name).toMatch(/italy/i)
+
+    const items = await getEmojiItems(':rocket')
+    const rocketItem = items.find(item => item.id === '🚀')
+
+    expect(rocketItem).toMatchObject({ name: 'rocket' })
+    rocketItem!.onItemClick()
+
+    expect(editor.insertInlineContent).toHaveBeenCalledWith('🚀', { updateSelection: true })
   })
 
   it('guards stale click handlers stored on wikilink suggestion items', async () => {

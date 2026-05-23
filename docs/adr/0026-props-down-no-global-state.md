@@ -2,8 +2,9 @@
 type: ADR
 id: "0026"
 title: "Props-down callbacks-up (no global state management)"
-status: active
+status: superseded
 date: 2026-02-15
+superseded_by: "0115"
 ---
 
 ## Context

@@ -81,7 +81,7 @@ proposed → active → superseded
 | [0023](0023-repair-vault-auto-bootstrap.md) | Repair Vault auto-bootstrap pattern | active |
 | [0024](0024-cache-outside-vault.md) | Vault cache stored outside vault directory | active |
 | [0025](0025-type-field-canonical.md) | type: as canonical field (replacing Is A:) | active |
-| [0026](0026-props-down-no-global-state.md) | Props-down callbacks-up (no global state) | active |
+| [0026](0026-props-down-no-global-state.md) | Props-down callbacks-up (no global state) | superseded → [0115](0115-scoped-react-context-for-shared-ui-preferences.md) |
 | [0027](0027-dual-ai-architecture.md) | Dual AI architecture (API chat + CLI agent) | superseded |
 | [0028](0028-cli-agent-only-no-api-key.md) | CLI agent only — no direct Anthropic API key | active |
 | [0029](0029-domain-command-builder-pattern.md) | Domain command builder pattern for useCommandRegistry | active |
@@ -168,6 +168,7 @@ proposed → active → superseded
 | [0112](0112-system-theme-mode.md) | System theme mode | active |
 | [0113](0113-shared-renderer-attachment-path-normalization.md) | Shared renderer attachment path normalization | active |
 | [0114](0114-mounted-workspaces-unified-graph.md) | Mounted workspaces unified graph | active |
+| [0115](0115-scoped-react-context-for-shared-ui-preferences.md) | Scoped React Context for shared UI preferences | active |
 | [0116](0116-rich-raw-transition-and-serialization-ownership.md) | Rich/raw transition and serialization ownership | active |
 | [0118](0118-entry-scoped-note-windows-without-vault-index-scans.md) | Entry-scoped note windows without vault index scans | active |
 | [0119](0119-vault-neutral-mcp-registration-with-mounted-workspace-guidance.md) | Vault-neutral MCP registration with mounted workspace guidance | active |

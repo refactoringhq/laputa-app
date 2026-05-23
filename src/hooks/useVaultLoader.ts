@@ -888,12 +888,14 @@ function useInitialLoadedWorkspaceMarker({
 }) {
   useEffect(() => {
     if (isLoading || !hasVaultPath({ vaultPath }) || initialLoadedVaultPathRef.current === vaultPath) return
+    const inferFallbackWorkspacePath = !vaults?.length
+    const loadedPaths = inferFallbackWorkspacePath && entries.length === 0
+      ? []
+      : loadedWorkspacePathsFromEntries(entries, vaultPath, { inferFallbackWorkspacePath })
     initialLoadedVaultPathRef.current = vaultPath
     loadedWorkspacePathsRef.current = new Set([
       ...loadedWorkspacePathsRef.current,
-      ...loadedWorkspacePathsFromEntries(entries, vaultPath, {
-        inferFallbackWorkspacePath: !vaults?.length,
-      }),
+      ...loadedPaths,
     ])
   }, [entries, initialLoadedVaultPathRef, isLoading, loadedWorkspacePathsRef, vaultPath, vaults])
 }
@@ -967,7 +969,10 @@ function loadMissingWorkspaceEntries({
   vaultPath: string
   vaults?: VaultOption[]
 }) {
-  void loadWorkspaceEntries(vault, defaultWorkspacePath, { reloadIfEmpty: true })
+  void loadWorkspaceEntries(vault, defaultWorkspacePath, {
+    forceReload: vault.path === vaultPath,
+    reloadIfEmpty: true,
+  })
     .then((loadedEntries) => {
       if (!isCurrentVaultPath(vaultPath)) return
       loadedPaths.add(vault.path)

@@ -408,6 +408,7 @@ vi.mock('@blocknote/react', () => ({
   DeleteLinkButton: () => null,
   SideMenuController: () => null,
   SuggestionMenuController: () => null,
+  GridSuggestionMenuController: () => null,
   useComponentsContext: () => ({
     LinkToolbar: {
       Button: ({

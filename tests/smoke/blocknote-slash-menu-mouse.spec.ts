@@ -13,11 +13,15 @@ test.afterEach(() => {
   removeFixtureVaultCopy(tempVaultDir)
 })
 
-async function openSlashMenuOnNewLine(page: Page) {
+async function focusNewEditorLine(page: Page) {
   await page.locator('[data-testid="note-list-container"]').getByText('Alpha Project', { exact: true }).click()
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
   await page.locator('.bn-block-content').last().click()
   await page.keyboard.press('Enter')
+}
+
+async function openSlashMenuOnNewLine(page: Page) {
+  await focusNewEditorLine(page)
   await page.keyboard.type('/')
 
   const menu = page.locator('.bn-suggestion-menu')
@@ -30,6 +34,15 @@ async function openFilteredSlashMenuOnNewLine(page: Page) {
   await page.keyboard.type('bul')
 
   const menu = page.locator('.bn-suggestion-menu')
+  await expect(menu).toBeVisible({ timeout: 5_000 })
+  return menu
+}
+
+async function openEmojiShortcodeMenuOnNewLine(page: Page, query: string) {
+  await focusNewEditorLine(page)
+  await page.keyboard.type(`:${query}`)
+
+  const menu = page.locator('.bn-grid-suggestion-menu')
   await expect(menu).toBeVisible({ timeout: 5_000 })
   return menu
 }
@@ -55,4 +68,24 @@ test('plain slash-menu mouse selection opens follow-up pickers', async ({ page }
 
   await expect(page.locator('.bn-grid-suggestion-menu')).toBeVisible({ timeout: 5_000 })
   await expect(page.locator('.bn-suggestion-menu')).not.toBeVisible()
+})
+
+test('emoji shortcode suggestions insert the selected emoji with the keyboard', async ({ page }) => {
+  await openEmojiShortcodeMenuOnNewLine(page, 'it')
+
+  await page.keyboard.press('Enter')
+
+  await expect(page.locator('.bn-editor')).toContainText('🇮🇹')
+  await expect(page.locator('.bn-editor')).not.toContainText(':it')
+  await expect(page.locator('.bn-grid-suggestion-menu')).not.toBeVisible()
+})
+
+test('emoji shortcode suggestions insert the selected emoji with the mouse', async ({ page }) => {
+  const menu = await openEmojiShortcodeMenuOnNewLine(page, 'rocket')
+
+  await menu.locator('.bn-grid-suggestion-menu-item').filter({ hasText: '🚀' }).click()
+
+  await expect(page.locator('.bn-editor')).toContainText('🚀')
+  await expect(page.locator('.bn-editor')).not.toContainText(':rocket')
+  await expect(page.locator('.bn-grid-suggestion-menu')).not.toBeVisible()
 })
