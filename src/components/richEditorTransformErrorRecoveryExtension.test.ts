@@ -61,6 +61,9 @@ describe('isRecoverableEditorTransformError', () => {
     expect(isRecoverableEditorTransformError(new RangeError(
       'Invalid content for node blockContainer: <paragraph("Procedures are long-running"), blockGroup(blockContainer(bulletListItem("Step")))>',
     ))).toBe(true)
+    expect(isRecoverableEditorTransformError(transformError(
+      'Cannot join blockGroup onto blockContainer',
+    ))).toBe(true)
     expect(isRecoverableEditorTransformError(new RangeError(
       'Inserted content deeper than insertion position',
     ))).toBe(true)
@@ -108,6 +111,13 @@ describe('installRichEditorTransformErrorRecovery', () => {
         'Invalid content for node blockContainer: <paragraph("Procedures are long-running"), blockGroup(blockContainer(bulletListItem("Step")))>',
       ),
       'transform_error',
+    )
+  })
+
+  it('repairs invalid block joins after pull refreshes editor state', () => {
+    expectDocumentRepairRecovery(
+      transformError('Cannot join blockGroup onto blockContainer'),
+      'invalid_block_join',
     )
   })
 
