@@ -16,6 +16,7 @@ import { buildTypeCommands } from './commands/typeCommands'
 import { buildFilterCommands } from './commands/filterCommands'
 import { localizeCommandActions } from './commands/localizeCommands'
 import { extractVaultTypes } from '../utils/vaultTypes'
+import type { GitRepositoryOption } from '../utils/gitRepositories'
 
 // Re-export types and helpers for backward compatibility
 export type { CommandAction, CommandGroup } from './commands/types'
@@ -76,6 +77,7 @@ interface CommandRegistryConfig {
   canAddRemote?: boolean
   gitFeaturesEnabled?: boolean
   isGitVault?: boolean
+  gitRepositories?: GitRepositoryOption[]
   onInitializeGit?: () => void
   onCreateType?: () => void
   onDeleteNote: (path: string) => void
@@ -83,6 +85,7 @@ interface CommandRegistryConfig {
   onUnarchiveNote: (path: string) => void
   onCommitPush: () => void
   onPull?: () => void
+  onPullRepository?: (path: string) => void
   onResolveConflicts?: () => void
   onSetViewMode: (mode: ViewMode) => void
   onToggleInspector: () => void
@@ -151,7 +154,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     onCustomizeNoteListColumns, canCustomizeNoteListColumns,
     onRestoreDeletedNote, canRestoreDeletedNote,
     selection, noteListFilter, onSetNoteListFilter,
-    gitFeaturesEnabled, isGitVault, onInitializeGit,
+    gitFeaturesEnabled, isGitVault, gitRepositories, onInitializeGit, onPullRepository,
   } = config
 
   const hasActiveNote = activeTabPath !== null
@@ -215,16 +218,18 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     modifiedCount,
     gitFeaturesEnabled,
     isGitVault,
+    repositories: gitRepositories,
     canAddRemote: config.canAddRemote ?? false,
     onAddRemote: config.onAddRemote,
     onCommitPush,
     onInitializeGit,
     onPull,
+    onPullRepository,
     onResolveConflicts,
     onSelect,
   }), [
-    modifiedCount, gitFeaturesEnabled, isGitVault, config.canAddRemote, config.onAddRemote,
-    onCommitPush, onInitializeGit, onPull, onResolveConflicts, onSelect,
+    modifiedCount, gitFeaturesEnabled, isGitVault, gitRepositories, config.canAddRemote, config.onAddRemote,
+    onCommitPush, onInitializeGit, onPull, onPullRepository, onResolveConflicts, onSelect,
   ])
 
   const viewCommands = useMemo(() => buildViewCommands({

@@ -272,6 +272,7 @@ export interface FrontmatterApplyCallbacks {
   updateEntry: (path: VaultPath, patch: Partial<VaultEntry>) => void
   toast: (message: ToastMessage) => void
   getEntry?: (path: VaultPath) => VaultEntry | undefined
+  onMissingNotePath?: (path: VaultPath, error: unknown) => void | Promise<void>
   shouldApply?: (path: VaultPath) => boolean
 }
 
@@ -339,15 +340,52 @@ function failureToastMessage(op: FrontmatterOp): ToastMessage {
   return `Failed to ${op} property`
 }
 
-function handleFrontmatterFailure(
-  op: FrontmatterOp,
-  err: unknown,
+function frontmatterErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return String(error)
+}
+
+export function isMissingFrontmatterTargetError(error: unknown): boolean {
+  return /does not exist|not found|enoent/i.test(frontmatterErrorMessage(error))
+}
+
+async function runMissingNotePathCallback(
+  path: VaultPath,
+  error: unknown,
   callbacks: FrontmatterApplyCallbacks,
-  options?: FrontmatterOpOptions,
-): undefined {
-  console.error(`Failed to ${op} frontmatter:`, err)
+): Promise<void> {
+  try {
+    await callbacks.onMissingNotePath?.(path, error)
+  } catch (callbackError) {
+    console.warn('Failed to handle missing frontmatter target:', callbackError)
+  }
+}
+
+interface FrontmatterFailureParams {
+  callbacks: FrontmatterApplyCallbacks
+  err: unknown
+  op: FrontmatterOp
+  options?: FrontmatterOpOptions
+  path: VaultPath
+}
+
+async function handleFrontmatterFailure({
+  callbacks,
+  err,
+  op,
+  options,
+  path,
+}: FrontmatterFailureParams): Promise<undefined> {
+  const missingTarget = isMissingFrontmatterTargetError(err)
+  if (missingTarget) {
+    console.warn(`Skipped ${op} frontmatter for missing note:`, err)
+    await runMissingNotePathCallback(path, err, callbacks)
+  } else {
+    console.error(`Failed to ${op} frontmatter:`, err)
+  }
   if (options?.silent) throw err
-  callbacks.toast(failureToastMessage(op))
+  if (!missingTarget) callbacks.toast(failureToastMessage(op))
   return undefined
 }
 
@@ -363,6 +401,6 @@ export async function runFrontmatterAndApply(request: FrontmatterRunRequest): Pr
     notifyFrontmatterSuccess(op, callbacks, options)
     return newContent
   } catch (err) {
-    return handleFrontmatterFailure(op, err, callbacks, options)
+    return handleFrontmatterFailure({ op, path, err, callbacks, options })
   }
 }

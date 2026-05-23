@@ -749,6 +749,30 @@ describe('StatusBar', () => {
     expect(screen.getByText(/1 behind/)).toBeInTheDocument()
   })
 
+  it('shows the selected repository on sync controls when multiple vaults are active', () => {
+    render(
+      <StatusBar
+        noteCount={100}
+        vaultPath="/Users/luca/Laputa"
+        vaults={vaults}
+        multiWorkspaceEnabled={true}
+        onSwitchVault={vi.fn()}
+        repositories={[
+          { path: '/Users/luca/Laputa', label: 'Main Vault', defaultForNewNotes: true },
+          { path: '/Users/luca/Work', label: 'Work Vault', defaultForNewNotes: false },
+        ]}
+        selectedRepositoryPath="/Users/luca/Work"
+        onRepositoryChange={vi.fn()}
+        syncStatus="idle"
+        remoteStatus={{ branch: 'main', ahead: 0, behind: 0, hasRemote: true }}
+      />
+    )
+
+    expect(screen.getByTestId('status-sync')).toHaveTextContent('Work Vault')
+    fireEvent.click(screen.getByTestId('status-sync'))
+    expect(screen.getByTestId('git-status-repository-select')).toBeInTheDocument()
+  })
+
   it('shows History badge in status bar', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} isGitVault />)
     expect(screen.getByTestId('status-pulse')).toBeInTheDocument()

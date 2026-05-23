@@ -57,6 +57,7 @@
   "command.git.commitPush": "Commit & Push",
   "command.git.addRemote": "Add Remote to Current Vault",
   "command.git.pull": "Pull from Remote",
+  "command.git.pullRepository": "Pull from Remote: {repository}",
   "command.git.resolveConflicts": "Resolve Conflicts",
   "command.git.viewChanges": "View Pending Changes",
   "git.repository.select": "Repository",

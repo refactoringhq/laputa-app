@@ -57,6 +57,7 @@
   "command.git.commitPush": "Commit & Push",
   "command.git.addRemote": "Thêm remote cho kho hiện tại",
   "command.git.pull": "Kéo từ remote",
+  "command.git.pullRepository": "Lấy từ Remote: {repository}",
   "command.git.resolveConflicts": "Giải quyết xung đột",
   "command.git.viewChanges": "Xem các thay đổi đang chờ",
   "git.repository.select": "Kho lưu trữ",

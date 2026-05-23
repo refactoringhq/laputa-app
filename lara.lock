@@ -59,6 +59,7 @@ files:
     command.git.commitPush: 8cb5faa4019716f43dd69c41496b1d46
     command.git.addRemote: 7eef951b3f909340a68dc9811be83e9e
     command.git.pull: 3988d61f4a4546381f61a4eaf61315b4
+    command.git.pullRepository: 931ad25176586fd4332dd671574d3185
     command.git.resolveConflicts: 871ac36968cfca3d2297a89b28b25dee
     command.git.viewChanges: b2699edf69d8e1031afce2b2f94e5c8d
     git.repository.select: 33fcf2b3ec4686d9cd06051c726d0ba2

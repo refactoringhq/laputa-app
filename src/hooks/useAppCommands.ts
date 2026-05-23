@@ -13,6 +13,7 @@ import { requestAddRemote } from '../utils/addRemoteEvents'
 import type { NoteListFilter } from '../utils/noteListHelpers'
 import type { ViewMode } from './useViewMode'
 import type { NoteListMultiSelectionCommands } from '../components/note-list/multiSelectionCommands'
+import type { GitRepositoryOption } from '../utils/gitRepositories'
 
 interface AppCommandsConfig {
   activeTabPath: string | null
@@ -38,6 +39,7 @@ interface AppCommandsConfig {
   onUnarchiveNote: (path: string) => void
   onCommitPush: () => void
   onPull?: () => void
+  onPullRepository?: (path: string) => void
   onResolveConflicts?: () => void
   onSetViewMode: (mode: ViewMode) => void
   onToggleInspector: () => void
@@ -73,6 +75,7 @@ interface AppCommandsConfig {
   canAddRemote?: boolean
   gitFeaturesEnabled?: boolean
   isGitVault?: boolean
+  gitRepositories?: GitRepositoryOption[]
   onInitializeGit?: () => void
   onCreateType?: () => void
   aiFeaturesEnabled?: boolean
@@ -164,6 +167,7 @@ type CommandRegistryCoreActions = Pick<
   | 'onUnarchiveNote'
   | 'onCommitPush'
   | 'onPull'
+  | 'onPullRepository'
   | 'onResolveConflicts'
   | 'onSetViewMode'
   | 'onToggleInspector'
@@ -189,6 +193,7 @@ type CommandRegistryVaultActions = Pick<
   | 'canAddRemote'
   | 'gitFeaturesEnabled'
   | 'isGitVault'
+  | 'gitRepositories'
   | 'onInitializeGit'
   | 'onCheckForUpdates'
   | 'onCreateType'
@@ -451,6 +456,7 @@ function createCommandRegistryCoreConfig(
     onUnarchiveNote: config.onUnarchiveNote,
     onCommitPush: config.onCommitPush,
     onPull: config.onPull,
+    onPullRepository: config.onPullRepository,
     onResolveConflicts: config.onResolveConflicts,
     onSetViewMode: config.onSetViewMode,
     onToggleInspector: config.onToggleInspector,
@@ -483,6 +489,7 @@ function createCommandRegistryVaultConfig(
     canAddRemote: config.canAddRemote ?? true,
     gitFeaturesEnabled: config.gitFeaturesEnabled,
     isGitVault: config.isGitVault,
+    gitRepositories: config.gitRepositories,
     onInitializeGit: config.onInitializeGit,
     onCheckForUpdates: config.onCheckForUpdates,
     onCreateType: config.onCreateType,

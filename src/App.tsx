@@ -636,8 +636,9 @@ function App() {
   })
   const handleVaultUpdate = useCallback(async (
     updatedFiles: string[],
-    options: { preserveFocusedEditor?: boolean } = {},
+    options: { preserveFocusedEditor?: boolean; vaultPath?: string } = {},
   ) => {
+    const updateVaultPath = options.vaultPath ?? resolvedPath
     await refreshPulledVaultState({
       activeTabPath: notes.activeTabPath,
       closeAllTabs,
@@ -651,7 +652,7 @@ function App() {
       reloadViews: vault.reloadViews,
       replaceActiveTab: handleReplaceActiveTab,
       updatedFiles,
-      vaultPath: resolvedPath,
+      vaultPath: updateVaultPath,
     })
     await refreshGitModifiedFiles()
   }, [
@@ -667,7 +668,10 @@ function App() {
       vault.unsavedPaths,
     ])
   const handlePulledVaultUpdate = useCallback(
-    (updatedFiles: string[]) => handleVaultUpdate(updatedFiles, getPulledVaultUpdateOptions()),
+    (updatedFiles: string[], vaultPath: string) => handleVaultUpdate(updatedFiles, {
+      ...getPulledVaultUpdateOptions(),
+      vaultPath,
+    }),
     [handleVaultUpdate],
   )
   const handleFocusedVaultUpdate = useCallback(
@@ -694,7 +698,7 @@ function App() {
   })
   const autoSync = useAutoSync({
     enabled: gitFeaturesEnabled && gitRepoState === 'ready',
-    vaultPath: resolvedPath,
+    vaultPath: gitSurfaces.syncRepositoryPath,
     intervalMinutes: settings.auto_pull_interval_minutes,
     onVaultUpdated: handlePulledVaultUpdate,
     onConflict: (files) => {
@@ -747,7 +751,8 @@ function App() {
   })
 
   const conflictFlow = useConflictFlow({
-    resolvedPath, entries: visibleEntries,
+    resolvedPath: gitSurfaces.syncRepositoryPath,
+    entries: visibleEntries,
     conflictFiles: autoSync.conflictFiles,
     pausePull: autoSync.pausePull, resumePull: autoSync.resumePull,
     triggerSync: autoSync.triggerSync, reloadVault: vault.reloadVault,
@@ -827,11 +832,13 @@ function App() {
     onSetFilter: (filterType) => {
       handleSetSelection({ kind: 'sectionGroup', type: filterType })
     },
-    onVaultChanged: (path) => { void handlePulledVaultUpdate(path ? [path] : []) },
+    onVaultChanged: (path) => { void handlePulledVaultUpdate(path ? [path] : [], resolvedPath) },
   })
 
-  const handleInitializeProperties = useCallback(async (path: string) => {
-    await initializeNoteProperties(notes.handleUpdateFrontmatter, path)
+  const handleInitializeProperties = useCallback((path: string) => {
+    void initializeNoteProperties(notes.handleUpdateFrontmatter, path).catch((err) => {
+      console.warn('Failed to initialize note properties:', err)
+    })
   }, [notes])
 
   const handleRemoveNoteIcon = useCallback(async (path: string) => {
@@ -1014,6 +1021,10 @@ function App() {
   const handleAppContentChange = appSave.handleContentChange
   const handleAppSave = appSave.handleSave
   const loadModifiedFiles = refreshGitModifiedFiles
+  const setSyncRepositoryPath = gitSurfaces.setSyncRepositoryPath
+  const syncRepositoryPath = gitSurfaces.syncRepositoryPath
+  const triggerSync = autoSync.triggerSync
+  const pullAndPush = autoSync.pullAndPush
 
   useEffect(() => {
     if (!gitFeaturesEnabled) return
@@ -1034,6 +1045,17 @@ function App() {
       runAutomaticCheckpoint,
     })
   }, [gitFeaturesEnabled, openCommitDialog, runAutomaticCheckpoint, settings.autogit_enabled])
+  const handlePullRepository = useCallback((targetVaultPath: string) => {
+    if (!gitFeaturesEnabled) return
+    setSyncRepositoryPath(targetVaultPath)
+    triggerSync(targetVaultPath)
+  }, [gitFeaturesEnabled, setSyncRepositoryPath, triggerSync])
+  const handlePullSelectedRepository = useCallback(() => {
+    handlePullRepository(syncRepositoryPath)
+  }, [handlePullRepository, syncRepositoryPath])
+  const handlePullAndPushSelectedRepository = useCallback(() => {
+    pullAndPush(syncRepositoryPath)
+  }, [pullAndPush, syncRepositoryPath])
 
   const handleTrackedContentChange = useCallback((path: string, content: string) => {
     recordAutoGitActivity()
@@ -1553,10 +1575,12 @@ function App() {
     onDeleteNote: deleteActions.handleDeleteNote,
     onArchiveNote: entryActions.handleArchiveNote, onUnarchiveNote: entryActions.handleUnarchiveNote,
     onCommitPush: handleCommitPush,
+    gitRepositories,
     gitFeaturesEnabled,
     isGitVault,
     onInitializeGit: openGitSetupDialog,
-    onPull: autoSync.triggerSync,
+    onPull: handlePullSelectedRepository,
+    onPullRepository: handlePullRepository,
     onResolveConflicts: conflictFlow.handleOpenConflictResolver,
     onSetViewMode: handleSetViewMode,
     onToggleInspector: handleToggleInspector,
@@ -1786,7 +1810,7 @@ function App() {
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
         <RenameDetectedBanner renames={detectedRenames} onUpdate={handleUpdateWikilinks} onDismiss={handleDismissRenames} />
-        <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} onTriggerSync={autoSync.triggerSync} onPullAndPush={autoSync.pullAndPush} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} aiFeaturesEnabled={aiFeaturesEnabled} mcpStatus={mcpStatus} onInstallMcp={openMcpSetupDialog} aiAgentsStatus={aiFeaturesEnabled ? aiAgentsStatus : undefined} vaultAiGuidanceStatus={aiFeaturesEnabled ? vaultAiGuidanceStatus : undefined} defaultAiAgent={aiFeaturesEnabled ? aiAgentPreferences.defaultAiAgent : undefined} defaultAiTarget={aiFeaturesEnabled ? settings.default_ai_target ?? undefined : undefined} aiModelProviders={aiFeaturesEnabled ? settings.ai_model_providers ?? [] : []} onSetDefaultAiAgent={aiFeaturesEnabled ? aiAgentPreferences.setDefaultAiAgent : undefined} onSetDefaultAiTarget={aiFeaturesEnabled ? aiAgentPreferences.setDefaultAiTarget : undefined} onRestoreVaultAiGuidance={aiFeaturesEnabled ? () => { void restoreVaultAiGuidance() } : undefined} locale={appLocale} />
+        <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.syncRepositoryPath} onRepositoryChange={gitSurfaces.setSyncRepositoryPath} onTriggerSync={handlePullSelectedRepository} onPullAndPush={handlePullAndPushSelectedRepository} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} aiFeaturesEnabled={aiFeaturesEnabled} mcpStatus={mcpStatus} onInstallMcp={openMcpSetupDialog} aiAgentsStatus={aiFeaturesEnabled ? aiAgentsStatus : undefined} vaultAiGuidanceStatus={aiFeaturesEnabled ? vaultAiGuidanceStatus : undefined} defaultAiAgent={aiFeaturesEnabled ? aiAgentPreferences.defaultAiAgent : undefined} defaultAiTarget={aiFeaturesEnabled ? settings.default_ai_target ?? undefined : undefined} aiModelProviders={aiFeaturesEnabled ? settings.ai_model_providers ?? [] : []} onSetDefaultAiAgent={aiFeaturesEnabled ? aiAgentPreferences.setDefaultAiAgent : undefined} onSetDefaultAiTarget={aiFeaturesEnabled ? aiAgentPreferences.setDefaultAiTarget : undefined} onRestoreVaultAiGuidance={aiFeaturesEnabled ? () => { void restoreVaultAiGuidance() } : undefined} locale={appLocale} />
         <GitSetupDialog open={gitFeaturesEnabled && shouldShowGitSetupDialog} onInitGit={handleInitGitRepo} onDismiss={dismissGitSetupDialog} onNeverForVault={neverForVaultGitSetupDialog} />
         <DeleteProgressNotice count={deleteActions.pendingDeleteCount} />
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />

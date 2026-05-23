@@ -159,6 +159,16 @@ function localizeSettingsStateCommand(command: CommandAction, t: Translate): str
   return null
 }
 
+function localizeGitStateCommand(command: CommandAction, t: Translate): string | null {
+  if (command.id.startsWith('git-pull-')) {
+    return t('command.git.pullRepository', {
+      repository: stripKnownPrefix(command.label, 'Pull from Remote: '),
+    })
+  }
+
+  return null
+}
+
 function localizeTypeCommand(command: CommandAction, t: Translate): string | null {
   if (command.id.startsWith('new-') && command.group === 'Note') {
     return t('command.note.newTypedNote', { type: stripKnownPrefix(command.label, 'New ') })
@@ -184,6 +194,7 @@ export function localizeCommandActions(commands: CommandAction[], locale: AppLoc
       : localizeNoteStateCommand(command, t)
         ?? localizeViewStateCommand(command, t)
         ?? localizeSettingsStateCommand(command, t)
+        ?? localizeGitStateCommand(command, t)
         ?? localizeTypeCommand(command, t)
         ?? command.label
     return label === command.label ? command : { ...command, label }

@@ -57,6 +57,7 @@
   "command.git.commitPush": "Fazer commit e push",
   "command.git.addRemote": "Adicionar repositório remoto ao cofre atual",
   "command.git.pull": "Fazer pull do repositório remoto",
+  "command.git.pullRepository": "Puxar do Remoto: {repository}",
   "command.git.resolveConflicts": "Resolver conflitos",
   "command.git.viewChanges": "Exibir alterações pendentes",
   "git.repository.select": "Repositório",

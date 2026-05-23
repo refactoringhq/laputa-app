@@ -31,6 +31,7 @@ import { ICON_STYLE, SEP_STYLE } from './styles'
 import type { VaultOption } from './types'
 import { VaultMenu } from './VaultMenu'
 import { formatShortcutDisplay } from '../../hooks/appCommandCatalog'
+import type { GitRepositoryOption } from '../../utils/gitRepositories'
 
 const SETTINGS_SHORTCUT = {
   shortcut: formatShortcutDisplay({ display: '⌘,' }),
@@ -66,6 +67,9 @@ interface StatusBarPrimarySectionProps {
   lastSyncTime: number | null
   conflictCount: number
   remoteStatus?: GitRemoteStatus | null
+  repositories?: GitRepositoryOption[]
+  selectedRepositoryPath?: string
+  onRepositoryChange?: (path: string) => void
   onTriggerSync?: () => void
   onPullAndPush?: () => void
   onOpenConflictResolver?: () => void
@@ -194,6 +198,9 @@ function StatusBarAiBadge({
 function StatusBarPrimaryBadges({
   modifiedCount,
   visibleRemoteStatus,
+  repositories,
+  selectedRepositoryPath,
+  onRepositoryChange,
   onAddRemote,
   onClickPending,
   onCommitPush,
@@ -227,6 +234,9 @@ function StatusBarPrimaryBadges({
 }: {
   modifiedCount: number
   visibleRemoteStatus: GitRemoteStatus | null
+  repositories?: GitRepositoryOption[]
+  selectedRepositoryPath?: string
+  onRepositoryChange?: (path: string) => void
   onAddRemote: () => void
   onClickPending?: () => void
   onCommitPush?: () => void
@@ -271,6 +281,9 @@ function StatusBarPrimaryBadges({
             status={syncStatus}
             lastSyncTime={lastSyncTime}
             remoteStatus={visibleRemoteStatus}
+            repositories={repositories}
+            selectedRepositoryPath={selectedRepositoryPath}
+            onRepositoryChange={onRepositoryChange}
             onTriggerSync={onTriggerSync}
             onPullAndPush={onPullAndPush}
             onOpenConflictResolver={onOpenConflictResolver}
@@ -408,6 +421,103 @@ function PrimarySeparator({ compact }: { compact: boolean }) {
   return compact ? null : <span style={SEP_STYLE}>|</span>
 }
 
+function StatusBarGitControls({
+  modifiedCount,
+  vaultPath,
+  onAddRemote,
+  onClickPending,
+  onCommitPush,
+  commitActionPending,
+  gitFeaturesEnabled,
+  onInitializeGit,
+  isOffline,
+  isVaultReloading,
+  isGitVault,
+  syncStatus,
+  lastSyncTime,
+  conflictCount,
+  remoteStatus,
+  repositories,
+  selectedRepositoryPath,
+  onRepositoryChange,
+  onTriggerSync,
+  onPullAndPush,
+  onOpenConflictResolver,
+  onClickPulse,
+  mcpStatus,
+  onInstallMcp,
+  aiAgentsStatus,
+  vaultAiGuidanceStatus,
+  defaultAiAgent,
+  defaultAiTarget,
+  aiModelProviders,
+  onSetDefaultAiAgent,
+  onSetDefaultAiTarget,
+  onRestoreVaultAiGuidance,
+  claudeCodeStatus,
+  claudeCodeVersion,
+  compact,
+  locale,
+}: StatusBarPrimarySectionProps & { compact: boolean; locale: AppLocale }) {
+  const gitVaultPath = selectedRepositoryPath || vaultPath
+  const { openAddRemote, closeAddRemote, showAddRemote, visibleRemoteStatus, handleRemoteConnected } = useStatusBarAddRemote({
+    vaultPath: gitVaultPath,
+    isGitVault: gitFeaturesEnabled !== false && isGitVault !== false,
+    remoteStatus,
+    onAddRemote,
+  })
+
+  return (
+    <>
+      <StatusBarPrimaryBadges
+        modifiedCount={modifiedCount}
+        visibleRemoteStatus={visibleRemoteStatus}
+        repositories={repositories}
+        selectedRepositoryPath={gitVaultPath}
+        onRepositoryChange={onRepositoryChange}
+        onAddRemote={() => {
+          void openAddRemote()
+        }}
+        onClickPending={onClickPending}
+        onCommitPush={onCommitPush}
+        commitActionPending={commitActionPending}
+        gitFeaturesEnabled={gitFeaturesEnabled !== false}
+        onInitializeGit={onInitializeGit}
+        syncStatus={syncStatus}
+        lastSyncTime={lastSyncTime}
+        onTriggerSync={onTriggerSync}
+        onPullAndPush={onPullAndPush}
+        onOpenConflictResolver={onOpenConflictResolver}
+        conflictCount={conflictCount}
+        onClickPulse={onClickPulse}
+        isGitVault={isGitVault !== false}
+        mcpStatus={mcpStatus}
+        onInstallMcp={onInstallMcp}
+        aiAgentsStatus={aiAgentsStatus}
+        vaultAiGuidanceStatus={vaultAiGuidanceStatus}
+        defaultAiAgent={defaultAiAgent}
+        defaultAiTarget={defaultAiTarget}
+        aiModelProviders={aiModelProviders}
+        onSetDefaultAiAgent={onSetDefaultAiAgent}
+        onSetDefaultAiTarget={onSetDefaultAiTarget}
+        onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
+        claudeCodeStatus={claudeCodeStatus}
+        claudeCodeVersion={claudeCodeVersion}
+        isOffline={isOffline === true}
+        isVaultReloading={isVaultReloading === true}
+        compact={compact}
+        locale={locale}
+      />
+      <AddRemoteModal
+        open={showAddRemote}
+        vaultPath={gitVaultPath}
+        onClose={closeAddRemote}
+        onRemoteConnected={handleRemoteConnected}
+      />
+    </>
+  )
+}
+
 export function StatusBarPrimarySection({
   modifiedCount,
   vaultPath,
@@ -430,6 +540,9 @@ export function StatusBarPrimarySection({
   lastSyncTime,
   conflictCount,
   remoteStatus,
+  repositories,
+  selectedRepositoryPath,
+  onRepositoryChange,
   onTriggerSync,
   onPullAndPush,
   onOpenConflictResolver,
@@ -454,13 +567,6 @@ export function StatusBarPrimarySection({
   stacked = false,
   compact = false,
 }: StatusBarPrimarySectionProps) {
-  const { openAddRemote, closeAddRemote, showAddRemote, visibleRemoteStatus, handleRemoteConnected } = useStatusBarAddRemote({
-    vaultPath,
-    isGitVault: gitFeaturesEnabled && isGitVault,
-    remoteStatus,
-    onAddRemote,
-  })
-
   return (
     <div style={primarySectionStyle(stacked, compact)}>
       <VaultMenu
@@ -481,12 +587,16 @@ export function StatusBarPrimarySection({
       />
       <PrimarySeparator compact={compact} />
       <BuildNumberButton buildNumber={buildNumber} onCheckForUpdates={onCheckForUpdates} compact={compact} locale={locale} />
-      <StatusBarPrimaryBadges
+      <StatusBarGitControls
         modifiedCount={modifiedCount}
-        visibleRemoteStatus={visibleRemoteStatus}
-        onAddRemote={() => {
-          void openAddRemote()
-        }}
+        vaultPath={vaultPath}
+        vaults={vaults}
+        onSwitchVault={onSwitchVault}
+        remoteStatus={remoteStatus}
+        repositories={repositories}
+        selectedRepositoryPath={selectedRepositoryPath}
+        onRepositoryChange={onRepositoryChange}
+        onAddRemote={onAddRemote}
         onClickPending={onClickPending}
         onCommitPush={onCommitPush}
         commitActionPending={commitActionPending}
@@ -515,12 +625,6 @@ export function StatusBarPrimarySection({
         isOffline={isOffline} isVaultReloading={isVaultReloading}
         compact={compact}
         locale={locale}
-      />
-      <AddRemoteModal
-        open={showAddRemote}
-        vaultPath={vaultPath}
-        onClose={closeAddRemote}
-        onRemoteConnected={handleRemoteConnected}
       />
     </div>
   )

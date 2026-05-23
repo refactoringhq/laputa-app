@@ -57,6 +57,7 @@
   "command.git.commitPush": "提交并推送",
   "command.git.addRemote": "为当前仓库添加远程地址",
   "command.git.pull": "从远程拉取",
+  "command.git.pullRepository": "从远程拉取：{repository}",
   "command.git.resolveConflicts": "解决冲突",
   "command.git.viewChanges": "查看待处理更改",
   "git.repository.select": "仓库",

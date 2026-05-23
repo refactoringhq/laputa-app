@@ -96,7 +96,7 @@ describe('useAutoSync', () => {
     const { result } = renderSync()
 
     await waitFor(() => {
-      expect(onVaultUpdated).toHaveBeenCalledWith(['note.md', 'project/plan.md'])
+      expect(onVaultUpdated).toHaveBeenCalledWith(['note.md', 'project/plan.md'], '/Users/luca/Laputa')
       expect(onToast).toHaveBeenCalledWith('Pulled 2 update(s) from remote')
       expect(result.current.syncStatus).toBe('idle')
     })
@@ -124,7 +124,7 @@ describe('useAutoSync', () => {
     )
 
     await waitFor(() => {
-      expect(asyncVaultRefresh).toHaveBeenCalledWith(['note.md'])
+      expect(asyncVaultRefresh).toHaveBeenCalledWith(['note.md'], '/Users/luca/Laputa')
     })
     expect(onToast).not.toHaveBeenCalledWith('Pulled 1 update(s) from remote')
 
@@ -417,7 +417,7 @@ describe('useAutoSync', () => {
     })
 
     await waitFor(() => {
-      expect(onVaultUpdated).toHaveBeenCalledWith(['note.md'])
+      expect(onVaultUpdated).toHaveBeenCalledWith(['note.md'], '/Users/luca/Laputa')
       expect(onSyncUpdated).toHaveBeenCalled()
       expect(onToast).toHaveBeenCalledWith('Pulled and pushed successfully')
       expect(result.current.syncStatus).toBe('idle')
@@ -456,6 +456,29 @@ describe('useAutoSync', () => {
     await waitFor(() => {
       expect(result.current.syncStatus).toBe('pull_required')
       expect(onToast).toHaveBeenCalledWith('Push still rejected after pull — try again')
+    })
+  })
+
+  it('manual triggerSync targets an explicit repository path', async () => {
+    const { result } = renderSync()
+    await waitFor(() => {
+      expect(result.current.syncStatus).toBe('idle')
+    })
+
+    mockInvokeFn.mockClear()
+    mockInvokeFn.mockImplementation((cmd: string) => {
+      if (cmd === 'get_last_commit_info') return Promise.resolve(MOCK_COMMIT_INFO)
+      if (cmd === 'git_remote_status') return Promise.resolve({ branch: 'main', ahead: 0, behind: 0, hasRemote: true })
+      return Promise.resolve(updated(['work.md']))
+    })
+
+    await act(async () => {
+      result.current.triggerSync('/Users/luca/Work')
+    })
+
+    await waitFor(() => {
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Work' })
+      expect(onVaultUpdated).toHaveBeenCalledWith(['work.md'], '/Users/luca/Work')
     })
   })
 

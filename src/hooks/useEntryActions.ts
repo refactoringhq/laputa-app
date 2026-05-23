@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import type { VaultEntry } from '../types'
-import type { FrontmatterOpOptions } from './frontmatterOps'
+import { isMissingFrontmatterTargetError, type FrontmatterOpOptions } from './frontmatterOps'
 import { trackEvent } from '../lib/telemetry'
 
 interface EntryActionsConfig {
@@ -51,6 +51,14 @@ interface RenameTypeSectionArgs {
 
 function findTypeEntry(entries: VaultEntry[], typeName: string): VaultEntry | undefined {
   return entries.find((entry) => entry.isA === 'Type' && entry.title === typeName)
+}
+
+function logOptimisticRollback(label: string, error: unknown): void {
+  if (isMissingFrontmatterTargetError(error)) {
+    console.warn(label, error)
+    return
+  }
+  console.error(label, error)
 }
 
 async function findOrCreateType(
@@ -139,7 +147,7 @@ function useArchiveActions({
     } catch (err) {
       updateEntry(path, { archived: false })
       setToastMessage('Failed to archive note — rolled back')
-      console.error('Optimistic archive rollback:', err)
+      logOptimisticRollback('Optimistic archive rollback:', err)
     }
   }, [onBeforeAction, handleUpdateFrontmatter, updateEntry, setToastMessage, onFrontmatterPersisted])
 
@@ -153,7 +161,7 @@ function useArchiveActions({
     } catch (err) {
       updateEntry(path, { archived: true })
       setToastMessage('Failed to unarchive note — rolled back')
-      console.error('Optimistic unarchive rollback:', err)
+      logOptimisticRollback('Optimistic unarchive rollback:', err)
     }
   }, [handleDeleteProperty, updateEntry, setToastMessage, onFrontmatterPersisted])
 

@@ -57,6 +57,7 @@
   "command.git.commitPush": "提交併推送",
   "command.git.addRemote": "為當前倉庫新增遠端地址",
   "command.git.pull": "從遠端拉取",
+  "command.git.pullRepository": "從遠端提取：{repository}",
   "command.git.resolveConflicts": "解決衝突",
   "command.git.viewChanges": "檢視待處理更改",
   "git.repository.select": "儲存庫",

@@ -8,6 +8,8 @@ import type { McpStatus } from '../../hooks/useMcpStatus'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import type { GitRemoteStatus, LastCommitInfo, SyncStatus } from '../../types'
 import { openExternalUrl } from '../../utils/url'
+import { gitRepositoryLabel, type GitRepositoryOption } from '../../utils/gitRepositories'
+import { GitRepositorySelect } from '../GitRepositorySelect'
 import { useDismissibleLayer } from './useDismissibleLayer'
 import { ICON_STYLE, SEP_STYLE } from './styles'
 
@@ -41,6 +43,16 @@ function formatElapsedSync(locale: AppLocale, lastSyncTime: number | null): stri
 function formatSyncLabel(locale: AppLocale, status: SyncStatus, lastSyncTime: number | null): string {
   const labelKey = SYNC_LABEL_KEYS.get(status)
   return labelKey ? translate(locale, labelKey) : formatElapsedSync(locale, lastSyncTime)
+}
+
+function formatSyncBadgeLabel(
+  locale: AppLocale,
+  status: SyncStatus,
+  lastSyncTime: number | null,
+  repositoryLabel?: string | null,
+): string {
+  const label = formatSyncLabel(locale, status, lastSyncTime)
+  return repositoryLabel ? `${repositoryLabel} · ${label}` : label
 }
 
 function syncIconColor(status: SyncStatus): string {
@@ -415,29 +427,19 @@ function PullAction({
 
   return (
     <div style={{ display: 'flex', gap: 4, marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-      <button
+      <Button
+        type="button"
+        variant="outline"
+        size="xs"
         onClick={() => {
           onPull?.()
           onClose()
         }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: '3px 8px',
-          background: 'transparent',
-          border: '1px solid var(--border)',
-          borderRadius: 4,
-          fontSize: 11,
-          color: 'var(--foreground)',
-          cursor: 'pointer',
-        }}
-        onMouseEnter={(event) => { event.currentTarget.style.background = 'var(--hover)' }}
-        onMouseLeave={(event) => { event.currentTarget.style.background = 'transparent' }}
+        className="h-6 gap-1 rounded-sm border-border bg-transparent px-2 text-[11px] text-foreground hover:bg-[var(--hover)]"
         data-testid="git-status-pull-btn"
       >
         <ArrowDown size={11} />{translate(locale, 'status.sync.pull')}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -445,12 +447,18 @@ function PullAction({
 function GitStatusPopup({
   status,
   remoteStatus,
+  repositories = [],
+  selectedRepositoryPath,
+  onRepositoryChange,
   locale = 'en',
   onPull,
   onClose,
 }: {
   status: SyncStatus
   remoteStatus: GitRemoteStatus | null
+  repositories?: GitRepositoryOption[]
+  selectedRepositoryPath?: string
+  onRepositoryChange?: (path: string) => void
   locale?: AppLocale
   onPull?: () => void
   onClose: () => void
@@ -474,6 +482,17 @@ function GitStatusPopup({
         color: 'var(--foreground)',
       }}
     >
+      {repositories.length > 1 && selectedRepositoryPath && onRepositoryChange && (
+        <div style={{ marginBottom: 8 }}>
+          <GitRepositorySelect
+            label={translate(locale, 'git.repository.select')}
+            repositories={repositories}
+            selectedPath={selectedRepositoryPath}
+            onChange={onRepositoryChange}
+            testId="git-status-repository-select"
+          />
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
         <GitBranch size={13} style={{ color: 'var(--muted-foreground)' }} />
         <span style={{ fontWeight: 500 }}>{remoteStatus?.branch || '—'}</span>
@@ -638,6 +657,9 @@ export function SyncBadge({
   status,
   lastSyncTime,
   remoteStatus,
+  repositories,
+  selectedRepositoryPath,
+  onRepositoryChange,
   onTriggerSync,
   onPullAndPush,
   onOpenConflictResolver,
@@ -647,6 +669,9 @@ export function SyncBadge({
   status: SyncStatus
   lastSyncTime: number | null
   remoteStatus?: GitRemoteStatus | null
+  repositories?: GitRepositoryOption[]
+  selectedRepositoryPath?: string
+  onRepositoryChange?: (path: string) => void
   onTriggerSync?: () => void
   onPullAndPush?: () => void
   onOpenConflictResolver?: () => void
@@ -656,6 +681,9 @@ export function SyncBadge({
   const [showPopup, setShowPopup] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
   const isSyncing = status === 'syncing'
+  const selectedRepositoryLabel = selectedRepositoryPath && repositories
+    ? gitRepositoryLabel(selectedRepositoryPath, repositories)
+    : null
 
   useDismissibleLayer(showPopup, popupRef, () => setShowPopup(false))
 
@@ -678,13 +706,16 @@ export function SyncBadge({
       <StatusBarAction copy={syncBadgeTooltipCopy(locale, status)} onClick={handleClick} testId="status-sync" compact={compact}>
         <span style={ICON_STYLE}>
           <SyncStatusIcon status={status} color={syncIconColor(status)} spinning={isSyncing} />
-          {compact ? null : formatSyncLabel(locale, status, lastSyncTime)}
+          {compact ? null : formatSyncBadgeLabel(locale, status, lastSyncTime, selectedRepositoryLabel)}
         </span>
       </StatusBarAction>
       {showPopup && (
         <GitStatusPopup
           status={status}
           remoteStatus={remoteStatus ?? null}
+          repositories={repositories}
+          selectedRepositoryPath={selectedRepositoryPath}
+          onRepositoryChange={onRepositoryChange}
           locale={locale}
           onPull={onTriggerSync}
           onClose={() => setShowPopup(false)}

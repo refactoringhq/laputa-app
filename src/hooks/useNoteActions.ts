@@ -315,6 +315,28 @@ function buildTabManagementOptions(
   return options
 }
 
+function handleMissingFrontmatterTarget({
+  activeTabPathRef,
+  closeAllTabs,
+  entries,
+  path,
+  reloadVault,
+  setToastMessage,
+}: {
+  activeTabPathRef: MutableRefObject<string | null>
+  closeAllTabs: () => void
+  entries: VaultEntry[]
+  path: string
+  reloadVault?: () => Promise<unknown>
+  setToastMessage: NoteActionsConfig['setToastMessage']
+}) {
+  const entry = findByNotePath(entries, path)
+  const label = entry ? entryDisplayLabel(entry) : notePathFilename(path) || 'Note'
+  if (notePathsMatch(activeTabPathRef.current, path)) closeAllTabs()
+  setToastMessage(`"${label}" could not be opened because its file is missing or moved.`)
+  void reloadVault?.()
+}
+
 function useGitignoredVisibilityTabCleanup({
   activeTabPathRef,
   closeAllTabs,
@@ -430,13 +452,17 @@ function useFrontmatterActionHandlers({
 
 function useFrontmatterRunner({
   activeTabPathRef,
+  closeAllTabs,
   entries,
+  reloadVault,
   setToastMessage,
   updateEntry,
   updateTabContent,
 }: {
   activeTabPathRef: MutableRefObject<string | null>
+  closeAllTabs: () => void
   entries: VaultEntry[]
+  reloadVault?: () => Promise<unknown>
   setToastMessage: NoteActionsConfig['setToastMessage']
   updateEntry: NoteActionsConfig['updateEntry']
   updateTabContent: (path: string, newContent: string) => void
@@ -452,11 +478,19 @@ function useFrontmatterRunner({
         updateEntry,
         toast: setToastMessage,
         getEntry: (p) => findByNotePath(entries, p),
+        onMissingNotePath: (p) => handleMissingFrontmatterTarget({
+          activeTabPathRef,
+          closeAllTabs,
+          entries,
+          path: p,
+          reloadVault,
+          setToastMessage,
+        }),
         shouldApply: (p) => activePathGuardAllowsMutation(p, activeTabPathRef, options),
       },
       options,
     }),
-    [activeTabPathRef, entries, setToastMessage, updateEntry, updateTabContent],
+    [activeTabPathRef, closeAllTabs, entries, reloadVault, setToastMessage, updateEntry, updateTabContent],
   )
 }
 
@@ -502,7 +536,15 @@ export function useNoteActions(config: NoteActionsConfig) {
     [entries, handleSelectNote, tabMgmt.activeTabPath, tabMgmt.tabs],
   )
 
-  const runFrontmatterOp = useFrontmatterRunner({ activeTabPathRef, entries, setToastMessage, updateEntry, updateTabContent })
+  const runFrontmatterOp = useFrontmatterRunner({
+    activeTabPathRef,
+    closeAllTabs: tabMgmt.closeAllTabs,
+    entries,
+    reloadVault: config.reloadVault,
+    setToastMessage,
+    updateEntry,
+    updateTabContent,
+  })
   const frontmatterActions = useFrontmatterActionHandlers({
     config,
     onPathRenamed: handlePathRenamed,

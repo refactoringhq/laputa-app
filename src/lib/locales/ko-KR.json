@@ -57,6 +57,7 @@
   "command.git.commitPush": "커밋 및 푸시",
   "command.git.addRemote": "현재 Vault에 원격 저장소 추가",
   "command.git.pull": "원격에서 가져오기",
+  "command.git.pullRepository": "원격에서 가져오기: {repository}",
   "command.git.resolveConflicts": "충돌 해결",
   "command.git.viewChanges": "보류 중인 변경 사항 보기",
   "git.repository.select": "저장소",

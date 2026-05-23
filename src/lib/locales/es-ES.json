@@ -57,6 +57,7 @@
   "command.git.commitPush": "Confirmar y enviar",
   "command.git.addRemote": "Añadir repositorio remoto al almacén actual",
   "command.git.pull": "Extraer del repositorio remoto",
+  "command.git.pullRepository": "Extraer del repositorio remoto: {repository}",
   "command.git.resolveConflicts": "Resolver conflictos",
   "command.git.viewChanges": "Ver cambios pendientes",
   "git.repository.select": "Repositorio",

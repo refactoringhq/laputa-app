@@ -57,6 +57,7 @@
   "command.git.commitPush": "Valider et pousser",
   "command.git.addRemote": "Ajouter le dépôt distant au coffre-fort actuel",
   "command.git.pull": "Extraire depuis le dépôt distant",
+  "command.git.pullRepository": "Extraire du dépôt distant : {repository}",
   "command.git.resolveConflicts": "Résoudre les conflits",
   "command.git.viewChanges": "Afficher les modifications en attente",
   "git.repository.select": "Dépôt",

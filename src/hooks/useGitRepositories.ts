@@ -181,6 +181,7 @@ export function useGitRepositories({
   const [changesRepositoryPath, setChangesRepositoryPath] = useValidatedRepositoryPath(selectionConfig)
   const [historyRepositoryPath, setHistoryRepositoryPath] = useValidatedRepositoryPath(selectionConfig)
   const [commitRepositoryPath, setCommitRepositoryPath] = useValidatedRepositoryPath(selectionConfig)
+  const [syncRepositoryPath, setSyncRepositoryPath] = useValidatedRepositoryPath(selectionConfig)
   const { byRepository, loadAllModifiedFiles, loadModifiedFilesForRepository } = useRepositoryModifiedFiles(repositories)
   const {
     byRepository: remoteStatusByRepository,
@@ -234,6 +235,8 @@ export function useGitRepositories({
     setChangesRepositoryPath,
     setCommitRepositoryPath,
     setHistoryRepositoryPath,
+    setSyncRepositoryPath,
+    syncRepositoryPath,
     totalModifiedCount: allModifiedFiles.length,
   }
 }

@@ -118,4 +118,27 @@ describe('useGitRepositories', () => {
 
     expect(mockInvoke).toHaveBeenCalledWith('get_modified_files', { vaultPath: '/default', includeStats: true })
   })
+
+  it('keeps an explicit sync repository selection separate from other Git surfaces', async () => {
+    const repositories = [
+      { path: '/default', label: 'Default', defaultForNewNotes: true },
+      { path: '/work', label: 'Work', defaultForNewNotes: false },
+    ]
+    vi.mocked(mockInvoke).mockResolvedValue([])
+
+    const { result } = renderHook(() => useGitRepositories({
+      defaultVaultPath: '/default',
+      repositories,
+    }))
+
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('get_modified_files', { vaultPath: '/default', includeStats: false }))
+
+    act(() => {
+      result.current.setSyncRepositoryPath('/work')
+    })
+
+    expect(result.current.syncRepositoryPath).toBe('/work')
+    expect(result.current.commitRepositoryPath).toBe('/default')
+    expect(result.current.changesRepositoryPath).toBe('/default')
+  })
 })

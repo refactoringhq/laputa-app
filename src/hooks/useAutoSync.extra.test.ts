@@ -120,7 +120,7 @@ describe('useAutoSync extra', () => {
     })
 
     await waitFor(() => {
-      expect(hook.onVaultUpdated).toHaveBeenCalledWith(['notes/today.md'])
+      expect(hook.onVaultUpdated).toHaveBeenCalledWith(['notes/today.md'], '/Users/luca/Laputa')
       expect(hook.onSyncUpdated).toHaveBeenCalledOnce()
       expect(hook.onToast).toHaveBeenCalledWith('Pulled and pushed successfully')
       expect(hook.result.current.syncStatus).toBe('idle')

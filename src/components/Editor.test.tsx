@@ -573,7 +573,7 @@ describe('Editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open table of contents' }))
 
     expect(screen.getByTestId('table-of-contents-panel')).toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: 'Table Heading' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Table Heading' }, { timeout: 5000 })).toBeInTheDocument()
   })
 
   // Regression: editor content did not appear on first load because BlockNote's

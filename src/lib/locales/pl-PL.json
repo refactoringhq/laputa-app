@@ -57,6 +57,7 @@
   "command.git.commitPush": "Zatwierdź i wypchnij",
   "command.git.addRemote": "Dodaj zdalne repozytorium do bieżącego sejfu",
   "command.git.pull": "Pobierz ze zdalnego repozytorium",
+  "command.git.pullRepository": "Pobierz z repozytorium zdalnego: {repository}",
   "command.git.resolveConflicts": "Rozwiąż konflikty",
   "command.git.viewChanges": "Pokaż oczekujące zmiany",
   "git.repository.select": "Repozytorium",

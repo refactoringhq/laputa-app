@@ -8,6 +8,7 @@ import type { ThemeMode } from '../lib/themeMode'
 import type { AppLocale } from '../lib/i18n'
 import type { GitRemoteStatus, SyncStatus } from '../types'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import type { GitRepositoryOption } from '../utils/gitRepositories'
 import {
   StatusBarPrimarySection,
   StatusBarSecondarySection,
@@ -84,6 +85,9 @@ interface StatusBarProps {
   lastSyncTime?: number | null
   conflictCount?: number
   remoteStatus?: GitRemoteStatus | null
+  repositories?: GitRepositoryOption[]
+  selectedRepositoryPath?: string
+  onRepositoryChange?: (path: string) => void
   onTriggerSync?: () => void
   onPullAndPush?: () => void
   onOpenConflictResolver?: () => void
@@ -145,6 +149,9 @@ function StatusBarPrimaryFromFooter({
   lastSyncTime = null,
   conflictCount = 0,
   remoteStatus,
+  repositories,
+  selectedRepositoryPath,
+  onRepositoryChange,
   onTriggerSync,
   onPullAndPush,
   onOpenConflictResolver,
@@ -197,6 +204,9 @@ function StatusBarPrimaryFromFooter({
       lastSyncTime={lastSyncTime}
       conflictCount={conflictCount}
       remoteStatus={remoteStatus}
+      repositories={repositories}
+      selectedRepositoryPath={selectedRepositoryPath}
+      onRepositoryChange={onRepositoryChange}
       onTriggerSync={onTriggerSync}
       onPullAndPush={onPullAndPush}
       onOpenConflictResolver={onOpenConflictResolver}

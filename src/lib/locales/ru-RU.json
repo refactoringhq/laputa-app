@@ -57,6 +57,7 @@
   "command.git.commitPush": "Commit и Push",
   "command.git.addRemote": "Добавить удаленный репозиторий в текущий хранилище",
   "command.git.pull": "Pull from Remote",
+  "command.git.pullRepository": "Получить из удаленного репозитория: {repository}",
   "command.git.resolveConflicts": "Разрешить конфликты",
   "command.git.viewChanges": "Просмотреть ожидающие изменения",
   "git.repository.select": "Репозиторий",

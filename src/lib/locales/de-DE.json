@@ -57,6 +57,7 @@
   "command.git.commitPush": "Commit & Push",
   "command.git.addRemote": "Remote zum aktuellen Vault hinzufügen",
   "command.git.pull": "Von Remote abrufen",
+  "command.git.pullRepository": "Aus Remote abrufen: {repository}",
   "command.git.resolveConflicts": "Konflikte auflösen",
   "command.git.viewChanges": "Ausstehende Änderungen anzeigen",
   "git.repository.select": "Repository",

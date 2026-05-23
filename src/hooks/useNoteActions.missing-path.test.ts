@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import type { VaultEntry } from '../types'
 import { useNoteActions, type NoteActionsConfig } from './useNoteActions'
 
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('../mock-tauri', () => ({
   isTauri: vi.fn(() => false),
   addMockEntry: vi.fn(),
@@ -59,9 +61,34 @@ function makeConfig(overrides: Partial<NoteActionsConfig> = {}): NoteActionsConf
   }
 }
 
+async function openNoteForFrontmatterRecovery(
+  result: { current: ReturnType<typeof useNoteActions> },
+  entry: VaultEntry,
+) {
+  vi.mocked(mockInvoke).mockResolvedValue('# Missing Note\n')
+  await act(async () => {
+    await result.current.handleSelectNote(entry)
+  })
+  vi.mocked(isTauri).mockReturnValue(true)
+  vi.mocked(invoke).mockRejectedValueOnce(new Error('File does not exist: /test/vault/missing.md'))
+}
+
+function expectMissingFrontmatterRecovery(
+  result: { current: ReturnType<typeof useNoteActions> },
+  config: NoteActionsConfig,
+) {
+  expect(result.current.tabs).toEqual([])
+  expect(result.current.activeTabPath).toBeNull()
+  expect(config.reloadVault).toHaveBeenCalledTimes(1)
+  expect(config.setToastMessage).toHaveBeenCalledWith(
+    '"Missing Note" could not be opened because its file is missing or moved.',
+  )
+}
+
 describe('useNoteActions missing-path recovery', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(invoke).mockReset()
     vi.mocked(isTauri).mockReturnValue(false)
   })
 
@@ -127,6 +154,46 @@ describe('useNoteActions missing-path recovery', () => {
     expect(config.setToastMessage).toHaveBeenCalledWith(
       '"bad.csv" could not be opened because it is not valid UTF-8 text.',
     )
+    warnSpy.mockRestore()
+  })
+
+  it('reloads and clears the active tab when a frontmatter write targets a deleted note file', async () => {
+    const entry = makeEntry()
+    const config = makeConfig({ entries: [entry] })
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const { result } = renderHook(() => useNoteActions(config))
+
+    await openNoteForFrontmatterRecovery(result, entry)
+    await act(async () => {
+      await result.current.handleUpdateFrontmatter(entry.path, 'status', 'Done')
+    })
+
+    expectMissingFrontmatterRecovery(result, config)
+    expect(config.updateEntry).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('still rejects silent frontmatter writes after running missing-note recovery', async () => {
+    const entry = makeEntry()
+    const config = makeConfig({ entries: [entry] })
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const { result } = renderHook(() => useNoteActions(config))
+
+    await openNoteForFrontmatterRecovery(result, entry)
+    let thrown: unknown
+
+    await act(async () => {
+      try {
+        await result.current.handleUpdateFrontmatter(entry.path, '_archived', true, { silent: true })
+      } catch (err) {
+        thrown = err
+      }
+    })
+
+    expect(thrown).toBeInstanceOf(Error)
+    expectMissingFrontmatterRecovery(result, config)
     warnSpy.mockRestore()
   })
 })
