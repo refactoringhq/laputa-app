@@ -154,12 +154,14 @@ test('mixed rich-text blocks with Korean list content stay editable after action
   await expect(bulletBlock).toBeVisible({ timeout: 5_000 })
 
   await page.locator('.bn-block-content', { hasText: '인용문' }).first().click()
+  await page.keyboard.press('End')
   await page.keyboard.insertText(' 추가')
   await bulletBlock.hover()
   await expect(page.locator('.bn-side-menu').first()).toBeVisible({ timeout: 5_000 })
   await page.locator('.bn-side-menu').first().click({ force: true })
   await page.keyboard.press('Escape')
   await bulletBlock.click()
+  await page.keyboard.press('End')
   await page.keyboard.insertText(' 계속')
   await page.waitForTimeout(700)
 

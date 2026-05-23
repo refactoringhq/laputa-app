@@ -36,6 +36,7 @@ interface RepairableBlockNoteEditor {
 }
 
 type RecoveryReason =
+  | 'invalid_insertion_depth'
   | 'mismatched_transaction'
   | 'stale_transaction'
   | 'table_position_out_of_range'
@@ -71,6 +72,10 @@ function isInvalidContentTransactionError(error: unknown): boolean {
   return error instanceof RangeError && error.message.startsWith('Invalid content for node ')
 }
 
+function isInvalidInsertionDepthError(error: unknown): boolean {
+  return error instanceof RangeError && error.message.includes('Inserted content deeper than insertion position')
+}
+
 function isTablePositionOutOfRangeError(error: unknown): boolean {
   return error instanceof RangeError && /^Index \d+ out of range for <tableRow\(/.test(error.message)
 }
@@ -80,7 +85,9 @@ function isTransformError(error: unknown): boolean {
 }
 
 function isRecoverableRangeError(error: unknown): boolean {
-  return isInvalidContentTransactionError(error) || isTablePositionOutOfRangeError(error)
+  return isInvalidContentTransactionError(error)
+    || isInvalidInsertionDepthError(error)
+    || isTablePositionOutOfRangeError(error)
 }
 
 export function isRecoverableEditorTransformError(error: unknown): boolean {
@@ -94,6 +101,7 @@ function recoveryReason(
 ): RecoveryReason {
   if (transactionDocIsStale(transaction, view)) return 'stale_transaction'
   if (isMismatchedTransactionError(error)) return 'mismatched_transaction'
+  if (isInvalidInsertionDepthError(error)) return 'invalid_insertion_depth'
   if (isTablePositionOutOfRangeError(error)) return 'table_position_out_of_range'
   return 'transform_error'
 }
