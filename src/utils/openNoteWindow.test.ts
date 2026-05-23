@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildNoteWindowUrl, buildRuntimeNoteWindowUrl, openNoteInNewWindow } from './openNoteWindow'
 import { isTauri } from '../mock-tauri'
-import { shouldUseLinuxWindowChrome } from './platform'
+import { shouldUseCustomWindowChrome } from './platform'
 
 const webviewWindowCalls = vi.fn()
 const localStorageMock = (() => {
@@ -21,7 +21,7 @@ vi.mock('../mock-tauri', () => ({
 }))
 
 vi.mock('./platform', () => ({
-  shouldUseLinuxWindowChrome: vi.fn(),
+  shouldUseCustomWindowChrome: vi.fn(),
 }))
 
 vi.mock('@tauri-apps/api/webviewWindow', () => ({
@@ -52,7 +52,7 @@ describe('openNoteWindow', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-14T16:00:00Z'))
     vi.mocked(isTauri).mockReturnValue(false)
-    vi.mocked(shouldUseLinuxWindowChrome).mockReturnValue(false)
+    vi.mocked(shouldUseCustomWindowChrome).mockReturnValue(false)
     localStorage.clear()
   })
 
@@ -104,9 +104,9 @@ describe('openNoteWindow', () => {
     })
   })
 
-  it('drops native decorations when Linux window chrome is active', async () => {
+  it('drops native decorations when custom desktop chrome is active', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
-    vi.mocked(shouldUseLinuxWindowChrome).mockReturnValue(true)
+    vi.mocked(shouldUseCustomWindowChrome).mockReturnValue(true)
 
     await openNoteInNewWindow('/vault/linux.md', '/vault', 'Linux Note')
 

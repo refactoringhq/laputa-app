@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isTauri } from '../mock-tauri'
-import { isLinux, isMac, isWindows, shouldUseLinuxWindowChrome } from './platform'
+import { isLinux, isMac, isWindows, shouldUseCustomWindowChrome } from './platform'
 
 vi.mock('../mock-tauri', () => ({
   isTauri: vi.fn(),
@@ -42,12 +42,18 @@ describe('platform helpers', () => {
     expect(isWindows()).toBe(false)
   })
 
-  it('only enables Linux window chrome inside Tauri', () => {
+  it('enables custom desktop chrome on Linux and Windows inside Tauri', () => {
     setUserAgent('Mozilla/5.0 (X11; Linux x86_64)')
     vi.mocked(isTauri).mockReturnValue(false)
-    expect(shouldUseLinuxWindowChrome()).toBe(false)
+    expect(shouldUseCustomWindowChrome()).toBe(false)
 
     vi.mocked(isTauri).mockReturnValue(true)
-    expect(shouldUseLinuxWindowChrome()).toBe(true)
+    expect(shouldUseCustomWindowChrome()).toBe(true)
+
+    setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+    expect(shouldUseCustomWindowChrome()).toBe(true)
+
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')
+    expect(shouldUseCustomWindowChrome()).toBe(false)
   })
 })

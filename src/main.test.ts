@@ -59,6 +59,16 @@ async function importEntrypoint() {
   await import('./main')
 }
 
+async function withUserAgent<T>(userAgent: string, callback: () => Promise<T>): Promise<T> {
+  const originalUserAgent = navigator.userAgent
+  Object.defineProperty(window.navigator, 'userAgent', { value: userAgent, configurable: true })
+  try {
+    return await callback()
+  } finally {
+    Object.defineProperty(window.navigator, 'userAgent', { value: originalUserAgent, configurable: true })
+  }
+}
+
 function createDragEventWithDataTransfer(
   type: 'dragover' | 'drop',
   dataTransfer: Partial<DataTransfer>,
@@ -112,6 +122,7 @@ describe('main entrypoint', () => {
     vi.resetModules()
     vi.clearAllMocks()
     document.body.innerHTML = '<div id="root"></div>'
+    document.body.className = ''
     window.__tolariaFrontendReady = false
     sessionStorage.clear()
   })
@@ -145,6 +156,14 @@ describe('main entrypoint', () => {
 
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '' })
   })
+
+  it('marks macOS chrome for traffic-light layout offsets', async () => {
+    await withUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15', async () => {
+      await importEntrypoint()
+    })
+
+    expect(document.body).toHaveClass('mac-chrome')
+  }, 60_000)
 
   it('ignores ResizeObserver loop notifications instead of showing the fatal overlay', async () => {
     await importEntrypoint()

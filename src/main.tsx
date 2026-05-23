@@ -17,7 +17,7 @@ import {
   type AppCommandShortcutEventOptions,
 } from './hooks/appCommandCatalog'
 import { isRecoveredBlockNoteRenderError } from './components/blockNoteRenderRecovery'
-import { shouldUseLinuxWindowChrome } from './utils/platform'
+import { isMac, shouldUseCustomWindowChrome } from './utils/platform'
 import { reloadFrontendOnceIfStartupFailed } from './utils/frontendReady'
 import { isNoteWindow } from './utils/windowMode'
 
@@ -60,8 +60,12 @@ if ('__TAURI__' in window || '__TAURI_INTERNALS__' in window) {
   document.addEventListener('contextmenu', preventNativeContextMenu, true)
 }
 
-if (shouldUseLinuxWindowChrome()) {
-  document.body.classList.add('linux-chrome')
+if (shouldUseCustomWindowChrome()) {
+  document.body.classList.add('custom-window-chrome')
+}
+
+if (isMac()) {
+  document.body.classList.add('mac-chrome')
 }
 
 applyStoredThemeMode(document, window.localStorage)

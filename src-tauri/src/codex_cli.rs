@@ -4,20 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 pub fn check_cli() -> AiAgentAvailability {
-    let binary = match find_codex_binary() {
-        Ok(binary) => binary,
-        Err(_) => {
-            return AiAgentAvailability {
-                installed: false,
-                version: None,
-            }
-        }
-    };
-
-    AiAgentAvailability {
-        installed: true,
-        version: crate::cli_agent_runtime::version_for_binary(&binary),
-    }
+    codex_availability_from_binary_result(find_codex_binary())
 }
 
 pub fn run_agent_stream<F>(request: AgentStreamRequest, emit: F) -> Result<String, String>
@@ -29,15 +16,37 @@ where
 }
 
 fn find_codex_binary() -> Result<PathBuf, String> {
-    find_codex_binary_on_path()
-        .filter(|binary| is_usable_codex_binary(binary))
-        .or_else(|| {
-            find_codex_binary_in_user_shell().filter(|binary| is_usable_codex_binary(binary))
-        })
-        .or_else(|| find_usable_codex_binary(codex_binary_candidates()))
-        .ok_or_else(|| {
-            "Codex CLI not found. Install it: https://developers.openai.com/codex/cli".into()
-        })
+    if let Some(binary) = find_codex_binary_on_path() {
+        return Ok(binary);
+    }
+
+    if let Some(binary) = find_codex_binary_in_user_shell() {
+        return Ok(binary);
+    }
+
+    if let Some(binary) = crate::cli_agent_runtime::find_executable_binary_candidate(
+        codex_binary_candidates(),
+        "Codex CLI",
+    )? {
+        return Ok(binary);
+    }
+
+    Err("Codex CLI not found. Install it: https://developers.openai.com/codex/cli".into())
+}
+
+fn codex_availability_from_binary_result(
+    binary_result: Result<PathBuf, String>,
+) -> AiAgentAvailability {
+    match binary_result {
+        Ok(binary) => AiAgentAvailability {
+            installed: true,
+            version: crate::cli_agent_runtime::version_for_binary(&binary),
+        },
+        Err(_) => AiAgentAvailability {
+            installed: false,
+            version: None,
+        },
+    }
 }
 
 fn find_codex_binary_on_path() -> Option<PathBuf> {
@@ -60,7 +69,7 @@ fn find_codex_binary_in_user_shell() -> Option<PathBuf> {
     user_shell_candidates()
         .into_iter()
         .filter(|shell| shell.exists())
-        .find_map(|shell| command_path_from_shell(&shell, "codex"))
+        .find_map(|shell| codex_path_from_shell(&shell))
 }
 
 fn user_shell_candidates() -> Vec<PathBuf> {
@@ -75,10 +84,10 @@ fn user_shell_candidates() -> Vec<PathBuf> {
     shells
 }
 
-fn command_path_from_shell(shell: &Path, command: &str) -> Option<PathBuf> {
+fn codex_path_from_shell(shell: &Path) -> Option<PathBuf> {
     crate::hidden_command(shell)
         .arg("-lc")
-        .arg(format!("command -v {command}"))
+        .arg("command -v codex")
         .output()
         .ok()
         .and_then(|output| path_from_successful_output(&output))
@@ -124,12 +133,16 @@ fn codex_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
     let mut candidates = vec![
         home.join(".local/bin/codex"),
         home.join(".local/bin/codex.exe"),
+        home.join(".local/bin/codex.cmd"),
         home.join(".codex/bin/codex"),
         home.join(".codex/bin/codex.exe"),
+        home.join(".codex/bin/codex.cmd"),
         home.join(".local/share/mise/shims/codex"),
         home.join(".local/share/mise/shims/codex.exe"),
+        home.join(".local/share/mise/shims/codex.cmd"),
         home.join(".asdf/shims/codex"),
         home.join(".asdf/shims/codex.exe"),
+        home.join(".asdf/shims/codex.cmd"),
         home.join(".npm-global/bin/codex"),
         home.join(".npm-global/bin/codex.cmd"),
         home.join(".npm-global/bin/codex.exe"),
@@ -138,22 +151,24 @@ fn codex_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".npm/bin/codex.exe"),
         home.join(".bun/bin/codex"),
         home.join(".bun/bin/codex.exe"),
+        home.join(".bun/bin/codex.cmd"),
         home.join(".linuxbrew/bin/codex"),
         home.join("AppData/Roaming/npm/codex.cmd"),
         home.join("AppData/Roaming/npm/codex.exe"),
         home.join("AppData/Local/pnpm/codex.cmd"),
         home.join("AppData/Local/pnpm/codex.exe"),
+        home.join("scoop/shims/codex.cmd"),
         home.join("scoop/shims/codex.exe"),
         PathBuf::from("/home/linuxbrew/.linuxbrew/bin/codex"),
         PathBuf::from("/usr/local/bin/codex"),
         PathBuf::from("/opt/homebrew/bin/codex"),
         PathBuf::from("/Applications/Codex.app/Contents/Resources/codex"),
     ];
-    candidates.extend(nvm_node_binary_candidates_for_home(home, "codex"));
+    candidates.extend(nvm_codex_binary_candidates_for_home(home));
     candidates
 }
 
-fn nvm_node_binary_candidates_for_home(home: &Path, binary_name: &str) -> Vec<PathBuf> {
+fn nvm_codex_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) else {
         return Vec::new();
     };
@@ -162,20 +177,10 @@ fn nvm_node_binary_candidates_for_home(home: &Path, binary_name: &str) -> Vec<Pa
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .filter(|path| path.is_dir())
-        .map(|path| path.join("bin").join(binary_name))
+        .map(|path| path.join("bin").join("codex"))
         .collect::<Vec<_>>();
     candidates.sort();
     candidates
-}
-
-fn find_usable_codex_binary(candidates: Vec<PathBuf>) -> Option<PathBuf> {
-    candidates
-        .into_iter()
-        .find(|binary| is_usable_codex_binary(binary))
-}
-
-fn is_usable_codex_binary(binary: &Path) -> bool {
-    crate::cli_agent_runtime::version_for_binary(binary).is_some()
 }
 
 fn run_agent_stream_with_binary<F>(
@@ -202,7 +207,12 @@ where
         emit,
         codex_session_id,
         dispatch_codex_event,
-        format_codex_error,
+        |stderr_output, status| {
+            format_codex_error(CodexProcessError {
+                stderr_output,
+                status,
+            })
+        },
     )
 }
 
@@ -276,7 +286,7 @@ fn build_codex_args(
         "-c".into(),
         codex_config_string_list("mcp_servers.tolaria.args", &[mcp_server_path.as_str()]),
         "-c".into(),
-        codex_mcp_env_config(&request.vault_path, &request.vault_paths),
+        codex_mcp_env_config(request),
     ];
 
     if let Some(path) = last_message_path {
@@ -300,11 +310,14 @@ fn codex_config_string_list(key: &str, values: &[&str]) -> String {
     format!("{key}=[{values}]")
 }
 
-fn codex_mcp_env_config(vault_path: &str, vault_paths: &[String]) -> String {
-    let vault_paths = crate::cli_agent_runtime::active_vault_paths_json(vault_path, vault_paths);
+fn codex_mcp_env_config(request: &AgentStreamRequest) -> String {
+    let vault_paths = crate::cli_agent_runtime::active_vault_paths_json(
+        &request.vault_path,
+        &request.vault_paths,
+    );
     format!(
         r#"mcp_servers.tolaria.env={{VAULT_PATH="{}",VAULT_PATHS="{}",WS_UI_PORT="9711"}}"#,
-        toml_escape(vault_path),
+        toml_escape(&request.vault_path),
         toml_escape(&vault_paths)
     )
 }
@@ -442,8 +455,13 @@ fn read_codex_last_message(path: &Path) -> Option<String> {
         .filter(|text| !text.is_empty())
 }
 
-fn format_codex_error(stderr_output: String, status: String) -> String {
-    let lower = stderr_output.to_ascii_lowercase();
+struct CodexProcessError {
+    stderr_output: String,
+    status: String,
+}
+
+fn format_codex_error(error: CodexProcessError) -> String {
+    let lower = error.stderr_output.to_ascii_lowercase();
     if is_codex_auth_error(&lower) {
         return "Codex CLI is not authenticated. Run `codex login` or launch `codex` in your terminal.".into();
     }
@@ -452,10 +470,15 @@ fn format_codex_error(stderr_output: String, status: String) -> String {
         return "Codex could not write to the active vault. Vault Safe uses a read-only Codex sandbox; switch to Power User for shell-backed local writes, or verify the selected vault folder is writable and retry. Writes outside the active vault remain blocked.".into();
     }
 
-    if stderr_output.trim().is_empty() {
-        format!("codex exited with status {status}")
+    if error.stderr_output.trim().is_empty() {
+        format!("codex exited with status {}", error.status)
     } else {
-        stderr_output.lines().take(3).collect::<Vec<_>>().join("\n")
+        error
+            .stderr_output
+            .lines()
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 
@@ -956,16 +979,22 @@ printf '%s\n' '{"type":"item.completed","item":{"id":"msg_1","type":"agent_messa
         let candidates = codex_binary_candidates_for_home(&home);
         let expected = [
             home.join(".local/bin/codex.exe"),
+            home.join(".local/bin/codex.cmd"),
             home.join(".local/share/mise/shims/codex.exe"),
+            home.join(".local/share/mise/shims/codex.cmd"),
             home.join(".asdf/shims/codex.exe"),
+            home.join(".asdf/shims/codex.cmd"),
+            home.join(".codex/bin/codex.cmd"),
             home.join(".npm-global/bin/codex.cmd"),
             home.join(".npm-global/bin/codex.exe"),
             home.join(".npm/bin/codex.cmd"),
             home.join(".npm/bin/codex.exe"),
+            home.join(".bun/bin/codex.cmd"),
             home.join("AppData/Roaming/npm/codex.cmd"),
             home.join("AppData/Roaming/npm/codex.exe"),
             home.join("AppData/Local/pnpm/codex.cmd"),
             home.join("AppData/Local/pnpm/codex.exe"),
+            home.join("scoop/shims/codex.cmd"),
             home.join("scoop/shims/codex.exe"),
         ];
 
@@ -979,6 +1008,16 @@ printf '%s\n' '{"type":"item.completed","item":{"id":"msg_1","type":"agent_messa
     }
 
     #[test]
+    fn codex_availability_reports_installed_even_when_version_probe_fails() {
+        let binary = PathBuf::from("C:/Users/alex/AppData/Roaming/npm/codex.cmd");
+
+        let availability = codex_availability_from_binary_result(Ok(binary));
+
+        assert!(availability.installed);
+        assert_eq!(availability.version, None);
+    }
+
+    #[test]
     fn codex_binary_candidates_include_nvm_managed_node_installs() {
         let home = tempfile::tempdir().unwrap();
         let codex = home.path().join(".nvm/versions/node/v22.12.0/bin/codex");
@@ -988,18 +1027,6 @@ printf '%s\n' '{"type":"item.completed","item":{"id":"msg_1","type":"agent_messa
         let candidates = codex_binary_candidates_for_home(home.path());
 
         assert!(candidates.contains(&codex), "missing {}", codex.display());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn usable_codex_binary_skips_broken_shims() {
-        let dir = tempfile::tempdir().unwrap();
-        let broken = executable_script(dir.path(), "broken-codex", "exit 1\n");
-        let working = executable_script(dir.path(), "codex", "echo codex-cli 0.124.0-alpha.2\n");
-
-        let found = find_usable_codex_binary(vec![broken, working.clone()]);
-
-        assert_eq!(found, Some(working));
     }
 
     #[test]
@@ -1051,7 +1078,7 @@ printf '%s\n' '{"type":"item.completed","item":{"id":"msg_1","type":"agent_messa
         .unwrap();
         std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        assert_eq!(command_path_from_shell(&shell, "codex"), Some(codex));
+        assert_eq!(codex_path_from_shell(&shell), Some(codex));
     }
 
     #[test]
@@ -1156,10 +1183,10 @@ printf '%s\n' '{"type":"item.completed","item":{"id":"msg_1","type":"agent_messa
 
     #[test]
     fn format_codex_error_explains_vault_write_permission_failures() {
-        let message = format_codex_error(
-            "The patch was rejected by the environment: writing is blocked by read-only sandbox; rejected by user approval settings".into(),
-            "exit status: 1".into(),
-        );
+        let message = format_codex_error(CodexProcessError {
+            stderr_output: "The patch was rejected by the environment: writing is blocked by read-only sandbox; rejected by user approval settings".into(),
+            status: "exit status: 1".into(),
+        });
 
         assert!(message.contains("active vault"));
         assert!(message.contains("writable"));

@@ -1,5 +1,5 @@
 import { isTauri } from '../mock-tauri'
-import { shouldUseLinuxWindowChrome } from './platform'
+import { shouldUseCustomWindowChrome } from './platform'
 import { rememberNoteWindowParams } from './windowMode'
 
 const MACOS_TRAFFIC_LIGHT_POSITION = { x: 18, y: 24 } as const
@@ -56,6 +56,6 @@ export async function openNoteInNewWindow(notePath: string, vaultPath: string, n
     titleBarStyle: 'overlay',
     trafficLightPosition: new LogicalPosition(MACOS_TRAFFIC_LIGHT_POSITION.x, MACOS_TRAFFIC_LIGHT_POSITION.y),
     hiddenTitle: true,
-    decorations: !shouldUseLinuxWindowChrome(),
+    decorations: !shouldUseCustomWindowChrome(),
   })
 }

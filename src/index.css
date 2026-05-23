@@ -381,7 +381,7 @@
     padding: 0;
     overflow: hidden;
   }
-  body.linux-chrome {
+  body.custom-window-chrome {
     padding-top: 32px;
   }
   html, body {

@@ -32,6 +32,18 @@ function makeBookTypeEntries(
 }
 
 const noop = () => undefined
+const MAC_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15'
+const WINDOWS_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36'
+
+function withUserAgent<T>(userAgent: string, callback: () => T): T {
+  const originalUserAgent = navigator.userAgent
+  Object.defineProperty(window.navigator, 'userAgent', { value: userAgent, configurable: true })
+  try {
+    return callback()
+  } finally {
+    Object.defineProperty(window.navigator, 'userAgent', { value: originalUserAgent, configurable: true })
+  }
+}
 
 function makeViewDefinition(overrides: Partial<ViewFile> = {}): ViewFile {
   return {
@@ -831,16 +843,28 @@ describe('NoteList type sections', () => {
 })
 
 describe('NoteList traffic-light padding', () => {
-  it('adds left padding when the sidebar is collapsed', () => {
-    const { container } = renderNoteList({ sidebarCollapsed: true })
-    const header = container.querySelector('.h-\\[52px\\]') as HTMLElement
-    expect(header.style.paddingLeft).toBe('80px')
+  it('adds left padding for macOS traffic lights when the sidebar is collapsed', () => {
+    withUserAgent(MAC_USER_AGENT, () => {
+      const { container } = renderNoteList({ sidebarCollapsed: true })
+      const header = container.querySelector('.h-\\[52px\\]') as HTMLElement
+      expect(header.style.paddingLeft).toBe('80px')
+    })
+  })
+
+  it('does not add macOS traffic-light padding on Windows when the sidebar is collapsed', () => {
+    withUserAgent(WINDOWS_USER_AGENT, () => {
+      const { container } = renderNoteList({ sidebarCollapsed: true })
+      const header = container.querySelector('.h-\\[52px\\]') as HTMLElement
+      expect(header.style.paddingLeft).toBe('')
+    })
   })
 
   it('does not add extra left padding when the sidebar is expanded', () => {
-    const { container } = renderNoteList({ sidebarCollapsed: false })
-    const header = container.querySelector('.h-\\[52px\\]') as HTMLElement
-    expect(header.style.paddingLeft).toBe('')
+    withUserAgent(MAC_USER_AGENT, () => {
+      const { container } = renderNoteList({ sidebarCollapsed: false })
+      const header = container.querySelector('.h-\\[52px\\]') as HTMLElement
+      expect(header.style.paddingLeft).toBe('')
+    })
   })
 
   it('defaults to no extra padding when sidebarCollapsed is omitted', () => {

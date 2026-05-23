@@ -2,7 +2,7 @@ import type { CSSProperties, MouseEvent, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useDragRegion } from '../hooks/useDragRegion'
-import { shouldUseLinuxWindowChrome } from '../utils/platform'
+import { shouldUseCustomWindowChrome } from '../utils/platform'
 import { LinuxMenuButton } from './LinuxMenuButton'
 import { Button } from './ui/button'
 
@@ -36,11 +36,11 @@ const RESIZE_HANDLES: ReadonlyArray<{
 ]
 
 export function LinuxTitlebar() {
-  const linuxChromeEnabled = shouldUseLinuxWindowChrome()
+  const customChromeEnabled = shouldUseCustomWindowChrome()
   const { onMouseDown } = useDragRegion()
-  const maximized = useLinuxMaximizedState(linuxChromeEnabled)
+  const maximized = useLinuxMaximizedState(customChromeEnabled)
 
-  if (!linuxChromeEnabled) return null
+  if (!customChromeEnabled) return null
 
   const appWindow = getCurrentWindow()
 
@@ -90,7 +90,7 @@ function useLinuxMaximizedState(enabled: boolean): boolean {
 }
 
 function ResizeHandles() {
-  if (!shouldUseLinuxWindowChrome()) return null
+  if (!shouldUseCustomWindowChrome()) return null
 
   const startResize = (direction: ResizeDirection) => (event: MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0) return

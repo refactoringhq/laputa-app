@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LinuxTitlebar } from './LinuxTitlebar'
-import { shouldUseLinuxWindowChrome } from '../utils/platform'
+import { shouldUseCustomWindowChrome } from '../utils/platform'
 
 const {
   close,
@@ -25,7 +25,7 @@ const {
 
 vi.mock('../utils/platform', () => ({
   isMac: () => false,
-  shouldUseLinuxWindowChrome: vi.fn(),
+  shouldUseCustomWindowChrome: vi.fn(),
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -47,11 +47,11 @@ vi.mock('@tauri-apps/api/window', () => ({
 describe('LinuxTitlebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(shouldUseLinuxWindowChrome).mockReturnValue(true)
+    vi.mocked(shouldUseCustomWindowChrome).mockReturnValue(true)
   })
 
-  it('does not render when Linux chrome is disabled', () => {
-    vi.mocked(shouldUseLinuxWindowChrome).mockReturnValue(false)
+  it('does not render when custom desktop chrome is disabled', () => {
+    vi.mocked(shouldUseCustomWindowChrome).mockReturnValue(false)
 
     render(<LinuxTitlebar />)
 
@@ -68,7 +68,7 @@ describe('LinuxTitlebar', () => {
     expect(startDragging).not.toHaveBeenCalled()
   })
 
-  it('wires the Linux titlebar window controls to the current window', () => {
+  it('wires custom titlebar window controls to the current window', () => {
     render(<LinuxTitlebar />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Minimize' }))

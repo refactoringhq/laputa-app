@@ -19,6 +19,6 @@ export function isWindows(): boolean {
   return getUserAgent().includes('Windows')
 }
 
-export function shouldUseLinuxWindowChrome(): boolean {
-  return isTauri() && isLinux()
+export function shouldUseCustomWindowChrome(): boolean {
+  return isTauri() && (isLinux() || isWindows())
 }
