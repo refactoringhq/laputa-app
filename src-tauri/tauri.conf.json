@@ -72,6 +72,11 @@
     ]
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["tolaria"]
+      }
+    },
     "updater": {
       "endpoints": [
         "https://refactoringhq.github.io/tolaria/stable/latest.json"

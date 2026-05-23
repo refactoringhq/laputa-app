@@ -29,7 +29,28 @@ function collectMissingMetadataCrashes(page: Page): string[] {
   return errors
 }
 
-function removeAlphaProjectStringMetadata(entries: Array<Record<string, unknown>>) {
+type VaultListEntry = Record<string, unknown>
+
+type VaultListPayload = VaultListEntry[] | Record<string, unknown>
+
+function mapVaultListEntries(
+  payload: unknown,
+  mapper: (entries: VaultListEntry[]) => VaultListEntry[],
+): unknown {
+  if (Array.isArray(payload)) return mapper(payload as VaultListEntry[])
+  if (!payload || typeof payload !== 'object') return payload
+
+  const record = payload as Record<string, unknown>
+  if (Array.isArray(record.entries)) {
+    return { ...record, entries: mapper(record.entries as VaultListEntry[]) }
+  }
+  if (Array.isArray(record.payload)) {
+    return { ...record, payload: mapper(record.payload as VaultListEntry[]) }
+  }
+  return payload
+}
+
+function removeAlphaProjectStringMetadata(entries: VaultListEntry[]) {
   return entries.map((entry) => {
     const entryPath = typeof entry.path === 'string' ? entry.path : ''
     const title = typeof entry.title === 'string' ? entry.title : ''
@@ -47,7 +68,7 @@ function removeAlphaProjectStringMetadata(entries: Array<Record<string, unknown>
   })
 }
 
-function appendMalformedReloadEntry(entries: Array<Record<string, unknown>>) {
+function appendMalformedReloadEntry(entries: VaultListEntry[]) {
   return entries.concat({
     filename: 'phantom-from-reload.md',
     title: 'Phantom From Reload',
@@ -56,6 +77,13 @@ function appendMalformedReloadEntry(entries: Array<Record<string, unknown>>) {
     relationships: {},
     properties: {},
     snippet: '',
+  })
+}
+
+function malformedVaultListPayload(payload: VaultListPayload, isReload: boolean): unknown {
+  return mapVaultListEntries(payload, (entries) => {
+    const scrubbedEntries = removeAlphaProjectStringMetadata(entries)
+    return isReload ? appendMalformedReloadEntry(scrubbedEntries) : scrubbedEntries
   })
 }
 
@@ -100,13 +128,12 @@ test.beforeEach(async ({ page }, testInfo) => {
       return
     }
     const response = await route.fetch()
-    const entries = await response.json() as Array<Record<string, unknown>>
-    const scrubbedEntries = removeAlphaProjectStringMetadata(entries)
+    const payload = await response.json() as VaultListPayload
     const body = readRouteJsonBody(route)
     const isReload = requestUrl.searchParams.get('reload') === '1' || body.reload === true
     await route.fulfill({
       response,
-      json: isReload ? appendMalformedReloadEntry(scrubbedEntries) : scrubbedEntries,
+      json: malformedVaultListPayload(payload, isReload),
     })
   })
   await openFixtureVaultDesktopHarness(page, tempVaultDir, {

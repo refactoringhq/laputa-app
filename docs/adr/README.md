@@ -168,6 +168,7 @@ proposed → active → superseded
 | [0112](0112-system-theme-mode.md) | System theme mode | active |
 | [0113](0113-shared-renderer-attachment-path-normalization.md) | Shared renderer attachment path normalization | active |
 | [0114](0114-mounted-workspaces-unified-graph.md) | Mounted workspaces unified graph | active |
+| [0115](0115-macos-custom-url-scheme-release-qa.md) | macOS custom URL scheme release QA | active |
 | [0116](0116-rich-raw-transition-and-serialization-ownership.md) | Rich/raw transition and serialization ownership | active |
 | [0118](0118-entry-scoped-note-windows-without-vault-index-scans.md) | Entry-scoped note windows without vault index scans | active |
 | [0119](0119-vault-neutral-mcp-registration-with-mounted-workspace-guidance.md) | Vault-neutral MCP registration with mounted workspace guidance | active |

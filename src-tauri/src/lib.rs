@@ -284,6 +284,7 @@ fn setup_desktop_plugins(app: &mut tauri::App) -> Result<(), Box<dyn std::error:
         .plugin(tauri_plugin_updater::Builder::new().build())?;
     app.handle().plugin(tauri_plugin_process::init())?;
     app.handle().plugin(tauri_plugin_opener::init())?;
+    app.handle().plugin(tauri_plugin_deep_link::init())?;
     #[cfg(not(target_os = "linux"))]
     menu::setup_menu(app)?;
     setup_linux_window_chrome(app)?;
