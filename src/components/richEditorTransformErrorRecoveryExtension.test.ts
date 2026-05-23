@@ -48,6 +48,12 @@ describe('isRecoverableEditorTransformError', () => {
     expect(isRecoverableEditorTransformError(new RangeError(
       'Invalid content for node blockContainer: <paragraph("Procedures are long-running"), blockGroup(blockContainer(bulletListItem("Step")))>',
     ))).toBe(true)
+    expect(isRecoverableEditorTransformError(new RangeError(
+      'Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>',
+    ))).toBe(true)
+    expect(isRecoverableEditorTransformError(new RangeError(
+      'Index 1 out of range for <paragraph("A")>',
+    ))).toBe(false)
     expect(isRecoverableEditorTransformError(new Error('unrelated'))).toBe(false)
   })
 })
@@ -90,6 +96,22 @@ describe('installRichEditorTransformErrorRecovery', () => {
     expect(recoverDocument).toHaveBeenCalledTimes(1)
     expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
       reason: 'transform_error',
+    })
+  })
+
+  it('recovers table selection transactions whose target row changed underneath BlockNote', () => {
+    const tableError = new RangeError(
+      'Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>',
+    )
+    const { currentDoc, view } = createView(tableError)
+    const recoverDocument = vi.fn()
+
+    installRichEditorTransformErrorRecovery(view, { recoverDocument })
+
+    expect(() => view.dispatch({ before: currentDoc })).not.toThrow()
+    expect(recoverDocument).toHaveBeenCalledTimes(1)
+    expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+      reason: 'table_position_out_of_range',
     })
   })
 
