@@ -59,12 +59,15 @@ async function copySelectedText(page: Page) {
   return readClipboard(page)
 }
 
-async function copyRichCodeBlockFromButton(page: Page, blockIndex: number) {
+async function expectRichCodeBlockButtonCopy(page: Page, blockIndex: number, expectedText: string) {
   await clearClipboard(page)
   const codeBlock = page.locator('.bn-block-content[data-content-type="codeBlock"]').nth(blockIndex)
+  await expect(codeBlock).toBeVisible()
   await codeBlock.hover()
-  await page.getByRole('button', { name: 'Copy code to clipboard' }).click()
-  return readClipboard(page)
+  const copyButton = page.getByRole('button', { name: 'Copy code to clipboard' })
+  await expect(copyButton).toBeVisible()
+  await copyButton.click()
+  await expect.poll(() => readClipboard(page)).toBe(expectedText)
 }
 
 async function selectRichCodeBlock(page: Page, blockIndex: number) {
@@ -128,9 +131,9 @@ test.describe('Fenced code copy', () => {
     await noteItem.click()
     await expect(page.locator(RICH_CODE_SELECTOR)).toHaveCount(3, { timeout: 10_000 })
 
-    await expect.poll(() => copyRichCodeBlockFromButton(page, 0)).toBe(JSON_SNIPPET)
-    await expect.poll(() => copyRichCodeBlockFromButton(page, 1)).toBe(TYPESCRIPT_SNIPPET)
-    await expect.poll(() => copyRichCodeBlockFromButton(page, 2)).toBe(CJK_SNIPPET)
+    await expectRichCodeBlockButtonCopy(page, 0, JSON_SNIPPET)
+    await expectRichCodeBlockButtonCopy(page, 1, TYPESCRIPT_SNIPPET)
+    await expectRichCodeBlockButtonCopy(page, 2, CJK_SNIPPET)
 
     await selectRichCodeBlock(page, 0)
     await expect.poll(() => copySelectedText(page)).toBe(JSON_SNIPPET)

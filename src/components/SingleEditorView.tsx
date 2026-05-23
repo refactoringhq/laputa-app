@@ -1,6 +1,5 @@
 import { ArrowSquareOut as ExternalLink, Copy } from '@phosphor-icons/react'
 import { Component, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import {
   GridSuggestionMenuController,
   BlockNoteViewRaw,
@@ -26,7 +25,7 @@ import { useEditorTheme } from '../hooks/useTheme'
 import { useImageDrop } from '../hooks/useImageDrop'
 import { useImageLightbox } from '../hooks/useImageLightbox'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { isTauri } from '../mock-tauri'
+import { writeClipboardText } from '../utils/clipboardText'
 import { buildTypeEntryMap } from '../utils/typeColors'
 import { searchEmojis, type EmojiEntry } from '../utils/emoji'
 import { preFilterWikilinks, deduplicateByPath, MIN_QUERY_LENGTH } from '../utils/wikilinkSuggestions'
@@ -474,19 +473,6 @@ function selectedEditorHtml(range: Range): string {
 function codeBlockText(codeBlock: HTMLElement): string {
   const codeElement = codeBlock.querySelector<HTMLElement>('pre code')
   return codeElement?.textContent ?? ''
-}
-
-async function writeClipboardText(text: string): Promise<void> {
-  if (isTauri()) {
-    await invoke('copy_text_to_clipboard', { text })
-    return
-  }
-
-  if (!navigator.clipboard?.writeText) {
-    throw new Error('Clipboard API is unavailable')
-  }
-
-  await navigator.clipboard.writeText(text)
 }
 
 type CodeBlockCopyTarget = {
