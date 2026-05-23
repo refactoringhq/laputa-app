@@ -86,6 +86,39 @@ function shouldReplaceActiveEntry(options: {
   return didPullUpdateActiveNote({ updatedFiles, vaultPath, activeTabPath: activePath })
 }
 
+function shouldPreserveFocusedActiveEntry(options: {
+  movedEntry: VaultEntry | null
+  shouldKeepActiveEditorMounted?: () => boolean
+}): boolean {
+  const { movedEntry, shouldKeepActiveEditorMounted } = options
+  if (movedEntry || !shouldKeepActiveEditorMounted) return false
+  return shouldKeepActiveEditorMounted()
+}
+
+async function applyActiveEntryReplacement(options: {
+  closeAllTabs: PulledVaultRefreshOptions['closeAllTabs']
+  movedEntry: VaultEntry | null
+  replaceActiveTab: PulledVaultRefreshOptions['replaceActiveTab']
+  replacementEntry: VaultEntry | null
+  shouldKeepActiveEditorMounted?: PulledVaultRefreshOptions['shouldKeepActiveEditorMounted']
+  shouldReplace: boolean | null
+}): Promise<boolean> {
+  const {
+    closeAllTabs,
+    movedEntry,
+    replaceActiveTab,
+    replacementEntry,
+    shouldKeepActiveEditorMounted,
+    shouldReplace,
+  } = options
+  if (!replacementEntry || !shouldReplace) return false
+  if (shouldPreserveFocusedActiveEntry({ movedEntry, shouldKeepActiveEditorMounted })) return true
+
+  closeAllTabs()
+  await replaceActiveTab(replacementEntry)
+  return true
+}
+
 export function getPulledVaultUpdateOptions(): { preserveFocusedEditor: true } {
   return { preserveFocusedEditor: true }
 }
@@ -100,6 +133,7 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
     reloadVault,
     reloadViews,
     replaceActiveTab,
+    shouldKeepActiveEditorMounted,
     updatedFiles,
     vaultPath,
   } = options
@@ -123,17 +157,23 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
   })
   const replacementEntry = refreshedEntry ?? movedEntry
 
-  if (replacementEntry && shouldReplaceActiveEntry({
+  const shouldReplace = replacementEntry && shouldReplaceActiveEntry({
     activePath,
     movedEntry,
     refreshedEntry,
     updatedFiles,
     vaultPath,
-  })) {
-    closeAllTabs()
-    await replaceActiveTab(replacementEntry)
-    return entries
-  }
+  })
+
+  const handledReplacement = await applyActiveEntryReplacement({
+    closeAllTabs,
+    movedEntry,
+    replaceActiveTab,
+    replacementEntry,
+    shouldKeepActiveEditorMounted,
+    shouldReplace,
+  })
+  if (handledReplacement) return entries
 
   if (!replacementEntry) closeAllTabs()
   return entries

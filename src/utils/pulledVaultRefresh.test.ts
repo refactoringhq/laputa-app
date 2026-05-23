@@ -92,17 +92,29 @@ describe('refreshPulledVaultState', () => {
     expect(options.closeAllTabs).not.toHaveBeenCalled()
   })
 
-  it('refreshes the focused active tab when an external watcher update changed that note', async () => {
+  it('keeps the active tab mounted while focused when an external watcher update changed that note', async () => {
     const options = makeOptions({
       shouldKeepActiveEditorMounted: vi.fn(() => true),
     })
 
     await refreshPulledVaultState(options)
 
-    expect(options.shouldKeepActiveEditorMounted).not.toHaveBeenCalled()
+    expect(options.shouldKeepActiveEditorMounted).toHaveBeenCalledOnce()
     expect(options.reloadVault).toHaveBeenCalledOnce()
     expect(options.reloadFolders).toHaveBeenCalledOnce()
     expect(options.reloadViews).toHaveBeenCalledOnce()
+    expect(options.closeAllTabs).not.toHaveBeenCalled()
+    expect(options.replaceActiveTab).not.toHaveBeenCalled()
+  })
+
+  it('refreshes the active tab when focus is outside the editor', async () => {
+    const options = makeOptions({
+      shouldKeepActiveEditorMounted: vi.fn(() => false),
+    })
+
+    await refreshPulledVaultState(options)
+
+    expect(options.shouldKeepActiveEditorMounted).toHaveBeenCalledOnce()
     expect(options.closeAllTabs).toHaveBeenCalledOnce()
     expect(options.replaceActiveTab).toHaveBeenCalledWith(makeEntry('/vault/active.md', 'Active'))
   })
