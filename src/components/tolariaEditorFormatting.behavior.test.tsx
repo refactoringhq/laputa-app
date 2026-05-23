@@ -79,6 +79,7 @@ vi.mock('@blocknote/react', () => ({
 
 vi.mock('@blocknote/core', () => ({
   blockHasType: blockHasTypeMock,
+  createExtension: (factory: unknown) => factory,
   defaultProps: { textAlignment: 'left' },
   editorHasBlockWithType: editorHasBlockWithTypeMock,
 }))
@@ -160,6 +161,7 @@ function createMockEditor(blockType = 'image', props: Record<string, unknown> = 
     domElement,
     focus: vi.fn(),
     getActiveStyles: () => ({ bold: true }),
+    getBlock: vi.fn((id: string) => (id === selectedBlock.id ? selectedBlock : undefined)),
     getSelection: () => ({ blocks: [selectedBlock] }),
     getTextCursorPosition: () => ({ block: selectedBlock }),
     toggleStyles: vi.fn(),
@@ -192,9 +194,25 @@ describe('tolariaEditorFormatting behavior', () => {
     expect(editor.toggleStyles).toHaveBeenCalledWith({ code: true })
     expect(editor.transact).toHaveBeenCalledTimes(1)
     expect(editor.updateBlock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'file-block' }),
+      'file-block',
       { type: 'heading', props: { level: 1 } },
     )
+  })
+
+  it('ignores stale block-type clicks when the selected block disappeared before the action', () => {
+    const editor = createMockEditor('paragraph')
+    editor.getBlock.mockImplementation(() => {
+      throw new Error('Block with ID file-block not found')
+    })
+    useBlockNoteEditorMock.mockReturnValue(editor)
+
+    render(<TolariaFormattingToolbar />)
+
+    expect(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Heading 1' }))
+    }).not.toThrow()
+    expect(editor.transact).not.toHaveBeenCalled()
+    expect(editor.updateBlock).not.toHaveBeenCalled()
   })
 
   it('opens selected file blocks through the active vault path', () => {

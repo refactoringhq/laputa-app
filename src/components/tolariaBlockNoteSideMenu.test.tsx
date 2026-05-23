@@ -367,6 +367,20 @@ describe('TolariaSideMenu', () => {
     })
   })
 
+  it('hides table header actions when the live block lookup throws after reload churn', () => {
+    const staleTable = {
+      id: 'table-block',
+      type: 'table',
+      content: { type: 'tableContent', rows: [], headerRows: undefined },
+    }
+    mockEditor.getBlock.mockImplementation(() => {
+      throw staleBlockError(staleTable)
+    })
+
+    expect(() => renderSideMenuWithBlock(staleTable)).not.toThrow()
+    expect(screen.queryByText('Header row')).not.toBeInTheDocument()
+  })
+
   it('ignores stale drag starts after reload churn', () => {
     renderSideMenuWithBlock(sideMenuBlock)
 
@@ -384,6 +398,18 @@ describe('TolariaSideMenu', () => {
     expect(mockEditor.transact).toHaveBeenCalled()
     expect(mockEditor.removeBlocks).toHaveBeenCalledWith([draggedBlock.id])
     expect(mockEditor.insertBlocks).toHaveBeenCalledWith([draggedBlock], targetBlock.id, 'before')
+  })
+
+  it('ignores pointer reorders when a target block lookup throws after reload churn', () => {
+    const { draggedBlock, dragHandle, targetBlock } = renderPointerReorderFixture()
+    mockEditor.getBlock.mockImplementation((id: string) => {
+      if (id === targetBlock.id) throw staleBlockError(id)
+      return id === draggedBlock.id ? draggedBlock : undefined
+    })
+
+    expect(() => dispatchHandlePointerReorder(dragHandle)).not.toThrow()
+    expect(mockEditor.removeBlocks).not.toHaveBeenCalled()
+    expect(mockEditor.insertBlocks).not.toHaveBeenCalled()
   })
 
   it('shows and clears pointer reorder affordances while dragging', () => {

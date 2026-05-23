@@ -67,6 +67,9 @@ describe('isRecoverableEditorTransformError', () => {
     expect(isRecoverableEditorTransformError(new RangeError(
       'Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>',
     ))).toBe(true)
+    expect(isRecoverableEditorTransformError(new Error(
+      'Block with ID 6c1c3bb4-e218-4f00-aaf5-40606852d286 not found',
+    ))).toBe(true)
     expect(isRecoverableEditorTransformError(new RangeError(
       'Index 1 out of range for <paragraph("A")>',
     ))).toBe(false)
@@ -120,6 +123,21 @@ describe('installRichEditorTransformErrorRecovery', () => {
       new RangeError('Inserted content deeper than insertion position'),
       'invalid_insertion_depth',
     )
+  })
+
+  it('recovers stale block-reference transactions from toolbar actions', () => {
+    const { currentDoc, view } = createView(new Error(
+      'Block with ID 6c1c3bb4-e218-4f00-aaf5-40606852d286 not found',
+    ))
+    const recoverDocument = vi.fn()
+
+    installRichEditorTransformErrorRecovery(view, { recoverDocument })
+
+    expect(() => view.dispatch({ before: currentDoc })).not.toThrow()
+    expect(recoverDocument).not.toHaveBeenCalled()
+    expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+      reason: 'stale_block_reference',
+    })
   })
 
   it('keeps non-ProseMirror dispatch failures visible', () => {

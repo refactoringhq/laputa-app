@@ -57,6 +57,7 @@
   "command.git.commitPush": "Закаміціць і адправіць (Commit & Push)",
   "command.git.addRemote": "Дадаць аддалены сервер (Remote) да сховішча",
   "command.git.pull": "Атрымаць змены (Pull)",
+  "command.git.pullRepository": "Атрымаць з аддаленага рэпазіторыя: {repository}",
   "command.git.resolveConflicts": "Вырашыць канфлікты",
   "command.git.viewChanges": "Прагледзець чакаючыя змены",
   "git.repository.select": "Сховішча",

@@ -57,6 +57,7 @@
   "command.git.commitPush": "Zakamicić i adpravić (Commit & Push)",
   "command.git.addRemote": "Dadać addalieny siervier (Remote) da schovišča",
   "command.git.pull": "Atrymać zmieny (Pull)",
+  "command.git.pullRepository": "Atrymać z addalienaha repazitoryja: {repository}",
   "command.git.resolveConflicts": "Vyrašyć kanflikty",
   "command.git.viewChanges": "Prahliedzieć čakajučyja zmieny",
   "git.repository.select": "Schovišča",

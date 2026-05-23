@@ -25,6 +25,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
+import { isStaleBlockReferenceError } from './richEditorTransformErrorRecoveryExtension'
 
 type TolariaBlockNoteEditor = BlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>
 type TolariaBlock = NonNullable<ReturnType<TolariaBlockNoteEditor['getBlock']>>
@@ -83,14 +84,26 @@ const SIDE_MENU_ALIGNMENT_ATTEMPTS = 8
 
 function liveSideMenuBlock(editor: TolariaBlockNoteEditor, block: SideMenuBlock | undefined) {
   if (!block) return undefined
-  return editor.getBlock(block.id)
+  try {
+    return editor.getBlock(block.id)
+  } catch (error) {
+    if (isStaleBlockReferenceError(error)) {
+      console.warn('[editor] Ignored stale block side-menu lookup:', error)
+      return undefined
+    }
+    throw error
+  }
 }
 
 function runSideMenuAction(action: () => void) {
   try {
     action()
   } catch (error) {
-    console.warn('[editor] Ignored stale block side-menu action:', error)
+    if (isStaleBlockReferenceError(error)) {
+      console.warn('[editor] Ignored stale block side-menu action:', error)
+      return
+    }
+    throw error
   }
 }
 
@@ -457,8 +470,8 @@ function validDropTarget({
   const blockId = blockIdFromElement(targetElement)
   if (!blockId || blockId === state.draggedBlockId) return null
 
-  const draggedBlock = editor.getBlock(state.draggedBlockId)
-  const targetBlock = editor.getBlock(blockId)
+  const draggedBlock = liveSideMenuBlock(editor, { id: state.draggedBlockId, type: '' })
+  const targetBlock = liveSideMenuBlock(editor, { id: blockId, type: '' })
   if (!draggedBlock || !targetBlock || hasChildBlock(draggedBlock, blockId)) return null
 
   return {
@@ -481,15 +494,15 @@ function moveBlockByPointerDrop({
 }): boolean {
   if (draggedBlockId === targetBlockId) return false
 
-  const draggedBlock = editor.getBlock(draggedBlockId)
-  const targetBlock = editor.getBlock(targetBlockId)
+  const draggedBlock = liveSideMenuBlock(editor, { id: draggedBlockId, type: '' })
+  const targetBlock = liveSideMenuBlock(editor, { id: targetBlockId, type: '' })
   if (!draggedBlock || !targetBlock || hasChildBlock(draggedBlock, targetBlockId)) return false
 
   let moved = false
   editor.focus()
   editor.transact(() => {
-    const currentDraggedBlock = editor.getBlock(draggedBlockId)
-    const currentTargetBlock = editor.getBlock(targetBlockId)
+    const currentDraggedBlock = liveSideMenuBlock(editor, { id: draggedBlockId, type: '' })
+    const currentTargetBlock = liveSideMenuBlock(editor, { id: targetBlockId, type: '' })
     if (!currentDraggedBlock || !currentTargetBlock) return
     if (hasChildBlock(currentDraggedBlock, targetBlockId)) return
 
