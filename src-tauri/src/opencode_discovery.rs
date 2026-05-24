@@ -86,14 +86,25 @@ fn path_from_successful_output(output: &std::process::Output) -> Option<PathBuf>
 }
 
 fn first_existing_path(stdout: &str) -> Option<PathBuf> {
-    stdout.lines().find_map(|line| {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-        let candidate = PathBuf::from(trimmed);
-        candidate.exists().then_some(candidate)
-    })
+    first_existing_path_for_platform(stdout, cfg!(windows))
+}
+
+fn first_existing_path_for_platform(stdout: &str, windows: bool) -> Option<PathBuf> {
+    let mut paths = stdout.lines().filter_map(existing_path);
+    if windows {
+        return paths.find(|path| crate::cli_agent_runtime::has_windows_cli_extension(path));
+    }
+
+    paths.next()
+}
+
+fn existing_path(line: &str) -> Option<PathBuf> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let candidate = PathBuf::from(trimmed);
+    candidate.exists().then_some(candidate)
 }
 
 fn opencode_binary_candidates() -> Vec<PathBuf> {
@@ -105,12 +116,16 @@ fn opencode_binary_candidates() -> Vec<PathBuf> {
 fn opencode_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
     vec![
         home.join(".local/bin/opencode"),
+        home.join(".local/bin/opencode.cmd"),
         home.join(".local/bin/opencode.exe"),
         home.join(".opencode/bin/opencode"),
+        home.join(".opencode/bin/opencode.cmd"),
         home.join(".opencode/bin/opencode.exe"),
         home.join(".local/share/mise/shims/opencode"),
+        home.join(".local/share/mise/shims/opencode.cmd"),
         home.join(".local/share/mise/shims/opencode.exe"),
         home.join(".asdf/shims/opencode"),
+        home.join(".asdf/shims/opencode.cmd"),
         home.join(".asdf/shims/opencode.exe"),
         home.join(".npm-global/bin/opencode"),
         home.join(".npm-global/bin/opencode.cmd"),
@@ -119,12 +134,14 @@ fn opencode_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
         home.join(".npm/bin/opencode.cmd"),
         home.join(".npm/bin/opencode.exe"),
         home.join(".bun/bin/opencode"),
+        home.join(".bun/bin/opencode.cmd"),
         home.join(".bun/bin/opencode.exe"),
         home.join(".linuxbrew/bin/opencode"),
         home.join("AppData/Roaming/npm/opencode.cmd"),
         home.join("AppData/Roaming/npm/opencode.exe"),
         home.join("AppData/Local/pnpm/opencode.cmd"),
         home.join("AppData/Local/pnpm/opencode.exe"),
+        home.join("scoop/shims/opencode.cmd"),
         home.join("scoop/shims/opencode.exe"),
         PathBuf::from("/home/linuxbrew/.linuxbrew/bin/opencode"),
         PathBuf::from("/usr/local/bin/opencode"),
@@ -182,14 +199,20 @@ mod tests {
         let home = PathBuf::from(r"C:\Users\alex");
         let candidates = opencode_binary_candidates_for_home(&home);
         let expected = [
+            home.join(".local/bin/opencode.cmd"),
+            home.join(".opencode/bin/opencode.cmd"),
+            home.join(".local/share/mise/shims/opencode.cmd"),
+            home.join(".asdf/shims/opencode.cmd"),
             home.join(".npm-global/bin/opencode.cmd"),
             home.join(".npm-global/bin/opencode.exe"),
             home.join(".npm/bin/opencode.cmd"),
             home.join(".npm/bin/opencode.exe"),
+            home.join(".bun/bin/opencode.cmd"),
             home.join("AppData/Roaming/npm/opencode.cmd"),
             home.join("AppData/Roaming/npm/opencode.exe"),
             home.join("AppData/Local/pnpm/opencode.cmd"),
             home.join("AppData/Local/pnpm/opencode.exe"),
+            home.join("scoop/shims/opencode.cmd"),
             home.join("scoop/shims/opencode.exe"),
         ];
 
@@ -219,5 +242,21 @@ mod tests {
         let stdout = format!("\n{}\n{}\n", missing.display(), opencode.display());
 
         assert_eq!(first_existing_path(&stdout), Some(opencode));
+    }
+
+    #[test]
+    fn windows_path_lookup_prefers_cmd_shim_over_extensionless_npm_script() {
+        let dir = tempfile::tempdir().unwrap();
+        let shell_script = dir.path().join("opencode");
+        let cmd_shim = dir.path().join("opencode.cmd");
+        std::fs::write(&shell_script, "#!/bin/sh\n").unwrap();
+        std::fs::write(&cmd_shim, "@ECHO off\n").unwrap();
+
+        let stdout = format!("{}\n{}\n", shell_script.display(), cmd_shim.display());
+
+        assert_eq!(
+            first_existing_path_for_platform(&stdout, true),
+            Some(cmd_shim)
+        );
     }
 }
