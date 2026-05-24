@@ -21,9 +21,13 @@ vi.mock('@tauri-apps/api/window', () => ({
 
 async function openSubmenu(label: string) {
   fireEvent.pointerDown(screen.getByRole('button', { name: 'Application menu' }), { button: 0 })
-  const trigger = await screen.findByText(label)
+  const trigger = await screen.findByRole('menuitem', { name: new RegExp(label) })
   fireEvent.pointerMove(trigger)
   fireEvent.click(trigger)
+}
+
+async function openHorizontalMenu(label: string) {
+  fireEvent.pointerDown(screen.getByRole('button', { name: label }), { button: 0 })
 }
 
 describe('LinuxMenuButton', () => {
@@ -43,6 +47,16 @@ describe('LinuxMenuButton', () => {
     expect(screen.getByText('Ctrl+Shift+L')).toBeInTheDocument()
     fireEvent.click(await screen.findByText('Toggle AI Panel'))
     expect(invoke).toHaveBeenCalledWith('trigger_menu_command', { id: 'view-toggle-ai-chat' })
+  }, MENU_TEST_TIMEOUT_MS)
+
+  it('dispatches shared menu commands from the horizontal desktop menu', async () => {
+    render(<LinuxMenuButton />)
+
+    expect(screen.getByTestId('desktop-horizontal-menu')).toBeInTheDocument()
+
+    await openHorizontalMenu('File')
+    fireEvent.click(await screen.findByText('New Note'))
+    expect(invoke).toHaveBeenCalledWith('trigger_menu_command', { id: 'file-new-note' })
   }, MENU_TEST_TIMEOUT_MS)
 
   it('invokes direct window actions from the Window submenu', async () => {

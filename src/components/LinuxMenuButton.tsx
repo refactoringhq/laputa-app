@@ -47,6 +47,39 @@ function triggerMenuCommand(menuItemId: string): void {
   void invoke('trigger_menu_command', { id: menuItemId }).catch(() => {})
 }
 
+function MenuSectionItems({ section }: { section: MenuSection }) {
+  return (
+    <>
+      {section.items.map((item, index) => {
+        if (item.kind === 'separator') {
+          return <DropdownMenuSeparator key={`${section.label}-${index}`} />
+        }
+
+        if (item.kind === 'command') {
+          return (
+            <DropdownMenuItem
+              key={item.menuItemId}
+              onSelect={() => triggerMenuCommand(item.menuItemId)}
+            >
+              <span>{item.label}</span>
+              {item.shortcut && (
+                <DropdownMenuShortcut>{item.shortcut}</DropdownMenuShortcut>
+              )}
+            </DropdownMenuItem>
+          )
+        }
+
+        return (
+          <DropdownMenuItem key={`${section.label}-${item.label}`} onSelect={item.action}>
+            <span>{item.label}</span>
+            {item.shortcut && <DropdownMenuShortcut>{item.shortcut}</DropdownMenuShortcut>}
+          </DropdownMenuItem>
+        )
+      })}
+    </>
+  )
+}
+
 function HamburgerIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
@@ -57,7 +90,7 @@ function HamburgerIcon() {
   )
 }
 
-export function LinuxMenuButton() {
+function AppMenuButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -77,36 +110,50 @@ export function LinuxMenuButton() {
           <DropdownMenuSub key={section.label}>
             <DropdownMenuSubTrigger>{section.label}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="min-w-[220px]">
-              {section.items.map((item, index) => {
-                if (item.kind === 'separator') {
-                  return <DropdownMenuSeparator key={`${section.label}-${index}`} />
-                }
-
-                if (item.kind === 'command') {
-                  return (
-                    <DropdownMenuItem
-                      key={item.menuItemId}
-                      onSelect={() => triggerMenuCommand(item.menuItemId)}
-                    >
-                      <span>{item.label}</span>
-                      {item.shortcut && (
-                        <DropdownMenuShortcut>{item.shortcut}</DropdownMenuShortcut>
-                      )}
-                    </DropdownMenuItem>
-                  )
-                }
-
-                return (
-                  <DropdownMenuItem key={`${section.label}-${item.label}`} onSelect={item.action}>
-                    <span>{item.label}</span>
-                    {item.shortcut && <DropdownMenuShortcut>{item.shortcut}</DropdownMenuShortcut>}
-                  </DropdownMenuItem>
-                )
-              })}
+              <MenuSectionItems section={section} />
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+function HorizontalMenuBar() {
+  return (
+    <div
+      className="hidden h-full min-[760px]:flex"
+      data-testid="desktop-horizontal-menu"
+    >
+      {MENU_SECTIONS.map((section) => (
+        <DropdownMenu key={section.label}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-full rounded-none px-3 text-[13px] font-normal text-foreground/75 hover:bg-foreground/10 hover:text-foreground"
+              data-no-drag
+            >
+              {section.label}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" sideOffset={0} className="min-w-[220px]">
+            <MenuSectionItems section={section} />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ))}
+    </div>
+  )
+}
+
+export function LinuxMenuButton() {
+  return (
+    <>
+      <div className="min-[760px]:hidden">
+        <AppMenuButton />
+      </div>
+      <HorizontalMenuBar />
+    </>
   )
 }
