@@ -240,6 +240,7 @@ function SortableSection({
 }
 
 export function TypesSection({
+  entries,
   visibleSections,
   allSectionGroups,
   sectionIds,
@@ -254,8 +255,10 @@ export function TypesSection({
   toggleVisibility,
   onCreateNewType,
   customizeRef,
+  workspaceOrder,
   locale = 'en',
 }: {
+  entries: VaultEntry[]
   visibleSections: SectionGroup[]
   allSectionGroups: SectionGroup[]
   sectionIds: string[]
@@ -267,9 +270,10 @@ export function TypesSection({
   showCustomize: boolean
   setShowCustomize: Dispatch<SetStateAction<boolean>>
   isSectionVisible: (type: string) => boolean
-  toggleVisibility: (type: string) => void
+  toggleVisibility: (type: string, typeEntryPath?: string) => void
   onCreateNewType?: () => void
   customizeRef: RefObject<HTMLDivElement | null>
+  workspaceOrder?: readonly string[]
   locale?: AppLocale
 }) {
   return (
@@ -306,9 +310,11 @@ export function TypesSection({
         </SidebarGroupHeader>
         {showCustomize && (
           <VisibilityPopover
+            entries={entries}
             sections={allSectionGroups}
             isSectionVisible={isSectionVisible}
             onToggle={toggleVisibility}
+            workspaceOrder={workspaceOrder}
             locale={locale}
           />
         )}

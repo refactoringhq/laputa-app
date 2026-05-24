@@ -49,7 +49,11 @@ interface RenameTypeSectionArgs {
   label: string
 }
 
-function findTypeEntry(entries: VaultEntry[], typeName: string): VaultEntry | undefined {
+function findTypeEntry(entries: VaultEntry[], typeName: string, typeEntryPath?: string): VaultEntry | undefined {
+  if (typeEntryPath) {
+    const entry = entries.find((candidate) => candidate.path === typeEntryPath)
+    if (entry?.isA === 'Type') return entry
+  }
   return entries.find((entry) => entry.isA === 'Type' && entry.title === typeName)
 }
 
@@ -64,9 +68,11 @@ function logOptimisticRollback(label: string, error: unknown): void {
 async function findOrCreateType(
   deps: Pick<TypeActionDeps, 'entries' | 'createTypeEntry'>,
   typeName: string,
+  typeEntryPath?: string,
 ): Promise<VaultEntry | null> {
-  const existingType = findTypeEntry(deps.entries, typeName)
+  const existingType = findTypeEntry(deps.entries, typeName, typeEntryPath)
   if (existingType) return existingType
+  if (typeEntryPath) return null
   try {
     return await deps.createTypeEntry(typeName)
   } catch {
@@ -114,8 +120,8 @@ async function renameTypeSection(deps: TypeActionDeps, args: RenameTypeSectionAr
   deps.onFrontmatterPersisted?.()
 }
 
-async function toggleTypeVisibility(deps: TypeActionDeps, typeName: string): Promise<void> {
-  const typeEntry = await findOrCreateType(deps, typeName)
+async function toggleTypeVisibility(deps: TypeActionDeps, typeName: string, typeEntryPath?: string): Promise<void> {
+  const typeEntry = await findOrCreateType(deps, typeName, typeEntryPath)
   if (!typeEntry) return
   if (typeEntry.visible === false) {
     await deps.handleDeleteProperty(typeEntry.path, 'visible')
@@ -202,8 +208,8 @@ function useTypeActions(deps: TypeActionDeps) {
     await renameTypeSection(typeActionDeps, { typeName, label })
   }, [typeActionDeps])
 
-  const handleToggleTypeVisibility = useCallback(async (typeName: string) => {
-    await toggleTypeVisibility(typeActionDeps, typeName)
+  const handleToggleTypeVisibility = useCallback(async (typeName: string, typeEntryPath?: string) => {
+    await toggleTypeVisibility(typeActionDeps, typeName, typeEntryPath)
   }, [typeActionDeps])
 
   return { handleCustomizeType, handleReorderSections, handleUpdateTypeTemplate, handleRenameSection, handleToggleTypeVisibility }

@@ -12,6 +12,7 @@ import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog'
+import { WorkspaceInitialsBadge } from '../WorkspaceInitialsBadge'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import { trackEvent } from '../../lib/telemetry'
 import type { VaultOption } from './types'
@@ -272,20 +273,15 @@ function DefaultVaultLabel({ isDefault, locale }: { isDefault: boolean; locale: 
   )
 }
 
-function WorkspaceInitialsBadge({ vault }: { vault: VaultOption }) {
+function VaultWorkspaceInitialsBadge({ vault }: { vault: VaultOption }) {
   const workspace = workspaceIdentityFromVault(vault)
-  const accentColor = workspace.color ? `var(--accent-${workspace.color})` : 'var(--muted-foreground)'
 
   return (
-    <span
-      className="inline-flex h-[16px] min-w-[18px] items-center justify-center rounded-sm border bg-transparent px-1 text-[9px] font-semibold opacity-75"
-      style={{ borderColor: accentColor, color: accentColor }}
-      title={`${workspace.label} (${workspace.alias})`}
-      aria-label={`Vault ${workspace.label}`}
-      data-testid={`vault-menu-workspace-badge-${vault.label}`}
-    >
-      {workspace.shortLabel}
-    </span>
+    <WorkspaceInitialsBadge
+      workspace={workspace}
+      ariaLabel={`Vault ${workspace.label}`}
+      testId={`vault-menu-workspace-badge-${vault.label}`}
+    />
   )
 }
 
@@ -458,7 +454,7 @@ function VaultMenuItem({
       {multiWorkspaceEnabled && (
         <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-2 pr-1">
           <DefaultVaultLabel isDefault={isActive} locale={locale} />
-          <WorkspaceInitialsBadge vault={vault} />
+          <VaultWorkspaceInitialsBadge vault={vault} />
         </span>
       )}
     </div>

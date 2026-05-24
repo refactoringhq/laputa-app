@@ -9,6 +9,7 @@ import { buildTypeEntryMap } from '../../utils/typeColors'
 import { countAllNotesByFilter } from '../../utils/noteListHelpers'
 import { buildDynamicSections, sortSections } from '../../utils/sidebarSections'
 import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
+import { buildTypeVisibilityLookup, isTypeSectionVisible } from '../../utils/typeVisibility'
 
 export type SidebarGroupKey = 'favorites' | 'views' | 'sections' | 'folders'
 
@@ -159,16 +160,17 @@ export function useSidebarInlineRenameInput({
 
 export function useSidebarSections(entries: VaultEntry[], pluralizeTypeLabels = true) {
   const typeEntryMap = useMemo(() => buildTypeEntryMap(entries), [entries])
+  const typeVisibility = useMemo(() => buildTypeVisibilityLookup(entries), [entries])
   const allSectionGroups = useMemo(() => {
     const sections = buildDynamicSections(entries, typeEntryMap, pluralizeTypeLabels)
     return sortSections(sections, typeEntryMap)
   }, [entries, pluralizeTypeLabels, typeEntryMap])
   const visibleSections = useMemo(
-    () => allSectionGroups.filter((group) => typeEntryMap[group.type]?.visible !== false),
-    [allSectionGroups, typeEntryMap],
+    () => allSectionGroups.filter((group) => isTypeSectionVisible(entries, group.type, typeVisibility)),
+    [allSectionGroups, entries, typeVisibility],
   )
   const sectionIds = useMemo(() => visibleSections.map((group) => group.type), [visibleSections])
-  return { typeEntryMap, allSectionGroups, visibleSections, sectionIds }
+  return { typeEntryMap, typeVisibility, allSectionGroups, visibleSections, sectionIds }
 }
 
 function loadCollapsedState(): Record<SidebarGroupKey, boolean> {

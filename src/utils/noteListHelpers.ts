@@ -17,6 +17,7 @@ import {
 import { evaluateView } from './viewFilters'
 import { viewMatchesSelection } from './viewIdentity'
 import { wikilinkTarget, resolveEntry } from './wikilink'
+import { buildTypeVisibilityLookup, isSectionEntryVisibleForType } from './typeVisibility'
 
 export type NoteListFilter = 'open' | 'archived'
 
@@ -518,7 +519,8 @@ function filterFolderEntries(entries: VaultEntry[], selection: Extract<SidebarSe
 }
 
 function filterSectionGroupEntries(entries: VaultEntry[], type: string, subFilter?: NoteListFilter): VaultEntry[] {
-  const typeEntries = entries.filter((entry) => isMarkdown(entry) && entry.isA === type)
+  const typeVisibility = buildTypeVisibilityLookup(entries)
+  const typeEntries = entries.filter((entry) => isSectionEntryVisibleForType(entry, type, typeVisibility))
   return subFilter ? applySubFilter(typeEntries, subFilter) : typeEntries.filter(isActive)
 }
 
@@ -565,9 +567,10 @@ export function filterEntries(
 
 /** Count notes per sub-filter for a given type. */
 export function countByFilter(entries: VaultEntry[], type: string): Record<NoteListFilter, number> {
+  const typeVisibility = buildTypeVisibilityLookup(entries)
   let open = 0, archived = 0
   for (const e of entries) {
-    if (!isMarkdown(e) || e.isA !== type) continue
+    if (!isSectionEntryVisibleForType(e, type, typeVisibility)) continue
     if (e.archived) archived++
     else open++
   }

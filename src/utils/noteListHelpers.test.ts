@@ -1,6 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import { buildRelationshipGroups, countAllByFilter, countAllNotesByFilter, countByFilter, filterEntries } from './noteListHelpers'
 import { allSelection, makeEntry, mockEntries } from '../test-utils/noteListTestUtils'
+import type { WorkspaceIdentity } from '../types'
+
+const mainWorkspace: WorkspaceIdentity = {
+  id: 'main',
+  label: 'Main',
+  alias: 'main',
+  path: '/vault/main',
+  shortLabel: 'MA',
+  color: 'blue',
+  icon: null,
+  mounted: true,
+  available: true,
+  defaultForNewNotes: true,
+}
+
+const workWorkspace: WorkspaceIdentity = {
+  id: 'work',
+  label: 'Work',
+  alias: 'work',
+  path: '/vault/work',
+  shortLabel: 'WK',
+  color: 'green',
+  icon: null,
+  mounted: true,
+  available: true,
+  defaultForNewNotes: false,
+}
 
 describe('filterEntries', () => {
   it('returns empty for entity selections because entity view uses grouped relationships', () => {
@@ -39,6 +66,18 @@ describe('filterEntries', () => {
 
     const result = filterEntries(entries, { kind: 'sectionGroup', type: 'Project' })
     expect(result.map((entry) => entry.title)).toEqual(['Active'])
+  })
+
+  it('filters duplicate type sections by workspace visibility', () => {
+    const entries = [
+      makeEntry({ path: '/vault/main/project.md', title: 'Project', isA: 'Type', workspace: mainWorkspace, visible: false }),
+      makeEntry({ path: '/vault/work/project.md', title: 'Project', isA: 'Type', workspace: workWorkspace, visible: null }),
+      makeEntry({ path: '/vault/main/main-project.md', title: 'Main Project', isA: 'Project', workspace: mainWorkspace }),
+      makeEntry({ path: '/vault/work/work-project.md', title: 'Work Project', isA: 'Project', workspace: workWorkspace }),
+    ]
+
+    const result = filterEntries(entries, { kind: 'sectionGroup', type: 'Project' })
+    expect(result.map((entry) => entry.title)).toEqual(['Work Project'])
   })
 
   it('filters all notes by open sub-filter', () => {
@@ -194,6 +233,18 @@ describe('countByFilter', () => {
     ]
 
     expect(countByFilter(entries, 'Project')).toEqual({ open: 2, archived: 1 })
+  })
+
+  it('counts duplicate type entries only from visible workspaces', () => {
+    const entries = [
+      makeEntry({ path: '/vault/main/project.md', title: 'Project', isA: 'Type', workspace: mainWorkspace, visible: false }),
+      makeEntry({ path: '/vault/work/project.md', title: 'Project', isA: 'Type', workspace: workWorkspace, visible: null }),
+      makeEntry({ path: '/vault/main/main-project.md', title: 'Main Project', isA: 'Project', workspace: mainWorkspace }),
+      makeEntry({ path: '/vault/work/work-project.md', title: 'Work Project', isA: 'Project', workspace: workWorkspace }),
+      makeEntry({ path: '/vault/work/archived-project.md', title: 'Archived Project', isA: 'Project', workspace: workWorkspace, archived: true }),
+    ]
+
+    expect(countByFilter(entries, 'Project')).toEqual({ open: 1, archived: 1 })
   })
 
   it('returns zeros when a type has no matching entries', () => {

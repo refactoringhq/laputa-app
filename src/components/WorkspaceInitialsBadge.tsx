@@ -2,12 +2,13 @@ import { cn } from '@/lib/utils'
 import type { WorkspaceIdentity } from '../types'
 
 interface WorkspaceInitialsBadgeProps {
+  ariaLabel?: string
   className?: string
   testId?: string
   workspace?: WorkspaceIdentity | null
 }
 
-export function WorkspaceInitialsBadge({ className, testId, workspace }: WorkspaceInitialsBadgeProps) {
+export function WorkspaceInitialsBadge({ ariaLabel, className, testId, workspace }: WorkspaceInitialsBadgeProps) {
   if (!workspace) return null
 
   const accentColor = workspace.color ? `var(--accent-${workspace.color})` : 'var(--muted-foreground)'
@@ -20,10 +21,10 @@ export function WorkspaceInitialsBadge({ className, testId, workspace }: Workspa
       )}
       style={{ borderColor: accentColor, color: accentColor }}
       title={`${workspace.label} (${workspace.alias})`}
-      aria-label={`Workspace ${workspace.label}`}
+      aria-label={ariaLabel ?? `Workspace ${workspace.label}`}
       data-testid={testId}
     >
-      {workspace.shortLabel}
+      <span className="block h-[16px] leading-[16px]">{workspace.shortLabel}</span>
     </span>
   )
 }

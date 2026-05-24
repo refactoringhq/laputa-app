@@ -32,6 +32,7 @@ import { useSidebarTypeInteractions } from './sidebar/useSidebarTypeInteractions
 import type { AppLocale } from '../lib/i18n'
 import type { FolderFileActions } from '../hooks/useFileActions'
 import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
+import { isTypeSectionVisible } from '../utils/typeVisibility'
 
 interface SidebarProps {
   entries: VaultEntry[]
@@ -45,7 +46,7 @@ interface SidebarProps {
   onReorderSections?: (orderedTypes: { typeName: string; order: number }[]) => void
   onRenameSection?: (typeName: string, label: string) => void
   onDeleteType?: (typeName: string) => void
-  onToggleTypeVisibility?: (typeName: string) => void
+  onToggleTypeVisibility?: (typeName: string, typeEntryPath?: string) => void
   onSelectFavorite?: (entry: VaultEntry) => void
   onReorderFavorites?: (orderedPaths: string[]) => void
   views?: ViewFile[]
@@ -63,6 +64,7 @@ interface SidebarProps {
   onStartRenameFolder?: (folderPath: string) => void
   onCancelRenameFolder?: () => void
   vaultRootPath?: string
+  workspaceOrder?: readonly string[]
   showInbox?: boolean
   inboxCount?: number
   allNotesFileVisibility?: AllNotesFileVisibility
@@ -98,6 +100,7 @@ interface SidebarNavigationProps extends Pick<
   | 'onStartRenameFolder'
   | 'onCancelRenameFolder'
   | 'vaultRootPath'
+  | 'workspaceOrder'
   | 'showInbox'
   | 'inboxCount'
   | 'onCreateNewType'
@@ -116,7 +119,7 @@ interface SidebarNavigationProps extends Pick<
   sectionProps: SidebarSectionProps
   typeInteractions: ReturnType<typeof useSidebarTypeInteractions>
   isSectionVisible: (type: string) => boolean
-  toggleVisibility: (type: string) => void
+  toggleVisibility: (type: string, typeEntryPath?: string) => void
 }
 
 type SidebarFavoritesNavigationProps = Pick<
@@ -153,6 +156,7 @@ type SidebarViewsNavigationProps = Pick<
 type SidebarTypesNavigationProps = Pick<
   SidebarNavigationProps,
   | 'loading'
+  | 'entries'
   | 'visibleSections'
   | 'allSectionGroups'
   | 'sectionIds'
@@ -165,6 +169,7 @@ type SidebarTypesNavigationProps = Pick<
   | 'isSectionVisible'
   | 'toggleVisibility'
   | 'onCreateNewType'
+  | 'workspaceOrder'
   | 'locale'
 >
 
@@ -285,6 +290,7 @@ function SidebarTypesNavigation({
   isSectionVisible,
   toggleVisibility,
   onCreateNewType,
+  workspaceOrder,
   locale,
 }: SidebarTypesNavigationProps) {
   if (loading) {
@@ -300,6 +306,7 @@ function SidebarTypesNavigation({
 
   return (
     <TypesSection
+      entries={sectionProps.entries}
       visibleSections={visibleSections}
       allSectionGroups={allSectionGroups}
       sectionIds={sectionIds}
@@ -314,6 +321,7 @@ function SidebarTypesNavigation({
       toggleVisibility={toggleVisibility}
       onCreateNewType={onCreateNewType}
       customizeRef={typeInteractions.customizeRef}
+      workspaceOrder={workspaceOrder}
       locale={locale}
     />
   )
@@ -423,6 +431,7 @@ function SidebarViewAndTypeNavigation(props: SidebarNavigationProps) {
       )}
       <SidebarTypesNavigation
         loading={props.loading}
+        entries={props.entries}
         visibleSections={props.visibleSections}
         allSectionGroups={props.allSectionGroups}
         sectionIds={props.sectionIds}
@@ -435,6 +444,7 @@ function SidebarViewAndTypeNavigation(props: SidebarNavigationProps) {
         isSectionVisible={props.isSectionVisible}
         toggleVisibility={props.toggleVisibility}
         onCreateNewType={props.onCreateNewType}
+        workspaceOrder={props.workspaceOrder}
         locale={props.locale}
       />
     </>
@@ -474,6 +484,18 @@ function useSidebarDndSensors() {
   )
 }
 
+function invokeTypeVisibilityToggle(
+  onToggleTypeVisibility: SidebarProps['onToggleTypeVisibility'],
+  type: string,
+  typeEntryPath?: string,
+) {
+  if (typeEntryPath) {
+    onToggleTypeVisibility?.(type, typeEntryPath)
+    return
+  }
+  onToggleTypeVisibility?.(type)
+}
+
 function useSidebarRuntime({
   entries,
   selection,
@@ -489,7 +511,13 @@ function useSidebarRuntime({
   pluralizeTypeLabels = true,
   locale = 'en',
 }: SidebarProps) {
-  const { typeEntryMap, allSectionGroups, visibleSections, sectionIds } = useSidebarSections(entries, pluralizeTypeLabels)
+  const {
+    typeEntryMap,
+    typeVisibility,
+    allSectionGroups,
+    visibleSections,
+    sectionIds,
+  } = useSidebarSections(entries, pluralizeTypeLabels)
   const { activeCount, archivedCount } = useEntryCounts(entries, allNotesFileVisibility)
   const { collapsed: groupCollapsed, toggle: toggleGroup } = useSidebarCollapsed()
   const typeInteractions = useSidebarTypeInteractions({
@@ -502,9 +530,11 @@ function useSidebarRuntime({
   })
 
   const isSectionVisible = useCallback((type: string) => (
-    (Reflect.get(typeEntryMap, type) as VaultEntry | undefined)?.visible !== false
-  ), [typeEntryMap])
-  const toggleVisibility = useCallback((type: string) => onToggleTypeVisibility?.(type), [onToggleTypeVisibility])
+    isTypeSectionVisible(entries, type, typeVisibility)
+  ), [entries, typeVisibility])
+  const toggleVisibility = useCallback((type: string, typeEntryPath?: string) => {
+    invokeTypeVisibilityToggle(onToggleTypeVisibility, type, typeEntryPath)
+  }, [onToggleTypeVisibility])
   const selectTypeNote = useCallback((type: string) => {
     const typeEntry = (Reflect.get(typeEntryMap, type) as VaultEntry | undefined)
       ?? (Reflect.get(typeEntryMap, type.toLowerCase()) as VaultEntry | undefined)
@@ -547,6 +577,7 @@ function useSidebarRuntime({
     toggleGroup,
     toggleVisibility,
     typeEntryMap,
+    typeVisibility,
     typeInteractions,
     visibleSections,
   }
@@ -581,6 +612,7 @@ function SidebarRuntimeNavigation({
       onStartRenameFolder={props.onStartRenameFolder}
       onCancelRenameFolder={props.onCancelRenameFolder}
       vaultRootPath={props.vaultRootPath}
+      workspaceOrder={props.workspaceOrder}
       showInbox={props.showInbox}
       inboxCount={props.inboxCount}
       locale={props.locale}
