@@ -553,7 +553,7 @@ describe('StatusBar', () => {
   })
 
   it('collapses status labels to icon-first controls at very narrow widths', () => {
-    setWindowWidth(880)
+    setWindowWidth(920)
     renderDenseStatusBar()
 
     expect(screen.getByTestId('status-bar')).toHaveStyle({
@@ -574,8 +574,21 @@ describe('StatusBar', () => {
     expect(screen.queryByText('Claude Code missing')).not.toBeInTheDocument()
   })
 
+  it('stacks the footer into two rows once the narrow-width breakpoint is crossed', () => {
+    setWindowWidth(900)
+    renderDenseStatusBar()
+
+    expect(screen.getByTestId('status-bar')).toHaveStyle({
+      flexWrap: 'wrap',
+      height: 'auto',
+    })
+    expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
+    expect(screen.getByTestId('status-pulse')).toBeInTheDocument()
+    expect(screen.getByTestId('status-feedback')).toBeInTheDocument()
+  })
+
   it('hides the active AI agent label in compact status layout', () => {
-    setWindowWidth(880)
+    setWindowWidth(920)
     render(
       <StatusBar
         noteCount={100}
