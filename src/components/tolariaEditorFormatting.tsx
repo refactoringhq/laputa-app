@@ -67,6 +67,9 @@ import {
 type TolariaBasicTextStyle = 'bold' | 'italic' | 'strike' | 'code'
 
 const FORMATTER_CLOSE_GRACE_MS = 160
+const FORMATTER_VIEWPORT_PADDING_PX = 8
+type TolariaFloatingOptions = NonNullable<FloatingUIOptions['useFloatingOptions']>
+type TolariaFloatingMiddleware = NonNullable<TolariaFloatingOptions['middleware']>[number]
 
 function isFocusStillWithinToolbar(
   currentTarget: EventTarget & Element,
@@ -227,6 +230,42 @@ function textAlignmentToPlacement(
       return 'top-end'
     default:
       return 'top-start'
+  }
+}
+
+function viewportClampMiddleware(): TolariaFloatingMiddleware {
+  return {
+    name: 'tolariaViewportClamp',
+    fn({ x, rects }: { rects: { floating: { width: number } }; x: number }) {
+      const viewportWidth = window.visualViewport?.width ?? window.innerWidth
+      const minX = FORMATTER_VIEWPORT_PADDING_PX
+      const maxX = Math.max(
+        minX,
+        viewportWidth - rects.floating.width - FORMATTER_VIEWPORT_PADDING_PX,
+      )
+
+      return {
+        x: Math.min(Math.max(x, minX), maxX),
+      }
+    },
+  }
+}
+
+function withViewportSafeMiddleware(
+  options?: TolariaFloatingOptions,
+): TolariaFloatingOptions {
+  if (!options) {
+    return {
+      middleware: [viewportClampMiddleware()],
+    }
+  }
+
+  return {
+    ...options,
+    middleware: [
+      ...(options.middleware ?? []),
+      viewportClampMiddleware(),
+    ],
   }
 }
 
@@ -730,7 +769,7 @@ export function TolariaFormattingToolbarController(props: {
           }
         },
         placement,
-        ...props.floatingUIOptions?.useFloatingOptions,
+        ...withViewportSafeMiddleware(props.floatingUIOptions?.useFloatingOptions),
       },
       elementProps: {
         style: {

@@ -287,6 +287,29 @@ describe('tolariaEditorFormatting behavior', () => {
     }))
   })
 
+  it('adds viewport-clamping middleware and preserves caller middleware', () => {
+    const editor = createMockEditor('paragraph')
+    useBlockNoteEditorMock.mockReturnValue(editor)
+
+    render(
+      <TolariaFormattingToolbarController
+        floatingUIOptions={{
+          useFloatingOptions: {
+            middleware: [{ name: 'custom-middleware' } as never],
+          },
+        }}
+      />,
+    )
+
+    const floatingOptions = positionPopoverState.lastProps?.useFloatingOptions as {
+      middleware: Array<{ name: string }>
+    }
+
+    expect(floatingOptions.middleware.map((middleware) => middleware.name)).toEqual(
+      expect.arrayContaining(['custom-middleware', 'tolariaViewportClamp']),
+    )
+  })
+
   it('falls back to top-start and focuses the block type trigger on mouse down', () => {
     const editor = createMockEditor('paragraph')
     const focusSpy = vi.spyOn(HTMLButtonElement.prototype, 'focus').mockImplementation(() => {})
