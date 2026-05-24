@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
-import { revealItemInDir } from '@tauri-apps/plugin-opener'
+import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
 import {
   copyLocalPath,
   isUrlValue,
@@ -55,6 +55,23 @@ describe('openExternalUrl', () => {
     await openExternalUrl('https://exa mple.com')
 
     expect(open).not.toHaveBeenCalled()
+  })
+
+  it('treats Windows user-canceled opener dialogs as a benign no-op', async () => {
+    vi.stubGlobal('isTauri', true)
+    vi.mocked(openUrl).mockRejectedValueOnce(new Error('The operation was canceled by the user. (os error 1223)'))
+
+    await expect(openExternalUrl('https://example.com')).resolves.toBeUndefined()
+
+    expect(openUrl).toHaveBeenCalledWith('https://example.com')
+  })
+
+  it('keeps real native opener failures visible to callers', async () => {
+    vi.stubGlobal('isTauri', true)
+    const failure = new Error('failed to open default browser')
+    vi.mocked(openUrl).mockRejectedValueOnce(failure)
+
+    await expect(openExternalUrl('https://example.com')).rejects.toThrow(failure)
   })
 })
 

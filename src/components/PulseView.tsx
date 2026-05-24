@@ -5,6 +5,7 @@ import { isTauri, mockInvoke } from '../mock-tauri'
 import { useDragRegion } from '../hooks/useDragRegion'
 import type { PulseCommit, PulseFile } from '../types'
 import { relativeDate } from '../utils/noteListHelpers'
+import { openExternalUrl } from '../utils/url'
 import { getLocaleDateLocale, translate, type AppLocale } from '../lib/i18n'
 import { GitRepositorySelect } from './GitRepositorySelect'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
@@ -147,6 +148,7 @@ function CommitCard({
   const [expanded, setExpanded] = useState(false)
   const Chevron = expanded ? CaretDown : CaretRight
   const toggleExpanded = useCallback(() => setExpanded((value) => !value), [])
+  const commitUrl = commit.githubUrl
 
   return (
     <div className="border-b border-border px-4 py-2">
@@ -174,19 +176,15 @@ function CommitCard({
           </div>
           <div className="flex items-center" style={{ gap: 8 }}>
             <span className="text-[11px] text-muted-foreground">{relativeDate(commit.date)}</span>
-            {commit.githubUrl ? (
+            {commitUrl ? (
               <a
                 className="flex items-center text-[11px] font-mono text-primary no-underline hover:underline"
                 style={{ gap: 3 }}
-                href={commit.githubUrl}
+                href={commitUrl}
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  if (isTauri()) {
-                    import('@tauri-apps/plugin-opener').then((mod) => mod.openUrl(commit.githubUrl!))
-                  } else {
-                    window.open(commit.githubUrl!, '_blank')
-                  }
+                  void openExternalUrl(commitUrl)
                 }}
                 title={translate(locale, 'pulse.openOnGitHub')}
               >

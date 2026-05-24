@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PulseView } from './PulseView'
 import type { PulseCommit } from '../types'
 
+const openExternalUrl = vi.fn()
 const mockCommits: PulseCommit[] = [
   {
     hash: 'abc123def456',
@@ -44,6 +45,9 @@ vi.mock('../mock-tauri', () => ({
 }))
 vi.mock('../hooks/useDragRegion', () => ({
   useDragRegion: () => ({ onMouseDown: dragRegionMouseDown }),
+}))
+vi.mock('../utils/url', () => ({
+  openExternalUrl: (...args: unknown[]) => openExternalUrl(...args),
 }))
 
 describe('PulseView', () => {
@@ -107,6 +111,17 @@ describe('PulseView', () => {
     // Non-GitHub commit should be a span
     const nonLink = screen.getByText('def456a')
     expect(nonLink.tagName).toBe('SPAN')
+  })
+
+  it('opens commit links through the shared external URL opener', async () => {
+    mockInvokeFn.mockResolvedValue(mockCommits)
+
+    render(<PulseView vaultPath="/test/vault" />)
+
+    const link = await screen.findByText('abc123d')
+    fireEvent.click(link)
+
+    expect(openExternalUrl).toHaveBeenCalledWith('https://github.com/owner/repo/commit/abc123def456')
   })
 
   it('renders file list with correct titles when expanded', async () => {
