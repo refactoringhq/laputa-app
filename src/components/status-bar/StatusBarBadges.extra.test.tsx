@@ -94,7 +94,7 @@ describe('StatusBarBadges extra coverage', () => {
 
     fireEvent.click(screen.getByTestId('status-sync'))
 
-    expect(screen.getByTestId('git-status-popup')).toHaveTextContent('main')
+    expect(screen.getByTestId('git-status-popup')).not.toHaveTextContent('main')
     expect(screen.getByText('↑ 2 ahead')).toBeInTheDocument()
     expect(screen.getByText('↓ 1 behind')).toBeInTheDocument()
     expect(screen.getByText(/Status: Synced/)).toBeInTheDocument()

@@ -757,12 +757,12 @@ describe('StatusBar', () => {
     fireEvent.click(screen.getByTestId('status-sync'))
     expect(screen.getByTestId('status-bar')).toHaveStyle({ zIndex: '30' })
     expect(screen.getByTestId('git-status-popup')).toBeInTheDocument()
-    expect(screen.getByText('main')).toBeInTheDocument()
+    expect(screen.queryByText('main')).not.toBeInTheDocument()
     expect(screen.getByText(/2 ahead/)).toBeInTheDocument()
     expect(screen.getByText(/1 behind/)).toBeInTheDocument()
   })
 
-  it('shows the selected repository on sync controls when multiple vaults are active', () => {
+  it('keeps sync controls vault-agnostic when multiple vaults are active', () => {
     render(
       <StatusBar
         noteCount={100}
@@ -781,9 +781,10 @@ describe('StatusBar', () => {
       />
     )
 
-    expect(screen.getByTestId('status-sync')).toHaveTextContent('Work Vault')
+    expect(screen.getByTestId('status-sync')).not.toHaveTextContent('Work Vault')
+    expect(screen.getByTestId('status-sync')).toHaveTextContent('Not synced')
     fireEvent.click(screen.getByTestId('status-sync'))
-    expect(screen.getByTestId('git-status-repository-select')).toBeInTheDocument()
+    expect(screen.queryByTestId('git-status-repository-select')).not.toBeInTheDocument()
   })
 
   it('shows History badge in status bar', () => {

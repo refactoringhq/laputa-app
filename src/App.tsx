@@ -699,6 +699,7 @@ function App() {
   const autoSync = useAutoSync({
     enabled: gitFeaturesEnabled && gitRepoState === 'ready',
     vaultPath: gitSurfaces.syncRepositoryPath,
+    vaultPaths: activeGitRepositoryPaths,
     intervalMinutes: settings.auto_pull_interval_minutes,
     onVaultUpdated: handlePulledVaultUpdate,
     onConflict: (files) => {
@@ -751,7 +752,7 @@ function App() {
   })
 
   const conflictFlow = useConflictFlow({
-    resolvedPath: gitSurfaces.syncRepositoryPath,
+    resolvedPath: autoSync.conflictVaultPath ?? graphDefaultWorkspacePath,
     entries: visibleEntries,
     conflictFiles: autoSync.conflictFiles,
     pausePull: autoSync.pausePull, resumePull: autoSync.resumePull,
@@ -1021,8 +1022,6 @@ function App() {
   const handleAppContentChange = appSave.handleContentChange
   const handleAppSave = appSave.handleSave
   const loadModifiedFiles = refreshGitModifiedFiles
-  const setSyncRepositoryPath = gitSurfaces.setSyncRepositoryPath
-  const syncRepositoryPath = gitSurfaces.syncRepositoryPath
   const triggerSync = autoSync.triggerSync
   const pullAndPush = autoSync.pullAndPush
 
@@ -1047,15 +1046,15 @@ function App() {
   }, [gitFeaturesEnabled, openCommitDialog, runAutomaticCheckpoint, settings.autogit_enabled])
   const handlePullRepository = useCallback((targetVaultPath: string) => {
     if (!gitFeaturesEnabled) return
-    setSyncRepositoryPath(targetVaultPath)
     triggerSync(targetVaultPath)
-  }, [gitFeaturesEnabled, setSyncRepositoryPath, triggerSync])
+  }, [gitFeaturesEnabled, triggerSync])
   const handlePullSelectedRepository = useCallback(() => {
-    handlePullRepository(syncRepositoryPath)
-  }, [handlePullRepository, syncRepositoryPath])
+    if (!gitFeaturesEnabled) return
+    triggerSync()
+  }, [gitFeaturesEnabled, triggerSync])
   const handlePullAndPushSelectedRepository = useCallback(() => {
-    pullAndPush(syncRepositoryPath)
-  }, [pullAndPush, syncRepositoryPath])
+    pullAndPush()
+  }, [pullAndPush])
 
   const handleTrackedContentChange = useCallback((path: string, content: string) => {
     recordAutoGitActivity()

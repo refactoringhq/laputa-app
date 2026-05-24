@@ -8,8 +8,7 @@ import type { McpStatus } from '../../hooks/useMcpStatus'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import type { GitRemoteStatus, LastCommitInfo, SyncStatus } from '../../types'
 import { openExternalUrl } from '../../utils/url'
-import { gitRepositoryLabel, type GitRepositoryOption } from '../../utils/gitRepositories'
-import { GitRepositorySelect } from '../GitRepositorySelect'
+import type { GitRepositoryOption } from '../../utils/gitRepositories'
 import { useDismissibleLayer } from './useDismissibleLayer'
 import { ICON_STYLE, SEP_STYLE } from './styles'
 
@@ -43,16 +42,6 @@ function formatElapsedSync(locale: AppLocale, lastSyncTime: number | null): stri
 function formatSyncLabel(locale: AppLocale, status: SyncStatus, lastSyncTime: number | null): string {
   const labelKey = SYNC_LABEL_KEYS.get(status)
   return labelKey ? translate(locale, labelKey) : formatElapsedSync(locale, lastSyncTime)
-}
-
-function formatSyncBadgeLabel(
-  locale: AppLocale,
-  status: SyncStatus,
-  lastSyncTime: number | null,
-  repositoryLabel?: string | null,
-): string {
-  const label = formatSyncLabel(locale, status, lastSyncTime)
-  return repositoryLabel ? `${repositoryLabel} · ${label}` : label
 }
 
 function syncIconColor(status: SyncStatus): string {
@@ -447,9 +436,6 @@ function PullAction({
 function GitStatusPopup({
   status,
   remoteStatus,
-  repositories = [],
-  selectedRepositoryPath,
-  onRepositoryChange,
   locale = 'en',
   onPull,
   onClose,
@@ -482,21 +468,6 @@ function GitStatusPopup({
         color: 'var(--foreground)',
       }}
     >
-      {repositories.length > 1 && selectedRepositoryPath && onRepositoryChange && (
-        <div style={{ marginBottom: 8 }}>
-          <GitRepositorySelect
-            label={translate(locale, 'git.repository.select')}
-            repositories={repositories}
-            selectedPath={selectedRepositoryPath}
-            onChange={onRepositoryChange}
-            testId="git-status-repository-select"
-          />
-        </div>
-      )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <GitBranch size={13} style={{ color: 'var(--muted-foreground)' }} />
-        <span style={{ fontWeight: 500 }}>{remoteStatus?.branch || '—'}</span>
-      </div>
       <RemoteStatusSummary remoteStatus={remoteStatus} locale={locale} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, color: 'var(--muted-foreground)' }}>
         {translate(locale, 'status.sync.status', { status: syncStatusText(locale, status) })}
@@ -681,9 +652,6 @@ export function SyncBadge({
   const [showPopup, setShowPopup] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
   const isSyncing = status === 'syncing'
-  const selectedRepositoryLabel = selectedRepositoryPath && repositories
-    ? gitRepositoryLabel(selectedRepositoryPath, repositories)
-    : null
 
   useDismissibleLayer(showPopup, popupRef, () => setShowPopup(false))
 
@@ -706,7 +674,7 @@ export function SyncBadge({
       <StatusBarAction copy={syncBadgeTooltipCopy(locale, status)} onClick={handleClick} testId="status-sync" compact={compact}>
         <span style={ICON_STYLE}>
           <SyncStatusIcon status={status} color={syncIconColor(status)} spinning={isSyncing} />
-          {compact ? null : formatSyncBadgeLabel(locale, status, lastSyncTime, selectedRepositoryLabel)}
+          {compact ? null : formatSyncLabel(locale, status, lastSyncTime)}
         </span>
       </StatusBarAction>
       {showPopup && (

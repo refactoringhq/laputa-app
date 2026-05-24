@@ -506,15 +506,16 @@ interface PulseCommit {
 
 ### Auto-Sync
 
-`useAutoSync` hook handles automatic git sync:
+`useAutoSync` hook handles automatic git sync across every active Git repository:
 - Configurable interval (from app settings: `auto_pull_interval_minutes`)
-- Pulls on interval, pushes after commits
-- Awaits the post-pull vault refresh so toasts land after note-list state is fresh
+- Pulls the active repository set concurrently on launch, focus, interval, and manual sync
+- Pushes the active repository set during divergence recovery
+- Awaits the post-pull vault refreshes so toasts land after note-list state is fresh
 - Reopens the clean active tab from disk only when the pull changed that active note, so unrelated updates do not remount the editor
 - Detects merge conflicts → opens `ConflictResolverModal`
-- Tracks remote status (branch, ahead/behind via `git_remote_status`)
+- Tracks aggregate remote status (ahead/behind via `git_remote_status`)
 - Handles push rejection (divergence) → sets `pull_required` status
-- `pullAndPush()`: pulls then auto-pushes for divergence recovery
+- `pullAndPush()`: pulls then auto-pushes each active repository for divergence recovery
 - `ConflictNoteBanner`: inline banner in editor for conflicted notes (Keep mine / Keep theirs)
 
 ### External Vault Refresh
@@ -547,7 +548,7 @@ External vault mutations are any disk writes Tolaria did not just perform throug
 - **No remote indicator**: Neutral chip in the bottom bar when `GitRemoteStatus.hasRemote === false`
 - **Pulse view**: Activity feed when Pulse filter is selected
 - **Pull command**: Cmd+K → "Pull from Remote", also in Vault menu
-- **Git status popup**: Click sync badge → shows branch, ahead/behind, Pull button
+- **Git status popup**: Click sync badge → shows aggregate ahead/behind and a Pull button for the active repository set
 - **Conflict banner**: Inline banner in editor with Keep mine / Keep theirs for conflicted notes
 
 ## BlockNote Customization

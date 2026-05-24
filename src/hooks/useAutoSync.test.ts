@@ -36,15 +36,17 @@ describe('useAutoSync', () => {
     mockInvokeFn.mockImplementation((cmd: string) => {
       if (cmd === 'get_last_commit_info') return Promise.resolve(MOCK_COMMIT_INFO)
       if (cmd === 'get_conflict_files') return Promise.resolve([])
+      if (cmd === 'git_remote_status') return Promise.resolve({ branch: 'main', ahead: 0, behind: 0, hasRemote: true })
       return Promise.resolve(upToDate())
     })
   })
 
-  function renderSync(intervalMinutes: number | null = 5, enabled = true) {
+  function renderSync(intervalMinutes: number | null = 5, enabled = true, vaultPaths?: string[]) {
     return renderHook(() =>
       useAutoSync({
         enabled,
         vaultPath: '/Users/luca/Laputa',
+        vaultPaths,
         intervalMinutes,
         onVaultUpdated,
         onConflict,
@@ -57,6 +59,15 @@ describe('useAutoSync', () => {
     renderSync()
     await waitFor(() => {
       expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Laputa' })
+    })
+  })
+
+  it('pulls all active vaults on mount', async () => {
+    renderSync(5, true, ['/Users/luca/Laputa', '/Users/luca/Work'])
+
+    await waitFor(() => {
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Laputa' })
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Work' })
     })
   })
 
@@ -479,6 +490,62 @@ describe('useAutoSync', () => {
     await waitFor(() => {
       expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Work' })
       expect(onVaultUpdated).toHaveBeenCalledWith(['work.md'], '/Users/luca/Work')
+    })
+  })
+
+  it('manual triggerSync syncs every active vault by default', async () => {
+    const { result } = renderSync(5, true, ['/Users/luca/Laputa', '/Users/luca/Work'])
+    await waitFor(() => {
+      expect(result.current.syncStatus).toBe('idle')
+    })
+
+    mockInvokeFn.mockClear()
+    mockInvokeFn.mockImplementation((cmd: string, args: { vaultPath?: string } = {}) => {
+      if (cmd === 'get_last_commit_info') return Promise.resolve(MOCK_COMMIT_INFO)
+      if (cmd === 'git_remote_status') return Promise.resolve({ branch: 'main', ahead: 0, behind: 0, hasRemote: true })
+      if (cmd === 'git_pull') return Promise.resolve(updated([args.vaultPath?.endsWith('/Work') ? 'work.md' : 'home.md']))
+      return Promise.resolve(upToDate())
+    })
+
+    await act(async () => {
+      result.current.triggerSync()
+    })
+
+    await waitFor(() => {
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Laputa' })
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Work' })
+      expect(onVaultUpdated).toHaveBeenCalledWith(['home.md'], '/Users/luca/Laputa')
+      expect(onVaultUpdated).toHaveBeenCalledWith(['work.md'], '/Users/luca/Work')
+      expect(onToast).toHaveBeenCalledWith('Pulled 2 update(s) from remote')
+    })
+  })
+
+  it('pullAndPush pulls and pushes every active vault by default', async () => {
+    const { result } = renderSync(5, true, ['/Users/luca/Laputa', '/Users/luca/Work'])
+    await waitFor(() => {
+      expect(result.current.syncStatus).toBe('idle')
+    })
+
+    mockInvokeFn.mockClear()
+    mockInvokeFn.mockImplementation((cmd: string) => {
+      if (cmd === 'get_conflict_files') return Promise.resolve([])
+      if (cmd === 'get_last_commit_info') return Promise.resolve(MOCK_COMMIT_INFO)
+      if (cmd === 'git_remote_status') return Promise.resolve({ branch: 'main', ahead: 0, behind: 0, hasRemote: true })
+      if (cmd === 'git_pull') return Promise.resolve(upToDate())
+      if (cmd === 'git_push') return Promise.resolve({ status: 'ok', message: 'Pushed successfully' })
+      return Promise.resolve(upToDate())
+    })
+
+    await act(async () => {
+      result.current.pullAndPush()
+    })
+
+    await waitFor(() => {
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Laputa' })
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Work' })
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_push', { vaultPath: '/Users/luca/Laputa' })
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_push', { vaultPath: '/Users/luca/Work' })
+      expect(onToast).toHaveBeenCalledWith('Pulled and pushed successfully')
     })
   })
 
