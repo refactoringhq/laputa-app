@@ -1,5 +1,6 @@
 pub mod ai_agents;
 pub mod ai_models;
+mod app_icon;
 pub mod app_updater;
 pub mod claude_cli;
 mod claude_invocation;
@@ -501,6 +502,7 @@ macro_rules! app_invoke_handler {
             commands::get_settings,
             commands::check_for_app_update,
             commands::update_menu_state,
+            commands::update_app_icon,
             commands::trigger_menu_command,
             commands::update_current_window_min_size,
             commands::perform_current_window_titlebar_double_click,
