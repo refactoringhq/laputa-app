@@ -6,7 +6,7 @@ import type { GitPullResult, GitPushResult, GitRemoteStatus, LastCommitInfo, Syn
 import { trackEvent } from '../lib/telemetry'
 
 const DEFAULT_INTERVAL_MS = 5 * 60_000
-const FOCUS_COOLDOWN_MS = 30_000
+const AUTO_SYNC_COOLDOWN_MS = 30_000
 
 type MaybePromise = void | Promise<void>
 
@@ -71,6 +71,10 @@ interface PullOutcome {
 interface PushOutcome {
   result: GitPushResult
   vaultPath: string
+}
+
+interface SyncBudgetOptions {
+  force?: boolean
 }
 
 interface UpdatedVaultRefreshOptions {
@@ -343,19 +347,18 @@ function useAutoSyncLifecycle(options: {
     if (!enabled) return
 
     void checkExistingConflicts().then(hasConflicts => {
-      if (!hasConflicts) void performPull()
+      if (hasConflicts) {
+        void refreshRemoteStatus()
+        return
+      }
+      void performPull()
     })
-    void refreshRemoteStatus()
   }, [checkExistingConflicts, enabled, performPull, refreshRemoteStatus])
 
-  const lastPullTimeRef = useRef(0)
   useEffect(() => {
     if (!enabled) return
 
     const handleFocus = () => {
-      const now = Date.now()
-      if (now - lastPullTimeRef.current < FOCUS_COOLDOWN_MS) return
-      lastPullTimeRef.current = now
       void performPull()
     }
     window.addEventListener('focus', handleFocus)
@@ -401,6 +404,24 @@ export function useAutoSync({
   const resolveTargetVaultPaths = useCallback((targetVaultPath?: string) => (
     targetVaultPath ? uniqueVaultPaths([targetVaultPath]) : targetVaultPaths
   ), [targetVaultPaths])
+  const lastAutoSyncStartedAtRef = useRef<Map<string, number>>(new Map())
+  const resolveBudgetedTargetVaultPaths = useCallback((
+    targetVaultPath?: string,
+    options: SyncBudgetOptions = {},
+  ) => {
+    const resolvedPaths = resolveTargetVaultPaths(targetVaultPath)
+    const now = Date.now()
+    const duePaths = options.force
+      ? resolvedPaths
+      : resolvedPaths.filter((path) => {
+        const lastStartedAt = lastAutoSyncStartedAtRef.current.get(path)
+        return lastStartedAt === undefined || now - lastStartedAt >= AUTO_SYNC_COOLDOWN_MS
+      })
+    for (const path of duePaths) {
+      lastAutoSyncStartedAtRef.current.set(path, now)
+    }
+    return duePaths
+  }, [resolveTargetVaultPaths])
   const refreshRemoteStatus = useRemoteStatusRefresher(setRemoteStatus)
   const checkExistingConflicts = useConflictChecker(setSyncStatus, setConflictFiles, setConflictVaultPath, callbacksRef)
   const refreshCommitInfo = useCommitInfoRefresher(vaultPath, setLastCommitInfo)
@@ -413,9 +434,9 @@ export function useAutoSync({
     [refreshRemoteStatus, targetVaultPaths],
   )
 
-  const performPull = useCallback(async (targetVaultPath?: string) => {
+  const performPull = useCallback(async (targetVaultPath?: string, options: SyncBudgetOptions = {}) => {
     if (!enabled) return
-    const pullVaultPaths = resolveTargetVaultPaths(targetVaultPath)
+    const pullVaultPaths = resolveBudgetedTargetVaultPaths(targetVaultPath, options)
     if (pullVaultPaths.length === 0) return
 
     await runSyncTask({
@@ -465,12 +486,12 @@ export function useAutoSync({
         void refreshRemoteStatus(pullVaultPaths)
       },
     })
-  }, [enabled, resolveTargetVaultPaths, refreshCommitInfo, checkExistingConflicts, refreshRemoteStatus])
+  }, [enabled, resolveBudgetedTargetVaultPaths, refreshCommitInfo, checkExistingConflicts, refreshRemoteStatus])
 
   /** Pull from remote, then auto-push if successful. Used for divergence recovery. */
   const pullAndPush = useCallback(async (targetVaultPath?: string) => {
     if (!enabled) return
-    const pullVaultPaths = resolveTargetVaultPaths(targetVaultPath)
+    const pullVaultPaths = resolveBudgetedTargetVaultPaths(targetVaultPath, { force: true })
     if (pullVaultPaths.length === 0) return
 
     await runSyncTask({
@@ -536,7 +557,7 @@ export function useAutoSync({
         void refreshRemoteStatus(pullVaultPaths)
       },
     })
-  }, [enabled, resolveTargetVaultPaths, refreshCommitInfo, checkExistingConflicts, refreshRemoteStatus])
+  }, [enabled, resolveBudgetedTargetVaultPaths, refreshCommitInfo, checkExistingConflicts, refreshRemoteStatus])
 
   const handlePushRejected = useCallback(() => {
     setSyncStatus('pull_required')
@@ -557,7 +578,7 @@ export function useAutoSync({
     if (!enabled) return
 
     trackEvent('sync_triggered')
-    void performPull(targetVaultPath)
+    void performPull(targetVaultPath, { force: true })
   }, [enabled, performPull])
 
   return { syncStatus, lastSyncTime, conflictFiles, conflictVaultPath, lastCommitInfo, remoteStatus, triggerSync, pullAndPush, pausePull, resumePull, handlePushRejected }

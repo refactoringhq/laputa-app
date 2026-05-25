@@ -509,6 +509,8 @@ interface PulseCommit {
 `useAutoSync` hook handles automatic git sync across every active Git repository:
 - Configurable interval (from app settings: `auto_pull_interval_minutes`)
 - Pulls the active repository set concurrently on launch, focus, interval, and manual sync
+- Budgets automatic launch/focus/interval pulls per repository with a short cooldown so focus or low interval settings do not repeat network Git work immediately after a recent sync; manual sync bypasses this budget
+- Refreshes aggregate remote status after a pull, and avoids a separate startup status fetch when the initial pull will already refresh it
 - Pushes the active repository set during divergence recovery
 - Awaits the post-pull vault refreshes so toasts land after note-list state is fresh
 - Reopens the clean active tab from disk only when the pull changed that active note, so unrelated updates do not remount the editor

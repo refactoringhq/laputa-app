@@ -26,6 +26,10 @@ function conflict(files: string[]): GitPullResult {
   return { status: 'conflict', message: `Merge conflict in ${files.length} file(s)`, updatedFiles: [], conflictFiles: files }
 }
 
+function commandCalls(command: string) {
+  return mockInvokeFn.mock.calls.filter((call: unknown[]) => call[0] === command)
+}
+
 describe('useAutoSync', () => {
   const onVaultUpdated = vi.fn()
   const onConflict = vi.fn()
@@ -69,6 +73,40 @@ describe('useAutoSync', () => {
       expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Laputa' })
       expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Work' })
     })
+  })
+
+  it('dedupes automatic mount, focus, and interval remote-status refreshes within cooldown', async () => {
+    const now = vi.spyOn(Date, 'now')
+    let clock = 1_000_000
+    now.mockImplementation(() => clock)
+
+    try {
+      renderSync(0.001, true, ['/Users/luca/Laputa', '/Users/luca/Work'])
+
+      await waitFor(() => {
+        expect(commandCalls('git_pull')).toHaveLength(2)
+        expect(commandCalls('git_remote_status')).toHaveLength(2)
+      })
+
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(commandCalls('git_remote_status')).toHaveLength(2)
+
+      mockInvokeFn.mockClear()
+      clock += 5_000
+
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+        await new Promise(resolve => setTimeout(resolve, 100))
+      })
+
+      expect(commandCalls('git_pull')).toHaveLength(0)
+      expect(commandCalls('git_remote_status')).toHaveLength(0)
+    } finally {
+      now.mockRestore()
+    }
   })
 
   it('does not call git operations when disabled', async () => {
