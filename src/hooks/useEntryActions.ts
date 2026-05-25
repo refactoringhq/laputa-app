@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react'
 import type { VaultEntry } from '../types'
 import { isMissingFrontmatterTargetError, type FrontmatterOpOptions } from './frontmatterOps'
 import { trackEvent } from '../lib/telemetry'
+import { findTypeDefinition } from '../utils/typeDefinitions'
 
 interface EntryActionsConfig {
   entries: VaultEntry[]
@@ -49,14 +50,6 @@ interface RenameTypeSectionArgs {
   label: string
 }
 
-function findTypeEntry(entries: VaultEntry[], typeName: string, typeEntryPath?: string): VaultEntry | undefined {
-  if (typeEntryPath) {
-    const entry = entries.find((candidate) => candidate.path === typeEntryPath)
-    if (entry?.isA === 'Type') return entry
-  }
-  return entries.find((entry) => entry.isA === 'Type' && entry.title === typeName)
-}
-
 function logOptimisticRollback(label: string, error: unknown): void {
   if (isMissingFrontmatterTargetError(error)) {
     console.warn(label, error)
@@ -70,7 +63,7 @@ async function findOrCreateType(
   typeName: string,
   typeEntryPath?: string,
 ): Promise<VaultEntry | null> {
-  const existingType = findTypeEntry(deps.entries, typeName, typeEntryPath)
+  const existingType = findTypeDefinition({ entries: deps.entries, type: typeName, typeEntryPath })
   if (existingType) return existingType
   if (typeEntryPath) return null
   try {

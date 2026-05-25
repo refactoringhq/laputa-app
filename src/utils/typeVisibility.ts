@@ -1,37 +1,24 @@
 import type { VaultEntry, WorkspaceIdentity } from '../types'
-
-const NO_WORKSPACE_KEY = '__tolaria_no_workspace__'
+import {
+  entryTypeWorkspaceKey,
+  findTypeDefinitionForWorkspace as findTypeDefinitionForWorkspaceByQuery,
+  isActiveTypeDefinition,
+  isMarkdownEntry,
+  isTypeDefinitionForName,
+  normalizeTypeName,
+  typeWorkspaceKey,
+} from './typeDefinitions'
 
 export type TypeVisibilityLookup = Record<string, Record<string, boolean>>
-
-function isMarkdown(entry: VaultEntry): boolean {
-  return entry.fileKind === 'markdown' || !entry.fileKind
-}
-
-function typeKey(type: string): string {
-  return type.trim().toLowerCase()
-}
-
-function workspaceKey(path?: string | null): string {
-  return path?.trim() || NO_WORKSPACE_KEY
-}
-
-function entryWorkspaceKey(entry: Pick<VaultEntry, 'workspace'>): string {
-  return workspaceKey(entry.workspace?.path)
-}
-
-function isActiveTypeDefinition(entry: VaultEntry): boolean {
-  return isMarkdown(entry) && entry.isA === 'Type' && !entry.archived
-}
 
 export function buildTypeVisibilityLookup(entries: VaultEntry[]): TypeVisibilityLookup {
   const lookup: TypeVisibilityLookup = {}
   for (const entry of entries) {
     if (!isActiveTypeDefinition(entry)) continue
-    const key = typeKey(entry.title)
+    const key = normalizeTypeName({ type: entry.title })
     if (!key) continue
     lookup[key] = lookup[key] ?? {}
-    lookup[key][entryWorkspaceKey(entry)] = entry.visible !== false
+    lookup[key][entryTypeWorkspaceKey(entry)] = entry.visible !== false
   }
   return lookup
 }
@@ -41,9 +28,9 @@ export function isTypeVisibleInWorkspace(
   type: string,
   workspacePath?: string | null,
 ): boolean {
-  const typeLookup = lookup[typeKey(type)]
+  const typeLookup = lookup[normalizeTypeName({ type })]
   if (!typeLookup) return true
-  const visible = typeLookup[workspaceKey(workspacePath)]
+  const visible = typeLookup[typeWorkspaceKey({ path: workspacePath })]
   return visible !== false
 }
 
@@ -52,12 +39,8 @@ export function isSectionEntryVisibleForType(
   type: string,
   lookup: TypeVisibilityLookup,
 ): boolean {
-  if (!isMarkdown(entry) || entry.isA !== type) return false
+  if (!isMarkdownEntry(entry) || entry.isA !== type) return false
   return isTypeVisibleInWorkspace(lookup, type, entry.workspace?.path)
-}
-
-function isMatchingTypeDefinition(entry: VaultEntry, type: string): boolean {
-  return isActiveTypeDefinition(entry) && typeKey(entry.title) === typeKey(type)
 }
 
 export function isTypeSectionVisible(
@@ -69,7 +52,7 @@ export function isTypeSectionVisible(
 
   for (const entry of entries) {
     if (isSectionEntryVisibleForType(entry, type, lookup)) return true
-    if (!isMatchingTypeDefinition(entry, type)) continue
+    if (!isTypeDefinitionForName(entry, { type })) continue
     hasMatchingTypeDefinition = true
     if (isTypeVisibleInWorkspace(lookup, type, entry.workspace?.path)) return true
   }
@@ -102,9 +85,5 @@ export function findTypeDefinitionForWorkspace(
   type: string,
   workspacePath: string,
 ): VaultEntry | null {
-  const key = typeKey(type)
-  return entries.find((entry) => (
-    isMatchingTypeDefinition(entry, key)
-      && entry.workspace?.path === workspacePath
-  )) ?? null
+  return findTypeDefinitionForWorkspaceByQuery({ entries, type, workspacePath })
 }

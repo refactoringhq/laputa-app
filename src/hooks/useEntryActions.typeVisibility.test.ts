@@ -23,6 +23,19 @@ function setup(entries: VaultEntry[]) {
 }
 
 describe('useEntryActions type visibility', () => {
+  it('targets an existing Type entry using normalized Type identity', async () => {
+    const typeEntry = makeEntry({ isA: 'Type', title: 'Journal', path: '/vault/journal.md', visible: null })
+    const { result, createTypeEntry, handleUpdateFrontmatter, updateEntry } = setup([typeEntry])
+
+    await act(async () => {
+      await result.current.handleToggleTypeVisibility(' journal ')
+    })
+
+    expect(createTypeEntry).not.toHaveBeenCalled()
+    expect(handleUpdateFrontmatter).toHaveBeenCalledWith('/vault/journal.md', 'visible', false)
+    expect(updateEntry).toHaveBeenCalledWith('/vault/journal.md', { visible: false })
+  })
+
   it('targets the provided Type entry path when duplicate type names exist', async () => {
     const hiddenTypeEntry = makeEntry({ isA: 'Type', title: 'Journal', path: '/vault/main/journal.md', visible: false })
     const visibleTypeEntry = makeEntry({ isA: 'Type', title: 'Journal', path: '/vault/work/journal.md', visible: null })
