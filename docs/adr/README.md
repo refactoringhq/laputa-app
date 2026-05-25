@@ -170,8 +170,9 @@ proposed → active → superseded
 | [0114](0114-mounted-workspaces-unified-graph.md) | Mounted workspaces unified graph | active |
 | [0115](0115-scoped-react-context-for-shared-ui-preferences.md) | Scoped React Context for shared UI preferences | active |
 | [0116](0116-rich-raw-transition-and-serialization-ownership.md) | Rich/raw transition and serialization ownership | active |
-| [0118](0118-entry-scoped-note-windows-without-vault-index-scans.md) | Entry-scoped note windows without vault index scans | active |
+| [0118](0118-entry-scoped-note-windows-without-vault-index-scans.md) | Entry-scoped note windows without vault index scans | superseded -> [0123](0123-full-vault-graph-for-secondary-note-windows.md) |
 | [0119](0119-vault-neutral-mcp-registration-with-mounted-workspace-guidance.md) | Vault-neutral MCP registration with mounted workspace guidance | active |
 | [0120](0120-stable-appimage-mcp-server-path-with-opencode-registration.md) | Stable AppImage MCP server path with OpenCode registration | active |
 | [0121](0121-appimage-external-fallback-for-audio-and-video-previews.md) | AppImage external fallback for audio and video previews | active |
 | [0122](0122-scalar-array-frontmatter-properties.md) | Scalar array frontmatter properties | active |
+| [0123](0123-full-vault-graph-for-secondary-note-windows.md) | Full vault graph for secondary note windows | active |

@@ -576,7 +576,7 @@ describe('App', () => {
     })
   })
 
-  it('opens a note window by loading only the requested entry', async () => {
+  it('opens a note window after loading the active vault graph', async () => {
     const listVault = vi.fn(() => mockEntries)
     const reloadVaultEntry = vi.fn(({ path }: { path: string }) =>
       mockEntries.find((entry) => entry.path === path) ?? null,
@@ -599,7 +599,7 @@ describe('App', () => {
     expect(getNoteContent).toHaveBeenCalledWith({ path: '/vault/project/test.md', vaultPath: '/vault' })
     await waitFor(() => expect(window.__laputaTest?.activeTabPath).toBe('/vault/project/test.md'))
     expect(screen.getByTestId('blocknote-view')).toHaveAttribute('data-editable', 'true')
-    expect(listVault).not.toHaveBeenCalled()
+    expect(listVault).toHaveBeenCalled()
   })
 
   it('shows keyboard shortcut hints', async () => {

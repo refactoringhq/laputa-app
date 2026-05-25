@@ -221,7 +221,7 @@ describe('App note windows', () => {
     )
   })
 
-  it('keeps note windows scoped to the active entry without loading the vault index', async () => {
+  it('loads the active vault graph in note windows while opening the requested note', async () => {
     renderApp(<App />)
 
     await waitFor(() => {
@@ -230,20 +230,20 @@ describe('App note windows', () => {
         vaultPath: '/vault',
       })
     })
-    expect(commandResults.list_vault).not.toHaveBeenCalled()
+    expect(commandResults.list_vault).toHaveBeenCalled()
 
     await waitFor(() => {
       expect(screen.getByTestId('mock-editor-entry-titles')).toHaveTextContent(
-        'Test Project',
+        'Test Project|Software Development|Second Project',
       )
     })
     expect(editorSnapshots.at(-1)).toEqual({
       activeTabPath: activeEntry.path,
-      entryTitles: ['Test Project'],
+      entryTitles: ['Test Project', 'Software Development', 'Second Project'],
     })
   })
 
-  it('opens repeated note windows without repeated full-vault scans', async () => {
+  it('opens repeated note windows through the full app vault loader', async () => {
     const firstWindow = renderApp(<App />)
 
     await waitFor(() => {
@@ -268,6 +268,6 @@ describe('App note windows', () => {
       })
     })
     expect(commandResults.reload_vault_entry).toHaveBeenCalledTimes(2)
-    expect(commandResults.list_vault).not.toHaveBeenCalled()
+    expect(vi.mocked(commandResults.list_vault).mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 })

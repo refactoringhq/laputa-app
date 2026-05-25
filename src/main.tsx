@@ -19,11 +19,10 @@ import {
 import { isRecoveredBlockNoteRenderError } from './components/blockNoteRenderRecovery'
 import { isMac, shouldUseCustomWindowChrome } from './utils/platform'
 import { reloadFrontendOnceIfStartupFailed } from './utils/frontendReady'
-import { isNoteWindow } from './utils/windowMode'
 
 const TLDRAW_CONTEXT_MENU_SELECTOR = '.tldraw-whiteboard'
 
-const RootApp = lazy(() => (isNoteWindow() ? import('./NoteWindowApp') : import('./App.tsx')))
+const RootApp = lazy(() => import('./App.tsx'))
 
 function dataTransferHasFiles(dataTransfer: DataTransfer | null): boolean {
   if (!dataTransfer) return false

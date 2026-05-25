@@ -356,7 +356,7 @@ function App() {
     resolvedPath,
     settings,
     vaultSwitcherLoaded: vaultSwitcher.loaded,
-    windowMode: Boolean(noteWindowParams),
+    windowMode: false,
   })
   const vaultWorkspaceOrder = useMemo(
     () => vaultSwitcher.allVaults.map((vault) => vault.path),
@@ -382,12 +382,7 @@ function App() {
     windowMode: Boolean(noteWindowParams),
   })
 
-  const vault = useVaultLoader(
-    noteWindowParams ? '' : resolvedPath,
-    graphVaults,
-    multiWorkspaceEnabled ? defaultWorkspacePath : null,
-    folderVaults,
-  )
+  const vault = useVaultLoader(resolvedPath, graphVaults, multiWorkspaceEnabled ? defaultWorkspacePath : null, folderVaults)
   const gitRepositories = useMemo(() => activeGitRepositories({
     defaultVaultPath: graphDefaultWorkspacePath,
     multiWorkspaceEnabled,
@@ -402,21 +397,20 @@ function App() {
     repositories: gitRepositories,
   })
   const watchedVaultPaths = useMemo(() => {
-    if (noteWindowParams) return []
     if (visibleWorkspacePathList && visibleWorkspacePathList.length > 0) return visibleWorkspacePathList
     return resolvedPath.trim() ? [resolvedPath] : []
-  }, [noteWindowParams, resolvedPath, visibleWorkspacePathList])
+  }, [resolvedPath, visibleWorkspacePathList])
   const visibleEntries = useVisibleWorkspaceEntries({
     entries: vault.entries,
     multiWorkspaceEnabled,
     visibleWorkspacePathList,
   })
-  const runtimeMissingVaultPath = !noteWindowParams ? vault.unavailableVaultPath : null
+  const runtimeMissingVaultPath = vault.unavailableVaultPath
   const {
     markInternalWrite: markRecentVaultWrite,
     filterExternalPaths: filterExternalVaultPaths,
   } = useRecentVaultWrites({
-    vaultPath: noteWindowParams ? '' : resolvedPath,
+    vaultPath: resolvedPath,
     vaultPaths: watchedVaultPaths,
   })
   const {
@@ -608,7 +602,7 @@ function App() {
     setToastMessage,
     updateEntry: vault.updateEntry,
     vaultPath: resolvedPath,
-    defaultWorkspacePath: noteWindowParams || !multiWorkspaceEnabled ? null : defaultWorkspacePath,
+    defaultWorkspacePath: multiWorkspaceEnabled ? defaultWorkspacePath : null,
     vaults: graphVaults ?? [],
     addPendingSave: handleCreatedVaultEntryPersisting,
     removePendingSave: vault.removePendingSave,
@@ -695,7 +689,7 @@ function App() {
     }
   }, [watchedVaultPaths])
   useVaultWatcher({
-    vaultPath: noteWindowParams ? '' : resolvedPath,
+    vaultPath: resolvedPath,
     vaultPaths: watchedVaultPaths,
     onVaultChanged: handleFocusedVaultUpdate,
     filterChangedPaths: filterExternalVaultPaths,
@@ -1742,7 +1736,7 @@ function App() {
               tabs={notes.tabs}
               activeTabPath={notes.activeTabPath}
               isVaultLoading={isVaultContentLoading}
-              entries={noteWindowParams && activeTab ? [activeTab.entry] : visibleEntries}
+              entries={visibleEntries}
               onNavigateWikilink={notes.handleNavigateWikilink}
               onLoadDiff={loadDiffForPath}
               onLoadDiffAtCommit={loadDiffAtCommitForPath}

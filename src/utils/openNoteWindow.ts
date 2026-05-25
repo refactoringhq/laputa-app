@@ -36,7 +36,7 @@ export function buildRuntimeNoteWindowUrl(
 }
 
 /**
- * Opens a note in a new Tauri window with a minimal editor-only layout.
+ * Opens a note in a new Tauri window that starts in an editor-only layout.
  * In browser mode (non-Tauri), this is a no-op.
  */
 export async function openNoteInNewWindow(notePath: string, vaultPath: string, noteTitle: string): Promise<void> {
