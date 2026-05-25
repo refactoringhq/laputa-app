@@ -9,6 +9,7 @@ pub enum AiAgentId {
     Pi,
     Gemini,
     Kiro,
+    Hermes,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -33,6 +34,7 @@ pub struct AiAgentsStatus {
     pub pi: AiAgentAvailability,
     pub gemini: AiAgentAvailability,
     pub kiro: AiAgentAvailability,
+    pub hermes: AiAgentAvailability,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -89,6 +91,7 @@ pub fn get_ai_agents_status() -> AiAgentsStatus {
         pi: crate::pi_cli::check_cli(),
         gemini: crate::gemini_cli::check_cli(),
         kiro: crate::kiro_cli::check_cli(),
+        hermes: crate::hermes_cli::check_cli(),
     }
 }
 
@@ -153,6 +156,7 @@ where
             crate::gemini_cli::run_agent_stream(mapped, emit)
         }
         AiAgentId::Kiro => run_kiro_agent_stream(request, permission_mode, emit),
+        AiAgentId::Hermes => run_hermes_agent_stream(request, permission_mode, emit),
     }
 }
 
@@ -172,6 +176,24 @@ where
         permission_mode,
     };
     crate::kiro_cli::run_agent_stream(mapped, emit)
+}
+
+fn run_hermes_agent_stream<F>(
+    request: AiAgentStreamRequest,
+    permission_mode: AiAgentPermissionMode,
+    emit: F,
+) -> Result<String, String>
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    let mapped = crate::cli_agent_runtime::AgentStreamRequest {
+        message: request.message,
+        system_prompt: request.system_prompt,
+        vault_path: request.vault_path,
+        vault_paths: request.vault_paths,
+        permission_mode,
+    };
+    crate::hermes_cli::run_agent_stream(mapped, emit)
 }
 
 fn availability_from_claude() -> AiAgentAvailability {
@@ -254,6 +276,8 @@ mod tests {
             status.opencode.installed,
             status.pi.installed,
             status.gemini.installed,
+            status.kiro.installed,
+            status.hermes.installed,
         ];
 
         assert!(install_flags

@@ -22,6 +22,8 @@ const installedAiAgentsStatus = {
   opencode: { status: 'installed' as const, version: '0.3.1' },
   pi: { status: 'installed' as const, version: '0.70.2' },
   gemini: { status: 'installed' as const, version: '0.5.1' },
+  kiro: { status: 'installed' as const, version: '0.41.0' },
+  hermes: { status: 'installed' as const, version: '0.14.0' },
 }
 
 const DEFAULT_WINDOW_WIDTH = 1280

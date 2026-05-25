@@ -27,6 +27,8 @@ describe('useAiAgentsStatus', () => {
           opencode: { installed: true, version: '0.3.1' },
           pi: { installed: true, version: '0.70.2' },
           gemini: { installed: true, version: '0.5.1' },
+          kiro: { status: 'missing', version: null },
+          hermes: { installed: true, version: '0.14.0' },
         })
       }
       return Promise.resolve(null)
@@ -39,6 +41,8 @@ describe('useAiAgentsStatus', () => {
     expect(result.current.opencode.status).toBe('checking')
     expect(result.current.pi.status).toBe('checking')
     expect(result.current.gemini.status).toBe('checking')
+    expect(result.current.kiro.status).toBe('checking')
+    expect(result.current.hermes.status).toBe('checking')
 
     await waitFor(() => {
       expect(result.current.claude_code).toEqual({ status: 'installed', version: '1.0.20' })
@@ -46,6 +50,8 @@ describe('useAiAgentsStatus', () => {
       expect(result.current.opencode).toEqual({ status: 'installed', version: '0.3.1' })
       expect(result.current.pi).toEqual({ status: 'installed', version: '0.70.2' })
       expect(result.current.gemini).toEqual({ status: 'installed', version: '0.5.1' })
+      expect(result.current.kiro).toEqual({ status: 'missing', version: null })
+      expect(result.current.hermes).toEqual({ status: 'installed', version: '0.14.0' })
     })
   })
 
@@ -60,6 +66,8 @@ describe('useAiAgentsStatus', () => {
       expect(result.current.opencode.status).toBe('missing')
       expect(result.current.pi.status).toBe('missing')
       expect(result.current.gemini.status).toBe('missing')
+      expect(result.current.kiro.status).toBe('missing')
+      expect(result.current.hermes.status).toBe('missing')
     })
   })
 })

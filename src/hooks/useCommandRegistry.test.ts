@@ -343,6 +343,8 @@ describe('useCommandRegistry', () => {
         opencode: { status: 'missing', version: null },
         pi: { status: 'missing', version: null },
         gemini: { status: 'missing', version: null },
+        kiro: { status: 'missing', version: null },
+        hermes: { status: 'missing', version: null },
       },
       selectedAiAgent: 'claude_code',
     })
@@ -910,6 +912,8 @@ describe('reload-vault command', () => {
         opencode: { status: 'installed', version: '0.3.1' },
         pi: { status: 'installed', version: '0.70.2' },
         gemini: { status: 'installed', version: '0.5.1' },
+        kiro: { status: 'missing', version: null },
+        hermes: { status: 'installed', version: '0.14.0' },
       },
       selectedAiAgent: 'claude_code',
       onSetDefaultAiAgent,
@@ -922,7 +926,7 @@ describe('reload-vault command', () => {
     expect(findCommand(result.current, 'switch-ai-agent-opencode')).toBeDefined()
     expect(findCommand(result.current, 'switch-ai-agent-pi')).toBeDefined()
     expect(findCommand(result.current, 'switch-ai-agent-gemini')).toBeDefined()
-
+    expect(findCommand(result.current, 'switch-ai-agent-hermes')).toBeDefined()
     cmd!.execute()
     expect(onSetDefaultAiAgent).toHaveBeenCalledWith('codex')
     expect(findCommand(result.current, 'switch-default-ai-agent')).toBeUndefined()
@@ -936,6 +940,8 @@ describe('reload-vault command', () => {
         opencode: { status: 'missing', version: null },
         pi: { status: 'missing', version: null },
         gemini: { status: 'missing', version: null },
+        kiro: { status: 'missing', version: null },
+        hermes: { status: 'missing', version: null },
       },
       selectedAiAgent: 'claude_code',
       onSetDefaultAiAgent: vi.fn(),

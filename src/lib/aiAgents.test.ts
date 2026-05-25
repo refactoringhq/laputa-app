@@ -14,6 +14,7 @@ describe('aiAgents helpers', () => {
     expect(normalizeStoredAiAgent('pi')).toBe('pi')
     expect(normalizeStoredAiAgent('gemini')).toBe('gemini')
     expect(normalizeStoredAiAgent('kiro')).toBe('kiro')
+    expect(normalizeStoredAiAgent('hermes')).toBe('hermes')
     expect(normalizeStoredAiAgent('cursor')).toBeNull()
   })
 
@@ -25,10 +26,12 @@ describe('aiAgents helpers', () => {
   it('normalizes raw status payloads', () => {
     const statuses = normalizeAiAgentsStatus({
       claude_code: { installed: true, version: '1.0.20' },
-      codex: { installed: false, version: null },
+      codex: { status: 'missing', version: null },
       opencode: { installed: true, version: '0.3.1' },
       pi: { installed: true, version: '0.70.2' },
       gemini: { installed: true, version: '0.5.1' },
+      kiro: { status: 'missing', version: null },
+      hermes: { installed: true, version: '0.14.0' },
     })
 
     expect(statuses.claude_code).toEqual({ status: 'installed', version: '1.0.20' })
@@ -36,6 +39,8 @@ describe('aiAgents helpers', () => {
     expect(statuses.opencode).toEqual({ status: 'installed', version: '0.3.1' })
     expect(statuses.pi).toEqual({ status: 'installed', version: '0.70.2' })
     expect(statuses.gemini).toEqual({ status: 'installed', version: '0.5.1' })
+    expect(statuses.kiro).toEqual({ status: 'missing', version: null })
+    expect(statuses.hermes).toEqual({ status: 'installed', version: '0.14.0' })
   })
 
   it('cycles through the supported agents', () => {
@@ -44,6 +49,7 @@ describe('aiAgents helpers', () => {
     expect(getNextAiAgentId('opencode')).toBe('pi')
     expect(getNextAiAgentId('pi')).toBe('gemini')
     expect(getNextAiAgentId('gemini')).toBe('kiro')
-    expect(getNextAiAgentId('kiro')).toBe('claude_code')
+    expect(getNextAiAgentId('kiro')).toBe('hermes')
+    expect(getNextAiAgentId('hermes')).toBe('claude_code')
   })
 })
