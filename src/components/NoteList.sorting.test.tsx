@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { NoteList } from './NoteList'
 import { APP_STORAGE_KEYS, LEGACY_APP_STORAGE_KEYS } from '../constants/appStorage'
@@ -192,6 +192,28 @@ describe('NoteList sort controls', () => {
     expect(screen.getByTestId('sort-option-created')).toBeInTheDocument()
     expect(screen.getByTestId('sort-option-title')).toBeInTheDocument()
     expect(screen.getByTestId('sort-option-status')).toBeInTheDocument()
+  })
+
+  it('keeps the sort menu in a viewport-clamped fixed layer', () => {
+    renderNoteList()
+    const trigger = screen.getByTestId('sort-button-__list__')
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 20,
+      top: 20,
+      right: 44,
+      bottom: 40,
+      left: 0,
+      width: 44,
+      height: 20,
+      toJSON: () => ({}),
+    })
+
+    fireEvent.click(trigger)
+
+    const menu = screen.getByTestId('sort-menu-__list__')
+    expect(menu).toHaveClass('fixed')
+    expect(menu).toHaveStyle({ left: '8px', top: '44px' })
   })
 
   it('changes list order when a different sort option is selected', () => {

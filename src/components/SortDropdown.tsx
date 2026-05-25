@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 import { ArrowUp, ArrowDown } from '@phosphor-icons/react'
 import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
@@ -16,10 +17,21 @@ const SORT_LABEL_KEYS = {
   status: 'noteList.sort.status',
 } satisfies Record<string, TranslationKey>
 const SORT_LABEL_KEYS_BY_OPTION = new Map<string, TranslationKey>(Object.entries(SORT_LABEL_KEYS))
+const SORT_MENU_WIDTH = 170
+const SORT_MENU_MAX_HEIGHT = 280
+const SORT_MENU_MIN_HEIGHT = 160
+const SORT_MENU_OFFSET = 4
+const SORT_MENU_VIEWPORT_PADDING = 8
 
 type SortMenuAction =
   | { type: 'close' }
   | { type: 'focus'; index: number }
+
+interface SortMenuPosition {
+  left: number
+  top: number
+  maxHeight: number
+}
 
 function getLocalizedSortOptionLabel(option: SortOption, locale: AppLocale): string {
   if (option.startsWith('property:')) return option.slice('property:'.length)
@@ -49,6 +61,30 @@ function resolveFocusedIndex(groupLabel: string, current: SortOption, sortItems:
 
 function focusSortItem(sortButtonRefs: React.MutableRefObject<Array<HTMLButtonElement | null>>, index: number) {
   sortButtonRefs.current.at(index)?.focus()
+}
+
+function clampMenuPosition(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+function resolveSortMenuPosition(trigger: HTMLElement): SortMenuPosition {
+  const rect = trigger.getBoundingClientRect()
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+  const maxLeft = Math.max(SORT_MENU_VIEWPORT_PADDING, viewportWidth - SORT_MENU_WIDTH - SORT_MENU_VIEWPORT_PADDING)
+  const left = clampMenuPosition(rect.right - SORT_MENU_WIDTH, SORT_MENU_VIEWPORT_PADDING, maxLeft)
+  const belowTop = rect.bottom + SORT_MENU_OFFSET
+  const availableBelow = viewportHeight - belowTop - SORT_MENU_VIEWPORT_PADDING
+  const availableAbove = rect.top - SORT_MENU_VIEWPORT_PADDING - SORT_MENU_OFFSET
+  const openAbove = availableBelow < SORT_MENU_MIN_HEIGHT && availableAbove > availableBelow
+  const availableHeight = openAbove ? availableAbove : availableBelow
+  const viewportBoundedMinHeight = Math.min(SORT_MENU_MIN_HEIGHT, Math.max(0, viewportHeight - (SORT_MENU_VIEWPORT_PADDING * 2)))
+  const maxHeight = Math.max(viewportBoundedMinHeight, Math.min(SORT_MENU_MAX_HEIGHT, availableHeight))
+  const top = openAbove
+    ? Math.max(SORT_MENU_VIEWPORT_PADDING, rect.top - SORT_MENU_OFFSET - maxHeight)
+    : Math.min(belowTop, viewportHeight - SORT_MENU_VIEWPORT_PADDING - maxHeight)
+
+  return { left, top, maxHeight }
 }
 
 function resolveSortMenuAction(key: string, focusIndex: number, itemCount: number): SortMenuAction | null {
@@ -88,6 +124,58 @@ function getDirectionButtonClass(isActive: boolean, activeDirection: SortDirecti
   )
 }
 
+function useSortMenuDismissal({
+  open,
+  containerRef,
+  menuRef,
+  onDismiss,
+}: {
+  open: boolean
+  containerRef: React.RefObject<HTMLDivElement | null>
+  menuRef: React.RefObject<HTMLDivElement | null>
+  onDismiss: () => void
+}) {
+  useEffect(() => {
+    if (!open) return
+
+    function handlePointerDown(event: MouseEvent) {
+      if (containerRef.current?.contains(event.target as Node)) return
+      if (menuRef.current?.contains(event.target as Node)) return
+      onDismiss()
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [containerRef, menuRef, onDismiss, open])
+}
+
+function useSortMenuPosition({
+  open,
+  triggerRef,
+}: {
+  open: boolean
+  triggerRef: React.RefObject<HTMLButtonElement | null>
+}) {
+  const [menuPosition, setMenuPosition] = useState<SortMenuPosition | null>(null)
+  const updateMenuPosition = useCallback(() => {
+    if (!triggerRef.current) return
+    setMenuPosition(resolveSortMenuPosition(triggerRef.current))
+  }, [triggerRef])
+
+  useLayoutEffect(() => {
+    if (!open) return
+
+    window.addEventListener('resize', updateMenuPosition)
+    window.addEventListener('scroll', updateMenuPosition, true)
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition)
+      window.removeEventListener('scroll', updateMenuPosition, true)
+    }
+  }, [open, updateMenuPosition])
+
+  return { menuPosition, updateMenuPosition }
+}
+
 function useSortDropdownState({
   groupLabel,
   current,
@@ -101,30 +189,22 @@ function useSortDropdownState({
 }) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const sortButtonRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const closeMenu = useCallback(() => {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }, [])
+  const dismissMenu = useCallback(() => setOpen(false), [])
+  const { menuPosition, updateMenuPosition } = useSortMenuPosition({ open, triggerRef })
 
-  useEffect(() => {
-    if (!open) return
-
-    function handlePointerDown(event: MouseEvent) {
-      if (containerRef.current?.contains(event.target as Node)) return
-      setOpen(false)
-    }
-
-    document.addEventListener('mousedown', handlePointerDown)
-    return () => document.removeEventListener('mousedown', handlePointerDown)
-  }, [open])
+  useSortMenuDismissal({ open, containerRef, menuRef, onDismiss: dismissMenu })
 
   useEffect(() => {
     if (!open) return
     focusSortItem(sortButtonRefs, resolveFocusedIndex(groupLabel, current, sortItems))
   }, [current, groupLabel, open, sortItems])
-
-  const closeMenu = useCallback(() => {
-    setOpen(false)
-    triggerRef.current?.focus()
-  }, [])
 
   const handleSelect = useCallback((option: SortOption, nextDirection: SortDirection) => {
     onChange(groupLabel, option, nextDirection)
@@ -147,13 +227,24 @@ function useSortDropdownState({
 
     focusSortItem(sortButtonRefs, action.index)
   }, [closeMenu, current, groupLabel, sortItems])
+  const toggleMenu = useCallback(() => {
+    if (open) {
+      setOpen(false)
+      return
+    }
+
+    updateMenuPosition()
+    setOpen(true)
+  }, [open, updateMenuPosition])
 
   return {
     open,
-    setOpen,
+    toggleMenu,
     containerRef,
+    menuRef,
     triggerRef,
     sortButtonRefs,
+    menuPosition,
     handleSelect,
     handleMenuKeyDown,
   }
@@ -206,6 +297,8 @@ function SortDropdownMenu({
   direction,
   sortItems,
   sortButtonRefs,
+  menuRef,
+  menuPosition,
   locale,
   onKeyDown,
   onSelect,
@@ -216,6 +309,8 @@ function SortDropdownMenu({
   direction: SortDirection
   sortItems: SortItem[]
   sortButtonRefs: React.MutableRefObject<Array<HTMLButtonElement | null>>
+  menuRef: React.RefObject<HTMLDivElement | null>
+  menuPosition: SortMenuPosition | null
   locale: AppLocale
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void
   onSelect: (option: SortOption, nextDirection: SortDirection) => void
@@ -225,12 +320,20 @@ function SortDropdownMenu({
   const hasCustom = sortItems.length > SORT_OPTIONS.length
   const builtInOptionCount = SORT_OPTIONS.length
 
-  return (
+  return createPortal((
     <div
+      ref={menuRef}
       role="menu"
       aria-label={translate(locale, 'noteList.sort.menu', { label: groupLabel })}
-      className="absolute right-0 top-full mt-1 rounded-md border border-border bg-popover p-1 shadow-md"
-      style={{ width: 170, maxHeight: 280, overflowY: 'auto' }}
+      className="fixed z-[12000] rounded-md border border-border bg-popover p-1 shadow-md"
+      style={{
+        left: menuPosition?.left ?? 0,
+        top: menuPosition?.top ?? 0,
+        width: SORT_MENU_WIDTH,
+        maxHeight: menuPosition?.maxHeight ?? SORT_MENU_MAX_HEIGHT,
+        overflowY: 'auto',
+        visibility: menuPosition ? 'visible' : 'hidden',
+      }}
       onKeyDown={onKeyDown}
       data-testid={`sort-menu-${groupLabel}`}
     >
@@ -252,7 +355,7 @@ function SortDropdownMenu({
         />
       ))}
     </div>
-  )
+  ), document.body)
 }
 
 export function SortDropdown({ groupLabel, current, direction, customProperties, locale = 'en', onChange }: {
@@ -266,10 +369,12 @@ export function SortDropdown({ groupLabel, current, direction, customProperties,
   const sortItems = useMemo(() => buildSortItems(locale, customProperties), [customProperties, locale])
   const {
     open,
-    setOpen,
+    toggleMenu,
     containerRef,
+    menuRef,
     triggerRef,
     sortButtonRefs,
+    menuPosition,
     handleSelect,
     handleMenuKeyDown,
   } = useSortDropdownState({
@@ -288,7 +393,7 @@ export function SortDropdown({ groupLabel, current, direction, customProperties,
         groupLabel={groupLabel}
         direction={direction}
         locale={locale}
-        onToggle={() => setOpen((value) => !value)}
+        onToggle={toggleMenu}
       />
       <SortDropdownMenu
         open={open}
@@ -297,6 +402,8 @@ export function SortDropdown({ groupLabel, current, direction, customProperties,
         direction={direction}
         sortItems={sortItems}
         sortButtonRefs={sortButtonRefs}
+        menuRef={menuRef}
+        menuPosition={menuPosition}
         locale={locale}
         onKeyDown={handleMenuKeyDown}
         onSelect={handleSelect}
