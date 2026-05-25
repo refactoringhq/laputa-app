@@ -5,8 +5,15 @@ import { repairMalformedEditorBlocks } from '../hooks/editorBlockRepair'
 const DISPATCH_RECOVERY_STATE_KEY = '__tolariaRichEditorTransformErrorRecovery'
 
 type RichEditorDispatch = (transaction: unknown) => unknown
+type RichEditorPropRunner<T> = (prop: T) => unknown
+type RichEditorSomeProp = <T>(propName: string, run?: RichEditorPropRunner<T>) => unknown
 type RecoverEditorDocument = () => void
 type RecoveryToken = symbol
+
+interface RecoveryDocumentEntry {
+  recoverDocument: RecoverEditorDocument
+  token: RecoveryToken
+}
 
 interface RichEditorDispatchView {
   dispatch: RichEditorDispatch
@@ -17,12 +24,14 @@ interface RichEditorDispatchView {
   }
 }
 
+interface RichEditorRecoveryView extends RichEditorDispatchView {
+  someProp?: RichEditorSomeProp
+}
+
 interface DispatchRecoveryState {
   originalDispatch: RichEditorDispatch
-  recoverDocuments: Array<{
-    recoverDocument: RecoverEditorDocument
-    token: RecoveryToken
-  }>
+  originalSomeProp?: RichEditorSomeProp
+  recoverDocuments: RecoveryDocumentEntry[]
   refCount: number
 }
 
@@ -135,7 +144,7 @@ export const reportRecoveredEditorTransformError = (reason: RecoveryReason, erro
 }
 
 function releaseRecoveryState(
-  view: RichEditorDispatchView,
+  view: RichEditorRecoveryView,
   recoveryState: DispatchRecoveryState,
   originalDispatch: RichEditorDispatch,
   token: RecoveryToken,
@@ -148,11 +157,12 @@ function releaseRecoveryState(
   if (state.refCount > 0) return
 
   view.dispatch = recoveryState.originalDispatch
+  if (recoveryState.originalSomeProp) view.someProp = recoveryState.originalSomeProp
   Reflect.deleteProperty(view, DISPATCH_RECOVERY_STATE_KEY)
 }
 
 function retainRecoveryState(
-  view: RichEditorDispatchView,
+  view: RichEditorRecoveryView,
   recoveryState: DispatchRecoveryState,
   token: RecoveryToken,
   recoverDocument?: RecoverEditorDocument,
@@ -162,8 +172,22 @@ function retainRecoveryState(
   return () => releaseRecoveryState(view, recoveryState, recoveryState.originalDispatch, token)
 }
 
-function activeRecoverDocument(recoveryState: DispatchRecoveryState): RecoverEditorDocument | undefined {
+function activeRecoverDocument(recoveryState: { recoverDocuments: RecoveryDocumentEntry[] }): RecoverEditorDocument | undefined {
   return recoveryState.recoverDocuments.at(-1)?.recoverDocument
+}
+
+function recoverAfterEditorTransformError(
+  error: unknown,
+  transaction: unknown,
+  view: RichEditorDispatchView,
+  recoveryState: { recoverDocuments: RecoveryDocumentEntry[] },
+): void {
+  if (!isRecoverableEditorTransformError(error)) throw error
+
+  if (shouldRepairEditorDocument(error)) {
+    activeRecoverDocument(recoveryState)?.()
+  }
+  reportRecoveredEditorTransformError(recoveryReason(error, transaction, view), error)
 }
 
 function createRecoveringDispatch(
@@ -174,30 +198,79 @@ function createRecoveringDispatch(
     try {
       return recoveryState.originalDispatch.call(view, transaction)
     } catch (error) {
-      if (!isRecoverableEditorTransformError(error)) throw error
-
-      if (shouldRepairEditorDocument(error)) {
-        activeRecoverDocument(recoveryState)?.()
-      }
-      reportRecoveredEditorTransformError(recoveryReason(error, transaction, view), error)
+      recoverAfterEditorTransformError(error, transaction, view, recoveryState)
       return undefined
     }
   }
 }
 
+function createRecoveringKeydownRunner<T>(
+  view: RichEditorRecoveryView,
+  recoveryState: DispatchRecoveryState,
+  run: RichEditorPropRunner<T>,
+): RichEditorPropRunner<T> {
+  return (prop: T) => {
+    try {
+      return run(prop)
+    } catch (error) {
+      recoverAfterEditorTransformError(error, undefined, view, recoveryState)
+      return true
+    }
+  }
+}
+
+function callSomeProp<T>(
+  view: RichEditorRecoveryView,
+  someProp: RichEditorSomeProp,
+  propName: string,
+  run?: RichEditorPropRunner<T>,
+): unknown {
+  const boundSomeProp = someProp as (
+    this: RichEditorRecoveryView,
+    propName: string,
+    run?: RichEditorPropRunner<T>,
+  ) => unknown
+
+  return boundSomeProp.call(view, propName, run)
+}
+
+function createRecoveringSomeProp(
+  view: RichEditorRecoveryView,
+  recoveryState: DispatchRecoveryState,
+): RichEditorSomeProp {
+  return <T>(propName: string, run?: RichEditorPropRunner<T>) => {
+    const originalSomeProp = recoveryState.originalSomeProp
+    if (!originalSomeProp) return undefined
+
+    if (propName !== 'handleKeyDown' || typeof run !== 'function') {
+      return callSomeProp(view, originalSomeProp, propName, run)
+    }
+
+    return callSomeProp(
+      view,
+      originalSomeProp,
+      propName,
+      createRecoveringKeydownRunner(view, recoveryState, run),
+    )
+  }
+}
+
 function installRecoveryState(
-  view: RichEditorDispatchView,
+  view: RichEditorRecoveryView,
   originalDispatch: RichEditorDispatch,
   token: RecoveryToken,
   recoverDocument?: RecoverEditorDocument,
 ): DispatchRecoveryState {
+  const originalSomeProp = typeof view.someProp === 'function' ? view.someProp : undefined
   const recoveryState: DispatchRecoveryState = {
     originalDispatch,
+    originalSomeProp,
     recoverDocuments: recoverDocument ? [{ recoverDocument, token }] : [],
     refCount: 1,
   }
 
   view.dispatch = createRecoveringDispatch(view, recoveryState)
+  if (originalSomeProp) view.someProp = createRecoveringSomeProp(view, recoveryState)
   Reflect.set(view, DISPATCH_RECOVERY_STATE_KEY, recoveryState)
   return recoveryState
 }
@@ -217,11 +290,12 @@ function repairEditorDocumentAfterInvalidContentError(editor: RepairableBlockNot
 }
 
 export function installRichEditorTransformErrorRecovery(
-  view: RichEditorDispatchView,
+  view: RichEditorRecoveryView,
   options: InstallRecoveryOptions = {},
 ): () => void {
   const token = Symbol('rich-editor-transform-error-recovery')
   const currentState = Reflect.get(view, DISPATCH_RECOVERY_STATE_KEY)
+
   if (isDispatchRecoveryState(currentState)) {
     return retainRecoveryState(view, currentState, token, options.recoverDocument)
   }
@@ -239,7 +313,7 @@ export const createRichEditorTransformErrorRecoveryExtension = createExtension((
     if (!view || typeof view.dispatch !== 'function') return
 
     const uninstall = installRichEditorTransformErrorRecovery(
-      view as unknown as RichEditorDispatchView,
+      view as unknown as RichEditorRecoveryView,
       { recoverDocument: () => repairEditorDocumentAfterInvalidContentError(editor as RepairableBlockNoteEditor) },
     )
     signal.addEventListener('abort', uninstall, { once: true })

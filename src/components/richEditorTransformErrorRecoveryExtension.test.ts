@@ -32,6 +32,24 @@ function createView(error?: Error) {
   return { currentDoc, dispatch, view }
 }
 
+function createViewWithSomeProp(handleKeyDown: () => boolean) {
+  const { currentDoc, dispatch, view } = createView()
+  const keyDownPlugin = vi.fn(handleKeyDown)
+  const someProp = vi.fn((_propName: string, run?: (prop: typeof keyDownPlugin) => unknown) => (
+    run?.(keyDownPlugin)
+  ))
+
+  return {
+    currentDoc,
+    dispatch,
+    keyDownPlugin,
+    view: {
+      ...view,
+      someProp,
+    },
+  }
+}
+
 function expectDocumentRepairRecovery(error: Error, reason: string) {
   const { currentDoc, view } = createView(error)
   const recoverDocument = vi.fn()
@@ -121,6 +139,33 @@ describe('installRichEditorTransformErrorRecovery', () => {
     )
   })
 
+  it('recovers invalid block joins thrown during keydown handling before dispatch', () => {
+    const { view, keyDownPlugin } = createViewWithSomeProp(() => {
+      throw transformError('Cannot join blockGroup onto blockContainer')
+    })
+    const recoverDocument = vi.fn()
+
+    installRichEditorTransformErrorRecovery(view, { recoverDocument })
+
+    expect(view.someProp('handleKeyDown', (handler) => handler())).toBe(true)
+    expect(keyDownPlugin).toHaveBeenCalledTimes(1)
+    expect(recoverDocument).toHaveBeenCalledTimes(1)
+    expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+      reason: 'invalid_block_join',
+    })
+  })
+
+  it('keeps unrelated keydown handler failures visible', () => {
+    const { view } = createViewWithSomeProp(() => {
+      throw new Error('keyboard plugin failed')
+    })
+
+    installRichEditorTransformErrorRecovery(view)
+
+    expect(() => view.someProp('handleKeyDown', (handler) => handler())).toThrow('keyboard plugin failed')
+    expect(trackEvent).not.toHaveBeenCalled()
+  })
+
   it('recovers table selection transactions whose target row changed underneath BlockNote', () => {
     expectDocumentRepairRecovery(
       new RangeError('Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>'),
@@ -173,6 +218,23 @@ describe('installRichEditorTransformErrorRecovery', () => {
 
     secondUninstall()
     expect(view.dispatch).toBe(dispatch)
+  })
+
+  it('restores the original keydown prop lookup after all installs are cleaned up', () => {
+    const { view } = createViewWithSomeProp(() => false)
+    const originalSomeProp = view.someProp
+
+    const firstUninstall = installRichEditorTransformErrorRecovery(view)
+    const secondUninstall = installRichEditorTransformErrorRecovery(view)
+    const wrappedSomeProp = view.someProp
+
+    expect(wrappedSomeProp).not.toBe(originalSomeProp)
+
+    firstUninstall()
+    expect(view.someProp).toBe(wrappedSomeProp)
+
+    secondUninstall()
+    expect(view.someProp).toBe(originalSomeProp)
   })
 
   it('restores the previous recoverDocument callback when a later install unmounts', () => {
