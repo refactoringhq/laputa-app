@@ -81,8 +81,8 @@ function composerSendButtonStyle(canSend: boolean): CSSProperties {
     background: canSend ? 'var(--primary)' : 'var(--muted)',
     color: canSend ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
     borderRadius: 8,
-    width: 32,
-    height: 34,
+    width: 30,
+    height: 30,
     cursor: canSend ? 'pointer' : 'not-allowed',
   }
 }
@@ -119,10 +119,10 @@ function ComposerInput({
       placeholder={placeholder}
       inputRef={inputRef}
       editorClassName={cn(
-        'max-h-[160px] overflow-y-auto overscroll-contain',
-        hasControls && 'min-h-[72px] border-0 px-2 py-2',
+        'max-h-[120px] overflow-y-auto overscroll-contain',
+        hasControls && 'min-h-[34px] border-0 px-2 py-1.5 leading-5',
       )}
-      editorStyle={{ maxHeight: 160, overflowY: 'auto', overscrollBehavior: 'contain' }}
+      editorStyle={{ maxHeight: 120, overflowY: 'auto', overscrollBehavior: 'contain' }}
     />
   )
 }
@@ -170,7 +170,7 @@ function ComposerControlsRow({
   if (!hasControls) return <>{sendButton}</>
 
   return (
-    <div className="mt-1 flex items-center justify-between gap-2">
+    <div className="mt-0.5 flex items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-1">
         {children}
       </div>
@@ -488,10 +488,10 @@ export function AiPanelComposer({
   return (
     <div
       className="flex shrink-0 flex-col border-t border-border"
-      style={{ padding: '8px 12px' }}
+      style={{ padding: '6px 10px' }}
     >
       <div className={cn(
-        hasControls ? 'rounded-xl border border-border bg-background p-2 shadow-xs' : 'flex items-end gap-2',
+        hasControls ? 'rounded-xl border border-border bg-background px-2 py-1.5 shadow-xs' : 'flex items-end gap-2',
       )}>
         <div className={cn('min-w-0 flex-1', hasControls && 'w-full')}>
           <ComposerInput

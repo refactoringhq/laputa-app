@@ -3,6 +3,7 @@ import {
   AI_WORKSPACE_WINDOW_LABEL,
   buildAiWorkspaceWindowUrl,
   buildRuntimeAiWorkspaceWindowUrl,
+  closeCurrentAiWorkspaceWindow,
   dockCurrentAiWorkspaceWindow,
   openAiWorkspaceWindow,
   readAiWorkspaceWindowContext,
@@ -15,7 +16,7 @@ const webviewGetByLabel = vi.fn()
 const existingUnminimize = vi.fn().mockResolvedValue(undefined)
 const existingSetFocus = vi.fn().mockResolvedValue(undefined)
 const emitTo = vi.fn().mockResolvedValue(undefined)
-const destroy = vi.fn().mockResolvedValue(undefined)
+const close = vi.fn().mockResolvedValue(undefined)
 const localStorageMock = (() => {
   let store: Record<string, string> = {}
   return {
@@ -47,8 +48,15 @@ vi.mock('@tauri-apps/api/event', () => ({
 }))
 
 vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: () => ({ destroy }),
+  getCurrentWindow: () => ({ close }),
 }))
+
+async function runCurrentWindowAction(action: () => Promise<void>) {
+  vi.mocked(isTauri).mockReturnValue(true)
+  const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+  await action()
+  return dispatchSpy
+}
 
 describe('openAiWorkspaceWindow', () => {
   beforeEach(() => {
@@ -111,6 +119,8 @@ describe('openAiWorkspaceWindow', () => {
         minHeight: 420,
         minimizable: false,
         decorations: false,
+        shadow: true,
+        transparent: true,
       }),
     )
     expect(localStorage.getItem('tolaria:ai-workspace-window:ai-workspace')).toBe('true')
@@ -130,17 +140,25 @@ describe('openAiWorkspaceWindow', () => {
     expect(webviewWindowCalls).not.toHaveBeenCalled()
   })
 
-  it('requests docking and destroys the current AI workspace window', async () => {
-    vi.mocked(isTauri).mockReturnValue(true)
-    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+  it('closes the current AI workspace window without docking it', async () => {
+    const dispatchSpy = await runCurrentWindowAction(closeCurrentAiWorkspaceWindow)
 
-    await dockCurrentAiWorkspaceWindow()
+    expect(dispatchSpy).not.toHaveBeenCalledWith(expect.objectContaining({
+      type: AI_WORKSPACE_DOCK_REQUESTED_EVENT,
+    }))
+    expect(emitTo).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalledOnce()
+    dispatchSpy.mockRestore()
+  })
+
+  it('requests docking and closes the current AI workspace window', async () => {
+    const dispatchSpy = await runCurrentWindowAction(dockCurrentAiWorkspaceWindow)
 
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({
       type: AI_WORKSPACE_DOCK_REQUESTED_EVENT,
     }))
     expect(emitTo).toHaveBeenCalledWith('main', AI_WORKSPACE_DOCK_REQUESTED_EVENT)
-    expect(destroy).toHaveBeenCalledOnce()
+    expect(close).toHaveBeenCalledOnce()
     dispatchSpy.mockRestore()
   })
 })

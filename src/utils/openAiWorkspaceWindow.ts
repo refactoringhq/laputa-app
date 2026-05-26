@@ -86,9 +86,18 @@ export async function openAiWorkspaceWindow(context: AiWorkspaceWindowContext = 
     resizable: true,
     minimizable: false,
     decorations: false,
+    shadow: true,
+    transparent: true,
   })
 
   return true
+}
+
+export async function closeCurrentAiWorkspaceWindow(): Promise<void> {
+  if (!isTauri()) return
+
+  const { getCurrentWindow } = await import('@tauri-apps/api/window')
+  await getCurrentWindow().close().catch(() => {})
 }
 
 export async function dockCurrentAiWorkspaceWindow(): Promise<void> {
@@ -99,5 +108,5 @@ export async function dockCurrentAiWorkspaceWindow(): Promise<void> {
   const { emitTo } = await import('@tauri-apps/api/event')
   const { getCurrentWindow } = await import('@tauri-apps/api/window')
   await emitTo('main', AI_WORKSPACE_DOCK_REQUESTED_EVENT).catch(() => {})
-  await getCurrentWindow().destroy().catch(() => {})
+  await getCurrentWindow().close().catch(() => {})
 }

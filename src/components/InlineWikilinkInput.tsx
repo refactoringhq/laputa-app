@@ -454,7 +454,8 @@ export function InlineWikilinkInput({
     forceRender((current) => current + 1)
   }
   const flushPendingCompositionInput = () => {
-    if (isComposingRef.current || !pendingCompositionInputRef.current) return
+    if (isComposingRef.current) return
+    const hadPendingInput = pendingCompositionInputRef.current
     pendingCompositionInputRef.current = false
 
     const editor = editorRef.current
@@ -466,6 +467,8 @@ export function InlineWikilinkInput({
     }
 
     const nextValue = normalizeInlineWikilinkValue(serializeInlineNode(editor))
+    if (!hadPendingInput && nextValue === value) return
+
     const nextSelection = readSelectionRange(editor)
     const clampedSelection: InlineSelectionRange = {
       start: Math.min(nextSelection.start, nextValue.length),

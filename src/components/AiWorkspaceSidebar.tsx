@@ -21,6 +21,7 @@ interface ConversationSidebarProps {
   collapsed: boolean
   conversations: AiConversation[]
   locale: AppLocale
+  onCanArchive: (conversation: AiConversation) => boolean
   onArchive: (id: string) => void
   onNewChat: () => void
   onRename: (id: string, title: string) => void
@@ -29,6 +30,7 @@ interface ConversationSidebarProps {
   onToggleCollapsed: () => void
   setShowArchived: (show: boolean) => void
   showArchived: boolean
+  sidebarWidth: number
   statuses: Record<string, AgentStatus>
 }
 
@@ -177,12 +179,14 @@ function CollapsedConversationSidebar({ locale, onNewChat }: { locale: AppLocale
 }
 
 function ConversationArchiveButton({
+  disabled,
   conversationId,
   locale,
   onArchive,
   onRestore,
   showArchived,
 }: {
+  disabled: boolean
   conversationId: string
   locale: AppLocale
   onArchive: (id: string) => void
@@ -196,9 +200,10 @@ function ConversationArchiveButton({
       type="button"
       variant="ghost"
       size="icon-xs"
-      className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+      className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 disabled:opacity-0"
       aria-label={label}
       title={label}
+      disabled={disabled}
       onClick={() => showArchived ? onRestore(conversationId) : onArchive(conversationId)}
     >
       {showArchived ? <ArrowSquareIn size={16} /> : <Archive size={16} />}
@@ -211,6 +216,7 @@ function ConversationRow({
   conversation,
   editing,
   locale,
+  onCanArchive,
   onArchive,
   onRename,
   onRestore,
@@ -224,6 +230,7 @@ function ConversationRow({
   conversation: AiConversation
   editing: boolean
   locale: AppLocale
+  onCanArchive: (conversation: AiConversation) => boolean
   onArchive: (id: string) => void
   onRename: (id: string, title: string) => void
   onRestore: (id: string) => void
@@ -262,6 +269,7 @@ function ConversationRow({
         </Button>
       )}
       <ConversationArchiveButton
+        disabled={!onCanArchive(conversation)}
         conversationId={conversation.id}
         locale={locale}
         onArchive={onArchive}
@@ -277,6 +285,7 @@ function ConversationList({
   conversations,
   editingId,
   locale,
+  onCanArchive,
   onArchive,
   onRename,
   onRestore,
@@ -285,7 +294,7 @@ function ConversationList({
   showArchived,
   statuses,
 }: Pick<ConversationSidebarProps,
-  'activeId' | 'conversations' | 'locale' | 'onArchive' | 'onRename' | 'onRestore' | 'onSelect' | 'showArchived' | 'statuses'
+  'activeId' | 'conversations' | 'locale' | 'onCanArchive' | 'onArchive' | 'onRename' | 'onRestore' | 'onSelect' | 'showArchived' | 'statuses'
 > & {
   editingId: string | null
   setEditingId: (id: string | null) => void
@@ -306,6 +315,7 @@ function ConversationList({
       conversation={conversation}
       editing={editingId === conversation.id}
       locale={locale}
+      onCanArchive={onCanArchive}
       onArchive={onArchive}
       onRename={onRename}
       onRestore={onRestore}
@@ -343,6 +353,7 @@ function ExpandedConversationSidebar({
   activeId,
   conversations,
   locale,
+  onCanArchive,
   onArchive,
   onRename,
   onRestore,
@@ -350,7 +361,7 @@ function ExpandedConversationSidebar({
   setShowArchived,
   showArchived,
   statuses,
-}: Omit<ConversationSidebarProps, 'collapsed' | 'onNewChat' | 'onToggleCollapsed'>) {
+}: Omit<ConversationSidebarProps, 'collapsed' | 'onNewChat' | 'onToggleCollapsed' | 'sidebarWidth'>) {
   const [editingId, setEditingId] = useState<string | null>(null)
 
   return (
@@ -361,6 +372,7 @@ function ExpandedConversationSidebar({
           conversations={conversations}
           editingId={editingId}
           locale={locale}
+          onCanArchive={onCanArchive}
           onArchive={onArchive}
           onRename={onRename}
           onRestore={onRestore}
@@ -384,6 +396,7 @@ export function ConversationSidebar({
   collapsed,
   conversations,
   locale,
+  onCanArchive,
   onArchive,
   onNewChat,
   onRename,
@@ -392,13 +405,14 @@ export function ConversationSidebar({
   onToggleCollapsed,
   setShowArchived,
   showArchived,
+  sidebarWidth,
   statuses,
 }: ConversationSidebarProps) {
   return (
-    <div className={cn(
-      'flex shrink-0 flex-col border-r border-border bg-sidebar transition-[width]',
-      collapsed ? 'w-12' : 'w-[220px]',
-    )}>
+    <div
+      className="flex shrink-0 flex-col border-r border-border bg-sidebar transition-[width]"
+      style={{ width: collapsed ? 48 : sidebarWidth }}
+    >
       <SidebarHeader
         collapsed={collapsed}
         locale={locale}
@@ -412,6 +426,7 @@ export function ConversationSidebar({
           activeId={activeId}
           conversations={conversations}
           locale={locale}
+          onCanArchive={onCanArchive}
           onArchive={onArchive}
           onRename={onRename}
           onRestore={onRestore}

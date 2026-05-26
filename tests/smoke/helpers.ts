@@ -15,6 +15,40 @@ export async function closeCommandPalette(page: Page): Promise<void> {
   await expect(page.locator(COMMAND_INPUT)).not.toBeVisible()
 }
 
+export async function installMockAiAgent(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    type Handler = (args?: Record<string, unknown>) => unknown
+    type BrowserWindow = Window & typeof globalThis & {
+      __mockHandlers?: Record<string, Handler>
+    }
+
+    const installMockAgent = (handlers?: Record<string, Handler> | null) => {
+      if (!handlers) return handlers ?? null
+      handlers.get_ai_agents_status = () => ({
+        claude_code: { installed: true, version: 'mock' },
+        codex: { installed: false, version: null },
+        opencode: { installed: false, version: null },
+        pi: { installed: false, version: null },
+        gemini: { installed: false, version: null },
+        kiro: { installed: false, version: null },
+      })
+      return handlers
+    }
+
+    const browserWindow = window as BrowserWindow
+    let ref = installMockAgent(browserWindow.__mockHandlers) ?? null
+    Object.defineProperty(browserWindow, '__mockHandlers', {
+      configurable: true,
+      set(value) {
+        ref = installMockAgent(value as Record<string, Handler> | undefined) ?? null
+      },
+      get() {
+        return installMockAgent(ref) ?? ref
+      },
+    })
+  })
+}
+
 export async function findCommand(
   page: Page,
   name: string,

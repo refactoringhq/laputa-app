@@ -205,8 +205,8 @@ describe('AiPanel', () => {
     editor.textContent = Array.from({ length: 40 }, (_, index) => `Line ${index + 1}`).join('\n')
     fireEvent.input(editor)
 
-    expect(editor).toHaveClass('max-h-[160px]', 'overflow-y-auto', 'overscroll-contain')
-    expect(editor).toHaveStyle({ maxHeight: '160px', overflowY: 'auto' })
+    expect(editor).toHaveClass('max-h-[120px]', 'overflow-y-auto', 'overscroll-contain')
+    expect(editor).toHaveStyle({ maxHeight: '120px', overflowY: 'auto' })
     expect(screen.getByTestId('agent-send')).toBeVisible()
   })
 

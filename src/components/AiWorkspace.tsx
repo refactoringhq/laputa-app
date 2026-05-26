@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   Archive,
   ArrowSquareIn,
@@ -44,7 +44,7 @@ import {
   vaultAiGuidanceNeedsRestore,
   type VaultAiGuidanceStatus,
 } from '../lib/vaultAiGuidance'
-import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
+import { translate, type AppLocale } from '../lib/i18n'
 import { trackAiWorkspaceChatTitled, trackAiWorkspaceSidebarToggled } from '../lib/productAnalytics'
 import type { AgentStatus } from '../hooks/useCliAiAgent'
 import type { AiWorkspaceConversationSetting } from '../types'
@@ -54,11 +54,13 @@ import { NEW_AI_CHAT_EVENT } from '../utils/aiPromptBridge'
 import { generateAiConversationTitle } from '../utils/aiConversationTitle'
 import { AiPanelView } from './AiPanel'
 import { ConversationSidebar } from './AiWorkspaceSidebar'
+import { ResizeHandle } from './ResizeHandle'
 import { useAiPanelController } from './useAiPanelController'
 import { buildAiWorkspaceTargetGroups, type AiWorkspaceTargetGroups } from './aiWorkspaceTargetGroups'
 
 export interface AiConversation {
   archived: boolean
+  hasActivity: boolean
   id: string
   targetId: string
   title: string
@@ -102,6 +104,12 @@ interface AiWorkspaceProps {
 
 let fallbackConversationIdCounter = 0
 
+const DEFAULT_DOCKED_WORKSPACE_SIZE = { height: 540, width: 560 }
+const MIN_DOCKED_WORKSPACE_SIZE = { height: 360, width: 460 }
+const DEFAULT_SIDEBAR_WIDTH = 168
+const MIN_SIDEBAR_WIDTH = 132
+const MAX_SIDEBAR_WIDTH = 240
+
 function randomConversationIdPart(): string {
   const cryptoApi = globalThis.crypto
   if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID().slice(0, 8)
@@ -120,14 +128,25 @@ function nextConversationId(): string {
   return `ai-chat-${Date.now()}-${randomConversationIdPart()}`
 }
 
-function statusLabelKey(status: AgentStatus): TranslationKey {
-  if (status === 'thinking' || status === 'tool-executing') return 'ai.workspace.status.running'
-  if (status === 'error') return 'ai.workspace.status.error'
-  return 'ai.workspace.status.idle'
-}
-
 function isRunningStatus(status: AgentStatus | undefined): boolean {
   return status === 'thinking' || status === 'tool-executing'
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+function maxDockedWorkspaceSize(): { height: number; width: number } {
+  if (typeof window === 'undefined') return { height: 680, width: 880 }
+
+  return {
+    height: Math.max(MIN_DOCKED_WORKSPACE_SIZE.height, window.innerHeight - 88),
+    width: Math.max(MIN_DOCKED_WORKSPACE_SIZE.width, window.innerWidth - 32),
+  }
+}
+
+function canArchiveConversation(conversation: AiConversation): boolean {
+  return conversation.archived || conversation.hasActivity
 }
 
 function agentReadinessForTarget(target: AiTarget, statuses: AiAgentsStatus): AiAgentReadiness {
@@ -157,6 +176,7 @@ function resolveTarget(conversation: AiConversation, groups: AiWorkspaceTargetGr
 function createConversation(locale: AppLocale, target: AiTarget, index: number): AiConversation {
   return {
     archived: false,
+    hasActivity: false,
     id: nextConversationId(),
     targetId: target.id,
     title: translate(locale, 'ai.workspace.chatTitle', { index }),
@@ -176,6 +196,7 @@ function conversationFromSetting(setting: AiWorkspaceConversationSetting, fallba
 
   return {
     archived: setting.archived === true,
+    hasActivity: !isDefaultConversationTitle(title),
     id,
     targetId: setting.target_id?.trim() || fallbackTarget.id,
     title,
@@ -202,6 +223,19 @@ function conversationsToSettings(conversations: AiConversation[]): AiWorkspaceCo
     target_id: conversation.usesDefaultTarget ? null : conversation.targetId,
     title: conversation.title,
   }))
+}
+
+function activeConversationForState(
+  conversations: AiConversation[],
+  activeId: string,
+  showArchived: boolean,
+): AiConversation | undefined {
+  const selected = conversations.find((conversation) => conversation.id === activeId)
+  if (selected && selected.archived === showArchived) return selected
+
+  return conversations.find((conversation) => conversation.archived === showArchived)
+    ?? conversations.find((conversation) => !conversation.archived)
+    ?? conversations[0]
 }
 
 interface UseConversationsOptions {
@@ -258,11 +292,15 @@ function renameConversationState(current: AiConversation[], id: string, title: s
 
 function titleConversationFromPromptState(current: AiConversation[], id: string, prompt: string): AiConversation[] {
   const generatedTitle = generateAiConversationTitle(prompt)
-  if (!generatedTitle) return current
 
   return current.map((conversation) => (
-    conversation.id === id && conversation.usesDefaultTitle
-      ? { ...conversation, title: generatedTitle, usesDefaultTitle: false }
+    conversation.id === id
+      ? {
+          ...conversation,
+          hasActivity: true,
+          title: generatedTitle && conversation.usesDefaultTitle ? generatedTitle : conversation.title,
+          usesDefaultTitle: generatedTitle ? false : conversation.usesDefaultTitle,
+        }
       : conversation
   ))
 }
@@ -290,20 +328,16 @@ function useConversations({
   const onSettingsChangeRef = useRef(onSettingsChange)
 
   const addConversation = useCallback((target: AiTarget) => {
-    setConversations((current) => {
-      const next = appendConversationState(current, locale, target)
-      setActiveId(next.activeId)
-      return next.conversations
-    })
-  }, [locale])
+    const next = appendConversationState(conversations, locale, target)
+    setConversations(next.conversations)
+    setActiveId(next.activeId)
+  }, [conversations, locale])
 
   const archiveConversation = useCallback((id: string) => {
-    setConversations((current) => {
-      const next = archiveConversationState(current, id)
-      if (next.activeId) setActiveId(next.activeId)
-      return next.conversations
-    })
-  }, [])
+    const next = archiveConversationState(conversations, id)
+    setConversations(next.conversations)
+    if (next.activeId) setActiveId(next.activeId)
+  }, [conversations])
 
   const restoreConversation = useCallback((id: string) => {
     setConversations((current) => restoreConversationState(current, id))
@@ -419,7 +453,7 @@ function TargetPickerContent({
   const hasLocalModelsSeparator = groups.localModels.length > 0 && groups.apiModels.length > 0
 
   return (
-    <DropdownMenuContent align="start" className="min-w-[280px]">
+    <DropdownMenuContent align="start" className="z-[12000] min-w-[280px]">
       {hasTargets ? (
         <DropdownMenuRadioGroup value={selectedTarget.id} onValueChange={onSelectTarget}>
           <TargetGroup label={translate(locale, 'ai.workspace.targetLocalAgents')} targets={groups.localAgents} />
@@ -511,7 +545,7 @@ function PermissionPicker({
           <CaretDown size={compact ? 12 : 13} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[180px]">
+      <DropdownMenuContent align="start" className="z-[12000] min-w-[180px]">
         {(['safe', 'power_user'] as const).map((mode) => (
           <DropdownMenuItem key={mode} onSelect={() => onChange(mode)}>
             {aiAgentPermissionModeLabels(mode, locale).control}
@@ -550,9 +584,9 @@ function GuidanceWarning({
 
 function WorkspaceHeader({
   conversation,
+  archiveDisabled,
   locale,
   mode,
-  status,
   onArchive,
   onClose,
   onDock,
@@ -560,9 +594,9 @@ function WorkspaceHeader({
   onPopOut,
 }: {
   conversation: AiConversation
+  archiveDisabled: boolean
   locale: AppLocale
   mode: 'docked' | 'window'
-  status: AgentStatus
   onArchive: () => void
   onClose: () => void
   onDock?: () => void
@@ -580,9 +614,6 @@ function WorkspaceHeader({
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <div className="min-w-0 max-w-[260px]">
           <div className="truncate text-[13px] font-semibold text-foreground">{conversation.title}</div>
-          <div className="truncate text-[11px] text-muted-foreground">
-            {translate(locale, statusLabelKey(status))}
-          </div>
         </div>
       </div>
       <div className="flex items-center gap-1">
@@ -591,7 +622,7 @@ function WorkspaceHeader({
             <GearSix size={16} />
           </Button>
         )}
-        <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.archive')} title={translate(locale, 'ai.workspace.archive')} onClick={onArchive}>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.archive')} title={translate(locale, 'ai.workspace.archive')} disabled={archiveDisabled} onClick={onArchive}>
           <Archive size={16} />
         </Button>
         {mode === 'docked' ? (
@@ -725,10 +756,10 @@ function ConversationSession({
   return (
     <div className={active ? 'flex min-h-0 flex-1 flex-col' : 'hidden'} data-testid={`ai-workspace-session-${conversation.id}`}>
       <WorkspaceHeader
+        archiveDisabled={!canArchiveConversation(conversation)}
         conversation={conversation}
         locale={locale}
         mode={mode}
-        status={controller.agent.status}
         onArchive={onArchive}
         onClose={onClose}
         onDock={onDock}
@@ -772,6 +803,7 @@ interface AiWorkspaceModel {
   activeId: string
   addDefaultConversation: () => void
   archiveConversationSafely: (id: string) => void
+  canArchiveConversation: (conversation: AiConversation) => boolean
   conversations: AiConversation[]
   fallbackTarget: AiTarget
   groups: AiWorkspaceTargetGroups
@@ -800,22 +832,174 @@ function resolveAiWorkspaceProps(props: AiWorkspaceProps): ResolvedAiWorkspacePr
   }
 }
 
-function workspaceClassName(mode: 'docked' | 'window'): string {
-  if (mode === 'window') return 'fixed inset-0 z-[90] flex bg-background text-foreground'
-
-  return 'fixed bottom-10 right-4 z-[90] flex h-[min(680px,calc(100vh-88px))] w-[min(880px,calc(100vw-32px))] overflow-hidden rounded-lg border border-border bg-background text-foreground shadow-2xl'
+interface AiWorkspaceSizing {
+  onSidebarResize: (delta: number) => void
+  onWorkspaceResize: (deltaWidth: number, deltaHeight: number) => void
+  sidebarWidth: number
+  workspaceSize: { height: number; width: number }
 }
 
-function workspaceStyle(mode: 'docked' | 'window'): CSSProperties | undefined {
+function workspaceClassName(mode: 'docked' | 'window'): string {
+  if (mode === 'window') {
+    return 'fixed inset-0 z-[120] flex overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-2xl'
+  }
+
+  return 'fixed bottom-20 right-4 z-[120] flex overflow-hidden rounded-lg border border-border bg-background text-foreground shadow-2xl'
+}
+
+function workspaceStyle(mode: 'docked' | 'window', size: AiWorkspaceSizing['workspaceSize']): CSSProperties | undefined {
   if (mode === 'window') return undefined
 
   return {
-    maxHeight: 'calc(100vh - 88px)',
+    height: size.height,
+    maxHeight: 'calc(100vh - 112px)',
     maxWidth: 'calc(100vw - 32px)',
-    minHeight: 420,
-    minWidth: 520,
-    resize: 'both',
+    minHeight: MIN_DOCKED_WORKSPACE_SIZE.height,
+    minWidth: MIN_DOCKED_WORKSPACE_SIZE.width,
+    width: size.width,
   }
+}
+
+function startResizeDrag(
+  event: ReactMouseEvent,
+  cursor: string,
+  onDrag: (deltaX: number, deltaY: number) => void,
+) {
+  event.preventDefault()
+  event.stopPropagation()
+
+  let lastX = event.clientX
+  let lastY = event.clientY
+  const previousCursor = document.body.style.cursor
+  const previousUserSelect = document.body.style.userSelect
+  document.body.style.cursor = cursor
+  document.body.style.userSelect = 'none'
+
+  const handleMouseMove = (moveEvent: MouseEvent) => {
+    const deltaX = moveEvent.clientX - lastX
+    const deltaY = moveEvent.clientY - lastY
+    lastX = moveEvent.clientX
+    lastY = moveEvent.clientY
+    onDrag(deltaX, deltaY)
+  }
+  const handleMouseUp = () => {
+    document.body.style.cursor = previousCursor
+    document.body.style.userSelect = previousUserSelect
+    window.removeEventListener('mousemove', handleMouseMove)
+    window.removeEventListener('mouseup', handleMouseUp)
+  }
+
+  window.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('mouseup', handleMouseUp)
+}
+
+function WorkspaceResizeHandles({
+  mode,
+  onResize,
+}: {
+  mode: 'docked' | 'window'
+  onResize: (deltaWidth: number, deltaHeight: number) => void
+}) {
+  if (mode === 'window') return null
+
+  return (
+    <>
+      <div
+        className="absolute inset-y-0 left-0 z-30 w-1 cursor-col-resize bg-transparent transition-colors hover:bg-border"
+        data-testid="ai-workspace-left-resize"
+        onMouseDown={(event) => startResizeDrag(event, 'col-resize', (deltaX) => onResize(-deltaX, 0))}
+      />
+      <div
+        className="absolute top-0 right-0 left-0 z-30 h-1 cursor-row-resize bg-transparent transition-colors hover:bg-border"
+        data-testid="ai-workspace-top-resize"
+        onMouseDown={(event) => startResizeDrag(event, 'row-resize', (_deltaX, deltaY) => onResize(0, -deltaY))}
+      />
+    </>
+  )
+}
+
+function useAiWorkspaceSizing(mode: 'docked' | 'window'): AiWorkspaceSizing {
+  const [workspaceSize, setWorkspaceSize] = useState(DEFAULT_DOCKED_WORKSPACE_SIZE)
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
+
+  const onWorkspaceResize = useCallback((deltaWidth: number, deltaHeight: number) => {
+    if (mode === 'window') return
+    setWorkspaceSize((current) => {
+      const max = maxDockedWorkspaceSize()
+      return {
+        height: clampNumber(current.height + deltaHeight, MIN_DOCKED_WORKSPACE_SIZE.height, max.height),
+        width: clampNumber(current.width + deltaWidth, MIN_DOCKED_WORKSPACE_SIZE.width, max.width),
+      }
+    })
+  }, [mode])
+  const onSidebarResize = useCallback((delta: number) => {
+    setSidebarWidth((current) => clampNumber(current + delta, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH))
+  }, [])
+
+  return { onSidebarResize, onWorkspaceResize, sidebarWidth, workspaceSize }
+}
+
+function useActiveConversationSync(
+  activeConversation: AiConversation | undefined,
+  activeId: string,
+  setActiveId: (id: string) => void,
+) {
+  useEffect(() => {
+    if (activeConversation && activeConversation.id !== activeId) setActiveId(activeConversation.id)
+  }, [activeConversation, activeId, setActiveId])
+}
+
+function useArchiveConversationSafely({
+  addConversation,
+  archiveConversation,
+  conversations,
+  fallbackTarget,
+}: {
+  addConversation: (target: AiTarget) => void
+  archiveConversation: (id: string) => void
+  conversations: AiConversation[]
+  fallbackTarget: AiTarget
+}) {
+  return useCallback((id: string) => {
+    const conversation = conversations.find((candidate) => candidate.id === id)
+    if (!conversation || !canArchiveConversation(conversation)) return
+
+    const activeCount = conversations.filter((conversation) => !conversation.archived).length
+    archiveConversation(id)
+    if (activeCount <= 1) addConversation(fallbackTarget)
+  }, [addConversation, archiveConversation, conversations, fallbackTarget])
+}
+
+function useTrackedConversationActions({
+  conversations,
+  renameConversation,
+  titleConversationFromPrompt,
+}: {
+  conversations: AiConversation[]
+  renameConversation: (id: string, title: string) => void
+  titleConversationFromPrompt: (id: string, prompt: string) => void
+}) {
+  const trackedRenameConversation = useCallback((id: string, title: string) => {
+    if (!title.trim()) return
+    renameConversation(id, title)
+    trackAiWorkspaceChatTitled('manual')
+  }, [renameConversation])
+  const trackedTitleConversationFromPrompt = useCallback((id: string, prompt: string) => {
+    const conversation = conversations.find((candidate) => candidate.id === id)
+    titleConversationFromPrompt(id, prompt)
+    if (conversation?.usesDefaultTitle) trackAiWorkspaceChatTitled('generated')
+  }, [conversations, titleConversationFromPrompt])
+
+  return { trackedRenameConversation, trackedTitleConversationFromPrompt }
+}
+
+function useAiWorkspaceNewChatEvent(open: boolean, addDefaultConversation: () => void) {
+  useEffect(() => {
+    if (!open) return
+    const handleNewChat = () => addDefaultConversation()
+    window.addEventListener(NEW_AI_CHAT_EVENT, handleNewChat)
+    return () => window.removeEventListener(NEW_AI_CHAT_EVENT, handleNewChat)
+  }, [addDefaultConversation, open])
 }
 
 function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceModel {
@@ -849,33 +1033,26 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
   })
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({})
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const activeConversation = conversations.find((conversation) => conversation.id === activeId)
-    ?? conversations.find((conversation) => !conversation.archived)
-    ?? conversations[0]
+  const activeConversation = activeConversationForState(conversations, activeId, showArchived)
 
   const addDefaultConversation = useCallback(() => {
     addConversation(fallbackTarget)
   }, [addConversation, fallbackTarget])
-
-  const archiveConversationSafely = useCallback((id: string) => {
-    const activeCount = conversations.filter((conversation) => !conversation.archived).length
-    archiveConversation(id)
-    if (activeCount <= 1) addConversation(fallbackTarget)
-  }, [addConversation, archiveConversation, conversations, fallbackTarget])
-
+  const archiveConversationSafely = useArchiveConversationSafely({
+    addConversation,
+    archiveConversation,
+    conversations,
+    fallbackTarget,
+  })
+  useActiveConversationSync(activeConversation, activeId, setActiveId)
   const handleStatusChange = useCallback((id: string, status: AgentStatus) => {
     setStatuses((current) => current[id] === status ? current : { ...current, [id]: status })
   }, [])
-  const trackedRenameConversation = useCallback((id: string, title: string) => {
-    if (!title.trim()) return
-    renameConversation(id, title)
-    trackAiWorkspaceChatTitled('manual')
-  }, [renameConversation])
-  const trackedTitleConversationFromPrompt = useCallback((id: string, prompt: string) => {
-    const conversation = conversations.find((candidate) => candidate.id === id)
-    titleConversationFromPrompt(id, prompt)
-    if (conversation?.usesDefaultTitle) trackAiWorkspaceChatTitled('generated')
-  }, [conversations, titleConversationFromPrompt])
+  const { trackedRenameConversation, trackedTitleConversationFromPrompt } = useTrackedConversationActions({
+    conversations,
+    renameConversation,
+    titleConversationFromPrompt,
+  })
   const toggleSidebarCollapsed = useCallback(() => {
     setSidebarCollapsed((current) => {
       const next = !current
@@ -884,13 +1061,7 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
     })
   }, [workspace.mode])
 
-  useEffect(() => {
-    if (!workspace.open) return
-    const handleNewChat = () => addDefaultConversation()
-    window.addEventListener(NEW_AI_CHAT_EVENT, handleNewChat)
-    return () => window.removeEventListener(NEW_AI_CHAT_EVENT, handleNewChat)
-  }, [addDefaultConversation, workspace.open])
-
+  useAiWorkspaceNewChatEvent(workspace.open, addDefaultConversation)
   useEffect(() => {
     updateDefaultConversationTargets(fallbackTarget.id)
   }, [fallbackTarget.id, updateDefaultConversationTargets])
@@ -900,6 +1071,7 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
     activeId,
     addDefaultConversation,
     archiveConversationSafely,
+    canArchiveConversation,
     conversations,
     fallbackTarget,
     groups,
@@ -919,20 +1091,24 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
 }
 
 function AiWorkspaceLayout({ model, workspace }: { model: AiWorkspaceModel; workspace: ResolvedAiWorkspaceProps }) {
+  const sizing = useAiWorkspaceSizing(workspace.mode)
+
   return (
     <section
       className={workspaceClassName(workspace.mode)}
-      style={workspaceStyle(workspace.mode)}
+      style={workspaceStyle(workspace.mode, sizing.workspaceSize)}
       data-testid="ai-workspace"
       data-ai-workspace-mode={workspace.mode}
       role="dialog"
       aria-label={translate(workspace.locale, 'ai.workspace.title')}
     >
+      <WorkspaceResizeHandles mode={workspace.mode} onResize={sizing.onWorkspaceResize} />
       <ConversationSidebar
         activeId={model.activeId}
         collapsed={model.sidebarCollapsed}
         conversations={model.conversations}
         locale={workspace.locale}
+        onCanArchive={model.canArchiveConversation}
         onArchive={model.archiveConversationSafely}
         onNewChat={model.addDefaultConversation}
         onRename={model.renameConversation}
@@ -941,8 +1117,12 @@ function AiWorkspaceLayout({ model, workspace }: { model: AiWorkspaceModel; work
         onToggleCollapsed={model.toggleSidebarCollapsed}
         setShowArchived={model.setShowArchived}
         showArchived={model.showArchived}
+        sidebarWidth={sizing.sidebarWidth}
         statuses={model.statuses}
       />
+      {!model.sidebarCollapsed && (
+        <ResizeHandle onResize={sizing.onSidebarResize} />
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
         <ConversationSessions model={model} workspace={workspace} />
       </div>
@@ -959,7 +1139,7 @@ function ConversationSessions({ model, workspace }: { model: AiWorkspaceModel; w
         return (
           <ConversationSession
             key={conversation.id}
-            active={conversation.id === model.activeConversation?.id && !conversation.archived}
+            active={conversation.id === model.activeConversation?.id}
             activeEntry={workspace.activeEntry}
             activeNoteContent={workspace.activeNoteContent}
             aiAgentsStatus={workspace.aiAgentsStatus}

@@ -17,7 +17,7 @@ The AI workspace also needs installation-local chat metadata so user-facing chat
 
 **The AI workspace pop-out uses a lightweight renderer route backed by app settings metadata.**
 
-`openAiWorkspaceWindow()` opens the `ai-workspace` Tauri webview with `?window=ai-workspace` plus active vault context in URL params. `App` routes that window directly to `AiWorkspaceWindowApp`, which loads settings, AI agent status, and vault guidance without mounting the full vault/editor shell. The window is undecorated and relies on `AiWorkspace` headers for drag regions and the workspace close/dock controls.
+`openAiWorkspaceWindow()` opens the `ai-workspace` Tauri webview with `?window=ai-workspace` plus active vault context in URL params. `App` routes that window directly to `AiWorkspaceWindowApp`, which loads settings, AI agent status, and vault guidance without mounting the full vault/editor shell. The window is undecorated and transparent, and it relies on `AiWorkspace` headers for drag regions plus separate close and dock controls. Close only closes the pop-out; dock emits the main-window dock request before closing the pop-out.
 
 `settings.ai_workspace_conversations` stores only chat sidebar metadata: conversation id, title, archive state, and explicit target override. Prompt text, transcripts, note content, model credentials, and vault-local configuration stay out of app settings.
 
@@ -30,6 +30,6 @@ The AI workspace also needs installation-local chat metadata so user-facing chat
 ## Consequences
 
 - Pop-out startup avoids full note graph loading and should be close to instant after the Tauri webview is created.
-- The dedicated AI window has no native traffic lights; users close or redock it through the workspace header controls.
+- The dedicated AI window has no native traffic lights; users close or redock it through separate workspace header controls, and the rounded workspace shell defines the visible floating-window corners.
 - Chat titles, archived state, and target overrides persist at the installation level in `settings.json`.
 - Future transcript persistence must use a separate storage decision; `ai_workspace_conversations` is intentionally metadata-only.

@@ -108,14 +108,66 @@ describe('AiWorkspace', () => {
   it('creates chats from the sidebar and hides the legacy AI panel header', () => {
     render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
 
-    expect(screen.getByTestId('ai-workspace')).toHaveAttribute('data-ai-workspace-mode', 'docked')
+    const workspace = screen.getByTestId('ai-workspace')
+    expect(workspace).toHaveAttribute('data-ai-workspace-mode', 'docked')
+    expect(workspace).toHaveStyle({ width: '560px' })
     expect(screen.getByTestId('ai-panel-view')).toHaveAttribute('data-show-header', 'false')
     expect(screen.queryByText('AI Agent')).toBeNull()
+    expect(screen.queryByText('Idle')).toBeNull()
 
     fireEvent.click(screen.getByTestId('ai-workspace-sidebar-new-chat'))
 
     expect(screen.getAllByText('Chat 1').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Chat 2').length).toBeGreaterThan(0)
+  })
+
+  it('resizes the docked workspace from the left edge and the sidebar split', () => {
+    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
+
+    const workspace = screen.getByTestId('ai-workspace')
+    fireEvent.mouseDown(screen.getByTestId('ai-workspace-left-resize'), { clientX: 100, clientY: 20 })
+    fireEvent.mouseMove(window, { clientX: 60, clientY: 20 })
+    fireEvent.mouseUp(window)
+    expect(workspace).toHaveStyle({ width: '600px' })
+
+    const sidebar = screen.getByTestId('ai-workspace-sidebar-header').parentElement
+    const sidebarHandle = workspace.querySelector('.cursor-col-resize:not([data-testid])')
+    expect(sidebar).toHaveStyle({ width: '168px' })
+    fireEvent.mouseDown(sidebarHandle as Element, { clientX: 100, clientY: 20 })
+    fireEvent.mouseMove(document, { clientX: 120, clientY: 20 })
+    fireEvent.mouseUp(document)
+    expect(sidebar).toHaveStyle({ width: '188px' })
+  })
+
+  it('does not archive an empty chat', () => {
+    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
+
+    const archiveButtons = screen.getAllByRole('button', { name: 'Archive chat' })
+    expect(archiveButtons.every((button) => button.hasAttribute('disabled'))).toBe(true)
+    fireEvent.click(archiveButtons[0])
+
+    expect(screen.getAllByText('Chat 1').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Chat 2')).toBeNull()
+  })
+
+  it('activates a visible chat when persisted settings start with an archived chat', () => {
+    render(
+      <AiWorkspace
+        open
+        mode="docked"
+        aiAgentsStatus={installedStatuses()}
+        aiModelProviders={providers}
+        conversationSettings={[
+          { id: 'archived-chat', title: 'Old Chat', target_id: null, archived: true },
+          { id: 'visible-chat', title: 'Live Chat', target_id: null, archived: false },
+        ]}
+        vaultPath="/tmp/vault"
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('ai-workspace-session-visible-chat')).toHaveClass('flex')
+    expect(screen.getByTestId('ai-workspace-session-archived-chat')).toHaveClass('hidden')
   })
 
   it('shows grouped target choices without missing agents', async () => {
@@ -145,6 +197,7 @@ describe('AiWorkspace', () => {
     fireEvent.click(screen.getByText('Send mocked prompt'))
 
     expect(screen.getAllByText('Summarize Quarterly Sponsor Outreach').length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'Archive chat' }).some((button) => !button.hasAttribute('disabled'))).toBe(true)
     expect(onConversationSettingsChange).toHaveBeenLastCalledWith([
       expect.objectContaining({ title: 'Summarize Quarterly Sponsor Outreach' }),
     ])

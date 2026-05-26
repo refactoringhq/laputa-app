@@ -1,38 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { installMockAiAgent } from './helpers'
 
 test.describe('AI chat empty body fix — no regression', () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      type Handler = (args?: Record<string, unknown>) => unknown
-      type BrowserWindow = Window & typeof globalThis & {
-        __mockHandlers?: Record<string, Handler>
-      }
-
-      const installMockAiAgent = (handlers?: Record<string, Handler> | null) => {
-        if (!handlers) return handlers ?? null
-        handlers.get_ai_agents_status = () => ({
-          claude_code: { installed: true, version: 'mock' },
-          codex: { installed: false, version: null },
-          opencode: { installed: false, version: null },
-          pi: { installed: false, version: null },
-          gemini: { installed: false, version: null },
-          kiro: { installed: false, version: null },
-        })
-        return handlers
-      }
-
-      const browserWindow = window as BrowserWindow
-      let ref = installMockAiAgent(browserWindow.__mockHandlers) ?? null
-      Object.defineProperty(browserWindow, '__mockHandlers', {
-        configurable: true,
-        set(value) {
-          ref = installMockAiAgent(value as Record<string, Handler> | undefined) ?? null
-        },
-        get() {
-          return installMockAiAgent(ref) ?? ref
-        },
-      })
-    })
+    await installMockAiAgent(page)
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await expect(page.locator('[data-testid="note-list-container"]')).toBeVisible({ timeout: 5_000 })

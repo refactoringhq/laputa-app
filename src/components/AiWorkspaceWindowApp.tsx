@@ -1,16 +1,33 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppPreferencesProvider, useAppPreferences } from '../hooks/useAppPreferences'
 import { useAiAgentsStatus } from '../hooks/useAiAgentsStatus'
 import { useSettings } from '../hooks/useSettings'
 import { useVaultAiGuidanceStatus } from '../hooks/useVaultAiGuidanceStatus'
 import { areAiFeaturesEnabled } from '../lib/aiFeatures'
 import type { AiWorkspaceConversationSetting, Settings } from '../types'
-import { dockCurrentAiWorkspaceWindow, readAiWorkspaceWindowContext } from '../utils/openAiWorkspaceWindow'
+import {
+  closeCurrentAiWorkspaceWindow,
+  dockCurrentAiWorkspaceWindow,
+  readAiWorkspaceWindowContext,
+} from '../utils/openAiWorkspaceWindow'
 import { AppAiWorkspaceSurface } from './AppAiWorkspaceSurface'
 import { Toast } from './Toast'
 
 function useAiWorkspaceWindowContext() {
   return useMemo(() => readAiWorkspaceWindowContext(), [])
+}
+
+function useTransparentWindowBackground() {
+  useEffect(() => {
+    const previousBodyBackground = document.body.style.background
+    const previousRootBackground = document.documentElement.style.background
+    document.body.style.background = 'transparent'
+    document.documentElement.style.background = 'transparent'
+    return () => {
+      document.body.style.background = previousBodyBackground
+      document.documentElement.style.background = previousRootBackground
+    }
+  }, [])
 }
 
 function useAiWorkspaceSettingsSaver(
@@ -25,6 +42,7 @@ function useAiWorkspaceSettingsSaver(
 }
 
 export function AiWorkspaceWindowApp() {
+  useTransparentWindowBackground()
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const context = useAiWorkspaceWindowContext()
   const { settings, loaded: settingsLoaded, saveSettings } = useSettings()
@@ -49,6 +67,11 @@ export function AiWorkspaceWindowApp() {
       console.warn('[ai] Failed to dock workspace window:', err)
     })
   }, [])
+  const handleClose = useCallback(() => {
+    void closeCurrentAiWorkspaceWindow().catch((err) => {
+      console.warn('[ai] Failed to close workspace window:', err)
+    })
+  }, [])
 
   return (
     <AppPreferencesProvider dateDisplayFormat={preferences.dateDisplayFormat}>
@@ -68,7 +91,7 @@ export function AiWorkspaceWindowApp() {
           openTabs={[]}
           noteList={[]}
           noteListFilter={{ type: null, query: '' }}
-          onClose={handleDock}
+          onClose={handleClose}
           onConversationSettingsChange={handleConversationSettingsChange}
           onDock={handleDock}
           onUnsupportedAiPaste={setToastMessage}

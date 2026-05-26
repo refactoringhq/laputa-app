@@ -170,10 +170,21 @@ describe('mockHandlers coverage', () => {
       anonymous_id: 'anon-1',
       release_channel: 'alpha',
       theme_mode: null,
+      date_display_format: null,
       note_width_mode: null,
       sidebar_type_pluralization_enabled: null,
+      initial_h1_auto_rename_enabled: null,
+      ai_features_enabled: null,
       ui_language: 'zh-CN',
       default_ai_agent: 'codex',
+      default_ai_target: null,
+      ai_model_providers: null,
+      ai_workspace_conversations: null,
+      hide_gitignored_files: null,
+      all_notes_show_pdfs: null,
+      all_notes_show_images: null,
+      all_notes_show_unsupported: null,
+      multi_workspace_enabled: null,
     })
 
     const list = {
