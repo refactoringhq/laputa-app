@@ -117,7 +117,8 @@ export interface TypeInstanceDefault {
 }
 
 function buildNoteBody({ template, initialEmptyHeading }: Pick<NoteContentParams, 'template' | 'initialEmptyHeading'>): string {
-  if (initialEmptyHeading) {
+  const templateStartsWithH1 = template?.trimStart().startsWith('# ') ?? false
+  if (initialEmptyHeading && !templateStartsWithH1) {
     return template ? `\n# \n\n${template}` : '\n# \n\n'
   }
   return template ? `\n${template}` : ''

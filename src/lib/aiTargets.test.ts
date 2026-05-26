@@ -59,6 +59,32 @@ describe('ai target provider contract', () => {
     })
   })
 
+  it('accepts legacy agent ids saved in the default target field', () => {
+    const target = resolveAiTarget({
+      default_ai_agent: 'claude_code',
+      default_ai_target: 'kiro',
+    } as Settings)
+
+    expect(target).toMatchObject({
+      kind: 'agent',
+      agent: 'kiro',
+      id: 'agent:kiro',
+    })
+  })
+
+  it('uses the legacy default agent when a saved agent target is stale', () => {
+    const target = resolveAiTarget({
+      default_ai_agent: 'kiro',
+      default_ai_target: 'agent:claude_code',
+    } as Settings)
+
+    expect(target).toMatchObject({
+      kind: 'agent',
+      agent: 'kiro',
+      id: 'agent:kiro',
+    })
+  })
+
   it('keeps provider defaults in one catalog with stable grouping metadata', () => {
     const entries = aiModelProviderCatalog()
     const kinds = entries.map((entry) => entry.kind)

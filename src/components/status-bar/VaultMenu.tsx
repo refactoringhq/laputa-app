@@ -19,6 +19,7 @@ import type { VaultOption } from './types'
 import { useDismissibleLayer } from './useDismissibleLayer'
 import { workspaceAliasFromOption, workspaceIdentityFromVault } from '../../utils/workspaces'
 import { reorderVaultPath, vaultPathList } from '../../utils/vaultOrdering'
+import { applyMountedChange } from './vaultMenuMountedChange'
 
 interface VaultMenuProps {
   vaults: VaultOption[]
@@ -90,6 +91,7 @@ interface VaultMenuInteractionOptions {
   onSwitchVault: (path: string) => void
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
   setOpen: (open: boolean) => void
+  vaultPath: string
 }
 
 interface MountToggleRequest {
@@ -104,10 +106,6 @@ interface VaultPathSelection extends VaultMenuInteractionOptions {
   path: string
 }
 
-interface VaultMountChangeRequest extends VaultMenuInteractionOptions {
-  mounted: boolean
-  path: string
-}
 
 function getVaultTriggerClassName(open: boolean, compact: boolean) {
   if (compact) {
@@ -293,10 +291,6 @@ function useIncludedVaults(vaults: VaultOption[], defaultPath: string): VaultOpt
   return useMemo(() => vaults.filter((vault) => isIncludedVault(vault, defaultPath)), [defaultPath, vaults])
 }
 
-function nextIncludedVaultPath(includedVaults: VaultOption[], currentPath: string): string | null {
-  return includedVaults.find((vault) => vault.path !== currentPath)?.path ?? null
-}
-
 function shouldDisableMountToggle({
   canSetDefaultWorkspace,
   defaultPath,
@@ -321,22 +315,6 @@ function selectVaultPath({
   setOpen(false)
 }
 
-function applyMountedChange({
-  defaultPath,
-  includedVaults,
-  mounted,
-  onSetDefaultWorkspace,
-  onUpdateWorkspaceIdentity,
-  path,
-}: VaultMountChangeRequest): void {
-  if (!mounted && path === defaultPath) {
-    const nextDefaultPath = nextIncludedVaultPath(includedVaults, path)
-    if (!nextDefaultPath) return
-    onSetDefaultWorkspace?.(nextDefaultPath)
-  }
-  onUpdateWorkspaceIdentity?.(path, { mounted })
-}
-
 function useVaultMenuInteractions({
   defaultPath,
   includedVaults,
@@ -345,6 +323,7 @@ function useVaultMenuInteractions({
   onSwitchVault,
   onUpdateWorkspaceIdentity,
   setOpen,
+  vaultPath,
 }: VaultMenuInteractionOptions) {
   const disableMountToggleForPath = useCallback((path: string) => (
     shouldDisableMountToggle({
@@ -366,22 +345,24 @@ function useVaultMenuInteractions({
       onUpdateWorkspaceIdentity,
       path,
       setOpen,
+      vaultPath,
     })
-  }, [defaultPath, includedVaults, multiWorkspaceEnabled, onSetDefaultWorkspace, onSwitchVault, onUpdateWorkspaceIdentity, setOpen])
+  }, [defaultPath, includedVaults, multiWorkspaceEnabled, onSetDefaultWorkspace, onSwitchVault, onUpdateWorkspaceIdentity, setOpen, vaultPath])
 
   const handleMountedChange = useCallback((path: string, mounted: boolean) => {
     applyMountedChange({
       defaultPath,
+      vaultPath,
       includedVaults,
       mounted,
-      multiWorkspaceEnabled,
-      onSetDefaultWorkspace,
-      onSwitchVault,
-      onUpdateWorkspaceIdentity,
       path,
-      setOpen,
+      callbacks: {
+        onSetDefaultWorkspace,
+        onSwitchVault,
+        onUpdateWorkspaceIdentity,
+      },
     })
-  }, [defaultPath, includedVaults, multiWorkspaceEnabled, onSetDefaultWorkspace, onSwitchVault, onUpdateWorkspaceIdentity, setOpen])
+  }, [defaultPath, includedVaults, onSetDefaultWorkspace, onSwitchVault, onUpdateWorkspaceIdentity, vaultPath])
 
   return { disableMountToggleForPath, handleMountedChange, handleSelectVault }
 }
@@ -747,6 +728,7 @@ export function VaultMenu(props: VaultMenuProps) {
     onSwitchVault,
     onUpdateWorkspaceIdentity,
     setOpen,
+    vaultPath,
   })
 
   useDismissibleLayer(open, menuRef, () => setOpen(false))

@@ -18,6 +18,7 @@ const aiAgentsStatus = {
   opencode: { status: 'missing' as const, version: null },
   pi: { status: 'missing' as const, version: null },
   gemini: { status: 'missing' as const, version: null },
+  kiro: { status: 'missing' as const, version: null },
 }
 
 describe('useAiAgentPreferences', () => {
@@ -86,6 +87,7 @@ describe('useAiAgentPreferences', () => {
         opencode: { status: 'missing', version: null },
         pi: { status: 'missing', version: null },
         gemini: { status: 'missing', version: null },
+        kiro: { status: 'missing', version: null },
       },
     }))
 

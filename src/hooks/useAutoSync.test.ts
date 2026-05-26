@@ -587,6 +587,40 @@ describe('useAutoSync', () => {
     })
   })
 
+  it('pullAndPush skips push for local-only vaults with no remote', async () => {
+    const { result } = renderSync()
+    await waitFor(() => {
+      expect(result.current.syncStatus).toBe('idle')
+    })
+
+    mockInvokeFn.mockClear()
+    mockInvokeFn.mockImplementation((cmd: string) => {
+      if (cmd === 'get_conflict_files') return Promise.resolve([])
+      if (cmd === 'get_last_commit_info') return Promise.resolve(MOCK_COMMIT_INFO)
+      if (cmd === 'git_remote_status') return Promise.resolve({ branch: 'main', ahead: 0, behind: 0, hasRemote: false })
+      if (cmd === 'git_pull') {
+        return Promise.resolve({
+          status: 'no_remote',
+          message: 'No remote configured',
+          updatedFiles: [],
+          conflictFiles: [],
+        })
+      }
+      if (cmd === 'git_push') return Promise.resolve({ status: 'ok', message: 'Pushed successfully' })
+      return Promise.resolve(upToDate())
+    })
+
+    await act(async () => {
+      result.current.pullAndPush()
+    })
+
+    await waitFor(() => {
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Laputa' })
+      expect(mockInvokeFn).not.toHaveBeenCalledWith('git_push', { vaultPath: '/Users/luca/Laputa' })
+      expect(result.current.syncStatus).toBe('idle')
+    })
+  })
+
   it('surfaces pull conflicts and pull errors during recovery pushes', async () => {
     let mode: 'conflict' | 'error' = 'conflict'
 

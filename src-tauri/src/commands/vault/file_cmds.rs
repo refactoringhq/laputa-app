@@ -191,11 +191,19 @@ pub fn batch_delete_notes(paths: Vec<PathBuf>) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub fn create_vault_folder(vault_path: PathBuf, folder_name: PathBuf) -> Result<String, String> {
+pub fn create_vault_folder(
+    vault_path: PathBuf,
+    folder_name: PathBuf,
+    parent_path: Option<PathBuf>,
+) -> Result<String, String> {
     let raw_vault_path = vault_path.to_string_lossy();
     with_boundary(Some(raw_vault_path.as_ref()), |boundary| {
         let folder_name = folder_name.to_string_lossy();
-        let folder_path = boundary.child_path(folder_name.as_ref())?;
+        let relative_path = match parent_path.as_deref() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent.join(folder_name.as_ref()),
+            _ => PathBuf::from(folder_name.as_ref()),
+        };
+        let folder_path = boundary.child_path(&relative_path.to_string_lossy())?;
         validate_folder_name(folder_name.as_ref())?;
         ensure_missing_folder(&folder_path, folder_name.as_ref())?;
         std::fs::create_dir_all(&folder_path)
@@ -370,7 +378,7 @@ mod tests {
         fs::write(dir.path().join("root.md"), "# Root\n").unwrap();
 
         assert_eq!(
-            create_vault_folder(root.clone(), PathBuf::from("Projects")).unwrap(),
+            create_vault_folder(root.clone(), PathBuf::from("Projects"), None).unwrap(),
             "Projects"
         );
         fs::write(dir.path().join("Projects/project.md"), "# Project\n").unwrap();
@@ -394,7 +402,7 @@ mod tests {
         assert!(error.contains("Path must stay inside the active vault"));
 
         let folder_error =
-            create_vault_folder(vault.path().to_path_buf(), PathBuf::from("../escape"))
+            create_vault_folder(vault.path().to_path_buf(), PathBuf::from("../escape"), None)
                 .unwrap_err();
         assert!(folder_error.contains("Path must stay inside the active vault"));
     }

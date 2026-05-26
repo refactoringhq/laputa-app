@@ -192,7 +192,7 @@ mod tests {
     fn test_create_vault_folder_rejects_escape_path() {
         let dir = tempfile::TempDir::new().unwrap();
 
-        let err = create_vault_folder(dir.path().into(), "../escape".into())
+        let err = create_vault_folder(dir.path().into(), "../escape".into(), None)
             .expect_err("expected escaping folder path to be rejected");
 
         assert_eq!(err, ACTIVE_VAULT_PATH_ERROR);
@@ -202,10 +202,55 @@ mod tests {
     fn test_create_vault_folder_rejects_windows_invalid_names() {
         let dir = tempfile::TempDir::new().unwrap();
 
-        let err = create_vault_folder(dir.path().into(), "con".into())
+        let err = create_vault_folder(dir.path().into(), "con".into(), None)
             .expect_err("expected Windows-invalid folder name to be rejected");
 
         assert_eq!(err, "Invalid folder name");
+    }
+
+    #[test]
+    fn test_create_vault_folder_nests_inside_parent_path() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(dir.path().join("Projects")).unwrap();
+
+        let name = create_vault_folder(
+            dir.path().into(),
+            "Laputa".into(),
+            Some(std::path::PathBuf::from("Projects")),
+        )
+        .expect("expected nested folder to be created");
+
+        assert_eq!(name, "Laputa");
+        assert!(dir.path().join("Projects").join("Laputa").is_dir());
+    }
+
+    #[test]
+    fn test_create_vault_folder_rejects_escape_via_parent_path() {
+        let dir = tempfile::TempDir::new().unwrap();
+
+        let err = create_vault_folder(
+            dir.path().into(),
+            "Laputa".into(),
+            Some(std::path::PathBuf::from("../escape")),
+        )
+        .expect_err("expected escaping parent path to be rejected");
+
+        assert_eq!(err, ACTIVE_VAULT_PATH_ERROR);
+    }
+
+    #[test]
+    fn test_create_vault_folder_treats_empty_parent_as_root() {
+        let dir = tempfile::TempDir::new().unwrap();
+
+        let name = create_vault_folder(
+            dir.path().into(),
+            "Inbox".into(),
+            Some(std::path::PathBuf::from("")),
+        )
+        .expect("expected empty parent to fall back to vault root");
+
+        assert_eq!(name, "Inbox");
+        assert!(dir.path().join("Inbox").is_dir());
     }
 
     #[test]

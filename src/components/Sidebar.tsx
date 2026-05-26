@@ -1,6 +1,6 @@
 import { useCallback, memo } from 'react'
 import type {
-  VaultEntry, FolderNode, SidebarSelection, ViewDefinition, ViewFile,
+  FolderCreationParent, FolderNode, SidebarSelection, VaultEntry, ViewDefinition, ViewFile,
 } from '../types'
 import {
   KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent,
@@ -56,7 +56,7 @@ interface SidebarProps {
   onUpdateViewDefinition?: (filename: string, patch: Partial<ViewDefinition>, rootPath?: string) => void
   onReorderViews?: (orderedFilenames: string[]) => void
   folders?: FolderNode[]
-  onCreateFolder?: (name: string) => Promise<boolean> | boolean
+  onCreateFolder?: (name: string, parent?: FolderCreationParent) => Promise<boolean> | boolean
   onRenameFolder?: (folderPath: string, nextName: string) => Promise<boolean> | boolean
   onDeleteFolder?: (folderPath: string) => void
   folderFileActions?: FolderFileActions

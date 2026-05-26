@@ -475,7 +475,7 @@ mod tests {
         assert_eq!(pull.status, "no_remote");
 
         let push = git_push(vault.clone()).await.unwrap();
-        assert_eq!(push.status, "error");
+        assert_eq!(push.status, "no_remote");
 
         let status = git_remote_status(vault.clone()).await.unwrap();
         assert!(!status.has_remote);

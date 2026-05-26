@@ -542,7 +542,17 @@ export function useAutoSync({
           })
         }
 
-        const pushOutcomes = await Promise.all(pullVaultPaths.map(async (path) => ({
+        const pushVaultPaths = pullOutcomes
+          .filter((outcome) => outcome.result.status !== 'no_remote')
+          .map((outcome) => outcome.vaultPath)
+
+        if (pushVaultPaths.length === 0) {
+          clearConflictState(setSyncStatus, setConflictFiles, setConflictVaultPath)
+          void refreshRemoteStatus(pullVaultPaths)
+          return
+        }
+
+        const pushOutcomes = await Promise.all(pushVaultPaths.map(async (path) => ({
           result: await tauriCall<GitPushResult>('git_push', { vaultPath: path }),
           vaultPath: path,
         })))

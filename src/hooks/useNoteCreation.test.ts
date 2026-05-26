@@ -148,6 +148,28 @@ describe('buildNoteContent', () => {
     })
     expect(content).toBe('---\ntype: Project\nstatus: Active\n---\n\n# \n\n## Objective\n\n')
   })
+
+  it('skips the empty H1 when the template already starts with one', () => {
+    const content = buildNoteContent({
+      title: null,
+      type: 'Weekly',
+      status: null,
+      template: '# Woche 2026.21\n\nWochennotiz\n',
+      initialEmptyHeading: true,
+    })
+    expect(content).toBe('---\ntype: Weekly\n---\n\n# Woche 2026.21\n\nWochennotiz\n')
+  })
+
+  it('skips the empty H1 when the template starts with an H1 after leading whitespace', () => {
+    const content = buildNoteContent({
+      title: null,
+      type: 'Weekly',
+      status: null,
+      template: '\n\n# Woche 2026.21\n',
+      initialEmptyHeading: true,
+    })
+    expect(content).toBe('---\ntype: Weekly\n---\n\n\n\n# Woche 2026.21\n')
+  })
 })
 
 describe('resolveNewNote', () => {

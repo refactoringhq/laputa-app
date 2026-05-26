@@ -141,7 +141,7 @@ export interface GitPullResult {
 }
 
 export interface GitPushResult {
-  status: 'ok' | 'rejected' | 'auth_error' | 'network_error' | 'error'
+  status: 'ok' | 'rejected' | 'auth_error' | 'network_error' | 'no_remote' | 'error'
   message: string
 }
 
@@ -275,4 +275,14 @@ export interface FolderNode {
   path: string
   rootPath?: string
   children: FolderNode[]
+}
+
+/**
+ * Context for a folder-create request: where the new folder should land.
+ * `path` is vault-relative (`''` means vault root); `rootPath` identifies the
+ * target vault when multiple workspaces are mounted.
+ */
+export interface FolderCreationParent {
+  path: string
+  rootPath?: string
 }

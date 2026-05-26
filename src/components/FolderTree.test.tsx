@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ComponentProps } from 'react'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { FolderTree } from './FolderTree'
@@ -21,6 +21,30 @@ const mockFolders: FolderNode[] = [
 
 const defaultSelection: SidebarSelection = { kind: 'filter', filter: 'all' }
 const vaultRootPath = '/Users/luca/Laputa'
+
+function renderTree(props: Partial<ComponentProps<typeof FolderTree>> = {}) {
+  const onSelect = props.onSelect ?? vi.fn()
+  render(
+    <FolderTree
+      folders={mockFolders}
+      selection={defaultSelection}
+      onSelect={onSelect}
+      {...props}
+    />,
+  )
+  return { onSelect }
+}
+
+function clickFolderRow(path: string) {
+  fireEvent.click(screen.getByTestId(`folder-row:${path}`))
+}
+
+async function submitNewFolder(name: string) {
+  fireEvent.click(screen.getByTestId('create-folder-btn'))
+  const input = screen.getByTestId('new-folder-input')
+  fireEvent.change(input, { target: { value: name } })
+  fireEvent.keyDown(input, { key: 'Enter' })
+}
 
 describe('FolderTree', () => {
   it('renders nothing when folders is empty', () => {
@@ -153,32 +177,16 @@ describe('FolderTree', () => {
   })
 
   it('selects the vault root with the root path attached', () => {
-    const onSelect = vi.fn()
-    render(
-      <FolderTree
-        folders={mockFolders}
-        selection={defaultSelection}
-        onSelect={onSelect}
-        vaultRootPath={vaultRootPath}
-      />,
-    )
+    const { onSelect } = renderTree({ vaultRootPath })
 
-    fireEvent.click(screen.getByTestId('folder-row:'))
+    clickFolderRow('')
     expect(onSelect).toHaveBeenCalledWith({ kind: 'folder', path: '', rootPath: vaultRootPath })
   })
 
   it('selects child folders with the vault root path attached when the tree has a root', () => {
-    const onSelect = vi.fn()
-    render(
-      <FolderTree
-        folders={mockFolders}
-        selection={defaultSelection}
-        onSelect={onSelect}
-        vaultRootPath={vaultRootPath}
-      />,
-    )
+    const { onSelect } = renderTree({ vaultRootPath })
 
-    fireEvent.click(screen.getByTestId('folder-row:areas'))
+    clickFolderRow('areas')
 
     expect(onSelect).toHaveBeenCalledWith({ kind: 'folder', path: 'areas', rootPath: vaultRootPath })
   })
@@ -233,6 +241,120 @@ describe('FolderTree', () => {
     )
     fireEvent.click(screen.getByTestId('create-folder-btn'))
     expect(screen.getByTestId('new-folder-input')).toBeInTheDocument()
+  })
+
+  it('passes the selected folder as the parent when creating a new folder', async () => {
+    const onCreateFolder = vi.fn().mockResolvedValue(true)
+    renderTree({
+      selection: { kind: 'folder', path: 'projects', rootPath: vaultRootPath },
+      onCreateFolder,
+      vaultRootPath,
+    })
+
+    await submitNewFolder('laputa')
+
+    await vi.waitFor(() => {
+      expect(onCreateFolder).toHaveBeenCalledWith('laputa', {
+        path: 'projects',
+        rootPath: vaultRootPath,
+      })
+    })
+  })
+
+  it('passes the target vault root when the vault root is selected', async () => {
+    const onCreateFolder = vi.fn().mockResolvedValue(true)
+    const otherVault = '/Users/luca/Team'
+    const folders: FolderNode[] = [
+      {
+        name: 'Personal',
+        path: '',
+        rootPath: vaultRootPath,
+        children: [{ name: 'areas', path: 'areas', rootPath: vaultRootPath, children: [] }],
+      },
+      {
+        name: 'Team',
+        path: '',
+        rootPath: otherVault,
+        children: [{ name: 'areas', path: 'areas', rootPath: otherVault, children: [] }],
+      },
+    ]
+
+    renderTree({
+      folders,
+      selection: { kind: 'folder', path: '', rootPath: otherVault },
+      onCreateFolder,
+      vaultRootPath,
+    })
+
+    await submitNewFolder('inbox')
+
+    await vi.waitFor(() => {
+      expect(onCreateFolder).toHaveBeenCalledWith('inbox', {
+        path: '',
+        rootPath: otherVault,
+      })
+    })
+  })
+
+  it('omits parent context when nothing folder-like is selected', async () => {
+    const onCreateFolder = vi.fn().mockResolvedValue(true)
+    renderTree({ onCreateFolder, vaultRootPath })
+
+    await submitNewFolder('inbox')
+
+    await vi.waitFor(() => {
+      expect(onCreateFolder).toHaveBeenCalledWith('inbox', undefined)
+    })
+  })
+
+  it('expands the selected parent after a successful create so the new child is visible', async () => {
+    const onCreateFolder = vi.fn().mockResolvedValue(true)
+    render(
+      <FolderTree
+        folders={mockFolders}
+        selection={{ kind: 'folder', path: 'projects' }}
+        onSelect={vi.fn()}
+        onCreateFolder={onCreateFolder}
+      />,
+    )
+
+    // Sanity: selecting a folder auto-expands its ancestors but not the folder
+    // itself, so 'projects' starts collapsed.
+    expect(screen.getByRole('button', { name: 'projects' })).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(screen.getByTestId('create-folder-btn'))
+    const input = screen.getByTestId('new-folder-input')
+    fireEvent.change(input, { target: { value: 'laputa' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await vi.waitFor(() => {
+      expect(onCreateFolder).toHaveBeenCalled()
+    })
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: 'projects' })).toHaveAttribute('aria-expanded', 'true')
+    })
+  })
+
+  it('leaves expansion alone when create resolves falsy (validation rejected, etc.)', async () => {
+    const onCreateFolder = vi.fn().mockResolvedValue(false)
+    render(
+      <FolderTree
+        folders={mockFolders}
+        selection={{ kind: 'folder', path: 'projects' }}
+        onSelect={vi.fn()}
+        onCreateFolder={onCreateFolder}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('create-folder-btn'))
+    const input = screen.getByTestId('new-folder-input')
+    fireEvent.change(input, { target: { value: 'laputa' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await vi.waitFor(() => {
+      expect(onCreateFolder).toHaveBeenCalled()
+    })
+    expect(screen.getByRole('button', { name: 'projects' })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('starts rename on folder double-click', () => {
