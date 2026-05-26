@@ -56,6 +56,8 @@ interface AiPanelViewProps {
   locale?: AppLocale
   activeEntry?: VaultEntry | null
   entries?: VaultEntry[]
+  interactive?: boolean
+  showHeader?: boolean
 }
 
 function readinessFromReadyFlag(ready: boolean | undefined): AiAgentReadiness {
@@ -74,6 +76,8 @@ export function AiPanelView({
   locale = 'en',
   activeEntry,
   entries,
+  interactive = true,
+  showHeader = true,
 }: AiPanelViewProps) {
   const defaultAiAgent = providedDefaultAiAgent ?? DEFAULT_AI_AGENT
   const defaultAiAgentReadiness = providedDefaultAiAgentReadiness
@@ -97,13 +101,14 @@ export function AiPanelView({
     handleNewChat,
   } = controller
 
-  useAiPanelPromptQueue({ agent, input, isActive, setInput })
+  useAiPanelPromptQueue({ agent, input, isActive, setInput, enabled: interactive })
   useAiPanelFocus({
     inputRef,
     panelRef,
     hasMessages: agent.messages.length > 0,
     isActive,
     onClose,
+    enabled: interactive,
   })
 
   return (
@@ -122,17 +127,19 @@ export function AiPanelView({
       data-testid="ai-panel"
       data-ai-active={isActive || undefined}
     >
-      <AiPanelHeader
-        agentLabel={agentLabel}
-        agentReadiness={defaultAiAgentReadiness}
-        targetKind={targetKind}
-        locale={locale}
-        permissionMode={permissionMode}
-        permissionModeDisabled={isActive}
-        onPermissionModeChange={handlePermissionModeChange}
-        onClose={onClose}
-        onNewChat={handleNewChat}
-      />
+      {showHeader && (
+        <AiPanelHeader
+          agentLabel={agentLabel}
+          agentReadiness={defaultAiAgentReadiness}
+          targetKind={targetKind}
+          locale={locale}
+          permissionMode={permissionMode}
+          permissionModeDisabled={isActive}
+          onPermissionModeChange={handlePermissionModeChange}
+          onClose={onClose}
+          onNewChat={handleNewChat}
+        />
+      )}
       {activeEntry && (
         <AiPanelContextBar activeEntry={activeEntry} linkedCount={linkedEntries.length} locale={locale} />
       )}

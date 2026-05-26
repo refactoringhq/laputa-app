@@ -115,7 +115,8 @@ tolaria/
 │   │   ├── RawEditorView.tsx     # CodeMirror raw editor
 │   │   ├── Inspector.tsx         # Fourth panel: metadata + relationships
 │   │   ├── DynamicPropertiesPanel.tsx  # Editable frontmatter properties
-│   │   ├── AiPanel.tsx           # AI agent panel (selected CLI agent + per-vault permission mode)
+│   │   ├── AiWorkspace.tsx       # Multi-chat AI workspace (docked or native window)
+│   │   ├── AiPanel.tsx           # AI transcript/composer surface (selected target + per-vault permission mode)
 │   │   ├── AiMessage.tsx         # Agent message display
 │   │   ├── AiActionCard.tsx      # Agent tool action cards
 │   │   ├── AiAgentsOnboardingPrompt.tsx # First-launch AI agent installer prompt
@@ -327,7 +328,9 @@ tolaria/
 
 | File | Why it matters |
 |------|---------------|
-| `src/components/AiPanel.tsx` | AI agent panel — selected CLI agent with tool execution, reasoning, actions, and per-vault permission mode. |
+| `src/components/AiWorkspace.tsx` | Multi-chat AI workspace — sidebar chats, installed-only target picker, permission picker, and dock/pop-out controls. |
+| `src/components/AiPanel.tsx` | Reusable AI transcript/composer surface — selected target with tool execution, reasoning, actions, and per-vault permission mode. |
+| `src/utils/openAiWorkspaceWindow.ts` | Native Tauri AI workspace window creation, focus, and dock-back traffic-light handling. |
 | `src/hooks/useCliAiAgent.ts` | Thin React owner for the selected CLI agent session state. |
 | `src/lib/aiAgentSession.ts` | Single message/session lifecycle for prompt normalization, history, streaming, and reset behavior. |
 | `src/lib/aiAgentPermissionMode.ts` | Safe/Power User mode normalization, display labels, and local transcript marker text. |

@@ -87,6 +87,7 @@ interface StatusBarPrimarySectionProps {
   aiModelProviders?: AiModelProvider[]
   onSetDefaultAiAgent?: (agent: AiAgentId) => void
   onSetDefaultAiTarget?: (target: string) => void
+  onOpenAiWorkspace?: () => void
   onRestoreVaultAiGuidance?: () => void
   claudeCodeStatus?: ClaudeCodeStatus
   claudeCodeVersion?: string | null
@@ -153,6 +154,7 @@ function StatusBarAiBadge({
   aiModelProviders,
   onSetDefaultAiAgent,
   onSetDefaultAiTarget,
+  onOpenAiWorkspace,
   onRestoreVaultAiGuidance,
   claudeCodeStatus,
   claudeCodeVersion,
@@ -167,6 +169,7 @@ function StatusBarAiBadge({
   | 'aiModelProviders'
   | 'onSetDefaultAiAgent'
   | 'onSetDefaultAiTarget'
+  | 'onOpenAiWorkspace'
   | 'onRestoreVaultAiGuidance'
   | 'claudeCodeStatus'
   | 'claudeCodeVersion'
@@ -183,6 +186,7 @@ function StatusBarAiBadge({
         providers={aiModelProviders}
         onSetDefaultAgent={onSetDefaultAiAgent}
         onSetDefaultTarget={onSetDefaultAiTarget}
+        onOpenWorkspace={onOpenAiWorkspace}
         onRestoreGuidance={onRestoreVaultAiGuidance}
         compact={compact}
         locale={locale}
@@ -224,6 +228,7 @@ function StatusBarPrimaryBadges({
   aiModelProviders,
   onSetDefaultAiAgent,
   onSetDefaultAiTarget,
+  onOpenAiWorkspace,
   onRestoreVaultAiGuidance,
   claudeCodeStatus,
   claudeCodeVersion,
@@ -260,6 +265,7 @@ function StatusBarPrimaryBadges({
   aiModelProviders?: AiModelProvider[]
   onSetDefaultAiAgent?: (agent: AiAgentId) => void
   onSetDefaultAiTarget?: (target: string) => void
+  onOpenAiWorkspace?: () => void
   onRestoreVaultAiGuidance?: () => void
   claudeCodeStatus?: ClaudeCodeStatus
   claudeCodeVersion?: string | null
@@ -297,20 +303,7 @@ function StatusBarPrimaryBadges({
         <MissingGitBadge onClick={onInitializeGit} showSeparator={!compact} compact={compact} locale={locale} />
       ) : null}
       {mcpStatus && <McpBadge status={mcpStatus} onInstall={onInstallMcp} showSeparator={!compact} compact={compact} locale={locale} />}
-      <StatusBarAiBadge
-        aiAgentsStatus={aiAgentsStatus}
-        vaultAiGuidanceStatus={vaultAiGuidanceStatus}
-        defaultAiAgent={defaultAiAgent}
-        defaultAiTarget={defaultAiTarget}
-        aiModelProviders={aiModelProviders}
-        onSetDefaultAiAgent={onSetDefaultAiAgent}
-        onSetDefaultAiTarget={onSetDefaultAiTarget}
-        onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
-        claudeCodeStatus={claudeCodeStatus}
-        claudeCodeVersion={claudeCodeVersion}
-        compact={compact}
-        locale={locale}
-      />
+      <StatusBarAiBadge aiAgentsStatus={aiAgentsStatus} vaultAiGuidanceStatus={vaultAiGuidanceStatus} defaultAiAgent={defaultAiAgent} defaultAiTarget={defaultAiTarget} aiModelProviders={aiModelProviders} onSetDefaultAiAgent={onSetDefaultAiAgent} onSetDefaultAiTarget={onSetDefaultAiTarget} onOpenAiWorkspace={onOpenAiWorkspace} onRestoreVaultAiGuidance={onRestoreVaultAiGuidance} claudeCodeStatus={claudeCodeStatus} claudeCodeVersion={claudeCodeVersion} compact={compact} locale={locale} />
     </>
   )
 }
@@ -453,6 +446,7 @@ function StatusBarGitControls({
   aiModelProviders,
   onSetDefaultAiAgent,
   onSetDefaultAiTarget,
+  onOpenAiWorkspace,
   onRestoreVaultAiGuidance,
   claudeCodeStatus,
   claudeCodeVersion,
@@ -500,6 +494,7 @@ function StatusBarGitControls({
         aiModelProviders={aiModelProviders}
         onSetDefaultAiAgent={onSetDefaultAiAgent}
         onSetDefaultAiTarget={onSetDefaultAiTarget}
+        onOpenAiWorkspace={onOpenAiWorkspace}
         onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
         claudeCodeStatus={claudeCodeStatus}
         claudeCodeVersion={claudeCodeVersion}
@@ -560,6 +555,7 @@ export function StatusBarPrimarySection({
   aiModelProviders,
   onSetDefaultAiAgent,
   onSetDefaultAiTarget,
+  onOpenAiWorkspace,
   onRestoreVaultAiGuidance,
   claudeCodeStatus,
   claudeCodeVersion,
@@ -619,6 +615,7 @@ export function StatusBarPrimarySection({
         aiModelProviders={aiModelProviders}
         onSetDefaultAiAgent={onSetDefaultAiAgent}
         onSetDefaultAiTarget={onSetDefaultAiTarget}
+        onOpenAiWorkspace={onOpenAiWorkspace}
         onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
         claudeCodeStatus={claudeCodeStatus}
         claudeCodeVersion={claudeCodeVersion}

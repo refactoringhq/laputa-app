@@ -18,6 +18,9 @@ interface TauriWindowInternals {
 }
 
 const NOTE_WINDOW_STORAGE_PREFIX = 'tolaria:note-window:'
+const AI_WORKSPACE_WINDOW_STORAGE_PREFIX = 'tolaria:ai-workspace-window:'
+const AI_WORKSPACE_WINDOW_LABEL = 'ai-workspace'
+const AI_WORKSPACE_WINDOW_STORAGE_KEY = `${AI_WORKSPACE_WINDOW_STORAGE_PREFIX}${AI_WORKSPACE_WINDOW_LABEL}`
 
 function getCurrentWindowLabel(): string | null {
   const internals = (window as Window & { __TAURI_INTERNALS__?: TauriWindowInternals }).__TAURI_INTERNALS__
@@ -76,10 +79,31 @@ export function rememberNoteWindowParams(label: string, params: NoteWindowParams
   }
 }
 
+export function rememberAiWorkspaceWindow(): void {
+  try {
+    localStorage.setItem(AI_WORKSPACE_WINDOW_STORAGE_KEY, 'true')
+  } catch {
+    // Best-effort fallback for Tauri windows that lose their initial URL params.
+  }
+}
+
 export function isNoteWindow(): boolean {
   const params = new URLSearchParams(window.location.search)
   if (params.get('window') === 'note') return true
   return getStoredNoteWindowParams(getCurrentWindowLabel()) !== null
+}
+
+export function isAiWorkspaceWindow(): boolean {
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('window') === 'ai-workspace') return true
+
+  if (getCurrentWindowLabel() !== AI_WORKSPACE_WINDOW_LABEL) return false
+
+  try {
+    return localStorage.getItem(AI_WORKSPACE_WINDOW_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
 }
 
 export function getNoteWindowParams(): NoteWindowParams | null {

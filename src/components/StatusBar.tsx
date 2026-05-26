@@ -114,6 +114,7 @@ interface StatusBarProps {
   aiModelProviders?: AiModelProvider[]
   onSetDefaultAiAgent?: (agent: AiAgentId) => void
   onSetDefaultAiTarget?: (target: string) => void
+  onOpenAiWorkspace?: () => void
   onRestoreVaultAiGuidance?: () => void
   claudeCodeStatus?: ClaudeCodeStatus
   claudeCodeVersion?: string | null
@@ -172,6 +173,7 @@ function StatusBarPrimaryFromFooter({
   aiModelProviders,
   onSetDefaultAiAgent,
   onSetDefaultAiTarget,
+  onOpenAiWorkspace,
   onRestoreVaultAiGuidance,
   claudeCodeStatus,
   claudeCodeVersion,
@@ -226,6 +228,7 @@ function StatusBarPrimaryFromFooter({
       aiModelProviders={aiModelProviders}
       onSetDefaultAiAgent={onSetDefaultAiAgent}
       onSetDefaultAiTarget={onSetDefaultAiTarget}
+      onOpenAiWorkspace={onOpenAiWorkspace}
       onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
       claudeCodeStatus={claudeCodeStatus}
       claudeCodeVersion={claudeCodeVersion}

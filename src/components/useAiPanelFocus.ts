@@ -6,6 +6,7 @@ interface UseAiPanelFocusArgs {
   hasMessages: boolean
   isActive: boolean
   onClose: () => void
+  enabled?: boolean
 }
 
 function focusPreferredElement(
@@ -36,19 +37,23 @@ export function useAiPanelFocus({
   hasMessages,
   isActive,
   onClose,
+  enabled = true,
 }: UseAiPanelFocusArgs) {
   const shouldFocusPanel = hasMessages || isActive
 
   useEffect(() => {
+    if (!enabled) return
+
     const timer = setTimeout(() => {
       focusPreferredElement(panelRef, inputRef, shouldFocusPanel)
     }, 0)
     return () => clearTimeout(timer)
-  }, [inputRef, panelRef, shouldFocusPanel])
+  }, [enabled, inputRef, panelRef, shouldFocusPanel])
 
   useEffect(() => {
+    if (!enabled) return
     focusPreferredElement(panelRef, inputRef, shouldFocusPanel)
-  }, [inputRef, panelRef, shouldFocusPanel])
+  }, [enabled, inputRef, panelRef, shouldFocusPanel])
 
   const handleEscape = useCallback((event: KeyboardEvent) => {
     if (!shouldHandleEscape(event, panelRef)) return
@@ -58,7 +63,8 @@ export function useAiPanelFocus({
   }, [onClose, panelRef])
 
   useEffect(() => {
+    if (!enabled) return
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [handleEscape])
+  }, [enabled, handleEscape])
 }

@@ -170,7 +170,7 @@ test.describe('keyboard command routing', () => {
 
     await triggerMenuCommand(page, APP_COMMAND_IDS.viewToggleAiChat)
     await expect(page.getByTestId('ai-panel')).toBeVisible({ timeout: 5_000 })
-    await expect(page.getByTitle('Close AI panel')).toBeVisible()
+    await expect(page.getByTitle('Close AI workspace')).toBeVisible()
 
     await triggerMenuCommand(page, APP_COMMAND_IDS.viewToggleAiChat)
     await expect(page.getByTestId('ai-panel')).not.toBeVisible({ timeout: 5_000 })

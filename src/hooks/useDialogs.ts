@@ -23,6 +23,8 @@ export function useDialogs() {
   const closeSettings = useCallback(() => setShowSettings(false), [])
   const openCloneVault = useCallback(() => setShowCloneVault(true), [])
   const closeCloneVault = useCallback(() => setShowCloneVault(false), [])
+  const openAIChat = useCallback(() => setShowAIChat(true), [])
+  const closeAIChat = useCallback(() => setShowAIChat(false), [])
   const toggleAIChat = useCallback(() => setShowAIChat((c) => !c), [])
   const openSearch = useCallback(() => setShowSearch(true), [])
   const closeSearch = useCallback(() => setShowSearch(false), [])
@@ -39,7 +41,7 @@ export function useDialogs() {
     showCreateTypeDialog, openCreateType, closeCreateType,
     showQuickOpen, openQuickOpen, closeQuickOpen,
     showCommandPalette, openCommandPalette, closeCommandPalette,
-    showAIChat, toggleAIChat,
+    showAIChat, openAIChat, closeAIChat, toggleAIChat,
     showSettings, openSettings, closeSettings,
     showCloneVault, openCloneVault, closeCloneVault,
     showSearch, openSearch, closeSearch,

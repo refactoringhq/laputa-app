@@ -13,6 +13,7 @@ interface UseAiPanelPromptQueueArgs {
   input: string
   isActive: boolean
   setInput: (value: string) => void
+  enabled?: boolean
 }
 
 export function useAiPanelPromptQueue({
@@ -20,6 +21,7 @@ export function useAiPanelPromptQueue({
   input,
   isActive,
   setInput,
+  enabled = true,
 }: UseAiPanelPromptQueueArgs) {
   const [queuedPrompt, setQueuedPrompt] = useState<QueuedAiPrompt | null>(null)
 
@@ -29,9 +31,10 @@ export function useAiPanelPromptQueue({
     agent.clearConversation()
   }, [agent, setInput])
 
-  useQueuedAiPrompt(handleQueuedPrompt)
+  useQueuedAiPrompt(handleQueuedPrompt, enabled)
 
   useEffect(() => {
+    if (!enabled) return
     if (!queuedPrompt || isActive) return
     if (input !== queuedPrompt.text) return
 
@@ -40,5 +43,5 @@ export function useAiPanelPromptQueue({
       setInput('')
       setQueuedPrompt(null)
     })
-  }, [agent, input, isActive, queuedPrompt, setInput])
+  }, [agent, enabled, input, isActive, queuedPrompt, setInput])
 }

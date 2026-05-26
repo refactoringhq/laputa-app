@@ -312,6 +312,40 @@ files:
     ai.panel.placeholder.missing: 547c492026d115608067988b7cfbb9a9
     ai.panel.placeholder.ready: 31f5265c2e0432a7ca10d08e5c6f3114
     ai.panel.send: 747c6a3564774149c989884e0c581d53
+    ai.workspace.title: d5b381672258b0bb54ede1e886895b3e
+    ai.workspace.newChat: a917baaf1484ec5dc85f19ab8fc4f4e9
+    ai.workspace.close: 184649ab030e9a609488608221c28d8c
+    ai.workspace.popOut: 85ec25ec056b3082651e6e3fcfa57416
+    ai.workspace.dock: 72e81ed23007ec6fb9820b9abec353c4
+    ai.workspace.settings: 2c178b1d7a60a3c2b37ca4221d322899
+    ai.workspace.archive: a02bc089273a8c460ea3d2cd2c257b59
+    ai.workspace.restore: 98ee8b364870e27dd48aca3240801abf
+    ai.workspace.showArchived: ae2bcb4cb837cc09a5767153efe4bf39
+    ai.workspace.hideArchived: e7c72757d5bc7330d876eeb1b6ce9c53
+    ai.workspace.noActiveChats: f0cdbf09f23eb9a2efbb5977bcc39c1a
+    ai.workspace.noArchivedChats: 68410efd12fc0308ce1ed2225000d4d5
+    ai.workspace.chatTitle: 2ecae1c7ffb3296a789ff8f3b3ed2922
+    ai.workspace.status.archived: 7d69b3cb4cada18ae61811304f8fbcb5
+    ai.workspace.status.idle: e599161956d626eda4cb0a5ffb85271c
+    ai.workspace.status.running: 5bda814c4aedb126839228f1a3d92f09
+    ai.workspace.status.done: f92965e2c8a7afb3c1b9a5c09a263636
+    ai.workspace.status.error: 902b0d55fddef6f8d651fe1035b7d4bd
+    ai.workspace.permissionMode: 5a7983f759c9e15ce53d7326f0abad71
+    ai.workspace.guidanceWarning: 00d95da9bc82394785728dec587b026e
+    ai.workspace.targetLabel: df5dd38c32585fe0c71c955b3a31f83c
+    ai.workspace.targetLocalAgents: 5a6a65e960093bfc37b4cc81c4a9f773
+    ai.workspace.targetLocalModels: c7c20443d8aaf04271df9d713f5c02ce
+    ai.workspace.targetApiModels: 66537b9e5200ebbbfbd091144d8afbcc
+    ai.workspace.noTargets: 7c3ed1f10281b41070e5a5cbe77453d7
+    ai.workspace.target.localAgents: 5a6a65e960093bfc37b4cc81c4a9f773
+    ai.workspace.target.localModels: c7c20443d8aaf04271df9d713f5c02ce
+    ai.workspace.target.apiModels: 66537b9e5200ebbbfbd091144d8afbcc
+    ai.workspace.target.none: 7c3ed1f10281b41070e5a5cbe77453d7
+    ai.workspace.target.unavailable: 453e6aa38d87b28ccae545967c53004f
+    ai.workspace.target.installed: 98dd43dfae05b11befe1f140e0ec787a
+    ai.workspace.target.installedVersion: 8677756d761e4cce240a637805482946
+    ai.workspace.target.localModel: d34f4b997ce78da5aa57d657a5d6fcb5
+    ai.workspace.target.apiModel: 589a257cbd265eaa7de93de8b4084dff
     mcp.setup.manageTitle: d786c7b9ab9b2406258648931bca0e01
     mcp.setup.setupTitle: b4b373f690c8a0008885b31e78e93a5c
     mcp.setup.connectedDescription: a2a3be70c0ac9fa7ef112df5252249fa
@@ -636,6 +670,7 @@ files:
     status.ai.vaultGuidance: 7bb4644efe6ae7cec9993c8bd85f1519
     status.ai.restoreGuidance: 23331fecc692d11d85cf24838ed273f2
     status.ai.openOptions: d387b1ab67586c7a2d83db8900a4dd8e
+    status.ai.openWorkspace: 178247429f30251ce21265570b612e9f
     status.ai.modelTargets: 8f3ceb96e088f8bdaecc236778401ac9
     status.ai.localChat: 215a24e3d38fb8b68deea6dad0142326
     status.ai.apiChat: 6dffd5b9997885efe701631cea5c470d

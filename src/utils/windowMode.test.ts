@@ -5,6 +5,8 @@ import {
   getNoteWindowParams,
   findNoteWindowEntry,
   getNoteWindowPathCandidates,
+  isAiWorkspaceWindow,
+  rememberAiWorkspaceWindow,
   rememberNoteWindowParams,
 } from './windowMode'
 
@@ -116,6 +118,26 @@ describe('windowMode', () => {
       })
 
       expect(isNoteWindow()).toBe(true)
+    })
+  })
+
+  describe('isAiWorkspaceWindow', () => {
+    it('returns true when window=ai-workspace', () => {
+      setSearch('?window=ai-workspace')
+      expect(isAiWorkspaceWindow()).toBe(true)
+    })
+
+    it('returns false for the main app window', () => {
+      setSearch('')
+      expect(isAiWorkspaceWindow()).toBe(false)
+    })
+
+    it('recovers from storage when the Tauri AI window loses query params', () => {
+      setSearch('')
+      setCurrentWindowLabel('ai-workspace')
+      rememberAiWorkspaceWindow()
+
+      expect(isAiWorkspaceWindow()).toBe(true)
     })
   })
 

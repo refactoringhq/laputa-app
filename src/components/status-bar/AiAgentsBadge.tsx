@@ -1,4 +1,5 @@
 import { CaretUpDown as ChevronsUpDown, Sparkle, Warning as AlertTriangle } from '@phosphor-icons/react'
+import { forwardRef, type ComponentPropsWithoutRef } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   AI_AGENT_DEFINITIONS,
@@ -47,6 +48,7 @@ interface AiAgentsBadgeProps {
   onSetDefaultAgent?: (agent: AiAgentId) => void
   onSetDefaultTarget?: (target: string) => void
   onRestoreGuidance?: () => void
+  onOpenWorkspace?: () => void
   compact?: boolean
   locale?: AppLocale
 }
@@ -144,6 +146,56 @@ function TriggerStateIcon({
   if (showSwitcherCue) return <ChevronsUpDown size={10} style={{ marginLeft: 2 }} />
   return null
 }
+
+function targetTriggerText(selectedTarget: AiTarget, defaultAgent: AiAgentId): string {
+  return selectedTarget.kind === 'api_model' ? selectedTarget.shortLabel : triggerLabel(defaultAgent)
+}
+
+function triggerIconColor(showWarning: boolean): string {
+  return showWarning ? 'var(--accent-orange)' : 'var(--muted-foreground)'
+}
+
+type AiAgentsBadgeButtonProps = ComponentPropsWithoutRef<typeof Button> & {
+  ariaLabel: string
+  compact: boolean
+  defaultAgent: AiAgentId
+  selectedTarget: AiTarget
+  showSwitcherCue: boolean
+  showWarning: boolean
+  title: string
+}
+
+const AiAgentsBadgeButton = forwardRef<HTMLButtonElement, AiAgentsBadgeButtonProps>(function AiAgentsBadgeButton({
+  ariaLabel,
+  compact,
+  defaultAgent,
+  selectedTarget,
+  showSwitcherCue,
+  showWarning,
+  title,
+  ...buttonProps
+}, ref) {
+  return (
+    <Button
+      ref={ref}
+      type="button"
+      variant="ghost"
+      size="xs"
+      className={triggerButtonClassName(compact)}
+      aria-label={ariaLabel}
+      title={title}
+      data-tooltip-mode="native-title"
+      data-testid="status-ai-agents"
+      {...buttonProps}
+    >
+      <span style={{ ...ICON_STYLE, color: triggerIconColor(showWarning) }}>
+        <Sparkle size={13} weight="regular" />
+        {!compact && targetTriggerText(selectedTarget, defaultAgent)}
+        <TriggerStateIcon showWarning={showWarning} showSwitcherCue={showSwitcherCue} />
+      </span>
+    </Button>
+  )
+})
 
 function GuidanceMenuSection({
   guidanceStatus,
@@ -274,6 +326,7 @@ export function AiAgentsBadge({
   onSetDefaultAgent,
   onSetDefaultTarget,
   onRestoreGuidance,
+  onOpenWorkspace,
   compact = false,
   locale = 'en',
 }: AiAgentsBadgeProps) {
@@ -291,27 +344,23 @@ export function AiAgentsBadge({
 
   if (isAiAgentsStatusChecking(statuses)) return null
 
+  if (onOpenWorkspace) {
+    const label = translate(locale, 'status.ai.openWorkspace')
+
+    return (
+      <>
+        <CompactSeparator compact={compact} />
+        <AiAgentsBadgeButton ariaLabel={label} compact={compact} defaultAgent={defaultAgent} onClick={onOpenWorkspace} selectedTarget={selectedTarget} showSwitcherCue={showSwitcherCue} showWarning={showWarning} title={label} />
+      </>
+    )
+  }
+
   return (
     <>
       <CompactSeparator compact={compact} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild={true}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            className={triggerButtonClassName(compact)}
-            aria-label={translate(locale, 'status.ai.openOptions')}
-            title={tooltip}
-            data-tooltip-mode="native-title"
-            data-testid="status-ai-agents"
-          >
-            <span style={{ ...ICON_STYLE, color: showWarning ? 'var(--accent-orange)' : 'var(--muted-foreground)' }}>
-              <Sparkle size={13} weight="regular" />
-              {!compact && (selectedTarget.kind === 'api_model' ? selectedTarget.shortLabel : triggerLabel(defaultAgent))}
-              <TriggerStateIcon showWarning={showWarning} showSwitcherCue={showSwitcherCue} />
-            </span>
-          </Button>
+          <AiAgentsBadgeButton ariaLabel={translate(locale, 'status.ai.openOptions')} compact={compact} defaultAgent={defaultAgent} selectedTarget={selectedTarget} showSwitcherCue={showSwitcherCue} showWarning={showWarning} title={tooltip} />
         </DropdownMenuTrigger>
         <AgentMenuContent
           statuses={statuses}

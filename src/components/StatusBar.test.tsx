@@ -985,6 +985,25 @@ describe('StatusBar', () => {
     expect(screen.getByTestId('status-ai-agents')).toHaveTextContent('Claude')
   })
 
+  it('opens the AI workspace from the status AI badge when provided', () => {
+    const onOpenAiWorkspace = vi.fn()
+    render(
+      <StatusBar
+        noteCount={100}
+        vaultPath="/Users/luca/Laputa"
+        vaults={vaults}
+        onSwitchVault={vi.fn()}
+        aiAgentsStatus={installedAiAgentsStatus}
+        defaultAiAgent="claude_code"
+        onOpenAiWorkspace={onOpenAiWorkspace}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('status-ai-agents'))
+
+    expect(onOpenAiWorkspace).toHaveBeenCalledOnce()
+  })
+
   it('opens the AI agent switcher from the keyboard and switches agents', () => {
     const onSetDefaultAiAgent = vi.fn()
     render(

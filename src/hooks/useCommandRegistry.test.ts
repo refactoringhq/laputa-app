@@ -583,6 +583,7 @@ describe('useCommandRegistry', () => {
   })
 
   it('includes a New AI chat command that opens and resets the panel session', () => {
+    vi.useFakeTimers()
     const config = makeConfig()
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
     const { result } = renderHook(() => useCommandRegistry(config))
@@ -595,9 +596,11 @@ describe('useCommandRegistry', () => {
 
     cmd!.execute()
 
-    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: NEW_AI_CHAT_EVENT }))
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: OPEN_AI_CHAT_EVENT }))
+    vi.runOnlyPendingTimers()
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: NEW_AI_CHAT_EVENT }))
     dispatchSpy.mockRestore()
+    vi.useRealTimers()
   })
 
   it('omits Inbox navigation when the explicit workflow is disabled', () => {

@@ -7,8 +7,11 @@ import {
 
 export function useQueuedAiPrompt(
   onPrompt: (prompt: QueuedAiPrompt) => void,
+  enabled = true,
 ) {
   useEffect(() => {
+    if (!enabled) return
+
     const consumePrompt = () => {
       const queuedPrompt = takeQueuedAiPrompt()
       if (queuedPrompt) onPrompt(queuedPrompt)
@@ -17,5 +20,5 @@ export function useQueuedAiPrompt(
     consumePrompt()
     window.addEventListener(AI_PROMPT_QUEUED_EVENT, consumePrompt)
     return () => window.removeEventListener(AI_PROMPT_QUEUED_EVENT, consumePrompt)
-  }, [onPrompt])
+  }, [enabled, onPrompt])
 }

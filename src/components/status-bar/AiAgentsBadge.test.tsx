@@ -92,6 +92,16 @@ describe('AiAgentsBadge', () => {
     expect(screen.getByTestId('status-ai-agents-menu')).toBeInTheDocument()
   })
 
+  it('opens the AI workspace directly when a workspace handler is provided', () => {
+    const onOpenWorkspace = vi.fn()
+    renderBadge({ onOpenWorkspace })
+
+    fireEvent.click(screen.getByTestId('status-ai-agents'))
+
+    expect(onOpenWorkspace).toHaveBeenCalledOnce()
+    expect(screen.queryByTestId('status-ai-agents-menu')).not.toBeInTheDocument()
+  })
+
   it('selects only the active model target when an API model is the default target', () => {
     renderBadge({
       defaultTarget: 'model:openai/gpt-5.5',
