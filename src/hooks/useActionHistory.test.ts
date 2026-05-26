@@ -1,58 +1,24 @@
-import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { useActionHistory } from './useActionHistory'
 
 describe('useActionHistory', () => {
-  it('undos and redos entries in stack order', async () => {
+  it('reveals the target note before undoing a persisted action', async () => {
     const calls: string[] = []
-    const { result } = renderHook(() => useActionHistory())
+    const onRevealTarget = vi.fn(async () => {
+      calls.push('reveal')
+    })
+    const undo = vi.fn(async () => {
+      calls.push('undo')
+    })
+    const { result } = renderHook(() => useActionHistory({ onRevealTarget }))
 
     act(() => {
-      result.current.record({
-        label: 'First',
-        undo: () => calls.push('undo:first'),
-        redo: () => calls.push('redo:first'),
-      })
-      result.current.record({
-        label: 'Second',
-        undo: () => calls.push('undo:second'),
-        redo: () => calls.push('redo:second'),
-      })
-    })
-
-    expect(result.current.canUndo).toBe(true)
-    expect(result.current.undoLabel).toBe('Second')
-
-    await act(async () => {
-      expect(await result.current.undo()).toBe(true)
-    })
-    expect(calls).toEqual(['undo:second'])
-    expect(result.current.redoLabel).toBe('Second')
-
-    await act(async () => {
-      expect(await result.current.undo()).toBe(true)
-      expect(await result.current.redo()).toBe(true)
-    })
-
-    expect(calls).toEqual(['undo:second', 'undo:first', 'redo:first'])
-    expect(result.current.undoLabel).toBe('First')
-    expect(result.current.redoLabel).toBe('Second')
-  })
-
-  it('does not record nested actions while replaying', async () => {
-    const nested = vi.fn()
-    const { result } = renderHook(() => useActionHistory())
-
-    act(() => {
-      result.current.record({
-        label: 'Outer',
-        undo: () => {
-          result.current.record({
-            label: 'Nested',
-            undo: nested,
-            redo: nested,
-          })
-        },
+      result.current.recordAction({
+        id: 'organize:/vault/a.md',
+        label: 'Mark as Organized',
+        path: '/vault/a.md',
+        undo,
         redo: vi.fn(),
       })
     })
@@ -61,8 +27,65 @@ describe('useActionHistory', () => {
       await result.current.undo()
     })
 
+    expect(onRevealTarget).toHaveBeenCalledWith(expect.objectContaining({ path: '/vault/a.md' }))
+    expect(calls).toEqual(['reveal', 'undo'])
     expect(result.current.canUndo).toBe(false)
-    expect(result.current.redoLabel).toBe('Outer')
-    expect(nested).not.toHaveBeenCalled()
+    expect(result.current.canRedo).toBe(true)
+  })
+
+  it('preserves the undo stack when replay fails', async () => {
+    const onToast = vi.fn()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { result } = renderHook(() => useActionHistory({ onToast }))
+
+    act(() => {
+      result.current.recordAction({
+        id: 'favorite:/vault/a.md',
+        label: 'Add to Favorites',
+        path: '/vault/a.md',
+        undo: vi.fn(async () => {
+          throw new Error('disk full')
+        }),
+        redo: vi.fn(),
+      })
+    })
+
+    await act(async () => {
+      await result.current.undo()
+    })
+
+    expect(result.current.canUndo).toBe(true)
+    expect(result.current.canRedo).toBe(false)
+    expect(onToast).toHaveBeenCalledWith('Failed to undo add to favorites')
+    warnSpy.mockRestore()
+  })
+
+  it('clears redo history when a new action is recorded', async () => {
+    const { result } = renderHook(() => useActionHistory())
+
+    act(() => {
+      result.current.recordAction({
+        id: 'first',
+        label: 'First',
+        undo: vi.fn(),
+        redo: vi.fn(),
+      })
+    })
+    await act(async () => {
+      await result.current.undo()
+    })
+    expect(result.current.canRedo).toBe(true)
+
+    act(() => {
+      result.current.recordAction({
+        id: 'second',
+        label: 'Second',
+        undo: vi.fn(),
+        redo: vi.fn(),
+      })
+    })
+
+    expect(result.current.canUndo).toBe(true)
+    expect(result.current.canRedo).toBe(false)
   })
 })

@@ -281,6 +281,8 @@ function createKeyboardActions(
     onSave: config.onSave,
     onUndo: config.onUndo,
     onRedo: config.onRedo,
+    canUndo: config.canUndo,
+    canRedo: config.canRedo,
     onOpenSettings: config.onOpenSettings,
     onDeleteNote: config.onDeleteNote,
     onSetViewMode: config.onSetViewMode,

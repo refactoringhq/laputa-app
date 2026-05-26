@@ -16,7 +16,7 @@ import { runFrontmatterAndApply, type FrontmatterOpOptions } from './frontmatter
 import { findByNotePath, notePathFilename, notePathsMatch } from '../utils/notePathIdentity'
 import type { VaultOption } from '../components/status-bar/types'
 import { canonicalFrontmatterKey } from '../utils/systemMetadata'
-import { useActionHistory, type ActionHistoryController } from './useActionHistory'
+import { useActionHistory, type ActionHistoryController, type ActionHistoryEntry } from './useActionHistory'
 
 export interface NoteActionsConfig {
   addEntry: (entry: VaultEntry) => void
@@ -67,7 +67,24 @@ function entryDisplayLabel(entry: VaultEntry): string {
 
 type RenamedPathMap = Map<string, string>
 
-function resolveLatestNotePath(renamedPaths: RenamedPathMap, path: string): string {
+interface RenamedPathLookup {
+  renamedPaths: RenamedPathMap
+  path: string
+}
+
+interface RenamedPathUpdate {
+  renamedPaths: RenamedPathMap
+  oldPath: string
+  newPath: string
+}
+
+interface FrontmatterSnapshotMutation {
+  entries: readonly VaultEntry[]
+  path: string
+  key: string
+}
+
+function resolveLatestNotePath({ renamedPaths, path }: RenamedPathLookup): string {
   let current = path
   const visited = new Set<string>()
 
@@ -81,9 +98,9 @@ function resolveLatestNotePath(renamedPaths: RenamedPathMap, path: string): stri
   return current
 }
 
-function trackRenamedNotePath(renamedPaths: RenamedPathMap, oldPath: string, newPath: string): void {
+function trackRenamedNotePath({ renamedPaths, oldPath, newPath }: RenamedPathUpdate): void {
   if (notePathsMatch(oldPath, newPath)) return
-  const latestPath = resolveLatestNotePath(renamedPaths, newPath)
+  const latestPath = resolveLatestNotePath({ renamedPaths, path: newPath })
   for (const [trackedOldPath, trackedNewPath] of renamedPaths) {
     if (trackedNewPath === oldPath) renamedPaths.set(trackedOldPath, latestPath)
   }
@@ -359,7 +376,7 @@ function frontmatterSnapshotFromEntry(entry: VaultEntry, key: string): Frontmatt
   return readSnapshot ? readSnapshot(entry) : frontmatterSnapshotFromProperties(entry.properties, canonicalKey)
 }
 
-function frontmatterSnapshotForMutation(entries: readonly VaultEntry[], path: string, key: string): FrontmatterSnapshot {
+function frontmatterSnapshotForMutation({ entries, path, key }: FrontmatterSnapshotMutation): FrontmatterSnapshot {
   const entry = findByNotePath(entries, path)
   return entry ? frontmatterSnapshotFromEntry(entry, key) : ABSENT_FRONTMATTER
 }
@@ -533,6 +550,7 @@ function useFrontmatterActionHandlers({
   ) => {
     actionHistory.record({
       label,
+      path,
       undo: () => applySnapshot(path, key, before, options),
       redo: () => applySnapshot(path, key, after, options),
     })
@@ -547,7 +565,7 @@ function useFrontmatterActionHandlers({
     const currentPath = resolvePath(path)
     const shouldRecordHistory = shouldRecordFrontmatterHistory(actionHistory, options)
     const before = shouldRecordHistory
-      ? frontmatterSnapshotForMutation(config.entries, currentPath, key)
+      ? frontmatterSnapshotForMutation({ entries: config.entries, path: currentPath, key })
       : ABSENT_FRONTMATTER
     const updated = await updateFrontmatterAndMaybeRename({
       config,
@@ -579,7 +597,7 @@ function useFrontmatterActionHandlers({
     const currentPath = resolvePath(path)
     const shouldRecordHistory = shouldRecordFrontmatterHistory(actionHistory, options)
     const before = shouldRecordHistory
-      ? frontmatterSnapshotForMutation(config.entries, currentPath, key)
+      ? frontmatterSnapshotForMutation({ entries: config.entries, path: currentPath, key })
       : ABSENT_FRONTMATTER
     if (!activePathGuardAllowsMutation(currentPath, activeTabPathRef, options)) return
     const canFlush = await flushBeforeNoteMutation(currentPath, config.flushBeforeNoteMutation)
@@ -599,7 +617,7 @@ function useFrontmatterActionHandlers({
     const currentPath = resolvePath(path)
     const shouldRecordHistory = shouldRecordFrontmatterHistory(actionHistory, options)
     const before = shouldRecordHistory
-      ? frontmatterSnapshotForMutation(config.entries, currentPath, key)
+      ? frontmatterSnapshotForMutation({ entries: config.entries, path: currentPath, key })
       : ABSENT_FRONTMATTER
     if (!activePathGuardAllowsMutation(currentPath, activeTabPathRef, options)) return
     const canFlush = await flushBeforeNoteMutation(currentPath, config.flushBeforeNoteMutation)
@@ -670,10 +688,13 @@ function useFrontmatterRunner({
 function useRenamedNotePathResolver(onPathRenamed?: (oldPath: string, newPath: string) => void) {
   const renamedPathsRef = useRef<RenamedPathMap>(new Map())
   const handlePathRenamed = useCallback((oldPath: string, newPath: string) => {
-    trackRenamedNotePath(renamedPathsRef.current, oldPath, newPath)
+    trackRenamedNotePath({ renamedPaths: renamedPathsRef.current, oldPath, newPath })
     onPathRenamed?.(oldPath, newPath)
   }, [onPathRenamed])
-  const resolveActionPath = useCallback((path: string) => resolveLatestNotePath(renamedPathsRef.current, path), [])
+  const resolveActionPath = useCallback((path: string) => resolveLatestNotePath({
+    renamedPaths: renamedPathsRef.current,
+    path,
+  }), [])
 
   return { handlePathRenamed, resolveActionPath }
 }
@@ -722,10 +743,24 @@ function buildNoteActionsResult({
 
 export function useNoteActions(config: NoteActionsConfig) {
   const { entries, setToastMessage, updateEntry } = config
-  const actionHistory = useActionHistory()
   const { handlePathRenamed, resolveActionPath } = useRenamedNotePathResolver(config.onPathRenamed)
   const tabMgmt = useTabManagement(buildTabManagementOptions(config))
   const { setTabs, handleSelectNote, openTabWithContent, activeTabPathRef, handleSwitchTab } = tabMgmt
+  const revealActionHistoryTarget = useCallback(async (item: ActionHistoryEntry) => {
+    const { path } = item
+    if (!path) return
+    if (activeTabPathRef.current === path) return
+    const entry = entries.find((candidate) => notePathsMatch(candidate.path, path))
+    if (!entry) {
+      setToastMessage('Cannot undo action because the note is no longer available')
+      throw new Error(`Action history target is unavailable: ${path}`)
+    }
+    await handleSelectNote(entry)
+  }, [activeTabPathRef, entries, handleSelectNote, setToastMessage])
+  const actionHistory = useActionHistory({
+    onRevealTarget: revealActionHistoryTarget,
+    onToast: setToastMessage,
+  })
   useGitignoredVisibilityTabCleanup({
     activeTabPathRef,
     closeAllTabs: tabMgmt.closeAllTabs,

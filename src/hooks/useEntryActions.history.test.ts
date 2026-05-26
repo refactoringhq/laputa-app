@@ -48,7 +48,20 @@ function makeActionHistory(records: ActionHistoryEntry[]) {
     undoLabel: null,
     redoLabel: null,
     isReplaying: () => replaying,
-    record: (entry) => { records.push(entry) },
+    record: (entry) => {
+      records.push(entry)
+      return () => {
+        const index = records.indexOf(entry)
+        if (index >= 0) records.splice(index, 1)
+      }
+    },
+    recordAction: (entry) => {
+      records.push(entry)
+      return () => {
+        const index = records.indexOf(entry)
+        if (index >= 0) records.splice(index, 1)
+      }
+    },
     undo: vi.fn().mockResolvedValue(false),
     redo: vi.fn().mockResolvedValue(false),
     withoutRecording: (run) => Promise.resolve(run()),
@@ -136,7 +149,7 @@ describe('useEntryActions action history', () => {
 
   it('records replayable favorite changes after persistence succeeds', async () => {
     await expectReplayableChange({
-      label: 'Favorite',
+      label: 'Add to Favorites',
       run: (actions) => actions.handleToggleFavorite(NOTE_PATH),
       verifyUndo: () => {
         expect(handleDeleteProperty).toHaveBeenCalledWith(NOTE_PATH, '_favorite', { silent: true })
@@ -151,14 +164,14 @@ describe('useEntryActions action history', () => {
 
   it('records replayable organized changes after persistence succeeds', async () => {
     await expectReplayableChange({
-      label: 'Organized',
+      label: 'Mark as Organized',
       run: (actions) => actions.handleToggleOrganized(NOTE_PATH),
       verifyUndo: () => expect(handleDeleteProperty).toHaveBeenCalledWith(NOTE_PATH, '_organized', { silent: true }),
       verifyRedo: () => expect(handleUpdateFrontmatter).toHaveBeenCalledWith(NOTE_PATH, '_organized', true, { silent: true }),
     })
   })
 
-  it('does not record failed favorite changes', async () => {
+  it('removes pending favorite history when persistence fails', async () => {
     const records: ActionHistoryEntry[] = []
     const history = makeActionHistory(records)
     handleUpdateFrontmatter.mockRejectedValueOnce(new Error('disk full'))

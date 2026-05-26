@@ -155,8 +155,7 @@ function isTextEditingElementFocused(): boolean {
 
 function runNativeTextHistoryCommand(command: 'undo' | 'redo'): boolean {
   if (!isTextEditingElementFocused()) return false
-  document.execCommand(command)
-  return true
+  return document.execCommand(command)
 }
 
 // Type declarations for mock content storage and test overrides

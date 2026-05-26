@@ -184,6 +184,40 @@ describe('useAppKeyboard', () => {
     expect(actions.onArchiveNote).not.toHaveBeenCalled()
   })
 
+  it('Cmd+Z triggers app action undo outside text editing', () => {
+    const actions = makeActions()
+    renderHook(() => useAppKeyboard(actions))
+    fireKey('z', { metaKey: true, code: 'KeyZ' })
+    expect(actions.onUndo).toHaveBeenCalledTimes(1)
+  })
+
+  it('Cmd+Shift+Z triggers app action redo outside text editing', () => {
+    const actions = makeActions()
+    renderHook(() => useAppKeyboard(actions))
+    fireKey('z', { metaKey: true, shiftKey: true, code: 'KeyZ' })
+    expect(actions.onRedo).toHaveBeenCalledTimes(1)
+  })
+
+  it('Ctrl+Y triggers app action redo on non-mac platforms', () => {
+    setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+    const actions = makeActions()
+    renderHook(() => useAppKeyboard(actions))
+    fireKey('y', { ctrlKey: true, code: 'KeyY' })
+    expect(actions.onRedo).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves text undo and redo to focused editors', () => {
+    const actions = makeActions()
+    renderHook(() => useAppKeyboard(actions))
+
+    withFocusedContentEditable((editable) => {
+      expect(fireKeyOnTarget(editable, 'z', { metaKey: true, code: 'KeyZ' }).defaultPrevented).toBe(false)
+      expect(fireKeyOnTarget(editable, 'z', { metaKey: true, shiftKey: true, code: 'KeyZ' }).defaultPrevented).toBe(false)
+      expect(actions.onUndo).not.toHaveBeenCalled()
+      expect(actions.onRedo).not.toHaveBeenCalled()
+    })
+  })
+
   it('Cmd+E uses the current multi-selection instead of the active note', () => {
     const actions = makeActions()
     const organizeSelected = vi.fn()

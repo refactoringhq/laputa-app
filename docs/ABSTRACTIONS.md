@@ -380,6 +380,8 @@ The renderer uses `viewOrdering` helpers to convert drag or command-palette move
 
 Domain command builders still own context-sensitive command-palette entries, availability, and execution callbacks. The manifest owns metadata that must stay identical across native menus, renderer shortcuts, deterministic QA bridges, and the custom desktop titlebar menu; OS-native menu items such as Undo, Copy/Paste, Services, Quit, and Window controls remain local to the native menu implementation.
 
+`useActionHistory` is the renderer-owned stack for reversible app-level actions. It records note-state actions only after persistence succeeds, replays one undo/redo at a time, and reveals the affected note before applying the reversal so editor pending-content flushes stay path-correct. Text editors and text inputs keep their native undo/redo history; app-level Undo/Redo shortcuts are handled only when focus is outside text-editing surfaces.
+
 ## File System Integration
 
 ### Vault Scanning (Rust)

@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 
 export interface ActionHistoryEntry {
+  id?: string
   label: string
-  undo: () => void | Promise<void>
-  redo: () => void | Promise<void>
+  path?: string
+  undo: () => Promise<void> | void
+  redo: () => Promise<void> | void
 }
 
 export interface ActionHistoryController {
@@ -12,17 +14,29 @@ export interface ActionHistoryController {
   undoLabel: string | null
   redoLabel: string | null
   isReplaying: () => boolean
-  record: (entry: ActionHistoryEntry) => void
+  record: (entry: ActionHistoryEntry) => (() => void) | void
+  recordAction: (entry: ActionHistoryEntry) => (() => void) | void
   undo: () => Promise<boolean>
   redo: () => Promise<boolean>
   withoutRecording: <T>(run: () => T | Promise<T>) => Promise<T>
 }
+
+interface ActionHistoryConfig {
+  onRevealTarget?: (item: ActionHistoryEntry) => Promise<void> | void
+  onToast?: (message: string) => void
+}
+
+type HistoryDirection = 'undo' | 'redo'
 
 interface ActionHistorySnapshot {
   canUndo: boolean
   canRedo: boolean
   undoLabel: string | null
   redoLabel: string | null
+}
+
+function actionFailureMessage(direction: HistoryDirection, label: string): string {
+  return `Failed to ${direction} ${label.toLowerCase()}`
 }
 
 function snapshot(
@@ -37,7 +51,23 @@ function snapshot(
   }
 }
 
-export function useActionHistory(): ActionHistoryController {
+function withoutItem(
+  stack: readonly ActionHistoryEntry[],
+  item: ActionHistoryEntry,
+): ActionHistoryEntry[] {
+  if (item.id) return stack.filter((candidate) => candidate.id !== item.id)
+  return stack.filter((candidate) => candidate !== item)
+}
+
+async function replayHistoryItem(direction: HistoryDirection, item: ActionHistoryEntry): Promise<void> {
+  if (direction === 'undo') {
+    await item.undo()
+    return
+  }
+  await item.redo()
+}
+
+export function useActionHistory({ onRevealTarget, onToast }: ActionHistoryConfig = {}): ActionHistoryController {
   const undoStackRef = useRef<ActionHistoryEntry[]>([])
   const redoStackRef = useRef<ActionHistoryEntry[]>([])
   const replayDepthRef = useRef(0)
@@ -58,41 +88,52 @@ export function useActionHistory(): ActionHistoryController {
     }
   }, [])
 
-  const record = useCallback((entry: ActionHistoryEntry) => {
-    if (isReplaying()) return
-    undoStackRef.current = [...undoStackRef.current, entry]
+  const record = useCallback((item: ActionHistoryEntry) => {
+    if (isReplaying()) return undefined
+    undoStackRef.current = [...undoStackRef.current, item]
     redoStackRef.current = []
     publish()
+    return () => {
+      undoStackRef.current = withoutItem(undoStackRef.current, item)
+      redoStackRef.current = withoutItem(redoStackRef.current, item)
+      publish()
+    }
   }, [isReplaying, publish])
 
-  const undo = useCallback(async () => {
-    const entry = undoStackRef.current.at(-1)
-    if (!entry) return false
+  const replay = useCallback(async (direction: HistoryDirection): Promise<boolean> => {
+    if (isReplaying()) return false
+    const source = direction === 'undo' ? undoStackRef : redoStackRef
+    const destination = direction === 'undo' ? redoStackRef : undoStackRef
+    const item = source.current.at(-1)
+    if (!item) return false
 
-    await withoutRecording(entry.undo)
-    undoStackRef.current = undoStackRef.current.slice(0, -1)
-    redoStackRef.current = [...redoStackRef.current, entry]
+    source.current = source.current.slice(0, -1)
     publish()
-    return true
-  }, [publish, withoutRecording])
 
-  const redo = useCallback(async () => {
-    const entry = redoStackRef.current.at(-1)
-    if (!entry) return false
-
-    await withoutRecording(entry.redo)
-    redoStackRef.current = redoStackRef.current.slice(0, -1)
-    undoStackRef.current = [...undoStackRef.current, entry]
-    publish()
-    return true
-  }, [publish, withoutRecording])
+    try {
+      await withoutRecording(async () => {
+        if (item.path) await onRevealTarget?.(item)
+        await replayHistoryItem(direction, item)
+      })
+      destination.current = [...destination.current, item]
+      publish()
+      return true
+    } catch (error) {
+      source.current = [...source.current, item]
+      onToast?.(actionFailureMessage(direction, item.label))
+      console.warn(`[action-history] Failed to ${direction} action`, error)
+      publish()
+      return false
+    }
+  }, [isReplaying, onRevealTarget, onToast, publish, withoutRecording])
 
   return useMemo(() => ({
     ...state,
     isReplaying,
     record,
-    undo,
-    redo,
+    recordAction: record,
+    redo: () => replay('redo'),
+    undo: () => replay('undo'),
     withoutRecording,
-  }), [isReplaying, record, redo, state, undo, withoutRecording])
+  }), [isReplaying, record, replay, state, withoutRecording])
 }

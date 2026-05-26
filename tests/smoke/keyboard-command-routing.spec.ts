@@ -58,6 +58,16 @@ async function expectPropertiesPanelToggle(page: Page, toggle: () => Promise<voi
   await expect(page.getByRole('button', { name: 'Open the properties panel' })).toBeVisible({ timeout: 5_000 })
 }
 
+async function dispatchAppCommand(page: Page, id: string): Promise<void> {
+  await page.evaluate((commandId) => {
+    const bridge = window.__laputaTest?.dispatchAppCommand
+    if (typeof bridge !== 'function') {
+      throw new Error('Tolaria test bridge is missing dispatchAppCommand')
+    }
+    bridge(commandId)
+  }, id)
+}
+
 test.describe('keyboard command routing', () => {
   test.beforeEach(() => {
     tempVaultDir = createFixtureVaultCopy()
@@ -135,6 +145,19 @@ test.describe('keyboard command routing', () => {
 
     await triggerMenuCommand(page, APP_COMMAND_IDS.noteToggleOrganized)
     await expect(page.getByRole('button', { name: 'Set note as organized' })).toBeVisible({ timeout: 5_000 })
+  })
+
+  test('app command bridge undoes and redoes organized state through action history @smoke', async ({ page }) => {
+    await openAlphaProjectInEditor(page)
+
+    await triggerMenuCommand(page, APP_COMMAND_IDS.noteToggleOrganized)
+    await expect(page.getByRole('button', { name: 'Set note as not organized' })).toBeVisible({ timeout: 5_000 })
+
+    await dispatchAppCommand(page, APP_COMMAND_IDS.editUndo)
+    await expect(page.getByRole('button', { name: 'Set note as organized' })).toBeVisible({ timeout: 5_000 })
+
+    await dispatchAppCommand(page, APP_COMMAND_IDS.editRedo)
+    await expect(page.getByRole('button', { name: 'Set note as not organized' })).toBeVisible({ timeout: 5_000 })
   })
 
   test('renderer shortcut bridge toggles the raw editor through the shared keyboard handler @smoke', async ({ page }) => {
