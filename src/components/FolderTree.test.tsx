@@ -44,7 +44,9 @@ async function submitNewFolder(name: string) {
   fireEvent.click(screen.getByTestId('create-folder-btn'))
   const input = screen.getByTestId('new-folder-input')
   fireEvent.change(input, { target: { value: name } })
-  fireEvent.keyDown(input, { key: 'Enter' })
+  await act(async () => {
+    fireEvent.keyDown(input, { key: 'Enter' })
+  })
 }
 
 describe('FolderTree', () => {
@@ -323,10 +325,7 @@ describe('FolderTree', () => {
     // itself, so 'projects' starts collapsed.
     expect(screen.getByRole('button', { name: 'projects' })).toHaveAttribute('aria-expanded', 'false')
 
-    fireEvent.click(screen.getByTestId('create-folder-btn'))
-    const input = screen.getByTestId('new-folder-input')
-    fireEvent.change(input, { target: { value: 'laputa' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await submitNewFolder('laputa')
 
     await vi.waitFor(() => {
       expect(onCreateFolder).toHaveBeenCalled()
@@ -347,10 +346,7 @@ describe('FolderTree', () => {
       />,
     )
 
-    fireEvent.click(screen.getByTestId('create-folder-btn'))
-    const input = screen.getByTestId('new-folder-input')
-    fireEvent.change(input, { target: { value: 'laputa' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await submitNewFolder('laputa')
 
     await vi.waitFor(() => {
       expect(onCreateFolder).toHaveBeenCalled()
