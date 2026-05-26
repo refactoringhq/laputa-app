@@ -26,7 +26,6 @@ import {
   type VaultAiGuidanceStatus,
 } from '../../lib/vaultAiGuidance'
 import { translate, type AppLocale } from '../../lib/i18n'
-import { openExternalUrl } from '../../utils/url'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,10 +79,6 @@ function badgeTooltip(
 
 function installedAgentDefinitions(statuses: AiAgentsStatus): AiAgentDefinition[] {
   return AI_AGENT_DEFINITIONS.filter((definition) => isAiAgentInstalled(statuses, definition.id))
-}
-
-function missingAgentDefinitions(statuses: AiAgentsStatus): AiAgentDefinition[] {
-  return AI_AGENT_DEFINITIONS.filter((definition) => !isAiAgentInstalled(statuses, definition.id))
 }
 
 function triggerLabel(defaultAgent: AiAgentId): string {
@@ -188,7 +183,6 @@ function AgentMenuContent({
   locale = 'en',
 }: AiAgentsBadgeProps & { selectedTarget: AiTarget; selectedAgentReady: boolean }) {
   const installedAgents = installedAgentDefinitions(statuses)
-  const missingAgents = missingAgentDefinitions(statuses)
   const modelTargets = configuredModelTargets(providers)
   const selectedAgentValue = selectedTarget.kind === 'agent' && selectedAgentReady ? selectedTarget.agent : undefined
 
@@ -226,20 +220,6 @@ function AgentMenuContent({
         locale={locale}
         onSetDefaultTarget={onSetDefaultTarget}
       />
-      {missingAgents.length > 0 && (
-        <>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>{translate(locale, 'status.ai.install')}</DropdownMenuLabel>
-          {missingAgents.map((definition) => (
-            <DropdownMenuItem
-              key={definition.id}
-              onSelect={() => void openExternalUrl(definition.installUrl)}
-            >
-              {translate(locale, 'status.ai.installAgent', { agent: definition.label })}
-            </DropdownMenuItem>
-          ))}
-        </>
-      )}
       <GuidanceMenuSection
         guidanceStatus={guidanceStatus}
         locale={locale}

@@ -408,21 +408,22 @@ function useVaultCollections(
   hiddenDefaults: string[],
   extraVaults: VaultOption[],
 ): VaultCollections {
+  const hiddenDefaultPaths = useMemo(() => hiddenDefaults ?? [], [hiddenDefaults])
   const defaultVaults = useMemo(
     () => buildDefaultVaults({ defaultAvailable, defaultPath }),
     [defaultAvailable, defaultPath],
   )
   const visibleDefaults = useMemo(
-    () => buildVisibleDefaultVaults({ defaultVaults, hiddenDefaults }),
-    [defaultVaults, hiddenDefaults],
+    () => buildVisibleDefaultVaults({ defaultVaults, hiddenDefaults: hiddenDefaultPaths }),
+    [defaultVaults, hiddenDefaultPaths],
   )
   const allVaults = useMemo(
-    () => buildAllVaults({ visibleDefaults, extraVaults, hiddenDefaults }),
-    [extraVaults, hiddenDefaults, visibleDefaults],
+    () => buildAllVaults({ visibleDefaults, extraVaults, hiddenDefaults: hiddenDefaultPaths }),
+    [extraVaults, hiddenDefaultPaths, visibleDefaults],
   )
   const isGettingStartedHidden = useMemo(
-    () => hiddenDefaults.includes(defaultPath),
-    [defaultPath, hiddenDefaults],
+    () => hiddenDefaultPaths.includes(defaultPath),
+    [defaultPath, hiddenDefaultPaths],
   )
 
   return { allVaults, defaultVaults, isGettingStartedHidden }

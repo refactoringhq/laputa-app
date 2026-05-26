@@ -52,6 +52,10 @@ function setGroupChildren(mode: 'all' | 'any', children: FilterNode[]): FilterGr
   return mode === 'all' ? { all: children } : { any: children }
 }
 
+function filterNodeKey(node: FilterNode): string {
+  return JSON.stringify(node)
+}
+
 function OperatorSelect({ value, onChange }: {
   value: FilterOp
   onChange: (v: FilterOp) => void
@@ -242,7 +246,7 @@ function FilterGroupView({ group, fields, depth, onChange, onRemove }: {
         {children.map((child, i) =>
           isFilterGroup(child) ? (
             <FilterGroupView
-              key={i}
+              key={filterNodeKey(child)}
               group={child}
               fields={fields}
               depth={depth + 1}
@@ -251,7 +255,7 @@ function FilterGroupView({ group, fields, depth, onChange, onRemove }: {
             />
           ) : (
             <FilterRow
-              key={i}
+              key={filterNodeKey(child)}
               condition={child}
               fields={fields}
               onUpdate={(c) => updateChild(i, c)}

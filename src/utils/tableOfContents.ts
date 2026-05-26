@@ -104,7 +104,7 @@ function appendHeadingItem(
     stack.pop()
   }
 
-  const parent = stack[stack.length - 1]
+  const parent = stack.at(-1)
   if (parent) {
     parent.children.push(item)
   } else {

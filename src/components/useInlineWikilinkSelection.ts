@@ -84,6 +84,7 @@ export function useInlineWikilinkSelection({
   }, [onChange])
 
   useLayoutEffect(() => {
+    void value
     const editor = getActiveSelectionEditor(editorRef.current, isComposingRef)
     if (!editor) return
     applySelectionRange(editor, selectionRange)

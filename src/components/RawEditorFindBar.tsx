@@ -109,16 +109,6 @@ function handleRawEditorFindKeyDown(
   moveMatch(event.shiftKey ? -1 : 1)
 }
 
-function handleRawEditorFindBarKeyDown(
-  event: React.KeyboardEvent<HTMLDivElement>,
-  close: () => void,
-): void {
-  if (event.key !== 'Escape') return
-
-  event.preventDefault()
-  close()
-}
-
 function selectActiveEditorFindMatch(
   viewRef: React.MutableRefObject<EditorView | null>,
   open: boolean,
@@ -180,7 +170,6 @@ interface RawEditorFindController {
   caseSensitive: boolean
   close: () => void
   findInputRef: React.RefObject<HTMLInputElement | null>
-  handleBarKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void
   handleFindChange: (event: React.ChangeEvent<HTMLInputElement>) => void
   handleFindKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void
   hasMatches: boolean
@@ -242,10 +231,6 @@ function useRawEditorFindController({
     handleRawEditorFindKeyDown(event, close, moveMatch)
   }, [close, moveMatch])
 
-  const handleBarKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-    handleRawEditorFindBarKeyDown(event, close)
-  }, [close])
-
   const replaceCurrent = useCallback(() => {
     replaceCurrentEditorFindMatch({ activeMatch, options, query, replacement, viewRef })
   }, [activeMatch, options, query, replacement, viewRef])
@@ -266,7 +251,6 @@ function useRawEditorFindController({
     caseSensitive,
     close,
     findInputRef: inputRef,
-    handleBarKeyDown,
     handleFindChange,
     handleFindKeyDown,
     hasMatches,
@@ -461,12 +445,12 @@ function ReplaceControls({
 
 export function RawEditorFindBar(props: RawEditorFindBarProps) {
   const { locale = 'en', onReplaceOpenChange, open, replaceOpen } = props
+  const barRef = useRef<HTMLDivElement>(null)
   const controller = useRawEditorFindController(props)
   const {
     caseSensitive,
     close,
     findInputRef,
-    handleBarKeyDown,
     handleFindChange,
     handleFindKeyDown,
     hasMatches,
@@ -483,13 +467,28 @@ export function RawEditorFindBar(props: RawEditorFindBarProps) {
     toggleRegex,
   } = controller
 
+  useEffect(() => {
+    if (!open) return
+    const bar = barRef.current
+    if (!bar) return
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      close()
+    }
+
+    bar.addEventListener('keydown', handleKeyDown)
+    return () => bar.removeEventListener('keydown', handleKeyDown)
+  }, [close, open])
+
   if (!open) return null
 
   return (
     <div
+      ref={barRef}
       className="flex shrink-0 flex-col gap-1.5 border-b px-3 py-2"
       data-testid="raw-editor-find-bar"
-      onKeyDown={handleBarKeyDown}
       style={{
         background: 'var(--surface-editor)',
         borderColor: 'var(--border-subtle)',

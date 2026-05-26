@@ -1,4 +1,4 @@
-import type { MouseEvent as ReactMouseEvent } from 'react'
+import type { MouseEvent as ReactMouseEvent, MouseEventHandler } from 'react'
 import {
   Folder,
   FolderOpen,
@@ -14,7 +14,7 @@ interface FolderItemRowProps {
   isExpanded: boolean
   isSelected: boolean
   node: FolderNode
-  onOpenMenu: (node: FolderNode, event: ReactMouseEvent<HTMLDivElement>) => void
+  onOpenMenu: (node: FolderNode, event: ReactMouseEvent<HTMLElement>) => void
   onSelect: () => void
   onStartRenameFolder?: (folderPath: string) => void
   onToggle: () => void
@@ -50,14 +50,6 @@ export function FolderItemRow({
           : 'text-foreground hover:bg-accent',
       )}
       style={{ paddingLeft: depthIndent, borderRadius: 4 }}
-      onContextMenu={(event) => {
-        if (!canOpenMenu) {
-          event.preventDefault()
-          return
-        }
-        onSelect()
-        onOpenMenu(node, event)
-      }}
     >
       <FolderSelectButton
         contentInset={contentInset}
@@ -66,6 +58,14 @@ export function FolderItemRow({
         isSelected={isSelected}
         node={node}
         onClick={handleSelectClick}
+        onContextMenu={(event) => {
+          if (!canOpenMenu) {
+            event.preventDefault()
+            return
+          }
+          onSelect()
+          onOpenMenu(node, event)
+        }}
         onDoubleClick={handleRenameDoubleClick}
       />
     </div>
@@ -79,6 +79,7 @@ function FolderSelectButton({
   isSelected,
   node,
   onClick,
+  onContextMenu,
   onDoubleClick,
 }: {
   contentInset: number
@@ -87,6 +88,7 @@ function FolderSelectButton({
   isSelected: boolean
   node: FolderNode
   onClick: (clickDetail: number) => void
+  onContextMenu: MouseEventHandler<HTMLButtonElement>
   onDoubleClick: () => void
 }) {
   return (
@@ -106,6 +108,7 @@ function FolderSelectButton({
       title={node.path || node.name}
       aria-expanded={hasChildren ? isExpanded : undefined}
       onClick={(event) => onClick(event.detail)}
+      onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
       data-testid={`folder-row:${node.path}`}
     >

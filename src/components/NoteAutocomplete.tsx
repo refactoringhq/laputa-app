@@ -207,7 +207,8 @@ function NoteAutocompleteMenuItem({
   onHover,
 }: NoteAutocompleteMenuItemProps) {
   return (
-    <div
+    <button
+      type="button"
       className={`wikilink-menu__item${selected ? ' wikilink-menu__item--selected' : ''}`}
       onMouseDown={preventAutocompleteMouseDown}
       onClick={() => onSelect(item.title)}
@@ -224,7 +225,7 @@ function NoteAutocompleteMenuItem({
         </span>
       )}
       <WorkspaceInitialsBadge workspace={item.workspace} testId="note-autocomplete-workspace-badge" />
-    </div>
+    </button>
   )
 }
 

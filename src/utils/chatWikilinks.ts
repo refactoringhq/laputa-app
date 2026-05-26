@@ -24,11 +24,12 @@ export function preprocessWikilinks(md: string): string {
   const segments: string[] = []
   const codeRegex = /(```[\s\S]*?```|`[^`\n]+`)/g
   let lastIndex = 0
-  let match
-  while ((match = codeRegex.exec(md)) !== null) {
+  let match = codeRegex.exec(md)
+  while (match !== null) {
     segments.push(replaceWikilinksInText(md.slice(lastIndex, match.index)))
     segments.push(match[0])
     lastIndex = match.index + match[0].length
+    match = codeRegex.exec(md)
   }
   segments.push(replaceWikilinksInText(md.slice(lastIndex)))
   return segments.join('')

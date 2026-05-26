@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react'
 import { getAssetUrlsByImport } from '@tldraw/assets/imports.vite'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import {
@@ -197,8 +197,12 @@ function installZoomAwareViewport(editor: Editor): () => void {
 
   return () => {
     window.removeEventListener('laputa-zoom-change', scheduleViewportUpdate)
-    animationFrameIds.forEach((id) => window.cancelAnimationFrame(id))
-    timeoutIds.forEach((id) => window.clearTimeout(id))
+    animationFrameIds.forEach((id) => {
+      window.cancelAnimationFrame(id)
+    })
+    timeoutIds.forEach((id) => {
+      window.clearTimeout(id)
+    })
     editor.updateViewportScreenBounds = updateViewportScreenBounds
     editor.dispatch = dispatch
   }
@@ -241,12 +245,12 @@ function canDismissDialog(openedAt: number): boolean {
   return performance.now() - openedAt >= DIALOG_OPEN_DISMISS_GRACE_MS
 }
 
-function isOverlayEvent(event: ReactMouseEvent<HTMLDivElement>): boolean {
+function isOverlayEvent(event: { currentTarget: EventTarget | null; target: EventTarget | null }): boolean {
   return event.target === event.currentTarget
 }
 
 function shouldCloseFromOverlayClick(
-  event: ReactMouseEvent<HTMLDivElement>,
+  event: { currentTarget: EventTarget | null; target: EventTarget | null },
   dialog: TLUiDialog,
   mouseDownInsideContent: boolean
 ): boolean {
@@ -291,6 +295,7 @@ function TolariaTldrawDialogContent({
 }
 
 const TolariaTldrawDialog = memo(function TolariaTldrawDialog({ dialog, onClose }: TolariaTldrawDialogProps) {
+  const overlayRef = useRef<HTMLDivElement>(null)
   const mouseDownInsideContentRef = useRef(false)
   const { openedAtRef, readyToOpen } = useDeferredDialogOpen()
 
@@ -302,22 +307,35 @@ const TolariaTldrawDialog = memo(function TolariaTldrawDialog({ dialog, onClose 
   const handleOpenChange = useCallback((isOpen: boolean) => {
     if (!isOpen) closeDialogNow()
   }, [closeDialogNow])
+  useEffect(() => {
+    const overlay = overlayRef.current
+    if (!overlay) return
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.target === overlay) mouseDownInsideContentRef.current = false
+    }
+    const handleClick = (event: MouseEvent) => {
+      if (shouldCloseFromOverlayClick({ currentTarget: overlay, target: event.target }, dialog, mouseDownInsideContentRef.current)) {
+        closeDialogFromBackground()
+      }
+    }
+
+    overlay.addEventListener('mousedown', handleMouseDown)
+    overlay.addEventListener('click', handleClick)
+    return () => {
+      overlay.removeEventListener('mousedown', handleMouseDown)
+      overlay.removeEventListener('click', handleClick)
+    }
+  }, [closeDialogFromBackground, dialog])
 
   if (!readyToOpen) return null
 
   return (
     <DialogPrimitive.Root open onOpenChange={handleOpenChange}>
       <div
+        ref={overlayRef}
         dir="ltr"
         className="tlui-dialog__overlay"
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget) mouseDownInsideContentRef.current = false
-        }}
-        onClick={(event) => {
-          if (shouldCloseFromOverlayClick(event, dialog, mouseDownInsideContentRef.current)) {
-            closeDialogFromBackground()
-          }
-        }}
       >
         <TolariaTldrawDialogContent
           dialog={dialog}
@@ -436,7 +454,7 @@ export function TldrawWhiteboard({
     }
   }, [boardId, store])
 
-  const startResize = (mode: ResizeMode) => (event: ReactPointerEvent<HTMLDivElement>) => {
+  const startResize = (mode: ResizeMode) => (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
 
@@ -489,23 +507,23 @@ export function TldrawWhiteboard({
         store={store}
         user={tldrawUser}
       />
-      <div
+      <button
+        type="button"
         aria-label="Resize whiteboard width"
-        className="tldraw-whiteboard__resize-handle tldraw-whiteboard__resize-handle--width"
+        className="tldraw-whiteboard__resize-handle tldraw-whiteboard__resize-handle--width border-0 bg-transparent p-0"
         onPointerDown={startResize('width')}
-        role="separator"
       />
-      <div
+      <button
+        type="button"
         aria-label="Resize whiteboard height"
-        className="tldraw-whiteboard__resize-handle tldraw-whiteboard__resize-handle--height"
+        className="tldraw-whiteboard__resize-handle tldraw-whiteboard__resize-handle--height border-0 bg-transparent p-0"
         onPointerDown={startResize('height')}
-        role="separator"
       />
-      <div
+      <button
+        type="button"
         aria-label="Resize whiteboard"
-        className="tldraw-whiteboard__resize-handle tldraw-whiteboard__resize-handle--corner"
+        className="tldraw-whiteboard__resize-handle tldraw-whiteboard__resize-handle--corner border-0 bg-transparent p-0"
         onPointerDown={startResize('both')}
-        role="separator"
       />
     </div>
   )

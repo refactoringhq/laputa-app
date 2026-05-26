@@ -97,7 +97,6 @@ function ManualMcpConfigSection(props: ManualMcpConfigSectionProps) {
         </Button>
       </div>
       <pre
-        tabIndex={0}
         className="max-h-48 overflow-auto rounded-md border border-border bg-background px-3 py-3 font-mono text-xs leading-5 text-foreground"
         data-testid="mcp-config-snippet"
       >

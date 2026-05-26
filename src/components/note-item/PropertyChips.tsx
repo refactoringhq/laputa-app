@@ -1,6 +1,5 @@
 import { createElement, useMemo, useState, type ComponentType, type MouseEvent, type ReactNode, type SVGAttributes } from 'react'
 import { Link } from '@phosphor-icons/react'
-import { cn } from '@/lib/utils'
 import type { VaultEntry } from '../../types'
 import { useDateDisplayFormat } from '../../hooks/useAppPreferences'
 import { resolveNoteIcon } from '../../utils/noteIcon'
@@ -119,21 +118,43 @@ export function PropertyChips({
   return (
     <div className="mt-1 flex flex-wrap gap-1" data-testid="property-chips">
       {chips.map(({ key, values }) =>
-        values.map((chip, index) => (
-          <span
-            key={`${key}-${index}`}
-            className={cn(
-              'inline-flex max-w-full items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground',
-              chip.action && 'cursor-pointer',
-            )}
-            style={chip.style}
-            onClick={(event) => { void handleChipClick(event, chip, onOpenNote) }}
-            data-testid={toChipTestId(key, index)}
-          >
-            <PropertyChipIcon noteIcon={chip.noteIcon} typeIcon={chip.typeIcon} tone={chip.tone} />
-            <span className="truncate whitespace-nowrap">{chip.label}</span>
-          </span>
-        ))
+        values.map((chip, index) => {
+          const content = (
+            <>
+              <PropertyChipIcon noteIcon={chip.noteIcon} typeIcon={chip.typeIcon} tone={chip.tone} />
+              <span className="truncate whitespace-nowrap">{chip.label}</span>
+            </>
+          )
+          const chipKey = `${key}-${chip.tone}-${chip.label}`
+          const testId = toChipTestId(key, index)
+          if (!chip.action) {
+            return (
+              <span
+                key={chipKey}
+                className="inline-flex max-w-full items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                style={chip.style}
+                data-testid={testId}
+                data-property-chip="true"
+              >
+                {content}
+              </span>
+            )
+          }
+
+          return (
+            <button
+              type="button"
+              key={chipKey}
+              className="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-md border-0 bg-muted px-1.5 py-0.5 text-left text-[10px] text-muted-foreground"
+              style={chip.style}
+              onClick={(event) => { void handleChipClick(event, chip, onOpenNote) }}
+              data-testid={testId}
+              data-property-chip="true"
+            >
+              {content}
+            </button>
+          )
+        })
       )}
     </div>
   )

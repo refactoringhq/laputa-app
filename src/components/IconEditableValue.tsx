@@ -169,13 +169,14 @@ export function IconEditableValue({
   }
 
   return (
-    <span
-      className="inline-flex h-6 min-w-0 max-w-full cursor-pointer items-center truncate rounded-md px-2 text-left text-[12px] text-secondary-foreground transition-colors hover:bg-muted"
+    <button
+      type="button"
+      className="inline-flex h-6 min-w-0 max-w-full cursor-pointer items-center truncate rounded-md border-0 bg-transparent px-2 text-left text-[12px] text-secondary-foreground transition-colors hover:bg-muted"
       onClick={onStartEdit}
       title={value || 'Click to edit'}
       data-testid="icon-editable-display"
     >
       {value || '\u2014'}
-    </span>
+    </button>
   )
 }

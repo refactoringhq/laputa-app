@@ -22,7 +22,7 @@ type PropertyEntry = [string, FrontmatterValue]
 function coerceValue(raw: string): FrontmatterValue {
   if (raw.toLowerCase() === 'true') return true
   if (raw.toLowerCase() === 'false') return false
-  if (!isNaN(Number(raw)) && raw.trim() !== '') return Number(raw)
+  if (!Number.isNaN(Number(raw)) && raw.trim() !== '') return Number(raw)
   return raw
 }
 

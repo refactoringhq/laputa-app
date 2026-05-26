@@ -26,7 +26,7 @@ export function ConflictNoteBanner({ onKeepMine, onKeepTheirs, locale = 'en' }: 
       <AlertTriangle size={13} />
       <span>{translate(locale, 'editor.banner.conflict')}</span>
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-        <button
+        <button type="button"
           data-testid="conflict-keep-mine-btn"
           onClick={onKeepMine}
           style={{
@@ -45,7 +45,7 @@ export function ConflictNoteBanner({ onKeepMine, onKeepTheirs, locale = 'en' }: 
         >
           {translate(locale, 'editor.banner.keepMine')}
         </button>
-        <button
+        <button type="button"
           data-testid="conflict-keep-theirs-btn"
           onClick={onKeepTheirs}
           style={{

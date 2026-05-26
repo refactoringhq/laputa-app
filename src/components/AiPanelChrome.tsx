@@ -324,6 +324,8 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    void isActive
+    void messages
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isActive])
 

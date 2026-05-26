@@ -18,7 +18,7 @@ type ViewFilenameAction = (filename: string, rootPath?: string) => void
 
 type RowKeyboardAction = 'select' | 'rename' | 'menu'
 
-function getRowKeyboardAction(event: KeyboardEvent<HTMLDivElement>): RowKeyboardAction | null {
+function getRowKeyboardAction(event: KeyboardEvent<HTMLElement>): RowKeyboardAction | null {
   if (event.key === 'Enter' || event.key === ' ') return 'select'
   if (event.key === 'F2') return 'rename'
   if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) return 'menu'
@@ -47,7 +47,7 @@ function useViewInteractionState() {
   const [customizePos, setCustomizePos] = useState<MenuPosition | null>(null)
   const [isRenaming, setIsRenaming] = useState(false)
   const customizeRef = useRef<HTMLDivElement>(null)
-  const rowRef = useRef<HTMLDivElement>(null)
+  const rowRef = useRef<HTMLElement>(null)
   const {
     closeContextMenu,
     contextMenu,
@@ -118,7 +118,7 @@ function useViewMenuActions({
   contextMenuPos: MenuPosition | null
   openContextMenuAt: (target: string, pos: MenuPosition) => void
   openContextMenuFromPointer: (target: string, event: MouseEvent) => void
-  rowRef: RefObject<HTMLDivElement | null>
+  rowRef: RefObject<HTMLElement | null>
   setCustomizePos: Dispatch<SetStateAction<MenuPosition | null>>
 }) {
   const hasMenuActions = !!(onEditView || onDeleteView || onUpdateViewDefinition)
@@ -182,7 +182,7 @@ function useViewRowKeyboardActions({
     }
   }, [onSelect, openKeyboardContextMenu, startRename])
 
-  return useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+  return useCallback((event: KeyboardEvent<HTMLElement>) => {
     if (isRenaming) return
     const action = getRowKeyboardAction(event)
     if (!action) return

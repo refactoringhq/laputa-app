@@ -16,7 +16,7 @@ We currently support security fixes for:
 
 ## Reporting a vulnerability
 
-Please email **luca@refactoring.club** with the subject line **`[Tolaria Security]`**.
+Please use GitHub's private vulnerability reporting flow for this repository.
 
 Include as much of the following as you can:
 

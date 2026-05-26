@@ -21,7 +21,7 @@ function getPromptCopy(statuses: AiAgentsStatus) {
   if (isAiAgentsStatusChecking(statuses)) {
     return {
       accentClassName: 'bg-muted text-muted-foreground',
-      description: 'Checking coding agents. You can also use a local model or API provider.',
+      description: 'Checking local agents. You can also use a local model or API provider.',
       icon: <Loader2 className="size-7 animate-spin" />,
       title: 'Checking AI agents',
     }
@@ -38,7 +38,7 @@ function getPromptCopy(statuses: AiAgentsStatus) {
 
   return {
     accentClassName: 'bg-[var(--feedback-success-bg)] text-[var(--feedback-success-text)]',
-    description: 'You can use the detected coding agents, or add local/API models in Settings.',
+    description: 'You can use the detected local agents, or add local/API models in Settings.',
     icon: <CheckCircle2 className="size-7" />,
     title: 'AI is ready',
   }
@@ -58,7 +58,7 @@ function AiModeChoices() {
     },
     {
       icon: <Terminal className="size-4" />,
-      title: 'Coding agent',
+      title: 'Local agent',
       description: 'Use Claude Code, Codex, OpenCode, Gemini CLI, or Pi for tool-capable vault editing on desktop.',
     },
   ]

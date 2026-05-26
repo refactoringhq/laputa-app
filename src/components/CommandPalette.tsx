@@ -291,6 +291,7 @@ function OpenCommandPalette({
   const inputRef = useRef<HTMLInputElement>(null)
   const aiInputRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const aiMode = aiModeEnabled && aiValue.startsWith(' ')
   const resolvedAiAgentReady = aiAgentReady ?? claudeCodeReady
   const { groups, flatList } = usePaletteResults(commands, query)
@@ -317,6 +318,7 @@ function OpenCommandPalette({
   }, [aiMode])
 
   useEffect(() => {
+    void selectedIndex
     if (aiMode || !listRef.current) return
     const selectedHTMLElement = listRef.current.querySelector('[data-selected="true"]') as HTMLElement | null
     selectedHTMLElement?.scrollIntoView({ block: 'nearest' })
@@ -357,6 +359,18 @@ function OpenCommandPalette({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [aiMode, flatList, onClose, selectedIndex])
+
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+
+    const handleRootClick = (event: MouseEvent) => {
+      if (event.target === root) onClose()
+    }
+
+    root.addEventListener('click', handleRootClick)
+    return () => root.removeEventListener('click', handleRootClick)
+  }, [onClose])
 
   const handleQueryChange = (nextQuery: string) => {
     setSelectedIndex(0)
@@ -401,16 +415,21 @@ function OpenCommandPalette({
 
   return (
     <div
+      ref={rootRef}
       data-command-palette="true"
       className="fixed inset-0 z-[1000] flex justify-center bg-[var(--shadow-dialog)] pt-[15vh]"
-      onClick={onClose}
     >
+      <button
+        type="button"
+        aria-label="Close command palette"
+        className="absolute inset-0 z-0 cursor-default border-0 bg-transparent p-0"
+        onClick={onClose}
+      />
       <div
         className={cn(
-          'flex w-[520px] max-h-[440px] max-w-[90vw] flex-col self-start overflow-hidden rounded-xl border border-[var(--border-dialog)] bg-popover shadow-[0_8px_32px_var(--shadow-dialog)]',
+          'relative z-10 flex w-[520px] max-h-[440px] max-w-[90vw] flex-col self-start overflow-hidden rounded-xl border border-[var(--border-dialog)] bg-popover shadow-[0_8px_32px_var(--shadow-dialog)]',
           aiMode && 'min-h-[220px]',
         )}
-        onClick={(event) => event.stopPropagation()}
       >
         {aiMode ? (
           <CommandPaletteAiMode
@@ -457,10 +476,11 @@ interface CommandRowProps {
 
 function CommandRow({ command, selected, onHover, onSelect }: CommandRowProps) {
   return (
-    <div
+    <button
+      type="button"
       data-selected={selected}
       className={cn(
-        'mx-1 flex cursor-pointer items-center justify-between rounded-md px-3 py-1.5 transition-colors',
+        'mx-1 flex w-[calc(100%-0.5rem)] cursor-pointer items-center justify-between rounded-md border-0 bg-transparent px-3 py-1.5 text-left transition-colors',
         selected ? 'bg-accent' : 'hover:bg-secondary',
       )}
       onClick={onSelect}
@@ -470,6 +490,6 @@ function CommandRow({ command, selected, onHover, onSelect }: CommandRowProps) {
       {command.shortcut && (
         <span className="text-[11px] text-muted-foreground">{command.shortcut}</span>
       )}
-    </div>
+    </button>
   )
 }

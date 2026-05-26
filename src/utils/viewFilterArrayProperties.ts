@@ -2,7 +2,6 @@ import type { FilterCondition } from '../types'
 
 type ConditionText = string
 type PropertyValue = string
-type PropertyArrayOperator = (field: PropertyArrayField, value: ConditionText, cond: FilterCondition) => boolean
 
 function toStringValue(value: unknown): ConditionText {
   if (value == null) return ''
@@ -50,17 +49,6 @@ class PropertyArrayField {
   }
 }
 
-const PROPERTY_ARRAY_OPERATORS: Partial<Record<FilterCondition['op'], PropertyArrayOperator>> = {
-  contains: (field, value) => field.contains(value),
-  not_contains: (field, value) => !field.contains(value),
-  equals: (field, value) => field.equals(value),
-  not_equals: (field, value) => !field.equals(value),
-  any_of: (field, _value, cond) => field.matchesAny(conditionList(cond.value)),
-  none_of: (field, _value, cond) => !field.matchesAny(conditionList(cond.value)),
-  is_empty: (field) => field.isEmpty(),
-  is_not_empty: (field) => !field.isEmpty(),
-}
-
 export function evaluatePropertyArrayCondition(
   cond: FilterCondition,
   values: PropertyValue[],
@@ -69,5 +57,18 @@ export function evaluatePropertyArrayCondition(
 ): boolean {
   const field = new PropertyArrayField(values)
   if (regex) return textMatchResult(cond.op, field.matchesRegex(regex))
-  return PROPERTY_ARRAY_OPERATORS[cond.op]?.(field, condVal, cond) ?? false
+  const contains = field.contains(condVal)
+  const equals = field.equals(condVal)
+  const matchesAny = field.matchesAny(conditionList(cond.value))
+  const isEmpty = field.isEmpty()
+  return new Map<FilterCondition['op'], boolean>([
+    ['contains', contains],
+    ['not_contains', !contains],
+    ['equals', equals],
+    ['not_equals', !equals],
+    ['any_of', matchesAny],
+    ['none_of', !matchesAny],
+    ['is_empty', isEmpty],
+    ['is_not_empty', !isEmpty],
+  ]).get(cond.op) ?? false
 }

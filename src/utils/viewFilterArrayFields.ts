@@ -4,7 +4,6 @@ import { evaluatePropertyArrayCondition } from './viewFilterArrayProperties'
 export type ViewFilterArrayKind = 'property' | 'relationship'
 type ConditionText = string
 type RelationshipValue = string
-type RelationshipArrayOperator = (field: RelationshipArrayField, value: ConditionText, cond: FilterCondition) => boolean
 
 interface ArrayFieldCondition {
   cond: FilterCondition
@@ -98,28 +97,34 @@ class RelationshipArrayField {
   }
 }
 
-const RELATIONSHIP_ARRAY_OPERATORS: Partial<Record<FilterCondition['op'], RelationshipArrayOperator>> = {
-  contains: (field, value) => field.contains(value),
-  not_contains: (field, value) => !field.contains(value),
-  equals: (field, value) => field.equals(value),
-  not_equals: (field, value) => !field.equals(value),
-  any_of: (field, _value, cond) => field.matchesAny(conditionList(cond.value)),
-  none_of: (field, _value, cond) => !field.matchesAny(conditionList(cond.value)),
-  is_empty: (field) => field.isEmpty(),
-  is_not_empty: (field) => !field.isEmpty(),
-}
-
 function textMatchResult(op: FilterCondition['op'], matched: boolean): boolean {
   if (op === 'contains' || op === 'equals') return matched
   if (op === 'not_contains' || op === 'not_equals') return !matched
   return false
 }
 
+function relationshipArrayMatch(field: RelationshipArrayField, cond: FilterCondition, condVal: ConditionText): boolean {
+  const contains = field.contains(condVal)
+  const equals = field.equals(condVal)
+  const matchesAny = field.matchesAny(conditionList(cond.value))
+  const isEmpty = field.isEmpty()
+  return new Map<FilterCondition['op'], boolean>([
+    ['contains', contains],
+    ['not_contains', !contains],
+    ['equals', equals],
+    ['not_equals', !equals],
+    ['any_of', matchesAny],
+    ['none_of', !matchesAny],
+    ['is_empty', isEmpty],
+    ['is_not_empty', !isEmpty],
+  ]).get(cond.op) ?? false
+}
+
 function evaluateRelationshipArrayCondition(cond: FilterCondition, values: RelationshipValue[], condVal: ConditionText, regex: RegExp | null): boolean {
   const { op } = cond
   const field = new RelationshipArrayField(values)
   if (regex) return textMatchResult(op, field.matchesRegex(regex))
-  return RELATIONSHIP_ARRAY_OPERATORS[op]?.(field, condVal, cond) ?? false
+  return relationshipArrayMatch(field, cond, condVal)
 }
 
 export function evaluateArrayFieldCondition({ cond, values, arrayKind, condVal, regex }: ArrayFieldCondition): boolean {

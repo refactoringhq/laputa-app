@@ -15,7 +15,7 @@ vi.mock('@/components/ui/dialog', () => ({
     open ? (
       <div data-testid="dialog-root">
         {children}
-        <button data-testid="dialog-close" onClick={() => onOpenChange(false)}>close</button>
+        <button type="button" data-testid="dialog-close" onClick={() => onOpenChange(false)}>close</button>
       </div>
     ) : null
   ),
@@ -26,9 +26,9 @@ vi.mock('@/components/ui/dialog', () => ({
     children: React.ReactNode
     onKeyDown?: (event: React.KeyboardEvent<HTMLDivElement>) => void
   }) => (
-    <div role="dialog" tabIndex={0} onKeyDown={onKeyDown}>
+    <dialog open onKeyDown={onKeyDown}>
       {children}
-    </div>
+    </dialog>
   ),
   DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DialogTitle: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,

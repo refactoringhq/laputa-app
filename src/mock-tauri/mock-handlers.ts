@@ -301,7 +301,7 @@ function handleRenameNoteFilename(args: {
 
   const parentDir = args.old_path.replace(/\/[^/]+$/, '')
   const newPath = `${parentDir}/${newFilename}`
-  if (newPath !== args.old_path && Object.prototype.hasOwnProperty.call(MOCK_CONTENT, newPath)) {
+  if (newPath !== args.old_path && Object.hasOwn(MOCK_CONTENT, newPath)) {
     throw new Error('A note with that name already exists')
   }
 
@@ -337,7 +337,7 @@ function handleMoveNoteToFolder(args: {
   if (newPath === args.old_path) {
     return { new_path: args.old_path, updated_files: 0, failed_updates: 0 }
   }
-  if (Object.prototype.hasOwnProperty.call(MOCK_CONTENT, newPath)) {
+  if (Object.hasOwn(MOCK_CONTENT, newPath)) {
     throw new Error('A note with that name already exists')
   }
 
@@ -373,7 +373,7 @@ function handleMoveNoteToWorkspace(args: {
   if (newPath === args.old_path) {
     return { new_path: args.old_path, updated_files: 0, failed_updates: 0 }
   }
-  if (Object.prototype.hasOwnProperty.call(MOCK_CONTENT, newPath)) {
+  if (Object.hasOwn(MOCK_CONTENT, newPath)) {
     throw new Error('A note with that name already exists')
   }
 

@@ -16,7 +16,7 @@ function BacklinkEntry({ entry, context, onNavigate }: {
 }) {
   const isDimmed = entry.archived
   return (
-    <button
+    <button type="button"
       className="flex w-full cursor-pointer flex-col items-start gap-0.5 border-none bg-transparent p-0 text-left hover:underline"
       onClick={() => onNavigate(entry.title)}
       title={entryStatusTitle(entry)}

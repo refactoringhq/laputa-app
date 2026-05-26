@@ -37,7 +37,7 @@ const RESIZE_HANDLES: ReadonlyArray<{
 
 export function LinuxTitlebar() {
   const customChromeEnabled = shouldUseCustomWindowChrome()
-  const { onMouseDown } = useDragRegion()
+  const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const maximized = useLinuxMaximizedState(customChromeEnabled)
 
   if (!customChromeEnabled) return null
@@ -48,9 +48,9 @@ export function LinuxTitlebar() {
     <>
       <ResizeHandles />
       <div
+        ref={dragRegionRef}
         className="fixed top-0 right-0 left-0 z-[1000] flex items-center justify-between border-b border-border bg-background select-none"
         style={{ height: LINUX_TITLEBAR_HEIGHT }}
-        onMouseDown={onMouseDown}
         data-testid="linux-titlebar"
       >
         <div className="flex h-full items-center" data-no-drag>
@@ -175,7 +175,7 @@ function TitlebarButton({
 
 function MinimizeIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
+    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
       <line x1="2.5" y1="6" x2="9.5" y2="6" />
     </svg>
   )
@@ -183,7 +183,7 @@ function MinimizeIcon() {
 
 function MaximizeIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
+    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
       <rect x="2.5" y="2.5" width="7" height="7" rx="0.5" />
     </svg>
   )
@@ -191,7 +191,7 @@ function MaximizeIcon() {
 
 function RestoreIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
+    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
       <rect x="2.5" y="3.8" width="6" height="6" rx="0.5" />
       <path d="M4 3.8 V 2.5 H 9.5 V 8" />
     </svg>
@@ -200,7 +200,7 @@ function RestoreIcon() {
 
 function CloseIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
+    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
       <line x1="3" y1="3" x2="9" y2="9" />
       <line x1="9" y1="3" x2="3" y2="9" />
     </svg>

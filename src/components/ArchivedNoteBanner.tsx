@@ -24,7 +24,7 @@ export function ArchivedNoteBanner({ onUnarchive, locale = 'en' }: ArchivedNoteB
     >
       <Archive size={13} weight="bold" />
       <span>{translate(locale, 'editor.banner.archived')}</span>
-      <button
+      <button type="button"
         data-testid="unarchive-btn"
         onClick={onUnarchive}
         style={{

@@ -50,13 +50,13 @@ export async function loadVaultList(): Promise<{
   hiddenDefaults: string[]
 }> {
   const data = await tauriCall<PersistedVaultList>('load_vault_list', {})
-  const persisted = data?.vaults ?? []
+  const persisted = data.vaults
   const checked = await Promise.all(persisted.map(checkAvailability))
   return {
     vaults: checked,
-    activeVault: data?.active_vault ?? null,
-    defaultWorkspacePath: data?.default_workspace_path ?? data?.active_vault ?? null,
-    hiddenDefaults: data?.hidden_defaults ?? [],
+    activeVault: data.active_vault,
+    defaultWorkspacePath: data.default_workspace_path ?? data.active_vault,
+    hiddenDefaults: data.hidden_defaults,
   }
 }
 

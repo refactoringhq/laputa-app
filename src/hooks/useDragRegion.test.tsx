@@ -16,15 +16,15 @@ vi.mock('@tauri-apps/api/window', () => ({
 }))
 
 function DragRegionHarness() {
-  const { onMouseDown } = useDragRegion()
+  const { dragRegionRef } = useDragRegion<HTMLDivElement>()
 
   return (
-    <div data-testid="drag-surface" onMouseDown={onMouseDown}>
+    <div data-testid="drag-surface" ref={dragRegionRef}>
       <div data-testid="no-drag-card" data-no-drag>
         <button type="button">Action</button>
       </div>
       <div role="menu" aria-label="Note actions">
-        <div role="menuitem">Delete this note</div>
+        <button type="button" role="menuitem">Delete this note</button>
       </div>
     </div>
   )

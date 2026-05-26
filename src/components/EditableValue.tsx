@@ -1,7 +1,17 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, type ComponentProps } from 'react'
 import { normalizeUrl, openExternalUrl } from '../utils/url'
 import { getTagStyle } from '../utils/tagStyles'
 import { PROPERTY_CHIP_STYLE } from './propertyChipStyles'
+
+function AutoFocusInput(props: ComponentProps<'input'>) {
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    ref.current?.focus()
+  }, [])
+
+  return <input ref={ref} {...props} />
+}
 
 export function UrlValue({
   value,
@@ -52,29 +62,29 @@ export function UrlValue({
 
   if (isEditing) {
     return (
-      <input
+      <AutoFocusInput
         className="w-full rounded border border-ring bg-muted px-2 py-1 text-[12px] text-foreground outline-none focus:border-primary"
         type="text"
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => onSave(editValue)}
-        autoFocus
       />
     )
   }
 
   return (
     <span className="group/url flex w-full min-w-0 items-center gap-1">
-      <span
-        className="inline-flex h-6 min-w-0 flex-1 cursor-pointer items-center justify-start overflow-hidden rounded-md px-2 text-left text-[12px] text-[var(--accent-blue)] underline decoration-[var(--accent-blue)]/40 transition-colors hover:decoration-[var(--accent-blue)]"
+      <button
+        type="button"
+        className="inline-flex h-6 min-w-0 flex-1 cursor-pointer items-center justify-start overflow-hidden rounded-md border-0 bg-transparent px-2 text-left text-[12px] text-[var(--accent-blue)] underline decoration-[var(--accent-blue)]/40 transition-colors hover:decoration-[var(--accent-blue)]"
         onClick={handleOpen}
         title={value}
         data-testid="url-link"
       >
         <span className="min-w-0 truncate">{value || '\u2014'}</span>
-      </span>
-      <button
+      </button>
+      <button type="button"
         className="shrink-0 border-none bg-transparent p-0 text-[12px] leading-none text-muted-foreground opacity-0 transition-all hover:text-foreground group-hover/url:opacity-100"
         onClick={handleEditClick}
         title="Edit URL"
@@ -112,26 +122,26 @@ export function EditableValue({
 
   if (isEditing) {
     return (
-      <input
+      <AutoFocusInput
         className="w-full rounded border border-ring bg-muted px-2 py-1 text-[12px] text-foreground outline-none focus:border-primary"
         type="text"
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => onSave(editValue)}
-        autoFocus
       />
     )
   }
 
   return (
-    <span
-      className="inline-flex h-6 w-full min-w-0 cursor-pointer items-center justify-start overflow-hidden rounded-md px-0 text-left text-[12px] text-secondary-foreground transition-colors hover:bg-muted"
+    <button
+      type="button"
+      className="inline-flex h-6 w-full min-w-0 cursor-pointer items-center justify-start overflow-hidden rounded-md border-0 bg-transparent px-0 text-left text-[12px] text-secondary-foreground transition-colors hover:bg-muted"
       onClick={onStartEdit}
       title={value || 'Click to edit'}
     >
       <span className="min-w-0 truncate">{value || '\u2014'}</span>
-    </span>
+    </button>
   )
 }
 
@@ -199,8 +209,8 @@ export function TagPillList({
     <div className="flex flex-wrap items-center gap-1">
       {items.map((item, idx) =>
         editingIndex === idx ? (
-          <input
-            key={idx}
+          <AutoFocusInput
+            key={item}
             className="rounded-full border border-ring bg-muted px-2 py-0.5 text-[11px] text-foreground outline-none focus:border-primary"
             style={{ width: Math.max(60, editValue.length * 7 + 16) }}
             type="text"
@@ -208,22 +218,26 @@ export function TagPillList({
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, 'edit')}
             onBlur={handleSaveEdit}
-            autoFocus
           />
         ) : (
           <span
-            key={idx}
-            className="group/pill relative inline-flex max-w-full min-w-0 cursor-pointer items-center overflow-hidden transition-colors"
+            key={item}
+            className="group/pill relative inline-flex max-w-full min-w-0 items-center overflow-hidden transition-colors"
             style={{
               ...PROPERTY_CHIP_STYLE,
               backgroundColor: getTagStyle(item).bg,
               color: getTagStyle(item).color,
             }}
-            onClick={() => handleStartEdit(idx)}
             title="Click to edit"
           >
-            <span className="min-w-0 truncate pr-4">{item}</span>
             <button
+              type="button"
+              className="min-w-0 truncate border-0 bg-transparent p-0 pr-4 text-left text-[inherit]"
+              onClick={() => handleStartEdit(idx)}
+            >
+              {item}
+            </button>
+            <button type="button"
               className="absolute right-0.5 top-1/2 flex h-3.5 w-3.5 -translate-y-1/2 items-center justify-center rounded-full border-none p-0 text-[10px] leading-none opacity-0 transition-all hover:bg-[var(--accent-red-light)] hover:text-[var(--accent-red)] group-hover/pill:opacity-100"
               style={{ color: getTagStyle(item).color, backgroundColor: getTagStyle(item).bg }}
               onClick={(e) => {
@@ -238,7 +252,7 @@ export function TagPillList({
         )
       )}
       {isAddingNew ? (
-        <input
+        <AutoFocusInput
           className="rounded-full border border-ring bg-muted px-2 py-0.5 text-[11px] text-foreground outline-none focus:border-primary"
           style={{ width: Math.max(60, newValue.length * 7 + 16) }}
           type="text"
@@ -250,10 +264,9 @@ export function TagPillList({
             else { setIsAddingNew(false); setNewValue('') }
           }}
           placeholder={`${label}...`}
-          autoFocus
         />
       ) : (
-        <button
+        <button type="button"
           className="inline-flex items-center justify-center border-none bg-muted leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           style={PROPERTY_CHIP_STYLE}
           onClick={() => setIsAddingNew(true)}

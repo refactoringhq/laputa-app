@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, SpeakerHigh, Video, WarningCircle } from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
@@ -22,6 +22,8 @@ interface FilePreviewFallbackProps {
   description: string
   onOpenExternal: () => void
 }
+
+const EMPTY_CAPTIONS_TRACK = 'data:text/vtt,WEBVTT'
 
 function fallbackContentForPreviewKind(previewKind: FilePreviewKind | null): Omit<FilePreviewFallbackProps, 'onOpenExternal'> {
   if (previewKind === 'image') {
@@ -223,22 +225,26 @@ function FilePreviewMedia({
           className="w-full max-w-2xl"
           data-testid="audio-file-preview"
           onError={onMediaError}
-        />
+        >
+          <track kind="captions" src={EMPTY_CAPTIONS_TRACK} srcLang="en" label="No captions available" default />
+        </audio>
       </FilePreviewMediaFrame>
     )
   }
 
   return (
     <FilePreviewMediaFrame video>
-      <video
-        controls
-        preload="metadata"
-        src={mediaSrc}
-        title={entry.title}
-        className="max-h-full max-w-full"
-        data-testid="video-file-preview"
-        onError={onMediaError}
-      />
+        <video
+          controls
+          preload="metadata"
+          src={mediaSrc}
+          title={entry.title}
+          className="max-h-full max-w-full"
+          data-testid="video-file-preview"
+          onError={onMediaError}
+        >
+          <track kind="captions" src={EMPTY_CAPTIONS_TRACK} srcLang="en" label="No captions available" default />
+        </video>
     </FilePreviewMediaFrame>
   )
 }
@@ -377,7 +383,9 @@ export function FilePreview({
   onOpenExternalFile,
   onRevealFile,
 }: FilePreviewProps) {
+  const previewRef = useRef<HTMLElement | null>(null)
   const previewKind = filePreviewKind(entry)
+  const previewPath = entry.path
   const assetSrc = useMemo(() => (previewKind ? convertFileSrc(entry.path) : null), [entry.path, previewKind])
   const fileTypeLabel = previewFileTypeLabel(entry)
   const externalMediaPreview = useExternalMediaPreview()
@@ -391,23 +399,31 @@ export function FilePreview({
   })
 
   useEffect(() => {
+    void previewPath
     trackFilePreviewOpened(previewKind)
-  }, [entry.path, previewKind])
+  }, [previewPath, previewKind])
 
-  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Escape') return
-    event.preventDefault()
-    focusNoteListContainer(document)
+  useEffect(() => {
+    previewRef.current?.setAttribute('tabindex', '0')
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      focusNoteListContainer(document)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   return (
     <section
+      ref={previewRef}
       className="flex min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground"
       data-testid="file-preview"
-      tabIndex={0}
-      role="group"
       aria-label={`Preview ${entry.title}`}
-      onKeyDown={handleKeyDown}
     >
       <FilePreviewHeader
         entry={entry}

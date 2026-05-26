@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useId, useState, useRef, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,6 +48,7 @@ function CreateViewDialogForm({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const nameInputId = useId()
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => inputRef.current?.focus(), 50)
@@ -90,8 +91,9 @@ function CreateViewDialogForm({
   return (
     <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">{translate(locale, 'viewDialog.nameLabel')}</label>
+        <label htmlFor={nameInputId} className="text-xs font-medium text-muted-foreground">{translate(locale, 'viewDialog.nameLabel')}</label>
         <Input
+          id={nameInputId}
           ref={inputRef}
           placeholder={translate(locale, 'viewDialog.namePlaceholder')}
           value={name}
@@ -105,7 +107,7 @@ function CreateViewDialogForm({
         <p role="alert" className="text-xs text-destructive">{saveError}</p>
       )}
       <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
-        <label className="text-xs font-medium text-muted-foreground">{translate(locale, 'viewDialog.filtersLabel')}</label>
+        <div className="text-xs font-medium text-muted-foreground">{translate(locale, 'viewDialog.filtersLabel')}</div>
         <FilterBuilder
           group={filters}
           onChange={setFilters}

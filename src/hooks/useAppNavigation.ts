@@ -29,7 +29,7 @@ export function useAppNavigation({
       navHistory.push(activeTabPath)
     }
     navFromHistoryRef.current = false
-  }, [activeTabPath]) // eslint-disable-line react-hooks/exhaustive-deps -- navHistory.push is stable
+  }, [activeTabPath, navHistory.push]) // eslint-disable-line react-hooks/exhaustive-deps -- navHistory.push is stable
 
   const isEntryExists = useCallback(
     (path: string) => entries.some(e => e.path === path),

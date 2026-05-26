@@ -1,4 +1,4 @@
-import { Fragment, createElement } from 'react'
+import { Fragment, createElement, useEffect, useImperativeHandle, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import type { VaultEntry } from '../types'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
@@ -10,6 +10,17 @@ import type {
 } from './inlineWikilinkText'
 import type { InlineWikilinkSuggestion } from './inlineWikilinkSuggestions'
 import { cn } from '@/lib/utils'
+
+function withNativeEvent<T extends Event>(event: T): T & { nativeEvent: T } {
+  const eventWithNativeEvent = event as T & { nativeEvent?: T }
+  if (!eventWithNativeEvent.nativeEvent) {
+    Object.defineProperty(event, 'nativeEvent', {
+      configurable: true,
+      value: event,
+    })
+  }
+  return event as T & { nativeEvent: T }
+}
 
 export function InlineWikilinkChipView({
   chip,
@@ -72,16 +83,17 @@ function InlineSuggestionRow({
   const typeIcon = getTypeIcon(suggestion.entry.isA, typeEntry?.icon)
 
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'mx-1 flex cursor-pointer items-center justify-between rounded-md px-3 py-2 transition-colors',
+        'mx-1 flex w-[calc(100%-0.5rem)] cursor-pointer items-center justify-between rounded-md border-0 bg-transparent px-3 py-2 text-left transition-colors',
         selected ? 'bg-accent' : 'hover:bg-secondary',
       )}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onSelect}
       onMouseEnter={onHover}
     >
-      <div className="flex min-w-0 items-center gap-2">
+      <span className="flex min-w-0 items-center gap-2">
         <span
           className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
           style={{ backgroundColor, color }}
@@ -98,11 +110,11 @@ function InlineSuggestionRow({
           )}
         </span>
         <span className="truncate text-sm text-foreground">{suggestion.title}</span>
-      </div>
+      </span>
       <span className="ml-3 shrink-0 text-[11px] text-muted-foreground">
         {suggestion.entry.isA ?? 'Note'}
       </span>
-    </div>
+    </button>
   )
 }
 
@@ -189,7 +201,20 @@ export function InlineWikilinkEditorField({
   segments: InlineWikilinkSegment[]
   typeEntryMap: Record<string, VaultEntry>
 }) {
+  const editorRef = useRef<HTMLDivElement | null>(null)
   const needsTrailingCaretAnchor = segments[segments.length - 1]?.kind === 'chip'
+  useImperativeHandle(inputRef, () => editorRef.current as HTMLDivElement, [])
+  useInlineWikilinkPlaceholder(editorRef, placeholder)
+  useInlineWikilinkEditorEvents(editorRef, {
+    onCompositionEnd,
+    onCompositionStart,
+    onCut,
+    onDrop,
+    onInput,
+    onKeyDown,
+    onPaste,
+    onSelectionChange,
+  })
 
   return (
     <div className="relative">
@@ -202,45 +227,102 @@ export function InlineWikilinkEditorField({
         </div>
       )}
       <div
-        ref={inputRef}
+        ref={editorRef}
         contentEditable={!disabled}
         suppressContentEditableWarning={true}
-        role="textbox"
-        aria-multiline="true"
-        aria-disabled={disabled || undefined}
-        aria-placeholder={placeholder}
+        aria-disabled={disabled ? 'true' : undefined}
         data-testid={dataTestId}
         className={cn(
           'min-h-[34px] w-full rounded-lg border border-border bg-transparent px-[10px] py-[8px] text-[13px] text-foreground outline-none',
           disabled && 'cursor-not-allowed opacity-60',
           editorClassName,
         )}
-        onCompositionEnd={onCompositionEnd}
-        onCompositionStart={onCompositionStart}
-        onInput={onInput}
-        onKeyDown={onKeyDown}
-        onCut={onCut}
-        onDrop={onDrop}
-        onPaste={onPaste}
-        onClick={onSelectionChange}
-        onKeyUp={onSelectionChange}
-        onMouseUp={onSelectionChange}
         style={{ ...editorStyle, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
       >
-        {segments.map((segment, index) => (
-          segment.kind === 'text'
-            ? <Fragment key={`text-${index}`}>{segment.text}</Fragment>
-            : (
-                <InlineWikilinkChipView
-                  key={`chip-${segment.chip.entry.path}-${segment.chip.target}`}
-                  chip={segment.chip}
-                  typeEntryMap={typeEntryMap}
-                />
-              )
-        ))}
+        {segments.map((segment) => renderInlineWikilinkSegment(segment, typeEntryMap))}
         {needsTrailingCaretAnchor ? '\u200B' : null}
       </div>
     </div>
+  )
+}
+
+type InlineWikilinkEditorHandlers = Pick<
+  Parameters<typeof InlineWikilinkEditorField>[0],
+  | 'onCompositionEnd'
+  | 'onCompositionStart'
+  | 'onCut'
+  | 'onDrop'
+  | 'onInput'
+  | 'onKeyDown'
+  | 'onPaste'
+  | 'onSelectionChange'
+>
+
+function useInlineWikilinkPlaceholder(editorRef: React.RefObject<HTMLDivElement | null>, placeholder?: string) {
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    syncPlaceholderAttribute(editor, placeholder)
+  }, [editorRef, placeholder])
+}
+
+function syncPlaceholderAttribute(editor: HTMLDivElement, placeholder?: string) {
+  if (placeholder) {
+    editor.setAttribute('aria-placeholder', placeholder)
+    return
+  }
+  editor.removeAttribute('aria-placeholder')
+}
+
+function useInlineWikilinkEditorEvents(
+  editorRef: React.RefObject<HTMLDivElement | null>,
+  handlers: InlineWikilinkEditorHandlers,
+) {
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const listenerMap = inlineWikilinkEditorListenerMap(handlers)
+    for (const [eventName, listener] of listenerMap) editor.addEventListener(eventName, listener)
+    return () => {
+      for (const [eventName, listener] of listenerMap) editor.removeEventListener(eventName, listener)
+    }
+  }, [editorRef, handlers])
+}
+
+function inlineWikilinkEditorListenerMap({
+  onCompositionEnd,
+  onCompositionStart,
+  onCut,
+  onDrop,
+  onInput,
+  onKeyDown,
+  onPaste,
+  onSelectionChange,
+}: InlineWikilinkEditorHandlers): Array<[keyof HTMLElementEventMap, EventListener]> {
+  const handleSelectionChange = () => onSelectionChange()
+  return [
+    ['compositionstart', () => onCompositionStart()],
+    ['compositionend', () => onCompositionEnd()],
+    ['input', () => onInput()],
+    ['keydown', (event) => onKeyDown(withNativeEvent(event) as unknown as React.KeyboardEvent<HTMLDivElement>)],
+    ['cut', (event) => onCut(withNativeEvent(event) as unknown as React.ClipboardEvent<HTMLDivElement>)],
+    ['drop', (event) => onDrop(withNativeEvent(event) as unknown as React.DragEvent<HTMLDivElement>)],
+    ['paste', (event) => onPaste(withNativeEvent(event) as unknown as React.ClipboardEvent<HTMLDivElement>)],
+    ['click', handleSelectionChange],
+    ['keyup', handleSelectionChange],
+    ['mouseup', handleSelectionChange],
+  ]
+}
+
+function renderInlineWikilinkSegment(segment: InlineWikilinkSegment, typeEntryMap: Record<string, VaultEntry>) {
+  if (segment.kind === 'text') return <Fragment key={`text-${segment.text}`}>{segment.text}</Fragment>
+  return (
+    <InlineWikilinkChipView
+      key={`chip-${segment.chip.entry.path}-${segment.chip.target}`}
+      chip={segment.chip}
+      typeEntryMap={typeEntryMap}
+    />
   )
 }
 

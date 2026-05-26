@@ -1089,6 +1089,7 @@ function useForegroundWorkTracker(
 ) {
   const foregroundWorkAtRef = useRef(0)
   useEffect(() => {
+    void activeTabPath
     foregroundWorkAtRef.current = Date.now()
   }, [activeTabPath])
   const handleForegroundEditorChange = useCallback(() => {

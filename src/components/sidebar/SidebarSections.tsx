@@ -389,16 +389,16 @@ export function SidebarTitleBar({
   canGoBack?: boolean
   canGoForward?: boolean
 }) {
-  const { onMouseDown } = useDragRegion()
+  const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const collapseLabel = translate(locale, 'sidebar.action.collapse')
   const backLabel = translate(locale, 'command.navigation.goBack')
   const forwardLabel = translate(locale, 'command.navigation.goForward')
 
   return (
     <div
+      ref={dragRegionRef}
       className="shrink-0 flex items-center border-b border-border"
       style={{ height: 52, padding: '0 8px', paddingLeft: 90, cursor: 'default', justifyContent: 'flex-start' }}
-      onMouseDown={onMouseDown}
     >
       <div className="flex items-center gap-5" style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}>
         {onCollapse && (
@@ -466,7 +466,7 @@ export function ContextMenuOverlay({
         <Palette size={14} />
         {translate(locale, 'sidebar.action.customizeIconColor')}
       </Button>
-      <div className="my-1 h-px bg-border" role="separator" />
+      <hr className="my-1 h-px border-0 bg-border" />
       <Button
         type="button"
         variant="ghost"

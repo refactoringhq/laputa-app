@@ -60,7 +60,7 @@ vi.mock('./NoteSearchList', () => ({
     return (
       <div data-testid="note-search-list">
         {props.items.map((item, index) => (
-          <button
+          <button type="button"
             key={item.title}
             data-testid={`note-search-item-${index}`}
             onMouseEnter={() => props.onItemHover(index)}

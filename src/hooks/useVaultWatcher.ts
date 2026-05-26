@@ -75,7 +75,7 @@ function useWatchRootsRef(watchRoots: WatchPath[]) {
 
   useEffect(() => {
     watchRootsRef.current = watchRoots
-  }, [watchRoots, watchRootsKey])
+  }, [watchRoots])
 
   return { watchRootsRef, watchRootsKey }
 }
@@ -144,6 +144,7 @@ export function useRecentVaultWrites({
   const vaultPathRef = useVaultPathRef(vaultPath)
 
   useEffect(() => {
+    void watchRootsKey
     recentWritesRef.current.clear()
   }, [watchRootsKey])
 
@@ -329,6 +330,7 @@ function useNativeVaultWatcher({
   clearPendingRefresh: () => void
 }) {
   useEffect(() => {
+    void watchRootsKey
     if (watchRoots.length === 0 || !isTauri()) return
 
     let cancelled = false

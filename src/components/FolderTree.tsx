@@ -55,7 +55,7 @@ interface FolderTreeBodyProps extends Pick<
   rootPath?: string
   sectionCollapsed: boolean
   toggleFolder: (path: string) => void
-  onOpenMenu: (node: FolderNode, event: ReactMouseEvent<HTMLDivElement>) => void
+  onOpenMenu: (node: FolderNode, event: ReactMouseEvent<HTMLElement>) => void
 }
 
 function vaultRootLabel(vaultRootPath: string, locale: AppLocale): string {

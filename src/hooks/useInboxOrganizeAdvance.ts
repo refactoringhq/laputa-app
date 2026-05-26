@@ -15,8 +15,10 @@ interface UseInboxOrganizeAdvanceOptions {
 
 function nextVisibleEntryAfter(entries: VaultEntry[], currentPath: string): VaultEntry | null {
   const currentIndex = entries.findIndex((entry) => entry.path === currentPath)
+  if (currentIndex < 0) return null
+
   const nextEntry = entries[currentIndex + 1]
-  return currentIndex >= 0 && nextEntry ? nextEntry : null
+  return nextEntry ?? null
 }
 
 function shouldAdvanceAfterOrganize(

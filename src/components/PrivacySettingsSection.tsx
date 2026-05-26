@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { createTranslator } from '../lib/i18n'
 import { SectionHeading, SettingsGroup, SettingsGroupItem } from './SettingsControls'
 import { Checkbox } from './ui/checkbox'
@@ -29,10 +30,12 @@ function TelemetryToggle({
   onChange: (value: boolean) => void
   testId: string
 }) {
+  const checkboxId = useId()
+
   return (
     <SettingsGroupItem testId={testId}>
-      <label className="flex cursor-pointer items-start gap-3">
-        <Checkbox checked={checked} onCheckedChange={(value) => onChange(isChecked(value))} className="mt-0.5" />
+      <label htmlFor={checkboxId} className="flex cursor-pointer items-start gap-3">
+        <Checkbox id={checkboxId} checked={checked} onCheckedChange={(value) => onChange(isChecked(value))} className="mt-0.5" />
         <span className="space-y-1">
           <span className="block text-sm font-medium text-foreground">{label}</span>
           <span className="block text-xs leading-5 text-muted-foreground">{description}</span>

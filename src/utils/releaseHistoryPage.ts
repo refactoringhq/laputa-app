@@ -26,6 +26,7 @@ type ReleaseEntry = {
   downloads: ReleaseDownload[]
   githubUrl: string | null
   notesHtml: string
+  notesListItemCount: number
   publishedLabel: string
   publishedTimestamp: number
   readableNotesUrl: string | null
@@ -547,6 +548,64 @@ function normalizeTextAsHtml(valueHtml: unknown): string | null {
   return valueHtml.length > 0 ? valueHtml : null
 }
 
+function isListMarkerBoundary(character: string | undefined): boolean {
+  return character === undefined || character === '>' || character === '/' || character === ' ' || character === '\t'
+}
+
+function renderedHtmlListItemCount(html: string): number {
+  let count = 0
+  let cursor = 0
+
+  while (cursor < html.length) {
+    const tagStart = html.indexOf('<', cursor)
+    if (tagStart === -1) break
+
+    let tagNameStart = tagStart + 1
+    while (html[tagNameStart] === ' ' || html[tagNameStart] === '\t') tagNameStart += 1
+
+    if (html[tagNameStart] !== '/') {
+      const tagPrefix = html.slice(tagNameStart, tagNameStart + 2).toLowerCase()
+      if (tagPrefix === 'li' && isListMarkerBoundary(html[tagNameStart + 2])) count += 1
+    }
+
+    cursor = tagNameStart + 1
+  }
+
+  return count
+}
+
+function isOrderedMarkdownListItem(line: string): boolean {
+  let markerIndex = 0
+  while (line[markerIndex] >= '0' && line[markerIndex] <= '9') markerIndex += 1
+  if (markerIndex === 0) return false
+
+  const marker = line[markerIndex]
+  if (marker !== '.' && marker !== ')') return false
+
+  const afterMarker = line[markerIndex + 1]
+  return afterMarker === ' ' || afterMarker === '\t'
+}
+
+function markdownListItemCount(markdown: string): number {
+  return markdown
+    .split('\n')
+    .filter((line) => {
+      const trimmedLine = line.trimStart()
+      return trimmedLine.startsWith('- ')
+        || trimmedLine.startsWith('* ')
+        || isOrderedMarkdownListItem(trimmedLine)
+    })
+    .length
+}
+
+function releaseNotesListItemCount(renderedMarkup: unknown, markdownFallback: unknown): number {
+  const bodyHtml = normalizeTextAsHtml(renderedMarkup)
+  if (bodyHtml !== null) return renderedHtmlListItemCount(bodyHtml)
+
+  const markdown = normalizeText(markdownFallback)
+  return markdown === null ? 0 : markdownListItemCount(markdown)
+}
+
 function normalizeUrl(value: unknown): string | null {
   const text = normalizeText(value)
   if (text === null) return null
@@ -656,12 +715,8 @@ function stableReleaseDedupeKey(release: ReleaseEntry): string {
   return stableDate === null ? `tag:${release.tagName}` : `date:${stableDate}`
 }
 
-function releaseNotesListItemCount(notesHtml: string): number {
-  return notesHtml.match(/<li\b/gi)?.length ?? 0
-}
-
 function releasePreferenceScore(release: ReleaseEntry): number {
-  return releaseNotesListItemCount(release.notesHtml) + release.downloads.length
+  return release.notesListItemCount + release.downloads.length
 }
 
 function mergeReleaseDownloads(primary: ReleaseDownload[], secondary: ReleaseDownload[]): ReleaseDownload[] {
@@ -717,6 +772,7 @@ function normalizeReleaseEntry(release: GitHubReleasePayload): [ReleaseChannel, 
     downloads: normalizeDownloads(release.assets),
     githubUrl: normalizeUrl(githubPageUrlPayload),
     notesHtml: resolveReleaseNotesAsHtml(releaseNotesMarkupPayload, release.body),
+    notesListItemCount: releaseNotesListItemCount(releaseNotesMarkupPayload, release.body),
     publishedLabel: formatPublishedLabel(release.published_at),
     publishedTimestamp: parsePublishedTimestamp(release.published_at),
     readableNotesUrl: readableNotesUrlForRelease(channel, tagName),

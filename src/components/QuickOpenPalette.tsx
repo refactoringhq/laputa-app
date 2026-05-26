@@ -111,6 +111,7 @@ function useQuickOpenKeyboard({
 export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, onCreateNote, onClose, locale = 'en' }: QuickOpenPaletteProps) {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const { results, selectedIndex, setSelectedIndex, handleKeyDown } = useNoteSearch(entries, query)
   const createAction = useQuickOpenCreateAction({ query, isLoading, resultCount: results.length, onCreateNote, onClose })
 
@@ -125,17 +126,35 @@ export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, o
 
   useQuickOpenKeyboard({ open, results, selectedIndex, onSelect, onClose, handleKeyDown, createFromQuery: createAction.create })
 
+  useEffect(() => {
+    if (!open) return
+    const root = rootRef.current
+    if (!root) return
+
+    const handleRootClick = (event: MouseEvent) => {
+      if (event.target === root) onClose()
+    }
+
+    root.addEventListener('click', handleRootClick)
+    return () => root.removeEventListener('click', handleRootClick)
+  }, [open, onClose])
+
   if (!open) return null
 
   return (
     <div
+      ref={rootRef}
       data-testid="quick-open-palette"
       className="fixed inset-0 z-[1000] flex justify-center bg-[var(--shadow-dialog)] pt-[15vh]"
-      onClick={onClose}
     >
+      <button
+        type="button"
+        aria-label="Close quick open"
+        className="absolute inset-0 z-0 cursor-default border-0 bg-transparent p-0"
+        onClick={onClose}
+      />
       <div
-        className="flex w-[500px] max-w-[90vw] max-h-[400px] flex-col self-start overflow-hidden rounded-xl border border-[var(--border-dialog)] bg-popover shadow-[0_8px_32px_var(--shadow-dialog)]"
-        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 flex w-[500px] max-w-[90vw] max-h-[400px] flex-col self-start overflow-hidden rounded-xl border border-[var(--border-dialog)] bg-popover shadow-[0_8px_32px_var(--shadow-dialog)]"
       >
         <Input
           ref={inputRef}

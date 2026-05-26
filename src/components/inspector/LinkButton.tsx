@@ -21,35 +21,38 @@ export function LinkButton({ label, noteIcon, typeColor, bgColor, isArchived, on
   const isDimmed = isArchived
   const color = isDimmed ? 'var(--muted-foreground)' : typeColor
   return (
-    <button
-      className={`group/link flex w-full items-center justify-between gap-2 border-none text-left cursor-pointer min-w-0${bgColor ? ' ring-inset hover:ring-1 hover:ring-current' : ' hover:opacity-80'}`}
+    <span
+      className={`group/link flex w-full min-w-0 items-center justify-between gap-2${bgColor ? ' ring-inset hover:ring-1 hover:ring-current' : ' hover:opacity-80'}`}
       style={{
         background: isDimmed ? 'var(--muted)' : (bgColor ?? 'transparent'),
         color, borderRadius: 6, padding: bgColor ? '6px 10px' : '4px 0',
         fontSize: 12, fontWeight: 500, opacity: isDimmed ? 0.7 : 1,
       }}
-      onClick={onClick}
-      title={title}
     >
-      <span className="flex items-center gap-1 flex-1 truncate">
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 truncate border-0 bg-transparent p-0 text-left text-[inherit]"
+        onClick={onClick}
+        title={title}
+      >
         <NoteTitleIcon icon={noteIcon} size={14} />
         {label}
         <StatusSuffix isArchived={isArchived} />
-      </span>
+      </button>
       <span className="flex items-center gap-1.5 shrink-0">
         {onRemove && (
-          <span
-            className="flex items-center opacity-0 transition-opacity group-hover/link:opacity-100"
-            onClick={(e) => { e.stopPropagation(); onRemove() }}
-            role="button"
+          <button
+            type="button"
+            className="flex items-center border-0 bg-transparent p-0 text-[inherit] opacity-0 transition-opacity group-hover/link:opacity-100"
+            onClick={onRemove}
             title="Remove from relation"
             data-testid="remove-relation-ref"
           >
             <X size={14} />
-          </span>
+          </button>
         )}
         <TypeIcon width={14} height={14} className="shrink-0" style={{ color, opacity: 0.5 }} />
       </span>
-    </button>
+    </span>
   )
 }

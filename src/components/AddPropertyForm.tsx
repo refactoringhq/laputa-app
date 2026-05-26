@@ -44,7 +44,7 @@ function canSubmitProperty({ key, value, displayMode }: { key: string; value: st
 function AddBooleanInput({ value, locale, onChange }: { value: string; locale: AppLocale; onChange: (v: string) => void }) {
   const boolVal = value.toLowerCase() === 'true'
   return (
-    <button
+    <button type="button"
       className="h-[26px] min-w-[60px] flex-1 rounded border border-border bg-muted px-1.5 text-[12px] text-secondary-foreground transition-colors hover:bg-accent"
       onClick={() => onChange(boolVal ? 'false' : 'true')}
       data-testid="add-property-boolean-toggle"
@@ -69,7 +69,7 @@ function AddDateInput({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
+        <button type="button"
           className="inline-flex h-[26px] min-w-[60px] flex-1 cursor-pointer items-center gap-1 rounded border border-border bg-muted px-1.5 text-[12px] transition-colors hover:bg-accent"
           data-testid="add-property-date-trigger"
         >
@@ -95,7 +95,7 @@ function AddStatusInput({ value, onChange, vaultStatuses }: { value: string; onC
   const [showDropdown, setShowDropdown] = useState(false)
   return (
     <span className="relative inline-flex min-w-[60px] flex-1 items-center">
-      <button
+      <button type="button"
         className="inline-flex h-[26px] min-w-[60px] flex-1 cursor-pointer items-center gap-1 rounded border border-border bg-muted px-1.5 text-[12px] transition-colors hover:bg-accent"
         onClick={() => setShowDropdown(true)}
         data-testid="add-property-status-trigger"

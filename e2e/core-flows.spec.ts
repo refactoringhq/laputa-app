@@ -224,7 +224,7 @@ test('full create note flow', async ({ page }) => {
 
   // Count should increase
   const countAfter = await page.locator('.note-list__count').textContent()
-  expect(parseInt(countAfter!)).toBe(parseInt(countBefore!) + 1)
+  expect(parseInt(countAfter!, 10)).toBe(parseInt(countBefore!, 10) + 1)
 
   // Note should be opened in editor
   await expect(page.locator('.editor__tab--active')).toHaveText(/E2E Test Note/)

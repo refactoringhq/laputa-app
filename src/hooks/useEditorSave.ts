@@ -565,7 +565,7 @@ export function useEditorSave({
     }
     updateVaultContent(path, content)
     applyTabContent(setTabs, path, content)
-  }, [pendingContentRef, resolvePath, updateVaultContent, setTabs])
+  }, [resolvePath, updateVaultContent, setTabs])
 
   const { saveNote } = useSaveNote(updateTabAndContent)
   const onAfterSaveRef = useOnAfterSaveRef(onAfterSave)

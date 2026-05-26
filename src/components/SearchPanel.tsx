@@ -184,6 +184,7 @@ export function SearchPanel({
   onClose,
 }: SearchPanelProps) {
   const dateDisplayFormat = useDateDisplayFormat()
+  const rootRef = useRef<HTMLDivElement>(null)
   const {
     elapsedMs,
     entryLookup,
@@ -201,16 +202,34 @@ export function SearchPanel({
     typeEntryMap,
   } = useSearchPanelController({ open, vaultPath, entries, onSelectNote, onClose })
 
+  useEffect(() => {
+    if (!open) return
+    const root = rootRef.current
+    if (!root) return
+
+    const handleRootClick = (event: MouseEvent) => {
+      if (event.target === root) onClose()
+    }
+
+    root.addEventListener('click', handleRootClick)
+    return () => root.removeEventListener('click', handleRootClick)
+  }, [open, onClose])
+
   if (!open) return null
 
   return (
     <div
+      ref={rootRef}
       className="fixed inset-0 z-[1000] flex justify-center bg-[var(--shadow-dialog)] pt-[15vh]"
-      onClick={onClose}
     >
+      <button
+        type="button"
+        aria-label="Close search"
+        className="absolute inset-0 z-0 cursor-default border-0 bg-transparent p-0"
+        onClick={onClose}
+      />
       <div
-        className="flex w-[540px] max-w-[90vw] max-h-[480px] flex-col self-start overflow-hidden rounded-xl border border-[var(--border-dialog)] bg-popover shadow-[0_8px_32px_var(--shadow-dialog)]"
-        onClick={e => e.stopPropagation()}
+        className="relative z-10 flex w-[540px] max-w-[90vw] max-h-[480px] flex-col self-start overflow-hidden rounded-xl border border-[var(--border-dialog)] bg-popover shadow-[0_8px_32px_var(--shadow-dialog)]"
       >
         <SearchInput
           ref={inputRef}
@@ -249,7 +268,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
   function SearchInput({ query, loading, onChange, onKeyDown }, ref) {
     return (
       <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <svg className="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.35-4.35" />
         </svg>
@@ -264,6 +283,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         />
         {loading && (
           <svg
+            aria-hidden="true"
             className="h-4 w-4 shrink-0 animate-spin text-muted-foreground"
             data-testid="search-spinner"
             viewBox="0 0 24 24"
@@ -361,9 +381,10 @@ function SearchResultRow({
   })
 
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        "cursor-pointer px-4 py-2.5 transition-colors",
+        "w-full cursor-pointer border-0 bg-transparent px-4 py-2.5 text-left transition-colors",
         selected ? "bg-accent" : "hover:bg-secondary",
       )}
       onClick={() => onSelect(result)}
@@ -381,7 +402,7 @@ function SearchResultRow({
         <WorkspaceInitialsBadge workspace={presentation.workspace} testId="search-result-workspace-badge" />
       </div>
       <SearchResultSubtitle subtitle={presentation.subtitle} />
-    </div>
+    </button>
   )
 }
 

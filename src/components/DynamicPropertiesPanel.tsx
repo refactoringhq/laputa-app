@@ -44,23 +44,13 @@ function PropertyRow({ propKey, value, editingKey, displayMode, autoMode, vaultS
   onDisplayModeChange: (key: string, mode: PropertyDisplayMode | null) => void
   locale: AppLocale
 }) {
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.target !== e.currentTarget) {
-      return
-    }
-    if (e.key === 'Enter' && editingKey !== propKey) {
-      e.preventDefault()
-      onStartEdit(propKey)
-    }
-  }
-
   return (
-    <div className={PROPERTY_ROW_CLASS_NAME} style={PROPERTY_PANEL_ROW_STYLE} tabIndex={0} onKeyDown={handleKeyDown} data-testid="editable-property">
+    <div className={PROPERTY_ROW_CLASS_NAME} style={PROPERTY_PANEL_ROW_STYLE} data-testid="editable-property">
       <span className={PROPERTY_PANEL_LABEL_CLASS_NAME}>
         <DisplayModeSelector propKey={propKey} currentMode={displayMode} autoMode={autoMode} onSelect={onDisplayModeChange} />
         <span className="min-w-0 flex-1 truncate">{humanizePropertyKey(propKey)}</span>
         {onDelete && (
-          <button className="border-none bg-transparent p-0 text-sm leading-none text-muted-foreground opacity-0 transition-all hover:text-destructive group-hover/prop:opacity-100" onClick={() => onDelete(propKey)} title={translate(locale, 'inspector.properties.deleteProperty')}>&times;</button>
+          <button type="button" className="border-none bg-transparent p-0 text-sm leading-none text-muted-foreground opacity-0 transition-all hover:text-destructive group-hover/prop:opacity-100" onClick={() => onDelete(propKey)} title={translate(locale, 'inspector.properties.deleteProperty')}>&times;</button>
         )}
       </span>
       <div className="min-w-0">

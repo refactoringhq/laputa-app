@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useMemo, useCallback, useState, useRef, useEffect, type KeyboardEvent, type ReactNode } from 'react'
 import type { VaultEntry } from '../../types'
 import { Plus, X } from '@phosphor-icons/react'
 import type { ParsedFrontmatter } from '../../utils/frontmatter'
@@ -234,8 +234,9 @@ function CreateAndOpenOption({ title, selected, locale, onClick, onHover }: {
   onHover: () => void
 }) {
   return (
-    <div
-      className={`flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm transition-colors ${selected ? 'bg-accent' : 'hover:bg-secondary'}`}
+    <button
+      type="button"
+      className={`flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-3 py-1.5 text-left text-sm transition-colors ${selected ? 'bg-accent' : 'hover:bg-secondary'}`}
       data-testid="create-and-open-option"
       onMouseDown={e => e.preventDefault()}
       onClick={onClick}
@@ -245,7 +246,7 @@ function CreateAndOpenOption({ title, selected, locale, onClick, onHover }: {
       <span className="truncate text-foreground">
         {translate(locale, 'inspector.relationship.createAndOpen')} <strong>{title}</strong>
       </span>
-    </div>
+    </button>
   )
 }
 
@@ -398,9 +399,13 @@ function InlineAddNote({ entries, sourceEntry, vaultPath, locale, onAdd, onCreat
     handleCreateAndOpen,
   } = useInlineAddNoteState(entries, vaultPath, sourceEntry, onAdd, onCreateAndOpenNote)
 
+  useEffect(() => {
+    if (active) inputRef.current?.focus()
+  }, [active, inputRef])
+
   if (!active) {
     return (
-      <button
+      <button type="button"
         className="mt-1 w-full border border-dashed border-border bg-transparent text-left text-muted-foreground cursor-pointer hover:border-foreground hover:text-foreground"
         style={{ borderRadius: 6, padding: '6px 10px', fontSize: 12 }}
         onClick={() => setActive(true)}
@@ -416,7 +421,6 @@ function InlineAddNote({ entries, sourceEntry, vaultPath, locale, onAdd, onCreat
       <div className="group/add relative flex items-center">
         <input
           ref={inputRef}
-          autoFocus
           className="w-full border border-border bg-transparent text-foreground"
           style={{ borderRadius: 6, outline: 'none', minWidth: 0, padding: '6px 10px', fontSize: 12 }}
           placeholder={translate(locale, 'inspector.relationship.noteTitle')}
@@ -425,7 +429,7 @@ function InlineAddNote({ entries, sourceEntry, vaultPath, locale, onAdd, onCreat
           onKeyDown={handleKeyDown}
           data-testid="add-relation-ref-input"
         />
-        <button
+        <button type="button"
           className="absolute right-1 top-1/2 -translate-y-1/2 border-none bg-transparent p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/add:opacity-100"
           onClick={dismiss}
         >
@@ -459,11 +463,11 @@ function RelationshipGroup({ label, refs, entries, sourceEntry, typeEntryMap, va
   return (
     <RelationshipSectionRow label={label} locale={locale}>
       <div className="flex flex-col gap-1">
-        {refs.map((ref, idx) => {
+        {refs.map((ref) => {
           const props = resolveRefProps(ref, entries, typeEntryMap)
           return (
             <LinkButton
-              key={`${ref}-${idx}`}
+              key={`${ref}-${props.target}`}
               {...props}
               onClick={() => onNavigate(props.target)}
               onRemove={onRemoveRef ? () => onRemoveRef(ref) : undefined}
@@ -879,7 +883,7 @@ function updateRefsForAddition(refs: string[], refToAdd: string): FrontmatterVal
 
 function DisabledLinkButton({ locale }: { locale: AppLocale }) {
   return (
-    <button className="mt-2 w-full border border-border bg-transparent text-center text-muted-foreground" style={{ borderRadius: 6, padding: '6px 12px', fontSize: 12, opacity: 0.5, cursor: 'not-allowed' }} disabled>{translate(locale, 'inspector.relationship.addRelationship')}</button>
+    <button type="button" className="mt-2 w-full border border-border bg-transparent text-center text-muted-foreground" style={{ borderRadius: 6, padding: '6px 12px', fontSize: 12, opacity: 0.5, cursor: 'not-allowed' }} disabled>{translate(locale, 'inspector.relationship.addRelationship')}</button>
   )
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import {
   DEFAULT_MODEL_CAPABILITIES,
   aiModelProviderCatalog,
@@ -142,10 +142,13 @@ function LabeledInput({
   placeholder?: string
   type?: 'text' | 'password'
 }) {
+  const inputId = useId()
+
   return (
-    <label className="space-y-1.5 text-xs font-medium text-foreground">
+    <label htmlFor={inputId} className="space-y-1.5 text-xs font-medium text-foreground">
       <span>{label}</span>
       <Input
+        id={inputId}
         type={type}
         value={value}
         placeholder={placeholder}
@@ -167,11 +170,13 @@ function ProviderKindSelect({
   value: AiModelProviderKind
   onChange: (value: AiModelProviderKind) => void
 }) {
+  const triggerId = useId()
+
   return (
-    <label className="space-y-1.5 text-xs font-medium text-foreground">
+    <label htmlFor={triggerId} className="space-y-1.5 text-xs font-medium text-foreground">
       <span>{t('settings.aiProviders.kind')}</span>
       <Select value={value} onValueChange={(next) => onChange(next as AiModelProviderKind)}>
-        <SelectTrigger className={`h-9 ${editableInputClassName()}`}>
+        <SelectTrigger id={triggerId} className={`h-9 ${editableInputClassName()}`}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -193,12 +198,14 @@ function ApiKeyStorageFields({
   draft: ProviderDraft
   updateDraft: (patch: Partial<ProviderDraft>) => void
 }) {
+  const triggerId = useId()
+
   return (
     <>
-      <label className="space-y-1.5 text-xs font-medium text-foreground">
+      <label htmlFor={triggerId} className="space-y-1.5 text-xs font-medium text-foreground">
         <span>{t('settings.aiProviders.keyStorage')}</span>
         <Select value={draft.apiKeyStorage} onValueChange={(next) => updateDraft({ apiKeyStorage: next as AiModelApiKeyStorage })}>
-          <SelectTrigger className={`h-9 ${editableInputClassName()}`}>
+          <SelectTrigger id={triggerId} className={`h-9 ${editableInputClassName()}`}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

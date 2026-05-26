@@ -225,6 +225,7 @@ export function InlineWikilinkInput({
   const handledFileDropRef = useRef(false)
   const pendingFocusAfterRemountRef = useRef<InlineSelectionRange | null>(null)
   useLayoutEffect(() => {
+    void renderVersion
     const target = pendingFocusAfterRemountRef.current
     if (!target) return
     pendingFocusAfterRemountRef.current = null
@@ -376,6 +377,7 @@ export function InlineWikilinkInput({
     notifyUnsupportedPaste()
   }, [disabled, insertTransferText, notifyUnsupportedPaste])
   useLayoutEffect(() => {
+    void renderVersion
     const editor = editorRef.current
     if (!editor) return
 

@@ -93,12 +93,22 @@ function HeaderTitle({
 }: Pick<NoteListHeaderProps, 'title' | 'typeDocument' | 'onOpenType'>) {
   const handleClick = typeDocument ? () => onOpenType(typeDocument) : undefined
 
+  if (typeDocument && handleClick) {
+    return (
+      <button
+        type="button"
+        className="m-0 min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-left text-[14px] font-semibold"
+        onClick={handleClick}
+        data-testid="type-header-link"
+      >
+        {title}
+      </button>
+    )
+  }
+
   return (
     <h3
       className="m-0 min-w-0 flex-1 truncate text-[14px] font-semibold"
-      style={typeDocument ? { cursor: 'pointer' } : undefined}
-      onClick={handleClick}
-      data-testid={typeDocument ? 'type-header-link' : undefined}
     >
       {title}
     </h3>
@@ -291,14 +301,14 @@ export function NoteListHeader({
   onSearchKeyDown,
   onGitRepositoryChange,
 }: NoteListHeaderProps) {
-  const { onMouseDown: onDragMouseDown } = useDragRegion()
+  const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const collapsedSidebarPadding = sidebarCollapsed && isMac()
     ? COLLAPSED_SIDEBAR_MAC_CHROME_PADDING
     : undefined
 
   return (
     <>
-      <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-border px-4" onMouseDown={onDragMouseDown} style={{ cursor: 'default', paddingLeft: collapsedSidebarPadding }}>
+      <div ref={dragRegionRef} className="flex h-[52px] shrink-0 items-center justify-between border-b border-border px-4" style={{ cursor: 'default', paddingLeft: collapsedSidebarPadding }}>
         <HeaderLeading
           title={title}
           typeDocument={typeDocument}

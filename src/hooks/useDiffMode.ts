@@ -229,7 +229,7 @@ export function useDiffMode({
     setDiffContent,
     setDiffLoading,
     setDiffPath,
-  }), [setDiffMode, setDiffContent, setDiffLoading, setDiffPath])
+  }), [])
   const {
     cancelActiveDiffLoad,
     createDiffLoadCancellation,

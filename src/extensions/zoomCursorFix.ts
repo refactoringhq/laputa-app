@@ -6,7 +6,7 @@ function parseZoomValue(source: string | undefined): number | null {
 
   let parsed = parseFloat(value)
   if (value.endsWith('%')) parsed /= 100
-  return parsed > 0 && isFinite(parsed) ? parsed : null
+  return parsed > 0 && Number.isFinite(parsed) ? parsed : null
 }
 
 /**

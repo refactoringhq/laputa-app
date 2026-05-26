@@ -9,10 +9,10 @@ type NoteListLayoutProps = ReturnType<typeof useNoteListModel> & {
 }
 
 const NOTE_LIST_LOADING_ROWS = [
-  { title: 184, line: 254, selected: false },
-  { title: 142, line: 220, selected: true },
-  { title: 98, line: 242, selected: false },
-  { title: 212, line: 198, selected: false },
+  { id: 'wide', title: 184, line: 254, selected: false },
+  { id: 'selected', title: 142, line: 220, selected: true },
+  { id: 'short', title: 98, line: 242, selected: false },
+  { id: 'long', title: 212, line: 198, selected: false },
 ]
 
 function NoteListLoadingBar({ width }: { width: number }) {
@@ -52,8 +52,8 @@ function NoteListLoadingRow({
 function NoteListLoadingSkeleton() {
   return (
     <div data-testid="note-list-loading-skeleton" className="animate-pulse">
-      {NOTE_LIST_LOADING_ROWS.map((row, index) => (
-        <NoteListLoadingRow key={index} {...row} />
+      {NOTE_LIST_LOADING_ROWS.map((row) => (
+        <NoteListLoadingRow key={row.id} {...row} />
       ))}
     </div>
   )
@@ -210,6 +210,8 @@ function NoteListBody({
       ref={noteListContainerRef}
       className="relative flex flex-1 flex-col overflow-hidden outline-none"
       style={{ minHeight: 0 }}
+      role="listbox"
+      aria-label="Notes"
       tabIndex={0}
       onBlur={handleNoteListBlur}
       onKeyDown={handleListKeyDown}

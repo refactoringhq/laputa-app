@@ -100,10 +100,6 @@ function SortablePropertyItem({ id, checked, locale = 'en', onToggle }: { id: No
       <label
         htmlFor={inputId}
         className="flex flex-1 cursor-pointer items-center gap-2 text-[13px]"
-        onClick={(event) => {
-          event.preventDefault()
-          onToggle(id)
-        }}
       >
         <span className="truncate">{id}</span>
       </label>

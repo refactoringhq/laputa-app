@@ -32,7 +32,7 @@ test('visual verify: editor theme + list indentation', async ({ page }) => {
     window.getComputedStyle(el).paddingLeft
   )
   console.log(`Level-0 padding-left: ${paddingL0}`)
-  expect(parseInt(paddingL0)).toBe(40)
+  expect(parseInt(paddingL0, 10)).toBe(40)
 
   // Bullet widgets and checkboxes are rendered
   const bulletCount = await page.locator('.cm-live-bullet').count()

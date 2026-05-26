@@ -133,7 +133,9 @@ describe('PulseView', () => {
     await waitFor(() => {
       expect(screen.getAllByLabelText('Expand files').length).toBeGreaterThan(0)
     })
-    screen.getAllByLabelText('Expand files').forEach((btn) => fireEvent.click(btn))
+    screen.getAllByLabelText('Expand files').forEach((btn) => {
+      fireEvent.click(btn)
+    })
 
     await waitFor(() => {
       expect(screen.getByText('my project')).toBeInTheDocument()
@@ -164,7 +166,9 @@ describe('PulseView', () => {
     await waitFor(() => {
       expect(screen.getAllByLabelText('Expand files').length).toBeGreaterThan(0)
     })
-    rowLabels.forEach((rowLabel) => fireEvent.click(screen.getByText(rowLabel)))
+    rowLabels.forEach((rowLabel) => {
+      fireEvent.click(screen.getByText(rowLabel))
+    })
 
     await waitFor(() => {
       expect(screen.getByText(fileText)).toBeInTheDocument()

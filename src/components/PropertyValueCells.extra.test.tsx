@@ -7,7 +7,7 @@ const { createValueButtonMock, calendarMockState } = vi.hoisted(() => ({
   createValueButtonMock:
     (testId: string, nextValue: (value: string) => string) =>
     ({ value, onSave }: { value: string; onSave: (value: string) => void }) => (
-      <button data-testid={testId} onClick={() => onSave(nextValue(value))}>
+      <button type="button" data-testid={testId} onClick={() => onSave(nextValue(value))}>
         {value}
       </button>
     ),
@@ -32,7 +32,7 @@ vi.mock('./EditableValue', () => ({
     label: string
     onSave: (items: string[]) => void
   }) => (
-    <button data-testid="tag-pill-list" onClick={() => onSave([...items, 'omega'])}>
+    <button type="button" data-testid="tag-pill-list" onClick={() => onSave([...items, 'omega'])}>
       {label}:{items.join(',')}
     </button>
   ),
@@ -48,8 +48,8 @@ vi.mock('./StatusDropdown', () => ({
     onCancel: () => void
   }) => (
     <div>
-      <button data-testid="status-save" onClick={() => onSave('Done')}>save</button>
-      <button data-testid="status-cancel" onClick={onCancel}>cancel</button>
+      <button type="button" data-testid="status-save" onClick={() => onSave('Done')}>save</button>
+      <button type="button" data-testid="status-cancel" onClick={onCancel}>cancel</button>
     </div>
   ),
 }))
@@ -63,9 +63,9 @@ vi.mock('./TagsDropdown', () => ({
     onClose: () => void
   }) => (
     <div data-testid="tags-dropdown">
-      <button data-testid="tags-toggle-alpha" onClick={() => onToggle('alpha')}>alpha</button>
-      <button data-testid="tags-toggle-beta" onClick={() => onToggle('beta')}>beta</button>
-      <button data-testid="tags-close" onClick={onClose}>close</button>
+      <button type="button" data-testid="tags-toggle-alpha" onClick={() => onToggle('alpha')}>alpha</button>
+      <button type="button" data-testid="tags-toggle-beta" onClick={() => onToggle('beta')}>beta</button>
+      <button type="button" data-testid="tags-close" onClick={onClose}>close</button>
     </div>
   ),
 }))
@@ -95,10 +95,10 @@ vi.mock('@/components/ui/calendar', () => ({
     calendarMockState.props.push({ captionLayout, navLayout, startMonth, endMonth })
     return (
     <div>
-      <button data-testid="date-picker-calendar" onClick={() => onSelect(new Date(2026, 3, 23))}>
+      <button type="button" data-testid="date-picker-calendar" onClick={() => onSelect(new Date(2026, 3, 23))}>
         pick
       </button>
-      <button data-testid="date-picker-empty" onClick={() => onSelect(undefined)}>
+      <button type="button" data-testid="date-picker-empty" onClick={() => onSelect(undefined)}>
         empty
       </button>
     </div>
@@ -116,7 +116,7 @@ vi.mock('@/components/ui/popover', () => ({
   }) => (
     <div>
       {children}
-      <button data-testid="popover-close" onClick={() => onOpenChange?.(false)}>close</button>
+      <button type="button" data-testid="popover-close" onClick={() => onOpenChange?.(false)}>close</button>
     </div>
   ),
   PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,

@@ -19,7 +19,9 @@ function installAnimationFrameStub() {
     flushAnimationFrame: () => {
       const pending = [...callbacks.values()]
       callbacks.clear()
-      pending.forEach((callback) => callback(0))
+      pending.forEach((callback) => {
+        callback(0)
+      })
     },
   }
 }

@@ -90,7 +90,9 @@ function installEditorDomSpies(scrollTop = 0) {
 
 function flushQueuedFrames(frameCallbacks: FrameRequestCallback[]) {
   act(() => {
-    frameCallbacks.splice(0).forEach((callback) => callback(0))
+    for (const callback of frameCallbacks.splice(0)) {
+      callback(0)
+    }
   })
 }
 

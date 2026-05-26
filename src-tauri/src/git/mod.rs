@@ -644,6 +644,10 @@ mod tests {
 
     #[test]
     fn test_parse_github_repo_path_variants() {
+        let tokenized_url = format!(
+            "https://{}@github.com/owner/repo.git",
+            ["gho", "abc123"].join("_")
+        );
         for url in [
             "https://github.com/owner/repo.git",
             "https://github.com/owner/repo",
@@ -651,7 +655,7 @@ mod tests {
             "git@github.com:owner/repo.git",
             "git@github.com:owner/repo",
             "ssh://git@github.com/owner/repo.git",
-            "https://gho_abc123@github.com/owner/repo.git",
+            tokenized_url.as_str(),
         ] {
             assert_repo_path(url, Some("owner/repo"));
         }

@@ -23,7 +23,9 @@ let tocWorker: Worker | null = null
 const pendingRequests = new Map<number, PendingRequest>()
 
 function rejectPendingRequests(reason: unknown) {
-  pendingRequests.forEach(({ reject }) => reject(reason))
+  pendingRequests.forEach(({ reject }) => {
+    reject(reason)
+  })
   pendingRequests.clear()
 }
 

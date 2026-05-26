@@ -8,8 +8,6 @@ const BLOCK_TOKEN_PREFIX = '@@TOLARIA_MATH_BLOCK:'
 const TOKEN_SUFFIX = '@@'
 const INLINE_TOKEN_RE = /@@TOLARIA_MATH_INLINE:([^@]+)@@/g
 const CODE_FENCE_PREFIXES = ['```', '~~~']
-const FINANCIAL_AMOUNT_PREFIX_RE = /^\d[\d,]*(?:\.\d+)?(?:[KMBT]|%)(?=[,\s.)])/i
-const PROSE_AFTER_AMOUNT_RE = /(?:,\s|\.\s|\s[a-z]{2,}\b)/i
 
 interface InlineItem {
   type: string
@@ -158,7 +156,58 @@ function isValidInlineLatex({ latex }: LatexPayload): boolean {
 
 function looksLikeFinancialProse({ latex }: LatexPayload): boolean {
   const trimmed = latex.trim()
-  return FINANCIAL_AMOUNT_PREFIX_RE.test(trimmed) && PROSE_AFTER_AMOUNT_RE.test(trimmed)
+  return hasFinancialAmountPrefix(trimmed) && hasProseAfterAmount(trimmed)
+}
+
+function hasFinancialAmountPrefix(text: string): boolean {
+  const integerEnd = scanIntegerAmount(text)
+  if (integerEnd === 0) return false
+
+  const suffixIndex = scanDecimalAmount(text, integerEnd)
+  if (!isFinancialSuffix(text.charAt(suffixIndex))) return false
+
+  const nextChar = text.charAt(suffixIndex + 1)
+  return nextChar === ',' || nextChar === '.' || nextChar === ')' || /\s/.test(nextChar)
+}
+
+function scanIntegerAmount(text: string): number {
+  if (!isAsciiDigit(text.charAt(0))) return 0
+
+  let index = 0
+  while (isAsciiDigit(text.charAt(index)) || text.charAt(index) === ',') index += 1
+  return index
+}
+
+function scanDecimalAmount(text: string, index: number): number {
+  if (text.charAt(index) !== '.') return index
+
+  let nextIndex = index + 1
+  if (!isAsciiDigit(text.charAt(nextIndex))) return index
+  while (isAsciiDigit(text.charAt(nextIndex))) nextIndex += 1
+  return nextIndex
+}
+
+function isFinancialSuffix(char: string): boolean {
+  return 'KMBT%'.includes(char.toUpperCase())
+}
+
+function hasProseAfterAmount(text: string): boolean {
+  for (let index = 0; index < text.length - 2; index += 1) {
+    const current = text.charAt(index)
+    const next = text.charAt(index + 1)
+    if ((current === ',' || current === '.') && /\s/.test(next)) return true
+    if (/\s/.test(current) && isAsciiLetter(next) && isAsciiLetter(text.charAt(index + 2))) return true
+  }
+  return false
+}
+
+function isAsciiDigit(char: string): boolean {
+  return char >= '0' && char <= '9'
+}
+
+function isAsciiLetter(char: string): boolean {
+  const lowerChar = char.toLowerCase()
+  return lowerChar >= 'a' && lowerChar <= 'z'
 }
 
 function readInlineMath({ text, index }: TextPosition): InlineMathMatch | null {
@@ -409,7 +458,7 @@ export function serializeMathAwareBlocks(editor: MarkdownSerializer, blocks: unk
   for (const block of blocks as BlockLike[]) {
     if (isMathBlock(block)) {
       flushPending()
-      chunks.push(displayMathMarkdown({ latex: block.props!.latex }))
+      chunks.push(displayMathMarkdown({ latex: block.props?.latex ?? '' }))
     } else {
       pending.push(block)
     }

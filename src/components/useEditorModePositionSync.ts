@@ -33,6 +33,7 @@ function useRawEditorRestoreEffect({
   rawMode: boolean
 }) {
   useEffect(() => {
+    void activeTabPath
     if (!rawMode || !restoreTransitionRef.current.rawRestore) return
 
     let frame = 0

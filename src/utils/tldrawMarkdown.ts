@@ -53,7 +53,7 @@ function decodeTldrawPayload(payload: unknown): TldrawPayload | null {
 
 function readFenceAttribute({ info, name }: FenceAttributeRequest): string {
   for (const match of info.matchAll(/\b([A-Za-z][\w-]*)=(?:"([^"]+)"|'([^']+)'|([^\s]+))/gu)) {
-    if (match[1] === name) return match[2] ?? match[3] ?? match[4] ?? ''
+    if (match.at(1) === name) return match.at(2) ?? match.at(3) ?? match.at(4) ?? ''
   }
   return ''
 }
@@ -142,11 +142,12 @@ export function isTldrawBlock(block: BlockLike): boolean {
 }
 
 export function tldrawMarkdown(block: BlockLike): string {
+  const props = block.props ?? {}
   return tldrawFenceSource({
-    boardId: block.props?.boardId ?? '',
-    height: block.props?.height ?? TLDRAW_DEFAULT_HEIGHT,
-    snapshot: block.props?.snapshot ?? '{}',
-    width: block.props?.width ?? '',
+    boardId: props.boardId ?? '',
+    height: props.height ?? TLDRAW_DEFAULT_HEIGHT,
+    snapshot: props.snapshot ?? '{}',
+    width: props.width ?? '',
   })
 }
 

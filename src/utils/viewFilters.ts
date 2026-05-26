@@ -54,7 +54,7 @@ function arrayField(values: string[], arrayKind: ViewFilterArrayKind): ResolvedF
 }
 
 function propertyField(value: VaultPropertyValue): ResolvedField {
-  if (Array.isArray(value)) return arrayField(value.map(toString), 'property')
+  if (Array.isArray(value)) return arrayField(value.map(toFilterString), 'property')
   return scalarField(value)
 }
 
@@ -76,7 +76,7 @@ function resolveField(entry: VaultEntry, field: string): ResolvedField {
     ?? scalarField(null)
 }
 
-function toString(v: unknown): string {
+function toFilterString(v: unknown): string {
   if (v == null) return ''
   if (typeof v === 'string') return v
   return String(v)
@@ -128,7 +128,7 @@ function evaluateRegexScalarCondition(op: FilterCondition['op'], fieldRaw: strin
 }
 
 function conditionList(value: unknown): string[] | null {
-  return Array.isArray(value) ? value.map(toString) : null
+  return Array.isArray(value) ? value.map(toFilterString) : null
 }
 
 function evaluateTextComparison(op: TextOp, fieldStr: string, condStr: string): boolean | null {
@@ -231,7 +231,7 @@ function evaluateScalarCondition(condition: ScalarCondition): boolean {
   if (dateResult !== null) return dateResult
 
   const { cond, scalar, condVal, regex } = condition
-  return evaluateTextCondition(cond, toString(scalar), condVal, regex)
+  return evaluateTextCondition(cond, toFilterString(scalar), condVal, regex)
 }
 
 function evaluateCondition(cond: FilterCondition, entry: VaultEntry): boolean {
@@ -239,7 +239,7 @@ function evaluateCondition(cond: FilterCondition, entry: VaultEntry): boolean {
   const emptyResult = evaluateEmptyCondition(cond.op, resolved)
   if (emptyResult !== null) return emptyResult
 
-  const condVal = toString(cond.value)
+  const condVal = toFilterString(cond.value)
   const regex = usesRegex(cond) ? compileRegex(cond, condVal) : null
   if (usesRegex(cond) && !regex) return false
 

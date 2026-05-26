@@ -90,14 +90,14 @@ type NoteItemRowState = 'binary' | 'multiSelected' | 'selected' | 'highlighted' 
 type NoteItemSurfaceProps = {
   className: string
   style: CSSProperties
-  onClick: MouseEventHandler<HTMLDivElement>
-  onContextMenu?: MouseEventHandler<HTMLDivElement>
+  onClick: MouseEventHandler<HTMLButtonElement>
+  onContextMenu?: MouseEventHandler<HTMLButtonElement>
   onMouseEnter?: () => void
   title?: string
   testId?: string
 }
 
-const NOTE_ITEM_BASE_CLASS_NAME = 'relative border-b border-[var(--border)] transition-colors'
+const NOTE_ITEM_BASE_CLASS_NAME = 'relative w-full border-0 border-b border-[var(--border)] bg-transparent p-0 text-left transition-colors'
 const BINARY_NOTE_STYLE: CSSProperties = { padding: '14px 16px' }
 const NOTE_ITEM_ROW_CLASS_NAMES: Record<NoteItemRowState, string> = {
   binary: 'cursor-default opacity-50',
@@ -369,13 +369,19 @@ function createNoteItemClickHandler(
   isUnavailableBinary: boolean,
   onClickNote: NoteItemProps['onClickNote'],
 ) {
+  const isPropertyChipTarget = (event: ReactMouseEvent) =>
+    event.target instanceof Element && event.target.closest('[data-property-chip="true"]') !== null
+
   if (isUnavailableBinary) {
     return (event: ReactMouseEvent) => {
       event.preventDefault()
       event.stopPropagation()
     }
   }
-  return (event: ReactMouseEvent) => onClickNote(entry, event)
+  return (event: ReactMouseEvent) => {
+    if (isPropertyChipTarget(event)) return
+    onClickNote(entry, event)
+  }
 }
 
 function resolveNoteItemSurfaceStyle({
@@ -463,7 +469,8 @@ function NoteItemRow({
   children: ReactNode
 }) {
   return (
-    <div
+    <button
+      type="button"
       className={surfaceProps.className}
       style={surfaceProps.style}
       onClick={surfaceProps.onClick}
@@ -476,7 +483,7 @@ function NoteItemRow({
       title={surfaceProps.title}
     >
       {children}
-    </div>
+    </button>
   )
 }
 

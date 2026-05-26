@@ -1,0 +1,38 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!src-tauri/gen/**",
+      "!target/**",
+      "!dist/**",
+      "!node_modules/**"
+    ]
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["site/**/*.vue"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "off",
+            "noUnusedVariables": "off",
+            "useHookAtTopLevel": "off"
+          }
+        }
+      }
+    }
+  ],
+  "linter": {
+    "rules": {
+      "correctness": {
+        "useQwikValidLexicalScope": "off"
+      }
+    }
+  }
+}

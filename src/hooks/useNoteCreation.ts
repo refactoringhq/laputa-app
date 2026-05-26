@@ -69,7 +69,11 @@ export interface UntitledNameParams {
 export function generateUntitledName({ entries, type, pendingTitles }: UntitledNameParams): string {
   const baseName = `Untitled ${type.toLowerCase()}`
   const existingTitles = new Set(entries.map(e => e.title))
-  if (pendingTitles) pendingTitles.forEach((title) => existingTitles.add(title))
+  if (pendingTitles) {
+    for (const title of pendingTitles) {
+      existingTitles.add(title)
+    }
+  }
   let title = baseName
   let counter = 2
   while (existingTitles.has(title)) {
@@ -168,7 +172,9 @@ export function resolveTypeInstanceDefaults(params: TemplateLookupParams): TypeI
     ...collectPropertyDefaults(typeEntry),
     ...collectRelationshipDefaults(typeEntry),
   ]
-  candidateDefaults.forEach((defaultValue) => appendUniqueDefault(defaults, seenKeys, defaultValue))
+  for (const defaultValue of candidateDefaults) {
+    appendUniqueDefault(defaults, seenKeys, defaultValue)
+  }
   return defaults
 }
 
@@ -220,7 +226,9 @@ function appendDefaultFrontmatterLines(lines: string[], defaults: TypeInstanceDe
     existingKeys.add(canonicalKey)
     if (Array.isArray(value)) {
       lines.push(`${key}:`)
-      value.forEach((item) => lines.push(`  - ${formatYamlScalar(item)}`))
+      for (const item of value) {
+        lines.push(`  - ${formatYamlScalar(item)}`)
+      }
     } else {
       lines.push(`${key}: ${formatYamlScalar(value)}`)
     }
@@ -613,7 +621,7 @@ async function createTypeSilently({
   } catch (error) {
     const message = createPersistFailureMessage(plan.resolved.entry, error)
     setToastMessage(message)
-    throw new Error(message)
+    throw new Error(message, { cause: error })
   }
 }
 

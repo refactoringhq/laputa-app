@@ -105,6 +105,25 @@ describe('AiAgentsBadge', () => {
     expect(screen.getByRole('menuitemradio', { name: /OpenAI.*gpt-5\.5/ })).toHaveAttribute('aria-checked', 'true')
   })
 
+  it('does not show install actions for missing local agents', () => {
+    renderBadge({
+      statuses: {
+        claude_code: { status: 'installed', version: '1.0.20' },
+        codex: { status: 'missing', version: null },
+        opencode: { status: 'missing', version: null },
+        pi: { status: 'missing', version: null },
+        gemini: { status: 'missing', version: null },
+      },
+    })
+    openAiAgentsMenu()
+
+    expect(screen.queryByText('Install')).not.toBeInTheDocument()
+    expect(screen.queryByText('Install Codex')).not.toBeInTheDocument()
+    expect(screen.queryByText('Install OpenCode')).not.toBeInTheDocument()
+    expect(screen.queryByText('Install Pi')).not.toBeInTheDocument()
+    expect(screen.queryByText('Install Gemini CLI')).not.toBeInTheDocument()
+  })
+
   it('shows the vault guidance summary and restore action', async () => {
     const onRestoreGuidance = vi.fn()
 

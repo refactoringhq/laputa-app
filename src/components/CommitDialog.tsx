@@ -75,14 +75,19 @@ export function CommitDialog({
 }: CommitDialogProps) {
   const [message, setMessage] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const suggestedMessageRef = useRef(suggestedMessage)
   const copy = getDialogCopy(commitMode)
 
   useEffect(() => {
+    suggestedMessageRef.current = suggestedMessage
+  }, [suggestedMessage])
+
+  useEffect(() => {
     if (open) {
-      setMessage(suggestedMessage ?? '') // eslint-disable-line react-hooks/set-state-in-effect -- reset on dialog open
+      setMessage(suggestedMessageRef.current ?? '') // eslint-disable-line react-hooks/set-state-in-effect -- reset on dialog open
       setTimeout(() => inputRef.current?.focus(), 50)
     }
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps -- only reset when dialog opens
+  }, [open])
 
   const handleSubmit = () => {
     const trimmed = message.trim()

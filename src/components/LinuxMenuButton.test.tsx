@@ -21,7 +21,9 @@ vi.mock('@tauri-apps/api/window', () => ({
 
 async function openSubmenu(label: string) {
   fireEvent.pointerDown(screen.getByRole('button', { name: 'Application menu' }), { button: 0 })
-  const trigger = await screen.findByRole('menuitem', { name: new RegExp(label) })
+  const trigger = await screen.findByRole('menuitem', {
+    name: (accessibleName) => accessibleName.includes(label),
+  })
   fireEvent.pointerMove(trigger)
   fireEvent.click(trigger)
 }

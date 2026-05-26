@@ -47,12 +47,20 @@ function triggerMenuCommand(menuItemId: string): void {
   void invoke('trigger_menu_command', { id: menuItemId }).catch(() => {})
 }
 
+function menuSeparatorKey(section: MenuSection, item: MenuItem): string {
+  const ordinal = section.items
+    .slice(0, section.items.indexOf(item) + 1)
+    .filter(candidate => candidate.kind === 'separator')
+    .length
+  return `${section.label}-separator-${ordinal}`
+}
+
 function MenuSectionItems({ section }: { section: MenuSection }) {
   return (
     <>
-      {section.items.map((item, index) => {
+      {section.items.map((item) => {
         if (item.kind === 'separator') {
-          return <DropdownMenuSeparator key={`${section.label}-${index}`} />
+          return <DropdownMenuSeparator key={menuSeparatorKey(section, item)} />
         }
 
         if (item.kind === 'command') {
@@ -82,7 +90,7 @@ function MenuSectionItems({ section }: { section: MenuSection }) {
 
 function HamburgerIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
       <line x1="2" y1="4" x2="12" y2="4" />
       <line x1="2" y1="7" x2="12" y2="7" />
       <line x1="2" y1="10" x2="12" y2="10" />

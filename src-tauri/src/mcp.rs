@@ -415,21 +415,14 @@ fn build_time_dev_mcp_server_dir() -> PathBuf {
 
 fn mcp_server_dir_candidates(dev_path: &Path, resource_roots: &[PathBuf]) -> Vec<PathBuf> {
     let current_dir = std::env::current_dir().ok();
-    let current_exe = std::env::current_exe().ok();
 
-    mcp_server_dir_candidates_for(
-        dev_path,
-        resource_roots,
-        current_dir.as_deref(),
-        current_exe.as_deref(),
-    )
+    mcp_server_dir_candidates_for(dev_path, resource_roots, current_dir.as_deref())
 }
 
 fn mcp_server_dir_candidates_for(
     dev_path: &Path,
     resource_roots: &[PathBuf],
     current_dir: Option<&Path>,
-    current_exe: Option<&Path>,
 ) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     push_unique_path(&mut candidates, dev_path.to_path_buf());
@@ -438,13 +431,7 @@ fn mcp_server_dir_candidates_for(
         push_resource_root_candidates(&mut candidates, root);
     }
 
-    if let Some(current_exe) = current_exe {
-        for root in executable_resource_roots(current_exe) {
-            push_resource_root_candidates(&mut candidates, &root);
-        }
-    }
-
-    for root in runtime_development_roots(current_dir, current_exe) {
+    for root in runtime_development_roots(current_dir) {
         push_development_root_candidates(&mut candidates, &root);
     }
 
@@ -462,40 +449,17 @@ fn push_resource_root_candidates(candidates: &mut Vec<PathBuf>, root: &Path) {
 fn push_development_root_candidates(candidates: &mut Vec<PathBuf>, root: &Path) {
     push_unique_path(candidates, root.join("mcp-server"));
     push_unique_path(candidates, root.join("resources").join("mcp-server"));
+    push_unique_path(
+        candidates,
+        root.join("src-tauri").join("resources").join("mcp-server"),
+    );
 }
 
-fn runtime_development_roots(
-    current_dir: Option<&Path>,
-    current_exe: Option<&Path>,
-) -> Vec<PathBuf> {
+fn runtime_development_roots(current_dir: Option<&Path>) -> Vec<PathBuf> {
     let mut roots = Vec::new();
 
     if let Some(current_dir) = current_dir {
         push_ancestor_paths(&mut roots, current_dir);
-    }
-    if let Some(exe_dir) = current_exe.and_then(Path::parent) {
-        push_ancestor_paths(&mut roots, exe_dir);
-    }
-
-    roots
-}
-
-fn executable_resource_roots(current_exe: &Path) -> Vec<PathBuf> {
-    let mut roots = Vec::new();
-    let Some(exe_dir) = current_exe.parent() else {
-        return roots;
-    };
-
-    if exe_dir.file_name().and_then(|name| name.to_str()) == Some("MacOS") {
-        if let Some(contents_dir) = exe_dir.parent() {
-            push_unique_path(&mut roots, contents_dir.join("Resources"));
-        }
-    }
-
-    push_unique_path(&mut roots, exe_dir.to_path_buf());
-    if let Some(parent) = exe_dir.parent() {
-        push_unique_path(&mut roots, parent.join("Resources"));
-        push_unique_path(&mut roots, parent.to_path_buf());
     }
 
     roots
@@ -1084,13 +1048,7 @@ mod tests {
     fn mcp_server_dir_candidates_include_runtime_dev_roots_when_build_path_is_stale() {
         let stale_dev_path = Path::new("/Users/runner/work/tolaria/tolaria/mcp-server");
         let current_dir = Path::new("/Users/luca/Workspace/tolaria");
-        let current_exe = Path::new("/Users/luca/Workspace/tolaria/src-tauri/target/debug/tolaria");
-        let candidates = mcp_server_dir_candidates_for(
-            stale_dev_path,
-            &[],
-            Some(current_dir),
-            Some(current_exe),
-        );
+        let candidates = mcp_server_dir_candidates_for(stale_dev_path, &[], Some(current_dir));
 
         assert!(candidates.contains(&PathBuf::from("/Users/luca/Workspace/tolaria/mcp-server")));
         assert!(candidates.contains(&PathBuf::from(
@@ -1101,8 +1059,10 @@ mod tests {
     #[test]
     fn mcp_server_dir_candidates_include_macos_bundle_resources() {
         let dev_path = Path::new("/repo/mcp-server");
-        let current_exe = Path::new("/Applications/Tolaria.app/Contents/MacOS/Tolaria");
-        let candidates = mcp_server_dir_candidates_for(dev_path, &[], None, Some(current_exe));
+        let resource_roots = vec![PathBuf::from(
+            "/Applications/Tolaria.app/Contents/Resources",
+        )];
+        let candidates = mcp_server_dir_candidates_for(dev_path, &resource_roots, None);
 
         assert!(candidates.contains(&PathBuf::from(
             "/Applications/Tolaria.app/Contents/Resources/mcp-server"

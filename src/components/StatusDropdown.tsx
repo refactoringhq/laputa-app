@@ -41,7 +41,7 @@ function ColorPickerRow({ status, onColorChange }: { status: string; onColorChan
   return (
     <div className="flex items-center gap-1 px-3 py-1.5" data-testid={`color-picker-${status}`}>
       {ACCENT_COLORS.map(c => (
-        <button
+        <button type="button"
           key={c.key}
           className="flex size-4 shrink-0 items-center justify-center rounded-full border-none p-0 transition-transform hover:scale-125"
           style={{ backgroundColor: c.css }}
@@ -84,19 +84,20 @@ function StatusOption({
           borderRadius: 4,
           backgroundColor: highlighted ? 'var(--muted)' : 'transparent',
         }}
-        onMouseEnter={onMouseEnter}
       >
-        <button
+        <button type="button"
           className="flex min-w-0 flex-1 items-center border-none bg-transparent p-0 text-left"
           onClick={() => onSelect(status)}
+          onMouseEnter={onMouseEnter}
           data-testid={`status-option-${status}`}
         >
           <StatusPill status={status} />
         </button>
-        <button
+        <button type="button"
           className="flex size-4 shrink-0 items-center justify-center rounded-full border-none p-0"
           style={{ backgroundColor: style.color }}
           onClick={() => onToggleColor(status)}
+          onMouseEnter={onMouseEnter}
           title="Change color"
           data-testid={`status-color-swatch-${status}`}
         />
@@ -302,7 +303,13 @@ export function StatusDropdown({
     <span ref={anchorRef} data-testid="status-dropdown">
       {createPortal(
         <>
-          <div className="fixed inset-0 z-[12000]" onClick={onCancel} data-testid="status-dropdown-backdrop" />
+          <button
+            type="button"
+            aria-label="Close status menu"
+            className="fixed inset-0 z-[12000] cursor-default border-0 bg-transparent p-0"
+            onClick={onCancel}
+            data-testid="status-dropdown-backdrop"
+          />
           <div
             ref={dropdownRef}
             className="fixed z-[12001] w-52 overflow-hidden rounded-lg border border-border bg-background shadow-lg"
@@ -379,7 +386,7 @@ function CreateSection({ show, query, showDivider, highlighted, onSave, onMouseE
   return (
     <>
       {showDivider && <div className="my-1 h-px bg-border" />}
-      <button
+      <button type="button"
         className="flex w-full items-center gap-1.5 border-none bg-transparent px-2 py-1 text-left text-[11px] transition-colors"
         style={{
           borderRadius: 4,

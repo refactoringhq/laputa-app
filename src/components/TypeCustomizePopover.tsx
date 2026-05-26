@@ -236,8 +236,6 @@ export function TypeCustomizePopover({
         surface === 'popover' && 'rounded-lg border bg-popover shadow-md',
       )}
       style={surface === 'popover' ? { width: 320, padding: 12 } : undefined}
-      onClick={(e) => e.stopPropagation()}
-      onContextMenu={(e) => e.stopPropagation()}
     >
       <ColorSection selectedColor={selectedColor} locale={locale} onSelectColor={handleColorClick} />
       <IconSection

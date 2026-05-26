@@ -130,7 +130,7 @@ describe('SettingsPanel', () => {
     expect(screen.getAllByText('Sync & Updates').length).toBeGreaterThan(0)
   })
 
-  it('separates coding agents, local models, and API models in AI settings', async () => {
+  it('separates local agents, local models, and API models in AI settings', async () => {
     const aiAgentsStatus: AiAgentsStatus = {
       claude_code: { status: 'installed', version: '2.1.18' },
       codex: { status: 'missing', version: null },
@@ -148,7 +148,7 @@ describe('SettingsPanel', () => {
       />
     )
 
-    expect(screen.getByText('Recognized coding agents')).toBeInTheDocument()
+    expect(screen.getByText('Recognized local agents')).toBeInTheDocument()
     expect(screen.getByText('Claude Code')).toBeInTheDocument()
     expect(screen.getByText('2.1.18')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Local model' })).toBeInTheDocument()
@@ -159,7 +159,7 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Test model' }))
     expect(await screen.findByText('Connection works. The model replied successfully.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add local model' })).toBeInTheDocument()
-    expect(screen.queryByText('Recognized coding agents')).not.toBeInTheDocument()
+    expect(screen.queryByText('Recognized local agents')).not.toBeInTheDocument()
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'API model' }), { button: 0, ctrlKey: false })
     expect(screen.getByRole('button', { name: 'Add API model' })).toBeInTheDocument()
@@ -182,7 +182,7 @@ describe('SettingsPanel', () => {
     )
 
     expect(within(screen.getByTestId('settings-ai-features-enabled')).getByRole('switch')).toHaveAttribute('aria-checked', 'false')
-    expect(screen.queryByText('Recognized coding agents')).not.toBeInTheDocument()
+    expect(screen.queryByText('Recognized local agents')).not.toBeInTheDocument()
 
     fireEvent.click(within(screen.getByTestId('settings-ai-features-enabled')).getByRole('switch'))
     saveSettingsPanel()

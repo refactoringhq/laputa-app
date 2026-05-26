@@ -8,7 +8,7 @@ const { createDropdownModule, createPrimarySecondaryActions } = vi.hoisted(() =>
   ) => (
     <div data-testid={containerTestId}>
       {actions.map(({ testId, label, onClick }) => (
-        <button key={testId} data-testid={testId} onClick={onClick}>
+        <button type="button" key={testId} data-testid={testId} onClick={onClick}>
           {label}
         </button>
       ))}
@@ -38,7 +38,7 @@ const { createDropdownModule, createPrimarySecondaryActions } = vi.hoisted(() =>
 
 vi.mock('./EditableValue', () => ({
   EditableValue: ({ value, onSave }: { value: string; onSave: (value: string) => void }) => (
-    <button data-testid="editable-value" onClick={() => onSave(`${value}-saved`)}>
+    <button type="button" data-testid="editable-value" onClick={() => onSave(`${value}-saved`)}>
       {value}
     </button>
   ),
@@ -51,12 +51,12 @@ vi.mock('./EditableValue', () => ({
     label: string
     onSave: (items: string[]) => void
   }) => (
-    <button data-testid="tag-pill-list" onClick={() => onSave([...items, 'gamma'])}>
+    <button type="button" data-testid="tag-pill-list" onClick={() => onSave([...items, 'gamma'])}>
       {label}:{items.join(',')}
     </button>
   ),
   UrlValue: ({ value, onSave }: { value: string; onSave: (value: string) => void }) => (
-    <button data-testid="url-value" onClick={() => onSave('https://saved.example')}>
+    <button type="button" data-testid="url-value" onClick={() => onSave('https://saved.example')}>
       {value}
     </button>
   ),
@@ -80,7 +80,7 @@ vi.mock('./TagsDropdown', () =>
 
 vi.mock('./ColorInput', () => ({
   ColorEditableValue: ({ value, onSave }: { value: string; onSave: (value: string) => void }) => (
-    <button data-testid="color-value" onClick={() => onSave('#00ff00')}>
+    <button type="button" data-testid="color-value" onClick={() => onSave('#00ff00')}>
       {value}
     </button>
   ),
@@ -88,7 +88,7 @@ vi.mock('./ColorInput', () => ({
 
 vi.mock('./IconEditableValue', () => ({
   IconEditableValue: ({ value, onSave }: { value: string; onSave: (value: string) => void }) => (
-    <button data-testid="icon-value" onClick={() => onSave('sparkles')}>
+    <button type="button" data-testid="icon-value" onClick={() => onSave('sparkles')}>
       {value}
     </button>
   ),
@@ -96,7 +96,7 @@ vi.mock('./IconEditableValue', () => ({
 
 vi.mock('@/components/ui/calendar', () => ({
   Calendar: ({ onSelect }: { onSelect: (value: Date) => void }) => (
-    <button
+    <button type="button"
       data-testid="date-picker-calendar"
       onClick={() => onSelect(new Date(2026, 3, 22))}
     >

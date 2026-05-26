@@ -75,7 +75,8 @@ function insertIntoTextControl(element: HTMLInputElement | HTMLTextAreaElement, 
 function insertIntoContentEditable(element: HTMLElement, text: string): boolean {
   if (!element.isContentEditable && !element.closest('[contenteditable="true"]')) return false
 
-  if (document.queryCommandSupported?.('insertText') && document.execCommand('insertText', false, text)) {
+  const queryCommandSupported = Reflect.get(document, 'queryCommandSupported') as ((commandId: string) => boolean) | undefined
+  if (queryCommandSupported?.call(document, 'insertText') && document.execCommand('insertText', false, text)) {
     return true
   }
 
@@ -182,8 +183,9 @@ async function readClipboardText(): Promise<string> {
     return invoke<string>('read_text_from_clipboard')
   }
 
-  if (navigator.clipboard?.readText) {
-    return navigator.clipboard.readText()
+  const clipboard = Reflect.get(navigator, 'clipboard') as Clipboard | undefined
+  if (clipboard && typeof clipboard.readText === 'function') {
+    return clipboard.readText()
   }
 
   return mockInvoke<string>('read_text_from_clipboard')

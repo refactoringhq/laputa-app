@@ -36,13 +36,8 @@ function invokeAppCommand<T>(command: string, args: Record<string, unknown>): Pr
 }
 
 export function hideWorkspaceMetadata(entries: VaultEntry[]): VaultEntry[] {
-  let changed = false
-  const nextEntries = entries.map((entry) => {
-    if (!entry.workspace) return entry
-    changed = true
-    return { ...entry, workspace: undefined }
-  })
-  return changed ? nextEntries : entries
+  if (!entries.some((entry) => entry.workspace)) return entries
+  return entries.map((entry) => entry.workspace ? { ...entry, workspace: undefined } : entry)
 }
 
 export function useWorkspaceGraphState({

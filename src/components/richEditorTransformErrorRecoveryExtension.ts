@@ -152,7 +152,7 @@ function releaseRecoveryState(
   const state = Reflect.get(view, DISPATCH_RECOVERY_STATE_KEY)
   if (!isDispatchRecoveryState(state) || state.originalDispatch !== originalDispatch) return
 
-  state.recoverDocuments = state.recoverDocuments.filter((entry) => entry.token !== token)
+  state.recoverDocuments = state.recoverDocuments.filter((entry) => !Object.is(entry.token, token))
   state.refCount -= 1
   if (state.refCount > 0) return
 

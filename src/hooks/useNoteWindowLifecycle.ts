@@ -39,8 +39,8 @@ async function resolveNoteWindowEntry(noteWindowParams: NoteWindowParams): Promi
         ? await invoke<VaultEntry | null>('reload_vault_entry', request)
         : await mockInvoke<VaultEntry | null>('reload_vault_entry', request)
       if (entry) return entry
-    } catch {
-      // Try the next normalized candidate before reporting the note as unavailable.
+    } catch (error) {
+      console.warn('Failed to resolve note window candidate:', error)
     }
   }
 }
@@ -71,7 +71,8 @@ async function openNoteWindowEntry({
     openedRef.current = true
     missingPathRef.current = null
     actionsRef.current.openTabWithContent(entry, content)
-  } catch {
+  } catch (error) {
+    console.warn('Failed to load note window content before opening fallback:', error)
     if (openedRef.current) return
     openedRef.current = true
     missingPathRef.current = null

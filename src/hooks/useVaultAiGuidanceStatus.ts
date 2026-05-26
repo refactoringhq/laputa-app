@@ -24,6 +24,7 @@ export function useVaultAiGuidanceStatus(
   refreshKey = '',
 ): { status: VaultAiGuidanceStatus; refresh: () => Promise<VaultAiGuidanceStatus> } {
   const checkingStatus = useMemo(() => createCheckingVaultAiGuidanceStatus(), [])
+  const statusRequest = useMemo(() => ({ refreshKey, vaultPath }), [refreshKey, vaultPath])
   const [status, setStatus] = useState<VaultAiGuidanceStatus>(() => createCheckingVaultAiGuidanceStatus())
 
   const refresh = useCallback(async () => {
@@ -48,9 +49,9 @@ export function useVaultAiGuidanceStatus(
   useEffect(() => {
     let cancelled = false
 
-    if (!vaultPath) return
+    if (!statusRequest.vaultPath) return
 
-    tauriCall<RawVaultAiGuidanceStatus>('get_vault_ai_guidance_status', { vaultPath })
+    tauriCall<RawVaultAiGuidanceStatus>('get_vault_ai_guidance_status', { vaultPath: statusRequest.vaultPath })
       .then((result) => {
         if (!cancelled) {
           setStatus(normalizeVaultAiGuidanceStatus(result))
@@ -63,7 +64,7 @@ export function useVaultAiGuidanceStatus(
       })
 
     return () => { cancelled = true }
-  }, [vaultPath, refreshKey])
+  }, [statusRequest])
 
   return {
     status: vaultPath ? status : checkingStatus,

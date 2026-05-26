@@ -81,8 +81,9 @@ export function formatSearchSubtitle(
   const parts: string[] = []
   const modified = entry.modifiedAt ?? entry.createdAt
   if (modified) parts.push(formatTimestampForDateDisplay(modified, dateDisplayFormat))
-  if (wasCreatedBeforeLastModification(entry)) {
-    parts.push(`Created ${formatTimestampForDateDisplay(entry.createdAt!, dateDisplayFormat)}`)
+  const created = entry.createdAt
+  if (created && wasCreatedBeforeLastModification(entry)) {
+    parts.push(`Created ${formatTimestampForDateDisplay(created, dateDisplayFormat)}`)
   }
   if (entry.wordCount > 0) {
     parts.push(`${entry.wordCount.toLocaleString('en-US')} words`)
@@ -153,9 +154,7 @@ export function getSortOptionLabel(option: SortOption): string {
 export function extractSortableProperties(entries: VaultEntry[]): string[] {
   const keys = new Set<string>()
   for (const entry of entries) {
-    if (entry.properties) {
-      for (const key of Object.keys(entry.properties)) keys.add(key)
-    }
+    for (const key of Object.keys(entry.properties)) keys.add(key)
   }
   return [...keys].sort((a, b) => a.localeCompare(b))
 }
@@ -170,7 +169,7 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}/
 function tryParseDate(s: string): number | null {
   if (!ISO_DATE_RE.test(s)) return null
   const d = new Date(s)
-  return isNaN(d.getTime()) ? null : d.getTime()
+  return Number.isNaN(d.getTime()) ? null : d.getTime()
 }
 
 function compareNumericPair(a: unknown, b: unknown): number | null {
@@ -192,8 +191,8 @@ function comparePropertyValues(a: unknown, b: unknown): number {
 
 function makePropertyComparator(key: string, flip: number): (a: VaultEntry, b: VaultEntry) => number {
   return (a, b) => {
-    const va = (a.properties ? Reflect.get(a.properties, key) : null) ?? null
-    const vb = (b.properties ? Reflect.get(b.properties, key) : null) ?? null
+    const va = Reflect.get(a.properties, key) ?? null
+    const vb = Reflect.get(b.properties, key) ?? null
     if (va == null && vb == null) return 0
     if (va == null) return 1
     if (vb == null) return -1
@@ -384,7 +383,7 @@ function appendDynamicInverseRelationshipEntries(
   entity: VaultEntry,
   entry: VaultEntry,
 ) {
-  for (const [key, refs] of Object.entries(entry.relationships ?? {})) {
+  for (const [key, refs] of Object.entries(entry.relationships)) {
     if (key === 'Type' || !refsMatch(refs, entity)) continue
     appendInverseRelationshipEntries(inverseGroups, resolveInverseRelationshipLabel(key, entry), entry)
   }
@@ -420,7 +419,7 @@ export function buildRelationshipGroups(
   allEntries: VaultEntry[],
 ): RelationshipGroup[] {
   const b = new GroupBuilder(entity.path, allEntries)
-  const rels = entity.relationships ?? {}
+  const rels = entity.relationships
 
   if (entity.isA === 'Type') {
     b.filterAndAdd('Instances', (e) => e.isA === entity.title)
@@ -432,9 +431,13 @@ export function buildRelationshipGroups(
   Object.keys(rels)
     .filter((k) => k.toLowerCase() !== 'type')
     .sort((a, b) => a.localeCompare(b))
-    .forEach((key) => b.addFromRefs(key, (Reflect.get(rels, key) as string[] | undefined) ?? []))
+    .forEach((key) => {
+      b.addFromRefs(key, (Reflect.get(rels, key) as string[] | undefined) ?? [])
+    })
 
-  collectInverseRelationshipGroups(entity, allEntries).forEach((group) => b.add(group.label, group.entries))
+  for (const group of collectInverseRelationshipGroups(entity, allEntries)) {
+    b.add(group.label, group.entries)
+  }
   b.add('Backlinks', findBacklinks(entity, allEntries).sort(sortByModified))
 
   return b.groups
@@ -545,8 +548,7 @@ function filterByKind(
   if (selection.kind === 'view') return filterViewEntries(entries, selection, options.views)
   if (selection.kind === 'folder') return filterFolderEntries(entries, selection, options.subFilter)
   if (selection.kind === 'sectionGroup') return filterSectionGroupEntries(entries, selection.type, options.subFilter)
-  if (selection.kind === 'filter') return filterTopLevelEntries(entries, selection, options)
-  return []
+  return filterTopLevelEntries(entries, selection, options)
 }
 
 function filterByFilterType(entries: VaultEntry[], filter: string): VaultEntry[] {

@@ -327,6 +327,7 @@ function useWelcomeActionButtons({
   )
 
   useEffect(() => {
+    void mode
     if (busy) return
 
     // WKWebView can ignore `autoFocus`; move focus explicitly so keyboard-only

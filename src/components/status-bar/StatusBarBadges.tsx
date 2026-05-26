@@ -482,10 +482,10 @@ export function CommitBadge({ info, locale = 'en' }: { info: LastCommitInfo; loc
 
   if (commitUrl) {
     return (
-      <span
-        role="button"
+      <button
+        type="button"
         onClick={() => openExternalUrl(commitUrl)}
-        style={{ ...ICON_STYLE, color: 'var(--muted-foreground)', textDecoration: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 3 }}
+        style={{ ...ICON_STYLE, color: 'var(--muted-foreground)', textDecoration: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 3, border: 0, background: 'transparent' }}
         title={translate(locale, 'status.commit.openOnGitHub', { hash: info.shortHash })}
         data-testid="status-commit-link"
         onMouseEnter={(event) => { event.currentTarget.style.color = 'var(--foreground)' }}
@@ -493,7 +493,7 @@ export function CommitBadge({ info, locale = 'en' }: { info: LastCommitInfo; loc
       >
         <GitCommitHorizontal size={13} />
         {info.shortHash}
-      </span>
+      </button>
     )
   }
 

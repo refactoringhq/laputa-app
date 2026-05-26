@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub(super) fn runtime_resource_roots() -> Vec<PathBuf> {
     let local_app_data = if cfg!(windows) {
@@ -10,7 +10,6 @@ pub(super) fn runtime_resource_roots() -> Vec<PathBuf> {
     runtime_resource_roots_for_env(
         non_empty_env_path("RESOURCEPATH"),
         non_empty_env_path("APPDIR"),
-        current_exe_dir(),
         local_app_data,
     )
 }
@@ -18,7 +17,6 @@ pub(super) fn runtime_resource_roots() -> Vec<PathBuf> {
 fn runtime_resource_roots_for_env(
     resource_path: Option<PathBuf>,
     appdir: Option<PathBuf>,
-    exe_dir: Option<PathBuf>,
     local_app_data: Option<PathBuf>,
 ) -> Vec<PathBuf> {
     let mut roots = Vec::new();
@@ -31,21 +29,12 @@ fn runtime_resource_roots_for_env(
         push_resource_root(&mut roots, appdir.join("usr/lib/tolaria"));
         push_resource_root(&mut roots, appdir.join("usr/lib/Tolaria"));
     }
-    if let Some(exe_dir) = exe_dir {
-        push_resource_root(&mut roots, exe_dir);
-    }
     if let Some(local_app_data) = local_app_data {
         push_resource_root(&mut roots, local_app_data.join("Tolaria"));
         push_resource_root(&mut roots, local_app_data.join("tolaria"));
     }
 
     roots
-}
-
-fn current_exe_dir() -> Option<PathBuf> {
-    std::env::current_exe()
-        .ok()
-        .and_then(|path| path.parent().map(Path::to_path_buf))
 }
 
 fn push_resource_root(roots: &mut Vec<PathBuf>, root: PathBuf) {
@@ -63,17 +52,13 @@ fn non_empty_env_path(key: &str) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn includes_windows_install_locations() {
         let local_app_data = PathBuf::from(r"C:\Users\alex\AppData\Local");
         let install_dir = local_app_data.join("Tolaria");
-        let roots = runtime_resource_roots_for_env(
-            None,
-            None,
-            Some(install_dir.clone()),
-            Some(local_app_data.clone()),
-        );
+        let roots = runtime_resource_roots_for_env(None, None, Some(local_app_data.clone()));
 
         assert_eq!(roots.iter().filter(|root| *root == &install_dir).count(), 1);
         assert!(roots.contains(&local_app_data.join("tolaria")));

@@ -1,5 +1,5 @@
 import { CaretUpDown } from '@phosphor-icons/react'
-import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from 'react'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { FilterFieldOptionsList } from './filter-builder/FilterFieldOptionsList'
@@ -276,33 +276,33 @@ export function FilterFieldCombobox({ value, fields, onChange }: FilterFieldComb
   )
   const options = useMemo(() => flattenGroups(fieldGroups), [fieldGroups])
 
-  const resetToCurrentValue = () => {
+  const resetToCurrentValue = useCallback(() => {
     setQuery(value)
     setHasTyped(false)
     setHighlightedIndex(initialHighlightIndex({
       options: flattenGroups(buildFieldGroups({ fields, currentValue: value, query: '' })),
       currentValue: value,
     }))
-  }
+  }, [fields, value])
 
-  const openCombobox = () => {
+  const openCombobox = useCallback(() => {
     resetToCurrentValue()
     setOpen(true)
     requestAnimationFrame(() => inputRef.current?.select())
-  }
+  }, [resetToCurrentValue])
 
-  const closeCombobox = () => {
+  const closeCombobox = useCallback(() => {
     setOpen(false)
     resetToCurrentValue()
-  }
+  }, [resetToCurrentValue])
 
-  const selectOption = (nextValue: FilterFieldName) => {
+  const selectOption = useCallback((nextValue: FilterFieldName) => {
     onChange(nextValue)
     setQuery(nextValue)
     setHasTyped(false)
     setHighlightedIndex(-1)
     setOpen(false)
-  }
+  }, [onChange])
 
   useEffect(() => {
     if (!open) return
@@ -317,10 +317,18 @@ export function FilterFieldCombobox({ value, fields, onChange }: FilterFieldComb
     return () => window.removeEventListener('resize', updateWidth)
   }, [open])
 
-  const handleBlur = (event: FocusEvent<HTMLDivElement>) => {
-    if (rootRef.current?.contains(event.relatedTarget as Node | null)) return
-    closeCombobox()
-  }
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+
+    const handleBlur = (event: globalThis.FocusEvent) => {
+      if (root.contains(event.relatedTarget as Node | null)) return
+      closeCombobox()
+    }
+
+    root.addEventListener('focusout', handleBlur)
+    return () => root.removeEventListener('focusout', handleBlur)
+  }, [closeCombobox])
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextQuery = event.target.value
@@ -351,7 +359,6 @@ export function FilterFieldCombobox({ value, fields, onChange }: FilterFieldComb
         <div
           ref={rootRef}
           className="relative flex-1 min-w-[160px]"
-          onBlur={handleBlur}
           data-testid="filter-field-combobox"
         >
           <FilterFieldInput

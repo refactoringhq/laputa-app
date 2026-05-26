@@ -385,7 +385,7 @@ describe('Editor', () => {
 
     render(
       <>
-        <div data-testid="note-list-container" tabIndex={0} />
+        <div data-testid="note-list-container" role="listbox" aria-label="Notes" tabIndex={0} />
         <Editor
           {...defaultProps}
           tabs={[{ entry: imageEntry, content: '' }]}

@@ -208,14 +208,21 @@ function buildArrowLigaturesExtension() {
   })
 }
 
+function readRefCurrent<T>(ref: React.RefObject<T>): T | null {
+  return ref.current
+}
+
 export function useCodeMirror(
-  containerRef: React.RefObject<HTMLDivElement | null>,
+  containerRef: React.RefObject<HTMLElement | null>,
   content: string,
   callbacks: CodeMirrorCallbacks,
 ) {
   const viewRef = useRef<EditorView | null>(null)
   const callbacksRef = useRef(callbacks)
-  callbacksRef.current = callbacks
+  const initialContentRef = useRef(content)
+  useEffect(() => {
+    callbacksRef.current = callbacks
+  }, [callbacks])
   // Track whether we're dispatching an external sync so the updateListener skips it
   const externalSyncRef = useRef(false)
 
@@ -231,11 +238,11 @@ export function useCodeMirror(
   }, [content])
 
   useEffect(() => {
-    const parent = containerRef.current
+    const parent = readRefCurrent(containerRef)
     if (!parent) return
 
     const state = EditorState.create({
-      doc: content,
+      doc: initialContentRef.current,
       extensions: [
         lineNumbers(),
         highlightActiveLine(),
@@ -283,8 +290,7 @@ export function useCodeMirror(
       view.destroy()
       viewRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [containerRef])
 
   return viewRef
 }

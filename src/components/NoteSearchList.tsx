@@ -46,7 +46,7 @@ function NoteSearchListItem<T extends NoteSearchResultItem>({
 }: NoteSearchListItemProps<T>) {
   const pressActivatedRef = useRef(false)
 
-  const activateFromPress = (event: MouseEvent<HTMLDivElement> | PointerEvent<HTMLDivElement>) => {
+  const activateFromPress = (event: MouseEvent<HTMLButtonElement> | PointerEvent<HTMLButtonElement>) => {
     event.preventDefault()
     if (!activateOnMouseDown) return
 
@@ -60,7 +60,7 @@ function NoteSearchListItem<T extends NoteSearchResultItem>({
     onItemClick(item, index)
   }
 
-  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (activateOnMouseDown) {
       event.preventDefault()
       event.stopPropagation()
@@ -73,40 +73,45 @@ function NoteSearchListItem<T extends NoteSearchResultItem>({
   return (
     <div
       className={cn(
-        'flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 transition-colors',
+        'flex cursor-pointer items-center justify-between gap-2 transition-colors',
         selected ? 'bg-accent' : 'hover:bg-secondary',
       )}
-      onPointerDownCapture={activateFromPress}
-      onMouseDownCapture={activateFromPress}
-      onClick={handleClick}
-      onMouseEnter={() => onItemHover?.(index)}
     >
-      <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-sm text-foreground">
-        {item.TypeIcon && (
-          <item.TypeIcon
-            width={14}
-            height={14}
-            className="shrink-0"
-            style={item.typeColor ? { color: item.typeColor } : undefined}
-          />
-        )}
-        <NoteTitleIcon icon={item.noteIcon} size={14} testId="note-search-item-icon" />
-        <span className="truncate">{item.title}</span>
-      </span>
-      {(item.noteType || item.workspace) && (
-        <span className="ml-2 flex shrink-0 items-center gap-1.5">
-          {item.noteType && (
-            <Badge
-              variant="secondary"
-              className="shrink-0 text-[11px]"
-              style={item.typeColor ? { color: item.typeColor, backgroundColor: item.typeLightColor } : undefined}
-            >
-              {item.noteType}
-            </Badge>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 border-0 bg-transparent px-3 py-1.5 text-left"
+        onPointerDownCapture={activateFromPress}
+        onMouseDownCapture={activateFromPress}
+        onClick={handleClick}
+        onMouseEnter={() => onItemHover?.(index)}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-sm text-foreground">
+          {item.TypeIcon && (
+            <item.TypeIcon
+              width={14}
+              height={14}
+              className="shrink-0"
+              style={item.typeColor ? { color: item.typeColor } : undefined}
+            />
           )}
-          <WorkspaceInitialsBadge workspace={item.workspace} testId="note-search-workspace-badge" />
+          <NoteTitleIcon icon={item.noteIcon} size={14} testId="note-search-item-icon" />
+          <span className="truncate">{item.title}</span>
         </span>
-      )}
+        {(item.noteType || item.workspace) && (
+          <span className="ml-2 flex shrink-0 items-center gap-1.5">
+            {item.noteType && (
+              <Badge
+                variant="secondary"
+                className="shrink-0 text-[11px]"
+                style={item.typeColor ? { color: item.typeColor, backgroundColor: item.typeLightColor } : undefined}
+              >
+                {item.noteType}
+              </Badge>
+            )}
+            <WorkspaceInitialsBadge workspace={item.workspace} testId="note-search-workspace-badge" />
+          </span>
+        )}
+      </button>
     </div>
   )
 }

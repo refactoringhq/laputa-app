@@ -104,12 +104,18 @@ function ActionCardHeader({
   renderIcon: IconRenderer
   status: AiActionStatus
 }) {
+  const setHeaderRef = useCallback((node: HTMLButtonElement | null) => {
+    if (!node) return
+    node.setAttribute('role', 'button')
+    node.setAttribute('tabindex', '0')
+  }, [])
+
   return (
-    <div
-      className="flex items-center gap-2"
+    <button
+      ref={setHeaderRef}
+      type="button"
+      className="flex w-full items-center gap-2 border-0 bg-transparent text-left"
       style={{ padding: '6px 10px', cursor: 'pointer' }}
-      role="button"
-      tabIndex={0}
       aria-expanded={expanded}
       onClick={onClick}
       onKeyDown={onKeyDown}
@@ -120,7 +126,7 @@ function ActionCardHeader({
       </span>
       <span className="flex-1 truncate">{label}</span>
       <StatusIndicator status={status} />
-    </div>
+    </button>
   )
 }
 

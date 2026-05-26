@@ -1,5 +1,5 @@
 import { Check, Cube, FolderOpen, GitBranch, Plus, Rocket, Warning as AlertTriangle, X } from '@phosphor-icons/react'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   DndContext, PointerSensor, closestCenter, type DragEndEvent, useSensor, useSensors,
@@ -277,7 +277,6 @@ function VaultWorkspaceInitialsBadge({ vault }: { vault: VaultOption }) {
   return (
     <WorkspaceInitialsBadge
       workspace={workspace}
-      ariaLabel={`Vault ${workspace.label}`}
       testId={`vault-menu-workspace-badge-${vault.label}`}
     />
   )
@@ -406,14 +405,26 @@ function VaultMenuItem({
   onRequestRemove,
 }: VaultMenuItemProps) {
   const unavailable = vault.available === false
+  const itemRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const item = itemRef.current
+    if (!item || unavailable) return
+
+    const handleItemClick = (event: MouseEvent) => {
+      if (event.target instanceof Element && event.target.closest('button,input')) return
+      onSelect()
+    }
+
+    item.addEventListener('click', handleItemClick)
+    return () => item.removeEventListener('click', handleItemClick)
+  }, [onSelect, unavailable])
 
   return (
     <div
+      ref={itemRef}
       className="group relative flex w-full items-center rounded-sm hover:bg-[var(--hover)]"
       data-testid={`vault-menu-item-${vault.label}`}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onSelect()
-      }}
     >
       {multiWorkspaceEnabled && (
         <WorkspaceMountCheckbox

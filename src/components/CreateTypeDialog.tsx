@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ interface CreateTypeDialogFormProps {
 
 function CreateTypeDialogForm({ initialName, onClose, onCreate }: CreateTypeDialogFormProps) {
   const [name, setName] = useState(initialName)
+  const nameInputId = useId()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,10 +31,11 @@ function CreateTypeDialogForm({ initialName, onClose, onCreate }: CreateTypeDial
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">
+        <label htmlFor={nameInputId} className="text-xs font-medium text-muted-foreground">
           Type Name
         </label>
         <Input
+          id={nameInputId}
           autoFocus
           placeholder="e.g. Recipe, Book, Habit..."
           value={name}

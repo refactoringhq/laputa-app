@@ -108,10 +108,11 @@ function isMermaidBlock(block: BlockLike): boolean {
 }
 
 function mermaidMarkdown(block: BlockLike): string {
-  const source = block.props?.source
+  const props = block.props ?? {}
+  const source = props.source
   if (source) return source
 
-  return mermaidFenceSource({ diagram: block.props?.diagram ?? '' })
+  return mermaidFenceSource({ diagram: props.diagram ?? '' })
 }
 
 export const mermaidMarkdownCodec: DurableBlockCodec = {

@@ -721,7 +721,7 @@ function App() {
       })
       return changed ? next : prev
     })
-  }, [visibleEntries]) // eslint-disable-line react-hooks/exhaustive-deps -- notes.setTabs is stable (useState setter)
+  }, [visibleEntries, notes.setTabs]) // eslint-disable-line react-hooks/exhaustive-deps -- notes.setTabs is stable (useState setter)
 
   const { handleGoBack, handleGoForward, canGoBack, canGoForward, entriesByPath } = useAppNavigation({
     entries: visibleEntries,
@@ -821,8 +821,7 @@ function App() {
     notes,
     refreshGitModifiedFiles,
     resolvedPath,
-    setToastMessage,
-    vault,
+    vault
   ])
 
   const aiActivity = useAiActivity({
@@ -903,7 +902,7 @@ function App() {
       setToastMessage(`Failed to create folder: ${e}`)
       return false
     }
-  }, [resolvedPath, vault, setToastMessage])
+  }, [resolvedPath, vault])
 
   const folderActions = useFolderActions({
     vaultPath: resolvedPath,
@@ -1169,7 +1168,7 @@ function App() {
     const created = await notes.handleCreateType(name)
     if (created) setToastMessage(`Type "${name}" created`)
     return created
-  }, [notes, setToastMessage])
+  }, [notes])
 
   const handleCreateMissingType = useCallback(async (path: string, missingType: string, nextTypeName: string) => {
     const trimmed = nextTypeName.trim()
@@ -1198,7 +1197,7 @@ function App() {
         : `Type set to "${resolvedTypeName}"`,
     )
     return true
-  }, [notes, resolvedPath, setToastMessage, visibleEntries])
+  }, [notes, resolvedPath, visibleEntries])
 
   const handleCreateOrUpdateView = useCallback(async (definition: ViewDefinition) => {
     const editing = dialogs.editingView
@@ -1229,7 +1228,7 @@ function App() {
       setToastMessage(`Could not save view: ${message}`)
       return false
     }
-  }, [graphDefaultWorkspacePath, multiWorkspaceEnabled, resolvedPath, vault, handleSetSelection, dialogs.editingView, setToastMessage])
+  }, [graphDefaultWorkspacePath, multiWorkspaceEnabled, resolvedPath, vault, handleSetSelection, dialogs.editingView])
 
   const handleUpdateViewDefinition = useCallback(async (filename: string, patch: Partial<ViewDefinition>, rootPath?: string) => {
     const existing = vault.views.find((view) => viewMatchesSelection(view, viewSelection(filename, rootPath)))
@@ -1255,7 +1254,7 @@ function App() {
         const message = err instanceof Error ? err.message : String(err)
         setToastMessage(`Could not save view: ${message}`)
       })
-  }, [handleUpdateViewDefinition, setToastMessage])
+  }, [handleUpdateViewDefinition])
 
   const handleEditView = useCallback((filename: string, rootPath?: string) => {
     const view = vault.views.find((candidate) => viewMatchesSelection(candidate, viewSelection(filename, rootPath)))
@@ -1384,7 +1383,7 @@ function App() {
     } else {
       setToastMessage(result.message)
     }
-  }, [appLocale, settings.release_channel, updateActions, updateStatus.state, setToastMessage])
+  }, [appLocale, settings.release_channel, updateActions, updateStatus.state])
 
   const handleRepairVault = useCallback(async () => {
     if (!resolvedPath) return
@@ -1397,7 +1396,7 @@ function App() {
     } catch (err) {
       setToastMessage(`Failed to repair vault: ${err}`)
     }
-  }, [refreshVaultAiGuidance, resolvedPath, vault, setToastMessage])
+  }, [refreshVaultAiGuidance, resolvedPath, vault])
 
   const restoreVaultAiGuidance = useCallback(async (successToast: string | null = 'Tolaria AI guidance restored') => {
     if (!resolvedPath) return
@@ -1410,7 +1409,7 @@ function App() {
     } catch (err) {
       setToastMessage(`Failed to restore Tolaria AI guidance: ${err}`)
     }
-  }, [refreshVaultAiGuidance, resolvedPath, vault, setToastMessage])
+  }, [refreshVaultAiGuidance, resolvedPath, vault])
 
   const activeCommandEntry = useMemo(() => {
     if (!notes.activeTabPath) return null
@@ -1537,7 +1536,7 @@ function App() {
     const entries = await reloadVaultForCommand()
     setToastMessage(`Vault reloaded (${entries.length} ${entries.length === 1 ? 'entry' : 'entries'})`)
     return entries
-  }, [reloadVaultForCommand, setToastMessage])
+  }, [reloadVaultForCommand])
 
   const {
     activeTab,
@@ -1650,7 +1649,7 @@ function App() {
     canRestoreDeletedNote: !!activeDeletedFile,
   })
 
-  const inboxCount = useMemo(() => filterInboxEntries(visibleEntries, inboxPeriod).length, [visibleEntries, inboxPeriod])
+  const inboxCount = useMemo(() => filterInboxEntries(visibleEntries, inboxPeriod).length, [visibleEntries])
 
   const aiNoteList = useMemo<NoteListItem[]>(() => {
     const isInbox = effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'inbox'
@@ -1663,7 +1662,7 @@ function App() {
     return filtered.map(e => ({
       path: e.path, title: e.title, type: e.isA ?? 'Note',
     }))
-  }, [allNotesFileVisibility, visibleEntries, vault.views, effectiveSelection, inboxPeriod])
+  }, [allNotesFileVisibility, visibleEntries, vault.views, effectiveSelection])
 
   const aiNoteListFilter = useMemo(() => {
     if (effectiveSelection.kind === 'sectionGroup') return { type: effectiveSelection.type, query: '' }

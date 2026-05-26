@@ -152,59 +152,53 @@ function CommitCard({
 
   return (
     <div className="border-b border-border px-4 py-2">
-      <div
-        className={cn(
-          'flex cursor-pointer items-start justify-between py-2 transition-colors focus-visible:bg-accent/40',
-          PULSE_ROW_FOCUS_CLASS_NAME,
-          PULSE_EDGE_TO_EDGE_ROW_CLASS_NAME,
-          expanded ? 'bg-accent/40' : 'hover:bg-accent/40',
-        )}
-        style={{ gap: 8 }}
-        role="button"
-        tabIndex={0}
-        aria-expanded={expanded}
-        onClick={toggleExpanded}
-        onKeyDown={(event) => {
-          if (event.target !== event.currentTarget) return
-          handleActivationKey(event, toggleExpanded)
-        }}
-      >
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center" style={{ gap: 6, marginBottom: 2 }}>
-            <GitCommit size={13} className="text-muted-foreground" style={{ flexShrink: 0 }} />
-            <span className="truncate text-[13px] font-medium text-foreground">{commit.message}</span>
-          </div>
-          <div className="flex items-center" style={{ gap: 8 }}>
-            <span className="text-[11px] text-muted-foreground">{relativeDate(commit.date)}</span>
-            {commitUrl ? (
-              <a
-                className="flex items-center text-[11px] font-mono text-primary no-underline hover:underline"
-                style={{ gap: 3 }}
-                href={commitUrl}
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  void openExternalUrl(commitUrl)
-                }}
-                title={translate(locale, 'pulse.openOnGitHub')}
-              >
-                {commit.shortHash}
-                <ArrowSquareOut size={10} />
-              </a>
-            ) : (
-              <span className="text-[11px] font-mono text-muted-foreground">{commit.shortHash}</span>
-            )}
-            <SummaryBadges added={commit.added} modified={commit.modified} deleted={commit.deleted} />
-          </div>
-        </div>
+      <div className="flex items-start" style={{ gap: 8 }}>
         <button
           type="button"
-          className="flex shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent p-0 text-muted-foreground hover:text-foreground"
+          className={cn(
+            'flex min-w-0 flex-1 items-start justify-between border-none bg-transparent py-2 text-left transition-colors',
+            PULSE_ROW_FOCUS_CLASS_NAME,
+            PULSE_EDGE_TO_EDGE_ROW_CLASS_NAME,
+            expanded ? 'bg-accent/40' : 'hover:bg-accent/40 focus-visible:bg-accent/40',
+          )}
+          style={{ gap: 8 }}
+          onClick={toggleExpanded}
+          onKeyDown={(event) => handleActivationKey(event, toggleExpanded)}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center" style={{ gap: 6, marginBottom: 2 }}>
+              <GitCommit size={13} className="text-muted-foreground" style={{ flexShrink: 0 }} />
+              <span className="truncate text-[13px] font-medium text-foreground">{commit.message}</span>
+            </div>
+            <div className="flex items-center" style={{ gap: 8 }}>
+              <span className="text-[11px] text-muted-foreground">{relativeDate(commit.date)}</span>
+              {!commitUrl && (
+                <span className="text-[11px] font-mono text-muted-foreground">{commit.shortHash}</span>
+              )}
+              <SummaryBadges added={commit.added} modified={commit.modified} deleted={commit.deleted} />
+            </div>
+          </div>
+        </button>
+        {commitUrl && (
+          <a
+            className="mt-2 flex shrink-0 items-center text-[11px] font-mono text-primary no-underline hover:underline"
+            style={{ gap: 3 }}
+            href={commitUrl}
+            onClick={(e) => {
+              e.preventDefault()
+              void openExternalUrl(commitUrl)
+            }}
+            title={translate(locale, 'pulse.openOnGitHub')}
+          >
+            {commit.shortHash}
+            <ArrowSquareOut size={10} />
+          </a>
+        )}
+        <button
+          type="button"
+          className="mt-2 flex shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent p-0 text-muted-foreground hover:text-foreground"
           style={{ width: 20, height: 20 }}
-          onClick={(event) => {
-            event.stopPropagation()
-            toggleExpanded()
-          }}
+          onClick={toggleExpanded}
           aria-label={translate(locale, expanded ? 'pulse.collapseFiles' : 'pulse.expandFiles')}
         >
           <Chevron size={12} />
@@ -233,14 +227,13 @@ function DayGroup({ label, commits, locale, onOpenNote }: {
 
   return (
     <div>
-      <div
+      <button
+        type="button"
         className={cn(
-          'flex cursor-pointer select-none items-center border-b border-border bg-muted/50 transition-colors hover:bg-muted focus-visible:bg-muted',
+          'flex w-full cursor-pointer select-none items-center border-0 border-b border-border bg-muted/50 text-left transition-colors hover:bg-muted focus-visible:bg-muted',
           PULSE_ROW_FOCUS_CLASS_NAME,
         )}
         style={{ padding: '6px 16px', gap: 6 }}
-        role="button"
-        tabIndex={0}
         aria-expanded={!collapsed}
         onClick={toggleCollapsed}
         onKeyDown={(event) => handleActivationKey(event, toggleCollapsed)}
@@ -255,7 +248,7 @@ function DayGroup({ label, commits, locale, onOpenNote }: {
             label: translate(locale, commits.length === 1 ? 'pulse.commitSingular' : 'pulse.commitPlural'),
           })})
         </span>
-      </div>
+      </button>
       {!collapsed && commits.map((commit) => (
         <CommitCard key={commit.hash} commit={commit} locale={locale} onOpenNote={onOpenNote} />
       ))}
@@ -268,13 +261,27 @@ function PulseHeader({
   onExpandSidebar,
   locale = 'en',
 }: Pick<PulseViewProps, 'sidebarCollapsed' | 'onExpandSidebar' | 'locale'>) {
-  const { onMouseDown } = useDragRegion()
+  type DragRegionResult = ReturnType<typeof useDragRegion<HTMLDivElement>> & {
+    dragRegionRef?: React.RefObject<HTMLDivElement | null>
+  }
+  const { dragRegionRef, onMouseDown } = useDragRegion<HTMLDivElement>() as DragRegionResult
+  const fallbackDragRegionRef = useRef<HTMLDivElement>(null)
+  const headerRef = dragRegionRef ?? fallbackDragRegionRef
+
+  useEffect(() => {
+    if (dragRegionRef) return
+    const header = fallbackDragRegionRef.current
+    if (!header) return
+
+    header.addEventListener('mousedown', onMouseDown)
+    return () => header.removeEventListener('mousedown', onMouseDown)
+  }, [dragRegionRef, onMouseDown])
 
   return (
     <div
+      ref={headerRef}
       className="flex shrink-0 items-center justify-between border-b border-border"
       style={{ height: 52, padding: '0 16px', cursor: 'default' }}
-      onMouseDown={onMouseDown}
       data-testid="pulse-header"
     >
       <div className="flex items-center" style={{ gap: 8 }}>
@@ -333,7 +340,7 @@ function ErrorState({ message, locale = 'en', onRetry }: { message: string; loca
   return (
     <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground" style={{ padding: 32 }}>
       <p className="text-[13px]">{message}</p>
-      <button
+      <button type="button"
         className="mt-2 cursor-pointer rounded border border-border bg-transparent px-3 py-1 text-[12px] text-foreground transition-colors hover:bg-accent"
         onClick={onRetry}
       >

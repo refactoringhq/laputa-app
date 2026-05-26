@@ -81,7 +81,9 @@ export function useEditorFocus(
     window.addEventListener(FOCUS_EVENT_NAME, handler)
     return () => {
       window.removeEventListener(FOCUS_EVENT_NAME, handler)
-      pendingCleanups.forEach((cleanup) => cleanup())
+      for (const cleanup of pendingCleanups) {
+        cleanup()
+      }
       pendingCleanups.clear()
     }
   }, [editor, editorMountedRef])

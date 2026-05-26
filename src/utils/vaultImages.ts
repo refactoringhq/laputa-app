@@ -221,8 +221,8 @@ function hasCommonSegmentAt(options: {
   caseInsensitive: boolean
 }): boolean {
   const { leftSegments, rightSegments, index, caseInsensitive } = options
-  const left = leftSegments[index]
-  const right = rightSegments[index]
+  const left = leftSegments.at(index)
+  const right = rightSegments.at(index)
   if (left === undefined || right === undefined) return false
   return samePathSegment({ left, right, caseInsensitive })
 }

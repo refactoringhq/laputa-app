@@ -56,7 +56,7 @@
         function prefersDarkTheme() {
           try {
             return typeof window.matchMedia === 'function' && window.matchMedia(systemDarkQuery).matches;
-          } catch (err) {
+          } catch {
             return false;
           }
         }
@@ -69,14 +69,15 @@
           document.documentElement.setAttribute('data-theme', mode);
           document.documentElement.classList.toggle('dark', mode === 'dark');
         }
+        var mode;
         try {
-          var mode = normalizeTheme(localStorage.getItem(key));
+          mode = normalizeTheme(localStorage.getItem(key));
           if (mode === null) {
             mode = normalizeTheme(localStorage.getItem(legacyKey));
             if (mode !== null) localStorage.setItem(key, mode);
           }
           applyTheme(mode);
-        } catch (err) {
+        } catch {
           applyTheme('light');
         }
       })();
@@ -93,7 +94,7 @@
         function hasReloadAttempted() {
           try {
             return sessionStorage.getItem(reloadAttemptKey) === '1';
-          } catch (err) {
+          } catch {
             return true;
           }
         }
@@ -102,7 +103,7 @@
           try {
             sessionStorage.setItem(reloadAttemptKey, '1');
             return true;
-          } catch (err) {
+          } catch {
             return false;
           }
         }
@@ -110,7 +111,7 @@
         function clearReloadAttempt() {
           try {
             sessionStorage.removeItem(reloadAttemptKey);
-          } catch (err) {
+          } catch {
             // Storage can be unavailable in hardened WebView/privacy modes.
           }
         }

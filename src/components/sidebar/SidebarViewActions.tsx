@@ -121,7 +121,7 @@ export function ViewContextMenu({
       )}
       {canDelete && (
         <>
-          <div className="my-1 h-px bg-border" role="separator" />
+          <hr className="my-1 h-px border-0 bg-border" />
           <ViewMenuButton destructive onClick={onDelete}>
             <Trash size={14} />
             {translate(locale, 'sidebar.action.deleteView')}

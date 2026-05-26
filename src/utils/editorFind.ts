@@ -55,9 +55,9 @@ export function findEditorMatches(
   if (!compiled.pattern) return { error: null, matches: [] }
 
   const matches: EditorFindMatch[] = []
-  let match: RegExpExecArray | null
+  let match = compiled.pattern.exec(documentText)
 
-  while ((match = compiled.pattern.exec(documentText)) !== null) {
+  while (match !== null) {
     if (match[0].length === 0) {
       return { error: 'Regex must match text', matches: [] }
     }
@@ -67,6 +67,7 @@ export function findEditorMatches(
       text: match[0],
       to: match.index + match[0].length,
     })
+    match = compiled.pattern.exec(documentText)
   }
 
   return { error: null, matches }

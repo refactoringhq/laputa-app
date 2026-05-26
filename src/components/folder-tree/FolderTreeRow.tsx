@@ -11,7 +11,7 @@ interface FolderTreeRowProps {
   expanded: Record<string, boolean>
   node: FolderNode
   onDeleteFolder?: (folderPath: string) => void
-  onOpenMenu: (node: FolderNode, event: ReactMouseEvent<HTMLDivElement>) => void
+  onOpenMenu: (node: FolderNode, event: ReactMouseEvent<HTMLElement>) => void
   onRenameFolder?: (folderPath: string, nextName: string) => Promise<boolean> | boolean
   onSelect: (selection: SidebarSelection) => void
   onStartRenameFolder?: (folderPath: string) => void

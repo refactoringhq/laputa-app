@@ -55,7 +55,7 @@ export function ReferencedByPanel({ items, typeEntryMap, onNavigate }: {
           return (
             <div key={label} className="flex min-w-0 flex-col gap-1 px-1.5">
               <ActionTooltip copy={{ label: tooltip }} side="top" align="start">
-                <span className={PROPERTY_PANEL_LABEL_CLASS_NAME} tabIndex={0} data-testid="derived-relationship-label">
+                <span className={PROPERTY_PANEL_LABEL_CLASS_NAME} data-testid="derived-relationship-label">
                   {label}
                 </span>
               </ActionTooltip>

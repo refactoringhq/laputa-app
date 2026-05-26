@@ -21,7 +21,7 @@ export function useFolderContextMenu({
     openContextMenuFromPointer,
   } = useSidebarContextMenu<string>()
 
-  const handleOpenMenu = useCallback((node: FolderNode, event: ReactMouseEvent<HTMLDivElement>) => {
+  const handleOpenMenu = useCallback((node: FolderNode, event: ReactMouseEvent<HTMLElement>) => {
     openContextMenuFromPointer(node.path, event)
   }, [openContextMenuFromPointer])
 

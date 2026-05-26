@@ -62,12 +62,12 @@ describe('MermaidDiagram', () => {
   it('keeps rendered SVG pointer events inside the Mermaid block', async () => {
     const onBlockPointer = vi.fn()
     render(
-      <div onClick={onBlockPointer} onMouseDown={onBlockPointer}>
+      <button type="button" onClick={onBlockPointer} onMouseDown={onBlockPointer}>
         <MermaidDiagram
           diagram={'flowchart LR\nA --> B'}
           source={'```mermaid\nflowchart LR\nA --> B\n```'}
         />
-      </div>,
+      </button>,
     )
 
     await waitFor(() => {

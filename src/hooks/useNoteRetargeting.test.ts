@@ -102,8 +102,8 @@ describe('useNoteRetargeting', () => {
     const selection: SidebarSelection = { kind: 'entity', entry: makeEntry() }
     moveNoteToFolder.mockImplementation(async (
       path: string,
-      folderPath: string,
-      vaultPath: string,
+      _folderPath: string,
+      _vaultPath: string,
       onEntryRenamed: (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }) => void,
     ) => {
       onEntryRenamed(path, { path: '/vault/projects/alpha.md', filename: 'alpha.md' })

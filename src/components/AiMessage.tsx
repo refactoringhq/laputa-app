@@ -47,7 +47,7 @@ function ReferencePill({ reference, onClick }: {
   const color = getTypeColor(reference.type)
   const lightColor = getTypeLightColor(reference.type)
   return (
-    <button
+    <button type="button"
       className="inline-flex items-center border-none cursor-pointer transition-opacity hover:opacity-80"
       style={{
         background: lightColor,
@@ -104,6 +104,7 @@ function ReasoningBlock({ text, expanded, onToggle }: {
   const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    void text
     if (expanded && contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight
     }
@@ -111,7 +112,7 @@ function ReasoningBlock({ text, expanded, onToggle }: {
 
   return (
     <div style={{ marginBottom: 8 }}>
-      <button
+      <button type="button"
         className="flex items-center gap-1.5 w-full border-none bg-transparent cursor-pointer p-0 text-muted-foreground hover:text-foreground transition-colors"
         style={{ fontSize: 12, padding: '4px 0' }}
         onClick={onToggle}
@@ -165,7 +166,7 @@ function ResponseBlock({ text, onNavigateWikilink }: { text: string; onNavigateW
   return (
     <div style={{ marginBottom: 4 }}>
       <MarkdownContent content={text} onWikilinkClick={onNavigateWikilink} />
-      <button
+      <button type="button"
         className="flex items-center gap-1 border-none bg-transparent p-0 text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
         style={{ fontSize: 11, marginTop: 4 }}
         data-testid="undo-button"

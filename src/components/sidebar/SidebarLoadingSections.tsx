@@ -19,6 +19,7 @@ interface SidebarLoadingActionProps {
 }
 
 interface SidebarLoadingRowProps {
+  id: string
   icon?: ReactNode
   iconColor?: string
   labelWidth: number
@@ -50,27 +51,27 @@ interface CreatableLoadingSectionConfig {
 }
 
 const FAVORITE_ROWS = [
-  { iconColor: 'var(--accent-yellow)', labelWidth: 132 },
-  { iconColor: 'var(--accent-red)', labelWidth: 118 },
+  { id: 'favorite-primary', iconColor: 'var(--accent-yellow)', labelWidth: 132 },
+  { id: 'favorite-secondary', iconColor: 'var(--accent-red)', labelWidth: 118 },
 ]
 
 const VIEW_ROWS = [
-  { icon: <Funnel size={16} />, labelWidth: 118 },
-  { icon: <Funnel size={16} />, labelWidth: 146, showCount: true },
+  { id: 'view-filtered', icon: <Funnel size={16} />, labelWidth: 118 },
+  { id: 'view-counted', icon: <Funnel size={16} />, labelWidth: 146, showCount: true },
 ]
 
 const TYPE_ROWS = [
-  { iconColor: 'var(--accent-red)', labelWidth: 72, showCount: true },
-  { iconColor: 'var(--accent-orange)', labelWidth: 92, showCount: true },
-  { iconColor: 'var(--accent-purple)', labelWidth: 104, showCount: true },
-  { iconColor: 'var(--accent-blue)', labelWidth: 126, showCount: true },
-  { iconColor: 'var(--accent-green)', labelWidth: 112, showCount: true },
-  { iconColor: 'var(--accent-yellow)', labelWidth: 96, showCount: true },
+  { id: 'type-red', iconColor: 'var(--accent-red)', labelWidth: 72, showCount: true },
+  { id: 'type-orange', iconColor: 'var(--accent-orange)', labelWidth: 92, showCount: true },
+  { id: 'type-purple', iconColor: 'var(--accent-purple)', labelWidth: 104, showCount: true },
+  { id: 'type-blue', iconColor: 'var(--accent-blue)', labelWidth: 126, showCount: true },
+  { id: 'type-green', iconColor: 'var(--accent-green)', labelWidth: 112, showCount: true },
+  { id: 'type-yellow', iconColor: 'var(--accent-yellow)', labelWidth: 96, showCount: true },
 ]
 
 const FOLDER_ROWS = [
-  { icon: <Folder size={16} />, labelWidth: 118 },
-  { icon: <Folder size={16} />, labelWidth: 92 },
+  { id: 'folder-primary', icon: <Folder size={16} />, labelWidth: 118 },
+  { id: 'folder-secondary', icon: <Folder size={16} />, labelWidth: 92 },
 ]
 
 type CreatableLoadingSectionKind = 'views' | 'folders'
@@ -183,8 +184,8 @@ function SidebarLoadingSection({
       </SidebarGroupHeader>
       {!collapsed && (
         <div className="flex flex-col gap-0.5 pb-2 animate-pulse" aria-hidden="true">
-          {rows.map((row, index) => (
-            <SidebarLoadingRow key={`${testId}-${index}`} {...row} />
+          {rows.map((row) => (
+            <SidebarLoadingRow key={`${testId}-${row.id}`} {...row} />
           ))}
         </div>
       )}

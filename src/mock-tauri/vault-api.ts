@@ -181,10 +181,7 @@ function fetchVaultApiGetRequest(request: VaultApiGetRequest): Promise<Response>
   if (request.kind === 'list') {
     return fetch('/api/vault/list', buildFetchOptions(request))
   }
-  if (request.kind === 'search') {
-    return fetch('/api/vault/search', buildFetchOptions(request))
-  }
-  return fetch('/api/vault/list', buildFetchOptions(request))
+  return fetch('/api/vault/search', buildFetchOptions(request))
 }
 
 function fetchVaultApiPostRequest(request: VaultApiPostRequest): Promise<Response> {

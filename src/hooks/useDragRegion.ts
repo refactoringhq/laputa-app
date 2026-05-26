@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 const NO_DRAG_SELECTOR = [
   'button',
@@ -26,8 +26,11 @@ function performCurrentWindowTitlebarDoubleClick(): Promise<void> {
  * Returns a mousedown handler that triggers Tauri window drag via startDragging().
  * More reliable than data-tauri-drag-region with titleBarStyle: Overlay in Tauri v2.
  */
-export function useDragRegion() {
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
+type DragRegionMouseEvent = React.MouseEvent | MouseEvent
+
+export function useDragRegion<T extends HTMLElement = HTMLElement>() {
+  const dragRegionRef = useRef<T | null>(null)
+  const onMouseDown = useCallback((e: DragRegionMouseEvent) => {
     if (e.button !== 0) return
     if (isDragDisabledTarget(e.target)) return
     e.preventDefault()
@@ -38,5 +41,12 @@ export function useDragRegion() {
     void getCurrentWindow().startDragging().catch(() => {})
   }, [])
 
-  return { onMouseDown }
+  useEffect(() => {
+    const element = dragRegionRef.current
+    if (!element) return
+    element.addEventListener('mousedown', onMouseDown)
+    return () => element.removeEventListener('mousedown', onMouseDown)
+  }, [onMouseDown])
+
+  return { dragRegionRef, onMouseDown }
 }

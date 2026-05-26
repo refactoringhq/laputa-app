@@ -82,8 +82,8 @@ describe('zoomCursorFix extra coverage', () => {
     expect(protoPosAndSideAtCoords).not.toHaveBeenCalled()
 
     view.destroy()
-    expect(Object.prototype.hasOwnProperty.call(view, 'posAtCoords')).toBe(false)
-    expect(Object.prototype.hasOwnProperty.call(view, 'posAndSideAtCoords')).toBe(false)
+    expect(Object.hasOwn(view, 'posAtCoords')).toBe(false)
+    expect(Object.hasOwn(view, 'posAndSideAtCoords')).toBe(false)
   })
 
   it('falls back to original coordinate methods when zoom is 1 or caret lookup misses', () => {

@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback, type MouseEvent } from 'react'
+import { memo, useMemo } from 'react'
 import Markdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -24,14 +24,6 @@ export const MarkdownContent = memo(function MarkdownContent({ content, onWikili
     [content, onWikilinkClick],
   )
 
-  const handleClick = useCallback((e: MouseEvent) => {
-    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-wikilink-target]')
-    if (el) {
-      e.preventDefault()
-      onWikilinkClick?.(el.dataset.wikilinkTarget!)
-    }
-  }, [onWikilinkClick])
-
   const components = useMemo(() => {
     if (!onWikilinkClick) return undefined
     return {
@@ -39,9 +31,21 @@ export const MarkdownContent = memo(function MarkdownContent({ content, onWikili
         if (href?.startsWith(WIKILINK_SCHEME)) {
           const target = decodeURIComponent(href.slice(WIKILINK_SCHEME.length))
           return (
-            <span className="chat-wikilink" data-wikilink-target={target} role="link" tabIndex={0}>
+            <a
+              ref={(node) => {
+                node?.setAttribute('role', 'link')
+                node?.setAttribute('tabindex', '0')
+              }}
+              href={href}
+              className="chat-wikilink border-0 bg-transparent p-0"
+              data-wikilink-target={target}
+              onClick={(event) => {
+                event.preventDefault()
+                onWikilinkClick(target)
+              }}
+            >
               {children}
-            </span>
+            </a>
           )
         }
         return <a href={href}>{children}</a>
@@ -50,7 +54,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, onWikili
   }, [onWikilinkClick])
 
   return (
-    <div className="ai-markdown" onClick={onWikilinkClick ? handleClick : undefined} role="presentation">
+    <div className="ai-markdown">
       <Markdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}

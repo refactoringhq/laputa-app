@@ -221,7 +221,7 @@ function ReadOnlyType({
       <TypeRowLabel />
       <TypeRowValue missingTypeName={missingTypeName} locale={locale} onCreateMissingType={onCreateMissingType}>
         {onNavigate ? (
-          <button
+          <button type="button"
             className="min-w-0 max-w-full truncate border-none cursor-pointer ring-inset hover:ring-1 hover:ring-current"
             style={{
               ...PROPERTY_CHIP_STYLE,

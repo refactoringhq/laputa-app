@@ -1,4 +1,4 @@
-import { useMemo, type HTMLAttributes } from 'react'
+import { useMemo, type ButtonHTMLAttributes, type RefObject } from 'react'
 import type { VaultEntry, ViewDefinition, ViewFile } from '../../types'
 import { Funnel } from '@phosphor-icons/react'
 import { NoteTitleIcon } from '../NoteTitleIcon'
@@ -22,7 +22,7 @@ interface SidebarViewItemProps {
   onEditView?: (filename: string, rootPath?: string) => void
   onDeleteView?: (filename: string, rootPath?: string) => void
   onUpdateViewDefinition?: (filename: string, patch: Partial<ViewDefinition>, rootPath?: string) => void
-  dragHandleProps?: HTMLAttributes<HTMLDivElement>
+  dragHandleProps?: ButtonHTMLAttributes<HTMLButtonElement>
   entries: VaultEntry[]
   locale?: AppLocale
 }
@@ -118,34 +118,42 @@ export function SidebarViewItem({
     startRename,
   } = interactions
 
+  const rowClassName = `flex cursor-pointer select-none items-center gap-2 rounded transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-accent'}`
+  const rowStyle = getViewRowStyle(showCount, isActive, accent)
+
   return (
     <div className="relative">
-      <div
-        ref={rowRef}
-        role="button"
-        tabIndex={0}
-        className={`flex cursor-pointer select-none items-center gap-2 rounded transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-accent'}`}
-        style={getViewRowStyle(showCount, isActive, accent)}
-        aria-label={view.definition.name}
-        {...(isRenaming ? undefined : dragHandleProps)}
-        onClick={isRenaming ? undefined : onSelect}
-        onContextMenu={isRenaming ? undefined : handleContextMenu}
-        onDoubleClick={isRenaming ? undefined : startRename}
-        onKeyDown={handleRowKeyDown}
-      >
-        <ViewIcon icon={view.definition.icon} isActive={isActive} accent={accent} />
-        {isRenaming ? (
+      {isRenaming ? (
+        <div
+          ref={rowRef as RefObject<HTMLDivElement>}
+          className={rowClassName}
+          style={rowStyle}
+        >
+          <ViewIcon icon={view.definition.icon} isActive={isActive} accent={accent} />
           <ViewRenameInput
             initialValue={view.definition.name}
             locale={locale}
             onCancel={() => setIsRenaming(false)}
             onSubmit={handleRenameSubmit}
           />
-        ) : (
+        </div>
+      ) : (
+        <button
+          ref={(node) => { rowRef.current = node }}
+          type="button"
+          className={`${rowClassName} w-full border-0 bg-transparent text-left`}
+          style={rowStyle}
+          {...dragHandleProps}
+          onClick={onSelect}
+          onContextMenu={handleContextMenu}
+          onDoubleClick={startRename}
+          onKeyDown={handleRowKeyDown}
+        >
+          <ViewIcon icon={view.definition.icon} isActive={isActive} accent={accent} />
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{view.definition.name}</span>
-        )}
-        {!isRenaming && <ViewCountChip count={count} isActive={isActive} accent={accent} />}
-      </div>
+          <ViewCountChip count={count} isActive={isActive} accent={accent} />
+        </button>
+      )}
       <ViewContextMenu
         pos={contextMenuPos}
         canCustomize={!!onUpdateViewDefinition}

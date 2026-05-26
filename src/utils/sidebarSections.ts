@@ -76,7 +76,8 @@ export function collectActiveTypes(entries: VaultEntry[]): Set<string> {
   const types = new Set<string>()
   for (const e of entries) {
     if (!shouldCollectActiveType(e)) continue
-    types.add(e.isA!)
+    const typeName = e.isA
+    if (typeName) types.add(typeName)
   }
   return types
 }
@@ -130,8 +131,8 @@ export function buildDynamicSections(
 
 export function sortSections(groups: SectionGroup[], typeEntryMap: Record<string, VaultEntry>): SectionGroup[] {
   return [...groups].sort((a, b) => {
-    const orderA = typeEntryMap[a.type]?.order ?? Infinity
-    const orderB = typeEntryMap[b.type]?.order ?? Infinity
+    const orderA = (Reflect.get(typeEntryMap, a.type) as VaultEntry | undefined)?.order ?? Infinity
+    const orderB = (Reflect.get(typeEntryMap, b.type) as VaultEntry | undefined)?.order ?? Infinity
     return orderA !== orderB ? orderA - orderB : a.label.localeCompare(b.label)
   })
 }

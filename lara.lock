@@ -183,12 +183,12 @@ files:
     settings.allNotesVisibility.unsupported: 257fe04419c9f6543a43e58b1edf9eb5
     settings.allNotesVisibility.unsupportedDescription: a3b8aa66900c742f001cd4533b3df44a
     settings.aiAgents.title: 27f08387b26e1ceeb1b60bd9c97e7a47
-    settings.aiAgents.description: 042a8037f1a4f90c76ce31a49fdff59c
+    settings.aiAgents.description: 768c138c3432fb159ac58c5a4471e786
     settings.aiFeatures.enable: af47a6b2bd32a7b7309bac7bef34f026
     settings.aiFeatures.enableDescription: 7d3916f7f9e1bf8b8797f50f4533b9da
     settings.aiAgents.default: 6af573559fd05d8c35bc57b41cc78e24
     settings.aiAgents.defaultTarget: 5acfc74fd97a6dd2d67d15c66de5eed5
-    settings.aiAgents.agentGroup: 965530cbbec45b1754ed3ece120399f7
+    settings.aiAgents.agentGroup: 11eaa7f817e3f24d54f3cf3025be49b1
     settings.aiAgents.localGroup: d34f4b997ce78da5aa57d657a5d6fcb5
     settings.aiAgents.apiGroup: 589a257cbd265eaa7de93de8b4084dff
     settings.aiAgents.installed: 73329564760013a7824ff9d5d1af91ff
@@ -199,11 +199,11 @@ files:
     settings.aiAgents.apiLocalKey: 119de2f31867b273a134f05bc56b9e57
     settings.aiAgents.apiEnv: e011db3dff54ed3deae37a9615e31ebf
     settings.aiAgents.apiNoKey: 5bbccbfcd09b28902bbf5319dd6e6053
-    settings.aiAgents.installedTitle: 5cb9b5ae5ebc66652814dff4584705cc
-    settings.aiAgents.installedDescription: fb9ba9667725fb40fa1e5d58a2c02692
+    settings.aiAgents.installedTitle: 0de6536215f76c44351ba4d809804c7a
+    settings.aiAgents.installedDescription: 27c8ed48439ac4a613409f5303fbca84
     settings.aiAgents.noVersion: 89831adb7114946e916b9c31d57a1e33
     settings.aiProviders.title: 63eb84d8510f9f086d282ec7d47adaa1
-    settings.aiProviders.description: 6c86c013eb6fb198b51e29ec47d66464
+    settings.aiProviders.description: d29dfa440713d15de311d29a64a27767
     settings.aiProviders.localTitle: c7c20443d8aaf04271df9d713f5c02ce
     settings.aiProviders.localDescription: 7abed40ef2e46741c64ff47e423cca39
     settings.aiProviders.apiTitle: 66537b9e5200ebbbfbd091144d8afbcc

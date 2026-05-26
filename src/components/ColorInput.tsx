@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { isValidCssColor, toHexColor } from '../utils/colorUtils'
 
 /**
@@ -58,56 +58,116 @@ export function ColorSwatch({ color, onChange }: {
  * Editable text field with an inline color swatch.
  * The swatch only appears when the value is a valid CSS color.
  */
-export function ColorEditableValue({ value, isEditing, onStartEdit, onSave, onCancel }: {
+interface ColorEditableValueProps {
   value: string
   isEditing: boolean
   onStartEdit: () => void
   onSave: (newValue: string) => void
   onCancel: () => void
-}) {
+}
+
+export function ColorEditableValue({ value, isEditing, onStartEdit, onSave, onCancel }: ColorEditableValueProps) {
   const [editValue, setEditValue] = useState(value)
   const showSwatch = isValidCssColor(isEditing ? editValue : value)
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') onSave(editValue)
-    else if (e.key === 'Escape') { setEditValue(value); onCancel() }
-  }
-
   const handlePickerChange = useCallback((hex: string) => {
-    if (isEditing) {
-      setEditValue(hex)
-    }
+    if (isEditing) setEditValue(hex)
     onSave(hex)
   }, [isEditing, onSave])
 
   if (isEditing) {
     return (
-      <span className="flex w-full items-center gap-1.5">
-        {showSwatch && <ColorSwatch color={editValue} onChange={handlePickerChange} />}
-        <input
-          className="w-full rounded border border-ring bg-muted px-2 py-1 text-[12px] text-foreground outline-none focus:border-primary"
-          type="text"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => onSave(editValue)}
-          autoFocus
-          data-testid="color-text-input"
-        />
-      </span>
+      <EditableColorValue
+        editValue={editValue}
+        onCancel={onCancel}
+        onChange={setEditValue}
+        onPickerChange={handlePickerChange}
+        onSave={onSave}
+        showSwatch={showSwatch}
+        value={value}
+      />
     )
   }
 
   return (
+    <ReadonlyColorValue
+      onPickerChange={handlePickerChange}
+      onStartEdit={onStartEdit}
+      showSwatch={showSwatch}
+      value={value}
+    />
+  )
+}
+
+function EditableColorValue({
+  editValue,
+  onCancel,
+  onChange,
+  onPickerChange,
+  onSave,
+  showSwatch,
+  value,
+}: {
+  editValue: string
+  onCancel: () => void
+  onChange: (value: string) => void
+  onPickerChange: (hex: string) => void
+  onSave: (newValue: string) => void
+  showSwatch: boolean
+  value: string
+}) {
+  const textInputRef = useRef<HTMLInputElement>(null)
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') onSave(editValue)
+    else if (e.key === 'Escape') {
+      onChange(value)
+      onCancel()
+    }
+  }
+
+  useEffect(() => {
+    textInputRef.current?.focus()
+  }, [])
+
+  return (
+    <span className="flex w-full items-center gap-1.5">
+      {showSwatch && <ColorSwatch color={editValue} onChange={onPickerChange} />}
+      <input
+        ref={textInputRef}
+        className="w-full rounded border border-ring bg-muted px-2 py-1 text-[12px] text-foreground outline-none focus:border-primary"
+        type="text"
+        value={editValue}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={() => onSave(editValue)}
+        data-testid="color-text-input"
+      />
+    </span>
+  )
+}
+
+function ReadonlyColorValue({
+  onPickerChange,
+  onStartEdit,
+  showSwatch,
+  value,
+}: {
+  onPickerChange: (hex: string) => void
+  onStartEdit: () => void
+  showSwatch: boolean
+  value: string
+}) {
+  return (
     <span className="inline-flex h-6 min-w-0 items-center gap-1.5">
-      {showSwatch && <ColorSwatch color={value} onChange={handlePickerChange} />}
-      <span
-        className="min-w-0 cursor-pointer truncate rounded px-1 text-left text-[12px] text-secondary-foreground transition-colors hover:bg-muted"
+      {showSwatch && <ColorSwatch color={value} onChange={onPickerChange} />}
+      <button
+        type="button"
+        className="min-w-0 cursor-pointer truncate rounded border-0 bg-transparent px-1 text-left text-[12px] text-secondary-foreground transition-colors hover:bg-muted"
         onClick={onStartEdit}
         title={value || 'Click to edit'}
       >
         {value || '\u2014'}
-      </span>
+      </button>
     </span>
   )
 }

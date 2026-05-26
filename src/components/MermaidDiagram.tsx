@@ -1,5 +1,5 @@
 import { ArrowsOut as Maximize2 } from '@phosphor-icons/react'
-import { useEffect, useId, useMemo, useState, type SyntheticEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -158,6 +158,16 @@ function MermaidLightbox({ svg }: { svg: string }) {
   )
 }
 
+function MermaidSourceFallback({ source }: { source: string }) {
+  const sourceRef = useRef<HTMLPreElement>(null)
+
+  useEffect(() => {
+    sourceRef.current?.setAttribute('aria-label', 'Mermaid source')
+  }, [])
+
+  return <pre ref={sourceRef}><code>{source}</code></pre>
+}
+
 export function MermaidDiagram({ diagram, source }: MermaidDiagramProps) {
   const reactId = useId()
   const renderId = useMemo(() => renderIdFromReactId(reactId), [reactId])
@@ -183,7 +193,7 @@ export function MermaidDiagram({ diagram, source }: MermaidDiagramProps) {
     return (
       <figure className="mermaid-diagram mermaid-diagram--error" data-testid="mermaid-diagram-error">
         <figcaption>Mermaid diagram unavailable</figcaption>
-        <pre aria-label="Mermaid source"><code>{source}</code></pre>
+        <MermaidSourceFallback source={source} />
       </figure>
     )
   }

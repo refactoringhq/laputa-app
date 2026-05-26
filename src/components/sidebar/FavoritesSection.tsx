@@ -62,18 +62,19 @@ function SortableFavoriteItem({
       {...attributes}
       {...listeners}
     >
-      <div
+      <button
+        type="button"
         className={`group/section flex cursor-pointer select-none items-center justify-between rounded transition-colors ${isActive ? '' : 'hover:bg-accent'}`}
         style={{ padding: SIDEBAR_ITEM_PADDING.withCount, borderRadius: 4, gap: 4, ...(isActive ? { background: typeLightColor } : {}) }}
         onClick={onSelect}
       >
         <div className="flex min-w-0 flex-1 items-center" style={{ gap: 4 }}>
           <NoteTitleIcon icon={icon} size={16} color={typeColor} />
-          <span className="min-w-0 truncate text-[13px] font-medium" style={{ marginLeft: 4, color: isActive ? typeColor : undefined }}>
+          <span className="min-w-0 truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium" style={{ marginLeft: 4, color: isActive ? typeColor : undefined }}>
             {entry.title}
           </span>
         </div>
-      </div>
+      </button>
     </div>
   )
 }

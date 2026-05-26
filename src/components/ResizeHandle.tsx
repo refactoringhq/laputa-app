@@ -5,13 +5,14 @@ interface ResizeHandleProps {
 }
 
 export function ResizeHandle({ onResize }: ResizeHandleProps) {
+  const handleRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const lastX = useRef(0)
   const pendingDelta = useRef(0)
   const rafId = useRef(0)
 
   const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+    (e: MouseEvent) => {
       e.preventDefault()
       isDragging.current = true
       lastX.current = e.clientX
@@ -65,10 +66,17 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
     }
   }, [onResize])
 
+  useEffect(() => {
+    const handle = handleRef.current
+    if (!handle) return
+    handle.addEventListener('mousedown', handleMouseDown)
+    return () => handle.removeEventListener('mousedown', handleMouseDown)
+  }, [handleMouseDown])
+
   return (
     <div
+      ref={handleRef}
       className="relative z-30 -ml-1 w-1 shrink-0 self-stretch cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)]"
-      onMouseDown={handleMouseDown}
     />
   )
 }

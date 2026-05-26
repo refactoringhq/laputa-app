@@ -1,4 +1,4 @@
-import { type ComponentType } from 'react'
+import { useEffect, useRef, type ComponentType, type MouseEvent as ReactMouseEvent } from 'react'
 import type { SidebarSelection, VaultEntry, WorkspaceIdentity } from '../types'
 import { cn } from '@/lib/utils'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
@@ -141,7 +141,7 @@ export function SidebarLoadingCountPill({ compact, testId = 'sidebar-count-skele
 }
 
 function NavItemLabel({ label, compact }: { label: string; compact?: boolean }) {
-  return <span className={cn("flex-1 font-medium", getNavItemTextClass(compact))}>{label}</span>
+  return <span className={cn("min-w-0 flex-1 truncate text-left font-medium", getNavItemTextClass(compact))}>{label}</span>
 }
 
 function NavItemCount({
@@ -224,8 +224,11 @@ function ClickableNavItem({
   padding: ReturnType<typeof getNavItemPadding>
 }) {
   return (
-    <div
-      className={cn("flex cursor-pointer select-none items-center gap-2 rounded transition-colors", isActive ? activeClassName : "text-foreground hover:bg-accent")}
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className={cn("h-auto w-full cursor-pointer select-none justify-start rounded text-left transition-colors", isActive ? activeClassName : "text-foreground hover:bg-accent")}
       style={{ padding, borderRadius: 4 }}
       onClick={onClick}
     >
@@ -238,7 +241,7 @@ function ClickableNavItem({
         style={resolveBadgeStyle(isActive, activeBadgeClassName, activeBadgeStyle, badgeStyle)}
         compact={compact}
       />
-    </div>
+    </Button>
   )
 }
 
@@ -455,8 +458,9 @@ function SectionHeaderLabel({
   }
 
   return (
-    <span
-      className="min-w-0 truncate text-[13px] font-medium"
+    <button
+      type="button"
+      className="min-w-0 truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium"
       style={{ marginLeft: 4, color: getSectionHeaderTitleColor(isActive, sectionColor) }}
       onDoubleClick={(event) => {
         event.stopPropagation()
@@ -464,7 +468,7 @@ function SectionHeaderLabel({
       }}
     >
       {label}
-    </span>
+    </button>
   )
 }
 
@@ -497,14 +501,35 @@ function SectionHeader({ label, type, Icon, sectionColor, sectionLightColor, ite
   onStartRename?: () => void; onSelectTypeNote?: () => void
   locale?: AppLocale
 }) {
+  const headerRef = useRef<HTMLDivElement>(null)
+  const selectHandler = getSectionSelectHandler(isRenaming, onSelect)
+  const contextMenuHandler = getSectionContextMenuHandler(isRenaming, onContextMenu)
+  const doubleClickHandler = !isRenaming ? onSelectTypeNote : undefined
+
+  useEffect(() => {
+    const header = headerRef.current
+    if (!header) return
+
+    const handleClick = () => selectHandler?.()
+    const handleContextMenu = (event: MouseEvent) => contextMenuHandler?.(event as unknown as ReactMouseEvent)
+    const handleDoubleClick = () => doubleClickHandler?.()
+
+    header.addEventListener('click', handleClick)
+    header.addEventListener('contextmenu', handleContextMenu)
+    header.addEventListener('dblclick', handleDoubleClick)
+    return () => {
+      header.removeEventListener('click', handleClick)
+      header.removeEventListener('contextmenu', handleContextMenu)
+      header.removeEventListener('dblclick', handleDoubleClick)
+    }
+  }, [contextMenuHandler, doubleClickHandler, selectHandler])
+
   return (
     <div
+      ref={headerRef}
       className={cn("group/section flex cursor-pointer select-none items-center justify-between rounded transition-colors", !isActive && "hover:bg-accent")}
       style={{ padding: SIDEBAR_ITEM_PADDING.withCount, borderRadius: 4, gap: 4, ...getSectionHeaderBackground(isActive, sectionLightColor) }}
       {...dragHandleProps}
-      onClick={getSectionSelectHandler(isRenaming, onSelect)}
-      onContextMenu={getSectionContextMenuHandler(isRenaming, onContextMenu)}
-      onDoubleClick={!isRenaming ? onSelectTypeNote : undefined}
     >
       <div className="flex min-w-0 flex-1 items-center" style={{ gap: 4 }}>
         <Icon size={16} weight={getSectionHeaderIconWeight(isActive)} style={{ color: sectionColor, flexShrink: 0 }} />

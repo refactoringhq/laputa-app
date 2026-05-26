@@ -277,11 +277,12 @@ function expandWikilinksInItem(item: InlineItem): InlineItem[] {
   const result: InlineItem[] = []
   let lastIndex = 0
   WL_RE.lastIndex = 0
-  let match
-  while ((match = WL_RE.exec(item.text)) !== null) {
+  let match = WL_RE.exec(item.text)
+  while (match !== null) {
     if (match.index > lastIndex) result.push(textSegment(item, item.text.slice(lastIndex, match.index)))
     result.push(wikilinkItem(decodePlaceholderPayload(match[1])))
     lastIndex = match.index + match[0].length
+    match = WL_RE.exec(item.text)
   }
   if (lastIndex < item.text.length) result.push(textSegment(item, item.text.slice(lastIndex)))
   return result
@@ -335,15 +336,16 @@ export function splitFrontmatter(content: MarkdownSource): FrontmatterSplit {
 export function extractOutgoingLinks(content: MarkdownSource): WikilinkTarget[] {
   const links: WikilinkTarget[] = []
   const re = /\[\[([^\]]+)\]\]/g
-  let match
   const searchableContent = blankFencedCodeLines(content)
   for (const line of searchableContent.split('\n')) {
     re.lastIndex = 0
-    while ((match = re.exec(line)) !== null) {
+    let match = re.exec(line)
+    while (match !== null) {
       const inner = match[1]
       const pipeIdx = inner.indexOf('|')
       const target = pipeIdx !== -1 ? inner.slice(0, pipeIdx) : inner
       if (target) links.push(target)
+      match = re.exec(line)
     }
   }
   return [...new Set(links)].sort()
@@ -368,8 +370,8 @@ export function extractBacklinkContext(
     if (!trimmed) continue
     // Check if this paragraph contains a wikilink matching any target
     const re = /\[\[([^\]]+)\]\]/g
-    let match
-    while ((match = re.exec(trimmed)) !== null) {
+    let match = re.exec(trimmed)
+    while (match !== null) {
       const inner = match[1]
       const pipeIdx = inner.indexOf('|')
       const target = pipeIdx !== -1 ? inner.slice(0, pipeIdx) : inner
@@ -379,6 +381,7 @@ export function extractBacklinkContext(
         if (flat.length <= maxLength) return flat
         return flat.slice(0, maxLength - 1) + '\u2026'
       }
+      match = re.exec(trimmed)
     }
   }
   return null

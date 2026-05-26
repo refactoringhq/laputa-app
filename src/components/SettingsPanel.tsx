@@ -20,8 +20,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react'
 import type { Settings } from '../types'
@@ -191,7 +189,7 @@ const DEFAULT_AUTOGIT_IDLE_THRESHOLD_SECONDS = 90
 const DEFAULT_AUTOGIT_INACTIVE_THRESHOLD_SECONDS = 30
 type Translate = ReturnType<typeof createTranslator>
 
-function isSaveShortcut(event: ReactKeyboardEvent): boolean {
+function isSaveShortcut(event: { ctrlKey: boolean; key: string; metaKey: boolean }): boolean {
   return event.key === 'Enter' && (event.metaKey || event.ctrlKey)
 }
 
@@ -355,6 +353,7 @@ function SettingsPanelInner({
   onClose,
 }: SettingsPanelInnerProps) {
   const [draft, setDraft] = useState(() => createSettingsDraft(settings, explicitOrganizationEnabled))
+  const backdropRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const draftLocale = resolveEffectiveLocale(draft.uiLanguage, [systemLocale])
   const t = createTranslator(draftLocale)
@@ -406,12 +405,8 @@ function SettingsPanelInner({
     onClose()
   }, [draft, onClose, onSave, onSaveExplicitOrganization, settings])
 
-  const handleBackdropClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) onClose()
-  }, [onClose])
-
-  const handleKeyDown = useCallback(
-    (event: ReactKeyboardEvent) => {
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation()
         onClose()
@@ -422,21 +417,35 @@ function SettingsPanelInner({
         event.preventDefault()
         handleSave()
       }
-    },
-    [handleSave, onClose],
-  )
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleSave, onClose])
+
+  useEffect(() => {
+    const backdrop = backdropRef.current
+    if (!backdrop) return
+
+    const handleBackdropClick = (event: MouseEvent) => {
+      if (event.target === backdrop) onClose()
+    }
+
+    backdrop.addEventListener('click', handleBackdropClick)
+    return () => backdrop.removeEventListener('click', handleBackdropClick)
+  }, [onClose])
 
   return (
     <div
+      ref={backdropRef}
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'var(--shadow-overlay)' }}
-      onClick={handleBackdropClick}
-      onKeyDown={handleKeyDown}
       data-testid="settings-panel"
     >
+      <SettingsBackdropCloseButton onClose={onClose} t={t} />
       <div
         ref={panelRef}
-        className="rounded-lg border border-border bg-background shadow-[0_18px_55px_var(--shadow-dialog)]"
+        className="relative rounded-lg border border-border bg-background shadow-[0_18px_55px_var(--shadow-dialog)]"
         style={{ width: 'min(960px, calc(100vw - 48px))', maxHeight: '86vh', display: 'flex', flexDirection: 'column' }}
       >
         <SettingsHeader onClose={onClose} t={t} />
@@ -459,6 +468,17 @@ function SettingsPanelInner({
         <SettingsFooter onClose={onClose} onSave={handleSave} t={t} />
       </div>
     </div>
+  )
+}
+
+function SettingsBackdropCloseButton({ onClose, t }: { onClose: () => void; t: Translate }) {
+  return (
+    <button
+      type="button"
+      aria-label={t('settings.close')}
+      className="absolute inset-0 cursor-default border-0 bg-transparent p-0"
+      onClick={onClose}
+    />
   )
 }
 

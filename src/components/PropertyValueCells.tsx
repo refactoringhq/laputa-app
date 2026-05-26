@@ -1,5 +1,5 @@
 import { ArrowUpRight, X as XIcon } from '@phosphor-icons/react'
-import { useState, useCallback, useRef, type ReactNode } from 'react'
+import { useState, useCallback, useEffect, useRef, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -104,15 +104,16 @@ function StatusValue({ propKey, value, isEditing, vaultStatuses, onSave, onStart
   const style = getStatusStyle(statusStr)
   return (
     <span className="relative inline-flex min-w-0 items-center">
-      <span
-        className="inline-flex cursor-pointer items-center gap-1.5 transition-opacity hover:opacity-80"
+      <button
+        type="button"
+        className="inline-flex cursor-pointer items-center gap-1.5 border-0 transition-opacity hover:opacity-80"
         style={{ ...PROPERTY_CHIP_STYLE, backgroundColor: style.bg, color: style.color }}
         onClick={() => onStartEdit(propKey)}
         data-testid="status-badge"
       >
         <span className="inline-block size-1.5 shrink-0 rounded-full" style={{ backgroundColor: style.color }} />
         {statusStr}
-      </span>
+      </button>
       {isEditing && (
         <StatusDropdown
           value={statusStr}
@@ -159,7 +160,7 @@ function TagsValue({ propKey, value, isEditing, vaultTags, onSave, onStartEdit }
             >
               {tag}
             </span>
-            <button
+            <button type="button"
               className="ml-0.5 max-w-0 overflow-hidden border-none bg-transparent p-0 leading-none opacity-0 transition-all duration-150 group-hover/tag:max-w-[14px] group-hover/tag:opacity-100"
               style={{ color: style.color, fontSize: 11, flexShrink: 0 }}
               onClick={() => handleRemove(tag)}
@@ -170,7 +171,7 @@ function TagsValue({ propKey, value, isEditing, vaultTags, onSave, onStartEdit }
           </span>
         )
       })}
-      <button
+      <button type="button"
         className="inline-flex shrink-0 items-center justify-center border-none bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         style={PROPERTY_CHIP_STYLE}
         onClick={() => onStartEdit(propKey)}
@@ -430,24 +431,8 @@ export function DisplayModeSelector({ propKey, currentMode, autoMode, onSelect }
   const CurrentIcon = Reflect.get(DISPLAY_MODE_ICONS, currentMode) as typeof DISPLAY_MODE_ICONS.text
   const showRelationshipIcon = showsRelationshipPropertyIcon(propKey)
 
-  const positionMenu = useCallback((node: HTMLDivElement | null) => {
-    if (!node) return
-    const el = triggerRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const menuW = 140
-    let left = rect.right - menuW
-    if (left < 8) left = 8
-    node.style.top = `${rect.bottom + 4}px`
-    node.style.left = `${left}px`
-  }, [])
-
   const handleSelect = (mode: PropertyDisplayMode) => {
-    if (mode === autoMode) {
-      onSelect(propKey, null)
-    } else {
-      onSelect(propKey, mode)
-    }
+    onSelect(propKey, mode === autoMode ? null : mode)
     setOpen(false)
   }
 
@@ -468,39 +453,106 @@ export function DisplayModeSelector({ propKey, currentMode, autoMode, onSelect }
           <CurrentIcon className="size-3.5" data-testid={`display-mode-icon-${currentMode}`} />
         )}
       </button>
-      {open && createPortal(
-        <>
-          <div className="fixed inset-0 z-[12000]" onClick={() => setOpen(false)} />
-          <div
-            ref={positionMenu}
-            className="fixed z-[12001] min-w-[130px] rounded-md border border-border bg-background py-1 shadow-md"
-            data-testid="display-mode-menu"
-          >
-            {DISPLAY_MODE_OPTIONS.map(opt => {
-              const OptIcon = DISPLAY_MODE_ICONS[opt.value]
-              return (
-                <button
-                  key={opt.value}
-                  className="flex w-full items-center gap-2 border-none bg-transparent px-3 py-1.5 text-left text-[12px] text-foreground transition-colors hover:bg-muted"
-                  onClick={() => handleSelect(opt.value)}
-                  data-testid={`display-mode-option-${opt.value}`}
-                >
-                  <span className="w-3 text-center text-[10px]">
-                    {currentMode === opt.value ? '\u2713' : ''}
-                  </span>
-                  <OptIcon className="size-3.5 text-muted-foreground" />
-                  {opt.label}
-                  {opt.value === autoMode && (
-                    <span className="ml-auto text-[10px] text-muted-foreground">auto</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </>,
-        document.body
+      {open && (
+        <DisplayModeMenu
+          autoMode={autoMode}
+          currentMode={currentMode}
+          onClose={() => setOpen(false)}
+          onSelect={handleSelect}
+          triggerRef={triggerRef}
+        />
       )}
     </div>
+  )
+}
+
+function DisplayModeMenu({
+  autoMode,
+  currentMode,
+  onClose,
+  onSelect,
+  triggerRef,
+}: {
+  autoMode: PropertyDisplayMode
+  currentMode: PropertyDisplayMode
+  onClose: () => void
+  onSelect: (mode: PropertyDisplayMode) => void
+  triggerRef: RefObject<HTMLButtonElement | null>
+}) {
+  const backdropRef = useRef<HTMLDivElement>(null)
+  const positionMenu = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return
+    const el = triggerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const menuW = 140
+    const left = Math.max(rect.right - menuW, 8)
+    node.style.top = `${rect.bottom + 4}px`
+    node.style.left = `${left}px`
+  }, [triggerRef])
+
+  useEffect(() => {
+    const backdrop = backdropRef.current
+    if (!backdrop) return
+
+    backdrop.addEventListener('click', onClose)
+    return () => backdrop.removeEventListener('click', onClose)
+  }, [onClose])
+
+  return createPortal(
+    <>
+      <div
+        ref={backdropRef}
+        className="fixed inset-0 z-[12000]"
+      />
+      <div
+        ref={positionMenu}
+        className="fixed z-[12001] min-w-[130px] rounded-md border border-border bg-background py-1 shadow-md"
+        data-testid="display-mode-menu"
+      >
+        {DISPLAY_MODE_OPTIONS.map((opt) => (
+          <DisplayModeOption
+            key={opt.value}
+            autoMode={autoMode}
+            currentMode={currentMode}
+            option={opt}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+    </>,
+    document.body,
+  )
+}
+
+function DisplayModeOption({
+  autoMode,
+  currentMode,
+  onSelect,
+  option,
+}: {
+  autoMode: PropertyDisplayMode
+  currentMode: PropertyDisplayMode
+  onSelect: (mode: PropertyDisplayMode) => void
+  option: typeof DISPLAY_MODE_OPTIONS[number]
+}) {
+  const OptIcon = DISPLAY_MODE_ICONS[option.value]
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center gap-2 border-none bg-transparent px-3 py-1.5 text-left text-[12px] text-foreground transition-colors hover:bg-muted"
+      onClick={() => onSelect(option.value)}
+      data-testid={`display-mode-option-${option.value}`}
+    >
+      <span className="w-3 text-center text-[10px]">
+        {currentMode === option.value ? '\u2713' : ''}
+      </span>
+      <OptIcon className="size-3.5 text-muted-foreground" />
+      {option.label}
+      {option.value === autoMode && (
+        <span className="ml-auto text-[10px] text-muted-foreground">auto</span>
+      )}
+    </button>
   )
 }
 

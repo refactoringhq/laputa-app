@@ -5,8 +5,25 @@ export interface DateParts {
 }
 
 export function parseDashDateParts(value: string): DateParts | null {
-  const [datePart, timePart] = value.split('T', 2)
-  if (timePart !== undefined && !isClockPrefix(timePart)) return null
+  const { datePart, timePart } = splitDateAndTime(value)
+  if (!isValidOptionalTime(timePart)) return null
+  return parseYearFirstDateParts(datePart)
+}
+
+function splitDateAndTime(value: string): { datePart: string; timePart: string | null } {
+  const timeSeparatorIndex = value.indexOf('T')
+  if (timeSeparatorIndex === -1) return { datePart: value, timePart: null }
+  return {
+    datePart: value.slice(0, timeSeparatorIndex),
+    timePart: value.slice(timeSeparatorIndex + 1),
+  }
+}
+
+function isValidOptionalTime(timePart: string | null): boolean {
+  return timePart === null || isClockPrefix(timePart)
+}
+
+function parseYearFirstDateParts(datePart: string): DateParts | null {
   const parts = datePart.split('-')
   if (parts.length !== 3) return null
   if (!matchesLength(parts[0], 4)) return null

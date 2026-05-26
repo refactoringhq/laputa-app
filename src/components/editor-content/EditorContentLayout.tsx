@@ -103,7 +103,7 @@ function DiffModeView({ diffContent, locale = 'en', onToggleDiff }: { diffConten
 
   return (
     <div className="flex-1 overflow-auto">
-      <button
+      <button type="button"
         className="flex items-center gap-1.5 px-4 py-2 text-xs text-primary bg-muted border-b border-border cursor-pointer hover:bg-accent transition-colors w-full border-t-0 border-l-0 border-r-0"
         onClick={onToggleDiff}
         title={label}

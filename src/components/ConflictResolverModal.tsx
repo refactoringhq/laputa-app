@@ -87,7 +87,7 @@ function ConflictFileRow({
   onOpenInEditor: () => void
   onFocus: () => void
 }) {
-  const rowRef = useRef<HTMLDivElement>(null)
+  const rowRef = useRef<HTMLTableRowElement>(null)
   const binary = isBinaryFile(state.file)
   const resolved = state.resolution !== null
 
@@ -96,9 +96,8 @@ function ConflictFileRow({
   }, [focused])
 
   return (
-    <div
+    <tr
       ref={rowRef}
-      role="row"
       tabIndex={0}
       onFocus={onFocus}
       className={cn(
@@ -108,12 +107,12 @@ function ConflictFileRow({
       )}
       data-testid={`conflict-file-${state.file}`}
     >
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+      <td className="flex min-w-0 flex-1 items-center gap-2">
         <FileText size={14} className="shrink-0 text-muted-foreground" />
         <span className="text-sm truncate" title={state.file}>{fileName(state.file)}</span>
         <ResolutionLabel resolution={state.resolution} />
-      </div>
-      <div className="flex items-center gap-1 shrink-0">
+      </td>
+      <td className="flex shrink-0 items-center gap-1">
         {state.resolving ? (
           <Loader2 size={14} className="animate-spin text-muted-foreground" />
         ) : (
@@ -154,8 +153,8 @@ function ConflictFileRow({
             )}
           </>
         )}
-      </div>
-    </div>
+      </td>
+    </tr>
   )
 }
 
@@ -290,22 +289,23 @@ function ConflictFileList({
   onResolveFile: (file: string, strategy: ConflictResolutionStrategy) => void
 }) {
   return (
-    <div
-      className="flex flex-col gap-2 max-h-[300px] overflow-y-auto"
-      role="grid"
+    <table
+      className="block max-h-[300px] overflow-y-auto"
       data-testid="conflict-file-list"
     >
-      {fileStates.map((state, index) => (
-        <ConflictFileRow
-          key={state.file}
-          state={state}
-          focused={index === focusIdx}
-          onResolve={(strategy) => onResolveFile(state.file, strategy)}
-          onOpenInEditor={() => onOpenInEditor(state.file)}
-          onFocus={() => onFocusRow(index)}
-        />
-      ))}
-    </div>
+      <tbody className="flex flex-col gap-2">
+        {fileStates.map((state, index) => (
+          <ConflictFileRow
+            key={state.file}
+            state={state}
+            focused={index === focusIdx}
+            onResolve={(strategy) => onResolveFile(state.file, strategy)}
+            onOpenInEditor={() => onOpenInEditor(state.file)}
+            onFocus={() => onFocusRow(index)}
+          />
+        ))}
+      </tbody>
+    </table>
   )
 }
 

@@ -67,11 +67,11 @@ function TagOption({
       <div
         className="flex w-full items-center gap-1 px-2 py-1 transition-colors"
         style={{ borderRadius: 4, backgroundColor: highlighted ? 'var(--muted)' : 'transparent' }}
-        onMouseEnter={onMouseEnter}
       >
-        <button
+        <button type="button"
           className="flex min-w-0 flex-1 items-center gap-1.5 border-none bg-transparent p-0 text-left"
           onClick={() => onToggle(tag)}
+          onMouseEnter={onMouseEnter}
           data-testid={`tag-option-${tag}`}
         >
           <span className="w-3.5 text-center text-[10px]" style={{ color: style.color }}>
@@ -79,10 +79,11 @@ function TagOption({
           </span>
           <TagPill tag={tag} />
         </button>
-        <button
+        <button type="button"
           className="flex size-4 shrink-0 items-center justify-center rounded-full border-none p-0"
           style={{ backgroundColor: style.color }}
           onClick={() => onToggleColor(tag)}
+          onMouseEnter={onMouseEnter}
           title="Change color"
           data-testid={`tag-color-swatch-${tag}`}
         />
@@ -241,7 +242,13 @@ export function TagsDropdown({
     <span ref={anchorRef} data-testid="tags-dropdown">
       {createPortal(
         <>
-          <div className="fixed inset-0 z-[12000]" onClick={onClose} data-testid="tags-dropdown-backdrop" />
+          <button
+            type="button"
+            aria-label="Close tags menu"
+            className="fixed inset-0 z-[12000] cursor-default border-0 bg-transparent p-0"
+            onClick={onClose}
+            data-testid="tags-dropdown-backdrop"
+          />
           <div
             ref={dropdownRef}
             className="fixed z-[12001] w-52 overflow-hidden rounded-lg border border-border bg-background shadow-lg"
@@ -338,7 +345,7 @@ function CreateTagSection({ show, query, showDivider, highlighted, onToggle, onM
   return (
     <>
       {showDivider && <div className="my-1 h-px bg-border" />}
-      <button
+      <button type="button"
         className="flex w-full items-center gap-1.5 border-none bg-transparent px-2 py-1 text-left text-[11px] transition-colors"
         style={{
           borderRadius: 4,

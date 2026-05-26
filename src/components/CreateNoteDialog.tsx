@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useId, useState, useRef, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,6 +30,7 @@ export function CreateNoteDialog({ open, onClose, onCreate, defaultType, customT
   const [title, setTitle] = useState('')
   const [type, setType] = useState<string>('Note')
   const inputRef = useRef<HTMLInputElement>(null)
+  const titleInputId = useId()
 
   useEffect(() => {
     if (open) {
@@ -58,10 +59,11 @@ export function CreateNoteDialog({ open, onClose, onCreate, defaultType, customT
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label htmlFor={titleInputId} className="text-xs font-medium text-muted-foreground">
               Title
             </label>
             <Input
+              id={titleInputId}
               ref={inputRef}
               placeholder="Enter note title..."
               value={title}
@@ -69,9 +71,9 @@ export function CreateNoteDialog({ open, onClose, onCreate, defaultType, customT
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <div className="text-xs font-medium text-muted-foreground">
               Type
-            </label>
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {BUILT_IN_TYPES.map((t) => (
                 <Button

@@ -58,7 +58,8 @@ function normalizeRelativeUnit(token: RelativeToken): RelativeUnit | null {
 }
 
 function shiftRelativeDate(reference: Date, unit: RelativeUnit, amount: number, future: boolean): Date {
-  const shift = RELATIVE_SHIFT.get(unit)!
+  const shift = RELATIVE_SHIFT.get(unit)
+  if (!shift) return reference
   return (future ? shift.future : shift.past)(reference, amount)
 }
 

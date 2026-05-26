@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Input } from './ui/input'
 import {
   Select,
@@ -107,6 +107,7 @@ export function SettingsRow({
 }
 
 export function SelectControl({
+  id,
   value,
   onValueChange,
   options,
@@ -114,6 +115,7 @@ export function SelectControl({
   ariaLabel,
   autoFocus = false,
 }: {
+  id?: string
   value: string
   onValueChange: (value: string) => void
   options: SelectOption[]
@@ -124,6 +126,7 @@ export function SelectControl({
   return (
     <Select value={value} onValueChange={onValueChange}>
       <SelectTrigger
+        id={id}
         className="w-full bg-transparent"
         aria-label={ariaLabel}
         data-testid={testId}
@@ -173,17 +176,19 @@ export function NumberInputControl({
 }
 
 export function SettingsSwitchControl({
+  id,
   label,
   checked,
   onChange,
   disabled = false,
 }: {
+  id?: string
   label: string
   checked: boolean
   onChange: (value: boolean) => void
   disabled?: boolean
 }) {
-  return <Switch checked={checked} onCheckedChange={onChange} aria-label={label} disabled={disabled} />
+  return <Switch id={id} checked={checked} onCheckedChange={onChange} aria-label={label} disabled={disabled} />
 }
 
 export function LabeledSelect({
@@ -201,10 +206,13 @@ export function LabeledSelect({
   testId: string
   autoFocus?: boolean
 }) {
+  const triggerId = useId()
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--foreground)' }}>{label}</label>
+      <label htmlFor={triggerId} style={{ fontSize: 12, fontWeight: 500, color: 'var(--foreground)' }}>{label}</label>
       <SelectControl
+        id={triggerId}
         value={value}
         onValueChange={onValueChange}
         options={options}
@@ -258,8 +266,12 @@ export function SettingsSwitchRow({
   disabled?: boolean
   testId?: string
 }) {
+  const generatedId = useId()
+  const switchId = testId ?? generatedId
+
   return (
     <label
+      htmlFor={switchId}
       className={`${SETTINGS_GROUP_ITEM_CLASS} flex flex-col gap-3 lg:flex-row lg:items-center`}
       style={{ cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1 }}
       data-testid={testId}
@@ -269,7 +281,7 @@ export function SettingsSwitchRow({
         <div className="text-xs leading-5 text-muted-foreground">{description}</div>
       </div>
       <div className="flex justify-start lg:shrink-0 lg:justify-end">
-        <SettingsSwitchControl label={label} checked={checked} onChange={onChange} disabled={disabled} />
+        <SettingsSwitchControl id={switchId} label={label} checked={checked} onChange={onChange} disabled={disabled} />
       </div>
     </label>
   )

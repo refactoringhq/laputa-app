@@ -95,16 +95,20 @@ export function retagEntriesForWorkspaceMetadata({
     vault.path,
     workspaceIdentityFromVault(vault, { defaultWorkspacePath }),
   ]))
-  let changed = false
-  const nextEntries = entries.map((entry) => {
+  let nextEntries: VaultEntry[] | null = null
+
+  entries.forEach((entry, index) => {
     const identity = identitiesByPath.get(entryWorkspacePath(entry, fallbackVaultPath))
-    if (!identity) return entry
-    if (workspaceIdentityMetadataMatches(entry.workspace, identity)) return entry
-    changed = true
-    return { ...entry, workspace: identity }
+    const nextEntry = identity && !workspaceIdentityMetadataMatches(entry.workspace, identity)
+      ? { ...entry, workspace: identity }
+      : entry
+    if (nextEntry === entry && nextEntries === null) return
+
+    nextEntries ??= entries.slice(0, index)
+    nextEntries.push(nextEntry)
   })
 
-  return changed ? nextEntries : entries
+  return nextEntries ?? entries
 }
 
 export function pruneEntriesOutsideWorkspaceSet({

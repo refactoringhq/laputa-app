@@ -27,7 +27,7 @@ export function NoteIcon({ icon, editable = true }: NoteIconProps) {
   return (
     <div className="note-icon-area" data-testid="note-icon-area" style={{ position: 'relative' }}>
       {hasIcon ? (
-        <button
+        <button type="button"
           className="note-icon-button note-icon-button--active"
           onClick={handleActivate}
           data-testid="note-icon-display"
@@ -38,7 +38,7 @@ export function NoteIcon({ icon, editable = true }: NoteIconProps) {
         </button>
       ) : (
         editable && (
-          <button
+          <button type="button"
             className="note-icon-button note-icon-button--add"
             onClick={handleActivate}
             data-testid="note-icon-add"

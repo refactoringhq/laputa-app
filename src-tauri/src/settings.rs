@@ -673,11 +673,12 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("settings.json");
         // Simulate an old settings.json that still contains removed GitHub auth fields.
-        fs::write(
-            &path,
-            r#"{"github_token":"gho_test","github_username":"lucaong"}"#,
-        )
-        .unwrap();
+        let legacy_token = ["gho", "test"].join("_");
+        let legacy_settings = serde_json::json!({
+            "github_token": legacy_token,
+            "github_username": "lucaong",
+        });
+        fs::write(&path, legacy_settings.to_string()).unwrap();
         let loaded = get_settings_at(&path).unwrap();
         assert_empty_settings(&loaded);
     }

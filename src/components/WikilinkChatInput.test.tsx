@@ -359,7 +359,7 @@ describe('WikilinkChatInput', () => {
     render(
       <>
         <Controlled onDraftChange={onDraftChange} />
-        <button data-testid="other-target">Other</button>
+        <button type="button" data-testid="other-target">Other</button>
       </>,
     )
     const initialEditor = screen.getByTestId('agent-input') as HTMLDivElement

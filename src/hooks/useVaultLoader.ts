@@ -408,6 +408,7 @@ function useInitialVaultLoad(options: InitialVaultLoadOptions) {
   )
 
   useEffect(() => {
+    void loadOptionsKey
     const path = vaultPath
     const loadOptions = loadOptionsRef.current
     const effectOptions = {
@@ -445,7 +446,7 @@ function useInitialVaultLoad(options: InitialVaultLoadOptions) {
     setEntries, setFolders, setIsLoading, setModifiedFiles, setModifiedFilesError, setViews,
     loadOptionsRef,
     loadOptionsKey,
-    folderVaults,
+    folderVaults
   ])
 }
 
@@ -860,6 +861,7 @@ function usePrunedWorkspaceLoadRefs(
   desiredWorkspacePaths: readonly string[],
 ) {
   useEffect(() => {
+    void desiredWorkspaceKey
     loadedWorkspacePathsRef.current = keepDesiredWorkspacePaths(
       loadedWorkspacePathsRef.current,
       desiredWorkspacePaths,
@@ -916,6 +918,7 @@ function useWorkspaceMetadataRetagEffect({
   vaults?: VaultOption[]
 }) {
   useEffect(() => {
+    void desiredWorkspaceKey
     if (!hasVaultPath({ vaultPath })) return
 
     setEntries((currentEntries) => retagEntriesForWorkspaceMetadata({
@@ -1017,6 +1020,7 @@ function useMissingWorkspaceLoads({
   vaults?: VaultOption[]
 }) {
   useEffect(() => {
+    void desiredWorkspaceKey
     if (!hasVaultPath({ vaultPath }) || !vaults?.length || isLoading) return
 
     const loadedPaths = loadedWorkspacePathsRef.current
@@ -1047,7 +1051,7 @@ function useMissingWorkspaceLoads({
     loadingWorkspacePathsRef,
     setEntries,
     vaultPath,
-    vaults,
+    vaults
   ])
 }
 

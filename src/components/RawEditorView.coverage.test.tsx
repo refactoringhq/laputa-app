@@ -78,7 +78,7 @@ vi.mock('./NoteSearchList', () => ({
   }) => (
     <div data-testid="raw-editor-note-search-list">
       {items.map((item, index) => (
-        <button
+        <button type="button"
           key={item.title}
           data-testid={`autocomplete-item-${index}`}
           data-selected={index === selectedIndex}

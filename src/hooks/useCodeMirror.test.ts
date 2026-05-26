@@ -161,6 +161,6 @@ describe('useCodeMirror', () => {
     )
     const view = result.current.current!
     // The extension overrides posAtCoords on the instance (not the prototype)
-    expect(Object.prototype.hasOwnProperty.call(view, 'posAtCoords')).toBe(true)
+    expect(Object.hasOwn(view, 'posAtCoords')).toBe(true)
   })
 })

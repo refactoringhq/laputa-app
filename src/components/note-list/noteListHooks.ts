@@ -1207,8 +1207,10 @@ export function useNoteListInteractions({
   })
 
   useEffect(() => {
+    void noteListFilter
+    void selection
     multiSelect.clear()
-  }, [noteListFilter, selection]) // eslint-disable-line react-hooks/exhaustive-deps -- clear only when selection/filter changes
+  }, [multiSelect.clear, noteListFilter, selection]) // eslint-disable-line react-hooks/exhaustive-deps -- clear only when selection/filter changes
 
   const handleClickNote = useNoteClickHandler({
     isChangesView,

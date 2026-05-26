@@ -31,7 +31,9 @@ function applyTypedInput(view: EditorView, text: string) {
 
 function typeSequence(view: EditorView, inputs: readonly string[]) {
   act(() => {
-    inputs.forEach((input) => applyTypedInput(view, input))
+    for (const input of inputs) {
+      applyTypedInput(view, input)
+    }
   })
 }
 

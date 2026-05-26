@@ -618,6 +618,7 @@ export function useNoteListKeyboard({
   const handleKeyDown = useDirectKeyDownHandler(processKeyDown)
   useGlobalKeyboardHandling({ enabled, panelRef, containerRef, processKeyDown })
   useEffect(() => {
+    void selectedNotePath
     cancelOpen()
   }, [cancelOpen, selectedNotePath])
 

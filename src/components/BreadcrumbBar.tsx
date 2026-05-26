@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import type { NoteWidthMode, VaultEntry } from '../types'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../lib/i18n'
@@ -1044,18 +1044,32 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
   onRenameFilename,
   ...actionProps
 }: BreadcrumbBarProps) {
-  const { onMouseDown } = useDragRegion()
+  type DragRegionResult = ReturnType<typeof useDragRegion<HTMLDivElement>> & {
+    dragRegionRef?: React.RefObject<HTMLDivElement | null>
+  }
+  const { dragRegionRef, onMouseDown } = useDragRegion<HTMLDivElement>() as DragRegionResult
+  const fallbackDragRegionRef = useRef<HTMLDivElement>(null)
+  const breadcrumbDragRegionRef = dragRegionRef ?? fallbackDragRegionRef
   const actionsRef = useRef<HTMLDivElement | null>(null)
   const titleRef = useRef<HTMLDivElement | null>(null)
   const overflowCollapsed = useBreadcrumbOverflow(titleRef, actionsRef)
+  useImperativeHandle(barRef, () => breadcrumbDragRegionRef.current as HTMLDivElement, [breadcrumbDragRegionRef])
+
+  useEffect(() => {
+    if (dragRegionRef) return
+    const bar = fallbackDragRegionRef.current
+    if (!bar) return
+
+    bar.addEventListener('mousedown', onMouseDown)
+    return () => bar.removeEventListener('mousedown', onMouseDown)
+  }, [dragRegionRef, onMouseDown])
 
   return (
     <TooltipProvider>
       <div
-        ref={barRef}
+        ref={breadcrumbDragRegionRef}
         data-tauri-drag-region
         data-title-hidden=""
-        onMouseDown={onMouseDown}
         className="breadcrumb-bar flex shrink-0 items-center border-b border-transparent"
         style={{
           height: 52,
