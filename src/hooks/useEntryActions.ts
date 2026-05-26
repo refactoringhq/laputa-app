@@ -3,6 +3,7 @@ import type { VaultEntry } from '../types'
 import { isMissingFrontmatterTargetError, type FrontmatterOpOptions } from './frontmatterOps'
 import { trackEvent } from '../lib/telemetry'
 import { findTypeDefinition } from '../utils/typeDefinitions'
+import type { ActionHistoryController, ActionHistoryEntry } from './useActionHistory'
 
 interface EntryActionsConfig {
   entries: VaultEntry[]
@@ -14,6 +15,7 @@ interface EntryActionsConfig {
   onFrontmatterPersisted?: () => void
   /** Called before trash/archive to flush unsaved editor content to disk. */
   onBeforeAction?: (path: string) => Promise<void>
+  actionHistory?: ActionHistoryController
 }
 
 type ArchiveActionDeps = Pick<EntryActionsConfig,
@@ -48,6 +50,113 @@ interface UpdateTypeTemplateArgs {
 interface RenameTypeSectionArgs {
   typeName: string
   label: string
+}
+
+interface FavoriteState {
+  favorite: boolean
+  favoriteIndex: number | null
+}
+
+interface FavoriteToggleResult {
+  before: FavoriteState
+  after: FavoriteState
+}
+
+type FavoritePersistenceDeps = Pick<EntryStateActionDeps, 'handleUpdateFrontmatter' | 'handleDeleteProperty'>
+type SetFavoriteState = (path: string, state: FavoriteState) => Promise<boolean>
+type SetOrganizedState = (path: string, organized: boolean) => Promise<boolean>
+
+function recordEntryActionHistory(
+  actionHistory: EntryActionsConfig['actionHistory'],
+  entry: ActionHistoryEntry,
+): void {
+  if (!actionHistory || actionHistory.isReplaying()) return
+  actionHistory.record(entry)
+}
+
+function recordAppliedEntryActionHistory(
+  applied: boolean,
+  actionHistory: EntryActionsConfig['actionHistory'],
+  entry: ActionHistoryEntry,
+): void {
+  if (!applied) return
+  recordEntryActionHistory(actionHistory, entry)
+}
+
+function recordFavoriteEntryHistory(
+  actionHistory: EntryActionsConfig['actionHistory'],
+  path: string,
+  result: FavoriteToggleResult | null,
+  setFavoriteState: SetFavoriteState,
+): void {
+  if (!result) return
+  recordEntryActionHistory(actionHistory, {
+    label: 'Favorite',
+    undo: async () => { await setFavoriteState(path, result.before) },
+    redo: async () => { await setFavoriteState(path, result.after) },
+  })
+}
+
+function recordOrganizedEntryHistory(
+  actionHistory: EntryActionsConfig['actionHistory'],
+  path: string,
+  toggled: boolean,
+  before: boolean,
+  setOrganizedState: SetOrganizedState,
+): void {
+  if (!toggled) return
+  recordEntryActionHistory(actionHistory, {
+    label: 'Organized',
+    undo: async () => { await setOrganizedState(path, before) },
+    redo: async () => { await setOrganizedState(path, !before) },
+  })
+}
+
+function favoriteRollbackState(entry: VaultEntry): FavoriteState {
+  return { favorite: entry.favorite, favoriteIndex: entry.favoriteIndex }
+}
+
+function maxFavoriteIndex(entries: readonly VaultEntry[]): number {
+  return entries
+    .filter((candidate) => candidate.favorite)
+    .reduce((max, candidate) => Math.max(max, candidate.favoriteIndex ?? 0), 0)
+}
+
+function nextFavoriteState(entry: VaultEntry, entries: readonly VaultEntry[]): FavoriteState {
+  return entry.favorite
+    ? { favorite: false, favoriteIndex: null }
+    : { favorite: true, favoriteIndex: maxFavoriteIndex(entries) + 1 }
+}
+
+function trackFavoriteState(state: FavoriteState): void {
+  trackEvent(state.favorite ? 'note_favorited' : 'note_unfavorited')
+}
+
+async function persistFavoriteIndex(
+  path: string,
+  favoriteIndex: number | null,
+  deps: FavoritePersistenceDeps,
+): Promise<void> {
+  if (favoriteIndex === null) {
+    await deps.handleDeleteProperty(path, '_favorite_index', { silent: true })
+    return
+  }
+  await deps.handleUpdateFrontmatter(path, '_favorite_index', favoriteIndex, { silent: true })
+}
+
+async function persistFavoriteState(
+  path: string,
+  state: FavoriteState,
+  deps: FavoritePersistenceDeps,
+): Promise<void> {
+  if (!state.favorite) {
+    await deps.handleDeleteProperty(path, '_favorite', { silent: true })
+    await deps.handleDeleteProperty(path, '_favorite_index', { silent: true })
+    return
+  }
+
+  await deps.handleUpdateFrontmatter(path, '_favorite', true, { silent: true })
+  await persistFavoriteIndex(path, state.favoriteIndex, deps)
 }
 
 function logOptimisticRollback(label: string, error: unknown): void {
@@ -147,7 +256,9 @@ function useArchiveActions({
       updateEntry(path, { archived: false })
       setToastMessage('Failed to archive note — rolled back')
       logOptimisticRollback('Optimistic archive rollback:', err)
+      return false
     }
+    return true
   }, [onBeforeAction, handleUpdateFrontmatter, updateEntry, setToastMessage, onFrontmatterPersisted])
 
   const handleUnarchiveNote = useCallback(async (path: string) => {
@@ -161,7 +272,9 @@ function useArchiveActions({
       updateEntry(path, { archived: true })
       setToastMessage('Failed to unarchive note — rolled back')
       logOptimisticRollback('Optimistic unarchive rollback:', err)
+      return false
     }
+    return true
   }, [handleDeleteProperty, updateEntry, setToastMessage, onFrontmatterPersisted])
 
   return { handleArchiveNote, handleUnarchiveNote }
@@ -216,35 +329,33 @@ function useFavoriteAction({
   setToastMessage,
   onFrontmatterPersisted,
 }: EntryStateActionDeps) {
-  return useCallback(async (path: string) => {
+  const setFavoriteState = useCallback(async (path: string, state: FavoriteState): Promise<boolean> => {
     const entry = entries.find((candidate) => candidate.path === path)
-    if (!entry) return
-    if (entry.favorite) {
-      trackEvent('note_unfavorited')
-      updateEntry(path, { favorite: false, favoriteIndex: null })
-      try {
-        await handleDeleteProperty(path, '_favorite', { silent: true })
-        await handleDeleteProperty(path, '_favorite_index', { silent: true })
-        onFrontmatterPersisted?.()
-      } catch {
-        updateEntry(path, { favorite: true, favoriteIndex: entry.favoriteIndex })
-        setToastMessage('Failed to unfavorite — rolled back')
-      }
-    } else {
-      trackEvent('note_favorited')
-      const maxIndex = entries.filter((candidate) => candidate.favorite).reduce((max, candidate) => Math.max(max, candidate.favoriteIndex ?? 0), 0)
-      const newIndex = maxIndex + 1
-      updateEntry(path, { favorite: true, favoriteIndex: newIndex })
-      try {
-        await handleUpdateFrontmatter(path, '_favorite', true, { silent: true })
-        await handleUpdateFrontmatter(path, '_favorite_index', newIndex, { silent: true })
-        onFrontmatterPersisted?.()
-      } catch {
-        updateEntry(path, { favorite: false, favoriteIndex: null })
-        setToastMessage('Failed to favorite — rolled back')
-      }
+    if (!entry) return false
+    const rollback = favoriteRollbackState(entry)
+    updateEntry(path, state)
+    try {
+      await persistFavoriteState(path, state, { handleUpdateFrontmatter, handleDeleteProperty })
+      onFrontmatterPersisted?.()
+      return true
+    } catch {
+      updateEntry(path, rollback)
+      setToastMessage(`Failed to ${state.favorite ? 'favorite' : 'unfavorite'} — rolled back`)
+      return false
     }
   }, [entries, updateEntry, handleUpdateFrontmatter, handleDeleteProperty, setToastMessage, onFrontmatterPersisted])
+
+  const toggleFavorite = useCallback(async (path: string): Promise<FavoriteToggleResult | null> => {
+    const entry = entries.find((candidate) => candidate.path === path)
+    if (!entry) return null
+    const before = favoriteRollbackState(entry)
+    const after = nextFavoriteState(entry, entries)
+    trackFavoriteState(after)
+
+    return await setFavoriteState(path, after) ? { before, after } : null
+  }, [entries, setFavoriteState])
+
+  return { setFavoriteState, toggleFavorite }
 }
 
 function useOrganizedAction({
@@ -255,35 +366,34 @@ function useOrganizedAction({
   setToastMessage,
   onFrontmatterPersisted,
 }: EntryStateActionDeps) {
-  return useCallback(async (path: string) => {
+  const setOrganizedState = useCallback(async (path: string, organized: boolean): Promise<boolean> => {
     const entry = entries.find((candidate) => candidate.path === path)
     if (!entry) return false
-    if (entry.organized) {
-      trackEvent('note_unorganized')
-      updateEntry(path, { organized: false })
-      try {
-        await handleDeleteProperty(path, '_organized', { silent: true })
-        onFrontmatterPersisted?.()
-        return true
-      } catch {
-        updateEntry(path, { organized: true })
-        setToastMessage('Failed to unorganize — rolled back')
-        return false
-      }
-    }
-
-    trackEvent('note_organized')
-    updateEntry(path, { organized: true })
+    updateEntry(path, { organized })
     try {
-      await handleUpdateFrontmatter(path, '_organized', true, { silent: true })
+      if (organized) {
+        await handleUpdateFrontmatter(path, '_organized', true, { silent: true })
+      } else {
+        await handleDeleteProperty(path, '_organized', { silent: true })
+      }
       onFrontmatterPersisted?.()
       return true
     } catch {
-      updateEntry(path, { organized: false })
-      setToastMessage('Failed to organize — rolled back')
+      updateEntry(path, { organized: entry.organized })
+      setToastMessage(`Failed to ${organized ? 'organize' : 'unorganize'} — rolled back`)
       return false
     }
   }, [entries, updateEntry, handleUpdateFrontmatter, handleDeleteProperty, setToastMessage, onFrontmatterPersisted])
+
+  const toggleOrganized = useCallback(async (path: string): Promise<boolean> => {
+    const entry = entries.find((candidate) => candidate.path === path)
+    if (!entry) return false
+    const organized = !entry.organized
+    trackEvent(organized ? 'note_organized' : 'note_unorganized')
+    return setOrganizedState(path, organized)
+  }, [entries, setOrganizedState])
+
+  return { setOrganizedState, toggleOrganized }
 }
 
 function useReorderFavoritesAction({ updateEntry, handleUpdateFrontmatter, onFrontmatterPersisted }: ReorderFavoritesDeps) {
@@ -301,13 +411,44 @@ function useReorderFavoritesAction({ updateEntry, handleUpdateFrontmatter, onFro
 export function useEntryActions(config: EntryActionsConfig) {
   const archiveActions = useArchiveActions(config)
   const typeActions = useTypeActions(config)
-  const handleToggleFavorite = useFavoriteAction(config)
-  const handleToggleOrganized = useOrganizedAction(config)
+  const favoriteActions = useFavoriteAction(config)
+  const organizedActions = useOrganizedAction(config)
   const handleReorderFavorites = useReorderFavoritesAction(config)
+  const handleArchiveNote = useCallback(async (path: string) => {
+    const archived = await archiveActions.handleArchiveNote(path)
+    recordAppliedEntryActionHistory(archived, config.actionHistory, {
+      label: 'Archive Note',
+      undo: async () => { await archiveActions.handleUnarchiveNote(path) },
+      redo: async () => { await archiveActions.handleArchiveNote(path) },
+    })
+  }, [archiveActions, config.actionHistory])
+
+  const handleUnarchiveNote = useCallback(async (path: string) => {
+    const unarchived = await archiveActions.handleUnarchiveNote(path)
+    recordAppliedEntryActionHistory(unarchived, config.actionHistory, {
+      label: 'Unarchive Note',
+      undo: async () => { await archiveActions.handleArchiveNote(path) },
+      redo: async () => { await archiveActions.handleUnarchiveNote(path) },
+    })
+  }, [archiveActions, config.actionHistory])
+
+  const handleToggleFavorite = useCallback(async (path: string) => {
+    const result = await favoriteActions.toggleFavorite(path)
+    recordFavoriteEntryHistory(config.actionHistory, path, result, favoriteActions.setFavoriteState)
+  }, [config.actionHistory, favoriteActions])
+
+  const handleToggleOrganized = useCallback(async (path: string) => {
+    const entry = config.entries.find((candidate) => candidate.path === path)
+    const before = entry?.organized ?? false
+    const toggled = await organizedActions.toggleOrganized(path)
+    recordOrganizedEntryHistory(config.actionHistory, path, toggled, before, organizedActions.setOrganizedState)
+    return toggled
+  }, [config.actionHistory, config.entries, organizedActions])
 
   return {
-    ...archiveActions,
     ...typeActions,
+    handleArchiveNote,
+    handleUnarchiveNote,
     handleToggleFavorite,
     handleToggleOrganized,
     handleReorderFavorites,

@@ -13,6 +13,12 @@ interface NoteCommandsConfig {
   onCreateType?: () => void
   currentFolderCreateOptions?: ImmediateCreateOptions
   onSave: () => void
+  onUndo?: () => void
+  onRedo?: () => void
+  canUndo?: boolean
+  canRedo?: boolean
+  undoLabel?: string | null
+  redoLabel?: string | null
   onFindInNote?: () => void
   onReplaceInNote?: () => void
   onPastePlainText: () => void
@@ -101,6 +107,7 @@ function buildCoreNoteCommands(config: NoteCommandsConfig): CommandAction[] {
       enabled: config.hasActiveNote,
       execute: config.onSave,
     }),
+    ...buildHistoryNoteCommands(config),
     createNoteCommand({
       id: 'paste-plain-text',
       label: 'Paste without formatting',
@@ -110,6 +117,31 @@ function buildCoreNoteCommands(config: NoteCommandsConfig): CommandAction[] {
       execute: config.onPastePlainText,
     }),
     ...buildEditorFindCommands(config),
+  ]
+}
+
+function historyCommandLabel(action: string, label?: string | null): string {
+  return [action, label].filter(Boolean).join(' ')
+}
+
+function buildHistoryNoteCommands(config: NoteCommandsConfig): CommandAction[] {
+  return [
+    createNoteCommand({
+      id: 'undo-action',
+      label: historyCommandLabel('Undo', config.undoLabel),
+      shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.editUndo),
+      keywords: ['undo', 'revert', 'history'],
+      enabled: Boolean(config.canUndo && config.onUndo),
+      execute: config.onUndo,
+    }),
+    createNoteCommand({
+      id: 'redo-action',
+      label: historyCommandLabel('Redo', config.redoLabel),
+      shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.editRedo),
+      keywords: ['redo', 'repeat', 'history'],
+      enabled: Boolean(config.canRedo && config.onRedo),
+      execute: config.onRedo,
+    }),
   ]
 }
 

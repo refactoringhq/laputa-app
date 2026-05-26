@@ -8,6 +8,7 @@ import { useNoteActions } from './useNoteActions'
 import type { NoteActionsConfig } from './useNoteActions'
 import { GITIGNORED_VISIBILITY_APPLIED_EVENT } from '../lib/gitignoredVisibilityEvents'
 import { clearNoteContentCache, getCachedNoteContentEntry } from './noteContentCache'
+import { updateMockFrontmatter } from './mockFrontmatterHelpers'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('../mock-tauri', () => ({
@@ -256,6 +257,50 @@ describe('useNoteActions hook', () => {
       await result.current.handleUpdateFrontmatter('/vault/note.md', 'color', 'blue')
     })
     expect(updateEntry).toHaveBeenCalledWith('/vault/note.md', { color: 'blue' })
+  })
+
+  it('records successful frontmatter updates for undo and redo', async () => {
+    const entry = makeEntry({ path: '/vault/note.md', status: 'Active' })
+    const { result } = renderHook(() => useNoteActions(makeConfig([entry])))
+
+    await act(async () => {
+      await result.current.handleUpdateFrontmatter('/vault/note.md', 'status', 'Done')
+    })
+
+    expect(result.current.canUndo).toBe(true)
+    expect(result.current.undoLabel).toBe('Update status')
+
+    await act(async () => {
+      await result.current.handleUndo()
+    })
+    await act(async () => {
+      await result.current.handleRedo()
+    })
+
+    expect(updateEntry).toHaveBeenCalledWith('/vault/note.md', { status: 'Done' })
+    expect(updateEntry).toHaveBeenCalledWith('/vault/note.md', { status: 'Active' })
+    expect(updateEntry).toHaveBeenLastCalledWith('/vault/note.md', { status: 'Done' })
+  })
+
+  it('does not record silent or failed frontmatter updates', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const entry = makeEntry({ path: '/vault/note.md', status: 'Active' })
+    const { result } = renderHook(() => useNoteActions(makeConfig([entry])))
+
+    await act(async () => {
+      await result.current.handleUpdateFrontmatter('/vault/note.md', 'status', 'Done', { silent: true })
+    })
+    expect(result.current.canUndo).toBe(false)
+
+    vi.mocked(updateMockFrontmatter).mockImplementationOnce(() => {
+      throw new Error('disk full')
+    })
+    await act(async () => {
+      await result.current.handleUpdateFrontmatter('/vault/note.md', 'status', 'Blocked')
+    })
+
+    expect(result.current.canUndo).toBe(false)
+    errorSpy.mockRestore()
   })
 
   it('handleDeleteProperty calls updateEntry with null/default values', async () => {

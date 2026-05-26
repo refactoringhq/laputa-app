@@ -38,6 +38,8 @@ type SimpleHandlerKey =
   | 'onQuickOpen'
   | 'onSave'
   | 'onFindInNote'
+  | 'onUndo'
+  | 'onRedo'
   | 'onReplaceInNote'
   | 'onPastePlainText'
   | 'onSearch'
@@ -305,6 +307,15 @@ function normalizeShortcutKey(key: string): string {
   return key.length === 1 ? key.toLowerCase() : key
 }
 
+function isPlatformRedoAlternate(event: ShortcutEventLike): boolean {
+  return !isMac()
+    && !event.altKey
+    && !event.metaKey
+    && event.ctrlKey
+    && !event.shiftKey
+    && normalizeShortcutKey(event.key) === 'y'
+}
+
 for (const [id, definition] of Object.entries(APP_COMMAND_DEFINITIONS) as Array<[AppCommandId, AppCommandDefinition]>) {
   const shortcut = definition.shortcut
   if (!shortcut) continue
@@ -391,6 +402,8 @@ export function findShortcutCommandId(
 }
 
 export function findShortcutCommandIdForEvent(event: ShortcutEventLike): AppCommandId | null {
+  if (isPlatformRedoAlternate(event)) return APP_COMMAND_IDS.editRedo
+
   for (const combo of shortcutCombosForEvent(event)) {
     const commandId = findShortcutCommandId(combo, event.key, event.code)
     if (commandId) return commandId

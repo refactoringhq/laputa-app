@@ -40,6 +40,10 @@ files:
     command.note.newType: adce5108f18945cc502a06c02445e32d
     command.note.newTypedNote: 1493eda772c2179cb6247169d00723b2
     command.note.saveNote: 2a309cda46e95b00d2a5a8afb3cc0047
+    command.note.undo: 1cdc076b28f70afac5fcedadf99fa119
+    command.note.undoAction: 83a1f43c314533161109d8d4daf032f2
+    command.note.redo: 5afeaba074ef570dc720caaa855d49f6
+    command.note.redoAction: 7556c9dd6845991933c56006bf7ffbac
     command.note.pastePlainText: 09e8075dbd91e11878f8f4a138df760c
     command.note.findInNote: f72f8f93d8e6119d5d08b60eb3a7b3bc
     command.note.replaceInNote: b008e2e20c5e4cd202f4386271d6bed1

@@ -35,12 +35,12 @@ export function notePathsCollide(leftPath: PathLike, rightPath: PathLike): boole
   return normalizeNotePathForCollision(leftPath) === normalizeNotePathForCollision(rightPath)
 }
 
-export function findByNotePath<T extends ItemWithNotePath>(items: T[], path: PathLike): T | undefined {
+export function findByNotePath<T extends ItemWithNotePath>(items: readonly T[], path: PathLike): T | undefined {
   if (!path) return undefined
   return items.find((item) => notePathsMatch(item.path, path))
 }
 
-export function findByCollidingNotePath<T extends ItemWithNotePath>(items: T[], path: PathLike): T | undefined {
+export function findByCollidingNotePath<T extends ItemWithNotePath>(items: readonly T[], path: PathLike): T | undefined {
   if (!path) return undefined
   return items.find((item) => notePathsCollide(item.path, path))
 }

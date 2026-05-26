@@ -15,6 +15,10 @@ interface VaultPathOptions {
   vaultPath: string
 }
 
+interface VaultEntriesOptions extends VaultPathOptions {
+  forceReload?: boolean
+}
+
 interface MountedVaultEntriesOptions extends VaultPathOptions {
   defaultWorkspacePath?: string | null
   forceReload?: boolean
@@ -158,8 +162,8 @@ function attachViewRootPath(
   }))
 }
 
-function loadVaultEntries({ vaultPath }: VaultPathOptions): Promise<VaultEntry[]> {
-  const command = isTauri() ? 'reload_vault' : 'list_vault'
+function loadVaultEntries({ vaultPath, forceReload = true }: VaultEntriesOptions): Promise<VaultEntry[]> {
+  const command = forceReload && isTauri() ? 'reload_vault' : 'list_vault'
   return loadVaultEntriesWithCommand({ vaultPath, command })
 }
 
@@ -230,7 +234,7 @@ export async function loadVaultData({ vaultPath, vaults, defaultWorkspacePath, f
   if (!isTauri()) console.info('[mock] Using mock Tauri data for browser testing')
   const entries = vaults?.length
     ? await loadMountedVaultEntries({ vaultPath, vaults, defaultWorkspacePath, forceReload })
-    : await loadVaultEntries({ vaultPath })
+    : await loadVaultEntries({ vaultPath, forceReload })
   console.log(`Vault scan complete: ${entries.length} entries found`)
   return { entries }
 }

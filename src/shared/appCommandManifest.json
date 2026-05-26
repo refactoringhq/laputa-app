@@ -62,6 +62,34 @@
         "requiresManualNativeAcceleratorQa": true
       }
     },
+    "editUndo": {
+      "id": "edit-undo",
+      "route": { "kind": "handler", "handler": "onUndo" },
+      "menuOwned": true,
+      "preferredShortcutQaMode": "renderer-shortcut-event",
+      "shortcut": {
+        "combo": "command-or-ctrl",
+        "key": "z",
+        "code": "KeyZ",
+        "display": "⌘Z",
+        "accelerator": "CmdOrCtrl+Z",
+        "requiresManualNativeAcceleratorQa": true
+      }
+    },
+    "editRedo": {
+      "id": "edit-redo",
+      "route": { "kind": "handler", "handler": "onRedo" },
+      "menuOwned": true,
+      "preferredShortcutQaMode": "renderer-shortcut-event",
+      "shortcut": {
+        "combo": "command-or-ctrl-shift",
+        "key": "z",
+        "code": "KeyZ",
+        "display": "⌘⇧Z",
+        "accelerator": "CmdOrCtrl+Shift+Z",
+        "requiresManualNativeAcceleratorQa": true
+      }
+    },
     "editFindInNote": {
       "id": "edit-find-in-note",
       "route": { "kind": "handler", "handler": "onFindInNote" },
@@ -428,6 +456,9 @@
     {
       "label": "Edit",
       "items": [
+        { "kind": "command", "command": "editUndo", "label": "Undo" },
+        { "kind": "command", "command": "editRedo", "label": "Redo" },
+        { "kind": "separator" },
         { "kind": "command", "command": "editPastePlainText", "label": "Paste without Formatting" },
         { "kind": "separator" },
         { "kind": "command", "command": "editFindInNote", "label": "Find in Note", "enabled": false },

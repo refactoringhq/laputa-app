@@ -175,4 +175,6 @@ proposed → active → superseded
 | [0120](0120-stable-appimage-mcp-server-path-with-opencode-registration.md) | Stable AppImage MCP server path with OpenCode registration | active |
 | [0121](0121-appimage-external-fallback-for-audio-and-video-previews.md) | AppImage external fallback for audio and video previews | active |
 | [0122](0122-scalar-array-frontmatter-properties.md) | Scalar array frontmatter properties | active |
-| [0123](0123-full-vault-graph-for-secondary-note-windows.md) | Full vault graph for secondary note windows | active |
+| [0123](0123-full-vault-graph-for-secondary-note-windows.md) | Full vault graph for secondary note windows | superseded -> [0124](0124-cached-secondary-note-window-startup.md) |
+| [0124](0124-cached-secondary-note-window-startup.md) | Cached secondary note window startup | active |
+| [0126](0126-renderer-action-history.md) | Renderer action history for app-level undo and redo | active |

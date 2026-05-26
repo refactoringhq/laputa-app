@@ -147,6 +147,7 @@ describe('useVaultLoader', () => {
     mockIsTauri = false
     backendInvokeFn.mockReset()
     backendInvokeFn.mockImplementation(defaultMockInvoke)
+    window.history.replaceState({}, '', '/')
   })
 
   it('loads entries on mount', async () => {
@@ -310,6 +311,40 @@ describe('useVaultLoader', () => {
     const issuedCommands = backendInvokeFn.mock.calls.map(([command]) => command)
     expect(issuedCommands).toContain('reload_vault')
     expect(issuedCommands).not.toContain('list_vault')
+  })
+
+  it('uses cached initial vault entries in Tauri note-window mode', async () => {
+    await enableTauriMode()
+    window.history.replaceState(
+      {},
+      '',
+      '/?window=note&path=%2Fvault%2Fnote%2Fhello.md&vault=%2Fvault&title=Hello',
+    )
+    backendInvokeFn.mockImplementation(((cmd: string) => {
+      if (cmd === 'list_vault') {
+        return Promise.resolve([
+          { ...mockEntries[0], path: '/vault/note/cached.md', filename: 'cached.md', title: 'Cached' },
+        ])
+      }
+      if (cmd === 'reload_vault') {
+        return Promise.resolve([
+          { ...mockEntries[0], path: '/vault/note/fresh.md', filename: 'fresh.md', title: 'Fresh' },
+        ])
+      }
+      if (cmd === 'get_modified_files') return Promise.resolve([])
+      if (cmd === 'list_vault_folders') return Promise.resolve([])
+      if (cmd === 'list_views') return Promise.resolve([])
+      return Promise.resolve(null)
+    }) as typeof defaultMockInvoke)
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+
+    await waitFor(() => {
+      expect(result.current.entries.map((entry) => entry.title)).toEqual(['Cached'])
+    })
+    const issuedCommands = backendInvokeFn.mock.calls.map(([command]) => command)
+    expect(issuedCommands).toContain('list_vault')
+    expect(issuedCommands).not.toContain('reload_vault')
   })
 
   it('freshly reloads the active mounted workspace on startup in Tauri mode', async () => {

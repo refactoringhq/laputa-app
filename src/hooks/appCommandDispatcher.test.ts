@@ -34,6 +34,8 @@ function makeHandlers(): AppCommandHandlers {
     onCreateType: vi.fn(),
     onQuickOpen: vi.fn(),
     onSave: vi.fn(),
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
     onOpenSettings: vi.fn(),
     onToggleInspector: vi.fn(),
     onCommandPalette: vi.fn(),
@@ -133,6 +135,8 @@ describe('appCommandDispatcher', () => {
 
   it('finds raw editor, AI, and plain-text paste shortcuts from the shared catalog', () => {
     expect(findShortcutCommandId('command-or-ctrl', 'o', 'KeyO')).toBe(APP_COMMAND_IDS.fileQuickOpen)
+    expect(findShortcutCommandId('command-or-ctrl', 'z', 'KeyZ')).toBe(APP_COMMAND_IDS.editUndo)
+    expect(findShortcutCommandId('command-or-ctrl-shift', 'z', 'KeyZ')).toBe(APP_COMMAND_IDS.editRedo)
     expect(findShortcutCommandId('command-or-ctrl', '\\')).toBe(APP_COMMAND_IDS.editToggleRawEditor)
     expect(findShortcutCommandId('command-or-ctrl-shift', '¬', 'KeyL')).toBe(APP_COMMAND_IDS.viewToggleAiChat)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'T', 'KeyT')).toBe(APP_COMMAND_IDS.viewToggleTableOfContents)
@@ -200,6 +204,16 @@ describe('appCommandDispatcher', () => {
     expectShortcutEventCommand({ key: 'l', code: 'KeyL', ctrlKey: true, shiftKey: true }, APP_COMMAND_IDS.viewToggleAiChat)
     expectShortcutEventCommand({ key: 'T', code: 'KeyT', metaKey: true, shiftKey: true }, APP_COMMAND_IDS.viewToggleTableOfContents)
     expectShortcutEventCommand({ key: 'V', code: 'KeyV', metaKey: true, shiftKey: true }, APP_COMMAND_IDS.editPastePlainText)
+    expectShortcutEventCommand({ key: 'z', code: 'KeyZ', metaKey: true }, APP_COMMAND_IDS.editUndo)
+    expectShortcutEventCommand({ key: 'z', code: 'KeyZ', metaKey: true, shiftKey: true }, APP_COMMAND_IDS.editRedo)
+  })
+
+  it('maps Ctrl+Y to redo only off macOS', () => {
+    setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+    expectShortcutEventCommand({ key: 'y', code: 'KeyY', ctrlKey: true }, APP_COMMAND_IDS.editRedo)
+
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')
+    expectShortcutEventCommand({ key: 'y', code: 'KeyY', ctrlKey: true }, null)
   })
 
   it('ignores macOS Control-only shortcuts so native text editing bindings pass through', () => {
@@ -240,6 +254,14 @@ describe('appCommandDispatcher', () => {
     const handlers = makeHandlers()
     expect(dispatchAppCommand(APP_COMMAND_IDS.editPastePlainText, handlers)).toBe(true)
     expect(handlers.onPastePlainText).toHaveBeenCalled()
+  })
+
+  it('dispatches undo and redo through the shared command path', () => {
+    const handlers = makeHandlers()
+    expect(dispatchAppCommand(APP_COMMAND_IDS.editUndo, handlers)).toBe(true)
+    expect(dispatchAppCommand(APP_COMMAND_IDS.editRedo, handlers)).toBe(true)
+    expect(handlers.onUndo).toHaveBeenCalledOnce()
+    expect(handlers.onRedo).toHaveBeenCalledOnce()
   })
 
   it('uses the active note for note-scoped commands', () => {

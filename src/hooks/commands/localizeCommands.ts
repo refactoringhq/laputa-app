@@ -80,20 +80,43 @@ function parenthesizedSuffix(label: string): string | null {
   return label.match(/\(([^)]+)\)$/)?.[1] ?? null
 }
 
-function localizeNoteStateCommand(command: CommandAction, t: Translate): string | null {
-  if (command.id === 'archive-note') {
-    return t(command.label === 'Unarchive Note' ? 'command.note.unarchiveNote' : 'command.note.archiveNote')
+function localizeUndoRedoCommand(command: CommandAction, t: Translate): string | null {
+  if (command.id === 'undo-action') {
+    const action = stripKnownPrefix(command.label, 'Undo ')
+    return action && action !== command.label
+      ? t('command.note.undoAction', { action })
+      : t('command.note.undo')
   }
 
-  if (command.id === 'toggle-favorite') {
-    return t(command.label === 'Remove from Favorites' ? 'command.note.removeFavorite' : 'command.note.addFavorite')
-  }
-
-  if (command.id === 'toggle-organized') {
-    return t(command.label === 'Mark as Unorganized' ? 'command.note.markUnorganized' : 'command.note.markOrganized')
+  if (command.id === 'redo-action') {
+    const action = stripKnownPrefix(command.label, 'Redo ')
+    return action && action !== command.label
+      ? t('command.note.redoAction', { action })
+      : t('command.note.redo')
   }
 
   return null
+}
+
+function noteToggleLabelKey(command: CommandAction): TranslationKey | null {
+  switch (command.id) {
+    case 'archive-note':
+      return command.label === 'Unarchive Note' ? 'command.note.unarchiveNote' : 'command.note.archiveNote'
+    case 'toggle-favorite':
+      return command.label === 'Remove from Favorites' ? 'command.note.removeFavorite' : 'command.note.addFavorite'
+    case 'toggle-organized':
+      return command.label === 'Mark as Unorganized' ? 'command.note.markUnorganized' : 'command.note.markOrganized'
+    default:
+      return null
+  }
+}
+
+function localizeNoteStateCommand(command: CommandAction, t: Translate): string | null {
+  const undoRedoLabel = localizeUndoRedoCommand(command, t)
+  if (undoRedoLabel) return undoRedoLabel
+
+  const toggleKey = noteToggleLabelKey(command)
+  return toggleKey ? t(toggleKey) : null
 }
 
 function localizeColumnsCommand(command: CommandAction, t: Translate): string {

@@ -28,6 +28,12 @@ interface AppCommandsConfig {
   onCommandPalette: () => void
   onSearch: () => void
   onFindInNote?: () => void
+  onUndo?: () => void
+  onRedo?: () => void
+  canUndo?: boolean
+  canRedo?: boolean
+  undoLabel?: string | null
+  redoLabel?: string | null
   onReplaceInNote?: () => void
   onPastePlainText: () => void
   onCreateNote: (type?: string, options?: ImmediateCreateOptions) => void
@@ -158,6 +164,12 @@ type CommandRegistryCoreActions = Pick<
   | 'onCreateNote'
   | 'onCreateNoteOfType'
   | 'onSave'
+  | 'onUndo'
+  | 'onRedo'
+  | 'canUndo'
+  | 'canRedo'
+  | 'undoLabel'
+  | 'redoLabel'
   | 'onFindInNote'
   | 'onReplaceInNote'
   | 'onPastePlainText'
@@ -267,6 +279,8 @@ function createKeyboardActions(
     onPastePlainText: config.onPastePlainText,
     onCreateNote: config.onCreateNote,
     onSave: config.onSave,
+    onUndo: config.onUndo,
+    onRedo: config.onRedo,
     onOpenSettings: config.onOpenSettings,
     onDeleteNote: config.onDeleteNote,
     onSetViewMode: config.onSetViewMode,
@@ -317,6 +331,8 @@ function createMenuEventActionHandlers(
   | 'onZoomReset'
   | 'onDeleteNote'
   | 'onFindInNote'
+  | 'onUndo'
+  | 'onRedo'
   | 'onReplaceInNote'
   | 'onPastePlainText'
   | 'onSearch'
@@ -344,6 +360,8 @@ function createMenuEventActionHandlers(
     onZoomReset: config.onZoomReset,
     onDeleteNote: config.onDeleteNote,
     onFindInNote: config.onFindInNote,
+    onUndo: config.onUndo,
+    onRedo: config.onRedo,
     onReplaceInNote: config.onReplaceInNote,
     onPastePlainText: config.onPastePlainText,
     onSearch: config.onSearch,
@@ -450,6 +468,12 @@ function createCommandRegistryCoreConfig(
     onCreateNote: config.onCreateNote,
     onCreateNoteOfType: config.onCreateNoteOfType,
     onSave: config.onSave,
+    onUndo: config.onUndo,
+    onRedo: config.onRedo,
+    canUndo: config.canUndo,
+    canRedo: config.canRedo,
+    undoLabel: config.undoLabel,
+    redoLabel: config.redoLabel,
     onOpenSettings: config.onOpenSettings,
     onOpenFeedback: config.onOpenFeedback,
     onDeleteNote: config.onDeleteNote,

@@ -336,13 +336,16 @@ fn build_file_menu(app: &App) -> MenuResult {
 fn build_edit_menu(app: &App) -> MenuResult {
     let section = manifest_section("Edit")?;
     let mut items = section.items.iter();
-    let mut builder = SubmenuBuilder::new(app, "Edit")
-        .undo()
-        .redo()
-        .separator()
-        .cut()
-        .copy()
-        .paste();
+    let mut builder = SubmenuBuilder::new(app, "Edit");
+
+    for item in items.by_ref() {
+        if matches!(item, ManifestMenuItem::Separator) {
+            break;
+        }
+        builder = append_manifest_item(app, builder, item)?;
+    }
+
+    builder = builder.separator().cut().copy().paste();
 
     if let Some(paste_plain_text) = items.next() {
         builder = append_manifest_item(app, builder, paste_plain_text)?;

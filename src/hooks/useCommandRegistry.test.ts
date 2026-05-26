@@ -332,6 +332,53 @@ describe('useCommandRegistry', () => {
     expect(findCommand(result.current, 'archive-note')?.shortcut).toBeUndefined()
   })
 
+  it('exposes undo and redo commands only when action history has entries', () => {
+    const onUndo = vi.fn()
+    const onRedo = vi.fn()
+    const { result, rerender } = renderHook(
+      (props) => useCommandRegistry(props),
+      {
+        initialProps: makeConfig({
+          onUndo,
+          onRedo,
+          canUndo: true,
+          canRedo: false,
+          undoLabel: 'Archive Note',
+          redoLabel: null,
+        }),
+      },
+    )
+
+    expect(findCommand(result.current, 'undo-action')).toMatchObject({
+      enabled: true,
+      label: 'Undo Archive Note',
+      shortcut: formatShortcutDisplay({ display: '⌘Z' }),
+    })
+    expect(findCommand(result.current, 'redo-action')).toMatchObject({
+      enabled: false,
+      label: 'Redo',
+      shortcut: formatShortcutDisplay({ display: '⌘⇧Z' }),
+    })
+
+    findCommand(result.current, 'undo-action')?.execute()
+    expect(onUndo).toHaveBeenCalledOnce()
+
+    rerender(makeConfig({
+      onUndo,
+      onRedo,
+      canUndo: false,
+      canRedo: true,
+      undoLabel: null,
+      redoLabel: 'Archive Note',
+    }))
+
+    expect(findCommand(result.current, 'undo-action')?.enabled).toBe(false)
+    expect(findCommand(result.current, 'redo-action')).toMatchObject({
+      enabled: true,
+      label: 'Redo Archive Note',
+    })
+  })
+
   it('removes AI commands when AI features are disabled', () => {
     const config = makeConfig({
       aiFeaturesEnabled: false,

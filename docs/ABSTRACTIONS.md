@@ -800,6 +800,15 @@ Vault guidance is intentionally short and vault-specific. General Tolaria produc
 - `src-tauri/resources/agent-docs/AGENTS.md` orients agents to the generated docs bundle, while `index.md`, section bundles, `all.md`, `search-index.json`, and `pages/` provide fast local lookup
 - `get_agent_docs_path` exposes the resolved resource folder to the renderer, and `buildAgentSystemPrompt()` tells every app-managed CLI agent to read vault `AGENTS.md` first, then search the bundled docs for Tolaria behavior
 
+### Action History
+
+`useActionHistory` owns renderer-scoped app undo/redo state. It stores explicit action entries with labels plus undo/redo callbacks, suppresses nested recording during replay, and exposes the top labels to command-palette commands.
+
+- Frontmatter mutations record history only after the write succeeds and only for non-silent user actions.
+- Entry state toggles such as archive, favorite, and organized record explicit before/after replay callbacks after persistence succeeds.
+- Text inputs, contenteditable surfaces, and editor-owned text history keep native undo/redo first; app-level history runs only when focus is outside text editing.
+- Irreversible destructive actions stay outside the stack and continue to use confirmation/destructive affordances.
+
 ### Getting Started / Onboarding
 
 `useOnboarding` hook detects first launch:

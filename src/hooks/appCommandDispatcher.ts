@@ -44,6 +44,8 @@ export interface AppCommandHandlers {
   onArchiveNote: (path: string) => void
   onDeleteNote: (path: string) => void
   onFindInNote?: () => void
+  onUndo?: () => void
+  onRedo?: () => void
   onReplaceInNote?: () => void
   onPastePlainText: () => void
   onSearch: () => void
@@ -81,6 +83,8 @@ type SimpleHandlerKey = keyof Pick<
   | 'onQuickOpen'
   | 'onSave'
   | 'onFindInNote'
+  | 'onUndo'
+  | 'onRedo'
   | 'onReplaceInNote'
   | 'onPastePlainText'
   | 'onSearch'
@@ -126,6 +130,8 @@ const SIMPLE_HANDLER_EXECUTORS: readonly [SimpleHandlerKey, SimpleHandlerExecuto
   ['onQuickOpen', (handlers) => handlers.onQuickOpen()],
   ['onSave', (handlers) => handlers.onSave()],
   ['onFindInNote', (handlers) => handlers.onFindInNote?.()],
+  ['onUndo', (handlers) => handlers.onUndo?.()],
+  ['onRedo', (handlers) => handlers.onRedo?.()],
   ['onReplaceInNote', (handlers) => handlers.onReplaceInNote?.()],
   ['onPastePlainText', (handlers) => handlers.onPastePlainText()],
   ['onSearch', (handlers) => handlers.onSearch()],

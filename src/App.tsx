@@ -141,6 +141,21 @@ function isActiveElementInsideEditorSurface(): boolean {
   return Boolean(activeElement.closest(ACTIVE_EDITOR_SURFACE_SELECTOR))
 }
 
+function isTextEditingElementFocused(): boolean {
+  const activeElement = document.activeElement
+  if (!(activeElement instanceof HTMLElement)) return false
+  return activeElement.tagName === 'INPUT'
+    || activeElement.tagName === 'TEXTAREA'
+    || activeElement.isContentEditable
+    || activeElement.closest('[contenteditable="true"]') !== null
+}
+
+function runNativeTextHistoryCommand(command: 'undo' | 'redo'): boolean {
+  if (!isTextEditingElementFocused()) return false
+  document.execCommand(command)
+  return true
+}
+
 // Type declarations for mock content storage and test overrides
 declare global {
   interface Window {
@@ -1136,6 +1151,7 @@ function App() {
     handleDeleteProperty: notes.handleDeleteProperty, setToastMessage,
     createTypeEntry: notes.createTypeEntrySilent,
     onBeforeAction: flushEditorStateBeforeAction,
+    actionHistory: notes.actionHistory,
   })
 
   const resolveVaultPathForNotePath = useCallback((path: string) => {
@@ -1555,6 +1571,14 @@ function App() {
   })
   const activeEditorVaultPath = activeTab ? vaultPathForEntry(activeTab.entry, resolvedPath) : resolvedPath
   const commandAiActions = useAppCommandAiActions(aiFeaturesEnabled, dialogs, aiAgentsStatus, vaultAiGuidanceStatus, restoreVaultAiGuidanceCommand, aiAgentPreferences)
+  const undoCommand = useCallback(() => {
+    if (runNativeTextHistoryCommand('undo')) return
+    void notes.handleUndo()
+  }, [notes])
+  const redoCommand = useCallback(() => {
+    if (runNativeTextHistoryCommand('redo')) return
+    void notes.handleRedo()
+  }, [notes])
 
   const commands = useAppCommands({
     activeTabPath: notes.activeTabPath, activeTabPathRef: notes.activeTabPathRef,
@@ -1572,6 +1596,12 @@ function App() {
     onCreateNote: notes.handleCreateNoteImmediate,
     onCreateNoteOfType: notes.handleCreateNoteImmediate,
     onSave: appSave.handleSave,
+    onUndo: undoCommand,
+    onRedo: redoCommand,
+    canUndo: notes.canUndo,
+    canRedo: notes.canRedo,
+    undoLabel: notes.undoLabel,
+    redoLabel: notes.redoLabel,
     onOpenSettings: handleOpenSettings,
     onOpenFeedback: openFeedback,
     onDeleteNote: deleteActions.handleDeleteNote,

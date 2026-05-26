@@ -15,6 +15,8 @@ export type KeyboardActions = Pick<
   | 'onSearch'
   | 'onCreateNote'
   | 'onSave'
+  | 'onUndo'
+  | 'onRedo'
   | 'onFindInNote'
   | 'onReplaceInNote'
   | 'onPastePlainText'
@@ -40,6 +42,8 @@ export type KeyboardActions = Pick<
 
 const TEXT_EDITING_KEYS = new Set(['Backspace', 'Delete'])
 const TEXT_EDITING_BLOCKED_COMMANDS = new Set<AppCommandId>([
+  APP_COMMAND_IDS.editUndo,
+  APP_COMMAND_IDS.editRedo,
   APP_COMMAND_IDS.viewGoBack,
   APP_COMMAND_IDS.viewGoForward,
 ])
