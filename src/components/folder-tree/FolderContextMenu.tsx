@@ -1,10 +1,11 @@
 import type { RefObject } from 'react'
-import { ClipboardText, FolderOpen, PencilSimple, Trash } from '@phosphor-icons/react'
+import { ClipboardText, FolderOpen, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { translate, type AppLocale } from '../../lib/i18n'
 
 export interface FolderContextMenuState {
   path: string
+  rootPath?: string
   x: number
   y: number
 }
@@ -15,6 +16,7 @@ interface FolderContextMenuProps {
   onDelete?: (folderPath: string) => void
   onReveal?: (folderPath: string) => void
   onCopyPath?: (folderPath: string) => void
+  onCreateNote?: (folderPath: string, rootPath?: string) => void
   onRename: (folderPath: string) => void
   locale?: AppLocale
 }
@@ -25,6 +27,7 @@ export function FolderContextMenu({
   onDelete,
   onReveal,
   onCopyPath,
+  onCreateNote,
   onRename,
   locale = 'en',
 }: FolderContextMenuProps) {
@@ -38,6 +41,18 @@ export function FolderContextMenu({
       style={{ left: menu.x, top: menu.y, minWidth: 180 }}
       data-testid="folder-context-menu"
     >
+      {onCreateNote && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm"
+          onClick={() => onCreateNote(menu.path, menu.rootPath)}
+          data-testid="create-node-in-folder-menu-item"
+        >
+          <Plus size={14} />
+          {translate(locale, 'sidebar.action.createNodeInFolderMenu')}
+        </Button>
+      )}
       {onReveal && (
         <Button
           type="button"

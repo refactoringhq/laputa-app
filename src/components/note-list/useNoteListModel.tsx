@@ -13,6 +13,7 @@ import type { NoteListFilter } from '../../utils/noteListHelpers'
 import { countByFilter, countAllByFilter, countAllNotesByFilter } from '../../utils/noteListHelpers'
 import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
 import type { GitRepositoryOption } from '../../utils/gitRepositories'
+import type { ImmediateCreateOptions } from '../../hooks/useNoteCreation'
 import { NoteItem } from '../NoteItem'
 import { prefetchNoteContent } from '../../hooks/useTabManagement'
 import type { MultiSelectState } from '../../hooks/useMultiSelect'
@@ -312,7 +313,7 @@ interface UseNoteListInteractionStateParams {
   onCopyFilePath?: (path: string) => void
   onAutoTriggerDiff?: () => void
   onDiscardFile?: (relativePath: string) => Promise<void>
-  onCreateNote: (type?: string) => void
+  onCreateNote: (type?: string, options?: ImmediateCreateOptions) => void
   onBulkArchive?: (paths: string[]) => void
   onBulkDeletePermanently?: (paths: string[]) => void
   locale: AppLocale

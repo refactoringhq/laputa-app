@@ -1,5 +1,6 @@
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../appCommandCatalog'
 import { buildEditorFindCommands } from './editorFindCommands'
+import type { ImmediateCreateOptions } from '../useNoteCreation'
 import type { CommandAction } from './types'
 
 interface NoteCommandsConfig {
@@ -8,8 +9,9 @@ interface NoteCommandsConfig {
   activeFileKind?: 'markdown' | 'text' | 'binary'
   isArchived: boolean
   activeNoteHasIcon?: boolean
-  onCreateNote: () => void
+  onCreateNote: (type?: string, options?: ImmediateCreateOptions) => void
   onCreateType?: () => void
+  currentFolderCreateOptions?: ImmediateCreateOptions
   onSave: () => void
   onFindInNote?: () => void
   onReplaceInNote?: () => void
@@ -63,6 +65,16 @@ function createNoteCommand(config: NoteCommandConfig): CommandAction {
   }
 }
 
+function buildCurrentFolderNoteCommand(config: NoteCommandsConfig): CommandAction {
+  return createNoteCommand({
+    id: 'create-note-current-folder',
+    label: 'Create New Note in Current Folder',
+    keywords: ['new', 'create', 'add', 'folder', 'current'],
+    enabled: config.currentFolderCreateOptions !== undefined,
+    execute: () => config.onCreateNote(undefined, config.currentFolderCreateOptions),
+  })
+}
+
 function buildCoreNoteCommands(config: NoteCommandsConfig): CommandAction[] {
   return [
     createNoteCommand({
@@ -73,6 +85,7 @@ function buildCoreNoteCommands(config: NoteCommandsConfig): CommandAction[] {
       enabled: true,
       execute: config.onCreateNote,
     }),
+    buildCurrentFolderNoteCommand(config),
     createNoteCommand({
       id: 'create-type',
       label: 'New Type',

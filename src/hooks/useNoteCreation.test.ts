@@ -362,6 +362,34 @@ describe('useNoteCreation hook', () => {
     vi.restoreAllMocks()
   })
 
+  it('handleCreateNoteImmediate can target a nested folder in a mounted vault', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValueOnce(undefined)
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
+    const { result } = renderHook(() => useNoteCreation(makeConfig(), tabDeps))
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate(undefined, {
+        creationPath: 'folder_header',
+        folderPath: 'Projects/2026 Planning',
+        vaultPath: '/Users/luca/Team',
+      })
+      await flushImmediateCreate()
+    })
+
+    const createdPath = '/Users/luca/Team/Projects/2026 Planning/untitled-note-1700000000.md'
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: createdPath,
+      content: expect.stringContaining('type: Note'),
+      vaultPath: '/Users/luca/Team',
+    })
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
+      path: createdPath,
+      workspace: expect.objectContaining({ path: '/Users/luca/Team' }),
+    }))
+    vi.restoreAllMocks()
+  })
+
   it('handleCreateNoteImmediate generates unique names on rapid calls via timestamp', async () => {
     vi.useFakeTimers()
     let ts = 1700000000000

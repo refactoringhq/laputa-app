@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import type { FolderNode } from '../../src/types'
 import { installFixtureVaultDesktopBridgeInBrowser } from './fixtureVaultDesktopBridge'
 
 const FIXTURE_VAULT = path.resolve('tests/fixtures/test-vault')
@@ -15,6 +16,7 @@ interface FixtureVaultPageArgs {
   page: Page
   vaultPath: string
   isGitRepo: boolean
+  folders: FolderNode[]
 }
 
 interface FixturePageArgs {
@@ -24,6 +26,7 @@ interface FixturePageArgs {
 interface FixtureVaultOptions {
   isGitRepo?: boolean
   expectedReadyTitle?: string
+  folders?: FolderNode[]
 }
 
 interface CopyDirArgs {
@@ -68,8 +71,8 @@ export function removeFixtureVaultCopy(tempVaultDir: string | null | undefined):
   removeFixtureVaultDirectory({ tempVaultDir })
 }
 
-async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: FixtureVaultPageArgs): Promise<void> {
-  await page.addInitScript(({ dismissedKey, initialIsGitRepo, resolvedVaultPath }: { dismissedKey: string; initialIsGitRepo: boolean; resolvedVaultPath: string }) => {
+async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folders }: FixtureVaultPageArgs): Promise<void> {
+  await page.addInitScript(({ dismissedKey, fixtureFolders, initialIsGitRepo, resolvedVaultPath }: { dismissedKey: string; fixtureFolders: FolderNode[]; initialIsGitRepo: boolean; resolvedVaultPath: string }) => {
     localStorage.clear()
     localStorage.setItem(dismissedKey, '1')
     let gitRepoReady = initialIsGitRepo
@@ -303,7 +306,7 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: Fix
     const buildFixtureReadHandlers = () => ({
       list_vault: (commandArgs?: FixtureCommandArgs) => readVaultList(commandArgs),
       reload_vault: (commandArgs?: FixtureCommandArgs) => readVaultList(commandArgs, true),
-      list_vault_folders: () => [],
+      list_vault_folders: () => fixtureFolders,
       list_views: () => [],
       get_modified_files: () => [],
       detect_renames: () => [],
@@ -437,6 +440,7 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo }: Fix
     })
   }, {
     dismissedKey: CLAUDE_CODE_ONBOARDING_DISMISSED_KEY,
+    fixtureFolders: folders,
     initialIsGitRepo: isGitRepo,
     resolvedVaultPath: vaultPath,
   })
@@ -460,6 +464,7 @@ export async function openFixtureVault(
     page,
     vaultPath,
     isGitRepo: options.isGitRepo ?? true,
+    folders: options.folders ?? [],
   })
   await waitForFixtureVaultReady({
     page,

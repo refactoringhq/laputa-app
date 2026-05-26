@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import type { VaultEntry, SidebarSelection, ModifiedFile, NoteStatus, ViewDefinition, ViewFile } from '../../types'
+import type { ImmediateCreateOptions } from '../../hooks/useNoteCreation'
 import {
   type SortOption, type SortDirection, type SortConfig, type NoteListFilter,
   getSortComparator, extractSortableProperties,
@@ -996,7 +997,36 @@ interface UseNoteListInteractionsParams {
   onAutoTriggerDiff?: () => void
   onDiscardFile?: (relativePath: string) => Promise<void>
   openContextMenuForEntry: (entry: VaultEntry, point: { x: number; y: number }) => void
-  onCreateNote: (type?: string) => void
+  onCreateNote: (type?: string, options?: ImmediateCreateOptions) => void
+}
+
+function createNoteRequestForSelection(selection: SidebarSelection): {
+  options?: ImmediateCreateOptions
+  type?: string
+} {
+  if (selection.kind === 'sectionGroup') return { type: selection.type }
+  if (selection.kind === 'folder') {
+    return {
+      options: {
+        creationPath: 'folder_header',
+        folderPath: selection.path,
+        vaultPath: selection.rootPath,
+      },
+    }
+  }
+  return {}
+}
+
+function createNoteForSelection(
+  onCreateNote: (type?: string, options?: ImmediateCreateOptions) => void,
+  selection: SidebarSelection,
+): void {
+  const request = createNoteRequestForSelection(selection)
+  if (request.options) {
+    onCreateNote(request.type, request.options)
+    return
+  }
+  onCreateNote(request.type)
 }
 
 function resolveChangesContextMenuEntry(
@@ -1232,7 +1262,7 @@ export function useNoteListInteractions({
   })
 
   const handleCreateNote = useCallback(() => {
-    onCreateNote(selection.kind === 'sectionGroup' ? selection.type : undefined)
+    createNoteForSelection(onCreateNote, selection)
   }, [onCreateNote, selection])
 
   const toggleGroup = useCallback((label: string) => {

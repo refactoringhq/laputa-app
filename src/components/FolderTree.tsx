@@ -162,6 +162,7 @@ export const FolderTree = memo(function FolderTree({
     closeContextMenu,
     contextMenu,
     handleCopyPathFromMenu,
+    handleCreateNoteFromMenu,
     handleDeleteFromMenu,
     handleOpenMenu,
     handleRevealFromMenu,
@@ -221,6 +222,7 @@ export const FolderTree = memo(function FolderTree({
         onDelete={handleDeleteFromMenu}
         onReveal={handleRevealFromMenu}
         onCopyPath={handleCopyPathFromMenu}
+        onCreateNote={handleCreateNoteFromMenu}
         onRename={handleRenameFromMenu}
         locale={locale}
       />

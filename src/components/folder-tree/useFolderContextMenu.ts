@@ -1,6 +1,7 @@
 import { useCallback, type MouseEvent as ReactMouseEvent } from 'react'
 import type { FolderNode } from '../../types'
 import type { FolderFileActions } from '../../hooks/useFileActions'
+import { requestCreateNoteInFolder } from '../../hooks/noteCreationRequests'
 import { useSidebarContextMenu } from '../sidebar/sidebarHooks'
 
 interface UseFolderContextMenuInput {
@@ -19,11 +20,16 @@ export function useFolderContextMenu({
     contextMenu,
     contextMenuRef,
     openContextMenuFromPointer,
-  } = useSidebarContextMenu<string>()
+  } = useSidebarContextMenu<{ path: string; rootPath?: string }>()
 
   const handleOpenMenu = useCallback((node: FolderNode, event: ReactMouseEvent<HTMLElement>) => {
-    openContextMenuFromPointer(node.path, event)
+    openContextMenuFromPointer({ path: node.path, rootPath: node.rootPath }, event)
   }, [openContextMenuFromPointer])
+
+  const handleCreateNoteFromMenu = useCallback((folderPath: string, rootPath?: string) => {
+    closeContextMenu()
+    requestCreateNoteInFolder(folderPath, rootPath)
+  }, [closeContextMenu])
 
   const handleRenameFromMenu = useCallback((folderPath: string) => {
     closeContextMenu()
@@ -45,7 +51,8 @@ export function useFolderContextMenu({
     folderFileActions?.copyFolderPath(folderPath)
   }, [closeContextMenu, folderFileActions])
   const menu = contextMenu ? {
-    path: contextMenu.target,
+    path: contextMenu.target.path,
+    rootPath: contextMenu.target.rootPath,
     x: contextMenu.pos.x,
     y: contextMenu.pos.y,
   } : null
@@ -54,6 +61,7 @@ export function useFolderContextMenu({
     closeContextMenu,
     contextMenu: menu,
     handleCopyPathFromMenu,
+    handleCreateNoteFromMenu,
     handleDeleteFromMenu,
     handleOpenMenu,
     handleRevealFromMenu,

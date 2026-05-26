@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { FolderTree } from './FolderTree'
 import { FOLDER_ROW_SINGLE_CLICK_DELAY_MS } from './folder-tree/useFolderRowInteractions'
 import { FOLDER_ROW_NESTING_INDENT, getFolderConnectorLeft } from './folder-tree/folderTreeLayout'
+import { CREATE_NOTE_IN_FOLDER_EVENT } from '../hooks/noteCreationRequests'
 import type { FolderNode, SidebarSelection } from '../types'
 
 const mockFolders: FolderNode[] = [
@@ -524,6 +525,44 @@ describe('FolderTree', () => {
     fireEvent.contextMenu(screen.getByText('projects'))
     fireEvent.click(screen.getByTestId('copy-folder-path-menu-item'))
     expect(onCopyFolderPath).toHaveBeenCalledWith('projects')
+  })
+
+  it('creates a note in the right-clicked mounted folder', () => {
+    const onCreateNoteInFolder = vi.fn()
+    const folders: FolderNode[] = [
+      {
+        name: 'Personal',
+        path: '',
+        rootPath: '/Users/luca/Personal',
+        children: [{ name: 'projects', path: 'projects', rootPath: '/Users/luca/Personal', children: [] }],
+      },
+      {
+        name: 'Team',
+        path: '',
+        rootPath: '/Users/luca/Team',
+        children: [{ name: 'projects', path: 'projects', rootPath: '/Users/luca/Team', children: [] }],
+      },
+    ]
+
+    render(
+      <FolderTree
+        folders={folders}
+        selection={defaultSelection}
+        onSelect={vi.fn()}
+        vaultRootPath="/Users/luca/Team"
+      />,
+    )
+
+    window.addEventListener(CREATE_NOTE_IN_FOLDER_EVENT, onCreateNoteInFolder)
+    fireEvent.contextMenu(screen.getAllByTestId('folder-row:projects')[1])
+    fireEvent.click(screen.getByTestId('create-node-in-folder-menu-item'))
+
+    expect(onCreateNoteInFolder).toHaveBeenCalledOnce()
+    expect((onCreateNoteInFolder.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      folderPath: 'projects',
+      rootPath: '/Users/luca/Team',
+    })
+    window.removeEventListener(CREATE_NOTE_IN_FOLDER_EVENT, onCreateNoteInFolder)
   })
 
   it('keeps destructive folder actions off the vault root row and menu', () => {

@@ -36,6 +36,7 @@ files:
     command.navigation.showArchivedNotes: 241399b908884adfe8608a3ab827ca74
     command.navigation.listType: 4f70c27c6826a37543c8ada561397c22
     command.note.newNote: 23c4edda8b815f750782f01870d27271
+    command.note.newNoteInCurrentFolder: 167b765903c70ab1b645908ff8a899ab
     command.note.newType: adce5108f18945cc502a06c02445e32d
     command.note.newTypedNote: 1493eda772c2179cb6247169d00723b2
     command.note.saveNote: 2a309cda46e95b00d2a5a8afb3cc0047
@@ -366,6 +367,7 @@ files:
     sidebar.action.createFolder: 5dc1e97c14fbe72d8b566ce29c39f010
     sidebar.action.renameFolder: db76034f8218cda07dadb746a5643019
     sidebar.action.deleteFolder: 2a2f15300f6f7c81d69860ac1796b517
+    sidebar.action.createNodeInFolderMenu: 857a479229a4ab0bc62bbfb621d3180a
     sidebar.action.revealFolderMenu: 76f4ed52da9937ae432dcf5a108fabb4
     sidebar.action.copyFolderPathMenu: 1779ec6018a385912c1a5499a1bbf2b2
     sidebar.action.renameFolderMenu: deb1d8fa030292e7eda2c244b313aca2

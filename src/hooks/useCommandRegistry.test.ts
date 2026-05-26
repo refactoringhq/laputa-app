@@ -652,6 +652,36 @@ describe('useCommandRegistry', () => {
     })
   })
 
+  it('exposes a current-folder create command only when a folder is selected', () => {
+    const onCreateNote = vi.fn()
+    const { result } = renderHook(() => useCommandRegistry(makeConfig({
+      onCreateNote,
+      selection: { kind: 'folder', path: 'Projects/2026 Planning', rootPath: '/vault' },
+    })))
+
+    const command = findCommand(result.current, 'create-note-current-folder')
+    expect(command).toMatchObject({
+      label: 'Create New Note in Current Folder',
+      group: 'Note',
+      enabled: true,
+    })
+
+    command!.execute()
+    expect(onCreateNote).toHaveBeenCalledWith(undefined, {
+      creationPath: 'folder_command_palette',
+      folderPath: 'Projects/2026 Planning',
+      vaultPath: '/vault',
+    })
+  })
+
+  it('disables the current-folder create command outside folder selections', () => {
+    const { result } = renderHook(() => useCommandRegistry(makeConfig({
+      selection: { kind: 'filter', filter: 'all' },
+    })))
+
+    expect(findCommand(result.current, 'create-note-current-folder')?.enabled).toBe(false)
+  })
+
   it('exposes paste without formatting in the command palette', () => {
     const onPastePlainText = vi.fn()
     const { result } = renderHook(() => useCommandRegistry(makeConfig({ onPastePlainText })))

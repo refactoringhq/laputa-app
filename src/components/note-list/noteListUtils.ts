@@ -2,6 +2,7 @@ import type { VaultEntry, SidebarSelection, SidebarFilter, ModifiedFile, NoteSta
 import type { RelationshipGroup } from '../../utils/noteListHelpers'
 import { translate, type AppLocale } from '../../lib/i18n'
 import { filenameStemToTitle } from '../../utils/noteTitle'
+import { vaultRelativePathLabel } from '../../utils/notePathIdentity'
 
 export interface DeletedNoteEntry extends VaultEntry {
   __deletedNotePreview: true
@@ -30,12 +31,20 @@ function resolveSelectionFilterTitle(selection: SidebarSelection, locale: AppLoc
   return translate(locale, FILTER_TITLE_KEYS[selection.filter])
 }
 
+function resolveFolderTitle(selection: SidebarSelection): string | null {
+  if (selection.kind !== 'folder') return null
+  if (selection.path.trim()) return vaultRelativePathLabel(selection.path)
+  return selection.rootPath ? vaultRelativePathLabel(selection.rootPath) : null
+}
+
 export function resolveHeaderTitle(selection: SidebarSelection, typeDocument: VaultEntry | null, views?: ViewFile[], locale: AppLocale = 'en'): string {
   if (selection.kind === 'view') {
     const view = views?.find((v) => v.filename === selection.filename)
     return view?.definition.name ?? translate(locale, 'noteList.title.view')
   }
   if (selection.kind === 'entity') return selection.entry.title
+  const folderTitle = resolveFolderTitle(selection)
+  if (folderTitle) return folderTitle
   if (typeDocument) return typeDocument.title
 
   return resolveSelectionFilterTitle(selection, locale) ?? translate(locale, 'noteList.title.notes')

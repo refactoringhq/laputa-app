@@ -188,6 +188,26 @@ describe('NoteList rendering', () => {
     expect(onCreateNote).toHaveBeenCalledWith(undefined)
   })
 
+  it('shows the active folder name and creates notes inside that folder', () => {
+    const { onCreateNote } = renderNoteList({
+      selection: {
+        kind: 'folder',
+        path: 'Projects/2026 Planning',
+        rootPath: '/Users/luca/Laputa',
+      },
+    })
+
+    expect(screen.getByRole('heading', { name: '2026 Planning' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTitle('Create new note'))
+
+    expect(onCreateNote).toHaveBeenCalledWith(undefined, {
+      creationPath: 'folder_header',
+      folderPath: 'Projects/2026 Planning',
+      vaultPath: '/Users/luca/Laputa',
+    })
+  })
+
   it('pins the current entity and shows grouped children', () => {
     renderNoteList({ selection: { kind: 'entity', entry: mockEntries[0] } })
     expect(screen.getAllByText('Build Laputa App').length).toBeGreaterThanOrEqual(1)

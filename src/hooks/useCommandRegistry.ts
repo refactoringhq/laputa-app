@@ -17,6 +17,7 @@ import { buildFilterCommands } from './commands/filterCommands'
 import { localizeCommandActions } from './commands/localizeCommands'
 import { extractVaultTypes } from '../utils/vaultTypes'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
+import type { ImmediateCreateOptions } from './useNoteCreation'
 
 // Re-export types and helpers for backward compatibility
 export type { CommandAction, CommandGroup } from './commands/types'
@@ -65,7 +66,7 @@ interface CommandRegistryConfig {
   onRestoreDeletedNote?: () => void
   canRestoreDeletedNote?: boolean
   onQuickOpen: () => void
-  onCreateNote: () => void
+  onCreateNote: (type?: string, options?: ImmediateCreateOptions) => void
   onCreateNoteOfType: (type: string) => void
   onSave: () => void
   onPastePlainText: () => void
@@ -129,6 +130,15 @@ interface CommandRegistryConfig {
   onSetNoteListFilter?: (filter: NoteListFilter) => void
 }
 
+function currentFolderCreateOptions(selection: SidebarSelection | undefined): ImmediateCreateOptions | undefined {
+  if (selection?.kind !== 'folder') return undefined
+  return {
+    creationPath: 'folder_command_palette',
+    folderPath: selection.path,
+    vaultPath: selection.rootPath,
+  }
+}
+
 export function useCommandRegistry(config: CommandRegistryConfig): import('./commands/types').CommandAction[] {
   const {
     activeTabPath, entries, modifiedCount,
@@ -166,6 +176,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
   const isArchived = activeEntry?.archived ?? false
   const isFavorite = activeEntry?.favorite ?? false
   const isSectionGroup = selection?.kind === 'sectionGroup'
+  const folderCreateOptions = useMemo(() => currentFolderCreateOptions(selection), [selection])
   const noteListColumnsLabel = config.noteListColumnsLabel ?? (
     selection?.kind === 'filter' && selection.filter === 'all'
       ? 'Customize All Notes columns'
@@ -195,7 +206,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
 
   const noteCommands = useMemo(() => buildNoteCommands({
     hasActiveNote, activeTabPath, activeFileKind: activeEntry?.fileKind ?? 'markdown', isArchived,
-    onCreateNote, onCreateType, onSave,
+    currentFolderCreateOptions: folderCreateOptions, onCreateNote, onCreateType, onSave,
     onFindInNote, onReplaceInNote, onPastePlainText,
     onDeleteNote, onArchiveNote, onUnarchiveNote,
     onChangeNoteType, onMoveNoteToFolder, canMoveNoteToFolder,
@@ -206,7 +217,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     onRestoreDeletedNote, canRestoreDeletedNote,
   }), [
     hasActiveNote, activeTabPath, activeEntry?.fileKind, isArchived,
-    onCreateNote, onCreateType, onSave, onFindInNote, onReplaceInNote, onPastePlainText, onDeleteNote, onArchiveNote, onUnarchiveNote,
+    folderCreateOptions, onCreateNote, onCreateType, onSave, onFindInNote, onReplaceInNote, onPastePlainText, onDeleteNote, onArchiveNote, onUnarchiveNote,
     onChangeNoteType, onMoveNoteToFolder, canMoveNoteToFolder,
     onSetNoteIcon, onRemoveNoteIcon, activeNoteHasIcon, onOpenInNewWindow,
     onRevealActiveFile, onCopyActiveFilePath, onOpenActiveFileExternal,
