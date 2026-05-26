@@ -126,11 +126,19 @@ export interface Settings {
   default_ai_agent?: AiAgentId | null
   default_ai_target?: string | null
   ai_model_providers?: AiModelProvider[] | null
+  ai_workspace_conversations?: AiWorkspaceConversationSetting[] | null
   hide_gitignored_files?: boolean | null
   all_notes_show_pdfs?: boolean | null
   all_notes_show_images?: boolean | null
   all_notes_show_unsupported?: boolean | null
   multi_workspace_enabled?: boolean | null
+}
+
+export interface AiWorkspaceConversationSetting {
+  archived?: boolean | null
+  id: string
+  target_id?: string | null
+  title: string
 }
 
 export interface GitPullResult {

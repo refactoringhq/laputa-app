@@ -10,6 +10,8 @@ import type { ThemeMode } from './themeMode'
 type TrackedPreviewKind = FilePreviewKind | 'unsupported'
 type FilePreviewAction = 'copy_path' | 'open_external' | 'reveal'
 type AgentBlockedReason = 'agent_unavailable' | 'missing_vault'
+type AiWorkspaceMode = 'docked' | 'window'
+type AiWorkspaceTitleSource = 'generated' | 'manual'
 
 const ALL_NOTES_VISIBILITY_CATEGORIES: ReadonlyArray<keyof AllNotesFileVisibility> = [
   'pdfs',
@@ -143,4 +145,15 @@ export function trackAiAgentPermissionModeChanged(agent: AiAgentId, permissionMo
     agent,
     permission_mode: permissionMode,
   })
+}
+
+export function trackAiWorkspaceSidebarToggled(collapsed: boolean, mode: AiWorkspaceMode): void {
+  trackEvent('ai_workspace_sidebar_toggled', {
+    collapsed: numericFlag(collapsed),
+    mode,
+  })
+}
+
+export function trackAiWorkspaceChatTitled(source: AiWorkspaceTitleSource): void {
+  trackEvent('ai_workspace_chat_titled', { source })
 }

@@ -3,7 +3,7 @@ import type { AiModelProvider, AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import type { NoteListItem } from '../utils/ai-context'
 import type { VaultAiGuidanceStatus } from '../lib/vaultAiGuidance'
-import type { VaultEntry } from '../types'
+import type { AiWorkspaceConversationSetting, VaultEntry } from '../types'
 import { AiWorkspace } from './AiWorkspace'
 
 interface AppAiWorkspaceSurfaceProps {
@@ -11,6 +11,8 @@ interface AppAiWorkspaceSurfaceProps {
   activeNoteContent?: string | null
   aiAgentsStatus: AiAgentsStatus
   aiModelProviders?: AiModelProvider[]
+  conversationSettings?: AiWorkspaceConversationSetting[] | null
+  conversationSettingsReady?: boolean
   defaultAiAgent: AiAgentId
   defaultAiAgentReadiness: AiAgentReadiness
   defaultAiAgentReady: boolean
@@ -21,6 +23,7 @@ interface AppAiWorkspaceSurfaceProps {
   noteList: NoteListItem[]
   noteListFilter: { type: string | null; query: string }
   onClose: () => void
+  onConversationSettingsChange?: (conversations: AiWorkspaceConversationSetting[]) => void
   onDock?: () => void
   onFileCreated?: (relativePath: string) => void
   onFileModified?: (relativePath: string) => void
@@ -42,6 +45,8 @@ export function AppAiWorkspaceSurface({
   activeNoteContent,
   aiAgentsStatus,
   aiModelProviders,
+  conversationSettings,
+  conversationSettingsReady,
   defaultAiAgent,
   defaultAiAgentReadiness,
   defaultAiAgentReady,
@@ -52,6 +57,7 @@ export function AppAiWorkspaceSurface({
   noteList,
   noteListFilter,
   onClose,
+  onConversationSettingsChange,
   onDock,
   onFileCreated,
   onFileModified,
@@ -73,6 +79,8 @@ export function AppAiWorkspaceSurface({
       open={open}
       aiAgentsStatus={aiAgentsStatus}
       aiModelProviders={aiModelProviders}
+      conversationSettings={conversationSettings}
+      conversationSettingsReady={conversationSettingsReady}
       defaultAiAgent={defaultAiAgent}
       defaultAiTarget={defaultAiTarget}
       defaultAiAgentReadiness={defaultAiAgentReadiness}
@@ -84,6 +92,7 @@ export function AppAiWorkspaceSurface({
       noteList={noteList}
       noteListFilter={noteListFilter}
       onClose={onClose}
+      onConversationSettingsChange={onConversationSettingsChange}
       onDock={onDock}
       onPopOut={onPopOut}
       onOpenAiSettings={onOpenAiSettings}

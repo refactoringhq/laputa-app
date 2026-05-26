@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { AiWorkspace } from './AiWorkspace'
 import { buildAiWorkspaceTargetGroups } from './aiWorkspaceTargetGroups'
 import {
@@ -8,13 +9,16 @@ import {
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 import type { AiModelProvider } from '../lib/aiTargets'
+import type { AgentStatus } from '../hooks/useCliAiAgent'
 import { resetVaultConfigStore } from '../utils/vaultConfigStore'
+
+let mockedAgentStatus: AgentStatus = 'idle'
 
 vi.mock('./useAiPanelController', () => ({
   useAiPanelController: () => ({
     agent: {
       messages: [],
-      status: 'idle',
+      status: mockedAgentStatus,
       sendMessage: vi.fn(),
       clearConversation: vi.fn(),
       addLocalMarker: vi.fn(),
@@ -33,8 +37,21 @@ vi.mock('./useAiPanelController', () => ({
 }))
 
 vi.mock('./AiPanel', () => ({
-  AiPanelView: ({ showHeader }: { showHeader?: boolean }) => (
-    <div data-testid="ai-panel-view" data-show-header={String(showHeader)}>Chat surface</div>
+  AiPanelView: ({
+    composerControls,
+    onSendPrompt,
+    showHeader,
+  }: {
+    composerControls?: ReactNode
+    onSendPrompt?: (prompt: string) => void
+    showHeader?: boolean
+  }) => (
+    <div data-testid="ai-panel-view" data-show-header={String(showHeader)}>
+      <button type="button" onClick={() => onSendPrompt?.('summarize quarterly sponsor outreach')}>
+        Send mocked prompt
+      </button>
+      {composerControls}
+    </div>
   ),
 }))
 
@@ -75,6 +92,7 @@ const providers: AiModelProvider[] = [
 
 describe('AiWorkspace', () => {
   beforeEach(() => {
+    mockedAgentStatus = 'idle'
     resetVaultConfigStore()
   })
 
@@ -118,5 +136,64 @@ describe('AiWorkspace', () => {
     expect(within(menu).queryByText('Gemini CLI')).toBeNull()
     expect(within(menu).getByText('Ollama · Llama 3.2')).toBeTruthy()
     expect(within(menu).getByText('OpenAI · GPT-4.1')).toBeTruthy()
+  })
+
+  it('renames the first chat from the first prompt and stores conversation settings', () => {
+    const onConversationSettingsChange = vi.fn()
+    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} onConversationSettingsChange={onConversationSettingsChange} />)
+
+    fireEvent.click(screen.getByText('Send mocked prompt'))
+
+    expect(screen.getAllByText('Summarize Quarterly Sponsor Outreach').length).toBeGreaterThan(0)
+    expect(onConversationSettingsChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({ title: 'Summarize Quarterly Sponsor Outreach' }),
+    ])
+  })
+
+  it('renames a persisted default chat title from the first prompt', () => {
+    const onConversationSettingsChange = vi.fn()
+    render(
+      <AiWorkspace
+        open
+        mode="docked"
+        aiAgentsStatus={installedStatuses()}
+        aiModelProviders={providers}
+        conversationSettings={[{ id: 'stored-chat', title: 'Chat 1', target_id: null, archived: false }]}
+        vaultPath="/tmp/vault"
+        onClose={vi.fn()}
+        onConversationSettingsChange={onConversationSettingsChange}
+      />,
+    )
+
+    fireEvent.click(screen.getByText('Send mocked prompt'))
+
+    expect(screen.getAllByText('Summarize Quarterly Sponsor Outreach').length).toBeGreaterThan(0)
+    expect(onConversationSettingsChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'stored-chat', title: 'Summarize Quarterly Sponsor Outreach' }),
+    ])
+  })
+
+  it('allows a chat title to be renamed from the sidebar', () => {
+    const onConversationSettingsChange = vi.fn()
+    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} onConversationSettingsChange={onConversationSettingsChange} />)
+
+    fireEvent.doubleClick(screen.getByRole('button', { name: /chat 1/i }))
+    const input = screen.getByLabelText('Rename chat')
+    fireEvent.change(input, { target: { value: 'Sponsor Plan' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(screen.getAllByText('Sponsor Plan').length).toBeGreaterThan(0)
+    expect(onConversationSettingsChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({ title: 'Sponsor Plan' }),
+    ])
+  })
+
+  it('collapses the workspace sidebar from the sidebar header', () => {
+    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse AI chat list' }))
+
+    expect(screen.queryByText('AI workspace')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Expand AI chat list' })).toBeTruthy()
   })
 })

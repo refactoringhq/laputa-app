@@ -178,4 +178,5 @@ proposed → active → superseded
 | [0123](0123-full-vault-graph-for-secondary-note-windows.md) | Full vault graph for secondary note windows | superseded -> [0124](0124-cached-secondary-note-window-startup.md) |
 | [0124](0124-cached-secondary-note-window-startup.md) | Cached secondary note window startup | active |
 | [0126](0126-renderer-action-history.md) | Renderer action history for app-level undo and redo | active |
-| [0127](0127-native-ai-workspace-window.md) | Native AI workspace window | active |
+| [0127](0127-native-ai-workspace-window.md) | Native AI workspace window | superseded -> [0128](0128-lightweight-ai-workspace-window.md) |
+| [0128](0128-lightweight-ai-workspace-window.md) | Lightweight AI workspace window | active |

@@ -9,7 +9,7 @@ import {
 import {
   dockCurrentAiWorkspaceWindow,
   openAiWorkspaceWindow,
-  registerAiWorkspaceTrafficLightDocking,
+  type AiWorkspaceWindowContext,
 } from '../utils/openAiWorkspaceWindow'
 
 interface UseAppAiWorkspaceBridgeOptions {
@@ -20,6 +20,7 @@ interface UseAppAiWorkspaceBridgeOptions {
   openSettings: () => void
   setSettingsInitialSectionId: (sectionId: string | null) => void
   showAIChat: boolean
+  windowContext?: AiWorkspaceWindowContext
 }
 
 interface AppAiWorkspaceBridge {
@@ -79,13 +80,6 @@ function useCloseDisabledAiWorkspace(aiFeaturesEnabled: boolean, closeAIChat: ()
   }, [aiFeaturesEnabled, closeAIChat, showAIChat])
 }
 
-function useAiWorkspaceTrafficLights(aiWorkspaceWindow: boolean) {
-  useEffect(() => {
-    if (!aiWorkspaceWindow) return
-    return registerAiWorkspaceTrafficLightDocking()
-  }, [aiWorkspaceWindow])
-}
-
 export function useAppAiWorkspaceBridge({
   aiFeaturesEnabled,
   aiWorkspaceWindow,
@@ -94,11 +88,11 @@ export function useAppAiWorkspaceBridge({
   openSettings,
   setSettingsInitialSectionId,
   showAIChat,
+  windowContext,
 }: UseAppAiWorkspaceBridgeOptions): AppAiWorkspaceBridge {
   useOpenAiChatEvent(aiFeaturesEnabled, openAIChat)
   useCloseDisabledAiWorkspace(aiFeaturesEnabled, closeAIChat, showAIChat)
   useDockRequestEvent(aiFeaturesEnabled, aiWorkspaceWindow, openAIChat)
-  useAiWorkspaceTrafficLights(aiWorkspaceWindow)
 
   const handleOpenAiSettings = useCallback(() => {
     setSettingsInitialSectionId(SETTINGS_SECTION_IDS.ai)
@@ -113,7 +107,7 @@ export function useAppAiWorkspaceBridge({
   const handlePopOutAiWorkspace = useCallback(() => {
     closeAIChat()
     trackEvent('ai_workspace_pop_out')
-    void openAiWorkspaceWindow()
+    void openAiWorkspaceWindow(windowContext)
       .then((opened) => {
         if (!opened) openAIChat()
       })
@@ -121,7 +115,7 @@ export function useAppAiWorkspaceBridge({
         console.warn('[ai] Failed to open workspace window:', err)
         openAIChat()
       })
-  }, [closeAIChat, openAIChat])
+  }, [closeAIChat, openAIChat, windowContext])
 
   const handleDockCurrentAiWorkspaceWindow = useCallback(() => {
     trackEvent('ai_workspace_docked', { source: 'button' })

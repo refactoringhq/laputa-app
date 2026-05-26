@@ -1,26 +1,27 @@
 import { isTauri } from '../mock-tauri'
-import { shouldUseCustomWindowChrome } from './platform'
 import { rememberAiWorkspaceWindow } from './windowMode'
 import { AI_WORKSPACE_DOCK_REQUESTED_EVENT, requestDockAiWorkspace } from './aiPromptBridge'
 
 export const AI_WORKSPACE_WINDOW_LABEL = 'ai-workspace'
 
 const AI_WORKSPACE_WINDOW_TITLE = 'Tolaria AI'
-const MACOS_TRAFFIC_LIGHT_POSITION = { x: 18, y: 22 } as const
 const APP_ORIGIN_PROTOCOLS = new Set(['http:', 'https:'])
-const MINIMIZE_DOCK_POLL_MS = 250
 
-interface AiWorkspaceDockingState {
-  cancelled: boolean
-  minimizeTimer: number | null
-  unlistenClose: (() => void) | null
+export interface AiWorkspaceWindowContext {
+  vaultPath?: string
+  vaultPaths?: string[]
 }
 
-export function buildAiWorkspaceWindowUrl(windowLabel = AI_WORKSPACE_WINDOW_LABEL): string {
+export function buildAiWorkspaceWindowUrl(
+  windowLabel = AI_WORKSPACE_WINDOW_LABEL,
+  context: AiWorkspaceWindowContext = {},
+): string {
   const params = new URLSearchParams({
     window: 'ai-workspace',
     windowLabel,
   })
+  if (context.vaultPath) params.set('vault', context.vaultPath)
+  if (context.vaultPaths?.length) params.set('vaultPaths', JSON.stringify(context.vaultPaths))
 
   return `/?${params.toString()}`
 }
@@ -31,14 +32,39 @@ function resolveAiWorkspaceWindowUrlForRuntime(route: string): string {
   return new URL(route, window.location.origin).toString()
 }
 
-export function buildRuntimeAiWorkspaceWindowUrl(windowLabel = AI_WORKSPACE_WINDOW_LABEL): string {
-  return resolveAiWorkspaceWindowUrlForRuntime(buildAiWorkspaceWindowUrl(windowLabel))
+export function buildRuntimeAiWorkspaceWindowUrl(
+  windowLabel = AI_WORKSPACE_WINDOW_LABEL,
+  context: AiWorkspaceWindowContext = {},
+): string {
+  return resolveAiWorkspaceWindowUrlForRuntime(buildAiWorkspaceWindowUrl(windowLabel, context))
 }
 
-export async function openAiWorkspaceWindow(): Promise<boolean> {
+export function readAiWorkspaceWindowContext(search = window.location.search): AiWorkspaceWindowContext {
+  const params = new URLSearchParams(search)
+  const vaultPath = params.get('vault') ?? undefined
+  const vaultPaths = parseVaultPathsParam(params.get('vaultPaths'))
+  return { vaultPath, vaultPaths }
+}
+
+function parseVaultPathsParam(raw: string | null): string[] | undefined {
+  if (!raw) return undefined
+
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      const paths = parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      return paths.length > 0 ? paths : undefined
+    }
+  } catch {
+    return undefined
+  }
+
+  return undefined
+}
+
+export async function openAiWorkspaceWindow(context: AiWorkspaceWindowContext = {}): Promise<boolean> {
   if (!isTauri()) return false
 
-  const { LogicalPosition } = await import('@tauri-apps/api/dpi')
   const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
   const existingWindow = await WebviewWindow.getByLabel(AI_WORKSPACE_WINDOW_LABEL)
   if (existingWindow) {
@@ -50,7 +76,7 @@ export async function openAiWorkspaceWindow(): Promise<boolean> {
   rememberAiWorkspaceWindow()
 
   new WebviewWindow(AI_WORKSPACE_WINDOW_LABEL, {
-    url: buildRuntimeAiWorkspaceWindowUrl(AI_WORKSPACE_WINDOW_LABEL),
+    url: buildRuntimeAiWorkspaceWindowUrl(AI_WORKSPACE_WINDOW_LABEL, context),
     title: AI_WORKSPACE_WINDOW_TITLE,
     width: 940,
     height: 680,
@@ -58,11 +84,8 @@ export async function openAiWorkspaceWindow(): Promise<boolean> {
     minHeight: 420,
     center: true,
     resizable: true,
-    minimizable: true,
-    titleBarStyle: 'overlay',
-    trafficLightPosition: new LogicalPosition(MACOS_TRAFFIC_LIGHT_POSITION.x, MACOS_TRAFFIC_LIGHT_POSITION.y),
-    hiddenTitle: true,
-    decorations: !shouldUseCustomWindowChrome(),
+    minimizable: false,
+    decorations: false,
   })
 
   return true
@@ -77,58 +100,4 @@ export async function dockCurrentAiWorkspaceWindow(): Promise<void> {
   const { getCurrentWindow } = await import('@tauri-apps/api/window')
   await emitTo('main', AI_WORKSPACE_DOCK_REQUESTED_EVENT).catch(() => {})
   await getCurrentWindow().destroy().catch(() => {})
-}
-
-function dockOnCloseRequest(currentWindow: ReturnType<typeof import('@tauri-apps/api/window').getCurrentWindow>, state: AiWorkspaceDockingState) {
-  void currentWindow.onCloseRequested((event) => {
-    event.preventDefault()
-    void dockCurrentAiWorkspaceWindow()
-  }).then((unlisten) => {
-    if (state.cancelled) {
-      unlisten()
-      return
-    }
-
-    state.unlistenClose = unlisten
-  })
-}
-
-function dockOnMinimize(currentWindow: ReturnType<typeof import('@tauri-apps/api/window').getCurrentWindow>, state: AiWorkspaceDockingState) {
-  state.minimizeTimer = window.setInterval(() => {
-    void currentWindow.isMinimized()
-      .then((minimized) => {
-        if (!minimized || state.cancelled) return
-
-        void currentWindow.unminimize().catch(() => {})
-        void dockCurrentAiWorkspaceWindow()
-      })
-      .catch(() => {})
-  }, MINIMIZE_DOCK_POLL_MS)
-}
-
-function connectTrafficLightDocking(state: AiWorkspaceDockingState) {
-  void import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-    if (state.cancelled) return
-
-    const currentWindow = getCurrentWindow()
-    dockOnCloseRequest(currentWindow, state)
-    dockOnMinimize(currentWindow, state)
-  })
-}
-
-export function registerAiWorkspaceTrafficLightDocking(): () => void {
-  if (!isTauri()) return () => {}
-
-  const state: AiWorkspaceDockingState = {
-    cancelled: false,
-    minimizeTimer: null,
-    unlistenClose: null,
-  }
-  connectTrafficLightDocking(state)
-
-  return () => {
-    state.cancelled = true
-    state.unlistenClose?.()
-    if (state.minimizeTimer !== null) window.clearInterval(state.minimizeTimer)
-  }
 }

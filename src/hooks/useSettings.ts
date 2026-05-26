@@ -55,6 +55,7 @@ const EMPTY_SETTINGS: Settings = {
   ai_features_enabled: null,
   default_ai_target: null,
   ai_model_providers: null,
+  ai_workspace_conversations: null,
   hide_gitignored_files: null,
   all_notes_show_pdfs: null,
   all_notes_show_images: null,
@@ -80,12 +81,24 @@ function normalizeSettings(settings: Settings): Settings {
     default_ai_agent: normalizeStoredAiAgent(settings.default_ai_agent),
     default_ai_target: settings.default_ai_target?.trim() || null,
     ai_model_providers: aiModelProviders.length > 0 ? aiModelProviders : null,
+    ai_workspace_conversations: normalizeAiWorkspaceConversations(settings.ai_workspace_conversations),
     hide_gitignored_files: settings.hide_gitignored_files ?? null,
     all_notes_show_pdfs: settings.all_notes_show_pdfs ?? null,
     all_notes_show_images: settings.all_notes_show_images ?? null,
     all_notes_show_unsupported: settings.all_notes_show_unsupported ?? null,
     multi_workspace_enabled: settings.multi_workspace_enabled ?? null,
   }
+}
+
+function normalizeAiWorkspaceConversations(settings: Settings['ai_workspace_conversations']) {
+  const conversations = (settings ?? []).map((conversation) => ({
+    archived: conversation.archived === true,
+    id: conversation.id.trim(),
+    target_id: conversation.target_id?.trim() || null,
+    title: conversation.title.trim(),
+  })).filter((conversation) => conversation.id && conversation.title)
+
+  return conversations.length > 0 ? conversations : null
 }
 
 function effectiveThemeMode(settings: Settings): ThemeMode {

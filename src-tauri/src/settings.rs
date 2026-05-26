@@ -66,6 +66,14 @@ const SUPPORTED_UI_LANGUAGE_ALIASES: &[(&str, &str)] = &[
 ];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct AiWorkspaceConversationSetting {
+    pub archived: Option<bool>,
+    pub id: String,
+    pub target_id: Option<String>,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Settings {
     pub auto_pull_interval_minutes: Option<u32>,
     pub git_enabled: Option<bool>,
@@ -88,6 +96,7 @@ pub struct Settings {
     pub default_ai_agent: Option<String>,
     pub default_ai_target: Option<String>,
     pub ai_model_providers: Option<Vec<AiModelProvider>>,
+    pub ai_workspace_conversations: Option<Vec<AiWorkspaceConversationSetting>>,
     pub hide_gitignored_files: Option<bool>,
     pub all_notes_show_pdfs: Option<bool>,
     pub all_notes_show_images: Option<bool>,
@@ -203,11 +212,44 @@ fn normalize_settings(settings: Settings) -> Settings {
         default_ai_agent: normalize_default_ai_agent(settings.default_ai_agent.as_deref()),
         default_ai_target: normalize_optional_string(settings.default_ai_target),
         ai_model_providers: normalize_ai_model_providers(settings.ai_model_providers),
+        ai_workspace_conversations: normalize_ai_workspace_conversations(
+            settings.ai_workspace_conversations,
+        ),
         hide_gitignored_files: settings.hide_gitignored_files,
         all_notes_show_pdfs: settings.all_notes_show_pdfs,
         all_notes_show_images: settings.all_notes_show_images,
         all_notes_show_unsupported: settings.all_notes_show_unsupported,
         multi_workspace_enabled: settings.multi_workspace_enabled,
+    }
+}
+
+fn normalize_ai_workspace_conversations(
+    conversations: Option<Vec<AiWorkspaceConversationSetting>>,
+) -> Option<Vec<AiWorkspaceConversationSetting>> {
+    let normalized: Vec<AiWorkspaceConversationSetting> = conversations
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|conversation| {
+            let id = conversation.id.trim().to_string();
+            let title = conversation.title.trim().to_string();
+            if id.is_empty() || title.is_empty() {
+                return None;
+            }
+
+            Some(AiWorkspaceConversationSetting {
+                archived: conversation.archived,
+                id,
+                target_id: normalize_optional_string(conversation.target_id),
+                title,
+            })
+        })
+        .take(100)
+        .collect();
+
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
     }
 }
 
@@ -357,6 +399,7 @@ mod tests {
             default_ai_agent: Some("codex".to_string()),
             default_ai_target: Some("agent:codex".to_string()),
             ai_model_providers: None,
+            ai_workspace_conversations: None,
             hide_gitignored_files: Some(false),
             multi_workspace_enabled: Some(true),
             all_notes_show_pdfs: Some(true),

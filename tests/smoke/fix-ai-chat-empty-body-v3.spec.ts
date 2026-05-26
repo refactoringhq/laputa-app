@@ -49,7 +49,10 @@ test.describe('AI chat empty body fix — no regression', () => {
 
     // Open the AI panel from the editor toolbar
     await page.getByRole('button', { name: 'Open the AI panel' }).click()
+    await expect(page.getByTestId('ai-workspace')).toBeVisible({ timeout: 3000 })
     await expect(page.getByTestId('ai-panel')).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId('ai-workspace-target-trigger')).toBeVisible()
+    await expect(page.getByTestId('ai-workspace-permission-trigger')).toBeVisible()
 
     // Send a message
     const input = page.getByTestId('agent-input')

@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useCallback, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import {
   AiPanelComposer,
   AiPanelContextBar,
@@ -58,10 +58,75 @@ interface AiPanelViewProps {
   entries?: VaultEntry[]
   interactive?: boolean
   showHeader?: boolean
+  composerControls?: ReactNode
+  onSendPrompt?: (text: string) => void
 }
 
 function readinessFromReadyFlag(ready: boolean | undefined): AiAgentReadiness {
   return (ready ?? true) ? 'ready' : 'missing'
+}
+
+interface AiPanelViewModel {
+  agentLabel: string
+  defaultAiAgent: AiAgentId
+  defaultAiAgentReadiness: AiAgentReadiness
+  targetKind: AiTarget['kind']
+}
+
+function resolveAiPanelViewModel({
+  defaultAiAgent,
+  defaultAiAgentReadiness,
+  defaultAiAgentReady,
+  defaultAiTarget,
+}: {
+  defaultAiAgent?: AiAgentId
+  defaultAiAgentReadiness?: AiAgentReadiness
+  defaultAiAgentReady?: boolean
+  defaultAiTarget?: AiTarget
+}): AiPanelViewModel {
+  const resolvedAgent = defaultAiAgent ?? DEFAULT_AI_AGENT
+  const resolvedReadiness = defaultAiAgentReadiness ?? readinessFromReadyFlag(defaultAiAgentReady)
+
+  return {
+    agentLabel: defaultAiTarget?.label ?? getAiAgentDefinition(resolvedAgent).label,
+    defaultAiAgent: resolvedAgent,
+    defaultAiAgentReadiness: resolvedReadiness,
+    targetKind: defaultAiTarget?.kind ?? 'agent',
+  }
+}
+
+function aiPanelFrameStyle(isActive: boolean): CSSProperties {
+  return {
+    outline: 'none',
+    borderLeft: isActive
+      ? '2px solid var(--accent-blue)'
+      : '1px solid var(--border)',
+    animation: isActive ? 'ai-border-pulse 2s ease-in-out infinite' : undefined,
+    transition: 'border-color 0.3s ease',
+  }
+}
+
+function AiPanelFrame({
+  children,
+  isActive,
+  panelRef,
+}: {
+  children: ReactNode
+  isActive: boolean
+  panelRef: RefObject<HTMLElement | null>
+}) {
+  return (
+    <aside
+      ref={panelRef}
+      tabIndex={-1}
+      className="flex flex-1 flex-col overflow-hidden bg-background text-foreground"
+      style={aiPanelFrameStyle(isActive)}
+      data-testid="ai-panel"
+      data-ai-active={isActive || undefined}
+    >
+      {children}
+    </aside>
+  )
 }
 
 export function AiPanelView({
@@ -78,15 +143,17 @@ export function AiPanelView({
   entries,
   interactive = true,
   showHeader = true,
+  composerControls,
+  onSendPrompt,
 }: AiPanelViewProps) {
-  const defaultAiAgent = providedDefaultAiAgent ?? DEFAULT_AI_AGENT
-  const defaultAiAgentReadiness = providedDefaultAiAgentReadiness
-    ?? readinessFromReadyFlag(providedDefaultAiAgentReady)
+  const view = resolveAiPanelViewModel({
+    defaultAiAgent: providedDefaultAiAgent,
+    defaultAiAgentReadiness: providedDefaultAiAgentReadiness,
+    defaultAiAgentReady: providedDefaultAiAgentReady,
+    defaultAiTarget,
+  })
   const inputRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
-  const activeTarget = defaultAiTarget
-  const agentLabel = activeTarget?.label ?? getAiAgentDefinition(defaultAiAgent).label
-  const targetKind = activeTarget?.kind ?? 'agent'
   const {
     agent,
     input,
@@ -110,28 +177,19 @@ export function AiPanelView({
     onClose,
     enabled: interactive,
   })
+  const handleComposerSend = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
+    if (!text.trim() || isActive) return
+    onSendPrompt?.(text)
+    handleSend(text, references)
+  }, [handleSend, isActive, onSendPrompt])
 
   return (
-    <aside
-      ref={panelRef}
-      tabIndex={-1}
-      className="flex flex-1 flex-col overflow-hidden bg-background text-foreground"
-      style={{
-        outline: 'none',
-        borderLeft: isActive
-          ? '2px solid var(--accent-blue)'
-          : '1px solid var(--border)',
-        animation: isActive ? 'ai-border-pulse 2s ease-in-out infinite' : undefined,
-        transition: 'border-color 0.3s ease',
-      }}
-      data-testid="ai-panel"
-      data-ai-active={isActive || undefined}
-    >
+    <AiPanelFrame panelRef={panelRef} isActive={isActive}>
       {showHeader && (
         <AiPanelHeader
-          agentLabel={agentLabel}
-          agentReadiness={defaultAiAgentReadiness}
-          targetKind={targetKind}
+          agentLabel={view.agentLabel}
+          agentReadiness={view.defaultAiAgentReadiness}
+          targetKind={view.targetKind}
           locale={locale}
           permissionMode={permissionMode}
           permissionModeDisabled={isActive}
@@ -144,8 +202,8 @@ export function AiPanelView({
         <AiPanelContextBar activeEntry={activeEntry} linkedCount={linkedEntries.length} locale={locale} />
       )}
       <AiPanelMessageHistory
-        agentLabel={agentLabel}
-        agentReadiness={defaultAiAgentReadiness}
+        agentLabel={view.agentLabel}
+        agentReadiness={view.defaultAiAgentReadiness}
         locale={locale}
         messages={agent.messages}
         isActive={isActive}
@@ -155,17 +213,18 @@ export function AiPanelView({
       />
       <AiPanelComposer
         entries={entries ?? []}
-        agentLabel={agentLabel}
-        agentReadiness={defaultAiAgentReadiness}
+        agentLabel={view.agentLabel}
+        agentReadiness={view.defaultAiAgentReadiness}
         locale={locale}
         input={input}
         inputRef={inputRef}
         isActive={isActive}
+        controls={composerControls}
         onChange={setInput}
-        onSend={handleSend}
+        onSend={handleComposerSend}
         onUnsupportedAiPaste={onUnsupportedAiPaste}
       />
-    </aside>
+    </AiPanelFrame>
   )
 }
 

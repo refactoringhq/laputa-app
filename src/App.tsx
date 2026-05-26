@@ -13,6 +13,7 @@ import { CommitDialog } from './components/CommitDialog'
 import { PulseView } from './components/PulseView'
 import { StatusBar } from './components/StatusBar'
 import { AppAiWorkspaceSurface } from './components/AppAiWorkspaceSurface'
+import { AiWorkspaceWindowApp } from './components/AiWorkspaceWindowApp'
 import { SettingsPanel } from './components/SettingsPanel'
 import { CloneVaultModal } from './components/CloneVaultModal'
 import { FeedbackDialog } from './components/FeedbackDialog'
@@ -82,14 +83,14 @@ import { DeleteProgressNotice } from './components/DeleteProgressNotice'
 import { UpdateBanner } from './components/UpdateBanner'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from './mock-tauri'
-import type { GitSetupPreference, SidebarSelection, InboxPeriod, ModifiedFile, VaultEntry, ViewDefinition, ViewFile, WorkspaceIdentity } from './types'
+import type { AiWorkspaceConversationSetting, GitSetupPreference, SidebarSelection, InboxPeriod, ModifiedFile, VaultEntry, ViewDefinition, ViewFile, WorkspaceIdentity } from './types'
 import type { NoteListItem } from './utils/ai-context'
 import { initializeNoteProperties } from './utils/initializeNoteProperties'
 import { filterEntries, filterInboxEntries, type NoteListFilter } from './utils/noteListHelpers'
 import { openNoteInNewWindow } from './utils/openNoteWindow'
 import { isWindows } from './utils/platform'
 import { getPulledVaultUpdateOptions, refreshPulledVaultState } from './utils/pulledVaultRefresh'
-import { isAiWorkspaceWindow, isNoteWindow, getNoteWindowParams } from './utils/windowMode'
+import { isAiWorkspaceWindow, isNoteWindow, getNoteWindowParams, type NoteWindowParams } from './utils/windowMode'
 import { GitSetupDialog } from './components/GitRequiredModal'
 import { RenameDetectedBanner } from './components/RenameDetectedBanner'
 import { openNoteListPropertiesPicker } from './components/note-list/noteListPropertiesEvents'
@@ -132,6 +133,7 @@ import { useStartupScreenState } from './hooks/useStartupScreenState'
 import { useGitFileWorkflows } from './hooks/useGitFileWorkflows'
 import { useAutoGitWork } from './hooks/useAutoGitWork'
 import { useAppAiWorkspaceBridge } from './hooks/useAppAiWorkspaceBridge'
+import type { AiWorkspaceWindowContext } from './utils/openAiWorkspaceWindow'
 import './App.css'
 
 const ACTIVE_EDITOR_SURFACE_SELECTOR = '.editor__blocknote-container, .raw-editor-codemirror'
@@ -240,10 +242,25 @@ function shouldPreserveViewRootPath(views: ViewFile[], editingRootPath?: string)
   return Boolean(editingRootPath) || views.some((view) => view.rootPath)
 }
 
+function aiWorkspaceWindowContextForPath(resolvedPath: string): AiWorkspaceWindowContext {
+  return {
+    vaultPath: resolvedPath,
+    vaultPaths: resolvedPath ? [resolvedPath] : [],
+  }
+}
+
 /** Wraps useEditorSave to also keep outgoingLinks in sync on save and on content change. */
 function App() {
   const noteWindowParams = useMemo(() => isNoteWindow() ? getNoteWindowParams() : null, [])
   const aiWorkspaceWindow = useMemo(() => isAiWorkspaceWindow(), [])
+
+  if (aiWorkspaceWindow) return <AiWorkspaceWindowApp />
+
+  return <MainApp noteWindowParams={noteWindowParams} />
+}
+
+function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | null }) {
+  const aiWorkspaceWindow = false
   const [selection, setSelection] = useState<SidebarSelection>(DEFAULT_SELECTION)
   const [noteListFilter, setNoteListFilter] = useState<NoteListFilter>('open')
   const selectionRef = useRef<SidebarSelection>(DEFAULT_SELECTION)
@@ -345,6 +362,7 @@ function App() {
       ? onboarding.state.vaultPath
       : vaultSwitcher.vaultPath
   )
+  const aiWorkspaceWindowContext = aiWorkspaceWindowContextForPath(resolvedPath)
   const [settingsInitialSectionId, setSettingsInitialSectionId] = useState<string | null>(null)
   const {
     effectiveShowAIChat,
@@ -360,6 +378,7 @@ function App() {
     openSettings: dialogs.openSettings,
     setSettingsInitialSectionId,
     showAIChat,
+    windowContext: aiWorkspaceWindowContext,
   })
   const {
     folderVaults,
@@ -1723,7 +1742,10 @@ function App() {
     vaultIsLoading: vault.isLoading,
     vaultSwitcher,
   })
-  const aiWorkspaceSurface = <AppAiWorkspaceSurface mode={aiWorkspaceWindow ? 'window' : 'docked'} open={aiWorkspaceWindow || effectiveShowAIChat} aiAgentsStatus={aiAgentsStatus} aiModelProviders={settings.ai_model_providers ?? []} defaultAiAgent={aiAgentPreferences.defaultAiAgent} defaultAiTarget={aiAgentPreferences.defaultAiTarget} defaultAiAgentReadiness={aiAgentPreferences.defaultAiAgentReadiness} defaultAiAgentReady={aiAgentPreferences.defaultAiAgentReady} activeEntry={activeTab?.entry ?? null} activeNoteContent={activeTab?.content ?? null} entries={visibleEntries} openTabs={notes.tabs.map((tab) => tab.entry)} noteList={aiNoteList} noteListFilter={aiNoteListFilter} onClose={aiWorkspaceWindow ? handleDockCurrentAiWorkspaceWindow : closeAIChat} onDock={aiWorkspaceWindow ? handleDockCurrentAiWorkspaceWindow : undefined} onPopOut={aiWorkspaceWindow ? undefined : handlePopOutAiWorkspace} onOpenAiSettings={aiWorkspaceWindow ? undefined : handleOpenAiSettings} onOpenNote={notes.handleNavigateWikilink} onRestoreVaultAiGuidance={aiFeaturesEnabled ? () => { void restoreVaultAiGuidance() } : undefined} onUnsupportedAiPaste={setToastMessage} onFileCreated={vaultBridge.handleAgentFileCreated} onFileModified={vaultBridge.handleAgentFileModified} onVaultChanged={vaultBridge.handleAgentVaultChanged} vaultAiGuidanceStatus={vaultAiGuidanceStatus} vaultPath={activeEditorVaultPath} vaultPaths={writableVaultPaths} locale={appLocale} />
+  const handleAiWorkspaceConversationsChange = useCallback((conversations: AiWorkspaceConversationSetting[]) => {
+    void saveSettings({ ...settings, ai_workspace_conversations: conversations })
+  }, [saveSettings, settings])
+  const aiWorkspaceSurface = <AppAiWorkspaceSurface mode={aiWorkspaceWindow ? 'window' : 'docked'} open={aiWorkspaceWindow || effectiveShowAIChat} aiAgentsStatus={aiAgentsStatus} aiModelProviders={settings.ai_model_providers ?? []} conversationSettings={settings.ai_workspace_conversations ?? null} conversationSettingsReady={settingsLoaded} defaultAiAgent={aiAgentPreferences.defaultAiAgent} defaultAiTarget={aiAgentPreferences.defaultAiTarget} defaultAiAgentReadiness={aiAgentPreferences.defaultAiAgentReadiness} defaultAiAgentReady={aiAgentPreferences.defaultAiAgentReady} activeEntry={activeTab?.entry ?? null} activeNoteContent={activeTab?.content ?? null} entries={visibleEntries} openTabs={notes.tabs.map((tab) => tab.entry)} noteList={aiNoteList} noteListFilter={aiNoteListFilter} onClose={aiWorkspaceWindow ? handleDockCurrentAiWorkspaceWindow : closeAIChat} onConversationSettingsChange={handleAiWorkspaceConversationsChange} onDock={aiWorkspaceWindow ? handleDockCurrentAiWorkspaceWindow : undefined} onPopOut={aiWorkspaceWindow ? undefined : handlePopOutAiWorkspace} onOpenAiSettings={aiWorkspaceWindow ? undefined : handleOpenAiSettings} onOpenNote={notes.handleNavigateWikilink} onRestoreVaultAiGuidance={aiFeaturesEnabled ? () => { void restoreVaultAiGuidance() } : undefined} onUnsupportedAiPaste={setToastMessage} onFileCreated={vaultBridge.handleAgentFileCreated} onFileModified={vaultBridge.handleAgentFileModified} onVaultChanged={vaultBridge.handleAgentVaultChanged} vaultAiGuidanceStatus={vaultAiGuidanceStatus} vaultPath={activeEditorVaultPath} vaultPaths={writableVaultPaths} locale={appLocale} />
   if (shouldShowStartupScreen) {
     return (
       <StartupScreen

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 
 interface TauriCapability {
   permissions: string[]
+  windows: string[]
 }
 
 const LINUX_WINDOW_CHROME_PERMISSIONS = [
@@ -21,5 +22,13 @@ describe('Tauri window-control permissions', () => {
     expect(capability.permissions).toEqual(
       expect.arrayContaining([...LINUX_WINDOW_CHROME_PERMISSIONS]),
     )
+  })
+
+  it('allows the AI workspace pop-out window to use app APIs', () => {
+    const capability = JSON.parse(
+      readFileSync(`${process.cwd()}/src-tauri/capabilities/default.json`, 'utf8'),
+    ) as TauriCapability
+
+    expect(capability.windows).toEqual(expect.arrayContaining(['main', 'ai-workspace', 'note-*']))
   })
 })

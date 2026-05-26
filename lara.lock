@@ -314,6 +314,8 @@ files:
     ai.panel.send: 747c6a3564774149c989884e0c581d53
     ai.workspace.title: d5b381672258b0bb54ede1e886895b3e
     ai.workspace.newChat: a917baaf1484ec5dc85f19ab8fc4f4e9
+    ai.workspace.collapseSidebar: 9ecc763686b7c61547281f3e05ffd06f
+    ai.workspace.expandSidebar: 281b619f3da2ba27e604302c3c00db56
     ai.workspace.close: 184649ab030e9a609488608221c28d8c
     ai.workspace.popOut: 85ec25ec056b3082651e6e3fcfa57416
     ai.workspace.dock: 72e81ed23007ec6fb9820b9abec353c4
@@ -325,6 +327,7 @@ files:
     ai.workspace.noActiveChats: f0cdbf09f23eb9a2efbb5977bcc39c1a
     ai.workspace.noArchivedChats: 68410efd12fc0308ce1ed2225000d4d5
     ai.workspace.chatTitle: 2ecae1c7ffb3296a789ff8f3b3ed2922
+    ai.workspace.renameChat: 0feba25e166f55afc51c4ebb33d8d757
     ai.workspace.status.archived: 7d69b3cb4cada18ae61811304f8fbcb5
     ai.workspace.status.idle: e599161956d626eda4cb0a5ffb85271c
     ai.workspace.status.running: 5bda814c4aedb126839228f1a3d92f09

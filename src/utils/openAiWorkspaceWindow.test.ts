@@ -5,9 +5,9 @@ import {
   buildRuntimeAiWorkspaceWindowUrl,
   dockCurrentAiWorkspaceWindow,
   openAiWorkspaceWindow,
+  readAiWorkspaceWindowContext,
 } from './openAiWorkspaceWindow'
 import { isTauri } from '../mock-tauri'
-import { shouldUseCustomWindowChrome } from './platform'
 import { AI_WORKSPACE_DOCK_REQUESTED_EVENT } from './aiPromptBridge'
 
 const webviewWindowCalls = vi.fn()
@@ -32,10 +32,6 @@ vi.mock('../mock-tauri', () => ({
   isTauri: vi.fn(),
 }))
 
-vi.mock('./platform', () => ({
-  shouldUseCustomWindowChrome: vi.fn(),
-}))
-
 vi.mock('@tauri-apps/api/webviewWindow', () => ({
   WebviewWindow: class MockWebviewWindow {
     static getByLabel = webviewGetByLabel
@@ -43,12 +39,6 @@ vi.mock('@tauri-apps/api/webviewWindow', () => ({
     constructor(label: string, options: unknown) {
       webviewWindowCalls(label, options)
     }
-  },
-}))
-
-vi.mock('@tauri-apps/api/dpi', () => ({
-  LogicalPosition: class MockLogicalPosition {
-    constructor(public x: number, public y: number) {}
   },
 }))
 
@@ -64,18 +54,31 @@ describe('openAiWorkspaceWindow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(isTauri).mockReturnValue(false)
-    vi.mocked(shouldUseCustomWindowChrome).mockReturnValue(false)
     webviewGetByLabel.mockResolvedValue(null)
     localStorage.clear()
   })
 
   it('builds the AI workspace route', () => {
-    const url = buildAiWorkspaceWindowUrl('ai-workspace')
+    const url = buildAiWorkspaceWindowUrl('ai-workspace', {
+      vaultPath: '/tmp/vault',
+      vaultPaths: ['/tmp/vault', '/tmp/other'],
+    })
     const parsed = new URL(url, 'https://tolaria.localhost')
 
     expect(parsed.pathname).toBe('/')
     expect(parsed.searchParams.get('window')).toBe('ai-workspace')
     expect(parsed.searchParams.get('windowLabel')).toBe('ai-workspace')
+    expect(parsed.searchParams.get('vault')).toBe('/tmp/vault')
+    expect(JSON.parse(parsed.searchParams.get('vaultPaths') ?? '[]')).toEqual(['/tmp/vault', '/tmp/other'])
+  })
+
+  it('reads the AI workspace route context', () => {
+    const search = '?window=ai-workspace&vault=%2Ftmp%2Fvault&vaultPaths=%5B%22%2Ftmp%2Fvault%22%5D'
+
+    expect(readAiWorkspaceWindowContext(search)).toEqual({
+      vaultPath: '/tmp/vault',
+      vaultPaths: ['/tmp/vault'],
+    })
   })
 
   it('resolves the runtime route against the current app origin', () => {
@@ -95,20 +98,19 @@ describe('openAiWorkspaceWindow', () => {
   it('opens one native Tauri AI workspace window', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
 
-    await openAiWorkspaceWindow()
+    await openAiWorkspaceWindow({ vaultPath: '/tmp/vault' })
 
     expect(webviewWindowCalls).toHaveBeenCalledWith(
       AI_WORKSPACE_WINDOW_LABEL,
       expect.objectContaining({
+        url: expect.stringContaining('vault=%2Ftmp%2Fvault'),
         title: 'Tolaria AI',
         width: 940,
         height: 680,
         minWidth: 520,
         minHeight: 420,
-        titleBarStyle: 'overlay',
-        trafficLightPosition: expect.objectContaining({ x: 18, y: 22 }),
-        hiddenTitle: true,
-        decorations: true,
+        minimizable: false,
+        decorations: false,
       }),
     )
     expect(localStorage.getItem('tolaria:ai-workspace-window:ai-workspace')).toBe('true')

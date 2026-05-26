@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   Archive,
   ArrowSquareIn,
   ArrowSquareOut,
   CaretDown,
   GearSix,
-  Plus,
-  Robot,
   WarningCircle,
   X,
 } from '@phosphor-icons/react'
@@ -47,19 +45,24 @@ import {
   type VaultAiGuidanceStatus,
 } from '../lib/vaultAiGuidance'
 import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
+import { trackAiWorkspaceChatTitled, trackAiWorkspaceSidebarToggled } from '../lib/productAnalytics'
 import type { AgentStatus } from '../hooks/useCliAiAgent'
+import type { AiWorkspaceConversationSetting } from '../types'
 import type { NoteListItem } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 import { NEW_AI_CHAT_EVENT } from '../utils/aiPromptBridge'
+import { generateAiConversationTitle } from '../utils/aiConversationTitle'
 import { AiPanelView } from './AiPanel'
+import { ConversationSidebar } from './AiWorkspaceSidebar'
 import { useAiPanelController } from './useAiPanelController'
 import { buildAiWorkspaceTargetGroups, type AiWorkspaceTargetGroups } from './aiWorkspaceTargetGroups'
 
-interface AiConversation {
+export interface AiConversation {
   archived: boolean
   id: string
   targetId: string
   title: string
+  usesDefaultTitle: boolean
   usesDefaultTarget: boolean
 }
 
@@ -68,6 +71,8 @@ interface AiWorkspaceProps {
   activeNoteContent?: string | null
   aiAgentsStatus: AiAgentsStatus
   aiModelProviders?: AiModelProvider[]
+  conversationSettings?: AiWorkspaceConversationSetting[] | null
+  conversationSettingsReady?: boolean
   defaultAiAgent?: AiAgentId
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
@@ -78,6 +83,7 @@ interface AiWorkspaceProps {
   noteList?: NoteListItem[]
   noteListFilter?: { type: string | null; query: string }
   onClose: () => void
+  onConversationSettingsChange?: (conversations: AiWorkspaceConversationSetting[]) => void
   onDock?: () => void
   onFileCreated?: (relativePath: string) => void
   onFileModified?: (relativePath: string) => void
@@ -94,22 +100,34 @@ interface AiWorkspaceProps {
   vaultPaths?: string[]
 }
 
+let fallbackConversationIdCounter = 0
+
+function randomConversationIdPart(): string {
+  const cryptoApi = globalThis.crypto
+  if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID().slice(0, 8)
+
+  if (typeof cryptoApi?.getRandomValues === 'function') {
+    const values = new Uint32Array(2)
+    cryptoApi.getRandomValues(values)
+    return Array.from(values, (value) => value.toString(36)).join('').slice(0, 8)
+  }
+
+  fallbackConversationIdCounter += 1
+  return fallbackConversationIdCounter.toString(36).padStart(4, '0')
+}
+
 function nextConversationId(): string {
-  return `ai-chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `ai-chat-${Date.now()}-${randomConversationIdPart()}`
 }
 
 function statusLabelKey(status: AgentStatus): TranslationKey {
   if (status === 'thinking' || status === 'tool-executing') return 'ai.workspace.status.running'
   if (status === 'error') return 'ai.workspace.status.error'
-  if (status === 'done') return 'ai.workspace.status.done'
   return 'ai.workspace.status.idle'
 }
 
-function statusDotClassName(status: AgentStatus | undefined): string {
-  if (status === 'thinking' || status === 'tool-executing') return 'bg-blue-500'
-  if (status === 'error') return 'bg-destructive'
-  if (status === 'done') return 'bg-green-600'
-  return 'bg-muted-foreground'
+function isRunningStatus(status: AgentStatus | undefined): boolean {
+  return status === 'thinking' || status === 'tool-executing'
 }
 
 function agentReadinessForTarget(target: AiTarget, statuses: AiAgentsStatus): AiAgentReadiness {
@@ -142,187 +160,196 @@ function createConversation(locale: AppLocale, target: AiTarget, index: number):
     id: nextConversationId(),
     targetId: target.id,
     title: translate(locale, 'ai.workspace.chatTitle', { index }),
+    usesDefaultTitle: true,
     usesDefaultTarget: true,
   }
 }
 
-function useConversations(locale: AppLocale, fallbackTarget: AiTarget) {
-  const [conversations, setConversations] = useState<AiConversation[]>(() => [
-    createConversation(locale, fallbackTarget, 1),
-  ])
+function isDefaultConversationTitle(title: string): boolean {
+  return /^Chat\s+\d+$/i.test(title.trim())
+}
+
+function conversationFromSetting(setting: AiWorkspaceConversationSetting, fallbackTarget: AiTarget): AiConversation | null {
+  const id = setting.id.trim()
+  const title = setting.title.trim()
+  if (!id || !title) return null
+
+  return {
+    archived: setting.archived === true,
+    id,
+    targetId: setting.target_id?.trim() || fallbackTarget.id,
+    title,
+    usesDefaultTitle: isDefaultConversationTitle(title),
+    usesDefaultTarget: !setting.target_id,
+  }
+}
+
+function conversationsFromSettings(
+  settings: AiWorkspaceConversationSetting[] | null | undefined,
+  fallbackTarget: AiTarget,
+  locale: AppLocale,
+): AiConversation[] {
+  const stored = (settings ?? [])
+    .map((setting) => conversationFromSetting(setting, fallbackTarget))
+    .filter((conversation): conversation is AiConversation => conversation !== null)
+  return stored.length > 0 ? stored : [createConversation(locale, fallbackTarget, 1)]
+}
+
+function conversationsToSettings(conversations: AiConversation[]): AiWorkspaceConversationSetting[] {
+  return conversations.map((conversation) => ({
+    archived: conversation.archived,
+    id: conversation.id,
+    target_id: conversation.usesDefaultTarget ? null : conversation.targetId,
+    title: conversation.title,
+  }))
+}
+
+interface UseConversationsOptions {
+  fallbackTarget: AiTarget
+  locale: AppLocale
+  onSettingsChange?: (conversations: AiWorkspaceConversationSetting[]) => void
+  settings?: AiWorkspaceConversationSetting[] | null
+  settingsReady: boolean
+}
+
+function appendConversationState(
+  current: AiConversation[],
+  locale: AppLocale,
+  target: AiTarget,
+): { activeId: string; conversations: AiConversation[] } {
+  const next = createConversation(locale, target, current.length + 1)
+  return {
+    activeId: next.id,
+    conversations: [...current, next],
+  }
+}
+
+function archiveConversationState(
+  current: AiConversation[],
+  id: string,
+): { activeId?: string; conversations: AiConversation[] } {
+  const conversations = current.map((conversation) => (
+    conversation.id === id ? { ...conversation, archived: true } : conversation
+  ))
+  const fallback = conversations.find((conversation) => !conversation.archived && conversation.id !== id)
+  return { activeId: fallback?.id, conversations }
+}
+
+function restoreConversationState(current: AiConversation[], id: string): AiConversation[] {
+  return current.map((conversation) => (
+    conversation.id === id ? { ...conversation, archived: false } : conversation
+  ))
+}
+
+function retargetConversationState(current: AiConversation[], id: string, targetId: string): AiConversation[] {
+  return current.map((conversation) => (
+    conversation.id === id ? { ...conversation, targetId, usesDefaultTarget: false } : conversation
+  ))
+}
+
+function renameConversationState(current: AiConversation[], id: string, title: string): AiConversation[] {
+  const nextTitle = title.trim()
+  if (!nextTitle) return current
+
+  return current.map((conversation) => (
+    conversation.id === id ? { ...conversation, title: nextTitle, usesDefaultTitle: false } : conversation
+  ))
+}
+
+function titleConversationFromPromptState(current: AiConversation[], id: string, prompt: string): AiConversation[] {
+  const generatedTitle = generateAiConversationTitle(prompt)
+  if (!generatedTitle) return current
+
+  return current.map((conversation) => (
+    conversation.id === id && conversation.usesDefaultTitle
+      ? { ...conversation, title: generatedTitle, usesDefaultTitle: false }
+      : conversation
+  ))
+}
+
+function updateDefaultConversationTargetState(current: AiConversation[], targetId: string): AiConversation[] {
+  return current.map((conversation) => (
+    conversation.usesDefaultTarget && conversation.targetId !== targetId
+      ? { ...conversation, targetId }
+      : conversation
+  ))
+}
+
+function useConversations({
+  fallbackTarget,
+  locale,
+  onSettingsChange,
+  settings,
+  settingsReady,
+}: UseConversationsOptions) {
+  const [conversations, setConversations] = useState<AiConversation[]>(() => (
+    conversationsFromSettings(settings, fallbackTarget, locale)
+  ))
   const [activeId, setActiveId] = useState(() => conversations[0]?.id ?? '')
   const [showArchived, setShowArchived] = useState(false)
+  const onSettingsChangeRef = useRef(onSettingsChange)
 
   const addConversation = useCallback((target: AiTarget) => {
     setConversations((current) => {
-      const next = createConversation(locale, target, current.length + 1)
-      setActiveId(next.id)
-      return [...current, next]
+      const next = appendConversationState(current, locale, target)
+      setActiveId(next.activeId)
+      return next.conversations
     })
   }, [locale])
 
   const archiveConversation = useCallback((id: string) => {
     setConversations((current) => {
-      const next = current.map((conversation) => (
-        conversation.id === id ? { ...conversation, archived: true } : conversation
-      ))
-      const fallback = next.find((conversation) => !conversation.archived && conversation.id !== id)
-      if (fallback) setActiveId(fallback.id)
-      return next
+      const next = archiveConversationState(current, id)
+      if (next.activeId) setActiveId(next.activeId)
+      return next.conversations
     })
   }, [])
 
   const restoreConversation = useCallback((id: string) => {
-    setConversations((current) => current.map((conversation) => (
-      conversation.id === id ? { ...conversation, archived: false } : conversation
-    )))
+    setConversations((current) => restoreConversationState(current, id))
     setActiveId(id)
     setShowArchived(false)
   }, [])
 
   const setConversationTarget = useCallback((id: string, targetId: string) => {
-    setConversations((current) => current.map((conversation) => (
-      conversation.id === id ? { ...conversation, targetId, usesDefaultTarget: false } : conversation
-    )))
+    setConversations((current) => retargetConversationState(current, id, targetId))
+  }, [])
+
+  const renameConversation = useCallback((id: string, title: string) => {
+    setConversations((current) => renameConversationState(current, id, title))
+  }, [])
+
+  const titleConversationFromPrompt = useCallback((id: string, prompt: string) => {
+    setConversations((current) => titleConversationFromPromptState(current, id, prompt))
   }, [])
 
   const updateDefaultConversationTargets = useCallback((targetId: string) => {
-    setConversations((current) => current.map((conversation) => (
-      conversation.usesDefaultTarget && conversation.targetId !== targetId
-        ? { ...conversation, targetId }
-        : conversation
-    )))
+    setConversations((current) => updateDefaultConversationTargetState(current, targetId))
   }, [])
+
+  useEffect(() => {
+    onSettingsChangeRef.current = onSettingsChange
+  }, [onSettingsChange])
+
+  useEffect(() => {
+    if (!settingsReady) return
+    onSettingsChangeRef.current?.(conversationsToSettings(conversations))
+  }, [conversations, settingsReady])
 
   return {
     activeId,
     addConversation,
     archiveConversation,
     conversations,
+    renameConversation,
     restoreConversation,
     setActiveId,
     setConversationTarget,
     setShowArchived,
     showArchived,
+    titleConversationFromPrompt,
     updateDefaultConversationTargets,
   }
-}
-
-function SidebarHeader({ locale, onNewChat }: { locale: AppLocale; onNewChat: () => void }) {
-  const { dragRegionRef } = useDragRegion<HTMLDivElement>()
-
-  return (
-    <div
-      ref={dragRegionRef}
-      className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3"
-      data-tauri-drag-region
-      data-testid="ai-workspace-sidebar-header"
-    >
-      <div className="flex min-w-0 items-center gap-2">
-        <Robot size={16} className="shrink-0 text-muted-foreground" />
-        <span className="truncate text-[13px] font-semibold text-foreground">
-          {translate(locale, 'ai.workspace.title')}
-        </span>
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        aria-label={translate(locale, 'ai.workspace.newChat')}
-        title={translate(locale, 'ai.workspace.newChat')}
-        data-testid="ai-workspace-sidebar-new-chat"
-        onClick={onNewChat}
-      >
-        <Plus size={15} />
-      </Button>
-    </div>
-  )
-}
-
-function ConversationSidebar({
-  activeId,
-  conversations,
-  locale,
-  onArchive,
-  onNewChat,
-  onRestore,
-  onSelect,
-  setShowArchived,
-  showArchived,
-  statuses,
-}: {
-  activeId: string
-  conversations: AiConversation[]
-  locale: AppLocale
-  onArchive: (id: string) => void
-  onNewChat: () => void
-  onRestore: (id: string) => void
-  onSelect: (id: string) => void
-  setShowArchived: (show: boolean) => void
-  showArchived: boolean
-  statuses: Record<string, AgentStatus>
-}) {
-  const visibleConversations = conversations.filter((conversation) => conversation.archived === showArchived)
-  const emptyLabel = showArchived
-    ? translate(locale, 'ai.workspace.noArchivedChats')
-    : translate(locale, 'ai.workspace.noActiveChats')
-
-  return (
-    <div className="flex w-[220px] shrink-0 flex-col border-r border-border bg-sidebar">
-      <SidebarHeader locale={locale} onNewChat={onNewChat} />
-      <div className="flex-1 overflow-y-auto p-2">
-        {visibleConversations.length === 0 ? (
-          <div className="px-2 py-4 text-[12px] text-muted-foreground">{emptyLabel}</div>
-        ) : visibleConversations.map((conversation) => {
-          const status = statuses[conversation.id] ?? 'idle'
-          const active = conversation.id === activeId
-          return (
-            <div key={conversation.id} className="group flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  'min-w-0 flex-1 justify-start rounded-md px-2 text-left text-[12px]',
-                  active ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
-                )}
-                aria-pressed={active}
-                onClick={() => onSelect(conversation.id)}
-              >
-                <span className={cn('h-2 w-2 rounded-full', statusDotClassName(status))} />
-                <span className="truncate">{conversation.title}</span>
-                <span className="ml-auto truncate text-[10px] opacity-70">
-                  {translate(locale, statusLabelKey(status))}
-                </span>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label={translate(locale, showArchived ? 'ai.workspace.restore' : 'ai.workspace.archive')}
-                title={translate(locale, showArchived ? 'ai.workspace.restore' : 'ai.workspace.archive')}
-                onClick={() => showArchived ? onRestore(conversation.id) : onArchive(conversation.id)}
-              >
-                {showArchived ? <ArrowSquareIn size={14} /> : <Archive size={14} />}
-              </Button>
-            </div>
-          )
-        })}
-      </div>
-      <div className="border-t border-border p-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-[12px] text-muted-foreground"
-          onClick={() => setShowArchived(!showArchived)}
-        >
-          <Archive size={14} />
-          {translate(locale, showArchived ? 'ai.workspace.hideArchived' : 'ai.workspace.showArchived')}
-        </Button>
-      </div>
-    </div>
-  )
 }
 
 function TargetGroup({ label, targets }: { label: string; targets: AiTarget[] }) {
@@ -340,13 +367,83 @@ function TargetGroup({ label, targets }: { label: string; targets: AiTarget[] })
   )
 }
 
+function TargetPickerTrigger({
+  compact,
+  disabled,
+  hasTargets,
+  locale,
+  selectedTarget,
+}: {
+  compact: boolean
+  disabled: boolean
+  hasTargets: boolean
+  locale: AppLocale
+  selectedTarget: AiTarget
+}) {
+  return (
+    <DropdownMenuTrigger asChild>
+      <Button
+        type="button"
+        variant={compact ? 'ghost' : 'outline'}
+        size={compact ? 'xs' : 'sm'}
+        className={cn(
+          'justify-between gap-1.5',
+          compact ? 'max-w-[150px] rounded-full px-2 text-[12px]' : 'max-w-[240px] gap-2',
+        )}
+        disabled={disabled || !hasTargets}
+        aria-label={translate(locale, 'ai.workspace.targetLabel')}
+        data-testid="ai-workspace-target-trigger"
+      >
+        <span className="truncate">{selectedTarget.shortLabel}</span>
+        <CaretDown size={compact ? 12 : 13} />
+      </Button>
+    </DropdownMenuTrigger>
+  )
+}
+
+function TargetPickerContent({
+  groups,
+  hasTargets,
+  locale,
+  onSelectTarget,
+  selectedTarget,
+}: {
+  groups: AiWorkspaceTargetGroups
+  hasTargets: boolean
+  locale: AppLocale
+  selectedTarget: AiTarget
+  onSelectTarget: (targetId: string) => void
+}) {
+  const hasLocalAgentsSeparator = groups.localAgents.length > 0
+    && (groups.localModels.length > 0 || groups.apiModels.length > 0)
+  const hasLocalModelsSeparator = groups.localModels.length > 0 && groups.apiModels.length > 0
+
+  return (
+    <DropdownMenuContent align="start" className="min-w-[280px]">
+      {hasTargets ? (
+        <DropdownMenuRadioGroup value={selectedTarget.id} onValueChange={onSelectTarget}>
+          <TargetGroup label={translate(locale, 'ai.workspace.targetLocalAgents')} targets={groups.localAgents} />
+          {hasLocalAgentsSeparator && <DropdownMenuSeparator />}
+          <TargetGroup label={translate(locale, 'ai.workspace.targetLocalModels')} targets={groups.localModels} />
+          {hasLocalModelsSeparator && <DropdownMenuSeparator />}
+          <TargetGroup label={translate(locale, 'ai.workspace.targetApiModels')} targets={groups.apiModels} />
+        </DropdownMenuRadioGroup>
+      ) : (
+        <DropdownMenuItem disabled>{translate(locale, 'ai.workspace.noTargets')}</DropdownMenuItem>
+      )}
+    </DropdownMenuContent>
+  )
+}
+
 function TargetPicker({
+  compact = false,
   disabled,
   groups,
   locale,
   selectedTarget,
   onSelectTarget,
 }: {
+  compact?: boolean
   disabled: boolean
   groups: AiWorkspaceTargetGroups
   locale: AppLocale
@@ -357,44 +454,33 @@ function TargetPicker({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="max-w-[240px] justify-between gap-2"
-          disabled={disabled || !hasTargets}
-          aria-label={translate(locale, 'ai.workspace.targetLabel')}
-          data-testid="ai-workspace-target-trigger"
-        >
-          <span className="truncate">{selectedTarget.shortLabel}</span>
-          <CaretDown size={13} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[280px]">
-        {hasTargets ? (
-          <DropdownMenuRadioGroup value={selectedTarget.id} onValueChange={onSelectTarget}>
-            <TargetGroup label={translate(locale, 'ai.workspace.targetLocalAgents')} targets={groups.localAgents} />
-            {groups.localAgents.length > 0 && (groups.localModels.length > 0 || groups.apiModels.length > 0) && <DropdownMenuSeparator />}
-            <TargetGroup label={translate(locale, 'ai.workspace.targetLocalModels')} targets={groups.localModels} />
-            {groups.localModels.length > 0 && groups.apiModels.length > 0 && <DropdownMenuSeparator />}
-            <TargetGroup label={translate(locale, 'ai.workspace.targetApiModels')} targets={groups.apiModels} />
-          </DropdownMenuRadioGroup>
-        ) : (
-          <DropdownMenuItem disabled>{translate(locale, 'ai.workspace.noTargets')}</DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
+      <TargetPickerTrigger
+        compact={compact}
+        disabled={disabled}
+        hasTargets={hasTargets}
+        locale={locale}
+        selectedTarget={selectedTarget}
+      />
+      <TargetPickerContent
+        groups={groups}
+        hasTargets={hasTargets}
+        locale={locale}
+        selectedTarget={selectedTarget}
+        onSelectTarget={onSelectTarget}
+      />
     </DropdownMenu>
   )
 }
 
 function PermissionPicker({
+  compact = false,
   disabled,
   locale,
   permissionMode,
   targetKind,
   onChange,
 }: {
+  compact?: boolean
   disabled: boolean
   locale: AppLocale
   permissionMode: AiAgentPermissionMode
@@ -403,7 +489,7 @@ function PermissionPicker({
 }) {
   if (targetKind === 'api_model') {
     return (
-      <Button type="button" variant="outline" size="sm" disabled className="text-muted-foreground">
+      <Button type="button" variant={compact ? 'ghost' : 'outline'} size={compact ? 'xs' : 'sm'} disabled className="rounded-full px-2 text-[12px] text-muted-foreground">
         {translate(locale, 'ai.panel.mode.chat')}
       </Button>
     )
@@ -414,15 +500,15 @@ function PermissionPicker({
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
-          variant="outline"
-          size="sm"
-          className="justify-between gap-2"
+          variant={compact ? 'ghost' : 'outline'}
+          size={compact ? 'xs' : 'sm'}
+          className={cn('justify-between', compact ? 'rounded-full px-2 text-[12px]' : 'gap-2')}
           disabled={disabled}
           aria-label={translate(locale, 'ai.workspace.permissionMode')}
           data-testid="ai-workspace-permission-trigger"
         >
           {aiAgentPermissionModeLabels(permissionMode, locale).control}
-          <CaretDown size={13} />
+          <CaretDown size={compact ? 12 : 13} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[180px]">
@@ -464,87 +550,61 @@ function GuidanceWarning({
 
 function WorkspaceHeader({
   conversation,
-  groups,
   locale,
   mode,
-  permissionMode,
-  selectedTarget,
   status,
   onArchive,
   onClose,
   onDock,
   onOpenAiSettings,
-  onPermissionModeChange,
   onPopOut,
-  onSelectTarget,
 }: {
   conversation: AiConversation
-  groups: AiWorkspaceTargetGroups
   locale: AppLocale
   mode: 'docked' | 'window'
-  permissionMode: AiAgentPermissionMode
-  selectedTarget: AiTarget
   status: AgentStatus
   onArchive: () => void
   onClose: () => void
   onDock?: () => void
   onOpenAiSettings?: () => void
-  onPermissionModeChange: (mode: AiAgentPermissionMode) => void
   onPopOut?: () => void
-  onSelectTarget: (targetId: string) => void
 }) {
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
-  const running = status === 'thinking' || status === 'tool-executing'
 
   return (
     <div
       ref={dragRegionRef}
       className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-3"
-      data-tauri-drag-region
       data-testid="ai-workspace-chat-header"
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <div className="min-w-[92px] max-w-[160px]">
+        <div className="min-w-0 max-w-[260px]">
           <div className="truncate text-[13px] font-semibold text-foreground">{conversation.title}</div>
           <div className="truncate text-[11px] text-muted-foreground">
             {translate(locale, statusLabelKey(status))}
           </div>
         </div>
-        <TargetPicker
-          disabled={running}
-          groups={groups}
-          locale={locale}
-          selectedTarget={selectedTarget}
-          onSelectTarget={onSelectTarget}
-        />
-        <PermissionPicker
-          disabled={running}
-          locale={locale}
-          permissionMode={permissionMode}
-          targetKind={selectedTarget.kind}
-          onChange={onPermissionModeChange}
-        />
       </div>
       <div className="flex items-center gap-1">
         {onOpenAiSettings && (
           <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.settings')} title={translate(locale, 'ai.workspace.settings')} onClick={onOpenAiSettings}>
-            <GearSix size={15} />
+            <GearSix size={16} />
           </Button>
         )}
         <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.archive')} title={translate(locale, 'ai.workspace.archive')} onClick={onArchive}>
-          <Archive size={15} />
+          <Archive size={16} />
         </Button>
         {mode === 'docked' ? (
           <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.popOut')} title={translate(locale, 'ai.workspace.popOut')} onClick={onPopOut}>
-            <ArrowSquareOut size={15} />
+            <ArrowSquareOut size={16} />
           </Button>
         ) : (
           <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.dock')} title={translate(locale, 'ai.workspace.dock')} onClick={onDock}>
-            <ArrowSquareIn size={15} />
+            <ArrowSquareIn size={16} />
           </Button>
         )}
         <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.close')} title={translate(locale, 'ai.workspace.close')} onClick={onClose}>
-          <X size={15} />
+          <X size={16} />
         </Button>
       </div>
     </div>
@@ -575,6 +635,7 @@ function ConversationSession({
   onRestoreVaultAiGuidance,
   onSelectTarget,
   onStatusChange,
+  onTitleFromPrompt,
   onUnsupportedAiPaste,
   onVaultChanged,
   openTabs,
@@ -606,6 +667,7 @@ function ConversationSession({
   onRestoreVaultAiGuidance?: () => void
   onSelectTarget: (targetId: string) => void
   onStatusChange: (id: string, status: AgentStatus) => void
+  onTitleFromPrompt: (id: string, prompt: string) => void
   onUnsupportedAiPaste?: (message: string) => void
   onVaultChanged?: () => void
   openTabs?: VaultEntry[]
@@ -634,6 +696,27 @@ function ConversationSession({
     onFileModified,
     onVaultChanged,
   })
+  const running = isRunningStatus(controller.agent.status)
+  const composerControls = (
+    <>
+      <TargetPicker
+        compact
+        disabled={running}
+        groups={groups}
+        locale={locale}
+        selectedTarget={target}
+        onSelectTarget={onSelectTarget}
+      />
+      <PermissionPicker
+        compact
+        disabled={running}
+        locale={locale}
+        permissionMode={controller.permissionMode}
+        targetKind={target.kind}
+        onChange={controller.handlePermissionModeChange}
+      />
+    </>
+  )
 
   useEffect(() => {
     onStatusChange(conversation.id, controller.agent.status)
@@ -643,19 +726,14 @@ function ConversationSession({
     <div className={active ? 'flex min-h-0 flex-1 flex-col' : 'hidden'} data-testid={`ai-workspace-session-${conversation.id}`}>
       <WorkspaceHeader
         conversation={conversation}
-        groups={groups}
         locale={locale}
         mode={mode}
-        permissionMode={controller.permissionMode}
-        selectedTarget={target}
         status={controller.agent.status}
         onArchive={onArchive}
         onClose={onClose}
         onDock={onDock}
         onOpenAiSettings={onOpenAiSettings}
-        onPermissionModeChange={controller.handlePermissionModeChange}
         onPopOut={onPopOut}
-        onSelectTarget={onSelectTarget}
       />
       <GuidanceWarning locale={locale} onRestore={onRestoreVaultAiGuidance} status={vaultAiGuidanceStatus} />
       <div className="flex min-h-0 flex-1">
@@ -667,10 +745,12 @@ function ConversationSession({
           defaultAiTarget={target}
           entries={entries}
           activeEntry={activeEntry}
+          composerControls={composerControls}
           interactive={active}
           locale={locale}
           onClose={onClose}
           onOpenNote={onOpenNote}
+          onSendPrompt={(prompt) => onTitleFromPrompt(conversation.id, prompt)}
           onUnsupportedAiPaste={onUnsupportedAiPaste}
           showHeader={false}
         />
@@ -696,12 +776,16 @@ interface AiWorkspaceModel {
   fallbackTarget: AiTarget
   groups: AiWorkspaceTargetGroups
   handleStatusChange: (id: string, status: AgentStatus) => void
+  renameConversation: (id: string, title: string) => void
   restoreConversation: (id: string) => void
+  sidebarCollapsed: boolean
   setActiveId: (id: string) => void
   setConversationTarget: (id: string, targetId: string) => void
   setShowArchived: (show: boolean) => void
   showArchived: boolean
   statuses: Record<string, AgentStatus>
+  titleConversationFromPrompt: (id: string, prompt: string) => void
+  toggleSidebarCollapsed: () => void
   updateDefaultConversationTargets: (targetId: string) => void
 }
 
@@ -722,6 +806,18 @@ function workspaceClassName(mode: 'docked' | 'window'): string {
   return 'fixed bottom-10 right-4 z-[90] flex h-[min(680px,calc(100vh-88px))] w-[min(880px,calc(100vw-32px))] overflow-hidden rounded-lg border border-border bg-background text-foreground shadow-2xl'
 }
 
+function workspaceStyle(mode: 'docked' | 'window'): CSSProperties | undefined {
+  if (mode === 'window') return undefined
+
+  return {
+    maxHeight: 'calc(100vh - 88px)',
+    maxWidth: 'calc(100vw - 32px)',
+    minHeight: 420,
+    minWidth: 520,
+    resize: 'both',
+  }
+}
+
 function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceModel {
   const groups = useMemo(
     () => buildAiWorkspaceTargetGroups(workspace.aiAgentsStatus, workspace.aiModelProviders),
@@ -736,14 +832,23 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
     addConversation,
     archiveConversation,
     conversations,
+    renameConversation,
     restoreConversation,
     setActiveId,
     setConversationTarget,
     setShowArchived,
     showArchived,
+    titleConversationFromPrompt,
     updateDefaultConversationTargets,
-  } = useConversations(workspace.locale, fallbackTarget)
+  } = useConversations({
+    fallbackTarget,
+    locale: workspace.locale,
+    onSettingsChange: workspace.onConversationSettingsChange,
+    settings: workspace.conversationSettings,
+    settingsReady: workspace.conversationSettingsReady ?? true,
+  })
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({})
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const activeConversation = conversations.find((conversation) => conversation.id === activeId)
     ?? conversations.find((conversation) => !conversation.archived)
     ?? conversations[0]
@@ -761,6 +866,23 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
   const handleStatusChange = useCallback((id: string, status: AgentStatus) => {
     setStatuses((current) => current[id] === status ? current : { ...current, [id]: status })
   }, [])
+  const trackedRenameConversation = useCallback((id: string, title: string) => {
+    if (!title.trim()) return
+    renameConversation(id, title)
+    trackAiWorkspaceChatTitled('manual')
+  }, [renameConversation])
+  const trackedTitleConversationFromPrompt = useCallback((id: string, prompt: string) => {
+    const conversation = conversations.find((candidate) => candidate.id === id)
+    titleConversationFromPrompt(id, prompt)
+    if (conversation?.usesDefaultTitle) trackAiWorkspaceChatTitled('generated')
+  }, [conversations, titleConversationFromPrompt])
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((current) => {
+      const next = !current
+      trackAiWorkspaceSidebarToggled(next, workspace.mode)
+      return next
+    })
+  }, [workspace.mode])
 
   useEffect(() => {
     if (!workspace.open) return
@@ -782,12 +904,16 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
     fallbackTarget,
     groups,
     handleStatusChange,
+    renameConversation: trackedRenameConversation,
     restoreConversation,
+    sidebarCollapsed,
     setActiveId,
     setConversationTarget,
     setShowArchived,
     showArchived,
     statuses,
+    titleConversationFromPrompt: trackedTitleConversationFromPrompt,
+    toggleSidebarCollapsed,
     updateDefaultConversationTargets,
   }
 }
@@ -796,6 +922,7 @@ function AiWorkspaceLayout({ model, workspace }: { model: AiWorkspaceModel; work
   return (
     <section
       className={workspaceClassName(workspace.mode)}
+      style={workspaceStyle(workspace.mode)}
       data-testid="ai-workspace"
       data-ai-workspace-mode={workspace.mode}
       role="dialog"
@@ -803,12 +930,15 @@ function AiWorkspaceLayout({ model, workspace }: { model: AiWorkspaceModel; work
     >
       <ConversationSidebar
         activeId={model.activeId}
+        collapsed={model.sidebarCollapsed}
         conversations={model.conversations}
         locale={workspace.locale}
         onArchive={model.archiveConversationSafely}
         onNewChat={model.addDefaultConversation}
+        onRename={model.renameConversation}
         onRestore={model.restoreConversation}
         onSelect={model.setActiveId}
+        onToggleCollapsed={model.toggleSidebarCollapsed}
         setShowArchived={model.setShowArchived}
         showArchived={model.showArchived}
         statuses={model.statuses}
@@ -852,6 +982,7 @@ function ConversationSessions({ model, workspace }: { model: AiWorkspaceModel; w
             onRestoreVaultAiGuidance={workspace.onRestoreVaultAiGuidance}
             onSelectTarget={(targetId) => model.setConversationTarget(conversation.id, targetId)}
             onStatusChange={model.handleStatusChange}
+            onTitleFromPrompt={model.titleConversationFromPrompt}
             onUnsupportedAiPaste={workspace.onUnsupportedAiPaste}
             onVaultChanged={workspace.onVaultChanged}
             openTabs={workspace.openTabs}

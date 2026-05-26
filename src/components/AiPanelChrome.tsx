@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { Robot, X, PaperPlaneRight, Plus, Link } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import type { AiAgentMessage } from '../hooks/useCliAiAgent'
 import type { AiAgentReadiness } from '../lib/aiAgents'
 import type { NoteReference } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
+import { cn } from '@/lib/utils'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -53,6 +54,7 @@ interface AiPanelComposerProps {
   input: string
   inputRef: React.RefObject<HTMLDivElement | null>
   isActive: boolean
+  controls?: ReactNode
   onChange: (value: string) => void
   onSend: (text: string, references: NoteReference[]) => void
   onUnsupportedAiPaste?: (message: string) => void
@@ -72,6 +74,109 @@ function getComposerPlaceholder(
   }
 
   return t('ai.panel.placeholder.ready', { agent: agentLabel })
+}
+
+function composerSendButtonStyle(canSend: boolean): CSSProperties {
+  return {
+    background: canSend ? 'var(--primary)' : 'var(--muted)',
+    color: canSend ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
+    borderRadius: 8,
+    width: 32,
+    height: 34,
+    cursor: canSend ? 'pointer' : 'not-allowed',
+  }
+}
+
+function ComposerInput({
+  disabled,
+  entries,
+  hasControls,
+  input,
+  inputRef,
+  onChange,
+  onSend,
+  onUnsupportedAiPaste,
+  placeholder,
+}: {
+  disabled: boolean
+  entries: VaultEntry[]
+  hasControls: boolean
+  input: string
+  inputRef: React.RefObject<HTMLDivElement | null>
+  onChange: (value: string) => void
+  onSend: (text: string, references: NoteReference[]) => void
+  onUnsupportedAiPaste?: (message: string) => void
+  placeholder: string
+}) {
+  return (
+    <WikilinkChatInput
+      entries={entries}
+      value={input}
+      onChange={onChange}
+      onSend={onSend}
+      onUnsupportedPaste={onUnsupportedAiPaste}
+      disabled={disabled}
+      placeholder={placeholder}
+      inputRef={inputRef}
+      editorClassName={cn(
+        'max-h-[160px] overflow-y-auto overscroll-contain',
+        hasControls && 'min-h-[72px] border-0 px-2 py-2',
+      )}
+      editorStyle={{ maxHeight: 160, overflowY: 'auto', overscrollBehavior: 'contain' }}
+    />
+  )
+}
+
+function ComposerSendButton({
+  canSend,
+  entries,
+  input,
+  label,
+  onSend,
+}: {
+  canSend: boolean
+  entries: VaultEntry[]
+  input: string
+  label: string
+  onSend: (text: string, references: NoteReference[]) => void
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className="shrink-0 flex items-center justify-center border-none cursor-pointer transition-colors"
+      style={composerSendButtonStyle(canSend)}
+      onClick={() => onSend(input, extractInlineWikilinkReferences(input, entries))}
+      disabled={!canSend}
+      aria-label={label}
+      title={label}
+      data-testid="agent-send"
+    >
+      <PaperPlaneRight size={16} />
+    </Button>
+  )
+}
+
+function ComposerControlsRow({
+  children,
+  hasControls,
+  sendButton,
+}: {
+  children?: ReactNode
+  hasControls: boolean
+  sendButton: ReactNode
+}) {
+  if (!hasControls) return <>{sendButton}</>
+
+  return (
+    <div className="mt-1 flex items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-1">
+        {children}
+      </div>
+      {sendButton}
+    </div>
+  )
 }
 
 function permissionModeTooltip(
@@ -360,6 +465,7 @@ export function AiPanelComposer({
   input,
   inputRef,
   isActive,
+  controls,
   onChange,
   onSend,
   onUnsupportedAiPaste,
@@ -368,49 +474,41 @@ export function AiPanelComposer({
   const composerDisabled = isActive || agentReadiness !== 'ready'
   const canSend = !composerDisabled && input.trim().length > 0
   const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
-  const sendButtonStyle = {
-    background: canSend ? 'var(--primary)' : 'var(--muted)',
-    color: canSend ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
-    borderRadius: 8,
-    width: 32,
-    height: 34,
-    cursor: canSend ? 'pointer' : 'not-allowed',
-  } as const
+  const hasControls = controls !== undefined && controls !== null
+  const sendButton = (
+    <ComposerSendButton
+      canSend={canSend}
+      entries={entries}
+      input={input}
+      label={t('ai.panel.send')}
+      onSend={onSend}
+    />
+  )
 
   return (
     <div
       className="flex shrink-0 flex-col border-t border-border"
       style={{ padding: '8px 12px' }}
     >
-      <div className="flex items-end gap-2">
-        <div className="min-w-0 flex-1">
-          <WikilinkChatInput
+      <div className={cn(
+        hasControls ? 'rounded-xl border border-border bg-background p-2 shadow-xs' : 'flex items-end gap-2',
+      )}>
+        <div className={cn('min-w-0 flex-1', hasControls && 'w-full')}>
+          <ComposerInput
+            disabled={composerDisabled}
             entries={entries}
-            value={input}
+            hasControls={hasControls}
+            input={input}
+            inputRef={inputRef}
             onChange={onChange}
             onSend={onSend}
-            onUnsupportedPaste={onUnsupportedAiPaste}
-            disabled={composerDisabled}
+            onUnsupportedAiPaste={onUnsupportedAiPaste}
             placeholder={placeholder}
-            inputRef={inputRef}
-            editorClassName="max-h-[160px] overflow-y-auto overscroll-contain"
-            editorStyle={{ maxHeight: 160, overflowY: 'auto', overscrollBehavior: 'contain' }}
           />
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="shrink-0 flex items-center justify-center border-none cursor-pointer transition-colors"
-          style={sendButtonStyle}
-          onClick={() => onSend(input, extractInlineWikilinkReferences(input, entries))}
-          disabled={!canSend}
-          aria-label={t('ai.panel.send')}
-          title={t('ai.panel.send')}
-          data-testid="agent-send"
-        >
-          <PaperPlaneRight size={16} />
-        </Button>
+        <ComposerControlsRow hasControls={hasControls} sendButton={sendButton}>
+          {controls}
+        </ComposerControlsRow>
       </div>
     </div>
   )
