@@ -20,6 +20,9 @@ interface SearchPanelProps {
 }
 
 type SearchKeyboardAction = 'close' | 'next' | 'previous' | 'select'
+// WKWebView can emit duplicate non-text navigation keydowns around native key injection.
+const NATIVE_KEYDOWN_DUPLICATE_WINDOW_MS = 500
+const handledSearchKeyboardEvents = new WeakSet<Event>()
 
 interface SearchKeyboardEvent {
   key: string
@@ -28,6 +31,12 @@ interface SearchKeyboardEvent {
   repeat?: boolean
   stopImmediatePropagation?: () => void
   stopPropagation?: () => void
+  timeStamp?: number
+}
+
+interface SearchKeydownRecord {
+  key: string
+  timeStamp: number
 }
 
 interface SearchKeyboardActionContext {
@@ -67,6 +76,7 @@ function shouldHandleKeydown(
   event: SearchKeyboardEvent,
   pressedKeys: Set<string>,
   handledEvents: WeakSet<Event>,
+  recentKeydownRef: React.MutableRefObject<SearchKeydownRecord | null>,
 ): boolean {
   const eventIdentity = resolveSearchKeyboardEventIdentity(event)
   if (eventIdentity) {
@@ -74,11 +84,42 @@ function shouldHandleKeydown(
     handledEvents.add(eventIdentity)
   }
 
+  if (isDuplicateNativeKeydown(event, recentKeydownRef.current)) {
+    return false
+  }
+
+  rememberSearchKeydown(event, recentKeydownRef)
   if (event.repeat) return true
   if (pressedKeys.has(event.key)) return false
 
   pressedKeys.add(event.key)
   return true
+}
+
+function isDuplicateNativeKeydown(
+  event: SearchKeyboardEvent,
+  previous: SearchKeydownRecord | null,
+): boolean {
+  const timeStamp = resolveSearchKeyboardEventTimestamp(event)
+  if (!previous || timeStamp === null || previous.key !== event.key) return false
+
+  const elapsedMs = timeStamp - previous.timeStamp
+  return elapsedMs >= 0 && elapsedMs <= NATIVE_KEYDOWN_DUPLICATE_WINDOW_MS
+}
+
+function rememberSearchKeydown(
+  event: SearchKeyboardEvent,
+  recentKeydownRef: React.MutableRefObject<SearchKeydownRecord | null>,
+) {
+  const timeStamp = resolveSearchKeyboardEventTimestamp(event)
+  if (timeStamp !== null) recentKeydownRef.current = { key: event.key, timeStamp }
+}
+
+function resolveSearchKeyboardEventTimestamp(event: SearchKeyboardEvent): number | null {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') return performance.now()
+
+  const { timeStamp } = event
+  return typeof timeStamp === 'number' && Number.isFinite(timeStamp) ? timeStamp : null
 }
 
 function resolveSearchKeyboardEventIdentity(event: SearchKeyboardEvent): Event | null {
@@ -192,7 +233,7 @@ function useSearchKeyboard({
   setSelectedIndex: React.Dispatch<React.SetStateAction<number>>
 }) {
   const pressedKeysRef = useRef(new Set<string>())
-  const handledEventsRef = useRef(new WeakSet<Event>())
+  const recentKeydownRef = useRef<SearchKeydownRecord | null>(null)
   const handleKeyDown = useCallback((e: SearchKeyboardEvent) => {
     const action = resolveSearchKeyboardAction(e.key)
     if (!action) return
@@ -200,7 +241,7 @@ function useSearchKeyboard({
     e.preventDefault()
     e.stopImmediatePropagation?.()
     e.stopPropagation?.()
-    if (!shouldHandleKeydown(e, pressedKeysRef.current, handledEventsRef.current)) return
+    if (!shouldHandleKeydown(e, pressedKeysRef.current, handledSearchKeyboardEvents, recentKeydownRef)) return
 
     performSearchKeyboardAction(action, { handleSelect, onClose, resultsRef, selectedIndexRef, setSelectedIndex })
   }, [handleSelect, onClose, resultsRef, selectedIndexRef, setSelectedIndex])
@@ -287,6 +328,9 @@ export function SearchPanel({
     showWorkspace,
     typeEntryMap,
   } = useSearchPanelController({ open, vaultPath, entries, onSelectNote, onClose })
+  const handleResultHover = useCallback((index: number, event: React.MouseEvent<HTMLDivElement>) => {
+    if (shouldApplySearchResultHover(event)) setSelectedIndex(index)
+  }, [setSelectedIndex])
 
   useEffect(() => {
     if (!open) return
@@ -335,7 +379,7 @@ export function SearchPanel({
           dateDisplayFormat={dateDisplayFormat}
           listRef={listRef}
           onSelect={handleSelect}
-          onHover={setSelectedIndex}
+          onHover={handleResultHover}
         />
       </div>
     </div>
@@ -393,7 +437,7 @@ interface SearchContentProps {
   dateDisplayFormat: DateDisplayFormat
   listRef: React.RefObject<HTMLDivElement | null>
   onSelect: (result: SearchResult) => void
-  onHover: (index: number) => void
+  onHover: (index: number, event: React.MouseEvent<HTMLDivElement>) => void
 }
 
 interface SearchResultRowProps {
@@ -405,7 +449,7 @@ interface SearchResultRowProps {
   showWorkspace: boolean
   dateDisplayFormat: DateDisplayFormat
   onSelect: (result: SearchResult) => void
-  onHover: (index: number) => void
+  onHover: (index: number, event: React.MouseEvent<HTMLDivElement>) => void
 }
 
 interface SearchResultPresentation {
@@ -473,7 +517,7 @@ function SearchResultRow({
         selected ? "bg-accent" : "hover:bg-secondary",
       )}
       onClick={() => onSelect(result)}
-      onMouseMove={() => onHover(index)}
+      onMouseMove={(event) => onHover(index, event)}
     >
       <div className="flex items-center gap-2">
         {createElement(presentation.TypeIcon, {
@@ -572,4 +616,8 @@ function SearchContent({
       )}
     </div>
   )
+}
+
+function shouldApplySearchResultHover(event: React.MouseEvent<HTMLDivElement>): boolean {
+  return event.movementX !== 0 || event.movementY !== 0
 }
