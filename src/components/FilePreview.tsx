@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, SpeakerHigh, Video, WarningCircle } from '@phosphor-icons/react'
+import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, Link, SpeakerHigh, Video, WarningCircle } from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
+import { translate, type AppLocale } from '../lib/i18n'
 import { trackFilePreviewAction, trackFilePreviewFailed, trackFilePreviewOpened } from '../lib/productAnalytics'
 import { filePreviewKind, previewFileTypeLabel, type FilePreviewKind } from '../utils/filePreview'
 import { useExternalMediaPreview } from '../utils/mediaPreviewRuntime'
@@ -11,7 +12,9 @@ import { Button } from './ui/button'
 
 interface FilePreviewProps {
   entry: VaultEntry
+  locale?: AppLocale
   onCopyFilePath?: (path: string) => void
+  onCopyDeepLink?: (entry: VaultEntry) => void
   onOpenExternalFile?: (path: string) => void
   onRevealFile?: (path: string) => void
 }
@@ -94,16 +97,20 @@ function FilePreviewHeader({
   entry,
   previewKind,
   fileTypeLabel,
+  locale = 'en',
   onOpenExternal,
   onRevealFile,
   onCopyFilePath,
+  onCopyDeepLink,
 }: {
   entry: VaultEntry
   previewKind: FilePreviewKind | null
   fileTypeLabel: string
+  locale?: AppLocale
   onOpenExternal: () => void
   onRevealFile?: () => void
   onCopyFilePath?: () => void
+  onCopyDeepLink?: () => void
 }) {
   return (
     <div
@@ -128,6 +135,12 @@ function FilePreviewHeader({
           <Button type="button" variant="ghost" size="sm" onClick={onCopyFilePath}>
             <ClipboardText size={15} />
             Copy path
+          </Button>
+        )}
+        {onCopyDeepLink && (
+          <Button type="button" variant="ghost" size="sm" onClick={onCopyDeepLink}>
+            <Link size={15} />
+            {translate(locale, 'filePreview.copyDeepLink')}
           </Button>
         )}
         <Button type="button" variant="ghost" size="sm" onClick={onOpenExternal}>
@@ -327,14 +340,18 @@ function useFilePreviewFailureState(entryPath: string) {
 }
 
 function useFilePreviewActions({
+  entry,
   entryPath,
   onCopyFilePath,
+  onCopyDeepLink,
   onOpenExternalFile,
   onRevealFile,
   previewKind,
 }: {
+  entry: VaultEntry
   entryPath: string
   onCopyFilePath?: (path: string) => void
+  onCopyDeepLink?: (entry: VaultEntry) => void
   onOpenExternalFile?: (path: string) => void
   onRevealFile?: (path: string) => void
   previewKind: FilePreviewKind | null
@@ -361,7 +378,12 @@ function useFilePreviewActions({
     onCopyFilePath?.(entryPath)
   }, [entryPath, onCopyFilePath, previewKind])
 
-  return { handleOpenExternal, handleRevealFile, handleCopyFilePath }
+  const handleCopyDeepLink = useCallback(() => {
+    trackFilePreviewAction('copy_deep_link', previewKind)
+    onCopyDeepLink?.(entry)
+  }, [entry, onCopyDeepLink, previewKind])
+
+  return { handleOpenExternal, handleRevealFile, handleCopyFilePath, handleCopyDeepLink }
 }
 
 function isMediaPreviewKind(previewKind: FilePreviewKind | null): boolean {
@@ -379,7 +401,9 @@ function previewKindForBody(
 
 export function FilePreview({
   entry,
+  locale = 'en',
   onCopyFilePath,
+  onCopyDeepLink,
   onOpenExternalFile,
   onRevealFile,
 }: FilePreviewProps) {
@@ -391,8 +415,10 @@ export function FilePreview({
   const externalMediaPreview = useExternalMediaPreview()
   const failures = useFilePreviewFailureState(entry.path)
   const actions = useFilePreviewActions({
+    entry,
     entryPath: entry.path,
     onCopyFilePath,
+    onCopyDeepLink,
     onOpenExternalFile,
     onRevealFile,
     previewKind,
@@ -429,9 +455,11 @@ export function FilePreview({
         entry={entry}
         previewKind={previewKind}
         fileTypeLabel={fileTypeLabel}
+        locale={locale}
         onOpenExternal={actions.handleOpenExternal}
         onRevealFile={onRevealFile ? actions.handleRevealFile : undefined}
         onCopyFilePath={onCopyFilePath ? actions.handleCopyFilePath : undefined}
+        onCopyDeepLink={onCopyDeepLink ? actions.handleCopyDeepLink : undefined}
       />
       <div className="min-h-0 flex-1 overflow-auto bg-background">
         <FilePreviewBody

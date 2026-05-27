@@ -18,7 +18,9 @@
     "core:window:allow-close",
     "core:window:allow-set-title",
     "core:webview:allow-create-webview-window",
+    "core:event:default",
     "dialog:default",
+    "deep-link:default",
     "updater:default",
     "process:default",
     "opener:default"

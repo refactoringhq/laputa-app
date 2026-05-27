@@ -42,6 +42,7 @@ export interface EditorContentProps {
   onEnterNeighborhood?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
   onCopyFilePath?: (path: string) => void
+  onCopyDeepLink?: (entry: VaultEntry) => void
   onDeleteNote?: (path: string) => void
   onArchiveNote?: (path: string) => void
   onUnarchiveNote?: (path: string) => void

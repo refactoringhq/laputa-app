@@ -403,11 +403,13 @@ describe('useCommandRegistry', () => {
   it('exposes active file actions when a note is selected', () => {
     const onRevealActiveFile = vi.fn()
     const onCopyActiveFilePath = vi.fn()
+    const onCopyActiveDeepLink = vi.fn()
     const config = makeConfig({
       activeTabPath: '/vault/current.md',
       entries: [{ path: '/vault/current.md', title: 'Current', fileKind: 'markdown' }],
       onRevealActiveFile,
       onCopyActiveFilePath,
+      onCopyActiveDeepLink,
     })
     const { result } = renderHook(() => useCommandRegistry(config))
 
@@ -421,12 +423,19 @@ describe('useCommandRegistry', () => {
       group: 'Note',
       label: 'Copy File Path',
     })
+    expect(findCommand(result.current, 'copy-active-deep-link')).toMatchObject({
+      enabled: true,
+      group: 'Note',
+      label: 'Copy deep link to current item',
+    })
 
     findCommand(result.current, 'reveal-active-file')!.execute()
     findCommand(result.current, 'copy-active-file-path')!.execute()
+    findCommand(result.current, 'copy-active-deep-link')!.execute()
 
     expect(onRevealActiveFile).toHaveBeenCalledWith('/vault/current.md')
     expect(onCopyActiveFilePath).toHaveBeenCalledWith('/vault/current.md')
+    expect(onCopyActiveDeepLink).toHaveBeenCalledWith('/vault/current.md')
   })
 
   it('only enables external open for non-markdown active files', () => {

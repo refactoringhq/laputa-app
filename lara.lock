@@ -59,6 +59,7 @@ files:
     command.note.removeIcon: 4bccbad66025e506b37b4218498b299c
     command.note.changeType: 4a54ffd47ed1f65ee97f34bfe8c3de14
     command.note.moveToFolder: 3a0f26c42b9168ad839960d134065905
+    command.note.copyDeepLink: 8de1795f59af124594dc4decf77909a1
     command.note.openNewWindow: 6f67b2857093fa0fd45b1122dff4865d
     command.git.initialize: 54a57cdc7105db6fb22dca661ce01ad6
     command.git.commitPush: 8cb5faa4019716f43dd69c41496b1d46
@@ -515,8 +516,23 @@ files:
     editor.toolbar.delete: f48134a07b016a1de05d4ba6d2fbfb41
     editor.toolbar.revealFile: 76f4ed52da9937ae432dcf5a108fabb4
     editor.toolbar.copyFilePath: 64c6cec5ca57efbb8c9c93ae5fbccd27
+    editor.toolbar.copyNoteDeepLink: 0fff274a7c47e7c12457c0b7412e86ce
     editor.toolbar.moreActions: 89e19353176b94068dec4c768c25e70b
     editor.toolbar.openProperties: 948b90b60b8ce827f179e8c5b85b112e
+    filePreview.copyDeepLink: b75833669968adbef634495636e3fe50
+    deepLinks.copied: 6ada57681192daf3b4afa07ce7a30575
+    deepLinks.error.ambiguousVault: 4365c6d5cf8c2c1165259b32d24a6274
+    deepLinks.error.copyFailed: 57b74ecce2d00b4c327d15830f79410d
+    deepLinks.error.invalidScheme: 58eaa7ac701a0508cbae90c5d3837ce4
+    deepLinks.error.malformedUrl: 4f85323322ef0a1d627df621edb749c7
+    deepLinks.error.missingFile: 79a0c73176508c58b4d785fabaf7d8cc
+    deepLinks.error.missingPath: a6bb1c92f1a38476ff603a2d3ff81223
+    deepLinks.error.missingVault: e2936e1f599c7ed229efb5d4a122fc4b
+    deepLinks.error.openFailed: 97901feafe25688fcc3fc4dcfaf82619
+    deepLinks.error.outsideVault: fda2fd5675b596df7ba0e0b1a11ec47d
+    deepLinks.error.unavailableVault: 911dfaf8e855bd8cadefe7df9a98a7e8
+    deepLinks.error.unknownVault: b4940569e884833f50466177dab1f62f
+    deepLinks.error.unsafePath: e09caab43be8c2372bfc94e947ea34e6
     editor.slash.math: a49950aa047c2292e989e368a97a3aae
     tableOfContents.title: f61d6c3e3733db355168b7e1aee6780b
     tableOfContents.close: d3292972a10edd1a06a627f3552f760a

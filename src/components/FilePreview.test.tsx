@@ -81,6 +81,7 @@ describe('FilePreview', () => {
   it('routes header file actions to the active file path', () => {
     const onRevealFile = vi.fn()
     const onCopyFilePath = vi.fn()
+    const onCopyDeepLink = vi.fn()
     const onOpenExternalFile = vi.fn()
 
     render(
@@ -88,6 +89,7 @@ describe('FilePreview', () => {
         entry={imageEntry}
         onRevealFile={onRevealFile}
         onCopyFilePath={onCopyFilePath}
+        onCopyDeepLink={onCopyDeepLink}
         onOpenExternalFile={onOpenExternalFile}
       />,
     )
@@ -96,10 +98,12 @@ describe('FilePreview', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Reveal' }))
     fireEvent.click(screen.getByRole('button', { name: 'Copy path' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
     fireEvent.click(screen.getByRole('button', { name: 'Open' }))
 
     expect(onRevealFile).toHaveBeenCalledWith('/vault/Attachments/photo.png')
     expect(onCopyFilePath).toHaveBeenCalledWith('/vault/Attachments/photo.png')
+    expect(onCopyDeepLink).toHaveBeenCalledWith(imageEntry)
     expect(onOpenExternalFile).toHaveBeenCalledWith('/vault/Attachments/photo.png')
     expect(trackEventMock).toHaveBeenCalledWith('file_preview_action', {
       action: 'reveal',
@@ -107,6 +111,10 @@ describe('FilePreview', () => {
     })
     expect(trackEventMock).toHaveBeenCalledWith('file_preview_action', {
       action: 'copy_path',
+      preview_kind: 'image',
+    })
+    expect(trackEventMock).toHaveBeenCalledWith('file_preview_action', {
+      action: 'copy_deep_link',
       preview_kind: 'image',
     })
     expect(trackEventMock).toHaveBeenCalledWith('file_preview_action', {

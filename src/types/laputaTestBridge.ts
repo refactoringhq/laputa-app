@@ -6,6 +6,7 @@ import type {
 export interface LaputaTestBridge {
   activeTabPath?: string | null
   dispatchAppCommand?: (id: string) => void
+  openDeepLink?: (url: string) => void
   dispatchShortcutEvent?: (init: AppCommandShortcutEventInit) => void
   dispatchBrowserMenuCommand?: (id: string) => void
   triggerMenuCommand?: (id: string) => Promise<unknown>

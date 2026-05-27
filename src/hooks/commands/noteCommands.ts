@@ -33,6 +33,7 @@ interface NoteCommandsConfig {
   onOpenInNewWindow?: () => void
   onRevealActiveFile?: (path: string) => void
   onCopyActiveFilePath?: (path: string) => void
+  onCopyActiveDeepLink?: (path: string) => void
   onOpenActiveFileExternal?: (path: string) => void
   onToggleFavorite?: (path: string) => void
   isFavorite?: boolean
@@ -244,33 +245,54 @@ function buildRetargetingCommands(config: NoteCommandsConfig): CommandAction[] {
   ]
 }
 
+interface ActivePathCommandConfig {
+  enabled: boolean
+  id: string
+  keywords: string[]
+  label: string
+  run: (path: string) => void
+}
+
+function buildActivePathCommand(config: NoteCommandsConfig, command: ActivePathCommandConfig): CommandAction {
+  return createNoteCommand({
+    id: command.id,
+    label: command.label,
+    keywords: command.keywords,
+    enabled: config.hasActiveNote && command.enabled,
+    path: config.activeTabPath,
+    run: command.run,
+  })
+}
+
 function buildFileActionCommands(config: NoteCommandsConfig): CommandAction[] {
   const activeFileKind = config.activeFileKind ?? 'markdown'
-  const hasNonMarkdownActiveFile = config.hasActiveNote && activeFileKind !== 'markdown'
-
   return [
-    createNoteCommand({
+    buildActivePathCommand(config, {
       id: 'reveal-active-file',
       label: 'Reveal in Finder',
       keywords: ['file', 'folder', 'finder', 'reveal', 'show', 'filesystem'],
-      enabled: config.hasActiveNote && !!config.onRevealActiveFile,
-      path: config.activeTabPath,
+      enabled: !!config.onRevealActiveFile,
       run: (path) => config.onRevealActiveFile?.(path),
     }),
-    createNoteCommand({
+    buildActivePathCommand(config, {
       id: 'copy-active-file-path',
       label: 'Copy File Path',
       keywords: ['file', 'path', 'copy', 'clipboard', 'filesystem'],
-      enabled: config.hasActiveNote && !!config.onCopyActiveFilePath,
-      path: config.activeTabPath,
+      enabled: !!config.onCopyActiveFilePath,
       run: (path) => config.onCopyActiveFilePath?.(path),
     }),
-    createNoteCommand({
+    buildActivePathCommand(config, {
+      id: 'copy-active-deep-link',
+      label: 'Copy deep link to current item',
+      keywords: ['deeplink', 'deep link', 'url', 'link', 'copy', 'clipboard'],
+      enabled: !!config.onCopyActiveDeepLink,
+      run: (path) => config.onCopyActiveDeepLink?.(path),
+    }),
+    buildActivePathCommand(config, {
       id: 'open-active-file-external',
       label: 'Open in Default App',
       keywords: ['file', 'open', 'external', 'default', 'attachment'],
-      enabled: hasNonMarkdownActiveFile && !!config.onOpenActiveFileExternal,
-      path: config.activeTabPath,
+      enabled: activeFileKind !== 'markdown' && !!config.onOpenActiveFileExternal,
       run: (path) => config.onOpenActiveFileExternal?.(path),
     }),
   ]

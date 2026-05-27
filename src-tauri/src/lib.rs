@@ -279,8 +279,43 @@ fn setup_common_plugins(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
 }
 
 #[cfg(desktop)]
+fn focus_main_window(app_handle: &tauri::AppHandle) {
+    use tauri::Manager;
+
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+#[cfg(desktop)]
+fn with_desktop_entry_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
+    builder
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            focus_main_window(app);
+        }))
+        .plugin(tauri_plugin_deep_link::init())
+}
+
+#[cfg(desktop)]
+fn setup_deep_link_runtime_registration(
+    _app: &mut tauri::App,
+) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    {
+        use tauri_plugin_deep_link::DeepLinkExt;
+
+        _app.deep_link().register_all()?;
+    }
+
+    Ok(())
+}
+
+#[cfg(desktop)]
 fn setup_desktop_plugins(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     setup_macos_webview_shortcut_prevention(app)?;
+    setup_deep_link_runtime_registration(app)?;
     app.handle()
         .plugin(tauri_plugin_updater::Builder::new().build())?;
     app.handle().plugin(tauri_plugin_process::init())?;
@@ -559,6 +594,9 @@ pub fn run() {
     linux_appimage::apply_startup_env_overrides();
 
     let builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    let builder = with_desktop_entry_plugins(builder);
 
     #[cfg(desktop)]
     let builder = builder

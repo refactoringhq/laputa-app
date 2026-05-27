@@ -61,6 +61,7 @@ import { useBulkActions } from './hooks/useBulkActions'
 import { useDeleteActions } from './hooks/useDeleteActions'
 import { useFolderActions } from './hooks/useFolderActions'
 import { useFileActions } from './hooks/useFileActions'
+import { useDeepLinks } from './hooks/useDeepLinks'
 import { useLayoutPanels } from './hooks/useLayoutPanels'
 import { useConflictFlow } from './hooks/useConflictFlow'
 import { useAppSave } from './hooks/useAppSave'
@@ -1593,6 +1594,38 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     updateFrontmatter: notes.handleUpdateFrontmatter,
     setToastMessage,
   })
+
+  const {
+    isStartupLoading,
+    isVaultContentLoading,
+    shouldResumeFreshStartOnboarding,
+    shouldShowStartupScreen,
+  } = useStartupScreenState({
+    aiAgentsPromptVisible: aiAgentsOnboarding.showPrompt,
+    isNoteWindow: Boolean(noteWindowParams) || aiWorkspaceWindow,
+    onboardingState: onboarding.state,
+    runtimeMissingVaultPath,
+    selectedVaultPath,
+    settingsLoaded,
+    showMcpSetupDialog,
+    telemetryConsent: settings.telemetry_consent,
+    vaultIsLoading: vault.isLoading,
+    vaultSwitcher,
+  })
+  const deepLinks = useDeepLinks({
+    activeEntry: activeTab?.entry ?? null,
+    currentVaultPath: resolvedPath,
+    enabled: !noteWindowParams && !aiWorkspaceWindow,
+    entries: visibleEntries,
+    isVaultContentLoading,
+    locale: appLocale,
+    onSelectNote: notes.handleSelectNote,
+    onSwitchVault: vaultSwitcher.switchVault,
+    reloadVault: vault.reloadVault,
+    setToastMessage,
+    vaultListLoaded: vaultSwitcher.loaded,
+    vaults: vaultSwitcher.allVaults,
+  })
   const activeEditorVaultPath = activeTab ? vaultPathForEntry(activeTab.entry, resolvedPath) : resolvedPath
   const commandAiActions = useAppCommandAiActions(aiFeaturesEnabled, dialogs, aiAgentsStatus, vaultAiGuidanceStatus, restoreVaultAiGuidanceCommand, aiAgentPreferences)
   const undoCommand = useCallback(() => {
@@ -1693,6 +1726,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onOpenInNewWindow: handleOpenInNewWindow,
     onRevealActiveFile: fileActions.revealFile,
     onCopyActiveFilePath: fileActions.copyFilePath,
+    onCopyActiveDeepLink: deepLinks.copyPathDeepLink,
     onOpenActiveFileExternal: fileActions.openExternalFile,
     onToggleFavorite: entryActions.handleToggleFavorite,
     onToggleOrganized: toggleOrganizedCommand,
@@ -1724,23 +1758,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     return { type: null, query: '' }
   }, [effectiveSelection])
 
-  const {
-    isStartupLoading,
-    isVaultContentLoading,
-    shouldResumeFreshStartOnboarding,
-    shouldShowStartupScreen,
-  } = useStartupScreenState({
-    aiAgentsPromptVisible: aiAgentsOnboarding.showPrompt,
-    isNoteWindow: Boolean(noteWindowParams) || aiWorkspaceWindow,
-    onboardingState: onboarding.state,
-    runtimeMissingVaultPath,
-    selectedVaultPath,
-    settingsLoaded,
-    showMcpSetupDialog,
-    telemetryConsent: settings.telemetry_consent,
-    vaultIsLoading: vault.isLoading,
-    vaultSwitcher,
-  })
   const handleAiWorkspaceConversationsChange = useCallback((conversations: AiWorkspaceConversationSetting[]) => {
     void saveSettings({ ...settings, ai_workspace_conversations: conversations })
   }, [saveSettings, settings])
@@ -1845,6 +1862,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onEnterNeighborhood={activeDeletedFile ? undefined : handleEnterNeighborhood}
               onRevealFile={fileActions.revealFile}
               onCopyFilePath={fileActions.copyFilePath}
+              onCopyDeepLink={activeDeletedFile ? undefined : deepLinks.copyEntryDeepLink}
               onOpenExternalFile={fileActions.openExternalFile}
               onDeleteNote={activeDeletedFile ? undefined : deleteActions.handleDeleteNote}
               onArchiveNote={activeDeletedFile ? undefined : entryActions.handleArchiveNote}

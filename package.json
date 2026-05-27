@@ -55,6 +55,7 @@
     "@sentry/react": "^10.47.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-deep-link": "2.4.9",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-opener": "^2.5.3",
     "@tauri-apps/plugin-process": "^2.3.1",

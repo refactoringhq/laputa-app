@@ -179,6 +179,14 @@ Git-facing renderer code must pass an explicit repository path instead of assumi
 
 `useGitFileWorkflows` is the renderer abstraction for note-scoped Git file actions. It translates active tabs, visible entries, and modified-file surfaces into the correct repository path for diff/history commands, deleted-note previews, queued editor diff requests, and discard refresh behavior.
 
+### Tolaria Deep Links
+
+Deep links identify existing vault items with `tolaria://<vault-slug>/<relative-path-with-extension>`. The slug is derived from the registered workspace alias, then label, then path basename; generated links append a stable short hash when two vaults share the same base slug. A manually typed ambiguous base slug is rejected instead of choosing the wrong vault.
+
+The relative path is encoded per segment, preserving `/` as the separator while allowing spaces, Unicode, and reserved characters inside filenames. Decoding rejects `.`, `..`, encoded slashes, backslashes, empty segments, and any resolved path outside the target vault root. Links keep the file extension so Markdown, text, media, PDFs, and other vault files can all route through the same `VaultEntry` lookup.
+
+Deep links are navigation-only. Opening one can focus Tolaria, switch to a registered vault, reload the index once, and open an existing item; it never creates missing files, imports external files, or silently falls back to another vault. v1 links are path-based, so renaming or moving a file changes the canonical link. macOS and Windows are the verified v1 desktop targets; Linux registration is best-effort until package-level QA covers the supported desktop environments.
+
 ### File kinds and binary previews
 
 `VaultEntry.fileKind` comes from the Rust vault scanner and intentionally stays coarse-grained:

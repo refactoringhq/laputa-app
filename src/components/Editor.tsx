@@ -91,6 +91,7 @@ interface EditorProps {
   onEnterNeighborhood?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
   onCopyFilePath?: (path: string) => void
+  onCopyDeepLink?: (entry: VaultEntry) => void
   onOpenExternalFile?: (path: string) => void
   onDeleteNote?: (path: string) => void
   onArchiveNote?: (path: string) => void
@@ -355,6 +356,7 @@ function EditorLayout({
   onEnterNeighborhood,
   onRevealFile,
   onCopyFilePath,
+  onCopyDeepLink,
   onOpenExternalFile,
   onDeleteNote,
   onArchiveNote,
@@ -426,6 +428,7 @@ function EditorLayout({
   onEnterNeighborhood?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
   onCopyFilePath?: (path: string) => void
+  onCopyDeepLink?: (entry: VaultEntry) => void
   onOpenExternalFile?: (path: string) => void
   onDeleteNote?: (path: string) => void
   onArchiveNote?: (path: string) => void
@@ -479,7 +482,9 @@ function EditorLayout({
             ? (
                 <FilePreview
                   entry={activeBinaryTab.entry}
+                  locale={locale}
                   onCopyFilePath={onCopyFilePath}
+                  onCopyDeepLink={onCopyDeepLink}
                   onOpenExternalFile={onOpenExternalFile}
                   onRevealFile={onRevealFile}
                 />
@@ -514,6 +519,7 @@ function EditorLayout({
               onEnterNeighborhood={onEnterNeighborhood}
               onRevealFile={onRevealFile}
               onCopyFilePath={onCopyFilePath}
+              onCopyDeepLink={onCopyDeepLink}
               onDeleteNote={onDeleteNote}
               onArchiveNote={onArchiveNote}
               onUnarchiveNote={onUnarchiveNote}

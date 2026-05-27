@@ -26,6 +26,7 @@ import {
   ArrowUUpLeft,
   ClipboardText,
   FolderOpen,
+  Link,
   MapTrifold,
   Star,
   CheckCircle,
@@ -58,6 +59,7 @@ interface BreadcrumbBarProps {
   onToggleOrganized?: () => void
   onRevealFile?: (path: string) => void
   onCopyFilePath?: (path: string) => void
+  onCopyDeepLink?: (entry: VaultEntry) => void
   onDelete?: () => void
   onArchive?: () => void
   onUnarchive?: () => void
@@ -453,6 +455,10 @@ function pathAction(action: ((path: string) => void) | undefined, path: string):
   return action ? () => action(path) : undefined
 }
 
+function entryAction(action: ((entry: VaultEntry) => void) | undefined, entry: VaultEntry): (() => void) | undefined {
+  return action ? () => action(entry) : undefined
+}
+
 function ArchiveMenuIcon({ archived }: { archived: boolean }) {
   return archived ? <ArrowUUpLeft size={16} /> : <Archive size={16} />
 }
@@ -827,6 +833,7 @@ function BreadcrumbActions({
   onToggleOrganized,
   onRevealFile,
   onCopyFilePath,
+  onCopyDeepLink,
   onDelete,
   onArchive,
   onUnarchive,
@@ -877,6 +884,7 @@ function BreadcrumbActions({
         onToggleTableOfContents={onToggleTableOfContents}
         onRevealFile={onRevealFile}
         onCopyFilePath={onCopyFilePath}
+        onCopyDeepLink={onCopyDeepLink}
         onArchive={onArchive}
         onUnarchive={onUnarchive}
         onDelete={onDelete}
@@ -899,6 +907,7 @@ function BreadcrumbOverflowMenu({
   onToggleTableOfContents,
   onRevealFile,
   onCopyFilePath,
+  onCopyDeepLink,
   onArchive,
   onUnarchive,
   onDelete,
@@ -916,6 +925,7 @@ function BreadcrumbOverflowMenu({
   | 'onToggleTableOfContents'
   | 'onRevealFile'
   | 'onCopyFilePath'
+  | 'onCopyDeepLink'
   | 'onArchive'
   | 'onUnarchive'
   | 'onDelete'
@@ -927,6 +937,7 @@ function BreadcrumbOverflowMenu({
   const runDiffAction = availableDiffAction(showDiffToggle, onToggleDiff)
   const runRevealAction = pathAction(onRevealFile, entry.path)
   const runCopyPathAction = pathAction(onCopyFilePath, entry.path)
+  const runCopyDeepLinkAction = entryAction(onCopyDeepLink, entry)
   const runArchiveAction = archiveAction(entry.archived, onArchive, onUnarchive)
   const runNeighborhoodAction = neighborhoodAction(entry, onEnterNeighborhood)
   const diffLabel = translate(locale, 'editor.toolbar.gitDiff')
@@ -980,6 +991,10 @@ function BreadcrumbOverflowMenu({
             </DropdownMenuItem>
           </>
         )}
+        <DropdownMenuItem disabled={!runCopyDeepLinkAction} onSelect={runCopyDeepLinkAction}>
+          <Link size={16} />
+          {translate(locale, 'editor.toolbar.copyNoteDeepLink')}
+        </DropdownMenuItem>
         <DropdownMenuItem disabled={!runArchiveAction} onSelect={runArchiveAction}>
           <ArchiveMenuIcon archived={entry.archived} />
           {archiveLabel}

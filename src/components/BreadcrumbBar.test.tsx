@@ -238,6 +238,16 @@ describe('BreadcrumbBar — file actions', () => {
 
     expect(onCopyFilePath).toHaveBeenCalledWith('/vault/note/test.md')
   })
+
+  it('copies the current note deep link from the overflow menu', async () => {
+    const onCopyDeepLink = vi.fn()
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onCopyDeepLink={onCopyDeepLink} />)
+
+    const menu = await openOverflowMenu()
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Copy note deeplink' }))
+
+    expect(onCopyDeepLink).toHaveBeenCalledWith(baseEntry)
+  })
 })
 
 describe('BreadcrumbBar — organized shortcut hint', () => {
@@ -559,7 +569,7 @@ describe('BreadcrumbBar — action buttons always right-aligned', () => {
       const menu = await openOverflowMenu()
       const menuLabels = within(menu).getAllByRole('menuitem').map((item) => item.textContent)
       expect(menuLabels[0]).toBe('Git diff')
-      expect(menuLabels.slice(-2)).toEqual(['Archive this note', 'Delete this note'])
+      expect(menuLabels.slice(-3)).toEqual(['Copy note deeplink', 'Archive this note', 'Delete this note'])
     } finally {
       restoreMeasurement()
     }
@@ -583,6 +593,7 @@ describe('BreadcrumbBar — action buttons always right-aligned', () => {
     expect(within(menu).queryByRole('menuitem', { name: 'Reveal in Finder' })).not.toBeInTheDocument()
     expect(within(menu).queryByRole('menuitem', { name: 'Copy file path' })).not.toBeInTheDocument()
     expect(within(menu).queryByRole('menuitem', { name: "Open note's neighborhood" })).not.toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: 'Copy note deeplink' })).toBeInTheDocument()
   })
 
   it('exposes lower-priority actions when overflow hides their toolbar buttons', async () => {
@@ -610,6 +621,7 @@ describe('BreadcrumbBar — action buttons always right-aligned', () => {
       expect(within(menu).getByRole('menuitem', { name: 'Reveal in Finder' })).toBeInTheDocument()
       expect(within(menu).getByRole('menuitem', { name: 'Copy file path' })).toBeInTheDocument()
       expect(within(menu).getByRole('menuitem', { name: "Open note's neighborhood" })).toBeInTheDocument()
+      expect(within(menu).getByRole('menuitem', { name: 'Copy note deeplink' })).toBeInTheDocument()
     } finally {
       restoreMeasurement()
     }

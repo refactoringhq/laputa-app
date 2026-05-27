@@ -71,6 +71,16 @@ export async function seedAutoGitSavedChange(page: Page): Promise<void> {
   })
 }
 
+export async function openDeepLink(page: Page, url: string): Promise<void> {
+  await page.evaluate((deepLinkUrl) => {
+    const bridge = window.__laputaTest?.openDeepLink
+    if (typeof bridge !== 'function') {
+      throw new Error('Tolaria test bridge is missing openDeepLink')
+    }
+    bridge(deepLinkUrl)
+  }, url)
+}
+
 export async function dispatchShortcutEvent(
   page: Page,
   init: AppCommandShortcutEventInit,

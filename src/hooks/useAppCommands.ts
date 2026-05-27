@@ -123,6 +123,7 @@ interface AppCommandsConfig {
   onOpenInNewWindow?: () => void
   onRevealActiveFile?: (path: string) => void
   onCopyActiveFilePath?: (path: string) => void
+  onCopyActiveDeepLink?: (path: string) => void
   onOpenActiveFileExternal?: (path: string) => void
   onRevealSelectedFolder?: () => void
   onCopySelectedFolderPath?: () => void
@@ -224,6 +225,7 @@ type CommandRegistryVaultActions = Pick<
   | 'onOpenInNewWindow'
   | 'onRevealActiveFile'
   | 'onCopyActiveFilePath'
+  | 'onCopyActiveDeepLink'
   | 'onOpenActiveFileExternal'
   | 'onRestoreDeletedNote'
   | 'canRestoreDeletedNote'
@@ -534,6 +536,7 @@ function createCommandRegistryVaultConfig(
     onOpenInNewWindow: config.onOpenInNewWindow,
     onRevealActiveFile: config.onRevealActiveFile,
     onCopyActiveFilePath: config.onCopyActiveFilePath,
+    onCopyActiveDeepLink: config.onCopyActiveDeepLink,
     onOpenActiveFileExternal: config.onOpenActiveFileExternal,
     onRestoreDeletedNote: config.onRestoreDeletedNote,
     canRestoreDeletedNote: config.canRestoreDeletedNote,
