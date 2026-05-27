@@ -453,12 +453,12 @@ export function InlineWikilinkInput({
     setSelectionRange(clampedSelection)
     forceRender((current) => current + 1)
   }
-  const flushPendingCompositionInput = () => {
+  const flushPendingCompositionInput = (compositionEditor?: HTMLDivElement | null) => {
     if (isComposingRef.current) return
     const hadPendingInput = pendingCompositionInputRef.current
     pendingCompositionInputRef.current = false
 
-    const editor = editorRef.current
+    const editor = compositionEditor ?? editorRef.current
     if (!editor) return
 
     if (containsUnsupportedInlineContent(editor)) {
@@ -475,7 +475,7 @@ export function InlineWikilinkInput({
       end: Math.min(nextSelection.end, nextValue.length),
     }
 
-    const shouldRestoreFocus = document.activeElement === editor
+    const shouldRestoreFocus = document.activeElement === editor || document.activeElement === editorRef.current
     pendingFocusAfterRemountRef.current = shouldRestoreFocus ? clampedSelection : null
     onChange(nextValue)
     setSelectionRange(clampedSelection)
@@ -484,9 +484,9 @@ export function InlineWikilinkInput({
   const handleCompositionStart = () => {
     isComposingRef.current = true
   }
-  const handleCompositionEnd = () => {
+  const handleCompositionEnd = (compositionEditor: HTMLDivElement) => {
     isComposingRef.current = false
-    queueMicrotask(flushPendingCompositionInput)
+    queueMicrotask(() => flushPendingCompositionInput(compositionEditor))
   }
   const handleInput = () => {
     if (disabled) return

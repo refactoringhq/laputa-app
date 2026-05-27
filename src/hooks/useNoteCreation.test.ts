@@ -18,6 +18,7 @@ import {
   useNoteCreation,
 } from './useNoteCreation'
 import type { NoteCreationConfig } from './useNoteCreation'
+import { requestCreateNoteInFolder } from './noteCreationRequests'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('../mock-tauri', () => ({
@@ -387,6 +388,31 @@ describe('useNoteCreation hook', () => {
       path: createdPath,
       workspace: expect.objectContaining({ path: '/Users/luca/Team' }),
     }))
+    vi.restoreAllMocks()
+  })
+
+  it('handles folder create requests from the folder tree event bridge', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValueOnce(undefined)
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
+    renderHook(() => useNoteCreation(makeConfig(), tabDeps))
+
+    await act(async () => {
+      requestCreateNoteInFolder('Projects/2026 Planning', '/Users/luca/Team')
+      await flushImmediateCreate()
+    })
+
+    const createdPath = '/Users/luca/Team/Projects/2026 Planning/untitled-note-1700000000.md'
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', {
+      path: createdPath,
+      content: expect.stringContaining('type: Note'),
+      vaultPath: '/Users/luca/Team',
+    })
+    expect(openTabWithContent).toHaveBeenCalledWith(
+      expect.objectContaining({ path: createdPath }),
+      expect.stringContaining('type: Note'),
+    )
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({ path: createdPath }))
     vi.restoreAllMocks()
   })
 

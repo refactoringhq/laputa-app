@@ -117,7 +117,7 @@ describe('SearchPanel', () => {
     render(
       <SearchPanel open={true} vaultPath="/vault" entries={MOCK_ENTRIES} onSelectNote={vi.fn()} onClose={onClose} />,
     )
-    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -214,6 +214,132 @@ describe('SearchPanel', () => {
     await waitFor(() => {
       const resultTwo = screen.getByText('Refactoring Retreat').closest('[class*="cursor-pointer"]')!
       expect(resultTwo.className).toContain('bg-accent')
+    })
+  })
+
+  it('moves down one result when ArrowDown is pressed in the input', async () => {
+    const entries: VaultEntry[] = [
+      ...MOCK_ENTRIES,
+      {
+        ...MOCK_ENTRIES[0],
+        path: '/vault/topic/search.md',
+        filename: 'search.md',
+        title: 'Search Patterns',
+      },
+    ]
+    mockInvokeFn.mockResolvedValue({
+      results: [
+        { title: 'Result One', path: '/vault/essay/ai-apis.md', snippet: 'First result', score: 0.9, note_type: null },
+        { title: 'Result Two', path: '/vault/event/retreat.md', snippet: 'Second result', score: 0.8, note_type: null },
+        { title: 'Result Three', path: '/vault/topic/search.md', snippet: 'Third result', score: 0.7, note_type: null },
+      ],
+      elapsed_ms: 20,
+    })
+
+    render(
+      <SearchPanel open={true} vaultPath="/vault" entries={entries} onSelectNote={vi.fn()} onClose={vi.fn()} />,
+    )
+
+    const input = screen.getByPlaceholderText('Search in all notes...')
+    fireEvent.change(input, { target: { value: 'test' } })
+
+    await waitFor(() => {
+      expect(screen.getByText('Search Patterns')).toBeInTheDocument()
+    })
+
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+    })
+
+    await waitFor(() => {
+      const resultTwo = screen.getByText('Refactoring Retreat').closest('[class*="cursor-pointer"]')!
+      const resultThree = screen.getByText('Search Patterns').closest('[class*="cursor-pointer"]')!
+      expect(resultTwo.className).toContain('bg-accent')
+      expect(resultThree.className).not.toContain('bg-accent')
+    })
+  })
+
+  it('ignores duplicate native ArrowDown keydown events for one press', async () => {
+    const entries: VaultEntry[] = [
+      ...MOCK_ENTRIES,
+      {
+        ...MOCK_ENTRIES[0],
+        path: '/vault/topic/search.md',
+        filename: 'search.md',
+        title: 'Search Patterns',
+      },
+    ]
+    mockInvokeFn.mockResolvedValue({
+      results: [
+        { title: 'Result One', path: '/vault/essay/ai-apis.md', snippet: 'First result', score: 0.9, note_type: null },
+        { title: 'Result Two', path: '/vault/event/retreat.md', snippet: 'Second result', score: 0.8, note_type: null },
+        { title: 'Result Three', path: '/vault/topic/search.md', snippet: 'Third result', score: 0.7, note_type: null },
+      ],
+      elapsed_ms: 20,
+    })
+
+    render(
+      <SearchPanel open={true} vaultPath="/vault" entries={entries} onSelectNote={vi.fn()} onClose={vi.fn()} />,
+    )
+
+    const input = screen.getByPlaceholderText('Search in all notes...')
+    fireEvent.change(input, { target: { value: 'test' } })
+
+    await waitFor(() => {
+      expect(screen.getByText('Search Patterns')).toBeInTheDocument()
+    })
+
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+    })
+
+    await waitFor(() => {
+      const resultTwo = screen.getByText('Refactoring Retreat').closest('[class*="cursor-pointer"]')!
+      const resultThree = screen.getByText('Search Patterns').closest('[class*="cursor-pointer"]')!
+      expect(resultTwo.className).toContain('bg-accent')
+      expect(resultThree.className).not.toContain('bg-accent')
+    })
+  })
+
+  it('allows a second ArrowDown press immediately after keyup', async () => {
+    const entries: VaultEntry[] = [
+      ...MOCK_ENTRIES,
+      {
+        ...MOCK_ENTRIES[0],
+        path: '/vault/topic/search.md',
+        filename: 'search.md',
+        title: 'Search Patterns',
+      },
+    ]
+    mockInvokeFn.mockResolvedValue({
+      results: [
+        { title: 'Result One', path: '/vault/essay/ai-apis.md', snippet: 'First result', score: 0.9, note_type: null },
+        { title: 'Result Two', path: '/vault/event/retreat.md', snippet: 'Second result', score: 0.8, note_type: null },
+        { title: 'Result Three', path: '/vault/topic/search.md', snippet: 'Third result', score: 0.7, note_type: null },
+      ],
+      elapsed_ms: 20,
+    })
+
+    render(
+      <SearchPanel open={true} vaultPath="/vault" entries={entries} onSelectNote={vi.fn()} onClose={vi.fn()} />,
+    )
+
+    const input = screen.getByPlaceholderText('Search in all notes...')
+    fireEvent.change(input, { target: { value: 'test' } })
+
+    await waitFor(() => {
+      expect(screen.getByText('Search Patterns')).toBeInTheDocument()
+    })
+
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+      fireEvent.keyUp(input, { key: 'ArrowDown' })
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Search Patterns').closest('[class*="cursor-pointer"]')!.className).toContain('bg-accent')
     })
   })
 
