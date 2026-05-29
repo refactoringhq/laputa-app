@@ -14,6 +14,7 @@ vi.mock('../hooks/useUpdater', async () => {
 
 function makeActions(overrides?: Partial<UpdateActions>): UpdateActions {
   return {
+    checkForUpdates: vi.fn(),
     startDownload: vi.fn(),
     openReleaseNotes: vi.fn(),
     dismiss: vi.fn(),
@@ -62,10 +63,29 @@ describe('UpdateBanner', () => {
     expect(container.innerHTML).toBe('')
   })
 
-  it('renders nothing on error state', () => {
-    const status: UpdateStatus = { state: 'error' }
-    const { container } = renderBanner(status)
-    expect(container.innerHTML).toBe('')
+  it('renders error banner with message and retry button', () => {
+    const actions = makeActions()
+    renderBanner({ state: 'error', message: 'Download failed: timeout' }, actions)
+
+    expect(screen.getByTestId('update-banner')).toBeTruthy()
+    expect(screen.getByText('Download failed: timeout')).toBeTruthy()
+    expect(screen.getByTestId('update-retry-btn')).toBeTruthy()
+    expect(screen.getByTestId('update-dismiss')).toBeTruthy()
+  })
+
+  it('renders default error message when no message provided', () => {
+    renderBanner({ state: 'error' })
+
+    expect(screen.getByTestId('update-banner')).toBeTruthy()
+    expect(screen.getByText('Update failed')).toBeTruthy()
+  })
+
+  it('retry button triggers checkForUpdates', () => {
+    const actions = makeActions({ checkForUpdates: vi.fn() })
+    renderBanner({ state: 'error', message: 'timeout' }, actions)
+
+    fireEvent.click(screen.getByTestId('update-retry-btn'))
+    expect(actions.checkForUpdates).toHaveBeenCalledOnce()
   })
 
   it('shows immediate feedback while checking for updates', () => {
@@ -130,7 +150,7 @@ describe('UpdateBanner', () => {
     expect(screen.getByText('65%')).toBeTruthy()
 
     const progressBar = screen.getByTestId('update-progress')
-    expect(progressBar.style.width).toBe('65%')
+    expect(progressBar.style.transform).toBe('scaleX(0.65)')
   })
 
   it('shows 0% at start of download', () => {
@@ -142,7 +162,7 @@ describe('UpdateBanner', () => {
 
     expect(screen.getByText('0%')).toBeTruthy()
     const progressBar = screen.getByTestId('update-progress')
-    expect(progressBar.style.width).toBe('0%')
+    expect(progressBar.style.transform).toBe('scaleX(0)')
   })
 
   it('shows restart button when update is ready', () => {

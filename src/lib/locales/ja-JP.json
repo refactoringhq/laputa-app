@@ -602,6 +602,8 @@
   "update.downloading": "Tolaria {version} をダウンロード中...",
   "update.readyRestart": "準備完了 - 適用するには再起動してください",
   "update.restartNow": "今すぐ再起動",
+  "update.error": "更新に失敗しました",
+  "update.retry": "再試行",
   "status.update.check": "更新を確認",
   "status.zoom.reset": "ズームレベルをリセット",
   "status.feedback.contribute": "Tolaria に貢献する",

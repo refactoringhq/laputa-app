@@ -602,6 +602,8 @@
   "update.downloading": "Tolaria {version} 다운로드 중...",
   "update.readyRestart": "준비 완료 - 적용하려면 다시 시작하세요",
   "update.restartNow": "지금 다시 시작",
+  "update.error": "업데이트 실패",
+  "update.retry": "다시 시도",
   "status.update.check": "업데이트 확인",
   "status.zoom.reset": "확대/축소 수준 재설정",
   "status.feedback.contribute": "Tolaria에 기여하기",

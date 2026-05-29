@@ -602,6 +602,8 @@
   "update.downloading": "Đang tải Tolaria {version}...",
   "update.readyRestart": "đã sẵn sàng - khởi động lại để áp dụng",
   "update.restartNow": "Khởi động lại ngay",
+  "update.error": "Cập nhật không thành công",
+  "update.retry": "Thử lại",
   "status.update.check": "Kiểm tra cập nhật",
   "status.zoom.reset": "Đặt lại mức thu phóng",
   "status.feedback.contribute": "Đóng góp cho Tolaria",

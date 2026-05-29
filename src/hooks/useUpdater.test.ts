@@ -150,6 +150,20 @@ describe('useUpdater', () => {
     })
   })
 
+  it('keeps startup auto-check failures silent in the banner', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    installInvokeHandlers({ checkResult: new Error('network error') })
+
+    const { result } = renderUpdater('stable')
+    await advanceAutoCheck()
+
+    expect(console.warn).toHaveBeenCalledWith(
+      '[updater] Failed to check for updates:',
+      expect.any(Error),
+    )
+    expect(result.current.status).toEqual({ state: 'idle' })
+  })
+
   it('transitions to available when an alpha update is found', async () => {
     const { result } = await performManualCheck(
       'alpha',
@@ -248,8 +262,11 @@ describe('useUpdater', () => {
       kind: 'error',
       message: 'Could not check for updates: network error',
     })
-    expect(console.warn).toHaveBeenCalledWith('[updater] Failed to check for updates')
-    expect(result.current.status).toEqual({ state: 'error' })
+    expect(console.warn).toHaveBeenCalledWith(
+      '[updater] Failed to check for updates:',
+      expect.any(Error),
+    )
+    expect(result.current.status).toEqual({ state: 'error', message: 'Could not check for updates: network error' })
   })
 
   it('dismiss resets the banner state', async () => {
@@ -315,6 +332,54 @@ describe('useUpdater', () => {
     expect(isRestartRequiredAfterUpdate()).toBe(true)
   })
 
+  it('does not show ready until the install call resolves after download Finished', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    let resolveInstall: () => void = () => {}
+    const installPromise = new Promise<void>((resolve) => {
+      resolveInstall = resolve
+    })
+
+    installInvokeHandlers({
+      checkResult: makeUpdate(),
+      downloadImpl: async (args) => {
+        args.onEvent.onmessage({ event: 'Started', data: { contentLength: 1000 } })
+        args.onEvent.onmessage({ event: 'Progress', data: { chunkLength: 1000 } })
+        args.onEvent.onmessage({ event: 'Finished' })
+        await installPromise
+      },
+    })
+
+    const { result } = renderUpdater('stable')
+
+    await act(async () => {
+      await result.current.actions.checkForUpdates()
+    })
+
+    let downloadPromise: Promise<void> = Promise.resolve()
+    await act(async () => {
+      downloadPromise = result.current.actions.startDownload() as unknown as Promise<void>
+      await Promise.resolve()
+    })
+
+    expect(result.current.status).toEqual({
+      state: 'downloading',
+      version: '2026.4.16',
+      displayVersion: '2026.4.16',
+      progress: 1,
+    })
+
+    await act(async () => {
+      resolveInstall()
+      await downloadPromise
+    })
+
+    expect(result.current.status).toEqual({
+      state: 'ready',
+      version: '2026.4.16',
+      displayVersion: '2026.4.16',
+    })
+  })
+
   it('transitions to error when download fails', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
     installInvokeHandlers({
@@ -334,7 +399,7 @@ describe('useUpdater', () => {
       await result.current.actions.startDownload()
     })
 
-    expect(console.warn).toHaveBeenCalledWith('[updater] Download failed')
-    expect(result.current.status).toEqual({ state: 'error' })
+    expect(console.warn).toHaveBeenCalledWith('[updater] Download failed:', expect.any(Error))
+    expect(result.current.status).toEqual({ state: 'error', message: 'download failed' })
   })
 })

@@ -602,6 +602,8 @@
   "update.downloading": "Download di Tolaria {version} in corso...",
   "update.readyRestart": "è pronta - riavvia per applicare l'aggiornamento",
   "update.restartNow": "Riavvia ora",
+  "update.error": "Aggiornamento non riuscito",
+  "update.retry": "Riprova",
   "status.update.check": "Verifica disponibilità aggiornamenti",
   "status.zoom.reset": "Ripristina il livello di zoom",
   "status.feedback.contribute": "Contribuisci a Tolaria",

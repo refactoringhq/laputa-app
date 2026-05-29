@@ -602,6 +602,8 @@
   "update.downloading": "Tolaria {version} wird heruntergeladen …",
   "update.readyRestart": "ist bereit – zum Übernehmen neu starten",
   "update.restartNow": "Jetzt neu starten",
+  "update.error": "Update fehlgeschlagen",
+  "update.retry": "Erneut versuchen",
   "status.update.check": "Nach Updates suchen",
   "status.zoom.reset": "Zoomstufe zurücksetzen",
   "status.feedback.contribute": "Zu Tolaria beitragen",

@@ -22,7 +22,7 @@ export type UpdateStatus =
   | ({ state: 'available'; notes: string | undefined } & UpdateVersionInfo)
   | ({ state: 'downloading'; progress: number } & UpdateVersionInfo)
   | ({ state: 'ready' } & UpdateVersionInfo)
-  | { state: 'error' }
+  | { state: 'error'; message?: string }
 
 export type UpdateCheckResult =
   | { kind: 'up-to-date' }
@@ -61,6 +61,12 @@ function buildUpdateCheckErrorMessage(error: unknown): string {
   return 'Could not check for updates'
 }
 
+function getUpdateInstallErrorMessage(error: unknown): string | undefined {
+  if (error instanceof Error && error.message.trim()) return error.message
+  if (typeof error === 'string' && error.trim()) return error
+  return undefined
+}
+
 function toAvailableStatus(update: AppUpdateMetadata): UpdateStatus {
   return {
     state: 'available',
@@ -89,7 +95,8 @@ function createDownloadProgressHandler(
       return
     }
 
-    setStatus({ state: 'ready', ...versionInfo })
+    // 'Finished' fires after HTTP download but before binary replacement.
+    // Don't set 'ready' here — let the full IPC call resolve instead.
   }
 }
 
@@ -99,10 +106,14 @@ export function useUpdater(
   const [status, setStatus] = useState<UpdateStatus>({ state: 'idle' })
   const updateRef = useRef<AppUpdateMetadata | null>(null)
 
-  const checkForUpdates = useCallback(async (): Promise<UpdateCheckResult> => {
+  const runUpdateCheck = useCallback(async (
+    options: { showChecking: boolean; showErrors: boolean },
+  ): Promise<UpdateCheckResult> => {
     if (!isTauri()) return { kind: 'up-to-date' }
 
-    setStatus({ state: 'checking' })
+    if (options.showChecking) {
+      setStatus({ state: 'checking' })
+    }
 
     try {
       const update = await checkForAppUpdate(releaseChannel)
@@ -117,17 +128,28 @@ export function useUpdater(
       setStatus(toAvailableStatus(update))
       return { kind: 'available', ...versionInfo }
     } catch (error) {
-      console.warn('[updater] Failed to check for updates')
-      setStatus({ state: 'error' })
-      return { kind: 'error', message: buildUpdateCheckErrorMessage(error) }
+      console.warn('[updater] Failed to check for updates:', error)
+      const message = buildUpdateCheckErrorMessage(error)
+      if (options.showErrors) {
+        setStatus({ state: 'error', message })
+      } else {
+        setStatus((prev) => (prev.state === 'checking' ? { state: 'idle' } : prev))
+      }
+      return { kind: 'error', message }
     }
   }, [releaseChannel])
 
+  const checkForUpdates = useCallback((): Promise<UpdateCheckResult> => (
+    runUpdateCheck({ showChecking: true, showErrors: true })
+  ), [runUpdateCheck])
+
   useEffect(() => {
     if (!isTauri()) return
-    const timer = setTimeout(() => { checkForUpdates() }, 3000)
+    const timer = setTimeout(() => {
+      void runUpdateCheck({ showChecking: false, showErrors: false })
+    }, 3000)
     return () => clearTimeout(timer)
-  }, [checkForUpdates])
+  }, [runUpdateCheck])
 
   const startDownload = useCallback(async () => {
     const update = updateRef.current
@@ -145,9 +167,9 @@ export function useUpdater(
 
       // If Finished wasn't emitted via callback, set ready after await resolves
       setStatus((prev) => (prev.state === 'downloading' ? { state: 'ready', ...versionInfo } : prev))
-    } catch {
-      console.warn('[updater] Download failed')
-      setStatus({ state: 'error' })
+    } catch (error) {
+      console.warn('[updater] Download failed:', error)
+      setStatus({ state: 'error', message: getUpdateInstallErrorMessage(error) })
     }
   }, [releaseChannel])
 

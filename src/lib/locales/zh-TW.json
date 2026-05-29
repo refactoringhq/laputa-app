@@ -602,6 +602,8 @@
   "update.downloading": "正在下載 Tolaria {version}...",
   "update.readyRestart": "已準備好 - 重啟後應用",
   "update.restartNow": "立即重啟",
+  "update.error": "更新失敗",
+  "update.retry": "重試",
   "status.update.check": "檢查更新",
   "status.zoom.reset": "重置縮放級別",
   "status.feedback.contribute": "為 Tolaria 貢獻反饋",

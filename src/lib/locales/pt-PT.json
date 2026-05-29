@@ -602,6 +602,8 @@
   "update.downloading": "A transferir a Tolaria {version}...",
   "update.readyRestart": "está pronta – reinicie para aplicar",
   "update.restartNow": "Reiniciar agora",
+  "update.error": "Falha na atualização",
+  "update.retry": "Tentar novamente",
   "status.update.check": "Verificar se há atualizações",
   "status.zoom.reset": "Repor o nível de zoom",
   "status.feedback.contribute": "Contribuir para a Tolaria",

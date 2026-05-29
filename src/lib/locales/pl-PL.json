@@ -602,6 +602,8 @@
   "update.downloading": "Pobieranie Tolaria {version}...",
   "update.readyRestart": "jest gotowa — uruchom ponownie, aby zastosować",
   "update.restartNow": "Uruchom ponownie",
+  "update.error": "Aktualizacja nie powiodła się",
+  "update.retry": "Spróbuj ponownie",
   "status.update.check": "Sprawdź aktualizacje",
   "status.zoom.reset": "Resetuj poziom powiększenia",
   "status.feedback.contribute": "Współtwórz Tolaria",

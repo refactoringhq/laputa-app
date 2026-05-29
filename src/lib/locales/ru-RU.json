@@ -602,6 +602,8 @@
   "update.downloading": "Загрузка Tolaria {version}...",
   "update.readyRestart": "Готово — перезапустите приложение, чтобы применить обновление",
   "update.restartNow": "Перезапустить сейчас",
+  "update.error": "Не удалось обновить",
+  "update.retry": "Повторить",
   "status.update.check": "Проверить наличие обновлений",
   "status.zoom.reset": "Сбросить уровень масштабирования",
   "status.feedback.contribute": "Внести свой вклад в Tolaria",

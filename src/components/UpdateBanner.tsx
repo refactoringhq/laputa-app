@@ -11,7 +11,7 @@ interface UpdateBannerProps {
   locale?: AppLocale
 }
 
-type VisibleUpdateStatus = Exclude<UpdateStatus, { state: 'idle' } | { state: 'error' }>
+type VisibleUpdateStatus = Exclude<UpdateStatus, { state: 'idle' }>
 
 const bannerStyle = {
   display: 'flex',
@@ -123,11 +123,13 @@ function renderDownloadingContent(status: Extract<VisibleUpdateStatus, { state: 
         <div
           data-testid="update-progress"
           style={{
-            width: `${Math.round(status.progress * 100)}%`,
+            width: '100%',
             height: '100%',
             background: 'var(--text-inverse)',
             borderRadius: 2,
-            transition: 'width 0.2s ease',
+            transform: `scaleX(${status.progress})`,
+            transformOrigin: 'left',
+            transition: 'transform 0.2s ease',
           }}
         />
       </div>
@@ -160,7 +162,45 @@ function renderReadyContent(status: Extract<VisibleUpdateStatus, { state: 'ready
   )
 }
 
-function renderBannerContent(status: VisibleUpdateStatus, actions: UpdateActions, locale: AppLocale) {
+function renderErrorContent(status: Extract<UpdateStatus, { state: 'error' }>, actions: UpdateActions, locale: AppLocale) {
+  return (
+    <>
+      <span style={{ flex: 1 }}>
+        {status.message || translate(locale, 'update.error')}
+      </span>
+      <Button
+        type="button"
+        size="xs"
+        data-testid="update-retry-btn"
+        onClick={() => { void actions.checkForUpdates() }}
+        style={primaryActionStyle}
+      >
+        {translate(locale, 'update.retry')}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        data-testid="update-dismiss"
+        onClick={actions.dismiss}
+        style={dismissButtonStyle}
+        aria-label={translate(locale, 'update.dismiss')}
+      >
+        <X size={14} />
+      </Button>
+    </>
+  )
+}
+
+function UpdateBannerContent({
+  status,
+  actions,
+  locale,
+}: {
+  status: VisibleUpdateStatus
+  actions: UpdateActions
+  locale: AppLocale
+}) {
   switch (status.state) {
     case 'checking':
       return renderCheckingContent(locale)
@@ -170,11 +210,19 @@ function renderBannerContent(status: VisibleUpdateStatus, actions: UpdateActions
       return renderDownloadingContent(status, locale)
     case 'ready':
       return renderReadyContent(status, locale)
+    case 'error':
+      return renderErrorContent(status, actions, locale)
   }
 }
 
 export function UpdateBanner({ status, actions, locale = 'en' }: UpdateBannerProps) {
-  if (status.state === 'idle' || status.state === 'error') return null
+  if (status.state === 'idle') return null
 
-  return <div data-testid="update-banner" style={bannerStyle}>{renderBannerContent(status, actions, locale)}</div>
+  const bannerBackground = status.state === 'error' ? 'var(--accent-red)' : 'var(--accent-blue)'
+
+  return (
+    <div data-testid="update-banner" style={{ ...bannerStyle, background: bannerBackground }}>
+      <UpdateBannerContent status={status} actions={actions} locale={locale} />
+    </div>
+  )
 }

@@ -250,11 +250,15 @@ jobs:
           INTEL_SIG=$(cat "$INTEL_SIG_FILE")
           INTEL_UPDATER=$(basename "$INTEL_UPDATER_FILE")
 
-          LINUX_SIG_FILE=$(find_required "linux-x86_64-bundles/*/*.AppImage.sig" "linux-x86_64-bundles/*/*.AppImage.tar.gz.sig" "linux-x86_64-bundles/*/*.deb.sig" "linux-x86_64-bundles/*.AppImage.sig" "linux-x86_64-bundles/*.AppImage.tar.gz.sig" "linux-x86_64-bundles/*.deb.sig")
-          LINUX_UPDATER_FILE="${LINUX_SIG_FILE%.sig}"
-          LINUX_SIG=$(cat "$LINUX_SIG_FILE")
-          LINUX_UPDATER=$(basename "$LINUX_UPDATER_FILE")
-          LINUX_DOWNLOAD=$(basename "$(find_required "linux-x86_64-bundles/*/*.AppImage" "linux-x86_64-bundles/*/*.deb" "linux-x86_64-bundles/*/*.AppImage.tar.gz" "linux-x86_64-bundles/*.AppImage" "linux-x86_64-bundles/*.deb" "linux-x86_64-bundles/*.AppImage.tar.gz")")
+          LINUX_APPIMAGE_SIG_FILE=$(find_required "linux-x86_64-bundles/*/*.AppImage.tar.gz.sig" "linux-x86_64-bundles/*/*.AppImage.sig" "linux-x86_64-bundles/*.AppImage.tar.gz.sig" "linux-x86_64-bundles/*.AppImage.sig")
+          LINUX_APPIMAGE_UPDATER_FILE="${LINUX_APPIMAGE_SIG_FILE%.sig}"
+          LINUX_APPIMAGE_SIG=$(cat "$LINUX_APPIMAGE_SIG_FILE")
+          LINUX_APPIMAGE_UPDATER=$(basename "$LINUX_APPIMAGE_UPDATER_FILE")
+          LINUX_APPIMAGE_DOWNLOAD=$(basename "$(find_required "linux-x86_64-bundles/*/*.AppImage" "linux-x86_64-bundles/*.AppImage")")
+          LINUX_DEB_SIG_FILE=$(find_required "linux-x86_64-bundles/*/*.deb.sig" "linux-x86_64-bundles/*.deb.sig")
+          LINUX_DEB_FILE="${LINUX_DEB_SIG_FILE%.sig}"
+          LINUX_DEB_SIG=$(cat "$LINUX_DEB_SIG_FILE")
+          LINUX_DEB=$(basename "$LINUX_DEB_FILE")
 
           WINDOWS_SIG_FILE=$(find_required "windows-x86_64-bundles/*/*-setup.exe.sig" "windows-x86_64-bundles/*/*.msi.sig" "windows-x86_64-bundles/*/*.nsis.zip.sig" "windows-x86_64-bundles/*/*.msi.zip.sig" "windows-x86_64-bundles/*-setup.exe.sig" "windows-x86_64-bundles/*.msi.sig" "windows-x86_64-bundles/*.nsis.zip.sig" "windows-x86_64-bundles/*.msi.zip.sig")
           WINDOWS_UPDATER_FILE="${WINDOWS_SIG_FILE%.sig}"
@@ -279,9 +283,13 @@ jobs:
                 "download_url": "https://github.com/${REPO}/releases/download/${TAG}/${INTEL_UPDATER}"
               },
               "linux-x86_64": {
-                "signature": "${LINUX_SIG}",
-                "url": "https://github.com/${REPO}/releases/download/${TAG}/${LINUX_UPDATER}",
-                "download_url": "https://github.com/${REPO}/releases/download/${TAG}/${LINUX_DOWNLOAD}"
+                "signature": "${LINUX_APPIMAGE_SIG}",
+                "url": "https://github.com/${REPO}/releases/download/${TAG}/${LINUX_APPIMAGE_UPDATER}",
+                "download_url": "https://github.com/${REPO}/releases/download/${TAG}/${LINUX_APPIMAGE_DOWNLOAD}"
+              },
+              "linux-x86_64-deb": {
+                "signature": "${LINUX_DEB_SIG}",
+                "url": "https://github.com/${REPO}/releases/download/${TAG}/${LINUX_DEB}"
               },
               "windows-x86_64": {
                 "signature": "${WINDOWS_SIG}",

@@ -76,6 +76,33 @@ describe('release workflow macOS artifact names', () => {
     expect(signingScript).toContain('timestampUrl')
     expect(signingScript).toContain('WINDOWS_CODE_SIGNING_CERTIFICATE_THUMBPRINT')
   })
+
+  it('publishes installer-specific Linux updater manifest entries', () => {
+    const workflows = [
+      readFileSync(`${process.cwd()}/.github/workflows/release.yml`, 'utf8'),
+      readFileSync(`${process.cwd()}/.github/workflows/release-stable.yml`, 'utf8'),
+    ]
+
+    for (const workflow of workflows) {
+      expect(workflow).toContain(
+        'LINUX_APPIMAGE_SIG_FILE=$(find_required "linux-x86_64-bundles/*/*.AppImage.tar.gz.sig" "linux-x86_64-bundles/*/*.AppImage.sig" "linux-x86_64-bundles/*.AppImage.tar.gz.sig" "linux-x86_64-bundles/*.AppImage.sig")',
+      )
+      expect(workflow).toContain(
+        'LINUX_APPIMAGE_DOWNLOAD=$(basename "$(find_required "linux-x86_64-bundles/*/*.AppImage" "linux-x86_64-bundles/*.AppImage")")',
+      )
+      expect(workflow).toContain(
+        'LINUX_DEB_SIG_FILE=$(find_required "linux-x86_64-bundles/*/*.deb.sig" "linux-x86_64-bundles/*.deb.sig")',
+      )
+      expect(workflow).toContain('"linux-x86_64": {')
+      expect(workflow).toContain('"signature": "${LINUX_APPIMAGE_SIG}"')
+      expect(workflow).toContain('"url": "https://github.com/${REPO}/releases/download/${TAG}/${LINUX_APPIMAGE_UPDATER}"')
+      expect(workflow).toContain('"download_url": "https://github.com/${REPO}/releases/download/${TAG}/${LINUX_APPIMAGE_DOWNLOAD}"')
+      expect(workflow).toContain('"linux-x86_64-deb": {')
+      expect(workflow).toContain('"signature": "${LINUX_DEB_SIG}"')
+      expect(workflow).toContain('"url": "https://github.com/${REPO}/releases/download/${TAG}/${LINUX_DEB}"')
+      expect(workflow).not.toContain('"deb_url"')
+    }
+  })
 })
 
 describe('extractStableDownloadTargets', () => {
