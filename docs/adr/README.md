@@ -164,7 +164,7 @@ proposed → active → superseded
 | [0108](0108-sanitized-rendered-markup-and-safe-regex.md) | Sanitized rendered markup and safe user regex | active |
 | [0109](0109-debounced-worker-derived-editor-indexes.md) | Debounced worker-derived editor indexes | active |
 | [0110](0110-in-app-media-and-pdf-file-previews.md) | In-app media and PDF previews for binary vault files | superseded → [0121](0121-appimage-external-fallback-for-audio-and-video-previews.md) |
-| [0111](0111-path-aware-external-vault-refresh-with-focused-editor-preservation.md) | Path-aware external vault refresh with focused-editor preservation | active |
+| [0111](0111-path-aware-external-vault-refresh-with-focused-editor-preservation.md) | Path-aware external vault refresh with focused-editor preservation | superseded → [0135](0135-clean-active-note-refresh-after-external-edit.md) |
 | [0112](0112-system-theme-mode.md) | System theme mode | active |
 | [0113](0113-shared-renderer-attachment-path-normalization.md) | Shared renderer attachment path normalization | active |
 | [0114](0114-mounted-workspaces-unified-graph.md) | Mounted workspaces unified graph | active |
@@ -186,3 +186,4 @@ proposed → active → superseded
 | [0132](0132-alpha-authenticode-soft-gate.md) | Alpha Authenticode soft gate | active |
 | [0133](0133-request-scoped-ai-stream-events.md) | Request-scoped AI stream event channels | active |
 | [0134](0134-direct-shiki-language-registrations.md) | Direct Shiki language registrations for code blocks | active |
+| [0135](0135-clean-active-note-refresh-after-external-edit.md) | Clean active notes refresh immediately after external edits | active |
