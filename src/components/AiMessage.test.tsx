@@ -38,6 +38,21 @@ describe('AiMessage', () => {
     expect(screen.getByRole('button', { name: 'Fork chat from here' })).toBeTruthy()
   })
 
+  it('localizes reasoning and tool use chrome', () => {
+    render(
+      <AiMessage
+        userMessage="Fai qualcosa"
+        locale="it-IT"
+        reasoning="Sto pensando..."
+        reasoningDone
+        actions={[{ tool: 'search_notes', toolId: 't1', label: 'Cercato', status: 'done' }]}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: /ragionamento/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /uso degli strumenti/i })).toBeTruthy()
+  })
+
   it('shows reasoning expanded while streaming (reasoningDone=false)', () => {
     render(<AiMessage userMessage="Ask" reasoning="Thinking about it..." reasoningDone={false} actions={[]} />)
     expect(screen.getByTestId('reasoning-toggle')).toBeTruthy()

@@ -106,8 +106,8 @@ function UserBubble({ content, references, onOpenNote }: {
   )
 }
 
-function ReasoningBlock({ text, expanded, onToggle }: {
-  text: string; expanded: boolean; onToggle: () => void
+function ReasoningBlock({ locale, text, expanded, onToggle }: {
+  locale: AppLocale; text: string; expanded: boolean; onToggle: () => void
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -127,7 +127,7 @@ function ReasoningBlock({ text, expanded, onToggle }: {
         data-testid="reasoning-toggle"
       >
         <Brain size={14} />
-        <span>Reasoning</span>
+        <span>{translate(locale, 'ai.message.reasoning')}</span>
         {expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
       </button>
       {expanded && (
@@ -174,6 +174,7 @@ function ToolUseBlock({
   actions,
   expanded,
   expandedActionIds,
+  locale,
   onOpenNote,
   onToggle,
   onToggleAction,
@@ -181,6 +182,7 @@ function ToolUseBlock({
   actions: AiAction[]
   expanded: boolean
   expandedActionIds: Set<string>
+  locale: AppLocale
   onOpenNote?: (path: string) => void
   onToggle: () => void
   onToggleAction: (toolId: string) => void
@@ -198,7 +200,7 @@ function ToolUseBlock({
         data-testid="tool-use-toggle"
       >
         <Terminal size={14} />
-        <span>Tool use</span>
+        <span>{translate(locale, 'ai.message.toolUse')}</span>
         <span
           className={`inline-flex h-4 min-w-4 items-center justify-center rounded-full ${pending ? 'animate-pulse' : ''}`}
           style={{
@@ -372,6 +374,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
       <UserBubble content={userMessage} references={references} onOpenNote={onOpenNote} />
       {reasoning && (
         <ReasoningBlock
+          locale={locale}
           text={reasoning}
           expanded={reasoningExpanded}
           onToggle={() => setUserOverride(prev => !prev)}
@@ -382,6 +385,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
           actions={actions}
           expanded={toolUseExpanded}
           expandedActionIds={expandedActions}
+          locale={locale}
           onOpenNote={onOpenNote}
           onToggle={() => setToolUseExpanded((current) => !current)}
           onToggleAction={toggleAction}

@@ -317,6 +317,8 @@ files:
     ai.message.regenerate: e464a5330788a9f79d06c96989f840cb
     ai.message.copy: 53fa249ce3d02c8a686b657b31d02ee7
     ai.message.fork: f5aace5e5b5e7b0954651a2da44b6755
+    ai.message.reasoning: 87a222577e9c7b7a0739d92337f4fe46
+    ai.message.toolUse: d6093cfe0c95f805875e5724eecd20aa
     ai.workspace.title: 375099f0c804e924c1dc275370710d92
     ai.workspace.newChat: a917baaf1484ec5dc85f19ab8fc4f4e9
     ai.workspace.collapseSidebar: 9ecc763686b7c61547281f3e05ffd06f
@@ -358,6 +360,10 @@ files:
     ai.workspace.target.installedVersion: 8677756d761e4cce240a637805482946
     ai.workspace.target.localModel: d34f4b997ce78da5aa57d657a5d6fcb5
     ai.workspace.target.apiModel: 589a257cbd265eaa7de93de8b4084dff
+    window.minimize: d27532d90ecd513e97ab811c0f34dbfd
+    window.maximize: 9369ba148ee259473fc1fb4939b6c2e8
+    window.restore: 2bd339d85ee3b33e513359ce781b60cc
+    window.close: d3d2e617335f08df83599665eef8a418
     mcp.setup.manageTitle: d786c7b9ab9b2406258648931bca0e01
     mcp.setup.setupTitle: b4b373f690c8a0008885b31e78e93a5c
     mcp.setup.connectedDescription: a2a3be70c0ac9fa7ef112df5252249fa

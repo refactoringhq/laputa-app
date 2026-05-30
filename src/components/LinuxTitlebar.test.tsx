@@ -79,4 +79,12 @@ describe('LinuxTitlebar', () => {
     expect(toggleMaximize).toHaveBeenCalledOnce()
     expect(close).toHaveBeenCalledOnce()
   })
+
+  it('localizes titlebar window control labels', () => {
+    render(<LinuxTitlebar locale="it-IT" />)
+
+    expect(screen.getByRole('button', { name: 'Riduci a icona' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ingrandisci' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Chiudi' })).toBeTruthy()
+  })
 })
