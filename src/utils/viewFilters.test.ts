@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import { evaluateView } from './viewFilters'
-import type { VaultEntry, ViewDefinition } from '../types'
+import type { FilterNode, VaultEntry, ViewDefinition } from '../types'
 
 const NOW = Math.floor(Date.now() / 1000)
 
@@ -18,446 +18,349 @@ function makeEntry(overrides: Partial<VaultEntry>): VaultEntry {
   }
 }
 
+function makeView(filters: ViewDefinition['filters'], name = 'Test'): ViewDefinition {
+  return { name, icon: null, color: null, sort: null, filters }
+}
+
+function makeFilterView(filter: FilterNode, name = 'Test'): ViewDefinition {
+  return makeView({ all: [filter] }, name)
+}
+
+function titlesFor(view: ViewDefinition, entries: VaultEntry[]): string[] {
+  return evaluateView(view, entries).map((entry) => entry.title)
+}
+
+function expectFilterTitles(
+  filter: FilterNode,
+  entries: VaultEntry[],
+  expectedTitles: string[],
+  name?: string,
+) {
+  expect(titlesFor(makeFilterView(filter, name), entries)).toEqual(expectedTitles)
+}
+
 describe('evaluateView', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
 
   it('filters by type equals', () => {
-    const view: ViewDefinition = {
-      name: 'Projects', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'type', op: 'equals', value: 'Project' }] },
-    }
     const entries = [
       makeEntry({ isA: 'Project', title: 'P1' }),
       makeEntry({ isA: 'Note', title: 'N1' }),
       makeEntry({ isA: 'Project', title: 'P2' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['P1', 'P2'])
+    expectFilterTitles({ field: 'type', op: 'equals', value: 'Project' }, entries, ['P1', 'P2'], 'Projects')
   })
 
   it('filters by status not_equals', () => {
-    const view: ViewDefinition = {
-      name: 'Active', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'status', op: 'not_equals', value: 'done' }] },
-    }
     const entries = [
       makeEntry({ status: 'active', title: 'A' }),
       makeEntry({ status: 'done', title: 'D' }),
       makeEntry({ status: null, title: 'N' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['A', 'N'])
+    expectFilterTitles({ field: 'status', op: 'not_equals', value: 'done' }, entries, ['A', 'N'], 'Active')
   })
 
   it('filters by relationship contains wikilink', () => {
-    const view: ViewDefinition = {
-      name: 'Related', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'Related to', op: 'contains', value: '[[laputa-app]]' }] },
-    }
     const entries = [
       makeEntry({ title: 'Match', relationships: { 'Related to': ['[[laputa-app|Laputa App]]', '[[other]]'] } }),
       makeEntry({ title: 'No match', relationships: { 'Related to': ['[[something]]'] } }),
       makeEntry({ title: 'No rels', relationships: {} }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Match'])
+    expectFilterTitles({ field: 'Related to', op: 'contains', value: '[[laputa-app]]' }, entries, ['Match'], 'Related')
   })
 
   it('evaluates nested AND/OR groups', () => {
-    const view: ViewDefinition = {
-      name: 'Complex', icon: null, color: null, sort: null,
-      filters: {
+    const view = makeView(
+      {
         any: [
           { all: [{ field: 'type', op: 'equals', value: 'Project' }, { field: 'status', op: 'equals', value: 'active' }] },
           { all: [{ field: 'type', op: 'equals', value: 'Event' }] },
         ],
       },
-    }
+      'Complex',
+    )
     const entries = [
       makeEntry({ isA: 'Project', status: 'active', title: 'Active Proj' }),
       makeEntry({ isA: 'Project', status: 'done', title: 'Done Proj' }),
       makeEntry({ isA: 'Event', title: 'My Event' }),
       makeEntry({ isA: 'Note', title: 'Random' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Active Proj', 'My Event'])
+    expect(titlesFor(view, entries)).toEqual(['Active Proj', 'My Event'])
   })
 
   it('filters by is_empty and is_not_empty', () => {
-    const view: ViewDefinition = {
-      name: 'Has Status', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'status', op: 'is_not_empty' }] },
-    }
     const entries = [
       makeEntry({ status: 'active', title: 'Has' }),
       makeEntry({ status: null, title: 'Null' }),
       makeEntry({ status: '', title: 'Empty' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Has'])
+    expectFilterTitles({ field: 'status', op: 'is_not_empty' }, entries, ['Has'], 'Has Status')
   })
 
   it('excludes archived entries', () => {
-    const view: ViewDefinition = {
-      name: 'All', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'type', op: 'equals', value: 'Note' }] },
-    }
     const entries = [
       makeEntry({ isA: 'Note', title: 'Active' }),
       makeEntry({ isA: 'Note', title: 'Archived', archived: true }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Active'])
+    expectFilterTitles({ field: 'type', op: 'equals', value: 'Note' }, entries, ['Active'], 'All')
   })
 
   it('filters by property field', () => {
-    const view: ViewDefinition = {
-      name: 'By Owner', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'Owner', op: 'equals', value: 'Luca' }] },
-    }
     const entries = [
       makeEntry({ title: 'Match', properties: { Owner: 'Luca' } }),
       makeEntry({ title: 'Other', properties: { Owner: 'Brian' } }),
       makeEntry({ title: 'None', properties: {} }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Match'])
+    expectFilterTitles({ field: 'Owner', op: 'equals', value: 'Luca' }, entries, ['Match'], 'By Owner')
   })
 
   it('filters with any_of operator', () => {
-    const view: ViewDefinition = {
-      name: 'Multi', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'status', op: 'any_of', value: ['active', 'in progress'] }] },
-    }
     const entries = [
       makeEntry({ status: 'active', title: 'A' }),
       makeEntry({ status: 'In Progress', title: 'B' }),
       makeEntry({ status: 'done', title: 'C' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['A', 'B'])
+    expectFilterTitles({ field: 'status', op: 'any_of', value: ['active', 'in progress'] }, entries, ['A', 'B'], 'Multi')
   })
 
   it('contains on relationship uses substring match for plain text', () => {
-    const view: ViewDefinition = {
-      name: 'Monday', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'belongs to', op: 'contains', value: 'Monday' }] },
-    }
     const entries = [
       makeEntry({ title: 'A', relationships: { 'belongs to': ['[[Monday Ideas]]'] } }),
       makeEntry({ title: 'B', relationships: { 'belongs to': ['[[Monday Recap]]'] } }),
       makeEntry({ title: 'C', relationships: { 'belongs to': ['[[Tuesday Ideas]]'] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['A', 'B'])
+    expectFilterTitles({ field: 'belongs to', op: 'contains', value: 'Monday' }, entries, ['A', 'B'], 'Monday')
   })
 
   it('not_contains on relationship uses substring match for plain text', () => {
-    const view: ViewDefinition = {
-      name: 'Not Monday', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'belongs to', op: 'not_contains', value: 'Monday' }] },
-    }
     const entries = [
       makeEntry({ title: 'A', relationships: { 'belongs to': ['[[Monday Ideas]]'] } }),
       makeEntry({ title: 'B', relationships: { 'belongs to': ['[[Tuesday Ideas]]'] } }),
       makeEntry({ title: 'C', relationships: { 'belongs to': [] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['B', 'C'])
+    expectFilterTitles({ field: 'belongs to', op: 'not_contains', value: 'Monday' }, entries, ['B', 'C'], 'Not Monday')
   })
 
   it('contains on relationship uses exact match for wikilink syntax', () => {
-    const view: ViewDefinition = {
-      name: 'Exact', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'belongs to', op: 'contains', value: '[[Monday Ideas]]' }] },
-    }
     const entries = [
       makeEntry({ title: 'A', relationships: { 'belongs to': ['[[Monday Ideas]]'] } }),
       makeEntry({ title: 'B', relationships: { 'belongs to': ['[[Monday Recap]]'] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['A'])
+    expectFilterTitles({ field: 'belongs to', op: 'contains', value: '[[Monday Ideas]]' }, entries, ['A'], 'Exact')
   })
 
   it('equals on relationship matches a single-item array by stem', () => {
-    const view: ViewDefinition = {
-      name: 'session-trail', icon: null, color: null, sort: null,
-      filters: {
+    const view = makeView(
+      {
         any: [
           { field: 'belongs_to', op: 'equals', value: 'svc-session-trail' },
           { field: 'related_to', op: 'equals', value: 'svc-session-trail' },
         ],
       },
-    }
+      'session-trail',
+    )
     const entries = [
       makeEntry({ title: 'Matches', relationships: { related_to: ['[[svc-session-trail]]'] } }),
       makeEntry({ title: 'Bracketed value also matches', relationships: { related_to: ['[[svc-session-trail|Trail]]'] } }),
       makeEntry({ title: 'Other relation', relationships: { related_to: ['[[unrelated]]'] } }),
       makeEntry({ title: 'No rels', relationships: {} }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Matches', 'Bracketed value also matches'])
+    expect(titlesFor(view, entries)).toEqual(['Matches', 'Bracketed value also matches'])
   })
 
   it('equals on relationship requires a single-item array (mirrors Rust semantics)', () => {
-    const view: ViewDefinition = {
-      name: 'single', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'related_to', op: 'equals', value: 'svc-session-trail' }] },
-    }
     const entries = [
       makeEntry({ title: 'Single', relationships: { related_to: ['[[svc-session-trail]]'] } }),
       makeEntry({ title: 'Multiple', relationships: { related_to: ['[[svc-session-trail]]', '[[other]]'] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Single'])
+    expectFilterTitles({ field: 'related_to', op: 'equals', value: 'svc-session-trail' }, entries, ['Single'], 'single')
   })
 
   it('not_equals on relationship is the inverse of equals', () => {
-    const view: ViewDefinition = {
-      name: 'not-equals', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'related_to', op: 'not_equals', value: 'svc-session-trail' }] },
-    }
     const entries = [
       makeEntry({ title: 'Single match', relationships: { related_to: ['[[svc-session-trail]]'] } }),
       makeEntry({ title: 'Multiple', relationships: { related_to: ['[[svc-session-trail]]', '[[other]]'] } }),
       makeEntry({ title: 'Other', relationships: { related_to: ['[[unrelated]]'] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Multiple', 'Other'])
+    expectFilterTitles(
+      { field: 'related_to', op: 'not_equals', value: 'svc-session-trail' },
+      entries,
+      ['Multiple', 'Other'],
+      'not-equals',
+    )
   })
 
   it('any_of / none_of on relationship always use exact stem match', () => {
-    const view: ViewDefinition = {
-      name: 'Exact list', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'belongs to', op: 'any_of', value: ['[[Monday]]'] }] },
-    }
     const entries = [
       makeEntry({ title: 'Exact', relationships: { 'belongs to': ['[[Monday]]'] } }),
       makeEntry({ title: 'Partial', relationships: { 'belongs to': ['[[Monday Ideas]]'] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Exact'])
+    expectFilterTitles({ field: 'belongs to', op: 'any_of', value: ['[[Monday]]'] }, entries, ['Exact'], 'Exact list')
   })
 
   it('before operator works with ISO date strings in properties', () => {
-    const view: ViewDefinition = {
-      name: 'Before', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'Date', op: 'before', value: '2024-06-01' }] },
-    }
     const entries = [
       makeEntry({ title: 'Early', properties: { Date: '2024-03-15' } }),
       makeEntry({ title: 'Late', properties: { Date: '2024-09-01' } }),
       makeEntry({ title: 'NoDate', properties: {} }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Early'])
+    expectFilterTitles({ field: 'Date', op: 'before', value: '2024-06-01' }, entries, ['Early'], 'Before')
   })
 
   it('after operator works with ISO date strings in properties', () => {
-    const view: ViewDefinition = {
-      name: 'After', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'Date', op: 'after', value: '2024-06-01' }] },
-    }
     const entries = [
       makeEntry({ title: 'Early', properties: { Date: '2024-03-15' } }),
       makeEntry({ title: 'Late', properties: { Date: '2024-09-01' } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Late'])
+    expectFilterTitles({ field: 'Date', op: 'after', value: '2024-06-01' }, entries, ['Late'], 'After')
   })
 
   it('before/after works with ISO datetime strings', () => {
-    const view: ViewDefinition = {
-      name: 'Before datetime', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'Date', op: 'before', value: '2024-03-15T12:00:00' }] },
-    }
     const entries = [
       makeEntry({ title: 'Morning', properties: { Date: '2024-03-15T08:00:00' } }),
       makeEntry({ title: 'Evening', properties: { Date: '2024-03-15T18:00:00' } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Morning'])
+    expectFilterTitles({ field: 'Date', op: 'before', value: '2024-03-15T12:00:00' }, entries, ['Morning'], 'Before datetime')
   })
 
   it('before/after works with numeric Unix timestamps', () => {
-    const view: ViewDefinition = {
-      name: 'After ts', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'Date', op: 'after', value: '2024-01-01' }] },
-    }
     // Unix timestamp for 2024-06-15 in seconds
     const ts = Math.floor(new Date('2024-06-15').getTime() / 1000)
     const entries = [
       makeEntry({ title: 'Match', properties: { Date: ts } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Match'])
+    expectFilterTitles({ field: 'Date', op: 'after', value: '2024-01-01' }, entries, ['Match'], 'After ts')
   })
 
   it('before/after accept natural-language relative date phrases', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-07T12:00:00Z'))
 
-    const view: ViewDefinition = {
-      name: 'Recent', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'Date', op: 'after', value: '10 days ago' }] },
-    }
     const entries = [
       makeEntry({ title: 'Older', properties: { Date: '2026-03-20' } }),
       makeEntry({ title: 'Recent', properties: { Date: '2026-03-30' } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Recent'])
+    expectFilterTitles({ field: 'Date', op: 'after', value: '10 days ago' }, entries, ['Recent'], 'Recent')
   })
 
   it('body contains filters on snippet text (case-insensitive)', () => {
-    const view: ViewDefinition = {
-      name: 'Body search', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'body', op: 'contains', value: 'quarterly' }] },
-    }
     const entries = [
       makeEntry({ title: 'Match', snippet: 'This is the quarterly review summary' }),
       makeEntry({ title: 'No match', snippet: 'Daily standup notes' }),
       makeEntry({ title: 'Case match', snippet: 'QUARTERLY PLANNING session' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Match', 'Case match'])
+    expectFilterTitles({ field: 'body', op: 'contains', value: 'quarterly' }, entries, ['Match', 'Case match'], 'Body search')
   })
 
   it('body not_contains excludes matching notes', () => {
-    const view: ViewDefinition = {
-      name: 'Body exclude', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'body', op: 'not_contains', value: 'draft' }] },
-    }
     const entries = [
       makeEntry({ title: 'Final', snippet: 'Final version of the document' }),
       makeEntry({ title: 'Draft', snippet: 'This is a draft version' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Final'])
+    expectFilterTitles({ field: 'body', op: 'not_contains', value: 'draft' }, entries, ['Final'], 'Body exclude')
   })
 
   it('body filter combines with property filters (AND)', () => {
-    const view: ViewDefinition = {
-      name: 'Combined', icon: null, color: null, sort: null,
-      filters: { all: [
+    const view = makeView(
+      { all: [
         { field: 'type', op: 'equals', value: 'Note' },
         { field: 'body', op: 'contains', value: 'important' },
       ] },
-    }
+      'Combined',
+    )
     const entries = [
       makeEntry({ title: 'Yes', isA: 'Note', snippet: 'This is important content' }),
       makeEntry({ title: 'Wrong type', isA: 'Project', snippet: 'This is important content' }),
       makeEntry({ title: 'No match', isA: 'Note', snippet: 'Regular content' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Yes'])
+    expect(titlesFor(view, entries)).toEqual(['Yes'])
   })
 
   it('wikilink filter matches frontmatter with alias via path', () => {
-    const view: ViewDefinition = {
-      name: 'By path', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'belongs to', op: 'contains', value: '[[monday-112]]' }] },
-    }
     const entries = [
       makeEntry({ title: 'Match', relationships: { 'belongs to': ['[[monday-112|Monday #112]]'] } }),
       makeEntry({ title: 'No match', relationships: { 'belongs to': ['[[tuesday-200|Tuesday]]'] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Match'])
+    expectFilterTitles({ field: 'belongs to', op: 'contains', value: '[[monday-112]]' }, entries, ['Match'], 'By path')
   })
 
   it('wikilink filter matches frontmatter with alias via alias', () => {
-    const view: ViewDefinition = {
-      name: 'By alias', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'belongs to', op: 'contains', value: '[[Monday #112]]' }] },
-    }
     const entries = [
       makeEntry({ title: 'Match', relationships: { 'belongs to': ['[[monday-112|Monday #112]]'] } }),
       makeEntry({ title: 'No match', relationships: { 'belongs to': ['[[tuesday-200|Tuesday]]'] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Match'])
+    expectFilterTitles({ field: 'belongs to', op: 'contains', value: '[[Monday #112]]' }, entries, ['Match'], 'By alias')
   })
 
   it('wikilink filter with stem|title format matches frontmatter path', () => {
-    const view: ViewDefinition = {
-      name: 'Stem format', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'belongs to', op: 'contains', value: '[[monday-112|Monday 112]]' }] },
-    }
     const entries = [
       makeEntry({ title: 'Match', relationships: { 'belongs to': ['[[monday-112|Monday #112]]'] } }),
       makeEntry({ title: 'No match', relationships: { 'belongs to': ['[[other]]'] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Match'])
+    expectFilterTitles(
+      { field: 'belongs to', op: 'contains', value: '[[monday-112|Monday 112]]' },
+      entries,
+      ['Match'],
+      'Stem format',
+    )
   })
 
   it('any_of on relationship uses alias matching', () => {
-    const view: ViewDefinition = {
-      name: 'Any of', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'belongs to', op: 'any_of', value: ['[[monday-112|Monday 112]]'] }] },
-    }
     const entries = [
       makeEntry({ title: 'Match', relationships: { 'belongs to': ['[[monday-112|Monday #112]]'] } }),
       makeEntry({ title: 'No', relationships: { 'belongs to': ['[[other]]'] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Match'])
+    expectFilterTitles(
+      { field: 'belongs to', op: 'any_of', value: ['[[monday-112|Monday 112]]'] },
+      entries,
+      ['Match'],
+      'Any of',
+    )
   })
 
   it('body is_empty matches notes with empty snippet', () => {
-    const view: ViewDefinition = {
-      name: 'Empty body', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'body', op: 'is_empty' }] },
-    }
     const entries = [
       makeEntry({ title: 'Empty', snippet: '' }),
       makeEntry({ title: 'Has content', snippet: 'Some text here' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Empty'])
+    expectFilterTitles({ field: 'body', op: 'is_empty' }, entries, ['Empty'], 'Empty body')
   })
 
   it('supports regex matching on scalar fields', () => {
-    const view: ViewDefinition = {
-      name: 'Regex title', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'title', op: 'contains', value: '^alpha\\s+project$', regex: true }] },
-    }
     const entries = [
       makeEntry({ title: 'Alpha Project' }),
       makeEntry({ title: 'Alpha Notes' }),
       makeEntry({ title: 'alpha project' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Alpha Project', 'alpha project'])
+    expectFilterTitles(
+      { field: 'title', op: 'contains', value: '^alpha\\s+project$', regex: true },
+      entries,
+      ['Alpha Project', 'alpha project'],
+      'Regex title',
+    )
   })
 
   it('supports regex matching on relationship aliases and stems', () => {
-    const view: ViewDefinition = {
-      name: 'Regex relationship', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'belongs to', op: 'contains', value: 'monday-(112|113)|Monday #112', regex: true }] },
-    }
     const entries = [
       makeEntry({ title: 'Alias match', relationships: { 'belongs to': ['[[monday-112|Monday #112]]'] } }),
       makeEntry({ title: 'Stem match', relationships: { 'belongs to': ['[[monday-113]]'] } }),
       makeEntry({ title: 'No match', relationships: { 'belongs to': ['[[tuesday-200|Tuesday]]'] } }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result.map((e) => e.title)).toEqual(['Alias match', 'Stem match'])
+    expectFilterTitles(
+      { field: 'belongs to', op: 'contains', value: 'monday-(112|113)|Monday #112', regex: true },
+      entries,
+      ['Alias match', 'Stem match'],
+      'Regex relationship',
+    )
   })
 
   it('treats invalid regex filters as matching nothing', () => {
-    const view: ViewDefinition = {
-      name: 'Broken regex', icon: null, color: null, sort: null,
-      filters: { all: [{ field: 'title', op: 'contains', value: '(', regex: true }] },
-    }
     const entries = [
       makeEntry({ title: 'Alpha Project' }),
       makeEntry({ title: 'Beta Project' }),
     ]
-    const result = evaluateView(view, entries)
-    expect(result).toEqual([])
+    expectFilterTitles({ field: 'title', op: 'contains', value: '(', regex: true }, entries, [], 'Broken regex')
   })
 })
