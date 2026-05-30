@@ -120,6 +120,8 @@ test.describe('Pull refreshes the open note immediately', () => {
 
     await openNote(page, originalTitle)
     await expect(page.locator('.bn-editor h1').first()).toHaveText(originalTitle, { timeout: 5_000 })
+    await placeCaretAtEndOfBlock(page, 1)
+    await expectEditorFocused(page)
 
     fs.writeFileSync(notePath, `---
 Is A: Note

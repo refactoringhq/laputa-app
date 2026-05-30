@@ -78,7 +78,7 @@ import type { AiWorkspaceConversationSetting, GitSetupPreference, SidebarSelecti
 import { initializeNoteProperties } from './utils/initializeNoteProperties'
 import { type NoteListFilter } from './utils/noteListHelpers'
 import { openNoteInNewWindow } from './utils/openNoteWindow'
-import { getPulledVaultUpdateOptions, refreshPulledVaultState } from './utils/pulledVaultRefresh'
+import { refreshPulledVaultState } from './utils/pulledVaultRefresh'
 import { viewMatchesSelection } from './utils/viewIdentity'
 import { isAiWorkspaceWindow, isNoteWindow, getNoteWindowParams, type NoteWindowParams } from './utils/windowMode'
 import { GitSetupDialog } from './components/GitRequiredModal'
@@ -128,7 +128,6 @@ import {
   activeVaultModifiedFiles,
   aiWorkspaceWindowContextForPath,
   canCustomizeColumnsForSelection,
-  isActiveElementInsideEditorSurface,
   mergeModifiedFiles,
   runNativeTextHistoryCommand,
   shouldPreferOnboardingVaultPath,
@@ -533,7 +532,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   })
   const handleVaultUpdate = useCallback(async (
     updatedFiles: string[],
-    options: { preserveFocusedEditor?: boolean; vaultPath?: string } = {},
+    options: { vaultPath?: string } = {},
   ) => {
     const updateVaultPath = options.vaultPath ?? resolvedPath
     await refreshPulledVaultState({
@@ -541,9 +540,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       closeAllTabs,
       getActiveTabPath: () => noteActiveTabPathRef.current,
       hasUnsavedChanges: (path) => vault.unsavedPaths.has(path),
-      shouldKeepActiveEditorMounted: options.preserveFocusedEditor
-        ? isActiveElementInsideEditorSurface
-        : undefined,
       reloadFolders: vault.reloadFolders,
       reloadVault: vault.reloadVault,
       reloadViews: vault.reloadViews,
@@ -565,14 +561,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       vault.unsavedPaths,
     ])
   const handlePulledVaultUpdate = useCallback(
-    (updatedFiles: string[], vaultPath: string) => handleVaultUpdate(updatedFiles, {
-      ...getPulledVaultUpdateOptions(),
-      vaultPath,
-    }),
+    (updatedFiles: string[], vaultPath: string) => handleVaultUpdate(updatedFiles, { vaultPath }),
     [handleVaultUpdate],
   )
   const handleFocusedVaultUpdate = useCallback(
-    (updatedFiles: string[]) => handleVaultUpdate(updatedFiles, { preserveFocusedEditor: true }),
+    (updatedFiles: string[]) => handleVaultUpdate(updatedFiles),
     [handleVaultUpdate],
   )
   useEffect(() => {
@@ -642,7 +635,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     closeAllTabs,
     replaceActiveTab: handleReplaceActiveTab,
     hasUnsavedChanges: (path) => vault.unsavedPaths.has(path),
-    shouldKeepActiveEditorMounted: isActiveElementInsideEditorSurface,
     onSelectNote: notes.handleSelectNote,
     activeTabPath: notes.activeTabPath,
     getActiveTabPath: () => notes.activeTabPathRef.current,
