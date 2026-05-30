@@ -107,7 +107,7 @@ tolaria/
 │   ├── theme.json                # Editor typography theme configuration
 │   ├── index.css                 # Semantic app theme variables + Tailwind setup
 │   │
-│   ├── components/               # UI components (~98 files)
+│   ├── components/               # UI components (~100 files)
 │   │   ├── Sidebar.tsx           # Left panel: filters + type groups
 │   │   ├── SidebarParts.tsx      # Sidebar subcomponents
 │   │   ├── NoteList.tsx          # Second panel: filtered note list
@@ -120,7 +120,9 @@ tolaria/
 │   │   ├── RawEditorView.tsx     # CodeMirror raw editor
 │   │   ├── Inspector.tsx         # Fourth panel: metadata + relationships
 │   │   ├── DynamicPropertiesPanel.tsx  # Editable frontmatter properties
-│   │   ├── AiWorkspace.tsx       # Multi-chat AI workspace (docked or native window)
+│   │   ├── AiWorkspace.tsx       # Multi-chat AI workspace orchestration (docked or native window)
+│   │   ├── AiWorkspaceChrome.tsx # AI workspace header and vault-guidance chrome
+│   │   ├── AiWorkspaceResizeHandles.tsx # AI workspace edge resize handles
 │   │   ├── AiPanel.tsx           # AI transcript/composer surface (selected target + per-vault permission mode)
 │   │   ├── AiMessage.tsx         # Agent message display
 │   │   ├── AiActionCard.tsx      # Agent tool action cards
@@ -333,7 +335,11 @@ tolaria/
 
 | File | Why it matters |
 |------|---------------|
-| `src/components/AiWorkspace.tsx` | Multi-chat AI workspace — sidebar chats, installed-only target picker, permission picker, and dock/pop-out controls. |
+| `src/components/AiWorkspace.tsx` | Multi-chat AI workspace orchestration — chat sessions, sidebar tabs, target/permission controls, and dock/pop-out wiring. |
+| `src/components/AiWorkspaceChrome.tsx` | Header and vault-guidance chrome shared by docked and popped-out AI workspace modes. |
+| `src/components/AiWorkspaceResizeHandles.tsx` | Edge resize affordances for docked/side AI workspace layouts. |
+| `src/components/aiWorkspaceConversations.ts` | Conversation metadata state, settings persistence, default title generation, and target resolution. |
+| `src/components/aiWorkspaceSizing.ts` | AI workspace sizing, localStorage persistence, class names, and layout style helpers. |
 | `src/components/AiPanel.tsx` | Reusable AI transcript/composer surface — selected target with tool execution, reasoning, actions, and per-vault permission mode. |
 | `src/utils/openAiWorkspaceWindow.ts` | Native Tauri AI workspace window creation, focus, and dock-back traffic-light handling. |
 | `src/hooks/useCliAiAgent.ts` | Thin React owner for the selected CLI agent session state. |
