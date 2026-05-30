@@ -740,5 +740,6 @@
   "locale.plPL": "Tiếng Ba Lan",
   "locale.beBY": "Tiếng Belarus",
   "locale.beLatn": "Tiếng Belarus (Latinh)",
-  "locale.idID": "Tiếng Indonesia"
+  "locale.idID": "Tiếng Indonesia",
+  "sidebar.group.tags": "TAGS"
 }

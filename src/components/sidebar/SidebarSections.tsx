@@ -32,6 +32,7 @@ import { translate, type AppLocale } from '../../lib/i18n'
 
 export { SidebarTopNav } from './SidebarTopNav'
 export { FavoritesSection } from './FavoritesSection'
+export { TagsSection } from './TagsSection'
 
 const SIDEBAR_TITLE_BAR_ACTION_CLASSNAME =
   '!h-auto !w-auto !min-w-0 !rounded-none !p-0 text-muted-foreground hover:!bg-transparent hover:text-foreground [&_svg]:!size-4'

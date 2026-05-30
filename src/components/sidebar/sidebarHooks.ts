@@ -11,7 +11,7 @@ import { buildDynamicSections, sortSections } from '../../utils/sidebarSections'
 import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
 import { buildTypeVisibilityLookup, isTypeSectionVisible } from '../../utils/typeVisibility'
 
-export type SidebarGroupKey = 'favorites' | 'views' | 'sections' | 'folders'
+export type SidebarGroupKey = 'favorites' | 'views' | 'sections' | 'tags' | 'folders'
 
 export interface SidebarMenuPosition {
   x: number
@@ -180,7 +180,7 @@ function loadCollapsedState(): Record<SidebarGroupKey, boolean> {
   } catch {
     // Ignore localStorage failures and fall back to defaults.
   }
-  return { favorites: false, views: false, sections: false, folders: false }
+  return { favorites: false, views: false, sections: false, tags: false, folders: false }
 }
 
 export function useSidebarCollapsed() {

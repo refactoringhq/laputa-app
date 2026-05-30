@@ -740,5 +740,6 @@
   "locale.plPL": "Polacco",
   "locale.beBY": "Bielorusso",
   "locale.beLatn": "Bielorusso (Latino)",
-  "locale.idID": "Indonesiano"
+  "locale.idID": "Indonesiano",
+  "sidebar.group.tags": "TAGS"
 }

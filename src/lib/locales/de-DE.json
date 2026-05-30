@@ -740,5 +740,6 @@
   "locale.plPL": "Polnisch",
   "locale.beBY": "Belarussisch",
   "locale.beLatn": "Belarussisch (Lateinisch)",
-  "locale.idID": "Indonesisch"
+  "locale.idID": "Indonesisch",
+  "sidebar.group.tags": "TAGS"
 }

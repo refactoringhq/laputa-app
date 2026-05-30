@@ -740,5 +740,6 @@
   "locale.plPL": "Poĺskaja",
   "locale.beBY": "Bielaruskaja",
   "locale.beLatn": "Bielaruskaja (Łacinka)",
-  "locale.idID": "Indonesian"
+  "locale.idID": "Indonesian",
+  "sidebar.group.tags": "TAGS"
 }

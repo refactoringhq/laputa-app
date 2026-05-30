@@ -43,6 +43,7 @@ export function resolveHeaderTitle(selection: SidebarSelection, typeDocument: Va
     return view?.definition.name ?? translate(locale, 'noteList.title.view')
   }
   if (selection.kind === 'entity') return selection.entry.title
+  if (selection.kind === 'tag') return selection.tag
   const folderTitle = resolveFolderTitle(selection)
   if (folderTitle) return folderTitle
   if (typeDocument) return typeDocument.title
