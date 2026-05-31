@@ -41,17 +41,25 @@
 
           isLinux = lib.hasSuffix "linux" system;
 
-          nodeModules = lib.optionalAttrs isLinux {
-            tolaria-node-modules = import ./nix/node-modules.nix {
+          # pnpm dependency closure — pure node files, works on every system.
+          tolariaNodeModules = import ./nix/node-modules.nix {
+            inherit pkgs lib;
+          };
+
+          # tolaria-mcp: stdio MCP server + ws-bridge. Pure node, cross-platform.
+          mcpPackage = {
+            tolaria-mcp = import ./nix/mcp-server.nix {
               inherit pkgs lib;
+              nodeModules = tolariaNodeModules;
             };
           };
 
+          # tolaria: the desktop app. Linux only (WebKitGTK 4.1 stack).
           tauriPackage = lib.optionalAttrs isLinux {
             tolaria = import ./nix/tauri-package.nix {
               inherit pkgs lib;
               craneLib = rust.craneLib;
-              nodeModules = nodeModules.tolaria-node-modules;
+              nodeModules = tolariaNodeModules;
             };
           };
         in
@@ -62,7 +70,9 @@
             formatter = config.treefmt.build.wrapper;
           };
 
-          packages = nodeModules // tauriPackage // lib.optionalAttrs isLinux {
+          packages = {
+            tolaria-node-modules = tolariaNodeModules;
+          } // mcpPackage // tauriPackage // lib.optionalAttrs isLinux {
             default = tauriPackage.tolaria;
           };
         };
