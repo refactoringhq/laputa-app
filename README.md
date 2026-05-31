@@ -45,6 +45,20 @@ brew install --cask tolaria
 
 Download the [latest release here](https://refactoringhq.github.io/tolaria/download/) for macOS, Windows, or Linux. Windows installers are Authenticode-signed; company-managed devices may still require IT approval of the Tolaria publisher before first install.
 
+### Nix (Linux)
+
+The repository ships a flake that builds the desktop binary against pinned nixpkgs:
+
+```bash
+# Run once without installing
+nix run github:refactoringhq/tolaria
+
+# Install into your profile
+nix profile install github:refactoringhq/tolaria
+```
+
+This produces a wrapped binary with WebKitGTK 4.1, libsoup3, and the bundled MCP sidecar baked into the closure. Supported systems: `x86_64-linux`, `aarch64-linux`. macOS users should use Homebrew or the dmg from releases — the Darwin devShell exists for contributors but Nix-built `.app` bundles are out of scope.
+
 ## Getting started
 
 When you open Tolaria for the first time you get the chance of cloning the [getting started vault](https://github.com/refactoringhq/tolaria-getting-started) — which gives you a walkthrough of the whole app.
@@ -63,6 +77,8 @@ Tolaria is open source and built with Tauri, React, and TypeScript. If you want 
 - macOS or Linux for development
 
 #### Linux system dependencies
+
+NixOS contributors can skip the distro packages below: `direnv allow` (or `nix develop`) loads the full WebKitGTK / libsoup3 / GTK3 / Wayland / X11 stack and pins Node 24 + pnpm 11 + Rust toolchain in a single shell.
 
 Tauri 2 on Linux requires WebKit2GTK 4.1 and GTK 3:
 
