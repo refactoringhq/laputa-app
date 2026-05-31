@@ -9,6 +9,7 @@ describe('NoteList context menu', () => {
     const onEnterNeighborhood = vi.fn()
     const onBulkArchive = vi.fn()
     const onBulkDeletePermanently = vi.fn()
+    const onExportPdf = vi.fn()
     const onToggleFavorite = vi.fn()
     const onToggleOrganized = vi.fn()
     const onRevealFile = vi.fn()
@@ -19,6 +20,7 @@ describe('NoteList context menu', () => {
       onEnterNeighborhood,
       onBulkArchive,
       onBulkDeletePermanently,
+      onExportPdf,
       onToggleFavorite,
       onToggleOrganized,
       onRevealFile,
@@ -55,6 +57,10 @@ describe('NoteList context menu', () => {
     fireEvent.contextMenu(screen.getByText('Build Laputa App'))
     fireEvent.click(screen.getByText('Copy file path'))
     expect(onCopyFilePath).toHaveBeenCalledWith(mockEntries[0].path)
+
+    fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+    fireEvent.click(screen.getByText('Export note as PDF'))
+    expect(onExportPdf).toHaveBeenCalledWith(mockEntries[0])
 
     fireEvent.contextMenu(screen.getByText('Build Laputa App'))
     fireEvent.click(screen.getByText('Archive this note'))

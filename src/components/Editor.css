@@ -307,6 +307,7 @@ body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadc
 }
 
 @media print {
+  html:has(body.tolaria-note-pdf-exporting),
   body.tolaria-note-pdf-exporting {
     background: #fff !important;
     color: #111 !important;
@@ -321,11 +322,20 @@ body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadc
     visibility: hidden !important;
   }
 
-  body.tolaria-note-pdf-exporting :is(#root, .app-shell, .app, .app__editor, .editor, .editor-scroll-area) {
+  body.tolaria-note-pdf-exporting :is(.app__sidebar, .app__note-list, .breadcrumb-bar, .editor-memory-probe) {
+    display: none !important;
+  }
+
+  body.tolaria-note-pdf-exporting .editor > .relative > :not(:has([data-note-pdf-export-root="true"])) {
+    display: none !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(#root, .app-shell, .app, .app__editor, .editor, .editor > .relative, .editor-content-width--normal, .editor-content-width--wide, .editor-scroll-area) {
     display: block !important;
     height: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
+    width: auto !important;
   }
 
   body.tolaria-note-pdf-exporting [data-note-pdf-export-root="true"],
@@ -334,8 +344,6 @@ body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadc
   }
 
   body.tolaria-note-pdf-exporting [data-note-pdf-export-root="true"] {
-    position: absolute !important;
-    inset: 0 auto auto 0 !important;
     display: block !important;
     width: 100% !important;
     max-width: none !important;

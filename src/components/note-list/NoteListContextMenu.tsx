@@ -8,6 +8,7 @@ import {
 import type { AppLocale } from '../../lib/i18n'
 import { trackEvent } from '../../lib/telemetry'
 import type { VaultEntry } from '../../types'
+import { isMarkdownEntry } from '../../utils/typeDefinitions'
 import { NoteListContextMenuNode } from './NoteListContextMenuView'
 
 export type NoteListContextMenuState = {
@@ -22,6 +23,7 @@ interface NoteListContextMenuParams {
   onOpenInNewWindow?: (entry: VaultEntry) => void
   onArchivePaths?: (paths: string[]) => void
   onDeletePaths?: (paths: string[]) => void
+  onExportPdf?: (entry: VaultEntry) => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
   onRevealFile?: (path: string) => void
@@ -34,6 +36,7 @@ function hasNoteListContextActions({
   onOpenInNewWindow,
   onArchivePaths,
   onDeletePaths,
+  onExportPdf,
   onToggleFavorite,
   onToggleOrganized,
   onRevealFile,
@@ -42,6 +45,7 @@ function hasNoteListContextActions({
   return [
     onOpenInNewWindow,
     onEnterNeighborhood && entry.fileKind !== 'binary',
+    onExportPdf && isMarkdownEntry(entry),
     onArchivePaths && !entry.archived,
     onDeletePaths,
     onToggleFavorite,
@@ -57,6 +61,7 @@ export function useNoteListContextMenu({
   onOpenInNewWindow,
   onArchivePaths,
   onDeletePaths,
+  onExportPdf,
   onToggleFavorite,
   onToggleOrganized,
   onRevealFile,
@@ -91,6 +96,7 @@ export function useNoteListContextMenu({
       onOpenInNewWindow,
       onArchivePaths,
       onDeletePaths,
+      onExportPdf,
       onToggleFavorite,
       onToggleOrganized,
       onRevealFile,
@@ -105,6 +111,7 @@ export function useNoteListContextMenu({
     onCopyFilePath,
     onDeletePaths,
     onEnterNeighborhood,
+    onExportPdf,
     onOpenInNewWindow,
     onRevealFile,
     onToggleFavorite,
@@ -120,6 +127,7 @@ export function useNoteListContextMenu({
       onOpenInNewWindow={onOpenInNewWindow}
       onArchivePaths={onArchivePaths}
       onDeletePaths={onDeletePaths}
+      onExportPdf={onExportPdf}
       onToggleFavorite={onToggleFavorite}
       onToggleOrganized={onToggleOrganized}
       onRevealFile={onRevealFile}

@@ -565,6 +565,8 @@ macro_rules! app_invoke_handler {
             commands::reinit_telemetry,
             commands::should_use_external_media_preview,
             commands::print_current_webview,
+            commands::can_export_current_webview_pdf,
+            commands::export_current_webview_pdf,
             commands::list_views,
             commands::save_view_cmd,
             commands::delete_view_cmd,
