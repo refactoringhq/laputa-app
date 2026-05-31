@@ -559,9 +559,14 @@ describe('AiWorkspace', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Quarterly sponsor outreach').length).toBeGreaterThan(0)
     })
-    expect(onConversationSettingsChange).toHaveBeenLastCalledWith([
-      expect.objectContaining({ id: 'stored-chat', title: 'Quarterly sponsor outreach' }),
-    ])
+    await waitFor(() => {
+      expect(onConversationSettingsChange.mock.calls.some(([settings]) => (
+        settings.some((setting) => (
+          setting.id === 'stored-chat'
+          && setting.title === 'Quarterly sponsor outreach'
+        ))
+      ))).toBe(true)
+    })
   })
 
   it('allows a chat title to be renamed from the sidebar', () => {

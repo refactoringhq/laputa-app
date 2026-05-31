@@ -12,8 +12,8 @@ type FilePreviewAction = 'copy_deep_link' | 'copy_path' | 'open_external' | 'rev
 type AgentBlockedReason = 'agent_unavailable' | 'missing_vault'
 type AiWorkspaceMode = 'docked' | 'side' | 'window'
 type AiWorkspaceTitleSource = 'generated' | 'manual'
-type NotePdfExportFailureReason = 'print_unavailable' | 'print_error'
-type NotePdfExportSource = 'breadcrumb' | 'app_command'
+type NotePdfExportFailureReason = 'export_unavailable' | 'export_error'
+type NotePdfExportSource = 'breadcrumb' | 'app_command' | 'note_list_context_menu'
 
 const ALL_NOTES_VISIBILITY_CATEGORIES: ReadonlyArray<keyof AllNotesFileVisibility> = [
   'pdfs',
