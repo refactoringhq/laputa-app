@@ -7,16 +7,24 @@
 let
   fenixPkgs = fenix.packages.${system};
 
-  toolchain = fenixPkgs.combine [
+  # Minimal toolchain crane uses to build the desktop app. Keeping rustfmt and
+  # rust-analyzer out of this closure means `nix build .#tolaria` no longer
+  # waits on their substitutes.
+  buildToolchain = fenixPkgs.combine [
     fenixPkgs.stable.rustc
     fenixPkgs.stable.cargo
     fenixPkgs.stable.clippy
-    fenixPkgs.stable.rustfmt
-    fenixPkgs.stable.rust-analyzer
     fenixPkgs.stable.rust-src
   ];
 
-  craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
+  # Dev shell adds the IDE-only components on top.
+  toolchain = fenixPkgs.combine [
+    buildToolchain
+    fenixPkgs.stable.rustfmt
+    fenixPkgs.stable.rust-analyzer
+  ];
+
+  craneLib = (crane.mkLib pkgs).overrideToolchain buildToolchain;
 in
 {
   inherit toolchain craneLib;
