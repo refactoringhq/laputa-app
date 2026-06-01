@@ -606,7 +606,7 @@ Defined in `src/utils/mathMarkdown.ts`, `src/components/editorSchema.tsx`, and s
 
 - `$...$` becomes a `mathInline` schema node and line-owned `$$...$$` / multiline `$$` blocks become `mathBlock` nodes.
 - The rich editor renders both node types through KaTeX with `throwOnError: false`, so malformed formulas keep their source visible instead of breaking the note.
-- Double-clicking rendered math, or pressing `Enter`/`F2` when a math node is selected, restores the Markdown source and selects only the formula body for editing.
+- Double-clicking rendered display math edits the math block's `latex` property in-place; Markdown delimiters remain owned by serialization. Inline math can still be reopened as source text for direct editing.
 - `serializeMathAwareBlocks()` converts math nodes back to Markdown delimiters before save, raw-mode entry, and editor-position snapshots.
 - Raw CodeMirror mode always shows the plain Markdown source, so imported technical notes stay editable outside Tolaria.
 

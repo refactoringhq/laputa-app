@@ -134,12 +134,12 @@ function readMathInputTransaction(
   }
 }
 
-function mathSource({ kind, latex }: { kind: MathKind; latex: string }): string {
-  return kind === 'block' ? `$$\n${latex}\n$$` : `$${latex}$`
+function mathSource({ latex }: { latex: string }): string {
+  return `$${latex}$`
 }
 
-function mathLatexSelectionRange({ from, kind, latex }: { from: number; kind: MathKind; latex: string }) {
-  const sourceStart = kind === 'block' ? from + 1 + '$$\n'.length : from + 1
+function mathLatexSelectionRange({ from, latex }: { from: number; latex: string }) {
+  const sourceStart = from + 1
   return { from: sourceStart, to: sourceStart + latex.length }
 }
 
@@ -250,7 +250,7 @@ function readSelectedMathLocation(view: EditorViewLike): MathNodeLocation | null
 
   const kind = mathKindForNode(selection.node)
   const latex = readLatexAttr(selection.node)
-  if (!kind || latex === null) return null
+  if (kind !== 'inline' || latex === null) return null
 
   return {
     from: selection.from,
@@ -264,14 +264,9 @@ function readSelectedMathLocation(view: EditorViewLike): MathNodeLocation | null
 function replacementForMathSource(
   view: EditorViewLike,
   location: MathNodeLocation,
-): ReturnType<EditorViewLike['state']['schema']['text']> | MathNodeLike | null {
+): ReturnType<EditorViewLike['state']['schema']['text']> {
   const source = mathSource(location)
-  const textNode = view.state.schema.text(source)
-
-  if (location.kind === 'inline') return textNode
-
-  const paragraphType = view.state.schema.nodes.paragraph
-  return paragraphType?.createChecked({}, textNode) ?? null
+  return view.state.schema.text(source)
 }
 
 function restoreMathSource({
@@ -324,7 +319,7 @@ function handleRenderedMathDoubleClick(
 ) {
   const target = readRenderedMathTarget(event.target)
   const view = readView()
-  if (!target || !view) return
+  if (!target || target.kind !== 'inline' || !view) return
 
   const location = readRenderedMathLocation({ ...target, view })
   if (!location) return
