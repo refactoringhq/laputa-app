@@ -58,4 +58,19 @@ describe('MathBlockEditor', () => {
     expect(editor.updateBlock).not.toHaveBeenCalled()
     expect(editor.focus).toHaveBeenCalled()
   })
+
+  it('uses editor selection colors and a single focused border while editing', () => {
+    renderMathBlockEditor()
+
+    fireEvent.doubleClick(document.querySelector('.math--block')!)
+    const source = screen.getByRole('textbox')
+
+    expect(source).toHaveClass('math-block-source')
+    expect(source).toHaveClass('selection:bg-[var(--colors-selection)]')
+    expect(source).toHaveClass('selection:text-[var(--colors-text)]')
+    expect(source).toHaveClass('focus-visible:ring-0')
+    expect(source).not.toHaveClass('selection:bg-primary')
+    expect(source).not.toHaveClass('selection:text-primary-foreground')
+    expect(source).not.toHaveClass('focus-visible:ring-[3px]')
+  })
 })
