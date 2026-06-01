@@ -52,6 +52,7 @@ import { findNearestTextCursorBlock } from './blockNoteCursorTarget'
 import { ImageLightbox } from './ImageLightbox'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
+import { subscribeRichEditorExternalChange } from './editorExternalChangeEvents'
 import {
   activatePlainTextPasteTarget,
   registerPlainTextPasteTarget,
@@ -1344,6 +1345,10 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
   useEffect(() => {
     _wikilinkEntriesRef.current = entries
   }, [entries])
+
+  useEffect(() => {
+    return subscribeRichEditorExternalChange(editor, handleEditorChange)
+  }, [editor, handleEditorChange])
 
   useEffect(() => {
     const container = containerRef.current

@@ -309,10 +309,9 @@ describe('createMathInputExtension', () => {
     })
   })
 
-  it('restores rendered block math source on double click', () => {
+  it('leaves rendered block math intact on double click', () => {
     const fixture = createFixture()
     const latex = '\\sqrt{x}'
-    const source = `$$\n${latex}\n$$`
     const mathElement = document.createElement('span')
     mathElement.className = 'math math--block'
     mathElement.dataset.latex = latex
@@ -323,23 +322,11 @@ describe('createMathInputExtension', () => {
 
     const event = fixture.fireMathDoubleClick(mathElement)
 
-    expect(fixture.textNodeFor).toHaveBeenCalledWith(source)
-    expect(fixture.paragraphNodeType.createChecked).toHaveBeenCalledWith({}, {
-      text: source,
-      type: 'text',
-    })
-    expect(fixture.transaction.replaceWith).toHaveBeenCalledWith(20, 21, {
-      attrs: {},
-      content: {
-        text: source,
-        type: 'text',
-      },
-      type: 'paragraph',
-    })
-    expect(fixture.setTextSelection).toHaveBeenCalledWith({ from: 24, to: 32 })
-    expect(event.preventDefault).toHaveBeenCalledTimes(1)
-    expect(event.stopPropagation).toHaveBeenCalledTimes(1)
-    expect(trackEvent).toHaveBeenCalledWith('math_source_edit_reopened', {
+    expect(fixture.transaction.replaceWith).not.toHaveBeenCalled()
+    expect(fixture.setTextSelection).not.toHaveBeenCalled()
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(event.stopPropagation).not.toHaveBeenCalled()
+    expect(trackEvent).not.toHaveBeenCalledWith('math_source_edit_reopened', {
       activation: 'pointer',
       math_mode: 'block',
     })
@@ -369,5 +356,23 @@ describe('createMathInputExtension', () => {
       activation: 'keyboard',
       math_mode: 'inline',
     })
+  })
+
+  it('leaves selected block math intact from the keyboard', () => {
+    const fixture = createFixture()
+    const selectedNode = createMathNode(MATH_BLOCK_TYPE, '\\sqrt{x}')
+    fixture.view.state.selection = {
+      from: 12,
+      node: selectedNode,
+      to: 13,
+    }
+    fixture.mount()
+
+    const event = fixture.fireKeyDown({ key: 'Enter' })
+
+    expect(fixture.transaction.replaceWith).not.toHaveBeenCalled()
+    expect(fixture.setTextSelection).not.toHaveBeenCalled()
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(event.stopPropagation).not.toHaveBeenCalled()
   })
 })
