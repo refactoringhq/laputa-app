@@ -1,9 +1,5 @@
 import { BookOpen, GearSix as Settings, Megaphone, Moon, Package, Sun, type IconProps } from '@phosphor-icons/react'
 import type { ComponentType, MouseEventHandler } from 'react'
-import type { AiAgentId, AiAgentsStatus } from '../../lib/aiAgents'
-import type { AiModelProvider } from '../../lib/aiTargets'
-import type { VaultAiGuidanceStatus } from '../../lib/vaultAiGuidance'
-import type { ClaudeCodeStatus } from '../../hooks/useClaudeCodeStatus'
 import type { McpStatus } from '../../hooks/useMcpStatus'
 import type { ThemeMode } from '../../lib/themeMode'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
@@ -11,11 +7,9 @@ import { useStatusBarAddRemote } from '../../hooks/useStatusBarAddRemote'
 import type { GitRemoteStatus, SyncStatus } from '../../types'
 import { rememberFeedbackDialogOpener } from '../../lib/feedbackDialogOpener'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
-import { AiAgentsBadge } from './AiAgentsBadge'
 import { AddRemoteModal } from '../AddRemoteModal'
 import { Button } from '@/components/ui/button'
 import {
-  ClaudeCodeBadge,
   CommitButton,
   ConflictBadge,
   ChangesBadge,
@@ -80,17 +74,6 @@ interface StatusBarPrimarySectionProps {
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
   mcpStatus?: McpStatus
   onInstallMcp?: () => void
-  aiAgentsStatus?: AiAgentsStatus
-  vaultAiGuidanceStatus?: VaultAiGuidanceStatus
-  defaultAiAgent?: AiAgentId
-  defaultAiTarget?: string
-  aiModelProviders?: AiModelProvider[]
-  onSetDefaultAiAgent?: (agent: AiAgentId) => void
-  onSetDefaultAiTarget?: (target: string) => void
-  onOpenAiWorkspace?: () => void
-  onRestoreVaultAiGuidance?: () => void
-  claudeCodeStatus?: ClaudeCodeStatus
-  claudeCodeVersion?: string | null
   stacked?: boolean
   compact?: boolean
   locale?: AppLocale
@@ -146,59 +129,6 @@ function BuildNumberButton({
   )
 }
 
-function StatusBarAiBadge({
-  aiAgentsStatus,
-  vaultAiGuidanceStatus,
-  defaultAiAgent,
-  defaultAiTarget,
-  aiModelProviders,
-  onSetDefaultAiAgent,
-  onSetDefaultAiTarget,
-  onOpenAiWorkspace,
-  onRestoreVaultAiGuidance,
-  claudeCodeStatus,
-  claudeCodeVersion,
-  compact,
-  locale,
-}: Pick<
-  StatusBarPrimarySectionProps,
-  | 'aiAgentsStatus'
-  | 'vaultAiGuidanceStatus'
-  | 'defaultAiAgent'
-  | 'defaultAiTarget'
-  | 'aiModelProviders'
-  | 'onSetDefaultAiAgent'
-  | 'onSetDefaultAiTarget'
-  | 'onOpenAiWorkspace'
-  | 'onRestoreVaultAiGuidance'
-  | 'claudeCodeStatus'
-  | 'claudeCodeVersion'
-  | 'compact'
-  | 'locale'
->) {
-  if (aiAgentsStatus && defaultAiAgent) {
-    return (
-      <AiAgentsBadge
-        statuses={aiAgentsStatus}
-        guidanceStatus={vaultAiGuidanceStatus}
-        defaultAgent={defaultAiAgent}
-        defaultTarget={defaultAiTarget}
-        providers={aiModelProviders}
-        onSetDefaultAgent={onSetDefaultAiAgent}
-        onSetDefaultTarget={onSetDefaultAiTarget}
-        onOpenWorkspace={onOpenAiWorkspace}
-        onRestoreGuidance={onRestoreVaultAiGuidance}
-        compact={compact}
-        locale={locale}
-      />
-    )
-  }
-
-  if (!claudeCodeStatus) return null
-
-  return <ClaudeCodeBadge status={claudeCodeStatus} version={claudeCodeVersion} showSeparator={!compact} compact={compact} locale={locale} />
-}
-
 function StatusBarPrimaryBadges({
   modifiedCount,
   visibleRemoteStatus,
@@ -221,17 +151,6 @@ function StatusBarPrimaryBadges({
   isGitVault,
   mcpStatus,
   onInstallMcp,
-  aiAgentsStatus,
-  vaultAiGuidanceStatus,
-  defaultAiAgent,
-  defaultAiTarget,
-  aiModelProviders,
-  onSetDefaultAiAgent,
-  onSetDefaultAiTarget,
-  onOpenAiWorkspace,
-  onRestoreVaultAiGuidance,
-  claudeCodeStatus,
-  claudeCodeVersion,
   isOffline,
   isVaultReloading,
   compact,
@@ -258,17 +177,6 @@ function StatusBarPrimaryBadges({
   isGitVault: boolean
   mcpStatus?: McpStatus
   onInstallMcp?: () => void
-  aiAgentsStatus?: AiAgentsStatus
-  vaultAiGuidanceStatus?: VaultAiGuidanceStatus
-  defaultAiAgent?: AiAgentId
-  defaultAiTarget?: string
-  aiModelProviders?: AiModelProvider[]
-  onSetDefaultAiAgent?: (agent: AiAgentId) => void
-  onSetDefaultAiTarget?: (target: string) => void
-  onOpenAiWorkspace?: () => void
-  onRestoreVaultAiGuidance?: () => void
-  claudeCodeStatus?: ClaudeCodeStatus
-  claudeCodeVersion?: string | null
   isOffline: boolean
   isVaultReloading: boolean
   compact: boolean
@@ -303,7 +211,6 @@ function StatusBarPrimaryBadges({
         <MissingGitBadge onClick={onInitializeGit} showSeparator={!compact} compact={compact} locale={locale} />
       ) : null}
       {mcpStatus && <McpBadge status={mcpStatus} onInstall={onInstallMcp} showSeparator={!compact} compact={compact} locale={locale} />}
-      <StatusBarAiBadge aiAgentsStatus={aiAgentsStatus} vaultAiGuidanceStatus={vaultAiGuidanceStatus} defaultAiAgent={defaultAiAgent} defaultAiTarget={defaultAiTarget} aiModelProviders={aiModelProviders} onSetDefaultAiAgent={onSetDefaultAiAgent} onSetDefaultAiTarget={onSetDefaultAiTarget} onOpenAiWorkspace={onOpenAiWorkspace} onRestoreVaultAiGuidance={onRestoreVaultAiGuidance} claudeCodeStatus={claudeCodeStatus} claudeCodeVersion={claudeCodeVersion} compact={compact} locale={locale} />
     </>
   )
 }
@@ -439,17 +346,6 @@ function StatusBarGitControls({
   onClickPulse,
   mcpStatus,
   onInstallMcp,
-  aiAgentsStatus,
-  vaultAiGuidanceStatus,
-  defaultAiAgent,
-  defaultAiTarget,
-  aiModelProviders,
-  onSetDefaultAiAgent,
-  onSetDefaultAiTarget,
-  onOpenAiWorkspace,
-  onRestoreVaultAiGuidance,
-  claudeCodeStatus,
-  claudeCodeVersion,
   compact,
   locale,
 }: StatusBarPrimarySectionProps & { compact: boolean; locale: AppLocale }) {
@@ -487,17 +383,6 @@ function StatusBarGitControls({
         isGitVault={isGitVault !== false}
         mcpStatus={mcpStatus}
         onInstallMcp={onInstallMcp}
-        aiAgentsStatus={aiAgentsStatus}
-        vaultAiGuidanceStatus={vaultAiGuidanceStatus}
-        defaultAiAgent={defaultAiAgent}
-        defaultAiTarget={defaultAiTarget}
-        aiModelProviders={aiModelProviders}
-        onSetDefaultAiAgent={onSetDefaultAiAgent}
-        onSetDefaultAiTarget={onSetDefaultAiTarget}
-        onOpenAiWorkspace={onOpenAiWorkspace}
-        onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
-        claudeCodeStatus={claudeCodeStatus}
-        claudeCodeVersion={claudeCodeVersion}
         isOffline={isOffline === true}
         isVaultReloading={isVaultReloading === true}
         compact={compact}
@@ -548,17 +433,6 @@ export function StatusBarPrimarySection({
   onUpdateWorkspaceIdentity,
   mcpStatus,
   onInstallMcp,
-  aiAgentsStatus,
-  vaultAiGuidanceStatus,
-  defaultAiAgent,
-  defaultAiTarget,
-  aiModelProviders,
-  onSetDefaultAiAgent,
-  onSetDefaultAiTarget,
-  onOpenAiWorkspace,
-  onRestoreVaultAiGuidance,
-  claudeCodeStatus,
-  claudeCodeVersion,
   locale = 'en',
   stacked = false,
   compact = false,
@@ -608,17 +482,6 @@ export function StatusBarPrimarySection({
         isGitVault={isGitVault}
         mcpStatus={mcpStatus}
         onInstallMcp={onInstallMcp}
-        aiAgentsStatus={aiAgentsStatus}
-        vaultAiGuidanceStatus={vaultAiGuidanceStatus}
-        defaultAiAgent={defaultAiAgent}
-        defaultAiTarget={defaultAiTarget}
-        aiModelProviders={aiModelProviders}
-        onSetDefaultAiAgent={onSetDefaultAiAgent}
-        onSetDefaultAiTarget={onSetDefaultAiTarget}
-        onOpenAiWorkspace={onOpenAiWorkspace}
-        onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
-        claudeCodeStatus={claudeCodeStatus}
-        claudeCodeVersion={claudeCodeVersion}
         isOffline={isOffline} isVaultReloading={isVaultReloading}
         compact={compact}
         locale={locale}

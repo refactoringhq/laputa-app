@@ -2,8 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Output;
 
+use super::command::{
+    git_output, git_output_result, run_git, stderr_text, stdout_lines, stdout_text,
+};
 use super::credentials::request_remote_credentials;
-use super::{ensure_author_config, git_command};
+use super::ensure_author_config;
+use super::remote_config::{configure_origin_remote, list_configured_remotes};
 
 const DEFAULT_REMOTE_NAME: &str = "origin";
 
@@ -105,7 +109,7 @@ pub fn git_add_remote(vault_path: &str, remote_url: &str) -> Result<GitAddRemote
     let connection = RemoteConnection::new(branch);
 
     let trimmed_url = remote_url.trim();
-    run_git(vault, &["remote", "add", DEFAULT_REMOTE_NAME, trimmed_url])?;
+    configure_origin_remote(vault, trimmed_url)?;
     request_remote_credentials(vault, trimmed_url);
 
     let result = finish_remote_connection(vault, &connection);
@@ -176,7 +180,7 @@ fn connect_result(status: ConnectStatus, message: impl Into<String>) -> GitAddRe
 }
 
 fn current_branch(vault: &Path) -> Result<String, String> {
-    let output = git_output(vault, &["branch", "--show-current"])?;
+    let output = git_output_result(vault, &["branch", "--show-current"])?;
 
     if output.status.success() {
         return Ok(stdout_text(&output));
@@ -186,34 +190,11 @@ fn current_branch(vault: &Path) -> Result<String, String> {
 }
 
 fn list_remotes(vault: &Path) -> Result<Vec<String>, String> {
-    let output = git_output(vault, &["remote"])?;
-
-    if !output.status.success() {
-        return Err(command_error("git remote", &output));
-    }
-
-    Ok(stdout_lines(&output))
+    list_configured_remotes(vault)
 }
 
 fn unset_upstream(vault: &Path) {
-    let _ = git_command()
-        .args(["branch", "--unset-upstream"])
-        .current_dir(vault)
-        .output();
-}
-
-fn run_git(vault: &Path, args: &[&str]) -> Result<(), String> {
-    let output = git_command()
-        .args(args)
-        .current_dir(vault)
-        .output()
-        .map_err(|e| format!("Failed to run git {}: {e}", args[0]))?;
-
-    if output.status.success() {
-        return Ok(());
-    }
-
-    Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    let _ = git_output(vault, &["branch", "--unset-upstream"]);
 }
 
 fn fetch_remote(vault: &Path) -> Result<(), String> {
@@ -221,7 +202,7 @@ fn fetch_remote(vault: &Path) -> Result<(), String> {
 }
 
 fn list_remote_branches(vault: &Path) -> Result<Vec<String>, String> {
-    let output = git_output(
+    let output = git_output_result(
         vault,
         &[
             "for-each-ref",
@@ -241,17 +222,17 @@ fn list_remote_branches(vault: &Path) -> Result<Vec<String>, String> {
 }
 
 fn histories_share_base(vault: &Path, connection: &RemoteConnection) -> bool {
-    git_command()
-        .args(["merge-base", "HEAD", connection.remote_branch.as_str()])
-        .current_dir(vault)
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    git_output(
+        vault,
+        &["merge-base", "HEAD", connection.remote_branch.as_str()],
+    )
+    .map(|output| output.status.success())
+    .unwrap_or(false)
 }
 
 fn ahead_behind_counts(vault: &Path, connection: &RemoteConnection) -> Result<(u32, u32), String> {
     let revision_range = format!("HEAD...{}", connection.remote_branch);
-    let output = git_output(
+    let output = git_output_result(
         vault,
         &["rev-list", "--left-right", "--count", &revision_range],
     )?;
@@ -318,33 +299,8 @@ fn classify_connect_error(stderr: &str) -> GitAddRemoteResult {
     )
 }
 
-fn git_output(vault: &Path, args: &[&str]) -> Result<Output, String> {
-    git_command()
-        .args(args)
-        .current_dir(vault)
-        .output()
-        .map_err(|e| format!("Failed to run git {}: {e}", args[0]))
-}
-
 fn command_error(command: &str, output: &Output) -> String {
     format!("{command} failed: {}", stderr_text(output))
-}
-
-fn stderr_text(output: &Output) -> String {
-    String::from_utf8_lossy(&output.stderr).trim().to_string()
-}
-
-fn stdout_text(output: &Output) -> String {
-    String::from_utf8_lossy(&output.stdout).trim().to_string()
-}
-
-fn stdout_lines(output: &Output) -> Vec<String> {
-    stdout_text(output)
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(ToOwned::to_owned)
-        .collect()
 }
 
 fn is_auth_error(lower: &str) -> bool {

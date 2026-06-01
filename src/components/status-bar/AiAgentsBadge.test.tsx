@@ -16,6 +16,7 @@ const installedStatuses = {
   opencode: { status: 'installed' as const, version: '0.3.1' },
   pi: { status: 'installed' as const, version: '0.70.2' },
   gemini: { status: 'installed' as const, version: '0.5.1' },
+  kiro: { status: 'installed' as const, version: '0.12.0' },
 }
 
 const openAiProvider: AiModelProvider = {
@@ -123,6 +124,7 @@ describe('AiAgentsBadge', () => {
         opencode: { status: 'missing', version: null },
         pi: { status: 'missing', version: null },
         gemini: { status: 'missing', version: null },
+        kiro: { status: 'missing', version: null },
       },
     })
     openAiAgentsMenu()
@@ -132,6 +134,7 @@ describe('AiAgentsBadge', () => {
     expect(screen.queryByText('Install OpenCode')).not.toBeInTheDocument()
     expect(screen.queryByText('Install Pi')).not.toBeInTheDocument()
     expect(screen.queryByText('Install Gemini CLI')).not.toBeInTheDocument()
+    expect(screen.queryByText('Install Kiro')).not.toBeInTheDocument()
   })
 
   it('shows the vault guidance summary and restore action', async () => {

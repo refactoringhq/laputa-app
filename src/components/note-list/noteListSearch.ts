@@ -8,6 +8,7 @@ interface NoteListSearchContext {
   typeEntryMap: Record<string, VaultEntry>
   displayPropsOverride?: string[] | null
   dateDisplayFormat?: DateDisplayFormat
+  fullTextResultPaths?: Set<string>
 }
 
 function normalizeQuery(query: string): string {
@@ -50,6 +51,7 @@ export function matchesNoteListQuery(
 ): boolean {
   const normalizedQuery = normalizeQuery(query)
   if (!normalizedQuery) return true
+  if (context.fullTextResultPaths?.has(entry.path)) return true
   return resolveSearchableText(entry, context).some((value) => value.toLowerCase().includes(normalizedQuery))
 }
 

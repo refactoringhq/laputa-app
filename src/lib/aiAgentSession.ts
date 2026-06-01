@@ -16,6 +16,7 @@ import type { ToolInvocation } from './aiAgentMessageState'
 import { trackAiAgentMessageBlocked, trackAiAgentMessageSent } from './productAnalytics'
 import { streamAiAgent } from '../utils/streamAiAgent'
 import { streamAiModel } from '../utils/streamAiModel'
+import { hydrateNoteReferences } from '../utils/ai-reference-content'
 
 export interface AiAgentSessionRuntime {
   setMessages: Dispatch<SetStateAction<AiAgentMessage[]>>
@@ -32,6 +33,12 @@ interface SendAgentMessageOptions {
   runtime: AiAgentSessionRuntime
   context: AgentExecutionContext
   prompt: PendingUserPrompt
+}
+
+interface RegenerateAgentMessageOptions {
+  runtime: AiAgentSessionRuntime
+  context: AgentExecutionContext
+  messageId: string
 }
 
 function normalizePrompt(prompt: PendingUserPrompt): PendingUserPrompt {
@@ -125,11 +132,15 @@ export async function sendAgentMessage({
 
   const messageId = appendStreamingMessage(runtime.setMessages, normalizedPrompt)
   runtime.setStatus('thinking')
+  const promptForAgent = {
+    ...normalizedPrompt,
+    references: await hydrateNoteReferences(normalizedPrompt.references),
+  }
 
   const { formattedMessage, systemPrompt } = buildFormattedMessage(
     context,
     runtime.messagesRef.current,
-    normalizedPrompt,
+    promptForAgent,
   )
 
   const callbacks = createStreamCallbacks({
@@ -145,6 +156,35 @@ export async function sendAgentMessage({
   })
 
   await streamWithSelectedTarget(context, formattedMessage, systemPrompt, callbacks)
+}
+
+export async function regenerateAgentMessage({
+  runtime,
+  context,
+  messageId,
+}: RegenerateAgentMessageOptions): Promise<void> {
+  const currentMessages = runtime.messagesRef.current
+  const messageIndex = currentMessages.findIndex((message) => message.id === messageId)
+  const message = currentMessages[messageIndex]
+  if (!message || message.localMarker || runtime.statusRef.current === 'thinking' || runtime.statusRef.current === 'tool-executing') return
+
+  const preservedMessages = currentMessages.slice(0, messageIndex)
+  runtime.abortRef.current = { aborted: false }
+  runtime.responseAccRef.current = ''
+  runtime.toolInputMapRef.current = new Map()
+  runtime.messagesRef.current = preservedMessages
+  runtime.statusRef.current = 'idle'
+  runtime.setMessages(preservedMessages)
+  runtime.setStatus('idle')
+
+  await sendAgentMessage({
+    runtime,
+    context,
+    prompt: {
+      text: message.userMessage,
+      references: message.references,
+    },
+  })
 }
 
 export function addAgentLocalMarker(

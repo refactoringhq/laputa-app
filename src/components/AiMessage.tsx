@@ -1,8 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { CaretRight, CaretDown, Brain, ArrowCounterClockwise } from '@phosphor-icons/react'
+import { CaretRight, CaretDown, Brain, ArrowsClockwise, Copy, GitBranch, Terminal } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
 import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { MarkdownContent } from './MarkdownContent'
+import { translate, type AppLocale } from '../lib/i18n'
 import type { NoteReference } from '../utils/ai-context'
+import { writeClipboardText } from '../utils/clipboardText'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 
 export interface AiAction {
@@ -19,13 +22,17 @@ export interface AiMessageProps {
   userMessage: string
   references?: NoteReference[]
   localMarker?: string
+  locale?: AppLocale
+  messageId?: string
   reasoning?: string
   reasoningDone?: boolean
   actions: AiAction[]
   response?: string
   isStreaming?: boolean
+  onFork?: (messageId: string) => void
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
+  onRegenerate?: (messageId: string) => void
 }
 
 function LocalMarker({ text }: { text: string }) {
@@ -44,8 +51,9 @@ function ReferencePill({ reference, onClick }: {
   reference: NoteReference
   onClick?: (path: string) => void
 }) {
-  const color = getTypeColor(reference.type)
-  const lightColor = getTypeLightColor(reference.type)
+  const type = reference.type ?? null
+  const color = getTypeColor(type)
+  const lightColor = getTypeLightColor(type)
   return (
     <button type="button"
       className="inline-flex items-center border-none cursor-pointer transition-opacity hover:opacity-80"
@@ -76,7 +84,7 @@ function UserBubble({ content, references, onOpenNote }: {
     <div className="flex justify-end" style={{ marginBottom: 8 }}>
       <div
         style={{
-          background: 'var(--muted)',
+          background: 'var(--state-hover)',
           color: 'var(--foreground)',
           borderRadius: '12px 12px 2px 12px',
           maxWidth: '85%',
@@ -98,8 +106,8 @@ function UserBubble({ content, references, onOpenNote }: {
   )
 }
 
-function ReasoningBlock({ text, expanded, onToggle }: {
-  text: string; expanded: boolean; onToggle: () => void
+function ReasoningBlock({ locale, text, expanded, onToggle }: {
+  locale: AppLocale; text: string; expanded: boolean; onToggle: () => void
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -119,7 +127,7 @@ function ReasoningBlock({ text, expanded, onToggle }: {
         data-testid="reasoning-toggle"
       >
         <Brain size={14} />
-        <span>Reasoning</span>
+        <span>{translate(locale, 'ai.message.reasoning')}</span>
         {expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
       </button>
       {expanded && (
@@ -162,25 +170,168 @@ function ActionCardsList({ actions, onOpenNote, expandedIds, onToggleExpand }: {
   )
 }
 
-function ResponseBlock({ text, onNavigateWikilink }: { text: string; onNavigateWikilink?: (target: string) => void }) {
+function ToolUseBlock({
+  actions,
+  expanded,
+  expandedActionIds,
+  locale,
+  onOpenNote,
+  onToggle,
+  onToggleAction,
+}: {
+  actions: AiAction[]
+  expanded: boolean
+  expandedActionIds: Set<string>
+  locale: AppLocale
+  onOpenNote?: (path: string) => void
+  onToggle: () => void
+  onToggleAction: (toolId: string) => void
+}) {
+  const pending = actions.some((action) => action.status === 'pending')
+
   return (
-    <div style={{ marginBottom: 4 }}>
-      <MarkdownContent content={text} onWikilinkClick={onNavigateWikilink} />
-      <button type="button"
-        className="flex items-center gap-1 border-none bg-transparent p-0 text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-        style={{ fontSize: 11, marginTop: 4 }}
-        data-testid="undo-button"
+    <div style={{ marginBottom: 8 }}>
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
+        style={{ fontSize: 12, padding: '4px 0' }}
+        aria-expanded={expanded}
+        onClick={onToggle}
+        data-testid="tool-use-toggle"
       >
-        <ArrowCounterClockwise size={12} />
-        <span>Undo</span>
+        <Terminal size={14} />
+        <span>{translate(locale, 'ai.message.toolUse')}</span>
+        <span
+          className={`inline-flex h-4 min-w-4 items-center justify-center rounded-full ${pending ? 'animate-pulse' : ''}`}
+          style={{
+            background: 'var(--state-hover)',
+            color: 'var(--muted-foreground)',
+            fontSize: 10,
+            fontWeight: 600,
+            padding: '0 5px',
+          }}
+          data-pending={pending || undefined}
+          data-testid="tool-use-count"
+        >
+          {actions.length}
+        </span>
+        {expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
       </button>
+      {expanded && (
+        <div data-testid="tool-use-content" style={{ marginTop: 4 }}>
+          <ActionCardsList
+            actions={actions}
+            onOpenNote={onOpenNote}
+            expandedIds={expandedActionIds}
+            onToggleExpand={onToggleAction}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ResponseActions({
+  locale,
+  messageId,
+  onCopy,
+  onFork,
+  onRegenerate,
+}: {
+  locale: AppLocale
+  messageId?: string
+  onCopy: () => void
+  onFork?: (messageId: string) => void
+  onRegenerate?: (messageId: string) => void
+}) {
+  const regenerateDisabled = !messageId || !onRegenerate
+  const forkDisabled = !messageId || !onFork
+
+  return (
+    <div
+      className="mt-1.5 flex items-center gap-1 opacity-0 transition-opacity group-hover/ai-response:opacity-100 group-focus-within/ai-response:opacity-100"
+      data-testid="ai-message-actions"
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="h-6 w-6 rounded-md p-0 text-muted-foreground hover:text-foreground"
+        disabled={regenerateDisabled}
+        aria-label={translate(locale, 'ai.message.regenerate')}
+        title={translate(locale, 'ai.message.regenerate')}
+        onClick={() => messageId && onRegenerate?.(messageId)}
+        data-testid="ai-message-regenerate"
+      >
+        <ArrowsClockwise size={14} />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="h-6 w-6 rounded-md p-0 text-muted-foreground hover:text-foreground"
+        aria-label={translate(locale, 'ai.message.copy')}
+        title={translate(locale, 'ai.message.copy')}
+        onClick={onCopy}
+        data-testid="ai-message-copy"
+      >
+        <Copy size={14} />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="h-6 w-6 rounded-md p-0 text-muted-foreground hover:text-foreground"
+        disabled={forkDisabled}
+        aria-label={translate(locale, 'ai.message.fork')}
+        title={translate(locale, 'ai.message.fork')}
+        onClick={() => messageId && onFork?.(messageId)}
+        data-testid="ai-message-fork"
+      >
+        <GitBranch size={14} />
+      </Button>
+    </div>
+  )
+}
+
+function ResponseBlock({
+  locale,
+  messageId,
+  onFork,
+  onNavigateWikilink,
+  onRegenerate,
+  text,
+}: {
+  locale: AppLocale
+  messageId?: string
+  onFork?: (messageId: string) => void
+  onNavigateWikilink?: (target: string) => void
+  onRegenerate?: (messageId: string) => void
+  text: string
+}) {
+  const handleCopy = useCallback(() => {
+    void writeClipboardText(text).catch((error) => {
+      console.warn('[ai] Failed to copy assistant message:', error)
+    })
+  }, [text])
+
+  return (
+    <div className="group/ai-response" style={{ marginBottom: 4 }}>
+      <MarkdownContent content={text} onWikilinkClick={onNavigateWikilink} />
+      <ResponseActions
+        locale={locale}
+        messageId={messageId}
+        onCopy={handleCopy}
+        onFork={onFork}
+        onRegenerate={onRegenerate}
+      />
     </div>
   )
 }
 
 function StreamingIndicator() {
   return (
-    <div className="flex items-center gap-2 text-muted-foreground" style={{ fontSize: 12, padding: '4px 0' }}>
+    <div className="flex items-center gap-2 text-muted-foreground" style={{ fontSize: 12, marginTop: 8, padding: 0 }}>
       <div className="flex gap-1">
         <span className="typing-dot" />
         <span className="typing-dot" style={{ animationDelay: '0.2s' }} />
@@ -198,10 +349,11 @@ export function AiMessage(props: AiMessageProps) {
   return <ConversationMessage {...props} />
 }
 
-function ConversationMessage({ userMessage, references, reasoning, reasoningDone, actions, response, isStreaming, onOpenNote, onNavigateWikilink }: AiMessageProps) {
+function ConversationMessage({ userMessage, references, locale = 'en', messageId, reasoning, reasoningDone, actions, response, isStreaming, onFork, onOpenNote, onNavigateWikilink, onRegenerate }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState(false)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
+  const [toolUseExpanded, setToolUseExpanded] = useState(false)
 
   // Auto: expanded while reasoning streams, collapsed once done
   // User can manually toggle to override the auto state
@@ -222,20 +374,33 @@ function ConversationMessage({ userMessage, references, reasoning, reasoningDone
       <UserBubble content={userMessage} references={references} onOpenNote={onOpenNote} />
       {reasoning && (
         <ReasoningBlock
+          locale={locale}
           text={reasoning}
           expanded={reasoningExpanded}
           onToggle={() => setUserOverride(prev => !prev)}
         />
       )}
       {actions.length > 0 && (
-        <ActionCardsList
+        <ToolUseBlock
           actions={actions}
+          expanded={toolUseExpanded}
+          expandedActionIds={expandedActions}
+          locale={locale}
           onOpenNote={onOpenNote}
-          expandedIds={expandedActions}
-          onToggleExpand={toggleAction}
+          onToggle={() => setToolUseExpanded((current) => !current)}
+          onToggleAction={toggleAction}
         />
       )}
-      {response && <ResponseBlock text={response} onNavigateWikilink={onNavigateWikilink} />}
+      {response && (
+        <ResponseBlock
+          locale={locale}
+          messageId={messageId}
+          text={response}
+          onFork={onFork}
+          onNavigateWikilink={onNavigateWikilink}
+          onRegenerate={onRegenerate}
+        />
+      )}
       {isStreaming && !response && <StreamingIndicator />}
     </div>
   )

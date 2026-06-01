@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::getting_started::{agents_content_can_be_refreshed, AGENTS_MD};
+use super::getting_started::{agents_content_is_known_managed_template, AGENTS_MD};
 
 /// Content for `type.md` — describes the generic Type metamodel for the vault.
 const TYPE_TYPE_DEFINITION: &str = "\
@@ -111,7 +111,9 @@ fn read_file_or_empty(path: &Path) -> String {
 }
 
 fn agents_content_can_be_replaced(content: &str) -> bool {
-    content.contains("See config/agents.md") || agents_content_can_be_refreshed(content)
+    content.trim().is_empty()
+        || content.contains("See config/agents.md")
+        || agents_content_is_known_managed_template(content)
 }
 
 fn root_agents_can_be_replaced(path: &Path) -> bool {
@@ -157,6 +159,30 @@ fn sync_managed_file(
     Ok(true)
 }
 
+fn strip_markdown_frontmatter(content: &str) -> &str {
+    let Some(line_ending) = resolve_frontmatter_line_ending(content) else {
+        return content;
+    };
+    let after_open = &content[3 + line_ending.len()..];
+    let close_marker = format!("{line_ending}---");
+    let Some(close_index) = after_open.find(&close_marker) else {
+        return content;
+    };
+    let after_close = &after_open[close_index + close_marker.len()..];
+    after_close.strip_prefix(line_ending).unwrap_or(after_close)
+}
+
+fn resolve_frontmatter_line_ending(content: &str) -> Option<&'static str> {
+    if content.starts_with("---\r\n") {
+        return Some("\r\n");
+    }
+    content.starts_with("---\n").then_some("\n")
+}
+
+fn guidance_content_has_body(content: &str) -> bool {
+    !strip_markdown_frontmatter(content).trim().is_empty()
+}
+
 fn classify_guidance_file(
     path: &Path,
     matches_managed: fn(&str) -> bool,
@@ -169,6 +195,10 @@ fn classify_guidance_file(
     let content = read_file_or_empty(path);
     if matches_managed(&content) {
         return AiGuidanceFileState::Managed;
+    }
+
+    if !guidance_content_has_body(&content) {
+        return AiGuidanceFileState::Broken;
     }
 
     if can_replace(path) {
@@ -468,17 +498,17 @@ mod tests {
         );
     }
 
-    fn assert_refreshes_outdated_managed_agents(run: VaultOperation) {
-        let outdated_agents = AGENTS_MD.replacen(
+    fn assert_preserves_edited_default_agents(run: VaultOperation) {
+        let edited_agents = AGENTS_MD.replacen(
             "Store note type in the `type:` frontmatter field.",
             "`type:` is the preferred type field. Tolaria still understands legacy aliases such as `Is A`.",
             1,
         );
-        let (_dir, vault) = run_with_agents(run, Some(&outdated_agents), None);
+        let (_dir, vault) = run_with_agents(run, Some(&edited_agents), None);
 
         let content = read_root_agents(&vault);
-        assert!(content.contains("Store note type in the `type:` frontmatter field."));
-        assert!(!content.contains("Tolaria still understands legacy aliases such as `Is A`."));
+        assert!(content.contains("Tolaria still understands legacy aliases such as `Is A`."));
+        assert!(!content.contains("Store note type in the `type:` frontmatter field."));
     }
 
     fn assert_legacy_agents_move_to_root(
@@ -584,7 +614,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seed_config_files_refreshes_stale_default_agents() {
+    fn test_seed_config_files_preserves_edited_stale_default_agents() {
         let (_dir, vault) = create_vault();
         write_root_agents(
             &vault,
@@ -594,15 +624,13 @@ mod tests {
         seed_config_files(vault.to_str().unwrap());
 
         let content = read_root_agents(&vault);
-        assert!(content.contains("Use the first H1 as the note title."));
-        assert!(content.contains("Tolaria reads notes recursively from all folders"));
-        assert!(content.contains("views/*.yml"));
-        assert!(content.contains("Belongs to:"));
+        assert!(content.contains("Do not add `title:` frontmatter."));
+        assert!(!content.contains("Use the first H1 as the note title."));
     }
 
     #[test]
-    fn test_seed_config_files_refreshes_outdated_managed_agents() {
-        assert_refreshes_outdated_managed_agents(run_seed);
+    fn test_seed_config_files_preserves_edited_default_agents() {
+        assert_preserves_edited_default_agents(run_seed);
     }
 
     #[test]
@@ -724,8 +752,8 @@ mod tests {
     }
 
     #[test]
-    fn test_repair_config_files_refreshes_outdated_managed_agents() {
-        assert_refreshes_outdated_managed_agents(run_repair);
+    fn test_repair_config_files_preserves_edited_default_agents() {
+        assert_preserves_edited_default_agents(run_repair);
     }
 
     #[test]
@@ -741,6 +769,48 @@ mod tests {
                 agents_state: AiGuidanceFileState::Custom,
                 claude_state: AiGuidanceFileState::Broken,
                 gemini_state: AiGuidanceFileState::Missing,
+                can_restore: true,
+            }
+        );
+    }
+
+    #[test]
+    fn test_get_ai_guidance_status_treats_edited_agents_as_custom() {
+        let (_dir, vault) = create_vault();
+        let edited_agents = AGENTS_MD.replacen("type: Note", "type: Vault Guidance", 1)
+            + "\n\n- Prefer the user's vault-specific naming conventions.\n";
+        write_root_agents(&vault, &edited_agents);
+        write_root_claude(&vault, CLAUDE_MD_SHIM);
+        write_root_gemini(&vault, GEMINI_MD_SHIM);
+
+        let status = get_ai_guidance_status(vault.to_str().unwrap()).unwrap();
+
+        assert_eq!(
+            status,
+            VaultAiGuidanceStatus {
+                agents_state: AiGuidanceFileState::Custom,
+                claude_state: AiGuidanceFileState::Managed,
+                gemini_state: AiGuidanceFileState::Managed,
+                can_restore: false,
+            }
+        );
+    }
+
+    #[test]
+    fn test_get_ai_guidance_status_reports_frontmatter_only_agents_as_broken() {
+        let (_dir, vault) = create_vault();
+        write_root_agents(&vault, "---\ntype: Vault Guidance\n---\n");
+        write_root_claude(&vault, CLAUDE_MD_SHIM);
+        write_root_gemini(&vault, GEMINI_MD_SHIM);
+
+        let status = get_ai_guidance_status(vault.to_str().unwrap()).unwrap();
+
+        assert_eq!(
+            status,
+            VaultAiGuidanceStatus {
+                agents_state: AiGuidanceFileState::Broken,
+                claude_state: AiGuidanceFileState::Managed,
+                gemini_state: AiGuidanceFileState::Managed,
                 can_restore: true,
             }
         );

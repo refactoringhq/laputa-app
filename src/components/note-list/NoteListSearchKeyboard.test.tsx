@@ -64,7 +64,7 @@ describe('NoteList search keyboard behavior', () => {
     expect(noteList).toHaveFocus()
   })
 
-  it('debounces note-list filtering and shows loading feedback while waiting', () => {
+  it('debounces note-list filtering and shows loading feedback while waiting', async () => {
     const entries = [
       makeIndexedEntry(0, { title: 'Alpha Strategy' }),
       ...Array.from({ length: 200 }, (_, index) => makeIndexedEntry(index + 1)),
@@ -84,9 +84,12 @@ describe('NoteList search keyboard behavior', () => {
     expect(screen.getByTestId('note-list-search-loading')).toBeInTheDocument()
     expect(screen.getByText('Note 1')).toBeInTheDocument()
 
-    act(() => {
+    await act(async () => {
       vi.advanceTimersByTime(180)
       flushAnimationFrame()
+    })
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync()
     })
 
     expect(screen.queryByTestId('note-list-search-loading')).not.toBeInTheDocument()

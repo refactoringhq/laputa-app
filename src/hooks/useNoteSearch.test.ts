@@ -47,6 +47,44 @@ describe('useNoteSearch', () => {
     expect(result.current.results[0].title).toBe('Alpha Project')
   })
 
+  it('matches existing notes by normalized filename-shaped queries', () => {
+    const alpha = makeEntry({
+      path: '/vault/alpha-project.md',
+      filename: 'alpha-project.md',
+      title: 'Alpha Project',
+    })
+
+    const { result: markdownQuery } = renderHook(() => useNoteSearch([alpha], 'alpha-project.md'))
+    const { result: punctuationQuery } = renderHook(() => useNoteSearch([alpha], 'Alpha Project!'))
+
+    expect(markdownQuery.current.results[0]?.entry).toBe(alpha)
+    expect(punctuationQuery.current.results[0]?.entry).toBe(alpha)
+  })
+
+  it('matches existing notes when the query omits title diacritics', () => {
+    const cafe = makeEntry({
+      path: '/vault/cafe-notes.md',
+      filename: 'cafe-notes.md',
+      title: 'Café Notes',
+    })
+
+    const { result } = renderHook(() => useNoteSearch([cafe], 'Cafe Notes'))
+
+    expect(result.current.results[0]?.entry).toBe(cafe)
+  })
+
+  it('does not normalize punctuation-only queries to untitled', () => {
+    const untitled = makeEntry({
+      path: '/vault/untitled.md',
+      filename: 'untitled.md',
+      title: 'Untitled',
+    })
+
+    const { result } = renderHook(() => useNoteSearch([untitled], '!!!'))
+
+    expect(result.current.results).toHaveLength(0)
+  })
+
   it('returns empty results when query has no matches', () => {
     const { result } = renderHook(() => useNoteSearch(entries, 'zzzzzzz'))
     expect(result.current.results).toHaveLength(0)

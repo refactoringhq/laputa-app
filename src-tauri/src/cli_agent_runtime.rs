@@ -5,6 +5,8 @@ use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
+mod windows_cmd_shim;
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct AgentStreamRequest {
     pub message: String,
@@ -107,13 +109,8 @@ pub(crate) fn version_for_binary(binary: &Path) -> Option<String> {
 pub(crate) fn command_target_avoiding_windows_cmd_shim(
     binary: &Path,
 ) -> Result<AgentCommandTarget, String> {
-    if is_windows_batch_shim(binary) {
-        if let Some(script) = node_script_from_windows_cmd_shim(binary) {
-            return Ok(AgentCommandTarget {
-                program: crate::mcp::find_node()?,
-                first_arg: Some(script),
-            });
-        }
+    if let Some(target) = windows_cmd_shim::command_target(binary)? {
+        return Ok(target);
     }
 
     Ok(AgentCommandTarget {
@@ -242,43 +239,6 @@ pub(crate) fn has_windows_cli_extension(path: &Path) -> bool {
                 .iter()
                 .any(|expected| extension.eq_ignore_ascii_case(expected))
         })
-}
-
-fn is_windows_batch_shim(binary: &Path) -> bool {
-    binary
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| {
-            extension.eq_ignore_ascii_case("cmd") || extension.eq_ignore_ascii_case("bat")
-        })
-}
-
-fn node_script_from_windows_cmd_shim(binary: &Path) -> Option<PathBuf> {
-    let contents = std::fs::read_to_string(binary).ok()?;
-    contents
-        .split('"')
-        .skip(1)
-        .step_by(2)
-        .filter(|token| is_node_script_token(token))
-        .find_map(|token| resolve_cmd_shim_script_path(binary, token))
-}
-
-fn is_node_script_token(token: &str) -> bool {
-    let lower = token.to_ascii_lowercase();
-    (lower.ends_with(".js") || lower.ends_with(".mjs") || lower.ends_with(".cjs"))
-        && (lower.starts_with("%dp0%") || lower.starts_with("%~dp0"))
-}
-
-fn resolve_cmd_shim_script_path(binary: &Path, token: &str) -> Option<PathBuf> {
-    let relative = token
-        .strip_prefix("%dp0%")
-        .or_else(|| token.strip_prefix("%~dp0"))?
-        .trim_start_matches(['\\', '/']);
-    let mut script = binary.parent()?.to_path_buf();
-    for part in relative.split(['\\', '/']).filter(|part| !part.is_empty()) {
-        script.push(part);
-    }
-    script.is_file().then_some(script)
 }
 
 pub(crate) fn parse_json_line(

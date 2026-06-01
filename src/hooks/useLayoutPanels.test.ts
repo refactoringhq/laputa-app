@@ -150,4 +150,16 @@ describe('useLayoutPanels', () => {
     })
     expect(localStorage.getItem(LEGACY_APP_STORAGE_KEYS.layoutPanels)).toBeNull()
   })
+
+  it('keeps the resized inspector width across close and reopen toggles', () => {
+    const { result } = renderHook(() => useLayoutPanels({ initialInspectorCollapsed: false }))
+
+    act(() => result.current.handleInspectorResize(-70))
+    expect(result.current.inspectorWidth).toBe(350)
+
+    act(() => result.current.setInspectorCollapsed(true))
+    act(() => result.current.setInspectorCollapsed(false))
+
+    expect(result.current.inspectorWidth).toBe(350)
+  })
 })

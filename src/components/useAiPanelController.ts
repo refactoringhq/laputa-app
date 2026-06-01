@@ -39,6 +39,7 @@ interface UseAiPanelControllerArgs {
   onFileCreated?: (relativePath: string) => void
   onFileModified?: (relativePath: string) => void
   onVaultChanged?: () => void
+  sessionId?: string
 }
 
 export interface AiPanelController {
@@ -116,6 +117,7 @@ function usePanelAgent({
   onFileCreated,
   onFileModified,
   onVaultChanged,
+  sessionId,
 }: Pick<
   UseAiPanelControllerArgs,
   | 'vaultPath'
@@ -127,6 +129,7 @@ function usePanelAgent({
   | 'onFileCreated'
   | 'onFileModified'
   | 'onVaultChanged'
+  | 'sessionId'
 > & { contextPrompt?: string }) {
   const fileCallbacks = useAgentFileCallbacks({ onFileCreated, onFileModified, onVaultChanged })
   const permissionMode = useVaultAiAgentPermissionMode()
@@ -135,6 +138,7 @@ function usePanelAgent({
     target: defaultAiTarget,
     agentReady: resolveAgentReady(defaultAiAgentReadiness, defaultAiAgentReady),
     permissionMode,
+    sessionId,
   })
   return { agent, permissionMode }
 }
@@ -157,6 +161,7 @@ export function useAiPanelController({
   onFileCreated,
   onFileModified,
   onVaultChanged,
+  sessionId,
 }: UseAiPanelControllerArgs): AiPanelController {
   const [input, setInput] = useState('')
   const { linkedEntries, contextPrompt } = useAiPanelContextSnapshot({
@@ -169,7 +174,7 @@ export function useAiPanelController({
     noteListFilter,
   })
 
-  const { agent, permissionMode } = usePanelAgent({ vaultPath, vaultPaths, contextPrompt, defaultAiAgent, defaultAiTarget, defaultAiAgentReady, defaultAiAgentReadiness, onFileCreated, onFileModified, onVaultChanged })
+  const { agent, permissionMode } = usePanelAgent({ vaultPath, vaultPaths, contextPrompt, defaultAiAgent, defaultAiTarget, defaultAiAgentReady, defaultAiAgentReadiness, onFileCreated, onFileModified, onVaultChanged, sessionId })
   const isActive = agent.status === 'thinking' || agent.status === 'tool-executing'
 
   const handleSend = useCallback((text: string, references: NoteReference[]) => {

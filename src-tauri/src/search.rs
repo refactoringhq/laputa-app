@@ -26,6 +26,7 @@ pub struct SearchOptions<'a> {
     pub mode: &'a str,
     pub limit: usize,
     pub hide_gitignored_files: bool,
+    pub exclude_frontmatter: bool,
 }
 
 struct Utf8Boundary<'a> {
@@ -126,7 +127,27 @@ pub fn search_vault(
         mode: _mode,
         limit,
         hide_gitignored_files: crate::settings::hide_gitignored_files_enabled(),
+        exclude_frontmatter: false,
     })
+}
+
+fn strip_frontmatter(content: &str) -> &str {
+    let Some(rest) = content.strip_prefix("---") else {
+        return content;
+    };
+
+    match rest.find("\n---") {
+        Some(end) => rest[end + 4..].trim_start(),
+        None => content,
+    }
+}
+
+fn searchable_content(content: &str, exclude_frontmatter: bool) -> &str {
+    if exclude_frontmatter {
+        strip_frontmatter(content)
+    } else {
+        content
+    }
 }
 
 fn is_markdown_search_candidate(vault_dir: &Path, path: &Path) -> bool {
@@ -164,7 +185,8 @@ pub fn search_vault_with_options(options: SearchOptions<'_>) -> Result<SearchRes
             Err(_) => continue,
         };
 
-        let content_lower = content.to_lowercase();
+        let searchable_content = searchable_content(&content, options.exclude_frontmatter);
+        let content_lower = searchable_content.to_lowercase();
         let filename = path
             .file_name()
             .and_then(|value| value.to_str())
@@ -183,7 +205,7 @@ pub fn search_vault_with_options(options: SearchOptions<'_>) -> Result<SearchRes
         }
         .score();
         let snippet = SnippetRequest {
-            content: &content,
+            content: searchable_content,
             query_lower: &query_lower,
         }
         .extract();
@@ -364,6 +386,7 @@ mod tests {
             mode: "keyword",
             limit: 10,
             hide_gitignored_files: true,
+            exclude_frontmatter: false,
         })
         .unwrap();
         let shown = search_vault_with_options(SearchOptions {
@@ -372,11 +395,52 @@ mod tests {
             mode: "keyword",
             limit: 10,
             hide_gitignored_files: false,
+            exclude_frontmatter: false,
         })
         .unwrap();
 
         assert_eq!(hidden.results.len(), 1);
         assert_eq!(hidden.results[0].title, "Visible");
         assert_eq!(shown.results.len(), 2);
+    }
+
+    #[test]
+    fn test_search_vault_can_exclude_frontmatter_from_content_matches() {
+        let dir = Builder::new()
+            .prefix("search-frontmatter-scope-")
+            .tempdir_in(std::env::current_dir().unwrap())
+            .unwrap();
+        fs::write(
+            dir.path().join("frontmatter-only.md"),
+            [
+                "---",
+                "Owner: hidden-frontmatter-keyword",
+                "---",
+                "",
+                "# Public Body",
+                "",
+                "The note body deliberately omits the hidden property token.",
+            ]
+            .join("\n"),
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("body-match.md"),
+            "# Body Match\n\nBody includes hidden-frontmatter-keyword here.",
+        )
+        .unwrap();
+
+        let response = search_vault_with_options(SearchOptions {
+            vault_path: dir.path().to_str().unwrap(),
+            query: "hidden-frontmatter-keyword",
+            mode: "keyword",
+            limit: 10,
+            hide_gitignored_files: false,
+            exclude_frontmatter: true,
+        })
+        .unwrap();
+
+        assert_eq!(response.results.len(), 1);
+        assert_eq!(response.results[0].title, "Body Match");
     }
 }

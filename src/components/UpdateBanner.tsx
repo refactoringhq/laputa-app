@@ -13,6 +13,10 @@ interface UpdateBannerProps {
 
 type VisibleUpdateStatus = Exclude<UpdateStatus, { state: 'idle' } | { state: 'error' }>
 
+function isUpdateBannerVisible(status: UpdateStatus): status is VisibleUpdateStatus {
+  return status.state !== 'idle' && status.state !== 'error'
+}
+
 const bannerStyle = {
   display: 'flex',
   alignItems: 'center',
@@ -174,7 +178,7 @@ function renderBannerContent(status: VisibleUpdateStatus, actions: UpdateActions
 }
 
 export function UpdateBanner({ status, actions, locale = 'en' }: UpdateBannerProps) {
-  if (status.state === 'idle' || status.state === 'error') return null
+  if (!isUpdateBannerVisible(status)) return null
 
   return <div data-testid="update-banner" style={bannerStyle}>{renderBannerContent(status, actions, locale)}</div>
 }

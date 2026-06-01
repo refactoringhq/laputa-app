@@ -16,7 +16,7 @@ const AGENT_DOCS_RESOURCE_DIR: &str = "agent-docs";
 #[cfg(desktop)]
 async fn run_desktop_stream<Event, Request, Runner>(
     app_handle: tauri::AppHandle,
-    event_name: &'static str,
+    event_name: String,
     request: Request,
     runner: Runner,
 ) -> Result<String, String>
@@ -31,7 +31,7 @@ where
         runner(
             request,
             Box::new(move |event| {
-                let _ = app_handle.emit(event_name, &event);
+                let _ = app_handle.emit(event_name.as_str(), &event);
             }),
         )
     })
@@ -47,9 +47,30 @@ macro_rules! define_desktop_stream_command {
             app_handle: tauri::AppHandle,
             request: $request,
         ) -> Result<String, String> {
-            run_desktop_stream(app_handle, $event_name, request, $runner).await
+            run_desktop_stream(app_handle, $event_name.to_string(), request, $runner).await
         }
     };
+}
+
+#[cfg(desktop)]
+fn is_scoped_stream_event_name(default_event_name: &str, event_name: &str) -> bool {
+    event_name
+        .strip_prefix(default_event_name)
+        .and_then(|suffix| suffix.strip_prefix('-'))
+        .is_some_and(|suffix| {
+            !suffix.is_empty()
+                && suffix
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric() || character == '-')
+        })
+}
+
+#[cfg(desktop)]
+fn stream_event_name(default_event_name: &'static str, requested: Option<&str>) -> String {
+    requested
+        .filter(|event_name| is_scoped_stream_event_name(default_event_name, event_name))
+        .unwrap_or(default_event_name)
+        .to_string()
 }
 
 // ── Claude CLI commands (desktop) ───────────────────────────────────────────
@@ -135,20 +156,36 @@ fn run_normalized_ai_agent_stream(
 }
 
 #[cfg(desktop)]
-define_desktop_stream_command!(
-    stream_ai_agent,
-    AiAgentStreamRequest,
-    "ai-agent-stream",
-    run_normalized_ai_agent_stream
-);
+#[tauri::command]
+pub async fn stream_ai_agent(
+    app_handle: tauri::AppHandle,
+    request: AiAgentStreamRequest,
+) -> Result<String, String> {
+    let event_name = stream_event_name("ai-agent-stream", request.event_name.as_deref());
+    run_desktop_stream(
+        app_handle,
+        event_name,
+        request,
+        run_normalized_ai_agent_stream,
+    )
+    .await
+}
 
 #[cfg(desktop)]
-define_desktop_stream_command!(
-    stream_ai_model,
-    AiModelStreamRequest,
-    "ai-model-stream",
-    crate::ai_models::run_ai_model_stream
-);
+#[tauri::command]
+pub async fn stream_ai_model(
+    app_handle: tauri::AppHandle,
+    request: AiModelStreamRequest,
+) -> Result<String, String> {
+    let event_name = stream_event_name("ai-model-stream", request.event_name.as_deref());
+    run_desktop_stream(
+        app_handle,
+        event_name,
+        request,
+        crate::ai_models::run_ai_model_stream,
+    )
+    .await
+}
 
 #[cfg(desktop)]
 #[tauri::command]
@@ -280,6 +317,7 @@ mod tests {
             vault_path: "~/Vaults/content".into(),
             vault_paths: vec!["~/Vaults/secondary".into()],
             permission_mode: None,
+            event_name: None,
         };
 
         let normalized = normalize_agent_request(request);
@@ -308,11 +346,29 @@ mod tests {
             vault_path: "/Users/example/vault".into(),
             vault_paths: Vec::new(),
             permission_mode: None,
+            event_name: None,
         };
 
         let normalized = normalize_agent_request(request);
 
         assert_eq!(normalized.vault_path, "/Users/example/vault");
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn stream_event_name_accepts_only_scoped_names() {
+        assert_eq!(
+            stream_event_name("ai-agent-stream", Some("ai-agent-stream-chat-123")),
+            "ai-agent-stream-chat-123",
+        );
+        assert_eq!(
+            stream_event_name("ai-agent-stream", Some("ai-model-stream-chat-123")),
+            "ai-agent-stream",
+        );
+        assert_eq!(
+            stream_event_name("ai-agent-stream", Some("ai-agent-stream/../bad")),
+            "ai-agent-stream",
+        );
     }
 
     #[test]

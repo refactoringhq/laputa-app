@@ -3,9 +3,11 @@ import {
   AI_WORKSPACE_WINDOW_LABEL,
   buildAiWorkspaceWindowUrl,
   buildRuntimeAiWorkspaceWindowUrl,
+  closePreloadedAiWorkspaceWindow,
   closeCurrentAiWorkspaceWindow,
   dockCurrentAiWorkspaceWindow,
   openAiWorkspaceWindow,
+  preloadAiWorkspaceWindow,
   readAiWorkspaceWindowContext,
 } from './openAiWorkspaceWindow'
 import { isTauri } from '../mock-tauri'
@@ -13,8 +15,11 @@ import { AI_WORKSPACE_DOCK_REQUESTED_EVENT } from './aiPromptBridge'
 
 const webviewWindowCalls = vi.fn()
 const webviewGetByLabel = vi.fn()
+const existingShow = vi.fn().mockResolvedValue(undefined)
 const existingUnminimize = vi.fn().mockResolvedValue(undefined)
 const existingSetFocus = vi.fn().mockResolvedValue(undefined)
+const existingClose = vi.fn().mockResolvedValue(undefined)
+const existingIsVisible = vi.fn().mockResolvedValue(true)
 const emitTo = vi.fn().mockResolvedValue(undefined)
 const close = vi.fn().mockResolvedValue(undefined)
 const localStorageMock = (() => {
@@ -63,11 +68,13 @@ describe('openAiWorkspaceWindow', () => {
     vi.clearAllMocks()
     vi.mocked(isTauri).mockReturnValue(false)
     webviewGetByLabel.mockResolvedValue(null)
+    existingIsVisible.mockResolvedValue(true)
     localStorage.clear()
   })
 
   it('builds the AI workspace route', () => {
     const url = buildAiWorkspaceWindowUrl('ai-workspace', {
+      activeConversationId: 'chat-1',
       vaultPath: '/tmp/vault',
       vaultPaths: ['/tmp/vault', '/tmp/other'],
     })
@@ -76,14 +83,16 @@ describe('openAiWorkspaceWindow', () => {
     expect(parsed.pathname).toBe('/')
     expect(parsed.searchParams.get('window')).toBe('ai-workspace')
     expect(parsed.searchParams.get('windowLabel')).toBe('ai-workspace')
+    expect(parsed.searchParams.get('activeConversationId')).toBe('chat-1')
     expect(parsed.searchParams.get('vault')).toBe('/tmp/vault')
     expect(JSON.parse(parsed.searchParams.get('vaultPaths') ?? '[]')).toEqual(['/tmp/vault', '/tmp/other'])
   })
 
   it('reads the AI workspace route context', () => {
-    const search = '?window=ai-workspace&vault=%2Ftmp%2Fvault&vaultPaths=%5B%22%2Ftmp%2Fvault%22%5D'
+    const search = '?window=ai-workspace&activeConversationId=chat-1&vault=%2Ftmp%2Fvault&vaultPaths=%5B%22%2Ftmp%2Fvault%22%5D'
 
     expect(readAiWorkspaceWindowContext(search)).toEqual({
+      activeConversationId: 'chat-1',
       vaultPath: '/tmp/vault',
       vaultPaths: ['/tmp/vault'],
     })
@@ -113,31 +122,96 @@ describe('openAiWorkspaceWindow', () => {
       expect.objectContaining({
         url: expect.stringContaining('vault=%2Ftmp%2Fvault'),
         title: 'Tolaria AI',
-        width: 940,
+        width: 560,
         height: 680,
-        minWidth: 520,
+        minWidth: 420,
         minHeight: 420,
         minimizable: false,
+        alwaysOnTop: false,
         decorations: false,
-        shadow: true,
+        shadow: false,
         transparent: true,
+        backgroundColor: '#00000000',
+        visible: true,
       }),
     )
     expect(localStorage.getItem('tolaria:ai-workspace-window:ai-workspace')).toBe('true')
   })
 
+  it('preloads a hidden native AI workspace window', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+
+    await preloadAiWorkspaceWindow({ vaultPath: '/tmp/vault' })
+
+    expect(webviewWindowCalls).toHaveBeenCalledWith(
+      AI_WORKSPACE_WINDOW_LABEL,
+      expect.objectContaining({
+        url: expect.stringContaining('vault=%2Ftmp%2Fvault'),
+        visible: false,
+      }),
+    )
+    expect(localStorage.getItem('tolaria:ai-workspace-window:ai-workspace')).toBe('true')
+  })
+
+  it('closes a hidden preloaded window', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+
+    await preloadAiWorkspaceWindow()
+    webviewGetByLabel.mockResolvedValue({ close: existingClose, isVisible: vi.fn().mockResolvedValue(false) })
+    await closePreloadedAiWorkspaceWindow()
+
+    expect(existingClose).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a visible preloaded window open during cleanup', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+
+    await preloadAiWorkspaceWindow()
+    webviewGetByLabel.mockResolvedValue({ close: existingClose, isVisible: vi.fn().mockResolvedValue(true) })
+    await closePreloadedAiWorkspaceWindow()
+
+    expect(existingClose).not.toHaveBeenCalled()
+  })
+
   it('focuses an existing AI workspace window instead of creating another', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
     webviewGetByLabel.mockResolvedValue({
+      show: existingShow,
       unminimize: existingUnminimize,
       setFocus: existingSetFocus,
+      isVisible: existingIsVisible,
     })
 
     await openAiWorkspaceWindow()
 
+    expect(existingShow).toHaveBeenCalledOnce()
     expect(existingUnminimize).toHaveBeenCalledOnce()
     expect(existingSetFocus).toHaveBeenCalledOnce()
+    expect(existingIsVisible).toHaveBeenCalledTimes(2)
     expect(webviewWindowCalls).not.toHaveBeenCalled()
+  })
+
+  it('replaces a stale existing AI workspace window when it cannot be shown', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    existingIsVisible.mockResolvedValue(false)
+    webviewGetByLabel.mockResolvedValue({
+      show: existingShow,
+      unminimize: existingUnminimize,
+      setFocus: existingSetFocus,
+      isVisible: existingIsVisible,
+      close: existingClose,
+    })
+
+    await openAiWorkspaceWindow({ vaultPath: '/tmp/vault' })
+
+    expect(existingClose).toHaveBeenCalledOnce()
+    expect(webviewWindowCalls).toHaveBeenCalledWith(
+      AI_WORKSPACE_WINDOW_LABEL,
+      expect.objectContaining({
+        url: expect.stringContaining('vault=%2Ftmp%2Fvault'),
+        visible: true,
+      }),
+    )
   })
 
   it('closes the current AI workspace window without docking it', async () => {

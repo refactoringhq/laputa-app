@@ -32,6 +32,7 @@ export function bindVaultConfigStore(initial: VaultConfig, save: SaveFn): void {
 export function resetVaultConfigStore(): void {
   config = DEFAULT_CONFIG
   saveFn = null
+  notify()
 }
 
 export function updateVaultConfigField<K extends keyof VaultConfig>(key: K, value: VaultConfig[K]): void {

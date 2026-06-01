@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { EXTRA_CODE_BLOCK_LANGUAGES } from '../utils/codeBlockLanguageCatalog'
 
 const nativeRegExpDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'RegExp')
 const NativeRegExp = RegExp
@@ -82,6 +83,42 @@ describe('editor schema code block highlighting', () => {
     })
   })
 
+  it('registers additional common Shiki code block languages', async () => {
+    vi.resetModules()
+
+    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
+    const options = createTolariaCodeBlockOptions()
+
+    expect(options.supportedLanguages?.powershell).toMatchObject({
+      name: 'PowerShell',
+      aliases: ['powershell', 'ps', 'ps1'],
+    })
+    expect(options.supportedLanguages?.vbscript).toMatchObject({
+      name: 'VBScript',
+      aliases: ['vbscript', 'vbs', 'vb', 'vba', 'visual-basic', 'visualbasic'],
+    })
+    expect(options.supportedLanguages?.dart).toMatchObject({
+      name: 'Dart',
+      aliases: ['dart'],
+    })
+    expect(options.supportedLanguages?.hcl).toMatchObject({
+      name: 'HCL',
+      aliases: ['hcl'],
+    })
+    expect(options.supportedLanguages?.terraform).toMatchObject({
+      name: 'Terraform',
+      aliases: ['terraform', 'tf', 'tfvars'],
+    })
+    expect(options.supportedLanguages?.dockerfile).toMatchObject({
+      name: 'Dockerfile',
+      aliases: ['dockerfile', 'docker'],
+    })
+    expect(options.supportedLanguages?.php).toMatchObject({
+      name: 'PHP',
+      aliases: ['php'],
+    })
+  })
+
   it('loads the Go Shiki grammar for Go code blocks', async () => {
     vi.resetModules()
 
@@ -90,6 +127,21 @@ describe('editor schema code block highlighting', () => {
 
     await expect(highlighter?.loadLanguage('go')).resolves.toBeUndefined()
     expect(highlighter?.getLoadedLanguages()).toContain('go')
+  })
+
+  it.each([
+    ...EXTRA_CODE_BLOCK_LANGUAGES.map(language => [language.id, language.id]),
+    ['ps1', 'ps1'],
+    ['vb', 'vb'],
+    ['php', 'php'],
+  ])('loads the %s Shiki grammar for code blocks', async (language, loadedLanguage) => {
+    vi.resetModules()
+
+    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
+    const highlighter = await createTolariaCodeBlockOptions().createHighlighter?.()
+
+    await expect(highlighter?.loadLanguage(language)).resolves.toBeUndefined()
+    expect(highlighter?.getLoadedLanguages()).toContain(loadedLanguage)
   })
 
   it('omits the Shiki highlighter when WebKit lacks precompiled regex flags', async () => {

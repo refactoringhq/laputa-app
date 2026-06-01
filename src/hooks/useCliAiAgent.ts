@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { AiAgentId } from '../lib/aiAgents'
 import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
 import type { AiTarget } from '../lib/aiTargets'
@@ -12,10 +12,16 @@ import type { AgentFileCallbacks } from '../lib/aiAgentFileOperations'
 import {
   addAgentLocalMarker,
   clearAgentConversation,
+  regenerateAgentMessage,
   sendAgentMessage,
   type AiAgentSessionRuntime,
 } from '../lib/aiAgentSession'
 import type { ToolInvocation } from '../lib/aiAgentMessageState'
+import {
+  aiWorkspaceSessionDispatchers,
+  aiWorkspaceSessionSnapshot,
+  subscribeAiWorkspaceSession,
+} from '../lib/aiWorkspaceSessionStore'
 
 export type { AgentFileCallbacks } from '../lib/aiAgentFileOperations'
 export type { AgentStatus } from '../lib/aiAgentConversation'
@@ -26,6 +32,7 @@ interface UseCliAiAgentOptions {
   target?: AiTarget
   agentReady: boolean
   permissionMode: AiAgentPermissionMode
+  sessionId?: string
 }
 
 interface UseCliAiAgentRuntime extends AiAgentSessionRuntime {
@@ -65,6 +72,44 @@ function useCliAiAgentRuntime(fileCallbacks: AgentFileCallbacks | undefined): Us
   }
 }
 
+function useSharedCliAiAgentRuntime(
+  sessionId: string | undefined,
+  fileCallbacks: AgentFileCallbacks | undefined,
+): UseCliAiAgentRuntime {
+  const resolvedSessionId = sessionId ?? ''
+  const subscribe = useCallback((listener: () => void) => (
+    resolvedSessionId ? subscribeAiWorkspaceSession(resolvedSessionId, listener) : () => {}
+  ), [resolvedSessionId])
+  const getSnapshot = useCallback(() => aiWorkspaceSessionSnapshot(resolvedSessionId), [resolvedSessionId])
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const dispatchers = resolvedSessionId
+    ? aiWorkspaceSessionDispatchers(resolvedSessionId)
+    : { setMessages: () => {}, setStatus: () => {} }
+  const abortRef = useRef({ aborted: false })
+  const responseAccRef = useRef('')
+  const fileCallbacksRef = useRef(fileCallbacks)
+  const toolInputMapRef = useRef<Map<string, ToolInvocation>>(new Map())
+  const messagesRef = useRef<AiAgentMessage[]>(snapshot.messages)
+  const statusRef = useRef<AgentStatus>(snapshot.status)
+
+  useEffect(() => { messagesRef.current = snapshot.messages }, [snapshot.messages])
+  useEffect(() => { statusRef.current = snapshot.status }, [snapshot.status])
+  useEffect(() => { fileCallbacksRef.current = fileCallbacks }, [fileCallbacks])
+
+  return {
+    messages: snapshot.messages,
+    setMessages: dispatchers.setMessages,
+    status: snapshot.status,
+    setStatus: dispatchers.setStatus,
+    abortRef,
+    responseAccRef,
+    fileCallbacksRef,
+    toolInputMapRef,
+    messagesRef,
+    statusRef,
+  }
+}
+
 export function useCliAiAgent(
   vaultPath: string,
   vaultPaths: string[] | undefined,
@@ -72,27 +117,45 @@ export function useCliAiAgent(
   fileCallbacks: AgentFileCallbacks | undefined,
   options: UseCliAiAgentOptions,
 ) {
-  const { agent, agentReady, target } = options
+  const { agent, agentReady, sessionId, target } = options
   const { permissionMode } = options
-  const runtime = useCliAiAgentRuntime(fileCallbacks)
+  const localRuntime = useCliAiAgentRuntime(fileCallbacks)
+  const sharedRuntime = useSharedCliAiAgentRuntime(sessionId, fileCallbacks)
+  const runtime = sessionId ? sharedRuntime : localRuntime
   const { messages, status } = runtime
 
-  async function sendMessage(text: string, references?: NoteReference[]): Promise<void> {
+  async function buildAgentContext() {
     const agentDocsPath = await getAgentDocsPath()
 
+    return {
+      agent,
+      agentDocsPath,
+      target,
+      ready: agentReady,
+      vaultPath,
+      vaultPaths,
+      permissionMode,
+      systemPromptOverride: contextPrompt,
+    }
+  }
+
+  async function sendPrompt(text: string, references?: NoteReference[]): Promise<void> {
     await sendAgentMessage({
       runtime,
-      context: {
-        agent,
-        agentDocsPath,
-        target,
-        ready: agentReady,
-        vaultPath,
-        vaultPaths,
-        permissionMode,
-        systemPromptOverride: contextPrompt,
-      },
+      context: await buildAgentContext(),
       prompt: { text, references },
+    })
+  }
+
+  async function sendMessage(text: string, references?: NoteReference[]): Promise<void> {
+    await sendPrompt(text, references)
+  }
+
+  async function regenerateMessage(messageId: string): Promise<void> {
+    await regenerateAgentMessage({
+      runtime,
+      context: await buildAgentContext(),
+      messageId,
     })
   }
 
@@ -104,5 +167,5 @@ export function useCliAiAgent(
     addAgentLocalMarker(runtime, text)
   }
 
-  return { messages, status, sendMessage, clearConversation, addLocalMarker }
+  return { messages, status, sendMessage, regenerateMessage, clearConversation, addLocalMarker }
 }

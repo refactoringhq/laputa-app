@@ -60,6 +60,7 @@ files:
     command.note.changeType: 4a54ffd47ed1f65ee97f34bfe8c3de14
     command.note.moveToFolder: 3a0f26c42b9168ad839960d134065905
     command.note.copyDeepLink: 8de1795f59af124594dc4decf77909a1
+    command.note.exportPdf: 7a39acf8742a59d1a4f7ae064b6219a0
     command.note.openNewWindow: 6f67b2857093fa0fd45b1122dff4865d
     command.git.initialize: 54a57cdc7105db6fb22dca661ce01ad6
     command.git.commitPush: 8cb5faa4019716f43dd69c41496b1d46
@@ -305,7 +306,7 @@ files:
     ai.panel.empty.checkingDescription: 31e41510d851c366860377ba0c956f0b
     ai.panel.empty.missingTitle: a2b764da52cb43b191bb4ecfd8ea4d26
     ai.panel.empty.missingDescription: 91825c7d86b1d588d44a33e1d94af950
-    ai.panel.empty.withContextTitle: 66f02985937083e4ef62b98cc9f25aee
+    ai.panel.empty.withContextTitle: cea2547385aeeb68fa494bb3b09b98f5
     ai.panel.empty.noContextTitle: e919aeb0a49b58e494e43e5f6f6597c9
     ai.panel.empty.withContextDescription: dd8faefcc8160a2db800a41d6628facb
     ai.panel.empty.noContextDescription: 6a6e610835808016d1f2790c3f991a54
@@ -313,11 +314,20 @@ files:
     ai.panel.placeholder.missing: 547c492026d115608067988b7cfbb9a9
     ai.panel.placeholder.ready: 31f5265c2e0432a7ca10d08e5c6f3114
     ai.panel.send: 747c6a3564774149c989884e0c581d53
-    ai.workspace.title: d5b381672258b0bb54ede1e886895b3e
+    ai.message.regenerate: e464a5330788a9f79d06c96989f840cb
+    ai.message.copy: 53fa249ce3d02c8a686b657b31d02ee7
+    ai.message.fork: f5aace5e5b5e7b0954651a2da44b6755
+    ai.message.reasoning: 87a222577e9c7b7a0739d92337f4fe46
+    ai.message.toolUse: d6093cfe0c95f805875e5724eecd20aa
+    ai.workspace.title: 375099f0c804e924c1dc275370710d92
     ai.workspace.newChat: a917baaf1484ec5dc85f19ab8fc4f4e9
     ai.workspace.collapseSidebar: 9ecc763686b7c61547281f3e05ffd06f
     ai.workspace.expandSidebar: 281b619f3da2ba27e604302c3c00db56
     ai.workspace.close: 184649ab030e9a609488608221c28d8c
+    ai.workspace.expandPanel: edbe17b531457367c1412e4b6349c194
+    ai.workspace.restorePanel: 64eb6176c678c6b395cfc93bac02a16f
+    ai.workspace.restoreGuidance: 2bd339d85ee3b33e513359ce781b60cc
+    ai.workspace.closeChat: 6c5be35688a466297db40c3a65ac9805
     ai.workspace.popOut: 85ec25ec056b3082651e6e3fcfa57416
     ai.workspace.dock: 72e81ed23007ec6fb9820b9abec353c4
     ai.workspace.settings: 2c178b1d7a60a3c2b37ca4221d322899
@@ -327,7 +337,7 @@ files:
     ai.workspace.hideArchived: e7c72757d5bc7330d876eeb1b6ce9c53
     ai.workspace.noActiveChats: f0cdbf09f23eb9a2efbb5977bcc39c1a
     ai.workspace.noArchivedChats: 68410efd12fc0308ce1ed2225000d4d5
-    ai.workspace.chatTitle: 2ecae1c7ffb3296a789ff8f3b3ed2922
+    ai.workspace.chatTitle: 189013cfac88018c68ec02e8edc2379b
     ai.workspace.renameChat: 0feba25e166f55afc51c4ebb33d8d757
     ai.workspace.status.archived: 7d69b3cb4cada18ae61811304f8fbcb5
     ai.workspace.status.idle: e599161956d626eda4cb0a5ffb85271c
@@ -350,6 +360,10 @@ files:
     ai.workspace.target.installedVersion: 8677756d761e4cce240a637805482946
     ai.workspace.target.localModel: d34f4b997ce78da5aa57d657a5d6fcb5
     ai.workspace.target.apiModel: 589a257cbd265eaa7de93de8b4084dff
+    window.minimize: d27532d90ecd513e97ab811c0f34dbfd
+    window.maximize: 9369ba148ee259473fc1fb4939b6c2e8
+    window.restore: 2bd339d85ee3b33e513359ce781b60cc
+    window.close: d3d2e617335f08df83599665eef8a418
     mcp.setup.manageTitle: d786c7b9ab9b2406258648931bca0e01
     mcp.setup.setupTitle: b4b373f690c8a0008885b31e78e93a5c
     mcp.setup.connectedDescription: a2a3be70c0ac9fa7ef112df5252249fa
@@ -517,8 +531,11 @@ files:
     editor.toolbar.revealFile: 76f4ed52da9937ae432dcf5a108fabb4
     editor.toolbar.copyFilePath: 64c6cec5ca57efbb8c9c93ae5fbccd27
     editor.toolbar.copyNoteDeepLink: 0fff274a7c47e7c12457c0b7412e86ce
+    editor.toolbar.exportPdf: 7a39acf8742a59d1a4f7ae064b6219a0
     editor.toolbar.moreActions: 89e19353176b94068dec4c768c25e70b
     editor.toolbar.openProperties: 948b90b60b8ce827f179e8c5b85b112e
+    editor.exportPdf.unavailable: 2fce9834984172b64b66767485d815e9
+    editor.exportPdf.failed: bf3fa78ff5725f5cbde8979b67ec2e2a
     filePreview.copyDeepLink: b75833669968adbef634495636e3fe50
     deepLinks.copied: 6ada57681192daf3b4afa07ce7a30575
     deepLinks.error.ambiguousVault: 4365c6d5cf8c2c1165259b32d24a6274

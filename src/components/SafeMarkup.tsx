@@ -17,10 +17,13 @@ const MERMAID_SVG_SANITIZE_CONFIG = {
   HTML_INTEGRATION_POINTS: { foreignobject: true },
 }
 
+const KATEX_MARKUP_SANITIZE_CONFIG = {
+  // KaTeX uses inline SVG paths for stretched radicals such as \sqrt{x}.
+  USE_PROFILES: { html: true, mathMl: true, svg: true },
+}
+
 function importSanitizedMarkupNodes(markup: string): Node[] {
-  const sanitized = DOMPurify.sanitize(markup, {
-    USE_PROFILES: { html: true, mathMl: true },
-  })
+  const sanitized = DOMPurify.sanitize(markup, KATEX_MARKUP_SANITIZE_CONFIG)
   const parsed = new DOMParser().parseFromString(sanitized, 'text/html')
   return Array.from(parsed.body.childNodes, (node) => document.importNode(node, true))
 }

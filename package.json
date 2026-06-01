@@ -53,6 +53,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/react": "^10.47.0",
+    "@shikijs/langs": "3.23.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-deep-link": "2.4.9",

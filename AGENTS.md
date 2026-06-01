@@ -1,73 +1,22 @@
 # AGENTS.md — Tolaria App
 
-> Quick links: [Architecture](docs/ARCHITECTURE.md) · [Abstractions](docs/ABSTRACTIONS.md) · [Wireframes](ui-design.pen)
+## 1. Development Process
 
----
-
-## 1. Task Workflow
-
-### 1a. Pick up a task
-
-Run `/laputa-next-task` — fetches next task (To Rework first, then Open), moves to In Progress, returns full description.
+### Start working on a task
 
 **Before writing a single line of code:** run `mcp__codescene__code_health_score` to check the current codebase health against `.codescene-thresholds`. If the score is already below the threshold, **stop and refactor first** — find the worst files with the MCP, improve them, commit, then start the task. Never start feature work on a codebase that is already below the gate.
 
 - Read task description and all comments fully
 - For To Rework: the ❌ QA failed comment tells you exactly what to fix
 - Check `docs/adr/` for relevant architecture decisions before structural choices
-- Add a comment: `🚀 Starting work on this task. [Brief description of approach]`
-
-### 1b. Implement
-
-- Work on `main` branch — **no branches, no PRs, ever**. Pre-commit and pre-push block work from any other branch.
-- Commit every 20–30 min: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
-- **⛔ NEVER use --no-verify**
-- For UI tasks: open `ui-design.pen` first, study visual language, design in light mode. You don't need Pencil to use it – you can open it as a JSON file.
-
-### 1c. When done
-
-**Phase 1 — Playwright (only for core user flows):**
-
-Write Playwright test in `tests/smoke/<slug>.spec.ts` only if feature touches: vault open, note create/save/delete, search, wikilink navigation, git commit/push, conflict resolution. Tag a test with `@smoke` only if it protects a core pre-push workflow. Do NOT tag cosmetic or mock-heavy checks — keep those in the full regression lane. The curated `pnpm playwright:smoke` suite must stay under **5 minutes**; use `pnpm playwright:regression` for the full Playwright pass.
-
-```bash
-pnpm dev --port 5201 &
-sleep 3
-BASE_URL="http://localhost:5201" npx playwright test tests/smoke/<slug>.spec.ts
-```
-
-**Phase 2 — Native app QA:**
-
-```bash
-pnpm tauri dev &
-sleep 10
-bash ~/.openclaw/skills/tolaria-qa/scripts/focus-app.sh laputa
-bash ~/.openclaw/skills/tolaria-qa/scripts/screenshot.sh /tmp/qa-native.png
-```
-
-Use computer-use/browser-control style interaction for native UI QA when available: click, hover, drag, select, scroll, and type the way a real user would with the mouse and trackpad. For every UI feature, test the primary mouse-driven path first, then verify any relevant keyboard shortcut or keyboard-first workflow still works. Tolaria is still a keyboard-first app, but QA must not assume users only interact by keyboard.
-
-Use `osascript` for app focus, keyboard shortcuts, and keyboard-specific checks. **⚠️ WKWebView:** `osascript keystroke` can be blocked inside editor content — use computer use for native editor interaction when possible, and rely on Playwright for deterministic text-input coverage. Write result as Todoist comment (✅ or ❌).
-
-After both phases pass, add a **completion comment** to the Todoist task. The comment must include:
-- What was implemented (a few lines covering logic and UX/UI)
-- QA: what was tested and how (Playwright / native screenshot / osascript)
-- Tests/coverage: commands run and final coverage result
-- CodeScene: before/after touched-file checks plus final Hotspot and Average scores after push
-- Codacy: MCP/CLI scan summary; confirm no new Critical/High findings
-- Localization: `pnpm l10n:translate` + `pnpm l10n:validate` result, or "no UI copy changes"
-- PostHog: event name(s) added, or why no event was needed
-- Refactoring: any files refactored to meet the CodeScene gate (or "none needed")
-- ADRs: any new/updated ADRs (or "none")
-- Docs: any updated docs (ARCHITECTURE.md, ABSTRACTIONS.md, etc.) (or "none")
-
----
-
-## 2. Development Process
+- Check `docs/ARCHITECTURE.md` and `docs/ABSTRACTIONS.md` for relevant structural information
+- For UI tasks: study app visual language and components first. Prioritize reusing existing components, assets, and variables over recreating them.
+- If working on a Todoist task, add a comment: `🚀 Starting work on this task. [Brief description of approach]`
 
 ### Commits & pushes
 
 - Push directly to `main` — no PRs, no branches. Pre-push blocks non-`main` pushes.
+- Commit every 20–30 min: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - Pre-push hook runs full check suite (build + tests + core Playwright smoke + CodeScene)
 - **A task is NOT done until `git push origin main` succeeds.** If the hook blocks: read the error, fix it (clippy, tests, CodeScene, build), commit the fix, push again. **⛔ NEVER use --no-verify**
 
@@ -133,16 +82,46 @@ Coverage is a release gate, not a vanity metric:
 - For bug fixes, add a regression test when practical.
 - For new behavior, add targeted coverage close to the changed code; do not rely only on broad E2E coverage.
 
+### UI and native QA
+
+**Phase 1 — Playwright (only for core user flows):**
+
+Write Playwright test in `tests/smoke/<slug>.spec.ts` only if feature touches: vault open, note create/save/delete, search, wikilink navigation, git commit/push, conflict resolution. Tag a test with `@smoke` only if it protects a core pre-push workflow. Do NOT tag cosmetic or mock-heavy checks — keep those in the full regression lane. The curated `pnpm playwright:smoke` suite must stay under **5 minutes**; use `pnpm playwright:regression` for the full Playwright pass.
+
+```bash
+pnpm dev --port 5201 &
+sleep 3
+BASE_URL="http://localhost:5201" npx playwright test tests/smoke/<slug>.spec.ts
+```
+
+**Phase 2 — Native app QA:**
+
+```bash
+pnpm tauri dev &
+sleep 10
+bash ~/.openclaw/skills/tolaria-qa/scripts/focus-app.sh laputa
+bash ~/.openclaw/skills/tolaria-qa/scripts/screenshot.sh /tmp/qa-native.png
+```
+
+Use computer-use/browser-control style interaction for native UI QA when available: click, hover, drag, select, scroll, and type the way a real user would with the mouse and trackpad. For every UI feature, test the primary mouse-driven path first, then verify any relevant keyboard shortcut or keyboard-first workflow still works. Tolaria is still a keyboard-first app, but QA must not assume users only interact by keyboard.
+
+Use `osascript` for app focus, keyboard shortcuts, and keyboard-specific checks. **⚠️ WKWebView:** `osascript keystroke` can be blocked inside editor content — use computer use for native editor interaction when possible, and rely on Playwright for deterministic text-input coverage. Write result as Todoist comment (✅ or ❌).
+
 ### Release-readiness checklist
 
-Before pushing or moving a task to In Review, verify and mention the result in the Todoist completion comment:
+Before pushing or moving a task to In Review, verify the release gates and add a **completion comment** to the Todoist task. The comment must include:
 
-- CodeScene before/after checked for every touched/new scorable file; final Hotspot and Average pass `.codescene-thresholds`.
+- What was implemented (a few lines covering logic and UX/UI).
+- QA: what was tested and how (Playwright / native screenshot / osascript).
+- Tests/coverage: commands run and final coverage result.
+- CodeScene: before/after touched-file checks plus final Hotspot and Average scores after push; final scores must pass `.codescene-thresholds`.
 - Coverage commands passed (`pnpm test:coverage` and `cargo llvm-cov ... --fail-under-lines 85`) or the change is docs-only.
-- Codacy checked via MCP or `.codacy/cli.sh`; all new Critical/High issues fixed.
-- Localization checked: any user-facing copy lives in `src/lib/locales/en.json`, `pnpm l10n:translate` was run, and `pnpm l10n:validate` passes. If no copy changed, say “Localization: no UI copy changes”.
-- PostHog checked: meaningful new user actions/events are instrumented with safe metadata; noisy/minor changes explicitly say “PostHog: no event needed because …”.
-- Docs/ADRs checked under the rules below.
+- Codacy: MCP/CLI scan summary; confirm no new Critical/High findings.
+- Localization: any user-facing copy lives in `src/lib/locales/en.json`, `pnpm l10n:translate` was run, and `pnpm l10n:validate` passes. If no copy changed, say “Localization: no UI copy changes”.
+- PostHog: meaningful new user actions/events are instrumented with safe metadata; noisy/minor changes explicitly say “PostHog: no event needed because …”.
+- Refactoring: any files refactored to meet the CodeScene gate, or "none needed".
+- ADRs: any new/updated ADRs, or "none".
+- Docs: any updated docs (`ARCHITECTURE.md`, `ABSTRACTIONS.md`, etc.), or "none".
 - Demo vault dirt checked: `git status --short -- demo-vault demo-vault-v2` is empty unless fixture changes are intentional.
 
 ### ADRs & docs
@@ -153,7 +132,7 @@ After any Tauri command, new component/hook, data model change, or new integrati
 
 ---
 
-## 3. Product Rules
+## 2. Product Rules
 
 ### Demo vault hygiene (`demo-vault/`, `demo-vault-v2/`)
 
@@ -193,7 +172,7 @@ Default to `demo-vault-v2/`. If you must use `~/Laputa/` for testing:
 
 ---
 
-## 4. Reference
+## 3. Reference
 
 ### macOS / Tauri gotchas
 

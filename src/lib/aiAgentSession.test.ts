@@ -5,6 +5,7 @@ const {
   buildAgentSystemPromptMock,
   createStreamCallbacksMock,
   formatMessageWithHistoryMock,
+  hydrateNoteReferencesMock,
   nextMessageIdMock,
   streamAiAgentMock,
   trackEventMock,
@@ -13,6 +14,7 @@ const {
   buildAgentSystemPromptMock: vi.fn(() => 'SYSTEM'),
   createStreamCallbacksMock: vi.fn(() => ({ stream: 'callbacks' })),
   formatMessageWithHistoryMock: vi.fn((_history: unknown, prompt: string) => `formatted:${prompt}`),
+  hydrateNoteReferencesMock: vi.fn(async (references: unknown) => references),
   nextMessageIdMock: vi.fn(),
   streamAiAgentMock: vi.fn(async () => {}),
   trackEventMock: vi.fn(),
@@ -36,6 +38,10 @@ vi.mock('./aiAgentStreamCallbacks', () => ({
 
 vi.mock('../utils/streamAiAgent', () => ({
   streamAiAgent: streamAiAgentMock,
+}))
+
+vi.mock('../utils/ai-reference-content', () => ({
+  hydrateNoteReferences: hydrateNoteReferencesMock,
 }))
 
 vi.mock('./telemetry', () => ({
@@ -120,7 +126,14 @@ function expectStreamingRuntimeState(session: RuntimeFixture): void {
 
 function expectFormattedHistoryUsed(): void {
   expect(trimHistoryMock).toHaveBeenCalledWith(expectedChatHistory, 100_000)
-  expect(formatMessageWithHistoryMock).toHaveBeenCalledWith(expectedChatHistory, 'Latest question')
+  expect(formatMessageWithHistoryMock).toHaveBeenCalledWith(
+    expectedChatHistory,
+    expect.stringContaining('Latest question'),
+  )
+  expect(formatMessageWithHistoryMock).toHaveBeenCalledWith(
+    expectedChatHistory,
+    expect.stringContaining('/vault/ref.md'),
+  )
 }
 
 function expectStreamingRequest(runtime: RuntimeFixture['runtime']): void {
@@ -132,7 +145,7 @@ function expectStreamingRequest(runtime: RuntimeFixture['runtime']): void {
   }))
   expect(streamAiAgentMock).toHaveBeenCalledWith({
     agent: 'codex',
-    message: 'formatted:Latest question',
+    message: expect.stringContaining('formatted:Latest question'),
     systemPrompt: 'SYSTEM',
     vaultPath: '/vault',
     permissionMode: 'power_user',
@@ -148,6 +161,7 @@ describe('aiAgentSession', () => {
     formatMessageWithHistoryMock.mockImplementation((_history: unknown, prompt: string) => `formatted:${prompt}`)
     trimHistoryMock.mockImplementation((history: unknown) => history)
     streamAiAgentMock.mockResolvedValue(undefined)
+    hydrateNoteReferencesMock.mockImplementation(async (references: unknown) => references)
     trackEventMock.mockClear()
   })
 
@@ -255,6 +269,7 @@ describe('aiAgentSession', () => {
     })
 
     expectStreamingRuntimeState(session)
+    expect(hydrateNoteReferencesMock).toHaveBeenCalledWith([{ path: '/vault/ref.md', title: 'Ref' }])
     expectFormattedHistoryUsed()
     expect(buildAgentSystemPromptMock).toHaveBeenCalledWith({
       agent: 'codex',

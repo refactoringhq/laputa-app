@@ -7,6 +7,8 @@ import { seedBlockNoteTable, triggerMenuCommand } from './testBridge'
 let tempVaultDir: string
 const TABLE_RELOAD_NOTE_PATH = '/project/table-reload-regression.md'
 const TABLE_RELOAD_NOTE_TITLE = 'Table Reload Regression'
+const ONE_CELL_TABLE_NOTE_PATH = '/project/one-cell-table-click-regression.md'
+const ONE_CELL_TABLE_NOTE_TITLE = 'One Cell Table Click Regression'
 const TABLE_WIKILINK_NOTE_PATH = '/table-wikilink-regression.md'
 const TABLE_WIKILINK_NOTE_TITLE = 'Table Wikilink Regression'
 const TABLE_WIKILINK_TARGET = 'application-design-and-build'
@@ -32,6 +34,25 @@ status: draft
 | --- | --- | --- |
 | A | B | C |
 | D | E | F |
+`,
+  )
+}
+
+function writeOneCellTableNote(vaultDir: string): void {
+  fs.writeFileSync(
+    path.join(vaultDir, ONE_CELL_TABLE_NOTE_PATH.slice(1)),
+    `---
+title: ${ONE_CELL_TABLE_NOTE_TITLE}
+isA: Project
+status: draft
+---
+# ${ONE_CELL_TABLE_NOTE_TITLE}
+
+| Requirement |
+| --- |
+| M shall include the Minimum Data Set (MDS) 3.0. |
+
+After table.
 `,
   )
 }
@@ -333,6 +354,38 @@ test.describe('table hover crash regression', () => {
 
     const editor = page.getByRole('textbox').last()
     await expect(editor).toContainText('stable after table reload')
+    await expect(page.locator('table')).toHaveCount(1)
+    expect(errors).toEqual([])
+  })
+
+  test('clicking a saved one-cell table after reload keeps the editor stable', async ({ page }) => {
+    const errors = trackUnexpectedErrors(page)
+
+    writeOneCellTableNote(tempVaultDir)
+    await openFixtureVaultTauri(page, tempVaultDir)
+    const tableReloadNote = page
+      .getByTestId('note-list-container')
+      .locator('[data-note-path]')
+      .filter({ hasText: ONE_CELL_TABLE_NOTE_TITLE })
+      .first()
+    await expect(tableReloadNote).toBeVisible({ timeout: 5_000 })
+    await tableReloadNote.click()
+
+    await expect(page.locator('table tr')).toHaveCount(2, { timeout: 5_000 })
+    await expect(tableCell(page, 1, 0)).toContainText('M shall include the Minimum Data Set (MDS) 3.0.')
+    await triggerMenuCommand(page, 'file-save')
+    await triggerMenuCommand(page, 'vault-reload')
+
+    await expect(page.locator('div.tableWrapper')).toBeVisible({ timeout: 5_000 })
+    await moveAcrossElement(page, 'div.tableWrapper')
+    await tableCell(page, 1, 0).click()
+
+    const trailingParagraph = page.locator('.bn-editor [data-content-type="paragraph"]').last()
+    await trailingParagraph.click()
+    await page.keyboard.type('stable after one-cell table reload')
+
+    const editor = page.getByRole('textbox').last()
+    await expect(editor).toContainText('stable after one-cell table reload')
     await expect(page.locator('table')).toHaveCount(1)
     expect(errors).toEqual([])
   })

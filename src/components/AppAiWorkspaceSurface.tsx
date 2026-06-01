@@ -18,10 +18,12 @@ interface AppAiWorkspaceSurfaceProps {
   defaultAiAgentReady: boolean
   defaultAiTarget?: AiTarget
   entries: VaultEntry[]
+  initialActiveConversationId?: string
   locale: AppLocale
-  mode: 'docked' | 'window'
+  mode: 'docked' | 'side' | 'window'
   noteList: NoteListItem[]
   noteListFilter: { type: string | null; query: string }
+  onActiveConversationChange?: (id: string) => void
   onClose: () => void
   onConversationSettingsChange?: (conversations: AiWorkspaceConversationSetting[]) => void
   onDock?: () => void
@@ -29,7 +31,7 @@ interface AppAiWorkspaceSurfaceProps {
   onFileModified?: (relativePath: string) => void
   onOpenAiSettings?: () => void
   onOpenNote?: (path: string) => void
-  onPopOut?: () => void
+  onPopOut?: (context?: { activeConversationId?: string }) => void
   onRestoreVaultAiGuidance?: () => void
   onUnsupportedAiPaste?: (message: string) => void
   onVaultChanged?: () => void
@@ -52,10 +54,12 @@ export function AppAiWorkspaceSurface({
   defaultAiAgentReady,
   defaultAiTarget,
   entries,
+  initialActiveConversationId,
   locale,
   mode,
   noteList,
   noteListFilter,
+  onActiveConversationChange,
   onClose,
   onConversationSettingsChange,
   onDock,
@@ -85,12 +89,14 @@ export function AppAiWorkspaceSurface({
       defaultAiTarget={defaultAiTarget}
       defaultAiAgentReadiness={defaultAiAgentReadiness}
       defaultAiAgentReady={defaultAiAgentReady}
+      initialActiveConversationId={initialActiveConversationId}
       activeEntry={activeEntry}
       activeNoteContent={activeNoteContent}
       entries={entries}
       openTabs={openTabs}
       noteList={noteList}
       noteListFilter={noteListFilter}
+      onActiveConversationChange={onActiveConversationChange}
       onClose={onClose}
       onConversationSettingsChange={onConversationSettingsChange}
       onDock={onDock}

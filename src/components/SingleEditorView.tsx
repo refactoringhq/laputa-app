@@ -52,12 +52,14 @@ import { findNearestTextCursorBlock } from './blockNoteCursorTarget'
 import { ImageLightbox } from './ImageLightbox'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
+import { subscribeRichEditorExternalChange } from './editorExternalChangeEvents'
 import {
   activatePlainTextPasteTarget,
   registerPlainTextPasteTarget,
   type PlainTextPasteTarget,
 } from '../utils/plainTextPaste'
 import {
+  blockNoteRenderRecoveryReason,
   isRecoverableBlockNoteRenderError,
   markRecoveredBlockNoteRenderError,
 } from './blockNoteRenderRecovery'
@@ -130,12 +132,13 @@ class BlockNoteRenderRecoveryBoundary extends Component<{
   }
 
   componentDidCatch(error: unknown) {
-    if (!isRecoverableBlockNoteRenderError(error)) return
+    const reason = blockNoteRenderRecoveryReason(error)
+    if (!reason) return
     if (this.state.retries >= MAX_BLOCKNOTE_RENDER_RECOVERY_RETRIES) return
 
     const attempt = this.state.retries + 1
     markRecoveredBlockNoteRenderError(error)
-    trackEvent('editor_render_recovered', { reason: 'block_missing_id', attempt })
+    trackEvent('editor_render_recovered', { reason, attempt })
     this.props.onRecover?.(attempt)
     this.setState(({ recoveryKey, retries }) => ({
       error: null,
@@ -1342,6 +1345,10 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
   useEffect(() => {
     _wikilinkEntriesRef.current = entries
   }, [entries])
+
+  useEffect(() => {
+    return subscribeRichEditorExternalChange(editor, handleEditorChange)
+  }, [editor, handleEditorChange])
 
   useEffect(() => {
     const container = containerRef.current

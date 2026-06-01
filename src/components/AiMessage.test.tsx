@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AiMessage } from './AiMessage'
 
@@ -6,10 +6,22 @@ vi.mock('./MarkdownContent', () => ({
   MarkdownContent: ({ content }: { content: string }) => <div data-testid="markdown-content">{content}</div>,
 }))
 
+const writeClipboardText = vi.fn()
+
+vi.mock('../utils/clipboardText', () => ({
+  writeClipboardText: (text: string) => writeClipboardText(text),
+}))
+
 describe('AiMessage', () => {
+  beforeEach(() => {
+    writeClipboardText.mockReset()
+    writeClipboardText.mockResolvedValue(undefined)
+  })
+
   it('renders user message', () => {
-    render(<AiMessage userMessage="Hello AI" actions={[]} />)
+    const { container } = render(<AiMessage userMessage="Hello AI" actions={[]} />)
     expect(screen.getByText('Hello AI')).toBeTruthy()
+    expect(container.querySelector('[style*="background: var(--state-hover)"]')).toBeTruthy()
   })
 
   it('renders response as markdown', () => {
@@ -18,9 +30,27 @@ describe('AiMessage', () => {
     expect(screen.getByText('Here is the **answer**')).toBeTruthy()
   })
 
-  it('shows undo button with response', () => {
+  it('shows assistant message actions with response', () => {
     render(<AiMessage userMessage="Ask" actions={[]} response="Done" />)
-    expect(screen.getByTestId('undo-button')).toBeTruthy()
+    expect(screen.getByTestId('ai-message-actions')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Regenerate response' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Copy response' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Fork chat from here' })).toBeTruthy()
+  })
+
+  it('localizes reasoning and tool use chrome', () => {
+    render(
+      <AiMessage
+        userMessage="Fai qualcosa"
+        locale="it-IT"
+        reasoning="Sto pensando..."
+        reasoningDone
+        actions={[{ tool: 'search_notes', toolId: 't1', label: 'Cercato', status: 'done' }]}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: /ragionamento/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /uso degli strumenti/i })).toBeTruthy()
   })
 
   it('shows reasoning expanded while streaming (reasoningDone=false)', () => {
@@ -52,7 +82,7 @@ describe('AiMessage', () => {
     expect(screen.queryByTestId('reasoning-content')).toBeNull()
   })
 
-  it('renders action cards', () => {
+  it('collapses tool use by default and shows the live call count', () => {
     render(
       <AiMessage
         userMessage="Do something"
@@ -62,6 +92,14 @@ describe('AiMessage', () => {
         ]}
       />,
     )
+    expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByTestId('tool-use-count').textContent).toBe('2')
+    expect(screen.getByTestId('tool-use-count')).toHaveAttribute('data-pending', 'true')
+    expect(screen.queryByTestId('ai-action-card')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+
+    expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getAllByTestId('ai-action-card')).toHaveLength(2)
   })
 
@@ -74,6 +112,7 @@ describe('AiMessage', () => {
         onOpenNote={onOpenNote}
       />,
     )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
     fireEvent.click(screen.getByTestId('action-card-header'))
     expect(onOpenNote).toHaveBeenCalledWith('/vault/note.md')
   })
@@ -90,6 +129,29 @@ describe('AiMessage', () => {
       <AiMessage userMessage="Ask" actions={[]} response="Done" isStreaming />,
     )
     expect(container.querySelector('.typing-dot')).toBeNull()
+  })
+
+  it('runs assistant message actions', () => {
+    const onRegenerate = vi.fn()
+    const onFork = vi.fn()
+    render(
+      <AiMessage
+        userMessage="Ask"
+        actions={[]}
+        messageId="message-1"
+        response="Done"
+        onFork={onFork}
+        onRegenerate={onRegenerate}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate response' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy response' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Fork chat from here' }))
+
+    expect(onRegenerate).toHaveBeenCalledWith('message-1')
+    expect(writeClipboardText).toHaveBeenCalledWith('Done')
+    expect(onFork).toHaveBeenCalledWith('message-1')
   })
 
   it('does not render reasoning block when no reasoning', () => {
@@ -153,6 +215,7 @@ describe('AiMessage', () => {
         ]}
       />,
     )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
     const headers = screen.getAllByTestId('action-card-header')
     // Both collapsed initially
     expect(screen.queryByTestId('action-card-details')).toBeNull()

@@ -1,6 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-
-const COMMAND_INPUT = 'input[placeholder="Type a command..."]'
+import { executeCommand, openCommandPalette } from './helpers'
 
 type Handler = (args?: Record<string, unknown>) => unknown
 type RemoteArgs = {
@@ -17,33 +16,6 @@ type BrowserWindow = Window &
     __remoteConnected?: boolean
     __addRemoteCalls?: string[]
   }
-
-async function openCommandPalette(page: Page): Promise<void> {
-  await page.keyboard.press('Control+k')
-  await expect(page.locator(COMMAND_INPUT)).toBeVisible()
-}
-
-async function executeCommand(page: Page, name: string): Promise<void> {
-  await page.locator(COMMAND_INPUT).fill(name)
-  await expect(page.locator('[data-selected="true"]').first()).toContainText(name, {
-    timeout: 2_000,
-  })
-  await page.keyboard.press('Enter')
-}
-
-async function focusStatusChip(page: Page, testId: string): Promise<void> {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    await page.keyboard.press('Tab')
-    const focused = await page.evaluate((expected) => {
-      const active = document.activeElement as HTMLElement | null
-      return active?.dataset?.testid === expected
-    }, testId)
-
-    if (focused) return
-  }
-
-  throw new Error(`Could not focus ${testId} with keyboard navigation`)
-}
 
 function installRemoteMocksScript() {
   const browserWindow = window as BrowserWindow
@@ -102,8 +74,10 @@ async function installRemoteMocks(page: Page): Promise<void> {
 }
 
 async function openAddRemoteFromStatusChip(page: Page): Promise<void> {
-  await expect(page.getByTestId('status-no-remote')).toContainText('No remote')
-  await focusStatusChip(page, 'status-no-remote')
+  const statusChip = page.getByTestId('status-no-remote')
+  await expect(statusChip).toContainText('No remote')
+  await statusChip.focus()
+  await expect(statusChip).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('add-remote-modal')).toBeVisible()
   await expect(page.getByTestId('add-remote-url')).toBeFocused()

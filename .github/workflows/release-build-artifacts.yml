@@ -1,0 +1,567 @@
+name: Release build artifacts
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      macos_bundles:
+        required: false
+        type: string
+        default: ""
+      upload_macos_dmg:
+        required: true
+        type: boolean
+      require_windows_authenticode:
+        required: false
+        type: boolean
+        default: true
+
+env:
+  # Bump this when Tauri/Rust target artifacts capture stale absolute paths.
+  RUST_TARGET_CACHE_VERSION: v2026-04-14-tolaria
+  # The production Vite bundle can exceed Node's default ~2GB heap on
+  # macOS arm64 runners while Tauri runs beforeBuildCommand.
+  NODE_OPTIONS: --max-old-space-size=4096
+
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: aarch64
+            target: aarch64-apple-darwin
+          - arch: x86_64
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Setup Bun (required for bundle-qmd.sh)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-release-cargo-${{ matrix.target }}-${{ env.RUST_TARGET_CACHE_VERSION }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-release-cargo-${{ matrix.target }}-${{ env.RUST_TARGET_CACHE_VERSION }}-
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Clear cached bundle artifacts
+        run: |
+          rm -rf src-tauri/target/${{ matrix.target }}/release/bundle
+
+      - name: Set version
+        run: |
+          VERSION="${{ inputs.version }}"
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+          sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+
+      - name: Import Apple Developer certificate into keychain
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/apple_cert.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/laputa-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Validate telemetry env
+        env:
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
+        run: |
+          python3 <<'PY'
+          import os
+          import re
+          import sys
+          from urllib.parse import urlparse
+
+          DISALLOWED_PLACEHOLDERS = {
+              "",
+              "-",
+              "_",
+              "false",
+              "true",
+              "null",
+              "undefined",
+              "none",
+              "disabled",
+          }
+
+          def normalize(name: str) -> str:
+              value = os.getenv(name, "").strip()
+              if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+                  value = value[1:-1].strip()
+              return value
+
+          def normalize_http_like(value: str) -> str:
+              if "://" in value:
+                  return value
+              return f"https://{value}"
+
+          def normalize_hostname(hostname: str) -> str:
+              normalized = hostname.strip().rstrip('.').lower()
+              if normalized.startswith('[') and normalized.endswith(']'):
+                  normalized = normalized[1:-1]
+              return normalized
+
+          def is_ip_address(hostname: str) -> bool:
+              if re.fullmatch(r"(?:\d{1,3}\.){3}\d{1,3}", hostname):
+                  return all(0 <= int(part) <= 255 for part in hostname.split('.'))
+              return ':' in hostname and re.fullmatch(r"[\da-f:]+", hostname, re.IGNORECASE) is not None
+
+          def is_allowed_hostname(hostname: str) -> bool:
+              normalized = normalize_hostname(hostname)
+              if not normalized or normalized in DISALLOWED_PLACEHOLDERS:
+                  return False
+              if normalized == 'localhost':
+                  return True
+              return '.' in normalized or is_ip_address(normalized)
+
+          def is_http_url(value: str) -> bool:
+              parsed = urlparse(normalize_http_like(value))
+              return parsed.scheme in {"http", "https"} and is_allowed_hostname(parsed.hostname or "")
+
+          values = {
+              name: normalize(name)
+              for name in (
+                  "VITE_SENTRY_DSN",
+                  "SENTRY_DSN",
+                  "VITE_POSTHOG_KEY",
+                  "VITE_POSTHOG_HOST",
+              )
+          }
+          errors = []
+
+          for name in ("VITE_SENTRY_DSN", "SENTRY_DSN", "VITE_POSTHOG_HOST"):
+              value = values[name]
+              if value.lower() in DISALLOWED_PLACEHOLDERS:
+                  errors.append(f"{name} must be set to a real value, not a placeholder")
+              elif not is_http_url(value):
+                  errors.append(f"{name} must be a valid http(s) URL with a non-placeholder host")
+
+          if values["VITE_POSTHOG_KEY"].lower() in DISALLOWED_PLACEHOLDERS:
+              errors.append("VITE_POSTHOG_KEY must be set to a real project API key, not a placeholder")
+
+          if errors:
+              print("Telemetry env validation failed:", file=sys.stderr)
+              for error in errors:
+                  print(f"- {error}", file=sys.stderr)
+              raise SystemExit(1)
+
+          print("Telemetry env validation passed.")
+          PY
+
+      - name: Build Tauri app (with signing + notarization)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ inputs.version }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
+        run: |
+          MACOS_BUNDLES="${{ inputs.macos_bundles }}"
+          if [ -n "$MACOS_BUNDLES" ]; then
+            pnpm tauri build --target ${{ matrix.target }} --bundles "$MACOS_BUNDLES"
+          else
+            pnpm tauri build --target ${{ matrix.target }}
+          fi
+
+      - name: Upload .dmg
+        if: ${{ inputs.upload_macos_dmg }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-${{ matrix.arch }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+          retention-days: 1
+
+      - name: Upload updater artifacts (.tar.gz + .sig)
+        uses: actions/upload-artifact@v4
+        with:
+          name: updater-${{ matrix.arch }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz.sig
+          retention-days: 1
+
+  build-linux:
+    name: Build (linux-x86_64)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            fcitx5-frontend-gtk3 \
+            libfuse2 \
+            librsvg2-dev \
+            curl \
+            wget \
+            patchelf \
+            build-essential \
+            file \
+            rpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-release-cargo-x86_64-unknown-linux-gnu-${{ env.RUST_TARGET_CACHE_VERSION }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-release-cargo-x86_64-unknown-linux-gnu-${{ env.RUST_TARGET_CACHE_VERSION }}-
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Clear cached bundle artifacts
+        run: |
+          rm -rf src-tauri/target/x86_64-unknown-linux-gnu/release/bundle
+
+      - name: Set version
+        run: |
+          VERSION="${{ inputs.version }}"
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+
+      - name: Build Tauri app (Linux bundles)
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ inputs.version }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
+        run: |
+          pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
+
+      - name: Validate Linux bundles
+        run: |
+          shopt -s nullglob
+          appimages=(
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+          )
+          installers=(
+            "${appimages[@]}"
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
+          )
+          signatures=(
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.tar.gz.sig
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb.sig
+          )
+          if [ ${#appimages[@]} -eq 0 ]; then
+            echo "::error::Linux build produced no AppImage bundle."
+            exit 1
+          fi
+          if [ ${#installers[@]} -eq 0 ]; then
+            echo "::error::Linux build produced no AppImage, deb or rpm bundle."
+            exit 1
+          fi
+          if [ ${#signatures[@]} -eq 0 ]; then
+            echo "::error::Linux build produced no updater signature (.sig) artifact."
+            exit 1
+          fi
+
+      - name: Upload Linux bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-bundles
+          path: |
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb.sig
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.tar.gz
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.tar.gz.sig
+          if-no-files-found: error
+          retention-days: 1
+
+  build-windows:
+    name: Build (windows-x86_64)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.cargo\registry
+            ~\.cargo\git
+            src-tauri\target
+          key: ${{ runner.os }}-release-cargo-x86_64-pc-windows-msvc-${{ env.RUST_TARGET_CACHE_VERSION }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-release-cargo-x86_64-pc-windows-msvc-${{ env.RUST_TARGET_CACHE_VERSION }}-
+
+      - name: Cache Tauri Windows tools
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\tauri
+          key: ${{ runner.os }}-tauri-tools-nsis-3.11-nsis-tauri-utils-0.5.3
+
+      - name: Prefetch Tauri NSIS toolchain
+        shell: pwsh
+        run: ./.github/scripts/prefetch-tauri-nsis.ps1
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Clear cached Windows bundle artifacts
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
+
+      - name: Set version
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          $tauri = Get-Content "src-tauri/tauri.conf.json" | ConvertFrom-Json
+          $tauri.version = $version
+          $tauri | ConvertTo-Json -Depth 100 | Set-Content "src-tauri/tauri.conf.json"
+          (Get-Content "src-tauri/Cargo.toml") -replace '^version = ".*"$', "version = `"$version`"" | Set-Content "src-tauri/Cargo.toml"
+
+      - name: Validate Windows release env
+        id: windows-signing
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          WINDOWS_CODE_SIGNING_CERTIFICATE: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE }}
+          WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD }}
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          REQUIRE_WINDOWS_AUTHENTICODE: ${{ inputs.require_windows_authenticode }}
+        run: |
+          for name in TAURI_SIGNING_PRIVATE_KEY TAURI_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required to build signed Windows updater artifacts."
+              exit 1
+            fi
+          done
+
+          has_certificate=false
+          has_password=false
+          if [ -n "$WINDOWS_CODE_SIGNING_CERTIFICATE" ] || [ -n "$WINDOWS_CERTIFICATE" ]; then
+            has_certificate=true
+          fi
+          if [ -n "$WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD" ] || [ -n "$WINDOWS_CERTIFICATE_PASSWORD" ]; then
+            has_password=true
+          fi
+
+          if [ "$has_certificate" != "$has_password" ]; then
+            echo "::error::Windows Authenticode signing is partially configured. Set both certificate and password secrets, or remove both for unsigned alpha Windows artifacts."
+            exit 1
+          fi
+
+          if [ "$has_certificate" = "true" ]; then
+            echo "authenticode_available=true" >> "$GITHUB_OUTPUT"
+          elif [ "$REQUIRE_WINDOWS_AUTHENTICODE" = "true" ]; then
+            echo "::error::WINDOWS_CODE_SIGNING_CERTIFICATE or WINDOWS_CERTIFICATE is required to Authenticode-sign Windows installers."
+            exit 1
+          else
+            echo "::warning::Windows Authenticode certificate secrets are not configured. Building alpha Windows artifacts without Authenticode signatures; Tauri updater signatures are still required."
+            echo "authenticode_available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare Windows Authenticode signing
+        if: ${{ steps.windows-signing.outputs.authenticode_available == 'true' }}
+        shell: pwsh
+        env:
+          WINDOWS_CODE_SIGNING_CERTIFICATE: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE }}
+          WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD }}
+          WINDOWS_CODE_SIGNING_CERTIFICATE_THUMBPRINT: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE_THUMBPRINT }}
+          WINDOWS_CODE_SIGNING_TIMESTAMP_URL: ${{ secrets.WINDOWS_CODE_SIGNING_TIMESTAMP_URL }}
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          WINDOWS_CERTIFICATE_THUMBPRINT: ${{ secrets.WINDOWS_CERTIFICATE_THUMBPRINT }}
+          WINDOWS_TIMESTAMP_URL: ${{ secrets.WINDOWS_TIMESTAMP_URL }}
+        run: ./.github/scripts/configure-windows-authenticode.ps1
+
+      - name: Build Tauri app (Windows bundles)
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ inputs.version }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
+        run: |
+          if ("${{ steps.windows-signing.outputs.authenticode_available }}" -eq "true") {
+            pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.windows-signing.conf.json
+          } else {
+            pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis
+          }
+
+      - name: Validate Windows Authenticode signatures
+        if: ${{ steps.windows-signing.outputs.authenticode_available == 'true' }}
+        shell: pwsh
+        run: |
+          $expectedThumbprint = $env:WINDOWS_CODE_SIGNING_CERTIFICATE_THUMBPRINT
+          if ([string]::IsNullOrWhiteSpace($expectedThumbprint)) {
+            throw "WINDOWS_CODE_SIGNING_CERTIFICATE_THUMBPRINT was not exported by the signing setup step."
+          }
+          $expectedThumbprint = ($expectedThumbprint -replace "\s", "").ToUpperInvariant()
+          $paths = @()
+          $paths += Get-ChildItem -Path "src-tauri/target/x86_64-pc-windows-msvc/release" -Filter "*.exe" -File -ErrorAction SilentlyContinue
+          $paths += Get-ChildItem -Path "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis" -Filter "*.exe" -File -ErrorAction SilentlyContinue
+          $paths += Get-ChildItem -Path "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi" -Filter "*.msi" -File -ErrorAction SilentlyContinue
+          $paths = @($paths | Sort-Object FullName -Unique)
+          if ($paths.Count -eq 0) {
+            throw "No Windows executable or installer artifacts found to verify."
+          }
+          foreach ($path in $paths) {
+            $signature = Get-AuthenticodeSignature -FilePath $path.FullName
+            if ($signature.Status -ne "Valid") {
+              throw "Invalid Authenticode signature for $($path.FullName): $($signature.Status)"
+            }
+            if ($null -eq $signature.SignerCertificate) {
+              throw "Missing signer certificate for $($path.FullName)."
+            }
+            $actualThumbprint = ($signature.SignerCertificate.Thumbprint -replace "\s", "").ToUpperInvariant()
+            if ($actualThumbprint -ne $expectedThumbprint) {
+              throw "Unexpected signer thumbprint for $($path.FullName): $actualThumbprint"
+            }
+            Write-Host "Authenticode signature OK: $($path.FullName)"
+          }
+
+      - name: Validate Windows bundles
+        shell: bash
+        run: |
+          shopt -s nullglob
+          installers=(
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+          )
+          signatures=(
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe.sig
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip.sig
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi.sig
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi.zip.sig
+          )
+          if [ ${#installers[@]} -eq 0 ]; then
+            echo "::error::Windows build produced no installable NSIS or MSI bundle."
+            exit 1
+          fi
+          for installer in "${installers[@]}"; do
+            if [[ "$(basename "$installer")" != *"${{ inputs.version }}"* ]]; then
+              echo "::error::Windows build produced an installer for a different version: $(basename "$installer")"
+              exit 1
+            fi
+          done
+          if [ ${#signatures[@]} -eq 0 ]; then
+            echo "::error::Windows build produced no updater signature (.sig) artifact."
+            exit 1
+          fi
+
+      - name: Upload Windows bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64-bundles
+          path: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe.sig
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.zip
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.zip.sig
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi.sig
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.zip
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.zip.sig
+          if-no-files-found: error
+          retention-days: 1

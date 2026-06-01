@@ -90,8 +90,8 @@ type NoteItemRowState = 'binary' | 'multiSelected' | 'selected' | 'highlighted' 
 type NoteItemSurfaceProps = {
   className: string
   style: CSSProperties
-  onClick: MouseEventHandler<HTMLButtonElement>
-  onContextMenu?: MouseEventHandler<HTMLButtonElement>
+  onClick: MouseEventHandler<HTMLDivElement>
+  onContextMenu?: MouseEventHandler<HTMLDivElement>
   onMouseEnter?: () => void
   title?: string
   testId?: string
@@ -458,19 +458,24 @@ function resolveNoteItemSurfaceProps({
 function NoteItemRow({
   surfaceProps,
   entryPath,
+  isSelected,
+  isMultiSelected,
   isHighlighted,
   changeStatus,
   children,
 }: {
   surfaceProps: NoteItemSurfaceProps
   entryPath: string
+  isSelected: boolean
+  isMultiSelected: boolean
   isHighlighted: boolean
   changeStatus: NoteItemProps['changeStatus']
   children: ReactNode
 }) {
   return (
-    <button
-      type="button"
+    <div
+      role="option"
+      aria-selected={isSelected || isMultiSelected}
       className={surfaceProps.className}
       style={surfaceProps.style}
       onClick={surfaceProps.onClick}
@@ -483,7 +488,7 @@ function NoteItemRow({
       title={surfaceProps.title}
     >
       {children}
-    </button>
+    </div>
   )
 }
 
@@ -566,6 +571,8 @@ export function NoteItem({ entry, isSelected, isMultiSelected = false, isHighlig
     <NoteItemRow
       surfaceProps={surfaceProps}
       entryPath={entry.path}
+      isSelected={isSelected}
+      isMultiSelected={isMultiSelected}
       isHighlighted={isHighlighted}
       changeStatus={changeStatus}
     >

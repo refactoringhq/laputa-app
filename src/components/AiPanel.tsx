@@ -1,7 +1,6 @@
 import { useCallback, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import {
   AiPanelComposer,
-  AiPanelContextBar,
   AiPanelHeader,
   AiPanelMessageHistory,
 } from './AiPanelChrome'
@@ -58,8 +57,12 @@ interface AiPanelViewProps {
   entries?: VaultEntry[]
   interactive?: boolean
   showHeader?: boolean
+  showLeftBorder?: boolean
+  surface?: 'default' | 'sidebar'
   composerControls?: ReactNode
+  onForkMessage?: (messageId: string) => void
   onSendPrompt?: (text: string) => void
+  onMessageHistoryScrollStateChange?: (scrolled: boolean) => void
 }
 
 function readinessFromReadyFlag(ready: boolean | undefined): AiAgentReadiness {
@@ -95,14 +98,16 @@ function resolveAiPanelViewModel({
   }
 }
 
-function aiPanelFrameStyle(isActive: boolean): CSSProperties {
+function aiPanelFrameStyle(isActive: boolean, showLeftBorder: boolean): CSSProperties {
   return {
     outline: 'none',
-    borderLeft: isActive
-      ? '2px solid var(--accent-blue)'
-      : '1px solid var(--border)',
-    animation: isActive ? 'ai-border-pulse 2s ease-in-out infinite' : undefined,
-    transition: 'border-color 0.3s ease',
+    borderLeft: showLeftBorder
+      ? isActive
+        ? '2px solid var(--accent-blue)'
+        : '1px solid var(--border)'
+      : undefined,
+    animation: showLeftBorder && isActive ? 'ai-border-pulse 2s ease-in-out infinite' : undefined,
+    transition: showLeftBorder ? 'border-color 0.3s ease' : undefined,
   }
 }
 
@@ -110,17 +115,21 @@ function AiPanelFrame({
   children,
   isActive,
   panelRef,
+  showLeftBorder,
+  surface,
 }: {
   children: ReactNode
   isActive: boolean
   panelRef: RefObject<HTMLElement | null>
+  showLeftBorder: boolean
+  surface: 'default' | 'sidebar'
 }) {
   return (
     <aside
       ref={panelRef}
       tabIndex={-1}
-      className="flex flex-1 flex-col overflow-hidden bg-background text-foreground"
-      style={aiPanelFrameStyle(isActive)}
+      className={`flex flex-1 flex-col overflow-hidden ${surface === 'sidebar' ? 'bg-sidebar text-sidebar-foreground' : 'bg-background text-foreground'}`}
+      style={aiPanelFrameStyle(isActive, showLeftBorder)}
       data-testid="ai-panel"
       data-ai-active={isActive || undefined}
     >
@@ -139,12 +148,15 @@ export function AiPanelView({
   defaultAiAgentReadiness: providedDefaultAiAgentReadiness,
   defaultAiAgentReady: providedDefaultAiAgentReady,
   locale = 'en',
-  activeEntry,
   entries,
   interactive = true,
   showHeader = true,
+  showLeftBorder = true,
+  surface = 'default',
   composerControls,
+  onForkMessage,
   onSendPrompt,
+  onMessageHistoryScrollStateChange,
 }: AiPanelViewProps) {
   const view = resolveAiPanelViewModel({
     defaultAiAgent: providedDefaultAiAgent,
@@ -158,7 +170,6 @@ export function AiPanelView({
     agent,
     input,
     setInput,
-    linkedEntries,
     hasContext,
     isActive,
     permissionMode,
@@ -184,7 +195,7 @@ export function AiPanelView({
   }, [handleSend, isActive, onSendPrompt])
 
   return (
-    <AiPanelFrame panelRef={panelRef} isActive={isActive}>
+    <AiPanelFrame panelRef={panelRef} isActive={isActive} showLeftBorder={showLeftBorder} surface={surface}>
       {showHeader && (
         <AiPanelHeader
           agentLabel={view.agentLabel}
@@ -198,17 +209,17 @@ export function AiPanelView({
           onNewChat={handleNewChat}
         />
       )}
-      {activeEntry && (
-        <AiPanelContextBar activeEntry={activeEntry} linkedCount={linkedEntries.length} locale={locale} />
-      )}
       <AiPanelMessageHistory
         agentLabel={view.agentLabel}
         agentReadiness={view.defaultAiAgentReadiness}
         locale={locale}
         messages={agent.messages}
         isActive={isActive}
+        onForkMessage={onForkMessage}
         onOpenNote={onOpenNote}
         onNavigateWikilink={handleNavigateWikilink}
+        onRegenerateMessage={agent.regenerateMessage}
+        onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
       />
       <AiPanelComposer

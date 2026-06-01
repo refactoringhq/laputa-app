@@ -1,5 +1,6 @@
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../appCommandCatalog'
 import { buildEditorFindCommands } from './editorFindCommands'
+import { translate, type AppLocale } from '../../lib/i18n'
 import type { ImmediateCreateOptions } from '../useNoteCreation'
 import type { CommandAction } from './types'
 
@@ -41,6 +42,8 @@ interface NoteCommandsConfig {
   isOrganized?: boolean
   onRestoreDeletedNote?: () => void
   canRestoreDeletedNote?: boolean
+  locale?: AppLocale
+  onExportNoteAsPdf?: () => void
 }
 
 interface NoteCommandConfig {
@@ -287,6 +290,13 @@ function buildFileActionCommands(config: NoteCommandsConfig): CommandAction[] {
       keywords: ['deeplink', 'deep link', 'url', 'link', 'copy', 'clipboard'],
       enabled: !!config.onCopyActiveDeepLink,
       run: (path) => config.onCopyActiveDeepLink?.(path),
+    }),
+    createNoteCommand({
+      id: 'export-note-pdf',
+      label: translate(config.locale ?? 'en', 'editor.toolbar.exportPdf'),
+      keywords: ['export', 'pdf', 'print', 'share', 'archive'],
+      enabled: config.hasActiveNote && activeFileKind === 'markdown' && !!config.onExportNoteAsPdf,
+      execute: () => config.onExportNoteAsPdf?.(),
     }),
     buildActivePathCommand(config, {
       id: 'open-active-file-external',

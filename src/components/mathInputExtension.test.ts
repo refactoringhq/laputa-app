@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { createMathInputExtension } from './mathInputExtension'
 import { trackEvent } from '../lib/telemetry'
+import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE } from '../utils/mathMarkdown'
 
 vi.mock('../lib/telemetry', () => ({
   trackEvent: vi.fn(),
@@ -21,8 +22,24 @@ function createTransaction() {
   return transaction
 }
 
+function createMathNode(type: string, latex: string, nodeSize = 1) {
+  return {
+    attrs: { latex },
+    nodeSize,
+    type: { name: type },
+  }
+}
+
 function createView(beforeText: string, transaction: ReturnType<typeof createTransaction>) {
   const mathNode = { nodeSize: 1 }
+  const textNodeFor = vi.fn((text: string) => ({ text, type: 'text' }))
+  const paragraphNodeType = {
+    createChecked: vi.fn((attrs: Record<string, unknown>, content: unknown) => ({
+      attrs,
+      content,
+      type: 'paragraph',
+    })),
+  }
   const selection = {
     from: beforeText.length,
     to: beforeText.length,
@@ -36,48 +53,76 @@ function createView(beforeText: string, transaction: ReturnType<typeof createTra
     },
   }
   const mathNodeType = { createChecked: vi.fn(() => mathNode) }
+  const docNodes: Array<{ node: ReturnType<typeof createMathNode>; pos: number }> = []
+  const doc = {
+    content: { size: 100 },
+    nodesBetween: vi.fn((
+      from: number,
+      to: number,
+      visit: (node: ReturnType<typeof createMathNode>, pos: number) => boolean | void,
+    ) => {
+      for (const item of docNodes) {
+        const nodeEnd = item.pos + item.node.nodeSize
+        if (nodeEnd < from || item.pos > to) continue
+        if (visit(item.node, item.pos) === false) return
+      }
+    }),
+  }
   const view = {
     composing: false,
     dispatch: vi.fn(),
+    posAtDOM: vi.fn(() => 0),
     state: {
-      schema: { nodes: { mathInline: mathNodeType } },
+      doc,
+      schema: {
+        nodes: {
+          mathInline: mathNodeType,
+          paragraph: paragraphNodeType,
+        },
+        text: textNodeFor,
+      },
       selection,
       storedMarks: null as Array<{ type: { name: string } }> | null,
       tr: transaction,
     },
   }
 
-  return { mathNode, mathNodeType, view }
+  return { docNodes, mathNode, mathNodeType, paragraphNodeType, textNodeFor, view }
 }
 
-function createDom(registerBeforeInput: (listener: (event: InputEvent) => void) => void) {
+function createDom(registerListener: (type: string, listener: EventListener) => void) {
   const dom = {
-    addEventListener: vi.fn((type: string, listener: (event: InputEvent) => void) => {
-      if (type === 'beforeinput') {
-        registerBeforeInput(listener)
-      }
+    addEventListener: vi.fn((type: string, listener: EventListener) => {
+      registerListener(type, listener)
     }),
   }
   return dom
 }
 
 function createFixture(beforeText = 'Inline $x^2$') {
-  let beforeInputListener: ((event: InputEvent) => void) | null = null
+  const listeners = new Map<string, EventListener>()
   const transaction = createTransaction()
-  const { mathNode, mathNodeType, view } = createView(beforeText, transaction)
-  const dom = createDom((listener) => {
-    beforeInputListener = listener
+  const { docNodes, mathNode, mathNodeType, paragraphNodeType, textNodeFor, view } = createView(beforeText, transaction)
+  const dom = createDom((type, listener) => {
+    listeners.set(type, listener)
   })
+  dom.addEventListener.mockImplementation((type: string, listener: EventListener) => {
+    listeners.set(type, listener)
+  })
+  const setTextSelection = vi.fn()
   const editor = {
-    _tiptapEditor: { view },
+    _tiptapEditor: { commands: { setTextSelection }, view },
     prosemirrorView: view,
   }
   const extension = createMathInputExtension()({ editor: editor as never })
 
   return {
+    docNodes,
     dom,
+    editor,
     extension,
     fireInput(event: Partial<InputEvent> = {}) {
+      const beforeInputListener = listeners.get('beforeinput')
       if (!beforeInputListener) {
         throw new Error('Math input extension did not register a beforeinput listener')
       }
@@ -93,6 +138,37 @@ function createFixture(beforeText = 'Inline $x^2$') {
       beforeInputListener(inputEvent as InputEvent)
       return inputEvent
     },
+    fireKeyDown(event: Partial<KeyboardEvent> = {}) {
+      const keyDownListener = listeners.get('keydown')
+      if (!keyDownListener) {
+        throw new Error('Math input extension did not register a keydown listener')
+      }
+
+      const keyDownEvent = {
+        key: 'F2',
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+        ...event,
+      }
+
+      keyDownListener(keyDownEvent as KeyboardEvent)
+      return keyDownEvent
+    },
+    fireMathDoubleClick(target: EventTarget) {
+      const doubleClickListener = listeners.get('dblclick')
+      if (!doubleClickListener) {
+        throw new Error('Math input extension did not register a dblclick listener')
+      }
+
+      const event = {
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+        target,
+      }
+
+      doubleClickListener(event as unknown as MouseEvent)
+      return event
+    },
     mathNode,
     mathNodeType,
     mount() {
@@ -104,6 +180,9 @@ function createFixture(beforeText = 'Inline $x^2$') {
       })
       return controller
     },
+    paragraphNodeType,
+    setTextSelection,
+    textNodeFor,
     transaction,
     view,
   }
@@ -197,5 +276,103 @@ describe('createMathInputExtension', () => {
     expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
       reason: 'transform_error',
     })
+  })
+
+  it('restores rendered inline math source on double click', () => {
+    const fixture = createFixture()
+    const latex = 'x^2'
+    const mathElement = document.createElement('span')
+    mathElement.className = 'math math--inline'
+    mathElement.dataset.latex = latex
+    const glyphText = document.createTextNode('x')
+    mathElement.append(glyphText)
+    const renderedNode = createMathNode(MATH_INLINE_TYPE, latex)
+    fixture.docNodes.push({ node: renderedNode, pos: 7 })
+    fixture.view.posAtDOM.mockReturnValue(7)
+    fixture.mount()
+
+    const event = fixture.fireMathDoubleClick(glyphText)
+
+    expect(fixture.textNodeFor).toHaveBeenCalledWith('$x^2$')
+    expect(fixture.transaction.replaceWith).toHaveBeenCalledWith(7, 8, {
+      text: '$x^2$',
+      type: 'text',
+    })
+    expect(fixture.transaction.scrollIntoView).toHaveBeenCalled()
+    expect(fixture.view.dispatch).toHaveBeenCalledWith(fixture.transaction)
+    expect(fixture.setTextSelection).toHaveBeenCalledWith({ from: 8, to: 11 })
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+    expect(event.stopPropagation).toHaveBeenCalledTimes(1)
+    expect(trackEvent).toHaveBeenCalledWith('math_source_edit_reopened', {
+      activation: 'pointer',
+      math_mode: 'inline',
+    })
+  })
+
+  it('leaves rendered block math intact on double click', () => {
+    const fixture = createFixture()
+    const latex = '\\sqrt{x}'
+    const mathElement = document.createElement('span')
+    mathElement.className = 'math math--block'
+    mathElement.dataset.latex = latex
+    const renderedNode = createMathNode(MATH_BLOCK_TYPE, latex)
+    fixture.docNodes.push({ node: renderedNode, pos: 20 })
+    fixture.view.posAtDOM.mockReturnValue(20)
+    fixture.mount()
+
+    const event = fixture.fireMathDoubleClick(mathElement)
+
+    expect(fixture.transaction.replaceWith).not.toHaveBeenCalled()
+    expect(fixture.setTextSelection).not.toHaveBeenCalled()
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(event.stopPropagation).not.toHaveBeenCalled()
+    expect(trackEvent).not.toHaveBeenCalledWith('math_source_edit_reopened', {
+      activation: 'pointer',
+      math_mode: 'block',
+    })
+  })
+
+  it('restores selected math source from the keyboard', () => {
+    const fixture = createFixture()
+    const latex = 'E=mc^2'
+    const selectedNode = createMathNode(MATH_INLINE_TYPE, latex)
+    fixture.view.state.selection = {
+      from: 12,
+      node: selectedNode,
+      to: 13,
+    }
+    fixture.mount()
+
+    const event = fixture.fireKeyDown({ key: 'Enter' })
+
+    expect(fixture.transaction.replaceWith).toHaveBeenCalledWith(12, 13, {
+      text: '$E=mc^2$',
+      type: 'text',
+    })
+    expect(fixture.setTextSelection).toHaveBeenCalledWith({ from: 13, to: 19 })
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+    expect(event.stopPropagation).toHaveBeenCalledTimes(1)
+    expect(trackEvent).toHaveBeenCalledWith('math_source_edit_reopened', {
+      activation: 'keyboard',
+      math_mode: 'inline',
+    })
+  })
+
+  it('leaves selected block math intact from the keyboard', () => {
+    const fixture = createFixture()
+    const selectedNode = createMathNode(MATH_BLOCK_TYPE, '\\sqrt{x}')
+    fixture.view.state.selection = {
+      from: 12,
+      node: selectedNode,
+      to: 13,
+    }
+    fixture.mount()
+
+    const event = fixture.fireKeyDown({ key: 'Enter' })
+
+    expect(fixture.transaction.replaceWith).not.toHaveBeenCalled()
+    expect(fixture.setTextSelection).not.toHaveBeenCalled()
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(event.stopPropagation).not.toHaveBeenCalled()
   })
 })

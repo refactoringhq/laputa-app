@@ -145,6 +145,39 @@ describe('aiAgentStreamCallbacks', () => {
     expect(output).toContain('[Tool output truncated: 50 chars omitted]')
   })
 
+  it('repairs missing sentence boundaries between streamed text chunks', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Question',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const responseAccRef = { current: '' }
+
+    const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef,
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onText("I'll create the Project note now.")
+    callbacks.onText('Created [[Tolaria Mobile]] as a Project note with a relation to [[frontend]].')
+    callbacks.onText('It covers three tech stack paths.')
+    callbacks.onDone()
+
+    expect(messages.getMessages()[0].response).toBe(
+      "I'll create the Project note now. Created [[Tolaria Mobile]] as a Project note with a relation to [[frontend]]. It covers three tech stack paths.",
+    )
+  })
+
   it('marks pending actions as failed when the stream errors', () => {
     const messages = createMessageStore([
       {

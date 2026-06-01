@@ -137,6 +137,7 @@ describe('SettingsPanel', () => {
       opencode: { status: 'missing', version: null },
       pi: { status: 'missing', version: null },
       gemini: { status: 'missing', version: null },
+      kiro: { status: 'missing', version: null },
     }
     render(
       <SettingsPanel

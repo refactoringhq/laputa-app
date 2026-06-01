@@ -19,8 +19,6 @@ function prepareRightPanelOpen(
   {
     closeTableOfContents,
     inspectorCollapsed,
-    onToggleAIChat,
-    onToggleInspector,
     showAIChat,
   }: RightPanelToggleOptions,
 ) {
@@ -28,8 +26,6 @@ function prepareRightPanelOpen(
   if (panel === 'ai' && showAIChat) return
 
   closeTableOfContents()
-  if (panel === 'properties' && showAIChat) onToggleAIChat?.()
-  if (panel === 'ai' && !inspectorCollapsed) onToggleInspector()
 }
 
 function toggleTableOfContentsPanel({

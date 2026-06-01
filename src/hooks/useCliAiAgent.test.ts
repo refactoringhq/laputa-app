@@ -4,6 +4,10 @@ import { useCliAiAgent } from './useCliAiAgent'
 import { streamAiAgent } from '../utils/streamAiAgent'
 import { buildAgentSystemPrompt } from '../utils/ai-agent'
 import { getAgentDocsPath } from '../lib/agentDocsPath'
+import {
+  cloneAiWorkspaceSessionUntilMessage,
+  resetAiWorkspaceSessionStoreForTests,
+} from '../lib/aiWorkspaceSessionStore'
 
 vi.mock('../utils/streamAiAgent', () => ({
   streamAiAgent: vi.fn(),
@@ -25,12 +29,14 @@ const VAULT = '/Users/luca/Laputa'
 function renderAgent(
   contextPrompt: string | undefined = undefined,
   permissionMode: 'safe' | 'power_user' = 'safe',
+  sessionId?: string,
 ) {
   return renderHook(
     ({ context }) => useCliAiAgent(VAULT, [VAULT, '/Users/luca/Brian'], context, undefined, {
       agent: 'codex',
       agentReady: true,
       permissionMode,
+      sessionId,
     }),
     { initialProps: { context: contextPrompt } },
   )
@@ -40,6 +46,7 @@ describe('useCliAiAgent', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetAgentDocsPath.mockResolvedValue('/app/agent-docs')
+    resetAiWorkspaceSessionStoreForTests()
     mockStreamAiAgent.mockImplementation(async ({ callbacks }) => {
       callbacks.onText('reply')
       callbacks.onDone()
@@ -138,6 +145,62 @@ describe('useCliAiAgent', () => {
     const freshMessage = mockStreamAiAgent.mock.calls[2][0].message
     expect(freshMessage).toBe('fresh start')
     expect(freshMessage).not.toContain('<conversation_history>')
+  })
+
+  it('restores workspace session messages after remounting the same chat', async () => {
+    const firstSession = renderAgent(undefined, 'safe', 'chat-1')
+
+    await act(async () => { await firstSession.result.current.sendMessage('Remember this') })
+    expect(firstSession.result.current.messages).toEqual([expect.objectContaining({
+      userMessage: 'Remember this',
+      response: 'reply',
+    })])
+
+    firstSession.unmount()
+    const secondSession = renderAgent(undefined, 'safe', 'chat-1')
+
+    expect(secondSession.result.current.messages).toEqual([expect.objectContaining({
+      userMessage: 'Remember this',
+      response: 'reply',
+    })])
+  })
+
+  it('regenerates a selected message without duplicating the old response', async () => {
+    let responseNumber = 0
+    mockStreamAiAgent.mockImplementation(async ({ callbacks }) => {
+      responseNumber += 1
+      callbacks.onText(`Response ${responseNumber}`)
+      callbacks.onDone()
+    })
+    const { result } = renderAgent()
+
+    await act(async () => { await result.current.sendMessage('Q1') })
+    await act(async () => { await result.current.sendMessage('Q2') })
+    const messageId = result.current.messages[1]?.id ?? ''
+
+    await act(async () => { await result.current.regenerateMessage(messageId) })
+
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ userMessage: 'Q1', response: 'Response 1' }),
+      expect.objectContaining({ userMessage: 'Q2', response: 'Response 3' }),
+    ])
+    expect(result.current.messages).toHaveLength(2)
+  })
+
+  it('clones a workspace session through a selected message', async () => {
+    const sourceSession = renderAgent(undefined, 'safe', 'chat-source')
+
+    await act(async () => { await sourceSession.result.current.sendMessage('First') })
+    await act(async () => { await sourceSession.result.current.sendMessage('Second') })
+    const firstMessageId = sourceSession.result.current.messages[0]?.id ?? ''
+    expect(firstMessageId).not.toBe('')
+
+    cloneAiWorkspaceSessionUntilMessage('chat-source', 'chat-fork', firstMessageId)
+    const forkSession = renderAgent(undefined, 'safe', 'chat-fork')
+
+    expect(forkSession.result.current.messages).toEqual([
+      expect.objectContaining({ userMessage: 'First', response: 'reply' }),
+    ])
   })
 
   it('adds a local response instead of streaming when the selected agent is unavailable', async () => {

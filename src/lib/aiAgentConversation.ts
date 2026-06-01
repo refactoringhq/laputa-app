@@ -8,7 +8,7 @@ import {
   trimHistory,
   type ChatMessage,
 } from '../utils/ai-chat'
-import type { NoteReference } from '../utils/ai-context'
+import { formatPromptWithReferences, type NoteReference } from '../utils/ai-context'
 import type { AiAgentId } from './aiAgents'
 import { getAiAgentDefinition } from './aiAgents'
 import type { AiAgentPermissionMode } from './aiAgentPermissionMode'
@@ -123,9 +123,10 @@ export function buildFormattedMessage(
   })
   const chatHistory = toChatHistory(messages.filter((message) => !message.isStreaming))
   const trimmedHistory = trimHistory(chatHistory, MAX_HISTORY_TOKENS)
+  const promptText = formatPromptWithReferences(prompt.text, prompt.references)
 
   return {
-    formattedMessage: formatMessageWithHistory(trimmedHistory, prompt.text),
+    formattedMessage: formatMessageWithHistory(trimmedHistory, promptText),
     systemPrompt,
   }
 }

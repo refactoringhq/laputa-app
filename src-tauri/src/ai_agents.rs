@@ -73,6 +73,8 @@ pub struct AiAgentStreamRequest {
     #[serde(default)]
     pub vault_paths: Vec<String>,
     pub permission_mode: Option<AiAgentPermissionMode>,
+    #[serde(default)]
+    pub event_name: Option<String>,
 }
 
 impl AiAgentStreamRequest {
@@ -260,6 +262,7 @@ mod tests {
             vault_path: "/tmp/vault".into(),
             vault_paths: Vec::new(),
             permission_mode,
+            event_name: None,
         }
     }
 

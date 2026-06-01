@@ -55,6 +55,7 @@ interface InlineWikilinkInputProps {
   submitOnEmpty?: boolean
   disabled?: boolean
   placeholder?: string
+  placeholderClassName?: string
   inputRef?: React.RefObject<HTMLDivElement | null>
   dataTestId?: string
   editorClassName?: string
@@ -189,6 +190,7 @@ export function InlineWikilinkInput({
   submitOnEmpty = false,
   disabled = false,
   placeholder,
+  placeholderClassName,
   inputRef,
   dataTestId = 'agent-input',
   editorClassName,
@@ -538,6 +540,7 @@ export function InlineWikilinkInput({
       disabled={disabled}
       inputRef={setCombinedRef}
       dataTestId={dataTestId}
+      placeholderClassName={placeholderClassName}
       editorClassName={editorClassName}
       editorStyle={editorStyle}
       onCompositionEnd={handleCompositionEnd}

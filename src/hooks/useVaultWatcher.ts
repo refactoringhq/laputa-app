@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { isTauri } from '../mock-tauri'
+import { cleanupTauriEventListener } from '../utils/tauriEventCleanup'
 import { isPathInsideVaultRoot } from '../utils/vaultPathContainment'
 
 export const VAULT_CHANGED_EVENT = 'vault-changed'
@@ -261,12 +262,6 @@ function handleWatcherEvent({
   if (root) enqueueChangedPaths(root, event.payload.paths ?? [])
 }
 
-function cleanupNativeWatcherListener(unlisten: UnlistenFn): void {
-  void Promise.resolve()
-    .then(unlisten)
-    .catch(() => {})
-}
-
 function usePendingVaultRefresh({
   onVaultChanged,
   filterChangedPaths,
@@ -340,7 +335,7 @@ function useNativeVaultWatcher({
       handleWatcherEvent({ event, roots: watchRoots, enqueueChangedPaths })
     }).then((nextUnlisten) => {
       if (cancelled) {
-        cleanupNativeWatcherListener(nextUnlisten)
+        cleanupTauriEventListener(nextUnlisten)
       } else {
         unlisten = nextUnlisten
       }
@@ -357,7 +352,7 @@ function useNativeVaultWatcher({
     return () => {
       cancelled = true
       clearPendingRefresh()
-      if (unlisten) cleanupNativeWatcherListener(unlisten)
+      cleanupTauriEventListener(unlisten)
       void invoke('stop_vault_watcher').catch(() => {})
     }
   }, [watchRoots, watchRootsKey, enqueueChangedPaths, clearPendingRefresh])

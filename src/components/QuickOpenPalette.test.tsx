@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QuickOpenPalette } from './QuickOpenPalette'
 import type { VaultEntry } from '../types'
 
@@ -82,7 +82,7 @@ describe('QuickOpenPalette', () => {
     expect(screen.getByText('No matching notes')).toBeInTheDocument()
   })
 
-  it('creates a note from an unmatched query when pressing Enter', () => {
+  it('creates a note from an unmatched query when pressing Enter', async () => {
     const onCreateNote = vi.fn()
     render(
       <QuickOpenPalette
@@ -98,9 +98,34 @@ describe('QuickOpenPalette', () => {
     expect(screen.getByText('Create note "New Research Brief"')).toBeInTheDocument()
     fireEvent.keyDown(window, { key: 'Enter' })
 
-    expect(onCreateNote).toHaveBeenCalledWith('New Research Brief')
+    await waitFor(() => {
+      expect(onCreateNote).toHaveBeenCalledWith('New Research Brief')
+    })
     expect(onSelect).not.toHaveBeenCalled()
-    expect(onClose).toHaveBeenCalled()
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled()
+    })
+  })
+
+  it('keeps the palette open when unmatched note creation is rejected', async () => {
+    const onCreateNote = vi.fn().mockResolvedValue(false)
+    render(
+      <QuickOpenPalette
+        open={true}
+        entries={entries}
+        onSelect={onSelect}
+        onCreateNote={onCreateNote}
+        onClose={onClose}
+      />,
+    )
+    fireEvent.change(screen.getByPlaceholderText('Search notes...'), { target: { value: 'Externally Created Note' } })
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(onCreateNote).toHaveBeenCalledWith('Externally Created Note')
+    })
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('shows type badge for entries with isA', () => {

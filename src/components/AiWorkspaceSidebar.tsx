@@ -5,7 +5,6 @@ import {
   Check,
   CircleNotch,
   Plus,
-  Robot,
   SidebarSimple,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
@@ -85,12 +84,9 @@ function SidebarHeader({
           <SidebarSimple size={16} />
         </Button>
         {!collapsed && (
-          <>
-            <Robot size={16} className="shrink-0 text-muted-foreground" />
-            <span className="truncate text-[13px] font-semibold text-foreground">
-              {translate(locale, 'ai.workspace.title')}
-            </span>
-          </>
+          <span className="truncate text-[13px] font-semibold text-foreground">
+            {translate(locale, 'ai.workspace.title')}
+          </span>
         )}
       </div>
       {!collapsed && (
@@ -255,14 +251,14 @@ function ConversationRow({
           variant="ghost"
           size="sm"
           className={cn(
-            'min-w-0 flex-1 justify-start gap-2 rounded-md px-2 pr-8 text-left text-[12px]',
+            'min-w-0 flex-1 justify-start gap-2 rounded-md px-2 pr-2 text-left text-[12px] transition-[padding] group-hover:pr-8 group-focus-within:pr-8',
             active ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
           )}
           aria-pressed={active}
           onClick={() => onSelect(conversation.id)}
           onDoubleClick={() => onStartEditing(conversation.id)}
         >
-          <span className="truncate">{conversation.title}</span>
+          <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
           <span className="ml-auto flex shrink-0 items-center">
             <SidebarStatusIndicator status={status} />
           </span>

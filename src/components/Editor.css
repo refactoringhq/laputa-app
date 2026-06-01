@@ -302,6 +302,97 @@ body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadc
   padding-right: clamp(24px, 4vw, 72px);
 }
 
+@page {
+  margin: 18mm;
+}
+
+@media print {
+  html:has(body.tolaria-note-pdf-exporting),
+  body.tolaria-note-pdf-exporting {
+    background: #fff !important;
+    color: #111 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  body.tolaria-note-pdf-exporting * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    visibility: hidden !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(.app__sidebar, .app__note-list, .breadcrumb-bar, .editor-memory-probe) {
+    display: none !important;
+  }
+
+  body.tolaria-note-pdf-exporting .editor > .relative > :not(:has([data-note-pdf-export-root="true"])) {
+    display: none !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(#root, .app-shell, .app, .app__editor, .editor, .editor > .relative, .editor-content-width--normal, .editor-content-width--wide, .editor-scroll-area) {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    width: auto !important;
+  }
+
+  body.tolaria-note-pdf-exporting [data-note-pdf-export-root="true"],
+  body.tolaria-note-pdf-exporting [data-note-pdf-export-root="true"] * {
+    visibility: visible !important;
+  }
+
+  body.tolaria-note-pdf-exporting [data-note-pdf-export-root="true"] {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body.tolaria-note-pdf-exporting .editor__blocknote-container,
+  body.tolaria-note-pdf-exporting .bn-container,
+  body.tolaria-note-pdf-exporting .bn-editor {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body.tolaria-note-pdf-exporting .bn-editor {
+    padding: 0 !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(.bn-block-outer, figure, table, pre, .math-block-shell, .mermaid-diagram, .tldraw-whiteboard) {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.tolaria-note-pdf-exporting :is(img, svg, canvas) {
+    max-width: 100% !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(a, .wikilink) {
+    color: #111 !important;
+    text-decoration: underline !important;
+  }
+
+  body.tolaria-note-pdf-exporting .bn-block-content[data-content-type="codeBlock"] {
+    border-color: #d0d7de !important;
+    background: #f6f8fa !important;
+    color: #111 !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(.editor__code-block-copy, .mermaid-diagram__expand-button, .tldraw-whiteboard__resize-handle, .tlui-layout, .tlui-popover, [data-radix-popper-content-wrapper]) {
+    display: none !important;
+  }
+}
+
 .raw-editor-codemirror {
   width: 100%;
   margin: 0;

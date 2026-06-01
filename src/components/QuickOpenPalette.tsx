@@ -13,14 +13,15 @@ interface QuickOpenPaletteProps {
   entries: VaultEntry[]
   isLoading?: boolean
   onSelect: (entry: VaultEntry) => void
-  onCreateNote?: (title: string) => unknown
+  onCreateNote?: (title: string) => unknown | Promise<unknown>
   onClose: () => void
   locale?: AppLocale
 }
 
 interface QuickOpenCreateActionProps {
   title: string
-  onCreate: () => void
+  onCreate: () => void | Promise<void>
+  disabled: boolean
   locale: AppLocale
 }
 
@@ -28,14 +29,15 @@ function quickOpenEmptyMessage(isLoading: boolean, locale: AppLocale): string {
   return isLoading ? translate(locale, 'status.vault.reloading') : translate(locale, 'noteList.empty.noMatching')
 }
 
-function QuickOpenCreateAction({ title, onCreate, locale }: QuickOpenCreateActionProps) {
+function QuickOpenCreateAction({ title, onCreate, disabled, locale }: QuickOpenCreateActionProps) {
   return (
     <div className="border-t border-border p-2">
       <Button
         type="button"
         variant="ghost"
         className="h-9 w-full justify-start gap-2 px-2 text-sm"
-        onClick={onCreate}
+        disabled={disabled}
+        onClick={() => { void onCreate() }}
       >
         <Plus size={14} className="shrink-0" />
         <span className="truncate">{translate(locale, 'noteList.quickOpenCreate', { title })}</span>
@@ -57,15 +59,21 @@ function useQuickOpenCreateAction({
   onCreateNote?: (title: string) => unknown
   onClose: () => void
 }) {
+  const [isCreating, setIsCreating] = useState(false)
   const title = query.trim()
   const canCreate = Boolean(onCreateNote && title && !isLoading && resultCount === 0)
-  const create = useCallback(() => {
-    if (!canCreate) return
-    onCreateNote?.(title)
-    onClose()
-  }, [canCreate, title, onCreateNote, onClose])
+  const create = useCallback(async () => {
+    if (!canCreate || isCreating) return
+    setIsCreating(true)
+    try {
+      const result = await onCreateNote?.(title)
+      if (result !== false) onClose()
+    } finally {
+      setIsCreating(false)
+    }
+  }, [canCreate, isCreating, title, onCreateNote, onClose])
 
-  return { canCreate, create, title }
+  return { canCreate, create, title, isCreating }
 }
 
 function useQuickOpenKeyboard({
@@ -83,7 +91,7 @@ function useQuickOpenKeyboard({
   onSelect: (entry: VaultEntry) => void
   onClose: () => void
   handleKeyDown: (e: KeyboardEvent) => void
-  createFromQuery: () => void
+  createFromQuery: () => void | Promise<void>
 }) {
   useEffect(() => {
     if (!open) return
@@ -99,7 +107,7 @@ function useQuickOpenKeyboard({
           onSelect(selected.entry)
           onClose()
         } else {
-          createFromQuery()
+          void createFromQuery()
         }
       }
     }
@@ -176,7 +184,14 @@ export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, o
           emptyMessage={quickOpenEmptyMessage(isLoading, locale)}
           className="flex-1 overflow-y-auto"
         />
-        {createAction.canCreate && <QuickOpenCreateAction title={createAction.title} onCreate={createAction.create} locale={locale} />}
+        {createAction.canCreate && (
+          <QuickOpenCreateAction
+            title={createAction.title}
+            onCreate={createAction.create}
+            disabled={createAction.isCreating}
+            locale={locale}
+          />
+        )}
       </div>
     </div>
   )

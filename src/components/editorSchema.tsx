@@ -16,7 +16,7 @@ import {
   VideoBlock,
   VideoToExternalHTML,
 } from '@blocknote/react'
-import { lazy, Suspense, type ComponentProps } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentProps, type KeyboardEvent } from 'react'
 import { resolveWikilinkColor as resolveColor } from '../utils/wikilinkColors'
 import { resolveEntry } from '../utils/wikilink'
 import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/mathMarkdown'
@@ -29,6 +29,8 @@ import { MermaidDiagram } from './MermaidDiagram'
 import { SafeHtmlSpan } from './SafeMarkup'
 import { updateTldrawBlockPropsSafely } from './tldrawBlockProps'
 import { useExternalMediaPreview } from '../utils/mediaPreviewRuntime'
+import { Textarea } from './ui/textarea'
+import { dispatchRichEditorExternalChange } from './editorExternalChangeEvents'
 
 const TldrawWhiteboard = lazy(() => import('./TldrawWhiteboard').then(module => ({
   default: module.TldrawWhiteboard,
@@ -107,6 +109,111 @@ function MathRender({ latex, displayMode }: { latex: string; displayMode: boolea
   )
 }
 
+type MathBlockEditorProps = {
+  block: {
+    id: string
+    props: {
+      latex: string
+    }
+  }
+  editor: {
+    domElement?: EventTarget | null
+    focus?: () => void
+    updateBlock: (blockId: string, update: { props: { latex: string } }) => void
+  }
+}
+
+function stopMathEditorEvent(event: { stopPropagation: () => void }) {
+  event.stopPropagation()
+}
+
+function isCommandModifierPressed(event: KeyboardEvent<HTMLTextAreaElement>): boolean {
+  return event.metaKey || event.ctrlKey
+}
+
+function isCommitMathEditShortcut(event: KeyboardEvent<HTMLTextAreaElement>): boolean {
+  return event.key === 'Enter' && isCommandModifierPressed(event)
+}
+
+export function MathBlockEditor({ block, editor }: MathBlockEditorProps) {
+  const currentLatex = block.props.latex
+  const editingSessionRef = useRef(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [draftLatex, setDraftLatex] = useState(currentLatex)
+  const [editing, setEditing] = useState(false)
+
+  useEffect(() => {
+    if (!editing) return
+    textareaRef.current?.focus()
+    textareaRef.current?.select()
+  }, [editing])
+
+  const startEditing = (event: { preventDefault: () => void; stopPropagation: () => void }) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setDraftLatex(currentLatex)
+    editingSessionRef.current = true
+    setEditing(true)
+  }
+
+  const finishEditing = () => {
+    if (!editingSessionRef.current) return
+    editingSessionRef.current = false
+    setEditing(false)
+    if (draftLatex !== currentLatex) {
+      editor.updateBlock(block.id, { props: { latex: draftLatex } })
+      dispatchRichEditorExternalChange(editor, editor.domElement ?? undefined)
+    }
+    editor.focus?.()
+  }
+
+  const cancelEditing = () => {
+    if (!editingSessionRef.current) return
+    editingSessionRef.current = false
+    setDraftLatex(currentLatex)
+    setEditing(false)
+    editor.focus?.()
+  }
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      cancelEditing()
+      return
+    }
+
+    if (isCommitMathEditShortcut(event)) {
+      event.preventDefault()
+      event.stopPropagation()
+      finishEditing()
+    }
+  }
+
+  return (
+    <div
+      className={editing ? 'math-block-shell math-block-shell--editing' : 'math-block-shell'}
+      onDoubleClick={editing ? stopMathEditorEvent : startEditing}
+    >
+      {editing ? (
+        <div contentEditable={false} onMouseDown={stopMathEditorEvent}>
+          <Textarea
+            ref={textareaRef}
+            aria-label={`Math: ${currentLatex}`}
+            className="min-h-24 font-mono text-sm"
+            value={draftLatex}
+            onBlur={finishEditing}
+            onChange={(event) => setDraftLatex(event.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
+      ) : (
+        <MathRender latex={currentLatex} displayMode />
+      )}
+    </div>
+  )
+}
+
 export const MathInline = createReactInlineContentSpec(
   {
     type: MATH_INLINE_TYPE,
@@ -132,9 +239,7 @@ const MathBlock = createReactBlockSpec(
   },
   {
     render: (props) => (
-      <div className="math-block-shell">
-        <MathRender latex={props.block.props.latex} displayMode />
-      </div>
+      <MathBlockEditor block={props.block} editor={props.editor} />
     ),
   },
 )

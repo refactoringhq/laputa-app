@@ -404,12 +404,14 @@ describe('useCommandRegistry', () => {
     const onRevealActiveFile = vi.fn()
     const onCopyActiveFilePath = vi.fn()
     const onCopyActiveDeepLink = vi.fn()
+    const onExportNoteAsPdf = vi.fn()
     const config = makeConfig({
       activeTabPath: '/vault/current.md',
       entries: [{ path: '/vault/current.md', title: 'Current', fileKind: 'markdown' }],
       onRevealActiveFile,
       onCopyActiveFilePath,
       onCopyActiveDeepLink,
+      onExportNoteAsPdf,
     })
     const { result } = renderHook(() => useCommandRegistry(config))
 
@@ -428,18 +430,26 @@ describe('useCommandRegistry', () => {
       group: 'Note',
       label: 'Copy deep link to current item',
     })
+    expect(findCommand(result.current, 'export-note-pdf')).toMatchObject({
+      enabled: true,
+      group: 'Note',
+      label: 'Export note as PDF',
+    })
 
     findCommand(result.current, 'reveal-active-file')!.execute()
     findCommand(result.current, 'copy-active-file-path')!.execute()
     findCommand(result.current, 'copy-active-deep-link')!.execute()
+    findCommand(result.current, 'export-note-pdf')!.execute()
 
     expect(onRevealActiveFile).toHaveBeenCalledWith('/vault/current.md')
     expect(onCopyActiveFilePath).toHaveBeenCalledWith('/vault/current.md')
     expect(onCopyActiveDeepLink).toHaveBeenCalledWith('/vault/current.md')
+    expect(onExportNoteAsPdf).toHaveBeenCalledOnce()
   })
 
-  it('only enables external open for non-markdown active files', () => {
+  it('only enables file-kind specific actions for supported active files', () => {
     const onOpenActiveFileExternal = vi.fn()
+    const onExportNoteAsPdf = vi.fn()
     const { result, rerender } = renderHook(
       (props) => useCommandRegistry(props),
       {
@@ -447,20 +457,24 @@ describe('useCommandRegistry', () => {
           activeTabPath: '/vault/current.md',
           entries: [{ path: '/vault/current.md', title: 'Current', fileKind: 'markdown' }],
           onOpenActiveFileExternal,
+          onExportNoteAsPdf,
         }),
       },
     )
 
     expect(findCommand(result.current, 'open-active-file-external')?.enabled).toBe(false)
+    expect(findCommand(result.current, 'export-note-pdf')?.enabled).toBe(true)
 
     rerender(makeConfig({
       activeTabPath: '/vault/Attachments/photo.png',
       entries: [{ path: '/vault/Attachments/photo.png', title: 'photo.png', fileKind: 'binary' }],
       onOpenActiveFileExternal,
+      onExportNoteAsPdf,
     }))
 
     const command = findCommand(result.current, 'open-active-file-external')!
     expect(command.enabled).toBe(true)
+    expect(findCommand(result.current, 'export-note-pdf')?.enabled).toBe(false)
     command.execute()
     expect(onOpenActiveFileExternal).toHaveBeenCalledWith('/vault/Attachments/photo.png')
   })

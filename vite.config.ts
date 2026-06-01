@@ -89,12 +89,14 @@ type FrontmatterPropertyValue = string | number | boolean | null
 type VaultSearchResult = { title: string; path: string; snippet: string; score: number; note_type: string | null }
 
 interface SearchEntryInput {
+  excludeFrontmatter: boolean
   entry: VaultEntry
   query: string
   rawContent: string
 }
 
 interface SearchRequestInput {
+  excludeFrontmatter: boolean
   query: string
   vaultPath: string
 }
@@ -411,6 +413,11 @@ function commandString({ args, key }: CommandStringInput): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
 }
 
+function commandBool({ args, key }: CommandStringInput): boolean {
+  const value = Reflect.get(args, key)
+  return value === true || value === '1' || value === 'true'
+}
+
 function commandResponse({ payload, statusCode = 200 }: CommandResponseInput): VaultCommandResponse {
   return { payload, statusCode }
 }
@@ -463,7 +470,10 @@ function commandVaultSearch({ args }: VaultCommandContext): VaultCommandResponse
   const vaultPath = commandString({ args, key: 'vault_path' })
   const query = (commandString({ args, key: 'query' }) ?? '').toLowerCase()
   const mode = commandString({ args, key: 'mode' }) ?? 'all'
-  const results = vaultPath && query ? collectVaultSearchResults({ vaultPath, query }) : []
+  const excludeFrontmatter = commandBool({ args, key: 'exclude_frontmatter' })
+  const results = vaultPath && query
+    ? collectVaultSearchResults({ vaultPath, query, excludeFrontmatter })
+    : []
   return commandResponse({ payload: { results, elapsed_ms: results.length > 0 ? 1 : 0, query, mode } })
 }
 
@@ -548,7 +558,7 @@ function vaultCommandContext(payload: VaultCommandPayload): VaultCommandContext 
   return { cmd: payload.cmd, args: payload.args }
 }
 
-const VAULT_ENDPOINT_ARG_KEYS = ['path', 'vault_path', 'query', 'mode', 'reload'] as const
+const VAULT_ENDPOINT_ARG_KEYS = ['path', 'vault_path', 'query', 'mode', 'reload', 'exclude_frontmatter'] as const
 
 function readVaultQueryArgs(url: URL): Record<string, unknown> {
   const args: Record<string, unknown> = {}
@@ -650,19 +660,26 @@ async function handleVaultSearch(url: URL, req: IncomingMessage, res: ServerResp
   return handleVaultReadCommand({ cmd: 'search_vault', pathname: '/api/vault/search', req, res, url })
 }
 
-function collectVaultSearchResults({ vaultPath, query }: SearchRequestInput): VaultSearchResult[] {
+function collectVaultSearchResults({ excludeFrontmatter, vaultPath, query }: SearchRequestInput): VaultSearchResult[] {
   const results: VaultSearchResult[] = []
   for (const filePath of findMarkdownFiles(vaultPath)) {
     const entry = parseMarkdownFile(filePath)
     if (!entry || entry.trashed) continue
     const rawContent = readUtf8File(filePath)
-    if (entryMatchesSearch({ entry, rawContent, query })) results.push(searchResultFromEntry(entry))
+    if (entryMatchesSearch({ entry, rawContent, query, excludeFrontmatter })) {
+      results.push(searchResultFromEntry(entry))
+    }
   }
   return results.slice(0, 20)
 }
 
-function entryMatchesSearch({ entry, rawContent, query }: SearchEntryInput): boolean {
-  return entry.title.toLowerCase().includes(query) || rawContent.toLowerCase().includes(query)
+function searchableSearchContent(rawContent: string, excludeFrontmatter: boolean): string {
+  return excludeFrontmatter ? matter(rawContent).content : rawContent
+}
+
+function entryMatchesSearch({ entry, excludeFrontmatter, rawContent, query }: SearchEntryInput): boolean {
+  const content = searchableSearchContent(rawContent, excludeFrontmatter)
+  return entry.title.toLowerCase().includes(query) || content.toLowerCase().includes(query)
 }
 
 function searchResultFromEntry(entry: VaultEntry): VaultSearchResult {

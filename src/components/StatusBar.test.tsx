@@ -4,25 +4,11 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { StatusBar } from './StatusBar'
 import { StatusBarPrimarySection } from './status-bar/StatusBarSections'
 import type { VaultOption } from './StatusBar'
-vi.mock('../utils/url', async () => {
-  const actual = await vi.importActual('../utils/url')
-  return { ...actual, openExternalUrl: vi.fn().mockResolvedValue(undefined) }
-})
-
-const { openExternalUrl } = await import('../utils/url') as typeof import('../utils/url') & { openExternalUrl: ReturnType<typeof vi.fn> }
 
 const vaults: VaultOption[] = [
   { label: 'Main Vault', path: '/Users/luca/Laputa', alias: 'main', mounted: true },
   { label: 'Work Vault', path: '/Users/luca/Work', alias: 'work', mounted: false },
 ]
-
-const installedAiAgentsStatus = {
-  claude_code: { status: 'installed' as const, version: '1.0.20' },
-  codex: { status: 'installed' as const, version: '0.37.0' },
-  opencode: { status: 'installed' as const, version: '0.3.1' },
-  pi: { status: 'installed' as const, version: '0.70.2' },
-  gemini: { status: 'installed' as const, version: '0.5.1' },
-}
 
 const DEFAULT_WINDOW_WIDTH = 1280
 
@@ -49,7 +35,6 @@ function renderDenseStatusBar() {
       buildNumber="b281"
       onCheckForUpdates={vi.fn()}
       mcpStatus="not_installed"
-      claudeCodeStatus="missing"
     />
   )
 }
@@ -564,7 +549,7 @@ describe('StatusBar', () => {
     expect(screen.getByTestId('status-pulse')).toBeInTheDocument()
     expect(screen.getByTestId('status-feedback')).toBeInTheDocument()
     expect(screen.getByTestId('status-build-number')).toBeInTheDocument()
-    expect(screen.getByTestId('status-claude-code')).toBeInTheDocument()
+    expect(screen.queryByTestId('status-claude-code')).not.toBeInTheDocument()
     expect(screen.queryByText('Commit')).not.toBeInTheDocument()
     expect(screen.queryByText('History')).not.toBeInTheDocument()
     expect(screen.queryByText('Contribute')).not.toBeInTheDocument()
@@ -587,7 +572,7 @@ describe('StatusBar', () => {
     expect(screen.getByTestId('status-feedback')).toBeInTheDocument()
   })
 
-  it('hides the active AI agent label in compact status layout', () => {
+  it('does not render the legacy AI agent control in the status bar', () => {
     setWindowWidth(920)
     render(
       <StatusBar
@@ -595,12 +580,10 @@ describe('StatusBar', () => {
         vaultPath="/Users/luca/Laputa"
         vaults={vaults}
         onSwitchVault={vi.fn()}
-        aiAgentsStatus={installedAiAgentsStatus}
-        defaultAiAgent="claude_code"
       />
     )
 
-    expect(screen.getByTestId('status-ai-agents')).toBeInTheDocument()
+    expect(screen.queryByTestId('status-ai-agents')).not.toBeInTheDocument()
     expect(screen.queryByText('Claude')).not.toBeInTheDocument()
   })
 
@@ -931,106 +914,9 @@ describe('StatusBar', () => {
     expect(screen.queryByTestId('status-commit-push')).not.toBeInTheDocument()
   })
 
-  it('shows Claude Code badge when installed', async () => {
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} claudeCodeStatus="installed" claudeCodeVersion="1.0.20" />)
-    const badge = screen.getByTestId('status-claude-code')
-    expect(badge).toBeInTheDocument()
-    expect(screen.getByText('Claude Code')).toBeInTheDocument()
-    await expectTooltip(screen.getByRole('button', { name: 'Claude Code 1.0.20' }), 'Claude Code 1.0.20')
-  })
-
-  it('shows Claude Code missing badge with warning when missing', async () => {
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} claudeCodeStatus="missing" />)
-    const badge = screen.getByTestId('status-claude-code')
-    expect(badge).toBeInTheDocument()
-    expect(screen.getByText('Claude Code missing')).toBeInTheDocument()
-    await expectTooltip(screen.getByRole('button', { name: 'Claude Code not found — click to install' }), 'Claude Code not found — click to install')
-  })
-
-  it('opens install URL when clicking missing Claude Code badge', () => {
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} claudeCodeStatus="missing" />)
-    fireEvent.click(screen.getByTestId('status-claude-code'))
-    expect(openExternalUrl).toHaveBeenCalledWith('https://docs.anthropic.com/en/docs/claude-code')
-  })
-
-  it('opens install URL on Enter key for missing Claude Code badge', () => {
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} claudeCodeStatus="missing" />)
-    fireEvent.keyDown(screen.getByTestId('status-claude-code'), { key: 'Enter' })
-    expect(openExternalUrl).toHaveBeenCalledWith('https://docs.anthropic.com/en/docs/claude-code')
-  })
-
-  it('hides Claude Code badge when status is checking', () => {
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} claudeCodeStatus="checking" />)
-    expect(screen.queryByTestId('status-claude-code')).not.toBeInTheDocument()
-  })
-
-  it('hides Claude Code badge when no claudeCodeStatus prop provided', () => {
+  it('does not render the legacy Claude Code badge in the status bar', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} />)
     expect(screen.queryByTestId('status-claude-code')).not.toBeInTheDocument()
-  })
-
-  it('shows the active AI agent directly in the bottom bar', () => {
-    render(
-      <StatusBar
-        noteCount={100}
-        vaultPath="/Users/luca/Laputa"
-        vaults={vaults}
-        onSwitchVault={vi.fn()}
-        aiAgentsStatus={installedAiAgentsStatus}
-        defaultAiAgent="claude_code"
-        onSetDefaultAiAgent={vi.fn()}
-      />,
-    )
-
-    expect(screen.getByTestId('status-ai-agents')).toHaveTextContent('Claude')
-  })
-
-  it('opens the AI workspace from the status AI badge when provided', () => {
-    const onOpenAiWorkspace = vi.fn()
-    render(
-      <StatusBar
-        noteCount={100}
-        vaultPath="/Users/luca/Laputa"
-        vaults={vaults}
-        onSwitchVault={vi.fn()}
-        aiAgentsStatus={installedAiAgentsStatus}
-        defaultAiAgent="claude_code"
-        onOpenAiWorkspace={onOpenAiWorkspace}
-      />,
-    )
-
-    fireEvent.click(screen.getByTestId('status-ai-agents'))
-
-    expect(onOpenAiWorkspace).toHaveBeenCalledOnce()
-  })
-
-  it('opens the AI agent switcher from the keyboard and switches agents', () => {
-    const onSetDefaultAiAgent = vi.fn()
-    render(
-      <StatusBar
-        noteCount={100}
-        vaultPath="/Users/luca/Laputa"
-        vaults={vaults}
-        onSwitchVault={vi.fn()}
-        aiAgentsStatus={installedAiAgentsStatus}
-        defaultAiAgent="claude_code"
-        onSetDefaultAiAgent={onSetDefaultAiAgent}
-      />,
-    )
-
-    const trigger = screen.getByTestId('status-ai-agents')
-    trigger.focus()
-    act(() => {
-      fireEvent.keyDown(trigger, { key: 'ArrowDown' })
-    })
-
-    const codexOption = screen.getByRole('menuitemradio', { name: /Codex/ })
-    codexOption.focus()
-    act(() => {
-      fireEvent.keyDown(codexOption, { key: 'Enter' })
-    })
-
-    expect(onSetDefaultAiAgent).toHaveBeenCalledWith('codex')
   })
 
 })

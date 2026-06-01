@@ -1,8 +1,4 @@
-import type { AiAgentId, AiAgentsStatus } from '../lib/aiAgents'
-import type { AiModelProvider } from '../lib/aiTargets'
-import type { VaultAiGuidanceStatus } from '../lib/vaultAiGuidance'
 import { useEffect, useState } from 'react'
-import type { ClaudeCodeStatus } from '../hooks/useClaudeCodeStatus'
 import type { McpStatus } from '../hooks/useMcpStatus'
 import type { ThemeMode } from '../lib/themeMode'
 import type { AppLocale } from '../lib/i18n'
@@ -107,17 +103,6 @@ interface StatusBarProps {
   aiFeaturesEnabled?: boolean
   mcpStatus?: McpStatus
   onInstallMcp?: () => void
-  aiAgentsStatus?: AiAgentsStatus
-  vaultAiGuidanceStatus?: VaultAiGuidanceStatus
-  defaultAiAgent?: AiAgentId
-  defaultAiTarget?: string
-  aiModelProviders?: AiModelProvider[]
-  onSetDefaultAiAgent?: (agent: AiAgentId) => void
-  onSetDefaultAiTarget?: (target: string) => void
-  onOpenAiWorkspace?: () => void
-  onRestoreVaultAiGuidance?: () => void
-  claudeCodeStatus?: ClaudeCodeStatus
-  claudeCodeVersion?: string | null
   locale?: AppLocale
 }
 
@@ -166,17 +151,6 @@ function StatusBarPrimaryFromFooter({
   aiFeaturesEnabled = true,
   mcpStatus,
   onInstallMcp,
-  aiAgentsStatus,
-  vaultAiGuidanceStatus,
-  defaultAiAgent,
-  defaultAiTarget,
-  aiModelProviders,
-  onSetDefaultAiAgent,
-  onSetDefaultAiTarget,
-  onOpenAiWorkspace,
-  onRestoreVaultAiGuidance,
-  claudeCodeStatus,
-  claudeCodeVersion,
   locale = 'en',
   compact,
   stacked,
@@ -221,17 +195,6 @@ function StatusBarPrimaryFromFooter({
       onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
       mcpStatus={aiFeaturesEnabled ? mcpStatus : undefined}
       onInstallMcp={onInstallMcp}
-      aiAgentsStatus={aiAgentsStatus}
-      vaultAiGuidanceStatus={vaultAiGuidanceStatus}
-      defaultAiAgent={defaultAiAgent}
-      defaultAiTarget={defaultAiTarget}
-      aiModelProviders={aiModelProviders}
-      onSetDefaultAiAgent={onSetDefaultAiAgent}
-      onSetDefaultAiTarget={onSetDefaultAiTarget}
-      onOpenAiWorkspace={onOpenAiWorkspace}
-      onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
-      claudeCodeStatus={claudeCodeStatus}
-      claudeCodeVersion={claudeCodeVersion}
       locale={locale}
       stacked={stacked}
       compact={compact}

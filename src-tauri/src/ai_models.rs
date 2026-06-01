@@ -62,6 +62,8 @@ pub struct AiModelStreamRequest {
     pub message: String,
     pub system_prompt: Option<String>,
     pub api_key_override: Option<String>,
+    #[serde(default)]
+    pub event_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -181,6 +183,7 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
                 .into(),
         ),
         api_key_override: normalize_optional_string(request.api_key_override),
+        event_name: None,
     };
     send_model_message(&request)
 }
@@ -535,6 +538,7 @@ mod tests {
             message: "Hello".into(),
             system_prompt: Some("  Be concise.  ".into()),
             api_key_override: None,
+            event_name: None,
         }
     }
 

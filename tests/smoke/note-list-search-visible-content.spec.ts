@@ -1,9 +1,37 @@
 import { test, expect } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
 import { createFixtureVaultCopy, openFixtureVaultDesktopHarness, removeFixtureVaultCopy } from '../helpers/fixtureVault'
 
 let tempVaultDir: string
 
 const SELECT_ALL_SHORTCUT = process.platform === 'darwin' ? 'Meta+A' : 'Control+A'
+const BODY_ONLY_NOTE_TITLE = 'Body Only Search Target'
+const BODY_ONLY_NOTE_FILENAME = 'body-only-search-target'
+const BODY_ONLY_QUERY = 'citrine-backlog-marker'
+
+function addBodyOnlySearchNote(vaultDir: string) {
+  const noteDir = path.join(vaultDir, 'note')
+  fs.mkdirSync(noteDir, { recursive: true })
+  fs.writeFileSync(
+    path.join(noteDir, `${BODY_ONLY_NOTE_FILENAME}.md`),
+    [
+      '---',
+      'Is A: Note',
+      'Status: Active',
+      '---',
+      '',
+      `# ${BODY_ONLY_NOTE_TITLE}`,
+      '',
+      'This opening paragraph deliberately omits the search phrase so the note list cannot match the local snippet.',
+      '',
+      '## Research Log',
+      '',
+      `The hidden body term is ${BODY_ONLY_QUERY}, which should still make this note discoverable.`,
+      '',
+    ].join('\n'),
+  )
+}
 
 async function showInboxPropertyColumn(
   page: import('@playwright/test').Page,
@@ -48,6 +76,7 @@ async function searchAndOpenByKeyboard(
 test.describe('Note-list search visible content', () => {
   test.beforeEach(async ({ page }) => {
     tempVaultDir = createFixtureVaultCopy()
+    addBodyOnlySearchNote(tempVaultDir)
     await openFixtureVaultDesktopHarness(page, tempVaultDir)
     await page.setViewportSize({ width: 1600, height: 900 })
   })
@@ -63,5 +92,16 @@ test.describe('Note-list search visible content', () => {
     await searchAndOpenByKeyboard(page, 'Team Meeting', 'Team Meeting', 'team-meeting')
     await searchAndOpenByKeyboard(page, 'referenced by Alpha Project', 'Note B', 'note-b')
     await searchAndOpenByKeyboard(page, 'Test User', 'Team Meeting', 'team-meeting')
+  })
+
+  test('keyboard note-list search finds body-only content matches @smoke', async ({ page }) => {
+    await showNoteListSearch(page)
+
+    await searchAndOpenByKeyboard(
+      page,
+      BODY_ONLY_QUERY,
+      BODY_ONLY_NOTE_TITLE,
+      BODY_ONLY_NOTE_FILENAME,
+    )
   })
 })

@@ -1,6 +1,7 @@
 import { CaretUpDown as ChevronsUpDown, Sparkle, Warning as AlertTriangle } from '@phosphor-icons/react'
 import { forwardRef, type ComponentPropsWithoutRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { AiAgentIcon } from '@/components/AiAgentIcon'
 import {
   AI_AGENT_DEFINITIONS,
   getAiAgentAvailability,
@@ -147,6 +148,18 @@ function TriggerStateIcon({
   return null
 }
 
+function TriggerLeadingIcon({
+  selectedTarget,
+  showWarning,
+}: {
+  selectedTarget: AiTarget
+  showWarning: boolean
+}) {
+  if (showWarning) return <AlertTriangle size={13} weight="regular" />
+  if (selectedTarget.kind === 'agent') return <AiAgentIcon agent={selectedTarget.agent} size={13} />
+  return <Sparkle size={13} weight="regular" />
+}
+
 function targetTriggerText(selectedTarget: AiTarget, defaultAgent: AiAgentId): string {
   return selectedTarget.kind === 'api_model' ? selectedTarget.shortLabel : triggerLabel(defaultAgent)
 }
@@ -189,7 +202,7 @@ const AiAgentsBadgeButton = forwardRef<HTMLButtonElement, AiAgentsBadgeButtonPro
       {...buttonProps}
     >
       <span style={{ ...ICON_STYLE, color: triggerIconColor(showWarning) }}>
-        <Sparkle size={13} weight="regular" />
+        <TriggerLeadingIcon selectedTarget={selectedTarget} showWarning={showWarning} />
         {!compact && targetTriggerText(selectedTarget, defaultAgent)}
         <TriggerStateIcon showWarning={showWarning} showSwitcherCue={showSwitcherCue} />
       </span>
@@ -257,7 +270,8 @@ function AgentMenuContent({
           }}
         >
           {installedAgents.map((definition) => (
-            <DropdownMenuRadioItem key={definition.id} value={definition.id}>
+            <DropdownMenuRadioItem key={definition.id} value={definition.id} className="gap-2">
+              <AiAgentIcon agent={definition.id} size={16} />
               <span>{definition.label}</span>
               <span className="ml-auto text-xs text-muted-foreground">
                 {statusText(statuses, definition)}

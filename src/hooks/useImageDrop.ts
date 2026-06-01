@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import type { Event as TauriEvent, UnlistenFn } from '@tauri-apps/api/event'
 import type { DragDropEvent as TauriDragDropPayload } from '@tauri-apps/api/webview'
 import { isTauri } from '../mock-tauri'
+import { cleanupTauriEventListeners } from '../utils/tauriEventCleanup'
 import { attachmentAssetUrlFromPath } from '../utils/vaultAttachments'
 
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
@@ -80,14 +81,6 @@ function insertDroppedImages({
   }
 }
 
-function cleanupNativeDropListeners(unlisteners: UnlistenFn[]): void {
-  for (const unlisten of unlisteners) {
-    void Promise.resolve()
-      .then(unlisten)
-      .catch(() => {})
-  }
-}
-
 async function registerNativeDropListeners(
   handler: (event: TauriDropEvent) => void,
 ): Promise<UnlistenFn[]> {
@@ -100,7 +93,7 @@ async function registerNativeDropListeners(
     unlisteners.push(await webview.listen<TauriDragDropPayload>(TAURI_DRAG_LEAVE_EVENT, handler))
     return unlisteners
   } catch (error) {
-    cleanupNativeDropListeners(unlisteners)
+    cleanupTauriEventListeners(unlisteners)
     throw error
   }
 }
@@ -174,7 +167,7 @@ export function useImageDrop({ containerRef, onImageUrl, vaultPath }: UseImageDr
           setIsDragOver(false)
         })
         if (mounted) unlisteners = nextUnlisteners
-        else cleanupNativeDropListeners(nextUnlisteners)
+        else cleanupTauriEventListeners(nextUnlisteners)
       } catch {
         // Tauri webview API not available.
       }
@@ -182,7 +175,7 @@ export function useImageDrop({ containerRef, onImageUrl, vaultPath }: UseImageDr
 
     return () => {
       mounted = false
-      cleanupNativeDropListeners(unlisteners)
+      cleanupTauriEventListeners(unlisteners)
       unlisteners = []
     }
   }, [])

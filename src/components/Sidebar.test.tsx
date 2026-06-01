@@ -1137,7 +1137,8 @@ describe('Sidebar', () => {
     function expectFavoriteRowToMatchTypeRow(favoriteTitle = 'My Favorite Note') {
       const { favoriteLabel, favoriteRow, typeLabel, typeRow } = getFavoriteAndTypeRows(favoriteTitle)
 
-      expect(favoriteRow.className).toBe(typeRow.className)
+      expect(favoriteRow.className).toContain(typeRow.className)
+      expect(favoriteRow.className).toContain('w-full')
       expect(favoriteRow.style.padding).toBe(typeRow.style.padding)
       expect(favoriteRow.style.gap).toBe(typeRow.style.gap)
       expect(favoriteLabel.className).toContain(typeLabel.className)

@@ -1,3 +1,5 @@
+import { canonicalKnownCodeBlockLanguage } from './codeBlockLanguageCatalog'
+
 type UnknownRecord = Record<string, unknown>
 type LanguageDetector = (source: string) => boolean
 
@@ -31,9 +33,9 @@ function textFromInlineContent(content: unknown): string {
   }).join('')
 }
 
-function normalizedLanguage(props: unknown): string {
+function readLanguage(props: unknown): string {
   if (!isRecord(props) || typeof props.language !== 'string') return ''
-  return props.language.trim().toLowerCase()
+  return props.language.trim()
 }
 
 function isPlainTextLanguage(language: string): boolean {
@@ -87,10 +89,6 @@ function withInferredChildren(block: UnknownRecord, children: unknown): UnknownR
   return children === block.children ? block : { ...block, children }
 }
 
-function shouldInferLanguage(block: UnknownRecord): boolean {
-  return block.type === 'codeBlock' && isPlainTextLanguage(normalizedLanguage(block.props))
-}
-
 function withInferredLanguage(block: UnknownRecord, children: unknown, language: string): UnknownRecord {
   const props = isRecord(block.props) ? block.props : {}
   return {
@@ -105,8 +103,15 @@ function withInferredLanguage(block: UnknownRecord, children: unknown, language:
 
 function inferBlockLanguage(block: UnknownRecord): UnknownRecord {
   const children = inferChildren(block.children)
+  const rawLanguage = readLanguage(block.props)
+  const language = rawLanguage.toLowerCase()
+  const canonicalLanguage = canonicalKnownCodeBlockLanguage(rawLanguage)
 
-  if (!shouldInferLanguage(block)) return withInferredChildren(block, children)
+  if (block.type === 'codeBlock' && canonicalLanguage && canonicalLanguage !== rawLanguage) {
+    return withInferredLanguage(block, children, canonicalLanguage)
+  }
+
+  if (!isPlainTextLanguage(language) || block.type !== 'codeBlock') return withInferredChildren(block, children)
 
   const inferred = inferCodeBlockLanguage(textFromInlineContent(block.content))
   if (!inferred) return withInferredChildren(block, children)

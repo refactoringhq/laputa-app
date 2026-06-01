@@ -8,6 +8,7 @@ import {
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 import { openExternalUrl } from '../utils/url'
+import { AiAgentIcon } from './AiAgentIcon'
 import { OnboardingShell } from './OnboardingShell'
 import { Button } from './ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card'
@@ -89,12 +90,15 @@ function AgentStatusList({ statuses }: { statuses: AiAgentsStatus }) {
             key={definition.id}
             className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm"
           >
-            <div className="space-y-1 text-left">
-              <div className="font-medium text-foreground">{definition.label}</div>
-              <div className="text-xs text-muted-foreground">
-                {ready
-                  ? `${definition.label}${status.version ? ` ${status.version}` : ''} is ready.`
-                  : `${definition.label} is not installed yet.`}
+            <div className="flex min-w-0 items-start gap-3 text-left">
+              <AiAgentIcon agent={definition.id} size={18} className="mt-0.5" />
+              <div className="min-w-0 space-y-1">
+                <div className="font-medium text-foreground">{definition.label}</div>
+                <div className="text-xs text-muted-foreground">
+                  {ready
+                    ? `${definition.label}${status.version ? ` ${status.version}` : ''} is ready.`
+                    : `${definition.label} is not installed yet.`}
+                </div>
               </div>
             </div>
             <span
@@ -169,6 +173,7 @@ export function AiAgentsOnboardingPrompt({
               onClick={() => void openExternalUrl(getAiAgentDefinition(definition.id).installUrl)}
               data-testid={`ai-agents-onboarding-install-${definition.id}`}
             >
+              <AiAgentIcon agent={definition.id} size={16} />
               Install {definition.label}
               <ArrowUpRight className="size-4" />
             </Button>

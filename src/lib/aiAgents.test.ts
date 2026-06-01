@@ -29,6 +29,7 @@ describe('aiAgents helpers', () => {
       opencode: { installed: true, version: '0.3.1' },
       pi: { installed: true, version: '0.70.2' },
       gemini: { installed: true, version: '0.5.1' },
+      kiro: { installed: true, version: '0.12.0' },
     })
 
     expect(statuses.claude_code).toEqual({ status: 'installed', version: '1.0.20' })
@@ -36,6 +37,7 @@ describe('aiAgents helpers', () => {
     expect(statuses.opencode).toEqual({ status: 'installed', version: '0.3.1' })
     expect(statuses.pi).toEqual({ status: 'installed', version: '0.70.2' })
     expect(statuses.gemini).toEqual({ status: 'installed', version: '0.5.1' })
+    expect(statuses.kiro).toEqual({ status: 'installed', version: '0.12.0' })
   })
 
   it('cycles through the supported agents', () => {

@@ -122,6 +122,9 @@ importers:
       '@sentry/react':
         specifier: ^10.47.0
         version: 10.47.0(react@19.2.4)
+      '@shikijs/langs':
+        specifier: 3.23.0
+        version: 3.23.0
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.1.18(vite@7.3.2(@types/node@24.10.13)(jiti@2.6.1)(lightningcss@1.30.2)(yaml@2.8.3))

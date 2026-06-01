@@ -1,6 +1,8 @@
 import { isTauri } from '../mock-tauri'
 import type { AiModelDefinition, AiModelProvider } from '../lib/aiTargets'
 import type { AgentStreamCallbacks } from './streamAiAgent'
+import { createScopedStreamEventName } from './aiStreamEvents'
+import { cleanupTauriEventListener } from './tauriEventCleanup'
 
 type AiModelStreamEvent =
   | { kind: 'Init'; session_id: string }
@@ -64,6 +66,7 @@ export async function streamAiModel({
 
   const { invoke } = await import('@tauri-apps/api/core')
   const { listen } = await import('@tauri-apps/api/event')
+  const eventName = createScopedStreamEventName('ai-model-stream')
   let closed = false
   const closeStream = (): void => {
     if (closed) return
@@ -71,7 +74,7 @@ export async function streamAiModel({
     callbacks.onDone()
   }
 
-  const unlisten = await listen<AiModelStreamEvent>('ai-model-stream', (event) => {
+  const unlisten = await listen<AiModelStreamEvent>(eventName, (event) => {
     if (event.payload.kind === 'Done') {
       closeStream()
       return
@@ -87,6 +90,7 @@ export async function streamAiModel({
         message,
         system_prompt: systemPrompt || null,
         api_key_override: null,
+        event_name: eventName,
       },
     })
     closeStream()
@@ -94,6 +98,6 @@ export async function streamAiModel({
     callbacks.onError(err instanceof Error ? err.message : String(err))
     closeStream()
   } finally {
-    unlisten()
+    cleanupTauriEventListener(unlisten)
   }
 }

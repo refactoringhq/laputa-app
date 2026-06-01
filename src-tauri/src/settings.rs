@@ -315,6 +315,55 @@ pub fn save_settings(settings: Settings) -> Result<(), String> {
     save_settings_at(&preferred_app_config_path("settings.json")?, settings)
 }
 
+fn ai_workspace_sessions_path() -> Result<PathBuf, String> {
+    resolve_existing_or_preferred_app_config_path("ai-workspace-sessions.json")
+}
+
+fn get_ai_workspace_sessions_at(path: &PathBuf) -> Result<serde_json::Value, String> {
+    if !path.exists() {
+        return Ok(serde_json::json!({}));
+    }
+
+    let content = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read AI workspace sessions: {}", e))?;
+    let sessions: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse AI workspace sessions: {}", e))?;
+    if sessions.is_object() {
+        Ok(sessions)
+    } else {
+        Ok(serde_json::json!({}))
+    }
+}
+
+fn save_ai_workspace_sessions_at(
+    path: &PathBuf,
+    sessions: serde_json::Value,
+) -> Result<(), String> {
+    if !sessions.is_object() {
+        return Err("AI workspace sessions must be a JSON object".to_string());
+    }
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+
+    let json = serde_json::to_string_pretty(&sessions)
+        .map_err(|e| format!("Failed to serialize AI workspace sessions: {}", e))?;
+    fs::write(path, json).map_err(|e| format!("Failed to write AI workspace sessions: {}", e))
+}
+
+pub fn get_ai_workspace_sessions() -> Result<serde_json::Value, String> {
+    get_ai_workspace_sessions_at(&ai_workspace_sessions_path()?)
+}
+
+pub fn save_ai_workspace_sessions(sessions: serde_json::Value) -> Result<(), String> {
+    save_ai_workspace_sessions_at(
+        &preferred_app_config_path("ai-workspace-sessions.json")?,
+        sessions,
+    )
+}
+
 fn last_vault_file() -> Result<PathBuf, String> {
     resolve_existing_or_preferred_app_config_path("last-vault.txt")
 }
@@ -747,6 +796,47 @@ mod tests {
             .to_str()
             .unwrap()
             .contains("com.tolaria.app"));
+    }
+
+    #[test]
+    fn test_ai_workspace_sessions_roundtrip() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("ai-workspace-sessions.json");
+        let sessions = serde_json::json!({
+            "chat-1": {
+                "messages": [
+                    {
+                        "userMessage": "Hello",
+                        "actions": [],
+                        "response": "Hi"
+                    }
+                ],
+                "status": "done"
+            }
+        });
+
+        save_ai_workspace_sessions_at(&path, sessions.clone()).unwrap();
+
+        assert_eq!(get_ai_workspace_sessions_at(&path).unwrap(), sessions);
+    }
+
+    #[test]
+    fn test_ai_workspace_sessions_missing_file_returns_empty_object() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("ai-workspace-sessions.json");
+
+        assert_eq!(
+            get_ai_workspace_sessions_at(&path).unwrap(),
+            serde_json::json!({})
+        );
+    }
+
+    #[test]
+    fn test_ai_workspace_sessions_rejects_non_object_payload() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("ai-workspace-sessions.json");
+
+        assert!(save_ai_workspace_sessions_at(&path, serde_json::json!([])).is_err());
     }
 
     #[test]

@@ -336,8 +336,11 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
         )
         const query = encodeURIComponent(readCommandString(commandArgs, 'query'))
         const mode = encodeURIComponent(readCommandString(commandArgs, 'mode', 'all'))
+        const excludeFrontmatter = readCommandValue(commandArgs, 'excludeFrontmatter') === true
+          ? '&exclude_frontmatter=1'
+          : ''
         return readJson(
-          `/api/vault/search?vault_path=${encodeURIComponent(resolvedPath)}&query=${query}&mode=${mode}`,
+          `/api/vault/search?vault_path=${encodeURIComponent(resolvedPath)}&query=${query}&mode=${mode}${excludeFrontmatter}`,
         )
       },
     })

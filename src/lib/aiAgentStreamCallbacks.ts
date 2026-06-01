@@ -15,6 +15,12 @@ import {
 
 const MAX_RETAINED_TOOL_OUTPUT_CHARS = 20_000
 
+function normalizeAssistantResponseText(response: string): string {
+  return response
+    .replace(/(?<!\b[A-Z])([.!?])(?=([A-ZÀ-ÖØ-Þ]|\[\[))/gu, '$1 ')
+    .replace(/(\]\])(?=[A-ZÀ-ÖØ-Þ])/gu, '$1 ')
+}
+
 export interface StreamMutationContext {
   agent: AiAgentId
   messageId: string
@@ -28,7 +34,7 @@ export interface StreamMutationContext {
 }
 
 function finalResponseText(response: string, agent: AiAgentId): string {
-  if (response.trim()) return response
+  if (response.trim()) return normalizeAssistantResponseText(response)
 
   if (agent === 'opencode') {
     return [
@@ -121,7 +127,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
       setStatus('error')
       streamFailed = true
-      const partial = responseAccRef.current
+      const partial = normalizeAssistantResponseText(responseAccRef.current)
       failureTracked = true
       trackAiAgentResponseFailed(agent, partial, toolInputMapRef.current.size)
       updateMessage(setMessages, messageId, (message) => ({

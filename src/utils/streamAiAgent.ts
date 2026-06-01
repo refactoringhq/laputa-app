@@ -4,6 +4,8 @@ import {
   normalizeAiAgentPermissionMode,
   type AiAgentPermissionMode,
 } from '../lib/aiAgentPermissionMode'
+import { createScopedStreamEventName } from './aiStreamEvents'
+import { cleanupTauriEventListener } from './tauriEventCleanup'
 
 type AiAgentStreamEvent =
   | { kind: 'Init'; session_id: string }
@@ -93,6 +95,7 @@ export async function streamAiAgent(
 
   const { invoke } = await import('@tauri-apps/api/core')
   const { listen } = await import('@tauri-apps/api/event')
+  const eventName = createScopedStreamEventName('ai-agent-stream')
   let closed = false
 
   const closeStream = (): void => {
@@ -101,7 +104,7 @@ export async function streamAiAgent(
     callbacks.onDone()
   }
 
-  const unlisten = await listen<AiAgentStreamEvent>('ai-agent-stream', (event) => {
+  const unlisten = await listen<AiAgentStreamEvent>(eventName, (event) => {
     if (event.payload.kind === 'Done') {
       closeStream()
       return
@@ -119,6 +122,7 @@ export async function streamAiAgent(
         vault_path: vaultPath,
         vault_paths: vaultPaths && vaultPaths.length > 0 ? vaultPaths : null,
         permission_mode: normalizeAiAgentPermissionMode(permissionMode),
+        event_name: eventName,
       },
     })
     closeStream()
@@ -126,6 +130,6 @@ export async function streamAiAgent(
     callbacks.onError(err instanceof Error ? err.message : String(err))
     closeStream()
   } finally {
-    unlisten()
+    cleanupTauriEventListener(unlisten)
   }
 }

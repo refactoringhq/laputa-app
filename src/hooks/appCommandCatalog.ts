@@ -48,6 +48,7 @@ type SimpleHandlerKey =
   | 'onToggleInspector'
   | 'onToggleAIChat'
   | 'onToggleTableOfContents'
+  | 'onExportNoteAsPdf'
   | 'onCommandPalette'
   | 'onZoomIn'
   | 'onZoomOut'

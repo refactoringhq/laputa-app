@@ -39,21 +39,23 @@ describe('release workflow macOS artifact names', () => {
   })
 
   it('passes the computed build version to Sentry release env for packaged apps', () => {
+    const artifactWorkflow = readFileSync(
+      `${process.cwd()}/.github/workflows/release-build-artifacts.yml`,
+      'utf8',
+    )
+    const releaseEnv = 'VITE_SENTRY_RELEASE: ${{ inputs.version }}'
+
+    expect(countOccurrences(artifactWorkflow, releaseEnv)).toBe(3)
+  })
+
+  it('gates Windows Authenticode signing through the shared artifact workflow', () => {
     const alphaWorkflow = readFileSync(`${process.cwd()}/.github/workflows/release.yml`, 'utf8')
     const stableWorkflow = readFileSync(
       `${process.cwd()}/.github/workflows/release-stable.yml`,
       'utf8',
     )
-    const releaseEnv = 'VITE_SENTRY_RELEASE: ${{ needs.version.outputs.version }}'
-
-    expect(countOccurrences(alphaWorkflow, releaseEnv)).toBe(3)
-    expect(countOccurrences(stableWorkflow, releaseEnv)).toBe(3)
-  })
-
-  it('requires Authenticode signing for Windows release installers', () => {
-    const alphaWorkflow = readFileSync(`${process.cwd()}/.github/workflows/release.yml`, 'utf8')
-    const stableWorkflow = readFileSync(
-      `${process.cwd()}/.github/workflows/release-stable.yml`,
+    const artifactWorkflow = readFileSync(
+      `${process.cwd()}/.github/workflows/release-build-artifacts.yml`,
       'utf8',
     )
     const signingScript = readFileSync(
@@ -61,14 +63,15 @@ describe('release workflow macOS artifact names', () => {
       'utf8',
     )
 
-    for (const workflow of [alphaWorkflow, stableWorkflow]) {
-      expect(workflow).toContain('WINDOWS_CODE_SIGNING_CERTIFICATE')
-      expect(workflow).toContain('WINDOWS_CERTIFICATE')
-      expect(workflow).toContain('./.github/scripts/configure-windows-authenticode.ps1')
-      expect(workflow).toContain('--config src-tauri/tauri.windows-signing.conf.json')
-      expect(workflow).toContain('Validate Windows Authenticode signatures')
-      expect(workflow).toContain('Get-AuthenticodeSignature')
-    }
+    expect(alphaWorkflow).toContain('require_windows_authenticode: false')
+    expect(stableWorkflow).toContain('require_windows_authenticode: true')
+    expect(artifactWorkflow).toContain('require_windows_authenticode:')
+    expect(artifactWorkflow).toContain('WINDOWS_CODE_SIGNING_CERTIFICATE')
+    expect(artifactWorkflow).toContain('WINDOWS_CERTIFICATE')
+    expect(artifactWorkflow).toContain('./.github/scripts/configure-windows-authenticode.ps1')
+    expect(artifactWorkflow).toContain('--config src-tauri/tauri.windows-signing.conf.json')
+    expect(artifactWorkflow).toContain('Validate Windows Authenticode signatures')
+    expect(artifactWorkflow).toContain('Get-AuthenticodeSignature')
     expect(signingScript).toContain('certificateThumbprint')
     expect(signingScript).toContain('timestampUrl')
     expect(signingScript).toContain('WINDOWS_CODE_SIGNING_CERTIFICATE_THUMBPRINT')

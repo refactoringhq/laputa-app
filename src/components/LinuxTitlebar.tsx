@@ -2,7 +2,9 @@ import type { CSSProperties, MouseEvent, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useDragRegion } from '../hooks/useDragRegion'
+import { resolveEffectiveLocale, translate, type AppLocale } from '../lib/i18n'
 import { shouldUseCustomWindowChrome } from '../utils/platform'
+import { cleanupTauriEventListener } from '../utils/tauriEventCleanup'
 import { LinuxMenuButton } from './LinuxMenuButton'
 import { Button } from './ui/button'
 
@@ -20,6 +22,10 @@ type ResizeDirection =
   | 'SouthWest'
   | 'West'
 
+type LinuxTitlebarProps = {
+  locale?: AppLocale
+}
+
 const RESIZE_HANDLES: ReadonlyArray<{
   cursor: CSSProperties['cursor']
   direction: ResizeDirection
@@ -35,10 +41,24 @@ const RESIZE_HANDLES: ReadonlyArray<{
   { direction: 'SouthEast', cursor: 'nwse-resize', style: { bottom: 0, right: 0, width: RESIZE_EDGE, height: RESIZE_EDGE } },
 ]
 
-export function LinuxTitlebar() {
+export function LinuxTitlebar({ locale: localeOverride }: LinuxTitlebarProps = {}) {
   const customChromeEnabled = shouldUseCustomWindowChrome()
+  const [documentLocale, setDocumentLocale] = useState(readDocumentLocale)
+  const locale = localeOverride ?? documentLocale
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const maximized = useLinuxMaximizedState(customChromeEnabled)
+
+  useEffect(() => {
+    if (localeOverride || !customChromeEnabled || typeof document === 'undefined') return
+
+    const syncLocale = () => setDocumentLocale(readDocumentLocale())
+    syncLocale()
+
+    const observer = new MutationObserver(syncLocale)
+    observer.observe(document.documentElement, { attributeFilter: ['lang'], attributes: true })
+
+    return () => observer.disconnect()
+  }, [customChromeEnabled, localeOverride])
 
   if (!customChromeEnabled) return null
 
@@ -56,10 +76,15 @@ export function LinuxTitlebar() {
         <div className="flex h-full items-center" data-no-drag>
           <LinuxMenuButton />
         </div>
-        <TitlebarWindowControls appWindow={appWindow} maximized={maximized} />
+        <TitlebarWindowControls appWindow={appWindow} locale={locale} maximized={maximized} />
       </div>
     </>
   )
+}
+
+function readDocumentLocale(): AppLocale {
+  if (typeof document === 'undefined') return 'en'
+  return resolveEffectiveLocale(document.documentElement.lang)
 }
 
 function useLinuxMaximizedState(enabled: boolean): boolean {
@@ -82,7 +107,7 @@ function useLinuxMaximizedState(enabled: boolean): boolean {
 
     return () => {
       active = false
-      void unlistenPromise.then((unlisten) => unlisten()).catch(() => {})
+      void unlistenPromise.then(cleanupTauriEventListener).catch(() => {})
     }
   }, [enabled])
 
@@ -117,24 +142,30 @@ function ResizeHandles() {
 
 function TitlebarWindowControls({
   appWindow,
+  locale,
   maximized,
 }: {
   appWindow: ReturnType<typeof getCurrentWindow>
+  locale: AppLocale
   maximized: boolean
 }) {
+  const minimizeLabel = translate(locale, 'window.minimize')
+  const resizeLabel = translate(locale, maximized ? 'window.restore' : 'window.maximize')
+  const closeLabel = translate(locale, 'window.close')
+
   return (
     <div className="flex h-full items-center" data-no-drag>
-      <TitlebarButton ariaLabel="Minimize" onClick={() => void appWindow.minimize().catch(() => {})}>
+      <TitlebarButton ariaLabel={minimizeLabel} onClick={() => void appWindow.minimize().catch(() => {})}>
         <MinimizeIcon />
       </TitlebarButton>
       <TitlebarButton
-        ariaLabel={maximized ? 'Restore' : 'Maximize'}
+        ariaLabel={resizeLabel}
         onClick={() => void appWindow.toggleMaximize().catch(() => {})}
       >
         {maximized ? <RestoreIcon /> : <MaximizeIcon />}
       </TitlebarButton>
       <TitlebarButton
-        ariaLabel="Close"
+        ariaLabel={closeLabel}
         close
         onClick={() => void appWindow.close().catch(() => {})}
       >

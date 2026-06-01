@@ -1,4 +1,4 @@
-import { SidebarSimple, X, Sparkle, WarningCircle, PencilSimple } from '@phosphor-icons/react'
+import { GearSix, X, Sparkle, WarningCircle, PencilSimple } from '@phosphor-icons/react'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { Button } from '@/components/ui/button'
 import { useDragRegion } from '../../hooks/useDragRegion'
@@ -36,11 +36,10 @@ export function InspectorHeader({ collapsed, frontmatterWarnings, locale = 'en',
   const propertiesTitle = translate(locale, 'inspector.title.properties')
   const showWarnings = Boolean(frontmatterWarnings && hasFrontmatterWarnings(frontmatterWarnings) && onOpenRawEditor)
   const propertiesIcon = (testId?: string) => (
-    <SidebarSimple
+    <GearSix
       size={16}
       weight="regular"
       className="shrink-0 text-muted-foreground"
-      style={{ transform: 'scaleX(-1)' }}
       data-testid={testId}
     />
   )
@@ -63,14 +62,7 @@ export function InspectorHeader({ collapsed, frontmatterWarnings, locale = 'en',
         </button>
       ) : (
         <>
-          <button type="button"
-            className="shrink-0 border-none bg-transparent p-1 text-muted-foreground cursor-pointer hover:text-foreground"
-            onClick={onToggle}
-            title={toggleLabel}
-            aria-label={toggleLabel}
-          >
-            {propertiesIcon('properties-panel-icon')}
-          </button>
+          {propertiesIcon('properties-panel-icon')}
           <span className="text-muted-foreground" style={{ fontSize: 13, fontWeight: 600 }}>{propertiesTitle}</span>
           {showWarnings && onOpenRawEditor && (
             <FrontmatterWarningsButton locale={locale} onOpenRawEditor={onOpenRawEditor} />

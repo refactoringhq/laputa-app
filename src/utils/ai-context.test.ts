@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { resolveTarget, collectLinkedEntries, buildContextualPrompt, buildContextSnapshot } from './ai-context'
+import {
+  resolveTarget,
+  collectLinkedEntries,
+  buildContextualPrompt,
+  buildContextSnapshot,
+  formatPromptWithReferences,
+} from './ai-context'
 import type { VaultEntry } from '../types'
 
 const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
@@ -237,6 +243,23 @@ describe('buildContextSnapshot', () => {
     expect(json.referencedNotes[1].type).toBe('Note') // null fallback
   })
 
+  it('embeds explicit referenced note bodies when available', () => {
+    const result = buildContextSnapshot({
+      activeEntry: active, entries,
+      references: [
+        {
+          title: 'Beta',
+          path: '/vault/b.md',
+          type: 'Person',
+          content: '---\ntitle: Beta\n---\n\n# Beta\nReferenced body.',
+        },
+      ],
+    })
+    const json = JSON.parse(result.split('```json\n')[1].split('\n```')[0])
+    expect(json.referencedNotes[0].body).toBe('# Beta\nReferenced body.')
+    expect(json.referencedNotes[0].body).not.toContain('title: Beta')
+  })
+
   it('omits referencedNotes when no references provided', () => {
     const result = buildContextSnapshot({ activeEntry: active, entries })
     const json = JSON.parse(result.split('```json\n')[1].split('\n```')[0])
@@ -395,5 +418,27 @@ describe('buildContextSnapshot', () => {
     expect(json.activeNote.frontmatter.belongsTo).toEqual(['[[Parent]]'])
     expect(json.activeNote.frontmatter.relatedTo).toEqual(['[[Sibling]]'])
     expect(json.activeNote.frontmatter.relationships).toEqual({ people: ['[[Alice]]'] })
+  })
+})
+
+describe('formatPromptWithReferences', () => {
+  it('adds referenced note context to the current prompt', () => {
+    const result = formatPromptWithReferences('Summarize this', [
+      {
+        title: 'Beta',
+        path: '/vault/b.md',
+        type: 'Person',
+        content: '---\ntitle: Beta\n---\n\nImportant referenced content.',
+      },
+    ])
+
+    expect(result).toContain('Summarize this')
+    expect(result).toContain('Referenced Notes')
+    expect(result).toContain('Important referenced content.')
+    expect(result).toContain('/vault/b.md')
+  })
+
+  it('leaves prompts without references unchanged', () => {
+    expect(formatPromptWithReferences('Plain prompt')).toBe('Plain prompt')
   })
 })

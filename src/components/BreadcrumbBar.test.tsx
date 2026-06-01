@@ -248,6 +248,16 @@ describe('BreadcrumbBar — file actions', () => {
 
     expect(onCopyDeepLink).toHaveBeenCalledWith(baseEntry)
   })
+
+  it('exports the current note as PDF from the overflow menu', async () => {
+    const onExportPdf = vi.fn()
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onExportPdf={onExportPdf} />)
+
+    const menu = await openOverflowMenu()
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Export note as PDF' }))
+
+    expect(onExportPdf).toHaveBeenCalledOnce()
+  })
 })
 
 describe('BreadcrumbBar — organized shortcut hint', () => {
@@ -686,18 +696,17 @@ describe('BreadcrumbBar — note width toggle', () => {
 })
 
 describe('BreadcrumbBar — AI panel toggle', () => {
-  it('hides the AI panel action when no toggle callback is available', () => {
+  it('keeps the AI panel action out of the breadcrumb bar', () => {
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
     expect(screen.queryByRole('button', { name: 'Open the AI panel' })).not.toBeInTheDocument()
   })
 
-  it('shows and runs the AI panel action when a toggle callback is available', () => {
+  it('does not render the breadcrumb AI panel action when a toggle callback is available', () => {
     const onToggleAIChat = vi.fn()
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onToggleAIChat={onToggleAIChat} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open the AI panel' }))
-
-    expect(onToggleAIChat).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'Open the AI panel' })).not.toBeInTheDocument()
+    expect(onToggleAIChat).not.toHaveBeenCalled()
   })
 })
 

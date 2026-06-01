@@ -37,6 +37,7 @@ const STATIC_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
   'change-note-type': 'command.note.changeType',
   'move-note-to-folder': 'command.note.moveToFolder',
   'copy-active-deep-link': 'command.note.copyDeepLink',
+  'export-note-pdf': 'command.note.exportPdf',
   'remove-note-icon': 'command.note.removeIcon',
   'open-in-new-window': 'command.note.openNewWindow',
   'initialize-git': 'command.git.initialize',

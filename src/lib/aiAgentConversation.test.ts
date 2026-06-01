@@ -164,6 +164,25 @@ describe('aiAgentConversation', () => {
     })
     expect(result.systemPrompt).toBe('SYSTEM')
   })
+
+  it('formats explicit note references into the current prompt', () => {
+    buildFormattedMessage(
+      { agent: 'codex', ready: true, vaultPath: '/vault', permissionMode: 'safe' },
+      [],
+      {
+        text: 'Use this note',
+        references: [{
+          path: '/vault/ref.md',
+          title: 'Ref',
+          type: 'Note',
+          content: 'Referenced body',
+        }],
+      },
+    )
+
+    expect(formatMessageWithHistoryMock).toHaveBeenCalledWith([], expect.stringContaining('Referenced body'))
+    expect(formatMessageWithHistoryMock).toHaveBeenCalledWith([], expect.stringContaining('/vault/ref.md'))
+  })
 })
 
 describe('aiAgentMessageState', () => {

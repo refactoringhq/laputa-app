@@ -95,7 +95,9 @@ function buildSearchRequest(args: Record<string, unknown>): VaultApiRequest | nu
   if (!query || !lastVaultPath) return null
 
   const mode = argText(payload, 'mode') ?? 'all'
-  return { kind: 'search', body: { mode, query, vault_path: lastVaultPath } }
+  const body: Record<string, unknown> = { mode, query, vault_path: lastVaultPath }
+  if (Reflect.get(payload, 'excludeFrontmatter') === true) body.exclude_frontmatter = true
+  return { kind: 'search', body }
 }
 
 function isPathQueryCommand(cmd: string): cmd is PathQueryCommand {

@@ -34,6 +34,23 @@ function mockFileHistory(path: string) {
   ]
 }
 
+function stripMockFrontmatter(content: string): string {
+  const lineEnding = content.startsWith('---\r\n')
+    ? '\r\n'
+    : content.startsWith('---\n') ? '\n' : null
+  if (!lineEnding) return content
+
+  const afterOpen = content.slice(3 + lineEnding.length)
+  const closeIndex = afterOpen.indexOf(`${lineEnding}---`)
+  if (closeIndex === -1) return content
+
+  return afterOpen.slice(closeIndex + lineEnding.length + 3).trimStart()
+}
+
+function mockSearchContent(content: string, excludeFrontmatter?: boolean): string {
+  return excludeFrontmatter ? stripMockFrontmatter(content) : content
+}
+
 function mockModifiedFiles(): ModifiedFile[] {
   return [
     { path: '/Users/luca/Laputa/26q1-laputa-app.md', relativePath: '26q1-laputa-app.md', status: 'modified' },
@@ -563,12 +580,12 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   migrate_is_a_to_type: () => 0,
   batch_archive_notes: (args: { paths: string[] }) => args.paths.length,
   batch_trash_notes: (args: { paths: string[] }) => args.paths.length,
-  search_vault: (args: { query: string; mode: string }) => {
+  search_vault: (args: { query: string; mode: string; excludeFrontmatter?: boolean }) => {
     const q = (args.query ?? '').toLowerCase()
     if (!q) return { results: [], elapsed_ms: 0, query: q, mode: args.mode }
     const matches = MOCK_ENTRIES
       .filter(e => {
-        const content = MOCK_CONTENT[e.path] ?? ''
+        const content = mockSearchContent(MOCK_CONTENT[e.path] ?? '', args.excludeFrontmatter)
         return e.title.toLowerCase().includes(q) || content.toLowerCase().includes(q)
       })
       .slice(0, 20)

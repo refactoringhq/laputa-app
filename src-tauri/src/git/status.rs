@@ -23,6 +23,12 @@ struct DiffStats {
     binary: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StatusEntry {
+    status_code: String,
+    relative_path: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FileChangeStatus {
     Modified,
@@ -54,37 +60,98 @@ impl FileChangeStatus {
     }
 }
 
-fn parse_status_path(raw_path: &str) -> String {
-    raw_path
-        .split(" -> ")
-        .last()
-        .unwrap_or(raw_path)
-        .trim()
-        .to_string()
+fn split_nul_fields(output: &[u8]) -> Vec<String> {
+    output
+        .split(|byte| *byte == 0)
+        .filter(|field| !field.is_empty())
+        .map(|field| String::from_utf8_lossy(field).into_owned())
+        .collect()
+}
+
+fn status_has_source_path(status_code: &str) -> bool {
+    status_code.contains('R') || status_code.contains('C')
+}
+
+fn parse_status_field(field: &str) -> Option<StatusEntry> {
+    if field.len() < 4 {
+        return None;
+    }
+
+    Some(StatusEntry {
+        status_code: field[..2].to_string(),
+        relative_path: field[3..].to_string(),
+    })
+}
+
+fn parse_status_output(output: &[u8]) -> Vec<StatusEntry> {
+    let fields = split_nul_fields(output);
+    let mut entries = Vec::new();
+    let mut index = 0;
+
+    while index < fields.len() {
+        let Some(entry) = parse_status_field(&fields[index]) else {
+            index += 1;
+            continue;
+        };
+        let has_source_path = status_has_source_path(&entry.status_code);
+        entries.push(entry);
+        index += if has_source_path { 2 } else { 1 };
+    }
+
+    entries
 }
 
 fn parse_numstat_field(field: &str) -> Option<usize> {
     field.parse().ok()
 }
 
-fn parse_numstat_line(line: &str) -> Option<(String, DiffStats)> {
-    let parts: Vec<&str> = line.split('\t').collect();
-    if parts.len() < 3 {
-        return None;
-    }
+fn parse_numstat_header(header: &str) -> Option<(Option<String>, DiffStats)> {
+    let mut parts = header.splitn(3, '\t');
+    let added = parts.next()?;
+    let deleted = parts.next()?;
+    let path = parts.next()?;
 
-    let added_lines = parse_numstat_field(parts[0]);
-    let deleted_lines = parse_numstat_field(parts[1]);
-    let binary = parts[0] == "-" || parts[1] == "-";
+    let added_lines = parse_numstat_field(added);
+    let deleted_lines = parse_numstat_field(deleted);
+    let binary = added == "-" || deleted == "-";
 
     Some((
-        parts.last()?.trim().to_string(),
+        (!path.is_empty()).then(|| path.to_string()),
         DiffStats {
             added_lines,
             deleted_lines,
             binary,
         },
     ))
+}
+
+fn parse_numstat_output(output: &[u8]) -> HashMap<String, DiffStats> {
+    let fields = split_nul_fields(output);
+    let mut stats = HashMap::new();
+    let mut index = 0;
+
+    while index < fields.len() {
+        let Some((path, diff_stats)) = parse_numstat_header(&fields[index]) else {
+            index += 1;
+            continue;
+        };
+
+        match path {
+            Some(path) => {
+                stats.insert(path, diff_stats);
+                index += 1;
+            }
+            None if index + 2 < fields.len() => {
+                stats.insert(fields[index + 2].clone(), diff_stats);
+                index += 3;
+            }
+            None => {
+                index += 1;
+            }
+        }
+    }
+
+    stats
 }
 
 fn repo_has_head(vault: &Path) -> Result<bool, String> {
@@ -103,7 +170,7 @@ fn load_diff_stats(vault: &Path) -> Result<HashMap<String, DiffStats>, String> {
     }
 
     let output = git_command()
-        .args(["diff", "--numstat", "--find-renames", "HEAD", "--"])
+        .args(["diff", "--numstat", "-z", "--find-renames", "HEAD", "--"])
         .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git diff --numstat: {e}"))?;
@@ -113,11 +180,7 @@ fn load_diff_stats(vault: &Path) -> Result<HashMap<String, DiffStats>, String> {
         return Err(format!("git diff --numstat failed: {}", stderr.trim()));
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(stdout
-        .lines()
-        .filter_map(parse_numstat_line)
-        .collect::<HashMap<_, _>>())
+    Ok(parse_numstat_output(&output.stdout))
 }
 
 fn count_worktree_lines(vault: &Path, relative_path: &Path) -> DiffStats {
@@ -229,7 +292,7 @@ pub fn get_modified_files_with_stats(
 
 fn get_modified_files_impl(vault: &Path, include_stats: bool) -> Result<Vec<ModifiedFile>, String> {
     let output = git_command()
-        .args(["status", "--porcelain", "--untracked-files=all"])
+        .args(["status", "--porcelain=v1", "-z", "--untracked-files=all"])
         .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git status: {e}"))?;
@@ -244,27 +307,22 @@ fn get_modified_files_impl(vault: &Path, include_stats: bool) -> Result<Vec<Modi
     } else {
         HashMap::new()
     };
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let files = stdout
-        .lines()
-        .filter(|line| !line.is_empty())
-        .filter_map(|line| {
-            if line.len() < 4 {
-                return None;
-            }
-            let status_code = &line[..2];
-            let relative_path = parse_status_path(&line[3..]);
-
+    let files = parse_status_output(&output.stdout)
+        .into_iter()
+        .filter_map(|entry| {
             // Only include markdown files
-            if !relative_path.ends_with(".md") {
+            if !entry.relative_path.ends_with(".md") {
                 return None;
             }
 
-            let status = FileChangeStatus::from_code(status_code);
-            let full_path = vault.join(&relative_path).to_string_lossy().to_string();
+            let status = FileChangeStatus::from_code(&entry.status_code);
+            let full_path = vault
+                .join(&entry.relative_path)
+                .to_string_lossy()
+                .to_string();
             let stats = resolve_diff_stats(
                 vault,
-                Path::new(&relative_path),
+                Path::new(&entry.relative_path),
                 status,
                 &diff_stats,
                 include_stats,
@@ -272,7 +330,7 @@ fn get_modified_files_impl(vault: &Path, include_stats: bool) -> Result<Vec<Modi
 
             Some(ModifiedFile {
                 path: full_path,
-                relative_path,
+                relative_path: entry.relative_path,
                 status: status.label().to_string(),
                 added_lines: stats.added_lines,
                 deleted_lines: stats.deleted_lines,
@@ -331,6 +389,32 @@ mod tests {
             .current_dir(vault)
             .output()
             .unwrap();
+    }
+
+    fn expect_modified_file(vp: &str, relative_path: &str, status: &str) -> ModifiedFile {
+        let modified = get_modified_files_with_stats(vp).unwrap();
+        let file = modified
+            .iter()
+            .find(|file| file.relative_path == relative_path)
+            .unwrap_or_else(|| panic!("{relative_path} should be reported as {status}"));
+
+        assert_eq!(file.status, status);
+        assert!(file.path.ends_with(relative_path));
+        file.clone()
+    }
+
+    fn expect_changed_file_after(
+        relative_path: &str,
+        status: &str,
+        change: impl FnOnce(&Path, &str),
+    ) -> ModifiedFile {
+        let dir = setup_git_repo();
+        let vault = dir.path();
+        let vp = vault.to_str().unwrap();
+
+        change(vault, vp);
+
+        expect_modified_file(vp, relative_path, status)
     }
 
     #[test]
@@ -443,24 +527,52 @@ mod tests {
 
     #[test]
     fn test_get_modified_files_preserves_chinese_markdown_path() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vp = vault.to_str().unwrap();
         let relative_path = "中文笔记.md";
 
-        force_quoted_git_paths(vault);
-        write_and_commit_markdown(vault, vp, relative_path, "# 初始\n");
-        fs::write(vault.join(relative_path), "# 初始\n\n更新\n").unwrap();
-
-        let modified = get_modified_files_with_stats(vp).unwrap();
-        let file = modified
-            .iter()
-            .find(|file| file.relative_path == relative_path)
-            .expect("Chinese markdown path should be reported as modified");
-
-        assert_eq!(file.status, "modified");
-        assert!(file.path.ends_with(relative_path));
+        let file = expect_changed_file_after(relative_path, "modified", |vault, vp| {
+            force_quoted_git_paths(vault);
+            write_and_commit_markdown(vault, vp, relative_path, "# 初始\n");
+            fs::write(vault.join(relative_path), "# 初始\n\n更新\n").unwrap();
+        });
         assert_eq!(file.added_lines, Some(2));
+    }
+
+    #[test]
+    fn test_get_modified_files_preserves_untracked_markdown_path_with_spaces() {
+        let relative_path = "test note.md";
+
+        let file = expect_changed_file_after(relative_path, "untracked", |vault, vp| {
+            write_and_commit_markdown(vault, vp, "init.md", "# Init\n");
+            fs::write(vault.join(relative_path), "# Test\n").unwrap();
+        });
+        assert_eq!(file.added_lines, Some(1));
+    }
+
+    #[test]
+    fn test_get_modified_files_preserves_modified_markdown_path_with_spaces() {
+        let relative_path = "test note.md";
+
+        let file = expect_changed_file_after(relative_path, "modified", |vault, vp| {
+            write_and_commit_markdown(vault, vp, relative_path, "# Test\n");
+            fs::write(vault.join(relative_path), "# Test\n\nUpdated\n").unwrap();
+        });
+        assert_eq!(file.added_lines, Some(2));
+    }
+
+    #[test]
+    fn test_get_modified_files_preserves_renamed_markdown_path_with_spaces() {
+        let relative_path = "test note.md";
+
+        let file = expect_changed_file_after(relative_path, "renamed", |vault, vp| {
+            write_and_commit_markdown(vault, vp, "alpha.md", "# Alpha\n");
+            git_command()
+                .args(["mv", "alpha.md", relative_path])
+                .current_dir(vault)
+                .output()
+                .unwrap();
+        });
+        assert_eq!(file.added_lines, Some(0));
+        assert_eq!(file.deleted_lines, Some(0));
     }
 
     #[test]

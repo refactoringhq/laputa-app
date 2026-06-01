@@ -292,6 +292,10 @@ pub(super) fn agents_content_can_be_refreshed(content: &str) -> bool {
     AgentsContent::new(content).can_be_refreshed()
 }
 
+pub(super) fn agents_content_is_known_managed_template(content: &str) -> bool {
+    AgentsContent::new(content).is_known_legacy_template()
+}
+
 /// Default AGENTS.md content — vault instructions for AI agents.
 /// Describes Tolaria vault mechanics only; no user-specific structure.
 /// The vault scanner will pick this up as a regular entry.

@@ -7,25 +7,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet" />
-    <style>
-      :root {
-        color-scheme: light;
-        background: #FFFFFF;
-        color: #37352F;
-      }
-      :root[data-theme="dark"] {
-        color-scheme: dark;
-        background: #1F1E1B;
-        color: #E6E1D8;
-      }
-      body {
-        background: inherit;
-        color: inherit;
-      }
-    </style>
-    <title>Tolaria</title>
-  </head>
-  <body>
     <script>
       (function () {
         function isResizeObserverLoopMessage(message) {
@@ -47,6 +28,63 @@
           }
         });
 
+        try {
+          if (new URLSearchParams(window.location.search).get('window') === 'ai-workspace') {
+            document.documentElement.classList.add('ai-workspace-native-window');
+          }
+        } catch {
+          // Leave the normal app chrome untouched if URL parsing is unavailable.
+        }
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        background: #FFFFFF;
+        color: #37352F;
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        background: #1F1E1B;
+        color: #E6E1D8;
+      }
+      body {
+        background: inherit;
+        color: inherit;
+      }
+      :root.ai-workspace-native-window,
+      :root.ai-workspace-native-window body {
+        background: transparent;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        width: 100%;
+      }
+      :root.ai-workspace-native-window body {
+        box-sizing: border-box;
+        padding: 20px;
+      }
+      :root.ai-workspace-native-window #root {
+        background: #FFFFFF;
+        border: 1px solid #E9E9E7;
+        border-radius: 12px;
+        box-sizing: border-box;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.10);
+        height: 100%;
+        overflow: hidden;
+        width: 100%;
+      }
+      :root.ai-workspace-native-window[data-theme="dark"] #root {
+        background: #1F1E1B;
+        border-color: #34322D;
+        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
+      }
+    </style>
+    <title>Tolaria</title>
+  </head>
+  <body>
+    <script>
+      (function () {
         var key = 'tolaria-theme';
         var legacyKey = 'laputa-theme';
         var systemDarkQuery = '(prefers-color-scheme: dark)';

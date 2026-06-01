@@ -4,6 +4,7 @@
 
 import type { VaultEntry } from '../types'
 import { isTauri } from '../mock-tauri'
+import { cleanupTauriEventListener } from './tauriEventCleanup'
 
 // --- Token estimation ---
 
@@ -208,7 +209,7 @@ export async function streamClaudeChat(
     callbacks.onError(err instanceof Error ? err.message : String(err))
     callbacks.onDone()
   } finally {
-    unlisten()
+    cleanupTauriEventListener(unlisten)
   }
 
   return state.sessionId

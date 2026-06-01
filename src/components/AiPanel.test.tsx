@@ -243,19 +243,19 @@ describe('AiPanel', () => {
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByText('Ask Claude Code about this note and its linked context')).toBeTruthy()
+    expect(screen.getByText('Ask anything to Claude Code')).toBeTruthy()
   })
 
-  it('shows context bar with active entry title', () => {
+  it('does not render a context bar for the active entry', () => {
     const entry = makeEntry({ title: 'My Note' })
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByTestId('context-bar')).toBeTruthy()
-    expect(screen.getByText('My Note')).toBeTruthy()
+    expect(screen.queryByTestId('context-bar')).toBeNull()
+    expect(screen.queryByText('My Note')).toBeNull()
   })
 
-  it('shows linked count in context bar when entry has outgoing links', () => {
+  it('does not show linked count in a sub-header', () => {
     const linked = makeEntry({ path: '/vault/linked.md', title: 'Linked Note' })
     const entry = makeEntry({ title: 'My Note', outgoingLinks: ['Linked Note'] })
     render(
@@ -264,11 +264,7 @@ describe('AiPanel', () => {
         activeEntry={entry} entries={[entry, linked]}
              />
     )
-    expect(screen.getByText('+ 1 linked')).toBeTruthy()
-  })
-
-  it('does not show context bar when no active entry', () => {
-    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    expect(screen.queryByText('+ 1 linked')).toBeNull()
     expect(screen.queryByTestId('context-bar')).toBeNull()
   })
 

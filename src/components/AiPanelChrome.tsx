@@ -1,5 +1,5 @@
-import { memo, useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
-import { Robot, X, PaperPlaneRight, Plus, Link } from '@phosphor-icons/react'
+import { memo, useCallback, useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
+import { Sparkle, X, PaperPlaneRight, Plus, Link } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
@@ -41,8 +41,11 @@ interface AiPanelMessageHistoryProps {
   locale?: AppLocale
   messages: AiAgentMessage[]
   isActive: boolean
+  onForkMessage?: (messageId: string) => void
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
+  onRegenerateMessage?: (messageId: string) => void
+  onScrollStateChange?: (scrolled: boolean) => void
   hasContext: boolean
 }
 
@@ -117,6 +120,7 @@ function ComposerInput({
       onUnsupportedPaste={onUnsupportedAiPaste}
       disabled={disabled}
       placeholder={placeholder}
+      placeholderClassName={hasControls ? 'px-2 py-1.5 text-[13px] leading-5' : undefined}
       inputRef={inputRef}
       editorClassName={cn(
         'max-h-[120px] overflow-y-auto overscroll-contain',
@@ -220,7 +224,7 @@ function AiPanelEmptyState({
         className="flex flex-col items-center justify-center text-center text-muted-foreground"
         style={{ paddingTop: 40 }}
       >
-        <Robot size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
+        <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
           {t('ai.panel.empty.checkingTitle')}
         </p>
@@ -237,7 +241,7 @@ function AiPanelEmptyState({
         className="flex flex-col items-center justify-center text-center text-muted-foreground"
         style={{ paddingTop: 40 }}
       >
-        <Robot size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
+        <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
           {t('ai.panel.empty.missingTitle', { agent: agentLabel })}
         </p>
@@ -253,7 +257,7 @@ function AiPanelEmptyState({
       className="flex flex-col items-center justify-center text-center text-muted-foreground"
       style={{ paddingTop: 40 }}
     >
-      <Robot size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
+      <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
       <p style={{ fontSize: 13, margin: '0 0 4px' }}>
         {hasContext
           ? t('ai.panel.empty.withContextTitle', { agent: agentLabel })
@@ -292,7 +296,7 @@ export const AiPanelHeader = memo(function AiPanelHeader({
       style={{ padding: '8px 12px', gap: 8 }}
     >
       <div className="flex items-center" style={{ gap: 8 }}>
-        <Robot size={16} className="shrink-0 text-muted-foreground" />
+        <Sparkle size={16} className="shrink-0 text-muted-foreground" />
         <div className="flex flex-1 flex-col overflow-hidden">
           <span className="text-muted-foreground" style={{ fontSize: 13, fontWeight: 600 }}>
             {t('ai.panel.title')}
@@ -422,20 +426,31 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   locale = 'en',
   messages,
   isActive,
+  onForkMessage,
   onOpenNote,
   onNavigateWikilink,
+  onRegenerateMessage,
+  onScrollStateChange,
   hasContext,
 }: AiPanelMessageHistoryProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
+
+  const updateScrollState = useCallback(() => {
+    const element = containerRef.current
+    onScrollStateChange?.((element?.scrollTop ?? 0) > 1)
+  }, [onScrollStateChange])
 
   useEffect(() => {
     void isActive
     void messages
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isActive])
+    if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(updateScrollState)
+    else updateScrollState()
+  }, [messages, isActive, updateScrollState])
 
   return (
-    <div className="flex-1 overflow-y-auto" style={{ padding: 12 }}>
+    <div ref={containerRef} className="flex-1 overflow-y-auto" style={{ padding: 12 }} onScroll={updateScrollState}>
       {messages.length === 0 && !isActive && (
         <AiPanelEmptyState
           agentLabel={agentLabel}
@@ -448,8 +463,12 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
         <AiMessage
           key={message.id ?? index}
           {...message}
+          locale={locale}
+          messageId={message.id}
+          onFork={onForkMessage}
           onOpenNote={onOpenNote}
           onNavigateWikilink={onNavigateWikilink}
+          onRegenerate={onRegenerateMessage}
         />
       ))}
       <div ref={endRef} />
@@ -487,7 +506,7 @@ export function AiPanelComposer({
 
   return (
     <div
-      className="flex shrink-0 flex-col border-t border-border"
+      className="flex shrink-0 flex-col"
       style={{ padding: '6px 10px' }}
     >
       <div className={cn(

@@ -374,6 +374,11 @@
         "accelerator": "CmdOrCtrl+Shift+O"
       }
     },
+    "noteExportPdf": {
+      "id": "note-export-pdf",
+      "route": { "kind": "handler", "handler": "onExportNoteAsPdf" },
+      "menuOwned": true
+    },
     "noteRestoreDeleted": {
       "id": "note-restore-deleted",
       "route": { "kind": "handler", "handler": "onRestoreDeletedNote" },
@@ -517,6 +522,7 @@
         { "kind": "command", "command": "noteRestoreDeleted", "label": "Restore Deleted Note", "enabled": false },
         { "kind": "separator" },
         { "kind": "command", "command": "noteOpenInNewWindow", "label": "Open in New Window" },
+        { "kind": "command", "command": "noteExportPdf", "label": "Export Note as PDF" },
         { "kind": "separator" },
         { "kind": "command", "command": "editToggleRawEditor", "label": "Toggle Raw Editor" },
         { "kind": "command", "command": "viewToggleTableOfContents", "label": "Toggle Table of Contents" },
@@ -557,7 +563,8 @@
       { "command": "editToggleDiff" },
       { "command": "viewToggleTableOfContents" },
       { "command": "viewToggleBacklinks" },
-      { "command": "noteOpenInNewWindow" }
+      { "command": "noteOpenInNewWindow" },
+      { "command": "noteExportPdf" }
     ],
     "editorFindDependent": [
       { "command": "editFindInNote" },

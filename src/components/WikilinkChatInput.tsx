@@ -11,6 +11,7 @@ interface WikilinkChatInputProps {
   onUnsupportedPaste?: (message: string) => void
   disabled?: boolean
   placeholder?: string
+  placeholderClassName?: string
   inputRef?: React.RefObject<HTMLDivElement | null>
   editorClassName?: string
   editorStyle?: CSSProperties
@@ -24,6 +25,7 @@ export function WikilinkChatInput({
   onUnsupportedPaste,
   disabled,
   placeholder,
+  placeholderClassName,
   inputRef,
   editorClassName,
   editorStyle,
@@ -37,6 +39,7 @@ export function WikilinkChatInput({
       onUnsupportedPaste={onUnsupportedPaste}
       disabled={disabled}
       placeholder={placeholder}
+      placeholderClassName={placeholderClassName}
       inputRef={inputRef}
       editorClassName={editorClassName}
       editorStyle={editorStyle}

@@ -100,14 +100,24 @@ pub async fn reload_vault(
 pub async fn search_vault(
     vault_path: String,
     query: String,
-    mode: String,
     limit: Option<usize>,
+    exclude_frontmatter: Option<bool>,
 ) -> Result<SearchResponse, String> {
     let vault_path = expand_tilde(&vault_path).into_owned();
     let limit = limit.unwrap_or(20);
-    tokio::task::spawn_blocking(move || search::search_vault(&vault_path, &query, &mode, limit))
-        .await
-        .map_err(|e| format!("Search task failed: {}", e))?
+    let exclude_frontmatter = exclude_frontmatter.unwrap_or(false);
+    tokio::task::spawn_blocking(move || {
+        search::search_vault_with_options(search::SearchOptions {
+            vault_path: &vault_path,
+            query: &query,
+            mode: "keyword",
+            limit,
+            hide_gitignored_files: crate::settings::hide_gitignored_files_enabled(),
+            exclude_frontmatter,
+        })
+    })
+    .await
+    .map_err(|e| format!("Search task failed: {}", e))?
 }
 
 #[cfg(test)]
@@ -264,7 +274,7 @@ mod tests {
         let response = search_vault(
             dir.path().to_string_lossy().into_owned(),
             "needle".to_string(),
-            "keyword".to_string(),
+            None,
             None,
         )
         .await
@@ -287,8 +297,8 @@ mod tests {
         let response = search_vault(
             dir.path().to_string_lossy().into_owned(),
             "needle".to_string(),
-            "keyword".to_string(),
             Some(1),
+            None,
         )
         .await
         .unwrap();

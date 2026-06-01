@@ -352,10 +352,13 @@ describe('NoteItem', () => {
     )
 
     const chip = screen.getByTestId('property-chip-belongs-to-0')
+    const row = chip.closest('[data-note-path]')
     expect(chip).toHaveTextContent('Build App')
     expect(chip.className).toContain('cursor-pointer')
     expect(chip).toHaveStyle({ color: 'rgb(0, 255, 255)' })
     expect(chip.getAttribute('style')).toContain('background-color: color-mix(in srgb, cyan 14%, transparent)')
+    expect(row?.tagName).toBe('DIV')
+    expect(row).toHaveAttribute('role', 'option')
 
     fireEvent.click(chip)
     expect(onClickNote).not.toHaveBeenCalled()

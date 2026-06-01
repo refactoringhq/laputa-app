@@ -53,6 +53,7 @@ export interface AppCommandHandlers {
   onToggleDiff?: () => void
   onToggleAIChat?: () => void
   onToggleTableOfContents?: () => void
+  onExportNoteAsPdf?: () => void
   onGoBack?: () => void
   onGoForward?: () => void
   onCheckForUpdates?: () => void
@@ -93,6 +94,7 @@ type SimpleHandlerKey = keyof Pick<
   | 'onToggleInspector'
   | 'onToggleAIChat'
   | 'onToggleTableOfContents'
+  | 'onExportNoteAsPdf'
   | 'onCommandPalette'
   | 'onZoomIn'
   | 'onZoomOut'
@@ -140,6 +142,7 @@ const SIMPLE_HANDLER_EXECUTORS: readonly [SimpleHandlerKey, SimpleHandlerExecuto
   ['onToggleInspector', (handlers) => handlers.onToggleInspector()],
   ['onToggleAIChat', (handlers) => handlers.onToggleAIChat?.()],
   ['onToggleTableOfContents', (handlers) => handlers.onToggleTableOfContents?.()],
+  ['onExportNoteAsPdf', (handlers) => handlers.onExportNoteAsPdf?.()],
   ['onCommandPalette', (handlers) => handlers.onCommandPalette()],
   ['onZoomIn', (handlers) => handlers.onZoomIn()],
   ['onZoomOut', (handlers) => handlers.onZoomOut()],

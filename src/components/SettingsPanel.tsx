@@ -46,6 +46,7 @@ import { areGitFeaturesEnabled } from '../lib/gitSettings'
 import { areAiFeaturesEnabled } from '../lib/aiFeatures'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import { AiProviderSettings } from './AiProviderSettings'
+import { AiAgentIcon } from './AiAgentIcon'
 import { GitSettingsSection } from './GitSettingsSection'
 import { PrivacySettingsSection } from './PrivacySettingsSection'
 import { SettingsBodyNav } from './SettingsBodyNav'
@@ -438,7 +439,7 @@ function SettingsPanelInner({
   return (
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-[1300] flex items-center justify-center"
       style={{ background: 'var(--shadow-overlay)' }}
       data-testid="settings-panel"
     >
@@ -1136,7 +1137,10 @@ function AiAgentsInstalledSection({
           return (
             <div key={definition.id} className="rounded-md border border-border bg-background px-3 py-2">
               <div className="flex items-center justify-between gap-2">
-                <div className="truncate text-sm font-medium text-foreground">{definition.label}</div>
+                <div className="flex min-w-0 items-center gap-2">
+                  <AiAgentIcon agent={definition.id} size={16} />
+                  <div className="truncate text-sm font-medium text-foreground">{definition.label}</div>
+                </div>
                 <div className={installed ? 'text-xs text-emerald-700' : 'text-xs text-muted-foreground'}>
                   {installed ? t('settings.aiAgents.installed') : t('settings.aiAgents.missing')}
                 </div>

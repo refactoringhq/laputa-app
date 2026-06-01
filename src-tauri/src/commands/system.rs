@@ -383,6 +383,16 @@ pub fn save_settings(settings: Settings) -> Result<(), String> {
     crate::settings::save_settings(settings)
 }
 
+#[tauri::command]
+pub fn get_ai_workspace_sessions() -> Result<serde_json::Value, String> {
+    crate::settings::get_ai_workspace_sessions()
+}
+
+#[tauri::command]
+pub fn save_ai_workspace_sessions(sessions: serde_json::Value) -> Result<(), String> {
+    crate::settings::save_ai_workspace_sessions(sessions)
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn check_for_app_update(

@@ -59,7 +59,8 @@ export function collectLinkedEntries(
 export interface NoteReference {
   title: string
   path: string
-  type: string | null
+  type?: string | null
+  content?: string
 }
 
 /** Lightweight note summary for the context snapshot. */
@@ -84,6 +85,9 @@ export interface ContextSnapshotParams {
 const MAX_ACTIVE_NOTE_BODY_CHARS = 24_000
 const ACTIVE_NOTE_BODY_HEAD_CHARS = 16_000
 const ACTIVE_NOTE_BODY_TAIL_CHARS = 4_000
+const MAX_REFERENCED_NOTE_BODY_CHARS = 12_000
+const REFERENCED_NOTE_BODY_HEAD_CHARS = 8_000
+const REFERENCED_NOTE_BODY_TAIL_CHARS = 2_000
 const MAX_NOTE_LIST_ITEMS = 100
 
 interface ActiveNoteBody {
@@ -142,6 +146,14 @@ function truncatedBodyInstruction(path: string, omittedChars: number): string {
   ].join(' ')
 }
 
+function truncatedReferencedBodyInstruction(path: string, omittedChars: number): string {
+  return [
+    '[Referenced note body truncated by Tolaria to keep CLI agent context within provider limits.',
+    `Omitted approximately ${omittedChars} characters from the middle.`,
+    `Use get_note("${path}") to read the full note before making content-sensitive edits or summaries.]`,
+  ].join(' ')
+}
+
 function compactActiveNoteBody(body: string, path: string): ActiveNoteBody {
   if (body.length <= MAX_ACTIVE_NOTE_BODY_CHARS) {
     return { body }
@@ -155,6 +167,25 @@ function compactActiveNoteBody(body: string, path: string): ActiveNoteBody {
     body: `${head}\n\n${truncatedBodyInstruction(path, omittedChars)}\n\n${tail}`,
     bodyTruncated: {
       shownChars: ACTIVE_NOTE_BODY_HEAD_CHARS + ACTIVE_NOTE_BODY_TAIL_CHARS,
+      totalChars: body.length,
+      strategy: 'head-tail',
+    },
+  }
+}
+
+function compactReferencedNoteBody(body: string, path: string): ActiveNoteBody {
+  if (body.length <= MAX_REFERENCED_NOTE_BODY_CHARS) {
+    return { body }
+  }
+
+  const head = body.slice(0, REFERENCED_NOTE_BODY_HEAD_CHARS).trimEnd()
+  const tail = body.slice(-REFERENCED_NOTE_BODY_TAIL_CHARS).trimStart()
+  const omittedChars = Math.max(0, body.length - REFERENCED_NOTE_BODY_HEAD_CHARS - REFERENCED_NOTE_BODY_TAIL_CHARS)
+
+  return {
+    body: `${head}\n\n${truncatedReferencedBodyInstruction(path, omittedChars)}\n\n${tail}`,
+    bodyTruncated: {
+      shownChars: REFERENCED_NOTE_BODY_HEAD_CHARS + REFERENCED_NOTE_BODY_TAIL_CHARS,
       totalChars: body.length,
       strategy: 'head-tail',
     },
@@ -208,14 +239,33 @@ function hasNoteListFilter(noteListFilter?: { type: string | null; query: string
   return Boolean(noteListFilter?.type || noteListFilter?.query)
 }
 
-function appendReferencedNotes(snapshot: Record<string, unknown>, references?: NoteReference[]): void {
-  if (!references?.length) return
-
-  snapshot.referencedNotes = references.map(ref => ({
+function referencedNoteSnapshot(ref: NoteReference): Record<string, unknown> {
+  const note: Record<string, unknown> = {
     path: ref.path,
     title: ref.title,
     type: ref.type ?? 'Note',
-  }))
+  }
+
+  if (ref.content === undefined) {
+    note.body = `[Referenced note content not embedded — use get_note("${ref.path}") to read the full note before answering about it.]`
+    return note
+  }
+
+  const bodySnapshot = compactReferencedNoteBody(extractBody(ref.content), ref.path)
+  note.body = bodySnapshot.body
+  assignIfPresent(note, 'bodyTruncated', bodySnapshot.bodyTruncated)
+  return note
+}
+
+function referencedNotesSnapshot(references?: NoteReference[]): Record<string, unknown>[] {
+  return references?.map(referencedNoteSnapshot) ?? []
+}
+
+function appendReferencedNotes(snapshot: Record<string, unknown>, references?: NoteReference[]): void {
+  const referencedNotes = referencedNotesSnapshot(references)
+  if (!referencedNotes.length) return
+
+  snapshot.referencedNotes = referencedNotes
 }
 
 function vaultSummary(entries: VaultEntry[]): Record<string, unknown> {
@@ -256,6 +306,21 @@ export function buildContextSnapshot(params: ContextSnapshotParams): string {
   ].join('\n')
 
   return `${preamble}\n\n## Context Snapshot\n\`\`\`json\n${JSON.stringify(snapshot, null, 2)}\n\`\`\``
+}
+
+export function formatPromptWithReferences(text: string, references?: NoteReference[]): string {
+  const referencedNotes = referencedNotesSnapshot(references)
+  if (!referencedNotes.length) return text
+
+  return [
+    text,
+    '',
+    '## Referenced Notes',
+    'The user explicitly referenced these notes in the prompt. Use their bodies as first-class context.',
+    '```json',
+    JSON.stringify(referencedNotes, null, 2),
+    '```',
+  ].join('\n')
 }
 
 /** Legacy: Build a contextual system prompt (text-based). */

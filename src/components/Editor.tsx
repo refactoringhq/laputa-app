@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, memo, useState } from 'react'
+import { useRef, useEffect, useCallback, memo, useState, type ReactNode } from 'react'
 import { useEditorTabSwap } from '../hooks/useEditorTabSwap'
 import { useCreateBlockNote } from '@blocknote/react'
 import '@blocknote/mantine/style.css'
@@ -36,6 +36,8 @@ import { createImeCompositionKeyGuardExtension } from './imeCompositionKeyGuardE
 import { createMathInputExtension } from './mathInputExtension'
 import { createRichEditorTransformErrorRecoveryExtension } from './richEditorTransformErrorRecoveryExtension'
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
+import { useEditorPdfExport } from './useEditorPdfExport'
+import type { NotePdfExportSource } from '../utils/notePdfExport'
 import './Editor.css'
 import './EditorTheme.css'
 
@@ -82,6 +84,7 @@ interface EditorProps {
   onInitializeProperties?: (path: string) => void
   showAIChat?: boolean
   onToggleAIChat?: () => void
+  aiWorkspaceSurface?: ReactNode
   vaultPath?: string
   vaultPaths?: string[]
   noteList?: NoteListItem[]
@@ -115,6 +118,10 @@ interface EditorProps {
   diffToggleRef?: React.MutableRefObject<() => void>
   /** Mutable ref that Editor registers its table-of-contents toggle into, for app shortcuts and menus. */
   tableOfContentsToggleRef?: React.MutableRefObject<() => void>
+  /** Mutable ref that Editor registers the PDF export command into, for command palette and native menu access. */
+  pdfExportRef?: React.MutableRefObject<((source?: NotePdfExportSource) => void) | null>
+  /** Emits short user-visible messages for editor actions. */
+  onToast?: (message: string | null) => void
   onFileCreated?: (relativePath: string) => void
   onFileModified?: (relativePath: string) => void
   onVaultChanged?: () => void
@@ -345,6 +352,7 @@ function EditorLayout({
   showDiffToggle,
   showAIChat,
   onToggleAIChat,
+  aiWorkspaceSurface,
   showTableOfContents,
   onToggleTableOfContents,
   inspectorCollapsed,
@@ -357,6 +365,7 @@ function EditorLayout({
   onRevealFile,
   onCopyFilePath,
   onCopyDeepLink,
+  onExportPdf,
   onOpenExternalFile,
   onDeleteNote,
   onArchiveNote,
@@ -417,6 +426,7 @@ function EditorLayout({
   showDiffToggle: boolean
   showAIChat?: boolean
   onToggleAIChat?: () => void
+  aiWorkspaceSurface?: ReactNode
   showTableOfContents?: boolean
   onToggleTableOfContents?: () => void
   inspectorCollapsed: boolean
@@ -469,13 +479,14 @@ function EditorLayout({
   workspaces?: WorkspaceIdentity[]
   onUnsupportedAiPaste?: (message: string) => void
   locale?: AppLocale
+  onExportPdf?: (source?: NotePdfExportSource) => void
 }) {
   const activeBinaryTab = activeTab?.entry.fileKind === 'binary' ? activeTab : null
   const showEmptyState = tabs.length === 0 && activeTabPath === null && !isVaultLoading
 
   return (
     <div className="editor flex flex-col min-h-0 overflow-hidden bg-background text-foreground">
-      <div className="flex flex-1 min-h-0">
+      <div className="relative flex flex-1 min-h-0">
         {showEmptyState
           ? <EditorEmptyState locale={locale} />
           : activeBinaryTab
@@ -520,6 +531,7 @@ function EditorLayout({
               onRevealFile={onRevealFile}
               onCopyFilePath={onCopyFilePath}
               onCopyDeepLink={onCopyDeepLink}
+              onExportPdf={() => onExportPdf?.('breadcrumb')}
               onDeleteNote={onDeleteNote}
               onArchiveNote={onArchiveNote}
               onUnarchiveNote={onUnarchiveNote}
@@ -576,6 +588,7 @@ function EditorLayout({
           workspaces={workspaces}
           locale={locale}
         />
+        {showAIChat && aiWorkspaceSurface}
       </div>
       <EditorMemoryProbe entries={entries} vaultPath={vaultPath} locale={locale} />
     </div>
@@ -620,6 +633,16 @@ export const Editor = memo(function Editor(props: EditorProps) {
     handleToggleRawExclusive: runtime.handleToggleRawExclusive,
     rawMode: runtime.rawMode,
   })
+  const handleExportPdf = useEditorPdfExport({
+    activeTab: runtime.activeTab,
+    diffMode: runtime.diffMode,
+    handleToggleDiffExclusive: runtime.handleToggleDiffExclusive,
+    handleToggleRawExclusive: runtime.handleToggleRawExclusive,
+    locale: props.locale,
+    onToast: props.onToast,
+    pdfExportRef: props.pdfExportRef,
+    rawMode: runtime.rawMode,
+  })
   useRegisterEditorContentFlushes({
     activeTab: runtime.activeTab,
     flushPendingEditorChange: runtime.flushPendingEditorChange,
@@ -645,6 +668,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
       onToggleAIChat={props.onToggleAIChat ? rightPanel.handleToggleAIChatPanel : undefined}
       showTableOfContents={rightPanel.showTableOfContents}
       onToggleTableOfContents={rightPanel.handleToggleTableOfContents}
+      onExportPdf={handleExportPdf}
     />
   )
 })

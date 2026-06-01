@@ -1,16 +1,10 @@
 import { useCallback, useEffect } from 'react'
-import { isTauri } from '../mock-tauri'
 import { trackEvent } from '../lib/telemetry'
 import { SETTINGS_SECTION_IDS } from '../components/settingsSectionIds'
 import {
   AI_WORKSPACE_DOCK_REQUESTED_EVENT,
   OPEN_AI_CHAT_EVENT,
 } from '../utils/aiPromptBridge'
-import {
-  dockCurrentAiWorkspaceWindow,
-  openAiWorkspaceWindow,
-  type AiWorkspaceWindowContext,
-} from '../utils/openAiWorkspaceWindow'
 
 interface UseAppAiWorkspaceBridgeOptions {
   aiFeaturesEnabled: boolean
@@ -20,38 +14,24 @@ interface UseAppAiWorkspaceBridgeOptions {
   openSettings: () => void
   setSettingsInitialSectionId: (sectionId: string | null) => void
   showAIChat: boolean
-  windowContext?: AiWorkspaceWindowContext
 }
 
 interface AppAiWorkspaceBridge {
   effectiveShowAIChat: boolean
-  handleDockCurrentAiWorkspaceWindow: () => void
   handleOpenAiSettings: () => void
   handleOpenDockedAiWorkspace: () => void
-  handlePopOutAiWorkspace: () => void
 }
 
-type Unlisten = () => void
-
-function listenForNativeDockRequests(handleDockRequest: () => void): Promise<Unlisten | null> | null {
-  if (!isTauri()) return null
-
-  return import('@tauri-apps/api/event')
-    .then(({ listen }) => listen(AI_WORKSPACE_DOCK_REQUESTED_EVENT, handleDockRequest))
-    .catch(() => null)
-}
-
-function useOpenAiChatEvent(aiFeaturesEnabled: boolean, openAIChat: () => void) {
+function useOpenAiChatEvent(aiFeaturesEnabled: boolean, openAiWorkspace: (source: 'event') => void) {
   useEffect(() => {
     const handleOpenAiChat = () => {
       if (!aiFeaturesEnabled) return
-      openAIChat()
-      trackEvent('ai_workspace_open', { source: 'event' })
+      openAiWorkspace('event')
     }
 
     window.addEventListener(OPEN_AI_CHAT_EVENT, handleOpenAiChat)
     return () => window.removeEventListener(OPEN_AI_CHAT_EVENT, handleOpenAiChat)
-  }, [aiFeaturesEnabled, openAIChat])
+  }, [aiFeaturesEnabled, openAiWorkspace])
 }
 
 function useDockRequestEvent(aiFeaturesEnabled: boolean, aiWorkspaceWindow: boolean, openAIChat: () => void) {
@@ -65,11 +45,9 @@ function useDockRequestEvent(aiFeaturesEnabled: boolean, aiWorkspaceWindow: bool
     }
 
     window.addEventListener(AI_WORKSPACE_DOCK_REQUESTED_EVENT, handleDockRequest)
-    const unlistenPromise = listenForNativeDockRequests(handleDockRequest)
 
     return () => {
       window.removeEventListener(AI_WORKSPACE_DOCK_REQUESTED_EVENT, handleDockRequest)
-      void unlistenPromise?.then((unlisten) => unlisten?.()).catch(() => undefined)
     }
   }, [aiFeaturesEnabled, aiWorkspaceWindow, openAIChat])
 }
@@ -88,9 +66,7 @@ export function useAppAiWorkspaceBridge({
   openSettings,
   setSettingsInitialSectionId,
   showAIChat,
-  windowContext,
 }: UseAppAiWorkspaceBridgeOptions): AppAiWorkspaceBridge {
-  useOpenAiChatEvent(aiFeaturesEnabled, openAIChat)
   useCloseDisabledAiWorkspace(aiFeaturesEnabled, closeAIChat, showAIChat)
   useDockRequestEvent(aiFeaturesEnabled, aiWorkspaceWindow, openAIChat)
 
@@ -99,36 +75,23 @@ export function useAppAiWorkspaceBridge({
     openSettings()
   }, [openSettings, setSettingsInitialSectionId])
 
+  const openAiWorkspace = useCallback(
+    (source: 'event' | 'status_bar') => {
+      trackEvent('ai_workspace_open', { source })
+      openAIChat()
+    },
+    [openAIChat],
+  )
+
+  useOpenAiChatEvent(aiFeaturesEnabled, openAiWorkspace)
+
   const handleOpenDockedAiWorkspace = useCallback(() => {
-    openAIChat()
-    trackEvent('ai_workspace_open', { source: 'status_bar' })
-  }, [openAIChat])
-
-  const handlePopOutAiWorkspace = useCallback(() => {
-    closeAIChat()
-    trackEvent('ai_workspace_pop_out')
-    void openAiWorkspaceWindow(windowContext)
-      .then((opened) => {
-        if (!opened) openAIChat()
-      })
-      .catch((err) => {
-        console.warn('[ai] Failed to open workspace window:', err)
-        openAIChat()
-      })
-  }, [closeAIChat, openAIChat, windowContext])
-
-  const handleDockCurrentAiWorkspaceWindow = useCallback(() => {
-    trackEvent('ai_workspace_docked', { source: 'button' })
-    void dockCurrentAiWorkspaceWindow().catch((err) => {
-      console.warn('[ai] Failed to dock workspace window:', err)
-    })
-  }, [])
+    openAiWorkspace('status_bar')
+  }, [openAiWorkspace])
 
   return {
     effectiveShowAIChat: aiFeaturesEnabled && showAIChat,
-    handleDockCurrentAiWorkspaceWindow,
     handleOpenAiSettings,
     handleOpenDockedAiWorkspace,
-    handlePopOutAiWorkspace,
   }
 }

@@ -15,10 +15,9 @@ import {
   EDITOR_FIND_AVAILABILITY_EVENT,
   readEditorFindAvailability,
 } from '../utils/editorFindEvents'
+import { cleanupTauriEventListener, type TauriUnlisten } from '../utils/tauriEventCleanup'
 
 const NOTE_LIST_SEARCH_MENU_ID = 'edit-toggle-note-list-search'
-
-type NativeUnlisten = () => void | Promise<void>
 
 export interface MenuEventHandlers extends AppCommandHandlers {
   activeTabPath: string | null
@@ -64,18 +63,12 @@ function syncNativeMenuState(state: MenuStatePayload): void {
     .catch((err) => console.warn('[menu] Failed to sync native menu state:', err))
 }
 
-function cleanupNativeMenuListener(unlisten: NativeUnlisten): void {
-  void Promise.resolve()
-    .then(unlisten)
-    .catch(() => {})
-}
-
 function useNativeMenuEventListener(handlersRef: { current: MenuEventHandlers }) {
   useEffect(() => {
     if (!isTauri()) return
 
     let disposed = false
-    let unlisten: NativeUnlisten | null = null
+    let unlisten: TauriUnlisten | null = null
 
     import('@tauri-apps/api/event')
       .then(async ({ listen }) => {
@@ -84,7 +77,7 @@ function useNativeMenuEventListener(handlersRef: { current: MenuEventHandlers })
         })
 
         if (disposed) {
-          cleanupNativeMenuListener(teardown)
+          cleanupTauriEventListener(teardown)
           return
         }
 
@@ -96,7 +89,7 @@ function useNativeMenuEventListener(handlersRef: { current: MenuEventHandlers })
 
     return () => {
       disposed = true
-      if (unlisten) cleanupNativeMenuListener(unlisten)
+      cleanupTauriEventListener(unlisten)
     }
   }, [handlersRef])
 }

@@ -7,6 +7,7 @@ import { executeCommand, openCommandPalette } from './helpers'
 let tempVaultDir: string
 
 const INLINE_LATEX = 'E=mc^2'
+const SQRT_LATEX = '\\sqrt{x}'
 const DISPLAY_LATEX = '\\int_0^1 x^2 \\, dx = \\frac{1}{3}'
 const MALFORMED_LATEX = '\\frac{'
 const TABLE_INLINE_LATEX = '\\frac{a}{b}+c'
@@ -92,6 +93,14 @@ async function expectMathNode(page: Page, selector: string, latex: string): Prom
   ).toBe(true)
 }
 
+async function expectMathSvgPath(page: Page, latex: string): Promise<void> {
+  await expect.poll(async () =>
+    page.locator('.math').evaluateAll((nodes, expectedLatex) =>
+      nodes.some((node) => node.getAttribute('data-latex') === expectedLatex && Boolean(node.querySelector('svg path'))),
+    latex),
+  ).toBe(true)
+}
+
 function readNoteBFile(): string {
   return fs.readFileSync(path.join(tempVaultDir, 'note', 'note-b.md'), 'utf8')
 }
@@ -104,6 +113,8 @@ test('LaTeX math source round-trips through rich mode, save, and reopen @smoke',
   const nextContent = `${originalContent.trimEnd()}
 
 Inline math $${INLINE_LATEX}$ stays in prose.
+
+Square root $${SQRT_LATEX}$ should draw a stretched radical.
 
 $$
 ${DISPLAY_LATEX}
@@ -120,20 +131,24 @@ Malformed math $${MALFORMED_LATEX}$ stays visible.
   await setRawEditorContent(page, nextContent)
 
   await expect.poll(readNoteBFile).toContain(`$${INLINE_LATEX}$`)
+  await expect.poll(readNoteBFile).toContain(`$${SQRT_LATEX}$`)
   await expect.poll(readNoteBFile).toContain(`$$\n${DISPLAY_LATEX}\n$$`)
 
   await toggleRawMode(page, '.bn-editor')
 
   await expectMathNode(page, '.math--inline', INLINE_LATEX)
+  await expectMathNode(page, '.math--inline', SQRT_LATEX)
+  await expectMathSvgPath(page, SQRT_LATEX)
   await expectMathNode(page, '.math--inline', TABLE_INLINE_LATEX)
   await expectMathNode(page, '.math--block', DISPLAY_LATEX)
   await expectMathNode(page, '.math--inline', MALFORMED_LATEX)
   await expect(page.locator('table')).toHaveCount(1)
-  await expect(page.locator('.math .katex, .math .katex-error')).toHaveCount(4)
+  await expect(page.locator('.math .katex, .math .katex-error')).toHaveCount(5)
 
   await toggleRawMode(page, '.cm-content')
   const rawAfterRichMode = await getRawEditorContent(page)
   expect(rawAfterRichMode).toContain(`$${INLINE_LATEX}$`)
+  expect(rawAfterRichMode).toContain(`$${SQRT_LATEX}$`)
   expect(rawAfterRichMode).toContain(`$$\n${DISPLAY_LATEX}\n$$`)
   expect(rawAfterRichMode).toContain(`$${MALFORMED_LATEX}$`)
   expect(rawAfterRichMode).toContain(`$${TABLE_INLINE_LATEX}$`)
@@ -147,6 +162,7 @@ Malformed math $${MALFORMED_LATEX}$ stays visible.
 
   const reopenedRaw = await getRawEditorContent(page)
   expect(reopenedRaw).toContain(`$${INLINE_LATEX}$`)
+  expect(reopenedRaw).toContain(`$${SQRT_LATEX}$`)
   expect(reopenedRaw).toContain(`$$\n${DISPLAY_LATEX}\n$$`)
   expect(reopenedRaw).toContain(`$${MALFORMED_LATEX}$`)
   expect(reopenedRaw).toContain(`$${TABLE_INLINE_LATEX}$`)

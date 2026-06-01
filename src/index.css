@@ -392,6 +392,25 @@
     width: 100%;
     height: 100%;
   }
+  html.ai-workspace-native-window,
+  html.ai-workspace-native-window body,
+  html.ai-workspace-native-window #root {
+    background: transparent;
+    overflow: hidden;
+  }
+  html.ai-workspace-native-window body {
+    padding: 20px;
+  }
+  html.ai-workspace-native-window #root {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.10);
+  }
+  html.ai-workspace-native-window.dark #root,
+  html.ai-workspace-native-window[data-theme="dark"] #root {
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
+  }
   /* Interactive controls should advertise clickability unless disabled. */
   :where(
     button:not(:disabled):not([aria-disabled="true"]),
@@ -573,8 +592,8 @@
 
 .typing-dot {
   display: inline-block;
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--muted-foreground);
   animation: typing-bounce 1.2s ease-in-out infinite;
@@ -582,5 +601,5 @@
 
 @keyframes typing-bounce {
   0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
-  30% { opacity: 1; transform: translateY(-3px); }
+  30% { opacity: 1; transform: translateY(-2px); }
 }

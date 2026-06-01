@@ -1,15 +1,12 @@
-use super::git_command;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+use super::command::{git_output, git_output_result, stderr_text, stdout_text};
 use super::conflict::get_conflict_files;
+use super::remote_config::has_configured_remote;
 
-const GIT_CONFIG_SUBCOMMAND: &str = "config";
-const GIT_CONFIG_GET_REGEXP: &str = "--get-regexp";
-const REMOTE_URL_CONFIG_PATTERN: &str = r"^remote\..*\.url$";
 const NO_REMOTE_STATUS: &str = "no_remote";
 const NO_REMOTE_MESSAGE: &str = "No remote configured";
-const GIT_INSPECT_REMOTES_ERROR: &str = "Failed to inspect git remotes";
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct GitPullResult {
@@ -24,33 +21,7 @@ pub struct GitPullResult {
 /// Check whether the vault repo has at least one remote configured.
 pub fn has_remote(vault_path: &str) -> Result<bool, String> {
     let vault = Path::new(vault_path);
-    remote_url_config_exists(vault)
-}
-
-fn remote_url_config_exists(vault: &Path) -> Result<bool, String> {
-    let output = git_command()
-        .args([
-            GIT_CONFIG_SUBCOMMAND,
-            GIT_CONFIG_GET_REGEXP,
-            REMOTE_URL_CONFIG_PATTERN,
-        ])
-        .current_dir(vault)
-        .output()
-        .map_err(|e| format!("Failed to inspect git remotes: {}", e))?;
-
-    if !output.status.success() {
-        if output.status.code() == Some(1) {
-            return Ok(false);
-        }
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(if stderr.is_empty() {
-            GIT_INSPECT_REMOTES_ERROR.to_string()
-        } else {
-            stderr
-        });
-    }
-
-    Ok(!String::from_utf8_lossy(&output.stdout).trim().is_empty())
+    has_configured_remote(vault)
 }
 
 /// Pull latest changes from remote. Uses --no-rebase to merge.
@@ -67,14 +38,11 @@ pub fn git_pull(vault_path: &str) -> Result<GitPullResult, String> {
         });
     }
 
-    let output = git_command()
-        .args(["pull", "--no-rebase"])
-        .current_dir(vault)
-        .output()
+    let output = git_output(vault, &["pull", "--no-rebase"])
         .map_err(|e| format!("Failed to run git pull: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let stdout = stdout_text(&output);
+    let stderr = stderr_text(&output);
 
     if output.status.success() {
         if stdout.contains("Already up to date") || stdout.contains("Already up-to-date") {
@@ -161,18 +129,14 @@ pub fn git_remote_status(vault_path: &str) -> Result<GitRemoteStatus, String> {
     }
 
     // Fetch latest remote refs (silent, best-effort)
-    let _ = git_command()
-        .args(["fetch", "--quiet"])
-        .current_dir(vault)
-        .output();
+    let _ = git_output(vault, &["fetch", "--quiet"]);
 
     let branch = current_branch(vault)?;
 
-    let output = git_command()
-        .args(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
-        .current_dir(vault)
-        .output()
-        .map_err(|e| format!("Failed to run git rev-list: {}", e))?;
+    let output = git_output_result(
+        vault,
+        &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"],
+    )?;
 
     if !output.status.success() {
         // No upstream set — report 0/0
@@ -184,8 +148,8 @@ pub fn git_remote_status(vault_path: &str) -> Result<GitRemoteStatus, String> {
         });
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let parts: Vec<&str> = stdout.trim().split('\t').collect();
+    let stdout = stdout_text(&output);
+    let parts: Vec<&str> = stdout.split('\t').collect();
     let ahead = parts.first().and_then(|s| s.parse().ok()).unwrap_or(0);
     let behind = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
 
@@ -198,12 +162,9 @@ pub fn git_remote_status(vault_path: &str) -> Result<GitRemoteStatus, String> {
 }
 
 fn current_branch(vault: &Path) -> Result<String, String> {
-    let output = git_command()
-        .args(["branch", "--show-current"])
-        .current_dir(vault)
-        .output()
+    let output = git_output(vault, &["branch", "--show-current"])
         .map_err(|e| format!("Failed to get branch: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    Ok(stdout_text(&output))
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -333,14 +294,11 @@ pub fn git_push(vault_path: &str) -> Result<GitPushResult, String> {
         });
     }
 
-    let output = git_command()
-        .args(["push"])
-        .current_dir(vault)
-        .output()
-        .map_err(|e| format!("Failed to run git push: {}", e))?;
+    let output =
+        git_output(vault, &["push"]).map_err(|e| format!("Failed to run git push: {}", e))?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stderr = stderr_text(&output);
         return Ok(classify_push_error(&stderr));
     }
 
@@ -353,6 +311,7 @@ pub fn git_push(vault_path: &str) -> Result<GitPushResult, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::git::git_command;
     use crate::git::git_commit;
     use crate::git::tests::{setup_git_repo, setup_remote_pair};
     use std::fs;

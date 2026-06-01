@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import type { VaultEntry } from '../types'
-import { fuzzyMatch, bestSearchRank } from '../utils/fuzzyMatch'
+import { fuzzyMatch } from '../utils/fuzzyMatch'
 import { getTypeColor, getTypeLightColor, buildTypeEntryMap } from '../utils/typeColors'
 import { getTypeIcon } from '../components/NoteItem'
 import type { NoteSearchResultItem } from '../components/NoteSearchList'
+import { slugifyNoteStem } from '../utils/noteSlug'
 
 const DEFAULT_MAX_RESULTS = 20
 
@@ -11,18 +12,168 @@ export interface NoteSearchResult extends NoteSearchResultItem {
   entry: VaultEntry
 }
 
-function toResult(e: VaultEntry, typeEntryMap: Record<string, VaultEntry>, showWorkspace: boolean): NoteSearchResult {
-  const noteType = e.isA || undefined
-  const te = typeEntryMap[e.isA ?? '']
+interface CandidateMatch {
+  match: boolean
+  rank: number
+  score: number
+}
+
+interface SearchCandidate {
+  value: string
+  exactRank: number
+  prefixRank: number
+  fuzzyRank: number
+}
+
+interface SearchTextInput {
+  value: string
+}
+
+interface SearchFormsInput {
+  value: string
+}
+
+interface UniqueValuesInput {
+  values: string[]
+}
+
+interface EntrySearchInput {
+  entry: VaultEntry
+}
+
+interface CandidateSearchInput {
+  queryForms: string[]
+  targetForms: string[]
+  candidate: SearchCandidate
+}
+
+interface RankedEntryInput {
+  query: string
+  entry: VaultEntry
+}
+
+interface TypePresentationInput {
+  noteType: string | undefined
+  typeEntry: VaultEntry | undefined
+}
+
+interface WorkspacePresentationInput {
+  entry: VaultEntry
+  showWorkspace: boolean
+}
+
+interface ResultInput {
+  entry: VaultEntry
+  typeEntryMap: Record<string, VaultEntry>
+  showWorkspace: boolean
+}
+
+const NO_MATCH: CandidateMatch = { match: false, rank: Number.POSITIVE_INFINITY, score: 0 }
+
+function compactUnique({ values }: UniqueValuesInput): string[] {
+  return Array.from(new Set(values.filter(Boolean)))
+}
+
+function removeDiacritics({ value }: SearchTextInput): string {
+  return value.normalize('NFKD').replace(/\p{Mark}/gu, '')
+}
+
+function stripMarkdownExtension({ value }: SearchTextInput): string {
+  return value.replace(/\.md$/iu, '')
+}
+
+function normalizeSearchText({ value }: SearchTextInput): string {
+  return removeDiacritics({ value }).toLocaleLowerCase().trim()
+}
+
+function hasSearchToken({ value }: SearchTextInput): boolean {
+  return /\p{Letter}|\p{Number}/u.test(value)
+}
+
+function searchForms({ value }: SearchFormsInput): string[] {
+  const normalized = normalizeSearchText({ value })
+  const withoutExtension = stripMarkdownExtension({ value: normalized })
+  const slug = hasSearchToken({ value: withoutExtension }) ? slugifyNoteStem(withoutExtension) : ''
+  return compactUnique({ values: [
+    normalized,
+    withoutExtension,
+    slug,
+  ] })
+}
+
+function filenameStem({ value }: SearchTextInput): string {
+  return stripMarkdownExtension({ value })
+}
+
+function searchCandidatesForEntry({ entry }: EntrySearchInput): SearchCandidate[] {
+  return [
+    { value: entry.title, exactRank: 0, prefixRank: 2, fuzzyRank: 4 },
+    ...entry.aliases.map((value) => ({ value, exactRank: 1, prefixRank: 3, fuzzyRank: 4 })),
+    { value: entry.filename, exactRank: 1, prefixRank: 3, fuzzyRank: 4 },
+    { value: filenameStem({ value: entry.filename }), exactRank: 1, prefixRank: 3, fuzzyRank: 4 },
+  ]
+}
+
+function betterMatch(left: CandidateMatch, right: CandidateMatch): CandidateMatch {
+  if (!right.match) return left
+  if (!left.match) return right
+  if (right.rank !== left.rank) return right.rank < left.rank ? right : left
+  return right.score > left.score ? right : left
+}
+
+function matchSearchForms({ queryForms, targetForms, candidate }: CandidateSearchInput): CandidateMatch {
+  let best = NO_MATCH
+  for (const queryForm of queryForms) {
+    for (const targetForm of targetForms) {
+      if (queryForm === targetForm) {
+        best = betterMatch(best, { match: true, rank: candidate.exactRank, score: Number.MAX_SAFE_INTEGER })
+        continue
+      }
+      if (targetForm.startsWith(queryForm)) {
+        best = betterMatch(best, { match: true, rank: candidate.prefixRank, score: -targetForm.length })
+        continue
+      }
+      const fuzzy = fuzzyMatch(queryForm, targetForm)
+      best = betterMatch(best, { ...fuzzy, rank: candidate.fuzzyRank })
+    }
+  }
+  return best
+}
+
+function rankSearchEntry({ query, entry }: RankedEntryInput): CandidateMatch {
+  const queryForms = searchForms({ value: query })
+  return searchCandidatesForEntry({ entry }).reduce((best, candidate) => (
+    betterMatch(best, matchSearchForms({
+      queryForms,
+      targetForms: searchForms({ value: candidate.value }),
+      candidate,
+    }))
+  ), NO_MATCH)
+}
+
+function typePresentation({ noteType, typeEntry }: TypePresentationInput) {
+  if (!noteType) return {}
   return {
-    entry: e,
-    title: e.title,
-    noteIcon: e.icon,
     noteType,
-    typeColor: noteType ? getTypeColor(e.isA, te?.color) : undefined,
-    typeLightColor: noteType ? getTypeLightColor(e.isA, te?.color) : undefined,
-    TypeIcon: noteType ? getTypeIcon(e.isA, te?.icon) : undefined,
-    workspace: showWorkspace ? e.workspace ?? null : null,
+    typeColor: getTypeColor(noteType, typeEntry?.color),
+    typeLightColor: getTypeLightColor(noteType, typeEntry?.color),
+    TypeIcon: getTypeIcon(noteType, typeEntry?.icon),
+  }
+}
+
+function workspacePresentation({ entry, showWorkspace }: WorkspacePresentationInput) {
+  return showWorkspace ? entry.workspace ?? null : null
+}
+
+function toResult({ entry, typeEntryMap, showWorkspace }: ResultInput): NoteSearchResult {
+  const noteType = entry.isA || undefined
+  const te = noteType ? typeEntryMap[noteType] : undefined
+  return {
+    entry,
+    title: entry.title,
+    noteIcon: entry.icon,
+    ...typePresentation({ noteType, typeEntry: te }),
+    workspace: workspacePresentation({ entry, showWorkspace }),
   }
 }
 
@@ -43,7 +194,7 @@ export function useNoteSearch(entries: VaultEntry[], query: string, maxResults =
   )
 
   const results: NoteSearchResult[] = useMemo(() => {
-    const mapResult = (e: VaultEntry) => toResult(e, typeEntryMap, showWorkspace)
+    const mapResult = (entry: VaultEntry) => toResult({ entry, typeEntryMap, showWorkspace })
     if (!query.trim()) {
       return [...searchableEntries]
         .sort((a, b) => (b.modifiedAt ?? 0) - (a.modifiedAt ?? 0))
@@ -53,8 +204,7 @@ export function useNoteSearch(entries: VaultEntry[], query: string, maxResults =
     return searchableEntries
       .map((e) => ({
         entry: e,
-        ...fuzzyMatch(query, e.title),
-        rank: bestSearchRank(query, e.title, e.aliases),
+        ...rankSearchEntry({ query, entry: e }),
       }))
       .filter((r) => r.match)
       .sort((a, b) => a.rank - b.rank || b.score - a.score)

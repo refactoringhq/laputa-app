@@ -51,7 +51,7 @@ function applyToModules(c: VaultConfig): void {
 }
 
 export function useVaultConfig(vaultPath: string) {
-  const config = useSyncExternalStore(subscribeVaultConfig, getVaultConfig)
+  const config = useSyncExternalStore(subscribeVaultConfig, getVaultConfig, getVaultConfig)
 
   useEffect(() => {
     resetVaultConfigStore()

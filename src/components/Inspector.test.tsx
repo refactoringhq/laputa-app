@@ -141,17 +141,15 @@ describe('Inspector', () => {
   it('calls onToggle when the close button is clicked', () => {
     const onToggle = vi.fn()
     render(<Inspector {...defaultProps} onToggle={onToggle} />)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Close Properties (⌘⇧I)' })[1])
+    fireEvent.click(screen.getByRole('button', { name: 'Close Properties (⌘⇧I)' }))
     expect(onToggle).toHaveBeenCalledOnce()
   })
 
-  it('closes when the properties sidebar icon is clicked', () => {
+  it('uses only the right-side close button while expanded', () => {
     const onToggle = vi.fn()
     render(<Inspector {...defaultProps} onToggle={onToggle} />)
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Close Properties (⌘⇧I)' })[0])
-
-    expect(onToggle).toHaveBeenCalledOnce()
+    expect(screen.getAllByRole('button', { name: 'Close Properties (⌘⇧I)' })).toHaveLength(1)
   })
 
   it('shows a colliding-properties warning that opens the raw editor', async () => {
