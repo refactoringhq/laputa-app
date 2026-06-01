@@ -289,6 +289,11 @@
   padding: 6px 0;
 }
 
+.editor__blocknote-container .math-block-source::selection {
+  background: var(--colors-selection);
+  color: var(--colors-text);
+}
+
 .editor__blocknote-container .math--block {
   display: block;
   min-width: max-content;

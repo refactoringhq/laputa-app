@@ -200,7 +200,7 @@ export function MathBlockEditor({ block, editor }: MathBlockEditorProps) {
           <Textarea
             ref={textareaRef}
             aria-label={`Math: ${currentLatex}`}
-            className="min-h-24 font-mono text-sm"
+            className="math-block-source min-h-24 font-mono text-sm selection:bg-[var(--colors-selection)] selection:text-[var(--colors-text)] focus-visible:ring-0"
             value={draftLatex}
             onBlur={finishEditing}
             onChange={(event) => setDraftLatex(event.target.value)}
