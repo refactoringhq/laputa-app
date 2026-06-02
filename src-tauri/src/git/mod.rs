@@ -287,17 +287,20 @@ fn run_git(dir: &Path, args: &[&str]) -> Result<(), String> {
     ))
 }
 
-/// Set local user.name and user.email if not already configured.
+/// Set local user.name and user.email only if no author config exists at any scope.
 pub(crate) fn ensure_author_config(dir: &Path) -> Result<(), String> {
     for (key, fallback) in [("user.name", "Tolaria"), ("user.email", "vault@tolaria.md")] {
-        let local = git_command()
-            .args(["config", "--local", key])
+        let has_config = git_command()
+            .args(["config", "--get", key])
             .current_dir(dir)
             .output()
-            .map_err(|e| format!("Failed to check git config {key}: {e}"))?;
+            .map(|output| {
+                let value = String::from_utf8_lossy(&output.stdout);
+                output.status.success() && !value.trim().is_empty()
+            })
+            .unwrap_or(false);
 
-        let value = String::from_utf8_lossy(&local.stdout);
-        if local.status.success() && !value.trim().is_empty() {
+        if has_config {
             continue;
         }
 
