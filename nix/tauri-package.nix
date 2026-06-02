@@ -207,6 +207,20 @@ craneLib.buildPackage {
       fi
     done
 
+    # Bundled runtime resources. mcp::mcp_server_dir reads RESOURCEPATH
+    # (see postFixup) and looks for <root>/resources/mcp-server/{index.js,
+    # ws-bridge.js}. The bundle-mcp / agent-docs scripts in
+    # buildPhaseCargoCommand already produced these under
+    # src-tauri/resources/; ship them next to the binary so the installed
+    # app can spawn the ws-bridge and serve agent docs.
+    install -d $out/share/tolaria/resources
+    if [ -d src-tauri/resources/mcp-server ]; then
+      cp -r src-tauri/resources/mcp-server $out/share/tolaria/resources/
+    fi
+    if [ -d src-tauri/resources/agent-docs ]; then
+      cp -r src-tauri/resources/agent-docs $out/share/tolaria/resources/
+    fi
+
     runHook postInstall
   '';
 
@@ -214,7 +228,8 @@ craneLib.buildPackage {
     wrapProgram $out/bin/tolaria \
       --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath runtimeLibs}" \
       --prefix PATH : "${lib.makeBinPath runtimeBins}" \
-      --set WEBKIT_DISABLE_DMABUF_RENDERER 1
+      --set WEBKIT_DISABLE_DMABUF_RENDERER 1 \
+      --set-default RESOURCEPATH "$out/share/tolaria"
   '';
 
   meta = with lib; {
