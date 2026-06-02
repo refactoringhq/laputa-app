@@ -7,21 +7,22 @@
 let
   fenixPkgs = fenix.packages.${system};
 
-  # Minimal toolchain crane uses to build the desktop app. Keeping rustfmt and
-  # rust-analyzer out of this closure means `nix build .#tolaria` no longer
-  # waits on their substitutes.
+  # Bare-minimum toolchain crane uses to build the desktop app.
+  # `cargo build` only needs rustc + cargo; clippy / rustfmt / rust-analyzer
+  # / rust-src are dev tools, not required to compile the release binary,
+  # and keeping them out of this closure removes them from the build graph.
   buildToolchain = fenixPkgs.combine [
     fenixPkgs.stable.rustc
     fenixPkgs.stable.cargo
-    fenixPkgs.stable.clippy
-    fenixPkgs.stable.rust-src
   ];
 
-  # Dev shell adds the IDE-only components on top.
+  # Dev shell adds the IDE / lint / format components on top.
   toolchain = fenixPkgs.combine [
     buildToolchain
+    fenixPkgs.stable.clippy
     fenixPkgs.stable.rustfmt
     fenixPkgs.stable.rust-analyzer
+    fenixPkgs.stable.rust-src
   ];
 
   craneLib = (crane.mkLib pkgs).overrideToolchain buildToolchain;
