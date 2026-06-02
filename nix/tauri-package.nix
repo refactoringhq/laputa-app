@@ -100,6 +100,23 @@ let
     pkgs.nodejs_24
   ];
 
+  # Desktop entry so XDG launchers (GNOME, KDE, rofi, etc.) discover Tolaria
+  # after `nix profile install` / `home-manager` activation. The icon name
+  # matches the basenames we install under hicolor/<size>x<size>/apps/.
+  desktopItem = pkgs.makeDesktopItem {
+    name = "club.refactoring.tolaria";
+    desktopName = "Tolaria";
+    genericName = "Knowledge Base";
+    comment = "Personal knowledge and life management app";
+    exec = "tolaria %U";
+    icon = "club.refactoring.tolaria";
+    terminal = false;
+    type = "Application";
+    categories = [ "Office" "Utility" ];
+    startupWMClass = "Tolaria";
+    startupNotify = true;
+  };
+
   runtimeLibs = with pkgs; [
     webkitgtk_4_1
     libsoup_3
@@ -177,9 +194,18 @@ craneLib.buildPackage {
 
     install -Dm755 src-tauri/target/release/tolaria $out/bin/tolaria
 
-    # Desktop entry + icon so `nix run .#tolaria` integrates with launchers.
-    install -Dm644 src-tauri/icons/icon.png \
-      $out/share/icons/hicolor/512x512/apps/club.refactoring.tolaria.png || true
+    # XDG desktop entry produced by makeDesktopItem.
+    install -Dm644 ${desktopItem}/share/applications/club.refactoring.tolaria.desktop \
+      $out/share/applications/club.refactoring.tolaria.desktop
+
+    # Hicolor icon theme entries — names must match the desktop file's Icon=.
+    for size in 32 64 128 256 512; do
+      src="src-tauri/icons/''${size}x''${size}.png"
+      if [ -f "$src" ]; then
+        install -Dm644 "$src" \
+          "$out/share/icons/hicolor/''${size}x''${size}/apps/club.refactoring.tolaria.png"
+      fi
+    done
 
     runHook postInstall
   '';
