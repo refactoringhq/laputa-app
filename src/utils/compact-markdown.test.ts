@@ -37,6 +37,11 @@ describe('compactMarkdown', () => {
     expect(compactMarkdown(input)).toBe('First paragraph.\n\nSecond paragraph.\n')
   })
 
+  it('preserves exactly one blank line between paragraphs', () => {
+    const input = 'Para one.\n\nPara two.\n'
+    expect(compactMarkdown(input)).toBe('Para one.\n\nPara two.\n')
+  })
+
   it('preserves blank lines inside fenced code blocks', () => {
     const input = '```\nline one\n\nline two\n\nline three\n```\n'
     expect(compactMarkdown(input)).toBe('```\nline one\n\nline two\n\nline three\n```\n')
@@ -60,6 +65,26 @@ describe('compactMarkdown', () => {
   it('preserves intentional backslash-only lines when no hard line break precedes them', () => {
     const input = 'just text\n\\\\\nafter\n'
     expect(compactMarkdown(input)).toBe('just text\n\\\\\nafter\n')
+  })
+
+  it('preserves authored hard breaks at the end of a line', () => {
+    const input = 'First line\\\\\nSecond line\n'
+    expect(compactMarkdown(input)).toBe('First line\\\\\nSecond line\n')
+  })
+
+  it('strips BlockNote single trailing backslash soft-break artifacts', () => {
+    const input = 'First line\\\nSecond line\n'
+    expect(compactMarkdown(input)).toBe('First line\nSecond line\n')
+  })
+
+  it('strips BlockNote soft-break artifacts after inline formatting closers', () => {
+    const input = '**bold**\\\nSecond line\n'
+    expect(compactMarkdown(input)).toBe('**bold**\nSecond line\n')
+  })
+
+  it('does not strip trailing backslashes inside indented code blocks', () => {
+    const input = '    const path = root + sep + \\\n    const next = 1\n'
+    expect(compactMarkdown(input)).toBe('    const path = root + sep + \\\n    const next = 1\n')
   })
 
   it('does not add trailing blank lines', () => {
@@ -143,5 +168,11 @@ describe('compactMarkdown', () => {
   it('does not decode HTML entities inside code blocks', () => {
     const input = '```\n&#x20; should stay\n```\n'
     expect(compactMarkdown(input)).toBe('```\n&#x20; should stay\n```\n')
+  })
+
+  it('is idempotent for mixed prose, blank lines, and tight lists', () => {
+    const input = 'First line\\\nSecond line\n\nPara two.\n\n* Item one\n\n* Item two\n'
+    const once = compactMarkdown(input)
+    expect(compactMarkdown(once)).toBe(once)
   })
 })

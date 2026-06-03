@@ -83,7 +83,8 @@ function isFenceDelimiter({ line }: MarkdownLineValue): boolean {
 function normalizeMarkdownLine({ line }: MarkdownLineValue): string {
   const normalizedBullets = normalizeBulletMarker({ line })
   const decodedEntities = decodeHtmlEntities({ line: normalizedBullets })
-  return normalizeStrongWhitespace({ line: decodedEntities })
+  const normalizedSoftBreaks = stripSoftBreakArtifact({ line: decodedEntities })
+  return normalizeStrongWhitespace({ line: normalizedSoftBreaks })
 }
 
 function shouldSkipLine({ doc, idx, line }: NormalizedLinePosition): boolean {
@@ -154,6 +155,20 @@ function normalizeBulletMarker({ line }: MarkdownLineValue): string {
 function decodeHtmlEntities({ line }: MarkdownLineValue): string {
   if (!line.includes('&#x')) return line
   return line.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+}
+
+const INDENTED_CODE_RE = /^(?: {4}|\t)/
+function stripSoftBreakArtifact({ line }: MarkdownLineValue): string {
+  if (INDENTED_CODE_RE.test(line) && !LIST_RE.test(line)) return line
+
+  const trimmedEnd = line.trimEnd()
+  if (!trimmedEnd.endsWith('\\')) return line
+
+  const previousChar = trimmedEnd.length > 1 ? trimmedEnd[trimmedEnd.length - 2] : ''
+  if (previousChar === '\\') return line
+
+  const trailingWhitespace = line.slice(trimmedEnd.length)
+  return `${trimmedEnd.slice(0, -1)}${trailingWhitespace}`
 }
 
 function normalizeStrongWhitespace({ line }: MarkdownLineValue): string {
