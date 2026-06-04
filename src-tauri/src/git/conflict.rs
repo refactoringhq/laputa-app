@@ -129,7 +129,9 @@ pub fn git_commit_conflict_resolution(vault_path: &str) -> Result<String, String
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::git::tests::{setup_git_repo, setup_remote_pair};
+    use crate::git::tests::{
+        setup_git_repo, setup_remote_pair, GitConfigEnvGuard, GIT_CONFIG_ENV_LOCK,
+    };
     use crate::git::{git_commit, git_pull, git_push};
     use std::fs;
     use std::path::Path;
@@ -310,6 +312,9 @@ mod tests {
 
     #[test]
     fn test_commit_conflict_resolution_sets_missing_local_author_identity() {
+        let _lock = GIT_CONFIG_ENV_LOCK.lock().unwrap();
+        let _env = GitConfigEnvGuard::isolated();
+
         let (_bare, _clone_a, clone_b) = setup_conflict_pair();
         let vault = clone_b.path();
         let vp_b = vault.to_str().unwrap();
@@ -328,7 +333,7 @@ mod tests {
         );
         assert_eq!(
             local_config_value(vault, "user.email").as_deref(),
-            Some("vault@tolaria.md")
+            Some("vault@tolaria.invalid")
         );
     }
 

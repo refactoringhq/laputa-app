@@ -343,7 +343,7 @@ fn concise_git_detail(stderr: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::git::tests::setup_git_repo;
+    use crate::git::tests::{setup_git_repo, GitConfigEnvGuard, GIT_CONFIG_ENV_LOCK};
     use crate::git::{git_commit, git_remote_status};
     use std::fs;
     use std::process::Command as StdCommand;
@@ -471,6 +471,9 @@ mod tests {
 
     #[test]
     fn git_add_remote_sets_local_identity_when_existing_repo_has_none() {
+        let _lock = GIT_CONFIG_ENV_LOCK.lock().unwrap();
+        let _env = GitConfigEnvGuard::isolated();
+
         let local = setup_git_repo();
         create_local_commit(local.path(), "note.md", "Local", "Initial local commit");
         clear_local_author(local.path());
