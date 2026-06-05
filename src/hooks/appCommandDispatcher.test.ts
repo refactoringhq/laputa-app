@@ -138,6 +138,7 @@ describe('appCommandDispatcher', () => {
     expect(findShortcutCommandId('command-or-ctrl', 'z', 'KeyZ')).toBe(APP_COMMAND_IDS.editUndo)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'z', 'KeyZ')).toBe(APP_COMMAND_IDS.editRedo)
     expect(findShortcutCommandId('command-or-ctrl', '\\')).toBe(APP_COMMAND_IDS.editToggleRawEditor)
+    expect(findShortcutCommandId('command-or-ctrl', '§', 'Backslash')).toBe(APP_COMMAND_IDS.editToggleRawEditor)
     expect(findShortcutCommandId('command-or-ctrl-shift', '¬', 'KeyL')).toBe(APP_COMMAND_IDS.viewToggleAiChat)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'T', 'KeyT')).toBe(APP_COMMAND_IDS.viewToggleTableOfContents)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'v', 'KeyV')).toBe(APP_COMMAND_IDS.editPastePlainText)
@@ -197,6 +198,7 @@ describe('appCommandDispatcher', () => {
 
   it('resolves event modifiers through the shared shortcut catalog', () => {
     expectShortcutEventCommand({ key: 'o', code: 'KeyO', metaKey: true }, APP_COMMAND_IDS.fileQuickOpen)
+    expectShortcutEventCommand({ key: '§', code: 'Backslash', metaKey: true }, APP_COMMAND_IDS.editToggleRawEditor)
     expectShortcutEventCommand({ key: '¬', code: 'KeyL', metaKey: true, shiftKey: true }, APP_COMMAND_IDS.viewToggleAiChat)
     expectShortcutEventCommand({ key: 'I', code: 'KeyI', metaKey: true, shiftKey: true }, APP_COMMAND_IDS.viewToggleProperties)
     expectShortcutEventCommand({ key: 'ArrowLeft', code: 'ArrowLeft', metaKey: true }, APP_COMMAND_IDS.viewGoBack)

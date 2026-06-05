@@ -225,7 +225,16 @@ test.describe('keyboard command routing', () => {
 
     await openAlphaProjectInEditor(page)
 
-    await triggerShortcutCommand(page, APP_COMMAND_IDS.editToggleRawEditor)
+    await dispatchShortcutEvent(page, {
+      key: '§',
+      code: 'Backslash',
+      ctrlKey: false,
+      metaKey: true,
+      shiftKey: false,
+      altKey: false,
+      bubbles: true,
+      cancelable: true,
+    })
     await expect(page.getByTestId('raw-editor-codemirror')).toBeVisible({ timeout: 5_000 })
     await expectRuntimeStyleNonce(page)
 
