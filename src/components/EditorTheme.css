@@ -280,7 +280,7 @@
 .editor__blocknote-container .math--inline {
   display: inline-flex;
   max-width: 100%;
-  vertical-align: -0.15em;
+  vertical-align: baseline;
 }
 
 .editor__blocknote-container .math-block-shell {
