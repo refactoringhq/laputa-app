@@ -2,7 +2,7 @@ import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import {
-  mkdtemp, mkdir, open, rm, writeFile,
+  access, mkdtemp, mkdir, open, readFile, rm, writeFile,
 } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import {
-  findMarkdownFiles, getNote, searchNotes, vaultContext,
+  createNote, findMarkdownFiles, getNote, searchNotes, vaultContext,
 } from './vault.js'
 import { requireVaultPath, requireVaultPaths } from './vault-path.js'
 import { vaultContextWithInstructions } from './agent-instructions.js'
@@ -123,6 +123,74 @@ describe('getNote', () => {
       'laputa-mcp-traversal-',
       outsideNote => path.relative(tmpDir, outsideNote),
     )
+  })
+})
+
+describe('createNote', () => {
+  it('creates a new markdown note inside the vault', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-create-'))
+    const content = `---
+type: Note
+---
+
+# MCP Created
+`
+
+    try {
+      const note = await createNote(vaultDir, 'note/mcp-created.md', content)
+      assert.equal(note.path, 'note/mcp-created.md')
+      assert.equal(await readFile(path.join(vaultDir, note.path), 'utf-8'), content)
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+    }
+  })
+
+  it('does not overwrite an existing note', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-create-existing-'))
+    const notePath = path.join(vaultDir, 'existing.md')
+    await writeFile(notePath, '# Existing\n', 'utf-8')
+
+    try {
+      await assert.rejects(
+        () => createNote(vaultDir, 'existing.md', '# Replacement\n'),
+        { code: 'EEXIST' },
+      )
+      assert.equal(await readFile(notePath, 'utf-8'), '# Existing\n')
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects absolute paths outside the vault', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-create-vault-'))
+    const outsideDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-create-outside-'))
+
+    try {
+      await assert.rejects(
+        () => createNote(vaultDir, path.join(outsideDir, 'outside.md'), '# Outside\n'),
+        { message: ACTIVE_VAULT_ERROR },
+      )
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+      await rm(outsideDir, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects outside paths before creating missing parent folders', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-create-vault-'))
+    const outsideDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-create-outside-'))
+    const outsideParent = path.join(outsideDir, 'missing-parent')
+
+    try {
+      await assert.rejects(
+        () => createNote(vaultDir, path.join(outsideParent, 'outside.md'), '# Outside\n'),
+        { message: ACTIVE_VAULT_ERROR },
+      )
+      await assert.rejects(() => access(outsideParent), { code: 'ENOENT' })
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+      await rm(outsideDir, { recursive: true, force: true })
+    }
   })
 })
 
@@ -330,7 +398,39 @@ describe('stdio process lifecycle', () => {
         assert.equal(tool.annotations?.destructiveHint, false, `${name} should not be treated as destructive`)
         assert.equal(tool.annotations?.openWorldHint, false, `${name} should stay scoped to local active vaults`)
       }
+
+      const createTool = toolsByName.get('create_note')
+      assert.ok(createTool, 'Missing MCP tool: create_note')
+      assert.equal(createTool.annotations?.readOnlyHint, false)
+      assert.equal(createTool.annotations?.destructiveHint, false)
+      assert.equal(createTool.annotations?.openWorldHint, false)
     } finally {
+      await closeMcpClient(client, stderr)
+    }
+  })
+
+  it('creates a note through the MCP create_note tool', async () => {
+    const { client, stderr } = await connectMcpClient()
+    const relativePath = 'note/mcp-tool-created.md'
+    const absolutePath = path.join(tmpDir, relativePath)
+    const content = `---
+type: Note
+---
+
+# MCP Tool Created
+`
+
+    try {
+      await rm(absolutePath, { force: true })
+      const result = await client.callTool({
+        name: 'create_note',
+        arguments: { path: relativePath, content },
+      })
+
+      assert.equal(await readFile(absolutePath, 'utf-8'), content)
+      assert.match(JSON.stringify(result.content), /mcp-tool-created\.md/)
+    } finally {
+      await rm(absolutePath, { force: true })
       await closeMcpClient(client, stderr)
     }
   })

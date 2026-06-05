@@ -360,7 +360,7 @@ The MCP server (`mcp-server/`) exposes vault operations as tools for AI assistan
 |------|--------|-------------|
 | `open_note` | `path` | Open and read a note by relative path |
 | `read_note` | `path` | Read note content (alias for `open_note`) |
-| `create_note` | `path, title, [type]` | Create new note with title and optional type frontmatter |
+| `create_note` | `path, content, [title], [type], [vaultPath]` | Create a new markdown note inside an active vault without overwriting existing files |
 | `search_notes` | `query, [limit]` | Search notes by title or content substring |
 | `list_vaults` | — | List active mounted vaults and whether each has root `AGENTS.md` instructions |
 | `append_to_note` | `path, text` | Append text to end of existing note |

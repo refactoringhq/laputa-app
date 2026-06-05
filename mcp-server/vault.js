@@ -1,9 +1,10 @@
 /**
  * Vault operations — read-only helpers for Tolaria markdown vault.
- * Write operations are handled by the app-managed agent's active permission
- * profile and native file-edit tools when available.
+ * Most write operations are handled by the app-managed agent's active
+ * permission profile and native file-edit tools; createNote is intentionally
+ * narrow so read-only agents can create a new Markdown file without overwrite.
  */
-import { open, opendir, realpath } from 'node:fs/promises'
+import { mkdir, open, opendir, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import matter from 'gray-matter'
 
@@ -57,6 +58,22 @@ export async function getNote(vaultPath, notePath) {
     path: relativePath,
     frontmatter: parsed.data,
     content: parsed.content.trim(),
+  }
+}
+
+/**
+ * Create a new markdown note inside the vault without overwriting an existing file.
+ * @param {string} vaultPath
+ * @param {string} notePath
+ * @param {string} content
+ * @returns {Promise<{path: string, absolutePath: string}>}
+ */
+export async function createNote(vaultPath, notePath, content) {
+  const { requestedPath, relativePath } = await resolveNewVaultNotePath(vaultPath, notePath)
+  await writeNewUtf8File(requestedPath, content)
+  return {
+    path: relativePath,
+    absolutePath: requestedPath,
   }
 }
 
@@ -143,6 +160,61 @@ function resolveRequestedNotePath(vaultRoot, notePath) {
   const resolved = resolveInside(vaultRoot, notePath)
   if (!resolved) throw new Error(ACTIVE_VAULT_ERROR)
   return resolved
+}
+
+async function resolveNewVaultNotePath(vaultPath, notePath) {
+  const requestedNotePath = validateNewNotePath(notePath)
+  const vaultRoot = await realpath(vaultPath)
+  const requestedPath = resolveRequestedNotePath(vaultRoot, requestedNotePath)
+  const relativePath = relativeNotePathInsideVault(vaultRoot, requestedPath)
+  await ensureWritableParentInsideVault(vaultRoot, requestedPath)
+  return { requestedPath, relativePath }
+}
+
+function validateNewNotePath(notePath) {
+  const trimmedPath = typeof notePath === 'string' ? notePath.trim() : ''
+  if (!trimmedPath) {
+    throw new Error('Note path is required')
+  }
+  if (!trimmedPath.endsWith('.md')) {
+    throw new Error('New notes must be markdown files ending in .md')
+  }
+  return trimmedPath
+}
+
+async function ensureWritableParentInsideVault(vaultRoot, requestedPath) {
+  const parentPath = path.dirname(requestedPath)
+  const existingAncestor = await nearestExistingAncestor(parentPath)
+  assertInsideVault(vaultRoot, existingAncestor)
+  await mkdir(parentPath, { recursive: true })
+  assertInsideVault(vaultRoot, await realpath(parentPath))
+}
+
+async function nearestExistingAncestor(targetPath) {
+  let currentPath = targetPath
+  while (currentPath && currentPath !== path.dirname(currentPath)) {
+    try {
+      return await realpath(currentPath)
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+      currentPath = path.dirname(currentPath)
+    }
+  }
+  return realpath(currentPath)
+}
+
+function assertInsideVault(vaultRoot, targetPath) {
+  if (!isVaultRelativePath(path.relative(vaultRoot, targetPath))) {
+    throw new Error(ACTIVE_VAULT_ERROR)
+  }
+}
+
+function relativeNotePathInsideVault(vaultRoot, requestedPath) {
+  const relativePath = path.relative(vaultRoot, requestedPath)
+  if (!isVaultRelativePath(relativePath) || !relativePath) {
+    throw new Error(ACTIVE_VAULT_ERROR)
+  }
+  return relativePath
 }
 
 function resolveInside(root, target) {
@@ -333,6 +405,15 @@ async function readUtf8File(filePath) {
   const handle = await open(filePath, 'r')
   try {
     return await handle.readFile('utf-8')
+  } finally {
+    await handle.close()
+  }
+}
+
+async function writeNewUtf8File(filePath, content) {
+  const handle = await open(filePath, 'wx')
+  try {
+    await handle.writeFile(content, 'utf-8')
   } finally {
     await handle.close()
   }

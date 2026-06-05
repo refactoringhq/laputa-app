@@ -249,7 +249,7 @@ tolaria/
 │   └── icons/                    # App icons
 │
 ├── mcp-server/                   # MCP bridge (Node.js or Bun)
-│   ├── index.js                  # MCP server entry (stdio, 14 tools)
+│   ├── index.js                  # MCP server entry (stdio tools)
 │   ├── vault.js                  # Vault file operations
 │   ├── ws-bridge.js              # WebSocket bridge (ports 9710, 9711)
 │   ├── test.js                   # MCP server tests

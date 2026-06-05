@@ -22,7 +22,7 @@
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 import {
-  getNote, searchNotes,
+  createNote, getNote, searchNotes,
 } from './vault.js'
 import { requireVaultPaths } from './vault-path.js'
 import { readAgentInstructions, vaultContextWithInstructions } from './agent-instructions.js'
@@ -60,6 +60,51 @@ function uiPath(args = {}) {
   const roots = activeVaultPaths()
   const vaultPath = requestedVaultPath(args) ?? (roots.length === 1 ? roots[0] : '')
   return vaultPath ? path.join(vaultPath, notePath) : notePath
+}
+
+function isInsideVaultRoot(vaultPath, notePath) {
+  const relative = path.relative(vaultPath, notePath)
+  return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative)
+}
+
+function notePathArg(args = {}) {
+  const notePath = typeof args.path === 'string' ? args.path.trim() : ''
+  if (!notePath) throw new Error('Note path is required')
+  return notePath
+}
+
+function writableVaultPath(args = {}) {
+  const requested = requestedVaultPath(args)
+  if (requested) return requested
+
+  const roots = activeVaultPaths()
+  const notePath = notePathArg(args)
+  if (path.isAbsolute(notePath)) {
+    const root = roots.find(vaultPath => isInsideVaultRoot(vaultPath, notePath))
+    if (root) return root
+  }
+  if (roots.length === 1) return roots[0]
+  throw new Error(`Note path is ambiguous across active vaults. Pass vaultPath for ${notePath}.`)
+}
+
+function yamlScalar(value) {
+  return JSON.stringify(value)
+}
+
+function fallbackCreateNoteContent(args = {}) {
+  const title = typeof args.title === 'string' && args.title.trim() ? args.title.trim() : path.basename(notePathArg(args), '.md')
+  const type = typeof args.type === 'string' && args.type.trim()
+    ? args.type.trim()
+    : typeof args.is_a === 'string' && args.is_a.trim()
+      ? args.is_a.trim()
+      : 'Note'
+  return `---\ntype: ${yamlScalar(type)}\n---\n\n# ${title}\n`
+}
+
+function createNoteContent(args = {}) {
+  return typeof args.content === 'string' && args.content.trim()
+    ? args.content
+    : fallbackCreateNoteContent(args)
 }
 
 async function getNoteFromActiveVaults(notePath, vaultPath = null) {
@@ -129,6 +174,16 @@ function uiOpenTabTool(args) {
   return { ok: true }
 }
 
+async function createNoteTool(args = {}) {
+  const notePath = notePathArg(args)
+  const vaultPath = writableVaultPath(args)
+  const note = await createNote(vaultPath, notePath, createNoteContent(args))
+  const targetPath = uiPath({ ...args, path: note.path, vaultPath })
+  broadcastUiAction('vault_changed', { path: targetPath })
+  broadcastUiAction('open_tab', { path: targetPath })
+  return { ok: true, path: note.path, absolutePath: note.absolutePath, vaultPath }
+}
+
 function highlightTool(args) {
   broadcastUiAction('highlight', { element: args.element, path: args.path })
   return { ok: true }
@@ -161,6 +216,7 @@ async function listVaultsTool() {
 const TOOL_EXECUTORS = [
   ['open_note', readNoteTool],
   ['read_note', readNoteTool],
+  ['create_note', createNoteTool],
   ['search_notes', (args) => searchActiveVaults(args.query, args.limit)],
   ['vault_context', () => activeVaultContext()],
   ['list_vaults', () => listVaultsTool()],

@@ -8,6 +8,7 @@
  *   - search_notes: full-text search across vault notes
  *   - get_vault_context: vault structure overview (types, note count, folders)
  *   - get_note: parsed frontmatter + content (convenience over raw cat)
+ *   - create_note: create a new markdown note without overwriting existing files
  *   - open_note: signal Tolaria UI to open a note as a tab
  *   - highlight_editor: visually highlight a UI element (editor, tab, etc.)
  *   - refresh_vault: trigger vault rescan so new/modified files appear
@@ -19,7 +20,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import WebSocket from 'ws'
-import { searchNotes, getNote } from './vault.js'
+import { createNote, searchNotes, getNote } from './vault.js'
 import { requireVaultPaths } from './vault-path.js'
 import { readAgentInstructions, vaultContextWithInstructions } from './agent-instructions.js'
 import path from 'node:path'
@@ -30,6 +31,12 @@ const LOCAL_READ_ONLY_TOOL_ANNOTATIONS = Object.freeze({
   readOnlyHint: true,
   destructiveHint: false,
   idempotentHint: true,
+  openWorldHint: false,
+})
+const LOCAL_CREATE_TOOL_ANNOTATIONS = Object.freeze({
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
   openWorldHint: false,
 })
 
@@ -157,6 +164,23 @@ const TOOLS = [
     },
   },
   {
+    name: 'create_note',
+    description: 'Create a new markdown note inside an active Tolaria vault. Does not overwrite existing files. Use content for the full markdown including YAML frontmatter and H1.',
+    annotations: LOCAL_CREATE_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path inside the vault, or an absolute path inside an active vault. Must end in .md.' },
+        content: { type: 'string', description: 'Full markdown note content, including YAML frontmatter when needed.' },
+        title: { type: 'string', description: 'Optional title used only when content is omitted.' },
+        type: { type: 'string', description: 'Optional note type used only when content is omitted.' },
+        is_a: { type: 'string', description: 'Legacy alias for type, used only when content is omitted.' },
+        vaultPath: { type: 'string', description: 'Optional target vault root when multiple vaults are active.' },
+      },
+      required: ['path'],
+    },
+  },
+  {
     name: 'open_note',
     description: 'Open a note in the Tolaria UI as a new tab. Use after creating or editing a note so the user can see it.',
     annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
@@ -268,6 +292,51 @@ function uiPath(args = {}) {
   return vaultPath ? path.join(vaultPath, notePath) : notePath
 }
 
+function isInsideVaultRoot(vaultPath, notePath) {
+  const relative = path.relative(vaultPath, notePath)
+  return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative)
+}
+
+function notePathArg(args = {}) {
+  const notePath = typeof args.path === 'string' ? args.path.trim() : ''
+  if (!notePath) throw new Error('Note path is required')
+  return notePath
+}
+
+function writableVaultPath(args = {}) {
+  const requested = requestedVaultPath(args)
+  if (requested) return requested
+
+  const roots = activeVaultPaths()
+  const notePath = notePathArg(args)
+  if (path.isAbsolute(notePath)) {
+    const root = roots.find(vaultPath => isInsideVaultRoot(vaultPath, notePath))
+    if (root) return root
+  }
+  if (roots.length === 1) return roots[0]
+  throw new Error(`Note path is ambiguous across active vaults. Pass vaultPath for ${notePath}.`)
+}
+
+function yamlScalar(value) {
+  return JSON.stringify(value)
+}
+
+function fallbackCreateNoteContent(args = {}) {
+  const title = typeof args.title === 'string' && args.title.trim() ? args.title.trim() : path.basename(notePathArg(args), '.md')
+  const type = typeof args.type === 'string' && args.type.trim()
+    ? args.type.trim()
+    : typeof args.is_a === 'string' && args.is_a.trim()
+      ? args.is_a.trim()
+      : 'Note'
+  return `---\ntype: ${yamlScalar(type)}\n---\n\n# ${title}\n`
+}
+
+function createNoteContent(args = {}) {
+  return typeof args.content === 'string' && args.content.trim()
+    ? args.content
+    : fallbackCreateNoteContent(args)
+}
+
 async function handleSearchNotes(args) {
   const results = await searchActiveVaults(args.query, args.limit)
   const text = results.length === 0
@@ -300,6 +369,21 @@ async function handleGetNote(args) {
   return { content: [{ type: 'text', text: JSON.stringify(note, null, 2) }] }
 }
 
+async function handleCreateNote(args = {}) {
+  const notePath = notePathArg(args)
+  const vaultPath = writableVaultPath(args)
+  const note = await createNote(vaultPath, notePath, createNoteContent(args))
+  const targetPath = uiPath({ ...args, path: note.path, vaultPath })
+  broadcastUiAction('vault_changed', { path: targetPath })
+  broadcastUiAction('open_tab', { path: targetPath })
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify({ path: note.path, absolutePath: note.absolutePath, vaultPath }, null, 2),
+    }],
+  }
+}
+
 function handleOpenNote(args) {
   // Refresh vault first so the new/modified note appears in the note list,
   // then signal the UI to open it in a tab.
@@ -324,6 +408,7 @@ const TOOL_HANDLERS = new Map([
   ['get_vault_context', handleVaultContext],
   ['list_vaults', handleListVaults],
   ['get_note', handleGetNote],
+  ['create_note', handleCreateNote],
   ['open_note', handleOpenNote],
   ['highlight_editor', handleHighlightEditor],
   ['refresh_vault', handleRefreshVault],

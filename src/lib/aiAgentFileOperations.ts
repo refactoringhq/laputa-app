@@ -1,3 +1,5 @@
+import { normalizeNotePathSeparators, normalizeVaultRelativePath } from '../utils/notePathIdentity'
+
 export interface AgentFileCallbacks {
   onFileCreated?: (relativePath: string) => void
   onFileModified?: (relativePath: string) => void
@@ -38,6 +40,11 @@ interface VaultRelativePathRequest {
   vaultPath: string
 }
 
+interface NormalizedToolPath {
+  value: string
+  windowsStyle: boolean
+}
+
 export function detectFileOperation(operation: AgentFileOperation): void {
   if (!operation.callbacks) return
   const context = {
@@ -52,6 +59,9 @@ export function detectFileOperation(operation: AgentFileOperation): void {
       return
     case 'Write':
       notifyWriteOperation(context)
+      return
+    case 'create_note':
+      notifyCreateNoteOperation(context)
       return
     case 'Edit':
       notifyEditOperation(context)
@@ -68,6 +78,13 @@ function notifyBashOperation(context: OperationContext): void {
 function notifyWriteOperation(context: OperationContext): void {
   notifyCreatedPath({
     relativePath: markdownPathFromToolInput(context),
+    callbacks: context.callbacks,
+  })
+}
+
+function notifyCreateNoteOperation(context: OperationContext): void {
+  notifyCreatedPath({
+    relativePath: markdownCreationPathFromToolInput(context),
     callbacks: context.callbacks,
   })
 }
@@ -100,6 +117,15 @@ function markdownPathFromToolInput(context: ToolInputContext): string | null {
     filePath: parseFilePath(context),
     vaultPath: context.vaultPath,
   })
+}
+
+function markdownCreationPathFromToolInput(context: ToolInputContext): string | null {
+  const filePath = parseFilePath(context)
+  if (!filePath?.endsWith('.md')) return null
+  const notePath = normalizeToolPath(filePath)
+  return isRelativePath(notePath)
+    ? safeRelativeMarkdownPath(notePath)
+    : markdownVaultRelativePath({ filePath, vaultPath: context.vaultPath })
 }
 
 function parseFilePath(source: ToolInputSource): string | null {
@@ -142,10 +168,35 @@ function markdownVaultRelativePath(request: {
 }
 
 function toVaultRelative({ filePath, vaultPath }: VaultRelativePathRequest): string | null {
-  const vaultRoot = vaultPath.replace(/\/+$/, '')
-  const prefix = `${vaultRoot}/`
-  if (!filePath.startsWith(prefix)) return null
-  return filePath.slice(prefix.length) || null
+  const vaultRoot = normalizeToolPath(vaultPath)
+  const notePath = normalizeToolPath(filePath)
+  return childPathInsideVault(vaultRoot, notePath)
+}
+
+function childPathInsideVault(vaultRoot: NormalizedToolPath, notePath: NormalizedToolPath): string | null {
+  const prefix = `${vaultRoot.value}/`
+  const caseInsensitive = vaultRoot.windowsStyle || notePath.windowsStyle
+  const normalizedPrefix = caseInsensitive ? prefix.toLowerCase() : prefix
+  const normalizedNotePath = caseInsensitive ? notePath.value.toLowerCase() : notePath.value
+  if (!normalizedNotePath.startsWith(normalizedPrefix)) return null
+  return notePath.value.slice(prefix.length) || null
+}
+
+function normalizeToolPath(value: string): NormalizedToolPath {
+  return {
+    value: normalizeNotePathSeparators(value).replace(/\/+$/u, ''),
+    windowsStyle: /^[A-Za-z]:[\\/]/u.test(value) || value.startsWith('\\\\'),
+  }
+}
+
+function isRelativePath(path: NormalizedToolPath): boolean {
+  return !path.value.startsWith('/') && !path.windowsStyle
+}
+
+function safeRelativeMarkdownPath(path: NormalizedToolPath): string | null {
+  const relativePath = normalizeVaultRelativePath(path.value)
+  if (!relativePath || relativePath.startsWith('../') || relativePath.includes('/../')) return null
+  return relativePath
 }
 
 export function parseBashFileCreation(request: BashFileCreationRequest): string | null {
