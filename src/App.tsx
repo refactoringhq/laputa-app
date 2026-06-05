@@ -129,6 +129,7 @@ import {
   activeVaultModifiedFiles,
   aiWorkspaceWindowContextForPath,
   canCustomizeColumnsForSelection,
+  isActiveElementInsideEditorSurface,
   mergeModifiedFiles,
   runNativeTextHistoryCommand,
   shouldPreferOnboardingVaultPath,
@@ -524,6 +525,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   } = notes
   const noteActiveTabPath = notes.activeTabPath
   const noteActiveTabPathRef = notes.activeTabPathRef
+  const refocusActiveEditor = useCallback((path: string) => {
+    window.dispatchEvent(new CustomEvent('laputa:focus-editor', { detail: { path } }))
+  }, [])
   useNoteWindowLifecycle({
     activeTabPath: notes.activeTabPath,
     handleSelectNote,
@@ -546,6 +550,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       reloadVault: vault.reloadVault,
       reloadViews: vault.reloadViews,
       replaceActiveTab: handleReplaceActiveTab,
+      refocusActiveEditor,
+      shouldRefocusActiveEditor: isActiveElementInsideEditorSurface,
       updatedFiles,
       vaultPath: updateVaultPath,
     })
@@ -555,6 +561,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       handleReplaceActiveTab,
       noteActiveTabPath,
       noteActiveTabPathRef,
+      refocusActiveEditor,
       refreshGitModifiedFiles,
       resolvedPath,
       vault.reloadFolders,
@@ -636,7 +643,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     reloadViews: vault.reloadViews,
     closeAllTabs,
     replaceActiveTab: handleReplaceActiveTab,
+    refocusActiveEditor,
     hasUnsavedChanges: (path) => vault.unsavedPaths.has(path),
+    shouldRefocusActiveEditor: isActiveElementInsideEditorSurface,
     onSelectNote: notes.handleSelectNote,
     activeTabPath: notes.activeTabPath,
     getActiveTabPath: () => notes.activeTabPathRef.current,

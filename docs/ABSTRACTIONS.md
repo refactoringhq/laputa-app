@@ -531,7 +531,7 @@ interface PulseCommit {
 - Refreshes aggregate remote status after a pull, and avoids a separate startup status fetch when the initial pull will already refresh it
 - Pushes the active repository set during divergence recovery
 - Awaits the post-pull vault refreshes so toasts land after note-list state is fresh
-- Reopens the clean active tab from disk only when the pull changed that active note, so unrelated updates do not remount the editor
+- Reopens the clean active tab from disk only when the pull changed that active note, then restores editor focus if the editor owned focus before the remount
 - Detects merge conflicts → opens `ConflictResolverModal`
 - Tracks aggregate remote status (ahead/behind via `git_remote_status`)
 - Handles push rejection (divergence) → sets `pull_required` status
@@ -540,7 +540,7 @@ interface PulseCommit {
 
 ### External Vault Refresh
 
-External vault mutations are any disk writes Tolaria did not just perform through its own save path: Git pulls, AI-agent writes, filesystem watcher events, and edits from another app. These changes must route through `refreshPulledVaultState()` rather than calling `reloadVault()` in isolation. The shared refresh abstraction reloads entries, folders, and saved views together, preserves unsaved active-editor content, reopens a clean active note when the changed-path list includes that note, and closes the active tab if the file disappeared. Editor focus does not block the clean active note from converging to disk when its own file changed externally. Unknown or unrelated watcher updates refresh vault-derived state without remounting the active editor. `useVaultWatcher` supplies changed filesystem paths to this abstraction after debouncing and after filtering recent app-owned saves. Overlapping entry reloads and modified-file polls are coalesced with a single trailing rerun so watcher and sync bursts do not stack native vault scans or Git status processes.
+External vault mutations are any disk writes Tolaria did not just perform through its own save path: Git pulls, AI-agent writes, filesystem watcher events, and edits from another app. These changes must route through `refreshPulledVaultState()` rather than calling `reloadVault()` in isolation. The shared refresh abstraction reloads entries, folders, and saved views together, preserves unsaved active-editor content, reopens a clean active note when the changed-path list includes that note, and closes the active tab if the file disappeared. Editor focus does not block the clean active note from converging to disk when its own file changed externally; if the active editor owned focus before that remount, the app requests editor focus again after the fresh tab is mounted. Unknown or unrelated watcher updates refresh vault-derived state without remounting the active editor. `useVaultWatcher` supplies changed filesystem paths to this abstraction after debouncing and after filtering recent app-owned saves. Overlapping entry reloads and modified-file polls are coalesced with a single trailing rerun so watcher and sync bursts do not stack native vault scans or Git status processes.
 
 `useGitRepositories` is the commit-time companion to `useAutoSync`:
 - Owns repository picker validation plus `get_modified_files` and `git_remote_status` loading for active Git repositories

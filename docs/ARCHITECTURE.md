@@ -98,7 +98,7 @@ flowchart LR
 
 #### External Change Detection
 
-The main window starts a native watcher for the active vault through `start_vault_watcher` / `stop_vault_watcher` (`src-tauri/src/vault_watcher.rs`, backed by Rust `notify`). The watcher emits `vault-changed` events for content paths and ignores churn from `.git/`, `node_modules/`, temp files, and `.tolaria-rename-txn`. `useVaultWatcher` batches those events, suppresses recent app-owned saves, and sends the remaining external paths through `refreshPulledVaultState()` so folders, saved views, note-list state, and clean active-editor content refresh under the ADR-0135 unsaved-edit rules. `useVaultLoader.isReloading` drives the status-bar reload spinner for both manual and watcher-triggered reloads.
+The main window starts a native watcher for the active vault through `start_vault_watcher` / `stop_vault_watcher` (`src-tauri/src/vault_watcher.rs`, backed by Rust `notify`). The watcher emits `vault-changed` events for content paths and ignores churn from `.git/`, `node_modules/`, temp files, and `.tolaria-rename-txn`. `useVaultWatcher` batches those events, suppresses recent app-owned saves, and sends the remaining external paths through `refreshPulledVaultState()` so folders, saved views, note-list state, and clean active-editor content refresh under the ADR-0135 unsaved-edit rules. When that clean active-editor remount starts from a focused editor, the main app dispatches a post-replacement editor focus request so typing can continue in the refreshed tab. `useVaultLoader.isReloading` drives the status-bar reload spinner for both manual and watcher-triggered reloads.
 
 #### Progressive Vault Loading
 
@@ -649,7 +649,8 @@ flowchart TD
     RV --> TAB{"clean active tab?"}
     TAB -->|Yes| RT["replace active tab\nwith fresh disk content"]
     TAB -->|No| DONE["idle"]
-    RT --> DONE
+    RT --> RF["restore editor focus\nwhen previously focused"]
+    RF --> DONE
     PC -->|Up to date| DONE["idle"]
 
     MAN["Manual commit\n(CommitDialog)"] --> RS["useGitRemoteStatus\n(commit-time check)"]
