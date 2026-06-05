@@ -14,7 +14,8 @@ vi.mock('../mock-tauri', () => ({
   isTauri: () => tauriMode,
 }))
 
-type DragDropEvent = { payload: { type: string; paths: string[]; position: { x: number; y: number } } }
+type NativeDropPayload = { type: string; paths: string[]; position: { x: number; y: number } }
+type DragDropEvent = { payload: unknown }
 type DragDropCallback = (event: DragDropEvent) => void
 let capturedDragDropHandler: DragDropCallback | undefined
 let nativeDropUnlisten = () => {
@@ -208,7 +209,7 @@ describe('useImageDrop — Tauri native drag-drop', () => {
     return renderHook(() => useImageDrop({ containerRef: ref, ...opts }))
   }
 
-  function emitNativeDropEvent(payload: DragDropEvent['payload']) {
+  function emitNativeDropEvent(payload: unknown) {
     if (!capturedDragDropHandler) throw new Error('No native drop handler registered')
     capturedDragDropHandler({ payload })
   }
@@ -245,6 +246,24 @@ describe('useImageDrop — Tauri native drag-drop', () => {
     expect(result.current.isDragOver).toBe(false)
   })
 
+  it('ignores malformed native drag-drop payloads without throwing', async () => {
+    const { result } = renderImageDropTauri()
+
+    await waitForNativeDropListeners()
+
+    const file = new File(['data'], 'photo.png', { type: 'image/png' })
+    act(() => { container.dispatchEvent(createDragEvent('dragover', [file])) })
+    expect(result.current.isDragOver).toBe(true)
+
+    expect(() => {
+      act(() => {
+        emitNativeDropEvent(null)
+      })
+    }).not.toThrow()
+
+    expect(result.current.isDragOver).toBe(false)
+  })
+
   it('copies native image drops into the vault and emits attachment asset URLs', async () => {
     const onImageUrl = vi.fn()
     const { invoke, convertFileSrc } = await import('@tauri-apps/api/core')
@@ -261,7 +280,7 @@ describe('useImageDrop — Tauri native drag-drop', () => {
         type: 'drop',
         paths: ['/tmp/photo.png', '/tmp/readme.txt'],
         position: { x: 100, y: 100 },
-      })
+      } satisfies NativeDropPayload)
     })
 
     await waitFor(() => {
