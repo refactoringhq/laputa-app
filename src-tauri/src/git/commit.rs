@@ -89,7 +89,7 @@ fn is_commit_signing_failure(detail: &str) -> bool {
 mod tests {
     use super::git_command;
     use super::*;
-    use crate::git::tests::setup_git_repo;
+    use crate::git::tests::{setup_git_repo, GitConfigEnvGuard};
     use std::fs;
     use std::path::Path;
 
@@ -138,6 +138,8 @@ mod tests {
 
     #[test]
     fn test_git_commit_sets_missing_local_author_identity() {
+        let _env = GitConfigEnvGuard::isolated();
+
         let dir = setup_git_repo();
         let vault = dir.path();
         unset_local_author_config(vault);
@@ -156,7 +158,7 @@ mod tests {
         );
         assert_eq!(
             local_config_value(vault, "user.email").as_deref(),
-            Some("vault@tolaria.md")
+            Some("vault@tolaria.default")
         );
 
         let author = git_command()
@@ -166,7 +168,39 @@ mod tests {
             .unwrap();
         assert_eq!(
             String::from_utf8_lossy(&author.stdout).trim(),
-            "Tolaria <vault@tolaria.md>"
+            "Tolaria <vault@tolaria.default>"
+        );
+    }
+
+    #[test]
+    fn test_git_commit_respects_global_author_identity() {
+        let _env =
+            GitConfigEnvGuard::with_global_identity(Some(("Global User", "global@test.com")));
+
+        let dir = setup_git_repo();
+        let vault = dir.path();
+        unset_local_author_config(vault);
+
+        fs::write(vault.join("global-identity.md"), "# Global identity\n").unwrap();
+
+        let result = git_commit(vault.to_str().unwrap(), "Commit with global identity");
+        assert!(
+            result.is_ok(),
+            "commit should use the global identity: {result:?}"
+        );
+
+        // The global identity resolves, so no local override is written.
+        assert_eq!(local_config_value(vault, "user.name"), None);
+        assert_eq!(local_config_value(vault, "user.email"), None);
+
+        let author = git_command()
+            .args(["log", "-1", "--format=%an <%ae>"])
+            .current_dir(vault)
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&author.stdout).trim(),
+            "Global User <global@test.com>"
         );
     }
 
