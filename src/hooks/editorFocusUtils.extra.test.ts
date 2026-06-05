@@ -83,6 +83,43 @@ describe('editorFocusUtils extra coverage', () => {
     expect(setTextCursorPosition).toHaveBeenCalledWith('title', 'start')
   })
 
+  it('does not select an empty heading until BlockNote provides a usable block id', () => {
+    const editable = document.createElement('div')
+    editable.className = 'ProseMirror'
+    editable.contentEditable = 'true'
+    editable.setAttribute('contenteditable', 'true')
+    editable.tabIndex = -1
+    Object.defineProperty(editable, 'isContentEditable', { configurable: true, value: true })
+    document.body.appendChild(editable)
+
+    const realFocus = HTMLElement.prototype.focus.bind(editable)
+    vi.spyOn(editable, 'focus').mockImplementation(() => realFocus())
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0)
+      return 1
+    })
+
+    const setTextCursorPosition = vi.fn((blockId: string) => {
+      if (typeof blockId !== 'string') {
+        throw new Error("Block doesn't have id")
+      }
+    })
+
+    expect(() => {
+      focusEditorWithRetries({
+        focus: vi.fn(),
+        document: [
+          {
+            type: 'heading',
+            content: [],
+          } as never,
+        ],
+        setTextCursorPosition,
+      }, true, undefined)
+    }).not.toThrow()
+    expect(setTextCursorPosition).not.toHaveBeenCalled()
+  })
+
   it('schedules another animation frame when nothing focusable is available yet', () => {
     const rAF = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1)
 
