@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { FilterBuilder } from './FilterBuilder'
@@ -69,6 +70,43 @@ describe('FilterBuilder value inputs', () => {
         all: [{ field: 'title', op: 'contains', value: 'plain text' }],
       }),
     )
+  })
+
+  it('keeps the value input focused while controlled filter state rerenders', () => {
+    function StatefulBuilder() {
+      const [group, setGroup] = useState<FilterGroup>({
+        all: [{ field: 'title', op: 'contains', value: '' }],
+      })
+
+      return (
+        <FilterBuilder
+          group={group}
+          onChange={(nextGroup) => {
+            onChange(nextGroup)
+            setGroup(nextGroup)
+          }}
+          availableFields={['type', 'status', 'title']}
+        />
+      )
+    }
+
+    render(<StatefulBuilder />)
+
+    const input = screen.getByTestId('filter-value-input')
+    input.focus()
+    expect(input).toHaveFocus()
+
+    fireEvent.change(input, { target: { value: 'p' } })
+
+    const updatedInput = screen.getByTestId('filter-value-input')
+    expect(updatedInput).toBe(input)
+    expect(updatedInput).toHaveFocus()
+
+    fireEvent.change(updatedInput, { target: { value: 'po' } })
+
+    expect(screen.getByTestId('filter-value-input')).toBe(input)
+    expect(screen.getByTestId('filter-value-input')).toHaveFocus()
+    expect(screen.getByTestId('filter-value-input')).toHaveValue('po')
   })
 
   it('toggles regex mode in the emitted filter payload', () => {

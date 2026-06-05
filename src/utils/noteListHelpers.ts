@@ -471,13 +471,8 @@ export function isAllNotesEntry(
   return isOptionalAllNotesFileVisible(entry, allNotesFileVisibility)
 }
 
-function entriesScopedToView(entries: VaultEntry[], view: ViewFile): VaultEntry[] {
-  if (!view.rootPath) return entries
-  return entries.filter((entry) => entry.workspace?.path === view.rootPath)
-}
-
 export function filterEntriesForViewFile(entries: VaultEntry[], view: ViewFile): VaultEntry[] {
-  return evaluateView(view.definition, entriesScopedToView(entries, view).filter(isMarkdown))
+  return evaluateView(view.definition, entries.filter(isMarkdown))
 }
 
 function filterViewEntries(entries: VaultEntry[], selection: Extract<SidebarSelection, { kind: 'view' }>, views?: ViewFile[]): VaultEntry[] {
