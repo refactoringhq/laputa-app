@@ -652,7 +652,8 @@ flowchart TD
     TAB -->|No| DONE["idle"]
     RT --> RF["restore editor focus\nwhen previously focused"]
     RF --> DONE
-    PC -->|Up to date| DONE["idle"]
+    PC -->|Manual up to date| RV
+    PC -->|Auto up to date| DONE["idle"]
 
     MAN["Manual commit\n(CommitDialog)"] --> RS["useGitRemoteStatus\n(commit-time check)"]
     RS --> RCHK["invoke('git_remote_status')"]
@@ -672,6 +673,8 @@ flowchart TD
     CMD["Cmd+K → Pull\nor Menu → Pull"] --> PULL
     STATUS["Click sync badge"] --> POPUP["GitStatusPopup\n(branch, ahead/behind)"]
 ```
+
+Manual Sync forces a visible-state refresh even when `git_pull` reports `up_to_date`, because the working tree may have already changed through another process while the app still holds stale vault and History state. Updated pulls refresh the vault index, folders, saved views, clean active-editor content, and Git history surfaces; manual up-to-date pulls refresh the vault/sidebar surfaces with unknown changed files and bump the History refresh key without showing a "Pulled 0 updates" toast. Automatic mount/focus/interval up-to-date checks stay cheap and do not reload the vault.
 
 `useGitRemoteStatus` re-checks `git_remote_status` for the default repository, and `useCommitFlow` can resolve remote status for an explicit selected repository when the commit dialog opens and again right before submit. If `hasRemote` is false, Tolaria keeps that repository's flow local-only: the status bar shows a neutral `No remote` chip for the default repository, the dialog copy switches from "Commit & Push" to "Commit", and no `git_push` call is attempted.
 

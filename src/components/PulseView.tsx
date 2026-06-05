@@ -21,6 +21,7 @@ function tauriCall<T>(command: string, args: Record<string, unknown>): Promise<T
 interface PulseViewProps {
   vaultPath: string
   onOpenNote?: (relativePath: string, commitHash?: string) => void
+  refreshKey?: number
   sidebarCollapsed?: boolean
   onExpandSidebar?: () => void
   repositories?: GitRepositoryOption[]
@@ -413,6 +414,7 @@ const PAGE_SIZE = 20
 export const PulseView = memo(function PulseView({
   vaultPath,
   onOpenNote,
+  refreshKey = 0,
   sidebarCollapsed,
   onExpandSidebar,
   repositories,
@@ -464,7 +466,7 @@ export const PulseView = memo(function PulseView({
     }
   }, [vaultPath, skip, loadingMore, hasMore])
 
-  useEffect(() => { loadInitial() }, [loadInitial])
+  useEffect(() => { loadInitial() }, [loadInitial, refreshKey])
 
   // Intersection Observer for infinite scroll
   useEffect(() => {

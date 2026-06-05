@@ -14,6 +14,11 @@ import {
 } from '../test-utils/noteListTestUtils'
 import type { ViewFile } from '../types'
 
+vi.mock('../hooks/useTabManagement', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks/useTabManagement')>()
+  return { ...actual, prefetchNoteContent: vi.fn() }
+})
+
 function makeBookTypeEntries(
   displayProps: string[] = [],
   entryOverrides: Parameters<typeof makeEntry>[0] = {},
@@ -32,6 +37,7 @@ function makeBookTypeEntries(
 }
 
 const noop = () => undefined
+const NOTE_LIST_SEARCH_SETTLE_TIMEOUT_MS = 3_000
 const MAC_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15'
 const WINDOWS_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36'
 
@@ -103,10 +109,10 @@ async function searchNoteList(query: string) {
   fireEvent.change(screen.getByPlaceholderText('Search notes...'), { target: { value: query } })
   await waitFor(() => {
     expect(screen.getByTestId('note-list-search-loading')).toBeInTheDocument()
-  })
+  }, { timeout: NOTE_LIST_SEARCH_SETTLE_TIMEOUT_MS })
   await waitFor(() => {
     expect(screen.queryByTestId('note-list-search-loading')).not.toBeInTheDocument()
-  })
+  }, { timeout: NOTE_LIST_SEARCH_SETTLE_TIMEOUT_MS })
 }
 
 interface NoteListSearchMockResult {

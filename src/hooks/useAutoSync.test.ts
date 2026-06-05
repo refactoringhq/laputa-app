@@ -413,6 +413,39 @@ describe('useAutoSync', () => {
     expect(onSyncUpdated).not.toHaveBeenCalled()
   })
 
+  it('manual triggerSync refreshes visible vault state after an up-to-date pull', async () => {
+    const onSyncUpdated = vi.fn()
+    const { result } = renderHook(() =>
+      useAutoSync({
+        vaultPath: '/Users/luca/Laputa',
+        intervalMinutes: 5,
+        onVaultUpdated,
+        onSyncUpdated,
+        onConflict,
+        onToast,
+      }),
+    )
+
+    await waitFor(() => {
+      expect(result.current.syncStatus).toBe('idle')
+    })
+    expect(onVaultUpdated).not.toHaveBeenCalled()
+    expect(onSyncUpdated).not.toHaveBeenCalled()
+
+    mockInvokeFn.mockClear()
+    onVaultUpdated.mockClear()
+
+    await act(async () => {
+      result.current.triggerSync('/Users/luca/Laputa')
+    })
+
+    await waitFor(() => {
+      expect(mockInvokeFn).toHaveBeenCalledWith('git_pull', { vaultPath: '/Users/luca/Laputa' })
+      expect(onVaultUpdated).toHaveBeenCalledWith([], '/Users/luca/Laputa')
+      expect(onSyncUpdated).toHaveBeenCalledOnce()
+    })
+  })
+
   it('detects conflicts when git_pull returns error with unresolved conflicts', async () => {
     mockInvokeFn.mockImplementation((cmd: string) => {
       if (cmd === 'get_conflict_files') return Promise.resolve(['conflict.md'])

@@ -74,6 +74,22 @@ describe('PulseView', () => {
     expect(screen.getByText('Remove old notes')).toBeInTheDocument()
   })
 
+  it('reloads commits when the refresh key changes after sync', async () => {
+    mockInvokeFn
+      .mockResolvedValueOnce([mockCommits[1]])
+      .mockResolvedValueOnce([{ ...mockCommits[0], hash: 'fresh', message: 'Fresh remote commit' }])
+
+    const { rerender } = render(<PulseView vaultPath="/test/vault" refreshKey={0} />)
+
+    expect(await screen.findByText('Remove old notes')).toBeInTheDocument()
+
+    rerender(<PulseView vaultPath="/test/vault" refreshKey={1} />)
+
+    expect(await screen.findByText('Fresh remote commit')).toBeInTheDocument()
+    expect(mockInvokeFn).toHaveBeenCalledTimes(2)
+    expect(mockInvokeFn).toHaveBeenLastCalledWith('get_vault_pulse', { vaultPath: '/test/vault', limit: 20, skip: 0 })
+  })
+
   it('shows summary badges for added/modified/deleted', async () => {
     mockInvokeFn.mockResolvedValue(mockCommits)
 

@@ -75,6 +75,7 @@ interface PushOutcome {
 
 interface SyncBudgetOptions {
   force?: boolean
+  refreshAfterUpToDate?: boolean
 }
 
 interface UpdatedVaultRefreshOptions {
@@ -83,6 +84,10 @@ interface UpdatedVaultRefreshOptions {
   setConflictFiles: SyncSetState<string[]>
   setConflictVaultPath: SyncSetState<string | null>
   setSyncStatus: SyncSetState<SyncStatus>
+}
+
+interface SuccessfulPullRefreshOptions extends UpdatedVaultRefreshOptions {
+  refreshAfterUpToDate: boolean
 }
 
 interface ConflictStateOptions {
@@ -117,6 +122,10 @@ function aggregateRemoteStatuses(statuses: GitRemoteStatus[]): GitRemoteStatus |
 
 function updatedPullOutcomes(outcomes: PullOutcome[]): PullOutcome[] {
   return outcomes.filter((outcome) => outcome.result.status === 'updated')
+}
+
+function upToDatePullOutcomes(outcomes: PullOutcome[]): PullOutcome[] {
+  return outcomes.filter((outcome) => outcome.result.status === 'up_to_date')
 }
 
 function firstConflictOutcome(outcomes: PullOutcome[]): PullOutcome | null {
@@ -254,10 +263,53 @@ async function refreshUpdatedVaults(options: UpdatedVaultRefreshOptions): Promis
   await callbacksRef.current.onSyncUpdated?.()
 }
 
+async function refreshUpToDateVaults(options: {
+  callbacksRef: MutableRefObject<SyncCallbacks>
+  notifySyncUpdated?: boolean
+  outcomes: PullOutcome[]
+}): Promise<void> {
+  const upToDateOutcomes = upToDatePullOutcomes(options.outcomes)
+  if (upToDateOutcomes.length === 0) return
+
+  await Promise.all(upToDateOutcomes.map((outcome) => (
+    options.callbacksRef.current.onVaultUpdated([], outcome.vaultPath)
+  )))
+  if (options.notifySyncUpdated) await options.callbacksRef.current.onSyncUpdated?.()
+}
+
 async function handleUpdatedPull(options: UpdatedVaultRefreshOptions): Promise<void> {
   const { outcomes, callbacksRef } = options
   await refreshUpdatedVaults(options)
   await callbacksRef.current.onToast(pulledUpdateToast(outcomes))
+}
+
+async function refreshSuccessfulPull(options: SuccessfulPullRefreshOptions): Promise<void> {
+  const {
+    outcomes,
+    callbacksRef,
+    refreshAfterUpToDate,
+    setConflictFiles,
+    setConflictVaultPath,
+    setSyncStatus,
+  } = options
+  const updatedOutcomes = updatedPullOutcomes(outcomes)
+
+  if (updatedOutcomes.length > 0) {
+    await handleUpdatedPull({
+      outcomes: updatedOutcomes,
+      callbacksRef,
+      setConflictFiles,
+      setConflictVaultPath,
+      setSyncStatus,
+    })
+    if (refreshAfterUpToDate) await refreshUpToDateVaults({ outcomes, callbacksRef })
+    return
+  }
+
+  clearConflictState(setSyncStatus, setConflictFiles, setConflictVaultPath)
+  if (refreshAfterUpToDate) {
+    await refreshUpToDateVaults({ outcomes, callbacksRef, notifySyncUpdated: true })
+  }
 }
 
 async function resolvePullError(options: PullErrorResolution): Promise<void> {
@@ -436,6 +488,7 @@ export function useAutoSync({
 
   const performPull = useCallback(async (targetVaultPath?: string, options: SyncBudgetOptions = {}) => {
     if (!enabled) return
+    const refreshAfterUpToDate = options.refreshAfterUpToDate === true
     const pullVaultPaths = resolveBudgetedTargetVaultPaths(targetVaultPath, options)
     if (pullVaultPaths.length === 0) return
 
@@ -469,18 +522,14 @@ export function useAutoSync({
             setSyncStatus,
           })
         } else {
-          const updatedOutcomes = updatedPullOutcomes(outcomes)
-          if (updatedOutcomes.length > 0) {
-            await handleUpdatedPull({
-              outcomes: updatedOutcomes,
-              callbacksRef,
-              setConflictFiles,
-              setConflictVaultPath,
-              setSyncStatus,
-            })
-          } else {
-            clearConflictState(setSyncStatus, setConflictFiles, setConflictVaultPath)
-          }
+          await refreshSuccessfulPull({
+            outcomes,
+            callbacksRef,
+            refreshAfterUpToDate,
+            setConflictFiles,
+            setConflictVaultPath,
+            setSyncStatus,
+          })
         }
 
         void refreshRemoteStatus(pullVaultPaths)
@@ -588,7 +637,7 @@ export function useAutoSync({
     if (!enabled) return
 
     trackEvent('sync_triggered')
-    void performPull(targetVaultPath, { force: true })
+    void performPull(targetVaultPath, { force: true, refreshAfterUpToDate: true })
   }, [enabled, performPull])
 
   return { syncStatus, lastSyncTime, conflictFiles, conflictVaultPath, lastCommitInfo, remoteStatus, triggerSync, pullAndPush, pausePull, resumePull, handlePushRejected }
