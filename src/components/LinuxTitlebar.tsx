@@ -74,7 +74,7 @@ export function LinuxTitlebar({ locale: localeOverride }: LinuxTitlebarProps = {
         data-testid="linux-titlebar"
       >
         <div className="flex h-full items-center" data-no-drag>
-          <LinuxMenuButton />
+          <LinuxMenuButton locale={locale} />
         </div>
         <TitlebarWindowControls appWindow={appWindow} locale={locale} maximized={maximized} />
       </div>

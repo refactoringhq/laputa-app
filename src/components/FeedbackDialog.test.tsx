@@ -51,6 +51,17 @@ describe('FeedbackDialog', () => {
     expect(screen.queryByText(/Sanitized and optional/i)).not.toBeInTheDocument()
   })
 
+  it('localizes the contribution dialog', () => {
+    render(<FeedbackDialog open={true} onClose={vi.fn()} buildNumber="b281" locale="zh-CN" releaseChannel="alpha" />)
+
+    expect(screen.getByText('参与 Tolaria 贡献')).toBeInTheDocument()
+    expect(screen.getByText('功能请求')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '打开产品看板' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '复制已清理的诊断信息' })).toBeInTheDocument()
+    expect(screen.queryByText('Contribute to Tolaria')).not.toBeInTheDocument()
+    expect(screen.queryByText('Feature requests')).not.toBeInTheDocument()
+  })
+
   it('focuses the primary CTA when opened', async () => {
     render(<FeedbackDialog open={true} onClose={vi.fn()} buildNumber="b281" releaseChannel={null} />)
     const cta = screen.getByRole('button', { name: 'Check out Refactoring' })

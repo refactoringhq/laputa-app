@@ -61,6 +61,18 @@ describe('LinuxMenuButton', () => {
     expect(invoke).toHaveBeenCalledWith('trigger_menu_command', { id: 'file-new-note' })
   }, MENU_TEST_TIMEOUT_MS)
 
+  it('localizes the custom desktop menu when a locale is provided', async () => {
+    render(<LinuxMenuButton locale="zh-CN" />)
+
+    expect(screen.getByRole('button', { name: '文件' })).toBeInTheDocument()
+
+    await openHorizontalMenu('视图')
+    expect(await screen.findByText('实际大小')).toBeInTheDocument()
+    fireEvent.click(await screen.findByText('切换 AI 面板'))
+
+    expect(invoke).toHaveBeenCalledWith('trigger_menu_command', { id: 'view-toggle-ai-chat' })
+  }, MENU_TEST_TIMEOUT_MS)
+
   it('invokes direct window actions from the Window submenu', async () => {
     render(<LinuxMenuButton />)
 

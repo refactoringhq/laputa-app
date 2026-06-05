@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { APP_COMMAND_MENU_SECTIONS } from '../hooks/appCommandCatalog'
+import { getAppCommandMenuSections } from '../hooks/appCommandCatalog'
+import { createTranslator, translate, type AppLocale } from '../lib/i18n'
 import { Button } from './ui/button'
 import {
   DropdownMenu,
@@ -30,18 +31,28 @@ type MenuSection = {
   label: string
 }
 
-const MENU_SECTIONS: ReadonlyArray<MenuSection> = [
-  ...APP_COMMAND_MENU_SECTIONS,
-  {
-    label: 'Window',
-    items: [
-      { kind: 'action', label: 'Minimize', action: () => void getCurrentWindow().minimize().catch(() => {}) },
-      { kind: 'action', label: 'Maximize', action: () => void getCurrentWindow().toggleMaximize().catch(() => {}) },
-      { kind: 'separator' },
-      { kind: 'action', label: 'Close', action: () => void getCurrentWindow().close().catch(() => {}) },
-    ],
-  },
-]
+function menuSections(locale: AppLocale): ReadonlyArray<MenuSection> {
+  const t = createTranslator(locale)
+  return [
+    ...getAppCommandMenuSections(t),
+    {
+      label: t('menu.window'),
+      items: [
+        { kind: 'action', label: t('window.minimize'), action: () => void getCurrentWindow().minimize().catch(() => {}) },
+        { kind: 'action', label: t('window.maximize'), action: () => void getCurrentWindow().toggleMaximize().catch(() => {}) },
+        { kind: 'separator' },
+        { kind: 'action', label: t('window.close'), action: () => void getCurrentWindow().close().catch(() => {}) },
+      ],
+    },
+  ]
+}
+
+const MENU_SECTIONS: ReadonlyArray<MenuSection> = menuSections('en')
+
+function getMenuSections(locale: AppLocale): ReadonlyArray<MenuSection> {
+  if (locale === 'en') return MENU_SECTIONS
+  return menuSections(locale)
+}
 
 function triggerMenuCommand(menuItemId: string): void {
   void invoke('trigger_menu_command', { id: menuItemId }).catch(() => {})
@@ -98,7 +109,7 @@ function HamburgerIcon() {
   )
 }
 
-function AppMenuButton() {
+function AppMenuButton({ locale, sections }: { locale: AppLocale; sections: ReadonlyArray<MenuSection> }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -106,7 +117,7 @@ function AppMenuButton() {
           type="button"
           variant="ghost"
           size="icon"
-          aria-label="Application menu"
+          aria-label={translate(locale, 'menu.application')}
           className="h-full w-[38px] rounded-none text-foreground/70 hover:bg-foreground/10 hover:text-foreground"
           data-no-drag
         >
@@ -114,7 +125,7 @@ function AppMenuButton() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" sideOffset={0} className="min-w-[200px]">
-        {MENU_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <DropdownMenuSub key={section.label}>
             <DropdownMenuSubTrigger>{section.label}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="min-w-[220px]">
@@ -127,13 +138,13 @@ function AppMenuButton() {
   )
 }
 
-function HorizontalMenuBar() {
+function HorizontalMenuBar({ sections }: { sections: ReadonlyArray<MenuSection> }) {
   return (
     <div
       className="hidden h-full min-[760px]:flex"
       data-testid="desktop-horizontal-menu"
     >
-      {MENU_SECTIONS.map((section) => (
+      {sections.map((section) => (
         <DropdownMenu key={section.label}>
           <DropdownMenuTrigger asChild>
             <Button
@@ -155,13 +166,15 @@ function HorizontalMenuBar() {
   )
 }
 
-export function LinuxMenuButton() {
+export function LinuxMenuButton({ locale = 'en' }: { locale?: AppLocale } = {}) {
+  const sections = getMenuSections(locale)
+
   return (
     <>
       <div className="min-[760px]:hidden">
-        <AppMenuButton />
+        <AppMenuButton locale={locale} sections={sections} />
       </div>
-      <HorizontalMenuBar />
+      <HorizontalMenuBar sections={sections} />
     </>
   )
 }
