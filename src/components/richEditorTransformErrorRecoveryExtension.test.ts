@@ -89,6 +89,9 @@ describe('isRecoverableEditorTransformError', () => {
       'Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>',
     ))).toBe(true)
     expect(isRecoverableEditorTransformError(new Error(
+      'Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>',
+    ))).toBe(true)
+    expect(isRecoverableEditorTransformError(new Error(
       'Block with ID 6c1c3bb4-e218-4f00-aaf5-40606852d286 not found',
     ))).toBe(true)
     expect(isRecoverableEditorTransformError(new RangeError(
@@ -192,6 +195,13 @@ describe('installRichEditorTransformErrorRecovery', () => {
   it('recovers table selection transactions whose target row changed underneath BlockNote', () => {
     expectDocumentRepairRecovery(
       new RangeError('Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>'),
+      'table_position_out_of_range',
+    )
+  })
+
+  it('recovers production table row index transactions reported as plain errors', () => {
+    expectDocumentRepairRecovery(
+      new Error('Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>'),
       'table_position_out_of_range',
     )
   })

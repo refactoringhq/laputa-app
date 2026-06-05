@@ -88,7 +88,7 @@ function isInvalidInsertionDepthError(error: unknown): boolean {
 }
 
 function isTablePositionOutOfRangeError(error: unknown): boolean {
-  return error instanceof RangeError && /^Index \d+ out of range for <tableRow\(/.test(error.message)
+  return error instanceof Error && /^Index \d+ out of range for <tableRow\(/.test(error.message)
 }
 
 function isInvalidBlockJoinError(error: unknown): boolean {

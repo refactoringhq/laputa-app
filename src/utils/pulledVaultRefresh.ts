@@ -10,6 +10,8 @@ interface PulledVaultRefreshOptions {
   reloadVault: () => Promise<VaultEntry[]>
   reloadViews: () => Promise<unknown> | unknown
   replaceActiveTab: (entry: VaultEntry) => Promise<void>
+  refocusActiveEditor?: (path: string) => void
+  shouldRefocusActiveEditor?: () => boolean
   updatedFiles: string[]
   vaultPath: string
 }
@@ -88,19 +90,25 @@ function shouldReplaceActiveEntry(options: {
 async function applyActiveEntryReplacement(options: {
   closeAllTabs: PulledVaultRefreshOptions['closeAllTabs']
   replaceActiveTab: PulledVaultRefreshOptions['replaceActiveTab']
+  refocusActiveEditor?: PulledVaultRefreshOptions['refocusActiveEditor']
   replacementEntry: VaultEntry | null
+  shouldRefocusActiveEditor?: PulledVaultRefreshOptions['shouldRefocusActiveEditor']
   shouldReplace: boolean | null
 }): Promise<boolean> {
   const {
     closeAllTabs,
     replaceActiveTab,
+    refocusActiveEditor,
     replacementEntry,
+    shouldRefocusActiveEditor,
     shouldReplace,
   } = options
   if (!replacementEntry || !shouldReplace) return false
 
+  const shouldRefocus = shouldRefocusActiveEditor?.() === true
   closeAllTabs()
   await replaceActiveTab(replacementEntry)
+  if (shouldRefocus) refocusActiveEditor?.(replacementEntry.path)
   return true
 }
 
@@ -114,6 +122,8 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
     reloadVault,
     reloadViews,
     replaceActiveTab,
+    refocusActiveEditor,
+    shouldRefocusActiveEditor,
     updatedFiles,
     vaultPath,
   } = options
@@ -148,7 +158,9 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
   const handledReplacement = await applyActiveEntryReplacement({
     closeAllTabs,
     replaceActiveTab,
+    refocusActiveEditor,
     replacementEntry,
+    shouldRefocusActiveEditor,
     shouldReplace,
   })
   if (handledReplacement) return entries

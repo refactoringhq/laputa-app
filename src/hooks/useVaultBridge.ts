@@ -10,11 +10,29 @@ interface VaultBridgeDeps {
   reloadViews: () => Promise<unknown> | unknown
   closeAllTabs: () => void
   replaceActiveTab: (entry: VaultEntry) => Promise<void>
+  refocusActiveEditor?: (path: string) => void
   hasUnsavedChanges: (path: string) => boolean
+  shouldRefocusActiveEditor?: () => boolean
   onSelectNote: (entry: VaultEntry) => void
   activeTabPath: string | null
   getActiveTabPath?: () => string | null
 }
+
+type RefreshAgentChangesOptions = Pick<
+  VaultBridgeDeps,
+  | 'activeTabPath'
+  | 'closeAllTabs'
+  | 'getActiveTabPath'
+  | 'hasUnsavedChanges'
+  | 'refocusActiveEditor'
+  | 'reloadFolders'
+  | 'reloadVault'
+  | 'reloadViews'
+  | 'replaceActiveTab'
+  | 'resolvedPath'
+  | 'shouldRefocusActiveEditor'
+> & { updatedFiles: string[] }
+type RefreshAgentChangesDeps = Omit<RefreshAgentChangesOptions, 'updatedFiles'>
 
 function findEntry(entriesByPath: Map<string, VaultEntry>, resolvedPath: string, path: string): VaultEntry | undefined {
   return entriesByPath.get(path) ?? entriesByPath.get(`${resolvedPath}/${path}`)
@@ -22,6 +40,58 @@ function findEntry(entriesByPath: Map<string, VaultEntry>, resolvedPath: string,
 
 function findInFresh(entries: VaultEntry[], resolvedPath: string, path: string): VaultEntry | undefined {
   return entries.find(e => e.path === path || e.path === `${resolvedPath}/${path}`)
+}
+
+function refreshAgentChangedFiles(options: RefreshAgentChangesOptions) {
+  const { resolvedPath, updatedFiles, ...refreshOptions } = options
+  return refreshPulledVaultState({
+    ...refreshOptions,
+    updatedFiles,
+    vaultPath: resolvedPath,
+  })
+}
+
+function useRefreshAgentChanges({
+  activeTabPath,
+  closeAllTabs,
+  getActiveTabPath,
+  hasUnsavedChanges,
+  refocusActiveEditor,
+  reloadFolders,
+  reloadVault,
+  reloadViews,
+  replaceActiveTab,
+  resolvedPath,
+  shouldRefocusActiveEditor,
+}: RefreshAgentChangesDeps) {
+  return useCallback((updatedFiles: string[]) => (
+    refreshAgentChangedFiles({
+      activeTabPath,
+      closeAllTabs,
+      getActiveTabPath,
+      hasUnsavedChanges,
+      reloadFolders,
+      reloadVault,
+      reloadViews,
+      replaceActiveTab,
+      refocusActiveEditor,
+      shouldRefocusActiveEditor,
+      updatedFiles,
+      resolvedPath,
+    })
+  ), [
+    activeTabPath,
+    closeAllTabs,
+    getActiveTabPath,
+    hasUnsavedChanges,
+    reloadFolders,
+    reloadVault,
+    reloadViews,
+    replaceActiveTab,
+    refocusActiveEditor,
+    resolvedPath,
+    shouldRefocusActiveEditor,
+  ])
 }
 
 export function useVaultBridge({
@@ -32,7 +102,9 @@ export function useVaultBridge({
   reloadViews,
   closeAllTabs,
   replaceActiveTab,
+  refocusActiveEditor,
   hasUnsavedChanges,
+  shouldRefocusActiveEditor,
   onSelectNote,
   activeTabPath,
   getActiveTabPath,
@@ -44,20 +116,7 @@ export function useVaultBridge({
     })
   }, [reloadVault, onSelectNote, resolvedPath])
 
-  const refreshAgentChanges = useCallback((updatedFiles: string[]) => (
-    refreshPulledVaultState({
-      activeTabPath,
-      closeAllTabs,
-      getActiveTabPath,
-      hasUnsavedChanges,
-      reloadFolders,
-      reloadVault,
-      reloadViews,
-      replaceActiveTab,
-      updatedFiles,
-      vaultPath: resolvedPath,
-    })
-  ), [
+  const refreshAgentChanges = useRefreshAgentChanges({
     activeTabPath,
     closeAllTabs,
     getActiveTabPath,
@@ -66,8 +125,10 @@ export function useVaultBridge({
     reloadVault,
     reloadViews,
     replaceActiveTab,
+    refocusActiveEditor,
     resolvedPath,
-  ])
+    shouldRefocusActiveEditor,
+  })
 
   const openNoteByPath = useCallback((path: string) => {
     const entry = findEntry(entriesByPath, resolvedPath, path)

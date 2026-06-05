@@ -1,6 +1,7 @@
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::pi_cli::AgentStreamRequest;
 use serde_json::{Map, Value};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
@@ -56,9 +57,18 @@ fn seed_agent_dir(source_dir: &Path, agent_dir: &Path) -> Result<(), String> {
         return Ok(());
     }
 
-    for entry in std::fs::read_dir(source_dir)
-        .map_err(|error| format!("Failed to read Pi agent directory: {error}"))?
-    {
+    let entries = match std::fs::read_dir(source_dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "Failed to read Pi agent directory at {}: {error}",
+                source_dir.display()
+            ));
+        }
+    };
+
+    for entry in entries {
         let entry = entry.map_err(|error| format!("Failed to read Pi agent file: {error}"))?;
         let target = agent_dir.join(entry.file_name());
         copy_agent_entry(&entry.path(), &target)?;
@@ -75,8 +85,16 @@ fn same_directory(left: &Path, right: &Path) -> bool {
 }
 
 fn copy_agent_entry(source: &Path, target: &Path) -> Result<(), String> {
-    let metadata = std::fs::metadata(source)
-        .map_err(|error| format!("Failed to inspect Pi agent config: {error}"))?;
+    let metadata = match std::fs::metadata(source) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "Failed to inspect Pi agent config at {}: {error}",
+                source.display()
+            ));
+        }
+    };
 
     if metadata.is_dir() {
         seed_agent_dir(source, target)
@@ -93,13 +111,30 @@ fn copy_agent_file(
     metadata: std::fs::Metadata,
 ) -> Result<(), String> {
     if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|error| format!("Failed to create Pi agent config parent: {error}"))?;
+        std::fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "Failed to create Pi agent config parent at {}: {error}",
+                parent.display()
+            )
+        })?;
     }
-    std::fs::copy(source, target)
-        .map_err(|error| format!("Failed to copy Pi agent config: {error}"))?;
-    std::fs::set_permissions(target, metadata.permissions())
-        .map_err(|error| format!("Failed to preserve Pi agent config permissions: {error}"))
+    match std::fs::copy(source, target) {
+        Ok(_) => {}
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "Failed to copy Pi agent config from {} to {}: {error}",
+                source.display(),
+                target.display()
+            ));
+        }
+    }
+    std::fs::set_permissions(target, metadata.permissions()).map_err(|error| {
+        format!(
+            "Failed to preserve Pi agent config permissions at {}: {error}",
+            target.display()
+        )
+    })
 }
 
 fn build_args() -> Vec<String> {
@@ -365,6 +400,18 @@ mod tests {
             mcp["mcpServers"]["tolaria"]["env"]["VAULT_PATH"],
             "/tmp/vault"
         );
+    }
+
+    #[test]
+    fn stale_pi_agent_config_entry_is_ignored() {
+        let source_agent_dir = tempfile::tempdir().unwrap();
+        let agent_dir = tempfile::tempdir().unwrap();
+        let stale_source = source_agent_dir.path().join("stale.json");
+        let target = agent_dir.path().join("stale.json");
+
+        copy_agent_entry(&stale_source, &target).unwrap();
+
+        assert!(!target.exists());
     }
 
     #[test]

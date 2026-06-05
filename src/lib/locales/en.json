@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "Export note as PDF",
   "editor.toolbar.moreActions": "More note actions",
   "editor.toolbar.openProperties": "Open the properties panel",
+  "editor.whiteboard.enterFullscreen": "Expand whiteboard",
+  "editor.whiteboard.exitFullscreen": "Exit fullscreen whiteboard",
   "editor.exportPdf.unavailable": "Open a Markdown note before exporting a PDF.",
   "editor.exportPdf.failed": "Could not start PDF export: {error}",
   "filePreview.copyDeepLink": "Copy link",

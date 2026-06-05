@@ -1,8 +1,35 @@
 pub use crate::cli_agent_runtime::AgentStreamRequest;
+use crate::cli_agent_runtime::EnvName;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
+
+const CLAUDE_PROVIDER_ENV_KEYS: &[EnvName<'static>] = &[
+    EnvName::trusted("ANTHROPIC_API_KEY"),
+    EnvName::trusted("ANTHROPIC_AUTH_TOKEN"),
+    EnvName::trusted("ANTHROPIC_BASE_URL"),
+    EnvName::trusted("ANTHROPIC_CUSTOM_HEADERS"),
+    EnvName::trusted("ANTHROPIC_MODEL"),
+    EnvName::trusted("ANTHROPIC_SMALL_FAST_MODEL"),
+    EnvName::trusted("CLAUDE_CODE_USE_BEDROCK"),
+    EnvName::trusted("CLAUDE_CODE_USE_VERTEX"),
+    EnvName::trusted("AWS_ACCESS_KEY_ID"),
+    EnvName::trusted("AWS_SECRET_ACCESS_KEY"),
+    EnvName::trusted("AWS_SESSION_TOKEN"),
+    EnvName::trusted("AWS_PROFILE"),
+    EnvName::trusted("AWS_REGION"),
+    EnvName::trusted("AWS_DEFAULT_REGION"),
+    EnvName::trusted("GOOGLE_APPLICATION_CREDENTIALS"),
+    EnvName::trusted("CLOUD_ML_REGION"),
+    EnvName::trusted("VERTEX_REGION"),
+    EnvName::trusted("HTTPS_PROXY"),
+    EnvName::trusted("HTTP_PROXY"),
+    EnvName::trusted("NO_PROXY"),
+    EnvName::trusted("SSL_CERT_FILE"),
+    EnvName::trusted("SSL_CERT_DIR"),
+    EnvName::trusted("NODE_EXTRA_CA_CERTS"),
+];
 
 /// Status returned by `check_claude_cli`.
 #[derive(Debug, Serialize, Clone)]
@@ -393,7 +420,7 @@ fn build_claude_command(
 ) -> Result<std::process::Command, String> {
     let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(request.bin)?;
     let mut cmd = crate::hidden_command(&target.program);
-    crate::cli_agent_runtime::configure_agent_command_environment(&mut cmd, request.bin);
+    configure_claude_command_environment(&mut cmd, request.bin);
     if let Some(first_arg) = target.first_arg {
         cmd.arg(first_arg);
     }
@@ -406,6 +433,11 @@ fn build_claude_command(
         cmd.current_dir(dir);
     }
     Ok(cmd)
+}
+
+fn configure_claude_command_environment(cmd: &mut std::process::Command, bin: &Path) {
+    crate::cli_agent_runtime::configure_agent_command_environment(cmd, bin);
+    crate::cli_agent_runtime::apply_user_shell_env_vars_if_missing(cmd, CLAUDE_PROVIDER_ENV_KEYS);
 }
 
 fn format_failed_claude_exit(failure: ClaudeFailure<'_>) -> String {
@@ -1146,6 +1178,12 @@ mod tests {
             .iter()
             .any(|arg| *arg == OsStr::new("Rename the note after reading the active vault")));
         assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/vault")));
+    }
+
+    #[test]
+    fn claude_provider_env_keys_include_reported_anthropic_overrides() {
+        assert!(CLAUDE_PROVIDER_ENV_KEYS.contains(&EnvName::trusted("ANTHROPIC_API_KEY")));
+        assert!(CLAUDE_PROVIDER_ENV_KEYS.contains(&EnvName::trusted("ANTHROPIC_BASE_URL")));
     }
 
     #[cfg(unix)]

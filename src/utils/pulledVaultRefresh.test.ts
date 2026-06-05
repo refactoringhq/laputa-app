@@ -100,6 +100,22 @@ describe('refreshPulledVaultState', () => {
     expect(options.replaceActiveTab).toHaveBeenCalledWith(makeEntry('/vault/active.md', 'Active'))
   })
 
+  it('refocuses the editor after refreshing a focused clean active tab', async () => {
+    const shouldRefocusActiveEditor = vi.fn(() => true)
+    const refocusActiveEditor = vi.fn()
+    const options = makeOptions({
+      shouldRefocusActiveEditor,
+      refocusActiveEditor,
+    })
+
+    await refreshPulledVaultState(options)
+
+    expect(shouldRefocusActiveEditor).toHaveBeenCalledOnce()
+    expect(options.closeAllTabs).toHaveBeenCalledOnce()
+    expect(options.replaceActiveTab).toHaveBeenCalledWith(makeEntry('/vault/active.md', 'Active'))
+    expect(refocusActiveEditor).toHaveBeenCalledWith('/vault/active.md')
+  })
+
   it('keeps the active tab mounted when the active note was not changed', async () => {
     const options = makeOptions({ updatedFiles: ['other.md'] })
 

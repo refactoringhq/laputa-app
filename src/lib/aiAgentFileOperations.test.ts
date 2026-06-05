@@ -23,6 +23,25 @@ describe('detectFileOperation', () => {
     expect(cb.onFileModified).not.toHaveBeenCalled()
   })
 
+  it('calls onFileCreated for create_note tool with relative markdown path', () => {
+    const cb = makeCallbacks()
+    detectFileOperation({ toolName: 'create_note', input: JSON.stringify({ path: 'note/generated.md' }), vaultPath: VAULT, callbacks: cb })
+    expect(cb.onFileCreated).toHaveBeenCalledWith('note/generated.md')
+    expect(cb.onVaultChanged).not.toHaveBeenCalled()
+  })
+
+  it('calls onFileCreated for create_note tool with Windows absolute path', () => {
+    const cb = makeCallbacks()
+    detectFileOperation({
+      toolName: 'create_note',
+      input: JSON.stringify({ path: String.raw`D:\Notes\Notas\nota-longa-teste-gerada-2.md` }),
+      vaultPath: String.raw`D:\Notes\Notas`,
+      callbacks: cb,
+    })
+    expect(cb.onFileCreated).toHaveBeenCalledWith('nota-longa-teste-gerada-2.md')
+    expect(cb.onVaultChanged).not.toHaveBeenCalled()
+  })
+
   it('calls onFileModified for Edit tool with .md in vault', () => {
     const cb = makeCallbacks()
     detectFileOperation({ toolName: 'Edit', input: JSON.stringify({ file_path: `${VAULT}/note/test.md` }), vaultPath: VAULT, callbacks: cb })

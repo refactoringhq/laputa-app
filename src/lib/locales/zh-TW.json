@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "將筆記匯出為 PDF",
   "editor.toolbar.moreActions": "更多筆記操作",
   "editor.toolbar.openProperties": "開啟屬性面板",
+  "editor.whiteboard.enterFullscreen": "展開白板",
+  "editor.whiteboard.exitFullscreen": "退出全螢幕白板",
   "editor.exportPdf.unavailable": "在匯出 PDF 之前，請先開啟 Markdown 筆記。",
   "editor.exportPdf.failed": "無法開始 PDF 匯出：{error}",
   "filePreview.copyDeepLink": "複製連結",

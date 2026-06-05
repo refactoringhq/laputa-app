@@ -42,6 +42,8 @@ describe('useVaultBridge', () => {
     activeTabPath: string | null = null,
     overrides: Partial<{
       hasUnsavedChanges: typeof hasUnsavedChanges
+      refocusActiveEditor: (path: string) => void
+      shouldRefocusActiveEditor: () => boolean
     }> = {},
   ) {
     const entriesByPath = new Map(entries.map(e => [e.path, e]))
@@ -55,6 +57,8 @@ describe('useVaultBridge', () => {
         closeAllTabs,
         replaceActiveTab,
         hasUnsavedChanges: overrides.hasUnsavedChanges ?? hasUnsavedChanges,
+        shouldRefocusActiveEditor: overrides.shouldRefocusActiveEditor,
+        refocusActiveEditor: overrides.refocusActiveEditor,
         onSelectNote,
         activeTabPath,
       }),
@@ -129,6 +133,22 @@ describe('useVaultBridge', () => {
     expectVaultDerivedStateReloaded({ reloadVault, reloadFolders, reloadViews })
     expect(closeAllTabs).toHaveBeenCalledOnce()
     expect(replaceActiveTab).toHaveBeenCalledWith(fresh)
+  })
+
+  it('refocuses the editor after agent changes refresh the focused active tab', async () => {
+    const fresh = makeEntry('/vault/active.md', 'Fresh active')
+    const shouldRefocusActiveEditor = vi.fn(() => true)
+    const refocusActiveEditor = vi.fn()
+    reloadVault.mockResolvedValue([fresh])
+    const { result } = renderBridge([], '/vault/active.md', {
+      refocusActiveEditor,
+      shouldRefocusActiveEditor,
+    })
+
+    await act(async () => { result.current.handleAgentFileModified('active.md') })
+
+    expect(shouldRefocusActiveEditor).toHaveBeenCalledOnce()
+    expect(refocusActiveEditor).toHaveBeenCalledWith('/vault/active.md')
   })
 
   it('handleAgentFileModified keeps the active tab mounted for other notes', async () => {

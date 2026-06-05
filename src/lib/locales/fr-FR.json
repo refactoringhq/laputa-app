@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "Exporter la note au format PDF",
   "editor.toolbar.moreActions": "Autres actions de note",
   "editor.toolbar.openProperties": "Ouvrir le panneau des propriétés",
+  "editor.whiteboard.enterFullscreen": "Agrandir le tableau blanc",
+  "editor.whiteboard.exitFullscreen": "Quitter le tableau blanc en plein écran",
   "editor.exportPdf.unavailable": "Ouvrez une note Markdown avant d'exporter un PDF.",
   "editor.exportPdf.failed": "Impossible de lancer l'exportation PDF : {error}",
   "filePreview.copyDeepLink": "Copier le lien",

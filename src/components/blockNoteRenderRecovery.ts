@@ -26,7 +26,7 @@ export function blockNoteRenderRecoveryReason(error: unknown): BlockNoteRenderRe
   if (!(error instanceof Error)) return null
   if (error.message === BLOCKNOTE_BLOCK_TYPE_MISMATCH_ERROR) return 'block_type_mismatch'
   if (error.message.includes(BLOCKNOTE_MISSING_ID_ERROR)) return 'block_missing_id'
-  if (error instanceof RangeError && BLOCKNOTE_TABLE_ROW_INDEX_ERROR.test(error.message)) {
+  if (BLOCKNOTE_TABLE_ROW_INDEX_ERROR.test(error.message)) {
     return 'table_row_index_out_of_range'
   }
 

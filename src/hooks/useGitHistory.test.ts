@@ -102,4 +102,31 @@ describe('useGitHistory', () => {
 
     expect(result.current).toEqual([])
   })
+
+  it('reloads history when the refresh key changes', async () => {
+    const loadGitHistory = vi.fn((path: string) => Promise.resolve([
+      { ...mockHistory[0], hash: `${path}-${loadGitHistory.mock.calls.length}` },
+    ]))
+
+    const { result, rerender } = renderHook(
+      ({ refreshKey }) => useGitHistory('/vault/a.md', loadGitHistory, true, refreshKey),
+      { initialProps: { refreshKey: 0 } },
+    )
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200)
+    })
+
+    expect(result.current[0]?.hash).toBe('/vault/a.md-1')
+
+    rerender({ refreshKey: 1 })
+    expect(result.current).toEqual([])
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200)
+    })
+
+    expect(loadGitHistory).toHaveBeenCalledTimes(2)
+    expect(result.current[0]?.hash).toBe('/vault/a.md-2')
+  })
 })

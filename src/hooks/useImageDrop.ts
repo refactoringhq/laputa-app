@@ -22,6 +22,28 @@ type DroppedImagesRequest = {
   vaultPath: string | undefined
   onImageUrl: ImageUrlHandler | undefined
 }
+type NativeDropEventRequest = {
+  event: TauriDropEvent
+  onImageUrl: ImageUrlHandler | undefined
+  setIsDragOver: (isDragOver: boolean) => void
+  vaultPath: string | undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+function isNativeDropPayload(payload: unknown): payload is TauriDragDropPayload {
+  if (!isRecord(payload)) return false
+  const type = Reflect.get(payload, 'type')
+  if (typeof type !== 'string') return false
+  if (type !== 'drop') return true
+  return isStringArray(Reflect.get(payload, 'paths'))
+}
 
 function hasImageFiles(dt: DataTransfer): boolean {
   for (let i = 0; i < dt.items.length; i++) {
@@ -79,6 +101,29 @@ function insertDroppedImages({
   for (const sourcePath of imagePaths) {
     void copyImageToVault({ sourcePath, vaultPath }).then(onImageUrl)
   }
+}
+
+function handleNativeDropEvent({
+  event,
+  onImageUrl,
+  setIsDragOver,
+  vaultPath,
+}: NativeDropEventRequest): void {
+  if (!isNativeDropPayload(event.payload)) {
+    setIsDragOver(false)
+    return
+  }
+  const { payload } = event
+  if (payload.type === 'drop') {
+    setIsDragOver(false)
+    insertDroppedImages({
+      imagePaths: payload.paths.filter(isImagePath),
+      vaultPath,
+      onImageUrl,
+    })
+    return
+  }
+  setIsDragOver(false)
 }
 
 async function registerNativeDropListeners(
@@ -155,16 +200,12 @@ export function useImageDrop({ containerRef, onImageUrl, vaultPath }: UseImageDr
     void (async () => {
       try {
         const nextUnlisteners = await registerNativeDropListeners((event) => {
-          if (event.payload.type === 'drop') {
-            setIsDragOver(false)
-            insertDroppedImages({
-              imagePaths: event.payload.paths.filter(isImagePath),
-              vaultPath: vaultPathRef.current,
-              onImageUrl: onImageUrlRef.current,
-            })
-            return
-          }
-          setIsDragOver(false)
+          handleNativeDropEvent({
+            event,
+            onImageUrl: onImageUrlRef.current,
+            setIsDragOver,
+            vaultPath: vaultPathRef.current,
+          })
         })
         if (mounted) unlisteners = nextUnlisteners
         else cleanupTauriEventListeners(nextUnlisteners)

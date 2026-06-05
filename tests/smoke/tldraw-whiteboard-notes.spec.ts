@@ -198,6 +198,41 @@ test('embedded tldraw interactions stay inside the whiteboard', async ({ page })
   await expectNoEditorNodeSelection(page)
 })
 
+test('embedded tldraw whiteboards can expand to a full-window workspace', async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+
+  const whiteboard = page.locator('.tldraw-whiteboard')
+  await expect(whiteboard).toBeVisible({ timeout: 20_000 })
+  const embeddedBox = await whiteboard.boundingBox()
+  expect(embeddedBox).not.toBeNull()
+
+  const fullscreenToggle = page.getByTestId('tldraw-whiteboard-fullscreen-toggle')
+  await expect(fullscreenToggle).toBeVisible({ timeout: 5_000 })
+  await fullscreenToggle.click()
+  await expect(whiteboard).toHaveClass(/tldraw-whiteboard--fullscreen/u)
+
+  const fullscreenBox = await whiteboard.boundingBox()
+  const viewport = page.viewportSize()
+  expect(fullscreenBox).not.toBeNull()
+  expect(viewport).not.toBeNull()
+  expect(fullscreenBox!.x).toBeLessThanOrEqual(8)
+  expect(fullscreenBox!.y).toBeLessThanOrEqual(8)
+  expect(fullscreenBox!.width).toBeGreaterThanOrEqual(viewport!.width - 16)
+  expect(fullscreenBox!.height).toBeGreaterThanOrEqual(viewport!.height - 16)
+
+  await page.getByTestId('tools.more-button').click()
+  await expect(page.getByTestId('tools.more.ellipse')).toBeVisible({ timeout: 5_000 })
+  await expect(whiteboard).toHaveClass(/tldraw-whiteboard--fullscreen/u)
+  await expectNoEditorNodeSelection(page)
+
+  await fullscreenToggle.click()
+  await expect(whiteboard).not.toHaveClass(/tldraw-whiteboard--fullscreen/u)
+
+  const restoredBox = await whiteboard.boundingBox()
+  expect(restoredBox).not.toBeNull()
+  expect(Math.abs(restoredBox!.height - embeddedBox!.height)).toBeLessThan(4)
+})
+
 test('embedded tldraw dialogs appear and release focus when closed', async ({ page }) => {
   await openNote(page, 'Whiteboard Embed')
 

@@ -18,7 +18,7 @@ function workspace(path: string, label: string): WorkspaceIdentity {
   }
 }
 
-function focusView(rootPath: string, label: string): ViewFile {
+function focusView(rootPath: string, label: string, relationshipTarget = 'podcast'): ViewFile {
   return {
     filename: 'focus.yml',
     rootPath,
@@ -28,26 +28,38 @@ function focusView(rootPath: string, label: string): ViewFile {
       icon: null,
       color: null,
       sort: null,
-      filters: { all: [{ field: 'type', op: 'equals', value: 'Note' }] },
+      filters: { all: [{ field: 'belongs_to', op: 'contains', value: relationshipTarget }] },
     },
   }
 }
 
 describe('view filtering across workspaces', () => {
-  it('matches duplicate view filenames by root path and scopes results to that workspace', () => {
+  it('matches duplicate view filenames by root path and searches every mounted workspace', () => {
     const personal = workspace('/personal', 'Personal')
     const team = workspace('/team', 'Team')
     const entries = [
-      makeEntry({ title: 'Personal Alpha', path: '/personal/alpha.md', isA: 'Note', workspace: personal }),
-      makeEntry({ title: 'Team Alpha', path: '/team/alpha.md', isA: 'Note', workspace: team }),
+      makeEntry({
+        title: 'Personal Essay',
+        path: '/personal/essay.md',
+        isA: 'Note',
+        relationships: { belongs_to: ['[[newsletter]]'] },
+        workspace: personal,
+      }),
+      makeEntry({
+        title: 'Team Essay',
+        path: '/team/essay.md',
+        isA: 'Note',
+        relationships: { belongs_to: ['[[podcast]]'] },
+        workspace: team,
+      }),
     ]
 
     const result = filterEntries(
       entries,
-      { kind: 'view', filename: 'focus.yml', rootPath: '/team' },
-      { views: [focusView('/personal', 'Personal'), focusView('/team', 'Team')] },
+      { kind: 'view', filename: 'focus.yml', rootPath: '/personal' },
+      { views: [focusView('/personal', 'Personal'), focusView('/team', 'Team', 'newsletter')] },
     )
 
-    expect(result.map((entry) => entry.title)).toEqual(['Team Alpha'])
+    expect(result.map((entry) => entry.title)).toEqual(['Team Essay'])
   })
 })

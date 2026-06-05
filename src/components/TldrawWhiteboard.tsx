@@ -1,5 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react'
 import { getAssetUrlsByImport } from '@tldraw/assets/imports.vite'
+import { ArrowsIn, ArrowsOut } from '@phosphor-icons/react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import {
   Box,
@@ -19,11 +20,15 @@ import {
 } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { useDocumentThemeMode } from '../hooks/useDocumentThemeMode'
+import { resolveEffectiveLocale, translate, type AppLocale } from '../lib/i18n'
 import type { ResolvedThemeMode } from '../lib/themeMode'
+import { Button } from './ui/button'
+import { ActionTooltip } from './ui/action-tooltip'
 import { installTldrawTextMeasurementGuard } from './tldrawTextMeasurementGuard'
 
 const EMPTY_TLDRAW_TRANSLATION_URL = 'data:application/json;base64,e30K'
 const TOLARIA_TLDRAW_USER_ID = 'tolaria-whiteboard'
+const WHITEBOARD_FULLSCREEN_BODY_CLASS = 'tldraw-whiteboard-fullscreen-open'
 
 function resolveTldrawAssetUrl(assetUrl: string | undefined): string {
   return assetUrl ?? EMPTY_TLDRAW_TRANSLATION_URL
@@ -99,6 +104,28 @@ function tldrawUserPreferences(themeMode: ResolvedThemeMode): TLUserPreferences 
 
 function ignoreTldrawUserPreferencesUpdate(preferences: TLUserPreferences) {
   void preferences
+}
+
+function readDocumentLocale(): AppLocale {
+  if (typeof document === 'undefined') return 'en'
+  return resolveEffectiveLocale(document.documentElement.lang)
+}
+
+function useDocumentLocale(): AppLocale {
+  const [locale, setLocale] = useState(readDocumentLocale)
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const syncLocale = () => setLocale(readDocumentLocale())
+    const observer = new MutationObserver(syncLocale)
+    observer.observe(document.documentElement, { attributeFilter: ['lang'], attributes: true })
+    syncLocale()
+
+    return () => observer.disconnect()
+  }, [])
+
+  return locale
 }
 
 function rejectionName(error: unknown): string {
@@ -425,6 +452,40 @@ function TolariaTldrawDialogs() {
   ))
 }
 
+function useFullscreenWhiteboard() {
+  const [fullscreen, setFullscreen] = useState(false)
+
+  useEffect(() => {
+    if (!fullscreen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFullscreen(false)
+    }
+    document.body.classList.add(WHITEBOARD_FULLSCREEN_BODY_CLASS)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.classList.remove(WHITEBOARD_FULLSCREEN_BODY_CLASS)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [fullscreen])
+
+  useEffect(() => {
+    const animationFrameId = window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    return () => { window.cancelAnimationFrame(animationFrameId) }
+  }, [fullscreen])
+
+  const toggleFullscreen = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setFullscreen((current) => !current)
+  }, [])
+
+  return { fullscreen, toggleFullscreen }
+}
+
 export function TldrawWhiteboard({
   boardId,
   height,
@@ -441,6 +502,12 @@ export function TldrawWhiteboard({
   const persistedSize = useMemo(() => normalizeSize({ height, width }), [height, width])
   const [resizingSize, setResizingSize] = useState<PixelSize | null>(null)
   const visibleSize = resizingSize ?? persistedSize
+  const { fullscreen, toggleFullscreen } = useFullscreenWhiteboard()
+  const locale = useDocumentLocale()
+  const fullscreenLabel = translate(
+    locale,
+    fullscreen ? 'editor.whiteboard.exitFullscreen' : 'editor.whiteboard.enterFullscreen',
+  )
   const themeMode = useDocumentThemeMode()
   const userPreferences = useMemo(() => tldrawUserPreferences(themeMode), [themeMode])
   const tldrawUser = useTldrawUser({
@@ -540,7 +607,7 @@ export function TldrawWhiteboard({
   return (
     <div
       ref={boardRef}
-      className="tldraw-whiteboard"
+      className={fullscreen ? 'tldraw-whiteboard tldraw-whiteboard--fullscreen' : 'tldraw-whiteboard'}
       contentEditable={false}
       data-board-id={boardId}
       style={cssSize(visibleSize)}
@@ -553,6 +620,21 @@ export function TldrawWhiteboard({
         store={store}
         user={tldrawUser}
       />
+      <ActionTooltip copy={{ label: fullscreenLabel }} side="left">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-xs"
+          aria-label={fullscreenLabel}
+          aria-pressed={fullscreen}
+          className="tldraw-whiteboard__fullscreen-button"
+          data-testid="tldraw-whiteboard-fullscreen-toggle"
+          title={fullscreenLabel}
+          onClick={toggleFullscreen}
+        >
+          {fullscreen ? <ArrowsIn aria-hidden="true" /> : <ArrowsOut aria-hidden="true" />}
+        </Button>
+      </ActionTooltip>
       <button
         type="button"
         aria-label="Resize whiteboard width"

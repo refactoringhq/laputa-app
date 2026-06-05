@@ -32,6 +32,15 @@ describe('blockNoteRenderRecovery', () => {
     expect(isRecoveredBlockNoteRenderError(error, '')).toBe(true)
   })
 
+  it('recognizes production table row index render errors that are plain Error instances', () => {
+    const error = new Error(
+      'Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>',
+    )
+
+    expect(blockNoteRenderRecoveryReason(error)).toBe('table_row_index_out_of_range')
+    expect(isRecoverableBlockNoteRenderError(error)).toBe(true)
+  })
+
   it('recognizes recovered BlockNote block type mismatch render errors', () => {
     const error = new Error('Block type does not match')
 

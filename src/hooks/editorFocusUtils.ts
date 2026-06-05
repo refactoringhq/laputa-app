@@ -9,7 +9,7 @@ interface HeadingRange {
 }
 
 interface FocusableHeadingBlock {
-  id: string
+  id?: unknown
   type?: string
   props?: { level?: number } & Record<string, unknown>
   content?: unknown
@@ -72,12 +72,21 @@ function getFirstHeadingBlock(editor: FocusableEditor): FocusableHeadingBlock | 
   return editor.document?.find(isTopLevelHeadingBlock)
 }
 
+function usableBlockId(block: FocusableHeadingBlock): string | null {
+  return typeof block.id === 'string' && block.id.trim().length > 0
+    ? block.id
+    : null
+}
+
 function trySelectEmptyFirstHeading(editor: FocusableEditor): boolean {
   const firstHeadingBlock = getFirstHeadingBlock(editor)
   if (!firstHeadingBlock || !editor.setTextCursorPosition) return false
   if (getHeadingBlockText(firstHeadingBlock)) return false
 
-  editor.setTextCursorPosition(firstHeadingBlock.id, 'start')
+  const headingBlockId = usableBlockId(firstHeadingBlock)
+  if (!headingBlockId) return false
+
+  editor.setTextCursorPosition(headingBlockId, 'start')
   return true
 }
 

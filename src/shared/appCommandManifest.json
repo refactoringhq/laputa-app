@@ -142,6 +142,7 @@
       "shortcut": {
         "combo": "command-or-ctrl",
         "key": "\\",
+        "code": "Backslash",
         "display": "⌘\\",
         "accelerator": "CmdOrCtrl+\\"
       }
