@@ -423,18 +423,32 @@ fn api_key_from_local_file(request: &AiModelStreamRequest) -> Result<Option<Stri
 }
 
 fn api_key_from_env(request: &AiModelStreamRequest) -> Result<Option<String>, String> {
+    api_key_from_env_with_lookup(
+        request,
+        crate::cli_agent_runtime::env_value_from_process_or_user_shell,
+    )
+}
+
+fn api_key_from_env_with_lookup(
+    request: &AiModelStreamRequest,
+    lookup: impl Fn(crate::cli_agent_runtime::EnvName<'_>) -> Option<String>,
+) -> Result<Option<String>, String> {
     let Some(name) = request
         .provider
         .api_key_env_var
         .as_deref()
         .and_then(non_empty_str)
+        .and_then(crate::cli_agent_runtime::EnvName::new)
     else {
         return Ok(None);
     };
 
-    std::env::var(name)
-        .map(Some)
-        .map_err(|_| format!("Environment variable {name} is not set for this AI provider."))
+    lookup(name).map(Some).ok_or_else(|| {
+        format!(
+            "Environment variable {} is not set for this AI provider.",
+            name.as_str()
+        )
+    })
 }
 
 fn api_key_from_provider(request: &AiModelStreamRequest) -> Result<Option<String>, String> {
@@ -634,6 +648,19 @@ mod tests {
             normalized_base_url(&request(provider)).unwrap_err(),
             "Custom API providers need a base URL.",
         );
+    }
+
+    #[test]
+    fn env_api_key_uses_shell_lookup_when_process_env_is_missing() {
+        let mut provider = provider(AiModelProviderKind::Anthropic);
+        provider.api_key_storage = Some(AiModelApiKeyStorage::Env);
+        provider.api_key_env_var = Some("ANTHROPIC_API_KEY".into());
+        let request = request(provider);
+
+        let api_key =
+            api_key_from_env_with_lookup(&request, |_| Some("shell-secret".to_string())).unwrap();
+
+        assert_eq!(api_key.as_deref(), Some("shell-secret"));
     }
 
     #[test]
