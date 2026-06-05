@@ -369,6 +369,7 @@ vi.mock('@blocknote/core', () => ({
   BlockNoteSchema: { create: () => ({ extend: () => ({}) }) },
   createCodeBlockSpec: vi.fn(() => ({})),
   createExtension: (factory: unknown) => () => factory,
+  createStyleSpec: vi.fn(() => ({})),
   createVideoBlockConfig: vi.fn(() => ({})), defaultInlineContentSpecs: {},
   filterSuggestionItems: vi.fn(() => []), videoParse: vi.fn(() => undefined),
 }))

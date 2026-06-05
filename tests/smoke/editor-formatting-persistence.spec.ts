@@ -53,6 +53,35 @@ async function getRawEditorContent(page: Page): Promise<string> {
   })
 }
 
+async function setRawEditorContent(page: Page, content: string) {
+  await page.evaluate((nextContent) => {
+    type CodeMirrorHost = Element & {
+      cmTile?: {
+        view?: {
+          dispatch: (transaction: { changes: { from: number; to: number; insert: string } }) => void
+          state: {
+            doc: {
+              length: number
+            }
+          }
+        }
+      }
+    }
+
+    const el = document.querySelector('.cm-content')
+    const view = el ? (el as CodeMirrorHost).cmTile?.view : null
+    if (!view) return
+
+    view.dispatch({
+      changes: {
+        from: 0,
+        to: view.state.doc.length,
+        insert: nextContent,
+      },
+    })
+  }, content)
+}
+
 async function roundTripThroughAnotherNote(page: Page) {
   await openNote(page, 'Note C')
   await openNote(page, 'Note B')
@@ -211,6 +240,22 @@ test('bold formatting keeps trailing whitespace outside markdown markers', async
     rawIncludes: 'This is Note B, **referenced** by Alpha Project.',
     rawExcludes: '**referenced **',
   })
+})
+
+test('Obsidian-style highlight markdown renders and persists', async ({ page }) => {
+  await openNote(page, 'Note B')
+  await openRawMode(page)
+  const raw = await getRawEditorContent(page)
+  const highlightedLine = 'Plain ==marked== text.'
+  await setRawEditorContent(page, `${raw.trimEnd()}\n\n${highlightedLine}\n`)
+
+  await openBlockNoteMode(page)
+  await expect(page.locator('.bn-editor mark.markdown-highlight', { hasText: 'marked' })).toBeVisible()
+  await expect(page.locator('.bn-editor')).not.toContainText('==marked==')
+
+  await roundTripThroughAnotherNote(page)
+  await openRawMode(page)
+  expect(await getRawEditorContent(page)).toContain(highlightedLine)
 })
 
 test('toolbar block-type commands persist numbered lists', async ({ page }) => {

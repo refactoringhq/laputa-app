@@ -2,6 +2,7 @@ import type { useCreateBlockNote } from '@blocknote/react'
 import { preProcessWikilinks, injectWikilinks } from '../utils/wikilinks'
 import { preProcessMathMarkdown, injectMathInBlocks } from '../utils/mathMarkdown'
 import { injectDurableEditorMarkdownBlocks, preProcessDurableEditorMarkdown } from '../utils/editorDurableMarkdown'
+import { injectMarkdownHighlightsInBlocks } from '../utils/markdownHighlightMarkdown'
 import { resolveImageUrls } from '../utils/vaultImages'
 import { repairMalformedEditorBlocks } from './editorBlockRepair'
 import { inferCodeBlockLanguages } from '../utils/codeBlockLanguage'
@@ -146,7 +147,8 @@ function preProcessEditorMarkdown(
 function injectEditorMarkdownBlocks(blocks: EditorBlocks): EditorBlocks {
   const withWikilinks = injectWikilinks(blocks)
   const withMath = injectMathInBlocks(withWikilinks)
-  return injectDurableEditorMarkdownBlocks(withMath) as EditorBlocks
+  const withHighlights = injectMarkdownHighlightsInBlocks(withMath)
+  return injectDurableEditorMarkdownBlocks(withHighlights) as EditorBlocks
 }
 
 function repairParsedMarkdownBlocks(parsed: MarkdownParseResult): EditorBlocks {
@@ -184,7 +186,7 @@ export async function resolveBlocksForTarget(
   const fastPathBlocks = buildFastPathBlocks({ preprocessed })
   if (fastPathBlocks) {
     return cacheResolvedEditorState(cache, targetPath, {
-      blocks: repairMalformedEditorBlocks(fastPathBlocks) as EditorBlocks,
+      blocks: repairMalformedEditorBlocks(injectEditorMarkdownBlocks(fastPathBlocks)) as EditorBlocks,
       scrollTop: 0,
       sourceContent: content,
     }, vaultPath)
