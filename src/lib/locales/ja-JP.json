@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "ノートをPDFとしてエクスポート",
   "editor.toolbar.moreActions": "その他のノート操作",
   "editor.toolbar.openProperties": "プロパティパネルを開く",
+  "editor.whiteboard.enterFullscreen": "ホワイトボードを展開",
+  "editor.whiteboard.exitFullscreen": "フルスクリーンホワイトボードを終了",
   "editor.exportPdf.unavailable": "PDFをエクスポートする前に、Markdownノートを開いてください。",
   "editor.exportPdf.failed": "PDFエクスポートを開始できませんでした：{error}",
   "filePreview.copyDeepLink": "リンクをコピー",

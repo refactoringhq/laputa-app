@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "노트를 PDF로 내보내기",
   "editor.toolbar.moreActions": "추가 노트 작업",
   "editor.toolbar.openProperties": "속성 패널 열기",
+  "editor.whiteboard.enterFullscreen": "화이트보드 펼치기",
+  "editor.whiteboard.exitFullscreen": "전체 화면 화이트보드에서 나가기",
   "editor.exportPdf.unavailable": "PDF로 내보내기 전에 Markdown 노트를 여세요.",
   "editor.exportPdf.failed": "PDF 내보내기를 시작할 수 없습니다: {error}",
   "filePreview.copyDeepLink": "링크 복사",

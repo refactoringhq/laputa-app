@@ -423,6 +423,21 @@
   user-select: none;
 }
 
+body.tldraw-whiteboard-fullscreen-open {
+  overflow: hidden;
+}
+
+.editor__blocknote-container .tldraw-whiteboard.tldraw-whiteboard--fullscreen {
+  position: fixed;
+  inset: 8px;
+  z-index: 1200;
+  width: auto;
+  max-width: none;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 24%);
+}
+
 .editor__blocknote-container .tldraw-whiteboard .tl-container {
   --color-background: var(--card);
   --tl-layer-menu-click-capture: 25;
@@ -432,6 +447,20 @@
   --tl-layer-cursor: 60;
   --tl-layer-header-footer: 70;
   --tl-layer-following-indicator: 80;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__fullscreen-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 90;
+  background: var(--background);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+}
+
+.editor__blocknote-container .tldraw-whiteboard--fullscreen .tldraw-whiteboard__fullscreen-button {
+  top: 12px;
+  right: 12px;
 }
 
 .editor__blocknote-container .tldraw-whiteboard [data-radix-popper-content-wrapper] {
@@ -449,6 +478,10 @@
   z-index: 2;
   background: transparent;
   touch-action: none;
+}
+
+.editor__blocknote-container .tldraw-whiteboard--fullscreen .tldraw-whiteboard__resize-handle {
+  display: none;
 }
 
 .editor__blocknote-container .tldraw-whiteboard__resize-handle--width {

@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "将笔记导出为 PDF",
   "editor.toolbar.moreActions": "更多笔记操作",
   "editor.toolbar.openProperties": "打开属性面板",
+  "editor.whiteboard.enterFullscreen": "展开白板",
+  "editor.whiteboard.exitFullscreen": "退出全屏白板",
   "editor.exportPdf.unavailable": "在导出 PDF 之前，请先打开 Markdown 笔记。",
   "editor.exportPdf.failed": "无法开始 PDF 导出：{error}",
   "filePreview.copyDeepLink": "复制链接",

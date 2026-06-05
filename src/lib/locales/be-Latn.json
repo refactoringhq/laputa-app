@@ -534,6 +534,8 @@
   "editor.toolbar.exportPdf": "Ekspartavać natatku ŭ farmacie PDF",
   "editor.toolbar.moreActions": "Boĺš dziejanniaŭ",
   "editor.toolbar.openProperties": "Adkryć ulascivasci",
+  "editor.whiteboard.enterFullscreen": "Pašyryć došku",
+  "editor.whiteboard.exitFullscreen": "Vyjsci z poŭnaekrannaj doški",
   "editor.exportPdf.unavailable": "Adkryjcie natatku Markdown pierad ekspartam u PDF.",
   "editor.exportPdf.failed": "Nie ŭdalosia pačać ekspart PDF: {error}",
   "filePreview.copyDeepLink": "Kapijavać spasylku",

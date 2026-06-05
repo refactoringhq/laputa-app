@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "Notiz als PDF exportieren",
   "editor.toolbar.moreActions": "Weitere Notizaktionen",
   "editor.toolbar.openProperties": "Eigenschaften-Panel öffnen",
+  "editor.whiteboard.enterFullscreen": "Whiteboard erweitern",
+  "editor.whiteboard.exitFullscreen": "Vollbild-Whiteboard verlassen",
   "editor.exportPdf.unavailable": "Öffne eine Markdown-Notiz, bevor du sie als PDF exportierst.",
   "editor.exportPdf.failed": "PDF-Export konnte nicht gestartet werden: {error}",
   "filePreview.copyDeepLink": "Link kopieren",

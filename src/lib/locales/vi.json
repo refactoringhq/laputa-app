@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "Xuất ghi chú dưới dạng PDF",
   "editor.toolbar.moreActions": "Thêm hành động ghi chú",
   "editor.toolbar.openProperties": "Mở bảng thuộc tính",
+  "editor.whiteboard.enterFullscreen": "Mở rộng bảng trắng",
+  "editor.whiteboard.exitFullscreen": "Thoát chế độ bảng trắng toàn màn hình",
   "editor.exportPdf.unavailable": "Mở ghi chú Markdown trước khi xuất PDF.",
   "editor.exportPdf.failed": "Không thể bắt đầu xuất PDF: {error}",
   "filePreview.copyDeepLink": "Sao chép liên kết",

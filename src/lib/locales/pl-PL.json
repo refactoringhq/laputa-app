@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "Eksportuj notatkę jako PDF",
   "editor.toolbar.moreActions": "Więcej działań notatki",
   "editor.toolbar.openProperties": "Otwórz panel właściwości",
+  "editor.whiteboard.enterFullscreen": "Rozwiń tablicę",
+  "editor.whiteboard.exitFullscreen": "Wyjdź z tablicy pełnoekranowej",
   "editor.exportPdf.unavailable": "Otwórz notatkę Markdown przed wyeksportowaniem pliku PDF.",
   "editor.exportPdf.failed": "Nie można rozpocząć eksportu do PDF: {error}",
   "filePreview.copyDeepLink": "Kopiuj link",

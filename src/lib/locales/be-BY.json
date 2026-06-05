@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "Экспартаваць нататку ў фармаце PDF",
   "editor.toolbar.moreActions": "Больш дзеянняў",
   "editor.toolbar.openProperties": "Адкрыць уласцівасці",
+  "editor.whiteboard.enterFullscreen": "Разгарнуць дошку",
+  "editor.whiteboard.exitFullscreen": "Выйсці з поўнаэкраннай дошкі",
   "editor.exportPdf.unavailable": "Адкрыйце нататку Markdown перад экспартам у PDF.",
   "editor.exportPdf.failed": "Немагчыма пачаць экспарт PDF: {error}",
   "filePreview.copyDeepLink": "Капіраваць спасылку",

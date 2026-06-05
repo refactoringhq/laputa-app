@@ -532,6 +532,8 @@
   "editor.toolbar.exportPdf": "Экспортировать заметку в формате PDF",
   "editor.toolbar.moreActions": "Другие действия с заметкой",
   "editor.toolbar.openProperties": "Открыть панель свойств",
+  "editor.whiteboard.enterFullscreen": "Развернуть доску",
+  "editor.whiteboard.exitFullscreen": "Выйти из полноэкранной доски",
   "editor.exportPdf.unavailable": "Откройте заметку Markdown перед экспортом в PDF.",
   "editor.exportPdf.failed": "Не удалось начать экспорт в PDF: {error}",
   "filePreview.copyDeepLink": "Копировать ссылку",

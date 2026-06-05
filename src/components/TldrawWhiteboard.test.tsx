@@ -1,7 +1,9 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Editor } from 'tldraw'
 import { TldrawWhiteboard } from './TldrawWhiteboard'
+import { TooltipProvider } from './ui/tooltip'
 
 interface MockTldrawProps {
   assetUrls: MockAssetUrls
@@ -157,6 +159,27 @@ function expectBundledTldrawAssetUrls(assetUrls: MockAssetUrls) {
   expectNoCdnUrls(assetUrls.translations)
 }
 
+function whiteboardProps(
+  overrides: Partial<ComponentProps<typeof TldrawWhiteboard>> = {},
+): ComponentProps<typeof TldrawWhiteboard> {
+  return {
+    boardId: 'board-1',
+    height: '520',
+    snapshot: '',
+    width: '',
+    onSizeChange: vi.fn(),
+    onSnapshotChange: vi.fn(),
+    ...overrides,
+  }
+}
+
+function renderWhiteboard(overrides: Partial<ComponentProps<typeof TldrawWhiteboard>> = {}) {
+  return render(
+    <TldrawWhiteboard {...whiteboardProps(overrides)} />,
+    { wrapper: TooltipProvider },
+  )
+}
+
 describe('TldrawWhiteboard', () => {
   afterEach(() => {
     cleanup()
@@ -166,16 +189,7 @@ describe('TldrawWhiteboard', () => {
   })
 
   it('uses bundled tldraw assets instead of CDN URLs', () => {
-    render(
-      <TldrawWhiteboard
-        boardId="board-1"
-        height="520"
-        snapshot=""
-        width=""
-        onSizeChange={vi.fn()}
-        onSnapshotChange={vi.fn()}
-      />
-    )
+    renderWhiteboard()
 
     expect(screen.getByTestId('mock-tldraw')).toHaveAttribute('data-draw-font-url')
     expect(assetImportMock.getAssetUrlsByImport).toHaveBeenCalledWith(expect.any(Function))
@@ -186,16 +200,7 @@ describe('TldrawWhiteboard', () => {
     document.documentElement.setAttribute('data-theme', 'dark')
     document.documentElement.classList.add('dark')
 
-    render(
-      <TldrawWhiteboard
-        boardId="board-1"
-        height="520"
-        snapshot=""
-        width=""
-        onSizeChange={vi.fn()}
-        onSnapshotChange={vi.fn()}
-      />
-    )
+    renderWhiteboard()
 
     expect(renderedTldrawProps().user?.userPreferences.get().colorScheme).toBe('dark')
   })
@@ -203,16 +208,7 @@ describe('TldrawWhiteboard', () => {
   it('updates the tldraw color scheme when Tolaria theme changes', async () => {
     document.documentElement.setAttribute('data-theme', 'light')
 
-    render(
-      <TldrawWhiteboard
-        boardId="board-1"
-        height="520"
-        snapshot=""
-        width=""
-        onSizeChange={vi.fn()}
-        onSnapshotChange={vi.fn()}
-      />
-    )
+    renderWhiteboard()
 
     expect(renderedTldrawProps().user?.userPreferences.get().colorScheme).toBe('light')
 
@@ -227,16 +223,7 @@ describe('TldrawWhiteboard', () => {
   })
 
   it('installs the text measurement guard when the canvas mounts', () => {
-    render(
-      <TldrawWhiteboard
-        boardId="board-1"
-        height="520"
-        snapshot=""
-        width=""
-        onSizeChange={vi.fn()}
-        onSnapshotChange={vi.fn()}
-      />
-    )
+    renderWhiteboard()
 
     const editor = mockEditor()
     const cleanup = renderedTldrawProps().onMount(editor)
@@ -254,16 +241,7 @@ describe('TldrawWhiteboard', () => {
   })
 
   it('suppresses whiteboard platform permission rejections while mounted', () => {
-    render(
-      <TldrawWhiteboard
-        boardId="board-1"
-        height="520"
-        snapshot=""
-        width=""
-        onSizeChange={vi.fn()}
-        onSnapshotChange={vi.fn()}
-      />
-    )
+    renderWhiteboard()
 
     const cleanup = renderedTldrawProps().onMount(mockEditor())
     const denied = {
@@ -280,28 +258,12 @@ describe('TldrawWhiteboard', () => {
 
   it('resets the drawing store when switching to a blank board snapshot', () => {
     const boardASnapshot = { records: { shape: 'from-board-a' } }
-    const { rerender } = render(
-      <TldrawWhiteboard
-        boardId="board-1"
-        height="520"
-        snapshot={JSON.stringify(boardASnapshot)}
-        width=""
-        onSizeChange={vi.fn()}
-        onSnapshotChange={vi.fn()}
-      />
-    )
+    const { rerender } = renderWhiteboard({ snapshot: JSON.stringify(boardASnapshot) })
 
     expect(tldrawStoreMock.loadSnapshot).toHaveBeenLastCalledWith(expect.any(Object), boardASnapshot)
 
     rerender(
-      <TldrawWhiteboard
-        boardId="board-2"
-        height="520"
-        snapshot=""
-        width=""
-        onSizeChange={vi.fn()}
-        onSnapshotChange={vi.fn()}
-      />
+      <TldrawWhiteboard {...whiteboardProps({ boardId: 'board-2' })} />
     )
 
     expect(tldrawStoreMock.loadSnapshot).toHaveBeenLastCalledWith(expect.any(Object), { records: {} })
