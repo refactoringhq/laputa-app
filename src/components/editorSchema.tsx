@@ -4,6 +4,7 @@ import {
   createCodeBlockSpec,
   BlockNoteSchema,
   createAudioBlockConfig,
+  createStyleSpec,
   createVideoBlockConfig,
   defaultInlineContentSpecs,
   videoParse,
@@ -22,6 +23,7 @@ import { resolveEntry } from '../utils/wikilink'
 import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/mathMarkdown'
 import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
 import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
+import { MARKDOWN_HIGHLIGHT_STYLE } from '../utils/markdownHighlightMarkdown'
 import type { VaultEntry } from '../types'
 import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { NoteTitleIcon } from './NoteTitleIcon'
@@ -394,6 +396,24 @@ const mermaidBlock = MermaidBlock()
 const tldrawBlock = TldrawBlock()
 const videoBlock = VideoBlockSpec()
 
+function markdownHighlightElement(): { dom: HTMLElement; contentDOM: HTMLElement } {
+  const mark = document.createElement('mark')
+  mark.className = 'markdown-highlight'
+  return { dom: mark, contentDOM: mark }
+}
+
+const MarkdownHighlightStyle = createStyleSpec(
+  {
+    type: MARKDOWN_HIGHLIGHT_STYLE,
+    propSchema: 'boolean',
+  },
+  {
+    render: markdownHighlightElement,
+    toExternalHTML: markdownHighlightElement,
+    parse: element => element.tagName === 'MARK' ? true : undefined,
+  },
+)
+
 export const schema = BlockNoteSchema.create({
   inlineContentSpecs: {
     ...defaultInlineContentSpecs,
@@ -401,6 +421,9 @@ export const schema = BlockNoteSchema.create({
     mathInline: MathInline,
   },
 }).extend({
+  styleSpecs: {
+    [MARKDOWN_HIGHLIGHT_STYLE]: MarkdownHighlightStyle,
+  },
   blockSpecs: {
     audio: audioBlock,
     mathBlock,

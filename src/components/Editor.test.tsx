@@ -54,6 +54,7 @@ vi.mock('@blocknote/core', () => ({
   createAudioBlockConfig: vi.fn(() => ({})),
   createCodeBlockSpec: vi.fn(() => ({})),
   createExtension: (factory: unknown) => () => factory,
+  createStyleSpec: vi.fn(() => ({})),
   createVideoBlockConfig: vi.fn(() => ({})),
   defaultInlineContentSpecs: {},
   filterSuggestionItems: vi.fn(() => []),

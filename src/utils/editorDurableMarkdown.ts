@@ -11,6 +11,7 @@ import {
   preProcessFileAttachmentMarkdown,
   serializeFileAttachmentBlocks,
 } from './fileAttachmentMarkdown'
+import { restoreMarkdownHighlightsInBlocks } from './markdownHighlightMarkdown'
 import { serializeMathAwareBlocks } from './mathMarkdown'
 import { mermaidMarkdownCodec } from './mermaidMarkdown'
 import { tldrawMarkdownCodec } from './tldrawMarkdown'
@@ -47,7 +48,10 @@ export function serializeDurableEditorBlocks(
     serializeOrdinaryBlocks: ordinaryBlocks => serializeDurableMarkdownBlocks({
       blocks: ordinaryBlocks,
       codecs: EDITOR_DURABLE_MARKDOWN_CODECS,
-      serializeOrdinaryBlocks: durableOrdinaryBlocks => serializeMathAwareBlocks(editor, durableOrdinaryBlocks),
+      serializeOrdinaryBlocks: durableOrdinaryBlocks => serializeMathAwareBlocks(
+        editor,
+        restoreMarkdownHighlightsInBlocks(durableOrdinaryBlocks),
+      ),
     }),
   })
 }

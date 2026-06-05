@@ -257,6 +257,14 @@
   color: var(--inline-styles-code-color);
 }
 
+/* --- Inline: Markdown highlight --- */
+.editor__blocknote-container .bn-editor mark.markdown-highlight {
+  background-color: var(--feedback-warning-bg);
+  color: var(--colors-text);
+  border-radius: 2px;
+  padding: 0 0.12em;
+}
+
 /* --- Inline: links --- */
 .editor__blocknote-container .bn-editor a {
   color: var(--inline-styles-link-color);
