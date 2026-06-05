@@ -1,4 +1,4 @@
-import { ArrowsOut as Maximize2 } from '@phosphor-icons/react'
+import { ArrowsOut as Maximize2, PencilSimpleLine } from '@phosphor-icons/react'
 import { useEffect, useId, useMemo, useState, type SyntheticEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -8,6 +8,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../hooks/appCommandDispatcher'
+import { translate } from '../lib/i18n'
+import { trackEvent } from '../lib/telemetry'
 import { SafeSvgDiv } from './SafeMarkup'
 
 type MermaidApi = typeof import('mermaid')['default']
@@ -41,6 +44,7 @@ const MERMAID_RENDER_HOST_STYLE = [
   'height:0',
   'overflow:hidden',
 ].join(';')
+const OPEN_RAW_EDITOR_LABEL = translate('en', 'editor.toolbar.rawOpen')
 
 function renderIdFromReactId(reactId: string): string {
   const safeId = reactId.replace(/[^a-zA-Z0-9_-]/g, '')
@@ -127,6 +131,33 @@ function stopMermaidViewportEvent(event: SyntheticEvent): void {
   event.stopPropagation()
 }
 
+function openRawEditorForMermaidSource(event: SyntheticEvent): void {
+  event.preventDefault()
+  event.stopPropagation()
+  trackEvent('editor_mermaid_raw_edit_requested')
+  window.dispatchEvent(new CustomEvent(APP_COMMAND_EVENT_NAME, {
+    detail: APP_COMMAND_IDS.editToggleRawEditor,
+  }))
+}
+
+function MermaidRawEditorButton() {
+  return (
+    <Button
+      aria-label={OPEN_RAW_EDITOR_LABEL}
+      className="mermaid-diagram__edit-button"
+      contentEditable={false}
+      onClick={openRawEditorForMermaidSource}
+      onMouseDown={stopMermaidViewportEvent}
+      size="icon-sm"
+      title={OPEN_RAW_EDITOR_LABEL}
+      type="button"
+      variant="outline"
+    >
+      <PencilSimpleLine aria-hidden="true" />
+    </Button>
+  )
+}
+
 function MermaidLightbox({ svg }: { svg: string }) {
   return (
     <Dialog>
@@ -186,6 +217,7 @@ export function MermaidDiagram({ diagram, source }: MermaidDiagramProps) {
   if (!diagram.trim() || currentState.error) {
     return (
       <figure className="mermaid-diagram mermaid-diagram--error" data-testid="mermaid-diagram-error">
+        <MermaidRawEditorButton />
         <figcaption>Mermaid diagram unavailable</figcaption>
         <MermaidSourceFallback source={source} />
       </figure>
@@ -194,6 +226,7 @@ export function MermaidDiagram({ diagram, source }: MermaidDiagramProps) {
 
   return (
     <figure className="mermaid-diagram" data-testid="mermaid-diagram">
+      <MermaidRawEditorButton />
       <MermaidLightbox svg={currentState.svg} />
       <MermaidSvgViewport
         ariaLabel="Mermaid diagram"

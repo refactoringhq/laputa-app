@@ -164,6 +164,68 @@ const APP_COMMAND_MANIFEST_STATE_GROUPS = appCommandManifest.menuStateGroups as 
   AppCommandMenuStateGroupReference[]
 >
 
+const MENU_LABEL_KEYS = {
+  File: 'menu.file',
+  Edit: 'menu.edit',
+  View: 'menu.view',
+  Go: 'menu.go',
+  Note: 'menu.note',
+  Vault: 'menu.vault',
+  Window: 'menu.window',
+  'New Note': 'command.note.newNote',
+  'New Type': 'command.note.newType',
+  'Quick Open': 'menu.file.quickOpen',
+  'Quick Open (Cmd+O)': 'menu.file.quickOpenCmdO',
+  'Quick Open (Ctrl+O)': 'menu.file.quickOpenCtrlO',
+  Save: 'menu.file.save',
+  Undo: 'command.note.undo',
+  Redo: 'command.note.redo',
+  'Paste without Formatting': 'menu.edit.pasteWithoutFormatting',
+  'Find in Note': 'command.note.findInNote',
+  'Replace in Note': 'command.note.replaceInNote',
+  'Find in Vault': 'menu.edit.findInVault',
+  'Toggle Note List Search': 'menu.edit.toggleNoteListSearch',
+  'Toggle Diff Mode': 'command.view.toggleDiff',
+  'Editor Only': 'command.view.editorOnly',
+  'Editor + Notes': 'command.view.editorNoteList',
+  'All Panels': 'menu.view.allPanels',
+  'Toggle Properties Panel': 'command.view.toggleProperties',
+  'Toggle AI Panel': 'command.view.toggleAiPanel',
+  'Zoom In': 'menu.view.zoomIn',
+  'Zoom Out': 'menu.view.zoomOut',
+  'Actual Size': 'menu.view.actualSize',
+  'Command Palette': 'menu.view.commandPalette',
+  'All Notes': 'menu.go.allNotes',
+  Archived: 'menu.go.archived',
+  Changes: 'menu.go.changes',
+  Inbox: 'menu.go.inbox',
+  'Go Back': 'command.navigation.goBack',
+  'Go Forward': 'command.navigation.goForward',
+  'Toggle Organized': 'menu.note.toggleOrganized',
+  'Archive Note': 'command.note.archiveNote',
+  'Delete Note': 'command.note.deleteNote',
+  'Restore Deleted Note': 'command.note.restoreDeleted',
+  'Open in New Window': 'command.note.openNewWindow',
+  'Export Note as PDF': 'command.note.exportPdf',
+  'Toggle Raw Editor': 'command.view.toggleRaw',
+  'Toggle Table of Contents': 'menu.note.toggleTableOfContents',
+  'Toggle Backlinks': 'command.view.toggleBacklinks',
+  'Open Vault…': 'command.settings.openVault',
+  'Remove Vault from List': 'command.settings.removeVault',
+  'Restore Getting Started': 'command.settings.restoreGettingStarted',
+  'Add Remote…': 'menu.vault.addRemote',
+  'Commit & Push': 'command.git.commitPush',
+  'Pull from Remote': 'command.git.pull',
+  'Resolve Conflicts': 'command.git.resolveConflicts',
+  'View Pending Changes': 'command.git.viewChanges',
+  'Reload Vault': 'command.settings.reloadVault',
+  'Repair Vault': 'command.settings.repairVault',
+  'Set Up External AI Tools…': 'command.settings.setupExternalAi',
+} as const
+
+export type AppCommandMenuLabelKey = (typeof MENU_LABEL_KEYS)[keyof typeof MENU_LABEL_KEYS]
+export type AppCommandMenuTranslator = (key: AppCommandMenuLabelKey) => string
+
 export const APP_COMMAND_IDS = Object.fromEntries(
   Object.entries(APP_COMMAND_MANIFEST_COMMANDS).map(([key, command]) => [key, command.id]),
 ) as { readonly [K in AppCommandKey]: string }
@@ -204,6 +266,11 @@ function resolvePlatformLabel(label: PlatformLabel): string {
   return label.default
 }
 
+function localizeMenuLabel(label: string, t?: AppCommandMenuTranslator): string {
+  const key = Reflect.get(MENU_LABEL_KEYS, label) as AppCommandMenuLabelKey | undefined
+  return key && t ? t(key) : label
+}
+
 function formatAcceleratorDisplay(accelerator: string): string {
   const commandPrefix = isMac() ? '⌘' : 'Ctrl+'
   const commandShiftPrefix = isMac() ? '⌘⇧' : 'Ctrl+Shift+'
@@ -227,15 +294,16 @@ function menuShortcutForCommand(
   return undefined
 }
 
-function toMenuItem(item: AppCommandMenuManifestItem): AppCommandMenuItem {
+function toMenuItem(item: AppCommandMenuManifestItem, t?: AppCommandMenuTranslator): AppCommandMenuItem {
   if (item.kind === 'separator') return { kind: 'separator' }
 
   if (item.kind === 'menu-event') {
+    const label = resolvePlatformLabel(item.label)
     return {
       kind: 'command',
       commandId: item.id,
       menuItemId: item.id,
-      label: resolvePlatformLabel(item.label),
+      label: localizeMenuLabel(label, t),
       shortcut: typeof item.accelerator === 'string'
         ? formatAcceleratorDisplay(item.accelerator)
         : undefined,
@@ -244,11 +312,12 @@ function toMenuItem(item: AppCommandMenuManifestItem): AppCommandMenuItem {
   }
 
   const command = Reflect.get(APP_COMMAND_MANIFEST_COMMANDS, item.command) as AppCommandManifestDefinition
+  const label = resolvePlatformLabel(item.label)
   return {
     kind: 'command',
     commandId: command.id,
     menuItemId: item.id ?? command.id,
-    label: resolvePlatformLabel(item.label),
+    label: localizeMenuLabel(label, t),
     shortcut: menuShortcutForCommand(item, command),
     enabled: item.enabled,
   }
@@ -258,12 +327,16 @@ function menuCommandIds(items: AppCommandMenuItem[]): string[] {
   return items.flatMap(item => item.kind === 'command' ? [item.commandId] : [])
 }
 
-export const APP_COMMAND_MENU_SECTIONS = APP_COMMAND_MANIFEST_MENUS.map(section => ({
-  label: section.label,
-  items: section.items.map(toMenuItem),
-}))
+export function getAppCommandMenuSections(t?: AppCommandMenuTranslator) {
+  return APP_COMMAND_MANIFEST_MENUS.map(section => ({
+    label: localizeMenuLabel(section.label, t),
+    items: section.items.map(item => toMenuItem(item, t)),
+  }))
+}
 
-const APP_COMMAND_APP_MENU_ITEMS = APP_COMMAND_MANIFEST_APP_MENU.map(toMenuItem)
+export const APP_COMMAND_MENU_SECTIONS = getAppCommandMenuSections()
+
+const APP_COMMAND_APP_MENU_ITEMS = APP_COMMAND_MANIFEST_APP_MENU.map(item => toMenuItem(item))
 
 export const APP_COMMAND_MENU_STATE_GROUPS = Object.fromEntries(
   Object.entries(APP_COMMAND_MANIFEST_STATE_GROUPS).map(([name, references]) => [

@@ -32,12 +32,14 @@ import { cn } from '../lib/utils'
 import { takeFeedbackDialogOpener } from '../lib/feedbackDialogOpener'
 import { useBuildNumber } from '../hooks/useBuildNumber'
 import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../hooks/appCommandDispatcher'
+import { createTranslator, type AppLocale, type TranslationKey } from '../lib/i18n'
 import { openExternalUrl } from '../utils/url'
 
 interface FeedbackDialogProps {
   open: boolean
   onClose: () => void
   buildNumber?: string
+  locale?: AppLocale
   releaseChannel?: string | null
 }
 
@@ -58,10 +60,10 @@ interface LinkFallback {
 }
 
 interface ContributionPath {
-  title: string
-  description: string
-  ctaLabel: string
-  label: string
+  titleKey: TranslationKey
+  descriptionKey: TranslationKey
+  ctaLabelKey: TranslationKey
+  labelKey: TranslationKey
   url: string
   icon: typeof Lightbulb
   tone: ContributionTone
@@ -69,8 +71,8 @@ interface ContributionPath {
 }
 
 interface ContributionLink {
-  ctaLabel: string
-  label: string
+  ctaLabelKey: TranslationKey
+  labelKey: TranslationKey
   url: string
 }
 
@@ -97,46 +99,46 @@ const CONTRIBUTION_BUTTON_CLASSES: Record<ContributionTone, string> = {
   red: 'border-[var(--accent-red)] hover:bg-[var(--accent-red-light)] [&_svg]:text-[var(--accent-red)]',
 }
 
-const SPONSOR_SUPPORT_PATH: ContributionPath = {
-  title: 'Sponsor / Support',
-  description: 'Luca here 👋 my full-time job is running Refactoring, a newsletter for 170K+ engineers about how to run good teams and ship software with AI. I write about workflows, interview tech leaders (e.g. DHH, Martin Fowler, and more) and run a private community of 2000+ engineers with monthly live coaching, AI club, and more.\n\nTolaria is FOSS and always will be. If you like it, the best way to support it is to subscribe to the newsletter.',
-  ctaLabel: 'Check out Refactoring',
-  label: 'Refactoring',
+const SPONSOR_SUPPORT_PATH = {
+  titleKey: 'feedback.sponsor.title',
+  descriptionKey: 'feedback.sponsor.description',
+  ctaLabelKey: 'feedback.sponsor.cta',
+  labelKey: 'feedback.sponsor.linkLabel',
   url: REFACTORING_HOME_URL,
   icon: Newspaper,
   tone: 'blue',
-}
+} satisfies ContributionPath
 
 const CONTRIBUTION_PATHS: ContributionPath[] = [
   {
-    title: 'Feature requests',
-    description: 'Search on the board first, upvote existing ideas, and create new posts when genuinely new!',
-    ctaLabel: 'Open Product Board',
-    label: 'Product Board',
+    titleKey: 'feedback.featureRequests.title',
+    descriptionKey: 'feedback.featureRequests.description',
+    ctaLabelKey: 'feedback.featureRequests.cta',
+    labelKey: 'feedback.featureRequests.linkLabel',
     url: TOLARIA_PRODUCT_BOARD_URL,
     icon: Lightbulb,
     tone: 'green',
   },
   {
-    title: 'Discussions',
-    description: 'Use Discussions for questions, conversations, show & tell, and community context.',
-    ctaLabel: 'Open Discussions',
-    label: 'GitHub Discussions',
+    titleKey: 'feedback.discussions.title',
+    descriptionKey: 'feedback.discussions.description',
+    ctaLabelKey: 'feedback.discussions.cta',
+    labelKey: 'feedback.discussions.linkLabel',
     url: TOLARIA_GITHUB_DISCUSSIONS_URL,
     icon: MessagesSquare,
     tone: 'purple',
   },
   {
-    title: 'Contribute code',
-    description: 'Small, focused PRs are welcome. Check the board first so you build the right things!',
-    ctaLabel: 'Open Pull Requests',
-    label: 'GitHub Pull Requests',
+    titleKey: 'feedback.contributeCode.title',
+    descriptionKey: 'feedback.contributeCode.description',
+    ctaLabelKey: 'feedback.contributeCode.cta',
+    labelKey: 'feedback.contributeCode.linkLabel',
     url: TOLARIA_GITHUB_PULL_REQUESTS_URL,
     icon: GitPullRequest,
     tone: 'yellow',
     secondaryLink: {
-      ctaLabel: 'Open Contributing Guide',
-      label: 'the contributing guide',
+      ctaLabelKey: 'feedback.contributingGuide.cta',
+      labelKey: 'feedback.contributingGuide.linkLabel',
       url: TOLARIA_GITHUB_CONTRIBUTING_URL,
     },
   },
@@ -204,7 +206,9 @@ function ContributionCard({
   )
 }
 
-function LinkFallbackBanner({ linkFallback }: { linkFallback: LinkFallback | null }) {
+type Translate = ReturnType<typeof createTranslator>
+
+function LinkFallbackBanner({ linkFallback, t }: { linkFallback: LinkFallback | null; t: Translate }) {
   if (!linkFallback) return null
 
   return (
@@ -216,8 +220,8 @@ function LinkFallbackBanner({ linkFallback }: { linkFallback: LinkFallback | nul
         color: 'var(--feedback-warning-text)',
       }}
     >
-      <p className="font-medium">Couldn’t open {linkFallback.label} automatically.</p>
-      <p className="mt-1">Open this URL manually instead:</p>
+      <p className="font-medium">{t('feedback.linkFallback.title', { label: linkFallback.label })}</p>
+      <p className="mt-1">{t('feedback.linkFallback.description')}</p>
       <p className="mt-2 break-all rounded-md bg-popover px-3 py-2 font-mono text-xs text-foreground">
         {linkFallback.url}
       </p>
@@ -225,18 +229,20 @@ function LinkFallbackBanner({ linkFallback }: { linkFallback: LinkFallback | nul
   )
 }
 
-function getCopyDiagnosticsLabel(copyState: 'idle' | 'copied' | 'failed') {
-  return copyState === 'copied' ? 'Diagnostics copied' : 'Copy sanitized diagnostics'
+function getCopyDiagnosticsLabel(copyState: 'idle' | 'copied' | 'failed', t: Translate) {
+  return copyState === 'copied' ? t('feedback.diagnosticsCopied') : t('feedback.copyDiagnostics')
 }
 
 function BugReportActions({
   copyState,
   canCopyDiagnostics,
   onCopyDiagnostics,
+  t,
 }: {
   copyState: 'idle' | 'copied' | 'failed'
   canCopyDiagnostics: boolean
   onCopyDiagnostics: () => void
+  t: Translate
 }) {
   return (
     <div className="flex w-full flex-col gap-2">
@@ -247,15 +253,15 @@ function BugReportActions({
         onClick={onCopyDiagnostics}
         disabled={!canCopyDiagnostics}
       >
-        {getCopyDiagnosticsLabel(copyState)}
+        {getCopyDiagnosticsLabel(copyState, t)}
         {copyState === 'copied' ? <Check size={14} /> : <Copy size={14} />}
       </Button>
       {copyState === 'copied' ? (
-        <p className="text-xs font-medium text-foreground">Diagnostics copied.</p>
+        <p className="text-xs font-medium text-foreground">{t('feedback.diagnosticsCopiedSentence')}</p>
       ) : null}
       {copyState === 'failed' ? (
         <p className="text-xs font-medium text-[var(--feedback-warning-text)]">
-          Clipboard access is unavailable right now. You can still open GitHub Issues directly.
+          {t('feedback.clipboardUnavailable')}
         </p>
       ) : null}
     </div>
@@ -341,23 +347,25 @@ function ContributionGrid({
   copyState,
   canCopyDiagnostics,
   onCopyDiagnostics,
+  t,
 }: {
   onOpenLink: (label: string, url: string) => void
   copyState: 'idle' | 'copied' | 'failed'
   canCopyDiagnostics: boolean
   onCopyDiagnostics: () => void
+  t: Translate
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
         <ContributionCard
-          title={SPONSOR_SUPPORT_PATH.title}
-          description={SPONSOR_SUPPORT_PATH.description}
-          ctaLabel={SPONSOR_SUPPORT_PATH.ctaLabel}
+          title={t(SPONSOR_SUPPORT_PATH.titleKey)}
+          description={t(SPONSOR_SUPPORT_PATH.descriptionKey)}
+          ctaLabel={t(SPONSOR_SUPPORT_PATH.ctaLabelKey)}
           icon={SPONSOR_SUPPORT_PATH.icon}
           tone={SPONSOR_SUPPORT_PATH.tone}
           autoFocus={true}
-          onAction={() => onOpenLink(SPONSOR_SUPPORT_PATH.label, SPONSOR_SUPPORT_PATH.url)}
+          onAction={() => onOpenLink(t(SPONSOR_SUPPORT_PATH.labelKey), SPONSOR_SUPPORT_PATH.url)}
         />
       </div>
       {CONTRIBUTION_PATHS.map((path) => {
@@ -365,36 +373,37 @@ function ContributionGrid({
 
         return (
           <ContributionCard
-            key={path.title}
-            title={path.title}
-            description={path.description}
-            ctaLabel={path.ctaLabel}
+            key={path.titleKey}
+            title={t(path.titleKey)}
+            description={t(path.descriptionKey)}
+            ctaLabel={t(path.ctaLabelKey)}
             icon={path.icon}
             tone={path.tone}
-            onAction={() => onOpenLink(path.label, path.url)}
+            onAction={() => onOpenLink(t(path.labelKey), path.url)}
             secondaryAction={secondaryLink ? (
               <ContributionLinkButton
-                label={secondaryLink.ctaLabel}
+                label={t(secondaryLink.ctaLabelKey)}
                 tone={path.tone}
                 accented={false}
-                onAction={() => onOpenLink(secondaryLink.label, secondaryLink.url)}
+                onAction={() => onOpenLink(t(secondaryLink.labelKey), secondaryLink.url)}
               />
             ) : undefined}
           />
         )
       })}
       <ContributionCard
-        title="Report a bug"
-        description="Explain how to reproduce, what you expected, vs what happened. Attach the diagnostics please!"
-        ctaLabel="Open GitHub Issues"
+        title={t('feedback.reportBug.title')}
+        description={t('feedback.reportBug.description')}
+        ctaLabel={t('feedback.reportBug.cta')}
         icon={Bug}
         tone="red"
-        onAction={() => onOpenLink('GitHub Issues', TOLARIA_GITHUB_ISSUES_URL)}
+        onAction={() => onOpenLink(t('feedback.reportBug.linkLabel'), TOLARIA_GITHUB_ISSUES_URL)}
         secondaryAction={(
           <BugReportActions
             copyState={copyState}
             canCopyDiagnostics={canCopyDiagnostics}
             onCopyDiagnostics={onCopyDiagnostics}
+            t={t}
           />
         )}
       />
@@ -406,8 +415,10 @@ export function FeedbackDialog({
   open,
   onClose,
   buildNumber,
+  locale = 'en',
   releaseChannel,
 }: FeedbackDialogProps) {
+  const t = createTranslator(locale)
   const detectedBuildNumber = useBuildNumber()
   const resolvedBuildNumber = buildNumber ?? detectedBuildNumber
   const diagnosticsBundle = useMemo(
@@ -437,19 +448,20 @@ export function FeedbackDialog({
         <DialogHeader className="space-y-2">
           <DialogTitle className="flex items-center gap-2">
             <Megaphone size={18} weight="duotone" />
-            Contribute to Tolaria
+            {t('feedback.title')}
           </DialogTitle>
           <DialogDescription>
-            Pick the path that fits what you want to do! Any type of help is appreciated
+            {t('feedback.description')}
           </DialogDescription>
         </DialogHeader>
 
-        <LinkFallbackBanner linkFallback={linkFallback} />
+        <LinkFallbackBanner linkFallback={linkFallback} t={t} />
         <ContributionGrid
           onOpenLink={handleOpenLink}
           copyState={copyState}
           canCopyDiagnostics={canCopyDiagnostics}
           onCopyDiagnostics={handleCopyDiagnostics}
+          t={t}
         />
       </DialogContent>
     </Dialog>

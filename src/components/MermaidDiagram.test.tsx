@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../hooks/appCommandDispatcher'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 import { MermaidDiagram } from './MermaidDiagram'
 
@@ -59,15 +60,40 @@ describe('MermaidDiagram', () => {
     expect(screen.getByTestId('mermaid-diagram-dialog-viewport').querySelector('svg')).not.toBeNull()
   })
 
+  it('offers a raw editor action for editing Mermaid source immediately', () => {
+    const commands: string[] = []
+    const handleCommand = (event: Event) => {
+      if (event instanceof CustomEvent && typeof event.detail === 'string') {
+        commands.push(event.detail)
+      }
+    }
+    window.addEventListener(APP_COMMAND_EVENT_NAME, handleCommand)
+
+    try {
+      render(
+        <MermaidDiagram
+          diagram={'flowchart LR\nA --> B'}
+          source={'```mermaid\nflowchart LR\nA --> B\n```'}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open the raw editor' }))
+
+      expect(commands).toEqual([APP_COMMAND_IDS.editToggleRawEditor])
+    } finally {
+      window.removeEventListener(APP_COMMAND_EVENT_NAME, handleCommand)
+    }
+  })
+
   it('keeps rendered SVG pointer events inside the Mermaid block', async () => {
     const onBlockPointer = vi.fn()
     render(
-      <button type="button" onClick={onBlockPointer} onMouseDown={onBlockPointer}>
+      <div onClick={onBlockPointer} onMouseDown={onBlockPointer}>
         <MermaidDiagram
           diagram={'flowchart LR\nA --> B'}
           source={'```mermaid\nflowchart LR\nA --> B\n```'}
         />
-      </button>,
+      </div>,
     )
 
     await waitFor(() => {

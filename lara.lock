@@ -17,6 +17,63 @@ files:
     command.toggleGitignoredFilesVisibility: 0a2d3ea4e8ff8b00a801183caeb97a03
     command.contribute: 9887a4451812854f0f1b6f669a874307
     command.checkUpdates: f77f38f684c8b974dd4a56bb321cfd5f
+    menu.application: bc16b1fbe2e90ace4991cafc5149955c
+    menu.file: 0b27918290ff5323bea1e3b78a9cf04e
+    menu.edit: 7dce122004969d56ae2e0245cb754d35
+    menu.view: 4351cfebe4b61d8aa5efa1d020710005
+    menu.go: 5f075ae3e1f9d0382bb8c4632991f96f
+    menu.note: 3b0649c72650c313a357338dcdfb64ec
+    menu.vault: 5b70a213f150f01f0776fa9481ef2ddf
+    menu.window: c89686a387d2b12b3c729ce35a0bcb5b
+    menu.file.quickOpen: d79cba7ca4badcccc081bdcba22abd32
+    menu.file.quickOpenCmdO: 2f1c2a963833b85008562cd615515234
+    menu.file.quickOpenCtrlO: 8aaba3ce15c61798ce80bda311fc1e2d
+    menu.file.save: c9cc8cce247e49bae79f15173ce97354
+    menu.edit.pasteWithoutFormatting: 0219dac5b3b9c457aa65eb19fdd3d22c
+    menu.edit.findInVault: 7dad10e092a9fe1bfbb4a96c377bc417
+    menu.edit.toggleNoteListSearch: f6e0cd9529f571609033958a55f18d78
+    menu.view.allPanels: d33bf99e0756e1d5008cb78902e38ca9
+    menu.view.zoomIn: f5ca4abce85e2dddb0342d0bae3a7270
+    menu.view.zoomOut: 30850b501f98539b1aabaa29fabe41ef
+    menu.view.actualSize: a5dac79ddad1cbdb8b60c5b347ee047e
+    menu.view.commandPalette: c0a2436cd8b2dc5085c869e4a052572f
+    menu.go.allNotes: cd76cf851b08a9d2feafaf255bc1f4d5
+    menu.go.archived: 7d69b3cb4cada18ae61811304f8fbcb5
+    menu.go.changes: c112bb3542e98308d12d5ecb10a67abc
+    menu.go.inbox: 3882d32c66e7e768145ecd8f104b0c08
+    menu.note.toggleOrganized: 003f5648f585407c894e85543a5fda47
+    menu.note.toggleTableOfContents: c464111f97490e65699fe18970fc00e1
+    menu.vault.addRemote: 4d9d0f784920d6ef7f9f3b33266dd00e
+    feedback.title: 96ab5025e38aef43fdb73c9830795264
+    feedback.description: e900af4efb9167033d4ecc8a02cfe463
+    feedback.sponsor.title: 2f6a1db54812f51924c3324a178125ed
+    feedback.sponsor.description: 6517e0c5d4e4801814a6034dd54862b6
+    feedback.sponsor.cta: a2c71ec076796ab6af0ba0ea882303fc
+    feedback.sponsor.linkLabel: 7fbe24a8f025219f4d165aeb75352125
+    feedback.featureRequests.title: 73ea5953d68b2c20a82bb94240f6fe17
+    feedback.featureRequests.description: 9583575bdef16e12927b0a5acfa84307
+    feedback.featureRequests.cta: c19ef0158349da249920b0d9f67d7d48
+    feedback.featureRequests.linkLabel: d125f38d1dc8dbdc7dae3f1778df3a3a
+    feedback.discussions.title: 560f23c77d499c21038c0b4487f03cb2
+    feedback.discussions.description: 2e4da4c5f54c7af3b8db9f3d93ed63c5
+    feedback.discussions.cta: 61ccb6a90ec8037f2926c48c0a90caa3
+    feedback.discussions.linkLabel: 4f85e3343c5e21d2b11812b2baa8ed83
+    feedback.contributeCode.title: 8f93fd72b63620711cc118403b85133e
+    feedback.contributeCode.description: 53230626356951578842a8cd7233d1f1
+    feedback.contributeCode.cta: c73dd5e7d432cd18c109b333e0b55299
+    feedback.contributeCode.linkLabel: bfe9dd9816bb39f82fc003de794a075d
+    feedback.contributingGuide.cta: 6cc1fbcbbc69a70a70a2020c979d8e22
+    feedback.contributingGuide.linkLabel: b1310938ecab4c502a8b3af2ca1ce188
+    feedback.reportBug.title: 3406147c3ce729ce17ed76d45c2896f9
+    feedback.reportBug.description: 6da172412f774e022b0f32ba17305491
+    feedback.reportBug.cta: 1f5aa905b40956ff5ea8b4cc5ea29315
+    feedback.reportBug.linkLabel: ffaa2eaa0f015cf037d2b5fe8af6b813
+    feedback.linkFallback.title: c5396ec50cec23a09977180747737264
+    feedback.linkFallback.description: 91d1e18130765119606f095ac473d9cd
+    feedback.copyDiagnostics: dedf5388697bba1fd53173b04823761a
+    feedback.diagnosticsCopied: 9c7f3f37df9c000fc67c1a6ee35f40e5
+    feedback.diagnosticsCopiedSentence: 6f8ebe492dbb95827ccf7536965dc672
+    feedback.clipboardUnavailable: 8e25a424420687ed8e0dc2b1be8c7406
     command.group.navigation: 846495f9ceed11accf8879f555936a7d
     command.group.note: 3b0649c72650c313a357338dcdfb64ec
     command.group.git: 0bcc70105ad279503e31fe7b3f47b665
