@@ -99,6 +99,10 @@ describe('isRecoverableEditorTransformError', () => {
       'Block with ID 6c1c3bb4-e218-4f00-aaf5-40606852d286 not found',
     ))).toBe(true)
     expect(isRecoverableEditorTransformError(nullFragmentAppendError())).toBe(true)
+    const stackOnlyAppendError = nullFragmentAppendError("Cannot read properties of null (reading 'append')")
+    stackOnlyAppendError.stack =
+      "TypeError: Cannot read properties of null (reading 'append')\n    at o.fillBefore(e).append (App-CrXlNLOq.js:1:1)"
+    expect(isRecoverableEditorTransformError(stackOnlyAppendError)).toBe(true)
     expect(isRecoverableEditorTransformError(new TypeError(
       "Cannot read properties of null (reading 'append')",
     ))).toBe(false)
