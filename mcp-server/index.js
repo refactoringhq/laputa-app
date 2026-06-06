@@ -20,10 +20,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import WebSocket from 'ws'
-import { createNote, searchNotes, getNote } from './vault.js'
-import { requireVaultPaths } from './vault-path.js'
-import { readAgentInstructions, vaultContextWithInstructions } from './agent-instructions.js'
-import path from 'node:path'
+import { createMcpToolService } from './tool-service.js'
 
 const WS_UI_PORT = parseInt(process.env.WS_UI_PORT || '9711', 10)
 const WS_UI_URL = `ws://localhost:${WS_UI_PORT}`
@@ -46,10 +43,6 @@ let uiSocket = null
 let reconnectTimer = null
 let shutdownStarted = false
 const RECONNECT_INTERVAL_MS = 3000
-
-function activeVaultPaths() {
-  return requireVaultPaths()
-}
 
 function connectUiBridge() {
   if (shutdownStarted) return
@@ -115,6 +108,8 @@ function broadcastUiAction(action, payload) {
   if (!uiSocket || uiSocket.readyState !== WebSocket.OPEN) return
   uiSocket.send(JSON.stringify({ type: 'ui_action', action, ...payload }))
 }
+
+const toolService = createMcpToolService({ emitUiAction: broadcastUiAction })
 
 const TOOLS = [
   {
@@ -220,125 +215,8 @@ const TOOLS = [
   },
 ]
 
-function requestedVaultPath(args = {}) {
-  const requested = typeof args.vaultPath === 'string' ? args.vaultPath.trim() : ''
-  if (!requested) return null
-  if (!activeVaultPaths().includes(requested)) {
-    throw new Error(`Vault is not active in Tolaria: ${requested}`)
-  }
-  return requested
-}
-
-function vaultLabel(vaultPath) {
-  return path.basename(vaultPath) || vaultPath
-}
-
-function withVaultMetadata(note, vaultPath) {
-  return {
-    ...note,
-    vaultPath,
-    vaultLabel: vaultLabel(vaultPath),
-  }
-}
-
-async function getNoteFromActiveVaults(notePath, vaultPath = null) {
-  const candidates = vaultPath ? [vaultPath] : activeVaultPaths()
-  const matches = []
-  const errors = []
-
-  for (const candidate of candidates) {
-    try {
-      matches.push(withVaultMetadata(await getNote(candidate, notePath), candidate))
-    } catch (error) {
-      errors.push(error)
-    }
-  }
-
-  if (matches.length === 1) return matches[0]
-  if (matches.length > 1) {
-    throw new Error(`Note path is ambiguous across active vaults. Pass vaultPath for ${notePath}.`)
-  }
-  throw errors[0] ?? new Error(`Note not found: ${notePath}`)
-}
-
-async function searchActiveVaults(query, limit = 10) {
-  const requestedLimit = Number.isFinite(limit) && limit > 0 ? limit : 10
-  const results = []
-
-  for (const vaultPath of activeVaultPaths()) {
-    const vaultResults = await searchNotes(vaultPath, query, requestedLimit)
-    results.push(...vaultResults.map((result) => withVaultMetadata(result, vaultPath)))
-    if (results.length >= requestedLimit) break
-  }
-
-  return results.slice(0, requestedLimit)
-}
-
-async function activeVaultContext(targetVaultPath = null) {
-  const roots = activeVaultPaths()
-  if (targetVaultPath) return vaultContextWithInstructions(targetVaultPath)
-  if (roots.length === 1) return vaultContextWithInstructions(roots[0])
-
-  return {
-    vaults: await Promise.all(roots.map(vaultContextWithInstructions)),
-  }
-}
-
-function uiPath(args = {}) {
-  const notePath = typeof args.path === 'string' ? args.path : ''
-  if (path.isAbsolute(notePath)) return notePath
-  const roots = activeVaultPaths()
-  const vaultPath = requestedVaultPath(args) ?? (roots.length === 1 ? roots[0] : '')
-  return vaultPath ? path.join(vaultPath, notePath) : notePath
-}
-
-function isInsideVaultRoot(vaultPath, notePath) {
-  const relative = path.relative(vaultPath, notePath)
-  return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative)
-}
-
-function notePathArg(args = {}) {
-  const notePath = typeof args.path === 'string' ? args.path.trim() : ''
-  if (!notePath) throw new Error('Note path is required')
-  return notePath
-}
-
-function writableVaultPath(args = {}) {
-  const requested = requestedVaultPath(args)
-  if (requested) return requested
-
-  const roots = activeVaultPaths()
-  const notePath = notePathArg(args)
-  if (path.isAbsolute(notePath)) {
-    const root = roots.find(vaultPath => isInsideVaultRoot(vaultPath, notePath))
-    if (root) return root
-  }
-  if (roots.length === 1) return roots[0]
-  throw new Error(`Note path is ambiguous across active vaults. Pass vaultPath for ${notePath}.`)
-}
-
-function yamlScalar(value) {
-  return JSON.stringify(value)
-}
-
-function fallbackCreateNoteContent(args = {}) {
-  const title = typeof args.title === 'string' && args.title.trim() ? args.title.trim() : path.basename(notePathArg(args), '.md')
-  const type = typeof args.type === 'string' && args.type.trim()
-    ? args.type.trim()
-    : typeof args.is_a === 'string' && args.is_a.trim()
-      ? args.is_a.trim()
-      : 'Note'
-  return `---\ntype: ${yamlScalar(type)}\n---\n\n# ${title}\n`
-}
-
-function createNoteContent(args = {}) {
-  return typeof args.content === 'string' && args.content.trim()
-    ? args.content
-    : fallbackCreateNoteContent(args)
-}
-
 async function handleSearchNotes(args) {
-  const results = await searchActiveVaults(args.query, args.limit)
+  const results = await toolService.searchNotes(args)
   const text = results.length === 0
     ? 'No matching notes found.'
     : results.map(r => `**${r.title}** (${r.vaultLabel} / ${r.path})\n${r.snippet}`).join('\n\n')
@@ -346,40 +224,25 @@ async function handleSearchNotes(args) {
 }
 
 async function handleVaultContext(args = {}) {
-  const ctx = await activeVaultContext(requestedVaultPath(args))
+  const ctx = await toolService.vaultContext(args)
   return { content: [{ type: 'text', text: JSON.stringify(ctx, null, 2) }] }
 }
 
 async function handleListVaults() {
-  const vaults = await Promise.all(activeVaultPaths().map(async (vaultPath) => {
-    const agentInstructions = await readAgentInstructions(vaultPath)
-    return {
-      path: vaultPath,
-      label: vaultLabel(vaultPath),
-      agentInstructionsPath: agentInstructions?.path ?? null,
-      hasAgentInstructions: agentInstructions !== null,
-    }
-  }))
-
-  return { content: [{ type: 'text', text: JSON.stringify({ vaults }, null, 2) }] }
+  return { content: [{ type: 'text', text: JSON.stringify(await toolService.listVaults(), null, 2) }] }
 }
 
 async function handleGetNote(args) {
-  const note = await getNoteFromActiveVaults(args.path, requestedVaultPath(args))
+  const note = await toolService.readNote(args)
   return { content: [{ type: 'text', text: JSON.stringify(note, null, 2) }] }
 }
 
 async function handleCreateNote(args = {}) {
-  const notePath = notePathArg(args)
-  const vaultPath = writableVaultPath(args)
-  const note = await createNote(vaultPath, notePath, createNoteContent(args))
-  const targetPath = uiPath({ ...args, path: note.path, vaultPath })
-  broadcastUiAction('vault_changed', { path: targetPath })
-  broadcastUiAction('open_tab', { path: targetPath })
+  const note = await toolService.createNote(args)
   return {
     content: [{
       type: 'text',
-      text: JSON.stringify({ path: note.path, absolutePath: note.absolutePath, vaultPath }, null, 2),
+      text: JSON.stringify(note, null, 2),
     }],
   }
 }
@@ -387,19 +250,17 @@ async function handleCreateNote(args = {}) {
 function handleOpenNote(args) {
   // Refresh vault first so the new/modified note appears in the note list,
   // then signal the UI to open it in a tab.
-  const targetPath = uiPath(args)
-  broadcastUiAction('vault_changed', { path: targetPath })
-  broadcastUiAction('open_tab', { path: targetPath })
+  const { targetPath } = toolService.openNoteAsTab(args)
   return { content: [{ type: 'text', text: `Opening ${targetPath} in Tolaria` }] }
 }
 
 function handleHighlightEditor(args) {
-  broadcastUiAction('highlight', { element: args.element, path: args.path })
+  toolService.highlightEditor(args)
   return { content: [{ type: 'text', text: `Highlighting ${args.element}` }] }
 }
 
 function handleRefreshVault(args) {
-  broadcastUiAction('vault_changed', { path: uiPath(args) })
+  toolService.refreshVault(args)
   return { content: [{ type: 'text', text: 'Vault refresh triggered' }] }
 }
 
