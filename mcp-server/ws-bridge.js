@@ -21,12 +21,7 @@
  */
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
-import {
-  createNote, getNote, searchNotes,
-} from './vault.js'
-import { requireVaultPaths } from './vault-path.js'
-import { readAgentInstructions, vaultContextWithInstructions } from './agent-instructions.js'
-import path from 'node:path'
+import { createMcpToolService } from './tool-service.js'
 
 const WS_PORT = parseInt(process.env.WS_PORT || '9710', 10)
 const WS_UI_PORT = parseInt(process.env.WS_UI_PORT || '9711', 10)
@@ -41,111 +36,6 @@ const TRUSTED_UI_ORIGINS = new Set([
 let uiBridge = null
 const UNKNOWN_TOOL = Symbol('unknown tool')
 
-function activeVaultPaths() {
-  return requireVaultPaths()
-}
-
-function requestedVaultPath(args = {}) {
-  const requested = typeof args.vaultPath === 'string' ? args.vaultPath.trim() : ''
-  if (!requested) return null
-  if (!activeVaultPaths().includes(requested)) {
-    throw new Error(`Vault is not active in Tolaria: ${requested}`)
-  }
-  return requested
-}
-
-function uiPath(args = {}) {
-  const notePath = typeof args.path === 'string' ? args.path : ''
-  if (path.isAbsolute(notePath)) return notePath
-  const roots = activeVaultPaths()
-  const vaultPath = requestedVaultPath(args) ?? (roots.length === 1 ? roots[0] : '')
-  return vaultPath ? path.join(vaultPath, notePath) : notePath
-}
-
-function isInsideVaultRoot(vaultPath, notePath) {
-  const relative = path.relative(vaultPath, notePath)
-  return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative)
-}
-
-function notePathArg(args = {}) {
-  const notePath = typeof args.path === 'string' ? args.path.trim() : ''
-  if (!notePath) throw new Error('Note path is required')
-  return notePath
-}
-
-function writableVaultPath(args = {}) {
-  const requested = requestedVaultPath(args)
-  if (requested) return requested
-
-  const roots = activeVaultPaths()
-  const notePath = notePathArg(args)
-  if (path.isAbsolute(notePath)) {
-    const root = roots.find(vaultPath => isInsideVaultRoot(vaultPath, notePath))
-    if (root) return root
-  }
-  if (roots.length === 1) return roots[0]
-  throw new Error(`Note path is ambiguous across active vaults. Pass vaultPath for ${notePath}.`)
-}
-
-function yamlScalar(value) {
-  return JSON.stringify(value)
-}
-
-function fallbackCreateNoteContent(args = {}) {
-  const title = typeof args.title === 'string' && args.title.trim() ? args.title.trim() : path.basename(notePathArg(args), '.md')
-  const type = typeof args.type === 'string' && args.type.trim()
-    ? args.type.trim()
-    : typeof args.is_a === 'string' && args.is_a.trim()
-      ? args.is_a.trim()
-      : 'Note'
-  return `---\ntype: ${yamlScalar(type)}\n---\n\n# ${title}\n`
-}
-
-function createNoteContent(args = {}) {
-  return typeof args.content === 'string' && args.content.trim()
-    ? args.content
-    : fallbackCreateNoteContent(args)
-}
-
-async function getNoteFromActiveVaults(notePath, vaultPath = null) {
-  const candidates = vaultPath ? [vaultPath] : activeVaultPaths()
-  const matches = []
-  const errors = []
-
-  for (const candidate of candidates) {
-    try {
-      matches.push({ ...(await getNote(candidate, notePath)), vaultPath: candidate })
-    } catch (error) {
-      errors.push(error)
-    }
-  }
-
-  if (matches.length === 1) return matches[0]
-  if (matches.length > 1) {
-    throw new Error(`Note path is ambiguous across active vaults. Pass vaultPath for ${notePath}.`)
-  }
-  throw errors[0] ?? new Error(`Note not found: ${notePath}`)
-}
-
-async function searchActiveVaults(query, limit = 10) {
-  const requestedLimit = Number.isFinite(limit) && limit > 0 ? limit : 10
-  const results = []
-
-  for (const vaultPath of activeVaultPaths()) {
-    const vaultResults = await searchNotes(vaultPath, query, requestedLimit)
-    results.push(...vaultResults.map((result) => ({ ...result, vaultPath })))
-    if (results.length >= requestedLimit) break
-  }
-
-  return results.slice(0, requestedLimit)
-}
-
-async function activeVaultContext() {
-  const roots = activeVaultPaths()
-  if (roots.length === 1) return vaultContextWithInstructions(roots[0])
-  return { vaults: await Promise.all(roots.map(vaultContextWithInstructions)) }
-}
-
 function broadcastUiAction(action, payload) {
   if (!uiBridge) return
   const msg = JSON.stringify({ type: 'ui_action', action, ...payload })
@@ -154,72 +44,49 @@ function broadcastUiAction(action, payload) {
   }
 }
 
+const toolService = createMcpToolService({ emitUiAction: broadcastUiAction })
 
 async function readNoteTool(args) {
-  const note = await getNoteFromActiveVaults(args.path, requestedVaultPath(args))
+  const note = await toolService.readNote(args)
   return { content: note.content, frontmatter: note.frontmatter }
 }
 
 function uiOpenNoteTool(args) {
-  const targetPath = uiPath(args)
-  broadcastUiAction('vault_changed', { path: targetPath })
-  broadcastUiAction('open_note', { path: targetPath })
+  toolService.openNoteInEditor(args)
   return { ok: true }
 }
 
 function uiOpenTabTool(args) {
-  const targetPath = uiPath(args)
-  broadcastUiAction('vault_changed', { path: targetPath })
-  broadcastUiAction('open_tab', { path: targetPath })
+  toolService.openNoteAsTab(args)
   return { ok: true }
 }
 
 async function createNoteTool(args = {}) {
-  const notePath = notePathArg(args)
-  const vaultPath = writableVaultPath(args)
-  const note = await createNote(vaultPath, notePath, createNoteContent(args))
-  const targetPath = uiPath({ ...args, path: note.path, vaultPath })
-  broadcastUiAction('vault_changed', { path: targetPath })
-  broadcastUiAction('open_tab', { path: targetPath })
-  return { ok: true, path: note.path, absolutePath: note.absolutePath, vaultPath }
+  return { ok: true, ...(await toolService.createNote(args)) }
 }
 
 function highlightTool(args) {
-  broadcastUiAction('highlight', { element: args.element, path: args.path })
+  toolService.highlightEditor(args)
   return { ok: true }
 }
 
 function uiSetFilterTool(args) {
-  broadcastUiAction('set_filter', { filterType: args.type })
+  toolService.setFilter(args)
   return { ok: true }
 }
 
 function refreshVaultTool(args) {
-  broadcastUiAction('vault_changed', { path: uiPath(args) })
+  toolService.refreshVault(args)
   return { ok: true }
-}
-
-async function listVaultsTool() {
-  return {
-    vaults: await Promise.all(activeVaultPaths().map(async (vaultPath) => {
-      const agentInstructions = await readAgentInstructions(vaultPath)
-      return {
-        path: vaultPath,
-        label: path.basename(vaultPath) || vaultPath,
-        agentInstructionsPath: agentInstructions?.path ?? null,
-        hasAgentInstructions: agentInstructions !== null,
-      }
-    })),
-  }
 }
 
 const TOOL_EXECUTORS = [
   ['open_note', readNoteTool],
   ['read_note', readNoteTool],
   ['create_note', createNoteTool],
-  ['search_notes', (args) => searchActiveVaults(args.query, args.limit)],
-  ['vault_context', () => activeVaultContext()],
-  ['list_vaults', () => listVaultsTool()],
+  ['search_notes', (args) => toolService.searchNotes(args)],
+  ['vault_context', (args) => toolService.vaultContext(args)],
+  ['list_vaults', () => toolService.listVaults()],
   ['ui_open_note', uiOpenNoteTool],
   ['ui_open_tab', uiOpenTabTool],
   ['ui_highlight', highlightTool],
@@ -335,7 +202,7 @@ export function startUiBridge(port = WS_UI_PORT) {
 }
 
 export function startBridge(port = WS_PORT) {
-  const currentVaultPaths = activeVaultPaths()
+  const currentVaultPaths = toolService.activeVaultPaths()
   const wss = new WebSocketServer({
     port,
     host: LOOPBACK_HOST,
@@ -365,7 +232,7 @@ export function startBridge(port = WS_PORT) {
 const isMain = process.argv[1]?.endsWith('ws-bridge.js')
 if (isMain) {
   try {
-    activeVaultPaths()
+    toolService.activeVaultPaths()
     startUiBridge().then(() => startBridge())
   } catch (err) {
     console.error(`[ws-bridge] ${err.message}`)

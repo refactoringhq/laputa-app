@@ -354,6 +354,7 @@ Each CLI agent authenticates itself outside Tolaria. Claude Code uses its existi
 ## MCP Server
 
 The MCP server (`mcp-server/`) exposes vault operations as tools for AI assistants (Claude Code, Gemini CLI, Cursor, or any MCP-compatible client).
+The stdio entrypoint and desktop WebSocket bridge share `mcp-server/tool-service.js` for mounted-vault resolution, note lookup/search, note creation defaults, vault listing, and UI action intents; `index.js` and `ws-bridge.js` only adapt those semantics to their transport-specific request and response shapes.
 
 ### Tool Surface
 
@@ -399,12 +400,15 @@ That setup is user-initiated through the status bar / command palette flow, not 
 flowchart TD
     subgraph MCP["MCP Server (Node.js or Bun) — mounted-workspace scoped"]
         IDX["index.js"]
+        SVC["tool-service.js\n(vault resolution, note operations,\nUI action intents)"]
         VAULT["vault.js\n(findMarkdownFiles, readNote, createNote,\nsearchNotes, appendToNote, editNoteFrontmatter,\ndeleteNote, linkNotes, listNotes, vaultContext)"]
         WSB["ws-bridge.js"]
 
         IDX -->|"stdio transport"| STDIO["Claude Code / Cursor / Gemini / OpenCode"]
-        IDX --> VAULT
-        IDX --> WSB
+        IDX --> SVC
+        SVC --> VAULT
+        IDX -.->|"UI action WebSocket client"| WSB
+        WSB --> SVC
         WSB -->|"port 9710 — tool bridge"| AI["AI Clients\n(Claude Code, external)"]
         WSB -->|"port 9711 — UI bridge"| FE["Frontend\n(useAiActivity)"]
     end
