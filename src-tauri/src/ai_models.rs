@@ -61,6 +61,9 @@ pub struct AiModelStreamRequest {
     pub model_id: String,
     pub message: String,
     pub system_prompt: Option<String>,
+    pub vault_path: Option<String>,
+    #[serde(default)]
+    pub vault_paths: Vec<String>,
     pub api_key_override: Option<String>,
     #[serde(default)]
     pub event_name: Option<String>,
@@ -166,7 +169,7 @@ where
         session_id: format!("api-{}", uuid::Uuid::new_v4()),
     });
 
-    let text = send_model_message(&request)?;
+    let text = send_model_message(&request, &mut emit)?;
 
     emit(AiAgentStreamEvent::TextDelta { text });
     emit(AiAgentStreamEvent::Done);
@@ -182,33 +185,39 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
             "You are testing whether this model endpoint is reachable. Reply with exactly OK."
                 .into(),
         ),
+        vault_path: None,
+        vault_paths: Vec::new(),
         api_key_override: normalize_optional_string(request.api_key_override),
         event_name: None,
     };
-    send_model_message(&request)
+    send_model_message(&request, &mut |_| {})
 }
 
-fn send_model_message(request: &AiModelStreamRequest) -> Result<String, String> {
+fn send_model_message<F>(request: &AiModelStreamRequest, emit: &mut F) -> Result<String, String>
+where
+    F: FnMut(AiAgentStreamEvent),
+{
     match request.provider.kind {
         AiModelProviderKind::Anthropic => send_anthropic_message(request),
-        _ => send_openai_compatible_message(request),
+        _ => send_openai_compatible_message(request, emit),
     }
 }
 
-fn send_openai_compatible_message(request: &AiModelStreamRequest) -> Result<String, String> {
+fn send_openai_compatible_message<F>(
+    request: &AiModelStreamRequest,
+    emit: &mut F,
+) -> Result<String, String>
+where
+    F: FnMut(AiAgentStreamEvent),
+{
     let endpoint = format!("{}/chat/completions", normalized_base_url(request)?);
-    let mut messages = Vec::new();
-    if let Some(system_prompt) = non_empty_option(request.system_prompt.as_deref()) {
-        messages.push(serde_json::json!({ "role": "system", "content": system_prompt }));
-    }
-    messages.push(serde_json::json!({ "role": "user", "content": request.message }));
-
-    let payload = serde_json::json!({
-        "model": request.model_id,
-        "messages": messages,
-        "stream": false
-    });
+    let payload = crate::ai_model_tools::openai_chat_payload(request);
     let json = send_json_request(request, endpoint, payload)?;
+    if let Some(tool_summary) =
+        crate::ai_model_tools::execute_openai_tool_calls(request, &json, emit)?
+    {
+        return Ok(tool_summary);
+    }
     extract_openai_text(&json)
 }
 
@@ -551,6 +560,8 @@ mod tests {
             model_id: "demo-model".into(),
             message: "Hello".into(),
             system_prompt: Some("  Be concise.  ".into()),
+            vault_path: None,
+            vault_paths: Vec::new(),
             api_key_override: None,
             event_name: None,
         }
@@ -621,6 +632,51 @@ mod tests {
         );
         assert_eq!(selected_max_tokens(&request), 8192);
         assert_eq!(headers, vec![("X-Demo", "demo")]);
+    }
+
+    #[test]
+    fn request_builders_apply_auth_and_provider_headers() {
+        let client = reqwest::blocking::Client::new();
+        let mut anthropic_provider = provider(AiModelProviderKind::Anthropic);
+        anthropic_provider.api_key_env_var = None;
+        anthropic_provider.headers = Some(BTreeMap::from([
+            ("Authorization".into(), "ignored".into()),
+            ("X-Demo".into(), "demo".into()),
+        ]));
+        let mut anthropic_request = request(anthropic_provider);
+        anthropic_request.api_key_override = Some(" secret ".into());
+
+        let built = apply_provider_headers(
+            apply_auth_headers(client.post("https://example.test"), &anthropic_request).unwrap(),
+            &anthropic_request,
+        )
+        .build()
+        .unwrap();
+
+        let headers = built.headers();
+        assert_eq!(
+            (
+                headers["x-api-key"].to_str().unwrap(),
+                headers["anthropic-version"].to_str().unwrap(),
+                headers["X-Demo"].to_str().unwrap(),
+                headers.get("authorization").is_none(),
+            ),
+            ("secret", "2023-06-01", "demo", true),
+        );
+
+        let mut openai_provider = provider(AiModelProviderKind::OpenAi);
+        openai_provider.api_key_env_var = None;
+        let mut openai_request = request(openai_provider);
+        openai_request.api_key_override = Some(" openai-secret ".into());
+        let built = apply_auth_headers(client.post("https://example.test"), &openai_request)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert_eq!(
+            built.headers()["authorization"].to_str().unwrap(),
+            "Bearer openai-secret"
+        );
     }
 
     #[test]

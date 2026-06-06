@@ -589,6 +589,8 @@
   "editor.toolbar.exportPdf": "Eksportuj notatkę jako PDF",
   "editor.toolbar.moreActions": "Więcej działań notatki",
   "editor.toolbar.openProperties": "Otwórz panel właściwości",
+  "editor.formatting.highlight": "Wyróżnienie",
+  "editor.formatting.highlightTooltip": "Wyróżnienie (zachowuje się w Markdownie)",
   "editor.whiteboard.enterFullscreen": "Rozwiń tablicę",
   "editor.whiteboard.exitFullscreen": "Wyjdź z tablicy pełnoekranowej",
   "editor.exportPdf.unavailable": "Otwórz notatkę Markdown przed wyeksportowaniem pliku PDF.",

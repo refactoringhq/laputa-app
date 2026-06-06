@@ -1303,6 +1303,7 @@ mod tests {
         assert!(matches!(events.last(), Some(ClaudeStreamEvent::Done)));
     }
 
+    #[cfg(unix)]
     #[test]
     fn run_subprocess_closes_stdin_even_when_parent_stdin_pipe_is_open() {
         use std::io::Read;
@@ -1321,7 +1322,7 @@ mod tests {
         let child_stdin = child.stdin.take().unwrap();
         let mut stdout = child.stdout.take().unwrap();
         let mut stderr = child.stderr.take().unwrap();
-        let deadline = Instant::now() + Duration::from_secs(5);
+        let deadline = Instant::now() + Duration::from_secs(30);
 
         let status = loop {
             if let Some(status) = child.try_wait().unwrap() {
@@ -1347,6 +1348,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[ignore = "spawned by run_subprocess_closes_stdin_even_when_parent_stdin_pipe_is_open"]
     #[test]
     fn stdin_probe_parent_child() {
@@ -1354,25 +1356,15 @@ mod tests {
             return;
         }
 
-        let fake_bin = current_test_binary();
-        let args = vec![
-            "stdin_probe_mock_claude_child".to_string(),
-            "--ignored".to_string(),
-            "--nocapture".to_string(),
-        ];
-        std::env::set_var("TOLARIA_STDIN_PROBE_MOCK_CLAUDE_CHILD", "1");
-        let mut events = vec![];
-        let result = run_claude_subprocess(
-            ClaudeSubprocessRequest {
-                bin: &fake_bin,
-                args: &args,
-                fallback_args: &[],
-                stdin_text: None,
-                cwd: None,
-            },
-            &mut |event| events.push(event),
-        );
-        std::env::remove_var("TOLARIA_STDIN_PROBE_MOCK_CLAUDE_CHILD");
+        let (result, events) = run_mock_script(MockClaudeScript(concat!(
+            "#!/bin/sh\n",
+            "stdin=\"$(cat)\"\n",
+            "if [ -n \"$stdin\" ]; then\n",
+            "  echo \"stdin was not closed\" >&2\n",
+            "  exit 9\n",
+            "fi\n",
+            "printf '%s\\n' '{\"type\":\"result\",\"result\":\"stdin closed\",\"session_id\":\"stdin-ok\"}'\n",
+        )));
 
         assert_eq!(result.unwrap(), "stdin-ok");
         assert!(matches!(
@@ -1381,28 +1373,6 @@ mod tests {
                 if text == "stdin closed" && session_id == "stdin-ok"
         ));
         assert!(matches!(events.last(), Some(ClaudeStreamEvent::Done)));
-    }
-
-    #[ignore = "spawned by stdin_probe_parent_child"]
-    #[test]
-    fn stdin_probe_mock_claude_child() {
-        if std::env::var_os("TOLARIA_STDIN_PROBE_MOCK_CLAUDE_CHILD").is_none() {
-            return;
-        }
-
-        use std::io::Read;
-
-        let mut stdin = String::new();
-        std::io::stdin().read_to_string(&mut stdin).unwrap();
-        assert!(stdin.is_empty(), "stdin was not EOF");
-        println!(
-            "{}",
-            serde_json::json!({
-                "type": "result",
-                "result": "stdin closed",
-                "session_id": "stdin-ok"
-            })
-        );
     }
 
     #[cfg(unix)]

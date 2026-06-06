@@ -82,6 +82,8 @@ async function streamWithSelectedTarget(
       model: context.target.model,
       message: formattedMessage,
       systemPrompt,
+      vaultPath: context.vaultPath,
+      vaultPaths: context.vaultPaths,
       callbacks,
     })
     return

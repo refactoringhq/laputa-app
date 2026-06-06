@@ -589,6 +589,8 @@
   "editor.toolbar.exportPdf": "Esporta nota in PDF",
   "editor.toolbar.moreActions": "Altre azioni della nota",
   "editor.toolbar.openProperties": "Apri il pannello delle proprietà",
+  "editor.formatting.highlight": "Evidenzia",
+  "editor.formatting.highlightTooltip": "Evidenziazione (persiste in markdown)",
   "editor.whiteboard.enterFullscreen": "Espandi la lavagna",
   "editor.whiteboard.exitFullscreen": "Esci dalla lavagna a schermo intero",
   "editor.exportPdf.unavailable": "Apri una nota Markdown prima di esportare un PDF.",
