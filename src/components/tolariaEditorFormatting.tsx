@@ -48,11 +48,13 @@ import {
   ArrowSquareOut as ExternalLink,
   CaretDown as ChevronDown,
   Code as Code2,
+  Highlighter,
   TextB as Bold,
   TextItalic as Italic,
   TextStrikethrough as Strikethrough,
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
+import { MARKDOWN_HIGHLIGHT_STYLE } from '../utils/markdownHighlightMarkdown'
 import {
   filterTolariaFormattingToolbarItems,
   getTolariaBlockTypeSelectItems,
@@ -64,7 +66,12 @@ import {
   reportRecoveredEditorTransformError,
 } from './richEditorTransformErrorRecoveryExtension'
 
-type TolariaBasicTextStyle = 'bold' | 'italic' | 'strike' | 'code'
+type TolariaBasicTextStyle =
+  | 'bold'
+  | 'italic'
+  | 'strike'
+  | 'code'
+  | typeof MARKDOWN_HIGHLIGHT_STYLE
 
 const FORMATTER_CLOSE_GRACE_MS = 160
 const FORMATTER_VIEWPORT_PADDING_PX = 8
@@ -183,6 +190,11 @@ const TOLARIA_BASIC_TEXT_STYLE_TOOLTIPS = {
     mainTooltip: 'Inline code (persists in markdown)',
     secondaryTooltip: '`code`',
   },
+  [MARKDOWN_HIGHLIGHT_STYLE]: {
+    label: 'Highlight',
+    mainTooltip: 'Highlight (persists in markdown)',
+    secondaryTooltip: '==highlight==',
+  },
 } satisfies Record<
   TolariaBasicTextStyle,
   { label: string; mainTooltip: string; secondaryTooltip: string }
@@ -193,6 +205,7 @@ const TOLARIA_BASIC_TEXT_STYLE_ICONS = {
   italic: Italic,
   strike: Strikethrough,
   code: Code2,
+  [MARKDOWN_HIGHLIGHT_STYLE]: Highlighter,
 } satisfies Record<TolariaBasicTextStyle, PhosphorIcon>
 
 type TolariaSelectedBlock = ReturnType<
@@ -649,7 +662,7 @@ function replaceToolbarControls(items: ReactElement[], vaultPath?: string) {
   })
 }
 
-function insertInlineCodeButton(items: ReactElement[]) {
+function insertExtraTextStyleButtons(items: ReactElement[]) {
   const strikeButtonIndex = items.findIndex(
     (item) => String(item.key) === 'strikeStyleButton',
   )
@@ -658,12 +671,16 @@ function insertInlineCodeButton(items: ReactElement[]) {
   return [
     ...items.slice(0, strikeButtonIndex + 1),
     <TolariaBasicTextStyleButton basicTextStyle="code" key="codeStyleButton" />,
+    <TolariaBasicTextStyleButton
+      basicTextStyle={MARKDOWN_HIGHLIGHT_STYLE}
+      key="highlightStyleButton"
+    />,
     ...items.slice(strikeButtonIndex + 1),
   ]
 }
 
 function getTolariaFormattingToolbarItems(vaultPath?: string) {
-  return insertInlineCodeButton(
+  return insertExtraTextStyleButtons(
     replaceToolbarControls(
       filterTolariaFormattingToolbarItems(
         getFormattingToolbarItems(),

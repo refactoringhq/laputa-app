@@ -207,6 +207,7 @@ test('toolbar only exposes audited markdown-safe formatting controls', async ({ 
   await expect(page.locator('.bn-formatting-toolbar [data-test="bold"]')).toBeVisible()
   await expect(page.locator('.bn-formatting-toolbar [data-test="italic"]')).toBeVisible()
   await expect(page.locator('.bn-formatting-toolbar [data-test="code"]')).toBeVisible()
+  await expect(page.locator('.bn-formatting-toolbar [data-test="highlight"]')).toBeVisible()
   await expect(page.locator('.bn-formatting-toolbar [data-test="strike"]')).toBeVisible()
   await expect(page.locator('.bn-formatting-toolbar [data-test="createLink"]')).toBeVisible()
 
@@ -256,6 +257,46 @@ test('Obsidian-style highlight markdown renders and persists', async ({ page }) 
   await roundTripThroughAnotherNote(page)
   await openRawMode(page)
   expect(await getRawEditorContent(page)).toContain(highlightedLine)
+})
+
+test('Obsidian-style highlight markdown typed in rich mode renders and persists', async ({ page }) => {
+  await openNote(page, 'Note B')
+
+  const block = page.locator('.bn-block-content').nth(1)
+  await block.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' Plain ==rich-marked==')
+
+  await expect(page.locator('.bn-editor mark.markdown-highlight', { hasText: 'rich-marked' })).toBeVisible()
+  await expect(block).not.toContainText('==rich-marked==')
+
+  await roundTripThroughAnotherNote(page)
+  await openRawMode(page)
+
+  expect(await getRawEditorContent(page)).toContain('Plain ==rich-marked==')
+})
+
+test('toolbar highlight button toggles selected text and persists removal', async ({ page }) => {
+  await openNote(page, 'Note B')
+  await selectWord(page, 1, 'referenced')
+
+  await page.locator('.bn-formatting-toolbar [data-test="highlight"]').click()
+  await expect(page.locator('.bn-editor mark.markdown-highlight', { hasText: 'referenced' })).toBeVisible()
+
+  await roundTripThroughAnotherNote(page)
+  await openRawMode(page)
+  expect(await getRawEditorContent(page)).toContain('This is Note B, ==referenced== by Alpha Project.')
+
+  await openBlockNoteMode(page)
+  await selectWord(page, 1, 'referenced')
+  await page.locator('.bn-formatting-toolbar [data-test="highlight"]').click()
+  await expect(page.locator('.bn-editor mark.markdown-highlight', { hasText: 'referenced' })).toHaveCount(0)
+
+  await roundTripThroughAnotherNote(page)
+  await openRawMode(page)
+  const raw = await getRawEditorContent(page)
+  expect(raw).toContain('This is Note B, referenced by Alpha Project.')
+  expect(raw).not.toContain('==referenced==')
 })
 
 test('toolbar block-type commands persist numbered lists', async ({ page }) => {

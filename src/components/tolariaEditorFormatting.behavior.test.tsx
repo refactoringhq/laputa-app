@@ -105,6 +105,7 @@ vi.mock('@phosphor-icons/react', () => ({
   ArrowSquareOut: MockIcon,
   CaretDown: MockIcon,
   Code: MockIcon,
+  Highlighter: MockIcon,
   TextB: MockIcon,
   TextItalic: MockIcon,
   TextStrikethrough: MockIcon,
@@ -155,6 +156,7 @@ function createMockEditor(blockType = 'image', props: Record<string, unknown> = 
         italic: { type: 'italic', propSchema: 'boolean' },
         strike: { type: 'strike', propSchema: 'boolean' },
         code: { type: 'code', propSchema: 'boolean' },
+        highlight: { type: 'highlight', propSchema: 'boolean' },
       },
     },
     prosemirrorState: { selection: { from: 1, to: 5 } },
@@ -187,11 +189,13 @@ describe('tolariaEditorFormatting behavior', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /bold/i }))
     fireEvent.click(screen.getByRole('button', { name: /inline code/i }))
+    fireEvent.click(screen.getByRole('button', { name: /highlight/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Heading 1' }))
 
     expect(editor.focus).toHaveBeenCalled()
     expect(editor.toggleStyles).toHaveBeenCalledWith({ bold: true })
     expect(editor.toggleStyles).toHaveBeenCalledWith({ code: true })
+    expect(editor.toggleStyles).toHaveBeenCalledWith({ highlight: true })
     expect(editor.transact).toHaveBeenCalledTimes(1)
     expect(editor.updateBlock).toHaveBeenCalledWith(
       'file-block',
