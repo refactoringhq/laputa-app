@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStatus, AiAgentMessage } from './aiAgentConversation'
+import type { AiModelDefinition, AiModelProvider, AiTarget } from './aiTargets'
 
 const {
   buildAgentSystemPromptMock,
@@ -8,6 +9,7 @@ const {
   hydrateNoteReferencesMock,
   nextMessageIdMock,
   streamAiAgentMock,
+  streamAiModelMock,
   trackEventMock,
   trimHistoryMock,
 } = vi.hoisted(() => ({
@@ -17,6 +19,7 @@ const {
   hydrateNoteReferencesMock: vi.fn(async (references: unknown) => references),
   nextMessageIdMock: vi.fn(),
   streamAiAgentMock: vi.fn(async () => {}),
+  streamAiModelMock: vi.fn(async () => {}),
   trackEventMock: vi.fn(),
   trimHistoryMock: vi.fn((history: unknown) => history),
 }))
@@ -38,6 +41,10 @@ vi.mock('./aiAgentStreamCallbacks', () => ({
 
 vi.mock('../utils/streamAiAgent', () => ({
   streamAiAgent: streamAiAgentMock,
+}))
+
+vi.mock('../utils/streamAiModel', () => ({
+  streamAiModel: streamAiModelMock,
 }))
 
 vi.mock('../utils/ai-reference-content', () => ({
@@ -109,6 +116,36 @@ const expectedChatHistory = [
   { role: 'user', content: 'Previous question', id: 'msg-1' },
   { role: 'assistant', content: 'Previous answer', id: 'msg-1-resp' },
 ]
+const apiModelProvider: AiModelProvider = {
+  id: 'openai',
+  name: 'OpenAI',
+  kind: 'open_ai',
+  base_url: 'https://api.openai.com/v1',
+  api_key_storage: 'local_file',
+  api_key_env_var: null,
+  models: [],
+}
+const apiModel: AiModelDefinition = {
+  id: 'gpt-5-nano',
+  display_name: 'GPT-5 nano',
+  context_window: null,
+  max_output_tokens: null,
+  capabilities: {
+    streaming: false,
+    tools: false,
+    vision: false,
+    json_mode: false,
+    reasoning: false,
+  },
+}
+const apiTarget: AiTarget = {
+  kind: 'api_model',
+  provider: apiModelProvider,
+  model: apiModel,
+  id: 'model:openai/gpt-5-nano',
+  label: 'OpenAI · GPT-5 nano',
+  shortLabel: 'GPT-5 nano',
+}
 
 function expectStreamingRuntimeState(session: RuntimeFixture): void {
   expect(session.runtime.abortRef.current).toEqual({ aborted: false })
@@ -149,6 +186,24 @@ function expectStreamingRequest(runtime: RuntimeFixture['runtime']): void {
     systemPrompt: 'SYSTEM',
     vaultPath: '/vault',
     permissionMode: 'power_user',
+    callbacks: { stream: 'callbacks' },
+  })
+}
+
+function expectApiModelStreamingRequest(runtime: RuntimeFixture['runtime']): void {
+  expect(createStreamCallbacksMock).toHaveBeenCalledWith(expect.objectContaining({
+    messageId: 'msg-stream',
+    vaultPath: '/vault',
+    setMessages: runtime.setMessages,
+    setStatus: runtime.setStatus,
+  }))
+  expect(streamAiModelMock).toHaveBeenCalledWith({
+    provider: apiModelProvider,
+    model: apiModel,
+    message: expect.stringContaining('formatted:Latest question'),
+    systemPrompt: 'SYSTEM',
+    vaultPath: '/vault',
+    vaultPaths: ['/vault', '/team-vault'],
     callbacks: { stream: 'callbacks' },
   })
 }
@@ -284,6 +339,35 @@ describe('aiAgentSession', () => {
       reference_count: 1,
       history_message_count: 1,
     })
+  })
+
+  it('passes vault roots to api model streams for native note tools', async () => {
+    nextMessageIdMock.mockReturnValue('msg-stream')
+    const session = createRuntime([
+      completedHistory,
+      streamingHistory,
+    ])
+
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'codex',
+        target: apiTarget,
+        ready: true,
+        vaultPath: '/vault',
+        vaultPaths: ['/vault', '/team-vault'],
+        permissionMode: 'safe',
+      },
+      prompt: {
+        text: '  Latest question  ',
+        references: [{ path: '/vault/ref.md', title: 'Ref' }],
+      },
+    })
+
+    expectStreamingRuntimeState(session)
+    expectFormattedHistoryUsed()
+    expectApiModelStreamingRequest(session.runtime)
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
   })
 
   it('clears the conversation and resets runtime refs', () => {

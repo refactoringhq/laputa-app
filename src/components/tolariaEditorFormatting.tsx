@@ -59,6 +59,7 @@ import {
   filterTolariaFormattingToolbarItems,
   getTolariaBlockTypeSelectItems,
 } from './tolariaEditorFormattingConfig'
+import { translate, type AppLocale } from '../lib/i18n'
 import { useBlockNoteFormattingToolbarHoverGuard } from './blockNoteFormattingToolbarHoverGuard'
 import { openEditorAttachmentOrUrl } from './editorAttachmentActions'
 import {
@@ -190,13 +191,8 @@ const TOLARIA_BASIC_TEXT_STYLE_TOOLTIPS = {
     mainTooltip: 'Inline code (persists in markdown)',
     secondaryTooltip: '`code`',
   },
-  [MARKDOWN_HIGHLIGHT_STYLE]: {
-    label: 'Highlight',
-    mainTooltip: 'Highlight (persists in markdown)',
-    secondaryTooltip: '==highlight==',
-  },
 } satisfies Record<
-  TolariaBasicTextStyle,
+  Exclude<TolariaBasicTextStyle, typeof MARKDOWN_HIGHLIGHT_STYLE>,
   { label: string; mainTooltip: string; secondaryTooltip: string }
 >
 
@@ -497,8 +493,10 @@ function updateSelectedBlocksToType(
 
 function TolariaBasicTextStyleButton({
   basicTextStyle,
+  locale = 'en',
 }: {
   basicTextStyle: TolariaBasicTextStyle
+  locale?: AppLocale
 }) {
   const Components = useComponentsContext()!
   const editor = useBlockNoteEditor<
@@ -519,11 +517,7 @@ function TolariaBasicTextStyleButton({
   if (buttonState === undefined) return null
 
   const Icon = Reflect.get(TOLARIA_BASIC_TEXT_STYLE_ICONS, basicTextStyle) as PhosphorIcon
-  const copy = Reflect.get(TOLARIA_BASIC_TEXT_STYLE_TOOLTIPS, basicTextStyle) as {
-    label: string
-    mainTooltip: string
-    secondaryTooltip: string
-  }
+  const copy = basicTextStyleCopy(basicTextStyle, locale)
 
   return (
     <Components.FormattingToolbar.Button
@@ -537,6 +531,25 @@ function TolariaBasicTextStyleButton({
       icon={<Icon />}
     />
   )
+}
+
+function basicTextStyleCopy(
+  basicTextStyle: TolariaBasicTextStyle,
+  locale: AppLocale,
+) {
+  if (basicTextStyle === MARKDOWN_HIGHLIGHT_STYLE) {
+    return {
+      label: translate(locale, 'editor.formatting.highlight'),
+      mainTooltip: translate(locale, 'editor.formatting.highlightTooltip'),
+      secondaryTooltip: '==highlight==',
+    }
+  }
+
+  return Reflect.get(TOLARIA_BASIC_TEXT_STYLE_TOOLTIPS, basicTextStyle) as {
+    label: string
+    mainTooltip: string
+    secondaryTooltip: string
+  }
 }
 
 function TolariaBlockTypeSelect() {
@@ -662,7 +675,7 @@ function replaceToolbarControls(items: ReactElement[], vaultPath?: string) {
   })
 }
 
-function insertExtraTextStyleButtons(items: ReactElement[]) {
+function insertExtraTextStyleButtons(items: ReactElement[], locale: AppLocale) {
   const strikeButtonIndex = items.findIndex(
     (item) => String(item.key) === 'strikeStyleButton',
   )
@@ -674,12 +687,13 @@ function insertExtraTextStyleButtons(items: ReactElement[]) {
     <TolariaBasicTextStyleButton
       basicTextStyle={MARKDOWN_HIGHLIGHT_STYLE}
       key="highlightStyleButton"
+      locale={locale}
     />,
     ...items.slice(strikeButtonIndex + 1),
   ]
 }
 
-function getTolariaFormattingToolbarItems(vaultPath?: string) {
+function getTolariaFormattingToolbarItems(vaultPath: string | undefined, locale: AppLocale) {
   return insertExtraTextStyleButtons(
     replaceToolbarControls(
       filterTolariaFormattingToolbarItems(
@@ -687,11 +701,18 @@ function getTolariaFormattingToolbarItems(vaultPath?: string) {
       ),
       vaultPath,
     ),
+    locale,
   )
 }
 
-export function TolariaFormattingToolbar({ vaultPath }: { vaultPath?: string } = {}) {
-  return <FormattingToolbar>{getTolariaFormattingToolbarItems(vaultPath)}</FormattingToolbar>
+export function TolariaFormattingToolbar({
+  locale = 'en',
+  vaultPath,
+}: {
+  locale?: AppLocale
+  vaultPath?: string
+} = {}) {
+  return <FormattingToolbar>{getTolariaFormattingToolbarItems(vaultPath, locale)}</FormattingToolbar>
 }
 
 export function TolariaFormattingToolbarController(props: {

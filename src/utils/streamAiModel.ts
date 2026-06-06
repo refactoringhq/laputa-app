@@ -18,7 +18,20 @@ interface StreamAiModelRequest {
   model: AiModelDefinition
   message: string
   systemPrompt?: string
+  vaultPath?: string
+  vaultPaths?: string[]
   callbacks: AgentStreamCallbacks
+}
+
+interface NativeAiModelStreamRequest {
+  provider: AiModelProvider
+  model_id: string
+  message: string
+  system_prompt: string | null
+  vault_path: string | null
+  vault_paths: string[] | null
+  api_key_override: null
+  event_name: string
 }
 
 function mockModelResponse(provider: AiModelProvider, model: AiModelDefinition, message: string): string {
@@ -49,55 +62,79 @@ function handleStreamEvent(data: AiModelStreamEvent, callbacks: AgentStreamCallb
   }
 }
 
-export async function streamAiModel({
-  provider,
-  model,
-  message,
-  systemPrompt,
-  callbacks,
-}: StreamAiModelRequest): Promise<void> {
-  if (!isTauri()) {
-    setTimeout(() => {
-      callbacks.onText(mockModelResponse(provider, model, message))
-      callbacks.onDone()
-    }, 300)
-    return
-  }
+function streamMockAiModel({ provider, model, message, callbacks }: StreamAiModelRequest): void {
+  setTimeout(() => {
+    callbacks.onText(mockModelResponse(provider, model, message))
+    callbacks.onDone()
+  }, 300)
+}
 
-  const { invoke } = await import('@tauri-apps/api/core')
-  const { listen } = await import('@tauri-apps/api/event')
-  const eventName = createScopedStreamEventName('ai-model-stream')
+function nativeVaultPaths(vaultPaths: string[] | undefined): string[] | null {
+  return vaultPaths && vaultPaths.length > 0 ? vaultPaths : null
+}
+
+function nativeAiModelRequest(request: StreamAiModelRequest, eventName: string): NativeAiModelStreamRequest {
+  return {
+    provider: request.provider,
+    model_id: request.model.id,
+    message: request.message,
+    system_prompt: request.systemPrompt || null,
+    vault_path: request.vaultPath || null,
+    vault_paths: nativeVaultPaths(request.vaultPaths),
+    api_key_override: null,
+    event_name: eventName,
+  }
+}
+
+function createStreamCloser(callbacks: AgentStreamCallbacks) {
   let closed = false
-  const closeStream = (): void => {
+  return (): void => {
     if (closed) return
     closed = true
     callbacks.onDone()
   }
+}
+
+function handleNativeStreamEvent(
+  data: AiModelStreamEvent,
+  callbacks: AgentStreamCallbacks,
+  closeStream: () => void,
+): void {
+  if (data.kind === 'Done') {
+    closeStream()
+    return
+  }
+  handleStreamEvent(data, callbacks)
+}
+
+async function streamNativeAiModel(request: StreamAiModelRequest): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core')
+  const { listen } = await import('@tauri-apps/api/event')
+  const eventName = createScopedStreamEventName('ai-model-stream')
+  const closeStream = createStreamCloser(request.callbacks)
 
   const unlisten = await listen<AiModelStreamEvent>(eventName, (event) => {
-    if (event.payload.kind === 'Done') {
-      closeStream()
-      return
-    }
-    handleStreamEvent(event.payload, callbacks)
+    handleNativeStreamEvent(event.payload, request.callbacks, closeStream)
   })
 
   try {
     await invoke<string>('stream_ai_model', {
-      request: {
-        provider,
-        model_id: model.id,
-        message,
-        system_prompt: systemPrompt || null,
-        api_key_override: null,
-        event_name: eventName,
-      },
+      request: nativeAiModelRequest(request, eventName),
     })
     closeStream()
   } catch (err) {
-    callbacks.onError(err instanceof Error ? err.message : String(err))
+    request.callbacks.onError(err instanceof Error ? err.message : String(err))
     closeStream()
   } finally {
     cleanupTauriEventListener(unlisten)
   }
+}
+
+export async function streamAiModel(request: StreamAiModelRequest): Promise<void> {
+  if (!isTauri()) {
+    streamMockAiModel(request)
+    return
+  }
+
+  await streamNativeAiModel(request)
 }

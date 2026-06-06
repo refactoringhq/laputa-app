@@ -1111,6 +1111,7 @@ function useSuggestionMenuItems(options: {
 }
 
 type EditorInteractionControllersProps = ReturnType<typeof useSuggestionMenuItems> & {
+  locale: AppLocale
   runEditorAction: (action: SuggestionAction) => void
   vaultPath?: string
 }
@@ -1120,6 +1121,7 @@ function EditorInteractionControllers({
   getPersonMentionItems,
   getSlashMenuItems,
   getWikilinkItems,
+  locale,
   runEditorAction,
   vaultPath,
 }: EditorInteractionControllersProps) {
@@ -1128,7 +1130,7 @@ function EditorInteractionControllers({
       <SideMenuController sideMenu={TolariaSideMenu} />
       <TolariaFormattingToolbarController
         formattingToolbar={(props) => (
-          <TolariaFormattingToolbar {...props} vaultPath={vaultPath} />
+          <TolariaFormattingToolbar {...props} locale={locale} vaultPath={vaultPath} />
         )}
         floatingUIOptions={{
           elementProps: {
@@ -1372,6 +1374,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
           >
             <EditorInteractionControllers
               {...suggestionMenuItems}
+              locale={locale}
               runEditorAction={runEditorAction}
               vaultPath={vaultPath}
             />

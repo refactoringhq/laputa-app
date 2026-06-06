@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 const OUTPUT_PREFIX: &str = "__TOLARIA_ENV__:";
 
@@ -110,6 +110,7 @@ fn user_shell_bindings_from_shell(shell: &Path, names: &[EnvName<'_>]) -> Option
     let output = crate::hidden_command(shell)
         .arg("-lc")
         .arg(shell_probe_script(shell, names))
+        .stdin(Stdio::null())
         .output()
         .ok()?;
     if !output.status.success() {
@@ -190,6 +191,80 @@ fn parse_probe_line(line: ProbeLine<'_>, names: &[EnvName<'_>]) -> Option<EnvBin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn env_value_uses_trimmed_process_value() {
+        let key = "TOLARIA_TEST_SHELL_ENV_PROCESS_VALUE";
+        std::env::set_var(key, "  process-secret  ");
+
+        let value = env_value_from_process_or_user_shell(EnvName::trusted(key));
+
+        std::env::remove_var(key);
+        assert_eq!(value.as_deref(), Some("process-secret"));
+    }
+
+    #[test]
+    fn command_value_marks_name_as_already_available() {
+        let mut command = Command::new("demo");
+        command.env("TOLARIA_TEST_COMMAND_VALUE", "command-secret");
+
+        apply_user_shell_env_vars_if_missing(
+            &mut command,
+            &[EnvName::trusted("TOLARIA_TEST_COMMAND_VALUE")],
+        );
+
+        let values = command
+            .get_envs()
+            .map(|(key, value)| (key.to_string_lossy().to_string(), value.is_some()))
+            .collect::<Vec<_>>();
+        assert_eq!(values, vec![("TOLARIA_TEST_COMMAND_VALUE".into(), true)]);
+    }
+
+    #[test]
+    fn parse_probe_output_filters_invalid_unexpected_and_blank_values() {
+        let names = [
+            EnvName::trusted("GOOD_VALUE"),
+            EnvName::trusted("OTHER_VALUE"),
+        ];
+
+        let bindings = parse_probe_output(
+            "__TOLARIA_ENV__:GOOD_VALUE=kept\n\
+             ignored\n\
+             __TOLARIA_ENV__:BAD-NAME=bad\n\
+             __TOLARIA_ENV__:OTHER_VALUE=   \n\
+             __TOLARIA_ENV__:UNEXPECTED=value\n",
+            &names,
+        );
+
+        assert_eq!(
+            bindings,
+            vec![EnvBinding {
+                name: "GOOD_VALUE".into(),
+                value: "kept".into(),
+            }]
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn user_shell_bindings_from_shell_returns_none_for_failing_shell() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let shell = dir.path().join("zsh");
+        std::fs::write(&shell, "#!/bin/sh\nexit 7\n").unwrap();
+        std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let values = user_shell_bindings_from_shell(&shell, &[EnvName::trusted("MISSING")]);
+
+        assert_eq!(values, None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rc_source_command_ignores_unknown_shells() {
+        assert_eq!(rc_source_command(Path::new("fish")), "");
+    }
 
     #[cfg(unix)]
     #[test]

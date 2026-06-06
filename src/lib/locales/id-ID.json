@@ -589,6 +589,8 @@
   "editor.toolbar.exportPdf": "Ekspor catatan sebagai PDF",
   "editor.toolbar.moreActions": "Tindakan catatan lainnya",
   "editor.toolbar.openProperties": "Buka panel properti",
+  "editor.formatting.highlight": "Sorot",
+  "editor.formatting.highlightTooltip": "Sorot (bertahan dalam markdown)",
   "editor.whiteboard.enterFullscreen": "Perluas papan tulis",
   "editor.whiteboard.exitFullscreen": "Keluar dari papan tulis layar penuh",
   "editor.exportPdf.unavailable": "Buka catatan Markdown sebelum mengekspor PDF.",

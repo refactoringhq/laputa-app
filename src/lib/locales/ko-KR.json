@@ -589,6 +589,8 @@
   "editor.toolbar.exportPdf": "노트를 PDF로 내보내기",
   "editor.toolbar.moreActions": "추가 노트 작업",
   "editor.toolbar.openProperties": "속성 패널 열기",
+  "editor.formatting.highlight": "강조",
+  "editor.formatting.highlightTooltip": "강조 표시(마크다운에 유지)",
   "editor.whiteboard.enterFullscreen": "화이트보드 펼치기",
   "editor.whiteboard.exitFullscreen": "전체 화면 화이트보드에서 나가기",
   "editor.exportPdf.unavailable": "PDF로 내보내기 전에 Markdown 노트를 여세요.",

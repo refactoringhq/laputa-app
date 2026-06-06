@@ -86,4 +86,29 @@ describe('streamAiModel', () => {
     expect(callbacks.onDone).toHaveBeenCalledTimes(1)
     expect(unlisten).toHaveBeenCalledTimes(1)
   })
+
+  it('passes active vault roots to native model streams for note tools', async () => {
+    isTauriState.value = true
+    const unlisten = vi.fn()
+    listenMock.mockResolvedValue(unlisten)
+    invokeMock.mockResolvedValue('session')
+
+    const callbacks = createCallbacks()
+
+    await streamAiModel({
+      provider,
+      model,
+      message: 'create a note',
+      vaultPath: '/vault',
+      vaultPaths: ['/vault', '/team-vault'],
+      callbacks,
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('stream_ai_model', {
+      request: expect.objectContaining({
+        vault_path: '/vault',
+        vault_paths: ['/vault', '/team-vault'],
+      }),
+    })
+  })
 })

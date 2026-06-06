@@ -589,6 +589,8 @@
   "editor.toolbar.exportPdf": "Экспартаваць нататку ў фармаце PDF",
   "editor.toolbar.moreActions": "Больш дзеянняў",
   "editor.toolbar.openProperties": "Адкрыць уласцівасці",
+  "editor.formatting.highlight": "Вылучэнне",
+  "editor.formatting.highlightTooltip": "Вылучэнне (захоўваецца ў Markdown)",
   "editor.whiteboard.enterFullscreen": "Разгарнуць дошку",
   "editor.whiteboard.exitFullscreen": "Выйсці з поўнаэкраннай дошкі",
   "editor.exportPdf.unavailable": "Адкрыйце нататку Markdown перад экспартам у PDF.",
