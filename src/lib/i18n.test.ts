@@ -48,12 +48,14 @@ describe('i18n', () => {
     expect(localeDisplayName('en', 'zh-CN')).toBe('英文')
     expect(localeDisplayName('es-419', 'en')).toBe('Spanish (Latin America)')
     expect(localeDisplayName('id-ID', 'id-ID')).toBe('Bahasa Indonesia')
+    expect(localeDisplayName('uk-UA', 'uk-UA')).toBe('Українська')
   })
 
   it('keeps locale label keys present in English', () => {
     expect(EN_TRANSLATIONS['locale.itIT']).toBe('Italian')
     expect(EN_TRANSLATIONS['locale.koKR']).toBe('Korean')
     expect(EN_TRANSLATIONS['locale.idID']).toBe('Indonesian')
+    expect(EN_TRANSLATIONS['locale.ukUA']).toBe('Ukrainian')
   })
 
   it('loads a translation catalog for every configured locale', () => {
