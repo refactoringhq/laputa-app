@@ -16,6 +16,10 @@ function transformError(message = 'Invalid transform') {
   return error
 }
 
+function nullFragmentAppendError(message = "null is not an object (evaluating 'o.fillBefore(e).append')") {
+  return new TypeError(message)
+}
+
 function createView(error?: Error) {
   const currentDoc = {
     eq: vi.fn((candidate: unknown) => candidate === currentDoc),
@@ -94,6 +98,10 @@ describe('isRecoverableEditorTransformError', () => {
     expect(isRecoverableEditorTransformError(new Error(
       'Block with ID 6c1c3bb4-e218-4f00-aaf5-40606852d286 not found',
     ))).toBe(true)
+    expect(isRecoverableEditorTransformError(nullFragmentAppendError())).toBe(true)
+    expect(isRecoverableEditorTransformError(new TypeError(
+      "Cannot read properties of null (reading 'append')",
+    ))).toBe(false)
     expect(isRecoverableEditorTransformError(new RangeError(
       'Index 1 out of range for <paragraph("A")>',
     ))).toBe(false)
@@ -210,6 +218,13 @@ describe('installRichEditorTransformErrorRecovery', () => {
     expectDocumentRepairRecovery(
       new RangeError('Inserted content deeper than insertion position'),
       'invalid_insertion_depth',
+    )
+  })
+
+  it('repairs null fragment append failures from invalid document model fills', () => {
+    expectDocumentRepairRecovery(
+      nullFragmentAppendError(),
+      'null_fragment_append',
     )
   })
 
