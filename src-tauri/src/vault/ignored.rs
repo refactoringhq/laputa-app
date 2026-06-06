@@ -12,10 +12,18 @@ fn normalize_relative_path(path: &str) -> String {
         .to_string()
 }
 
-fn relative_path(vault_path: &Path, path: &Path) -> Option<String> {
+fn stripped_relative_path(vault_path: &Path, path: &Path) -> Option<String> {
     let relative = path.strip_prefix(vault_path).ok()?;
     let normalized = normalize_relative_path(relative.to_string_lossy().as_ref());
     (!normalized.is_empty()).then_some(normalized)
+}
+
+fn relative_path(vault_path: &Path, path: &Path) -> Option<String> {
+    stripped_relative_path(vault_path, path).or_else(|| {
+        let canonical_vault_path = vault_path.canonicalize().ok()?;
+        let canonical_path = path.canonicalize().ok()?;
+        stripped_relative_path(&canonical_vault_path, &canonical_path)
+    })
 }
 
 fn should_descend_for_gitignore(entry: &DirEntry) -> bool {
@@ -333,5 +341,30 @@ mod tests {
         let entries = vec![entry(dir.path(), "notes/local.md")];
         let filtered = filter_gitignored_entries(dir.path(), entries, true);
         assert_eq!(entry_paths(dir.path(), &filtered), vec!["notes/local.md"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn filters_entries_with_real_paths_when_vault_root_is_symlinked() {
+        let dir = TempDir::new().unwrap();
+        let real_root = dir.path().join("real-vault");
+        let symlink_root = dir.path().join("linked-vault");
+        fs::create_dir_all(&real_root).unwrap();
+        std::os::unix::fs::symlink(&real_root, &symlink_root).unwrap();
+        init_git_repo(&symlink_root);
+        write_file(&real_root, ".gitignore", "tmp/\n");
+        write_file(&real_root, "visible.md", "# Visible\n");
+        write_file(&real_root, "tmp/hidden.md", "# Hidden\n");
+
+        let filtered = filter_gitignored_entries(
+            &symlink_root,
+            vec![
+                entry(&real_root, "visible.md"),
+                entry(&real_root, "tmp/hidden.md"),
+            ],
+            true,
+        );
+
+        assert_eq!(entry_paths(&real_root, &filtered), vec!["visible.md"]);
     }
 }
