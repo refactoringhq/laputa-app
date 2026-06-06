@@ -65,4 +65,15 @@ describe('i18n', () => {
     expect(translate('zh-CN', 'status.conflict.count', { count: 2, plural: 's' })).toBe('2 个冲突')
     expect(translate('zh-TW', 'status.conflict.count', { count: 2, plural: 's' })).toBe('2 個衝突')
   })
+
+  it('uses platform-neutral Chinese labels for revealing files and folders', () => {
+    const revealKeys = ['sidebar.action.revealFolderMenu', 'editor.toolbar.revealFile'] as const
+
+    for (const key of revealKeys) {
+      expect(translate('zh-CN', key)).toBe('在文件管理器中显示')
+      expect(translate('zh-CN', key)).not.toContain('访达')
+      expect(translate('zh-TW', key)).toBe('在檔案管理器中顯示')
+      expect(translate('zh-TW', key)).not.toContain('訪達')
+    }
+  })
 })

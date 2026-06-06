@@ -48,6 +48,7 @@ type RecoveryReason =
   | 'invalid_block_join'
   | 'invalid_insertion_depth'
   | 'mismatched_transaction'
+  | 'null_fragment_append'
   | 'stale_block_reference'
   | 'stale_transaction'
   | 'table_position_out_of_range'
@@ -95,6 +96,13 @@ function isInvalidBlockJoinError(error: unknown): boolean {
   return isTransformError(error) && /^Cannot join (blockGroup|tableCell) onto blockContainer$/.test(error.message)
 }
 
+function isNullFragmentAppendError(error: unknown): boolean {
+  if (!(error instanceof TypeError)) return false
+
+  const details = `${error.message}\n${error.stack ?? ''}`
+  return details.includes('fillBefore') && details.includes('.append')
+}
+
 export function isStaleBlockReferenceError(error: unknown): boolean {
   return error instanceof Error && /^Block with ID .+ not found$/.test(error.message)
 }
@@ -113,6 +121,7 @@ const RECOVERABLE_EDITOR_ERROR_PREDICATES = [
   isTransformError,
   isMismatchedTransactionError,
   isRecoverableRangeError,
+  isNullFragmentAppendError,
   isStaleBlockReferenceError,
 ]
 
@@ -130,12 +139,15 @@ function recoveryReason(
   if (isStaleBlockReferenceError(error)) return 'stale_block_reference'
   if (isInvalidBlockJoinError(error)) return 'invalid_block_join'
   if (isInvalidInsertionDepthError(error)) return 'invalid_insertion_depth'
+  if (isNullFragmentAppendError(error)) return 'null_fragment_append'
   if (isTablePositionOutOfRangeError(error)) return 'table_position_out_of_range'
   return 'transform_error'
 }
 
 function shouldRepairEditorDocument(error: unknown): boolean {
-  return isRecoverableRangeError(error) || isInvalidBlockJoinError(error)
+  return isRecoverableRangeError(error)
+    || isInvalidBlockJoinError(error)
+    || isNullFragmentAppendError(error)
 }
 
 export const reportRecoveredEditorTransformError = (reason: RecoveryReason, error: unknown): void => {

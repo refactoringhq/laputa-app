@@ -130,6 +130,12 @@ function updateEditorText(text: string) {
   fireEvent.input(editor)
 }
 
+async function waitForCompositionFlush() {
+  await act(async () => {
+    await Promise.resolve()
+  })
+}
+
 function clickFirstSuggestion() {
   const rows = screen.getByTestId('wikilink-menu').querySelectorAll('[class*="cursor-pointer"]')
   expect(rows.length).toBeGreaterThan(0)
@@ -336,9 +342,13 @@ describe('WikilinkChatInput', () => {
     firstEditor.appendChild(document.createTextNode('안'))
     fireEvent.input(firstEditor)
     fireEvent.compositionEnd(firstEditor)
+    await waitForCompositionFlush()
 
     await waitFor(() => {
       expect(onDraftChange).toHaveBeenLastCalledWith('안')
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('agent-input').textContent).toBe('안')
     })
 
     const secondEditor = screen.getByTestId('agent-input') as HTMLDivElement
@@ -347,6 +357,7 @@ describe('WikilinkChatInput', () => {
     secondEditor.appendChild(document.createTextNode('녕'))
     fireEvent.input(secondEditor)
     fireEvent.compositionEnd(secondEditor)
+    await waitForCompositionFlush()
 
     await waitFor(() => {
       expect(onDraftChange).toHaveBeenLastCalledWith('안녕')
