@@ -292,9 +292,18 @@
 }
 
 .editor__blocknote-container .math-block-shell {
-  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   padding: 6px 0;
+}
+
+.editor__blocknote-container .math-block-shell:not(.math-block-shell--editing) {
+  width: fit-content;
+  margin-inline: auto;
+}
+
+.editor__blocknote-container .math-block-shell--editing {
+  width: 100%;
 }
 
 .editor__blocknote-container .math-block-source::selection {

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MathBlockEditor } from './editorSchema'
@@ -72,5 +73,17 @@ describe('MathBlockEditor', () => {
     expect(source).not.toHaveClass('selection:bg-primary')
     expect(source).not.toHaveClass('selection:text-primary-foreground')
     expect(source).not.toHaveClass('focus-visible:ring-[3px]')
+  })
+
+  it('keeps display math selection chrome scoped to the rendered formula width', () => {
+    const editorThemeCss = readFileSync(`${process.cwd()}/src/components/EditorTheme.css`, 'utf8')
+
+    expect(editorThemeCss).toContain('.editor__blocknote-container .math-block-shell {')
+    expect(editorThemeCss).toContain('max-width: 100%;')
+    expect(editorThemeCss).toContain('.editor__blocknote-container .math-block-shell:not(.math-block-shell--editing) {')
+    expect(editorThemeCss).toContain('width: fit-content;')
+    expect(editorThemeCss).toContain('margin-inline: auto;')
+    expect(editorThemeCss).toContain('.editor__blocknote-container .math-block-shell--editing {')
+    expect(editorThemeCss).toContain('width: 100%;')
   })
 })
