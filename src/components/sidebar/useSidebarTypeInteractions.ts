@@ -2,13 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { VaultEntry } from '../../types'
 import { applyCustomization, useOutsideClick, useSidebarContextMenu } from './sidebarHooks'
 
-interface SidebarTypeGroup {
-  type: string
-  label: string
-}
-
 interface SidebarTypeInteractionsInput {
-  allSectionGroups: SidebarTypeGroup[]
   typeEntryMap: Record<string, VaultEntry>
   onCustomizeType?: (typeName: string, icon: string, color: string) => void
   onUpdateTypeTemplate?: (typeName: string, template: string) => void
@@ -60,7 +54,6 @@ function useSidebarTypeState() {
 }
 
 function useSidebarRenameCallbacks(params: {
-  allSectionGroups: SidebarTypeGroup[]
   closeContextMenu: () => void
   onRenameSection?: (typeName: string, label: string) => void
   renamingType: string | null
@@ -68,7 +61,6 @@ function useSidebarRenameCallbacks(params: {
   setRenamingType: React.Dispatch<React.SetStateAction<string | null>>
 }) {
   const {
-    allSectionGroups,
     closeContextMenu,
     onRenameSection,
     renamingType,
@@ -78,10 +70,9 @@ function useSidebarRenameCallbacks(params: {
 
   const handleStartRename = useCallback((type: string) => {
     closeContextMenu()
-    const group = allSectionGroups.find((sectionGroup) => sectionGroup.type === type)
-    setRenameInitialValue(group?.label ?? type)
+    setRenameInitialValue(type)
     setRenamingType(type)
-  }, [allSectionGroups, closeContextMenu, setRenameInitialValue, setRenamingType])
+  }, [closeContextMenu, setRenameInitialValue, setRenamingType])
 
   const handleRenameSubmit = useCallback((value: string) => {
     if (renamingType) onRenameSection?.(renamingType, value)
@@ -92,7 +83,6 @@ function useSidebarRenameCallbacks(params: {
 }
 
 export function useSidebarTypeInteractions({
-  allSectionGroups,
   typeEntryMap,
   onCustomizeType,
   onUpdateTypeTemplate,
@@ -101,7 +91,6 @@ export function useSidebarTypeInteractions({
 }: SidebarTypeInteractionsInput) {
   const state = useSidebarTypeState()
   const renameCallbacks = useSidebarRenameCallbacks({
-    allSectionGroups,
     closeContextMenu: state.closeContextMenu,
     onRenameSection,
     renamingType: state.renamingType,

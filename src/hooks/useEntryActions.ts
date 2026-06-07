@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react'
 import type { VaultEntry } from '../types'
 import { isMissingFrontmatterTargetError, type FrontmatterOpOptions } from './frontmatterOps'
 import { trackEvent } from '../lib/telemetry'
-import { findTypeDefinition } from '../utils/typeDefinitions'
+import { findTypeDefinition, normalizeTypeName } from '../utils/typeDefinitions'
 import type { ActionHistoryController, ActionHistoryEntry } from './useActionHistory'
 
 interface EntryActionsConfig {
@@ -12,6 +12,7 @@ interface EntryActionsConfig {
   handleDeleteProperty: (path: string, key: string, options?: FrontmatterOpOptions) => Promise<void>
   setToastMessage: (msg: string | null) => void
   createTypeEntry: (typeName: string) => Promise<VaultEntry>
+  renameTypeEntry?: (typeEntry: VaultEntry, newTypeName: string) => Promise<void>
   onFrontmatterPersisted?: () => void
   /** Called before trash/archive to flush unsaved editor content to disk. */
   onBeforeAction?: (path: string) => Promise<void>
@@ -23,7 +24,7 @@ type ArchiveActionDeps = Pick<EntryActionsConfig,
 >
 
 type TypeActionDeps = Pick<EntryActionsConfig,
-  'entries' | 'updateEntry' | 'handleUpdateFrontmatter' | 'handleDeleteProperty' | 'createTypeEntry' | 'onFrontmatterPersisted'
+  'entries' | 'updateEntry' | 'handleUpdateFrontmatter' | 'handleDeleteProperty' | 'createTypeEntry' | 'renameTypeEntry' | 'onFrontmatterPersisted'
 >
 
 type EntryStateActionDeps = Pick<EntryActionsConfig,
@@ -82,6 +83,42 @@ interface UpdateTypeTemplateArgs {
 
 interface RenameTypeSectionArgs {
   typeName: string
+  label: string
+}
+
+interface TypeNameComparison {
+  left: string
+  right: string
+}
+
+interface TypeEntryQuery {
+  entries: VaultEntry[]
+  typeEntry: VaultEntry
+  typeName: string
+}
+
+interface TypeRenameConflictQuery {
+  entries: VaultEntry[]
+  typeEntry: VaultEntry
+  newTypeName: string
+}
+
+interface RenameAssignedEntriesInput {
+  deps: TypeActionDeps
+  entries: VaultEntry[]
+  newTypeName: string
+}
+
+interface RenameTypeNameInput {
+  deps: TypeActionDeps
+  typeEntry: VaultEntry
+  oldTypeName: string
+  newTypeName: string
+}
+
+interface RenameSidebarLabelInput {
+  deps: TypeActionDeps
+  typeEntry: VaultEntry
   label: string
 }
 
@@ -194,17 +231,69 @@ async function updateTypeTemplate(deps: TypeActionDeps, args: UpdateTypeTemplate
   deps.onFrontmatterPersisted?.()
 }
 
+function typeNamesMatch({ left, right }: TypeNameComparison): boolean {
+  return normalizeTypeName({ type: left }) === normalizeTypeName({ type: right })
+}
+
+function assignedEntriesForType({ entries, typeEntry, typeName }: TypeEntryQuery): VaultEntry[] {
+  return entries.filter((entry) => (
+    entry.path !== typeEntry.path
+    && entry.isA !== null
+    && entry.isA !== 'Type'
+    && typeNamesMatch({ left: entry.isA, right: typeName })
+  ))
+}
+
+function hasTypeRenameConflict({ entries, typeEntry, newTypeName }: TypeRenameConflictQuery): boolean {
+  return entries.some((entry) => (
+    entry.path !== typeEntry.path
+    && entry.isA === 'Type'
+    && typeNamesMatch({ left: entry.title, right: newTypeName })
+  ))
+}
+
+async function clearSidebarLabel(deps: TypeActionDeps, typeEntry: VaultEntry): Promise<void> {
+  if (!typeEntry.sidebarLabel) return
+  await deps.handleDeleteProperty(typeEntry.path, 'sidebar label')
+}
+
+async function renameAssignedEntries({ deps, entries, newTypeName }: RenameAssignedEntriesInput): Promise<void> {
+  for (const entry of entries) {
+    await deps.handleUpdateFrontmatter(entry.path, 'type', newTypeName)
+  }
+}
+
+async function renameTypeName({ deps, typeEntry, oldTypeName, newTypeName }: RenameTypeNameInput): Promise<void> {
+  if (!newTypeName || typeNamesMatch({ left: oldTypeName, right: newTypeName })) return
+  if (!deps.renameTypeEntry || hasTypeRenameConflict({ entries: deps.entries, typeEntry, newTypeName })) return
+
+  const assignedEntries = assignedEntriesForType({ entries: deps.entries, typeEntry, typeName: oldTypeName })
+  await clearSidebarLabel(deps, typeEntry)
+  await renameAssignedEntries({ deps, entries: assignedEntries, newTypeName })
+  await deps.renameTypeEntry(typeEntry, newTypeName)
+  trackEvent('sidebar_type_renamed', { affected_notes: assignedEntries.length })
+  deps.onFrontmatterPersisted?.()
+}
+
+async function renameTypeSidebarLabel({ deps, typeEntry, label }: RenameSidebarLabelInput): Promise<void> {
+  if (label) {
+    await deps.handleUpdateFrontmatter(typeEntry.path, 'sidebar label', label)
+  } else {
+    await deps.handleDeleteProperty(typeEntry.path, 'sidebar label')
+  }
+  deps.updateEntry(typeEntry.path, { sidebarLabel: label || null })
+  deps.onFrontmatterPersisted?.()
+}
+
 async function renameTypeSection(deps: TypeActionDeps, args: RenameTypeSectionArgs): Promise<void> {
   const typeEntry = await findOrCreateType(deps, args.typeName)
   if (!typeEntry) return
   const trimmed = args.label.trim()
-  if (trimmed) {
-    await deps.handleUpdateFrontmatter(typeEntry.path, 'sidebar label', trimmed)
-  } else {
-    await deps.handleDeleteProperty(typeEntry.path, 'sidebar label')
+  if (deps.renameTypeEntry) {
+    await renameTypeName({ deps, typeEntry, oldTypeName: args.typeName, newTypeName: trimmed })
+    return
   }
-  deps.updateEntry(typeEntry.path, { sidebarLabel: trimmed || null })
-  deps.onFrontmatterPersisted?.()
+  await renameTypeSidebarLabel({ deps, typeEntry, label: trimmed })
 }
 
 async function toggleTypeVisibility(deps: TypeActionDeps, typeName: string, typeEntryPath?: string): Promise<void> {
@@ -349,6 +438,7 @@ function useTypeActions(deps: TypeActionDeps) {
     handleUpdateFrontmatter,
     handleDeleteProperty,
     createTypeEntry,
+    renameTypeEntry,
     onFrontmatterPersisted,
   } = deps
   const typeActionDeps = useMemo(() => ({
@@ -357,8 +447,9 @@ function useTypeActions(deps: TypeActionDeps) {
     handleUpdateFrontmatter,
     handleDeleteProperty,
     createTypeEntry,
+    renameTypeEntry,
     onFrontmatterPersisted,
-  }), [entries, updateEntry, handleUpdateFrontmatter, handleDeleteProperty, createTypeEntry, onFrontmatterPersisted])
+  }), [entries, updateEntry, handleUpdateFrontmatter, handleDeleteProperty, createTypeEntry, renameTypeEntry, onFrontmatterPersisted])
 
   const handleCustomizeType = useCallback(async (typeName: string, icon: string, color: string) => {
     await customizeTypeEntry(typeActionDeps, { typeName, icon, color })
