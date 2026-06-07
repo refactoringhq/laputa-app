@@ -61,6 +61,16 @@ describe('LinuxMenuButton', () => {
     expect(invoke).toHaveBeenCalledWith('trigger_menu_command', { id: 'file-new-note' })
   }, MENU_TEST_TIMEOUT_MS)
 
+  it('opens an adjacent horizontal menu tab with one pointer interaction while another tab is open', async () => {
+    render(<LinuxMenuButton />)
+
+    await openHorizontalMenu('File')
+    expect(await screen.findByText('New Note')).toBeInTheDocument()
+
+    await openHorizontalMenu('Edit')
+    expect(await screen.findByText('Paste without Formatting')).toBeInTheDocument()
+  }, MENU_TEST_TIMEOUT_MS)
+
   it('localizes the custom desktop menu when a locale is provided', async () => {
     render(<LinuxMenuButton locale="zh-CN" />)
 

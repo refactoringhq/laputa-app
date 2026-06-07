@@ -145,7 +145,7 @@ function HorizontalMenuBar({ sections }: { sections: ReadonlyArray<MenuSection> 
       data-testid="desktop-horizontal-menu"
     >
       {sections.map((section) => (
-        <DropdownMenu key={section.label}>
+        <DropdownMenu key={section.label} modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
