@@ -63,6 +63,13 @@ const SUPPORTED_UI_LANGUAGE_ALIASES: &[(&str, &str)] = &[
     ("ko-kr", "ko-KR"),
     ("vi", "vi"),
     ("vi-vn", "vi"),
+    ("pl", "pl-PL"),
+    ("pl-pl", "pl-PL"),
+    ("be", "be-BY"),
+    ("be-by", "be-BY"),
+    ("be-latn", "be-Latn"),
+    ("id", "id-ID"),
+    ("id-id", "id-ID"),
 ];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -675,6 +682,10 @@ mod tests {
             ("ja-JP", "ja-JP"),
             ("ko-KR", "ko-KR"),
             ("vi", "vi"),
+            ("pl-PL", "pl-PL"),
+            ("be-BY", "be-BY"),
+            ("be-Latn", "be-Latn"),
+            ("id-ID", "id-ID"),
         ];
 
         for (input, expected) in expected_languages {
@@ -697,6 +708,13 @@ mod tests {
             normalize_ui_language(Some("zh-Hant")).as_deref(),
             Some("zh-TW")
         );
+        assert_eq!(normalize_ui_language(Some("pl")).as_deref(), Some("pl-PL"));
+        assert_eq!(normalize_ui_language(Some("be")).as_deref(), Some("be-BY"));
+        assert_eq!(
+            normalize_ui_language(Some("be-latn")).as_deref(),
+            Some("be-Latn")
+        );
+        assert_eq!(normalize_ui_language(Some("id")).as_deref(), Some("id-ID"));
     }
 
     #[test]
