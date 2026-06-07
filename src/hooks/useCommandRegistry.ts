@@ -59,6 +59,7 @@ interface CommandRegistryConfig {
   onCopyActiveFilePath?: (path: string) => void
   onCopyActiveDeepLink?: (path: string) => void
   onOpenActiveFileExternal?: (path: string) => void
+  onConvertActivePdfToMarkdown?: () => void
   onExportNoteAsPdf?: () => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
@@ -169,7 +170,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     onReloadVault, onRepairVault,
     locale, systemLocale, selectedUiLanguage, onSetUiLanguage, onSetThemeMode,
     onSetNoteIcon, onRemoveNoteIcon, activeNoteHasIcon, onChangeNoteType, onMoveNoteToFolder, canMoveNoteToFolder,
-    onOpenInNewWindow, onRevealActiveFile, onCopyActiveFilePath, onCopyActiveDeepLink, onOpenActiveFileExternal, onExportNoteAsPdf, onToggleFavorite, onToggleOrganized,
+    onOpenInNewWindow, onRevealActiveFile, onCopyActiveFilePath, onCopyActiveDeepLink, onOpenActiveFileExternal, onConvertActivePdfToMarkdown, onExportNoteAsPdf, onToggleFavorite, onToggleOrganized,
     onCustomizeNoteListColumns, canCustomizeNoteListColumns,
     onRestoreDeletedNote, canRestoreDeletedNote,
     selection, noteListFilter, onSetNoteListFilter,
@@ -222,7 +223,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     onChangeNoteType, onMoveNoteToFolder, canMoveNoteToFolder,
     onSetNoteIcon, onRemoveNoteIcon, activeNoteHasIcon, onOpenInNewWindow,
     onRevealActiveFile, onCopyActiveFilePath, onOpenActiveFileExternal,
-    onCopyActiveDeepLink, onExportNoteAsPdf,
+    onCopyActiveDeepLink, onConvertActivePdfToMarkdown, onExportNoteAsPdf,
     onToggleFavorite, isFavorite,
     onToggleOrganized, isOrganized: activeEntry?.organized ?? false,
     onRestoreDeletedNote, canRestoreDeletedNote,
@@ -233,7 +234,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     onChangeNoteType, onMoveNoteToFolder, canMoveNoteToFolder,
     onSetNoteIcon, onRemoveNoteIcon, activeNoteHasIcon, onOpenInNewWindow,
     onRevealActiveFile, onCopyActiveFilePath, onOpenActiveFileExternal,
-    onCopyActiveDeepLink, onExportNoteAsPdf,
+    onCopyActiveDeepLink, onConvertActivePdfToMarkdown, onExportNoteAsPdf,
     onToggleFavorite, isFavorite,
     onToggleOrganized, activeEntry?.organized, onRestoreDeletedNote, canRestoreDeletedNote,
   ])

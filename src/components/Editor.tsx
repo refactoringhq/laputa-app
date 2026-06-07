@@ -96,6 +96,7 @@ interface EditorProps {
   onCopyDeepLink?: (entry: VaultEntry) => void
   onCopyGitUrl?: (entry: VaultEntry) => void
   onOpenExternalFile?: (path: string) => void
+  onConvertPdfToMarkdown?: (entry: VaultEntry) => void
   onDeleteNote?: (path: string) => void
   onArchiveNote?: (path: string) => void
   onUnarchiveNote?: (path: string) => void
@@ -406,6 +407,7 @@ function EditorLayout({
   workspaces,
   onUnsupportedAiPaste,
   locale,
+  onConvertPdfToMarkdown,
 }: {
   tabs: Tab[]
   activeTabPath: string | null
@@ -481,6 +483,7 @@ function EditorLayout({
   onUnsupportedAiPaste?: (message: string) => void
   locale?: AppLocale
   onExportPdf?: (source?: NotePdfExportSource) => void
+  onConvertPdfToMarkdown?: (entry: VaultEntry) => void
 }) {
   const activeBinaryTab = activeTab?.entry.fileKind === 'binary' ? activeTab : null
   const showEmptyState = tabs.length === 0 && activeTabPath === null && !isVaultLoading
@@ -498,6 +501,7 @@ function EditorLayout({
                   onCopyFilePath={onCopyFilePath}
                   onCopyDeepLink={onCopyDeepLink}
                   onOpenExternalFile={onOpenExternalFile}
+                  onConvertPdfToMarkdown={onConvertPdfToMarkdown}
                   onRevealFile={onRevealFile}
                 />
               )

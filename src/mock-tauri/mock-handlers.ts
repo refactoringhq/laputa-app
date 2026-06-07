@@ -529,6 +529,60 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     const filename = args.source_path.split('/').pop() ?? 'image.png'
     return `${vault}/attachments/${Date.now()}-${filename}`
   },
+  convert_pdf_to_markdown_note: (args: { pdfPath: string; ocrMode?: string }) => {
+    const pdfPath = args.pdfPath
+    const title = (pdfPath.split('/').pop() ?? 'Imported PDF').replace(/\.pdf$/i, '')
+    const notePath = pdfPath.replace(/\.pdf$/i, '.md')
+    const content = `---\ntype: Note\nsource_pdf: "${pdfPath}"\npdf_import:\n  mode: ${args.ocrMode ?? 'ocr_when_needed'}\n  imported_at: "mock"\n  pages: 1\n  pages_text_extracted: 1\n  pages_ocr: 0\n---\n\n# ${title}\n\n[Source PDF](<${pdfPath}>)\n\n## Page 1\n\nMock PDF conversion output.\n`
+    const existing = MOCK_ENTRIES.find(entry => entry.path === notePath)
+    if (!existing) {
+      MOCK_ENTRIES.push({
+        aliases: [],
+        archived: false,
+        belongsTo: [],
+        color: null,
+        createdAt: Date.now(),
+        favorite: false,
+        favoriteIndex: null,
+        fileKind: 'markdown',
+        fileSize: content.length,
+        filename: notePath.split('/').pop() ?? `${title}.md`,
+        hasH1: true,
+        icon: null,
+        isA: 'Note',
+        listPropertiesDisplay: [],
+        modifiedAt: Date.now(),
+        noteWidth: null,
+        order: null,
+        organized: false,
+        outgoingLinks: [],
+        properties: {},
+        relatedTo: [],
+        relationships: {},
+        sidebarLabel: null,
+        snippet: 'Mock PDF conversion output.',
+        sort: null,
+        status: null,
+        template: null,
+        title,
+        path: notePath,
+        view: null,
+        visible: null,
+        wordCount: 4,
+      })
+    }
+    writeMockContent({ path: notePath, content })
+    syncWindowContent()
+    return {
+      note_path: notePath,
+      note_title: title,
+      ocr_available: true,
+      page_count: 1,
+      pages_ocr: 0,
+      pages_text_extracted: 1,
+      text_length: 27,
+    }
+  },
   get_settings: () => ({ ...mockSettings }),
   save_settings: (args: { settings: Settings }) => {
     const s = args.settings

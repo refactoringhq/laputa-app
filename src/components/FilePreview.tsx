@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, Link, SpeakerHigh, Video, WarningCircle } from '@phosphor-icons/react'
+import { ArrowSquareOut, ClipboardText, FileDashed, FileDoc, FilePdf, FolderOpen, ImageSquare, Link, SpeakerHigh, Video, WarningCircle } from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
 import { translate, type AppLocale } from '../lib/i18n'
 import { trackFilePreviewAction, trackFilePreviewFailed, trackFilePreviewOpened } from '../lib/productAnalytics'
@@ -15,6 +15,7 @@ interface FilePreviewProps {
   locale?: AppLocale
   onCopyFilePath?: (path: string) => void
   onCopyDeepLink?: (entry: VaultEntry) => void
+  onConvertPdfToMarkdown?: (entry: VaultEntry) => void
   onOpenExternalFile?: (path: string) => void
   onRevealFile?: (path: string) => void
 }
@@ -102,6 +103,7 @@ function FilePreviewHeader({
   onRevealFile,
   onCopyFilePath,
   onCopyDeepLink,
+  onConvertPdfToMarkdown,
 }: {
   entry: VaultEntry
   previewKind: FilePreviewKind | null
@@ -111,6 +113,7 @@ function FilePreviewHeader({
   onRevealFile?: () => void
   onCopyFilePath?: () => void
   onCopyDeepLink?: () => void
+  onConvertPdfToMarkdown?: () => void
 }) {
   return (
     <div
@@ -141,6 +144,12 @@ function FilePreviewHeader({
           <Button type="button" variant="ghost" size="sm" onClick={onCopyDeepLink}>
             <Link size={15} />
             {translate(locale, 'filePreview.copyDeepLink')}
+          </Button>
+        )}
+        {onConvertPdfToMarkdown && (
+          <Button type="button" variant="ghost" size="sm" onClick={onConvertPdfToMarkdown}>
+            <FileDoc size={15} />
+            {translate(locale, 'filePreview.convertPdfToMarkdown')}
           </Button>
         )}
         <Button type="button" variant="ghost" size="sm" onClick={onOpenExternal}>
@@ -344,6 +353,7 @@ function useFilePreviewActions({
   entryPath,
   onCopyFilePath,
   onCopyDeepLink,
+  onConvertPdfToMarkdown,
   onOpenExternalFile,
   onRevealFile,
   previewKind,
@@ -352,6 +362,7 @@ function useFilePreviewActions({
   entryPath: string
   onCopyFilePath?: (path: string) => void
   onCopyDeepLink?: (entry: VaultEntry) => void
+  onConvertPdfToMarkdown?: (entry: VaultEntry) => void
   onOpenExternalFile?: (path: string) => void
   onRevealFile?: (path: string) => void
   previewKind: FilePreviewKind | null
@@ -383,7 +394,11 @@ function useFilePreviewActions({
     onCopyDeepLink?.(entry)
   }, [entry, onCopyDeepLink, previewKind])
 
-  return { handleOpenExternal, handleRevealFile, handleCopyFilePath, handleCopyDeepLink }
+  const handleConvertPdfToMarkdown = useCallback(() => {
+    onConvertPdfToMarkdown?.(entry)
+  }, [entry, onConvertPdfToMarkdown])
+
+  return { handleOpenExternal, handleRevealFile, handleCopyFilePath, handleCopyDeepLink, handleConvertPdfToMarkdown }
 }
 
 function isMediaPreviewKind(previewKind: FilePreviewKind | null): boolean {
@@ -404,6 +419,7 @@ export function FilePreview({
   locale = 'en',
   onCopyFilePath,
   onCopyDeepLink,
+  onConvertPdfToMarkdown,
   onOpenExternalFile,
   onRevealFile,
 }: FilePreviewProps) {
@@ -419,6 +435,7 @@ export function FilePreview({
     entryPath: entry.path,
     onCopyFilePath,
     onCopyDeepLink,
+    onConvertPdfToMarkdown,
     onOpenExternalFile,
     onRevealFile,
     previewKind,
@@ -460,6 +477,7 @@ export function FilePreview({
         onRevealFile={onRevealFile ? actions.handleRevealFile : undefined}
         onCopyFilePath={onCopyFilePath ? actions.handleCopyFilePath : undefined}
         onCopyDeepLink={onCopyDeepLink ? actions.handleCopyDeepLink : undefined}
+        onConvertPdfToMarkdown={previewKind === 'pdf' && onConvertPdfToMarkdown ? actions.handleConvertPdfToMarkdown : undefined}
       />
       <div className="min-h-0 flex-1 overflow-auto bg-background">
         <FilePreviewBody

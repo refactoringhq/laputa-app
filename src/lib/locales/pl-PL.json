@@ -805,5 +805,19 @@
   "locale.plPL": "Polski",
   "locale.beBY": "Białoruski",
   "locale.beLatn": "Białoruski (Łacinka)",
-  "locale.idID": "Indonezyjski"
+  "locale.idID": "Indonezyjski",
+  "filePreview.convertPdfToMarkdown": "Konwertuj do notatki",
+  "pdfImport.dialog.title": "Konwertuj PDF do notatki Markdown",
+  "pdfImport.dialog.description": "Utwórz notatkę Markdown z {file}.",
+  "pdfImport.dialog.untitledFile": "tego PDF",
+  "pdfImport.dialog.submit": "Konwertuj",
+  "pdfImport.dialog.working": "Konwertowanie...",
+  "pdfImport.mode.label": "Tryb konwersji",
+  "pdfImport.mode.textOnly": "Tylko ekstrakcja tekstu",
+  "pdfImport.mode.ocrWhenNeeded": "OCR gdy potrzebne",
+  "pdfImport.mode.ocrAllPages": "OCR wszystkich stron",
+  "pdfImport.language.label": "Język OCR",
+  "pdfImport.language.placeholder": "pol",
+  "pdfImport.toast.success": "Utworzono notatkę Markdown: {title}",
+  "pdfImport.toast.failed": "Nie można przekonwertować PDF: {error}"
 }

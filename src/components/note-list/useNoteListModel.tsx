@@ -341,6 +341,7 @@ interface UseNoteListInteractionStateParams {
   onOpenDeletedNote?: (entry: DeletedNoteEntry) => void
   onOpenInNewWindow?: (entry: VaultEntry) => void
   onExportPdf?: (entry: VaultEntry) => void
+  onConvertPdfToMarkdown?: (entry: VaultEntry) => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
   onRevealFile?: (path: string) => void
@@ -372,6 +373,7 @@ function useNoteListInteractionState({
   onOpenDeletedNote,
   onOpenInNewWindow,
   onExportPdf,
+  onConvertPdfToMarkdown,
   onToggleFavorite,
   onToggleOrganized,
   onRevealFile,
@@ -391,6 +393,7 @@ function useNoteListInteractionState({
     onEnterNeighborhood,
     onOpenInNewWindow,
     onExportPdf,
+    onConvertPdfToMarkdown,
     onArchivePaths: onBulkArchive,
     onDeletePaths: onBulkDeletePermanently,
     onToggleFavorite,
@@ -557,6 +560,7 @@ export interface NoteListProps {
   updateEntry?: (path: string, patch: Partial<VaultEntry>) => void
   onOpenInNewWindow?: (entry: VaultEntry) => void
   onExportPdf?: (entry: VaultEntry) => void
+  onConvertPdfToMarkdown?: (entry: VaultEntry) => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
   onRevealFile?: (path: string) => void
@@ -688,6 +692,7 @@ export function useNoteListModel({
   updateEntry,
   onOpenInNewWindow,
   onExportPdf,
+  onConvertPdfToMarkdown,
   onToggleFavorite,
   onToggleOrganized,
   onRevealFile,
@@ -749,6 +754,7 @@ export function useNoteListModel({
     onOpenDeletedNote,
     onOpenInNewWindow,
     onExportPdf,
+    onConvertPdfToMarkdown,
     onToggleFavorite,
     onToggleOrganized,
     onRevealFile,

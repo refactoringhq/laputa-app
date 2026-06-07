@@ -17,6 +17,7 @@ import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../../hooks/appCo
 import { translate, type AppLocale } from '../../lib/i18n'
 import { trackEvent } from '../../lib/telemetry'
 import type { VaultEntry } from '../../types'
+import { isPdfPreviewEntry } from '../../utils/filePreview'
 import { isMarkdownEntry } from '../../utils/typeDefinitions'
 import type { NoteListContextMenuState } from './NoteListContextMenu'
 
@@ -40,6 +41,7 @@ interface NoteListContextMenuNodeProps {
   onArchivePaths?: (paths: string[]) => void
   onDeletePaths?: (paths: string[]) => void
   onExportPdf?: (entry: VaultEntry) => void
+  onConvertPdfToMarkdown?: (entry: VaultEntry) => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
   onRevealFile?: (path: string) => void
@@ -57,6 +59,7 @@ type BuildContextMenuItemsParams = Pick<
   | 'onArchivePaths'
   | 'onDeletePaths'
   | 'onExportPdf'
+  | 'onConvertPdfToMarkdown'
   | 'onToggleFavorite'
   | 'onToggleOrganized'
   | 'onRevealFile'
@@ -184,6 +187,20 @@ function exportPdfItem(
   }]
 }
 
+function convertPdfToMarkdownItem(
+  entry: VaultEntry,
+  locale: AppLocale,
+  onConvertPdfToMarkdown: ((entry: VaultEntry) => void) | undefined,
+  selectAction: SelectContextAction,
+) {
+  if (!onConvertPdfToMarkdown || !isPdfPreviewEntry(entry)) return []
+  return [{
+    icon: FilePdf,
+    label: translate(locale, 'filePreview.convertPdfToMarkdown'),
+    onSelect: () => selectAction('convert_pdf_markdown', () => onConvertPdfToMarkdown(entry)),
+  }]
+}
+
 function archiveItem(
   entry: VaultEntry,
   locale: AppLocale,
@@ -228,6 +245,7 @@ function buildContextMenuItems(
     ...copyFilePathItem(entry, props.locale, props.onCopyFilePath, selectAction),
     ...copyGitUrlItem(entry, props.locale, props.canCopyGitUrl, props.onCopyGitUrl, selectAction),
     ...exportPdfItem(entry, props.locale, props.onExportPdf, selectAction),
+    ...convertPdfToMarkdownItem(entry, props.locale, props.onConvertPdfToMarkdown, selectAction),
     ...archiveItem(entry, props.locale, props.onArchivePaths, selectAction),
     ...deleteItem(entry, props.locale, props.onDeletePaths, selectAction),
   ]
@@ -258,6 +276,7 @@ export function NoteListContextMenuNode({
   onArchivePaths,
   onDeletePaths,
   onExportPdf,
+  onConvertPdfToMarkdown,
   onToggleFavorite,
   onToggleOrganized,
   onRevealFile,
@@ -281,6 +300,7 @@ export function NoteListContextMenuNode({
     onArchivePaths,
     onDeletePaths,
     onExportPdf,
+    onConvertPdfToMarkdown,
     onToggleFavorite,
     onToggleOrganized,
     onRevealFile,

@@ -805,5 +805,19 @@
   "locale.plPL": "波蘭語",
   "locale.beBY": "白俄羅斯語",
   "locale.beLatn": "白俄羅斯語（拉丁語）",
-  "locale.idID": "印尼"
+  "locale.idID": "印尼",
+  "filePreview.convertPdfToMarkdown": "轉換為筆記",
+  "pdfImport.dialog.title": "將PDF轉換為Markdown筆記",
+  "pdfImport.dialog.description": "從{file}建立Markdown筆記。",
+  "pdfImport.dialog.untitledFile": "此PDF",
+  "pdfImport.dialog.submit": "轉換",
+  "pdfImport.dialog.working": "轉換中...",
+  "pdfImport.mode.label": "轉換模式",
+  "pdfImport.mode.textOnly": "僅文字擷取",
+  "pdfImport.mode.ocrWhenNeeded": "需要時OCR",
+  "pdfImport.mode.ocrAllPages": "OCR所有頁面",
+  "pdfImport.language.label": "OCR語言",
+  "pdfImport.language.placeholder": "eng",
+  "pdfImport.toast.success": "已建立Markdown筆記: {title}",
+  "pdfImport.toast.failed": "無法轉換PDF: {error}"
 }

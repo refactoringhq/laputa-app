@@ -805,5 +805,19 @@
   "locale.plPL": "Польский",
   "locale.beBY": "Белорусский",
   "locale.beLatn": "Белорусский (Латинка)",
-  "locale.idID": "индонезийский"
+  "locale.idID": "индонезийский",
+  "filePreview.convertPdfToMarkdown": "Конвертировать в заметку",
+  "pdfImport.dialog.title": "Конвертировать PDF в заметку Markdown",
+  "pdfImport.dialog.description": "Создать заметку Markdown из {file}.",
+  "pdfImport.dialog.untitledFile": "этого PDF",
+  "pdfImport.dialog.submit": "Конвертировать",
+  "pdfImport.dialog.working": "Конвертация...",
+  "pdfImport.mode.label": "Режим конвертации",
+  "pdfImport.mode.textOnly": "Только извлечение текста",
+  "pdfImport.mode.ocrWhenNeeded": "OCR при необходимости",
+  "pdfImport.mode.ocrAllPages": "OCR всех страниц",
+  "pdfImport.language.label": "Язык OCR",
+  "pdfImport.language.placeholder": "rus",
+  "pdfImport.toast.success": "Создана заметка Markdown: {title}",
+  "pdfImport.toast.failed": "Не удалось конвертировать PDF: {error}"
 }

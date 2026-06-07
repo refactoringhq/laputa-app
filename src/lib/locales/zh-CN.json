@@ -805,5 +805,19 @@
   "locale.plPL": "波兰语",
   "locale.beBY": "白俄罗斯语",
   "locale.beLatn": "白俄罗斯语（拉丁语）",
-  "locale.idID": "印度尼西亚"
+  "locale.idID": "印度尼西亚",
+  "filePreview.convertPdfToMarkdown": "转换为笔记",
+  "pdfImport.dialog.title": "将PDF转换为Markdown笔记",
+  "pdfImport.dialog.description": "从{file}创建Markdown笔记。",
+  "pdfImport.dialog.untitledFile": "此PDF",
+  "pdfImport.dialog.submit": "转换",
+  "pdfImport.dialog.working": "转换中...",
+  "pdfImport.mode.label": "转换模式",
+  "pdfImport.mode.textOnly": "仅文本提取",
+  "pdfImport.mode.ocrWhenNeeded": "需要时OCR",
+  "pdfImport.mode.ocrAllPages": "OCR所有页面",
+  "pdfImport.language.label": "OCR语言",
+  "pdfImport.language.placeholder": "eng",
+  "pdfImport.toast.success": "已创建Markdown笔记: {title}",
+  "pdfImport.toast.failed": "无法转换PDF: {error}"
 }

@@ -805,5 +805,19 @@
   "locale.plPL": "Tiếng Ba Lan",
   "locale.beBY": "Tiếng Belarus",
   "locale.beLatn": "Tiếng Belarus (Latinh)",
-  "locale.idID": "Tiếng Indonesia"
+  "locale.idID": "Tiếng Indonesia",
+  "filePreview.convertPdfToMarkdown": "Chuyển thành ghi chú",
+  "pdfImport.dialog.title": "Chuyển PDF thành ghi chú Markdown",
+  "pdfImport.dialog.description": "Tạo ghi chú Markdown từ {file}.",
+  "pdfImport.dialog.untitledFile": "PDF này",
+  "pdfImport.dialog.submit": "Chuyển đổi",
+  "pdfImport.dialog.working": "Đang chuyển đổi...",
+  "pdfImport.mode.label": "Chế độ chuyển đổi",
+  "pdfImport.mode.textOnly": "Chỉ trích xuất văn bản",
+  "pdfImport.mode.ocrWhenNeeded": "OCR khi cần",
+  "pdfImport.mode.ocrAllPages": "OCR tất cả các trang",
+  "pdfImport.language.label": "Ngôn ngữ OCR",
+  "pdfImport.language.placeholder": "vie",
+  "pdfImport.toast.success": "Đã tạo ghi chú Markdown: {title}",
+  "pdfImport.toast.failed": "Không thể chuyển đổi PDF: {error}"
 }

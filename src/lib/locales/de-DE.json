@@ -805,5 +805,19 @@
   "locale.plPL": "Polnisch",
   "locale.beBY": "Belarussisch",
   "locale.beLatn": "Belarussisch (Lateinisch)",
-  "locale.idID": "Indonesisch"
+  "locale.idID": "Indonesisch",
+  "filePreview.convertPdfToMarkdown": "In Notiz konvertieren",
+  "pdfImport.dialog.title": "PDF in Markdown-Notiz konvertieren",
+  "pdfImport.dialog.description": "Eine Markdown-Notiz aus {file} erstellen.",
+  "pdfImport.dialog.untitledFile": "dieses PDF",
+  "pdfImport.dialog.submit": "Konvertieren",
+  "pdfImport.dialog.working": "Wird konvertiert...",
+  "pdfImport.mode.label": "Konvertierungsmodus",
+  "pdfImport.mode.textOnly": "Nur Textextraktion",
+  "pdfImport.mode.ocrWhenNeeded": "OCR bei Bedarf",
+  "pdfImport.mode.ocrAllPages": "Alle Seiten per OCR",
+  "pdfImport.language.label": "OCR-Sprache",
+  "pdfImport.language.placeholder": "deu",
+  "pdfImport.toast.success": "Markdown-Notiz erstellt: {title}",
+  "pdfImport.toast.failed": "PDF konnte nicht konvertiert werden: {error}"
 }

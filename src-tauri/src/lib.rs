@@ -569,6 +569,7 @@ macro_rules! app_invoke_handler {
             commands::print_current_webview,
             commands::can_export_current_webview_pdf,
             commands::export_current_webview_pdf,
+            commands::convert_pdf_to_markdown_note,
             commands::list_views,
             commands::save_view_cmd,
             commands::delete_view_cmd,

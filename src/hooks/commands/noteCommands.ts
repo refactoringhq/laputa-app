@@ -36,6 +36,7 @@ interface NoteCommandsConfig {
   onCopyActiveFilePath?: (path: string) => void
   onCopyActiveDeepLink?: (path: string) => void
   onOpenActiveFileExternal?: (path: string) => void
+  onConvertActivePdfToMarkdown?: () => void
   onToggleFavorite?: (path: string) => void
   isFavorite?: boolean
   onToggleOrganized?: (path: string) => void
@@ -297,6 +298,13 @@ function buildFileActionCommands(config: NoteCommandsConfig): CommandAction[] {
       keywords: ['export', 'pdf', 'print', 'share', 'archive'],
       enabled: config.hasActiveNote && activeFileKind === 'markdown' && !!config.onExportNoteAsPdf,
       execute: () => config.onExportNoteAsPdf?.(),
+    }),
+    createNoteCommand({
+      id: 'convert-pdf-markdown',
+      label: translate(config.locale ?? 'en', 'filePreview.convertPdfToMarkdown'),
+      keywords: ['pdf', 'markdown', 'import', 'ocr', 'convert'],
+      enabled: config.hasActiveNote && activeFileKind === 'binary' && !!config.onConvertActivePdfToMarkdown,
+      execute: () => config.onConvertActivePdfToMarkdown?.(),
     }),
     buildActivePathCommand(config, {
       id: 'open-active-file-external',

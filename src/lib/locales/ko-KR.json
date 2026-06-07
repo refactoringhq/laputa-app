@@ -805,5 +805,19 @@
   "locale.plPL": "폴란드어",
   "locale.beBY": "벨라루스어",
   "locale.beLatn": "벨라루스어 (라틴 문자)",
-  "locale.idID": "인도네시아 공화국"
+  "locale.idID": "인도네시아 공화국",
+  "filePreview.convertPdfToMarkdown": "노트로 변환",
+  "pdfImport.dialog.title": "PDF를 Markdown 노트로 변환",
+  "pdfImport.dialog.description": "{file}에서 Markdown 노트를 만듭니다.",
+  "pdfImport.dialog.untitledFile": "이 PDF",
+  "pdfImport.dialog.submit": "변환",
+  "pdfImport.dialog.working": "변환 중...",
+  "pdfImport.mode.label": "변환 모드",
+  "pdfImport.mode.textOnly": "텍스트 추출만",
+  "pdfImport.mode.ocrWhenNeeded": "필요시 OCR",
+  "pdfImport.mode.ocrAllPages": "모든 페이지 OCR",
+  "pdfImport.language.label": "OCR 언어",
+  "pdfImport.language.placeholder": "eng",
+  "pdfImport.toast.success": "Markdown 노트를 만들었습니다: {title}",
+  "pdfImport.toast.failed": "PDF를 변환할 수 없습니다: {error}"
 }

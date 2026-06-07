@@ -805,5 +805,19 @@
   "locale.plPL": "Polandia",
   "locale.beBY": "Belarusia",
   "locale.beLatn": "Belarusia (Latin)",
-  "locale.idID": "Bahasa Indonesia"
+  "locale.idID": "Bahasa Indonesia",
+  "filePreview.convertPdfToMarkdown": "Konversi ke catatan",
+  "pdfImport.dialog.title": "Konversi PDF ke catatan Markdown",
+  "pdfImport.dialog.description": "Buat catatan Markdown dari {file}.",
+  "pdfImport.dialog.untitledFile": "PDF ini",
+  "pdfImport.dialog.submit": "Konversi",
+  "pdfImport.dialog.working": "Mengonversi...",
+  "pdfImport.mode.label": "Mode konversi",
+  "pdfImport.mode.textOnly": "Ekstraksi teks saja",
+  "pdfImport.mode.ocrWhenNeeded": "OCR bila diperlukan",
+  "pdfImport.mode.ocrAllPages": "OCR semua halaman",
+  "pdfImport.language.label": "Bahasa OCR",
+  "pdfImport.language.placeholder": "ind",
+  "pdfImport.toast.success": "Catatan Markdown dibuat: {title}",
+  "pdfImport.toast.failed": "Tidak dapat mengonversi PDF: {error}"
 }

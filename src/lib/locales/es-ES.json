@@ -805,5 +805,19 @@
   "locale.plPL": "Polaco",
   "locale.beBY": "Bielorruso",
   "locale.beLatn": "Bielorruso (Latín)",
-  "locale.idID": "Indonésio"
+  "locale.idID": "Indonésio",
+  "filePreview.convertPdfToMarkdown": "Convertir en nota",
+  "pdfImport.dialog.title": "Convertir PDF en nota Markdown",
+  "pdfImport.dialog.description": "Crear una nota Markdown a partir de {file}.",
+  "pdfImport.dialog.untitledFile": "este PDF",
+  "pdfImport.dialog.submit": "Convertir",
+  "pdfImport.dialog.working": "Convirtiendo...",
+  "pdfImport.mode.label": "Modo de conversión",
+  "pdfImport.mode.textOnly": "Solo extracción de texto",
+  "pdfImport.mode.ocrWhenNeeded": "OCR cuando sea necesario",
+  "pdfImport.mode.ocrAllPages": "OCR en todas las páginas",
+  "pdfImport.language.label": "Idioma OCR",
+  "pdfImport.language.placeholder": "spa",
+  "pdfImport.toast.success": "Nota Markdown creada: {title}",
+  "pdfImport.toast.failed": "No se pudo convertir el PDF: {error}"
 }

@@ -449,6 +449,7 @@ describe('useCommandRegistry', () => {
 
   it('only enables file-kind specific actions for supported active files', () => {
     const onOpenActiveFileExternal = vi.fn()
+    const onConvertActivePdfToMarkdown = vi.fn()
     const onExportNoteAsPdf = vi.fn()
     const { result, rerender } = renderHook(
       (props) => useCommandRegistry(props),
@@ -463,20 +464,25 @@ describe('useCommandRegistry', () => {
     )
 
     expect(findCommand(result.current, 'open-active-file-external')?.enabled).toBe(false)
+    expect(findCommand(result.current, 'convert-pdf-markdown')?.enabled).toBe(false)
     expect(findCommand(result.current, 'export-note-pdf')?.enabled).toBe(true)
 
     rerender(makeConfig({
-      activeTabPath: '/vault/Attachments/photo.png',
-      entries: [{ path: '/vault/Attachments/photo.png', title: 'photo.png', fileKind: 'binary' }],
+      activeTabPath: '/vault/Attachments/report.pdf',
+      entries: [{ path: '/vault/Attachments/report.pdf', title: 'report.pdf', fileKind: 'binary' }],
       onOpenActiveFileExternal,
+      onConvertActivePdfToMarkdown,
       onExportNoteAsPdf,
     }))
 
     const command = findCommand(result.current, 'open-active-file-external')!
     expect(command.enabled).toBe(true)
     expect(findCommand(result.current, 'export-note-pdf')?.enabled).toBe(false)
+    expect(findCommand(result.current, 'convert-pdf-markdown')?.enabled).toBe(true)
     command.execute()
-    expect(onOpenActiveFileExternal).toHaveBeenCalledWith('/vault/Attachments/photo.png')
+    findCommand(result.current, 'convert-pdf-markdown')!.execute()
+    expect(onOpenActiveFileExternal).toHaveBeenCalledWith('/vault/Attachments/report.pdf')
+    expect(onConvertActivePdfToMarkdown).toHaveBeenCalledOnce()
   })
 
   it('disables Toggle Raw Editor when the active file cannot switch to rich mode', () => {

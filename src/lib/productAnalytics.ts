@@ -4,6 +4,7 @@ import { trackEvent } from './telemetry'
 import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import type { DateDisplayFormat } from '../utils/dateDisplay'
 import type { FilePreviewKind } from '../utils/filePreview'
+import type { PdfMarkdownImportSource, PdfMarkdownOcrMode } from '../utils/pdfMarkdownImport'
 import type { NoteWidthMode } from '../types'
 import type { ThemeMode } from './themeMode'
 
@@ -14,6 +15,7 @@ type AiWorkspaceMode = 'docked' | 'side' | 'window'
 type AiWorkspaceTitleSource = 'generated' | 'manual'
 type NotePdfExportFailureReason = 'export_unavailable' | 'export_error'
 type NotePdfExportSource = 'breadcrumb' | 'app_command' | 'note_list_context_menu'
+type PdfMarkdownImportFailureReason = 'conversion_error' | 'unavailable'
 
 const ALL_NOTES_VISIBILITY_CATEGORIES: ReadonlyArray<keyof AllNotesFileVisibility> = [
   'pdfs',
@@ -55,6 +57,50 @@ export function trackNotePdfExportFailed(
   reason: NotePdfExportFailureReason,
 ): void {
   trackEvent('note_pdf_export_failed', { reason, source })
+}
+
+export function trackPdfMarkdownImportStarted(
+  source: PdfMarkdownImportSource,
+  mode: PdfMarkdownOcrMode,
+): void {
+  trackEvent('pdf_markdown_import_started', { mode, source })
+}
+
+export function trackPdfMarkdownImportCompleted({
+  mode,
+  pageCount,
+  pagesOcr,
+  source,
+  textLength,
+}: {
+  mode: PdfMarkdownOcrMode
+  pageCount?: number
+  pagesOcr: number
+  source: PdfMarkdownImportSource
+  textLength: number
+}): void {
+  trackEvent('pdf_markdown_import_completed', {
+    mode,
+    ...(pageCount != null ? { page_count: pageCount } : {}),
+    pages_ocr: pagesOcr,
+    source,
+    text_length_bucket: textLengthBucket(textLength),
+  })
+}
+
+export function trackPdfMarkdownImportFailed(
+  source: PdfMarkdownImportSource,
+  mode: PdfMarkdownOcrMode,
+  reason: PdfMarkdownImportFailureReason,
+): void {
+  trackEvent('pdf_markdown_import_failed', { mode, reason, source })
+}
+
+function textLengthBucket(textLength: number): string {
+  if (textLength < 1_000) return 'lt_1k'
+  if (textLength < 10_000) return '1k_10k'
+  if (textLength < 50_000) return '10k_50k'
+  return 'gte_50k'
 }
 
 export function trackAllNotesVisibilityChanged(

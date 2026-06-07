@@ -8,6 +8,7 @@ import {
 import type { AppLocale } from '../../lib/i18n'
 import { trackEvent } from '../../lib/telemetry'
 import type { VaultEntry } from '../../types'
+import { isPdfPreviewEntry } from '../../utils/filePreview'
 import { isMarkdownEntry } from '../../utils/typeDefinitions'
 import { NoteListContextMenuNode } from './NoteListContextMenuView'
 
@@ -24,6 +25,7 @@ interface NoteListContextMenuParams {
   onArchivePaths?: (paths: string[]) => void
   onDeletePaths?: (paths: string[]) => void
   onExportPdf?: (entry: VaultEntry) => void
+  onConvertPdfToMarkdown?: (entry: VaultEntry) => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
   onRevealFile?: (path: string) => void
@@ -39,6 +41,7 @@ function hasNoteListContextActions({
   onArchivePaths,
   onDeletePaths,
   onExportPdf,
+  onConvertPdfToMarkdown,
   onToggleFavorite,
   onToggleOrganized,
   onRevealFile,
@@ -50,6 +53,7 @@ function hasNoteListContextActions({
     onOpenInNewWindow,
     onEnterNeighborhood && entry.fileKind !== 'binary',
     onExportPdf && isMarkdownEntry(entry),
+    onConvertPdfToMarkdown && isPdfPreviewEntry(entry),
     onArchivePaths && !entry.archived,
     onDeletePaths,
     onToggleFavorite,
@@ -67,6 +71,7 @@ export function useNoteListContextMenu({
   onArchivePaths,
   onDeletePaths,
   onExportPdf,
+  onConvertPdfToMarkdown,
   onToggleFavorite,
   onToggleOrganized,
   onRevealFile,
@@ -104,6 +109,7 @@ export function useNoteListContextMenu({
       onArchivePaths,
       onDeletePaths,
       onExportPdf,
+      onConvertPdfToMarkdown,
       onToggleFavorite,
       onToggleOrganized,
       onRevealFile,
@@ -122,6 +128,7 @@ export function useNoteListContextMenu({
     onDeletePaths,
     onEnterNeighborhood,
     onExportPdf,
+    onConvertPdfToMarkdown,
     onOpenInNewWindow,
     onCopyGitUrl,
     onRevealFile,
@@ -139,6 +146,7 @@ export function useNoteListContextMenu({
       onArchivePaths={onArchivePaths}
       onDeletePaths={onDeletePaths}
       onExportPdf={onExportPdf}
+      onConvertPdfToMarkdown={onConvertPdfToMarkdown}
       onToggleFavorite={onToggleFavorite}
       onToggleOrganized={onToggleOrganized}
       onRevealFile={onRevealFile}

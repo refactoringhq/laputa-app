@@ -805,5 +805,19 @@
   "locale.plPL": "Poĺskaja",
   "locale.beBY": "Bielaruskaja",
   "locale.beLatn": "Bielaruskaja (Łacinka)",
-  "locale.idID": "Indonesian"
+  "locale.idID": "Indonesian",
+  "filePreview.convertPdfToMarkdown": "Pieraŭtvaryć u natatku",
+  "pdfImport.dialog.title": "Pieraŭtvaryć PDF u natatku Markdown",
+  "pdfImport.dialog.description": "Stvaryć natatku Markdown z {file}.",
+  "pdfImport.dialog.untitledFile": "hetaha PDF",
+  "pdfImport.dialog.submit": "Pieraŭtvaryć",
+  "pdfImport.dialog.working": "Pieraŭtvarajecca...",
+  "pdfImport.mode.label": "Režym pieraŭtvarennia",
+  "pdfImport.mode.textOnly": "Tołki zdabyvannie tekstu",
+  "pdfImport.mode.ocrWhenNeeded": "OCR pry nieabchodnasci",
+  "pdfImport.mode.ocrAllPages": "OCR usich staronak",
+  "pdfImport.language.label": "Mova OCR",
+  "pdfImport.language.placeholder": "bel",
+  "pdfImport.toast.success": "Stvarana natatka Markdown: {title}",
+  "pdfImport.toast.failed": "Nie ŭdalosia pieraŭtvaryć PDF: {error}"
 }

@@ -126,6 +126,7 @@ interface AppCommandsConfig {
   onCopyActiveDeepLink?: (path: string) => void
   onOpenActiveFileExternal?: (path: string) => void
   onExportNoteAsPdf?: () => void
+  onConvertActivePdfToMarkdown?: (path: string) => void
   onRevealSelectedFolder?: () => void
   onCopySelectedFolderPath?: () => void
   onToggleFavorite?: (path: string) => void

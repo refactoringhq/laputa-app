@@ -19,6 +19,7 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { CloneVaultModal } from './components/CloneVaultModal'
 import { FeedbackDialog } from './components/FeedbackDialog'
 import { McpSetupDialog } from './components/McpSetupDialog'
+import { PdfMarkdownImportDialog } from './components/PdfMarkdownImportDialog'
 import { NoteRetargetingDialogs } from './components/note-retargeting/NoteRetargetingDialogs'
 import { StartupScreen } from './components/StartupScreen'
 import { useAiAgentsOnboarding } from './hooks/useAiAgentsOnboarding'
@@ -113,6 +114,17 @@ import {
 } from './utils/workspaces'
 import { activeGitRepositories } from './utils/gitRepositories'
 import { isMarkdownEntry } from './utils/typeDefinitions'
+import { isPdfPreviewEntry } from './utils/filePreview'
+import {
+  convertPdfToMarkdownNote,
+  type PdfMarkdownImportSource,
+  type PdfMarkdownOcrMode,
+} from './utils/pdfMarkdownImport'
+import {
+  trackPdfMarkdownImportCompleted,
+  trackPdfMarkdownImportFailed,
+  trackPdfMarkdownImportStarted,
+} from './lib/productAnalytics'
 import { useVisibleWorkspaceEntries, useWorkspaceGraphState } from './hooks/useWorkspaceGraphState'
 import { useGitSetupState } from './hooks/useGitSetupState'
 import { AppPreferencesProvider, useAppPreferences } from './hooks/useAppPreferences'
@@ -163,6 +175,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const [selection, setSelection] = useState<SidebarSelection>(DEFAULT_SELECTION)
   const [noteListFilter, setNoteListFilter] = useState<NoteListFilter>('open')
   const [pendingNoteListPdfExportPath, setPendingNoteListPdfExportPath] = useState<string | null>(null)
+  const [pdfMarkdownImportTarget, setPdfMarkdownImportTarget] = useState<{
+    entry: VaultEntry
+    source: PdfMarkdownImportSource
+  } | null>(null)
+  const [pdfMarkdownImportWorking, setPdfMarkdownImportWorking] = useState(false)
   const selectionRef = useRef<SidebarSelection>(DEFAULT_SELECTION)
   const neighborhoodHistoryRef = useRef<SidebarSelection[]>([])
   const inboxPeriod: InboxPeriod = 'all'
@@ -1324,6 +1341,63 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   })
   const activeTabEntry = activeTab?.entry ?? null
   const activeTabPath = activeTabEntry?.path
+  const openPdfMarkdownImportDialog = useCallback((entry: VaultEntry, source: PdfMarkdownImportSource) => {
+    if (!isPdfPreviewEntry(entry)) return
+    setPdfMarkdownImportTarget({ entry, source })
+  }, [])
+  const handleConvertActivePdfToMarkdown = useMemo(() => (
+    activeTabEntry && isPdfPreviewEntry(activeTabEntry)
+      ? () => openPdfMarkdownImportDialog(activeTabEntry, 'app_command')
+      : undefined
+  ), [activeTabEntry, openPdfMarkdownImportDialog])
+  const handleConvertPdfToMarkdownFromList = useCallback((entry: VaultEntry) => {
+    openPdfMarkdownImportDialog(entry, 'note_list_context_menu')
+  }, [openPdfMarkdownImportDialog])
+  const handleConvertPdfToMarkdownFromPreview = useCallback((entry: VaultEntry) => {
+    openPdfMarkdownImportDialog(entry, 'file_preview')
+  }, [openPdfMarkdownImportDialog])
+  const closePdfMarkdownImportDialog = useCallback(() => {
+    if (!pdfMarkdownImportWorking) setPdfMarkdownImportTarget(null)
+  }, [pdfMarkdownImportWorking])
+  const handlePdfMarkdownImportSubmit = useCallback(async ({
+    ocrLanguage,
+    ocrMode,
+  }: {
+    ocrLanguage: string
+    ocrMode: PdfMarkdownOcrMode
+  }) => {
+    if (!pdfMarkdownImportTarget) return
+
+    const { entry, source } = pdfMarkdownImportTarget
+    trackPdfMarkdownImportStarted(source, ocrMode)
+    setPdfMarkdownImportWorking(true)
+    try {
+      const result = await convertPdfToMarkdownNote({
+        ocrLanguage,
+        ocrMode,
+        pdfPath: entry.path,
+        vaultPath: vaultPathForEntry(entry, resolvedPath),
+      })
+      trackPdfMarkdownImportCompleted({
+        mode: ocrMode,
+        pageCount: result.page_count ?? undefined,
+        pagesOcr: result.pages_ocr,
+        source,
+        textLength: result.text_length,
+      })
+      const entries = await vault.reloadVault()
+      const createdEntry = entries.find((candidate) => candidate.path === result.note_path)
+      setToastMessage(translate(appLocale, 'pdfImport.toast.success', { title: result.note_title }))
+      setPdfMarkdownImportTarget(null)
+      if (createdEntry) await notes.handleSelectNote(createdEntry)
+    } catch (error) {
+      trackPdfMarkdownImportFailed(source, ocrMode, 'conversion_error')
+      const message = error instanceof Error ? error.message : String(error)
+      setToastMessage(translate(appLocale, 'pdfImport.toast.failed', { error: message }))
+    } finally {
+      setPdfMarkdownImportWorking(false)
+    }
+  }, [appLocale, notes, pdfMarkdownImportTarget, resolvedPath, vault])
   const handleSelectNoteForPdfExport = notes.handleSelectNote
   const handleExportNotePdfFromList = useCallback((entry: VaultEntry) => {
     if (!isMarkdownEntry(entry)) return
@@ -1488,6 +1562,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onCopyActiveFilePath: fileActions.copyFilePath,
     onCopyActiveDeepLink: deepLinks.copyPathDeepLink,
     onOpenActiveFileExternal: fileActions.openExternalFile,
+    onConvertActivePdfToMarkdown: handleConvertActivePdfToMarkdown,
     onToggleFavorite: entryActions.handleToggleFavorite,
     onToggleOrganized: toggleOrganizedCommand,
     onCustomizeNoteListColumns: handleCustomizeNoteListColumns,
@@ -1601,12 +1676,23 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 {effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
                   <PulseView vaultPath={gitSurfaces.historyRepositoryPath} onOpenNote={handlePulseOpenNote} refreshKey={gitHistoryRefreshKey} sidebarCollapsed={!sidebarVisible} onExpandSidebar={() => handleSetViewMode('all')} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.historyRepositoryPath} onRepositoryChange={gitSurfaces.setHistoryRepositoryPath} locale={appLocale} />
                 ) : (
-                  <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!sidebarVisible} onSelectNote={notes.handleSelectNote} onReplaceActiveTab={handleReplaceActiveTabWithQueuedDiff} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onExportPdf={handleExportNotePdfFromList} onToggleFavorite={entryActions.handleToggleFavorite} onToggleOrganized={explicitOrganizationEnabled ? entryActions.handleToggleOrganized : undefined} onRevealFile={fileActions.revealFile} onCopyFilePath={fileActions.copyFilePath} canCopyGitUrl={noteGitUrls.canCopyEntryGitUrl} onCopyGitUrl={noteGitUrls.copyEntryGitUrl} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
-                )}
-              </div>
-              <ResizeHandle onResize={layout.handleNoteListResize} />
-            </>
+                  <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!sidebarVisible} onSelectNote={notes.handleSelectNote} onReplaceActiveTab={handleReplaceActiveTabWithQueuedDiff} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onExportPdf={handleExportNotePdfFromList} onConvertPdfToMarkdown={handleConvertPdfToMarkdownFromList} onToggleFavorite={entryActions.handleToggleFavorite} onToggleOrganized={explicitOrganizationEnabled ? entryActions.handleToggleOrganized : undefined} onRevealFile={fileActions.revealFile} onCopyFilePath={fileActions.copyFilePath} canCopyGitUrl={noteGitUrls.canCopyEntryGitUrl} onCopyGitUrl={noteGitUrls.copyEntryGitUrl} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef}
+              onFileModified={vaultBridge.handleAgentFileModified}
+              onVaultChanged={vaultBridge.handleAgentVaultChanged}
+              workspaces={inspectorWorkspaces}
+              isConflicted={conflictFlow.isConflicted}
+              onKeepMine={conflictFlow.handleKeepMine}
+              onKeepTheirs={conflictFlow.handleKeepTheirs}
+              flushPendingEditorContentRef={flushPendingEditorContentRef}
+              flushPendingRawContentRef={flushPendingRawContentRef}
+              onToast={setToastMessage}
+              locale={appLocale}
+            />
           )}
+        </div>
+        <ResizeHandle onResize={layout.handleNoteListResize} />
+        </>
+      )}
           <div className={`app__editor${aiActivity.highlightElement === 'editor' || aiActivity.highlightElement === 'tab' ? ' ai-highlight' : ''}`}>
             <Editor
               tabs={notes.tabs}
@@ -1654,6 +1740,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onCopyDeepLink={activeDeletedFile ? undefined : deepLinks.copyEntryDeepLink}
               onCopyGitUrl={activeDeletedFile || !activeTabEntry || !noteGitUrls.canCopyEntryGitUrl(activeTabEntry) ? undefined : noteGitUrls.copyEntryGitUrl}
               onOpenExternalFile={fileActions.openExternalFile}
+              onConvertPdfToMarkdown={handleConvertPdfToMarkdownFromPreview}
               onDeleteNote={activeDeletedFile ? undefined : deleteActions.handleDeleteNote}
               onArchiveNote={activeDeletedFile ? undefined : entryActions.handleArchiveNote}
               onUnarchiveNote={activeDeletedFile ? undefined : entryActions.handleUnarchiveNote}
@@ -1713,6 +1800,14 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           aiModeEnabled={aiFeaturesEnabled}
           locale={appLocale}
           onClose={dialogs.closeCommandPalette}
+        />
+        <PdfMarkdownImportDialog
+          open={!!pdfMarkdownImportTarget}
+          fileTitle={pdfMarkdownImportTarget?.entry.title}
+          locale={appLocale}
+          working={pdfMarkdownImportWorking}
+          onClose={closePdfMarkdownImportDialog}
+          onSubmit={handlePdfMarkdownImportSubmit}
         />
         <SearchPanel open={dialogs.showSearch} vaultPath={resolvedPath} entries={visibleEntries} onSelectNote={notes.handleSelectNote} onClose={dialogs.closeSearch} />
         <CreateTypeDialog open={dialogs.showCreateTypeDialog} onClose={dialogs.closeCreateType} onCreate={handleCreateType} />

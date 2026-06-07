@@ -805,5 +805,19 @@
   "locale.plPL": "Польская",
   "locale.beBY": "Беларуская",
   "locale.beLatn": "Беларуская (Лацінка)",
-  "locale.idID": "Інданезійская"
+  "locale.idID": "Інданезійская",
+  "filePreview.convertPdfToMarkdown": "Пераўтварыць у нататку",
+  "pdfImport.dialog.title": "Пераўтварыць PDF у нататку Markdown",
+  "pdfImport.dialog.description": "Стварыць нататку Markdown з {file}.",
+  "pdfImport.dialog.untitledFile": "гэтага PDF",
+  "pdfImport.dialog.submit": "Пераўтварыць",
+  "pdfImport.dialog.working": "Пераўтвараецца...",
+  "pdfImport.mode.label": "Рэжым пераўтварэння",
+  "pdfImport.mode.textOnly": "Толькі здабыванне тэксту",
+  "pdfImport.mode.ocrWhenNeeded": "OCR пры неабходнасці",
+  "pdfImport.mode.ocrAllPages": "OCR усіх старонак",
+  "pdfImport.language.label": "Мова OCR",
+  "pdfImport.language.placeholder": "bel",
+  "pdfImport.toast.success": "Створана нататка Markdown: {title}",
+  "pdfImport.toast.failed": "Не ўдалося пераўтварыць PDF: {error}"
 }

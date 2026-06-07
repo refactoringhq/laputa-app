@@ -805,5 +805,19 @@
   "locale.plPL": "ポーランド語",
   "locale.beBY": "ベラルーシ語",
   "locale.beLatn": "ベラルーシ語（ラテン文字）",
-  "locale.idID": "インドネシア語"
+  "locale.idID": "インドネシア語",
+  "filePreview.convertPdfToMarkdown": "ノートに変換",
+  "pdfImport.dialog.title": "PDFをMarkdownノートに変換",
+  "pdfImport.dialog.description": "{file}からMarkdownノートを作成します。",
+  "pdfImport.dialog.untitledFile": "このPDF",
+  "pdfImport.dialog.submit": "変換",
+  "pdfImport.dialog.working": "変換中...",
+  "pdfImport.mode.label": "変換モード",
+  "pdfImport.mode.textOnly": "テキスト抽出のみ",
+  "pdfImport.mode.ocrWhenNeeded": "必要な場合のみOCR",
+  "pdfImport.mode.ocrAllPages": "全ページをOCR",
+  "pdfImport.language.label": "OCR言語",
+  "pdfImport.language.placeholder": "eng",
+  "pdfImport.toast.success": "Markdownノートを作成しました: {title}",
+  "pdfImport.toast.failed": "PDFを変換できませんでした: {error}"
 }

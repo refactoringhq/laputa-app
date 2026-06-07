@@ -808,3 +808,17 @@ files:
     locale.beBY: 0a6de4460095f398e8a45ed512a7538f
     locale.beLatn: 9c454dccccd6aaac0121a45b923dc5ad
     locale.idID: cc1c9b57607b4439578b68074a5e2d80
+    filePreview.convertPdfToMarkdown: 6d1261de5fb76a2b8a481a66d9498de9
+    pdfImport.dialog.title: 913ba3e227de409467e50904e30781e5
+    pdfImport.dialog.description: d223120847a03ad646b4b7aea7d85736
+    pdfImport.dialog.untitledFile: f18cf91b8cf2ae02f02fd182371cc846
+    pdfImport.dialog.submit: 920f4a0c5c8b9a0747380cf7c7f0b3c5
+    pdfImport.dialog.working: 883fdff0392ca87be05e6cf2d1b4e2df
+    pdfImport.mode.label: 6eeb6a44c90cc04de1138592b471017d
+    pdfImport.mode.textOnly: 4f58306fccc296d494452ded656f8745
+    pdfImport.mode.ocrWhenNeeded: f004a6b7b16f2114503646b4be0b0457
+    pdfImport.mode.ocrAllPages: 2792d53e388b315ce3a3598a8bdc37a1
+    pdfImport.language.label: 76241c1801440fc1b15875af2d46aa4b
+    pdfImport.language.placeholder: 74e6a8b111ea7da1a7d0a596f4c35208
+    pdfImport.toast.success: f05ef0a336464a01d5073a3a41d97cb2
+    pdfImport.toast.failed: 54f64102206bd249a3eafde263c6e58c

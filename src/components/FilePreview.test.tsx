@@ -130,6 +130,19 @@ describe('FilePreview', () => {
     expect(screen.getByText('PDF file')).toBeInTheDocument()
   })
 
+  it('offers PDF to Markdown conversion only for PDF previews', () => {
+    const onConvertPdfToMarkdown = vi.fn()
+    const { rerender } = render(
+      <FilePreview entry={pdfEntry} onConvertPdfToMarkdown={onConvertPdfToMarkdown} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Convert to note' }))
+    expect(onConvertPdfToMarkdown).toHaveBeenCalledWith(pdfEntry)
+
+    rerender(<FilePreview entry={imageEntry} onConvertPdfToMarkdown={onConvertPdfToMarkdown} />)
+    expect(screen.queryByRole('button', { name: 'Convert to note' })).not.toBeInTheDocument()
+  })
+
   it('renders supported PDFs when binary metadata is unavailable', () => {
     render(<FilePreview entry={{ ...pdfEntry, fileKind: undefined }} />)
 
