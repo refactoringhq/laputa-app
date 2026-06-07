@@ -53,27 +53,33 @@
           };
 
           # The bare desktop app (crane build). Linux only — WebKitGTK 4.1 stack.
-          tolariaApp = if isLinux
-            then import ./nix/tauri-package.nix {
-              inherit pkgs lib;
-              craneLib = rust.craneLib;
-              nodeModules = tolariaNodeModules;
-            }
+          tolariaApp =
+            if isLinux
+            then
+              import ./nix/tauri-package.nix
+                {
+                  inherit pkgs lib;
+                  craneLib = rust.craneLib;
+                  nodeModules = tolariaNodeModules;
+                }
             else null;
 
           # `tolaria` and `default` ship the desktop app + the MCP server in one
           # installable so launchers, MCP clients (Claude Desktop, Codex, ...)
           # all see the same versioned pair. `tolaria-mcp` stays exposed for
           # users who want only the server (e.g. on a remote node host).
-          tolariaBundle = if isLinux
-            then pkgs.symlinkJoin {
-              name = "tolaria-${tolariaApp.version}";
-              paths = [ tolariaApp tolariaMcp ];
-              meta = tolariaApp.meta // {
-                description = tolariaApp.meta.description
-                  + " (bundled with tolaria-mcp server)";
-              };
-            }
+          tolariaBundle =
+            if isLinux
+            then
+              pkgs.symlinkJoin
+                {
+                  name = "tolaria-${tolariaApp.version}";
+                  paths = [ tolariaApp tolariaMcp ];
+                  meta = tolariaApp.meta // {
+                    description = tolariaApp.meta.description
+                      + " (bundled with tolaria-mcp server)";
+                  };
+                }
             else null;
         in
         {

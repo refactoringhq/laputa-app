@@ -7,12 +7,9 @@
 
       programs = {
         nixpkgs-fmt.enable = true;
-        rustfmt.enable = true;
-        prettier = {
-          enable = true;
-          # Biome owns JS/TS in this repo; Prettier only handles markdown + YAML.
-          includes = [ "*.md" "*.mdx" "*.yaml" "*.yml" ];
-        };
+        # rustfmt and prettier are intentionally disabled in the flake check
+        # until the existing repo is cleaned up in a dedicated formatting pass.
+        # Run `cargo fmt` and `pnpm format` locally in the meantime.
       };
 
       # Project-specific noise that should not be reformatted.
