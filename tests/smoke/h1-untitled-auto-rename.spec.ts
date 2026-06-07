@@ -26,6 +26,28 @@ interface EmptyTitleHeadingState {
   placeholder: string | null
 }
 
+const REACT_UPDATE_LOOP_FRAGMENTS = [
+  'Maximum update depth',
+  'React error #185',
+  '#185',
+]
+
+function collectReactUpdateLoopErrors(page: Page): string[] {
+  const errors: string[] = []
+  const collect = (message: string) => {
+    if (REACT_UPDATE_LOOP_FRAGMENTS.some((fragment) => message.includes(fragment))) {
+      errors.push(message)
+    }
+  }
+
+  page.on('pageerror', (error) => collect(error.message))
+  page.on('console', (message) => {
+    if (message.type() === 'error') collect(message.text())
+  })
+
+  return errors
+}
+
 async function createUntitledNote(page: Page): Promise<void> {
   await page.locator('body').click()
   await triggerMenuCommand(page, 'file-new-note')
@@ -172,6 +194,30 @@ async function expectTitleHeadingText(page: Page, title: string): Promise<void> 
   })
 }
 
+async function dispatchRichHeadingPaste(page: Page, text: string): Promise<void> {
+  await page.evaluate((textFragment) => {
+    const target = document.querySelector<HTMLElement>(
+      [
+        '.bn-editor [data-content-type="heading"][data-level="1"] .bn-inline-content',
+        '.bn-editor [data-content-type="heading"]:not([data-level]) .bn-inline-content',
+        '.bn-editor h1',
+      ].join(', '),
+    )
+    if (!target) throw new Error('Title heading paste target was not found')
+
+    const clipboardData = new DataTransfer()
+    clipboardData.setData('text/html', '<h1>Rich <em>Paste</em> Payload</h1><table><tr><td>structured</td></tr></table>')
+    clipboardData.setData('text/plain', textFragment)
+
+    const event = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'clipboardData', { value: clipboardData })
+
+    if (target.dispatchEvent(event)) {
+      throw new Error('Rich title-heading paste was not intercepted')
+    }
+  }, text)
+}
+
 async function clickEditorChromeBelowLastBlock(page: Page): Promise<void> {
   const point = await page.evaluate(() => {
     const container = document.querySelector('.editor__blocknote-container')?.getBoundingClientRect()
@@ -253,9 +299,12 @@ test('@smoke new-note H1 auto-rename keeps the editor usable and leaves no untit
   expect(errors).toEqual([])
 })
 
-test('@smoke new-note short title typing stays in the H1 until Enter', async ({ page }) => {
+test('@smoke new-note short title typing and rich heading paste stay in the H1 until Enter', async ({ page }) => {
+  const errors = collectReactUpdateLoopErrors(page)
   const titleStart = 'Obsi'
   const title = 'Obsidian'
+  const richPasteSuffix = ' Rich Paste Payload'
+  const pastedTitle = `${title}${richPasteSuffix}`
   const bodyText = 'Body starts only after intentional Enter.'
 
   await createUntitledNote(page)
@@ -270,20 +319,25 @@ test('@smoke new-note short title typing stays in the H1 until Enter', async ({ 
 
   await page.keyboard.type('dian', { delay: 80 })
   await expectTitleHeadingText(page, title)
+  await page.keyboard.press('End')
+  await dispatchRichHeadingPaste(page, richPasteSuffix)
+  await expectTitleHeadingText(page, pastedTitle)
+  await expect.poll(() => activeSelectionBlockType(page), { timeout: 5_000 }).toBe('heading')
   await page.keyboard.press('Enter')
   await page.keyboard.type(bodyText, { delay: 35 })
 
-  await expectActiveFilename(page, slugifyTitle(title))
+  await expectActiveFilename(page, slugifyTitle(pastedTitle))
   await expectFileContentContains({
     vaultPath: tempVaultDir,
-    filename: `${slugifyTitle(title)}.md`,
-    text: `# ${title}`,
+    filename: `${slugifyTitle(pastedTitle)}.md`,
+    text: `# ${pastedTitle}`,
   })
   await expectFileContentContains({
     vaultPath: tempVaultDir,
-    filename: `${slugifyTitle(title)}.md`,
+    filename: `${slugifyTitle(pastedTitle)}.md`,
     text: bodyText,
   })
+  expect(errors).toEqual([])
 })
 
 test('@smoke new-note typing stays focused through initial save settlement', async ({ page }) => {
