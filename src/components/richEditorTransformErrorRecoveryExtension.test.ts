@@ -20,6 +20,10 @@ function nullFragmentAppendError(message = "null is not an object (evaluating 'o
   return new TypeError(message)
 }
 
+function indexSizeError() {
+  return new DOMException('The index is not in the allowed range.', 'IndexSizeError')
+}
+
 function createView(error?: Error) {
   const currentDoc = {
     eq: vi.fn((candidate: unknown) => candidate === currentDoc),
@@ -109,6 +113,7 @@ describe('isRecoverableEditorTransformError', () => {
     stackOnlyAppendError.stack =
       "TypeError: Cannot read properties of null (reading 'append')\n    at o.fillBefore(e).append (App-CrXlNLOq.js:1:1)"
     expect(isRecoverableEditorTransformError(stackOnlyAppendError)).toBe(true)
+    expect(isRecoverableEditorTransformError(indexSizeError())).toBe(true)
     expect(isRecoverableEditorTransformError(new TypeError(
       "Cannot read properties of null (reading 'append')",
     ))).toBe(false)
@@ -254,6 +259,17 @@ describe('installRichEditorTransformErrorRecovery', () => {
     expect(recoverDocument).not.toHaveBeenCalled()
     expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
       reason: 'stale_block_reference',
+    })
+  })
+
+  it('recovers DOM index-size selection failures from editor dispatch', () => {
+    const { currentDoc, view } = createView(indexSizeError())
+
+    installRichEditorTransformErrorRecovery(view)
+
+    expect(() => view.dispatch({ before: currentDoc })).not.toThrow()
+    expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+      reason: 'dom_index_size',
     })
   })
 

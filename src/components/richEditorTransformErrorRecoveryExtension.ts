@@ -45,6 +45,7 @@ interface RepairableBlockNoteEditor {
 }
 
 type RecoveryReason =
+  | 'dom_index_size'
   | 'invalid_block_join'
   | 'invalid_insertion_depth'
   | 'mismatched_transaction'
@@ -117,6 +118,10 @@ export function isStaleBlockReferenceError(error: unknown): boolean {
   return error instanceof Error && /^Block with ID .+ not found$/.test(error.message)
 }
 
+function isDomIndexSizeError(error: unknown): boolean {
+  return isRecord(error) && error.name === 'IndexSizeError'
+}
+
 function isTransformError(error: unknown): error is Error {
   return error instanceof Error && error.name === 'TransformError'
 }
@@ -134,9 +139,11 @@ const RECOVERABLE_EDITOR_ERROR_PREDICATES = [
   isRecoverableRangeError,
   isNullFragmentAppendError,
   isStaleBlockReferenceError,
+  isDomIndexSizeError,
 ]
 
 const RECOVERY_REASON_MATCHERS: RecoveryReasonMatcher[] = [
+  { matches: isDomIndexSizeError, reason: 'dom_index_size' },
   { matches: isMismatchedTransactionError, reason: 'mismatched_transaction' },
   { matches: isStaleBlockReferenceError, reason: 'stale_block_reference' },
   { matches: isInvalidBlockJoinError, reason: 'invalid_block_join' },
