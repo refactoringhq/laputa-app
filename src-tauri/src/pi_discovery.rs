@@ -88,12 +88,19 @@ fn path_from_successful_output(output: &std::process::Output) -> Option<PathBuf>
 }
 
 fn first_existing_path(stdout: &str) -> Option<PathBuf> {
+    first_existing_path_for_platform(stdout, cfg!(windows))
+}
+
+fn first_existing_path_for_platform(stdout: &str, windows: bool) -> Option<PathBuf> {
     stdout.lines().find_map(|line| {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             return None;
         }
         let candidate = PathBuf::from(trimmed);
+        if windows && !crate::cli_agent_runtime::has_windows_cli_extension(&candidate) {
+            return None;
+        }
         candidate.exists().then_some(candidate)
     })
 }
@@ -356,6 +363,18 @@ mod tests {
         let stdout = format!("\n{}\n{}\n", missing.display(), pi.display());
 
         assert_eq!(first_existing_path(&stdout), Some(pi));
+    }
+
+    #[test]
+    fn first_existing_windows_path_skips_extensionless_npm_wrapper() {
+        let dir = tempfile::tempdir().unwrap();
+        let wrapper = dir.path().join("pi");
+        let shim = dir.path().join("pi.cmd");
+        std::fs::write(&wrapper, "#!/bin/sh\n").unwrap();
+        std::fs::write(&shim, "@ECHO off\n").unwrap();
+        let stdout = format!("{}\n{}\n", wrapper.display(), shim.display());
+
+        assert_eq!(first_existing_path_for_platform(&stdout, true), Some(shim));
     }
 
     #[cfg(unix)]

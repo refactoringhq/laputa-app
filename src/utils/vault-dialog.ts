@@ -7,8 +7,11 @@
 import { isTauri } from '../mock-tauri'
 import {
   isRestartRequiredAfterUpdate,
+  markRestartRequiredAfterUpdate,
   RESTART_REQUIRED_FOLDER_PICKER_MESSAGE,
 } from '../lib/appUpdater'
+
+const NS_OPEN_PANEL_UNAVAILABLE_MARKER = 'unexpected NULL returned from +[NSOpenPanel openPanel]'
 
 export class NativeFolderPickerBlockedError extends Error {
   constructor(message = RESTART_REQUIRED_FOLDER_PICKER_MESSAGE) {
@@ -23,6 +26,16 @@ export function isNativeFolderPickerBlockedError(
   return error instanceof NativeFolderPickerBlockedError
 }
 
+function errorMessage(error: unknown): string {
+  if (typeof error === 'string') return error
+  if (error instanceof Error) return error.message
+  return ''
+}
+
+function isUnavailableNativeFolderPicker(error: unknown): boolean {
+  return errorMessage(error).includes(NS_OPEN_PANEL_UNAVAILABLE_MARKER)
+}
+
 export function formatFolderPickerActionError(
   action: string,
   error: unknown,
@@ -31,12 +44,7 @@ export function formatFolderPickerActionError(
     return error.message
   }
 
-  const message =
-    typeof error === 'string'
-      ? error
-      : error instanceof Error
-        ? error.message
-        : ''
+  const message = errorMessage(error)
 
   return message ? `${action}: ${message}` : action
 }
@@ -77,6 +85,28 @@ function normalizePickedFolderPath(selected: string | string[] | null): string |
 
 let folderPickerRequestInFlight = false
 
+async function pickNativeFolder(title?: string): Promise<string | null> {
+  if (isRestartRequiredAfterUpdate()) {
+    throw new NativeFolderPickerBlockedError()
+  }
+
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: title ?? 'Select folder',
+    })
+    return normalizePickedFolderPath(selected)
+  } catch (error) {
+    if (isUnavailableNativeFolderPicker(error)) {
+      markRestartRequiredAfterUpdate()
+      throw new NativeFolderPickerBlockedError()
+    }
+    throw error
+  }
+}
+
 /**
  * Opens a native folder picker dialog (Tauri) or falls back to prompt (browser).
  * Returns the selected folder path, or null if the user cancelled.
@@ -87,17 +117,7 @@ export async function pickFolder(title?: string): Promise<string | null> {
   folderPickerRequestInFlight = true
   try {
     if (isTauri()) {
-      if (isRestartRequiredAfterUpdate()) {
-        throw new NativeFolderPickerBlockedError()
-      }
-
-      const { open } = await import('@tauri-apps/plugin-dialog')
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: title ?? 'Select folder',
-      })
-      return normalizePickedFolderPath(selected)
+      return await pickNativeFolder(title)
     }
     return normalizePickedFolderPath(prompt(title ?? 'Enter folder path:'))
   } finally {

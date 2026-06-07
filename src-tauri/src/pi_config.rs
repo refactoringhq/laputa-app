@@ -18,8 +18,12 @@ pub(crate) fn build_command(
         request.permission_mode,
     )?;
 
-    let mut command = crate::hidden_command(binary);
+    let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(binary)?;
+    let mut command = crate::hidden_command(&target.program);
     crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
+    if let Some(first_arg) = target.first_arg {
+        command.arg(first_arg);
+    }
     command
         .args(build_args())
         .arg(build_prompt(request))
@@ -300,10 +304,15 @@ mod tests {
     }
 
     fn assert_pi_json_mode_args(args: &[String]) {
-        assert_eq!(args[0], "--mode");
-        assert_eq!(args[1], "json");
-        assert!(args.contains(&"--no-session".to_string()));
-        assert!(args.contains(&"--extension".to_string()));
+        assert_eq!(
+            (
+                args.first().map(String::as_str),
+                args.get(1).map(String::as_str),
+                args.iter().any(|arg| arg == "--no-session"),
+                args.iter().any(|arg| arg == "--extension"),
+            ),
+            (Some("--mode"), Some("json"), true, true)
+        );
     }
 
     #[test]
@@ -324,10 +333,20 @@ mod tests {
     }
 
     fn assert_command_identity(command: &std::process::Command, actual_args: &[&OsStr]) {
-        assert_eq!(command.get_program(), OsStr::new("pi"));
-        assert_eq!(actual_args[0], OsStr::new("--mode"));
-        assert_eq!(actual_args[1], OsStr::new("json"));
-        assert_eq!(actual_args.last(), Some(&OsStr::new("Rename the note")));
+        assert_eq!(
+            (
+                command.get_program(),
+                actual_args.first().copied(),
+                actual_args.get(1).copied(),
+                actual_args.last().copied(),
+            ),
+            (
+                OsStr::new("pi"),
+                Some(OsStr::new("--mode")),
+                Some(OsStr::new("json")),
+                Some(OsStr::new("Rename the note")),
+            )
+        );
     }
 
     fn assert_command_vault_scope(
@@ -338,6 +357,50 @@ mod tests {
         assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/vault")));
         assert_eq!(config_dir, Some(agent_dir.as_os_str()));
         assert!(agent_dir.join("mcp.json").exists());
+    }
+
+    #[test]
+    fn command_avoids_windows_cmd_shim_for_prompt_args() {
+        let _env_lock = PI_AGENT_ENV_LOCK.lock().unwrap();
+        let source_agent_dir = tempfile::tempdir().unwrap();
+        let agent_dir = tempfile::tempdir().unwrap();
+        let _guard = EnvGuard::set("PI_CODING_AGENT_DIR", source_agent_dir.path());
+        let shim = agent_dir.path().join("pi.cmd");
+        let launcher = agent_dir
+            .path()
+            .join("node_modules")
+            .join("@withpi")
+            .join("pi")
+            .join("bin")
+            .join("pi.exe");
+        std::fs::create_dir_all(launcher.parent().unwrap()).unwrap();
+        std::fs::write(&launcher, "native pi launcher").unwrap();
+        std::fs::write(
+            &shim,
+            r#"@ECHO off
+"%~dp0\node_modules\@withpi\pi\bin\pi.exe" %*
+"#,
+        )
+        .unwrap();
+
+        let command = build_command(&shim, &request(), agent_dir.path()).unwrap();
+        let actual_args = command.get_args().collect::<Vec<_>>();
+
+        assert_eq!(
+            (
+                command.get_program() != shim.as_os_str(),
+                command.get_program(),
+                actual_args.first().copied(),
+                actual_args.last().copied(),
+            ),
+            (
+                true,
+                launcher.as_os_str(),
+                Some(OsStr::new("--mode")),
+                Some(OsStr::new("Rename the note")),
+            ),
+            "Pi npm .cmd shims cannot be spawned directly on Windows"
+        );
     }
 
     #[test]
@@ -429,10 +492,20 @@ mod tests {
     }
 
     fn assert_base_mcp_config(json: &serde_json::Value) {
-        assert_eq!(json["settings"]["toolPrefix"], "none");
-        assert_eq!(json["mcpServers"]["tolaria"]["command"], "node");
-        assert_eq!(json["mcpServers"]["tolaria"]["lifecycle"], "lazy");
-        assert_eq!(json["mcpServers"]["tolaria"]["directTools"], true);
+        assert_eq!(
+            (
+                &json["settings"]["toolPrefix"],
+                &json["mcpServers"]["tolaria"]["command"],
+                &json["mcpServers"]["tolaria"]["lifecycle"],
+                &json["mcpServers"]["tolaria"]["directTools"],
+            ),
+            (
+                &serde_json::json!("none"),
+                &serde_json::json!("node"),
+                &serde_json::json!("lazy"),
+                &serde_json::json!(true),
+            )
+        );
     }
 
     fn assert_tolaria_mcp_env(json: &serde_json::Value) {

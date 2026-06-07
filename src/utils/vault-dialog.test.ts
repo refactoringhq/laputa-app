@@ -9,6 +9,7 @@ vi.mock('../lib/appUpdater', () => ({
   RESTART_REQUIRED_FOLDER_PICKER_MESSAGE:
     'Tolaria needs a restart before macOS can open another folder picker. Restart to apply the downloaded update and try again.',
   isRestartRequiredAfterUpdate: vi.fn(() => false),
+  markRestartRequiredAfterUpdate: vi.fn(),
 }))
 
 const openMock = vi.fn()
@@ -21,12 +22,16 @@ import { pickFolder } from './vault-dialog'
 import { isTauri } from '../mock-tauri'
 import {
   isRestartRequiredAfterUpdate,
+  markRestartRequiredAfterUpdate,
   RESTART_REQUIRED_FOLDER_PICKER_MESSAGE,
 } from '../lib/appUpdater'
 
 describe('pickFolder', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.clearAllMocks()
+    openMock.mockReset()
+    vi.mocked(isRestartRequiredAfterUpdate).mockReturnValue(false)
   })
 
   it('returns user input from prompt in browser mode', async () => {
@@ -70,6 +75,15 @@ describe('pickFolder', () => {
     await expect(pickFolder('Select vault')).rejects.toThrow(RESTART_REQUIRED_FOLDER_PICKER_MESSAGE)
   })
 
+  it('translates an NSOpenPanel panic into the restart-required folder picker error', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(isRestartRequiredAfterUpdate).mockReturnValue(false)
+    openMock.mockRejectedValue('panic: unexpected NULL returned from +[NSOpenPanel openPanel]')
+
+    await expect(pickFolder('Select vault')).rejects.toThrow(RESTART_REQUIRED_FOLDER_PICKER_MESSAGE)
+    expect(markRestartRequiredAfterUpdate).toHaveBeenCalledOnce()
+  })
+
   it('normalizes a native single-selection array to its first folder path', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
     vi.mocked(isRestartRequiredAfterUpdate).mockReturnValue(false)
@@ -98,6 +112,7 @@ describe('pickFolder', () => {
     const secondRequest = pickFolder('Open vault folder')
 
     await expect(secondRequest).resolves.toBeNull()
+    await new Promise(resolve => setTimeout(resolve, 0))
     expect(openMock).toHaveBeenCalledTimes(1)
 
     resolveOpen?.('/Users/test/restored-vault')
