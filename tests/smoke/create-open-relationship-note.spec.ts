@@ -1,39 +1,60 @@
 import { test, expect } from '@playwright/test'
-import { sendShortcut } from './helpers'
+import {
+  createFixtureVaultCopy,
+  openFixtureVault,
+  removeFixtureVaultCopy,
+} from '../helpers/fixtureVault'
 
-async function openNoteViaQuickOpen(page: import('@playwright/test').Page, query: string) {
-  await page.locator('body').click()
-  await sendShortcut(page, 'p', ['Control'])
-  const searchInput = page.locator('input[placeholder="Search notes..."]')
-  await expect(searchInput).toBeVisible()
-  await searchInput.fill(query)
-  await page.waitForTimeout(500)
-  await page.keyboard.press('Enter')
-  await page.waitForTimeout(1000)
+let tempVaultDir: string
+
+async function openNote(page: import('@playwright/test').Page, title: string) {
+  await page.getByTestId('note-list-container').getByText(title, { exact: true }).click()
+  await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible({ timeout: 5_000 })
+}
+
+async function openPropertiesPanel(page: import('@playwright/test').Page) {
+  const openPanelButton = page.getByRole('button', { name: 'Open the properties panel' })
+  if (await openPanelButton.count()) {
+    await openPanelButton.click()
+  }
+}
+
+async function openFirstRelationshipInput(page: import('@playwright/test').Page) {
+  const belongsToLabel = page.getByTestId('relationship-section-label').filter({ hasText: 'Belongs to' }).first()
+  await expect(belongsToLabel).toBeVisible({ timeout: 5_000 })
+
+  const addButton = page.getByTestId('add-relation-ref')
+  await expect(addButton.first()).toBeVisible()
+  await addButton.first().click()
+
+  const input = page.getByTestId('add-relation-ref-input')
+  await expect(input).toBeVisible()
+  return input
+}
+
+function slugFromTitle(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
 
 test.describe('Create & open note from relationship input', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 })
-    await page.goto('/')
-    await page.waitForLoadState('networkidle')
+    tempVaultDir = createFixtureVaultCopy()
+    await openFixtureVault(page, tempVaultDir, { expectedReadyTitle: 'Team Meeting' })
+  })
+
+  test.afterEach(() => {
+    removeFixtureVaultCopy(tempVaultDir)
   })
 
   test('creates note from relationship input without crash', async ({ page }) => {
     const pageErrors: string[] = []
     page.on('pageerror', (err) => pageErrors.push(err.message))
 
-    await openNoteViaQuickOpen(page, 'Start Laputa App')
+    await openNote(page, 'Team Meeting')
+    await openPropertiesPanel(page)
 
-    const belongsToLabel = page.locator('span.font-mono-overline').filter({ hasText: 'Belongs to' })
-    await expect(belongsToLabel).toBeVisible({ timeout: 5000 })
-
-    const addButton = page.getByTestId('add-relation-ref')
-    await expect(addButton.first()).toBeVisible()
-    await addButton.first().click()
-
-    const input = page.getByTestId('add-relation-ref-input')
-    await expect(input).toBeVisible()
+    const input = await openFirstRelationshipInput(page)
     const uniqueTitle = `Test Note ${Date.now()}`
     await input.fill(uniqueTitle)
     await page.waitForTimeout(300)
@@ -53,15 +74,10 @@ test.describe('Create & open note from relationship input', () => {
   })
 
   test('only the new note tab is active after creation', async ({ page }) => {
-    await openNoteViaQuickOpen(page, 'Start Laputa App')
+    await openNote(page, 'Team Meeting')
+    await openPropertiesPanel(page)
 
-    const belongsToLabel = page.locator('span.font-mono-overline').filter({ hasText: 'Belongs to' })
-    await expect(belongsToLabel).toBeVisible({ timeout: 5000 })
-
-    const addButton = page.getByTestId('add-relation-ref')
-    await addButton.first().click()
-
-    const input = page.getByTestId('add-relation-ref-input')
+    const input = await openFirstRelationshipInput(page)
     const uniqueTitle = `Tab Test ${Date.now()}`
     await input.fill(uniqueTitle)
     await page.waitForTimeout(300)
@@ -69,22 +85,20 @@ test.describe('Create & open note from relationship input', () => {
     await page.getByTestId('create-and-open-option').click()
     await page.waitForTimeout(2000)
 
-    // The new note title should be visible in the editor heading
+    // The newly created note should be the active single-note editor.
     await expect(page.locator('.app__editor')).toBeVisible()
+    await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(slugFromTitle(uniqueTitle), {
+      timeout: 5_000,
+    })
   })
 
   // TODO: fix relationship wikilink persistence in single-note model — the wikilink
   // write to the original note may race with navigation to the new note.
   test.skip('relationship wikilink is added to original note after creation', async ({ page }) => {
-    await openNoteViaQuickOpen(page, 'Start Laputa App')
+    await openNote(page, 'Team Meeting')
+    await openPropertiesPanel(page)
 
-    const belongsToLabel = page.locator('span.font-mono-overline').filter({ hasText: 'Belongs to' })
-    await expect(belongsToLabel).toBeVisible({ timeout: 5000 })
-
-    const addButton = page.getByTestId('add-relation-ref')
-    await addButton.first().click()
-
-    const input = page.getByTestId('add-relation-ref-input')
+    const input = await openFirstRelationshipInput(page)
     const uniqueTitle = `Link Test ${Date.now()}`
     await input.fill(uniqueTitle)
     await page.waitForTimeout(300)
@@ -93,7 +107,7 @@ test.describe('Create & open note from relationship input', () => {
     await page.waitForTimeout(3000)
 
     // Navigate back to the original note (single-note model: replaces the newly created note)
-    await openNoteViaQuickOpen(page, 'Start Laputa App')
+    await openNote(page, 'Team Meeting')
     await page.waitForTimeout(2000)
 
     // The new wikilink should appear in the relationships
