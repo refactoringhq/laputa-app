@@ -8,6 +8,7 @@ async function loadHandlers() {
 describe('mockHandlers coverage', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    localStorage.clear()
   })
 
   it('renames a note, updates its frontmatter title, and rewrites backlinks', async () => {
@@ -200,6 +201,23 @@ describe('mockHandlers coverage', () => {
       vaults: [{ label: 'Work', path: '/work' }],
       active_vault: '/work',
     })
+  })
+
+  it('persists browser mock settings across module reloads', async () => {
+    let { mockHandlers } = await loadHandlers()
+
+    mockHandlers.save_settings({
+      settings: {
+        ...mockHandlers.get_settings(),
+        ui_language: 'it-IT',
+      },
+    })
+
+    ;({ mockHandlers } = await loadHandlers())
+
+    expect(mockHandlers.get_settings()).toEqual(expect.objectContaining({
+      ui_language: 'it-IT',
+    }))
   })
 
   it('builds attachment paths for saved and copied images', async () => {

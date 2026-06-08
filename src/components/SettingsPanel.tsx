@@ -90,7 +90,7 @@ interface SettingsPanelProps {
   initialSectionId?: string | null
   locale?: AppLocale
   systemLocale?: AppLocale
-  onSave: (settings: Settings) => void
+  onSave: (settings: Settings) => void | Promise<void>
   onCopyMcpConfig?: () => void
   vaults?: VaultOption[]
   defaultWorkspacePath?: string | null
@@ -354,6 +354,7 @@ function SettingsPanelInner({
   onClose,
 }: SettingsPanelInnerProps) {
   const [draft, setDraft] = useState(() => createSettingsDraft(settings, explicitOrganizationEnabled))
+  const [saving, setSaving] = useState(false)
   const backdropRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const draftLocale = resolveEffectiveLocale(draft.uiLanguage, [systemLocale])
@@ -398,13 +399,23 @@ function SettingsPanelInner({
     onSave({ ...settings, theme_mode: value })
   }, [onSave, settings, updateDraft])
 
-  const handleSave = useCallback(() => {
-    trackTelemetryConsentChange(settings.analytics_enabled === true, draft.analytics)
-    trackSettingsPreferenceChanges(settings, draft)
-    onSave(buildSettingsFromDraft(settings, draft))
-    onSaveExplicitOrganization?.(draft.explicitOrganization)
-    onClose()
-  }, [draft, onClose, onSave, onSaveExplicitOrganization, settings])
+  const handleSave = useCallback(async () => {
+    if (saving) return
+
+    setSaving(true)
+    try {
+      trackTelemetryConsentChange(settings.analytics_enabled === true, draft.analytics)
+      trackSettingsPreferenceChanges(settings, draft)
+      const saveResult = onSave(buildSettingsFromDraft(settings, draft))
+      if (saveResult && typeof saveResult.then === 'function') await saveResult
+      onSaveExplicitOrganization?.(draft.explicitOrganization)
+      setSaving(false)
+      onClose()
+    } catch (err) {
+      setSaving(false)
+      console.error('Failed to save settings:', err)
+    }
+  }, [draft, onClose, onSave, onSaveExplicitOrganization, saving, settings])
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -416,7 +427,7 @@ function SettingsPanelInner({
 
       if (isSaveShortcut(event)) {
         event.preventDefault()
-        handleSave()
+        void handleSave()
       }
     }
 
@@ -466,7 +477,7 @@ function SettingsPanelInner({
           setHideGitignoredFiles={handleGitignoredVisibilityChange}
           setAllNotesFileVisibility={handleAllNotesFileVisibilityChange}
         />
-        <SettingsFooter onClose={onClose} onSave={handleSave} t={t} />
+        <SettingsFooter saving={saving} onClose={onClose} onSave={handleSave} t={t} />
       </div>
     </div>
   )

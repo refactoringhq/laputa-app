@@ -8,6 +8,7 @@ async function loadHandlers() {
 describe('mockHandlers additional coverage', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    localStorage.clear()
   })
 
   it('returns entry fallbacks, file history, diffs, and empty search results for empty queries', async () => {
