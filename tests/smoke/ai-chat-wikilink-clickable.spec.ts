@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test'
+import { installMockAiAgent } from './helpers'
 import { triggerMenuCommand } from './testBridge'
 
 test.describe('AI chat wikilink rendering', () => {
   test.beforeEach(async ({ page }) => {
+    await installMockAiAgent(page)
+
     // Block vault API so mock entries are used (ensures "Build Laputa App" exists)
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
 
@@ -44,25 +47,18 @@ test.describe('AI chat wikilink rendering', () => {
     await expect(wikilink).toHaveCSS('cursor', 'pointer')
   })
 
-  test('clicking a wikilink opens the note in a tab', async ({ page }) => {
-    // Click the second wikilink ("Matteo Cellini") which is NOT already open in a tab
+  test('clicking a wikilink opens the target note in the editor', async ({ page }) => {
+    // Click the second wikilink ("Matteo Cellini") which is NOT already open.
     const wikilink = page.locator('.chat-wikilink').nth(1)
     await expect(wikilink).toHaveText('Matteo Cellini')
 
-    // Verify "Matteo Cellini" is not yet in any tab
-    const tabsBefore = await page.locator('span.truncate:has-text("Matteo Cellini")').count()
-
-    // Click the wikilink
     await wikilink.click()
-    await page.waitForTimeout(500)
 
-    // Verify a new tab appeared with the note title
-    const tabsAfter = await page.locator('span.truncate:has-text("Matteo Cellini")').count()
-    expect(tabsAfter).toBeGreaterThan(tabsBefore)
+    await expect(page.locator('.bn-editor h1').first()).toHaveText('Matteo Cellini', { timeout: 5_000 })
   })
 
   test('clicking a wikilink after vault reload opens the target note without editor block-id crash', async ({ page }) => {
-    const editorCrashMessages: string[] = []
+    const editorCrashMessages = [''].slice(1)
     page.on('pageerror', error => {
       editorCrashMessages.push(error.message)
     })
@@ -81,12 +77,9 @@ test.describe('AI chat wikilink rendering', () => {
     const wikilink = page.locator('.chat-wikilink').nth(1)
     await expect(wikilink).toHaveText('Matteo Cellini')
 
-    const tabsBefore = await page.locator('span.truncate:has-text("Matteo Cellini")').count()
     await wikilink.click()
 
     await expect(page.locator('.bn-editor h1').first()).toHaveText('Matteo Cellini', { timeout: 5_000 })
-    const tabsAfter = await page.locator('span.truncate:has-text("Matteo Cellini")').count()
-    expect(tabsAfter).toBeGreaterThan(tabsBefore)
     expect(editorCrashMessages.filter(message => message.includes("Block doesn't have id"))).toEqual([])
   })
 })
