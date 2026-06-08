@@ -26,6 +26,7 @@ locales:
     - be-BY
     - id-ID
     - uk-UA
+    - sv-SE
 
 files:
   json:

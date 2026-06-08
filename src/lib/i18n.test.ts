@@ -49,6 +49,7 @@ describe('i18n', () => {
     expect(localeDisplayName('es-419', 'en')).toBe('Spanish (Latin America)')
     expect(localeDisplayName('id-ID', 'id-ID')).toBe('Bahasa Indonesia')
     expect(localeDisplayName('uk-UA', 'uk-UA')).toBe('Українська')
+    expect(localeDisplayName('sv-SE', 'sv-SE')).toBe('Svenska')
   })
 
   it('keeps locale label keys present in English', () => {
@@ -56,6 +57,7 @@ describe('i18n', () => {
     expect(EN_TRANSLATIONS['locale.koKR']).toBe('Korean')
     expect(EN_TRANSLATIONS['locale.idID']).toBe('Indonesian')
     expect(EN_TRANSLATIONS['locale.ukUA']).toBe('Ukrainian')
+    expect(EN_TRANSLATIONS['locale.svSE']).toBe('Swedish')
   })
 
   it('loads a translation catalog for every configured locale', () => {
