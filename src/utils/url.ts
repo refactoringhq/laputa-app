@@ -1,4 +1,5 @@
 import { isTauri } from '../mock-tauri'
+import { writeClipboardText } from './clipboardText'
 
 type ExternalUrlCandidate = string
 type AbsoluteFilePath = string
@@ -104,9 +105,5 @@ export async function revealLocalPath(absolutePath: AbsoluteFilePath): Promise<v
 
 /** Copy a local file or folder path to the system clipboard. */
 export async function copyLocalPath(absolutePath: AbsoluteFilePath): Promise<void> {
-  if (!navigator.clipboard?.writeText) {
-    throw new Error('Clipboard API is unavailable')
-  }
-
-  await navigator.clipboard.writeText(absolutePath)
+  await writeClipboardText(absolutePath)
 }

@@ -112,4 +112,21 @@ describe('local file actions', () => {
 
     expect(writeText).toHaveBeenCalledWith('/vault/Folder With Spaces/项目.md')
   })
+
+  it('falls back to the native clipboard command when Web Clipboard copy is denied in Tauri', async () => {
+    vi.stubGlobal('isTauri', true)
+    const writeText = vi.fn().mockRejectedValue(new DOMException(
+      'The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.',
+      'NotAllowedError',
+    ))
+    setClipboard(writeText)
+    vi.mocked(invoke).mockResolvedValueOnce(null)
+
+    await copyLocalPath('/vault/Folder With Spaces/项目.md')
+
+    expect(writeText).toHaveBeenCalledWith('/vault/Folder With Spaces/项目.md')
+    expect(invoke).toHaveBeenCalledWith('copy_text_to_clipboard', {
+      text: '/vault/Folder With Spaces/项目.md',
+    })
+  })
 })
