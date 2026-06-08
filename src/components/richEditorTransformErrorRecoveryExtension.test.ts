@@ -24,6 +24,12 @@ function indexSizeError() {
   return new DOMException('The index is not in the allowed range.', 'IndexSizeError')
 }
 
+function webkitNotFoundError() {
+  const error = new Error('The object can not be found here.')
+  error.name = 'NotFoundError'
+  return error
+}
+
 function createView(error?: Error) {
   const currentDoc = {
     eq: vi.fn((candidate: unknown) => candidate === currentDoc),
@@ -114,6 +120,7 @@ describe('isRecoverableEditorTransformError', () => {
       "TypeError: Cannot read properties of null (reading 'append')\n    at o.fillBefore(e).append (App-CrXlNLOq.js:1:1)"
     expect(isRecoverableEditorTransformError(stackOnlyAppendError)).toBe(true)
     expect(isRecoverableEditorTransformError(indexSizeError())).toBe(true)
+    expect(isRecoverableEditorTransformError(webkitNotFoundError())).toBe(true)
     expect(isRecoverableEditorTransformError(new TypeError(
       "Cannot read properties of null (reading 'append')",
     ))).toBe(false)
@@ -143,6 +150,17 @@ describe('installRichEditorTransformErrorRecovery', () => {
     expect(() => view.dispatch({ before: currentDoc })).not.toThrow()
     expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
       reason: 'mismatched_transaction',
+    })
+  })
+
+  it('recovers WebKit DOM NotFoundError from editor dispatch', () => {
+    const { currentDoc, view } = createView(webkitNotFoundError())
+
+    installRichEditorTransformErrorRecovery(view)
+
+    expect(() => view.dispatch({ before: currentDoc })).not.toThrow()
+    expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+      reason: 'dom_not_found',
     })
   })
 
