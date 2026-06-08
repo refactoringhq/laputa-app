@@ -47,6 +47,33 @@ describe('MathBlockEditor', () => {
     unsubscribe()
   })
 
+  it('ignores stale math block updates after the owning block disappears', () => {
+    const { editor } = renderMathBlockEditor()
+    const onExternalChange = vi.fn()
+    const unsubscribe = subscribeRichEditorExternalChange(editor, onExternalChange)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    editor.updateBlock.mockImplementation(() => {
+      throw new Error('Block with ID math-block not found')
+    })
+
+    fireEvent.doubleClick(document.querySelector('.math--block')!)
+    const source = screen.getByRole('textbox')
+    fireEvent.change(source, { target: { value: '\\frac{1}{2}' } })
+
+    expect(() => fireEvent.blur(source)).not.toThrow()
+    expect(editor.updateBlock).toHaveBeenCalledWith('math-block', {
+      props: { latex: '\\frac{1}{2}' },
+    })
+    expect(onExternalChange).not.toHaveBeenCalled()
+    expect(editor.focus).toHaveBeenCalled()
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[editor] Recovered rich-editor transform error:',
+      expect.any(Error),
+    )
+    unsubscribe()
+    warnSpy.mockRestore()
+  })
+
   it('cancels math block editing without changing the block', () => {
     const { editor } = renderMathBlockEditor()
 

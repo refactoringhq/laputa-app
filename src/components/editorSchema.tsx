@@ -33,6 +33,10 @@ import { updateTldrawBlockPropsSafely } from './tldrawBlockProps'
 import { useExternalMediaPreview } from '../utils/mediaPreviewRuntime'
 import { Textarea } from './ui/textarea'
 import { dispatchRichEditorExternalChange } from './editorExternalChangeEvents'
+import {
+  isStaleBlockReferenceError,
+  reportRecoveredEditorTransformError,
+} from './richEditorTransformErrorRecoveryExtension'
 
 const TldrawWhiteboard = lazy(() => import('./TldrawWhiteboard').then(module => ({
   default: module.TldrawWhiteboard,
@@ -137,6 +141,22 @@ function isCommitMathEditShortcut(event: KeyboardEvent<HTMLTextAreaElement>): bo
   return event.key === 'Enter' && isCommandModifierPressed(event)
 }
 
+function updateMathBlockLatexSafely(
+  editor: MathBlockEditorProps['editor'],
+  blockId: string,
+  latex: string,
+) {
+  try {
+    editor.updateBlock(blockId, { props: { latex } })
+    return true
+  } catch (error) {
+    if (!isStaleBlockReferenceError(error)) throw error
+
+    reportRecoveredEditorTransformError('stale_block_reference', error)
+    return false
+  }
+}
+
 export function MathBlockEditor({ block, editor }: MathBlockEditorProps) {
   const currentLatex = block.props.latex
   const editingSessionRef = useRef(false)
@@ -163,8 +183,8 @@ export function MathBlockEditor({ block, editor }: MathBlockEditorProps) {
     editingSessionRef.current = false
     setEditing(false)
     if (draftLatex !== currentLatex) {
-      editor.updateBlock(block.id, { props: { latex: draftLatex } })
-      dispatchRichEditorExternalChange(editor, editor.domElement ?? undefined)
+      const updated = updateMathBlockLatexSafely(editor, block.id, draftLatex)
+      if (updated) dispatchRichEditorExternalChange(editor, editor.domElement ?? undefined)
     }
     editor.focus?.()
   }
