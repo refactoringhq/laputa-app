@@ -104,6 +104,15 @@ describe('editorModePosition', () => {
     expect(content.slice(restoreState!.anchor, restoreState!.head).trim()).toBe('Paragraph one')
   })
 
+  it('ignores stale BlockNote cursor positions that no longer have a block', () => {
+    const editor = makeEditor(blocks)
+    editor.getTextCursorPosition = () => (
+      { block: undefined } as unknown as ReturnType<NonNullable<BlockNotePositionEditor['getTextCursorPosition']>>
+    )
+
+    expect(captureRichEditorPositionSnapshot(editor, document)).toBeNull()
+  })
+
   it('restores a raw-editor selection and scroll position through the DOM bridge', () => {
     const dispatch = vi.fn()
     const focus = vi.fn()
