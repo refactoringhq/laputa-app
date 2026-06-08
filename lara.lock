@@ -598,6 +598,9 @@ files:
     editor.whiteboard.exitFullscreen: afd0a0414d79d047f00319921e4d4944
     editor.exportPdf.unavailable: 2fce9834984172b64b66767485d815e9
     editor.exportPdf.failed: bf3fa78ff5725f5cbde8979b67ec2e2a
+    excalidrawFileEditor.label: 6ea1007e2a26b8ee7eb055b8ea826851
+    excalidrawFileEditor.invalidJson: 83a73a23745277704d03cd337bad11bf
+    excalidrawFileEditor.invalidScene: a75452794fa940abe0ebe9e1afc1ea4d
     filePreview.copyDeepLink: b75833669968adbef634495636e3fe50
     deepLinks.copied: 6ada57681192daf3b4afa07ce7a30575
     deepLinks.error.ambiguousVault: 4365c6d5cf8c2c1165259b32d24a6274

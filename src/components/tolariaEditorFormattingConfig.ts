@@ -17,6 +17,7 @@ import {
   Paragraph,
   Quotes,
   ScribbleLoop,
+  PenNib,
   Smiley,
   SpeakerHigh,
   Table,
@@ -30,6 +31,7 @@ import {
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
 import { trackEvent } from '../lib/telemetry'
+import { EXCALIDRAW_BLOCK_TYPE, EXCALIDRAW_DEFAULT_HEIGHT } from '../utils/excalidrawMarkdown'
 import { MATH_BLOCK_TYPE } from '../utils/mathMarkdown'
 import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
 import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
@@ -103,6 +105,7 @@ const TOLARIA_SLASH_MENU_ICONS: Partial<Record<string, PhosphorIcon>> = {
   code_block: CodeBlock,
   divider: Minus,
   emoji: Smiley,
+  excalidraw: PenNib,
   file: File,
   heading: TextHOne,
   heading_2: TextHTwo,
@@ -122,12 +125,12 @@ const TOLARIA_SLASH_MENU_ICONS: Partial<Record<string, PhosphorIcon>> = {
   whiteboard: ScribbleLoop,
 }
 
-function createBoardId(): string {
+function createBoardId(prefix: string): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID()
   }
 
-  return `whiteboard-${Date.now().toString(36)}`
+  return `${prefix}-${Date.now().toString(36)}`
 }
 
 function createWhiteboardSlashMenuItem(
@@ -139,8 +142,25 @@ function createWhiteboardSlashMenuItem(
     aliases: ['tldraw', 'drawing', 'canvas', 'sketch'],
     type: TLDRAW_BLOCK_TYPE,
     props: {
-      boardId: createBoardId(),
+      boardId: createBoardId('whiteboard'),
       height: TLDRAW_DEFAULT_HEIGHT,
+      snapshot: '{}',
+      width: '',
+    },
+  })
+}
+
+function createExcalidrawSlashMenuItem(
+  editor: Parameters<typeof getDefaultReactSlashMenuItems>[0],
+): TolariaSlashMenuItem {
+  return createBlockSlashMenuItem(editor, {
+    key: 'excalidraw',
+    title: 'Excalidraw',
+    aliases: ['draw', 'sketch', 'diagram', 'hand-drawn'],
+    type: EXCALIDRAW_BLOCK_TYPE,
+    props: {
+      boardId: createBoardId('excalidraw'),
+      height: EXCALIDRAW_DEFAULT_HEIGHT,
       snapshot: '{}',
       width: '',
     },
@@ -274,6 +294,7 @@ export function getTolariaSlashMenuItems(
       createMermaidSlashMenuItem(editor),
       createMathSlashMenuItem(editor, labels),
       createWhiteboardSlashMenuItem(editor),
+      createExcalidrawSlashMenuItem(editor),
     ],
   )
 

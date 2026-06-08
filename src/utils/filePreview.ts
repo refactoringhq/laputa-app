@@ -1,6 +1,6 @@
 import type { VaultEntry } from '../types'
 
-export type FilePreviewKind = 'image' | 'pdf' | 'audio' | 'video'
+export type FilePreviewKind = 'image' | 'pdf' | 'audio' | 'video' | 'excalidraw'
 
 const IMAGE_PREVIEW_EXTENSIONS = new Set([
   'apng',
@@ -19,6 +19,7 @@ const IMAGE_PREVIEW_EXTENSIONS = new Set([
 const PDF_PREVIEW_EXTENSIONS = new Set(['pdf'])
 const AUDIO_PREVIEW_EXTENSIONS = new Set(['aac', 'flac', 'm4a', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'wave'])
 const VIDEO_PREVIEW_EXTENSIONS = new Set(['m4v', 'mov', 'mp4', 'ogv', 'webm'])
+const EXCALIDRAW_PREVIEW_EXTENSIONS = new Set(['excalidraw'])
 
 function extensionFromFilename(filename: string): string | null {
   const lastSegment = filename.split(/[\\/]/u).pop() ?? filename
@@ -40,10 +41,12 @@ export function isPdfPreviewEntry(entry: Pick<VaultEntry, 'fileKind' | 'filename
 }
 
 export function filePreviewKind(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): FilePreviewKind | null {
-  if (entry.fileKind && entry.fileKind !== 'binary') return null
-
   const extension = previewExtension(entry)
   if (!extension) return null
+
+  if (EXCALIDRAW_PREVIEW_EXTENSIONS.has(extension)) return 'excalidraw'
+
+  if (entry.fileKind && entry.fileKind !== 'binary') return null
   if (IMAGE_PREVIEW_EXTENSIONS.has(extension)) return 'image'
   if (PDF_PREVIEW_EXTENSIONS.has(extension)) return 'pdf'
   if (AUDIO_PREVIEW_EXTENSIONS.has(extension)) return 'audio'
@@ -53,6 +56,10 @@ export function filePreviewKind(entry: Pick<VaultEntry, 'fileKind' | 'filename' 
 
 export function isFilePreviewEntry(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): boolean {
   return filePreviewKind(entry) !== null
+}
+
+export function isExcalidrawEntry(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): boolean {
+  return filePreviewKind(entry) === 'excalidraw'
 }
 
 export function previewFileTypeLabel(entry: Pick<VaultEntry, 'filename' | 'path'>): string {

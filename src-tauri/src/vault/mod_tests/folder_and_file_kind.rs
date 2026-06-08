@@ -114,6 +114,7 @@ fn test_classify_file_kind_by_extension() {
         ("readme.txt", "text"),
         ("note.md", "markdown"),
         ("README.markdown", "markdown"),
+        ("diagram.excalidraw", "text"),
         ("photo.png", "binary"),
         ("archive.zip", "binary"),
     ] {

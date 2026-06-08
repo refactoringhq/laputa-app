@@ -20,7 +20,9 @@ import { formatShortcutDisplay } from '../hooks/appCommandCatalog'
 import { EditorRightPanel } from './EditorRightPanel'
 import { EditorContent } from './EditorContent'
 import { EditorMemoryProbe } from './EditorMemoryProbe'
+import { ExcalidrawFileEditor } from './ExcalidrawFileEditor'
 import { FilePreview } from './FilePreview'
+import { isExcalidrawEntry } from '../utils/filePreview'
 import { schema } from './editorSchema'
 import { useRightPanelExclusion } from './useRightPanelExclusion'
 import type { RawEditorFindRequest } from './RawEditorFindBar'
@@ -483,6 +485,7 @@ function EditorLayout({
   onExportPdf?: (source?: NotePdfExportSource) => void
 }) {
   const activeBinaryTab = activeTab?.entry.fileKind === 'binary' ? activeTab : null
+  const activeExcalidrawTab = activeTab && isExcalidrawEntry(activeTab.entry) ? activeTab : null
   const showEmptyState = tabs.length === 0 && activeTabPath === null && !isVaultLoading
 
   return (
@@ -490,7 +493,16 @@ function EditorLayout({
       <div className="relative flex flex-1 min-h-0">
         {showEmptyState
           ? <EditorEmptyState locale={locale} />
-          : activeBinaryTab
+          : activeExcalidrawTab
+            ? (
+                <ExcalidrawFileEditor
+                  path={activeExcalidrawTab.entry.path}
+                  content={activeExcalidrawTab.content}
+                  onContentChange={(next) => onContentChange?.(activeExcalidrawTab.entry.path, next)}
+                  locale={locale}
+                />
+              )
+            : activeBinaryTab
             ? (
                 <FilePreview
                   entry={activeBinaryTab.entry}

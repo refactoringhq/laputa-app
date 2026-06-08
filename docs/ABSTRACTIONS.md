@@ -634,6 +634,17 @@ Defined in `src/utils/durableMarkdownBlocks.ts`, `src/utils/editorDurableMarkdow
 - Mermaid and tldraw both register small codecs with the shared durable fenced-block pipeline; scanner, token, block injection, and mixed serialization mechanics live in one owner.
 - The `/whiteboard` slash command inserts an empty tldraw block using the same Markdown-durable storage path. Preview images are intentionally omitted; thumbnails can be added later as derived cache artifacts.
 
+### Excalidraw Diagrams
+
+Defined in `src/utils/durableMarkdownBlocks.ts`, `src/utils/editorDurableMarkdown.ts`, `src/utils/excalidrawMarkdown.ts`, `src/components/ExcalidrawCanvas.tsx`, `src/components/ExcalidrawFileEditor.tsx`, `src/components/editorSchema.tsx`, and the routing branch in `src/components/Editor.tsx`:
+
+- Two surfaces share one editable canvas: a fenced `excalidraw` block embedded inside `.md` notes, and a full-file editor that mounts when the active vault entry has a `.excalidraw` extension.
+- Embedded blocks follow the same `DurableBlockCodec` lifecycle as Mermaid and tldraw: ` ```excalidraw id="…" height="…" width="…" ` fences become temporary placeholders before BlockNote parses, then resolve into `excalidrawBlock` schema nodes whose props hold the scene snapshot JSON. Round-trip is byte-identical when no edits occur.
+- Standalone files are added to the Rust `TEXT_EXTENSIONS` list so the vault scanner indexes them as `file_kind: "text"`. The frontend Editor branches on `isExcalidrawEntry()` to mount `ExcalidrawFileEditor` instead of the raw-text editor, reusing the existing text-content IPC for read/save.
+- Snapshot changes debounce at 350 ms via `ExcalidrawCanvas` and flow upstream: embedded blocks call `updateExcalidrawBlockPropsSafely()`, file edits call the standard `onContentChange` callback.
+- Malformed JSON on either surface renders a non-destructive raw view with an error banner and suppresses autosave until valid scene data is restored.
+- The `/excalidraw` slash command inserts an empty scene block with a freshly generated `boardId`. Embedded image assets in the scene's `files` field are deferred, matching the same deferral ADR-0107 made for tldraw assets.
+
 ### Formatting Surface Policy
 
 Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tolariaEditorFormattingConfig.ts`:
