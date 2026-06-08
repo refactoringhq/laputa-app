@@ -43,7 +43,7 @@ type TolariaBlockTypeSelectItem = {
 }
 type SlashInsertEditor = {
   getTextCursorPosition: () => { block: unknown }
-  updateBlock: (block: unknown, update: Record<string, unknown>) => void
+  replaceBlocks: (blocksToReplace: unknown[], blocksToInsert: Array<Record<string, unknown>>) => void
 }
 type BlockSlashMenuItemConfig = {
   aliases: string[]
@@ -191,10 +191,10 @@ function createBlockSlashMenuItem(
     group: 'Media',
     onItemClick: () => {
       const block = blockEditor.getTextCursorPosition().block
-      blockEditor.updateBlock(block, {
+      blockEditor.replaceBlocks([block], [{
         type: config.type,
         props: config.props,
-      })
+      }])
       if (config.eventName) trackEvent(config.eventName)
     },
   } as TolariaSlashMenuItem
