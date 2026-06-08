@@ -166,6 +166,66 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
       return entries
     }
 
+    const FRONTMATTER_ALIAS_GROUPS = {
+      aliases: ['aliases'],
+      color: ['color'],
+      status: ['status'],
+      template: ['template'],
+      title: ['title'],
+      type: ['type', 'is_a', 'is a'],
+      view: ['view'],
+      visible: ['visible'],
+      _archived: ['_archived', 'archived'],
+      _favorite: ['_favorite'],
+      _favorite_index: ['_favorite_index'],
+      _icon: ['_icon', 'icon'],
+      _list_properties_display: ['_list_properties_display'],
+      _organized: ['_organized'],
+      _order: ['_order', 'order'],
+      _sidebar_label: ['_sidebar_label', 'sidebar_label', 'sidebar label'],
+      _sort: ['_sort', 'sort'],
+      _width: ['_width', 'width'],
+      belongs_to: ['belongs_to', 'belongs to'],
+      related_to: ['related_to', 'related to'],
+    } as const
+    const canonicalFrontmatterAliases = new Map<string, string>()
+    const canonicalWriteKeys = new Set([
+      'type',
+      '_archived',
+      '_favorite',
+      '_favorite_index',
+      '_icon',
+      '_list_properties_display',
+      '_organized',
+      '_order',
+      '_sidebar_label',
+      '_sort',
+      '_width',
+    ])
+
+    for (const [canonicalKey, aliases] of Object.entries(FRONTMATTER_ALIAS_GROUPS)) {
+      for (const alias of aliases) {
+        canonicalFrontmatterAliases.set(alias, canonicalKey)
+      }
+    }
+
+    const normalizeFrontmatterKey = (key: string) => key
+      .trim()
+      .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+
+    const canonicalFrontmatterKey = (key: string) =>
+      canonicalFrontmatterAliases.get(normalizeFrontmatterKey(key)) ?? normalizeFrontmatterKey(key)
+
+    const canonicalFrontmatterWriteKey = (key: string) => {
+      const canonicalKey = canonicalFrontmatterKey(key)
+      return canonicalWriteKeys.has(canonicalKey) ? canonicalKey : key
+    }
+
+    const frontmatterKeysMatch = (left: string, right: string) =>
+      canonicalFrontmatterKey(left) === canonicalFrontmatterKey(right)
+
     const serializeFrontmatterValue = (value: unknown): string[] => {
       if (Array.isArray(value)) {
         if (value.length === 0) return ['[]']
@@ -179,11 +239,12 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
 
     const replaceFrontmatterEntry = (content: string, key: string, value: unknown) => {
       const { frontmatter, body, lineEnding } = splitFrontmatter(content)
+      const writeKey = canonicalFrontmatterWriteKey(key)
       const entryLines = serializeFrontmatterValue(value)
       const nextEntryLines =
         entryLines[0] === ''
-          ? [`${key}:`, ...entryLines.slice(1)]
-          : [`${key}: ${entryLines[0]}`]
+          ? [`${writeKey}:`, ...entryLines.slice(1)]
+          : [`${writeKey}: ${entryLines[0]}`]
 
       if (frontmatter === null) {
         return `${FRONTMATTER_DELIMITER}\n${nextEntryLines.join('\n')}\n${FRONTMATTER_DELIMITER}\n${body}`
@@ -191,11 +252,11 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
 
       const nextEntries = splitFrontmatterEntries(frontmatter)
         .filter((entry) => entry.key !== '')
-        .map((entry) => (entry.key === key ? { key, lines: nextEntryLines } : entry))
+        .map((entry) => (frontmatterKeysMatch(entry.key, key) ? { key: writeKey, lines: nextEntryLines } : entry))
 
-      const hasEntry = nextEntries.some((entry) => entry.key === key)
+      const hasEntry = nextEntries.some((entry) => frontmatterKeysMatch(entry.key, key))
       if (!hasEntry) {
-        nextEntries.push({ key, lines: nextEntryLines })
+        nextEntries.push({ key: writeKey, lines: nextEntryLines })
       }
 
       return `${FRONTMATTER_DELIMITER}${lineEnding}${nextEntries.flatMap((entry) => entry.lines).join(lineEnding)}${lineEnding}${FRONTMATTER_DELIMITER}${body}`
@@ -206,7 +267,7 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
       if (frontmatter === null) return content
 
       const nextEntries = splitFrontmatterEntries(frontmatter)
-        .filter((entry) => entry.key !== '' && entry.key !== key)
+        .filter((entry) => entry.key !== '' && !frontmatterKeysMatch(entry.key, key))
 
       if (nextEntries.length === 0) {
         return body
