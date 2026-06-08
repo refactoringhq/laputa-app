@@ -3,6 +3,7 @@ import type { useCreateBlockNote } from '@blocknote/react'
 import {
   isRecoverableEditorTransformError,
   reportRecoveredEditorTransformError,
+  richEditorTransformRecoveryErrorReason,
 } from './richEditorTransformErrorRecoveryExtension'
 
 export type RichEditorInputView = NonNullable<ReturnType<typeof useCreateBlockNote>['prosemirrorView']>
@@ -60,7 +61,10 @@ function isComposingInput(event: InputEvent, view: RichEditorInputView): boolean
 export function recoverRichEditorInputTransformError(error: unknown): boolean {
   if (!isRecoverableEditorTransformError(error)) return false
 
-  reportRecoveredEditorTransformError('transform_error', error)
+  reportRecoveredEditorTransformError(
+    richEditorTransformRecoveryErrorReason(error) ?? 'transform_error',
+    error,
+  )
   return true
 }
 

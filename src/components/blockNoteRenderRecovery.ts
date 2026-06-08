@@ -1,15 +1,11 @@
-const BLOCKNOTE_MISSING_ID_ERROR = "Block doesn't have id"
-const BLOCKNOTE_BLOCK_TYPE_MISMATCH_ERROR = 'Block type does not match'
+import {
+  classifyRichEditorRecoveryError,
+  type BlockNoteRenderRecoveryReason,
+} from './richEditorRecoveryClassifier'
+
 const BLOCKNOTE_RECOVERY_BOUNDARY_NAME = 'BlockNoteRenderRecoveryBoundary'
 const RECOVERED_BLOCKNOTE_RENDER_ERROR_MARK = '__tolariaRecoveredBlockNoteRenderError'
-const BLOCKNOTE_TABLE_ROW_INDEX_ERROR = /^Index \d+ out of range for <tableRow\(/
-const BLOCKNOTE_PARAGRAPH_INDEX_ERROR = /^Index \d+ out of range for <paragraph\(/
-
-export type BlockNoteRenderRecoveryReason =
-  | 'block_type_mismatch'
-  | 'block_missing_id'
-  | 'paragraph_index_out_of_range'
-  | 'table_row_index_out_of_range'
+export type { BlockNoteRenderRecoveryReason } from './richEditorRecoveryClassifier'
 
 type MarkedRecoveredBlockNoteRenderError = Error & {
   [RECOVERED_BLOCKNOTE_RENDER_ERROR_MARK]?: true
@@ -25,17 +21,7 @@ export function isRecoverableBlockNoteRenderError(error: unknown): boolean {
 }
 
 export function blockNoteRenderRecoveryReason(error: unknown): BlockNoteRenderRecoveryReason | null {
-  if (!(error instanceof Error)) return null
-  if (error.message === BLOCKNOTE_BLOCK_TYPE_MISMATCH_ERROR) return 'block_type_mismatch'
-  if (error.message.includes(BLOCKNOTE_MISSING_ID_ERROR)) return 'block_missing_id'
-  if (BLOCKNOTE_TABLE_ROW_INDEX_ERROR.test(error.message)) {
-    return 'table_row_index_out_of_range'
-  }
-  if (BLOCKNOTE_PARAGRAPH_INDEX_ERROR.test(error.message)) {
-    return 'paragraph_index_out_of_range'
-  }
-
-  return null
+  return classifyRichEditorRecoveryError(error, 'render')
 }
 
 export function markRecoveredBlockNoteRenderError(error: unknown): void {

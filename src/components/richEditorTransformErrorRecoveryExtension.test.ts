@@ -215,21 +215,21 @@ describe('installRichEditorTransformErrorRecovery', () => {
   it('recovers table selection transactions whose target row changed underneath BlockNote', () => {
     expectDocumentRepairRecovery(
       new RangeError('Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>'),
-      'table_position_out_of_range',
+      'table_row_index_out_of_range',
     )
   })
 
   it('recovers production table row index transactions reported as plain errors', () => {
     expectDocumentRepairRecovery(
       new Error('Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>'),
-      'table_position_out_of_range',
+      'table_row_index_out_of_range',
     )
   })
 
   it('recovers production paragraph index transactions from stale slash input', () => {
     expectDocumentRepairRecovery(
       new RangeError('Index 1 out of range for <paragraph("/")>'),
-      'paragraph_position_out_of_range',
+      'paragraph_index_out_of_range',
     )
   })
 

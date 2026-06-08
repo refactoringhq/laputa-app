@@ -1,6 +1,12 @@
 import { createExtension } from '@blocknote/core'
 import { trackEvent } from '../lib/telemetry'
 import { repairMalformedEditorBlocks } from '../hooks/editorBlockRepair'
+import {
+  classifyRichEditorRecoveryError,
+  richEditorRecoveryErrorNeedsDocumentRepair,
+  type RichEditorTransformRecoveryReason,
+} from './richEditorRecoveryClassifier'
+export { isStaleBlockReferenceError } from './richEditorRecoveryClassifier'
 
 const DISPATCH_RECOVERY_STATE_KEY = '__tolariaRichEditorTransformErrorRecovery'
 
@@ -44,22 +50,7 @@ interface RepairableBlockNoteEditor {
   replaceBlocks?: (currentBlocks: unknown[], nextBlocks: unknown[]) => unknown
 }
 
-type RecoveryReason =
-  | 'dom_index_size'
-  | 'invalid_block_join'
-  | 'invalid_insertion_depth'
-  | 'mismatched_transaction'
-  | 'null_fragment_append'
-  | 'paragraph_position_out_of_range'
-  | 'stale_block_reference'
-  | 'stale_transaction'
-  | 'table_position_out_of_range'
-  | 'transform_error'
-
-interface RecoveryReasonMatcher {
-  matches: (error: unknown) => boolean
-  reason: RecoveryReason
-}
+type RecoveryReason = RichEditorTransformRecoveryReason
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -83,78 +74,12 @@ function transactionDocIsStale(transaction: unknown, view: RichEditorDispatchVie
   return !currentDoc.eq(before)
 }
 
-function isMismatchedTransactionError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes('Applying a mismatched transaction')
-}
-
-function isInvalidContentTransactionError(error: unknown): boolean {
-  return error instanceof RangeError && error.message.startsWith('Invalid content for node ')
-}
-
-function isInvalidInsertionDepthError(error: unknown): boolean {
-  return error instanceof RangeError && error.message.includes('Inserted content deeper than insertion position')
-}
-
-function isTablePositionOutOfRangeError(error: unknown): boolean {
-  return error instanceof Error && /^Index \d+ out of range for <tableRow\(/.test(error.message)
-}
-
-function isParagraphPositionOutOfRangeError(error: unknown): boolean {
-  return error instanceof Error && /^Index \d+ out of range for <paragraph\(/.test(error.message)
-}
-
-function isInvalidBlockJoinError(error: unknown): boolean {
-  return isTransformError(error) && /^Cannot join (blockGroup|tableCell) onto blockContainer$/.test(error.message)
-}
-
-function isNullFragmentAppendError(error: unknown): boolean {
-  if (!(error instanceof TypeError)) return false
-
-  const details = `${error.message}\n${error.stack ?? ''}`
-  return details.includes('fillBefore') && details.includes('.append')
-}
-
-export function isStaleBlockReferenceError(error: unknown): boolean {
-  return error instanceof Error && /^Block with ID .+ not found$/.test(error.message)
-}
-
-function isDomIndexSizeError(error: unknown): boolean {
-  return isRecord(error) && error.name === 'IndexSizeError'
-}
-
-function isTransformError(error: unknown): error is Error {
-  return error instanceof Error && error.name === 'TransformError'
-}
-
-function isRecoverableRangeError(error: unknown): boolean {
-  return isInvalidContentTransactionError(error)
-    || isInvalidInsertionDepthError(error)
-    || isParagraphPositionOutOfRangeError(error)
-    || isTablePositionOutOfRangeError(error)
-}
-
-const RECOVERABLE_EDITOR_ERROR_PREDICATES = [
-  isTransformError,
-  isMismatchedTransactionError,
-  isRecoverableRangeError,
-  isNullFragmentAppendError,
-  isStaleBlockReferenceError,
-  isDomIndexSizeError,
-]
-
-const RECOVERY_REASON_MATCHERS: RecoveryReasonMatcher[] = [
-  { matches: isDomIndexSizeError, reason: 'dom_index_size' },
-  { matches: isMismatchedTransactionError, reason: 'mismatched_transaction' },
-  { matches: isStaleBlockReferenceError, reason: 'stale_block_reference' },
-  { matches: isInvalidBlockJoinError, reason: 'invalid_block_join' },
-  { matches: isInvalidInsertionDepthError, reason: 'invalid_insertion_depth' },
-  { matches: isNullFragmentAppendError, reason: 'null_fragment_append' },
-  { matches: isParagraphPositionOutOfRangeError, reason: 'paragraph_position_out_of_range' },
-  { matches: isTablePositionOutOfRangeError, reason: 'table_position_out_of_range' },
-]
-
 export function isRecoverableEditorTransformError(error: unknown): boolean {
-  return RECOVERABLE_EDITOR_ERROR_PREDICATES.some((predicate) => predicate(error))
+  return richEditorTransformRecoveryErrorReason(error) !== null
+}
+
+export function richEditorTransformRecoveryErrorReason(error: unknown): RecoveryReason | null {
+  return classifyRichEditorRecoveryError(error, 'transform')
 }
 
 function recoveryReason(
@@ -163,13 +88,11 @@ function recoveryReason(
   view: RichEditorDispatchView,
 ): RecoveryReason {
   if (transactionDocIsStale(transaction, view)) return 'stale_transaction'
-  return RECOVERY_REASON_MATCHERS.find(({ matches }) => matches(error))?.reason ?? 'transform_error'
+  return richEditorTransformRecoveryErrorReason(error) ?? 'transform_error'
 }
 
 function shouldRepairEditorDocument(error: unknown): boolean {
-  return isRecoverableRangeError(error)
-    || isInvalidBlockJoinError(error)
-    || isNullFragmentAppendError(error)
+  return richEditorRecoveryErrorNeedsDocumentRepair(error)
 }
 
 export const reportRecoveredEditorTransformError = (reason: RecoveryReason, error: unknown): void => {
