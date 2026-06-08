@@ -477,10 +477,12 @@ describe('useVaultLoader', () => {
 
     it('is a no-op for non-existent paths', async () => {
       const { result } = await renderVaultLoader()
+      const entriesBefore = result.current.entries
 
       act(() => { result.current.removeEntry('/vault/note/nonexistent.md') })
 
       expect(result.current.entries).toHaveLength(1)
+      expect(result.current.entries).toBe(entriesBefore)
     })
   })
 
@@ -495,6 +497,15 @@ describe('useVaultLoader', () => {
       })
 
       expect(result.current.entries).toHaveLength(0)
+    })
+
+    it('preserves entries reference when none of the paths exist', async () => {
+      const { result } = await renderVaultLoader()
+      const entriesBefore = result.current.entries
+
+      act(() => { result.current.removeEntries(['/vault/note/nonexistent.md']) })
+
+      expect(result.current.entries).toBe(entriesBefore)
     })
   })
 
@@ -970,6 +981,20 @@ describe('useVaultLoader', () => {
         properties: {},
         snippet: '',
       }))
+    })
+
+    it('preserves entries reference when the old path does not exist', async () => {
+      const { result } = await renderVaultLoader()
+      const entriesBefore = result.current.entries
+
+      act(() => {
+        result.current.replaceEntry('/vault/note/nonexistent.md', {
+          path: '/vault/note/renamed.md',
+          filename: 'renamed.md',
+        })
+      })
+
+      expect(result.current.entries).toBe(entriesBefore)
     })
   })
 
