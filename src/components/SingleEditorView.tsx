@@ -76,6 +76,7 @@ import {
   selectedEditorDomHtml,
   selectedEditorPlainText,
   selectedEditorRange,
+  writeRichEditorClipboardPayload,
 } from './editorRichCopy'
 
 const TEST_TABLE_MARKDOWN = `| Head 1 | Head 2 | Head 3 |
@@ -941,8 +942,7 @@ function handleSelectedEditorCopy(
 
   const richPayload = richEditorClipboardPayload(editor)
   if (richPayload) {
-    event.clipboardData.setData('blocknote/html', richPayload.blocknoteHtml)
-    event.clipboardData.setData('text/html', richPayload.html)
+    writeRichEditorClipboardPayload(event.clipboardData, richPayload)
   } else {
     const markup = selectedEditorDomHtml(range)
     if (markup.length > 0) {
