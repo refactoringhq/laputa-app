@@ -11,6 +11,7 @@ export type BlockNoteRenderRecoveryReason =
 
 export type RichEditorTransformRecoveryReason =
   | 'dom_index_size'
+  | 'dom_not_found'
   | 'invalid_block_join'
   | 'invalid_insertion_depth'
   | 'mismatched_transaction'
@@ -79,6 +80,15 @@ function isDomIndexSizeError(error: unknown): boolean {
   return isRecord(error) && error.name === 'IndexSizeError'
 }
 
+function isWebKitDomNotFoundError(error: unknown): boolean {
+  return (
+    isRecord(error)
+    && error.name === 'NotFoundError'
+    && typeof error.message === 'string'
+    && error.message.includes('The object can not be found here')
+  )
+}
+
 function isTransformError(error: unknown): error is Error {
   return error instanceof Error && error.name === 'TransformError'
 }
@@ -109,6 +119,11 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
   {
     matches: isDomIndexSizeError,
     reason: 'dom_index_size',
+    surfaces: ['transform'],
+  },
+  {
+    matches: isWebKitDomNotFoundError,
+    reason: 'dom_not_found',
     surfaces: ['transform'],
   },
   {

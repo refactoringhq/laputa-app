@@ -11,6 +11,12 @@ function transformError(message = 'Invalid transform') {
 }
 
 describe('richEditorRecoveryClassifier', () => {
+  function webkitNotFoundError() {
+    const error = new Error('The object can not be found here.')
+    error.name = 'NotFoundError'
+    return error
+  }
+
   it('normalizes paragraph and table index failures across render and transform recovery', () => {
     const tableError = new RangeError(
       'Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>',
@@ -26,6 +32,8 @@ describe('richEditorRecoveryClassifier', () => {
   it('keeps render recovery narrower than transform recovery', () => {
     expect(classifyRichEditorRecoveryError(new Error("Block doesn't have id"), 'render')).toBe('block_missing_id')
     expect(classifyRichEditorRecoveryError(new Error("Block doesn't have id"), 'transform')).toBeNull()
+    expect(classifyRichEditorRecoveryError(webkitNotFoundError(), 'transform')).toBe('dom_not_found')
+    expect(classifyRichEditorRecoveryError(webkitNotFoundError(), 'render')).toBeNull()
     expect(classifyRichEditorRecoveryError(transformError(), 'transform')).toBe('transform_error')
     expect(classifyRichEditorRecoveryError(transformError(), 'render')).toBeNull()
   })
