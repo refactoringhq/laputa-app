@@ -276,7 +276,7 @@ mod tests {
         let zshrc = dir.path().join(".zshrc");
         std::fs::write(
             &shell,
-            "#!/bin/sh\nexport HOME=$(dirname \"$0\")\nexec /bin/sh -c \"$2\"\n",
+            "#!/bin/sh\nexport HOME=$(dirname \"$0\")\nunset ZDOTDIR\nexec /bin/sh -c \"$2\"\n",
         )
         .unwrap();
         std::fs::write(
