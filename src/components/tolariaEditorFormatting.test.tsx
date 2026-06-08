@@ -226,8 +226,10 @@ describe('tolariaEditorFormatting', () => {
     const block = { id: 'active-block' }
     const editor = {
       getTextCursorPosition: () => ({ block }),
+      replaceBlocks: () => {},
       updateBlock: () => {},
     }
+    const replaceBlocks = vi.spyOn(editor, 'replaceBlocks')
     const updateBlock = vi.spyOn(editor, 'updateBlock')
 
     const mathItem = createMathSlashMenuItem(editor as never)
@@ -240,10 +242,11 @@ describe('tolariaEditorFormatting', () => {
 
     mathItem?.onItemClick()
 
-    expect(updateBlock).toHaveBeenCalledWith(block, {
+    expect(replaceBlocks).toHaveBeenCalledWith([block], [{
       type: MATH_BLOCK_TYPE,
       props: { latex: MATH_SLASH_COMMAND_LATEX },
-    })
+    }])
+    expect(updateBlock).not.toHaveBeenCalled()
     expect(trackEvent).toHaveBeenCalledWith('editor_math_slash_command_used')
   })
 })
