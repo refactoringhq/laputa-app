@@ -181,6 +181,7 @@ describe('NoteList changes view', () => {
     fireEvent.contextMenu(noteItem)
 
     expect(screen.getByTestId('changes-context-menu')).toBeInTheDocument()
+    expect(screen.getByTestId('changes-context-menu')).toHaveClass('z-[12000]')
     expect(screen.getByTestId('discard-changes-button')).toBeInTheDocument()
   })
 
