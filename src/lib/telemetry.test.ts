@@ -17,6 +17,7 @@ import {
   teardownSentry,
   trackEvent,
 } from './telemetry'
+import { retainWhiteboardPlatformPermissionGuard } from '../utils/whiteboardPlatformPermissionRejection'
 
 afterEach(() => {
   teardownSentry()
@@ -71,6 +72,15 @@ describe('trackEvent', () => {
 })
 
 describe('initSentry', () => {
+  function initSentryBeforeSend(): (event: Record<string, unknown>, hint?: { originalException?: unknown }) => unknown {
+    vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.ingest.sentry.io/123456')
+    initSentry('anonymous-user')
+
+    const beforeSend = sentryMocks.init.mock.calls[0]?.[0]?.beforeSend
+    expect(beforeSend).toEqual(expect.any(Function))
+    return beforeSend as (event: Record<string, unknown>, hint?: { originalException?: unknown }) => unknown
+  }
+
   it.each([
     ['stable builds', '2026.4.23', '2026.4.23', 'stable'],
     ['alpha builds', '2026.4.28-alpha.7', undefined, 'prerelease'],
@@ -88,6 +98,65 @@ describe('initSentry', () => {
     expect(sentryMocks.setUser).toHaveBeenCalledWith({ id: 'anonymous-user' })
     expect(sentryMocks.setTag).toHaveBeenCalledWith('tolaria.build_version', buildVersion)
     expect(sentryMocks.setTag).toHaveBeenCalledWith('tolaria.release_kind', releaseKind)
+  })
+
+  it('drops active whiteboard platform permission rejections before sending them to Sentry', () => {
+    const beforeSend = initSentryBeforeSend()
+    const releaseGuard = retainWhiteboardPlatformPermissionGuard()
+    const rejectionEvent = {
+      exception: {
+        values: [{
+          type: 'NotAllowedError',
+          value: 'The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.',
+        }],
+      },
+    }
+    const hintedEvent = { message: 'Unhandled promise rejection' }
+
+    try {
+      expect(beforeSend(rejectionEvent)).toBeNull()
+      expect(beforeSend(hintedEvent, {
+        originalException: {
+          name: 'NotAllowedError',
+          message: 'The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.',
+        },
+      })).toBeNull()
+    } finally {
+      releaseGuard()
+    }
+  })
+
+  it('keeps non-whiteboard Sentry events while the whiteboard guard is active', () => {
+    const beforeSend = initSentryBeforeSend()
+    const releaseGuard = retainWhiteboardPlatformPermissionGuard()
+    const event = {
+      exception: {
+        values: [{
+          type: 'Error',
+          value: 'Save failed',
+        }],
+      },
+    }
+
+    try {
+      expect(beforeSend(event)).toBe(event)
+    } finally {
+      releaseGuard()
+    }
+  })
+
+  it('keeps platform permission rejections when no whiteboard guard is active', () => {
+    const beforeSend = initSentryBeforeSend()
+    const event = {
+      exception: {
+        values: [{
+          type: 'NotAllowedError',
+          value: 'The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.',
+        }],
+      },
+    }
+
+    expect(beforeSend(event)).toBe(event)
   })
 })
 

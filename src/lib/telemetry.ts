@@ -1,12 +1,39 @@
 import * as Sentry from '@sentry/react'
 import { resolveFrontendTelemetryConfig } from './telemetryConfig'
 import { redactPathText } from './sensitiveTextRedaction'
+import {
+  hasActiveWhiteboardPlatformPermissionGuard,
+  isWhiteboardPlatformPermissionRejection,
+} from '../utils/whiteboardPlatformPermissionRejection'
 
-function scrubPaths(input: string): string {
+type SensitiveTelemetryText = string
+type AnonymousTelemetryId = string
+type ReleaseChannel = string
+type FeatureFlagKey = string
+type ProductAnalyticsEventName = string
+type ProductAnalyticsProperties = Record<string, string | number>
+
+function scrubPaths(input: SensitiveTelemetryText): string {
   return redactPathText({ text: input })
 }
 
-function scrubSentryEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
+function shouldDropWhiteboardPlatformPermissionEvent(
+  event: Sentry.ErrorEvent,
+  hint?: Sentry.EventHint,
+): boolean {
+  if (!hasActiveWhiteboardPlatformPermissionGuard()) return false
+  if (isWhiteboardPlatformPermissionRejection(hint?.originalException)) return true
+
+  return (event.exception?.values ?? []).some((exception) =>
+    isWhiteboardPlatformPermissionRejection({
+      message: exception.value ?? '',
+      name: exception.type ?? '',
+    }))
+}
+
+function scrubSentryEvent(event: Sentry.ErrorEvent, hint?: Sentry.EventHint): Sentry.ErrorEvent | null {
+  if (shouldDropWhiteboardPlatformPermissionEvent(event, hint)) return null
+
   if (event.message) event.message = scrubPaths(event.message)
   for (const ex of event.exception?.values ?? []) {
     if (ex.value) ex.value = scrubPaths(ex.value)
@@ -20,7 +47,7 @@ function scrubSentryEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
 let sentryInitialized = false
 let posthogInstance: typeof import('posthog-js').default | null = null
 
-export function initSentry(anonymousId: string): void {
+export function initSentry(anonymousId: AnonymousTelemetryId): void {
   if (sentryInitialized) return
 
   const { sentryDsn, sentryBuildVersion, sentryRelease } = resolveFrontendTelemetryConfig()
@@ -50,7 +77,7 @@ export function teardownSentry(): void {
   sentryInitialized = false
 }
 
-export async function initPostHog(anonymousId: string, releaseChannel?: string): Promise<void> {
+export async function initPostHog(anonymousId: AnonymousTelemetryId, releaseChannel?: ReleaseChannel): Promise<void> {
   if (posthogInstance) return
 
   const { posthogKey, posthogHost } = resolveFrontendTelemetryConfig()
@@ -75,25 +102,25 @@ export function teardownPostHog(): void {
   posthogInstance = null
 }
 
-export function updatePostHogIdentify(releaseChannel: string): void {
+export function updatePostHogIdentify(releaseChannel: ReleaseChannel): void {
   posthogInstance?.identify(undefined, { release_channel: releaseChannel })
 }
 
 /** Hardcoded defaults for first launch with no network (PostHog cache empty). */
 const FEATURE_DEFAULTS: Record<string, boolean> = {}
 
-let currentReleaseChannel: string = 'stable'
+let currentReleaseChannel: ReleaseChannel = 'stable'
 
-export function setReleaseChannel(channel: string): void {
+export function setReleaseChannel(channel: ReleaseChannel): void {
   currentReleaseChannel = channel
 }
 
-export function isFeatureEnabled(flagKey: string): boolean {
+export function isFeatureEnabled(flagKey: FeatureFlagKey): boolean {
   if (currentReleaseChannel === 'alpha') return true
   return posthogInstance?.isFeatureEnabled(flagKey) ?? (Reflect.get(FEATURE_DEFAULTS, flagKey) as boolean | undefined) ?? false
 }
 
-export function trackEvent(name: string, properties?: Record<string, string | number>): void {
+export function trackEvent(name: ProductAnalyticsEventName, properties?: ProductAnalyticsProperties): void {
   posthogInstance?.capture(name, properties)
 }
 
