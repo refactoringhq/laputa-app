@@ -293,6 +293,47 @@ describe('useImageDrop — Tauri native drag-drop', () => {
     expect(invoke).toHaveBeenCalledTimes(1)
   })
 
+  it('handles active-vault boundary failures from native image drops', async () => {
+    const onImageUrl = vi.fn()
+    const onUnhandledRejection = vi.fn()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { invoke } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockClear()
+    vi.mocked(invoke).mockRejectedValue('Path must stay inside the active vault')
+    process.on('unhandledRejection', onUnhandledRejection)
+    try {
+      renderImageDropTauri({ onImageUrl, vaultPath: '/vault' })
+
+      await waitForNativeDropListeners()
+
+      act(() => {
+        emitNativeDropEvent({
+          type: 'drop',
+          paths: ['/tmp/photo.png'],
+          position: { x: 100, y: 100 },
+        } satisfies NativeDropPayload)
+      })
+
+      await waitFor(() => {
+        expect(invoke).toHaveBeenCalledWith('copy_image_to_vault', {
+          vaultPath: '/vault',
+          sourcePath: '/tmp/photo.png',
+        })
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(warn).toHaveBeenCalledWith(
+        '[image-drop] Failed to copy dropped image into vault:',
+        'Path must stay inside the active vault',
+      )
+      expect(onUnhandledRejection).not.toHaveBeenCalled()
+      expect(onImageUrl).not.toHaveBeenCalled()
+    } finally {
+      process.removeListener('unhandledRejection', onUnhandledRejection)
+      warn.mockRestore()
+    }
+  })
+
   it('resets isDragOver on Tauri leave event', async () => {
     const { result } = renderImageDropTauri()
 
