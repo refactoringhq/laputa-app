@@ -11,6 +11,10 @@ type RepairResult = {
   changed: boolean
 }
 
+type RepairContext = {
+  seenIds: Set<string>
+}
+
 type ChildRepair = {
   children: unknown
   promoted: unknown[]
@@ -26,6 +30,15 @@ function createEditorBlockId(): string {
   return `tolaria-block-${fallbackBlockIdSequence}`
 }
 
+function createUniqueEditorBlockId(context: RepairContext): string {
+  let id = createEditorBlockId()
+  while (context.seenIds.has(id)) {
+    id = createEditorBlockId()
+  }
+  context.seenIds.add(id)
+  return id
+}
+
 function isEditorBlockRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -38,9 +51,21 @@ function hasUsableBlockId(block: Record<string, unknown>): boolean {
   return typeof block.id === 'string' && block.id.trim().length > 0
 }
 
-function fallbackParagraphBlock(): Record<string, unknown> {
+function replacementBlockId(block: Record<string, unknown>, context: RepairContext): string | null {
+  if (hasUsableBlockId(block)) {
+    const id = block.id as string
+    if (!context.seenIds.has(id)) {
+      context.seenIds.add(id)
+      return null
+    }
+  }
+
+  return createUniqueEditorBlockId(context)
+}
+
+function fallbackParagraphBlock(context: RepairContext): Record<string, unknown> {
   return {
-    id: createEditorBlockId(),
+    id: createUniqueEditorBlockId(context),
     type: 'paragraph',
     content: [],
     children: [],
@@ -58,12 +83,12 @@ function splitChildrenForBlock(
   return { safeChildren: [], promotedChildren: children }
 }
 
-function repairBlockList(blocks: unknown[]): RepairResult {
+function repairBlockList(blocks: unknown[], context: RepairContext): RepairResult {
   const repairedBlocks: unknown[] = []
   let changed = false
 
   for (const block of blocks) {
-    const repaired = repairEditorBlock(block)
+    const repaired = repairEditorBlock(block, context)
     repairedBlocks.push(...repaired.blocks)
     changed ||= repaired.changed || repaired.blocks.length !== 1 || repaired.blocks[0] !== block
   }
@@ -71,12 +96,12 @@ function repairBlockList(blocks: unknown[]): RepairResult {
   return { blocks: changed ? repairedBlocks : blocks, changed }
 }
 
-function repairBlockChildren(block: Record<string, unknown>): ChildRepair {
+function repairBlockChildren(block: Record<string, unknown>, context: RepairContext): ChildRepair {
   if (!Array.isArray(block.children)) {
     return { children: block.children, promoted: [], changed: false, writeChildren: false }
   }
 
-  const repaired = repairBlockList(block.children)
+  const repaired = repairBlockList(block.children, context)
   const { safeChildren, promotedChildren } = splitChildrenForBlock(block, repaired.blocks)
   const movedChildren = promotedChildren.length > 0
   return {
@@ -89,33 +114,33 @@ function repairBlockChildren(block: Record<string, unknown>): ChildRepair {
 
 function applyBlockRepair(
   block: Record<string, unknown>,
-  missingId: boolean,
+  replacementId: string | null,
   childRepair: ChildRepair,
 ): Record<string, unknown> {
   return {
     ...block,
-    ...(missingId ? { id: createEditorBlockId() } : {}),
+    ...(replacementId ? { id: replacementId } : {}),
     ...(childRepair.writeChildren ? { children: childRepair.children } : {}),
   }
 }
 
-function repairBlockRecord(block: Record<string, unknown>): RepairResult {
-  const childRepair = repairBlockChildren(block)
-  const missingId = !hasUsableBlockId(block)
+function repairBlockRecord(block: Record<string, unknown>, context: RepairContext): RepairResult {
+  const replacementId = replacementBlockId(block, context)
+  const childRepair = repairBlockChildren(block, context)
 
-  if (!missingId && !childRepair.changed) return { blocks: [block], changed: false }
+  if (!replacementId && !childRepair.changed) return { blocks: [block], changed: false }
 
   return {
-    blocks: [applyBlockRepair(block, missingId, childRepair), ...childRepair.promoted],
+    blocks: [applyBlockRepair(block, replacementId, childRepair), ...childRepair.promoted],
     changed: true,
   }
 }
 
-function repairEditorBlock(block: unknown): RepairResult {
-  if (!isEditorBlockRecord(block)) return { blocks: [fallbackParagraphBlock()], changed: true }
-  return repairBlockRecord(block)
+function repairEditorBlock(block: unknown, context: RepairContext): RepairResult {
+  if (!isEditorBlockRecord(block)) return { blocks: [fallbackParagraphBlock(context)], changed: true }
+  return repairBlockRecord(block, context)
 }
 
 export function repairMalformedEditorBlocks(blocks: unknown[]): unknown[] {
-  return repairBlockList(blocks).blocks
+  return repairBlockList(blocks, { seenIds: new Set() }).blocks
 }
