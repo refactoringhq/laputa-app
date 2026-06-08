@@ -21,7 +21,7 @@ export interface AiWorkspaceWindowContext {
 interface ExistingAiWorkspaceWindow {
   close?: () => Promise<void>
   isVisible?: () => Promise<boolean>
-  once?: (event: string, handler: (event?: unknown) => void) => Promise<TauriUnlisten>
+  listen?: (event: string, handler: (event?: unknown) => void) => Promise<TauriUnlisten>
   setAlwaysOnTop?: (alwaysOnTop: boolean) => Promise<void>
   setBackgroundColor?: (color: typeof TRANSPARENT_WINDOW_BACKGROUND) => Promise<void>
   setFocus: () => Promise<void>
@@ -121,9 +121,37 @@ async function emitAiWorkspaceContext(context: AiWorkspaceWindowContext): Promis
   await emitTo(AI_WORKSPACE_WINDOW_LABEL, AI_WORKSPACE_CONTEXT_UPDATED_EVENT, context).catch(() => {})
 }
 
+async function getExistingAiWorkspaceWindow(): Promise<ExistingAiWorkspaceWindow | null> {
+  const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
+  return WebviewWindow.getByLabel(AI_WORKSPACE_WINDOW_LABEL)
+}
+
+async function createAiWorkspaceWindow(
+  context: AiWorkspaceWindowContext,
+  options: AiWorkspaceWindowOptions = {},
+): Promise<ExistingAiWorkspaceWindow> {
+  const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
+  return new WebviewWindow(
+    AI_WORKSPACE_WINDOW_LABEL,
+    aiWorkspaceWindowOptions(context, options),
+  ) as ExistingAiWorkspaceWindow
+}
+
+function cleanupRegisteredListeners(
+  settled: boolean,
+  unlisteners: TauriUnlisten[],
+  saveCleanup: (unlisteners: TauriUnlisten[]) => void,
+): void {
+  if (settled) {
+    cleanupTauriEventListeners(unlisteners)
+    return
+  }
+  saveCleanup(unlisteners)
+}
+
 function waitForCreated(existingWindow: ExistingAiWorkspaceWindow): Promise<void> {
-  const once = existingWindow.once?.bind(existingWindow)
-  if (!once) return Promise.resolve()
+  const listen = existingWindow.listen?.bind(existingWindow)
+  if (!listen) return Promise.resolve()
 
   return new Promise((resolve, reject) => {
     let settled = false
@@ -143,39 +171,74 @@ function waitForCreated(existingWindow: ExistingAiWorkspaceWindow): Promise<void
       window.clearTimeout(timeout)
       finish(error)
     }
+    const saveCleanup = (unlisteners: TauriUnlisten[]) => {
+      cleanup = unlisteners
+    }
 
     void Promise.all([
-      once('tauri://created', () => complete()),
-      once('tauri://error', (event) => complete(event)),
+      listen('tauri://created', () => complete()),
+      listen('tauri://error', (event) => complete(event)),
     ]).then((unlisteners) => {
-      cleanup = unlisteners
+      cleanupRegisteredListeners(settled, unlisteners, saveCleanup)
     }).catch(complete)
   })
 }
 
+async function setWindowAlwaysOnTop(existingWindow: ExistingAiWorkspaceWindow, alwaysOnTop: boolean): Promise<void> {
+  if (!existingWindow.setAlwaysOnTop) return
+  await existingWindow.setAlwaysOnTop(alwaysOnTop).catch(() => {})
+}
+
+async function setWindowBackground(existingWindow: ExistingAiWorkspaceWindow): Promise<void> {
+  if (!existingWindow.setBackgroundColor) return
+  await existingWindow.setBackgroundColor(TRANSPARENT_WINDOW_BACKGROUND).catch(() => {})
+}
+
+async function setWindowShadow(existingWindow: ExistingAiWorkspaceWindow, enabled: boolean): Promise<void> {
+  if (!existingWindow.setShadow) return
+  await existingWindow.setShadow(enabled).catch(() => {})
+}
+
+async function showWindow(existingWindow: ExistingAiWorkspaceWindow): Promise<void> {
+  if (!existingWindow.show) return
+  await existingWindow.show().catch(() => {})
+}
+
+async function closeWindow(existingWindow: ExistingAiWorkspaceWindow): Promise<void> {
+  if (!existingWindow.close) return
+  await existingWindow.close().catch(() => {})
+}
+
 async function refreshAiWorkspaceWindowChrome(existingWindow: ExistingAiWorkspaceWindow): Promise<void> {
-  await existingWindow.setAlwaysOnTop?.(false).catch(() => {})
-  await existingWindow.setBackgroundColor?.(TRANSPARENT_WINDOW_BACKGROUND).catch(() => {})
-  await existingWindow.setShadow?.(false).catch(() => {})
+  await setWindowAlwaysOnTop(existingWindow, false)
+  await setWindowBackground(existingWindow)
+  await setWindowShadow(existingWindow, false)
+}
+
+function clearTemporaryAlwaysOnTop(existingWindow: ExistingAiWorkspaceWindow): void {
+  window.setTimeout(() => {
+    void setWindowAlwaysOnTop(existingWindow, false)
+  }, 150)
+}
+
+async function raiseWindowTemporarily(existingWindow: ExistingAiWorkspaceWindow): Promise<void> {
+  await setWindowAlwaysOnTop(existingWindow, true)
+  await showWindow(existingWindow)
+  clearTemporaryAlwaysOnTop(existingWindow)
 }
 
 export async function raiseAiWorkspaceWindowAboveMain(): Promise<void> {
   if (!isTauri()) return
 
-  const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-  const existingWindow = await WebviewWindow.getByLabel(AI_WORKSPACE_WINDOW_LABEL)
+  const existingWindow = await getExistingAiWorkspaceWindow()
   if (!existingWindow) return
 
-  await existingWindow.setAlwaysOnTop?.(true).catch(() => {})
-  await existingWindow.show?.().catch(() => {})
-  window.setTimeout(() => {
-    void existingWindow.setAlwaysOnTop?.(false).catch(() => {})
-  }, 150)
+  await raiseWindowTemporarily(existingWindow)
 }
 
 async function revealAiWorkspaceWindow(existingWindow: ExistingAiWorkspaceWindow): Promise<boolean> {
-  await existingWindow.setBackgroundColor?.(TRANSPARENT_WINDOW_BACKGROUND).catch(() => {})
-  await existingWindow.show?.()
+  await setWindowBackground(existingWindow)
+  await showWindow(existingWindow)
   await existingWindow.unminimize().catch(() => {})
   await existingWindow.setFocus().catch(() => {})
   await refreshAiWorkspaceWindowChrome(existingWindow)
@@ -190,20 +253,16 @@ export async function preloadAiWorkspaceWindow(context: AiWorkspaceWindowContext
   if (!isTauri()) return false
 
   const key = aiWorkspaceContextKey(context)
-  const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-  const existingWindow = await WebviewWindow.getByLabel(AI_WORKSPACE_WINDOW_LABEL)
+  const existingWindow = await getExistingAiWorkspaceWindow()
   if (existingWindow) {
     if (preloadedContextKey === key) return true
     const visible = await visibleWindowState(existingWindow)
     if (visible) return true
-    await existingWindow.close?.().catch(() => {})
+    await closeWindow(existingWindow)
   }
 
   rememberAiWorkspaceWindow()
-  const window = new WebviewWindow(
-    AI_WORKSPACE_WINDOW_LABEL,
-    aiWorkspaceWindowOptions(context, { visible: false }),
-  ) as ExistingAiWorkspaceWindow
+  const window = await createAiWorkspaceWindow(context, { visible: false })
   await waitForCreated(window)
   preloadedContextKey = key
   return true
@@ -212,28 +271,26 @@ export async function preloadAiWorkspaceWindow(context: AiWorkspaceWindowContext
 export async function closePreloadedAiWorkspaceWindow(): Promise<void> {
   if (!isTauri() || !preloadedContextKey) return
 
-  const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-  const existingWindow = await WebviewWindow.getByLabel(AI_WORKSPACE_WINDOW_LABEL)
+  const existingWindow = await getExistingAiWorkspaceWindow()
   preloadedContextKey = null
   if (!existingWindow) return
-  const visible = await existingWindow.isVisible?.().catch(() => true)
-  if (!visible) await existingWindow.close?.().catch(() => {})
+  const visible = await visibleWindowState(existingWindow)
+  if (!visible) await closeWindow(existingWindow)
 }
 
 export async function openAiWorkspaceWindow(context: AiWorkspaceWindowContext = {}): Promise<boolean> {
   if (!isTauri()) return false
 
-  const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-  const existingWindow = await WebviewWindow.getByLabel(AI_WORKSPACE_WINDOW_LABEL)
+  const existingWindow = await getExistingAiWorkspaceWindow()
   let staleExistingWindowClosed = false
   if (existingWindow) {
     const visible = await visibleWindowState(existingWindow)
     if (!preloadedContextKey && !visible) {
-      await existingWindow.close?.().catch(() => {})
+      await closeWindow(existingWindow)
       staleExistingWindowClosed = true
     } else if (preloadedContextKey && preloadedContextKey !== aiWorkspaceContextKey(context)) {
       preloadedContextKey = null
-      await existingWindow.close?.().catch(() => {})
+      await closeWindow(existingWindow)
       staleExistingWindowClosed = true
     } else {
       preloadedContextKey = null
@@ -245,21 +302,18 @@ export async function openAiWorkspaceWindow(context: AiWorkspaceWindowContext = 
     }
   }
 
-  const currentWindow = staleExistingWindowClosed ? null : await WebviewWindow.getByLabel(AI_WORKSPACE_WINDOW_LABEL)
+  const currentWindow = staleExistingWindowClosed ? null : await getExistingAiWorkspaceWindow()
   if (currentWindow) {
     const existingWindowIsVisible = await revealAiWorkspaceWindow(currentWindow).catch(() => false)
     if (existingWindowIsVisible) {
       await emitAiWorkspaceContext(context)
       return true
     }
-    await currentWindow.close?.().catch(() => {})
+    await closeWindow(currentWindow)
   }
 
   rememberAiWorkspaceWindow()
-  const window = new WebviewWindow(
-    AI_WORKSPACE_WINDOW_LABEL,
-    aiWorkspaceWindowOptions(context),
-  ) as ExistingAiWorkspaceWindow
+  const window = await createAiWorkspaceWindow(context)
   await waitForCreated(window)
   await refreshAiWorkspaceWindowChrome(window)
   await emitAiWorkspaceContext(context)

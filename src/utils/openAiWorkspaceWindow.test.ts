@@ -22,6 +22,7 @@ const existingClose = vi.fn().mockResolvedValue(undefined)
 const existingIsVisible = vi.fn().mockResolvedValue(true)
 const emitTo = vi.fn().mockResolvedValue(undefined)
 const close = vi.fn().mockResolvedValue(undefined)
+const webviewListen = vi.fn()
 const localStorageMock = (() => {
   let store: Record<string, string> = {}
   return {
@@ -41,6 +42,8 @@ vi.mock('../mock-tauri', () => ({
 vi.mock('@tauri-apps/api/webviewWindow', () => ({
   WebviewWindow: class MockWebviewWindow {
     static getByLabel = webviewGetByLabel
+
+    listen = webviewListen
 
     constructor(label: string, options: unknown) {
       webviewWindowCalls(label, options)
@@ -69,6 +72,11 @@ describe('openAiWorkspaceWindow', () => {
     vi.mocked(isTauri).mockReturnValue(false)
     webviewGetByLabel.mockResolvedValue(null)
     existingIsVisible.mockResolvedValue(true)
+    webviewListen.mockImplementation((event: string, handler: (event?: unknown) => void) => {
+      const unlisten = vi.fn()
+      if (event === 'tauri://created') queueMicrotask(() => handler())
+      return Promise.resolve(unlisten)
+    })
     localStorage.clear()
   })
 
@@ -151,6 +159,26 @@ describe('openAiWorkspaceWindow', () => {
       }),
     )
     expect(localStorage.getItem('tolaria:ai-workspace-window:ai-workspace')).toBe('true')
+  })
+
+  it('uses manual create listeners so stale Tauri unlisten failures are swallowed', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    const staleCreatedUnlisten = vi.fn(() => {
+      throw new TypeError("undefined is not an object (evaluating 'listeners[eventId].handlerId')")
+    })
+    const errorUnlisten = vi.fn()
+    webviewListen.mockImplementation((event: string, handler: (event?: unknown) => void) => {
+      if (event === 'tauri://created') queueMicrotask(() => handler())
+      return Promise.resolve(event === 'tauri://created' ? staleCreatedUnlisten : errorUnlisten)
+    })
+
+    await preloadAiWorkspaceWindow()
+    await Promise.resolve()
+
+    expect(webviewListen).toHaveBeenCalledWith('tauri://created', expect.any(Function))
+    expect(webviewListen).toHaveBeenCalledWith('tauri://error', expect.any(Function))
+    expect(staleCreatedUnlisten).toHaveBeenCalledOnce()
+    expect(errorUnlisten).toHaveBeenCalledOnce()
   })
 
   it('closes a hidden preloaded window', async () => {
