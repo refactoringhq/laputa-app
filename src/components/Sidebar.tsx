@@ -20,12 +20,14 @@ import {
   type SidebarSectionProps,
   SidebarTitleBar,
   SidebarTopNav,
+  TagsSection,
   TypesSection,
   ViewsSection,
 } from './sidebar/SidebarSections'
 import {
   SidebarCreatableLoadingSection,
   SidebarFavoritesLoadingSection,
+  SidebarTagsLoadingSection,
   SidebarTypesLoadingSection,
 } from './sidebar/SidebarLoadingSections'
 import { useSidebarTypeInteractions } from './sidebar/useSidebarTypeInteractions'
@@ -447,6 +449,22 @@ function SidebarViewAndTypeNavigation(props: SidebarNavigationProps) {
         workspaceOrder={props.workspaceOrder}
         locale={props.locale}
       />
+      {props.loading ? (
+        <SidebarTagsLoadingSection
+          collapsed={props.groupCollapsed.tags}
+          locale={props.locale}
+          onToggle={() => props.toggleGroup('tags')}
+        />
+      ) : (
+        <TagsSection
+          entries={props.entries}
+          selection={props.selection}
+          onSelect={props.onSelect}
+          collapsed={props.groupCollapsed.tags}
+          onToggle={() => props.toggleGroup('tags')}
+          locale={props.locale}
+        />
+      )}
     </>
   )
 }

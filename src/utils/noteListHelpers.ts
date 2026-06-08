@@ -1,4 +1,5 @@
 import type { VaultEntry, SidebarSelection, InboxPeriod, ViewFile } from '../types'
+import { entryHasTag } from './tagTree'
 import { APP_STORAGE_KEYS, LEGACY_APP_STORAGE_KEYS, getAppStorageItem } from '../constants/appStorage'
 import {
   orderInverseRelationshipLabels as sortInverseRelationshipLabels,
@@ -522,6 +523,11 @@ function filterSectionGroupEntries(entries: VaultEntry[], type: string, subFilte
   return subFilter ? applySubFilter(typeEntries, subFilter) : typeEntries.filter(isActive)
 }
 
+function filterTagEntries(entries: VaultEntry[], tag: string, subFilter?: NoteListFilter): VaultEntry[] {
+  const matched = entries.filter((entry) => entryHasTag(entry, tag))
+  return subFilter ? applySubFilter(matched, subFilter) : matched.filter(isActive)
+}
+
 function filterTopLevelEntries(
   entries: VaultEntry[],
   selection: Extract<SidebarSelection, { kind: 'filter' }>,
@@ -543,6 +549,7 @@ function filterByKind(
   if (selection.kind === 'view') return filterViewEntries(entries, selection, options.views)
   if (selection.kind === 'folder') return filterFolderEntries(entries, selection, options.subFilter)
   if (selection.kind === 'sectionGroup') return filterSectionGroupEntries(entries, selection.type, options.subFilter)
+  if (selection.kind === 'tag') return filterTagEntries(entries, selection.tag, options.subFilter)
   return filterTopLevelEntries(entries, selection, options)
 }
 
@@ -568,6 +575,17 @@ export function countByFilter(entries: VaultEntry[], type: string): Record<NoteL
   let open = 0, archived = 0
   for (const e of entries) {
     if (!isSectionEntryVisibleForType(e, type, typeVisibility)) continue
+    if (e.archived) archived++
+    else open++
+  }
+  return { open, archived }
+}
+
+/** Count open/archived entries that have the given tag. */
+export function countTagEntriesByFilter(entries: VaultEntry[], tag: string): Record<NoteListFilter, number> {
+  let open = 0, archived = 0
+  for (const e of entries) {
+    if (!entryHasTag(e, tag)) continue
     if (e.archived) archived++
     else open++
   }

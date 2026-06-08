@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from 'react'
-import { Folder, Funnel, Plus, SlidersHorizontal } from '@phosphor-icons/react'
+import { Folder, Funnel, Plus, SlidersHorizontal, Tag } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { translate, type AppLocale } from '../../lib/i18n'
 import { SidebarGroupHeader } from './SidebarGroupHeader'
@@ -72,6 +72,12 @@ const TYPE_ROWS = [
 const FOLDER_ROWS = [
   { id: 'folder-primary', icon: <Folder size={16} />, labelWidth: 118 },
   { id: 'folder-secondary', icon: <Folder size={16} />, labelWidth: 92 },
+]
+
+const TAG_ROWS = [
+  { id: 'tag-primary', icon: <Tag size={16} />, labelWidth: 96, showCount: true },
+  { id: 'tag-secondary', icon: <Tag size={16} />, labelWidth: 120, showCount: true },
+  { id: 'tag-tertiary', icon: <Tag size={16} />, labelWidth: 84, showCount: true },
 ]
 
 type CreatableLoadingSectionKind = 'views' | 'folders'
@@ -246,6 +252,18 @@ function CreatableLoadingSection({
         </SidebarLoadingAction>
       )}
     </SidebarLoadingSection>
+  )
+}
+
+export function SidebarTagsLoadingSection(props: SidebarLoadingSectionsProps) {
+  const locale = props.locale ?? 'en'
+  return (
+    <SidebarLoadingSection
+      {...props}
+      label={translate(locale, 'sidebar.group.tags')}
+      rows={TAG_ROWS}
+      testId="sidebar-loading-tags"
+    />
   )
 }
 

@@ -10,7 +10,7 @@ import type {
 } from '../../types'
 import type { AppLocale } from '../../lib/i18n'
 import type { NoteListFilter, RelationshipGroup } from '../../utils/noteListHelpers'
-import { countByFilter, countAllByFilter, countAllNotesByFilter } from '../../utils/noteListHelpers'
+import { countByFilter, countAllByFilter, countAllNotesByFilter, countTagEntriesByFilter } from '../../utils/noteListHelpers'
 import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
 import type { GitRepositoryOption } from '../../utils/gitRepositories'
 import type { ImmediateCreateOptions } from '../../hooks/useNoteCreation'
@@ -48,7 +48,8 @@ function useViewFlags(selection: SidebarSelection) {
   const isInboxView = selection.kind === 'filter' && selection.filter === 'inbox'
   const isAllNotesView = selection.kind === 'filter' && selection.filter === 'all'
   const isChangesView = selection.kind === 'filter' && selection.filter === 'changes'
-  const showFilterPills = isSectionGroup || isFolderView
+  const isTagView = selection.kind === 'tag'
+  const showFilterPills = isSectionGroup || isFolderView || isTagView
   return { isSectionGroup, isFolderView, isInboxView, isAllNotesView, isChangesView, showFilterPills }
 }
 
@@ -143,6 +144,7 @@ function useFilterCounts(
   return useMemo(() => {
     if (selection.kind === 'sectionGroup') return countByFilter(entries, selection.type)
     if (selection.kind === 'folder') return countAllByFilter(entries)
+    if (selection.kind === 'tag') return countTagEntriesByFilter(entries, selection.tag)
     if (selection.kind === 'filter' && selection.filter === 'all') {
       return countAllNotesByFilter(entries, allNotesFileVisibility)
     }
@@ -225,7 +227,7 @@ function useNoteListContent({
   allNotesFileVisibility,
 }: UseNoteListContentParams) {
   const dateDisplayFormat = useDateDisplayFormat()
-  const subFilter = (selection.kind === 'sectionGroup' || selection.kind === 'folder')
+  const subFilter = (selection.kind === 'sectionGroup' || selection.kind === 'folder' || selection.kind === 'tag')
     ? noteListFilter
     : undefined
   const effectiveInboxPeriod = isInboxView ? inboxPeriod : undefined
@@ -646,7 +648,7 @@ function buildNoteListLayoutModel(params: {
     modifiedFilesError: params.modifiedFilesError,
     searched: params.content.searched,
     query: params.content.query,
-    showFilterPills: params.selection.kind === 'sectionGroup' || params.selection.kind === 'folder',
+    showFilterPills: params.selection.kind === 'sectionGroup' || params.selection.kind === 'folder' || params.selection.kind === 'tag',
     noteListFilter: params.noteListFilter,
     filterCounts: params.filterCounts,
     onNoteListFilterChange: params.onNoteListFilterChange,

@@ -48,6 +48,7 @@ export function isSelectionActive(current: SidebarSelection, check: SidebarSelec
       const currentView = current as typeof check
       return currentView.filename === check.filename && (currentView.rootPath ?? '') === (check.rootPath ?? '')
     }
+    case 'tag': return (current as typeof check).tag === check.tag
     default: return false
   }
 }

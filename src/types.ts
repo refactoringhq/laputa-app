@@ -244,6 +244,7 @@ export type SidebarSelection =
   | { kind: 'folder'; path: string; rootPath?: string }
   | { kind: 'entity'; entry: VaultEntry }
   | { kind: 'view'; filename: string; rootPath?: string }
+  | { kind: 'tag'; tag: string }
 
 // --- Custom Views ---
 
