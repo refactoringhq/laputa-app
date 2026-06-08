@@ -3,8 +3,19 @@ import type { useCreateBlockNote } from '@blocknote/react'
 
 export const CODE_BLOCK_SELECTOR = '[data-content-type="codeBlock"]'
 const CLIPBOARD_INLINE_FORMAT_SELECTOR = 'a, b, code, em, i, s, span, strong, u'
+const CLIPBOARD_WIKILINK_SELECTOR = [
+  '[data-inline-content-type="wikilink"][data-target]',
+  '.wikilink[data-target]',
+  '[data-wikilink-target]',
+].join(',')
+const MARKDOWN_WIKILINK_RE = /\[\[[^\]]+\]\]/
 
 type RichEditor = ReturnType<typeof useCreateBlockNote>
+type ClipboardWriter = Pick<DataTransfer, 'setData'>
+type ClipboardWikilink = {
+  label: string
+  target: string
+}
 
 export type RichEditorClipboardPayload = {
   blocknoteHtml: string
@@ -24,11 +35,66 @@ export function richEditorClipboardPayload(editor: RichEditor): RichEditorClipbo
     return {
       blocknoteHtml: clipboardHTML,
       html: externalHTML,
-      markdown,
+      markdown: restoreWikilinkMarkdown(markdown, externalHTML, clipboardHTML),
     }
   } catch {
     return null
   }
+}
+
+export function writeRichEditorClipboardPayload(
+  clipboardData: ClipboardWriter,
+  payload: RichEditorClipboardPayload,
+) {
+  clipboardData.setData('blocknote/html', payload.blocknoteHtml)
+  clipboardData.setData('text/html', payload.html)
+  if (MARKDOWN_WIKILINK_RE.test(payload.markdown)) {
+    clipboardData.setData('text/markdown', payload.markdown)
+  }
+}
+
+function restoreWikilinkMarkdown(
+  markdown: string,
+  externalHTML: string,
+  blocknoteHtml: string,
+): string {
+  const wikilinks = clipboardWikilinksFromHtml(externalHTML)
+    ?? clipboardWikilinksFromHtml(blocknoteHtml)
+  if (!wikilinks) return markdown
+
+  let restored = markdown
+  let searchFrom = 0
+  for (const wikilink of wikilinks) {
+    const index = restored.indexOf(wikilink.label, searchFrom)
+    if (index === -1) continue
+
+    const replacement = `[[${wikilink.target}]]`
+    restored = restored.slice(0, index) + replacement + restored.slice(index + wikilink.label.length)
+    searchFrom = index + replacement.length
+  }
+
+  return restored
+}
+
+function clipboardWikilinksFromHtml(html: string): ClipboardWikilink[] | null {
+  const ownerDocument = globalThis.document
+  if (!ownerDocument || html.length === 0) return null
+
+  const container = ownerDocument.createElement('div')
+  container.innerHTML = html
+  const wikilinks = Array.from(container.querySelectorAll<HTMLElement>(CLIPBOARD_WIKILINK_SELECTOR))
+    .map(clipboardWikilinkFromElement)
+    .filter((wikilink): wikilink is ClipboardWikilink => wikilink !== null)
+
+  return wikilinks.length > 0 ? wikilinks : null
+}
+
+function clipboardWikilinkFromElement(element: HTMLElement): ClipboardWikilink | null {
+  const target = element.getAttribute('data-target') ?? element.getAttribute('data-wikilink-target')
+  const label = element.textContent
+  if (!target || !label) return null
+
+  return { label, target }
 }
 
 function nodeElement(node: Node | null): HTMLElement | null {
