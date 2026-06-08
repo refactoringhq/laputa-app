@@ -808,5 +808,7 @@
   "locale.plPL": "Polonais",
   "locale.beBY": "Biélorusse",
   "locale.beLatn": "Biélorusse (Latin)",
-  "locale.idID": "Indonésien"
+  "locale.idID": "Indonésien",
+  "locale.ukUA": "Ukrainien",
+  "locale.svSE": "Suédois"
 }

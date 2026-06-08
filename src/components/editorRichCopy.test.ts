@@ -1,6 +1,7 @@
 import { BlockNoteEditor } from '@blocknote/core'
-import { describe, expect, it } from 'vitest'
-import { richEditorClipboardPayload } from './editorRichCopy'
+import { describe, expect, it, vi } from 'vitest'
+import { schema } from './editorSchema'
+import { richEditorClipboardPayload, writeRichEditorClipboardPayload } from './editorRichCopy'
 
 function createMountedEditor() {
   const mount = globalThis.document.createElement('div')
@@ -41,6 +42,59 @@ function createMountedEditor() {
 }
 
 describe('richEditorClipboardPayload', () => {
+  it('keeps single and multi wikilink targets in copied markdown', () => {
+    const mount = globalThis.document.createElement('div')
+    globalThis.document.body.appendChild(mount)
+    const editor = BlockNoteEditor.create({
+      schema,
+      initialContent: [{
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'See ', styles: {} },
+          { type: 'wikilink', props: { target: 'Project Alpha' } },
+          { type: 'text', text: ' and ', styles: {} },
+          { type: 'wikilink', props: { target: 'team/Beta|Beta Team' } },
+        ],
+      }],
+    })
+    editor.mount(mount)
+
+    try {
+      editor._tiptapEditor.commands.selectAll()
+
+      const payload = richEditorClipboardPayload(editor)
+
+      expect(payload?.markdown).toContain('[[Project Alpha]]')
+      expect(payload?.markdown).toContain('[[team/Beta|Beta Team]]')
+    } finally {
+      editor.unmount()
+      mount.remove()
+    }
+  })
+
+  it('writes markdown clipboard data only for wikilink selections', () => {
+    const clipboardData = { setData: vi.fn() }
+
+    writeRichEditorClipboardPayload(clipboardData, {
+      blocknoteHtml: '<p>See Alpha</p>',
+      html: '<p>See Alpha</p>',
+      markdown: 'See [[Project Alpha]]\n',
+    })
+
+    expect(clipboardData.setData).toHaveBeenCalledWith('blocknote/html', '<p>See Alpha</p>')
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/html', '<p>See Alpha</p>')
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/markdown', 'See [[Project Alpha]]\n')
+
+    const richClipboardData = { setData: vi.fn() }
+    writeRichEditorClipboardPayload(richClipboardData, {
+      blocknoteHtml: '<strong>Bold copy</strong>',
+      html: '<strong>Bold copy</strong>',
+      markdown: '**Bold copy**\n',
+    })
+
+    expect(richClipboardData.setData).not.toHaveBeenCalledWith('text/markdown', '**Bold copy**\n')
+  })
+
   it('preserves semantic table and list markup from a mounted BlockNote selection', () => {
     const { cleanup, editor } = createMountedEditor()
 

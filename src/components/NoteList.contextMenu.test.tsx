@@ -34,6 +34,7 @@ describe('NoteList context menu', () => {
     fireEvent.contextMenu(screen.getByText('Build Laputa App'))
 
     expect(screen.getByTestId('note-list-context-menu')).toBeInTheDocument()
+    expect(screen.getByTestId('note-list-context-menu')).toHaveClass('z-[12000]')
     expect(screen.getByText(getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteOpenInNewWindow)!)).toBeInTheDocument()
     expect(screen.getByText(getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteToggleFavorite)!)).toBeInTheDocument()
     expect(screen.getByText(getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteToggleOrganized)!)).toBeInTheDocument()

@@ -47,7 +47,7 @@ export function ChangesContextMenuNode({
   return (
     <div
       ref={ctxMenuRef}
-      className="fixed z-50 rounded-md border bg-popover p-1 shadow-md"
+      className="fixed z-[12000] rounded-md border bg-popover p-1 shadow-md"
       style={{ left: ctxMenu.x, top: ctxMenu.y, minWidth: 180 }}
       data-testid="changes-context-menu"
     >

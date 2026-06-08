@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { repairMalformedEditorBlocks } from './editorBlockRepair'
 
+type TestBlock = {
+  id: string
+  type: string
+  content: unknown[]
+  children: TestBlock[]
+}
+
 function textContent(text: string) {
   return [{ type: 'text', text, styles: {} }]
 }
@@ -12,6 +19,10 @@ function block(type: string, text: string, children: unknown[] = []) {
     content: textContent(text),
     children,
   }
+}
+
+function collectIds(blocks: TestBlock[]): string[] {
+  return blocks.flatMap(item => [item.id, ...collectIds(item.children)])
 }
 
 describe('repairMalformedEditorBlocks', () => {
@@ -46,5 +57,24 @@ describe('repairMalformedEditorBlocks', () => {
     const parent = block('toggleListItem', 'Toggle summary', [nested])
 
     expect(repairMalformedEditorBlocks([parent])).toEqual([parent])
+  })
+
+  it('assigns fresh ids to duplicate blocks before render recovery retries', () => {
+    const first = { ...block('paragraph', 'Intro'), id: 'duplicate-id' }
+    const second = { ...block('mermaidBlock', 'Diagram'), id: 'duplicate-id' }
+    const nested = { ...block('paragraph', 'Nested'), id: 'duplicate-id' }
+    const parent = block('numberedListItem', 'Parent', [nested])
+
+    const result = repairMalformedEditorBlocks([first, second, parent]) as TestBlock[]
+    const ids = collectIds(result)
+
+    expect(result[0].id).toBe('duplicate-id')
+    expect(result[1]).toMatchObject({
+      type: 'mermaidBlock',
+      content: textContent('Diagram'),
+    })
+    expect(result[1].id).not.toBe('duplicate-id')
+    expect(result[2].children[0].id).not.toBe('duplicate-id')
+    expect(new Set(ids).size).toBe(ids.length)
   })
 })
