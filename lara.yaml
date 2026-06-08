@@ -25,6 +25,7 @@ locales:
     - pl-PL
     - be-BY
     - id-ID
+    - uk-UA
 
 files:
   json:
