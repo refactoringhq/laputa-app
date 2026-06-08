@@ -531,22 +531,45 @@ function useEntryMutations(
   }, [setEntries])
 
   const removeEntry = useCallback((path: string) => {
-    setEntries((prev) => prev.filter((e) => e.path !== path))
+    setEntries((prev) => removeEntryByPath(prev, path))
   }, [setEntries])
 
   const removeEntries = useCallback((paths: string[]) => {
     if (paths.length === 0) return
-    const pathSet = new Set(paths)
-    setEntries((prev) => prev.filter((entry) => !pathSet.has(entry.path)))
+    setEntries((prev) => removeEntriesByPath(prev, paths))
   }, [setEntries])
 
   const replaceEntry = useCallback((oldPath: string, patch: Partial<VaultEntry> & { path: string }) => {
-    setEntries((prev) => prev.map((entry, index) =>
-      entry.path === oldPath ? normalizeVaultEntry({ ...entry, ...patch }, '', index) : entry,
-    ))
+    setEntries((prev) => replaceEntryByPath(prev, oldPath, patch))
   }, [setEntries])
 
   return { addEntry, updateEntry, removeEntry, removeEntries, replaceEntry }
+}
+
+function removeEntryByPath(entries: VaultEntry[], path: string): VaultEntry[] {
+  const nextEntries = entries.filter((entry) => entry.path !== path)
+  return nextEntries.length === entries.length ? entries : nextEntries
+}
+
+function removeEntriesByPath(entries: VaultEntry[], paths: string[]): VaultEntry[] {
+  if (paths.length === 0) return entries
+
+  const pathSet = new Set(paths)
+  const nextEntries = entries.filter((entry) => !pathSet.has(entry.path))
+  return nextEntries.length === entries.length ? entries : nextEntries
+}
+
+function replaceEntryByPath(
+  entries: VaultEntry[],
+  oldPath: string,
+  patch: Partial<VaultEntry> & { path: string },
+): VaultEntry[] {
+  const entryIndex = entries.findIndex((entry) => entry.path === oldPath)
+  if (entryIndex < 0) return entries
+
+  const nextEntries = [...entries]
+  nextEntries[entryIndex] = normalizeVaultEntry({ ...entries[entryIndex], ...patch }, '', entryIndex)
+  return nextEntries
 }
 
 function useGitLoaders(vaultPath: string) {

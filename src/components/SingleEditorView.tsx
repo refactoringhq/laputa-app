@@ -40,6 +40,7 @@ import {
   handleEditorFileBlockClick,
   openEditorAttachmentOrUrl,
 } from './editorAttachmentActions'
+import { insertImageBlockAfterCursor } from './editorImageInsertion'
 import { useBlockNoteSideMenuHoverGuard } from './blockNoteSideMenuHoverGuard'
 import { getTolariaSlashMenuItems } from './tolariaEditorFormattingConfig'
 import {
@@ -1179,9 +1180,7 @@ function useInsertImageCallback(editor: ReturnType<typeof useCreateBlockNote>) {
   const editorRef = useRef(editor)
   useEffect(() => { editorRef.current = editor }, [editor])
   return useCallback((url: string) => {
-    const e = editorRef.current
-    const cursorBlock = e.getTextCursorPosition().block
-    e.insertBlocks([{ type: 'image' as const, props: { url } }], cursorBlock, 'after')
+    insertImageBlockAfterCursor(editorRef.current, url)
   }, [])
 }
 
