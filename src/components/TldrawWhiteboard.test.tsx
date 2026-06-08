@@ -256,6 +256,30 @@ describe('TldrawWhiteboard', () => {
     expect(dispatchUnhandledRejection(denied).defaultPrevented).toBe(false)
   })
 
+  it('prevents whiteboard permission rejections before earlier global listeners observe them', () => {
+    const observedDefaultPrevented: boolean[] = []
+    const sentryLikeListener = (event: PromiseRejectionEvent) => {
+      observedDefaultPrevented.push(event.defaultPrevented)
+    }
+    window.addEventListener('unhandledrejection', sentryLikeListener)
+    let guardCleanup: (() => void) | undefined
+
+    try {
+      renderWhiteboard()
+      guardCleanup = renderedTldrawProps().onMount(mockEditor())
+      const denied = {
+        name: 'NotAllowedError',
+        message: 'The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.',
+      }
+
+      expect(dispatchUnhandledRejection(denied).defaultPrevented).toBe(true)
+      expect(observedDefaultPrevented).toEqual([true])
+    } finally {
+      guardCleanup?.()
+      window.removeEventListener('unhandledrejection', sentryLikeListener)
+    }
+  })
+
   it('resets the drawing store when switching to a blank board snapshot', () => {
     const boardASnapshot = { records: { shape: 'from-board-a' } }
     const { rerender } = renderWhiteboard({ snapshot: JSON.stringify(boardASnapshot) })
