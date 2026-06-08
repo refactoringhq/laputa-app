@@ -13,7 +13,7 @@ interface BlockSelectionLike {
 }
 
 interface TextCursorPositionLike {
-  block: BlockLike
+  block?: BlockLike
 }
 
 export interface BlockNotePositionEditor {
@@ -225,7 +225,14 @@ function getSelectionIndexes(editor: BlockNotePositionEditor): [number, number] 
 function getCursorIndex(editor: BlockNotePositionEditor): number | null {
   if (typeof editor.getTextCursorPosition !== 'function') return null
 
-  const cursorBlockId = editor.getTextCursorPosition().block.id
+  let cursorBlockId: string | undefined
+  try {
+    cursorBlockId = editor.getTextCursorPosition()?.block?.id
+  } catch {
+    return null
+  }
+  if (!cursorBlockId) return null
+
   const cursorIndex = editor.document.findIndex(block => block.id === cursorBlockId)
   return cursorIndex === -1 ? null : cursorIndex
 }
@@ -277,7 +284,8 @@ export function captureRichEditorPositionSnapshot(
   if (editor.document.length === 0) return null
 
   const selectionIndexes = getSelectionIndexes(editor)
-  const [anchorBlockIndex, headBlockIndex] = selectionIndexes ?? [getCursorIndex(editor), getCursorIndex(editor)]
+  const cursorIndex = selectionIndexes ? null : getCursorIndex(editor)
+  const [anchorBlockIndex, headBlockIndex] = selectionIndexes ?? [cursorIndex, cursorIndex]
   if (anchorBlockIndex === null || headBlockIndex === null) return null
 
   return {
