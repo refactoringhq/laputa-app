@@ -15,6 +15,7 @@ import {
   type ResolvedTolariaDeepLink,
 } from '../utils/deepLinks'
 import { notePathsMatch } from '../utils/notePathIdentity'
+import { cleanupTauriEventListener, type TauriUnlisten } from '../utils/tauriEventCleanup'
 import { vaultPathForEntry } from '../utils/workspaces'
 
 interface UseDeepLinksConfig {
@@ -287,7 +288,7 @@ async function installTauriDeepLinkListener({
   })
   if (!listenerState.disposed) return stopListening
 
-  stopListening()
+  cleanupTauriEventListener(stopListening)
   return () => {}
 }
 
@@ -302,7 +303,7 @@ function useTauriDeepLinkListener({
     if (!enabled || !isTauri()) return undefined
 
     const listenerState = { disposed: false }
-    let unlisten: (() => void) | null = null
+    let unlisten: TauriUnlisten | null = null
 
     installTauriDeepLinkListener({ listenerState, setPendingUrl })
       .then((stopListening) => {
@@ -314,7 +315,7 @@ function useTauriDeepLinkListener({
 
     return () => {
       listenerState.disposed = true
-      unlisten?.()
+      cleanupTauriEventListener(unlisten)
     }
   }, [enabled, setPendingUrl])
 }
