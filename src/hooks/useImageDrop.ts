@@ -90,6 +90,10 @@ async function copyImageToVault({
   return attachmentAssetUrlFromPath({ path: savedPath })
 }
 
+function logDroppedImageCopyFailure(error: unknown): void {
+  console.warn('[image-drop] Failed to copy dropped image into vault:', error)
+}
+
 function insertDroppedImages({
   imagePaths,
   vaultPath,
@@ -99,7 +103,7 @@ function insertDroppedImages({
   if (!vaultPath || !onImageUrl) return
 
   for (const sourcePath of imagePaths) {
-    void copyImageToVault({ sourcePath, vaultPath }).then(onImageUrl)
+    void copyImageToVault({ sourcePath, vaultPath }).then(onImageUrl, logDroppedImageCopyFailure)
   }
 }
 
