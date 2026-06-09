@@ -36,6 +36,19 @@ const mockCommits: PulseCommit[] = [
 
 const mockInvokeFn = vi.fn()
 const dragRegionMouseDown = vi.fn()
+const MAC_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15'
+const WINDOWS_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36'
+
+async function withUserAgent<T>(userAgent: string, callback: () => T | Promise<T>): Promise<T> {
+  const originalUserAgent = navigator.userAgent
+  Object.defineProperty(window.navigator, 'userAgent', { value: userAgent, configurable: true })
+  try {
+    return await callback()
+  } finally {
+    Object.defineProperty(window.navigator, 'userAgent', { value: originalUserAgent, configurable: true })
+  }
+}
+
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => mockInvokeFn(...args),
 }))
@@ -350,5 +363,37 @@ describe('PulseView', () => {
     fireEvent.click(button)
 
     expect(onExpandSidebar).toHaveBeenCalledTimes(1)
+  })
+
+  it('offsets the collapsed-sidebar expand button past macOS traffic lights', async () => {
+    mockInvokeFn.mockResolvedValue([])
+
+    await withUserAgent(MAC_USER_AGENT, async () => {
+      render(
+        <PulseView
+          vaultPath="/test/vault"
+          sidebarCollapsed
+          onExpandSidebar={vi.fn()}
+        />,
+      )
+
+      expect(await screen.findByTestId('pulse-header')).toHaveStyle({ paddingLeft: '90px' })
+    })
+  })
+
+  it('keeps the default collapsed-sidebar header padding off macOS', async () => {
+    mockInvokeFn.mockResolvedValue([])
+
+    await withUserAgent(WINDOWS_USER_AGENT, async () => {
+      render(
+        <PulseView
+          vaultPath="/test/vault"
+          sidebarCollapsed
+          onExpandSidebar={vi.fn()}
+        />,
+      )
+
+      expect(await screen.findByTestId('pulse-header')).toHaveStyle({ paddingLeft: '16px' })
+    })
   })
 })

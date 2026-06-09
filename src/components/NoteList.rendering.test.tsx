@@ -1112,7 +1112,7 @@ describe('NoteList traffic-light padding', () => {
     withUserAgent(MAC_USER_AGENT, () => {
       const { container } = renderNoteList({ sidebarCollapsed: true })
       const header = container.querySelector('.h-\\[52px\\]') as HTMLElement
-      expect(header.style.paddingLeft).toBe('80px')
+      expect(header.style.paddingLeft).toBe('90px')
     })
   })
 
