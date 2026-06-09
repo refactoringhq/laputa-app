@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "강조 표시(마크다운에 유지)",
   "editor.whiteboard.enterFullscreen": "화이트보드 펼치기",
   "editor.whiteboard.exitFullscreen": "전체 화면 화이트보드에서 나가기",
+  "editor.whiteboard.permissionDeniedTitle": "화이트보드 권한 차단됨",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria는 이 화이트보드에 필요한 데스크톱 기능을 사용할 수 없습니다. 시스템 설정에서 권한을 허용한 다음 메모를 다시 여세요.",
   "editor.exportPdf.unavailable": "PDF로 내보내기 전에 Markdown 노트를 여세요.",
   "editor.exportPdf.failed": "PDF 내보내기를 시작할 수 없습니다: {error}",
   "filePreview.copyDeepLink": "링크 복사",

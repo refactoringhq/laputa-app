@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Sorot (bertahan dalam markdown)",
   "editor.whiteboard.enterFullscreen": "Perluas papan tulis",
   "editor.whiteboard.exitFullscreen": "Keluar dari papan tulis layar penuh",
+  "editor.whiteboard.permissionDeniedTitle": "Izin papan tulis diblokir",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria tidak dapat menggunakan fitur desktop yang dibutuhkan papan tulis ini. Izinkan di pengaturan sistem Anda, lalu buka kembali catatan tersebut.",
   "editor.exportPdf.unavailable": "Buka catatan Markdown sebelum mengekspor PDF.",
   "editor.exportPdf.failed": "Tidak dapat memulai ekspor PDF: {error}",
   "filePreview.copyDeepLink": "Salin tautan",

@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Đánh dấu (duy trì trong markdown)",
   "editor.whiteboard.enterFullscreen": "Mở rộng bảng trắng",
   "editor.whiteboard.exitFullscreen": "Thoát chế độ bảng trắng toàn màn hình",
+  "editor.whiteboard.permissionDeniedTitle": "Quyền truy cập bảng trắng bị chặn",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria không thể sử dụng một tính năng trên máy tính mà bảng trắng này cần. Cho phép quyền trong cài đặt hệ thống của bạn, sau đó mở lại ghi chú.",
   "editor.exportPdf.unavailable": "Mở ghi chú Markdown trước khi xuất PDF.",
   "editor.exportPdf.failed": "Không thể bắt đầu xuất PDF: {error}",
   "filePreview.copyDeepLink": "Sao chép liên kết",

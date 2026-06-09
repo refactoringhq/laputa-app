@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Выделение (сохраняется в Markdown)",
   "editor.whiteboard.enterFullscreen": "Развернуть доску",
   "editor.whiteboard.exitFullscreen": "Выйти из полноэкранной доски",
+  "editor.whiteboard.permissionDeniedTitle": "Разрешение для доски заблокировано",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria не удалось использовать функцию настольного компьютера, необходимую для этой доски. Разрешите доступ в настройках системы, а затем снова откройте заметку.",
   "editor.exportPdf.unavailable": "Откройте заметку Markdown перед экспортом в PDF.",
   "editor.exportPdf.failed": "Не удалось начать экспорт в PDF: {error}",
   "filePreview.copyDeepLink": "Копировать ссылку",

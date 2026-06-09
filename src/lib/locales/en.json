@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Highlight (persists in markdown)",
   "editor.whiteboard.enterFullscreen": "Expand whiteboard",
   "editor.whiteboard.exitFullscreen": "Exit fullscreen whiteboard",
+  "editor.whiteboard.permissionDeniedTitle": "Whiteboard permission blocked",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria could not use a desktop capability that this whiteboard needs. Allow the permission in your system settings, then reopen the note.",
   "editor.exportPdf.unavailable": "Open a Markdown note before exporting a PDF.",
   "editor.exportPdf.failed": "Could not start PDF export: {error}",
   "filePreview.copyDeepLink": "Copy link",

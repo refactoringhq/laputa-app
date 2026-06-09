@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Wyróżnienie (zachowuje się w Markdownie)",
   "editor.whiteboard.enterFullscreen": "Rozwiń tablicę",
   "editor.whiteboard.exitFullscreen": "Wyjdź z tablicy pełnoekranowej",
+  "editor.whiteboard.permissionDeniedTitle": "Zablokowano uprawnienie do tablicy",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria nie mogła użyć funkcji pulpitu, której potrzebuje ta tablica. Przyznaj uprawnienie w ustawieniach systemowych, a następnie ponownie otwórz notatkę.",
   "editor.exportPdf.unavailable": "Otwórz notatkę Markdown przed wyeksportowaniem pliku PDF.",
   "editor.exportPdf.failed": "Nie można rozpocząć eksportu do PDF: {error}",
   "filePreview.copyDeepLink": "Kopiuj link",
