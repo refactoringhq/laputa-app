@@ -6,6 +6,7 @@ import { useDragRegion } from '../hooks/useDragRegion'
 import type { PulseCommit, PulseFile } from '../types'
 import { relativeDate } from '../utils/noteListHelpers'
 import { openExternalUrl } from '../utils/url'
+import { isMac, MACOS_TRAFFIC_LIGHT_SAFE_PADDING } from '../utils/platform'
 import { getLocaleDateLocale, translate, type AppLocale } from '../lib/i18n'
 import { GitRepositorySelect } from './GitRepositorySelect'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
@@ -278,11 +279,15 @@ function PulseHeader({
     return () => header.removeEventListener('mousedown', onMouseDown)
   }, [dragRegionRef, onMouseDown])
 
+  const leftPadding = sidebarCollapsed && isMac()
+    ? MACOS_TRAFFIC_LIGHT_SAFE_PADDING
+    : 16
+
   return (
     <div
       ref={headerRef}
       className="flex shrink-0 items-center justify-between border-b border-border"
-      style={{ height: 52, padding: '0 16px', cursor: 'default' }}
+      style={{ height: 52, padding: `0 16px 0 ${leftPadding}px`, cursor: 'default' }}
       data-testid="pulse-header"
     >
       <div className="flex items-center" style={{ gap: 8 }}>
