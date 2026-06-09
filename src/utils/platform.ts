@@ -1,5 +1,7 @@
 import { isTauri } from '../mock-tauri'
 
+export const MACOS_TRAFFIC_LIGHT_SAFE_PADDING = 90
+
 function getUserAgent(): string {
   if (typeof navigator === 'undefined') return ''
   return navigator.userAgent
