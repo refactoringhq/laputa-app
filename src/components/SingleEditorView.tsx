@@ -1228,6 +1228,60 @@ function useRichEditorPlainTextPasteTarget(options: {
   }, [])
 }
 
+const PROSEMIRROR_HIGHLIGHT_PLUGIN_KEY_PREFIX = 'prosemirror-highlight$'
+const PROSEMIRROR_HIGHLIGHT_REFRESH_META = 'prosemirror-highlight-refresh'
+
+type CodeBlockHighlightRefreshTransaction = {
+  setMeta: (key: string, value: boolean) => CodeBlockHighlightRefreshTransaction
+}
+
+type CodeBlockHighlightRefreshView = {
+  dispatch: (transaction: CodeBlockHighlightRefreshTransaction) => void
+  state: {
+    config?: {
+      pluginsByKey?: Record<string, unknown>
+    }
+    tr: CodeBlockHighlightRefreshTransaction
+  }
+}
+
+type EditorWithCodeBlockHighlightRefreshView = {
+  _tiptapEditor?: {
+    view?: CodeBlockHighlightRefreshView | null
+  } | null
+  prosemirrorView?: CodeBlockHighlightRefreshView | null
+}
+
+function clearCodeBlockHighlightCache(view: CodeBlockHighlightRefreshView) {
+  const pluginKey = Object.keys(view.state.config?.pluginsByKey ?? {})
+    .find((key) => key.startsWith(PROSEMIRROR_HIGHLIGHT_PLUGIN_KEY_PREFIX))
+  if (!pluginKey) return
+
+  const pluginState = (view.state as Record<string, unknown>)[pluginKey]
+  if (typeof pluginState !== 'object' || pluginState === null) return
+
+  const decorationCache = (pluginState as { cache?: unknown }).cache
+  if (typeof decorationCache !== 'object' || decorationCache === null) return
+
+  const cacheMap = (decorationCache as { cache?: unknown }).cache
+  if (cacheMap instanceof Map) cacheMap.clear()
+}
+
+function codeBlockHighlightRefreshView(editor: ReturnType<typeof useCreateBlockNote>) {
+  const editorWithView = editor as unknown as EditorWithCodeBlockHighlightRefreshView
+  return editorWithView._tiptapEditor?.view ?? editorWithView.prosemirrorView ?? null
+}
+
+function refreshCodeBlockSyntaxHighlighting(editor: ReturnType<typeof useCreateBlockNote>) {
+  const view = codeBlockHighlightRefreshView(editor)
+  if (!view) return
+
+  clearCodeBlockHighlightCache(view)
+  const transaction = view.state.tr.setMeta(PROSEMIRROR_HIGHLIGHT_REFRESH_META, true)
+
+  view.dispatch(transaction)
+}
+
 /** Single BlockNote editor view — content is swapped via replaceBlocks */
 export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange, sourceEntry, vaultPath, editable = true, locale = 'en' }: {
   editor: ReturnType<typeof useCreateBlockNote>
@@ -1241,6 +1295,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
 }) {
   const { cssVars } = useEditorTheme()
   const themeMode = useDocumentThemeMode()
+  const previousThemeModeRef = useRef(themeMode)
   const containerRef = useRef<HTMLDivElement>(null)
   const suppressNextContainerClickRef = useRef(false)
   const handleContainerClick = useEditorContainerClickHandler({
@@ -1271,6 +1326,13 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
   useEffect(() => {
     _wikilinkEntriesRef.current = entries
   }, [entries])
+
+  useEffect(() => {
+    if (previousThemeModeRef.current === themeMode) return
+
+    previousThemeModeRef.current = themeMode
+    refreshCodeBlockSyntaxHighlighting(editor)
+  }, [editor, themeMode])
 
   useEffect(() => {
     return subscribeRichEditorExternalChange(editor, handleEditorChange)
