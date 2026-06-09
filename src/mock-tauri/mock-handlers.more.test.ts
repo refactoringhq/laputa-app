@@ -76,6 +76,37 @@ describe('mockHandlers additional coverage', () => {
     expect(content[backlinkPath]).toBe('Links: [[weekly-notes]] and [[Meeting Notes|alias]].')
   })
 
+  it('moves a note into another workspace without rewriting links that still use the same relative path', async () => {
+    const { mockHandlers } = await loadHandlers()
+    const sourceVaultPath = '/Users/mock/Personal Vault'
+    const destinationVaultPath = '/Users/mock/Team Vault'
+    const sourcePath = `${sourceVaultPath}/areas/weekly-review.md`
+    const backlinkPath = `${sourceVaultPath}/backlinks.md`
+
+    mockHandlers.save_note_content({
+      path: sourcePath,
+      content: '# Weekly Review',
+    })
+    mockHandlers.save_note_content({
+      path: backlinkPath,
+      content: 'Links: [[areas/weekly-review]] and [[Weekly Review|alias]].',
+    })
+
+    expect(mockHandlers.move_note_to_workspace({
+      source_vault_path: sourceVaultPath,
+      destination_vault_path: destinationVaultPath,
+      old_path: sourcePath,
+    })).toEqual({
+      new_path: `${destinationVaultPath}/areas/weekly-review.md`,
+      updated_files: 0,
+      failed_updates: 0,
+    })
+
+    const content = mockHandlers.get_all_content() as Record<string, string>
+    expect(content[`${destinationVaultPath}/areas/weekly-review.md`]).toBe('# Weekly Review')
+    expect(content[backlinkPath]).toBe('Links: [[areas/weekly-review]] and [[Weekly Review|alias]].')
+  })
+
   it('tracks remote state through create, clone, and add-remote flows', async () => {
     const { mockHandlers } = await loadHandlers()
     const emptyVaultPath = '/Users/mock/Documents/Brand New Vault'
