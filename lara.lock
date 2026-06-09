@@ -596,6 +596,8 @@ files:
     editor.formatting.highlightTooltip: c27173fea9ec1718030c5fa8440b2c78
     editor.whiteboard.enterFullscreen: 606bf766125ecff4b33ca98122222c72
     editor.whiteboard.exitFullscreen: afd0a0414d79d047f00319921e4d4944
+    editor.whiteboard.permissionDeniedTitle: f40def4c1928438aa4ac86421fed9fd9
+    editor.whiteboard.permissionDeniedBody: eb1399413cae00b1614695d3c5c7ac9f
     editor.exportPdf.unavailable: 2fce9834984172b64b66767485d815e9
     editor.exportPdf.failed: bf3fa78ff5725f5cbde8979b67ec2e2a
     filePreview.copyDeepLink: b75833669968adbef634495636e3fe50

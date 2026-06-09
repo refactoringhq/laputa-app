@@ -596,6 +596,8 @@
   "editor.formatting.highlightTooltip": "Vylučennie (zachoŭvajecca ŭ Markdown)",
   "editor.whiteboard.enterFullscreen": "Pašyryć došku",
   "editor.whiteboard.exitFullscreen": "Vyjsci z poŭnaekrannaj doški",
+  "editor.whiteboard.permissionDeniedTitle": "Dostup da doški zablakavany",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria nie zmahla vykarystać mahčymaść nastolnaj systemy, patrebnuju hetaj došcy. Dazvolcie hety dostup u sistemnych naladach, potym adkryjcie natatku nanoŭ.",
   "editor.exportPdf.unavailable": "Adkryjcie natatku Markdown pierad ekspartam u PDF.",
   "editor.exportPdf.failed": "Nie ŭdalosia pačać ekspart PDF: {error}",
   "filePreview.copyDeepLink": "Kapijavać spasylku",

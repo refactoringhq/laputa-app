@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "醒目提示（在 Markdown 中保留）",
   "editor.whiteboard.enterFullscreen": "展開白板",
   "editor.whiteboard.exitFullscreen": "退出全螢幕白板",
+  "editor.whiteboard.permissionDeniedTitle": "白板權限遭封鎖",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria 無法使用此白板所需的桌面功能。請在系統設定中授予權限，然後重新開啟筆記。",
   "editor.exportPdf.unavailable": "在匯出 PDF 之前，請先開啟 Markdown 筆記。",
   "editor.exportPdf.failed": "無法開始 PDF 匯出：{error}",
   "filePreview.copyDeepLink": "複製連結",

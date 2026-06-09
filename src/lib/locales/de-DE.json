@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Hervorhebung (bleibt in Markdown erhalten)",
   "editor.whiteboard.enterFullscreen": "Whiteboard erweitern",
   "editor.whiteboard.exitFullscreen": "Vollbild-Whiteboard verlassen",
+  "editor.whiteboard.permissionDeniedTitle": "Whiteboard-Berechtigung blockiert",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria konnte eine Desktop-Funktion, die dieses Whiteboard benötigt, nicht nutzen. Erteilen Sie die Berechtigung in Ihren Systemeinstellungen und öffnen Sie die Notiz dann erneut.",
   "editor.exportPdf.unavailable": "Öffne eine Markdown-Notiz, bevor du sie als PDF exportierst.",
   "editor.exportPdf.failed": "PDF-Export konnte nicht gestartet werden: {error}",
   "filePreview.copyDeepLink": "Link kopieren",

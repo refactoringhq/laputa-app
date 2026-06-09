@@ -490,6 +490,29 @@ body.tldraw-whiteboard-fullscreen-open {
   right: 12px;
 }
 
+.editor__blocknote-container .tldraw-whiteboard__permission-error {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  z-index: 95;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--destructive) 34%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--background) 94%, var(--destructive));
+  color: var(--foreground);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 16%);
+}
+
+.editor__blocknote-container .tldraw-whiteboard__permission-error strong {
+  color: var(--destructive);
+  font-size: 0.86rem;
+}
+
 .editor__blocknote-container .tldraw-whiteboard [data-radix-popper-content-wrapper] {
   position: absolute !important;
 }

@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Markera (bevaras i markdown)",
   "editor.whiteboard.enterFullscreen": "Expandera whiteboard",
   "editor.whiteboard.exitFullscreen": "Avsluta helskärm för whiteboard",
+  "editor.whiteboard.permissionDeniedTitle": "Whiteboard-behörighet blockerad",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria kunde inte använda en skrivbordsfunktion som den här whiteboardtavlan behöver. Tillåt behörigheten i dina systeminställningar och öppna sedan anteckningen igen.",
   "editor.exportPdf.unavailable": "Öppna en Markdown-anteckning innan du exporterar en PDF.",
   "editor.exportPdf.failed": "Det gick inte att starta PDF-exporten: {error}",
   "filePreview.copyDeepLink": "Kopiera länk",

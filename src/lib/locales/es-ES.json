@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Resaltado (persiste en Markdown)",
   "editor.whiteboard.enterFullscreen": "Expandir pizarra",
   "editor.whiteboard.exitFullscreen": "Salir de la pizarra en pantalla completa",
+  "editor.whiteboard.permissionDeniedTitle": "Permiso de pizarra bloqueado",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria no ha podido usar una función de escritorio que esta pizarra necesita. Concede el permiso en la configuración de tu sistema y, a continuación, vuelve a abrir la nota.",
   "editor.exportPdf.unavailable": "Abre una nota de Markdown antes de exportar un PDF.",
   "editor.exportPdf.failed": "No se ha podido iniciar la exportación a PDF: {error}",
   "filePreview.copyDeepLink": "Copiar enlace",
