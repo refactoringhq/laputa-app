@@ -469,7 +469,7 @@
   "sidebar.action.moveViewDown": "將檢視向下移動",
   "sidebar.action.customizeSections": "自定義分組",
   "sidebar.action.renameSection": "重新命名分組…",
-  "sidebar.action.renameType": "重新命名類型…",
+  "sidebar.action.renameType": "變更顯示名稱…",
   "sidebar.action.customizeIconColor": "自定義圖示和顏色…",
   "sidebar.action.deleteType": "刪除類型",
   "sidebar.action.createType": "新建型別",
