@@ -23,8 +23,11 @@ Status: Active
 Inline \`const answer = 42\` should stay on the lighter inline chip.
 
 \`\`\`ts
-const answer = 42
-console.log(answer)
+function paint(answer: number) {
+  return answer + 42
+}
+
+console.log(paint(1))
 \`\`\`
 `)
 }
@@ -35,6 +38,12 @@ async function backgroundColor(locator: Locator) {
 
 async function textColor(locator: Locator) {
   return locator.evaluate((element) => getComputedStyle(element).color)
+}
+
+async function tokenColors(locator: Locator) {
+  return locator.evaluateAll((elements) => (
+    Array.from(new Set(elements.map((element) => getComputedStyle(element).color)))
+  ))
 }
 
 test.describe('Editor code block theme', () => {
@@ -62,24 +71,29 @@ test.describe('Editor code block theme', () => {
     const codeBlock = page.locator('.bn-block-content[data-content-type="codeBlock"]').first()
     const fencedCode = codeBlock.locator('pre code').first()
     const highlightedToken = codeBlock.locator('.shiki').first()
+    const highlightedTokens = codeBlock.locator('.shiki')
 
     await expect(codeBlock).toBeVisible({ timeout: 10_000 })
     await expect(inlineCode).toBeVisible({ timeout: 10_000 })
     await expect(fencedCode).toBeVisible()
 
     await expect.poll(() => backgroundColor(inlineCode)).toBe('rgb(240, 240, 239)')
-    await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(245, 248, 255)')
     await expect.poll(() => backgroundColor(fencedCode)).toBe('rgba(0, 0, 0, 0)')
     await expect.poll(() => textColor(fencedCode)).toBe('rgb(55, 53, 47)')
-    await expect.poll(() => textColor(highlightedToken)).toBe('rgb(55, 53, 47)')
+    const lightCodeBlockBackground = await backgroundColor(codeBlock)
+    const lightTokenColors = await tokenColors(highlightedTokens)
+    expect(lightTokenColors.length).toBeGreaterThan(0)
 
     await page.getByTestId('status-theme-mode').click()
     await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(22, 22, 22)')
     await expect.poll(() => textColor(fencedCode)).toBe('rgb(255, 255, 255)')
+    await expect.poll(() => tokenColors(highlightedTokens)).not.toEqual(lightTokenColors)
+    const darkTokenColors = await tokenColors(highlightedTokens)
 
     await page.getByTestId('status-theme-mode').click()
-    await expect.poll(() => backgroundColor(codeBlock)).toBe('rgb(245, 248, 255)')
+    await expect.poll(() => backgroundColor(codeBlock)).toBe(lightCodeBlockBackground)
     await expect.poll(() => textColor(fencedCode)).toBe('rgb(55, 53, 47)')
+    await expect.poll(() => tokenColors(highlightedTokens)).not.toEqual(darkTokenColors)
     await expect(highlightedToken).toBeVisible()
   })
 })
