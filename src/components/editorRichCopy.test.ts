@@ -1,7 +1,12 @@
 import { BlockNoteEditor } from '@blocknote/core'
 import { describe, expect, it, vi } from 'vitest'
 import { schema } from './editorSchema'
-import { richEditorClipboardPayload, writeRichEditorClipboardPayload } from './editorRichCopy'
+import {
+  richEditorClipboardPayload,
+  selectedEditorDomHtml,
+  selectedEditorPlainText,
+  writeRichEditorClipboardPayload,
+} from './editorRichCopy'
 
 function createMountedEditor() {
   const mount = globalThis.document.createElement('div')
@@ -72,18 +77,22 @@ describe('richEditorClipboardPayload', () => {
     }
   })
 
-  it('writes markdown clipboard data only for wikilink selections', () => {
+  it('writes plain markdown clipboard data for wikilink selections', () => {
     const clipboardData = { setData: vi.fn() }
 
     writeRichEditorClipboardPayload(clipboardData, {
       blocknoteHtml: '<p>See Alpha</p>',
       html: '<p>See Alpha</p>',
-      markdown: 'See [[Project Alpha]]\n',
+      markdown: 'See [[Project Alpha]] & <done>\n',
     })
 
-    expect(clipboardData.setData).toHaveBeenCalledWith('blocknote/html', '<p>See Alpha</p>')
-    expect(clipboardData.setData).toHaveBeenCalledWith('text/html', '<p>See Alpha</p>')
-    expect(clipboardData.setData).toHaveBeenCalledWith('text/markdown', 'See [[Project Alpha]]\n')
+    expect(clipboardData.setData).not.toHaveBeenCalledWith('blocknote/html', '<p>See Alpha</p>')
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', 'See [[Project Alpha]] & <done>')
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/markdown', 'See [[Project Alpha]] & <done>\n')
+    expect(clipboardData.setData).toHaveBeenCalledWith(
+      'text/html',
+      '<p>See [[Project Alpha]] &amp; &lt;done&gt;</p>',
+    )
 
     const richClipboardData = { setData: vi.fn() }
     writeRichEditorClipboardPayload(richClipboardData, {
@@ -92,7 +101,46 @@ describe('richEditorClipboardPayload', () => {
       markdown: '**Bold copy**\n',
     })
 
+    expect(richClipboardData.setData).toHaveBeenCalledWith('blocknote/html', '<strong>Bold copy</strong>')
+    expect(richClipboardData.setData).toHaveBeenCalledWith('text/html', '<strong>Bold copy</strong>')
     expect(richClipboardData.setData).not.toHaveBeenCalledWith('text/markdown', '**Bold copy**\n')
+  })
+
+  it('writes wikilink markdown as plain text for normal paste targets', () => {
+    const clipboardData = { setData: vi.fn() }
+
+    writeRichEditorClipboardPayload(clipboardData, {
+      blocknoteHtml: '<p><span class="wikilink" data-target="file-name">File Name</span></p>',
+      html: '<p><span class="wikilink" data-target="file-name">File Name</span></p>',
+      markdown: '[[file-name]]\n',
+    })
+
+    expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', '[[file-name]]')
+  })
+
+  it('restores DOM wikilinks when editor markdown payload is unavailable', () => {
+    const paragraph = globalThis.document.createElement('p')
+    paragraph.append('See ')
+    const wikilink = globalThis.document.createElement('span')
+    wikilink.setAttribute('data-inline-content-type', 'wikilink')
+    wikilink.setAttribute('data-target', 'file-name')
+    wikilink.textContent = 'File Name'
+    paragraph.appendChild(wikilink)
+    globalThis.document.body.appendChild(paragraph)
+
+    try {
+      const range = globalThis.document.createRange()
+      range.selectNodeContents(paragraph)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+
+      expect(selectedEditorPlainText(selection as Selection, range)).toBe('See [[file-name]]')
+      expect(selectedEditorDomHtml(range)).toBe('<p>See [[file-name]]</p>')
+    } finally {
+      window.getSelection()?.removeAllRanges()
+      paragraph.remove()
+    }
   })
 
   it('preserves semantic table and list markup from a mounted BlockNote selection', () => {
