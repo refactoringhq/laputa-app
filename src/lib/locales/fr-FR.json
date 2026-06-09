@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Surlignage (persiste dans le Markdown)",
   "editor.whiteboard.enterFullscreen": "Agrandir le tableau blanc",
   "editor.whiteboard.exitFullscreen": "Quitter le tableau blanc en plein écran",
+  "editor.whiteboard.permissionDeniedTitle": "Autorisation du tableau blanc bloquée",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria n'a pas pu utiliser une fonctionnalité de bureau dont ce tableau blanc a besoin. Autorisez l'accès dans les paramètres de votre système, puis rouvrez la note.",
   "editor.exportPdf.unavailable": "Ouvrez une note Markdown avant d'exporter un PDF.",
   "editor.exportPdf.failed": "Impossible de lancer l'exportation PDF : {error}",
   "filePreview.copyDeepLink": "Copier le lien",

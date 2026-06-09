@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Evidenziazione (persiste in markdown)",
   "editor.whiteboard.enterFullscreen": "Espandi la lavagna",
   "editor.whiteboard.exitFullscreen": "Esci dalla lavagna a schermo intero",
+  "editor.whiteboard.permissionDeniedTitle": "Autorizzazione per la lavagna bloccata",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria non ha potuto utilizzare una funzionalità desktop necessaria per questa lavagna. Concedi l'autorizzazione nelle impostazioni di sistema, quindi riapri la nota.",
   "editor.exportPdf.unavailable": "Apri una nota Markdown prima di esportare un PDF.",
   "editor.exportPdf.failed": "Impossibile avviare l'esportazione in PDF: {error}",
   "filePreview.copyDeepLink": "Copia link",

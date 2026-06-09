@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Destaque (persiste em markdown)",
   "editor.whiteboard.enterFullscreen": "Expandir quadro branco",
   "editor.whiteboard.exitFullscreen": "Sair do quadro branco em ecrã inteiro",
+  "editor.whiteboard.permissionDeniedTitle": "Permissão de quadro branco bloqueada",
+  "editor.whiteboard.permissionDeniedBody": "A Tolaria não conseguiu usar uma funcionalidade de ambiente de trabalho necessária para este quadro branco. Ative a permissão nas definições do sistema e, em seguida, reabra a nota.",
   "editor.exportPdf.unavailable": "Abra uma nota Markdown antes de exportar um PDF.",
   "editor.exportPdf.failed": "Não foi possível iniciar a exportação para PDF: {error}",
   "filePreview.copyDeepLink": "Copiar link",

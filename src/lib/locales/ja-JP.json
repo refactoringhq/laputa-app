@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "ハイライト（Markdownで保持）",
   "editor.whiteboard.enterFullscreen": "ホワイトボードを展開",
   "editor.whiteboard.exitFullscreen": "フルスクリーンホワイトボードを終了",
+  "editor.whiteboard.permissionDeniedTitle": "ホワイトボードのアクセスがブロックされました",
+  "editor.whiteboard.permissionDeniedBody": "Tolariaは、このホワイトボードに必要なデスクトップ機能を使用できませんでした。システム設定で権限を許可してから、ノートを再度開いてください。",
   "editor.exportPdf.unavailable": "PDFをエクスポートする前に、Markdownノートを開いてください。",
   "editor.exportPdf.failed": "PDFエクスポートを開始できませんでした：{error}",
   "filePreview.copyDeepLink": "リンクをコピー",

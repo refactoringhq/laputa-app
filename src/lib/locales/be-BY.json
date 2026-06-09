@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Вылучэнне (захоўваецца ў Markdown)",
   "editor.whiteboard.enterFullscreen": "Разгарнуць дошку",
   "editor.whiteboard.exitFullscreen": "Выйсці з поўнаэкраннай дошкі",
+  "editor.whiteboard.permissionDeniedTitle": "Дазвол на выкарыстанне дошкі заблакіраваны",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria не змагла выкарыстаць функцыю працоўнага стала, неабходную для гэтай дошкі. Дазвольце доступ у наладах сістэмы, а потым зноў адкрыйце нататку.",
   "editor.exportPdf.unavailable": "Адкрыйце нататку Markdown перад экспартам у PDF.",
   "editor.exportPdf.failed": "Немагчыма пачаць экспарт PDF: {error}",
   "filePreview.copyDeepLink": "Капіраваць спасылку",
