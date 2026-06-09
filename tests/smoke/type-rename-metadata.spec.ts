@@ -18,7 +18,7 @@ test.afterEach(() => {
   removeFixtureVaultCopy(tempVaultDir)
 })
 
-test('renaming a type section rewrites the type note and assigned note metadata @smoke', async ({ page }) => {
+test('changing a type section display name preserves type metadata @smoke', async ({ page }) => {
   await page.getByText('Projects', { exact: true }).dblclick()
 
   const renameInput = page.getByRole('textbox', { name: 'Section name' })
@@ -26,18 +26,20 @@ test('renaming a type section rewrites the type note and assigned note metadata 
   await renameInput.fill('Initiative')
   await renameInput.press('Enter')
 
-  await expect(page.getByText('Initiatives', { exact: true })).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByText('Initiative', { exact: true })).toBeVisible({ timeout: 5_000 })
 
   const oldTypePath = path.join(tempVaultDir, 'type', 'project.md')
   const newTypePath = path.join(tempVaultDir, 'type', 'initiative.md')
 
-  await expect(async () => {
-    expect(fs.existsSync(oldTypePath)).toBe(false)
-    expect(fs.existsSync(newTypePath)).toBe(true)
-  }).toPass({ timeout: 5_000 })
+  expect(fs.existsSync(oldTypePath)).toBe(true)
+  expect(fs.existsSync(newTypePath)).toBe(false)
+
+  const typeContent = fs.readFileSync(oldTypePath, 'utf-8')
+  expect(typeContent).toContain('_sidebar_label: "Initiative"')
+  expect(typeContent).toContain('# Project')
 
   const alphaContent = fs.readFileSync(path.join(tempVaultDir, 'project', 'alpha-project.md'), 'utf-8')
-  expect(alphaContent).toContain('type: "Initiative"')
-  expect(alphaContent).not.toContain('Is A: Project')
+  expect(alphaContent).toContain('Is A: Project')
   expect(alphaContent).not.toContain('type: "Project"')
+  expect(alphaContent).not.toContain('Initiative')
 })

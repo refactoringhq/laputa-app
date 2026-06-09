@@ -1050,19 +1050,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     }
   }, [notes.activeTabPath, seedAutoGitSavedChange])
 
-  const renameTypeEntry = useCallback(async (typeEntry: VaultEntry, newTypeName: string) => {
-    const typeVaultPath = vaultPathForEntry(typeEntry, resolvedPath)
-    await notes.handleRenameNote(typeEntry.path, newTypeName, typeVaultPath, (oldPath, newEntry) => {
-      vault.replaceEntry(oldPath, { ...newEntry, isA: 'Type' })
-    })
-  }, [notes, resolvedPath, vault])
-
   const entryActions = useEntryActions({
     entries: visibleEntries, updateEntry: vault.updateEntry,
     handleUpdateFrontmatter: notes.handleUpdateFrontmatter,
     handleDeleteProperty: notes.handleDeleteProperty, setToastMessage,
     createTypeEntry: notes.createTypeEntrySilent,
-    renameTypeEntry,
     onBeforeAction: flushEditorStateBeforeAction,
     actionHistory: notes.actionHistory,
   })

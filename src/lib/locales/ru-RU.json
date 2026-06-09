@@ -469,7 +469,7 @@
   "sidebar.action.moveViewDown": "Переместить представление вниз",
   "sidebar.action.customizeSections": "Настроить разделы",
   "sidebar.action.renameSection": "Переименовать раздел…",
-  "sidebar.action.renameType": "Переименовать тип…",
+  "sidebar.action.renameType": "Изменить отображаемое имя…",
   "sidebar.action.customizeIconColor": "Настроить значок и цвет…",
   "sidebar.action.deleteType": "Удалить тип",
   "sidebar.action.createType": "Создать новый тип",
