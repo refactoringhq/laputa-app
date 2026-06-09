@@ -7,6 +7,7 @@ export type BlockNoteRenderRecoveryReason =
   | 'block_type_mismatch'
   | 'block_missing_id'
   | 'paragraph_index_out_of_range'
+  | 'stale_block_reference'
   | 'table_row_index_out_of_range'
 
 export type RichEditorTransformRecoveryReason =
@@ -136,7 +137,7 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
   {
     matches: isStaleBlockReferenceError,
     reason: 'stale_block_reference',
-    surfaces: ['transform'],
+    surfaces: ['render', 'transform'],
   },
   {
     matches: isInvalidBlockJoinError,

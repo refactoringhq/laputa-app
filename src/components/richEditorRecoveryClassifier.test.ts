@@ -50,6 +50,7 @@ describe('richEditorRecoveryClassifier', () => {
 
     expect(classifyRichEditorRecoveryError(invalidContentError, 'transform')).toBe('transform_error')
     expect(richEditorRecoveryErrorNeedsDocumentRepair(invalidContentError)).toBe(true)
+    expect(classifyRichEditorRecoveryError(staleBlockError, 'render')).toBe('stale_block_reference')
     expect(classifyRichEditorRecoveryError(staleBlockError, 'transform')).toBe('stale_block_reference')
     expect(richEditorRecoveryErrorNeedsDocumentRepair(staleBlockError)).toBe(false)
   })
