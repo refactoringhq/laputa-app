@@ -19,7 +19,6 @@ interface WorkspaceSettingsRowsProps {
   onReorderVaults?: (orderedPaths: string[]) => void
   onSetDefaultWorkspace?: (path: string) => void
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
-  setVaultPendingRemoval: (vault: VaultOption) => void
   vaults: VaultOption[]
 }
 
@@ -149,14 +148,15 @@ function WorkspaceRowActions({
   onMoveVault,
   onSetDefaultWorkspace,
   onUpdateWorkspaceIdentity,
-  onRemoveVault,
+  onRequestRemoveVault,
   workspace,
   vault,
-}: Pick<WorkspaceSettingsRowsProps, 'locale' | 'onRemoveVault' | 'onSetDefaultWorkspace' | 'onUpdateWorkspaceIdentity'> & {
+}: Pick<WorkspaceSettingsRowsProps, 'locale' | 'onSetDefaultWorkspace' | 'onUpdateWorkspaceIdentity'> & {
   canEdit: boolean
   canMoveDown: boolean
   canMoveUp: boolean
   onMoveVault?: (path: string, direction: VaultMoveDirection) => void
+  onRequestRemoveVault?: () => void
   workspace: ReturnType<typeof workspaceIdentityFromVault>
   vault: VaultOption
 }) {
@@ -186,12 +186,12 @@ function WorkspaceRowActions({
       >
         {workspace.defaultForNewNotes ? t('workspace.manager.default') : t('workspace.manager.makeDefault')}
       </Button>
-      {onRemoveVault && (
+      {onRequestRemoveVault && (
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
-          onClick={() => onRemoveVault(vault.path)}
+          onClick={onRequestRemoveVault}
           disabled={workspace.defaultForNewNotes}
           aria-label={removeLabel}
           title={removeLabel}
@@ -205,17 +205,65 @@ function WorkspaceRowActions({
   )
 }
 
+function WorkspaceRemovalConfirmation({
+  locale,
+  onCancel,
+  onConfirm,
+  workspace,
+}: Pick<WorkspaceSettingsRowsProps, 'locale'> & {
+  onCancel: () => void
+  onConfirm: () => void
+  workspace: ReturnType<typeof workspaceIdentityFromVault>
+}) {
+  const t = createTranslator(locale)
+  const title = t('status.vault.removeConfirmTitle')
+
+  return (
+    <div
+      role="group"
+      aria-label={title}
+      className="rounded-md border border-destructive/40 bg-destructive/5 p-3"
+      data-testid={`settings-workspace-remove-confirm-${workspace.alias}`}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return
+        event.stopPropagation()
+        onCancel()
+      }}
+    >
+      <div className="text-sm font-medium text-foreground">{title}</div>
+      <div className="mt-1 text-xs leading-5 text-muted-foreground">
+        {t('status.vault.removeConfirmMessage', { label: workspace.label })}
+      </div>
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        <Button type="button" variant="outline" size="xs" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="button" variant="destructive" size="xs" onClick={onConfirm}>
+          {t('status.vault.removeConfirmAction')}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function WorkspaceSettingsRow({
   defaultWorkspacePath,
   locale,
+  onCancelRemoveVault,
+  onConfirmRemoveVault,
   onMoveVault,
+  onRequestRemoveVault,
   onSetDefaultWorkspace,
   onUpdateWorkspaceIdentity,
-  onRemoveVault,
   vaults,
   vault,
-}: Pick<WorkspaceSettingsRowsProps, 'defaultWorkspacePath' | 'locale' | 'onRemoveVault' | 'onSetDefaultWorkspace' | 'onUpdateWorkspaceIdentity' | 'vaults'> & {
+  pendingRemoval,
+}: Pick<WorkspaceSettingsRowsProps, 'defaultWorkspacePath' | 'locale' | 'onSetDefaultWorkspace' | 'onUpdateWorkspaceIdentity' | 'vaults'> & {
+  onCancelRemoveVault: () => void
+  onConfirmRemoveVault?: () => void
   onMoveVault?: (path: string, direction: VaultMoveDirection) => void
+  onRequestRemoveVault?: () => void
+  pendingRemoval: boolean
   vault: VaultOption
 }) {
   const workspace = workspaceIdentityFromVault(vault, { defaultWorkspacePath })
@@ -236,11 +284,19 @@ function WorkspaceSettingsRow({
           onMoveVault={onMoveVault}
           onSetDefaultWorkspace={onSetDefaultWorkspace}
           onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
-          onRemoveVault={onRemoveVault}
+          onRequestRemoveVault={onRequestRemoveVault}
           workspace={workspace}
           vault={vault}
         />
       </div>
+      {pendingRemoval && onConfirmRemoveVault && (
+        <WorkspaceRemovalConfirmation
+          locale={locale}
+          onCancel={onCancelRemoveVault}
+          onConfirm={onConfirmRemoveVault}
+          workspace={workspace}
+        />
+      )}
       <WorkspaceIdentityInputs canEdit={canEdit} locale={locale} onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity} vault={vault} />
     </div>
   )
@@ -263,9 +319,10 @@ export function WorkspaceSettingsRows({
   onReorderVaults,
   onSetDefaultWorkspace,
   onUpdateWorkspaceIdentity,
-  setVaultPendingRemoval,
   vaults,
 }: WorkspaceSettingsRowsProps) {
+  const [pendingRemovalPath, setPendingRemovalPath] = useState<string | null>(null)
+
   const moveVault = (path: string, direction: VaultMoveDirection) => {
     moveVaultInList(vaults, onReorderVaults, path, direction)
   }
@@ -278,10 +335,16 @@ export function WorkspaceSettingsRows({
             key={vault.path}
             defaultWorkspacePath={defaultWorkspacePath}
             locale={locale}
+            onCancelRemoveVault={() => setPendingRemovalPath(null)}
+            onConfirmRemoveVault={onRemoveVault ? () => {
+              onRemoveVault(vault.path)
+              setPendingRemovalPath(null)
+            } : undefined}
             onMoveVault={onReorderVaults ? moveVault : undefined}
+            onRequestRemoveVault={onRemoveVault ? () => setPendingRemovalPath(vault.path) : undefined}
             onSetDefaultWorkspace={onSetDefaultWorkspace}
             onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
-            onRemoveVault={onRemoveVault ? () => setVaultPendingRemoval(vault) : undefined}
+            pendingRemoval={pendingRemovalPath === vault.path}
             vaults={vaults}
             vault={vault}
           />
