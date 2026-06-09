@@ -18,9 +18,11 @@ import {
   VideoToExternalHTML,
 } from '@blocknote/react'
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentProps, type KeyboardEvent } from 'react'
+import { trackExcalidrawOpened } from '../utils/excalidrawTelemetry'
 import { resolveWikilinkColor as resolveColor } from '../utils/wikilinkColors'
 import { resolveEntry } from '../utils/wikilink'
 import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/mathMarkdown'
+import { EXCALIDRAW_BLOCK_TYPE, EXCALIDRAW_DEFAULT_HEIGHT, excalidrawFenceSource } from '../utils/excalidrawMarkdown'
 import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
 import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
 import { MARKDOWN_HIGHLIGHT_STYLE } from '../utils/markdownHighlightMarkdown'
@@ -29,6 +31,7 @@ import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { MermaidDiagram } from './MermaidDiagram'
 import { SafeHtmlSpan } from './SafeMarkup'
+import { updateExcalidrawBlockPropsSafely } from './excalidrawBlockProps'
 import { updateTldrawBlockPropsSafely } from './tldrawBlockProps'
 import { useExternalMediaPreview } from '../utils/mediaPreviewRuntime'
 import { Textarea } from './ui/textarea'
@@ -40,6 +43,9 @@ import {
 
 const TldrawWhiteboard = lazy(() => import('./TldrawWhiteboard').then(module => ({
   default: module.TldrawWhiteboard,
+})))
+const ExcalidrawCanvas = lazy(() => import('./ExcalidrawCanvas').then(module => ({
+  default: module.ExcalidrawCanvas,
 })))
 type AudioBlockProps = ComponentProps<typeof AudioBlock>
 type VideoBlockProps = ComponentProps<typeof VideoBlock>
@@ -292,6 +298,29 @@ function readMermaidPreElement(element: HTMLElement): { source: string; diagram:
   }
 }
 
+function readLanguageCodeElement(element: HTMLElement, language: string): Element | undefined {
+  if (element.tagName !== 'PRE') return undefined
+  if (element.childElementCount !== 1) return undefined
+
+  const code = element.firstElementChild
+  if (code?.tagName !== 'CODE') return undefined
+  if (readCodeElementLanguage(code) !== language) return undefined
+
+  return code
+}
+
+function readExcalidrawPreElement(element: HTMLElement): { boardId: string; height: string; snapshot: string; width: string } | undefined {
+  const code = readLanguageCodeElement(element, 'excalidraw')
+  if (!code) return undefined
+
+  return {
+    boardId: '',
+    height: EXCALIDRAW_DEFAULT_HEIGHT,
+    snapshot: code.textContent?.trim() ?? '',
+    width: '',
+  }
+}
+
 const MermaidBlock = createReactBlockSpec(
   {
     type: MERMAID_BLOCK_TYPE,
@@ -409,8 +438,66 @@ const TldrawBlock = createReactBlockSpec(
   },
 )
 
+const ExcalidrawBlock = createReactBlockSpec(
+  {
+    type: EXCALIDRAW_BLOCK_TYPE,
+    propSchema: {
+      boardId: { default: '' },
+      height: { default: EXCALIDRAW_DEFAULT_HEIGHT },
+      snapshot: { default: '{}' },
+      width: { default: '' },
+    },
+    content: 'none',
+  },
+  {
+    runsBefore: ['codeBlock'],
+    meta: { selectable: false },
+    parse: readExcalidrawPreElement,
+    toExternalHTML: (props) => (
+      <pre><code className="language-excalidraw">{props.block.props.snapshot}</code></pre>
+    ),
+    render: (props) => <EmbeddedExcalidrawBlockRender block={props.block} editor={props.editor} />,
+  },
+)
+
+interface EmbeddedExcalidrawBlockRenderProps {
+  block: {
+    id: string
+    props: { boardId: string; height: string; snapshot: string; width: string }
+  }
+  editor: Parameters<typeof updateExcalidrawBlockPropsSafely>[0]['editor']
+}
+
+function EmbeddedExcalidrawBlockRender({ block, editor }: EmbeddedExcalidrawBlockRenderProps) {
+  useEffect(() => {
+    trackExcalidrawOpened('embedded')
+  }, [])
+
+  return (
+    <Suspense fallback={<div className="excalidraw-canvas excalidraw-canvas--loading" />}>
+      <ExcalidrawCanvas
+        boardId={block.props.boardId}
+        height={block.props.height}
+        snapshot={block.props.snapshot}
+        width={block.props.width}
+        onSnapshotChange={(snapshot) => {
+          updateExcalidrawBlockPropsSafely({
+            blockId: block.id,
+            editor,
+            nextProps: (currentProps) => ({
+              ...currentProps,
+              snapshot,
+            }),
+          })
+        }}
+      />
+    </Suspense>
+  )
+}
+
 const codeBlock = createCodeBlockSpec(createTolariaCodeBlockOptions())
 const audioBlock = AudioBlockSpec()
+const excalidrawBlock = ExcalidrawBlock()
 const mathBlock = MathBlock()
 const mermaidBlock = MermaidBlock()
 const tldrawBlock = TldrawBlock()
@@ -434,6 +521,8 @@ const MarkdownHighlightStyle = createStyleSpec(
   },
 )
 
+export { excalidrawFenceSource }
+
 export const schema = BlockNoteSchema.create({
   inlineContentSpecs: {
     ...defaultInlineContentSpecs,
@@ -446,6 +535,7 @@ export const schema = BlockNoteSchema.create({
   },
   blockSpecs: {
     audio: audioBlock,
+    excalidrawBlock,
     mathBlock,
     mermaidBlock,
     tldrawBlock,
