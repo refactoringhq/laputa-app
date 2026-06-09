@@ -458,14 +458,6 @@ function neighborhoodAction(
   return onEnterNeighborhood ? () => onEnterNeighborhood(entry) : undefined
 }
 
-function measureExpandedActionsWidth(
-  actions: HTMLDivElement,
-  collapsed: boolean,
-  cachedExpandedActionsWidth: number,
-) {
-  return collapsed ? cachedExpandedActionsWidth || actions.scrollWidth : actions.scrollWidth
-}
-
 function readElementWidth(element: HTMLElement): number {
   return element.getBoundingClientRect().width || element.scrollWidth || element.clientWidth
 }
@@ -523,6 +515,27 @@ function shouldCollapseBreadcrumbOverflow(
   return measureNaturalTitleWidth(title) > availableTitleWidth
 }
 
+function withExpandedActionMeasurement<T>(
+  actions: HTMLDivElement,
+  collapsed: boolean,
+  measure: () => T,
+): T {
+  if (!collapsed) return measure()
+
+  const previousValue = actions.getAttribute('data-overflow-collapsed')
+  // Probe the expanded geometry; measuring the collapsed layout can oscillate.
+  actions.setAttribute('data-overflow-collapsed', 'false')
+  try {
+    return measure()
+  } finally {
+    if (previousValue === null) {
+      actions.removeAttribute('data-overflow-collapsed')
+    } else {
+      actions.setAttribute('data-overflow-collapsed', previousValue)
+    }
+  }
+}
+
 function useBreadcrumbOverflow(
   titleRef: React.RefObject<HTMLDivElement | null>,
   actionsRef: React.RefObject<HTMLDivElement | null>,
@@ -538,9 +551,12 @@ function useBreadcrumbOverflow(
 
     let frame = 0
     const measure = () => {
-      const expandedActionsWidth = measureExpandedActionsWidth(actions, collapsed, expandedActionsWidthRef.current)
-      if (!collapsed) expandedActionsWidthRef.current = expandedActionsWidth
-      setCollapsed(shouldCollapseBreadcrumbOverflow(title, actions, expandedActionsWidth))
+      const nextCollapsed = withExpandedActionMeasurement(actions, collapsed, () => {
+        const expandedActionsWidth = actions.scrollWidth || expandedActionsWidthRef.current
+        expandedActionsWidthRef.current = expandedActionsWidth
+        return shouldCollapseBreadcrumbOverflow(title, actions, expandedActionsWidth)
+      })
+      setCollapsed((current) => current === nextCollapsed ? current : nextCollapsed)
     }
     const scheduleMeasure = () => {
       cancelAnimationFrame(frame)
