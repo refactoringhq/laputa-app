@@ -73,7 +73,7 @@
     "date-fns": "^4.1.0",
     "dompurify": "3.4.2",
     "katex": "^0.16.28",
-    "mermaid": "^11.14.0",
+    "mermaid": "^11.15.0",
     "posthog-js": "^1.363.5",
     "radix-ui": "^1.4.3",
     "react": "^19.2.0",
