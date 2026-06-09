@@ -469,7 +469,7 @@
   "sidebar.action.moveViewDown": "Flytta vy nedåt",
   "sidebar.action.customizeSections": "Anpassa sektioner",
   "sidebar.action.renameSection": "Byt namn på sektion…",
-  "sidebar.action.renameType": "Byt namn på typ…",
+  "sidebar.action.renameType": "Ändra visningsnamn…",
   "sidebar.action.customizeIconColor": "Anpassa ikon och färg…",
   "sidebar.action.deleteType": "Radera typ",
   "sidebar.action.createType": "Skapa ny typ",

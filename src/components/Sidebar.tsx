@@ -521,6 +521,7 @@ function useSidebarRuntime({
   const { activeCount, archivedCount } = useEntryCounts(entries, allNotesFileVisibility)
   const { collapsed: groupCollapsed, toggle: toggleGroup } = useSidebarCollapsed()
   const typeInteractions = useSidebarTypeInteractions({
+    allSectionGroups,
     typeEntryMap,
     onCustomizeType,
     onUpdateTypeTemplate,
