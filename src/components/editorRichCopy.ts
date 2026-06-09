@@ -46,11 +46,39 @@ export function writeRichEditorClipboardPayload(
   clipboardData: ClipboardWriter,
   payload: RichEditorClipboardPayload,
 ) {
+  const wikilinkPlainText = plainTextForWikilinkMarkdown(payload.markdown)
+  if (wikilinkPlainText !== null) {
+    clipboardData.setData('text/plain', wikilinkPlainText)
+    clipboardData.setData('text/markdown', payload.markdown)
+    clipboardData.setData('text/html', plainTextHtml(wikilinkPlainText))
+    return
+  }
+
   clipboardData.setData('blocknote/html', payload.blocknoteHtml)
   clipboardData.setData('text/html', payload.html)
-  if (MARKDOWN_WIKILINK_RE.test(payload.markdown)) {
-    clipboardData.setData('text/markdown', payload.markdown)
-  }
+}
+
+function plainTextForWikilinkMarkdown(markdown: string): string | null {
+  if (!MARKDOWN_WIKILINK_RE.test(markdown)) return null
+
+  return withoutSyntheticTerminalNewline(markdown)
+}
+
+function withoutSyntheticTerminalNewline(text: string): string {
+  return text.replace(/\r?\n$/, '')
+}
+
+function plainTextHtml(text: string): string {
+  const escapedLines = text.split(/\r?\n/).map(escapeHtml)
+  return `<p>${escapedLines.join('<br>')}</p>`
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
 }
 
 function restoreWikilinkMarkdown(
@@ -62,7 +90,11 @@ function restoreWikilinkMarkdown(
     ?? clipboardWikilinksFromHtml(blocknoteHtml)
   if (!wikilinks) return markdown
 
-  let restored = markdown
+  return restoreWikilinksInText(markdown, wikilinks)
+}
+
+function restoreWikilinksInText(text: string, wikilinks: ClipboardWikilink[]): string {
+  let restored = text
   let searchFrom = 0
   for (const wikilink of wikilinks) {
     const index = restored.indexOf(wikilink.label, searchFrom)
@@ -82,11 +114,34 @@ function clipboardWikilinksFromHtml(html: string): ClipboardWikilink[] | null {
 
   const container = ownerDocument.createElement('div')
   container.innerHTML = html
+  return clipboardWikilinksFromContainer(container)
+}
+
+function clipboardWikilinksFromContainer(container: ParentNode): ClipboardWikilink[] | null {
   const wikilinks = Array.from(container.querySelectorAll<HTMLElement>(CLIPBOARD_WIKILINK_SELECTOR))
     .map(clipboardWikilinkFromElement)
     .filter((wikilink): wikilink is ClipboardWikilink => wikilink !== null)
 
   return wikilinks.length > 0 ? wikilinks : null
+}
+
+function clipboardWikilinksFromRange(range: Range): ClipboardWikilink[] | null {
+  return clipboardWikilinksFromContainer(range.cloneContents())
+    ?? closestWikilinkFromRange(range)
+}
+
+function closestWikilinkFromRange(range: Range): ClipboardWikilink[] | null {
+  const wikilinkElement = nodeElement(range.commonAncestorContainer)
+    ?.closest<HTMLElement>(CLIPBOARD_WIKILINK_SELECTOR)
+  if (!wikilinkElement) return null
+
+  const wikilink = clipboardWikilinkFromElement(wikilinkElement)
+  return wikilink ? [wikilink] : null
+}
+
+function restoredWikilinkPlainText(range: Range, text: string): string | null {
+  const wikilinks = clipboardWikilinksFromRange(range)
+  return wikilinks ? restoreWikilinksInText(text, wikilinks) : null
 }
 
 function clipboardWikilinkFromElement(element: HTMLElement): ClipboardWikilink | null {
@@ -171,13 +226,20 @@ export function selectedEditorPlainText(selection: Selection, range: Range): str
   const text = selection.toString() || range.cloneContents().textContent || ''
   if (text.length === 0) return null
 
-  return text.replace(/\r?\n$/, '')
+  return withoutSyntheticTerminalNewline(restoredWikilinkPlainText(range, text) ?? text)
 }
 
 export function selectedEditorDomHtml(range: Range): string {
   const wrapper = document.createElement('div')
   const selectedContent = range.cloneContents()
   const commonElement = nodeElement(range.commonAncestorContainer)
+  const selectedText = selectedContent.textContent || ''
+  const wikilinkPlainText = selectedText.length > 0
+    ? restoredWikilinkPlainText(range, selectedText)
+    : null
+  if (wikilinkPlainText !== null) {
+    return plainTextHtml(withoutSyntheticTerminalNewline(wikilinkPlainText))
+  }
 
   if (commonElement?.matches(CLIPBOARD_INLINE_FORMAT_SELECTOR)) {
     const inlineWrapper = commonElement.cloneNode(false)
