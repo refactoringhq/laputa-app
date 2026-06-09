@@ -316,10 +316,20 @@ describe('SettingsPanel', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Remove vault Personal Notes' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Remove vault Team Vault' }))
+    const teamRow = screen.getByTestId('settings-workspace-row-team')
+    fireEvent.click(within(teamRow).getByRole('button', { name: 'Remove vault Team Vault' }))
 
-    expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Remove vault' }))
+    const confirmation = within(teamRow).getByTestId('settings-workspace-remove-confirm-team')
+    expect(screen.queryByTestId('confirm-delete-dialog')).not.toBeInTheDocument()
+    expect(confirmation).toHaveTextContent('Remove vault?')
+    expect(confirmation).toHaveTextContent("This removes Team Vault from Tolaria's vault list. Files on disk are not deleted.")
+
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Cancel' }))
+    expect(onRemoveVault).not.toHaveBeenCalled()
+    expect(within(teamRow).queryByTestId('settings-workspace-remove-confirm-team')).not.toBeInTheDocument()
+
+    fireEvent.click(within(teamRow).getByRole('button', { name: 'Remove vault Team Vault' }))
+    fireEvent.click(within(teamRow).getByRole('button', { name: 'Remove vault' }))
 
     expect(onRemoveVault).toHaveBeenCalledWith('/team')
   })
