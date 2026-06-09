@@ -29,7 +29,9 @@ where
     let prompt =
         crate::cli_agent_runtime::build_prompt(&request.message, request.system_prompt.as_deref());
 
-    let mut child = spawn_kiro_process(&binary, Path::new(&request.vault_path))?;
+    let mut child = build_kiro_command(&binary, Path::new(&request.vault_path))?
+        .spawn()
+        .map_err(|e| format!("Failed to spawn kiro-cli: {e}"))?;
     let prompt_handle = write_prompt_async(
         child.stdin.take().ok_or("No stdin handle")?,
         prompt.into_bytes(),
@@ -61,9 +63,13 @@ where
     Ok(session_id)
 }
 
-fn spawn_kiro_process(binary: &Path, vault_path: &Path) -> Result<std::process::Child, String> {
-    let mut command = crate::hidden_command(binary);
+fn build_kiro_command(binary: &Path, vault_path: &Path) -> Result<std::process::Command, String> {
+    let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(binary)?;
+    let mut command = crate::hidden_command(&target.program);
     crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
+    if let Some(first_arg) = target.first_arg {
+        command.arg(first_arg);
+    }
     command
         .arg("chat")
         .arg("--no-interactive")
@@ -72,9 +78,7 @@ fn spawn_kiro_process(binary: &Path, vault_path: &Path) -> Result<std::process::
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    command
-        .spawn()
-        .map_err(|e| format!("Failed to spawn kiro-cli: {e}"))
+    Ok(command)
 }
 
 fn write_prompt_async(
@@ -288,6 +292,49 @@ mod tests {
         assert_eq!(
             content["mcpServers"]["tolaria"]["env"]["WS_UI_PORT"],
             "9711"
+        );
+    }
+
+    #[test]
+    fn command_avoids_windows_cmd_shim_for_chat_args() {
+        use std::ffi::OsStr;
+
+        let dir = tempfile::tempdir().unwrap();
+        let shim = dir.path().join("kiro-cli.cmd");
+        let launcher = dir
+            .path()
+            .join("node_modules")
+            .join("@kiro")
+            .join("cli")
+            .join("bin")
+            .join("kiro.exe");
+        std::fs::create_dir_all(launcher.parent().unwrap()).unwrap();
+        std::fs::write(&launcher, "native kiro launcher").unwrap();
+        std::fs::write(
+            &shim,
+            r#"@ECHO off
+"%~dp0\node_modules\@kiro\cli\bin\kiro.exe" %*
+"#,
+        )
+        .unwrap();
+
+        let command = build_kiro_command(&shim, dir.path()).unwrap();
+        let actual_args = command.get_args().collect::<Vec<_>>();
+
+        assert_eq!(
+            (
+                command.get_program() != shim.as_os_str(),
+                command.get_program(),
+                actual_args.get(0).copied(),
+                actual_args.get(1).copied(),
+            ),
+            (
+                true,
+                launcher.as_os_str(),
+                Some(OsStr::new("chat")),
+                Some(OsStr::new("--no-interactive")),
+            ),
+            "Kiro npm .cmd shims cannot be spawned directly on Windows"
         );
     }
 

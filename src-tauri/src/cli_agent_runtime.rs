@@ -485,12 +485,19 @@ fn path_from_successful_output(output: &std::process::Output) -> Option<PathBuf>
 }
 
 pub(crate) fn first_existing_path(stdout: &str) -> Option<PathBuf> {
+    first_existing_path_for_platform(stdout, cfg!(windows))
+}
+
+fn first_existing_path_for_platform(stdout: &str, windows: bool) -> Option<PathBuf> {
     stdout.lines().find_map(|line| {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             return None;
         }
         let candidate = PathBuf::from(trimmed);
+        if windows && !has_windows_cli_extension(&candidate) {
+            return None;
+        }
         candidate.exists().then_some(candidate)
     })
 }
@@ -583,6 +590,33 @@ mod tests {
                 .unwrap();
 
         assert_eq!(found, Some(executable));
+    }
+
+    #[test]
+    fn first_existing_path_skips_empty_and_missing_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("missing-kiro-cli");
+        let kiro = dir.path().join("kiro-cli");
+        std::fs::write(&kiro, "#!/bin/sh\n").unwrap();
+
+        let stdout = format!("\n{}\n{}\n", missing.display(), kiro.display());
+
+        assert_eq!(first_existing_path(&stdout), Some(kiro));
+    }
+
+    #[test]
+    fn first_existing_windows_path_skips_extensionless_npm_wrapper() {
+        let dir = tempfile::tempdir().unwrap();
+        let wrapper = dir.path().join("kiro-cli");
+        let shim = dir.path().join("kiro-cli.cmd");
+        std::fs::write(&wrapper, "#!/bin/sh\n").unwrap();
+        std::fs::write(&shim, "@ECHO off\n").unwrap();
+        let stdout = format!("{}\n{}\n", wrapper.display(), shim.display());
+
+        assert_eq!(
+            super::first_existing_path_for_platform(&stdout, true),
+            Some(shim)
+        );
     }
 
     #[cfg(unix)]
