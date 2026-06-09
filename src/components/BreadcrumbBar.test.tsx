@@ -148,6 +148,31 @@ function mockCollapsedBreadcrumbOverflow() {
   }
 }
 
+function mockOscillatingBreadcrumbOverflow() {
+  const requestFrame = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
+    callback(0)
+    return 1
+  })
+  const cancelFrame = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {})
+  const rects = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    if (this.classList.contains('breadcrumb-bar__actions')) {
+      const collapsed = this.getAttribute('data-overflow-collapsed') === 'true'
+      return DOMRect.fromRect({ x: collapsed ? 1000 : 200, y: 0, width: 20, height: 52 })
+    }
+    return DOMRect.fromRect({ x: 0, y: 0, width: 500, height: 52 })
+  })
+  const scrollWidths = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function () {
+    return this.classList.contains('breadcrumb-bar__actions') ? 400 : 500
+  })
+
+  return () => {
+    requestFrame.mockRestore()
+    cancelFrame.mockRestore()
+    rects.mockRestore()
+    scrollWidths.mockRestore()
+  }
+}
+
 describe('BreadcrumbBar — drag region', () => {
   it('forwards mousedown events to the shared drag-region hook', () => {
     const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
@@ -651,6 +676,30 @@ describe('BreadcrumbBar — action buttons always right-aligned', () => {
       expect(within(menu).getByRole('menuitem', { name: "Open note's neighborhood" })).toBeInTheDocument()
       expect(within(menu).getByRole('menuitem', { name: 'Copy note deeplink' })).toBeInTheDocument()
     } finally {
+      restoreMeasurement()
+    }
+  })
+
+  it('settles overflow measurement when collapsed layout would otherwise oscillate', () => {
+    const restoreMeasurement = mockOscillatingBreadcrumbOverflow()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    try {
+      expect(() => {
+        render(
+          <BreadcrumbBar
+            entry={baseEntry}
+            {...defaultProps}
+            noteWidth="normal"
+            onToggleNoteWidth={vi.fn()}
+            onRevealFile={vi.fn()}
+            onCopyFilePath={vi.fn()}
+            onEnterNeighborhood={vi.fn()}
+          />,
+        )
+      }).not.toThrow()
+    } finally {
+      consoleError.mockRestore()
       restoreMeasurement()
     }
   })
