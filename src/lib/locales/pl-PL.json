@@ -469,7 +469,7 @@
   "sidebar.action.moveViewDown": "Przesuń widok w dół",
   "sidebar.action.customizeSections": "Dostosuj sekcje",
   "sidebar.action.renameSection": "Zmień nazwę sekcji…",
-  "sidebar.action.renameType": "Zmień nazwę typu…",
+  "sidebar.action.renameType": "Zmień nazwę wyświetlaną…",
   "sidebar.action.customizeIconColor": "Dostosuj ikonę i kolor…",
   "sidebar.action.deleteType": "Usuń typ",
   "sidebar.action.createType": "Utwórz nowy typ",
