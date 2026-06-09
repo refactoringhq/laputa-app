@@ -114,6 +114,7 @@ describe('isRecoverableEditorTransformError', () => {
     expect(isRecoverableEditorTransformError(new Error(
       'Block with ID 6c1c3bb4-e218-4f00-aaf5-40606852d286 not found',
     ))).toBe(true)
+    expect(isRecoverableEditorTransformError(new Error("Block doesn't have id"))).toBe(true)
     expect(isRecoverableEditorTransformError(nullFragmentAppendError())).toBe(true)
     const stackOnlyAppendError = nullFragmentAppendError("Cannot read properties of null (reading 'append')")
     stackOnlyAppendError.stack =
@@ -200,6 +201,29 @@ describe('installRichEditorTransformErrorRecovery', () => {
     expect(recoverDocument).toHaveBeenCalledTimes(1)
     expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
       reason: 'invalid_block_join',
+    })
+  })
+
+  it('repairs missing-id block transactions before they escape dispatch', () => {
+    expectDocumentRepairRecovery(
+      new Error("Block doesn't have id"),
+      'block_missing_id',
+    )
+  })
+
+  it('repairs missing-id block failures thrown during keydown handling', () => {
+    const { view, keyDownPlugin } = createViewWithSomeProp(() => {
+      throw new Error("Block doesn't have id")
+    })
+    const recoverDocument = vi.fn()
+
+    installRichEditorTransformErrorRecovery(view, { recoverDocument })
+
+    expect(view.someProp('handleKeyDown', (handler) => handler())).toBe(true)
+    expect(keyDownPlugin).toHaveBeenCalledTimes(1)
+    expect(recoverDocument).toHaveBeenCalledTimes(1)
+    expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+      reason: 'block_missing_id',
     })
   })
 
