@@ -75,7 +75,7 @@ function openProjectsContextMenu() {
 describe('Sidebar Type row actions', () => {
   it('shows Type-specific context menu labels on right-click', () => {
     openProjectsContextMenu()
-    expect(screen.getByText('Rename type…')).toBeInTheDocument()
+    expect(screen.getByText('Change display name…')).toBeInTheDocument()
     expect(screen.getByText('Customize icon & color…')).toBeInTheDocument()
     expect(screen.getByText('Delete type')).toBeInTheDocument()
   })
@@ -83,7 +83,7 @@ describe('Sidebar Type row actions', () => {
   it('dismisses the type context menu on Escape', () => {
     openProjectsContextMenu()
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByText('Rename type…')).not.toBeInTheDocument()
+    expect(screen.queryByText('Change display name…')).not.toBeInTheDocument()
   })
 
   it('calls onDeleteType from the context menu', () => {
@@ -96,7 +96,7 @@ describe('Sidebar Type row actions', () => {
 
   it('starts inline rename from the context menu', () => {
     openProjectsContextMenu()
-    fireEvent.click(screen.getByText('Rename type…'))
+    fireEvent.click(screen.getByText('Change display name…'))
     expect(screen.getByRole('textbox', { name: 'Section name' })).toBeInTheDocument()
   })
 
@@ -110,7 +110,7 @@ describe('Sidebar Type row actions', () => {
     const onRenameSection = vi.fn()
     renderSidebar({ onRenameSection })
     fireEvent.contextMenu(getProjectsHeader())
-    fireEvent.click(screen.getByText('Rename type…'))
+    fireEvent.click(screen.getByText('Change display name…'))
     const input = screen.getByRole('textbox', { name: 'Section name' })
 
     fireEvent.change(input, { target: { value: 'My Projects' } })
@@ -123,7 +123,7 @@ describe('Sidebar Type row actions', () => {
     const onRenameSection = vi.fn()
     renderSidebar({ onRenameSection })
     fireEvent.contextMenu(getProjectsHeader())
-    fireEvent.click(screen.getByText('Rename type…'))
+    fireEvent.click(screen.getByText('Change display name…'))
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Section name' }), { key: 'Escape' })
 
     expect(onRenameSection).not.toHaveBeenCalled()
