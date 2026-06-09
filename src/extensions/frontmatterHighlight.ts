@@ -4,6 +4,7 @@ import { RangeSetBuilder } from '@codemirror/state'
 const frontmatterDelimiter = Decoration.mark({ class: 'cm-frontmatter-delimiter' })
 const frontmatterKey = Decoration.mark({ class: 'cm-frontmatter-key' })
 const frontmatterValue = Decoration.mark({ class: 'cm-frontmatter-value' })
+const frontmatterError = Decoration.mark({ class: 'cm-frontmatter-error' })
 
 function findFrontmatterEnd(doc: { lines: number; line(n: number): { text: string } }): number {
   if (doc.lines < 1) return -1
@@ -23,9 +24,7 @@ function buildDecorations(view: EditorView): DecorationSet {
 
   for (let i = 1; i <= fmEnd; i++) {
     const line = doc.line(i)
-    const text = line.text
-
-    decorateFrontmatterLine(builder, line.from, text, i === 1 || i === fmEnd)
+    decorateFrontmatterLine(builder, line.from, line.text, i === 1 || i === fmEnd)
   }
 
   return builder.finish()
@@ -34,6 +33,62 @@ function buildDecorations(view: EditorView): DecorationSet {
 function decorateFrontmatterLine(
   builder: RangeSetBuilder<Decoration>,
   from: number,
+  text: string,
+  isDelimiter: boolean,
+): void {
+  const trimmed = text.trim()
+  if (trimmed.length === 0 || trimmed.startsWith('#')) return
+
+  if (isDelimiter) {
+    builder.add(from, from + text.length, frontmatterDelimiter)
+    return
+  }
+
+  const colonIdx = text.indexOf(':')
+  
+  if (colonIdx > 0) {
+    // Highlights keys (including indented nested YAML keys)
+    const keyStart = text.length - text.trimStart().length
+    builder.add(from + keyStart, from + colonIdx, frontmatterKey)
+    
+    const valuePart = text.slice(colonIdx + 1).trimStart()
+    if (valuePart.length > 0) {
+      const valueOffset = text.indexOf(valuePart, colonIdx + 1)
+      builder.add(from + valueOffset, from + text.length, frontmatterValue)
+    }
+  } else if (trimmed.startsWith('- ')) {
+    // Feature: Highlight YAML array/bullet items cleanly as values
+    const dashOffset = text.indexOf('-')
+    builder.add(from + dashOffset + 2, from + text.length, frontmatterValue)
+  } else {
+    // Feature: Highlight invalid YAML syntax lines inside frontmatter block
+    builder.add(from, from + text.length, frontmatterError)
+  }
+}
+
+export const frontmatterHighlightPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet
+    constructor(view: EditorView) {
+      this.decorations = buildDecorations(view)
+    }
+    update(update: { docChanged: boolean; viewportChanged: boolean; view: EditorView }) {
+      if (update.docChanged) {
+        this.decorations = buildDecorations(update.view)
+      }
+    }
+  },
+  { decorations: (v) => v.decorations },
+)
+
+export function frontmatterHighlightTheme() {
+  return EditorView.baseTheme({
+    '.cm-frontmatter-delimiter': { color: 'var(--syntax-frontmatter-key)', fontWeight: '600' },
+    '.cm-frontmatter-key': { color: 'var(--syntax-frontmatter-key)' },
+    '.cm-frontmatter-value': { color: 'var(--syntax-frontmatter-value)' },
+    '.cm-frontmatter-error': { backgroundColor: 'rgba(255, 0, 0, 0.15)', textDecoration: 'underline wavy red' },
+  })
+}
   text: string,
   isDelimiter: boolean,
 ): void {
