@@ -594,6 +594,8 @@
   "editor.formatting.highlightTooltip": "Виділення (зберігається в Markdown)",
   "editor.whiteboard.enterFullscreen": "Розгорнути дошку",
   "editor.whiteboard.exitFullscreen": "Вийти з повноекранної дошки",
+  "editor.whiteboard.permissionDeniedTitle": "Дозвіл на доступ до дошки заблоковано",
+  "editor.whiteboard.permissionDeniedBody": "Tolaria не вдалося використати функцію робочого столу, необхідну для цієї дошки. Надайте дозвіл у налаштуваннях системи, а потім знову відкрийте нотатку.",
   "editor.exportPdf.unavailable": "Відкрийте нотатку Markdown перед експортом у PDF.",
   "editor.exportPdf.failed": "Не вдалося розпочати експорт PDF: {error}",
   "filePreview.copyDeepLink": "Копіювати посилання",

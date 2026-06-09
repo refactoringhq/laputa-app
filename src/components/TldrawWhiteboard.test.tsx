@@ -249,11 +249,32 @@ describe('TldrawWhiteboard', () => {
       message: 'The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.',
     }
 
-    expect(dispatchUnhandledRejection(denied).defaultPrevented).toBe(true)
-    expect(dispatchUnhandledRejection(new Error('save failed')).defaultPrevented).toBe(false)
+    act(() => {
+      expect(dispatchUnhandledRejection(denied).defaultPrevented).toBe(true)
+      expect(dispatchUnhandledRejection(new Error('save failed')).defaultPrevented).toBe(false)
+    })
 
     cleanup()
     expect(dispatchUnhandledRejection(denied).defaultPrevented).toBe(false)
+  })
+
+  it('shows a whiteboard fallback when the platform permission is denied', () => {
+    renderWhiteboard()
+
+    const cleanup = renderedTldrawProps().onMount(mockEditor())
+    const denied = {
+      name: 'NotAllowedError',
+      message: 'The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.',
+    }
+
+    act(() => {
+      expect(dispatchUnhandledRejection(denied).defaultPrevented).toBe(true)
+    })
+
+    expect(screen.getByTestId('tldraw-whiteboard-permission-error')).toHaveTextContent('Whiteboard permission blocked')
+    expect(screen.getByTestId('tldraw-whiteboard-permission-error')).toHaveTextContent('reopen the note')
+
+    cleanup()
   })
 
   it('prevents whiteboard permission rejections before earlier global listeners observe them', () => {
@@ -272,7 +293,9 @@ describe('TldrawWhiteboard', () => {
         message: 'The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.',
       }
 
-      expect(dispatchUnhandledRejection(denied).defaultPrevented).toBe(true)
+      act(() => {
+        expect(dispatchUnhandledRejection(denied).defaultPrevented).toBe(true)
+      })
       expect(observedDefaultPrevented).toEqual([true])
     } finally {
       guardCleanup?.()
