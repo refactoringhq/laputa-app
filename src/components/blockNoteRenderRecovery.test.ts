@@ -67,6 +67,13 @@ describe('blockNoteRenderRecovery', () => {
     expect(isRecoveredBlockNoteRenderError(error, '')).toBe(true)
   })
 
+  it('recognizes stale BlockNote block references during note render', () => {
+    const error = new Error('Block with ID stale-block not found')
+
+    expect(blockNoteRenderRecoveryReason(error)).toBe('stale_block_reference')
+    expect(isRecoverableBlockNoteRenderError(error)).toBe(true)
+  })
+
   it('recognizes recovered BlockNote errors from the React component stack fallback', () => {
     expect(isRecoveredBlockNoteRenderError(
       new Error("Block doesn't have id"),
