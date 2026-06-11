@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MARKDOWN_HIGHLIGHT_STYLE } from '../utils/markdownHighlightMarkdown'
+import { createRichEditorInputTransformExtension } from './richEditorInputTransform'
 import { createRichEditorMarkdownInputTransformExtension } from './richEditorInputTransformExtension'
 
 function createTransaction() {
@@ -163,5 +164,53 @@ describe('createRichEditorMarkdownInputTransformExtension', () => {
     expect(fixture.transaction.addMark).toHaveBeenCalledWith(26, 32, fixture.highlightMark)
     expect(fixture.view.dispatch).toHaveBeenLastCalledWith(fixture.transaction)
     expect(highlightEvent.preventDefault).toHaveBeenCalledTimes(1)
+  })
+
+  it('lets Chinese IME punctuation commits bypass rich-editor markdown transforms', () => {
+    let beforeInputListener: EventListener | null = null
+    const transaction = createTransaction()
+    const handleBeforeInput = vi.fn(() => ({
+      preventDefault: true,
+      transaction,
+    }))
+    const view = {
+      composing: false,
+      dispatch: vi.fn(),
+      dom: { isConnected: true },
+    }
+    const dom = {
+      addEventListener: vi.fn((type: string, listener: EventListener) => {
+        if (type === 'beforeinput') beforeInputListener = listener
+      }),
+    }
+    const editor = {
+      _tiptapEditor: { view },
+      prosemirrorView: view,
+    }
+    const extension = createRichEditorInputTransformExtension({
+      createTransforms: () => [{ handleBeforeInput }],
+      key: 'testTransform',
+    })()({ editor: editor as never })
+    const controller = new AbortController()
+    extension.mount?.({
+      dom: dom as never,
+      root: document,
+      signal: controller.signal,
+    })
+
+    if (!beforeInputListener) throw new Error('Input transform did not mount beforeinput')
+
+    const event = {
+      data: '，',
+      inputType: 'insertCompositionText',
+      isComposing: false,
+      preventDefault: vi.fn(),
+    } as unknown as InputEvent
+
+    beforeInputListener(event)
+
+    expect(handleBeforeInput).not.toHaveBeenCalled()
+    expect(view.dispatch).not.toHaveBeenCalled()
+    expect(event.preventDefault).not.toHaveBeenCalled()
   })
 })
