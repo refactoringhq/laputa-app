@@ -3,6 +3,10 @@ const BLOCKNOTE_BLOCK_TYPE_MISMATCH_ERROR = 'Block type does not match'
 const BLOCKNOTE_TABLE_ROW_INDEX_ERROR = /^Index \d+ out of range for <tableRow\(/
 const BLOCKNOTE_PARAGRAPH_INDEX_ERROR = /^Index \d+ out of range for <paragraph\(/
 const NULL_APPEND_PROPERTY_ERROR = "Cannot read properties of null (reading 'append')"
+const WEBKIT_DOM_NOT_FOUND_MESSAGES = [
+  'The object can not be found here',
+  'A requested file or directory could not be found at the time an operation was processed',
+]
 
 export type BlockNoteRenderRecoveryReason =
   | 'block_type_mismatch'
@@ -85,12 +89,12 @@ function isDomIndexSizeError(error: unknown): boolean {
 }
 
 function isWebKitDomNotFoundError(error: unknown): boolean {
-  return (
-    isRecord(error)
-    && error.name === 'NotFoundError'
-    && typeof error.message === 'string'
-    && error.message.includes('The object can not be found here')
-  )
+  if (!isRecord(error)) return false
+  if (error.name !== 'NotFoundError') return false
+  if (typeof error.message !== 'string') return false
+
+  const { message } = error
+  return WEBKIT_DOM_NOT_FOUND_MESSAGES.some((expectedMessage) => message.includes(expectedMessage))
 }
 
 function isTransformError(error: unknown): error is Error {
