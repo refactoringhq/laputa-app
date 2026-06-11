@@ -1,7 +1,11 @@
-import type { CSSProperties, RefObject, ReactNode } from 'react'
+import type { RefObject, ReactNode } from 'react'
 import { ClipboardText, FolderOpen, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { translate, type AppLocale } from '../../lib/i18n'
+import { getContextMenuPositionStyle } from '../contextMenuPosition'
+
+const FOLDER_CONTEXT_MENU_MIN_WIDTH = 'min(11.25rem, calc(100vw - 16px))'
+const FOLDER_CONTEXT_MENU_MAX_WIDTH = 'min(22rem, calc(100vw - 16px))'
 
 const folderContextMenuSurfaceClass = 'fixed z-50 w-max min-w-[min(11.25rem,calc(100vw-16px))] max-w-[min(22rem,calc(100vw-16px))] rounded-md border bg-popover p-1 shadow-md'
 const folderContextMenuButtonClass = 'h-auto w-full max-w-full justify-start gap-2 px-2 py-1.5 text-sm'
@@ -24,27 +28,22 @@ interface FolderContextMenuProps {
   locale?: AppLocale
 }
 
-function getFolderContextMenuStyle(menu: FolderContextMenuState): CSSProperties {
-  return {
-    left: menu.x,
-    top: menu.y,
-  }
-}
-
 function FolderMenuLabel({ children }: { children: ReactNode }) {
   return <span className="min-w-0 flex-1 truncate text-left">{children}</span>
 }
 
-export function FolderContextMenu({
-  menu,
-  menuRef,
-  onDelete,
-  onReveal,
-  onCopyPath,
-  onCreateNote,
-  onRename,
-  locale = 'en',
-}: FolderContextMenuProps) {
+export function FolderContextMenu(props: FolderContextMenuProps) {
+  const {
+    menu,
+    menuRef,
+    onDelete,
+    onReveal,
+    onCopyPath,
+    onCreateNote,
+    onRename,
+    locale = 'en',
+  } = props
+
   if (!menu) return null
   const canMutateFolder = menu.path.length > 0
 
@@ -52,7 +51,10 @@ export function FolderContextMenu({
     <div
       ref={menuRef}
       className={folderContextMenuSurfaceClass}
-      style={getFolderContextMenuStyle(menu)}
+      style={getContextMenuPositionStyle(menu, {
+        maxWidth: FOLDER_CONTEXT_MENU_MAX_WIDTH,
+        minWidth: FOLDER_CONTEXT_MENU_MIN_WIDTH,
+      })}
       data-testid="folder-context-menu"
     >
       {onCreateNote && (

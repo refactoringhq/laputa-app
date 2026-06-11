@@ -7,6 +7,11 @@ export interface ContextMenuPoint {
   y: number
 }
 
+export interface ContextMenuPositionOptions {
+  maxWidth?: CSSProperties['maxWidth']
+  minWidth: CSSProperties['minWidth']
+}
+
 function getViewportSize() {
   return {
     width: window.visualViewport?.width ?? window.innerWidth,
@@ -31,14 +36,17 @@ function spaceAfter(viewportSize: number, coordinate: number): number {
   return Math.max(CONTEXT_MENU_VIEWPORT_PADDING, viewportSize - coordinate - CONTEXT_MENU_VIEWPORT_PADDING)
 }
 
-export function getContextMenuPositionStyle(point: ContextMenuPoint, minWidth: number): CSSProperties {
+export function getContextMenuPositionStyle(
+  point: ContextMenuPoint,
+  { maxWidth, minWidth }: ContextMenuPositionOptions,
+): CSSProperties {
   const viewport = getViewportSize()
   const x = clampToViewport(point.x, viewport.width)
   const y = clampToViewport(point.y, viewport.height)
   const availableAbove = spaceBefore(y)
   const availableBelow = spaceAfter(viewport.height, y)
   const style: CSSProperties = {
-    maxWidth: `calc(100vw - ${CONTEXT_MENU_VIEWPORT_PADDING * 2}px)`,
+    maxWidth: maxWidth ?? `calc(100vw - ${CONTEXT_MENU_VIEWPORT_PADDING * 2}px)`,
     minWidth,
     overflowY: 'auto',
   }
