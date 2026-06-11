@@ -67,11 +67,7 @@ pub(crate) fn build_prompt(message: &str, system_prompt: Option<&str>) -> String
 }
 
 pub(crate) fn mcp_server_path_string() -> Result<String, String> {
-    Ok(crate::mcp::mcp_server_dir()?
-        .join("index.js")
-        .to_str()
-        .ok_or("Invalid MCP server path")?
-        .to_string())
+    crate::mcp::mcp_server_index_js_path_string()
 }
 
 pub(crate) fn active_vault_paths(primary_vault_path: &str, vault_paths: &[String]) -> Vec<String> {
