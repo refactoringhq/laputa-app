@@ -126,6 +126,18 @@ describe('resolveImageUrls', () => {
     )
   })
 
+  it('resolves bare attachment subdirectory image paths against the active note directory', () => {
+    tauriMode = true
+    const notePath = '/vault/projects/notes/plan.md'
+
+    expect(resolveImageUrls('![shot](attachments/shot.png)', '/vault', notePath)).toBe(
+      resolveImageUrls('![shot](./attachments/shot.png)', '/vault', notePath),
+    )
+    expect(resolveImageUrls('![shot](attachments/shot.png)', '/vault', notePath)).toBe(
+      `![shot](${assetUrl('/vault/projects/notes/attachments/shot.png')})`,
+    )
+  })
+
   it('resolves parenthesized and percent-encoded note-relative image paths', () => {
     tauriMode = true
     const markdown = [
