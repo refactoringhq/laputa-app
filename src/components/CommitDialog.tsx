@@ -8,6 +8,7 @@ import type { CommitMode } from '../hooks/useCommitFlow'
 import { GitRepositorySelect } from './GitRepositorySelect'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
 import { translate, type AppLocale } from '../lib/i18n'
+import type { GitAuthorIdentity } from '../types'
 
 type CommitDialogCopy = {
   title: string
@@ -16,7 +17,7 @@ type CommitDialogCopy = {
   shortcutHint: string
 }
 
-function getDialogCopy(commitMode: CommitMode): CommitDialogCopy {
+const getDialogCopy = (commitMode: CommitMode): CommitDialogCopy => {
   const submitShortcut = formatShortcutDisplay({ display: '⌘↵' })
 
   if (commitMode === 'local') {
@@ -36,21 +37,59 @@ function getDialogCopy(commitMode: CommitMode): CommitDialogCopy {
   }
 }
 
-function changedFilesLabel(modifiedCount: number): string {
-  return `${modifiedCount} file${modifiedCount !== 1 ? 's' : ''} changed`
+const changedFilesLabel = (modifiedCount: number): string => (
+  `${modifiedCount} file${modifiedCount !== 1 ? 's' : ''} changed`
+)
+
+const isSubmitShortcut = (event: React.KeyboardEvent): boolean => (
+  event.key === 'Enter' && (event.metaKey || event.ctrlKey)
+)
+
+const isCloseShortcut = (event: React.KeyboardEvent): boolean => event.key === 'Escape'
+
+const formatAuthorIdentity = (identity: GitAuthorIdentity): string => (
+  `${identity.name} <${identity.email}>`
+)
+
+const formatOptionalAuthorIdentity = (identity: GitAuthorIdentity | null): string => (
+  identity ? formatAuthorIdentity(identity) : ''
+)
+
+const authorWarningText = (identity: GitAuthorIdentity, locale: AppLocale): string | null => {
+  if (identity.warning === 'local_overrides_global') {
+    return translate(locale, 'git.author.warning.localOverridesGlobal')
+  }
+
+  return null
 }
 
-function isSubmitShortcut(event: React.KeyboardEvent): boolean {
-  return event.key === 'Enter' && (event.metaKey || event.ctrlKey)
-}
+const CommitAuthorIdentity = ({
+  identity,
+  locale,
+}: {
+  identity: GitAuthorIdentity | null
+  locale: AppLocale
+}) => {
+  const hidden = identity === null
+  const warningText = identity ? authorWarningText(identity, locale) : null
 
-function isCloseShortcut(event: React.KeyboardEvent): boolean {
-  return event.key === 'Escape'
+  return (
+    <div className="space-y-1 text-xs" data-testid="commit-author-identity" hidden={hidden} aria-hidden={hidden}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-medium text-muted-foreground">{translate(locale, 'git.author.label')}</span>
+        <span className="truncate text-right font-mono text-[11px]">{formatOptionalAuthorIdentity(identity)}</span>
+      </div>
+      {warningText && (
+        <p className="text-[11px] leading-4 text-amber-700 dark:text-amber-300">{warningText}</p>
+      )}
+    </div>
+  )
 }
 
 interface CommitDialogProps {
   open: boolean
   modifiedCount: number
+  authorIdentity?: GitAuthorIdentity | null
   commitMode?: CommitMode
   locale?: AppLocale
   repositories?: GitRepositoryOption[]
@@ -61,18 +100,20 @@ interface CommitDialogProps {
   onClose: () => void
 }
 
-export function CommitDialog({
-  open,
-  modifiedCount,
-  commitMode = 'push',
-  locale = 'en',
-  repositories = [],
-  selectedRepositoryPath = '',
-  suggestedMessage,
-  onRepositoryChange,
-  onCommit,
-  onClose,
-}: CommitDialogProps) {
+export function CommitDialog(props: CommitDialogProps) {
+  const {
+    open,
+    modifiedCount,
+    authorIdentity = null,
+    commitMode = 'push',
+    locale = 'en',
+    repositories = [],
+    selectedRepositoryPath = '',
+    suggestedMessage,
+    onRepositoryChange,
+    onCommit,
+    onClose,
+  } = props
   const [message, setMessage] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const suggestedMessageRef = useRef(suggestedMessage)
@@ -125,6 +166,7 @@ export function CommitDialog({
             testId="commit-repository-select"
           />
         )}
+        <CommitAuthorIdentity identity={authorIdentity} locale={locale} />
         <Textarea
           ref={inputRef}
           className="min-h-[84px] resize-y bg-[var(--bg-input)] py-2.5 text-[13px]"

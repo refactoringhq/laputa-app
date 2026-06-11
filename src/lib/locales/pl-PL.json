@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Pobierz z repozytorium zdalnego: {repository}",
   "command.git.resolveConflicts": "Rozwiąż konflikty",
   "command.git.viewChanges": "Pokaż oczekujące zmiany",
+  "git.author.label": "Autor commitów",
+  "git.author.warning.localOverridesGlobal": "Autor repozytorium Git różni się od Twojego globalnego autora Git. Anuluj i zaktualizuj konfigurację Git tego skarbca przed wykonaniem commit, jeśli wygląda na nieprawidłową.",
   "git.repository.select": "Repozytorium",
   "git.toast.autoGitFailed": "Błąd AutoGit: {error}",
   "git.toast.commitFailed": "Zatwierdzenie nie powiodło się: {error}",

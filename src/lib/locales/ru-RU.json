@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Получить из удаленного репозитория: {repository}",
   "command.git.resolveConflicts": "Разрешить конфликты",
   "command.git.viewChanges": "Просмотреть ожидающие изменения",
+  "git.author.label": "Автор коммита",
+  "git.author.warning.localOverridesGlobal": "Автор репозитория Git отличается от вашего глобального автора Git. Если конфигурация git этого хранилища выглядит неправильно, отмените и обновите ее перед коммитом.",
   "git.repository.select": "Репозиторий",
   "git.toast.autoGitFailed": "Ошибка AutoGit: {error}",
   "git.toast.commitFailed": "Ошибка коммита: {error}",

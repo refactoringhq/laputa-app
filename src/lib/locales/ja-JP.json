@@ -124,6 +124,8 @@
   "command.git.pullRepository": "リモートからプル：{repository}",
   "command.git.resolveConflicts": "競合を解決",
   "command.git.viewChanges": "保留中の変更を表示",
+  "git.author.label": "コミット作成者",
+  "git.author.warning.localOverridesGlobal": "リポジトリのGit作成者が、グローバルのGit作成者と異なります。間違っているように見える場合は、コミットする前にこのボールトのgit configをキャンセルして更新してください。",
   "git.repository.select": "リポジトリ",
   "git.toast.autoGitFailed": "AutoGitに失敗しました：{error}",
   "git.toast.commitFailed": "コミットに失敗しました：{error}",

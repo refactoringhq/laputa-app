@@ -449,6 +449,12 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     mockSavedSinceCommit.clear()
     return `[main abc1234] ${args.message}\n ${count} files changed`
   },
+  git_author_identity: () => ({
+    name: 'Demo User',
+    email: 'demo@example.com',
+    source: 'global',
+    warning: null,
+  }),
   get_build_number: () => 'bDEV',
   should_use_external_media_preview: () => false,
   get_last_commit_info: (): LastCommitInfo => ({ shortHash: 'a1b2c3d', commitUrl: 'https://github.com/lucaong/laputa-vault/commit/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0' }),

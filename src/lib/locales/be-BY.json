@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Атрымаць з аддаленага рэпазіторыя: {repository}",
   "command.git.resolveConflicts": "Вырашыць канфлікты",
   "command.git.viewChanges": "Прагледзець чакаючыя змены",
+  "git.author.label": "Аўтар каміту",
+  "git.author.warning.localOverridesGlobal": "Аўтар Git у рэпазітары адрозніваецца ад вашага глабальнага аўтара Git. Калі здаецца, што нешта не так, скасуйце і абнавіце git config гэтага сховішча перад камітам.",
   "git.repository.select": "Сховішча",
   "git.toast.autoGitFailed": "Памылка AutoGit: {error}",
   "git.toast.commitFailed": "Памылка каміта: {error}",

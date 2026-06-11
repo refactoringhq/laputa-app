@@ -134,4 +134,25 @@ describe('CommitDialog', () => {
     expect(screen.getByTestId('commit-repository-select')).toBeInTheDocument()
     expect(screen.getByText('Work')).toBeInTheDocument()
   })
+
+  it('shows the commit author and warns when repository config overrides global identity', () => {
+    render(
+      <CommitDialog
+        open={true}
+        modifiedCount={2}
+        authorIdentity={{
+          name: 'Unexpected User',
+          email: 'unexpected@example.com',
+          source: 'repository',
+          warning: 'local_overrides_global',
+        }}
+        onCommit={onCommit}
+        onClose={onClose}
+      />,
+    )
+
+    expect(screen.getByText('Commit author')).toBeInTheDocument()
+    expect(screen.getByText('Unexpected User <unexpected@example.com>')).toBeInTheDocument()
+    expect(screen.getByText("Repository Git author differs from your global Git author. Cancel and update this vault's git config before committing if it looks wrong.")).toBeInTheDocument()
+  })
 })

@@ -496,6 +496,7 @@ macro_rules! app_invoke_handler {
             commands::get_file_diff_at_commit,
             commands::get_vault_pulse,
             commands::git_commit,
+            commands::git_author_identity,
             commands::get_build_number,
             commands::get_last_commit_info,
             commands::git_pull,

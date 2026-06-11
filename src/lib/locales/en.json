@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Pull from Remote: {repository}",
   "command.git.resolveConflicts": "Resolve Conflicts",
   "command.git.viewChanges": "View Pending Changes",
+  "git.author.label": "Commit author",
+  "git.author.warning.localOverridesGlobal": "Repository Git author differs from your global Git author. Cancel and update this vault's git config before committing if it looks wrong.",
   "git.repository.select": "Repository",
   "git.toast.autoGitFailed": "AutoGit failed: {error}",
   "git.toast.commitFailed": "Commit failed: {error}",

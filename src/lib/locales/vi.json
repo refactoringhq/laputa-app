@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Lấy từ Remote: {repository}",
   "command.git.resolveConflicts": "Giải quyết xung đột",
   "command.git.viewChanges": "Xem các thay đổi đang chờ",
+  "git.author.label": "Tác giả cam kết",
+  "git.author.warning.localOverridesGlobal": "Tác giả Git của kho lưu trữ khác với tác giả Git toàn cục của bạn. Hủy và cập nhật cấu hình git của vault này trước khi commit nếu nó có vẻ không đúng.",
   "git.repository.select": "Kho lưu trữ",
   "git.toast.autoGitFailed": "AutoGit không thành công: {error}",
   "git.toast.commitFailed": "Gửi không thành công: {error}",

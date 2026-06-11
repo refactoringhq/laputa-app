@@ -124,6 +124,8 @@
   "command.git.pullRepository": "원격에서 가져오기: {repository}",
   "command.git.resolveConflicts": "충돌 해결",
   "command.git.viewChanges": "보류 중인 변경 사항 보기",
+  "git.author.label": "커밋 작성자",
+  "git.author.warning.localOverridesGlobal": "리포지토리 Git 작성자가 글로벌 Git 작성자와 다릅니다. 잘못된 것처럼 보이면 커밋하기 전에 이 보관함의 Git 구성을 취소하고 업데이트하세요.",
   "git.repository.select": "저장소",
   "git.toast.autoGitFailed": "AutoGit 실패: {error}",
   "git.toast.commitFailed": "커밋 실패: {error}",

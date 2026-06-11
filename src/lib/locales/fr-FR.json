@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Extraire du dépôt distant : {repository}",
   "command.git.resolveConflicts": "Résoudre les conflits",
   "command.git.viewChanges": "Afficher les modifications en attente",
+  "git.author.label": "Auteur de la validation",
+  "git.author.warning.localOverridesGlobal": "L'auteur Git du dépôt diffère de votre auteur Git global. Annulez et mettez à jour la configuration Git de ce coffre-fort avant de valider si elle semble incorrecte.",
   "git.repository.select": "Dépôt",
   "git.toast.autoGitFailed": "Échec d'AutoGit : {error}",
   "git.toast.commitFailed": "Échec de la validation : {error}",
