@@ -407,6 +407,14 @@ fn mcp_server_dir_for_registration() -> Result<PathBuf, String> {
     mcp_server_dir()
 }
 
+pub(crate) fn mcp_server_index_js_path_string() -> Result<String, String> {
+    Ok(index_js_client_path(&mcp_server_dir()?))
+}
+
+fn index_js_client_path(server_dir: &Path) -> String {
+    paths::client_script_path(&server_dir.join("index.js"))
+}
+
 fn build_time_dev_mcp_server_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -607,6 +615,7 @@ fn entry_has_ui_port(entry: &serde_json::Value) -> bool {
 
 /// Build the durable external MCP server entry JSON for an index.js path.
 fn build_mcp_entry(runtime_command: &str, index_js: &str) -> serde_json::Value {
+    let index_js = paths::client_script_path(Path::new(index_js));
     serde_json::json!({
         "type": "stdio",
         "command": runtime_command,
@@ -635,7 +644,7 @@ pub fn mcp_config_snippet(vault_path: &str) -> Result<String, String> {
         )
     })?;
     let server_dir = mcp_server_dir_for_registration()?;
-    let index_js = server_dir.join("index.js").to_string_lossy().into_owned();
+    let index_js = index_js_client_path(&server_dir);
     let runtime_command = runtime.binary.to_string_lossy().into_owned();
     let entry = build_mcp_entry(&runtime_command, &index_js);
 
@@ -665,7 +674,7 @@ pub fn register_mcp(vault_path: &str) -> Result<String, String> {
         )
     })?;
     let server_dir = mcp_server_dir_for_registration()?;
-    let index_js = server_dir.join("index.js").to_string_lossy().into_owned();
+    let index_js = index_js_client_path(&server_dir);
     let runtime_command = runtime.binary.to_string_lossy().into_owned();
 
     let entry = build_mcp_entry(&runtime_command, &index_js);
@@ -875,6 +884,28 @@ mod tests {
         index_js
     }
 
+    fn assert_candidates_include(candidates: &[PathBuf], expected: &[PathBuf]) {
+        for candidate in expected {
+            assert!(
+                candidates.contains(candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    fn assert_home_binary_candidates_include(
+        home: &Path,
+        candidates: &[PathBuf],
+        expected_relative_paths: &[&str],
+    ) {
+        let expected = expected_relative_paths
+            .iter()
+            .map(|relative| home.join(relative))
+            .collect::<Vec<_>>();
+        assert_candidates_include(candidates, &expected);
+    }
+
     #[test]
     fn build_mcp_entry_produces_correct_json() {
         let entry = build_mcp_entry("/usr/local/bin/node", "/path/to/index.js");
@@ -889,6 +920,13 @@ mod tests {
                 }
             })
         );
+    }
+
+    #[test]
+    fn build_mcp_entry_strips_windows_extended_length_script_prefix() {
+        let entry = build_mcp_entry("node", r"\\?\D:\Tolaria\mcp-server\index.js");
+
+        assert_eq!(entry["args"][0], r"D:\Tolaria\mcp-server\index.js",);
     }
 
     #[test]
@@ -963,20 +1001,16 @@ mod tests {
     fn node_binary_candidates_include_shell_managed_installs() {
         let home = PathBuf::from("/Users/alex");
         let candidates = node_binary_candidates_for_home(&home);
-        let expected = [
-            home.join(".local/share/mise/shims/node"),
-            home.join(".asdf/shims/node"),
-            home.join(".volta/bin/node"),
-            home.join(".linuxbrew/bin/node"),
-        ];
-
-        for candidate in expected {
-            assert!(
-                candidates.contains(&candidate),
-                "missing {}",
-                candidate.display()
-            );
-        }
+        assert_home_binary_candidates_include(
+            &home,
+            &candidates,
+            &[
+                ".local/share/mise/shims/node",
+                ".asdf/shims/node",
+                ".volta/bin/node",
+                ".linuxbrew/bin/node",
+            ],
+        );
     }
 
     #[test]
@@ -1003,7 +1037,7 @@ mod tests {
         let dev_path = Path::new("/repo/mcp-server");
         let resource_roots = vec![PathBuf::from("/opt/tolaria")];
         let candidates = mcp_server_dir_candidates(dev_path, &resource_roots);
-        let expected = [
+        let expected = vec![
             PathBuf::from("/opt/tolaria/Tolaria/mcp-server"),
             PathBuf::from("/opt/tolaria/Tolaria/resources/mcp-server"),
             PathBuf::from("/opt/tolaria/lib/Tolaria/mcp-server"),
@@ -1022,7 +1056,7 @@ mod tests {
             PathBuf::from("/usr/lib/tolaria/resources/mcp-server"),
         ];
 
-        assert!(expected.iter().all(|path| candidates.contains(path)));
+        assert_candidates_include(&candidates, &expected);
     }
 
     #[test]
@@ -1039,9 +1073,12 @@ mod tests {
         let resource_roots = vec![PathBuf::from("/tmp/.mount_tolaria/usr")];
         let candidates = mcp_server_dir_candidates(dev_path, &resource_roots);
 
-        assert!(candidates.contains(&PathBuf::from(
-            "/tmp/.mount_tolaria/usr/lib/tolaria/resources/mcp-server"
-        )));
+        assert_candidates_include(
+            &candidates,
+            &[PathBuf::from(
+                "/tmp/.mount_tolaria/usr/lib/tolaria/resources/mcp-server",
+            )],
+        );
     }
 
     #[test]
@@ -1064,9 +1101,12 @@ mod tests {
         )];
         let candidates = mcp_server_dir_candidates_for(dev_path, &resource_roots, None);
 
-        assert!(candidates.contains(&PathBuf::from(
-            "/Applications/Tolaria.app/Contents/Resources/mcp-server"
-        )));
+        assert_candidates_include(
+            &candidates,
+            &[PathBuf::from(
+                "/Applications/Tolaria.app/Contents/Resources/mcp-server",
+            )],
+        );
     }
 
     #[test]
@@ -1275,21 +1315,17 @@ mod tests {
     fn bun_binary_candidates_include_shell_managed_installs() {
         let home = PathBuf::from("/Users/alex");
         let candidates = bun_binary_candidates_for_home(&home);
-        let expected = [
-            home.join(".bun/bin/bun"),
-            home.join(".local/share/mise/shims/bun"),
-            home.join(".mise/shims/bun"),
-            home.join(".asdf/shims/bun"),
-            home.join(".proto/bin/bun"),
-        ];
-
-        for candidate in expected {
-            assert!(
-                candidates.contains(&candidate),
-                "missing {}",
-                candidate.display()
-            );
-        }
+        assert_home_binary_candidates_include(
+            &home,
+            &candidates,
+            &[
+                ".bun/bin/bun",
+                ".local/share/mise/shims/bun",
+                ".mise/shims/bun",
+                ".asdf/shims/bun",
+                ".proto/bin/bun",
+            ],
+        );
     }
 
     #[test]
@@ -1406,7 +1442,7 @@ mod tests {
     }
 
     #[test]
-    fn read_registered_mcp_entry_prefers_primary_server_name() {
+    fn read_registered_mcp_entry_prefers_primary_then_uses_legacy_server_name() {
         let (_tmp, config_path) = temp_config_path("mcp.json");
         write_mcp_servers_config(
             &config_path,
@@ -1418,16 +1454,11 @@ mod tests {
 
         let entry = read_registered_mcp_entry(&config_path).unwrap();
         assert_eq!(entry["args"][0], "/primary/index.js");
-    }
 
-    #[test]
-    fn read_registered_mcp_entry_uses_legacy_server_name() {
-        let (_tmp, config_path) = temp_config_path("mcp.json");
         write_mcp_servers_config(
             &config_path,
             vec![(LEGACY_MCP_SERVER_NAME, managed_server("/legacy/index.js"))],
         );
-
         let entry = read_registered_mcp_entry(&config_path).unwrap();
         assert_eq!(entry["args"][0], "/legacy/index.js");
     }
