@@ -161,6 +161,9 @@ importers:
       dompurify:
         specifier: 3.4.2
         version: 3.4.2
+      hono:
+        specifier: 4.12.21
+        version: 4.12.21
       katex:
         specifier: ^0.16.28
         version: 0.16.28
@@ -4187,6 +4190,10 @@ packages:
 
   hono@4.12.18:
     resolution: {integrity: sha512-RWzP96k/yv0PQfyXnWjs6zot20TqfpfsNXhOnev8d1InAxubW93L11/oNUc3tQqn2G0bSdAOBpX+2uDFHV7kdQ==}
+    engines: {node: '>=16.9.0'}
+
+  hono@4.12.21:
+    resolution: {integrity: sha512-uV63apnb0kyPtAUwoWgaGh9HyIFcv8lgmzPZSiTBQAFOFGIzka5EZ1dZocmGnn0XdX0+XTqJ6Tqv7selMuGLRQ==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -10219,6 +10226,8 @@ snapshots:
   highlight.js@11.11.1: {}
 
   hono@4.12.18: {}
+
+  hono@4.12.21: {}
 
   hookable@5.5.3: {}
 
