@@ -46,6 +46,7 @@ function FolderRenameRow({
         placeholder={translate(locale, 'sidebar.folder.name')}
         leftInset={contentInset}
         selectTextOnFocus={true}
+        submitOnBlur={true}
         testId="rename-folder-input"
         onCancel={onCancelRenameFolder}
         onSubmit={(nextName) => onRenameFolder(node.path, nextName)}

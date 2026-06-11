@@ -466,6 +466,47 @@ describe('FolderTree', () => {
     vi.useRealTimers()
   })
 
+  it('commits folder rename on blur so the row can collapse afterward', async () => {
+    vi.useFakeTimers()
+    const renameSpy = vi.fn()
+
+    function FolderTreeRenameHarness() {
+      const [renamingFolderPath, setRenamingFolderPath] = useState<string | null>('projects')
+      return (
+        <FolderTree
+          folders={mockFolders}
+          selection={{ kind: 'folder', path: 'projects' }}
+          onSelect={vi.fn()}
+          onRenameFolder={(folderPath, nextName) => {
+            renameSpy(folderPath, nextName)
+            setRenamingFolderPath(null)
+            return true
+          }}
+          renamingFolderPath={renamingFolderPath}
+          onCancelRenameFolder={() => setRenamingFolderPath(null)}
+        />
+      )
+    }
+
+    render(<FolderTreeRenameHarness />)
+
+    fireEvent.blur(screen.getByTestId('rename-folder-input'))
+
+    await vi.waitFor(() => {
+      expect(renameSpy).toHaveBeenCalledWith('projects', 'projects')
+    })
+    expect(screen.queryByTestId('rename-folder-input')).not.toBeInTheDocument()
+    expect(screen.queryByText('laputa')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('folder-row:projects'))
+    act(() => {
+      vi.advanceTimersByTime(FOLDER_ROW_SINGLE_CLICK_DELAY_MS)
+    })
+
+    expect(screen.getByText('laputa')).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
   it('opens a context menu with a delete action on right-click', () => {
     const onDeleteFolder = vi.fn()
     render(
