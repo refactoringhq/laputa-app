@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
@@ -87,6 +88,23 @@ fn non_empty_env_path(key: &str) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+pub(super) fn client_script_path(path: &Path) -> String {
+    strip_windows_verbatim_prefix(&path.to_string_lossy()).into_owned()
+}
+
+fn strip_windows_verbatim_prefix(path: &str) -> Cow<'_, str> {
+    const VERBATIM_PREFIX: &str = r"\\?\";
+    const VERBATIM_UNC_PREFIX: &str = r"\\?\UNC\";
+
+    if let Some(rest) = path.strip_prefix(VERBATIM_UNC_PREFIX) {
+        return Cow::Owned(format!(r"\\{rest}"));
+    }
+
+    path.strip_prefix(VERBATIM_PREFIX)
+        .map(Cow::Borrowed)
+        .unwrap_or_else(|| Cow::Borrowed(path))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,5 +138,32 @@ mod tests {
         assert!(candidates.contains(&PathBuf::from(
             "/Applications/Tolaria.app/Contents/Resources/mcp-server"
         )));
+    }
+
+    #[test]
+    fn client_script_path_strips_windows_extended_length_disk_prefix() {
+        let path = PathBuf::from(r"\\?\D:\Tolaria\mcp-server\index.js");
+
+        assert_eq!(client_script_path(&path), r"D:\Tolaria\mcp-server\index.js",);
+    }
+
+    #[test]
+    fn client_script_path_strips_windows_extended_length_unc_prefix() {
+        let path = PathBuf::from(r"\\?\UNC\server\share\Tolaria\mcp-server\index.js");
+
+        assert_eq!(
+            client_script_path(&path),
+            r"\\server\share\Tolaria\mcp-server\index.js",
+        );
+    }
+
+    #[test]
+    fn client_script_path_preserves_normal_paths_with_spaces() {
+        let path = PathBuf::from(r"D:\Program Files\Tolaria\mcp-server\index.js");
+
+        assert_eq!(
+            client_script_path(&path),
+            r"D:\Program Files\Tolaria\mcp-server\index.js",
+        );
     }
 }
