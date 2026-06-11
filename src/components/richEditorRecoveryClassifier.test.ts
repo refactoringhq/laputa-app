@@ -11,8 +11,8 @@ function transformError(message = 'Invalid transform') {
 }
 
 describe('richEditorRecoveryClassifier', () => {
-  function webkitNotFoundError() {
-    const error = new Error('The object can not be found here.')
+  function webkitNotFoundError(message = 'The object can not be found here.') {
+    const error = new Error(message)
     error.name = 'NotFoundError'
     return error
   }
@@ -40,6 +40,14 @@ describe('richEditorRecoveryClassifier', () => {
     expect(classifyRichEditorRecoveryError(webkitNotFoundError(), 'render')).toBeNull()
     expect(classifyRichEditorRecoveryError(transformError(), 'transform')).toBe('transform_error')
     expect(classifyRichEditorRecoveryError(transformError(), 'render')).toBeNull()
+  })
+
+  it('classifies the WebKit filesystem NotFoundError message from production', () => {
+    const error = webkitNotFoundError(
+      'A requested file or directory could not be found at the time an operation was processed.',
+    )
+
+    expect(classifyRichEditorRecoveryError(error, 'transform')).toBe('dom_not_found')
   })
 
   it('separates document repair decisions from telemetry reason names', () => {
