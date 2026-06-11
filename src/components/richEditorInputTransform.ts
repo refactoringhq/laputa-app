@@ -55,7 +55,11 @@ function isLiveEditorView(view: RichEditorInputView): boolean {
 }
 
 function isComposingInput(event: InputEvent, view: RichEditorInputView): boolean {
-  return event.isComposing || Boolean(view.composing)
+  const inputType = typeof event.inputType === 'string' ? event.inputType : ''
+
+  return event.isComposing
+    || inputType.toLowerCase().includes('composition')
+    || Boolean(view.composing)
 }
 
 export function recoverRichEditorInputTransformError(error: unknown): boolean {
