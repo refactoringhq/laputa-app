@@ -14,11 +14,54 @@ import {
 } from './productAnalytics'
 
 const MAX_RETAINED_TOOL_OUTPUT_CHARS = 20_000
+const ASCII_WORD_RE = /^[A-Za-z0-9_]$/u
+const SENTENCE_START_RE = /^[A-ZÀ-ÖØ-Þ]$/u
 
-function normalizeAssistantResponseText(response: string): string {
-  return response
-    .replace(/(?<!\b[A-Z])([.!?])(?=([A-ZÀ-ÖØ-Þ]|\[\[))/gu, '$1 ')
-    .replace(/(\]\])(?=[A-ZÀ-ÖØ-Þ])/gu, '$1 ')
+type AssistantResponseText = string
+type StreamErrorMessage = string
+type ToolInvocationId = string
+type ToolOutputText = string
+
+function normalizeAssistantResponseText(response: AssistantResponseText): AssistantResponseText {
+  let normalized = ''
+
+  for (let index = 0; index < response.length; index += 1) {
+    normalized += response[index]
+
+    if (needsSpaceAfterSentencePunctuation(response, index) || needsSpaceAfterWikilink(response, index)) {
+      normalized += ' '
+    }
+  }
+
+  return normalized
+}
+
+function needsSpaceAfterSentencePunctuation(response: AssistantResponseText, index: number): boolean {
+  const char = response[index]
+  if (char !== '.' && char !== '!' && char !== '?') return false
+  if (isSingleLetterInitialBeforePunctuation(response, index)) return false
+
+  return startsSentenceOrWikilink(response, index + 1)
+}
+
+function startsSentenceOrWikilink(response: AssistantResponseText, index: number): boolean {
+  return startsWikilink(response, index) || SENTENCE_START_RE.test(response[index] ?? '')
+}
+
+function startsWikilink(response: AssistantResponseText, index: number): boolean {
+  return response[index] === '[' && response[index + 1] === '['
+}
+
+function isSingleLetterInitialBeforePunctuation(response: AssistantResponseText, punctuationIndex: number): boolean {
+  const initialIndex = punctuationIndex - 1
+  if (!SENTENCE_START_RE.test(response[initialIndex] ?? '')) return false
+
+  const previousChar = response[initialIndex - 1]
+  return previousChar === undefined || !ASCII_WORD_RE.test(previousChar)
+}
+
+function needsSpaceAfterWikilink(response: AssistantResponseText, index: number): boolean {
+  return response[index - 1] === ']' && response[index] === ']' && SENTENCE_START_RE.test(response[index + 1] ?? '')
 }
 
 export interface StreamMutationContext {
@@ -33,7 +76,7 @@ export interface StreamMutationContext {
   fileCallbacksRef: MutableRefObject<AgentFileCallbacks | undefined>
 }
 
-function finalResponseText(response: string, agent: AiAgentId): string {
+function finalResponseText(response: AssistantResponseText, agent: AiAgentId): AssistantResponseText {
   if (response.trim()) return normalizeAssistantResponseText(response)
 
   if (agent === 'opencode') {
@@ -47,7 +90,7 @@ function finalResponseText(response: string, agent: AiAgentId): string {
   return `${getAiAgentDefinition(agent).label} finished without returning a reply.`
 }
 
-function retainedToolOutput(output: string | undefined): string | undefined {
+function retainedToolOutput(output: ToolOutputText | undefined): ToolOutputText | undefined {
   if (!output || output.length <= MAX_RETAINED_TOOL_OUTPUT_CHARS) return output
 
   const omitted = output.length - MAX_RETAINED_TOOL_OUTPUT_CHARS
@@ -99,7 +142,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       updateMessage(setMessages, messageId, (message) => updateToolAction(message, toolName, toolId, input))
     },
 
-    onToolDone: (toolId: string, output?: string) => {
+    onToolDone: (toolId: ToolInvocationId, output?: ToolOutputText) => {
       if (abortRef.current.aborted) return
 
       const info = toolInputMapRef.current.get(toolId)
@@ -122,7 +165,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       }))
     },
 
-    onError: (error: string) => {
+    onError: (error: StreamErrorMessage) => {
       if (abortRef.current.aborted) return
 
       setStatus('error')
