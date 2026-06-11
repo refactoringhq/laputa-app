@@ -579,6 +579,27 @@ describe('WikilinkChatInput', () => {
     expect(screen.getByTestId('agent-input').textContent).toBe('first line\n\n')
   })
 
+  it('keeps a long draft anchored when Ctrl+Enter inserts a line break', () => {
+    const onDraftChange = vi.fn()
+    const onSend = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} onSend={onSend} />)
+
+    const longDraft = Array.from({ length: 24 }, (_, index) => `line ${index + 1}`).join('\n')
+    updateEditorText(longDraft)
+    const editor = screen.getByTestId('agent-input') as HTMLDivElement
+    editor.scrollTop = 72
+    onDraftChange.mockClear()
+
+    fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
+
+    const remountedEditor = screen.getByTestId('agent-input') as HTMLDivElement
+    expect(onSend).not.toHaveBeenCalled()
+    expect(onDraftChange).toHaveBeenLastCalledWith(`${longDraft}\n`)
+    expect(remountedEditor).not.toBe(editor)
+    expect(remountedEditor.scrollTop).toBe(72)
+    expect(remountedEditor).toHaveFocus()
+  })
+
   it('inserts one controlled newline from native insertLineBreak beforeinput', () => {
     const onDraftChange = vi.fn()
     render(<Controlled onDraftChange={onDraftChange} />)
