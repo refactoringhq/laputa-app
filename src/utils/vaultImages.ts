@@ -18,6 +18,7 @@ type MarkdownImageUrl = string
 
 const URL_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z0-9+.-]*:/
 const WINDOWS_DRIVE_PATH_PATTERN = /^[A-Za-z]:[\\/]/
+const BACKSLASH_CODE = 92
 const MARKDOWN_IMAGE_URL_FORBIDDEN_CHARS = ['\t', '\n', '\r', '"']
 
 interface MarkdownImageToken {
@@ -54,6 +55,11 @@ interface NoteDirectoryRelativePathRequest {
 
 interface MarkdownDestinationRequest {
   destination: string
+}
+
+interface MarkdownDestinationScanState {
+  inTitle: boolean
+  parenthesisDepth: number
 }
 
 interface UrlOnlyRequest {
@@ -96,6 +102,77 @@ function rewriteMarkdownImages(
   return rewritten + markdown.slice(cursor)
 }
 
+function trailingBackslashCount(markdown: Markdown, index: number): number {
+  let cursor = index
+
+  while (cursor > 0) {
+    if (markdown.charCodeAt(cursor - 1) !== BACKSLASH_CODE) break
+    cursor -= 1
+  }
+
+  return index - cursor
+}
+
+function isEscaped(markdown: Markdown, index: number): boolean {
+  return trailingBackslashCount(markdown, index) % 2 === 1
+}
+
+function isTitleQuoteStart(markdown: Markdown, index: number, destinationStart: number): boolean {
+  const previous = markdown[index - 1]
+  if (previous !== ' ' && previous !== '\t') return false
+
+  return markdown.slice(destinationStart, index).trim().length > 0
+}
+
+function handleTitleScanCharacter(state: MarkdownDestinationScanState, char: string): boolean {
+  if (!state.inTitle) return false
+  if (char === '"') state.inTitle = false
+  return true
+}
+
+function handleParenthesisScanCharacter(state: MarkdownDestinationScanState, char: string): boolean {
+  if (char === '(') {
+    state.parenthesisDepth += 1
+    return false
+  }
+
+  if (char !== ')') return false
+  if (state.parenthesisDepth === 0) return true
+  state.parenthesisDepth -= 1
+  return false
+}
+
+function isDestinationClosingParenthesis(
+  markdown: Markdown,
+  cursor: number,
+  destinationStart: number,
+  state: MarkdownDestinationScanState,
+): boolean {
+  const char = markdown[cursor]
+  if (isEscaped(markdown, cursor)) return false
+  if (handleTitleScanCharacter(state, char)) return false
+
+  if (char === '"' && isTitleQuoteStart(markdown, cursor, destinationStart)) {
+    state.inTitle = true
+    return false
+  }
+
+  return handleParenthesisScanCharacter(state, char)
+}
+
+function markdownImageDestinationEnd(markdown: Markdown, destinationStart: number): number | null {
+  const state = {
+    inTitle: false,
+    parenthesisDepth: 0,
+  }
+
+  for (let cursor = destinationStart; cursor < markdown.length; cursor += 1) {
+    if (isDestinationClosingParenthesis(markdown, cursor, destinationStart, state)) return cursor
+  }
+
+  return null
+}
+
 function nextMarkdownImage(markdown: Markdown, startIndex: number): MarkdownImageToken | null {
   const start = markdown.indexOf('![', startIndex)
   if (start === -1) return null
@@ -103,10 +180,11 @@ function nextMarkdownImage(markdown: Markdown, startIndex: number): MarkdownImag
   const altEnd = markdown.indexOf('](', start + 2)
   if (altEnd === -1) return nextMarkdownImage(markdown, start + 2)
 
-  const destinationEnd = markdown.indexOf(')', altEnd + 2)
-  if (destinationEnd === -1) return null
+  const destinationStart = altEnd + 2
+  const destinationEnd = markdownImageDestinationEnd(markdown, destinationStart)
+  if (destinationEnd === null) return nextMarkdownImage(markdown, start + 2)
 
-  const destinationText = markdown.slice(altEnd + 2, destinationEnd)
+  const destinationText = markdown.slice(destinationStart, destinationEnd)
   const destination = parseMarkdownImageDestination({
     destination: destinationText,
   })

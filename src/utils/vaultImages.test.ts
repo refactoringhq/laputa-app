@@ -126,6 +126,28 @@ describe('resolveImageUrls', () => {
     )
   })
 
+  it('resolves parenthesized and percent-encoded note-relative image paths', () => {
+    tauriMode = true
+    const markdown = [
+      '![one](./img/foo(1).png "first")',
+      '![two](./img/截图（1）.png)',
+      '![three](./img/My%20File.png)',
+    ].join('\n')
+
+    expect(resolveImageUrls(markdown, '/vault', '/vault/projects/notes/plan.md')).toBe([
+      `![one](${assetUrl('/vault/projects/notes/img/foo(1).png')} "first")`,
+      `![two](${assetUrl('/vault/projects/notes/img/截图（1）.png')})`,
+      `![three](${assetUrl('/vault/projects/notes/img/My File.png')})`,
+    ].join('\n'))
+  })
+
+  it('leaves malformed parenthesized image markdown visible', () => {
+    tauriMode = true
+    const markdown = '![broken](attachments/foo(1.png)'
+
+    expect(resolveImageUrls(markdown, '/vault')).toBe(markdown)
+  })
+
   it('resolves parent traversal from the active note directory', () => {
     tauriMode = true
     const markdown = '![diagram](../shared/Architecture.png)'
@@ -223,6 +245,14 @@ describe('portableImageUrls', () => {
 
     expect(portableImageUrls(markdown, '/vault', '/vault/projects/notes/plan.md')).toBe(
       '![shot](./img/Meeting Snapshot.png)',
+    )
+  })
+
+  it('serializes parenthesized vault-local asset URLs with title attributes', () => {
+    const markdown = `![shot](${assetUrl('/vault/projects/notes/img/foo(1).png')} "first")`
+
+    expect(portableImageUrls(markdown, '/vault', '/vault/projects/notes/plan.md')).toBe(
+      '![shot](./img/foo(1).png "first")',
     )
   })
 
