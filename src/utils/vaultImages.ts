@@ -361,10 +361,10 @@ function resolveNoteRelativeUrl(request: ImageUrlRequest): MarkdownImageUrl | nu
 }
 
 function resolveImageUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
-  return resolvePortableAttachmentUrl(request)
-    ?? resolveLegacyAttachmentAssetUrl(request)
+  return resolveLegacyAttachmentAssetUrl(request)
     ?? resolveAbsoluteFilesystemUrl({ url: request.url })
     ?? resolveNoteRelativeUrl(request)
+    ?? resolvePortableAttachmentUrl(request)
 }
 
 export function resolveImageUrls(
