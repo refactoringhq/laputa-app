@@ -17,6 +17,7 @@ import {
   type AppCommandShortcutEventOptions,
 } from './hooks/appCommandCatalog'
 import { isRecoveredBlockNoteRenderError } from './components/blockNoteRenderRecovery'
+import { isRecoveredActionTooltipError } from './components/ui/actionTooltipRecovery'
 import { isMac, shouldUseCustomWindowChrome } from './utils/platform'
 import { reloadFrontendOnceIfStartupFailed } from './utils/frontendReady'
 
@@ -178,6 +179,7 @@ function captureRecoverableReactRootError(
   const componentStack = errorInfo.componentStack ?? ''
   if (isResizeObserverLoopError(error)) return
   if (isRecoveredBlockNoteRenderError(error, componentStack)) return
+  if (isRecoveredActionTooltipError(error, componentStack)) return
 
   captureReactRootError(error, { componentStack })
 }

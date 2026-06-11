@@ -483,6 +483,29 @@ describe('FolderTree', () => {
     expect(onDeleteFolder).toHaveBeenCalledWith('projects')
   })
 
+  it('sizes the folder context menu to visible actions instead of filling the viewport', () => {
+    render(
+      <FolderTree
+        folders={mockFolders}
+        selection={defaultSelection}
+        onSelect={vi.fn()}
+        folderFileActions={{
+          copyFolderPath: vi.fn(),
+          revealFolder: vi.fn(),
+        }}
+        onDeleteFolder={vi.fn()}
+        onStartRenameFolder={vi.fn()}
+      />,
+    )
+
+    fireEvent.contextMenu(screen.getByText('projects'))
+
+    const menu = screen.getByTestId('folder-context-menu')
+    expect(menu).toHaveClass('w-max')
+    expect(menu).toHaveClass('min-w-[min(11.25rem,calc(100vw-16px))]')
+    expect(menu).toHaveClass('max-w-[min(22rem,calc(100vw-16px))]')
+  })
+
   it('dismisses the folder context menu on Escape', () => {
     render(
       <FolderTree

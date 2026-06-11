@@ -1,7 +1,14 @@
-import type { RefObject } from 'react'
+import type { RefObject, ReactNode } from 'react'
 import { ClipboardText, FolderOpen, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { translate, type AppLocale } from '../../lib/i18n'
+import { getContextMenuPositionStyle } from '../contextMenuPosition'
+
+const FOLDER_CONTEXT_MENU_MIN_WIDTH = 'min(11.25rem, calc(100vw - 16px))'
+const FOLDER_CONTEXT_MENU_MAX_WIDTH = 'min(22rem, calc(100vw - 16px))'
+
+const folderContextMenuSurfaceClass = 'fixed z-50 w-max min-w-[min(11.25rem,calc(100vw-16px))] max-w-[min(22rem,calc(100vw-16px))] rounded-md border bg-popover p-1 shadow-md'
+const folderContextMenuButtonClass = 'h-auto w-full max-w-full justify-start gap-2 px-2 py-1.5 text-sm'
 
 export interface FolderContextMenuState {
   path: string
@@ -21,83 +28,92 @@ interface FolderContextMenuProps {
   locale?: AppLocale
 }
 
-export function FolderContextMenu({
-  menu,
-  menuRef,
-  onDelete,
-  onReveal,
-  onCopyPath,
-  onCreateNote,
-  onRename,
-  locale = 'en',
-}: FolderContextMenuProps) {
+function FolderMenuLabel({ children }: { children: ReactNode }) {
+  return <span className="min-w-0 flex-1 truncate text-left">{children}</span>
+}
+
+export function FolderContextMenu(props: FolderContextMenuProps) {
+  const {
+    menu,
+    menuRef,
+    onDelete,
+    onReveal,
+    onCopyPath,
+    onCreateNote,
+    onRename,
+    locale = 'en',
+  } = props
+
   if (!menu) return null
   const canMutateFolder = menu.path.length > 0
 
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 rounded-md border bg-popover p-1 shadow-md"
-      style={{ left: menu.x, top: menu.y, minWidth: 180 }}
+      className={folderContextMenuSurfaceClass}
+      style={getContextMenuPositionStyle(menu, {
+        maxWidth: FOLDER_CONTEXT_MENU_MAX_WIDTH,
+        minWidth: FOLDER_CONTEXT_MENU_MIN_WIDTH,
+      })}
       data-testid="folder-context-menu"
     >
       {onCreateNote && (
         <Button
           type="button"
           variant="ghost"
-          className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm"
+          className={folderContextMenuButtonClass}
           onClick={() => onCreateNote(menu.path, menu.rootPath)}
           data-testid="create-node-in-folder-menu-item"
         >
-          <Plus size={14} />
-          {translate(locale, 'sidebar.action.createNodeInFolderMenu')}
+          <Plus size={14} className="shrink-0" />
+          <FolderMenuLabel>{translate(locale, 'sidebar.action.createNodeInFolderMenu')}</FolderMenuLabel>
         </Button>
       )}
       {onReveal && (
         <Button
           type="button"
           variant="ghost"
-          className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm"
+          className={folderContextMenuButtonClass}
           onClick={() => onReveal(menu.path)}
           data-testid="reveal-folder-menu-item"
         >
-          <FolderOpen size={14} />
-          {translate(locale, 'sidebar.action.revealFolderMenu')}
+          <FolderOpen size={14} className="shrink-0" />
+          <FolderMenuLabel>{translate(locale, 'sidebar.action.revealFolderMenu')}</FolderMenuLabel>
         </Button>
       )}
       {onCopyPath && (
         <Button
           type="button"
           variant="ghost"
-          className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm"
+          className={folderContextMenuButtonClass}
           onClick={() => onCopyPath(menu.path)}
           data-testid="copy-folder-path-menu-item"
         >
-          <ClipboardText size={14} />
-          {translate(locale, 'sidebar.action.copyFolderPathMenu')}
+          <ClipboardText size={14} className="shrink-0" />
+          <FolderMenuLabel>{translate(locale, 'sidebar.action.copyFolderPathMenu')}</FolderMenuLabel>
         </Button>
       )}
       {canMutateFolder && (
         <Button
           type="button"
           variant="ghost"
-          className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm"
+          className={folderContextMenuButtonClass}
           onClick={() => onRename(menu.path)}
         >
-          <PencilSimple size={14} />
-          {translate(locale, 'sidebar.action.renameFolderMenu')}
+          <PencilSimple size={14} className="shrink-0" />
+          <FolderMenuLabel>{translate(locale, 'sidebar.action.renameFolderMenu')}</FolderMenuLabel>
         </Button>
       )}
       {canMutateFolder && (
         <Button
           type="button"
           variant="ghost"
-          className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-sm text-destructive hover:text-destructive"
+          className={`${folderContextMenuButtonClass} text-destructive hover:text-destructive`}
           onClick={() => onDelete?.(menu.path)}
           data-testid="delete-folder-menu-item"
         >
-          <Trash size={14} />
-          {translate(locale, 'sidebar.action.deleteFolderMenu')}
+          <Trash size={14} className="shrink-0" />
+          <FolderMenuLabel>{translate(locale, 'sidebar.action.deleteFolderMenu')}</FolderMenuLabel>
         </Button>
       )}
     </div>

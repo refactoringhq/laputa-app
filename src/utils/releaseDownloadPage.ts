@@ -1,7 +1,7 @@
 const RELEASE_HISTORY_URL = 'https://tolaria.md/releases/'
 const DOWNLOAD_FRAME_NAME = 'tolaria-download-frame'
 const WINDOWS_MANAGED_INSTALL_NOTE =
-  'Windows installers are Authenticode-signed. Company-managed devices may still require IT to approve the Tolaria publisher before first install.'
+  'Windows updater bundles are signed. Authenticode publisher signing is added when configured; managed devices may require IT approval before install.'
 
 type StablePlatformKey =
   | 'darwin-aarch64'

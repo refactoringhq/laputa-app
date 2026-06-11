@@ -13,10 +13,6 @@ on:
       upload_macos_dmg:
         required: true
         type: boolean
-      require_windows_authenticode:
-        required: false
-        type: boolean
-        default: true
 
 env:
   # Bump this when Tauri/Rust target artifacts capture stale absolute paths.
@@ -255,6 +251,7 @@ jobs:
             patchelf \
             build-essential \
             file \
+            cpio \
             rpm
 
       - name: Setup pnpm
@@ -338,6 +335,65 @@ jobs:
             echo "::error::Linux build produced no updater signature (.sig) artifact."
             exit 1
           fi
+
+          validate_desktop_categories() {
+            local package_path="$1"
+            local extract_dir="$2"
+
+            rm -rf "$extract_dir"
+            mkdir -p "$extract_dir"
+
+            case "$package_path" in
+              *.deb)
+                dpkg-deb -x "$package_path" "$extract_dir"
+                ;;
+              *.rpm)
+                (
+                  cd "$extract_dir"
+                  rpm2cpio "$GITHUB_WORKSPACE/$package_path" | cpio -id --quiet
+                )
+                ;;
+              *)
+                echo "::error::Unsupported package format for desktop entry validation: $package_path"
+                exit 1
+                ;;
+            esac
+
+            mapfile -t desktop_files < <(find "$extract_dir/usr/share/applications" -type f -name "*.desktop" 2>/dev/null)
+            if [ ${#desktop_files[@]} -eq 0 ]; then
+              echo "::error::$package_path did not include a desktop entry under /usr/share/applications."
+              exit 1
+            fi
+
+            for desktop_file in "${desktop_files[@]}"; do
+              local categories
+              categories=$(grep "^Categories=" "$desktop_file" | cut -d= -f2- || true)
+              if [ -z "$categories" ]; then
+                echo "::error::$package_path has an empty Categories field in $(basename "$desktop_file")."
+                exit 1
+              fi
+              if [[ "$categories" != *";" ]]; then
+                echo "::error::$package_path has a Categories field that is not semicolon-terminated: $categories"
+                exit 1
+              fi
+              case ";$categories" in
+                *";Office;"*|*";Utility;"*)
+                  ;;
+                *)
+                  echo "::error::$package_path has an unexpected launcher category: $categories"
+                  exit 1
+                  ;;
+              esac
+            done
+          }
+
+          for deb in src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb; do
+            validate_desktop_categories "$deb" "$RUNNER_TEMP/tolaria-deb-desktop"
+          done
+
+          for rpm_package in src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm; do
+            validate_desktop_categories "$rpm_package" "$RUNNER_TEMP/tolaria-rpm-desktop"
+          done
 
       - name: Upload Linux bundles
         uses: actions/upload-artifact@v4
@@ -425,7 +481,6 @@ jobs:
           WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD }}
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-          REQUIRE_WINDOWS_AUTHENTICODE: ${{ inputs.require_windows_authenticode }}
         run: |
           for name in TAURI_SIGNING_PRIVATE_KEY TAURI_KEY_PASSWORD; do
             if [ -z "${!name}" ]; then
@@ -444,17 +499,14 @@ jobs:
           fi
 
           if [ "$has_certificate" != "$has_password" ]; then
-            echo "::error::Windows Authenticode signing is partially configured. Set both certificate and password secrets, or remove both for unsigned alpha Windows artifacts."
+            echo "::error::Windows Authenticode signing is partially configured. Set both certificate and password secrets, or remove both to build with Tauri updater signatures only."
             exit 1
           fi
 
           if [ "$has_certificate" = "true" ]; then
             echo "authenticode_available=true" >> "$GITHUB_OUTPUT"
-          elif [ "$REQUIRE_WINDOWS_AUTHENTICODE" = "true" ]; then
-            echo "::error::WINDOWS_CODE_SIGNING_CERTIFICATE or WINDOWS_CERTIFICATE is required to Authenticode-sign Windows installers."
-            exit 1
           else
-            echo "::warning::Windows Authenticode certificate secrets are not configured. Building alpha Windows artifacts without Authenticode signatures; Tauri updater signatures are still required."
+            echo "::warning::Windows Authenticode certificate secrets are not configured. Building Windows artifacts without Authenticode signatures; Tauri updater signatures are still required."
             echo "authenticode_available=false" >> "$GITHUB_OUTPUT"
           fi
 

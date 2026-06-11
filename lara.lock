@@ -474,6 +474,9 @@ files:
     sidebar.action.renameType: fda33d75aadfece7de1e1cc61186d99f
     sidebar.action.customizeIconColor: 9a2f685c74d261ab483ef00dee5314fe
     sidebar.action.deleteType: c52e15c44f6372c6ddb2758254a041ef
+    sidebar.typeDelete.blockedInUseOne: be7a2deea4ea29e8d5ec02f1fe2433c0
+    sidebar.typeDelete.blockedInUseMany: 2b5c044e5c4cce91649de1f1942d0463
+    sidebar.typeDelete.missingDefinition: fa8320bdc0d2b4e7e6a2dc4a8a97a311
     sidebar.action.createType: 6cfb8b8aa3fdce38e675819691b48f5c
     sidebar.action.collapse: 00873bdddd457791609bff1243c40a6b
     sidebar.action.expand: 8f98e9696f6eed958573012f52710faa

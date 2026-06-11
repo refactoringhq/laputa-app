@@ -28,14 +28,14 @@ brew install --cask tolaria
 | Platform | Status | Notes |
 | --- | --- | --- |
 | macOS | Primary | Apple Silicon and Intel builds are published. Homebrew is available. |
-| Windows | Supported, early | NSIS installers are Authenticode-signed and updater bundles are Tauri-signed. Company-managed SmartScreen, Defender, or WDAC policies can still require IT approval of the Tolaria publisher before first install. |
+| Windows | Supported, early | NSIS installers and updater bundles are Tauri-signed. Authenticode publisher signing will be added after Windows certificate provisioning; company-managed SmartScreen, Defender, or WDAC policies can still require IT approval before install. |
 | Linux | Supported, early | AppImage, deb, and RPM artifacts are published. Desktop behavior depends on distribution WebKitGTK and input-method integration. |
 
 See [Supported Platforms](/reference/supported-platforms) for the current support policy.
 
 ## Managed Windows Devices
 
-Do not disable SmartScreen or Windows Security to install Tolaria. On a managed Windows device, validate that the downloaded installer has a valid Tolaria Authenticode signature, then install it through the normal Windows prompt. If company policy still blocks the first run because reputation is not yet established, ask IT to approve the Tolaria publisher or deploy the same signed installer through the approved software portal.
+Do not disable SmartScreen or Windows Security to install Tolaria. On a managed Windows device, install Tolaria through your normal software approval path if policy blocks unsigned or unknown-publisher installers. After Authenticode provisioning is complete, validate that the downloaded installer has a valid Tolaria publisher signature before installing.
 
 ## After Installing
 

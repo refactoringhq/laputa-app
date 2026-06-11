@@ -52,7 +52,24 @@ jobs:
         # paying for the package build script's duplicate `tsc -b` pass.
         run: pnpm exec vite build
 
+      - name: Check whether docs build is needed
+        id: docs-changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$BASE_SHA" ] || [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            echo "should-build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(docs/|site/|scripts/build-agent-docs\.mjs|package\.json|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'; then
+            echo "should-build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should-build=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Docs build check
+        if: steps.docs-changes.outputs.should-build == 'true'
         run: pnpm docs:build
 
       # ── 1. Coverage-backed tests ──────────────────────────────────────────
@@ -67,7 +84,7 @@ jobs:
 
       - name: Upload frontend coverage to Codecov
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe
+        uses: codecov/codecov-action@5975040f7f7d40edaff8d784b576fd65ae95c073
         with:
           use_oidc: true
           fail_ci_if_error: true
@@ -177,7 +194,7 @@ jobs:
 
       - name: Upload Rust coverage to Codecov
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe
+        uses: codecov/codecov-action@5975040f7f7d40edaff8d784b576fd65ae95c073
         with:
           use_oidc: true
           fail_ci_if_error: true

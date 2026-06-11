@@ -4,23 +4,23 @@ import { Input } from './input'
 import { Textarea } from './textarea'
 
 describe('text controls', () => {
-  it('disables native text assistance on inputs by default', () => {
+  it('keeps inputs out of spellcheck without disabling IME autocorrection', () => {
     render(<Input aria-label="Search" />)
 
     const input = screen.getByLabelText('Search')
     expect(input).toHaveAttribute('spellcheck', 'false')
-    expect(input).toHaveAttribute('autocorrect', 'off')
     expect(input).toHaveAttribute('autocomplete', 'off')
-    expect(input).toHaveAttribute('autocapitalize', 'off')
+    expect(input).not.toHaveAttribute('autocorrect')
+    expect(input).not.toHaveAttribute('autocapitalize')
   })
 
-  it('disables native text assistance on textareas by default', () => {
+  it('keeps textareas out of spellcheck without disabling IME autocorrection', () => {
     render(<Textarea aria-label="Message" />)
 
     const textarea = screen.getByLabelText('Message')
     expect(textarea).toHaveAttribute('spellcheck', 'false')
-    expect(textarea).toHaveAttribute('autocorrect', 'off')
     expect(textarea).toHaveAttribute('autocomplete', 'off')
-    expect(textarea).toHaveAttribute('autocapitalize', 'off')
+    expect(textarea).not.toHaveAttribute('autocorrect')
+    expect(textarea).not.toHaveAttribute('autocapitalize')
   })
 })

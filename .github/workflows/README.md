@@ -45,6 +45,7 @@ Il project ID lo trovi nella dashboard CodeScene.
 - Installa/attiva il repo in Codecov una volta sola tramite GitHub App / import del repository.
 - Nessun `CODECOV_TOKEN` richiesto in GitHub Actions: `ci.yml` usa OIDC (`id-token: write` + `use_oidc: true`).
 - Il workflow carica `coverage/lcov.info` (Vitest) e `coverage/rust.lcov` (cargo-llvm-cov).
+- L'action Codecov resta con integrity validation attiva. Se Codecov ruota la chiave GPG del CLI, aggiorna il pin dell'action invece di usare `skip_validation`.
 
 ### Telemetry Secrets For Release Builds
 Aggiungi anche questi secrets per i workflow `release.yml` e `release-stable.yml`:
@@ -57,6 +58,23 @@ VITE_POSTHOG_HOST=https://eu.i.posthog.com
 ```
 
 Senza questi valori, i build distribuiti possono mantenere i toggle telemetry nelle Settings ma non inizializzare davvero PostHog/Sentry.
+
+### Windows Authenticode Secrets For Release Builds
+Windows alpha e stable release builds usano sempre le firme Tauri updater. Se i secret Authenticode sono presenti, il workflow firma anche gli installer Windows e verifica le firme; se mancano, emette un warning e pubblica gli artifact Windows senza Authenticode finche' il certificato non e' pronto.
+
+```
+WINDOWS_CODE_SIGNING_CERTIFICATE=<base64-encoded pfx>
+WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD=<pfx password>
+```
+
+Opzionale:
+
+```
+WINDOWS_CODE_SIGNING_CERTIFICATE_THUMBPRINT=<expected thumbprint>
+WINDOWS_CODE_SIGNING_TIMESTAMP_URL=https://timestamp.digicert.com
+```
+
+Il certificato deve essere un certificato di code signing trusted; un certificato self-signed non e' adatto per i release artifact pubblici.
 
 ### Coverage Thresholds
 Configura in `vitest.config.ts`:

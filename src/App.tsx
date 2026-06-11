@@ -113,6 +113,7 @@ import {
 } from './utils/workspaces'
 import { activeGitRepositories } from './utils/gitRepositories'
 import { isMarkdownEntry } from './utils/typeDefinitions'
+import { resolveTypeDeleteRequest, typeDeleteBlockedMessageKey } from './utils/typeDeletion'
 import { useVisibleWorkspaceEntries, useWorkspaceGraphState } from './hooks/useWorkspaceGraphState'
 import { useGitSetupState } from './hooks/useGitSetupState'
 import { AppPreferencesProvider, useAppPreferences } from './hooks/useAppPreferences'
@@ -1075,12 +1076,22 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   })
 
   const handleDeleteType = useCallback((typeName: string) => {
-    const typeEntry = visibleEntries.find((entry) => entry.isA === 'Type' && entry.title === typeName)
-    if (!typeEntry) return
+    const request = resolveTypeDeleteRequest(vault.entries, typeName)
+    if (request.kind === 'blocked') {
+      trackEvent('sidebar_type_delete_blocked', {
+        reason: request.reason,
+        instance_count: request.instanceCount,
+      })
+      setToastMessage(translate(appLocale, typeDeleteBlockedMessageKey(request), {
+        count: request.instanceCount,
+        type: typeName,
+      }))
+      return
+    }
 
     trackEvent('sidebar_type_delete_requested')
-    deleteActions.handleDeleteNote(typeEntry.path)
-  }, [deleteActions, visibleEntries])
+    deleteActions.handleDeleteNote(request.typeEntry.path)
+  }, [appLocale, deleteActions, vault.entries])
 
   const shouldLoadGitHistory = !layout.inspectorCollapsed && !effectiveShowAIChat
   const gitHistory = useGitHistory(notes.activeTabPath, loadGitHistoryForPath, shouldLoadGitHistory, gitHistoryRefreshKey)

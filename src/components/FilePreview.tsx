@@ -27,6 +27,25 @@ interface FilePreviewFallbackProps {
 }
 
 const EMPTY_CAPTIONS_TRACK = 'data:text/vtt,WEBVTT'
+let pdfPreviewLoadSequence = 0
+
+function nextPdfPreviewLoadKey(): string {
+  pdfPreviewLoadSequence += 1
+  return String(pdfPreviewLoadSequence)
+}
+
+function appendPdfPreviewLoadKey(assetSrc: string, loadKey: string): string {
+  const hashIndex = assetSrc.indexOf('#')
+  const baseSrc = hashIndex === -1 ? assetSrc : assetSrc.slice(0, hashIndex)
+  const hash = hashIndex === -1 ? '' : assetSrc.slice(hashIndex)
+  const separator = baseSrc.includes('?') ? '&' : '?'
+  return `${baseSrc}${separator}tolaria_pdf_preview=${encodeURIComponent(loadKey)}${hash}`
+}
+
+function usePdfPreviewLoadKey(): string {
+  const [loadKey] = useState(nextPdfPreviewLoadKey)
+  return loadKey
+}
 
 function fallbackContentForPreviewKind(previewKind: FilePreviewKind | null): Omit<FilePreviewFallbackProps, 'onOpenExternal'> {
   if (previewKind === 'image') {
@@ -165,6 +184,7 @@ function FilePreviewPdf({
 
   return (
     <object
+      key={pdfSrc}
       data={pdfSrc}
       type="application/pdf"
       title={entry.title}
@@ -410,7 +430,13 @@ export function FilePreview({
   const previewRef = useRef<HTMLElement | null>(null)
   const previewKind = filePreviewKind(entry)
   const previewPath = entry.path
-  const assetSrc = useMemo(() => (previewKind ? convertFileSrc(entry.path) : null), [entry.path, previewKind])
+  const pdfPreviewLoadKey = usePdfPreviewLoadKey()
+  const assetSrc = useMemo(() => {
+    if (!previewKind) return null
+
+    const src = convertFileSrc(entry.path)
+    return previewKind === 'pdf' ? appendPdfPreviewLoadKey(src, pdfPreviewLoadKey) : src
+  }, [entry.path, pdfPreviewLoadKey, previewKind])
   const fileTypeLabel = previewFileTypeLabel(entry)
   const externalMediaPreview = useExternalMediaPreview()
   const failures = useFilePreviewFailureState(entry.path)

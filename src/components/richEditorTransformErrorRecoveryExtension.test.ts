@@ -124,7 +124,7 @@ describe('isRecoverableEditorTransformError', () => {
     expect(isRecoverableEditorTransformError(webkitNotFoundError())).toBe(true)
     expect(isRecoverableEditorTransformError(new TypeError(
       "Cannot read properties of null (reading 'append')",
-    ))).toBe(false)
+    ))).toBe(true)
     expect(isRecoverableEditorTransformError(new Error('unrelated'))).toBe(false)
   })
 })
@@ -285,6 +285,13 @@ describe('installRichEditorTransformErrorRecovery', () => {
   it('repairs null fragment append failures from invalid document model fills', () => {
     expectDocumentRepairRecovery(
       nullFragmentAppendError(),
+      'null_fragment_append',
+    )
+  })
+
+  it('repairs production null append failures reported without a fillBefore stack', () => {
+    expectDocumentRepairRecovery(
+      new TypeError("Cannot read properties of null (reading 'append')"),
       'null_fragment_append',
     )
   })

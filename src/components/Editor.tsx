@@ -493,6 +493,7 @@ function EditorLayout({
           : activeBinaryTab
             ? (
                 <FilePreview
+                  key={activeBinaryTab.entry.path}
                   entry={activeBinaryTab.entry}
                   locale={locale}
                   onCopyFilePath={onCopyFilePath}

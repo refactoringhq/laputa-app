@@ -104,6 +104,17 @@ function isLineBreakShortcut(
     && event.keyCode !== 229
 }
 
+function isNativeCompositionBeforeInput(
+  nativeEvent: InputEvent,
+  isComposing: boolean,
+  hasPendingCompositionInput: boolean,
+) {
+  return isComposing
+    || hasPendingCompositionInput
+    || nativeEvent.isComposing
+    || nativeEvent.inputType === 'insertCompositionText'
+}
+
 export const UNSUPPORTED_INLINE_PASTE_MESSAGE = 'Only text paste is supported in the AI composer right now.'
 
 function hasUnsupportedClipboardPayload(clipboardData: DataTransfer) {
@@ -344,6 +355,12 @@ export function InlineWikilinkInput({
     if (disabled) return
 
     if (!isInsertBeforeInput(nativeEvent)) return
+
+    if (isNativeCompositionBeforeInput(
+      nativeEvent,
+      isComposingRef.current,
+      pendingCompositionInputRef.current,
+    )) return
 
     if (nativeEvent.inputType === 'insertLineBreak') {
       nativeEvent.preventDefault()

@@ -34,6 +34,26 @@ Trova l'ID del progetto nella dashboard CodeScene (URL: `https://codescene.io/pr
 https://eu.i.posthog.com
 ```
 
+**Windows Authenticode release signing**
+
+Windows release artifacts can be Authenticode-signed when a trusted code-signing certificate is available. Until Windows certificate provisioning is complete, the release workflow warns and publishes Windows artifacts with Tauri updater signatures only.
+
+To enable Authenticode, configure a trusted certificate exported as base64 PFX data:
+
+```
+WINDOWS_CODE_SIGNING_CERTIFICATE=<base64-encoded pfx>
+WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD=<pfx password>
+```
+
+Optional:
+
+```
+WINDOWS_CODE_SIGNING_CERTIFICATE_THUMBPRINT=<expected certificate thumbprint>
+WINDOWS_CODE_SIGNING_TIMESTAMP_URL=https://timestamp.digicert.com
+```
+
+Legacy aliases `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD`, `WINDOWS_CERTIFICATE_THUMBPRINT`, and `WINDOWS_TIMESTAMP_URL` are still accepted by the signing script. Do not use a self-signed certificate for public releases; Windows Authenticode release signing needs a certificate from a trusted CA or signing service.
+
 ### 2. Enable GitHub Actions
 
 - Vai su Settings → Actions → General

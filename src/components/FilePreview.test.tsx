@@ -59,6 +59,12 @@ const pdfEntry: VaultEntry = {
   filename: 'report.pdf',
   title: 'report.pdf',
 }
+const secondPdfEntry: VaultEntry = {
+  ...imageEntry,
+  path: '/vault/Attachments/brief.pdf',
+  filename: 'brief.pdf',
+  title: 'brief.pdf',
+}
 const audioEntry: VaultEntry = {
   ...imageEntry,
   path: '/vault/Attachments/meeting.mp3',
@@ -126,14 +132,45 @@ describe('FilePreview', () => {
   it('renders supported PDF files through the asset preview path', () => {
     render(<FilePreview entry={pdfEntry} />)
 
-    expect(screen.getByTestId('pdf-file-preview')).toHaveAttribute('data', 'asset:///vault/Attachments/report.pdf')
+    expect(screen.getByTestId('pdf-file-preview')).toHaveAttribute(
+      'data',
+      expect.stringMatching(/^asset:\/\/\/vault\/Attachments\/report\.pdf\?tolaria_pdf_preview=/u),
+    )
     expect(screen.getByText('PDF file')).toBeInTheDocument()
   })
 
   it('renders supported PDFs when binary metadata is unavailable', () => {
     render(<FilePreview entry={{ ...pdfEntry, fileKind: undefined }} />)
 
-    expect(screen.getByTestId('pdf-file-preview')).toHaveAttribute('data', 'asset:///vault/Attachments/report.pdf')
+    expect(screen.getByTestId('pdf-file-preview')).toHaveAttribute(
+      'data',
+      expect.stringMatching(/^asset:\/\/\/vault\/Attachments\/report\.pdf\?tolaria_pdf_preview=/u),
+    )
+  })
+
+  it('uses a fresh PDF asset URL when reopening the same PDF after navigation', () => {
+    const firstRender = render(<FilePreview entry={pdfEntry} />)
+    const firstPdfSrc = firstRender.getByTestId('pdf-file-preview').getAttribute('data')
+
+    firstRender.unmount()
+    render(<FilePreview entry={pdfEntry} />)
+
+    expect(screen.getByTestId('pdf-file-preview')).toHaveAttribute(
+      'data',
+      expect.stringMatching(/^asset:\/\/\/vault\/Attachments\/report\.pdf\?tolaria_pdf_preview=/u),
+    )
+    expect(screen.getByTestId('pdf-file-preview').getAttribute('data')).not.toBe(firstPdfSrc)
+  })
+
+  it('refreshes the PDF object URL when the preview remounts for a PDF file switch', () => {
+    const renderPreview = (entry: VaultEntry) => <FilePreview key={entry.path} entry={entry} />
+    const { rerender } = render(renderPreview(pdfEntry))
+    const firstPdfSrc = screen.getByTestId('pdf-file-preview').getAttribute('data')
+
+    rerender(renderPreview(secondPdfEntry))
+    rerender(renderPreview(pdfEntry))
+
+    expect(screen.getByTestId('pdf-file-preview').getAttribute('data')).not.toBe(firstPdfSrc)
   })
 
   it('renders supported audio files through the media asset path', () => {

@@ -19,6 +19,7 @@ import { trackEvent } from '../../lib/telemetry'
 import type { VaultEntry } from '../../types'
 import { isMarkdownEntry } from '../../utils/typeDefinitions'
 import type { NoteListContextMenuState } from './NoteListContextMenu'
+import { getContextMenuPositionStyle } from '../contextMenuPosition'
 
 interface NoteListContextMenuItem {
   destructive?: boolean
@@ -249,23 +250,25 @@ function NoteListContextMenuButton({ item }: { item: NoteListContextMenuItem }) 
   )
 }
 
-export function NoteListContextMenuNode({
-  ctxMenu,
-  ctxMenuRef,
-  locale,
-  onEnterNeighborhood,
-  onOpenInNewWindow,
-  onArchivePaths,
-  onDeletePaths,
-  onExportPdf,
-  onToggleFavorite,
-  onToggleOrganized,
-  onRevealFile,
-  onCopyFilePath,
-  canCopyGitUrl,
-  onCopyGitUrl,
-  onClose,
-}: NoteListContextMenuNodeProps) {
+export function NoteListContextMenuNode(props: NoteListContextMenuNodeProps) {
+  const {
+    ctxMenu,
+    ctxMenuRef,
+    locale,
+    onEnterNeighborhood,
+    onOpenInNewWindow,
+    onArchivePaths,
+    onDeletePaths,
+    onExportPdf,
+    onToggleFavorite,
+    onToggleOrganized,
+    onRevealFile,
+    onCopyFilePath,
+    canCopyGitUrl,
+    onCopyGitUrl,
+    onClose,
+  } = props
+
   if (!ctxMenu) return null
 
   const { entry } = ctxMenu
@@ -293,7 +296,7 @@ export function NoteListContextMenuNode({
     <div
       ref={ctxMenuRef}
       className="fixed z-[12000] rounded-md border bg-popover p-1 shadow-md"
-      style={{ left: ctxMenu.x, top: ctxMenu.y, minWidth: 240 }}
+      style={getContextMenuPositionStyle(ctxMenu, { minWidth: 240 })}
       data-testid="note-list-context-menu"
     >
       {items.map((item) => <NoteListContextMenuButton key={item.label} item={item} />)}

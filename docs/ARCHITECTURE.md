@@ -960,9 +960,9 @@ push to main
       → tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
       → verify Linux installer and updater-signature artifacts exist
       → upload .deb, .rpm, .AppImage, and signed Linux updater bundles
-      → pnpm install, stamp version, import the Windows code-signing certificate when configured
-      → tauri build --target x86_64-pc-windows-msvc --bundles nsis, using the Authenticode signing config when certificate secrets exist
-      → verify the Windows app executable and installer Authenticode signatures with Get-AuthenticodeSignature when Authenticode is configured
+      → pnpm install, stamp version, optionally import the Windows code-signing certificate
+      → tauri build --target x86_64-pc-windows-msvc --bundles nsis, with Authenticode signing config only when certificate secrets are present
+      → verify Windows app executable and installer Authenticode signatures when Authenticode signing ran
       → upload NSIS installer, optional MSI artifacts, and signed Windows updater bundles
   → release job:
       → generate alpha-latest.json with darwin-aarch64, darwin-x86_64, Linux, and Windows updater URLs
@@ -989,9 +989,9 @@ push stable-vYYYY.M.D tag
       → tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
       → verify Linux installer and updater-signature artifacts exist
       → upload .deb, .rpm, .AppImage, and signed Linux updater bundles
-      → pnpm install, stamp version, import the Windows code-signing certificate
-      → tauri build --target x86_64-pc-windows-msvc --bundles nsis with Authenticode signing config
-      → verify the Windows app executable and installer Authenticode signatures with Get-AuthenticodeSignature
+      → pnpm install, stamp version, optionally import the Windows code-signing certificate
+      → tauri build --target x86_64-pc-windows-msvc --bundles nsis, with Authenticode signing config only when certificate secrets are present
+      → verify Windows app executable and installer Authenticode signatures when Authenticode signing ran
       → upload NSIS installer, optional MSI artifacts, and signed Windows updater bundles
   → release job:
       → generate stable-latest.json with macOS Apple Silicon, macOS Intel, Linux, and Windows updater URLs plus platform-specific manual download URLs
@@ -1000,7 +1000,7 @@ push stable-vYYYY.M.D tag
       → build VitePress public docs into the GitHub Pages root
       → build static HTML release history page at /releases/
       → publish stable/latest.json
-      → publish stable/download/ and download/ as permanent download pages that keep the browser page visible while the platform installer starts, default Linux visitors to AppImage, require an explicit Windows installer click with managed-device signing guidance, and expose RPM as a manual Linux option when the stable release includes one
+      → publish stable/download/ and download/ as permanent download pages that keep the browser page visible while the platform installer starts, default Linux visitors to AppImage, require an explicit Windows installer click with managed-device guidance, and expose RPM as a manual Linux option when the stable release includes one
       → preserve alpha/latest.json
       → deploy to gh-pages
 ```

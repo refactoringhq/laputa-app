@@ -192,6 +192,21 @@ describe('main entrypoint', () => {
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack })
   })
 
+  it('suppresses recovered action tooltip render errors from Sentry', async () => {
+    await importEntrypoint()
+
+    const { markRecoveredActionTooltipError } = await import('./components/ui/actionTooltipRecovery')
+    const error = new Error('tooltip content render failed')
+    const componentStack = '\n    in TooltipContent\n    in ActionTooltipBoundary'
+    window.__tolariaFrontendReady = true
+    markRecoveredActionTooltipError(error)
+
+    rootOptions().onCaughtError?.(error, { componentStack })
+
+    expect(mocks.sentryHandler).not.toHaveBeenCalled()
+    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+  })
+
   it('mounts a frontend readiness marker after the app shell', async () => {
     await importEntrypoint()
 

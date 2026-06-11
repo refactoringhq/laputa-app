@@ -67,9 +67,6 @@ jobs:
       version: ${{ needs.version.outputs.version }}
       macos_bundles: ""
       upload_macos_dmg: true
-      # One-time stable promotion exceptions while Windows certificate secrets
-      # are still being provisioned. Future stable tags must keep Authenticode.
-      require_windows_authenticode: ${{ !contains(fromJson('["v2026-06-01","v2026-06-06"]'), needs.version.outputs.tag) }}
     secrets: inherit
 
   # ─────────────────────────────────────────────────────────────

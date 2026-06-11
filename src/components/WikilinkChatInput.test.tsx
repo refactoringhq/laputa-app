@@ -365,6 +365,45 @@ describe('WikilinkChatInput', () => {
     expect(screen.getByTestId('agent-input').textContent).toBe('안녕')
   })
 
+  it('lets Korean composition commit text reach the native input pipeline', async () => {
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+
+    const editor = screen.getByTestId('agent-input') as HTMLDivElement
+    editor.focus()
+
+    fireEvent.compositionStart(editor)
+    editor.textContent = '안녕하세'
+    setSelection(editor, '안녕하세'.length)
+    fireEvent.input(editor)
+    fireEvent.compositionEnd(editor)
+
+    const commitEvent = new Event('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperties(commitEvent, {
+      data: { value: '요' },
+      inputType: { value: 'insertText' },
+      isComposing: { value: false },
+    })
+
+    fireEvent(editor, commitEvent)
+
+    expect(commitEvent.defaultPrevented).toBe(false)
+    expect(onDraftChange).not.toHaveBeenCalled()
+
+    editor.textContent = '안녕하세요'
+    setSelection(editor, '안녕하세요'.length)
+    fireEvent.input(editor)
+    await waitForCompositionFlush()
+
+    await waitFor(() => {
+      expect(onDraftChange).toHaveBeenLastCalledWith('안녕하세요')
+    })
+    expect(screen.getByTestId('agent-input').textContent).toBe('안녕하세요')
+  })
+
   it('does not steal focus back if it was moved elsewhere during composition end', async () => {
     const onDraftChange = vi.fn()
     render(

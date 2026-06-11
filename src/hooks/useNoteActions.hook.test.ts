@@ -895,6 +895,57 @@ describe('useNoteActions hook', () => {
       expect(onPathRenamed).toHaveBeenCalledWith('/test/vault/old-name.md', '/test/vault/new-name.md')
     })
 
+    it('routes undoable frontmatter changes to the renamed note path', async () => {
+      const oldPath = '/test/vault/old-name.md'
+      const newPath = '/test/vault/new-name.md'
+      const entry = makeEntry({
+        path: oldPath,
+        filename: 'old-name.md',
+        title: 'Old Name',
+        status: 'Active',
+      })
+      const config = makeConfig([entry])
+      config.onPathRenamed = vi.fn()
+      config.replaceEntry = vi.fn()
+
+      vi.mocked(mockInvoke).mockImplementation(async (cmd: string) => {
+        if (cmd === 'rename_note') return { new_path: newPath, updated_files: 1 }
+        if (cmd === 'get_note_content') return '---\ntitle: New Name\nstatus: Done\n---\n# New Name\n'
+        if (cmd === 'save_note_content') return undefined
+        return ''
+      })
+
+      const { result } = renderHook(() => useNoteActions(config))
+
+      await act(async () => { result.current.handleSelectNote(entry) })
+      await act(async () => {
+        await result.current.handleUpdateFrontmatter(oldPath, 'status', 'Done')
+      })
+      await act(async () => {
+        await result.current.handleRenameNote(oldPath, 'New Name', '/test/vault', config.replaceEntry!)
+      })
+      vi.mocked(mockInvoke).mockClear()
+
+      await act(async () => {
+        await result.current.handleUndo()
+      })
+
+      const savePaths = vi.mocked(mockInvoke).mock.calls
+        .filter(([cmd]) => cmd === 'save_note_content')
+        .map(([, args]) => args)
+        .filter((args): args is { path: string } => (
+          typeof args === 'object'
+          && args !== null
+          && 'path' in args
+          && typeof args.path === 'string'
+        ))
+        .map((args) => args.path)
+
+      expect(savePaths).toContain(newPath)
+      expect(savePaths).not.toContain(oldPath)
+      expect(updateEntry).toHaveBeenCalledWith(newPath, expect.objectContaining({ status: 'Active' }))
+    })
+
     it('handleUpdateFrontmatter does not trigger rename for non-title keys', async () => {
       const config = makeConfig()
       vi.mocked(mockInvoke).mockResolvedValue('')

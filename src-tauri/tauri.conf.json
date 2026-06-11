@@ -55,6 +55,7 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
+    "category": "Productivity",
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"

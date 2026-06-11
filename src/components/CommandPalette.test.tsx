@@ -183,14 +183,14 @@ describe('CommandPalette', () => {
     expect(screen.getByPlaceholderText('Type a command...')).toBeInTheDocument()
   })
 
-  it('opts the command input out of spellcheck and text correction', () => {
+  it('opts the command input out of spellcheck without disabling IME autocorrection', () => {
     render(<CommandPalette open={true} commands={commands} onClose={onClose} />)
     const input = screen.getByPlaceholderText('Type a command...')
 
     expect(input).toHaveAttribute('spellcheck', 'false')
-    expect(input).toHaveAttribute('autocorrect', 'off')
-    expect(input).toHaveAttribute('autocapitalize', 'off')
     expect(input).toHaveAttribute('autocomplete', 'off')
+    expect(input).not.toHaveAttribute('autocorrect')
+    expect(input).not.toHaveAttribute('autocapitalize')
   })
 
   it('shows all enabled commands grouped by category', () => {

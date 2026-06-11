@@ -2,6 +2,7 @@ const BLOCKNOTE_MISSING_ID_ERROR = "Block doesn't have id"
 const BLOCKNOTE_BLOCK_TYPE_MISMATCH_ERROR = 'Block type does not match'
 const BLOCKNOTE_TABLE_ROW_INDEX_ERROR = /^Index \d+ out of range for <tableRow\(/
 const BLOCKNOTE_PARAGRAPH_INDEX_ERROR = /^Index \d+ out of range for <paragraph\(/
+const NULL_APPEND_PROPERTY_ERROR = "Cannot read properties of null (reading 'append')"
 
 export type BlockNoteRenderRecoveryReason =
   | 'block_type_mismatch'
@@ -69,6 +70,7 @@ function isInvalidBlockJoinError(error: unknown): boolean {
 
 function isNullFragmentAppendError(error: unknown): boolean {
   if (!(error instanceof TypeError)) return false
+  if (error.message === NULL_APPEND_PROPERTY_ERROR) return true
 
   const details = `${error.message}\n${error.stack ?? ''}`
   return details.includes('fillBefore') && details.includes('.append')

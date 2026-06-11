@@ -1,15 +1,17 @@
 export const nativeTextAssistanceDisabledAttributes = {
   spellcheck: 'false',
-  autocorrect: 'off',
   autocomplete: 'off',
-  autocapitalize: 'off',
 } as const
 
 export const nativeTextAssistanceDisabledProps = {
   spellCheck: false,
-  autoCorrect: 'off',
   autoComplete: 'off',
-  autoCapitalize: 'off',
+} as const
+
+export const rawEditorTextInputAttributes = {
+  ...nativeTextAssistanceDisabledAttributes,
+  autocorrect: 'on',
+  autocapitalize: 'sentences',
 } as const
 
 const TEXT_ENTRY_SELECTOR = [

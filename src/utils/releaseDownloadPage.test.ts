@@ -48,7 +48,7 @@ describe('release workflow macOS artifact names', () => {
     expect(countOccurrences(artifactWorkflow, releaseEnv)).toBe(3)
   })
 
-  it('gates Windows Authenticode signing through the shared artifact workflow', () => {
+  it('keeps Windows Authenticode optional while certificate provisioning is pending', () => {
     const alphaWorkflow = readFileSync(`${process.cwd()}/.github/workflows/release.yml`, 'utf8')
     const stableWorkflow = readFileSync(
       `${process.cwd()}/.github/workflows/release-stable.yml`,
@@ -63,15 +63,24 @@ describe('release workflow macOS artifact names', () => {
       'utf8',
     )
 
-    expect(alphaWorkflow).toContain('require_windows_authenticode: false')
-    expect(stableWorkflow).toContain(
-      `require_windows_authenticode: \${{ !contains(fromJson('["v2026-06-01","v2026-06-06"]'), needs.version.outputs.tag) }}`,
-    )
-    expect(artifactWorkflow).toContain('require_windows_authenticode:')
+    expect(alphaWorkflow).not.toContain('require_windows_authenticode')
+    expect(stableWorkflow).not.toContain('require_windows_authenticode')
+    expect(artifactWorkflow).not.toContain('require_windows_authenticode')
+    expect(artifactWorkflow).toContain('id: windows-signing')
+    expect(artifactWorkflow).toContain('authenticode_available=true')
+    expect(artifactWorkflow).toContain('authenticode_available=false')
+    expect(artifactWorkflow).toContain('without Authenticode signatures')
+    expect(artifactWorkflow).toContain('Tauri updater signatures are still required')
     expect(artifactWorkflow).toContain('WINDOWS_CODE_SIGNING_CERTIFICATE')
     expect(artifactWorkflow).toContain('WINDOWS_CERTIFICATE')
+    expect(artifactWorkflow).toContain('Set both certificate and password secrets')
+    expect(artifactWorkflow).not.toContain('required to Authenticode-sign Windows installers')
     expect(artifactWorkflow).toContain('./.github/scripts/configure-windows-authenticode.ps1')
     expect(artifactWorkflow).toContain('--config src-tauri/tauri.windows-signing.conf.json')
+    expect(artifactWorkflow).toContain('pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis')
+    expect(artifactWorkflow).toContain(
+      "if: ${{ steps.windows-signing.outputs.authenticode_available == 'true' }}",
+    )
     expect(artifactWorkflow).toContain('Validate Windows Authenticode signatures')
     expect(artifactWorkflow).toContain('Get-AuthenticodeSignature')
     expect(signingScript).toContain('certificateThumbprint')
@@ -143,7 +152,8 @@ describe('buildStableDownloadRedirectPage', () => {
     expect(html).toContain('Tolaria Stable Download')
     expect(html).toContain('DOWNLOAD_TARGETS')
     expect(html).toContain('Download Tolaria for Windows')
-    expect(html).toContain('Windows installers are Authenticode-signed')
+    expect(html).toContain('Windows updater bundles are signed')
+    expect(html).toContain('Authenticode publisher signing is added when configured')
     expect(html).toContain('Download Tolaria for macOS Apple Silicon')
     expect(html).toContain('Download Tolaria for Intel Mac')
     expect(html).toContain('hasMultipleMacDownloads')
