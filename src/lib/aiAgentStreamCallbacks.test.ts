@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStatus, AiAgentMessage } from './aiAgentConversation'
 
@@ -176,6 +178,12 @@ describe('aiAgentStreamCallbacks', () => {
     expect(messages.getMessages()[0].response).toBe(
       "I'll create the Project note now. Created [[Tolaria Mobile]] as a Project note with a relation to [[frontend]]. It covers three tech stack paths.",
     )
+  })
+
+  it('keeps response normalization compatible with WebKit regex syntax support', () => {
+    const source = readFileSync(join(process.cwd(), 'src/lib/aiAgentStreamCallbacks.ts'), 'utf8')
+
+    expect(source).not.toMatch(/\(\?<[!=]/u)
   })
 
   it('marks pending actions as failed when the stream errors', () => {
