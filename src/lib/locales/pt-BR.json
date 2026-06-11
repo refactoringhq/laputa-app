@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Puxar do Remoto: {repository}",
   "command.git.resolveConflicts": "Resolver conflitos",
   "command.git.viewChanges": "Exibir alterações pendentes",
+  "git.author.label": "Autor do commit",
+  "git.author.warning.localOverridesGlobal": "O autor do repositório Git é diferente do seu autor global do Git. Cancele e atualize a configuração do Git deste cofre antes de fazer o commit, se ela parecer incorreta.",
   "git.repository.select": "Repositório",
   "git.toast.autoGitFailed": "Falha no AutoGit: {error}",
   "git.toast.commitFailed": "Falha no commit: {error}",

@@ -465,7 +465,7 @@ The `with_frontmatter()` helper wraps this in a read-transform-write cycle on th
 
 ## Git Integration
 
-Git operations live in `src-tauri/src/git/`. All operations shell out to the `git` CLI (not libgit2). Path-producing commands use `core.quotePath=false` so Unicode note filenames stay as UTF-8 paths across status, history, cache invalidation, and rename detection.
+Git operations live in `src-tauri/src/git/`. All operations shell out to the `git` CLI (not libgit2). Path-producing commands use `core.quotePath=false` so Unicode note filenames stay as UTF-8 paths across status, history, cache invalidation, and rename detection. Git subprocesses also inherit the user's shell-managed Git identity/config environment when the app process is missing it, including `GIT_AUTHOR_*`, `GIT_COMMITTER_*`, `GIT_CONFIG_*`, `XDG_CONFIG_HOME`, and `EMAIL`.
 
 ### Data Types
 
@@ -517,6 +517,7 @@ interface PulseCommit {
 | `status.rs` | Modified files | `git status --porcelain` — filtered to `.md` |
 | `status.rs` | File diff | `git diff`, fallback to `--cached`, then synthetic for untracked |
 | `file_url.rs` | File URL | Builds a copyable remote URL from the primary remote, current branch, and vault-relative path without exposing remote credentials |
+| `author.rs` | Author identity | Resolves the exact commit author Tolaria will use, heals the legacy Tolaria fallback email, and reports when repo-local identity shadows the global Git identity |
 | `commit.rs` | Commit | Ensures a local author fallback when needed, then runs `git add -A && git commit -m "..."`; broken signing helpers trigger one unsigned retry for the same app-managed commit |
 | `remote.rs` | Pull / Push | `git pull --rebase` / `git push` |
 | `connect.rs` | Add remote | Adds `origin`, fetches it, validates history compatibility, and only starts tracking when the remote is safe |

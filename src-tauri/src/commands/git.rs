@@ -1,6 +1,6 @@
 use crate::git::{
-    GitCommit, GitPullResult, GitPushResult, GitRemoteStatus, LastCommitInfo, ModifiedFile,
-    PulseCommit,
+    GitAuthorIdentity, GitCommit, GitPullResult, GitPushResult, GitRemoteStatus, LastCommitInfo,
+    ModifiedFile, PulseCommit,
 };
 
 use super::expand_tilde;
@@ -82,6 +82,13 @@ pub fn get_vault_pulse(
 pub fn git_commit(vault_path: VaultPathArg, message: CommitMessageArg) -> Result<String, String> {
     let vault_path = expand_tilde(&vault_path);
     crate::git::git_commit(&vault_path, &message)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn git_author_identity(vault_path: VaultPathArg) -> Result<GitAuthorIdentity, String> {
+    let vault_path = expand_tilde(&vault_path);
+    crate::git::git_author_identity(&vault_path)
 }
 
 #[cfg(desktop)]
@@ -298,6 +305,12 @@ pub fn get_vault_pulse(
 #[tauri::command]
 pub fn git_commit(_vault_path: VaultPathArg, _message: CommitMessageArg) -> Result<String, String> {
     Err("Git commit is not available on mobile".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn git_author_identity(_vault_path: VaultPathArg) -> Result<GitAuthorIdentity, String> {
+    Err("Git author identity is not available on mobile".into())
 }
 
 #[cfg(mobile)]

@@ -126,6 +126,8 @@ files:
     command.git.pullRepository: 931ad25176586fd4332dd671574d3185
     command.git.resolveConflicts: 871ac36968cfca3d2297a89b28b25dee
     command.git.viewChanges: b2699edf69d8e1031afce2b2f94e5c8d
+    git.author.label: 7a0ca1a813e4518e479a7927890568ce
+    git.author.warning.localOverridesGlobal: 5ea1eb9d1b9d2a80662368ee9e1fba63
     git.repository.select: 33fcf2b3ec4686d9cd06051c726d0ba2
     git.toast.autoGitFailed: 3e5d7e183a78e1f54c87ad0dba8a302b
     git.toast.commitFailed: bb50986d29c30042bed1446f8adaa544

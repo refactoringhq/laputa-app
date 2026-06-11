@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Atrymać z addalienaha repazitoryja: {repository}",
   "command.git.resolveConflicts": "Vyrašyć kanflikty",
   "command.git.viewChanges": "Prahliedzieć čakajučyja zmieny",
+  "git.author.label": "Aŭtar kamita",
+  "git.author.warning.localOverridesGlobal": "Aŭtar Git u repazitoryi adroźnivajecca ad vašaha hlabalnaha aŭtara Git. Kali zdajecca, što niešta nie tak, skasujcie i abnavicie git config hetaha schovišča pierad kamitam.",
   "git.repository.select": "Schovišča",
   "git.toast.autoGitFailed": "Pamylka AutoGit: {error}",
   "git.toast.commitFailed": "Pamylka kamita: {error}",

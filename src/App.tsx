@@ -1741,6 +1741,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           open={commitFlow.showCommitDialog}
           modifiedCount={commitModifiedFiles.length}
           commitMode={commitFlow.commitMode}
+          authorIdentity={commitFlow.authorIdentity}
           locale={appLocale}
           repositories={gitRepositories}
           selectedRepositoryPath={gitSurfaces.commitRepositoryPath}

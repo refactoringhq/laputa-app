@@ -5,15 +5,22 @@ test.describe('Sync error UX — actionable push error messages', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
+    await page.waitForFunction(() => {
+      const handlers = Reflect.get(globalThis, '__mockHandlers')
+      return Boolean(handlers && typeof handlers === 'object' && Reflect.get(handlers, 'git_push'))
+    })
+    await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible()
   })
 
   test('rejected push shows actionable "Pull first" message in toast', async ({ page }) => {
     // Override git_push mock to return a rejected result
     await page.evaluate(() => {
-      window.__mockHandlers!.git_push = () => ({
+      const handlers = Reflect.get(globalThis, '__mockHandlers')
+      if (!handlers || typeof handlers !== 'object') throw new Error('Mock handlers were not installed')
+      Reflect.set(handlers, 'git_push', () => ({
         status: 'rejected',
         message: 'Push rejected: remote has new commits. Pull first, then push.',
-      })
+      }))
     })
 
     // Open commit dialog via command palette
@@ -36,10 +43,12 @@ test.describe('Sync error UX — actionable push error messages', () => {
 
   test('auth error push shows authentication message in toast', async ({ page }) => {
     await page.evaluate(() => {
-      window.__mockHandlers!.git_push = () => ({
+      const handlers = Reflect.get(globalThis, '__mockHandlers')
+      if (!handlers || typeof handlers !== 'object') throw new Error('Mock handlers were not installed')
+      Reflect.set(handlers, 'git_push', () => ({
         status: 'auth_error',
         message: 'Push failed: authentication error. Check your credentials.',
-      })
+      }))
     })
 
     await openCommandPalette(page)
