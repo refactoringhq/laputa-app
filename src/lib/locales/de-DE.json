@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Aus Remote abrufen: {repository}",
   "command.git.resolveConflicts": "Konflikte auflösen",
   "command.git.viewChanges": "Ausstehende Änderungen anzeigen",
+  "git.author.label": "Autor des Commits",
+  "git.author.warning.localOverridesGlobal": "Der Git-Autor des Repositorys unterscheidet sich von Ihrem globalen Git-Autor. Breche ab und aktualisiere die Git-Konfiguration dieses Vaults, bevor du einen Commit durchführst, wenn sie falsch aussieht.",
   "git.repository.select": "Repository",
   "git.toast.autoGitFailed": "AutoGit ist fehlgeschlagen: {error}",
   "git.toast.commitFailed": "Commit fehlgeschlagen: {error}",

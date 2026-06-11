@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Esegui il pull dal repository remoto: {repository}",
   "command.git.resolveConflicts": "Risolvi conflitti",
   "command.git.viewChanges": "Visualizza modifiche in sospeso",
+  "git.author.label": "Autore del commit",
+  "git.author.warning.localOverridesGlobal": "L'autore Git del repository è diverso dal tuo autore Git globale. Annulla e aggiorna la configurazione Git di questo vault prima di eseguire il commit se sembra errata.",
   "git.repository.select": "Repository",
   "git.toast.autoGitFailed": "AutoGit non riuscito: {error}",
   "git.toast.commitFailed": "Commit non riuscito: {error}",

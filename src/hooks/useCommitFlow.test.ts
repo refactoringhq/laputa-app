@@ -47,6 +47,9 @@ describe('useCommitFlow', () => {
     mockInvokeFn.mockReset()
     mockInvokeFn.mockImplementation((command: string) => {
       if (command === 'git_commit') return Promise.resolve('[main abc1234] test commit')
+      if (command === 'git_author_identity') {
+        return Promise.resolve({ name: 'Test User', email: 'test@example.com', source: 'global', warning: null })
+      }
       if (command === 'git_push') return Promise.resolve({ status: 'ok', message: 'Pushed to remote' })
       throw new Error(`Unexpected command: ${command}`)
     })

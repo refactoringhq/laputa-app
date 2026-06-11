@@ -89,6 +89,16 @@ export interface GitCommit {
   date: number // unix timestamp
 }
 
+export type GitAuthorIdentitySource = 'environment' | 'fallback' | 'global' | 'repository' | 'system' | 'unknown'
+export type GitAuthorIdentityWarning = 'local_overrides_global'
+
+export interface GitAuthorIdentity {
+  name: string
+  email: string
+  source: GitAuthorIdentitySource
+  warning: GitAuthorIdentityWarning | null
+}
+
 export interface LastCommitInfo {
   shortHash: string
   commitUrl: string | null

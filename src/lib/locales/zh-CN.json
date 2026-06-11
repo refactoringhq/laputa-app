@@ -124,6 +124,8 @@
   "command.git.pullRepository": "从远程拉取：{repository}",
   "command.git.resolveConflicts": "解决冲突",
   "command.git.viewChanges": "查看待处理更改",
+  "git.author.label": "提交作者",
+  "git.author.warning.localOverridesGlobal": "存储库 Git 作者与您的全局 Git 作者不同。如果看起来有问题，请在提交之前取消并更新此保管库的 Git 配置。",
   "git.repository.select": "仓库",
   "git.toast.autoGitFailed": "AutoGit 失败：{error}",
   "git.toast.commitFailed": "提交失败：{error}",

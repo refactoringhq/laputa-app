@@ -1,3 +1,4 @@
+mod author;
 mod clone;
 mod command;
 mod commit;
@@ -20,6 +21,15 @@ use std::sync::OnceLock;
 #[cfg(test)]
 use std::cell::RefCell;
 
+use crate::cli_agent_runtime::{env_value_from_process_or_user_shell, EnvName};
+
+pub(crate) use author::ensure_author_config;
+pub use author::{git_author_identity, GitAuthorIdentity};
+#[cfg(test)]
+pub(crate) use author::{
+    local_config_value, AuthorConfigKey, FALLBACK_AUTHOR_EMAIL, FALLBACK_AUTHOR_NAME,
+    LEGACY_FALLBACK_EMAIL,
+};
 pub use clone::clone_repo;
 pub use commit::git_commit;
 pub use conflict::{
@@ -68,6 +78,17 @@ const DEFAULT_GITIGNORE: &str = "# Tolaria app files (machine-specific, never co
 *.swp\n\
 *.swo\n";
 
+const GIT_SHELL_ENV_NAMES: [EnvName<'static>; 8] = [
+    EnvName::trusted("GIT_AUTHOR_NAME"),
+    EnvName::trusted("GIT_AUTHOR_EMAIL"),
+    EnvName::trusted("GIT_COMMITTER_NAME"),
+    EnvName::trusted("GIT_COMMITTER_EMAIL"),
+    EnvName::trusted("GIT_CONFIG_GLOBAL"),
+    EnvName::trusted("GIT_CONFIG_SYSTEM"),
+    EnvName::trusted("XDG_CONFIG_HOME"),
+    EnvName::trusted("EMAIL"),
+];
+
 #[derive(Clone)]
 struct GitLaunchConfig {
     program: OsString,
@@ -80,6 +101,11 @@ struct ShellGitConfig {
     path: Option<OsString>,
 }
 
+struct GitShellEnvBinding {
+    name: &'static str,
+    value: String,
+}
+
 pub(crate) fn git_command() -> Command {
     let config = git_launch_config();
     let mut command = crate::hidden_command(&config.program);
@@ -87,10 +113,32 @@ pub(crate) fn git_command() -> Command {
         command.env("PATH", path);
     }
     sanitize_linux_appimage_git_env(&mut command);
+    apply_git_shell_env(&mut command);
     #[cfg(test)]
     apply_test_git_config_env(&mut command);
     command.args(["-c", "core.quotePath=false"]);
     command
+}
+
+fn apply_git_shell_env(command: &mut Command) {
+    for binding in git_shell_env_bindings() {
+        command.env(binding.name, &binding.value);
+    }
+}
+
+fn git_shell_env_bindings() -> &'static Vec<GitShellEnvBinding> {
+    static BINDINGS: OnceLock<Vec<GitShellEnvBinding>> = OnceLock::new();
+    BINDINGS.get_or_init(|| {
+        GIT_SHELL_ENV_NAMES
+            .iter()
+            .filter_map(|name| {
+                env_value_from_process_or_user_shell(*name).map(|value| GitShellEnvBinding {
+                    name: name.as_str(),
+                    value,
+                })
+            })
+            .collect()
+    })
 }
 
 #[cfg(test)]
@@ -316,88 +364,6 @@ fn run_git(dir: &Path, args: &[&str]) -> Result<(), String> {
     ))
 }
 
-/// Fallback author name written when no identity is configured anywhere.
-const FALLBACK_AUTHOR_NAME: &str = "Tolaria";
-
-/// Fallback author email written when no identity is configured anywhere.
-const FALLBACK_AUTHOR_EMAIL: &str = "vault@tolaria.default";
-
-/// Email previously hardcoded by Tolaria. GitHub may attribute it to a real
-/// account, so it is treated as "no identity": healed from the local scope and
-/// skipped wherever it resolves from.
-const LEGACY_FALLBACK_EMAIL: &str = "vault@tolaria.md";
-
-/// Ensure git can resolve an author identity for the vault, without ever
-/// overriding one the user configured themselves.
-///
-/// 1. Heal: earlier Tolaria versions unconditionally wrote
-///    `Tolaria <vault@tolaria.md>` into the repo-local config, shadowing the
-///    user's own global/system identity. If that legacy email is still present
-///    locally, remove it so the user's identity resolves again.
-/// 2. Respect: if git resolves a value from any scope, keep it. A resolved email
-///    equal to the legacy fallback is skipped, since it misattributes commits.
-/// 3. Fallback: only when nothing resolves, write a repo-local Tolaria fallback
-///    identity so app-managed commits still work.
-pub(crate) fn ensure_author_config(dir: &Path) -> Result<(), String> {
-    heal_legacy_local_identity(dir)?;
-
-    for (key, fallback, skip_legacy) in [
-        ("user.name", FALLBACK_AUTHOR_NAME, false),
-        ("user.email", FALLBACK_AUTHOR_EMAIL, true),
-    ] {
-        let resolved = git_command()
-            .args(["config", key])
-            .current_dir(dir)
-            .output()
-            .map_err(|e| format!("Failed to check git config {key}: {e}"))?;
-
-        let value = String::from_utf8_lossy(&resolved.stdout);
-        let value = value.trim();
-        if resolved.status.success() && resolved_author_value_is_usable(value, skip_legacy) {
-            continue;
-        }
-
-        run_git(dir, &["config", "--local", key, fallback])?;
-    }
-    Ok(())
-}
-
-fn resolved_author_value_is_usable(value: &str, skip_legacy: bool) -> bool {
-    if value.is_empty() {
-        return false;
-    }
-
-    !skip_legacy || value != LEGACY_FALLBACK_EMAIL
-}
-
-/// Remove the local `vault@tolaria.md` email that earlier versions wrote into
-/// repo-local config. A local name the user set themselves is left untouched.
-fn heal_legacy_local_identity(dir: &Path) -> Result<(), String> {
-    let local_email = local_config_value(dir, "user.email")?;
-    if local_email.as_deref() != Some(LEGACY_FALLBACK_EMAIL) {
-        return Ok(());
-    }
-
-    run_git(dir, &["config", "--local", "--unset-all", "user.email"])?;
-    if local_config_value(dir, "user.name")?.as_deref() == Some(FALLBACK_AUTHOR_NAME) {
-        run_git(dir, &["config", "--local", "--unset-all", "user.name"])?;
-    }
-    Ok(())
-}
-
-/// Read a repo-local config value, or `None` when it is not set.
-fn local_config_value(dir: &Path, key: &str) -> Result<Option<String>, String> {
-    let output = git_command()
-        .args(["config", "--local", key])
-        .current_dir(dir)
-        .output()
-        .map_err(|e| format!("Failed to check git config {key}: {e}"))?;
-
-    let value = String::from_utf8_lossy(&output.stdout);
-    let value = value.trim();
-    Ok((output.status.success() && !value.is_empty()).then(|| value.to_string()))
-}
-
 /// Extract "owner/repo" from a GitHub remote URL.
 /// Supports HTTPS (https://github.com/owner/repo.git) and
 /// SSH (git@github.com:owner/repo.git) formats.
@@ -580,11 +546,15 @@ mod tests {
 
     fn assert_local_identity(dir: &Path, name: Option<&str>, email: Option<&str>) {
         assert_eq!(
-            local_config_value(dir, "user.name").unwrap().as_deref(),
+            local_config_value(dir, AuthorConfigKey::Name)
+                .unwrap()
+                .as_deref(),
             name
         );
         assert_eq!(
-            local_config_value(dir, "user.email").unwrap().as_deref(),
+            local_config_value(dir, AuthorConfigKey::Email)
+                .unwrap()
+                .as_deref(),
             email
         );
     }
@@ -661,6 +631,22 @@ mod tests {
 
         // A local identity the user set themselves is never touched.
         assert_local_identity(dir.path(), Some("Vault Owner"), Some("owner@example.com"));
+    }
+
+    #[test]
+    fn test_git_author_identity_warns_when_local_identity_shadows_global_identity() {
+        let _env =
+            GitConfigEnvGuard::with_global_identity(Some(("Vault Owner", "owner@example.com")));
+
+        let dir = init_plain_repo();
+        set_local_identity(dir.path(), "Unexpected User", "unexpected@example.com");
+
+        let identity = git_author_identity(dir.path().to_str().unwrap()).unwrap();
+
+        assert_eq!(identity.name, "Unexpected User");
+        assert_eq!(identity.email, "unexpected@example.com");
+        assert_eq!(identity.source, "repository");
+        assert_eq!(identity.warning.as_deref(), Some("local_overrides_global"));
     }
 
     #[test]

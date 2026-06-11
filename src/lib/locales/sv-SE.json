@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Hämta från fjärr: {repository}",
   "command.git.resolveConflicts": "Lös konflikter",
   "command.git.viewChanges": "Visa väntande ändringar",
+  "git.author.label": "Commit-författare",
+  "git.author.warning.localOverridesGlobal": "Repository Git-författaren skiljer sig från din globala Git-författare. Avbryt och uppdatera detta valvs git-konfiguration innan du gör en commit om den ser fel ut.",
   "git.repository.select": "Arkiv",
   "git.toast.autoGitFailed": "AutoGit misslyckades: {error}",
   "git.toast.commitFailed": "Incheckning misslyckades: {error}",

@@ -124,6 +124,8 @@
   "command.git.pullRepository": "Extraer del repositorio remoto: {repository}",
   "command.git.resolveConflicts": "Resolver conflictos",
   "command.git.viewChanges": "Ver cambios pendientes",
+  "git.author.label": "Autor de la confirmación",
+  "git.author.warning.localOverridesGlobal": "El autor del repositorio Git es diferente de su autor global de Git. Cancele y actualice la configuración de Git de este almacén antes de confirmar si parece incorrecta.",
   "git.repository.select": "Repositorio",
   "git.toast.autoGitFailed": "Error de AutoGit: {error}",
   "git.toast.commitFailed": "Error al confirmar: {error}",
