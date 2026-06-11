@@ -66,7 +66,7 @@ export function useInlineWikilinkSelection({
   const focusSelectionRange = useCallback((nextSelectionRange: InlineSelectionRange) => {
     const editor = editorRef.current
     if (!editor) return
-    editor.focus()
+    editor.focus({ preventScroll: true })
     applySelectionRange(editor, nextSelectionRange)
   }, [])
 

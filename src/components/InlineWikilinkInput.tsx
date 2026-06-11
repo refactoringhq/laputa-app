@@ -44,6 +44,7 @@ import {
   isInsertBeforeInput,
   isPlainTextBeforeInput,
 } from './inlineWikilinkBeforeInput'
+import { restorePendingRemountState } from './inlineWikilinkRemountState'
 import { useNativePathDrop } from './useNativePathDrop'
 
 interface InlineWikilinkInputProps {
@@ -98,7 +99,7 @@ function isLineBreakShortcut(
   isComposing: boolean,
 ) {
   return event.key === 'Enter'
-    && event.shiftKey
+    && (event.shiftKey || event.ctrlKey)
     && !isComposing
     && !event.nativeEvent.isComposing
     && event.keyCode !== 229
@@ -237,13 +238,16 @@ export function InlineWikilinkInput({
   const pendingCompositionInputRef = useRef(false)
   const handledFileDropRef = useRef(false)
   const pendingFocusAfterRemountRef = useRef<InlineSelectionRange | null>(null)
+  const pendingScrollTopAfterRemountRef = useRef<number | null>(null)
   useLayoutEffect(() => {
     void renderVersion
-    const target = pendingFocusAfterRemountRef.current
-    if (!target) return
-    pendingFocusAfterRemountRef.current = null
-    focusSelectionRange(target)
-  }, [focusSelectionRange, renderVersion])
+    restorePendingRemountState(
+      editorRef.current,
+      focusSelectionRange,
+      pendingFocusAfterRemountRef,
+      pendingScrollTopAfterRemountRef,
+    )
+  }, [editorRef, focusSelectionRange, renderVersion])
   const activeQuery = useMemo(
     () => selectionRange.start === selectionRange.end
       ? findActiveWikilinkQuery(value, selectionIndex)
@@ -278,6 +282,7 @@ export function InlineWikilinkInput({
     onChange(nextState.value)
     setSelectionRange(nextState.selection)
     pendingFocusAfterRemountRef.current = shouldRestoreFocus ? nextState.selection : null
+    pendingScrollTopAfterRemountRef.current = editor?.scrollTop ?? null
     forceRender((current) => current + 1)
   }, [editorRef, onChange, selectionRange, setSelectionRange, value])
   const insertNativePathDrop = (paths: string[]) => {
