@@ -103,7 +103,7 @@ function organizedItem(
   onToggleOrganized: ((path: string) => void) | undefined,
   selectAction: SelectContextAction,
 ) {
-  if (!onToggleOrganized) return []
+  if (!onToggleOrganized || !isMarkdownEntry(entry)) return []
   return [{
     icon: CheckCircle,
     iconWeight: entry.organized ? 'fill' as const : 'regular' as const,

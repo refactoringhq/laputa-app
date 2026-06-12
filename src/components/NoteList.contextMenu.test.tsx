@@ -122,6 +122,36 @@ describe('NoteList context menu', () => {
     expect(screen.getByText('Mark as Unorganized')).toBeInTheDocument()
   })
 
+  it('hides the organized action for PDF file rows while keeping file actions', () => {
+    const pdfEntry = makeEntry({
+      fileKind: 'binary',
+      filename: 'research.pdf',
+      path: '/vault/research.pdf',
+      title: 'research.pdf',
+    })
+    const onCopyFilePath = vi.fn()
+    const onRevealFile = vi.fn()
+    const onToggleOrganized = vi.fn()
+
+    renderNoteList({
+      allNotesFileVisibility: { pdfs: true, images: false, unsupported: false },
+      entries: [pdfEntry],
+      onCopyFilePath,
+      onRevealFile,
+      onToggleOrganized,
+    })
+
+    fireEvent.contextMenu(screen.getByTestId('pdf-file-item'))
+
+    expect(screen.getByTestId('note-list-context-menu')).toBeInTheDocument()
+    expect(screen.queryByText('Mark as Organized')).not.toBeInTheDocument()
+    expect(screen.getByText('Reveal in Finder')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Copy file path'))
+    expect(onCopyFilePath).toHaveBeenCalledWith(pdfEntry.path)
+    expect(onToggleOrganized).not.toHaveBeenCalled()
+  })
+
   it('hides the git URL action for notes without a remote', () => {
     renderNoteList({
       canCopyGitUrl: () => false,
