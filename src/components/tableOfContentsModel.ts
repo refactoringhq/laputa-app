@@ -39,6 +39,11 @@ interface HeadingBlockMatch {
   headings: MarkdownHeading[]
 }
 
+interface MarkdownCodeFence {
+  marker: string
+  size: number
+}
+
 export interface TocItem {
   blockId?: string
   children: TocItem[]
@@ -169,16 +174,48 @@ function stripInlineMarkdown({ text }: { text: string }): string {
     .trim()
 }
 
+function codeFenceForLine(line: string): MarkdownCodeFence | null {
+  const match = line.match(/^ {0,3}(`{3,}|~{3,})/)
+  const fence = match?.at(1)
+  if (!fence) return null
+  return { marker: fence.charAt(0), size: fence.length }
+}
+
+function closesCodeFence(line: string, codeFence: MarkdownCodeFence): boolean {
+  const match = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/)
+  const fence = match?.at(1)
+  return fence !== undefined
+    && fence.charAt(0) === codeFence.marker
+    && fence.length >= codeFence.size
+}
+
+function parseMarkdownHeading(line: string): MarkdownHeading | null {
+  const match = line.match(/^(#{1,3})\s+(.+?)\s*#*\s*$/)
+  if (!match) return null
+  const title = stripInlineMarkdown({ text: match.at(2)! })
+  return title.length > 0
+    ? { level: match.at(1)!.length as TocLevel, title }
+    : null
+}
+
 function parseMarkdownHeadings({ markdown }: { markdown: string }): MarkdownHeading[] {
-  return stripFrontmatter({ markdown })
-    .split('\n')
-    .map((line) => line.match(/^(#{1,3})\s+(.+?)\s*#*\s*$/))
-    .filter((match): match is RegExpMatchArray => match !== null)
-    .map((match) => ({
-      level: match.at(1)!.length as TocLevel,
-      title: stripInlineMarkdown({ text: match.at(2)! }),
-    }))
-    .filter((heading) => heading.title.length > 0)
+  const headings: MarkdownHeading[] = []
+  let codeFence: MarkdownCodeFence | null = null
+
+  stripFrontmatter({ markdown }).split('\n').forEach((line) => {
+    if (codeFence) {
+      if (closesCodeFence(line, codeFence)) codeFence = null
+      return
+    }
+
+    codeFence = codeFenceForLine(line)
+    if (codeFence) return
+
+    const heading = parseMarkdownHeading(line)
+    if (heading) headings.push(heading)
+  })
+
+  return headings
 }
 
 function parsedBlockHeadings(blocks: unknown[]): MarkdownHeading[] {
