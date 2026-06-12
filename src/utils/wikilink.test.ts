@@ -112,6 +112,21 @@ describe('resolveEntry', () => {
     expect(resolveEntry([adr, flat], 'docs/adr/0031-foo')).toBe(adr)
   })
 
+  it('resolves path-style targets against Windows entry paths', () => {
+    const archivedAdr = makeEntry({
+      path: 'C:\\Users\\lrfno\\Documents\\Tolaria Vault\\archive\\0031-foo.md',
+      filename: '0031-foo.md',
+      title: '0031 Foo',
+    })
+    const currentAdr = makeEntry({
+      path: 'C:\\Users\\lrfno\\Documents\\Tolaria Vault\\docs\\adr\\0031-foo.md',
+      filename: '0031-foo.md',
+      title: '0031 Foo',
+    })
+
+    expect(resolveEntry([archivedAdr, currentAdr], 'docs/adr/0031-foo')).toBe(currentAdr)
+  })
+
   it('disambiguates same-name files in different subfolders via path', () => {
     const alpha = makeEntry({ path: '/vault/projects/alpha.md', filename: 'alpha.md', title: 'Alpha' })
     const alphaArchived = makeEntry({ path: '/vault/archive/alpha.md', filename: 'alpha.md', title: 'Alpha' })
