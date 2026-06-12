@@ -39,6 +39,27 @@ describe('tldraw block prop updates', () => {
     expect(editor.updateBlock).not.toHaveBeenCalled()
   })
 
+  it('turns a stale whiteboard block lookup into a no-op', () => {
+    const missingBlockError = new Error('Block with ID whiteboard-block not found')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const editor: TldrawBlockMutationEditor = {
+      getBlock: vi.fn(() => {
+        throw missingBlockError
+      }),
+      updateBlock: vi.fn(),
+    }
+
+    expect(() => updateTldrawBlockPropsSafely({
+      blockId: 'whiteboard-block',
+      editor,
+      nextProps: (props) => ({ ...props, snapshot: '{ "store": "next" }' }),
+    })).not.toThrow()
+    expect(editor.updateBlock).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith('[editor] Ignored stale whiteboard block update:', missingBlockError)
+
+    warn.mockRestore()
+  })
+
   it('resolves live whiteboard props before writing a debounced snapshot', () => {
     const editor: TldrawBlockMutationEditor = {
       getBlock: vi.fn(() => tldrawBlock({
