@@ -56,14 +56,29 @@ function liveTldrawBlock(value: unknown): LiveTldrawBlock | null {
   return props ? { id: value.id, props } : null
 }
 
-function isMissingBlockError(error: unknown) {
+function isMissingBlockError(error: unknown): error is Error {
   return error instanceof Error
     && error.message.includes('Block with ID')
     && error.message.includes('not found')
 }
 
+function warnStaleTldrawBlockUpdate(error: Error) {
+  console.warn('[editor] Ignored stale whiteboard block update:', error)
+}
+
+function getLiveTldrawBlock(editor: TldrawBlockMutationEditor, blockId: string) {
+  try {
+    return liveTldrawBlock(editor.getBlock(blockId))
+  } catch (error) {
+    if (!isMissingBlockError(error)) throw error
+
+    warnStaleTldrawBlockUpdate(error)
+    return null
+  }
+}
+
 export function updateTldrawBlockPropsSafely({ blockId, editor, nextProps }: TldrawBlockMutation) {
-  const liveBlock = liveTldrawBlock(editor.getBlock(blockId))
+  const liveBlock = getLiveTldrawBlock(editor, blockId)
   if (!liveBlock) return false
 
   try {
@@ -75,7 +90,7 @@ export function updateTldrawBlockPropsSafely({ blockId, editor, nextProps }: Tld
   } catch (error) {
     if (!isMissingBlockError(error)) throw error
 
-    console.warn('[editor] Ignored stale whiteboard block update:', error)
+    warnStaleTldrawBlockUpdate(error)
     return false
   }
 }
