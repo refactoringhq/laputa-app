@@ -54,7 +54,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, onWikili
   }, [onWikilinkClick])
 
   return (
-    <div className="ai-markdown">
+    <div className="ai-markdown min-w-0 max-w-full overflow-hidden">
       <Markdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}

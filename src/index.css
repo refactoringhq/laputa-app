@@ -451,6 +451,8 @@
   font-size: 13px;
   line-height: 1.6;
   color: var(--foreground);
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .ai-markdown > :first-child { margin-top: 0; }
@@ -488,13 +490,16 @@
   background: var(--muted);
   border-radius: 3px;
   padding: 0.15em 0.35em;
+  overflow-wrap: anywhere;
 }
 
 .ai-markdown pre {
   margin: 0.5em 0;
   border-radius: 6px;
   background: var(--muted);
-  overflow-x: auto;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   max-height: 400px;
 }
 
@@ -505,7 +510,9 @@
   border-radius: 0;
   font-size: 12px;
   line-height: 1.5;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .ai-markdown blockquote {
@@ -545,8 +552,11 @@
 
 .ai-markdown table {
   border-collapse: collapse;
+  display: block;
   margin: 0.5em 0;
   font-size: 12px;
+  max-width: 100%;
+  overflow-x: auto;
   width: 100%;
 }
 .ai-markdown th,
