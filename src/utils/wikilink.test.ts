@@ -119,6 +119,19 @@ describe('resolveEntry', () => {
     expect(resolveEntry([alpha, alphaArchived], 'archive/alpha')).toBe(alphaArchived)
   })
 
+  it('resolves path-style target against Windows backslash entry paths', () => {
+    const adr = makeEntry({ path: 'C:\\Users\\lrfno\\Documents\\vault\\docs\\adr\\0031-foo.md', filename: '0031-foo.md', title: '0031 Foo' })
+    const flat = makeEntry({ path: 'C:\\Users\\lrfno\\Documents\\vault\\hello.md', filename: 'hello.md', title: 'Hello' })
+    expect(resolveEntry([adr, flat], 'docs/adr/0031-foo')).toBe(adr)
+  })
+
+  it('disambiguates same-name files in different subfolders via Windows backslash paths', () => {
+    const alpha = makeEntry({ path: 'C:\\vault\\projects\\alpha.md', filename: 'alpha.md', title: 'Alpha' })
+    const alphaArchived = makeEntry({ path: 'C:\\vault\\archive\\alpha.md', filename: 'alpha.md', title: 'Alpha' })
+    expect(resolveEntry([alpha, alphaArchived], 'projects/alpha')).toBe(alpha)
+    expect(resolveEntry([alpha, alphaArchived], 'archive/alpha')).toBe(alphaArchived)
+  })
+
   it('resolves full-path wikilinks to non-Markdown duplicate filenames', () => {
     const yamlA = makeEntry({ path: '/vault/a/file.yml', filename: 'file.yml', title: 'file.yml', fileKind: 'text' })
     const yamlB = makeEntry({ path: '/vault/b/file.yml', filename: 'file.yml', title: 'file.yml', fileKind: 'text' })
