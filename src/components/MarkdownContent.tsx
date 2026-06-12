@@ -5,8 +5,9 @@ import rehypeHighlight from 'rehype-highlight'
 import { preprocessWikilinks, WIKILINK_SCHEME } from '../utils/chatWikilinks'
 import { supportsModernRegexFeatures } from '../utils/regexCapabilities'
 
-const REMARK_PLUGINS = [remarkGfm]
-const REHYPE_PLUGINS = supportsModernRegexFeatures() ? [rehypeHighlight] : []
+const MODERN_REGEX_AVAILABLE = supportsModernRegexFeatures()
+const REMARK_PLUGINS = MODERN_REGEX_AVAILABLE ? [remarkGfm] : []
+const REHYPE_PLUGINS = MODERN_REGEX_AVAILABLE ? [rehypeHighlight] : []
 
 function wikilinkUrlTransform(url: string): string {
   if (url.startsWith(WIKILINK_SCHEME)) return url
