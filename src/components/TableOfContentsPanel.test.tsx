@@ -38,6 +38,29 @@ describe('TableOfContentsPanel', () => {
     expect(toc.children.map((item) => item.title)).toEqual(['Tolaria + Refactoring', 'Principles'])
   })
 
+  it('ignores markdown headings inside fenced and inline code areas', () => {
+    const toc = buildTableOfContentsFromMarkdown(
+      'Markdown Outline',
+      [
+        '# Markdown Outline',
+        '',
+        '## Real Setup',
+        '',
+        '```ts',
+        '# Fenced code is not a heading',
+        '## Nested fenced code is not a heading',
+        '```',
+        '',
+        'This paragraph mentions `# Inline code is not a heading`.',
+        '',
+        '## Real Followup',
+      ].join('\n'),
+    )
+
+    expect(toc.children.map((item) => item.title)).toEqual(['Real Setup', 'Real Followup'])
+    expect(toc.children.flatMap((item) => item.children)).toEqual([])
+  })
+
   it('keeps navigation ids after removing a duplicate markdown title H1', async () => {
     const setTextCursorPosition = vi.fn()
     render(
