@@ -148,7 +148,10 @@ function prioritizeSourceWorkspace(entries: VaultEntry[], sourceEntry?: VaultEnt
 
 function findEntryByPathSuffix(entries: VaultEntry[], resolutionKey: ResolutionKey): VaultEntry | undefined {
   if (resolutionKey.pathSuffixes.length === 0) return undefined
-  return entries.find(entry => resolutionKey.pathSuffixes.some(pathSuffix => entry.path.toLowerCase().endsWith(pathSuffix)))
+  return entries.find((entry) => {
+    const normalizedEntryPath = normalizeFilesystemPath(entry.path).toLowerCase()
+    return resolutionKey.pathSuffixes.some(pathSuffix => normalizedEntryPath.endsWith(pathSuffix))
+  })
 }
 
 function findEntryByFilename(entries: VaultEntry[], { exactTarget, targetWithoutWorkspace, lastSegment }: ResolutionKey): VaultEntry | undefined {
