@@ -57,4 +57,17 @@ describe('MarkdownContent WebKit regex fallback', () => {
     }).not.toThrow()
     expect(screen.getByText('const prompt = "(?<name>.*)"')).toBeInTheDocument()
   })
+
+  it('renders AI markdown with email text when regex lookbehind is unavailable', async () => {
+    installLegacyWebKitRegExp()
+    vi.resetModules()
+
+    const { MarkdownContent } = await import('./MarkdownContent')
+
+    expect(() => {
+      render(<MarkdownContent content="Contact luca@example.com for details" />)
+    }).not.toThrow()
+    expect(screen.getByText('Contact luca@example.com for details')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'luca@example.com' })).not.toBeInTheDocument()
+  })
 })
