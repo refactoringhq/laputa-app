@@ -163,6 +163,58 @@ describe('useCommitFlow', () => {
     expect(gitAuthorIdentityCallCount()).toBe(1)
   })
 
+  it('ignores stale author identity responses after the dialog switches vaults', async () => {
+    const vaultAIdentity = {
+      ...testAuthorIdentity,
+      email: 'a@example.com',
+      name: 'Vault A',
+    }
+    const vaultBIdentity = {
+      ...testAuthorIdentity,
+      email: 'b@example.com',
+      name: 'Vault B',
+    }
+    const pendingVaultAIdentity = createDeferred<typeof testAuthorIdentity>()
+    mockInvokeFn.mockImplementation((command: string, args?: Record<string, unknown>) => {
+      if (command !== 'git_author_identity') throw new Error(`Unexpected command: ${command}`)
+      return args?.vaultPath === '/vault-a'
+        ? pendingVaultAIdentity.promise
+        : Promise.resolve(vaultBIdentity)
+    })
+    const props = {
+      manualVaultPath: '/vault-a',
+    }
+    const { result, rerender } = renderHook(
+      ({ manualVaultPath }) => useCommitFlow({
+        savePending,
+        loadModifiedFiles,
+        loadModifiedFilesForVaultPath,
+        resolveRemoteStatusForVaultPath,
+        setToastMessage,
+        onPushRejected,
+        manualVaultPath,
+        vaultPath: '/vault',
+      }),
+      { initialProps: props },
+    )
+
+    await act(async () => {
+      await result.current.openCommitDialog()
+    })
+    expect(result.current.showCommitDialog).toBe(true)
+    expect(result.current.authorIdentity).toBeNull()
+
+    rerender({ manualVaultPath: '/vault-b' })
+    await waitFor(() => expect(result.current.authorIdentity).toEqual(vaultBIdentity))
+
+    await act(async () => {
+      pendingVaultAIdentity.resolve(vaultAIdentity)
+      await pendingVaultAIdentity.promise
+    })
+
+    expect(result.current.authorIdentity).toEqual(vaultBIdentity)
+  })
+
   it('clears opening state and reports recovery when dialog preparation fails', async () => {
     loadModifiedFiles.mockRejectedValueOnce(new Error('status unavailable'))
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
