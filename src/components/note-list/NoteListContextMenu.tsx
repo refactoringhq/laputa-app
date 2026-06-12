@@ -53,7 +53,7 @@ function hasNoteListContextActions({
     onArchivePaths && !entry.archived,
     onDeletePaths,
     onToggleFavorite,
-    onToggleOrganized,
+    onToggleOrganized && isMarkdownEntry(entry),
     onRevealFile,
     onCopyFilePath,
     onCopyGitUrl && canCopyGitUrl?.(entry),
