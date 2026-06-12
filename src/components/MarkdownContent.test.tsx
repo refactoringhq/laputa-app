@@ -62,6 +62,11 @@ describe('MarkdownContent', () => {
     expect(container.querySelector('.ai-markdown')).toBeTruthy()
   })
 
+  it('constrains markdown to the current chat width', () => {
+    const { container } = render(<MarkdownContent content="Hello" />)
+    expect(container.querySelector('.ai-markdown')).toHaveClass('min-w-0', 'max-w-full', 'overflow-hidden')
+  })
+
   it('renders plain text without crashing', () => {
     render(<MarkdownContent content="Just plain text" />)
     expect(screen.getByText('Just plain text')).toBeTruthy()

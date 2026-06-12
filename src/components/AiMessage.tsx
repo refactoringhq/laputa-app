@@ -83,6 +83,7 @@ function UserBubble({ content, references, onOpenNote }: {
   return (
     <div className="flex justify-end" style={{ marginBottom: 8 }}>
       <div
+        className="min-w-0 max-w-[85%] overflow-hidden"
         style={{
           background: 'var(--state-hover)',
           color: 'var(--foreground)',
@@ -91,6 +92,7 @@ function UserBubble({ content, references, onOpenNote }: {
           padding: '8px 12px',
           fontSize: 13,
           lineHeight: 1.5,
+          overflowWrap: 'anywhere',
         }}
       >
         {references && references.length > 0 && (
@@ -316,7 +318,11 @@ function ResponseBlock({
   }, [text])
 
   return (
-    <div className="group/ai-response" style={{ marginBottom: 4 }}>
+    <div
+      className="group/ai-response min-w-0 max-w-full overflow-hidden"
+      style={{ marginBottom: 4 }}
+      data-testid="ai-response-block"
+    >
       <MarkdownContent content={text} onWikilinkClick={onNavigateWikilink} />
       <ResponseActions
         locale={locale}
@@ -370,7 +376,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
   }, [])
 
   return (
-    <div data-testid="ai-message" style={{ marginBottom: 16 }}>
+    <div className="min-w-0 max-w-full" data-testid="ai-message" style={{ marginBottom: 16 }}>
       <UserBubble content={userMessage} references={references} onOpenNote={onOpenNote} />
       {reasoning && (
         <ReasoningBlock
