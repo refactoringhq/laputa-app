@@ -24,10 +24,24 @@ describe('AiMessage', () => {
     expect(container.querySelector('[style*="background: var(--state-hover)"]')).toBeTruthy()
   })
 
+  it('keeps long user messages inside the chat column', () => {
+    const longToken = 'https://example.com/'.padEnd(180, 'a')
+    render(<AiMessage userMessage={longToken} actions={[]} />)
+
+    const bubble = screen.getByText(longToken)
+    expect(bubble).toHaveClass('min-w-0', 'max-w-[85%]', 'overflow-hidden')
+    expect(bubble).toHaveStyle({ overflowWrap: 'anywhere' })
+  })
+
   it('renders response as markdown', () => {
     render(<AiMessage userMessage="Ask" actions={[]} response="Here is the **answer**" />)
     expect(screen.getByTestId('markdown-content')).toBeTruthy()
     expect(screen.getByText('Here is the **answer**')).toBeTruthy()
+  })
+
+  it('constrains assistant responses to the available chat width', () => {
+    render(<AiMessage userMessage="Ask" actions={[]} response="Done" />)
+    expect(screen.getByTestId('ai-response-block')).toHaveClass('min-w-0', 'max-w-full', 'overflow-hidden')
   })
 
   it('shows assistant message actions with response', () => {
