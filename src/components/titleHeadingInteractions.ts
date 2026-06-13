@@ -1,10 +1,8 @@
 import { useCallback, type ClipboardEvent } from 'react'
 import { handleFreshListItemPlainTextPaste, type InlineContentEditor } from './freshListItemPaste'
+import { prepareTitleHeadingRichPaste, type TitleHeadingPasteEditor } from './titleHeadingPasteTarget'
 
-type TitleHeadingEditor = InlineContentEditor & {
-  document: Array<{ id?: unknown; type?: string }>
-  setTextCursorPosition: (blockId: string, placement: 'end') => void
-}
+type TitleHeadingEditor = InlineContentEditor & TitleHeadingPasteEditor
 
 type EditorActionRunner = (action: () => void) => void
 
@@ -69,7 +67,7 @@ export function useEditorPasteHandler(options: {
 
     event.preventDefault()
     runEditorAction(() => {
-      editor.focus()
+      prepareTitleHeadingRichPaste(titleHeading, editor)
       editor.insertInlineContent(text, { updateSelection: true })
     })
   }, [editable, editor, runEditorAction])
@@ -84,7 +82,6 @@ export function queueTitleHeadingCursorRepair(
 
   queueMicrotask(() => {
     if (isSelectionInsideElement(titleHeading)) return
-
     const firstBlock = editor.document[0]
     if (firstBlock?.type !== 'heading' || typeof firstBlock.id !== 'string') return
 
