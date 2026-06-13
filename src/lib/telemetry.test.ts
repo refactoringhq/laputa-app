@@ -158,6 +158,33 @@ describe('initSentry', () => {
 
     expect(beforeSend(event)).toBe(event)
   })
+
+  it('drops stale Tauri listener cleanup errors before sending them to Sentry', () => {
+    const beforeSend = initSentryBeforeSend()
+    const staleListenerEvent = {
+      exception: {
+        values: [{
+          type: 'TypeError',
+          value: "undefined is not an object (evaluating 'listeners[eventId].handlerId')",
+        }],
+      },
+    }
+    const messageOnlyEvent = {
+      message: "TypeError: undefined is not an object (evaluating 'listeners[eventId].handlerId')",
+    }
+    const unrelatedTypeErrorEvent = {
+      exception: {
+        values: [{
+          type: 'TypeError',
+          value: "undefined is not an object (evaluating 'note.title')",
+        }],
+      },
+    }
+
+    expect(beforeSend(staleListenerEvent)).toBeNull()
+    expect(beforeSend(messageOnlyEvent)).toBeNull()
+    expect(beforeSend(unrelatedTypeErrorEvent)).toBe(unrelatedTypeErrorEvent)
+  })
 })
 
 describe('isFeatureEnabled', () => {
