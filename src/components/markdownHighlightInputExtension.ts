@@ -8,9 +8,11 @@ import {
 const MARKDOWN_HIGHLIGHT_DELIMITER = '=='
 const MARKDOWN_HIGHLIGHT_DELIMITER_LENGTH = MARKDOWN_HIGHLIGHT_DELIMITER.length
 const FINAL_MARKDOWN_HIGHLIGHT_INPUT = '='
+const CODE_BLOCK_NODE_TYPE = 'codeBlock'
 const CODE_MARK_TYPE = 'code'
 
 type EditorViewLike = NonNullable<ReturnType<typeof useCreateBlockNote>['prosemirrorView']>
+type TextblockParent = EditorViewLike['state']['selection']['$from']['parent']
 type MarkLike = { type: { name: string } }
 type EditorMark = Parameters<EditorViewLike['state']['tr']['addMark']>[2]
 type MarkTypeLike = { create: () => EditorMark }
@@ -64,10 +66,15 @@ function rangeHasCodeMark(
   return containsCode
 }
 
+function isCodeBlockTextblock(parent: TextblockParent): boolean {
+  return parent.type?.name === CODE_BLOCK_NODE_TYPE
+}
+
 function readCursorText(view: EditorViewLike): MarkdownHighlightCursorText | null {
   const { from, to, $from } = view.state.selection
   if (from !== to) return null
   if (!$from.parent.isTextblock) return null
+  if (isCodeBlockTextblock($from.parent)) return null
 
   return {
     beforeText: $from.parent.textBetween(0, $from.parentOffset, '', ''),

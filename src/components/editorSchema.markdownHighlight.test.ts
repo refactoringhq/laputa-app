@@ -23,4 +23,18 @@ describe('editor schema Markdown highlight parsing', () => {
       'Plain ==marked== text',
     )
   })
+
+  it('keeps equality operators literal inside fenced code blocks', async () => {
+    const editor = BlockNoteEditor.create({ schema })
+    const markdown = [
+      '```python',
+      'if a == "1" and b == "2":',
+      '```',
+    ].join('\n')
+    const blocks = injectMarkdownHighlightsInBlocks(await editor.tryParseMarkdownToBlocks(markdown))
+
+    expect(editor.blocksToMarkdownLossy(restoreMarkdownHighlightsInBlocks(blocks))).toContain(
+      'if a == "1" and b == "2":',
+    )
+  })
 })

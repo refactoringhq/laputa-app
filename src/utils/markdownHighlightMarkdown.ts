@@ -189,8 +189,14 @@ function transformBlockContent(
   return content
 }
 
+function shouldTransformBlockContent(block: BlockLike): boolean {
+  return block.type !== 'codeBlock'
+}
+
 function transformBlock(block: BlockLike, transform: InlineContentTransform): BlockLike {
-  const content = transformBlockContent(block.content, transform)
+  const content = shouldTransformBlockContent(block)
+    ? transformBlockContent(block.content, transform)
+    : block.content
   const children = Array.isArray(block.children)
     ? block.children.map(child => transformBlock(child, transform))
     : block.children
