@@ -61,6 +61,20 @@ describe('markdown highlight round-trip', () => {
     }])
   })
 
+  it('leaves fenced code block equality operators literal', () => {
+    const blocks = injectMarkdownHighlightsInBlocks([{
+      type: 'codeBlock',
+      content: [{ type: 'text', text: 'if a == "1" and b == "2":', styles: {} }],
+      children: [],
+    }])
+
+    expect(blocks).toEqual([{
+      type: 'codeBlock',
+      content: [{ type: 'text', text: 'if a == "1" and b == "2":', styles: {} }],
+      children: [],
+    }])
+  })
+
   it('serializes highlighted inline content back to ==markdown== source', () => {
     const editor = {
       blocksToMarkdownLossy: vi.fn((blocks: unknown[]) => {

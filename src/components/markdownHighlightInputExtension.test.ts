@@ -14,7 +14,7 @@ function createTransaction() {
   return transaction
 }
 
-function createView(beforeText: string, parentStart = 0) {
+function createView(beforeText: string, parentStart = 0, parentTypeName = 'paragraph') {
   const cursor = parentStart + beforeText.length
   const transaction = createTransaction()
   const highlightMark = { type: { name: MARKDOWN_HIGHLIGHT_STYLE } }
@@ -58,6 +58,7 @@ function createView(beforeText: string, parentStart = 0) {
         $from: {
           parent: {
             isTextblock: true,
+            type: { name: parentTypeName },
             textBetween: vi.fn(() => beforeText),
           },
           parentOffset: beforeText.length,
@@ -79,9 +80,13 @@ function createView(beforeText: string, parentStart = 0) {
   }
 }
 
-function createFixture(beforeText = 'Plain ==marked=', parentStart = 0) {
+function createFixture(beforeText = 'Plain ==marked=', parentStart = 0, parentTypeName = 'paragraph') {
   let beforeInputListener: EventListener | null = null
-  const { docNodes, highlightMark, highlightMarkType, transaction, view } = createView(beforeText, parentStart)
+  const { docNodes, highlightMark, highlightMarkType, transaction, view } = createView(
+    beforeText,
+    parentStart,
+    parentTypeName,
+  )
   const dom = {
     addEventListener: vi.fn((type: string, listener: EventListener) => {
       if (type === 'beforeinput') {
@@ -189,6 +194,13 @@ describe('createMarkdownHighlightInputExtension', () => {
   it('leaves highlight-looking syntax literal inside inline code', () => {
     const fixture = createFixture()
     fixture.view.state.storedMarks = [{ type: { name: 'code' } }]
+    fixture.mount()
+
+    expectNoHighlightTransform(fixture)
+  })
+
+  it('leaves completed highlight syntax literal inside code blocks', () => {
+    const fixture = createFixture('if a=="1" and b=', 0, 'codeBlock')
     fixture.mount()
 
     expectNoHighlightTransform(fixture)
