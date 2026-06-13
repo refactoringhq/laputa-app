@@ -160,6 +160,57 @@ describe('useEditorModePositionSync', () => {
     expect(editor.focus).toHaveBeenCalled()
   })
 
+  it('keeps a raw-to-rich cursor restore pending until the active tab swap completes', () => {
+    const editor = makeEditor()
+    const paragraphOffset = content.indexOf('Paragraph one') + 5
+    const restoreTransitionRef = createRestoreTransitionRef()
+    installRawView({
+      state: {
+        doc: { toString: () => content },
+        selection: { main: { anchor: paragraphOffset, head: paragraphOffset } },
+      },
+      scrollDOM: { scrollTop: 24 },
+      dispatch: vi.fn(),
+      focus: vi.fn(),
+    })
+
+    const { result, rerender } = renderHook(
+      ({ activeTabPath, rawMode }) => {
+        useEditorModePositionSync({
+          activeTabPath,
+          editor: editor as never,
+          restoreTransitionRef,
+          rawMode,
+        })
+        return { restoreTransitionRef }
+      },
+      { initialProps: { activeTabPath: 'note.md', rawMode: true } },
+    )
+
+    act(() => {
+      result.current.restoreTransitionRef.current.richRestore = captureRawEditorPositionSnapshot(document)
+    })
+    rerender({ activeTabPath: 'note.md', rawMode: false })
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('laputa:editor-tab-swapped', {
+        detail: { path: 'other-note.md' },
+      }))
+    })
+
+    expect(editor.setTextCursorPosition).not.toHaveBeenCalled()
+    expect(result.current.restoreTransitionRef.current.richRestore).not.toBeNull()
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('laputa:editor-tab-swapped', {
+        detail: { path: 'note.md' },
+      }))
+    })
+
+    expect(editor.setTextCursorPosition).toHaveBeenCalledWith('details', 'end')
+    expect(result.current.restoreTransitionRef.current.richRestore).toBeNull()
+  })
+
   it('cancels a pending BlockNote restore when raw mode starts again before the frame runs', () => {
     const editor = makeEditor()
     const paragraphOffset = content.indexOf('Paragraph one') + 5
