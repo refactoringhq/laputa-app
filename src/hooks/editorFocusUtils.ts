@@ -78,16 +78,32 @@ function usableBlockId(block: FocusableHeadingBlock): string | null {
     : null
 }
 
-function trySelectEmptyFirstHeading(editor: FocusableEditor): boolean {
+function tryPlaceCursorInBlock(
+  setTextCursorPosition: FocusableEditor['setTextCursorPosition'],
+  blockId: string,
+): boolean {
+  if (!setTextCursorPosition) return false
+
+  try {
+    setTextCursorPosition(blockId, 'start')
+    return true
+  } catch {
+    return false
+  }
+}
+
+function emptyFirstHeadingBlockId(editor: FocusableEditor) {
   const firstHeadingBlock = getFirstHeadingBlock(editor)
-  if (!firstHeadingBlock || !editor.setTextCursorPosition) return false
-  if (getHeadingBlockText(firstHeadingBlock)) return false
+  if (!firstHeadingBlock) return null
+  if (getHeadingBlockText(firstHeadingBlock)) return null
 
-  const headingBlockId = usableBlockId(firstHeadingBlock)
+  return usableBlockId(firstHeadingBlock)
+}
+
+function trySelectEmptyFirstHeading(editor: FocusableEditor): boolean {
+  const headingBlockId = emptyFirstHeadingBlockId(editor)
   if (!headingBlockId) return false
-
-  editor.setTextCursorPosition(headingBlockId, 'start')
-  return true
+  return tryPlaceCursorInBlock(editor.setTextCursorPosition, headingBlockId)
 }
 
 function trySelectFirstHeading(editor: FocusableEditor): boolean {
