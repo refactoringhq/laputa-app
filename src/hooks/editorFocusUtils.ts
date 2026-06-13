@@ -1,18 +1,15 @@
+import { trySelectFirstHeading } from './editorTitleSelection'
+import type { TitleHeadingTextBlock } from './editorTitleHeadingText'
+
 const ROOT_EDITABLE_SELECTOR = '.ProseMirror[contenteditable="true"]'
 const FALLBACK_EDITABLE_SELECTOR = '.bn-editor [contenteditable="true"]'
 const MAX_FOCUS_ATTEMPTS = 12
 const MAX_TITLE_SELECTION_ATTEMPTS = 12
 
-interface HeadingRange {
-  from: number
-  to: number
-}
-
-interface FocusableHeadingBlock {
+interface FocusableHeadingBlock extends TitleHeadingTextBlock {
   id?: unknown
   type?: string
   props?: { level?: number } & Record<string, unknown>
-  content?: unknown
 }
 
 interface TiptapChain {
@@ -30,92 +27,6 @@ export interface FocusableEditor {
   _tiptapEditor?: TiptapEditor
   document?: FocusableHeadingBlock[]
   setTextCursorPosition?: (targetBlock: string, placement?: 'start' | 'end') => void
-}
-
-function buildHeadingRange(pos: number, nodeSize: number): HeadingRange | null {
-  const range = { from: pos + 1, to: pos + nodeSize - 1 }
-  return range.from <= range.to ? range : null
-}
-
-function findFirstHeadingRange(tiptap: TiptapEditor): HeadingRange | null {
-  let range: HeadingRange | null = null
-
-  tiptap.state.doc.descendants((node, pos) => {
-    if (range) return false
-    if (node.type.name !== 'heading') return
-
-    range = buildHeadingRange(pos, node.nodeSize)
-    return false
-  })
-
-  return range
-}
-
-function isTopLevelHeadingBlock(block: FocusableHeadingBlock): boolean {
-  return block.type === 'heading' && (block.props?.level === undefined || block.props?.level === 1)
-}
-
-function getHeadingBlockText(block: FocusableHeadingBlock | undefined): string {
-  if (!Array.isArray(block?.content)) return ''
-
-  return block.content
-    .filter((item): item is { type?: string; text?: string } => (
-      typeof item === 'object' && item !== null
-    ))
-    .filter((item) => item.type === 'text')
-    .map((item) => item.text ?? '')
-    .join('')
-    .trim()
-}
-
-function getFirstHeadingBlock(editor: FocusableEditor): FocusableHeadingBlock | undefined {
-  return editor.document?.find(isTopLevelHeadingBlock)
-}
-
-function usableBlockId(block: FocusableHeadingBlock): string | null {
-  return typeof block.id === 'string' && block.id.trim().length > 0
-    ? block.id
-    : null
-}
-
-function tryPlaceCursorInBlock(
-  setTextCursorPosition: FocusableEditor['setTextCursorPosition'],
-  blockId: string,
-): boolean {
-  if (!setTextCursorPosition) return false
-
-  try {
-    setTextCursorPosition(blockId, 'start')
-    return true
-  } catch {
-    return false
-  }
-}
-
-function emptyFirstHeadingBlockId(editor: FocusableEditor) {
-  const firstHeadingBlock = getFirstHeadingBlock(editor)
-  if (!firstHeadingBlock) return null
-  if (getHeadingBlockText(firstHeadingBlock)) return null
-
-  return usableBlockId(firstHeadingBlock)
-}
-
-function trySelectEmptyFirstHeading(editor: FocusableEditor): boolean {
-  const headingBlockId = emptyFirstHeadingBlockId(editor)
-  if (!headingBlockId) return false
-  return tryPlaceCursorInBlock(editor.setTextCursorPosition, headingBlockId)
-}
-
-function trySelectFirstHeading(editor: FocusableEditor): boolean {
-  if (trySelectEmptyFirstHeading(editor)) return true
-  const tiptap = editor._tiptapEditor
-  if (!tiptap?.state?.doc) return false
-
-  const range = findFirstHeadingRange(tiptap)
-  if (!range) return false
-
-  tiptap.chain().setTextSelection(range).run()
-  return true
 }
 
 function hasEditableFocus(): boolean {

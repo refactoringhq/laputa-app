@@ -141,6 +141,49 @@ describe('editorFocusUtils extra coverage', () => {
     expect(setTextCursorPosition).toHaveBeenCalledTimes(13)
   })
 
+  it('stops title selection retries once the title has user text in the DOM', () => {
+    const wrapper = document.createElement('div')
+    wrapper.className = 'bn-editor'
+    const editable = createEditableElement('')
+    const heading = document.createElement('div')
+    heading.setAttribute('data-content-type', 'heading')
+    heading.setAttribute('data-level', '1')
+    heading.textContent = 'Sentry Fresh Paste Guard'
+    wrapper.append(editable, heading)
+    document.body.appendChild(wrapper)
+
+    mockImmediateEditableFocus(editable)
+    mockImmediateAnimationFrame()
+    const setTextCursorPosition = vi.fn()
+    const chainResult = { setTextSelection: vi.fn().mockReturnThis(), run: vi.fn() }
+    const tiptap = {
+      chain: vi.fn(() => chainResult),
+      state: {
+        doc: {
+          descendants: vi.fn((cb: (node: { type: { name: string }; nodeSize: number }, pos: number) => void) => {
+            cb({ type: { name: 'heading' }, nodeSize: 15 }, 2)
+          }),
+        },
+      },
+    }
+
+    focusEditorWithRetries({
+      focus: vi.fn(),
+      _tiptapEditor: tiptap,
+      document: [
+        {
+          id: 'title',
+          type: 'heading',
+          content: [],
+        },
+      ],
+      setTextCursorPosition,
+    }, true, undefined)
+
+    expect(setTextCursorPosition).not.toHaveBeenCalled()
+    expect(tiptap.chain).not.toHaveBeenCalled()
+  })
+
   it('schedules another animation frame when nothing focusable is available yet', () => {
     const rAF = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1)
 
