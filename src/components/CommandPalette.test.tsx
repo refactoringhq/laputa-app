@@ -281,7 +281,12 @@ describe('CommandPalette', () => {
   it('keeps keyboard selection stable when the mouse is already over a row', () => {
     render(<CommandPalette open={true} commands={commands} onClose={onClose} />)
 
-    fireEvent.mouseEnter(screen.getByText('Commit & Push'))
+    fireEvent.mouseMove(screen.getByText('Commit & Push'), {
+      clientX: 10,
+      clientY: 10,
+      screenX: 10,
+      screenY: 10,
+    })
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'Enter' })
 
@@ -293,10 +298,50 @@ describe('CommandPalette', () => {
   it('lets real mouse movement take over command selection', () => {
     render(<CommandPalette open={true} commands={commands} onClose={onClose} />)
 
-    fireEvent.mouseMove(screen.getByText('Commit & Push'))
+    fireEvent.mouseMove(screen.getByText('Commit & Push'), {
+      clientX: 10,
+      clientY: 10,
+      screenX: 10,
+      screenY: 10,
+    })
+    fireEvent.mouseMove(screen.getByText('Commit & Push'), {
+      clientX: 10,
+      clientY: 11,
+      screenX: 10,
+      screenY: 11,
+    })
     fireEvent.keyDown(window, { key: 'Enter' })
 
     expect(commands[2].execute).toHaveBeenCalledOnce()
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('ignores stationary mouse hover again after keyboard navigation changes selection', () => {
+    render(<CommandPalette open={true} commands={commands} onClose={onClose} />)
+
+    fireEvent.mouseMove(screen.getByText('Commit & Push'), {
+      clientX: 10,
+      clientY: 10,
+      screenX: 10,
+      screenY: 10,
+    })
+    fireEvent.mouseMove(screen.getByText('Commit & Push'), {
+      clientX: 10,
+      clientY: 11,
+      screenX: 10,
+      screenY: 11,
+    })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.mouseMove(screen.getByText('Commit & Push'), {
+      clientX: 10,
+      clientY: 11,
+      screenX: 10,
+      screenY: 11,
+    })
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(commands[1].execute).toHaveBeenCalledOnce()
+    expect(commands[2].execute).not.toHaveBeenCalled()
     expect(onClose).toHaveBeenCalledOnce()
   })
 

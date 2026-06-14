@@ -164,8 +164,62 @@ describe('QuickOpenPalette', () => {
   it('keeps keyboard selection stable when the mouse is already over a result', () => {
     render(<QuickOpenPalette open={true} entries={entries} onSelect={onSelect} onClose={onClose} />)
 
-    fireEvent.mouseEnter(screen.getByText('Gamma Experiment'))
+    fireEvent.mouseMove(screen.getByText('Gamma Experiment'), {
+      clientX: 10,
+      clientY: 10,
+      screenX: 10,
+      screenY: 10,
+    })
     fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(onSelect).toHaveBeenCalledWith(entries[1])
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('lets mouse movement take over after the cursor position actually changes', () => {
+    render(<QuickOpenPalette open={true} entries={entries} onSelect={onSelect} onClose={onClose} />)
+
+    fireEvent.mouseMove(screen.getByText('Gamma Experiment'), {
+      clientX: 10,
+      clientY: 10,
+      screenX: 10,
+      screenY: 10,
+    })
+    fireEvent.mouseMove(screen.getByText('Gamma Experiment'), {
+      clientX: 10,
+      clientY: 11,
+      screenX: 10,
+      screenY: 11,
+    })
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(onSelect).toHaveBeenCalledWith(entries[2])
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('ignores stationary mouse hover again after keyboard navigation changes selection', () => {
+    render(<QuickOpenPalette open={true} entries={entries} onSelect={onSelect} onClose={onClose} />)
+
+    fireEvent.mouseMove(screen.getByText('Gamma Experiment'), {
+      clientX: 10,
+      clientY: 10,
+      screenX: 10,
+      screenY: 10,
+    })
+    fireEvent.mouseMove(screen.getByText('Gamma Experiment'), {
+      clientX: 10,
+      clientY: 11,
+      screenX: 10,
+      screenY: 11,
+    })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.mouseMove(screen.getByText('Gamma Experiment'), {
+      clientX: 10,
+      clientY: 11,
+      screenX: 10,
+      screenY: 11,
+    })
     fireEvent.keyDown(window, { key: 'Enter' })
 
     expect(onSelect).toHaveBeenCalledWith(entries[1])
