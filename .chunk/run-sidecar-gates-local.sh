@@ -8,6 +8,7 @@ playwright_shards="${PLAYWRIGHT_SHARDS:-8}"
 playwright_concurrency="${PLAYWRIGHT_CONCURRENCY:-4}"
 playwright_shared_server="${PLAYWRIGHT_SHARED_SERVER:-1}"
 vitest_coverage_max_workers="${VITEST_COVERAGE_MAX_WORKERS:-${SIDECAR_VITEST_MAX_WORKERS:-2}}"
+frontend_coverage_shards="${FRONTEND_COVERAGE_SHARDS:-${SIDECAR_FRONTEND_COVERAGE_SHARDS:-2}}"
 cargo_build_jobs="${CARGO_BUILD_JOBS:-2}"
 timeout_seconds="${SIDECAR_GATE_TIMEOUT:-1800}"
 poll_interval="${SIDECAR_GATE_POLL_INTERVAL:-20}"
@@ -168,7 +169,7 @@ launch_lane() {
       --sidecar-id "$sidecar_id" \
       --command bash \
       --args -lc \
-      --args "cd '$remote_workdir' && export RUST_CHANGED='$rust_changed' PLAYWRIGHT_SHARDS='$playwright_shards' PLAYWRIGHT_CONCURRENCY='$playwright_concurrency' PLAYWRIGHT_SHARED_SERVER='$playwright_shared_server' VITEST_COVERAGE_MAX_WORKERS='$vitest_coverage_max_workers' CARGO_BUILD_JOBS='$cargo_build_jobs' && rm -f '$remote_status' '$remote_log' '$remote_pid' '$remote_launcher' && nohup setsid -f bash -lc 'bash .chunk/run-sidecar-lane.sh $lane >\"$remote_log\" 2>&1; printf \"%s\\n\" \"\$?\" >\"$remote_status\"' </dev/null >'$remote_launcher' 2>&1" \
+      --args "cd '$remote_workdir' && export RUST_CHANGED='$rust_changed' PLAYWRIGHT_SHARDS='$playwright_shards' PLAYWRIGHT_CONCURRENCY='$playwright_concurrency' PLAYWRIGHT_SHARED_SERVER='$playwright_shared_server' VITEST_COVERAGE_MAX_WORKERS='$vitest_coverage_max_workers' FRONTEND_COVERAGE_SHARDS='$frontend_coverage_shards' CARGO_BUILD_JOBS='$cargo_build_jobs' && rm -f '$remote_status' '$remote_log' '$remote_pid' '$remote_launcher' && nohup setsid -f bash -lc 'bash .chunk/run-sidecar-lane.sh $lane >\"$remote_log\" 2>&1; printf \"%s\\n\" \"\$?\" >\"$remote_status\"' </dev/null >'$remote_launcher' 2>&1" \
       >"$launch_output_file" 2>&1 &
     launch_pid=$!
 
@@ -355,7 +356,7 @@ echo "  playwright: ${playwright_name}"
 if [[ -n "${SIDECAR_FRONTEND_ID:-}${SIDECAR_RUST_ID:-}${SIDECAR_PLAYWRIGHT_ID:-}" ]]; then
   echo "  explicit sidecar IDs are set for one or more lanes"
 fi
-echo "  vitest workers=${vitest_coverage_max_workers}; playwright shards=${playwright_shards}; concurrency=${playwright_concurrency}; cargo jobs=${cargo_build_jobs}"
+echo "  vitest workers=${vitest_coverage_max_workers}; frontend coverage shards=${frontend_coverage_shards}; playwright shards=${playwright_shards}; concurrency=${playwright_concurrency}; cargo jobs=${cargo_build_jobs}"
 
 if ! frontend_id="$(ensure_sidecar "$frontend_name" "${SIDECAR_FRONTEND_ID:-}")"; then
   echo "Chunk frontend sidecar unavailable"
