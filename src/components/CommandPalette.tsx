@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { VaultEntry } from '../types'
 import { fuzzyMatch } from '../utils/fuzzyMatch'
+import { detectIntentionalMouseMovement, type MouseMovementSnapshot } from '../utils/mouseMovement'
 import { queueAiPrompt, requestOpenAiChat } from '../utils/aiPromptBridge'
 import type { NoteReference } from '../utils/ai-context'
 import type { CommandAction, CommandGroup } from '../hooks/useCommandRegistry'
@@ -194,6 +195,13 @@ function CommandPaletteResults({
   onSelect: (command: CommandAction) => void
 }) {
   const flatList = groups.flatMap((group) => group.items)
+  const lastMouseMoveRef = useRef<MouseMovementSnapshot | null>(null)
+
+  const handleHover = (index: number, event: React.MouseEvent<HTMLButtonElement>) => {
+    const decision = detectIntentionalMouseMovement(event.nativeEvent, lastMouseMoveRef.current)
+    lastMouseMoveRef.current = decision.snapshot
+    if (decision.moved) onHover(index)
+  }
 
   if (flatList.length === 0) {
     return (
@@ -232,7 +240,7 @@ function CommandPaletteResults({
                   key={command.id}
                   command={command}
                   selected={globalIndex === selectedIndex}
-                  onHover={() => onHover(globalIndex)}
+                  onHover={(event) => handleHover(globalIndex, event)}
                   onSelect={() => onSelect(command)}
                 />
               )
@@ -468,7 +476,7 @@ function OpenCommandPalette({
 interface CommandRowProps {
   command: CommandAction
   selected: boolean
-  onHover: () => void
+  onHover: (event: React.MouseEvent<HTMLButtonElement>) => void
   onSelect: () => void
 }
 
