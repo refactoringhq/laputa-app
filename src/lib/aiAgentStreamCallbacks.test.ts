@@ -147,6 +147,56 @@ describe('aiAgentStreamCallbacks', () => {
     expect(output).toContain('[Tool output truncated: 50 chars omitted]')
   })
 
+  it('keeps failed MCP create_note results from reporting a created file', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Create a verification note',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const fileCallbacks = {
+      onFileCreated: vi.fn(),
+      onVaultChanged: vi.fn(),
+    }
+    const callbacks = createStreamCallbacks({
+      agent: 'pi',
+      messageId: 'msg-1',
+      vaultPath: String.raw`H:\Notes`,
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: fileCallbacks },
+    })
+    const output = JSON.stringify({
+      content: [{
+        type: 'text',
+        text: 'Error: Failed to create H:/Notes/test-tool-verification.md: Access is denied',
+      }],
+      isError: true,
+    })
+
+    callbacks.onToolStart(
+      'create_note',
+      'tool-1',
+      JSON.stringify({ path: 'H:/Notes/test-tool-verification.md' }),
+    )
+    callbacks.onToolDone('tool-1', output)
+
+    expect(detectFileOperationMock).not.toHaveBeenCalled()
+    expect(fileCallbacks.onFileCreated).not.toHaveBeenCalled()
+    expect(fileCallbacks.onVaultChanged).not.toHaveBeenCalled()
+    expect(messages.getMessages()[0].actions[0]).toMatchObject({
+      tool: 'create_note',
+      toolId: 'tool-1',
+      status: 'error',
+      output,
+    })
+  })
+
   it('repairs missing sentence boundaries between streamed text chunks', () => {
     const messages = createMessageStore([
       {
