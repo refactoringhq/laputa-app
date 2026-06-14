@@ -17,6 +17,7 @@ const installedStatuses = {
   pi: { status: 'installed' as const, version: '0.70.2' },
   gemini: { status: 'installed' as const, version: '0.5.1' },
   kiro: { status: 'installed' as const, version: '0.12.0' },
+  hermes: { status: 'installed' as const, version: 'Hermes Agent 0.16.0' },
 }
 
 const openAiProvider: AiModelProvider = {
@@ -125,6 +126,7 @@ describe('AiAgentsBadge', () => {
         pi: { status: 'missing', version: null },
         gemini: { status: 'missing', version: null },
         kiro: { status: 'missing', version: null },
+        hermes: { status: 'missing', version: null },
       },
     })
     openAiAgentsMenu()
@@ -135,6 +137,7 @@ describe('AiAgentsBadge', () => {
     expect(screen.queryByText('Install Pi')).not.toBeInTheDocument()
     expect(screen.queryByText('Install Gemini CLI')).not.toBeInTheDocument()
     expect(screen.queryByText('Install Kiro')).not.toBeInTheDocument()
+    expect(screen.queryByText('Install Hermes Agent')).not.toBeInTheDocument()
   })
 
   it('shows the vault guidance summary and restore action', async () => {

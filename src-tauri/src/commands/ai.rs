@@ -240,6 +240,14 @@ pub fn get_ai_agents_status() -> AiAgentsStatus {
             installed: false,
             version: None,
         },
+        kiro: crate::ai_agents::AiAgentAvailability {
+            installed: false,
+            version: None,
+        },
+        hermes: crate::ai_agents::AiAgentAvailability {
+            installed: false,
+            version: None,
+        },
     }
 }
 
