@@ -64,18 +64,27 @@ pub(crate) fn handle_run_event(app_handle: &AppHandle, event: &RunEvent) {
                 WindowEvent::Moved(_) | WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. },
             ..
         } if label == MAIN_WINDOW_LABEL => cache_current_normal_frame(app_handle),
+        RunEvent::WindowEvent { label, event, .. }
+            if label == MAIN_WINDOW_LABEL && saves_live_main_window_frame_on_event(event) =>
+        {
+            save_main_window_frame(app_handle)
+        }
         RunEvent::WindowEvent {
             label,
-            event: WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed,
+            event: WindowEvent::Destroyed,
             ..
-        } if label == MAIN_WINDOW_LABEL => save_main_window_frame(app_handle),
-        RunEvent::Exit => save_main_window_frame(app_handle),
+        } if label == MAIN_WINDOW_LABEL => save_cached_main_window_frame(app_handle),
+        RunEvent::Exit => save_cached_main_window_frame(app_handle),
         _ => {}
     }
 }
 
 fn restores_window_frame_after_runtime_ready(event: &RunEvent) -> bool {
     matches!(event, RunEvent::Ready)
+}
+
+fn saves_live_main_window_frame_on_event(event: &WindowEvent) -> bool {
+    matches!(event, WindowEvent::CloseRequested { .. })
 }
 
 fn restore_main_window_state_from_handle(app_handle: &AppHandle) {
@@ -110,6 +119,14 @@ fn cache_current_normal_frame(app_handle: &AppHandle) {
 
 fn save_main_window_frame(app_handle: &AppHandle) {
     let frame = current_normal_main_window_frame(app_handle).or_else(|| cached_frame(app_handle));
+    write_main_window_frame_if_available(frame);
+}
+
+fn save_cached_main_window_frame(app_handle: &AppHandle) {
+    write_main_window_frame_if_available(cached_frame(app_handle));
+}
+
+fn write_main_window_frame_if_available(frame: Option<WindowFrame>) {
     if let Some(frame) = frame {
         if let Err(err) = write_main_window_frame(frame) {
             log::warn!("Failed to save main window state: {err}");
@@ -516,6 +533,9 @@ mod tests {
         assert!(restores_window_frame_after_runtime_ready(&RunEvent::Ready));
         assert!(!restores_window_frame_after_runtime_ready(
             &RunEvent::Resumed
+        ));
+        assert!(!saves_live_main_window_frame_on_event(
+            &WindowEvent::Destroyed
         ));
     }
 
