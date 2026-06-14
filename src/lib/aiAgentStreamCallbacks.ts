@@ -22,6 +22,10 @@ type StreamErrorMessage = string
 type ToolInvocationId = string
 type ToolOutputText = string
 
+interface ToolOutputInspection {
+  output?: ToolOutputText
+}
+
 function normalizeAssistantResponseText(response: AssistantResponseText): AssistantResponseText {
   let normalized = ''
 
@@ -90,7 +94,7 @@ function finalResponseText(response: AssistantResponseText, agent: AiAgentId): A
   return `${getAiAgentDefinition(agent).label} finished without returning a reply.`
 }
 
-function retainedToolOutput(output: ToolOutputText | undefined): ToolOutputText | undefined {
+function retainedToolOutput({ output }: ToolOutputInspection): ToolOutputText | undefined {
   if (!output || output.length <= MAX_RETAINED_TOOL_OUTPUT_CHARS) return output
 
   const omitted = output.length - MAX_RETAINED_TOOL_OUTPUT_CHARS
@@ -98,6 +102,28 @@ function retainedToolOutput(output: ToolOutputText | undefined): ToolOutputText 
     output.slice(0, MAX_RETAINED_TOOL_OUTPUT_CHARS),
     `[Tool output truncated: ${omitted} chars omitted]`,
   ].join('\n\n')
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function toolOutputIndicatesFailure({ output }: ToolOutputInspection): boolean {
+  const trimmed = output?.trim()
+  if (!trimmed) return false
+  if (/^Error:/iu.test(trimmed)) return true
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch {
+    return false
+  }
+  if (!parsed) return false
+  if (!isRecord(parsed)) return false
+
+  const error = parsed.error
+  return parsed.isError === true || typeof error === 'string' || isRecord(error)
 }
 
 export function createStreamCallbacks(context: StreamMutationContext) {
@@ -146,7 +172,9 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       if (abortRef.current.aborted) return
 
       const info = toolInputMapRef.current.get(toolId)
-      if (info) {
+      const toolOutput = { output }
+      const failed = toolOutputIndicatesFailure(toolOutput)
+      if (info && !failed) {
         detectFileOperation({
           toolName: info.tool,
           input: info.input,
@@ -159,7 +187,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
         ...message,
         actions: message.actions.map((action) => (
           action.toolId === toolId
-            ? { ...action, status: 'done' as const, output: retainedToolOutput(output) }
+            ? { ...action, status: failed ? 'error' as const : 'done' as const, output: retainedToolOutput(toolOutput) }
             : action
         )),
       }))
