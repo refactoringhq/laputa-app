@@ -89,7 +89,7 @@ test('creating an untitled draft hides the legacy title section in the editor', 
   await expect(page.locator('.title-section[data-title-ui-visible]')).toHaveCount(0)
 })
 
-test('@smoke older notes with a document title do not render the legacy title section', async ({ page }) => {
+test('older notes with a document title do not render the legacy title section', async ({ page }) => {
   await openNote(page, 'Alpha Project')
 
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
@@ -119,7 +119,7 @@ test('deleting the H1 does not resurrect the legacy title section', async ({ pag
   await expect(page.getByRole('heading', { name: 'Alpha Project', level: 1 })).toHaveCount(0)
 })
 
-test('@smoke edited H1 titles drive note list, search, and wikilink autocomplete', async ({ page }) => {
+test('edited H1 titles drive note list, search, and wikilink autocomplete', async ({ page }) => {
   const updatedTitle = 'Updated Display Title'
   const noteList = page.locator('[data-testid="note-list-container"]')
 
@@ -151,7 +151,7 @@ test('@smoke edited H1 titles drive note list, search, and wikilink autocomplete
   await expect(suggestionMenu).toContainText(updatedTitle, { timeout: 5_000 })
 })
 
-test('@smoke rapid H1 typing stays stable while editing an existing note', async ({ page }) => {
+test('rapid H1 typing stays stable while editing an existing note', async ({ page }) => {
   const noteList = page.locator('[data-testid="note-list-container"]')
   const firstTitle = 'Alpha Project Fast Typing Check'
   const finalTitle = 'Alpha Project Fast Typing Flow'

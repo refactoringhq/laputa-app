@@ -80,6 +80,41 @@ pnpm playwright:smoke       # Curated Playwright core smoke lane (~5 min)
 pnpm playwright:regression  # Full Playwright regression suite
 ```
 
+## Chunk Sidecar Validation
+
+The experimental `.chunk/config.json` mirrors the portable parts of the local git hook gate as named validations. Use it for inner-loop checks before running the full pre-push hook:
+
+```bash
+chunk validate --list
+chunk validate lint
+chunk validate typecheck
+chunk validate frontend-coverage
+```
+
+Remote sidecar validation requires CircleCI authentication:
+
+```bash
+chunk auth set circleci
+chunk sidecar setup --name tolaria-hooks
+chunk validate --remote lint
+```
+
+For Playwright smoke, prefer the shared-server shard runner after setup:
+
+```bash
+chunk sidecar ssh --sidecar-id <playwright-sidecar-id> -- 'cd /home/user/tolaria && PLAYWRIGHT_CONCURRENCY=4 bash .chunk/run-playwright-shards.sh 8'
+```
+
+The pre-push hook uses the faster sidecar path automatically when Chunk is available. It syncs the checkout to three independent sidecars and fans out the automatic gates:
+
+- `tolaria-hooks-frontend-2`: lint and build first, then frontend coverage.
+- `tolaria-hooks-rust`: clippy, rustfmt, and Rust coverage.
+- `tolaria-hooks-playwright`: curated Playwright smoke with a shared Vite server and eight shards.
+
+Set `LAPUTA_PREPUSH_LOCAL=1` to force the local fallback path. If CircleCI has duplicate sidecar names, pin lanes with `SIDECAR_FRONTEND_ID`, `SIDECAR_RUST_ID`, and `SIDECAR_PLAYWRIGHT_ID`.
+
+The sidecar is Linux-based, so keep native macOS Tauri QA and app-focus screenshot checks on the host machine. The Chunk config is intended for portable frontend, Rust, coverage, and Playwright smoke checks. Avoid starting multiple `chunk validate --remote ...` processes against the same sidecar at once; each validate run syncs the checkout, so concurrent validates can race.
+
 ## Starter Vaults And Remotes
 
 `create_getting_started_vault` clones the public starter repo and then removes every git remote from the new local copy. That means Getting Started vaults open local-only by default. Users connect a compatible remote later through the bottom-bar `No remote` chip or the command palette, both of which feed the same `AddRemoteModal` and `git_add_remote` backend flow.

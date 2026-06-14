@@ -1,5 +1,5 @@
 #!/bin/sh
-# Pre-commit: fast local gate before commit. Full suite runs in pre-push/CI.
+# Pre-commit: fast local lint gate before commit. Full suite runs in pre-push/CI.
 set -e
 
 ensure_node_tooling() {
@@ -21,34 +21,15 @@ ensure_node_tooling() {
   fi
 }
 
-require_main_branch() {
-  if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
-    echo "❌ Commits must happen on main. Detached HEAD is not allowed."
-    exit 1
-  fi
-
-  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-  if [ "$CURRENT_BRANCH" != "main" ]; then
-    echo "❌ Commits must happen on main. Current branch: $CURRENT_BRANCH"
-    echo "   Merge or cherry-pick your work onto main, then commit there."
-    exit 1
-  fi
-}
-
-require_main_branch
 ensure_node_tooling
 
 echo "🔍 Pre-commit checks..."
 
 STAGED_FILES=$(git diff --cached --name-only)
 APP_CHANGED=false
-SITE_CHANGED=false
 
 for FILE in $STAGED_FILES; do
   case "$FILE" in
-    site/*)
-      SITE_CHANGED=true
-      ;;
     .github/workflows/*|.husky/*|docs/*|*.md)
       ;;
     *)
@@ -58,81 +39,17 @@ for FILE in $STAGED_FILES; do
 done
 
 if [ "$APP_CHANGED" = false ]; then
-  if [ "$SITE_CHANGED" = true ]; then
-    echo "  → docs build..."
-    pnpm docs:build
-  else
-    echo "  → app checks skipped (docs/workflow/hooks only)"
-  fi
+  echo "  → app checks skipped (docs/workflow/hooks only)"
   echo "✅ Pre-commit passed"
   exit 0
 fi
 
-# Lint + types (only if TS files staged)
-STAGED_TS=$(echo "$STAGED_FILES" | grep -E '\.(ts|tsx)$' || true)
-if [ -n "$STAGED_TS" ]; then
-  echo "  → lint + tsc..."
+# Lint only when frontend source files are staged. Typecheck and test coverage
+# run in the pre-push gate.
+STAGED_LINTABLE=$(echo "$STAGED_FILES" | grep -E '\.(ts|tsx|js|jsx|mjs)$' || true)
+if [ -n "$STAGED_LINTABLE" ]; then
+  echo "  → lint..."
   pnpm lint --quiet
-  npx tsc --noEmit
 fi
-
-# Unit tests
-echo "  → tests..."
-pnpm exec vitest run --silent
 
 echo "✅ Pre-commit passed"
-
-# ── CodeScene Code Health gate ────────────────────────────────────────────
-# Uses the remote project score as an early warning signal.
-# Thresholds are a ratchet — only go up.
-# When the remote baseline is already below threshold, allow recovery commits to
-# land; otherwise the stale remote score would block the refactors needed to
-# restore the gate.
-# Never use eslint-disable, #[allow(...)], or `as any`.
-echo "🏥 CodeScene code health check..."
-THRESHOLDS_FILE=".codescene-thresholds"
-if [ -z "$CODESCENE_PAT" ] || [ -z "$CODESCENE_PROJECT_ID" ]; then
-  echo "  ⚠️  CODESCENE_PAT or CODESCENE_PROJECT_ID not set — skipping (CI will enforce)"
-elif [ ! -f "$THRESHOLDS_FILE" ]; then
-  echo "  ⚠️  $THRESHOLDS_FILE not found — skipping (CI will enforce)"
-else
-  # Read ratchet thresholds
-  HOTSPOT_THRESHOLD=$(grep '^HOTSPOT_THRESHOLD=' "$THRESHOLDS_FILE" | cut -d= -f2)
-  AVERAGE_THRESHOLD=$(grep '^AVERAGE_THRESHOLD=' "$THRESHOLDS_FILE" | cut -d= -f2)
-  if [ -z "$HOTSPOT_THRESHOLD" ] || [ -z "$AVERAGE_THRESHOLD" ]; then
-    echo "  ⚠️  Could not parse thresholds from $THRESHOLDS_FILE — skipping"
-  else
-    API_RESPONSE=$(curl -sf \
-      -H "Authorization: Bearer $CODESCENE_PAT" \
-      -H "Accept: application/json" \
-      "https://api.codescene.io/v2/projects/$CODESCENE_PROJECT_ID" 2>/dev/null || echo "{}")
-    HOTSPOT_SCORE=$(echo "$API_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['analysis']['hotspot_code_health']['now'])" 2>/dev/null || echo "")
-    AVERAGE_SCORE=$(echo "$API_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['analysis']['code_health']['now'])" 2>/dev/null || echo "")
-    if [ -z "$HOTSPOT_SCORE" ] || [ -z "$AVERAGE_SCORE" ]; then
-      echo "  ⚠️  Could not fetch CodeScene scores — skipping (CI will enforce)"
-    else
-      echo "  Hotspot Code Health: $HOTSPOT_SCORE (threshold: $HOTSPOT_THRESHOLD)"
-      echo "  Average Code Health: $AVERAGE_SCORE (threshold: $AVERAGE_THRESHOLD)"
-      python3 -c "
-import sys
-hotspot = float('$HOTSPOT_SCORE')
-average = float('$AVERAGE_SCORE')
-h_thresh = float('$HOTSPOT_THRESHOLD')
-a_thresh = float('$AVERAGE_THRESHOLD')
-failed = False
-if hotspot < h_thresh:
-    print(f'WARN: Hotspot Code Health {hotspot:.2f} < {h_thresh} — remote baseline is currently red')
-    failed = True
-else:
-    print(f'OK: Hotspot {hotspot:.2f} >= {h_thresh}')
-if average < a_thresh:
-    print(f'WARN: Average Code Health {average:.2f} < {a_thresh} — remote baseline is currently red')
-    failed = True
-else:
-    print(f'OK: Average {average:.2f} >= {a_thresh}')
-if failed:
-    print('  ⚠️  Recovery mode: allowing this commit so refactors can land and restore the gate on a later push.')
-" || exit 1
-    fi
-  fi
-fi

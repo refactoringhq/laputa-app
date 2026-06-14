@@ -9,7 +9,7 @@ test.describe('AI chat empty body fix — no regression', () => {
     await expect(page.locator('[data-testid="note-list-container"]')).toBeVisible({ timeout: 5_000 })
   })
 
-  test('AI panel opens, note is selected, message can be sent and response renders @smoke', async ({ page }) => {
+  test('AI panel opens, note is selected, message can be sent and response renders', async ({ page }) => {
     // Select a note so the AI panel has context
     const noteItem = page.locator('.app__note-list .cursor-pointer').first()
     await noteItem.click()

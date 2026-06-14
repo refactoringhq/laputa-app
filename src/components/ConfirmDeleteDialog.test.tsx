@@ -47,29 +47,35 @@ describe('ConfirmDeleteDialog', () => {
     })
   })
 
-  it('submits the destructive action when Enter is pressed', () => {
+  it('submits the destructive action when Enter is pressed', async () => {
     renderDialog()
 
-    fireEvent.keyDown(screen.getByTestId('confirm-delete-dialog'), { key: 'Enter' })
+    fireEvent.keyDown(window, { key: 'Enter' })
 
-    expect(onConfirm).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(onConfirm).toHaveBeenCalledTimes(1)
+    })
   })
 
-  it('does not submit twice when Enter repeats', () => {
+  it('does not submit twice when Enter repeats', async () => {
     renderDialog()
 
-    fireEvent.keyDown(screen.getByTestId('confirm-delete-dialog'), { key: 'Enter' })
-    fireEvent.keyDown(screen.getByTestId('confirm-delete-dialog'), { key: 'Enter', repeat: true })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    fireEvent.keyDown(window, { key: 'Enter', repeat: true })
 
-    expect(onConfirm).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(onConfirm).toHaveBeenCalledTimes(1)
+    })
   })
 
-  it('treats Enter as the primary confirm shortcut even from the cancel button', () => {
+  it('treats Enter as the primary confirm shortcut even from the cancel button', async () => {
     renderDialog()
 
     fireEvent.keyDown(screen.getByText('Cancel'), { key: 'Enter' })
 
-    expect(onConfirm).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(onConfirm).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('calls onCancel when cancel button clicked', () => {
