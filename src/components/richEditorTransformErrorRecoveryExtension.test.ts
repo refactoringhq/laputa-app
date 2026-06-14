@@ -114,6 +114,7 @@ describe('isRecoverableEditorTransformError', () => {
     expect(isRecoverableEditorTransformError(new Error(
       'Block with ID 6c1c3bb4-e218-4f00-aaf5-40606852d286 not found',
     ))).toBe(true)
+    expect(isRecoverableEditorTransformError(new Error('Block type does not match'))).toBe(true)
     expect(isRecoverableEditorTransformError(new Error("Block doesn't have id"))).toBe(true)
     expect(isRecoverableEditorTransformError(nullFragmentAppendError())).toBe(true)
     const stackOnlyAppendError = nullFragmentAppendError("Cannot read properties of null (reading 'append')")
@@ -308,6 +309,17 @@ describe('installRichEditorTransformErrorRecovery', () => {
     expect(recoverDocument).not.toHaveBeenCalled()
     expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
       reason: 'stale_block_reference',
+    })
+  })
+
+  it('recovers BlockNote block type mismatch transactions from active editing', () => {
+    const { currentDoc, view } = createView(new Error('Block type does not match'))
+
+    installRichEditorTransformErrorRecovery(view)
+
+    expect(() => view.dispatch({ before: currentDoc })).not.toThrow()
+    expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+      reason: 'block_type_mismatch',
     })
   })
 
