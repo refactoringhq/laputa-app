@@ -273,7 +273,10 @@ where
     F: FnMut(ClaudeStreamEvent),
 {
     let bin = find_claude_binary()?;
-    let invocation = crate::claude_invocation::agent(&req)?;
+    let strict_mcp_config = crate::settings::get_settings()
+        .map(|s| s.strict_mcp_config.unwrap_or(true))
+        .unwrap_or(true);
+    let invocation = crate::claude_invocation::agent(&req, strict_mcp_config)?;
     run_claude_subprocess(
         ClaudeSubprocessRequest {
             bin: &bin,

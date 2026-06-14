@@ -104,6 +104,7 @@ pub struct Settings {
     pub default_ai_target: Option<String>,
     pub ai_model_providers: Option<Vec<AiModelProvider>>,
     pub ai_workspace_conversations: Option<Vec<AiWorkspaceConversationSetting>>,
+    pub strict_mcp_config: Option<bool>,
     pub hide_gitignored_files: Option<bool>,
     pub all_notes_show_pdfs: Option<bool>,
     pub all_notes_show_images: Option<bool>,
@@ -222,6 +223,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         ai_workspace_conversations: normalize_ai_workspace_conversations(
             settings.ai_workspace_conversations,
         ),
+        strict_mcp_config: settings.strict_mcp_config,
         hide_gitignored_files: settings.hide_gitignored_files,
         all_notes_show_pdfs: settings.all_notes_show_pdfs,
         all_notes_show_images: settings.all_notes_show_images,
@@ -456,6 +458,7 @@ mod tests {
             default_ai_target: Some("agent:codex".to_string()),
             ai_model_providers: None,
             ai_workspace_conversations: None,
+            strict_mcp_config: None,
             hide_gitignored_files: Some(false),
             multi_workspace_enabled: Some(true),
             all_notes_show_pdfs: Some(true),

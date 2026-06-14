@@ -29,8 +29,8 @@ pub(crate) fn chat(req: &ChatStreamRequest) -> ClaudeInvocation {
     chat_with_windows_limit(req, cfg!(windows))
 }
 
-pub(crate) fn agent(req: &AgentStreamRequest) -> Result<ClaudeInvocation, String> {
-    agent_with_windows_limit(req, cfg!(windows))
+pub(crate) fn agent(req: &AgentStreamRequest, strict_mcp_config: bool) -> Result<ClaudeInvocation, String> {
+    agent_with_windows_limit(req, strict_mcp_config, cfg!(windows))
 }
 
 fn chat_with_windows_limit(
@@ -61,28 +61,32 @@ fn chat_with_windows_limit(
 
 fn agent_with_windows_limit(
     req: &AgentStreamRequest,
+    strict_mcp_config: bool,
     enforce_windows_limit: bool,
 ) -> Result<ClaudeInvocation, String> {
-    let args = agent_args(req)?;
+    let args = agent_args(req, strict_mcp_config)?;
     let fallback_args = vec![
-        agent_args_without_session_persistence(req)?,
-        agent_args_compat(req)?,
+        agent_args_without_session_persistence(req, strict_mcp_config)?,
+        agent_args_compat(req, strict_mcp_config)?,
     ];
     if should_pipe_prompt_for_windows(enforce_windows_limit, &args, &fallback_args) {
         return Ok(ClaudeInvocation {
             args: agent_args_with_tool_policy(
                 req,
+                strict_mcp_config,
                 AgentToolPolicy::strict(req.permission_mode),
                 PromptSource::Stdin,
             )?,
             fallback_args: vec![
                 agent_args_with_tool_policy(
                     req,
+                    strict_mcp_config,
                     AgentToolPolicy::strict_without_session_persistence(req.permission_mode),
                     PromptSource::Stdin,
                 )?,
                 agent_args_with_tool_policy(
                     req,
+                    strict_mcp_config,
                     AgentToolPolicy::compat(req.permission_mode),
                     PromptSource::Stdin,
                 )?,
@@ -141,25 +145,28 @@ fn chat_args_with_tool_policy(
     args
 }
 
-fn agent_args(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
+fn agent_args(req: &AgentStreamRequest, strict_mcp_config: bool) -> Result<Vec<String>, String> {
     agent_args_with_tool_policy(
         req,
+        strict_mcp_config,
         AgentToolPolicy::strict(req.permission_mode),
         PromptSource::Argument,
     )
 }
 
-fn agent_args_without_session_persistence(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
+fn agent_args_without_session_persistence(req: &AgentStreamRequest, strict_mcp_config: bool) -> Result<Vec<String>, String> {
     agent_args_with_tool_policy(
         req,
+        strict_mcp_config,
         AgentToolPolicy::strict_without_session_persistence(req.permission_mode),
         PromptSource::Argument,
     )
 }
 
-fn agent_args_compat(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
+fn agent_args_compat(req: &AgentStreamRequest, strict_mcp_config: bool) -> Result<Vec<String>, String> {
     agent_args_with_tool_policy(
         req,
+        strict_mcp_config,
         AgentToolPolicy::compat(req.permission_mode),
         PromptSource::Argument,
     )
@@ -167,6 +174,7 @@ fn agent_args_compat(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
 
 fn agent_args_with_tool_policy(
     req: &AgentStreamRequest,
+    strict_mcp_config: bool,
     policy: AgentToolPolicy,
     prompt_source: PromptSource,
 ) -> Result<Vec<String>, String> {
@@ -179,9 +187,13 @@ fn agent_args_with_tool_policy(
         "stream-json".into(),
         "--verbose".into(),
         "--include-partial-messages".into(),
-        "--mcp-config".into(),
-        mcp_config(&req.vault_path, &req.vault_paths)?,
-        "--strict-mcp-config".into(),
+    ]);
+    if strict_mcp_config {
+        args.push("--mcp-config".into());
+        args.push(mcp_config(&req.vault_path, &req.vault_paths)?);
+        args.push("--strict-mcp-config".into());
+    }
+    args.extend([
         "--permission-mode".into(),
         "acceptEdits".into(),
         policy.tool_flag.into(),
@@ -458,7 +470,7 @@ mod tests {
             Some("Read the active vault first."),
             AiAgentPermissionMode::Safe,
         );
-        let agent_invocation = agent_with_windows_limit(&agent_req, true).unwrap();
+        let agent_invocation = agent_with_windows_limit(&agent_req, true, true).unwrap();
 
         assert_eq!(
             agent_invocation.args.first().map(String::as_str),
@@ -493,14 +505,14 @@ mod tests {
             "do it",
             Some("Act as expert."),
             AiAgentPermissionMode::Safe,
-        )) {
+        ), true) {
             assert_args_contain!(args, ["--append-system-prompt", "Act as expert."]);
         }
     }
 
     #[test]
     fn agent_args_empty_system_prompt_is_skipped() {
-        if let Ok(args) = agent_args(&agent_request("x", Some(""), AiAgentPermissionMode::Safe)) {
+        if let Ok(args) = agent_args(&agent_request("x", Some(""), AiAgentPermissionMode::Safe), true) {
             assert!(!args.contains(&"--append-system-prompt".to_string()));
         }
     }
@@ -511,7 +523,7 @@ mod tests {
             "Rename the note",
             None,
             AiAgentPermissionMode::Safe,
-        ))
+        ), true)
         .unwrap();
 
         assert_args_contain!(args, ["--tools", "Read,Edit,MultiEdit,Write,Glob,Grep,LS"]);
@@ -524,7 +536,7 @@ mod tests {
             "Rename the note",
             None,
             AiAgentPermissionMode::Safe,
-        ))
+        ), true)
         .unwrap();
 
         assert_eq!(
@@ -542,7 +554,7 @@ mod tests {
             "Rename the note",
             None,
             AiAgentPermissionMode::Safe,
-        ))
+        ), true)
         .unwrap();
 
         assert_args_contain!(
@@ -556,12 +568,25 @@ mod tests {
     }
 
     #[test]
+    fn agent_args_omit_strict_mcp_config_when_disabled() {
+        let args = agent_args(&agent_request(
+            "Rename the note",
+            None,
+            AiAgentPermissionMode::Safe,
+        ), false)
+        .unwrap();
+
+        assert_args_lack!(args, ["--strict-mcp-config", "--mcp-config"]);
+        assert_args_contain!(args, ["--permission-mode", "acceptEdits"]);
+    }
+
+    #[test]
     fn agent_args_allow_bash_in_power_user_mode_without_dangerous_bypass() {
         let args = agent_args(&agent_request(
             "Rename the note",
             None,
             AiAgentPermissionMode::PowerUser,
-        ))
+        ), true)
         .unwrap();
 
         assert_args_contain!(args, ["--strict-mcp-config"]);
@@ -575,7 +600,7 @@ mod tests {
             "Run a local script",
             None,
             AiAgentPermissionMode::PowerUser,
-        ))
+        ), true)
         .unwrap();
 
         assert_eq!(arg_value_after(&args, "--allowedTools"), Some("Bash"));
@@ -588,7 +613,7 @@ mod tests {
             Some("Read the active vault first."),
             AiAgentPermissionMode::Safe,
         );
-        let invocation = agent_with_windows_limit(&req, true).unwrap();
+        let invocation = agent_with_windows_limit(&req, true, true).unwrap();
 
         assert_args_contain!(
             invocation.args,
