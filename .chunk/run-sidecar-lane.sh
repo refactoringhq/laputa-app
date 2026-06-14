@@ -53,6 +53,22 @@ wait_for_jobs() {
   return "$failures"
 }
 
+run_frontend_coverage_job() {
+  local shard_count="${FRONTEND_COVERAGE_SHARDS:-1}"
+
+  if [[ ! "$shard_count" =~ ^[1-9][0-9]*$ ]]; then
+    printf 'FRONTEND_COVERAGE_SHARDS must be a positive integer\n' >&2
+    return 2
+  fi
+
+  if [[ "$shard_count" == "1" ]]; then
+    run_job frontend-coverage pnpm test:coverage --silent
+    return
+  fi
+
+  run_job frontend-coverage node scripts/run-vitest-coverage-shards.mjs --silent
+}
+
 run_frontend_lane() {
   log_dir="${TMPDIR:-/tmp}/tolaria-sidecar-frontend-$$"
   jobs_file="${log_dir}/jobs"
@@ -61,7 +77,7 @@ run_frontend_lane() {
   trap terminate_jobs INT TERM
 
   export VITEST_COVERAGE_MAX_WORKERS="${VITEST_COVERAGE_MAX_WORKERS:-2}"
-  log_lane "vitest workers=${VITEST_COVERAGE_MAX_WORKERS}"
+  log_lane "vitest workers=${VITEST_COVERAGE_MAX_WORKERS}; coverage shards=${FRONTEND_COVERAGE_SHARDS:-1}"
   run_job frontend-lint pnpm lint
   run_job frontend-build pnpm build
 
@@ -70,7 +86,7 @@ run_frontend_lane() {
   fi
 
   : > "$jobs_file"
-  run_job frontend-coverage pnpm test:coverage --silent
+  run_frontend_coverage_job
   wait_for_jobs
 }
 
