@@ -45,17 +45,17 @@ describe('ai target provider contract', () => {
     )
   })
 
-  it('resolves Kiro as a persisted default agent target', () => {
+  it('resolves Hermes as a persisted default agent target', () => {
     const target = resolveAiTarget({
       default_ai_agent: 'claude_code',
-      default_ai_target: 'agent:kiro',
+      default_ai_target: 'agent:hermes',
     } as Settings)
 
     expect(target).toMatchObject({
       kind: 'agent',
-      agent: 'kiro',
-      id: 'agent:kiro',
-      label: 'Kiro',
+      agent: 'hermes',
+      id: 'agent:hermes',
+      label: 'Hermes Agent',
     })
   })
 

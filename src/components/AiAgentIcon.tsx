@@ -24,6 +24,7 @@ const AI_AGENT_ICON_SOURCES: Record<AiAgentId, string> = {
   pi: '/ai-agent-icons/pi.svg',
   gemini: '/ai-agent-icons/gemini.svg',
   kiro: '/ai-agent-icons/kiro.svg',
+  hermes: '/ai-agent-icons/hermes.svg',
 }
 
 export function AiAgentIcon({
