@@ -164,9 +164,10 @@ run_sidecar_automatic_checks() {
   if bash .chunk/run-sidecar-gates-local.sh "$RUST_CHANGED"; then
     echo "  ✅ Chunk sidecar automatic checks OK"
     return 0
+  else
+    SIDECAR_STATUS=$?
   fi
 
-  SIDECAR_STATUS=$?
   if [ "$SIDECAR_STATUS" -eq 86 ]; then
     echo "  ⚠️  Chunk sidecar unavailable; falling back to local automatic checks"
     return 1
