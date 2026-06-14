@@ -22,6 +22,7 @@ function installedStatusResponse() {
     pi: { installed: true, version: '0.70.2' },
     gemini: { installed: true, version: '0.5.1' },
     kiro: { installed: true, version: '0.4.0' },
+    hermes: { installed: true, version: 'Hermes Agent 0.16.0' },
   }
 }
 
@@ -58,6 +59,7 @@ describe('useAiAgentsStatus', () => {
         expect(result.current.pi).toEqual({ status: 'installed', version: '0.70.2' })
         expect(result.current.gemini).toEqual({ status: 'installed', version: '0.5.1' })
         expect(result.current.kiro).toEqual({ status: 'installed', version: '0.4.0' })
+        expect(result.current.hermes).toEqual({ status: 'installed', version: 'Hermes Agent 0.16.0' })
       })
     })
 

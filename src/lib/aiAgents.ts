@@ -1,4 +1,4 @@
-export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi' | 'gemini' | 'kiro'
+export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi' | 'gemini' | 'kiro' | 'hermes'
 
 export type AiAgentStatus = 'checking' | 'installed' | 'missing'
 export type AiAgentReadiness = 'checking' | 'ready' | 'missing'
@@ -56,6 +56,12 @@ export const AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] = [
     shortLabel: 'Kiro',
     installUrl: 'https://kiro.dev/docs/cli',
   },
+  {
+    id: 'hermes',
+    label: 'Hermes Agent',
+    shortLabel: 'Hermes',
+    installUrl: 'https://hermes-agent.nousresearch.com/docs/getting-started/quickstart',
+  },
 ] as const
 
 export function createAiAgentAvailability(status: AiAgentStatus = 'checking', version: string | null = null): AiAgentAvailability {
@@ -108,6 +114,7 @@ export function normalizeAiAgentsStatus(payload: Partial<Record<AiAgentId, { ins
     pi: normalizeAvailability(payload?.pi),
     gemini: normalizeAvailability(payload?.gemini),
     kiro: normalizeAvailability(payload?.kiro),
+    hermes: normalizeAvailability(payload?.hermes),
   }
 }
 
