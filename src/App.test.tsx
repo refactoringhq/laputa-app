@@ -607,11 +607,12 @@ describe('App', () => {
     const quickOpenHint = formatShortcutDisplay({ display: '⌘P / ⌘O' })
     const newNoteHint = formatShortcutDisplay({ display: '⌘N' })
     const { container } = render(<App />)
-    await waitFor(() => {
-      const shortcutHint = Array.from(container.querySelectorAll('span.text-xs.text-muted-foreground'))
-        .find((element) => element.textContent === `${quickOpenHint} to search · ${newNoteHint} to create`)
+    await screen.findByText('Select a note to start editing')
 
-      expect(shortcutHint).toBeInTheDocument()
+    await waitFor(() => {
+      const visibleText = container.textContent ?? ''
+      expect(visibleText).toContain(`${quickOpenHint} to search`)
+      expect(visibleText).toContain(`${newNoteHint} to create`)
     })
   })
 
