@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import type { ViewDefinition, ViewFile } from '../../types'
 import { translate, type AppLocale } from '../../lib/i18n'
 import { TypeCustomizePopover } from '../TypeCustomizePopover'
+import { getContextMenuPositionStyle } from '../contextMenuPosition'
 import { useSidebarInlineRenameInput } from './sidebarHooks'
 
 export interface MenuPosition {
@@ -17,6 +18,11 @@ export interface MenuPosition {
 }
 
 export type ViewDefinitionPatchHandler = (filename: string, patch: Partial<ViewDefinition>, rootPath?: string) => void
+
+const VIEW_CONTEXT_MENU_SURFACE_CLASSNAME =
+  'fixed z-50 inline-flex w-fit max-w-[calc(100vw-16px)] flex-col rounded-md border bg-popover p-1 text-popover-foreground shadow-md'
+const VIEW_CONTEXT_MENU_BUTTON_CLASSNAME =
+  'h-auto w-auto max-w-full justify-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm font-normal'
 
 function updateViewDefinition(
   view: ViewFile,
@@ -70,7 +76,7 @@ function ViewMenuButton({
   destructive?: boolean
   onClick: () => void
 }) {
-  const className = `h-auto w-full justify-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm font-normal${destructive ? ' text-destructive hover:text-destructive' : ''}`
+  const className = `${VIEW_CONTEXT_MENU_BUTTON_CLASSNAME}${destructive ? ' text-destructive hover:text-destructive' : ''}`
   return (
     <Button type="button" variant="ghost" size="sm" className={className} onClick={onClick}>
       {children}
@@ -104,8 +110,9 @@ export function ViewContextMenu({
   return (
     <div
       ref={innerRef}
-      className="fixed z-50 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-      style={{ left: pos.x, top: pos.y, minWidth: 200 }}
+      className={VIEW_CONTEXT_MENU_SURFACE_CLASSNAME}
+      style={getContextMenuPositionStyle(pos)}
+      data-testid="sidebar-view-context-menu"
     >
       {canEdit && (
         <ViewMenuButton onClick={onEdit}>
@@ -150,7 +157,7 @@ export function ViewCustomizePanel({
   if (!pos || !onUpdateViewDefinition) return null
 
   return (
-    <div ref={innerRef} className="fixed z-50" style={{ left: pos.x, top: pos.y }}>
+    <div ref={innerRef} className="fixed z-50" style={getContextMenuPositionStyle(pos)}>
       <TypeCustomizePopover
         currentIcon={view.definition.icon}
         currentColor={view.definition.color}

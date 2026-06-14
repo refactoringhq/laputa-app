@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Sidebar } from './Sidebar'
 import type { SidebarSelection, VaultEntry } from '../types'
 
@@ -72,6 +72,12 @@ function openProjectsContextMenu() {
   fireEvent.contextMenu(getProjectsHeader())
 }
 
+afterEach(() => {
+  document.documentElement.style.removeProperty('zoom')
+  document.documentElement.style.removeProperty('--tolaria-overlay-zoom-factor')
+  document.documentElement.style.removeProperty('--tolaria-overlay-zoom-inverse')
+})
+
 describe('Sidebar Type row actions', () => {
   it('shows Type-specific context menu labels on right-click', () => {
     openProjectsContextMenu()
@@ -84,10 +90,23 @@ describe('Sidebar Type row actions', () => {
     openProjectsContextMenu()
 
     const menu = screen.getByTestId('sidebar-type-context-menu')
-    expect(menu).toHaveClass('w-max')
-    expect(menu).toHaveClass('min-w-[min(11.25rem,calc(100vw-16px))]')
-    expect(menu).toHaveClass('max-w-[min(22rem,calc(100vw-16px))]')
+    expect(menu).toHaveClass('inline-flex')
+    expect(menu).toHaveClass('w-fit')
+    expect(menu).toHaveClass('max-w-[calc(100vw-16px)]')
     expect(menu.style.minWidth).toBe('')
+  })
+
+  it('positions the type context menu at the pointer while the app is zoomed', () => {
+    document.documentElement.style.setProperty('zoom', '130%')
+    document.documentElement.style.setProperty('--tolaria-overlay-zoom-factor', '1.3')
+    document.documentElement.style.setProperty('--tolaria-overlay-zoom-inverse', String(1 / 1.3))
+    renderSidebar()
+
+    fireEvent.contextMenu(getProjectsHeader(), { clientX: 130, clientY: 260 })
+
+    const menu = screen.getByTestId('sidebar-type-context-menu')
+    expect(menu.style.left).toBe('100px')
+    expect(menu.style.top).toBe('200px')
   })
 
   it('dismisses the type context menu on Escape', () => {
