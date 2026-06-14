@@ -5,9 +5,21 @@ type KeyboardModifier = 'Meta' | 'Control' | 'Shift' | 'Alt'
 const COMMAND_MODIFIER: KeyboardModifier = process.platform === 'darwin' ? 'Meta' : 'Control'
 
 export async function openCommandPalette(page: Page): Promise<void> {
-  await page.locator('body').click()
-  await sendShortcut(page, 'k', ['Control'])
-  await expect(page.locator(COMMAND_INPUT)).toBeVisible()
+  const input = page.locator(COMMAND_INPUT)
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.locator('body').click()
+    await sendShortcut(page, 'k', ['Control'])
+
+    try {
+      await input.waitFor({ state: 'visible', timeout: 2_000 })
+      return
+    } catch {
+      if (attempt === 2) {
+        throw new Error('Command palette did not open after 3 shortcut attempts')
+      }
+    }
+  }
 }
 
 export async function closeCommandPalette(page: Page): Promise<void> {

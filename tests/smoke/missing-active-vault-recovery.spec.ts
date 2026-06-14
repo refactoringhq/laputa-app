@@ -95,7 +95,7 @@ async function installMissingVaultMock(page: Page): Promise<void> {
   }, entry)
 }
 
-test('missing active vault reload shows recovery state and clears stale notes @smoke', async ({ page }) => {
+test('missing active vault reload shows recovery state and clears stale notes', async ({ page }) => {
   await installMissingVaultMock(page)
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
