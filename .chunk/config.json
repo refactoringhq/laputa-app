@@ -1,0 +1,157 @@
+{
+  "commands": [
+    {
+      "name": "lint",
+      "run": "pnpm lint",
+      "role": "gate",
+      "fileExt": ".ts,.tsx,.js,.jsx,.mjs,.json",
+      "timeout": 120,
+      "limit": 3
+    },
+    {
+      "name": "typecheck",
+      "run": "npx tsc --noEmit",
+      "role": "gate",
+      "fileExt": ".ts,.tsx",
+      "timeout": 180,
+      "limit": 3
+    },
+    {
+      "name": "build",
+      "run": "pnpm build",
+      "role": "gate",
+      "fileExt": ".ts,.tsx,.css,.html,.json",
+      "timeout": 300,
+      "limit": 2
+    },
+    {
+      "name": "frontend-coverage",
+      "run": "pnpm test:coverage --silent",
+      "role": "gate",
+      "fileExt": ".ts,.tsx",
+      "timeout": 300,
+      "limit": 2
+    },
+    {
+      "name": "rust-lint",
+      "run": "cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings && cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check",
+      "role": "gate",
+      "fileExt": ".rs",
+      "timeout": 300,
+      "limit": 2
+    },
+    {
+      "name": "rust-coverage",
+      "run": "cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --ignore-filename-regex \"lib\\.rs|main\\.rs|menu\\.rs\" --fail-under-lines 85 -- --test-threads=1",
+      "role": "gate",
+      "fileExt": ".rs",
+      "timeout": 900,
+      "limit": 1
+    },
+    {
+      "name": "smoke-1",
+      "run": "bash .chunk/run-playwright-smoke.sh 1/8",
+      "role": "gate",
+      "fileExt": ".ts,.tsx",
+      "timeout": 240,
+      "limit": 1
+    },
+    {
+      "name": "smoke-2",
+      "run": "bash .chunk/run-playwright-smoke.sh 2/8",
+      "role": "gate",
+      "fileExt": ".ts,.tsx",
+      "timeout": 240,
+      "limit": 1
+    },
+    {
+      "name": "smoke-3",
+      "run": "bash .chunk/run-playwright-smoke.sh 3/8",
+      "role": "gate",
+      "fileExt": ".ts,.tsx",
+      "timeout": 240,
+      "limit": 1
+    },
+    {
+      "name": "smoke-4",
+      "run": "bash .chunk/run-playwright-smoke.sh 4/8",
+      "role": "gate",
+      "fileExt": ".ts,.tsx",
+      "timeout": 240,
+      "limit": 1
+    },
+    {
+      "name": "smoke-5",
+      "run": "bash .chunk/run-playwright-smoke.sh 5/8",
+      "role": "gate",
+      "fileExt": ".ts,.tsx",
+      "timeout": 240,
+      "limit": 1
+    },
+    {
+      "name": "smoke-6",
+      "run": "bash .chunk/run-playwright-smoke.sh 6/8",
+      "role": "gate",
+      "fileExt": ".ts,.tsx",
+      "timeout": 240,
+      "limit": 1
+    },
+    {
+      "name": "smoke-7",
+      "run": "bash .chunk/run-playwright-smoke.sh 7/8",
+      "role": "gate",
+      "fileExt": ".ts,.tsx",
+      "timeout": 240,
+      "limit": 1
+    },
+    {
+      "name": "smoke-8",
+      "run": "bash .chunk/run-playwright-smoke.sh 8/8",
+      "role": "gate",
+      "fileExt": ".ts,.tsx",
+      "timeout": 240,
+      "limit": 1
+    }
+  ],
+  "stopHookMaxAttempts": 2,
+  "vcs": {
+    "org": "refactoringhq",
+    "repo": "tolaria"
+  },
+  "orgID": "39f93336-5295-4c6c-845f-e692c1d3f968",
+  "environment": {
+    "stack": "javascript-rust-tauri",
+    "setup": [
+      {
+        "name": "system",
+        "command": "sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential curl file git libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev patchelf pkg-config unzip wget xvfb && sudo rm -rf /var/lib/apt/lists/*"
+      },
+      {
+        "name": "rust",
+        "command": "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && . \"$HOME/.cargo/env\" && rustup default stable && rustup component add clippy rustfmt && cargo install cargo-llvm-cov --locked"
+      },
+      {
+        "name": "node",
+        "command": "curl -fsSL https://nodejs.org/dist/v26.3.0/node-v26.3.0-linux-x64.tar.xz | sudo tar -xJ -C /usr/local --strip-components=1 && node --version && npm --version"
+      },
+      {
+        "name": "pnpm",
+        "command": "sudo npm install -g pnpm@10.33.0 && pnpm --version"
+      },
+      {
+        "name": "install",
+        "command": "mkdir -p \"$HOME/Documents\" && pnpm install --frozen-lockfile && . \"$HOME/.cargo/env\" && cargo fetch --manifest-path src-tauri/Cargo.toml"
+      },
+      {
+        "name": "playwright-deps",
+        "command": "pnpm exec playwright install-deps chromium"
+      },
+      {
+        "name": "playwright",
+        "command": "node .chunk/install-playwright-browsers.mjs"
+      }
+    ],
+    "image": "cimg/node",
+    "image_version": "26.3.0"
+  }
+}
