@@ -16,6 +16,7 @@ export type BlockNoteRenderRecoveryReason =
   | 'table_row_index_out_of_range'
 
 export type RichEditorTransformRecoveryReason =
+  | 'block_type_mismatch'
   | 'block_missing_id'
   | 'dom_index_size'
   | 'dom_not_found'
@@ -105,7 +106,7 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
   {
     matches: (error) => isMessage(error, BLOCKNOTE_BLOCK_TYPE_MISMATCH_ERROR),
     reason: 'block_type_mismatch',
-    surfaces: ['render'],
+    surfaces: ['render', 'transform'],
   },
   {
     matches: (error) => messageIncludes(error, BLOCKNOTE_MISSING_ID_ERROR),
