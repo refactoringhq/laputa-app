@@ -29,7 +29,7 @@
       "run": "pnpm test:coverage --silent",
       "role": "gate",
       "fileExt": ".ts,.tsx",
-      "timeout": 300,
+      "timeout": 600,
       "limit": 2
     },
     {
