@@ -905,13 +905,29 @@ describe('useVaultLoader', () => {
     })
 
     it('refreshes modified files list', async () => {
-      const { result } = await renderVaultLoader()
+      let statusCalls = 0
+      backendInvokeFn.mockImplementation(((cmd: string) => {
+        if (isVaultLoadCommand(cmd)) return Promise.resolve(mockEntries)
+        if (cmd === 'list_vault_folders' || cmd === 'list_views') return Promise.resolve([])
+        if (cmd === 'get_modified_files') {
+          statusCalls += 1
+          return Promise.resolve(statusCalls === 1 ? [] : mockModifiedFiles)
+        }
+        return Promise.resolve(null)
+      }) as typeof defaultMockInvoke)
+
+      const { result } = renderHook(() => useVaultLoader('/vault'))
+      await waitForEntries(result)
+      await waitFor(() => {
+        expect(statusCalls).toBe(1)
+      })
 
       await act(async () => {
         await result.current.loadModifiedFiles()
       })
 
-      expect(result.current.modifiedFiles).toHaveLength(1)
+      await waitForModifiedFiles(result)
+      expect(statusCalls).toBe(2)
     })
 
     it('captures backend errors when modified files cannot be loaded', async () => {

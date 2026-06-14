@@ -7,9 +7,13 @@ pub const GETTING_STARTED_REPO_URL: &str =
 
 /// Default location for the Getting Started vault.
 pub fn default_vault_path() -> Result<PathBuf, String> {
-    dirs::document_dir()
+    documents_dir()
         .map(|d| d.join("Getting Started"))
         .ok_or_else(|| "Could not determine Documents directory".to_string())
+}
+
+fn documents_dir() -> Option<PathBuf> {
+    dirs::document_dir().or_else(|| dirs::home_dir().map(|home| home.join("Documents")))
 }
 
 const GETTING_STARTED_REQUIRED_CONFIG_FILES: [&str; 2] = ["type.md", "note.md"];
