@@ -6,8 +6,15 @@ use crate::ai_models::{normalize_ai_model_providers, AiModelProvider};
 
 const APP_CONFIG_DIR: &str = "com.tolaria.app";
 const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
-const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] =
-    &["claude_code", "codex", "opencode", "pi", "gemini", "kiro"];
+const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &[
+    "claude_code",
+    "codex",
+    "opencode",
+    "pi",
+    "gemini",
+    "kiro",
+    "hermes",
+];
 pub const DEFAULT_HIDE_GITIGNORED_FILES: bool = true;
 const SUPPORTED_NOTE_WIDTH_MODES: &[&str] = &["normal", "wide"];
 const SUPPORTED_DATE_DISPLAY_FORMATS: &[&str] = &["us", "european", "friendly", "iso"];
@@ -619,6 +626,15 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("gemini"));
+    }
+
+    #[test]
+    fn test_hermes_default_ai_agent_is_preserved() {
+        let loaded = save_and_reload(Settings {
+            default_ai_agent: Some("hermes".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("hermes"));
     }
 
     #[test]

@@ -13,6 +13,7 @@ pub enum AiAgentId {
     Pi,
     Gemini,
     Kiro,
+    Hermes,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -37,6 +38,7 @@ pub struct AiAgentsStatus {
     pub pi: AiAgentAvailability,
     pub gemini: AiAgentAvailability,
     pub kiro: AiAgentAvailability,
+    pub hermes: AiAgentAvailability,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -95,7 +97,7 @@ impl AiAgentStreamRequest {
 /// shell startup). Running them sequentially used to add ~5 s to cold start
 /// when no agents are installed. Fan them out across Tokio's blocking pool
 /// so the user-perceived wall time is the slowest single probe rather than
-/// the sum of all six.
+/// the sum of all supported probes.
 ///
 /// A panicking probe is mapped to `installed: false` so the IPC handler
 /// always returns a fully populated `AiAgentsStatus` and the frontend can
@@ -107,14 +109,16 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
     let pi = tokio::task::spawn_blocking(crate::pi_cli::check_cli);
     let gemini = tokio::task::spawn_blocking(crate::gemini_cli::check_cli);
     let kiro = tokio::task::spawn_blocking(crate::kiro_cli::check_cli);
+    let hermes = tokio::task::spawn_blocking(crate::hermes_cli::check_cli);
 
-    let (claude, codex, opencode, pi, gemini, kiro) = tokio::join!(
+    let (claude, codex, opencode, pi, gemini, kiro, hermes) = tokio::join!(
         availability_or_missing(claude, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(codex, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(opencode, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(pi, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(gemini, AI_AGENT_STATUS_PROBE_TIMEOUT),
-        availability_or_missing(kiro, AI_AGENT_STATUS_PROBE_TIMEOUT)
+        availability_or_missing(kiro, AI_AGENT_STATUS_PROBE_TIMEOUT),
+        availability_or_missing(hermes, AI_AGENT_STATUS_PROBE_TIMEOUT)
     );
 
     AiAgentsStatus {
@@ -124,6 +128,7 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
         pi,
         gemini,
         kiro,
+        hermes,
     }
 }
 
@@ -144,77 +149,83 @@ fn missing_availability() -> AiAgentAvailability {
     }
 }
 
-pub fn run_ai_agent_stream<F>(request: AiAgentStreamRequest, mut emit: F) -> Result<String, String>
+pub fn run_ai_agent_stream<F>(request: AiAgentStreamRequest, emit: F) -> Result<String, String>
 where
     F: FnMut(AiAgentStreamEvent),
 {
     let permission_mode = request.permission_mode();
     match request.agent {
-        AiAgentId::ClaudeCode => {
-            let mapped = crate::claude_cli::AgentStreamRequest {
-                message: request.message,
-                system_prompt: request.system_prompt,
-                vault_path: request.vault_path,
-                vault_paths: request.vault_paths,
-                permission_mode,
-            };
-            crate::claude_cli::run_agent_stream(mapped, |event| {
-                if let Some(mapped_event) = map_claude_event(event) {
-                    emit(mapped_event);
-                }
-            })
-        }
-        AiAgentId::Codex => {
-            let mapped = crate::codex_cli::AgentStreamRequest {
-                message: request.message,
-                system_prompt: request.system_prompt,
-                vault_path: request.vault_path,
-                vault_paths: request.vault_paths,
-                permission_mode,
-            };
-            crate::codex_cli::run_agent_stream(mapped, emit)
-        }
-        AiAgentId::Opencode => {
-            let mapped = crate::opencode_cli::AgentStreamRequest {
-                message: request.message,
-                system_prompt: request.system_prompt,
-                vault_path: request.vault_path,
-                vault_paths: request.vault_paths,
-                permission_mode,
-            };
-            crate::opencode_cli::run_agent_stream(mapped, emit)
-        }
-        AiAgentId::Pi => {
-            let mapped = crate::pi_cli::AgentStreamRequest {
-                message: request.message,
-                system_prompt: request.system_prompt,
-                vault_path: request.vault_path,
-                vault_paths: request.vault_paths,
-                permission_mode,
-            };
-            crate::pi_cli::run_agent_stream(mapped, emit)
-        }
-        AiAgentId::Gemini => {
-            let mapped = crate::gemini_cli::AgentStreamRequest {
-                message: request.message,
-                system_prompt: request.system_prompt,
-                vault_path: request.vault_path,
-                vault_paths: request.vault_paths,
-                permission_mode,
-            };
-            crate::gemini_cli::run_agent_stream(mapped, emit)
-        }
-        AiAgentId::Kiro => run_kiro_agent_stream(request, permission_mode, emit),
+        AiAgentId::ClaudeCode => run_claude_agent_stream(request, permission_mode, emit),
+        AiAgentId::Codex => run_shared_agent_stream(
+            request,
+            permission_mode,
+            crate::codex_cli::run_agent_stream,
+            emit,
+        ),
+        AiAgentId::Opencode => run_shared_agent_stream(
+            request,
+            permission_mode,
+            crate::opencode_cli::run_agent_stream,
+            emit,
+        ),
+        AiAgentId::Pi => run_shared_agent_stream(
+            request,
+            permission_mode,
+            crate::pi_cli::run_agent_stream,
+            emit,
+        ),
+        AiAgentId::Gemini => run_shared_agent_stream(
+            request,
+            permission_mode,
+            crate::gemini_cli::run_agent_stream,
+            emit,
+        ),
+        AiAgentId::Kiro => run_shared_agent_stream(
+            request,
+            permission_mode,
+            crate::kiro_cli::run_agent_stream,
+            emit,
+        ),
+        AiAgentId::Hermes => run_shared_agent_stream(
+            request,
+            permission_mode,
+            crate::hermes_cli::run_agent_stream,
+            emit,
+        ),
     }
 }
 
-fn run_kiro_agent_stream<F>(
+fn run_claude_agent_stream<F>(
     request: AiAgentStreamRequest,
     permission_mode: AiAgentPermissionMode,
+    mut emit: F,
+) -> Result<String, String>
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    let mapped = crate::claude_cli::AgentStreamRequest {
+        message: request.message,
+        system_prompt: request.system_prompt,
+        vault_path: request.vault_path,
+        vault_paths: request.vault_paths,
+        permission_mode,
+    };
+    crate::claude_cli::run_agent_stream(mapped, |event| {
+        if let Some(mapped_event) = map_claude_event(event) {
+            emit(mapped_event);
+        }
+    })
+}
+
+fn run_shared_agent_stream<F, R>(
+    request: AiAgentStreamRequest,
+    permission_mode: AiAgentPermissionMode,
+    runner: R,
     emit: F,
 ) -> Result<String, String>
 where
     F: FnMut(AiAgentStreamEvent),
+    R: FnOnce(crate::cli_agent_runtime::AgentStreamRequest, F) -> Result<String, String>,
 {
     let mapped = crate::cli_agent_runtime::AgentStreamRequest {
         message: request.message,
@@ -223,7 +234,7 @@ where
         vault_paths: request.vault_paths,
         permission_mode,
     };
-    crate::kiro_cli::run_agent_stream(mapped, emit)
+    runner(mapped, emit)
 }
 
 fn availability_from_claude() -> AiAgentAvailability {
@@ -308,6 +319,7 @@ mod tests {
             status.pi.installed,
             status.gemini.installed,
             status.kiro.installed,
+            status.hermes.installed,
         ];
 
         assert!(install_flags
