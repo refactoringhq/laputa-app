@@ -39,7 +39,7 @@ Keep native macOS Tauri QA outside Chunk. The sidecar is Linux-based and is mean
 
 The local pre-push hook prefers the sidecar fast path when Chunk is available. It targets three independent sidecars by name and always passes `--sidecar-id` after resolution, avoiding races with Chunk's global active-sidecar state:
 
-- `tolaria-hooks-frontend-2`: lint and build first, then frontend coverage with `VITEST_COVERAGE_MAX_WORKERS=2`.
+- `tolaria-hooks-frontend-2`: lint and build first, then frontend coverage with `FRONTEND_COVERAGE_SHARDS=2` and `VITEST_COVERAGE_MAX_WORKERS=2`.
 - `tolaria-hooks-rust`: clippy, rustfmt, and `cargo llvm-cov` with `CARGO_BUILD_JOBS=2`.
 - `tolaria-hooks-playwright`: curated Playwright smoke with one shared Vite server, eight shards, and four concurrent shard workers.
 
@@ -51,4 +51,13 @@ The lane launcher uses `chunk sidecar exec` only to start detached remote lane p
 bash .chunk/run-sidecar-gates-local.sh true
 ```
 
-Latest measured passing run: lane runtime 444s, external wall time 457s including sync. Warm Rust completed in 40s, Playwright smoke in 104s, and frontend coverage remained the long pole at 441s. A previous Playwright run exposed `tests/smoke/h1-title-decoupled.spec.ts` as flaky on sidecar, so it remains in regression coverage but is no longer part of the curated smoke lane.
+Latest measured passing run with two frontend coverage shards: lane runtime 318s including sync, frontend completed in 313s, and Playwright smoke completed in 104s. The previous single-coverage frontend path took 441s with 457s external wall time, so the two-shard experiment reduced the sidecar long pole by about 29%. A previous Playwright run exposed `tests/smoke/h1-title-decoupled.spec.ts` as flaky on sidecar, so it remains in regression coverage but is no longer part of the curated smoke lane.
+
+To compare the frontend coverage experiment against the old single coverage run, use:
+
+```bash
+FRONTEND_COVERAGE_SHARDS=1 bash .chunk/run-sidecar-gates-local.sh false
+FRONTEND_COVERAGE_SHARDS=2 bash .chunk/run-sidecar-gates-local.sh false
+```
+
+The default sidecar fast path uses two frontend coverage shards. Each shard disables per-shard coverage thresholds, then the merged V8/Istanbul coverage map is checked once against the same 70% line/function/branch/statement thresholds.

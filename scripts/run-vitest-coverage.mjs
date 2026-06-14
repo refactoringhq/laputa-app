@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 import { cp, mkdir, rm } from 'node:fs/promises'
+import console from 'node:console'
 import os from 'node:os'
+import process from 'node:process'
 import { resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 
 const rootDir = process.cwd()
-const finalCoverageDir = resolve(rootDir, 'coverage')
+const finalCoverageDir = resolve(rootDir, process.env.VITEST_COVERAGE_FINAL_DIR ?? 'coverage')
 const coverageRunRoot = resolve(os.tmpdir(), 'tolaria-vitest-coverage-runs')
 const forwardedArgs = process.argv.slice(2)
 const hasFileParallelismOverride = forwardedArgs.some((arg) =>
@@ -15,7 +17,13 @@ const hasFileParallelismOverride = forwardedArgs.some((arg) =>
 const hasMaxWorkersOverride = forwardedArgs.some((arg) =>
   arg === '--maxWorkers' || arg.startsWith('--maxWorkers=')
 )
+const hasShardOverride = forwardedArgs.some((arg) =>
+  arg === '--shard' || arg.startsWith('--shard=')
+)
 const defaultMaxWorkers = resolveDefaultMaxWorkers()
+const coverageShard = process.env.VITEST_COVERAGE_SHARD?.trim() ?? ''
+const skipCoverageThresholds = process.env.VITEST_COVERAGE_SKIP_THRESHOLDS === '1'
+const skipClearCache = process.env.VITEST_COVERAGE_SKIP_CLEAR_CACHE === '1'
 const maxAttempts = 2
 
 // Standalone pnpm installs ship a native binary, so npm_execpath points at
@@ -57,6 +65,19 @@ function resolveDefaultMaxWorkers() {
   return '4'
 }
 
+function isValidCoverageShard(value) {
+  return /^[1-9][0-9]*\/[1-9][0-9]*$/.test(value)
+}
+
+function coverageThresholdOverrideArgs() {
+  return [
+    '--coverage.thresholds.lines=0',
+    '--coverage.thresholds.functions=0',
+    '--coverage.thresholds.branches=0',
+    '--coverage.thresholds.statements=0',
+  ]
+}
+
 async function runCoverageAttempt(attempt) {
   const runId = `${Date.now()}-${process.pid}-${attempt}`
   const runCoverageDir = resolve(coverageRunRoot, runId)
@@ -65,7 +86,9 @@ async function runCoverageAttempt(attempt) {
   await mkdir(runCoverageDir, { recursive: true })
   // Vitest writes per-worker coverage shards under reportsDirectory/.tmp.
   await mkdir(runCoverageTempDir, { recursive: true })
-  await clearVitestCache()
+  if (!skipClearCache) {
+    await clearVitestCache()
+  }
 
   const commandArgs = [
     ...baseCommandArgs,
@@ -74,6 +97,8 @@ async function runCoverageAttempt(attempt) {
     // file parallelism. Callers can still opt into serial or wider runs.
     ...(hasFileParallelismOverride ? [] : ['--fileParallelism']),
     ...(hasMaxWorkersOverride ? [] : [`--maxWorkers=${defaultMaxWorkers}`]),
+    ...(coverageShard && !hasShardOverride ? [`--shard=${coverageShard}`] : []),
+    ...(skipCoverageThresholds ? coverageThresholdOverrideArgs() : []),
     `--coverage.reportsDirectory=${runCoverageDir}`,
     ...forwardedArgs,
   ]
@@ -141,6 +166,11 @@ async function clearVitestCache() {
   if (exitCode !== 0) {
     throw new Error(`Vitest cache clear failed with exit code ${exitCode}`)
   }
+}
+
+if (coverageShard && !isValidCoverageShard(coverageShard)) {
+  console.error(`Invalid VITEST_COVERAGE_SHARD=${JSON.stringify(coverageShard)}; expected index/total`)
+  process.exit(2)
 }
 
 let finalRun = null
