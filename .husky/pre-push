@@ -65,14 +65,9 @@ ensure_node_tooling() {
 }
 
 require_main_push() {
-  if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
-    echo "❌ Pushes must happen from main. Detached HEAD is not allowed."
-    exit 1
-  fi
-
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-  if [ "$CURRENT_BRANCH" != "main" ]; then
-    echo "❌ Pushes must happen from main. Current branch: $CURRENT_BRANCH"
+  if [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "HEAD" ]; then
+    echo "❌ Pushes must happen from main or a detached HEAD that is pushed directly to main. Current branch: $CURRENT_BRANCH"
     exit 1
   fi
 
@@ -81,6 +76,8 @@ require_main_push() {
 
     case "$LOCAL_REF:$REMOTE_REF" in
       refs/heads/main:refs/heads/main)
+        ;;
+      HEAD:refs/heads/main)
         ;;
       refs/tags/*:refs/tags/*)
         ;;
@@ -102,7 +99,6 @@ else
 fi
 require_main_push
 ensure_node_tooling
-ensure_cargo_tooling
 
 START_TIME=$(date +%s)
 
@@ -152,71 +148,103 @@ if [ "$APP_CHANGED" = false ]; then
   exit 0
 fi
 
-# ── 0. Frontend lint ───────────────────────────────────────────────────
-echo ""
-echo "🔎 [0/6] Frontend lint..."
-pnpm lint
-echo "  ✅ Lint OK"
+run_sidecar_automatic_checks() {
+  if [ "${LAPUTA_PREPUSH_LOCAL:-0}" = "1" ]; then
+    echo "☁️  Chunk sidecar checks disabled by LAPUTA_PREPUSH_LOCAL=1"
+    return 1
+  fi
 
-# ── 1. TypeScript + Vite build ──────────────────────────────────────────
-echo ""
-echo "📦 [1/6] TypeScript + Vite build..."
-pnpm build
-echo "  ✅ Build OK"
+  if ! command -v bash >/dev/null 2>&1; then
+    echo "☁️  bash not found; falling back to local automatic checks"
+    return 1
+  fi
 
-# ── 2. Frontend coverage (≥70%) — includes all unit tests ───────────────
-echo ""
-echo "📊 [2/6] Frontend tests + coverage (≥70%)..."
-pnpm test:coverage --silent
-echo "  ✅ Frontend coverage OK"
+  echo ""
+  echo "☁️  Running automatic checks on Chunk sidecar..."
+  if bash .chunk/run-sidecar-gates-local.sh "$RUST_CHANGED"; then
+    echo "  ✅ Chunk sidecar automatic checks OK"
+    return 0
+  fi
 
-# ── 3. Rust lint (clippy + fmt) — fast, run before coverage ─────────────
-echo ""
-if [ "$RUST_CHANGED" = true ]; then
-  echo "🔧 [3/6] Clippy + rustfmt..."
-  cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
-  cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check
-  echo "  ✅ Rust lint OK"
-else
-  echo "⏭️  [3/6] Rust lint — skipped (no src-tauri/ changes)"
-fi
+  SIDECAR_STATUS=$?
+  if [ "$SIDECAR_STATUS" -eq 86 ]; then
+    echo "  ⚠️  Chunk sidecar unavailable; falling back to local automatic checks"
+    return 1
+  fi
 
-# ── 4. Rust coverage (≥85% lines) ──────────────────────────────────────
-echo ""
-if [ "$RUST_CHANGED" = true ]; then
-  LLVM_COV_FLAGS="--no-clean"
-  if [ "${LAPUTA_FULL_COVERAGE:-0}" = "1" ]; then
-    LLVM_COV_FLAGS=""
-    echo "🦀 [4/6] Rust coverage — FULL (LAPUTA_FULL_COVERAGE=1)..."
+  echo "  ❌ Chunk sidecar automatic checks FAILED"
+  exit "$SIDECAR_STATUS"
+}
+
+if ! run_sidecar_automatic_checks; then
+  ensure_cargo_tooling
+
+  # ── 0. Frontend lint ───────────────────────────────────────────────────
+  echo ""
+  echo "🔎 [0/6] Frontend lint..."
+  pnpm lint
+  echo "  ✅ Lint OK"
+
+  # ── 1. TypeScript + Vite build ──────────────────────────────────────────
+  echo ""
+  echo "📦 [1/6] TypeScript + Vite build..."
+  pnpm build
+  echo "  ✅ Build OK"
+
+  # ── 2. Frontend coverage (≥70%) — includes all unit tests ───────────────
+  echo ""
+  echo "📊 [2/6] Frontend tests + coverage (≥70%)..."
+  pnpm test:coverage --silent
+  echo "  ✅ Frontend coverage OK"
+
+  # ── 3. Rust lint (clippy + fmt) — fast, run before coverage ─────────────
+  echo ""
+  if [ "$RUST_CHANGED" = true ]; then
+    echo "🔧 [3/6] Clippy + rustfmt..."
+    cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
+    cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check
+    echo "  ✅ Rust lint OK"
   else
-    echo "🦀 [4/6] Rust coverage (≥85%, incremental)..."
+    echo "⏭️  [3/6] Rust lint — skipped (no src-tauri/ changes)"
   fi
-  # Unset GIT_DIR so git tests create isolated repos without inheriting hook context
-  unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
-  # shellcheck disable=SC2086
-  cargo llvm-cov \
-    --manifest-path src-tauri/Cargo.toml \
-    $LLVM_COV_FLAGS \
-    --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" \
-    --fail-under-lines 85 \
-    -- --test-threads=1
-  echo "  ✅ Rust coverage OK"
-else
-  echo "⏭️  [4/6] Rust coverage — skipped (no src-tauri/ changes)"
-fi
 
-# ── 5. Playwright core smoke lane (if any exist) ──────────────────────
-echo ""
-SMOKE_FILES=$(find tests/smoke tests/integration -name '*.spec.ts' 2>/dev/null | head -1)
-if [ -n "$SMOKE_FILES" ]; then
-  echo "🎭 [5/6] Playwright core smoke tests..."
-  if ! pnpm playwright:smoke; then
-    echo "  ❌ Core smoke tests FAILED"
-    exit 1
+  # ── 4. Rust coverage (≥85% lines) ──────────────────────────────────────
+  echo ""
+  if [ "$RUST_CHANGED" = true ]; then
+    LLVM_COV_FLAGS="--no-clean"
+    if [ "${LAPUTA_FULL_COVERAGE:-0}" = "1" ]; then
+      LLVM_COV_FLAGS=""
+      echo "🦀 [4/6] Rust coverage — FULL (LAPUTA_FULL_COVERAGE=1)..."
+    else
+      echo "🦀 [4/6] Rust coverage (≥85%, incremental)..."
+    fi
+    # Unset GIT_DIR so git tests create isolated repos without inheriting hook context
+    unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+    # shellcheck disable=SC2086
+    cargo llvm-cov \
+      --manifest-path src-tauri/Cargo.toml \
+      $LLVM_COV_FLAGS \
+      --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" \
+      --fail-under-lines 85 \
+      -- --test-threads=1
+    echo "  ✅ Rust coverage OK"
+  else
+    echo "⏭️  [4/6] Rust coverage — skipped (no src-tauri/ changes)"
   fi
-  echo "  ✅ Core smoke tests OK"
-else
-  echo "⏭️  [5/6] Playwright core smoke tests — skipped (no tests/**/*.spec.ts)"
+
+  # ── 5. Playwright core smoke lane (if any exist) ──────────────────────
+  echo ""
+  SMOKE_FILES=$(find tests/smoke tests/integration -name '*.spec.ts' 2>/dev/null | head -1)
+  if [ -n "$SMOKE_FILES" ]; then
+    echo "🎭 [5/6] Playwright core smoke tests..."
+    if ! pnpm playwright:smoke; then
+      echo "  ❌ Core smoke tests FAILED"
+      exit 1
+    fi
+    echo "  ✅ Core smoke tests OK"
+  else
+    echo "⏭️  [5/6] Playwright core smoke tests — skipped (no tests/**/*.spec.ts)"
+  fi
 fi
 
 # ── 6. CodeScene code health gate (ratchet) ──────────────────────────────
