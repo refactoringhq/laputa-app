@@ -15,6 +15,7 @@ const hasFileParallelismOverride = forwardedArgs.some((arg) =>
 const hasMaxWorkersOverride = forwardedArgs.some((arg) =>
   arg === '--maxWorkers' || arg.startsWith('--maxWorkers=')
 )
+const defaultMaxWorkers = resolveDefaultMaxWorkers()
 const maxAttempts = 2
 
 // Standalone pnpm installs ship a native binary, so npm_execpath points at
@@ -41,6 +42,21 @@ function appendCapturedOutput(output, chunk) {
   return nextOutput.length > 200_000 ? nextOutput.slice(-200_000) : nextOutput
 }
 
+function resolveDefaultMaxWorkers() {
+  const value = process.env.VITEST_COVERAGE_MAX_WORKERS?.trim()
+
+  if (!value) {
+    return '4'
+  }
+
+  if (/^[1-9][0-9]*%?$/.test(value)) {
+    return value
+  }
+
+  console.warn(`Ignoring invalid VITEST_COVERAGE_MAX_WORKERS=${JSON.stringify(value)}; using 4`)
+  return '4'
+}
+
 async function runCoverageAttempt(attempt) {
   const runId = `${Date.now()}-${process.pid}-${attempt}`
   const runCoverageDir = resolve(coverageRunRoot, runId)
@@ -57,7 +73,7 @@ async function runCoverageAttempt(attempt) {
     // contention that makes a few DOM-heavy suites time out under full
     // file parallelism. Callers can still opt into serial or wider runs.
     ...(hasFileParallelismOverride ? [] : ['--fileParallelism']),
-    ...(hasMaxWorkersOverride ? [] : ['--maxWorkers=4']),
+    ...(hasMaxWorkersOverride ? [] : [`--maxWorkers=${defaultMaxWorkers}`]),
     `--coverage.reportsDirectory=${runCoverageDir}`,
     ...forwardedArgs,
   ]

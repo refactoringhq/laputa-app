@@ -247,7 +247,7 @@ test.afterEach(async () => {
   removeFixtureVaultCopy(tempVaultDir)
 })
 
-test('@smoke new-note H1 auto-rename keeps the editor usable and leaves no untitled duplicates', async ({ page }) => {
+test('new-note H1 auto-rename keeps the editor usable and leaves no untitled duplicates', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => {
     errors.push(err.message)
@@ -299,7 +299,7 @@ test('@smoke new-note H1 auto-rename keeps the editor usable and leaves no untit
   expect(errors).toEqual([])
 })
 
-test('@smoke new-note short title typing and rich heading paste stay in the H1 until Enter', async ({ page }) => {
+test('new-note short title typing and rich heading paste stay in the H1 until Enter', async ({ page }) => {
   const errors = collectReactUpdateLoopErrors(page)
   const titleStart = 'Obsi'
   const title = 'Obsidian'
@@ -360,7 +360,7 @@ test('@smoke new-note typing stays focused through initial save settlement', asy
   })
 })
 
-test('@smoke new-note editor mode roundtrip stays editable after auto-rename', async ({ page }) => {
+test('new-note editor mode roundtrip stays editable after auto-rename', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => {
     errors.push(err.message)
@@ -398,7 +398,7 @@ test('@smoke new-note editor mode roundtrip stays editable after auto-rename', a
   expect(errors).toEqual([])
 })
 
-test('@smoke new-note H1 auto-rename preserves body typing and cursor while rename lands', async ({ page }) => {
+test('new-note H1 auto-rename preserves body typing and cursor while rename lands', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => {
     errors.push(err.message)
@@ -434,7 +434,7 @@ test('@smoke new-note H1 auto-rename preserves body typing and cursor while rena
   await expect(errors).toEqual([])
 })
 
-test('@smoke fresh-note Enter stays stable after autosave and editor chrome clicks', async ({ page }) => {
+test('fresh-note Enter stays stable after autosave and editor chrome clicks', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => {
     errors.push(err.message)

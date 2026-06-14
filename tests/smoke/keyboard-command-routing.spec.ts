@@ -139,14 +139,14 @@ test.describe('keyboard command routing', () => {
     expect(runtimeStyleCspSignals).toEqual([])
   })
 
-  test('desktop menu-command bridge toggles the properties panel through the shared command path @smoke', async ({ page }) => {
+  test('desktop menu-command bridge toggles the properties panel through the shared command path', async ({ page }) => {
     await openAlphaProjectInEditor(page)
     await expectPropertiesPanelToggle(page, async () => {
       await triggerMenuCommand(page, APP_COMMAND_IDS.viewToggleProperties)
     })
   })
 
-  test('desktop keyboard shortcut toggles the properties panel through the renderer shortcut path @smoke', async ({ page }) => {
+  test('desktop keyboard shortcut toggles the properties panel through the renderer shortcut path', async ({ page }) => {
     await openAlphaProjectInEditor(page)
     await expectPropertiesPanelToggle(page, async () => {
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Shift+I' : 'Control+Shift+I')
@@ -176,7 +176,7 @@ test.describe('keyboard command routing', () => {
     await expect(page.locator('input[placeholder="Search notes..."]')).toBeFocused()
   })
 
-  test('quick open ignores a stationary pointer until it moves @smoke', async ({ page }) => {
+  test('quick open ignores a stationary pointer until it moves', async ({ page }) => {
     await openFixtureVaultDesktopHarness(page, tempVaultDir)
     await openQuickOpenFromKeyboard(page)
 
@@ -232,7 +232,7 @@ test.describe('keyboard command routing', () => {
     await expectSelectedSearchResult(page, 'Second Search Result')
   })
 
-  test('desktop menu-command bridge toggles organized state through the shared command path @smoke', async ({ page }) => {
+  test('desktop menu-command bridge toggles organized state through the shared command path', async ({ page }) => {
     await openAlphaProjectInEditor(page)
 
     await expect(page.getByRole('button', { name: 'Set note as organized' })).toBeVisible({ timeout: 5_000 })
@@ -244,7 +244,7 @@ test.describe('keyboard command routing', () => {
     await expect(page.getByRole('button', { name: 'Set note as organized' })).toBeVisible({ timeout: 5_000 })
   })
 
-  test('app command bridge undoes and redoes organized state through action history @smoke', async ({ page }) => {
+  test('app command bridge undoes and redoes organized state through action history', async ({ page }) => {
     await openAlphaProjectInEditor(page)
 
     await triggerMenuCommand(page, APP_COMMAND_IDS.noteToggleOrganized)
@@ -257,7 +257,7 @@ test.describe('keyboard command routing', () => {
     await expect(page.getByRole('button', { name: 'Set note as not organized' })).toBeVisible({ timeout: 5_000 })
   })
 
-  test('renderer shortcut bridge toggles the raw editor through the shared keyboard handler @smoke', async ({ page }) => {
+  test('renderer shortcut bridge toggles the raw editor through the shared keyboard handler', async ({ page }) => {
     const runtimeStyleCspSignals = collectRuntimeStyleCspSignals(page)
 
     await openAlphaProjectInEditor(page)
@@ -281,7 +281,7 @@ test.describe('keyboard command routing', () => {
     expect(runtimeStyleCspSignals).toEqual([])
   })
 
-  test('desktop menu-command bridge toggles the AI panel, while the wrong modifier event does not @smoke', async ({ page }) => {
+  test('desktop menu-command bridge toggles the AI panel, while the wrong modifier event does not', async ({ page }) => {
     await openAlphaProjectInEditor(page)
 
     await dispatchShortcutEvent(page, {

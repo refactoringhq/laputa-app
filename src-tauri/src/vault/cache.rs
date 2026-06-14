@@ -148,13 +148,35 @@ fn parse_porcelain_line(line: &str) -> Option<(&str, String)> {
     Some((&line[..2], line[3..].trim().to_string()))
 }
 
+fn push_changed_path_prefer_existing(paths: &mut Vec<String>, vault: &Path, path: &str) {
+    let normalized = super::path_identity::normalize_relative_path(path);
+    if normalized.is_empty() || super::path_identity::has_hidden_segment(&normalized) {
+        return;
+    }
+
+    let key = relative_path_key(&normalized);
+    if let Some(existing_index) = paths
+        .iter()
+        .position(|existing| relative_path_key(existing) == key)
+    {
+        let existing_path = vault.join(&paths[existing_index]);
+        let candidate_path = vault.join(&normalized);
+        if !existing_path.is_file() && candidate_path.is_file() {
+            paths[existing_index] = normalized;
+        }
+        return;
+    }
+
+    paths.push(normalized);
+}
+
 /// Extract file paths from git diff --name-only output.
 /// Includes all non-hidden files (not just .md) so the cache picks up
 /// view files (.yml), binary assets, etc.
-fn collect_paths_from_diff(stdout: &str) -> Vec<String> {
+fn collect_paths_from_diff(vault: &Path, stdout: &str) -> Vec<String> {
     let mut paths = Vec::new();
     for line in stdout.lines() {
-        push_unique_relative_path(&mut paths, line);
+        push_changed_path_prefer_existing(&mut paths, vault, line);
     }
     paths
 }
@@ -173,7 +195,7 @@ fn collect_paths_from_porcelain(stdout: &str) -> Vec<String> {
 fn git_changed_files(vault: &Path, from_hash: &str, to_hash: &str) -> Vec<String> {
     let diff_arg = format!("{}..{}", from_hash, to_hash);
     let mut files = run_git(vault, &["diff", &diff_arg, "--name-only"])
-        .map(|s| collect_paths_from_diff(&s))
+        .map(|s| collect_paths_from_diff(vault, &s))
         .unwrap_or_default();
 
     // Include uncommitted changes (modified, staged, and untracked files).
