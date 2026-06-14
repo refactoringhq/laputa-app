@@ -12,6 +12,7 @@ import {
   type AppCommandHandlers,
 } from './appCommandDispatcher'
 import {
+  APP_COMMAND_DEFINITIONS,
   getDeterministicShortcutQaDefinition,
   APP_COMMAND_MENU_SECTIONS,
   APP_COMMAND_MENU_STATE_GROUPS,
@@ -142,6 +143,16 @@ describe('appCommandDispatcher', () => {
     expect(findShortcutCommandId('command-or-ctrl-shift', '¬', 'KeyL')).toBe(APP_COMMAND_IDS.viewToggleAiChat)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'T', 'KeyT')).toBe(APP_COMMAND_IDS.viewToggleTableOfContents)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'v', 'KeyV')).toBe(APP_COMMAND_IDS.editPastePlainText)
+  })
+
+  it('routes every shortcut-capable command through the dispatcher', () => {
+    for (const commandId of Object.values(APP_COMMAND_IDS)) {
+      if (!APP_COMMAND_DEFINITIONS[commandId].shortcut) continue
+
+      const handlers = makeHandlers()
+      const handled = dispatchAppCommand(commandId, handlers)
+      expect(handled, `shortcut command ${commandId} should dispatch through a handler`).toBe(true)
+    }
   })
 
   it('gives every shortcut command an explicit deterministic QA strategy', () => {
