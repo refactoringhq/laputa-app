@@ -36,6 +36,7 @@ stop_shared_server() {
 
 cleanup() {
   local status=$?
+  trap - EXIT INT TERM
 
   for pid in "${batch_pids[@]:-}"; do
     kill -TERM "$pid" 2>/dev/null || true
@@ -52,7 +53,7 @@ cleanup() {
   exit "$status"
 }
 
-trap cleanup INT TERM
+trap cleanup EXIT INT TERM
 
 wait_for_shared_server() {
   local deadline=$((SECONDS + 30))
