@@ -26,6 +26,7 @@ import { SidebarGroupHeader } from './SidebarGroupHeader'
 import { SidebarViewItem } from './SidebarViewItem'
 import { computeReorder } from './sidebarHooks'
 import { SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM } from './sidebarStyles'
+import { getContextMenuPositionStyle } from '../contextMenuPosition'
 import { countByFilter } from '../../utils/noteListHelpers'
 import { viewIdentityKey, viewSelectionForView } from '../../utils/viewIdentity'
 import { translate, type AppLocale } from '../../lib/i18n'
@@ -40,9 +41,9 @@ const SIDEBAR_COLLAPSE_SHORTCUT = getAppCommandShortcutDisplay(APP_COMMAND_IDS.v
 const HISTORY_BACK_SHORTCUT = getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewGoBack)
 const HISTORY_FORWARD_SHORTCUT = getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewGoForward)
 const SIDEBAR_TYPE_CONTEXT_MENU_SURFACE_CLASSNAME =
-  'fixed z-50 w-max min-w-[min(11.25rem,calc(100vw-16px))] max-w-[min(22rem,calc(100vw-16px))] rounded-md border bg-popover p-1 shadow-md'
+  'fixed z-50 inline-flex w-fit max-w-[calc(100vw-16px)] flex-col rounded-md border bg-popover p-1 shadow-md'
 const SIDEBAR_TYPE_CONTEXT_MENU_BUTTON_CLASSNAME =
-  'h-auto w-full max-w-full justify-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm font-normal'
+  'h-auto w-auto max-w-full justify-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm font-normal'
 
 export interface SidebarSectionProps {
   entries: VaultEntry[]
@@ -458,7 +459,7 @@ export function ContextMenuOverlay({
     <div
       ref={innerRef}
       className={SIDEBAR_TYPE_CONTEXT_MENU_SURFACE_CLASSNAME}
-      style={{ left: pos.x, top: pos.y }}
+      style={getContextMenuPositionStyle(pos)}
       data-testid="sidebar-type-context-menu"
     >
       <Button

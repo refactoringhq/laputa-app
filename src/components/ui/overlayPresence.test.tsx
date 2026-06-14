@@ -63,7 +63,7 @@ describe('overlay presence stability', () => {
     expect(document.documentElement.style.getPropertyValue('--tolaria-overlay-zoom-inverse')).toBe(String(100 / 110))
   })
 
-  it('compensates tooltip popper wrapper positioning without cancelling content zoom', async () => {
+  it('keeps tooltip positioning and arrow geometry in the same Radix shell', async () => {
     document.documentElement.style.setProperty('--tolaria-overlay-zoom-factor', '1.4')
     document.documentElement.style.setProperty('--tolaria-overlay-zoom-inverse', String(1 / 1.4))
 
@@ -80,14 +80,16 @@ describe('overlay presence stability', () => {
 
     const positionShell = document.querySelector('[data-slot="tooltip-content"]') as HTMLElement
     const positionWrapper = positionShell.parentElement as HTMLElement
-    const visualShell = document.querySelector('[data-slot="tooltip-visual-scale"]') as HTMLElement
     expect(positionWrapper).toHaveAttribute('data-radix-popper-content-wrapper')
     await waitFor(() => {
-      expect(positionWrapper).toHaveAttribute('data-tolaria-tooltip-position-zoom', 'inverse')
-      expect(positionWrapper.style.getPropertyValue('--tolaria-tooltip-wrapper-zoom')).toBe('var(--tolaria-overlay-zoom-inverse, 1)')
+      expect(positionWrapper.style.transform).toContain('translate')
     })
+    expect(positionWrapper).not.toHaveAttribute('data-tolaria-tooltip-position-zoom')
+    expect(positionWrapper.style.getPropertyValue('--tolaria-tooltip-wrapper-zoom')).toBe('')
+    expect(positionWrapper.style.getPropertyValue('zoom')).toBe('')
     expect(positionShell.className).not.toContain('[zoom:var(--tolaria-overlay-zoom-inverse,1)]')
-    expect(visualShell.className).toContain('[zoom:var(--tolaria-overlay-zoom-factor,1)]')
+    expect(positionShell.className).not.toContain('[zoom:var(--tolaria-overlay-zoom-factor,1)]')
+    expect(document.querySelector('[data-slot="tooltip-visual-scale"]')).not.toBeInTheDocument()
   })
 
   it('keeps popover content free of Radix presence animation classes', () => {
