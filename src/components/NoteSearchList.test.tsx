@@ -198,8 +198,22 @@ describe('NoteSearchList', () => {
 
   it('calls onItemHover when the mouse actually moves over an item', () => {
     renderList({ itemHover: onItemHover })
-    fireEvent.mouseMove(screen.getByText('Gamma Experiment'))
+    fireEvent.mouseMove(screen.getByText('Gamma Experiment'), { clientX: 10, clientY: 10 })
+    fireEvent.mouseMove(screen.getByText('Gamma Experiment'), { clientX: 10, clientY: 11 })
     expect(onItemHover).toHaveBeenCalledWith(2)
+  })
+
+  it('does not call onItemHover for a zero-delta mousemove after a keyboard-opened list appears', () => {
+    renderList({ itemHover: onItemHover })
+
+    fireEvent.mouseMove(screen.getByText('Gamma Experiment'), {
+      clientX: 10,
+      clientY: 10,
+      screenX: 10,
+      screenY: 10,
+    })
+
+    expect(onItemHover).not.toHaveBeenCalled()
   })
 
   it('highlights selected item with accent background', () => {
