@@ -80,6 +80,16 @@ describe('Sidebar Type row actions', () => {
     expect(screen.getByText('Delete type')).toBeInTheDocument()
   })
 
+  it('sizes the type context menu to visible actions instead of filling the viewport', () => {
+    openProjectsContextMenu()
+
+    const menu = screen.getByTestId('sidebar-type-context-menu')
+    expect(menu).toHaveClass('w-max')
+    expect(menu).toHaveClass('min-w-[min(11.25rem,calc(100vw-16px))]')
+    expect(menu).toHaveClass('max-w-[min(22rem,calc(100vw-16px))]')
+    expect(menu.style.minWidth).toBe('')
+  })
+
   it('dismisses the type context menu on Escape', () => {
     openProjectsContextMenu()
     fireEvent.keyDown(document, { key: 'Escape' })
