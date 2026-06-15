@@ -164,6 +164,18 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { clearParsedNoteBlockCache } from '../hooks/editorParsedBlockCache'
 
 type EditorComponentProps = ComponentProps<typeof Editor>
+type BlockNotePasteHandlerOptions = {
+  plainTextAsMarkdown?: boolean
+  prioritizeMarkdownOverHTML?: boolean
+}
+type BlockNotePasteHandlerContext = {
+  defaultPasteHandler: (options?: BlockNotePasteHandlerOptions) => boolean | undefined
+  editor: { pasteText: (text: string) => boolean | undefined }
+  event: ClipboardEvent
+}
+type BlockNoteCreationOptions = {
+  pasteHandler?: (context: BlockNotePasteHandlerContext) => boolean | undefined
+}
 
 function render(ui: ReactElement) {
   return rtlRender(ui, { wrapper: TooltipProvider })
@@ -233,6 +245,42 @@ function renderEditor(overrides: Partial<EditorComponentProps> = {}) {
   return render(<Editor {...defaultProps} {...overrides} />)
 }
 
+function latestBlockNoteOptions(): BlockNoteCreationOptions {
+  const options = blockNoteCreation.options.at(-1)
+  if (!options || typeof options !== 'object') {
+    throw new Error('BlockNote editor was not created')
+  }
+  return options as BlockNoteCreationOptions
+}
+
+function clipboardEventForPlainText(text: string): ClipboardEvent {
+  const clipboardData = {
+    getData: vi.fn((type: string) => type === 'text/plain' ? text : ''),
+    types: ['text/plain'],
+  }
+
+  return { clipboardData } as unknown as ClipboardEvent
+}
+
+function runConfiguredPlainTextPaste(text: string) {
+  renderEditor()
+
+  const pasteHandler = latestBlockNoteOptions().pasteHandler
+  if (!pasteHandler) {
+    throw new Error('BlockNote paste handler was not configured')
+  }
+
+  const pasteText = vi.fn(() => true)
+  const defaultPasteHandler = vi.fn(() => true)
+  const handled = pasteHandler({
+    defaultPasteHandler,
+    editor: { pasteText },
+    event: clipboardEventForPlainText(text),
+  })
+
+  return { defaultPasteHandler, handled, pasteText }
+}
+
 async function flushEditorSwapWork() {
   for (let i = 0; i < 4; i += 1) {
     await act(async () => {
@@ -272,6 +320,21 @@ describe('Editor', () => {
 
     expect(dragRegion).toHaveAttribute('data-tauri-drag-region')
     expect(dragRegion).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('pastes SQL wildcard plain text without treating the asterisk as Markdown', () => {
+    const { defaultPasteHandler, handled, pasteText } = runConfiguredPlainTextPaste('SELECT * FROM OPENQUERY')
+
+    expect(handled).toBe(true)
+    expect(pasteText).toHaveBeenCalledWith('SELECT * FROM OPENQUERY')
+    expect(defaultPasteHandler).not.toHaveBeenCalled()
+  })
+
+  it('keeps plain Markdown emphasis on the BlockNote default paste path', () => {
+    const { defaultPasteHandler, pasteText } = runConfiguredPlainTextPaste('*italic*')
+
+    expect(defaultPasteHandler).toHaveBeenCalledTimes(1)
+    expect(pasteText).not.toHaveBeenCalled()
   })
 
   it.each([
