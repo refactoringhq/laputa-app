@@ -192,6 +192,20 @@ describe('main entrypoint', () => {
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack })
   })
 
+  it('suppresses caught BlockNote block-type mismatch render errors without component stacks', async () => {
+    await importEntrypoint()
+
+    const error = new Error('Block type does not match')
+    window.__tolariaFrontendReady = true
+
+    rootOptions().onCaughtError?.(error, {})
+    expect(mocks.sentryHandler).not.toHaveBeenCalled()
+    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+
+    rootOptions().onUncaughtError?.(error, {})
+    expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '' })
+  })
+
   it('suppresses recovered action tooltip render errors from Sentry', async () => {
     await importEntrypoint()
 
