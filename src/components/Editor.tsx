@@ -32,6 +32,7 @@ import {
 import { useRegisterEditorContentFlushes } from './editorContentFlushRegistration'
 import { useRawModeWithFlush } from './useRawModeWithFlush'
 import { createImeCompositionKeyGuardExtension } from './imeCompositionKeyGuardExtension'
+import { handleRichEditorPaste } from './richEditorPaste'
 import { createRichEditorMarkdownInputTransformExtension } from './richEditorInputTransformExtension'
 import { createRichEditorTransformErrorRecoveryExtension } from './richEditorTransformErrorRecoveryExtension'
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
@@ -221,6 +222,7 @@ function useEditorSetup({
     schema,
     domAttributes: RICH_EDITOR_BIDI_DOM_ATTRIBUTES,
     uploadFile: (file: File) => uploadImageFile(file, vaultPathRef.current),
+    pasteHandler: handleRichEditorPaste,
     _tiptapOptions: { injectNonce: RUNTIME_STYLE_NONCE },
     extensions: [
       createRichEditorTransformErrorRecoveryExtension(),
