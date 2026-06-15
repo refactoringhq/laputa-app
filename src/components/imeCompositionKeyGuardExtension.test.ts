@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createImeCompositionKeyGuardExtension,
+  shouldStopComposingParagraphInput,
   shouldStopComposingEnterKey,
 } from './imeCompositionKeyGuardExtension'
 
@@ -21,13 +22,35 @@ function createKeyboardEvent(event: Partial<KeyboardEvent> = {}) {
   }
 }
 
+function createInputEvent(event: Partial<InputEvent> = {}) {
+  return {
+    inputType: 'insertParagraph',
+    isComposing: false,
+    preventDefault: vi.fn(),
+    stopImmediatePropagation: vi.fn(),
+    timeStamp: 100,
+    ...event,
+  } as InputEvent & {
+    preventDefault: ReturnType<typeof vi.fn>
+    stopImmediatePropagation: ReturnType<typeof vi.fn>
+  }
+}
+
 function createFixture() {
   let keydownListener: KeyListener | null = null
+  let compositionEndListener: EventListener | null = null
+  let beforeInputListener: EventListener | null = null
   const view = { composing: false }
   const dom = {
-    addEventListener: vi.fn((type: string, listener: KeyListener) => {
+    addEventListener: vi.fn((type: string, listener: EventListener) => {
       if (type === 'keydown') {
-        keydownListener = listener
+        keydownListener = listener as KeyListener
+      }
+      if (type === 'compositionend') {
+        compositionEndListener = listener
+      }
+      if (type === 'beforeinput') {
+        beforeInputListener = listener
       }
     }),
   }
@@ -48,6 +71,22 @@ function createFixture() {
       const keyboardEvent = createKeyboardEvent(event)
       keydownListener(keyboardEvent)
       return keyboardEvent
+    },
+    fireCompositionEnd(event: Partial<CompositionEvent> = {}) {
+      if (!compositionEndListener) {
+        throw new Error('IME composition key guard did not register a compositionend listener')
+      }
+
+      compositionEndListener({ timeStamp: 100, ...event } as CompositionEvent)
+    },
+    fireBeforeInput(event: Partial<InputEvent> = {}) {
+      if (!beforeInputListener) {
+        throw new Error('IME composition key guard did not register a beforeinput listener')
+      }
+
+      const inputEvent = createInputEvent(event)
+      beforeInputListener(inputEvent)
+      return inputEvent
     },
     mount() {
       const controller = new AbortController()
@@ -86,6 +125,24 @@ describe('shouldStopComposingEnterKey', () => {
 
     expect(shouldStopComposingEnterKey(event, { composing: false })).toBe(false)
   })
+
+  it('matches paragraph insertion while ProseMirror is still composing', () => {
+    const event = createInputEvent({ isComposing: false })
+
+    expect(shouldStopComposingParagraphInput(event, { composing: true })).toBe(true)
+  })
+
+  it('matches paragraph insertion shortly after composition ends', () => {
+    const event = createInputEvent({ timeStamp: 120 })
+
+    expect(shouldStopComposingParagraphInput(event, { composing: false }, 100)).toBe(true)
+  })
+
+  it('leaves normal paragraph insertion outside composition alone', () => {
+    const event = createInputEvent({ timeStamp: 700 })
+
+    expect(shouldStopComposingParagraphInput(event, { composing: false }, 100)).toBe(false)
+  })
 })
 
 describe('createImeCompositionKeyGuardExtension', () => {
@@ -102,6 +159,29 @@ describe('createImeCompositionKeyGuardExtension', () => {
         signal: expect.any(AbortSignal),
       }),
     )
+  })
+
+  it('blocks paragraph insertion shortly after composition ends', () => {
+    const fixture = createFixture()
+    fixture.mount()
+
+    fixture.fireCompositionEnd({ timeStamp: 100 })
+    const event = fixture.fireBeforeInput({ timeStamp: 120 })
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+    expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(1)
+  })
+
+  it('only blocks one paragraph insertion after composition ends', () => {
+    const fixture = createFixture()
+    fixture.mount()
+
+    fixture.fireCompositionEnd({ timeStamp: 100 })
+    fixture.fireBeforeInput({ timeStamp: 120 })
+    const event = fixture.fireBeforeInput({ timeStamp: 130 })
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(event.stopImmediatePropagation).not.toHaveBeenCalled()
   })
 
   it('stops composing Enter before BlockNote list shortcuts can split the item', () => {

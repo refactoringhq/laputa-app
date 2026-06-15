@@ -64,6 +64,21 @@ test('composing Enter inside a Korean bullet item does not split the list item',
     defaultPrevented: false,
     reachedEditorBubble: false,
   })
+
+  const paragraphInputResult = await bullet.evaluate((element) => {
+    const editor = document.querySelector('.bn-editor')
+    editor?.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
+    const event = new InputEvent('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertParagraph',
+    })
+    element.dispatchEvent(event)
+
+    return event.defaultPrevented
+  })
+
+  expect(paragraphInputResult).toBe(true)
   await expect(page.locator('.bn-block-content[data-content-type="bulletListItem"]')).toHaveCount(
     bulletCountBefore,
   )
