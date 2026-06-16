@@ -46,6 +46,7 @@ const EMPTY_SETTINGS: Settings = {
   analytics_enabled: null,
   anonymous_id: null,
   release_channel: null,
+  automatic_update_checks_enabled: null,
   theme_mode: null,
   ui_language: null,
   date_display_format: null,
@@ -72,6 +73,7 @@ function normalizeSettings(settings: Settings): Settings {
     release_channel: serializeReleaseChannel(
       normalizeReleaseChannel(settings.release_channel),
     ),
+    automatic_update_checks_enabled: settings.automatic_update_checks_enabled ?? null,
     theme_mode: normalizeThemeMode(settings.theme_mode),
     ui_language: serializeUiLanguagePreference(settings.ui_language),
     date_display_format: normalizeDateDisplayFormat(settings.date_display_format),

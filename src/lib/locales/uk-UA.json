@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable слідує за підвищеними вручну випусками; Alpha слідує за кожним надсиланням до main.",
   "settings.releaseStable": "Stable",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "Автоматично перевіряти наявність оновлень",
+  "settings.automaticUpdateChecksDescription": "Шукати випуски Tolaria у фоновому режимі та показувати запит на оновлення, коли випуск доступний.",
   "settings.workspaces.title": "Сховища",
   "settings.workspaces.enable": "Використовувати декілька сховищ одночасно",
   "settings.workspaces.enableDescription": "Експериментально: завантажувати включені сховища в один граф. Залиште вимкненим, щоб працювати з одним сховищем за раз.",

@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable theo các bản phát hành đã được duyệt; Alpha theo mọi lần đẩy lên main.",
   "settings.releaseStable": "Ổn định",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "Tự động kiểm tra cập nhật",
+  "settings.automaticUpdateChecksDescription": "Tìm kiếm các bản phát hành Tolaria ở chế độ nền và hiển thị lời nhắc cập nhật khi có bản phát hành.",
   "settings.workspaces.title": "Vault",
   "settings.workspaces.enable": "Sử dụng nhiều vault cùng một lúc",
   "settings.workspaces.enableDescription": "Thử nghiệm: tải các vault được bao gồm vào một biểu đồ duy nhất. Bỏ chọn tùy chọn này để sử dụng một vault mỗi lần.",

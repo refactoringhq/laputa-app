@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable отслеживает продвигаемые релизы; Alpha отслеживает каждый push в main.",
   "settings.releaseStable": "Stable",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "Автоматически проверять наличие обновлений",
+  "settings.automaticUpdateChecksDescription": "Искать выпуски Tolaria в фоновом режиме и показывать подсказку об обновлении, когда оно доступно.",
   "settings.workspaces.title": "Хранилища",
   "settings.workspaces.enable": "Использовать несколько хранилищ одновременно",
   "settings.workspaces.enableDescription": "Экспериментальная функция: загрузка включенных хранилищ в один граф. Отключите эту опцию, чтобы использовать только один хранилище за раз.",
