@@ -24,6 +24,10 @@ interface MockAssetUrls {
   translations: Record<string, string>
 }
 
+interface MockCreateTLStoreOptions {
+  onMount?: (editor: Editor) => void | (() => void)
+}
+
 const tldrawMock = vi.hoisted(() => ({
   Tldraw: vi.fn(),
 }))
@@ -109,6 +113,17 @@ function renderedTldrawProps(): MockTldrawProps {
   return props
 }
 
+function renderedStoreOnMount(): NonNullable<MockCreateTLStoreOptions['onMount']> {
+  const createStoreCalls = tldrawStoreMock.createTLStore.mock.calls as [MockCreateTLStoreOptions?][]
+  const onMount = createStoreCalls
+    .map(([options]) => options?.onMount)
+    .find((handler): handler is NonNullable<MockCreateTLStoreOptions['onMount']> =>
+      typeof handler === 'function')
+
+  expect(onMount).toEqual(expect.any(Function))
+  return onMount
+}
+
 function mockEditor(): Editor {
   const container = document.createElement('div')
   const canvas = document.createElement('div')
@@ -120,7 +135,7 @@ function mockEditor(): Editor {
     getContainer: vi.fn(() => container),
     textMeasure: {
       measureElementTextNodeSpans: vi.fn(() => {
-        throw new TypeError("Cannot read properties of undefined (reading 'top')")
+        throw new TypeError("undefined is not an object (evaluating 'v.top')")
       }),
     },
     updateViewportScreenBounds: vi.fn(),
@@ -222,11 +237,11 @@ describe('TldrawWhiteboard', () => {
     })
   })
 
-  it('installs the text measurement guard when the canvas mounts', () => {
+  it('installs the text measurement guard before tldraw runtime guards mount', () => {
     renderWhiteboard()
 
     const editor = mockEditor()
-    const cleanup = renderedTldrawProps().onMount(editor)
+    const cleanupStoreMount = renderedStoreOnMount()(editor)
 
     expect(editor.textMeasure.measureElementTextNodeSpans(measuredTextElement())).toEqual({
       didTruncate: false,
@@ -236,7 +251,17 @@ describe('TldrawWhiteboard', () => {
       }],
     })
 
-    cleanup()
+    const cleanupRuntimeMount = renderedTldrawProps().onMount(editor)
+    cleanupRuntimeMount()
+    expect(editor.textMeasure.measureElementTextNodeSpans(measuredTextElement())).toEqual({
+      didTruncate: false,
+      spans: [{
+        box: { h: 24, w: 88, x: 0, y: 0 },
+        text: 'Label',
+      }],
+    })
+
+    if (typeof cleanupStoreMount === 'function') cleanupStoreMount()
     expect(() => editor.textMeasure.measureElementTextNodeSpans(measuredTextElement())).toThrow('top')
   })
 
