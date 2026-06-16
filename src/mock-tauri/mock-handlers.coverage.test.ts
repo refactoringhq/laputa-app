@@ -169,6 +169,7 @@ describe('mockHandlers coverage', () => {
       analytics_enabled: true,
       anonymous_id: 'anon-1',
       release_channel: 'alpha',
+      automatic_update_checks_enabled: null,
       theme_mode: null,
       date_display_format: null,
       note_width_mode: null,

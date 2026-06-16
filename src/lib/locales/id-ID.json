@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stabil mengikuti rilis yang dipromosikan; Alpha mengikuti setiap dorongan ke main.",
   "settings.releaseStable": "Stabil",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "Periksa pembaruan secara otomatis",
+  "settings.automaticUpdateChecksDescription": "Cari rilis Tolaria di latar belakang dan tampilkan perintah pembaruan saat tersedia.",
   "settings.workspaces.title": "Brankas",
   "settings.workspaces.enable": "Gunakan banyak brankas secara bersamaan",
   "settings.workspaces.enableDescription": "Eksperimental: muat brankas yang disertakan ke dalam satu grafik. Nonaktifkan ini untuk menggunakan satu brankas dalam satu waktu.",

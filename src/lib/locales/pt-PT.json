@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable segue lançamentos promovidos; Alpha segue cada push para main.",
   "settings.releaseStable": "Stable",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "Verificar atualizações automaticamente",
+  "settings.automaticUpdateChecksDescription": "Procurar lançamentos da Tolaria em segundo plano e mostrar um aviso de atualização quando estiver disponível.",
   "settings.workspaces.title": "Cofres",
   "settings.workspaces.enable": "Utilizar vários cofres ao mesmo tempo",
   "settings.workspaces.enableDescription": "Experimental: carregar os cofres incluídos num único grafo. Deixe esta opção desativada para usar um cofre de cada vez.",

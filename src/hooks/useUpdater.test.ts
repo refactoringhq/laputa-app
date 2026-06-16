@@ -81,8 +81,8 @@ function installInvokeHandlers({
   })
 }
 
-function renderUpdater(releaseChannel: string) {
-  return renderHook(() => useUpdater(releaseChannel))
+function renderUpdater(releaseChannel: string, automaticChecksEnabled = true) {
+  return renderHook(() => useUpdater(releaseChannel, automaticChecksEnabled))
 }
 
 async function performManualCheck(
@@ -145,6 +145,33 @@ describe('useUpdater', () => {
     renderUpdater('stable')
     await advanceAutoCheck()
 
+    expect(mockInvoke).toHaveBeenCalledWith('check_for_app_update', {
+      releaseChannel: 'stable',
+    })
+  })
+
+  it('does not automatically check for updates when automatic checks are disabled', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    installInvokeHandlers({ checkResult: makeUpdate() })
+
+    renderUpdater('stable', false)
+    await advanceAutoCheck()
+
+    expect(mockInvoke).not.toHaveBeenCalled()
+  })
+
+  it('keeps manual update checks available when automatic checks are disabled', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    installInvokeHandlers({ checkResult: null })
+
+    const { result } = renderUpdater('stable', false)
+
+    let outcome: unknown
+    await act(async () => {
+      outcome = await result.current.actions.checkForUpdates()
+    })
+
+    expect(outcome).toEqual({ kind: 'up-to-date' })
     expect(mockInvoke).toHaveBeenCalledWith('check_for_app_update', {
       releaseChannel: 'stable',
     })

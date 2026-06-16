@@ -95,6 +95,7 @@ function createDownloadProgressHandler(
 
 export function useUpdater(
   releaseChannel: string | null | undefined,
+  automaticChecksEnabled = true,
 ): { status: UpdateStatus; actions: UpdateActions } {
   const [status, setStatus] = useState<UpdateStatus>({ state: 'idle' })
   const updateRef = useRef<AppUpdateMetadata | null>(null)
@@ -124,10 +125,11 @@ export function useUpdater(
   }, [releaseChannel])
 
   useEffect(() => {
+    if (!automaticChecksEnabled) return
     if (!isTauri()) return
     const timer = setTimeout(() => { checkForUpdates() }, 3000)
     return () => clearTimeout(timer)
-  }, [checkForUpdates])
+  }, [automaticChecksEnabled, checkForUpdates])
 
   const startDownload = useCallback(async () => {
     const update = updateRef.current

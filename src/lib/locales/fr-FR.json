@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable suit les versions promues; Alpha suit chaque push vers main.",
   "settings.releaseStable": "Stable",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "Rechercher automatiquement les mises à jour",
+  "settings.automaticUpdateChecksDescription": "Rechercher les versions de Tolaria en arrière-plan et afficher une invite de mise à jour lorsqu'une version est disponible.",
   "settings.workspaces.title": "Coffres",
   "settings.workspaces.enable": "Utiliser plusieurs coffres en même temps",
   "settings.workspaces.enableDescription": "Expérimental : charger les coffres-forts inclus dans un seul graphique. Désactivez cette option pour utiliser un seul coffre-fort à la fois.",
