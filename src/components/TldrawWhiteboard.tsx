@@ -164,7 +164,7 @@ function parseSnapshot(source: string): TLStoreSnapshot | null {
 
 function createBoardStore(boardId: string) {
   void boardId
-  return createTLStore()
+  return createTLStore({ onMount: installTldrawTextMeasurementGuard })
 }
 
 function serializeSnapshot(snapshot: TLStoreSnapshot): string {
@@ -260,14 +260,12 @@ function installZoomAwareViewport(editor: Editor): () => void {
 }
 
 function installWhiteboardRuntimeGuards(editor: Editor, options: WhiteboardRuntimeGuardOptions): () => void {
-  const cleanupTextMeasurementGuard = installTldrawTextMeasurementGuard(editor)
   const cleanupZoomAwareViewport = installZoomAwareViewport(editor)
   const cleanupPlatformPermissionGuard = installTldrawPlatformPermissionGuard(options)
 
   return () => {
     cleanupPlatformPermissionGuard()
     cleanupZoomAwareViewport()
-    cleanupTextMeasurementGuard()
   }
 }
 
