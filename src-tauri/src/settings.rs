@@ -100,6 +100,7 @@ pub struct Settings {
     pub analytics_enabled: Option<bool>,
     pub anonymous_id: Option<String>,
     pub release_channel: Option<String>,
+    pub automatic_update_checks_enabled: Option<bool>,
     pub theme_mode: Option<String>,
     pub ui_language: Option<String>,
     pub date_display_format: Option<String>,
@@ -216,6 +217,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         analytics_enabled: settings.analytics_enabled,
         anonymous_id: normalize_optional_string(settings.anonymous_id),
         release_channel: normalize_release_channel(settings.release_channel.as_deref()),
+        automatic_update_checks_enabled: settings.automatic_update_checks_enabled,
         theme_mode: normalize_theme_mode(settings.theme_mode.as_deref()),
         ui_language: normalize_ui_language(settings.ui_language.as_deref()),
         date_display_format: normalize_date_display_format(settings.date_display_format.as_deref()),
@@ -452,6 +454,7 @@ mod tests {
             analytics_enabled: Some(false),
             anonymous_id: Some("abc-123-uuid".to_string()),
             release_channel: Some("alpha".to_string()),
+            automatic_update_checks_enabled: Some(false),
             theme_mode: Some("dark".to_string()),
             ui_language: Some("zh-Hans".to_string()),
             date_display_format: Some("iso".to_string()),
@@ -492,6 +495,7 @@ mod tests {
             autogit_inactive_threshold_seconds: Some(30),
             auto_advance_inbox_after_organize: Some(true),
             release_channel: Some("alpha".to_string()),
+            automatic_update_checks_enabled: Some(false),
             theme_mode: Some("dark".to_string()),
             ui_language: Some("zh-Hans".to_string()),
             date_display_format: Some("european".to_string()),
@@ -514,6 +518,7 @@ mod tests {
         assert_eq!(loaded.autogit_inactive_threshold_seconds, Some(30));
         assert_eq!(loaded.auto_advance_inbox_after_organize, Some(true));
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
+        assert_eq!(loaded.automatic_update_checks_enabled, Some(false));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
         assert_eq!(loaded.ui_language.as_deref(), Some("zh-CN"));
         assert_eq!(loaded.date_display_format.as_deref(), Some("european"));

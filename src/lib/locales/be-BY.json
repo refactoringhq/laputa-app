@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Стабільны канал для правераных рэлізаў; Альфа – для самых апошніх змяненняў.",
   "settings.releaseStable": "Стабільны (Stable)",
   "settings.releaseAlpha": "Альфа (Alpha)",
+  "settings.automaticUpdateChecks": "Аўтаматычна правяраць наяўнасць абнаўленняў",
+  "settings.automaticUpdateChecksDescription": "Шукаць выпускі Tolaria ў фонавым рэжыме і паказваць запыт на абнаўленне, калі яно даступнае.",
   "settings.workspaces.title": "Сховішчы",
   "settings.workspaces.enable": "Выкарыстоўваць некалькі сховішчаў адначасова",
   "settings.workspaces.enableDescription": "Эксперыментальна: загружаць уключаныя сховішчы ў адзін граф. Пакіньце выключаным, каб выкарыстоўваць адно сховішча за раз.",

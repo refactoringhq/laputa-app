@@ -1061,7 +1061,7 @@ sequenceDiagram
 - `anonymous_id` is a locally-generated UUID, never tied to identity
 - `send_default_pii: false` on both SDKs
 - PostHog: `autocapture: false`, `persistence: 'memory'`, no cookies
-- Product events use categorical metadata only: file preview kind/action, AI agent id/permission mode/counts/status, and All Notes visibility category/enabled state.
+- Product events use categorical metadata only: file preview kind/action, AI agent id/permission mode/counts/status, update-check preference state, and All Notes visibility category/enabled state.
 
 **Architecture:**
 - **Rust:** `sentry` crate initialized in `lib.rs::setup()` via `telemetry::init_sentry_from_settings()`
@@ -1075,7 +1075,8 @@ sequenceDiagram
 Tolaria uses the Tauri updater plugin for automatic updates:
 
 - `src-tauri/tauri.conf.json` points the default desktop feed at `stable/latest.json`
-- `useUpdater(releaseChannel)` waits 3 seconds after launch, then calls Rust commands instead of hard-coding one updater endpoint in the frontend
+- `useUpdater(releaseChannel, automaticChecksEnabled)` waits 3 seconds after launch when automatic checks are enabled, then calls Rust commands instead of hard-coding one updater endpoint in the frontend
+- `automatic_update_checks_enabled` is an installation-local Settings flag that defaults to enabled; disabling it skips only the startup/background probe, not manual status-bar update checks
 - `src-tauri/src/app_updater.rs` maps the selected channel to `alpha/latest.json` or `stable/latest.json`
 - `download_and_install_app_update` streams progress events back into `UpdateBanner`
 
