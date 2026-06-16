@@ -20,7 +20,6 @@ import { components } from '@blocknote/mantine'
 import { MantineContext, MantineProvider } from '@mantine/core'
 import { trackEvent } from '../lib/telemetry'
 import { useDocumentThemeMode } from '../hooks/useDocumentThemeMode'
-import { repairMalformedEditorBlocks } from '../hooks/editorBlockRepair'
 import { useEditorTheme } from '../hooks/useTheme'
 import { useImageDrop } from '../hooks/useImageDrop'
 import { useImageLightbox } from '../hooks/useImageLightbox'
@@ -63,7 +62,9 @@ import {
   blockNoteRenderRecoveryReason,
   isRecoverableBlockNoteRenderError,
   markRecoveredBlockNoteRenderError,
+  type BlockNoteRenderRecoveryReason,
 } from './blockNoteRenderRecovery'
+import { repairEditorDocumentForRenderRecovery } from './blockNoteRenderRecoveryDocument'
 import {
   queueTitleHeadingCursorRepair,
   useEditorPasteHandler,
@@ -138,7 +139,7 @@ type BlockNoteRenderRecoveryState = {
 
 class BlockNoteRenderRecoveryBoundary extends Component<{
   children: (recoveryKey: number) => ReactNode
-  onRecover?: (attempt: number) => void
+  onRecover?: (attempt: number, reason: BlockNoteRenderRecoveryReason) => void
 }, BlockNoteRenderRecoveryState> {
   state: BlockNoteRenderRecoveryState = {
     error: null,
@@ -158,7 +159,7 @@ class BlockNoteRenderRecoveryBoundary extends Component<{
     const attempt = this.state.retries + 1
     markRecoveredBlockNoteRenderError(error)
     trackEvent('editor_render_recovered', { reason, attempt })
-    this.props.onRecover?.(attempt)
+    this.props.onRecover?.(attempt, reason)
     this.setState(({ recoveryKey, retries }) => ({
       error: null,
       recoveryKey: recoveryKey + 1,
@@ -179,24 +180,6 @@ class BlockNoteRenderRecoveryBoundary extends Component<{
     }
 
     return this.props.children(this.state.recoveryKey)
-  }
-}
-
-function repairEditorDocumentForRenderRecovery(editor: ReturnType<typeof useCreateBlockNote>) {
-  const current = editor.document
-  const safeBlocks = repairMalformedEditorBlocks(current)
-  if (safeBlocks === current) return
-
-  try {
-    editor.replaceBlocks(current, safeBlocks)
-  } catch (error) {
-    console.warn('[editor] Failed to repair BlockNote document before render recovery:', error)
-    try {
-      const markup = editor.blocksToHTMLLossy(safeBlocks)
-      editor._tiptapEditor.commands.setContent(markup)
-    } catch (fallbackError) {
-      console.warn('[editor] Failed to apply repaired BlockNote document fallback:', fallbackError)
-    }
   }
 }
 
@@ -1310,7 +1293,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
           <div className="editor__drop-overlay-label">Drop image here</div>
         </div>
       )}
-      <BlockNoteRenderRecoveryBoundary onRecover={() => repairEditorDocumentForRenderRecovery(editor)}>
+      <BlockNoteRenderRecoveryBoundary onRecover={(_, reason) => repairEditorDocumentForRenderRecovery(editor, reason)}>
         {(recoveryKey) => (
           <SharedContextBlockNoteView
             key={recoveryKey}
