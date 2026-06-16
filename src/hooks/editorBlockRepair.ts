@@ -96,6 +96,10 @@ function repairBlockList(blocks: unknown[], context: RepairContext): RepairResul
   return { blocks: changed ? repairedBlocks : blocks, changed }
 }
 
+function rekeyBlockList(blocks: unknown[], context: RepairContext): unknown[] {
+  return blocks.map((block) => rekeyEditorBlock(block, context))
+}
+
 function repairBlockChildren(block: Record<string, unknown>, context: RepairContext): ChildRepair {
   if (!Array.isArray(block.children)) {
     return { children: block.children, promoted: [], changed: false, writeChildren: false }
@@ -141,6 +145,22 @@ function repairEditorBlock(block: unknown, context: RepairContext): RepairResult
   return repairBlockRecord(block, context)
 }
 
+function rekeyEditorBlock(block: unknown, context: RepairContext): unknown {
+  if (!isEditorBlockRecord(block)) return fallbackParagraphBlock(context)
+
+  return {
+    ...block,
+    id: createUniqueEditorBlockId(context),
+    ...(Array.isArray(block.children)
+      ? { children: rekeyBlockList(block.children, context) }
+      : {}),
+  }
+}
+
 export function repairMalformedEditorBlocks(blocks: unknown[]): unknown[] {
   return repairBlockList(blocks, { seenIds: new Set() }).blocks
+}
+
+export function rebuildEditorBlocksWithFreshIds(blocks: unknown[]): unknown[] {
+  return rekeyBlockList(repairMalformedEditorBlocks(blocks), { seenIds: new Set() })
 }
