@@ -181,6 +181,8 @@ files:
     settings.releaseChannelDescription: c5ae9b7f25376df383d36603366ac1fa
     settings.releaseStable: fa3aff3c185c6dc7754235f397c2099a
     settings.releaseAlpha: 6132295fcf5570fb8b0a944ef322a598
+    settings.automaticUpdateChecks: 95e5c6aab9c42787930040ed1743a708
+    settings.automaticUpdateChecksDescription: 1cecffe438411cac2f910946d0706ab1
     settings.workspaces.title: 10075fec14fcc45a489d02bedf972e97
     settings.workspaces.enable: f418b797fc4d13ca6b59333326ac3246
     settings.workspaces.enableDescription: 1487bd26586b773c77c01746399cc4cd

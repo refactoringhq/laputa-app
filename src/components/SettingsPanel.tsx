@@ -44,6 +44,7 @@ import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel }
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
 import { areGitFeaturesEnabled } from '../lib/gitSettings'
 import { areAiFeaturesEnabled } from '../lib/aiFeatures'
+import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import { AiProviderSettings } from './AiProviderSettings'
 import { AiAgentIcon } from './AiAgentIcon'
@@ -113,6 +114,7 @@ interface SettingsDraft {
   defaultAiTarget: string
   aiModelProviders: AiModelProvider[]
   releaseChannel: ReleaseChannel
+  automaticUpdateChecksEnabled: boolean
   themeMode: ThemeMode
   uiLanguage: UiLanguagePreference
   dateDisplayFormat: DateDisplayFormat
@@ -154,6 +156,8 @@ interface SettingsBodyProps {
   onCopyMcpConfig?: () => void
   releaseChannel: ReleaseChannel
   setReleaseChannel: (value: ReleaseChannel) => void
+  automaticUpdateChecksEnabled: boolean
+  setAutomaticUpdateChecksEnabled: (value: boolean) => void
   themeMode: ThemeMode
   setThemeMode: (value: ThemeMode) => void
   uiLanguage: UiLanguagePreference
@@ -216,6 +220,7 @@ function createSettingsDraft(
     defaultAiTarget: resolveAiTarget(settings).id,
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
+    automaticUpdateChecksEnabled: areAutomaticUpdateChecksEnabled(settings),
     themeMode: resolveSettingsDraftThemeMode(settings.theme_mode),
     uiLanguage: settings.ui_language ?? SYSTEM_UI_LANGUAGE,
     dateDisplayFormat: normalizeDateDisplayFormat(settings.date_display_format) ?? DEFAULT_DATE_DISPLAY_FORMAT,
@@ -263,6 +268,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     analytics_enabled: draft.analytics,
     anonymous_id: resolveAnonymousId(settings, draft),
     release_channel: serializeReleaseChannel(draft.releaseChannel),
+    automatic_update_checks_enabled: draft.automaticUpdateChecksEnabled ? null : false,
     theme_mode: draft.themeMode,
     ui_language: serializeUiLanguagePreference(draft.uiLanguage),
     date_display_format: draft.dateDisplayFormat,
@@ -566,6 +572,8 @@ function SettingsBodyFromDraft({
       onCopyMcpConfig={onCopyMcpConfig}
       releaseChannel={draft.releaseChannel}
       setReleaseChannel={(value) => updateDraft('releaseChannel', value)}
+      automaticUpdateChecksEnabled={draft.automaticUpdateChecksEnabled}
+      setAutomaticUpdateChecksEnabled={(value) => updateDraft('automaticUpdateChecksEnabled', value)}
       themeMode={draft.themeMode}
       setThemeMode={setThemeMode}
       uiLanguage={draft.uiLanguage}
@@ -627,6 +635,8 @@ function SettingsSyncAndAppearanceSections({
   setAutoGitInactiveThresholdSeconds,
   releaseChannel,
   setReleaseChannel,
+  automaticUpdateChecksEnabled,
+  setAutomaticUpdateChecksEnabled,
   multiWorkspaceEnabled,
   setMultiWorkspaceEnabled,
   vaults,
@@ -646,6 +656,8 @@ function SettingsSyncAndAppearanceSections({
           setPullInterval={setPullInterval}
           releaseChannel={releaseChannel}
           setReleaseChannel={setReleaseChannel}
+          automaticUpdateChecksEnabled={automaticUpdateChecksEnabled}
+          setAutomaticUpdateChecksEnabled={setAutomaticUpdateChecksEnabled}
         />
       </SettingsSection>
       <SettingsSection id={SETTINGS_SECTION_IDS.workspaces}>
@@ -802,7 +814,18 @@ function SyncAndUpdatesSection({
   setPullInterval,
   releaseChannel,
   setReleaseChannel,
-}: Pick<SettingsBodyProps, 't' | 'pullInterval' | 'setPullInterval' | 'releaseChannel' | 'setReleaseChannel'>) {
+  automaticUpdateChecksEnabled,
+  setAutomaticUpdateChecksEnabled,
+}: Pick<
+  SettingsBodyProps,
+  | 't'
+  | 'pullInterval'
+  | 'setPullInterval'
+  | 'releaseChannel'
+  | 'setReleaseChannel'
+  | 'automaticUpdateChecksEnabled'
+  | 'setAutomaticUpdateChecksEnabled'
+>) {
   return (
     <>
       <SectionHeading
@@ -836,6 +859,14 @@ function SyncAndUpdatesSection({
             testId="settings-release-channel"
           />
         </SettingsRow>
+
+        <SettingsSwitchRow
+          label={t('settings.automaticUpdateChecks')}
+          description={t('settings.automaticUpdateChecksDescription')}
+          checked={automaticUpdateChecksEnabled}
+          onChange={setAutomaticUpdateChecksEnabled}
+          testId="settings-automatic-update-checks"
+        />
       </SettingsGroup>
     </>
   )

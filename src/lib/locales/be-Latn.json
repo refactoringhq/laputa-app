@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stabiĺny kanal dlia pravieranych relizaŭ; Aĺfa – dlia samych apošnich zmianienniaŭ.",
   "settings.releaseStable": "Stabiĺny (Stable)",
   "settings.releaseAlpha": "Aĺfa (Alpha)",
+  "settings.automaticUpdateChecks": "Aŭtamatyčna praviarać abnaŭlienni",
+  "settings.automaticUpdateChecksDescription": "Šukać relizy Tolaria ŭ fonavym režymie i pakazvać prapanovu abnaŭliennia, kali jano dastupnaje.",
   "settings.appearance.title": "Zniešni vyhliad",
   "settings.appearance.description": "Abiarycie kaliarovuju temu prahramy.",
   "settings.theme.label": "Tema",

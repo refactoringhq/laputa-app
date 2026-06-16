@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable śledzi promowane wydania; Alpha śledzi każde wypchnięcie do main.",
   "settings.releaseStable": "Stabilny",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "Automatycznie sprawdzaj dostępność aktualizacji",
+  "settings.automaticUpdateChecksDescription": "Wyszukuj wersje Tolarii w tle i wyświetlaj monit o aktualizację, gdy jest ona dostępna.",
   "settings.workspaces.title": "Magazyny",
   "settings.workspaces.enable": "Korzystaj z wielu skarbców jednocześnie",
   "settings.workspaces.enableDescription": "Eksperymentalne: załaduj zawarte skarbce do jednego grafu. Pozostaw tę opcję wyłączoną, aby korzystać z jednego skarbca naraz.",

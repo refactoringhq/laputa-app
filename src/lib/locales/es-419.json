@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable sigue las versiones promocionadas; Alpha sigue cada push a main.",
   "settings.releaseStable": "Stable",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "Buscar actualizaciones automáticamente",
+  "settings.automaticUpdateChecksDescription": "Buscar versiones de Tolaria en segundo plano y mostrar un aviso de actualización cuando haya una disponible.",
   "settings.workspaces.title": "Vaults",
   "settings.workspaces.enable": "Usar varios almacenes al mismo tiempo",
   "settings.workspaces.enableDescription": "Experimental: cargar los vaults incluidos en un solo grafo. Deje esta opción desactivada para usar un solo repositorio a la vez.",
