@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable은 승격된 릴리스를 따르고, Alpha는 main으로의 모든 푸시를 따릅니다.",
   "settings.releaseStable": "Stable",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "업데이트 자동 확인",
+  "settings.automaticUpdateChecksDescription": "백그라운드에서 Tolaria 릴리스를 확인하고 릴리스가 있을 때 업데이트 프롬프트를 표시합니다.",
   "settings.workspaces.title": "Vaults",
   "settings.workspaces.enable": "여러 개의 보관소를 동시에 사용",
   "settings.workspaces.enableDescription": "실험적 기능: 포함된 보관소를 하나의 그래프로 로드합니다. 한 번에 하나의 보관만 사용하려면 이 옵션을 비활성화하세요.",

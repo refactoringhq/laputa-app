@@ -126,6 +126,7 @@ export interface Settings {
   analytics_enabled: boolean | null
   anonymous_id: string | null
   release_channel: string | null
+  automatic_update_checks_enabled?: boolean | null
   theme_mode?: ThemeMode | null
   ui_language?: AppLocale | null
   date_display_format?: DateDisplayFormat | null

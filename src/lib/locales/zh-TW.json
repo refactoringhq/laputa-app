@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable 跟隨推廣版本；Alpha 跟隨 main 的每次推送。",
   "settings.releaseStable": "Stable",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "自動檢查更新",
+  "settings.automaticUpdateChecksDescription": "在背景中尋找 Tolaria 版本，並在有可用版本時顯示更新提示。",
   "settings.workspaces.title": "保管庫",
   "settings.workspaces.enable": "同時使用多個 Vault",
   "settings.workspaces.enableDescription": "實驗性功能：將包含的 Vault 載入至同一個圖形中。關閉此功能，即可一次使用一個 Vault。",

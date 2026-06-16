@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable följer godkända versioner; Alpha följer varje push till main.",
   "settings.releaseStable": "Stable",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "Sök efter uppdateringar automatiskt",
+  "settings.automaticUpdateChecksDescription": "Sök efter Tolaria-utgåvor i bakgrunden och visa en uppdateringsprompt när en är tillgänglig.",
   "settings.workspaces.title": "Valv",
   "settings.workspaces.enable": "Använd flera valv samtidigt",
   "settings.workspaces.enableDescription": "Experimentellt: läs in inkluderade valv i en graf. Lämna detta avstängt för att använda ett valv i taget.",

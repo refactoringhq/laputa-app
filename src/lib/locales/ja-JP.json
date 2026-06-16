@@ -179,6 +179,8 @@
   "settings.releaseChannelDescription": "Stable は昇格済みリリースを追跡し、Alpha は main へのすべての push を追跡します。",
   "settings.releaseStable": "Stable",
   "settings.releaseAlpha": "Alpha",
+  "settings.automaticUpdateChecks": "自動的に更新を確認する",
+  "settings.automaticUpdateChecksDescription": "バックグラウンドでTolariaのリリースを確認し、利用可能な場合は更新プロンプトを表示します。",
   "settings.workspaces.title": "Vaults",
   "settings.workspaces.enable": "複数のVaultを同時に使用する",
   "settings.workspaces.enableDescription": "実験的機能：含まれる複数のVaultを1つのグラフに読み込む。一度に1つのボルトのみを使用する場合は、この設定をオフのままにしてください。",

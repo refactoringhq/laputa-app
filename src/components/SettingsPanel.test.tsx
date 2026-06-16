@@ -26,6 +26,7 @@ const emptySettings: Settings = {
   analytics_enabled: null,
   anonymous_id: null,
   release_channel: null,
+  automatic_update_checks_enabled: null,
   theme_mode: null,
   ui_language: null,
   date_display_format: null,
@@ -222,6 +223,7 @@ describe('SettingsPanel', () => {
       autogit_idle_threshold_seconds: 90,
       autogit_inactive_threshold_seconds: 30,
       release_channel: null,
+      automatic_update_checks_enabled: null,
       theme_mode: 'light',
       date_display_format: 'friendly',
       note_width_mode: 'normal',
@@ -597,6 +599,30 @@ describe('SettingsPanel', () => {
 
     expect(screen.getByTestId('settings-release-channel')).toHaveAttribute('data-value', 'stable')
     expect(screen.queryByText(/Beta\/Stable/i)).not.toBeInTheDocument()
+  })
+
+  it('defaults automatic update checks to on', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    expect(screen.getByRole('switch', { name: 'Check for updates automatically' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('saves and tracks the automatic update checks preference when toggled off', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Check for updates automatically' }))
+    fireEvent.click(screen.getByTestId('settings-save'))
+
+    expectSettingsSaved({
+      automatic_update_checks_enabled: false,
+    })
+    expect(trackEventMock).toHaveBeenCalledWith('automatic_update_checks_changed', {
+      enabled: 0,
+    })
   })
 
   it('anchors the default agent dropdown with the popper strategy', () => {
