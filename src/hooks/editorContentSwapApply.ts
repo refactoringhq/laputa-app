@@ -1,5 +1,7 @@
 import type { MutableRefObject } from 'react'
 import type { useCreateBlockNote } from '@blocknote/react'
+import { trackEvent } from '../lib/telemetry'
+import { classifyRichEditorRecoveryError } from '../components/richEditorRecoveryClassifier'
 import { blankParagraphBlocks } from './editorTabContent'
 import { EDITOR_CONTAINER_SELECTOR } from './editorDomSelection'
 import { resetTextSelectionBeforeContentSwap } from './editorTiptapSelection'
@@ -30,6 +32,17 @@ interface ApplyMarkupStateToEditorOptions extends Omit<AppliedEditorContentCommi
   markup: string
 }
 
+function reportEditorContentSwapFailure(error: unknown): void {
+  const reason = classifyRichEditorRecoveryError(error, 'transform')
+  if (!reason) {
+    console.error('applyBlocks failed, trying fallback:', error)
+    return
+  }
+
+  console.warn('[editor] Recovered rich-editor content swap:', error)
+  trackEvent('rich_editor_transform_error_recovered', { reason })
+}
+
 export function applyBlocksToEditor(options: ApplyBlocksToEditorOptions): boolean {
   const {
     editor,
@@ -47,7 +60,7 @@ export function applyBlocksToEditor(options: ApplyBlocksToEditorOptions): boolea
       editor.insertBlocks(safeBlocks, current[0], 'before')
     }
   } catch (err) {
-    console.error('applyBlocks failed, trying fallback:', err)
+    reportEditorContentSwapFailure(err)
     try {
       const markup = editor.blocksToHTMLLossy(safeBlocks)
       editor._tiptapEditor.commands.setContent(markup)
