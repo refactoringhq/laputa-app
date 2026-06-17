@@ -34,6 +34,8 @@ _order: 10
 # Project
 ```
 
+Type templates can live in the Type document's `template` frontmatter field. When a hand-edited Type body contains template-like structure after its own `# TypeName` heading, Tolaria also uses that body content as the new-note template. Plain descriptive body text stays documentation-only.
+
 ## What Types Control
 
 - Sidebar grouping.

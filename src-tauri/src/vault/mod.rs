@@ -15,6 +15,7 @@ mod rename;
 mod rename_transaction;
 mod title_sync;
 mod trash;
+mod type_templates;
 mod view_date_filters;
 mod view_migration;
 mod view_relationships;
@@ -51,6 +52,7 @@ pub use views::{
 use file::read_file_metadata;
 use frontmatter::{extract_fm_and_rels, resolve_is_a, resolve_note_width};
 use parsing::{count_body_words, extract_outgoing_links, extract_snippet, extract_title};
+use type_templates::TypeTemplateSource;
 
 use gray_matter::engine::YAML;
 use gray_matter::Matter;
@@ -117,6 +119,15 @@ pub fn parse_md_file(path: &Path, git_dates: Option<(u64, u64)>) -> Result<Vault
     let (fs_modified, fs_created, file_size) = read_file_metadata(path)?;
     let (modified_at, created_at) = resolve_entry_dates(fs_modified, fs_created, git_dates);
     let is_a = resolve_is_a(frontmatter.is_a);
+    let template = TypeTemplateSource {
+        explicit_template: frontmatter
+            .template
+            .map(|value| value.into_scalar().unwrap_or_default()),
+        is_a: is_a.as_deref(),
+        title: &title,
+        body: &parsed.content,
+    }
+    .resolve();
 
     // Add "Type" relationship: isA becomes a navigable link to the type document.
     // Skip for type documents themselves (isA == "Type") to avoid self-referential links.
@@ -156,7 +167,7 @@ pub fn parse_md_file(path: &Path, git_dates: Option<(u64, u64)>) -> Result<Vault
         color: frontmatter.color.and_then(|v| v.into_scalar()),
         order: frontmatter.order,
         sidebar_label: frontmatter.sidebar_label.and_then(|v| v.into_scalar()),
-        template: frontmatter.template.and_then(|v| v.into_scalar()),
+        template,
         sort: frontmatter.sort.and_then(|v| v.into_scalar()),
         view: frontmatter.view.and_then(|v| v.into_scalar()),
         note_width: resolve_note_width(frontmatter.note_width),

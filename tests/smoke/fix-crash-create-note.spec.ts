@@ -6,16 +6,16 @@ import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from
 
 let tempVaultDir: string
 
-function seedTypeEntry(vaultPath: string, typeName: string, template: string): void {
+function seedBodyTemplateTypeEntry(vaultPath: string, typeName: string, template: string): void {
   const slug = typeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'type'
   const body = [
     '---',
-    `title: ${typeName}`,
     'type: Type',
-    'template: |',
-    ...template.split('\n').map((line) => `  ${line}`),
     '---',
     '',
+    `# ${typeName}`,
+    '',
+    template,
   ].join('\n')
   fs.writeFileSync(path.join(vaultPath, `${slug}.md`), body)
 }
@@ -123,12 +123,18 @@ test.describe('Create note crash fix', () => {
     })
   })
 
-  test('command palette creates typed notes without crashing when a type template is present @smoke', async ({ page }) => {
-    seedTypeEntry(tempVaultDir, 'Procedure', '## Checklist\n\n- first step\n- [[Alpha Project]]\n- unmatched [link')
+  test('command palette creates typed notes from a Type body template @smoke', async ({ page }) => {
+    seedBodyTemplateTypeEntry(tempVaultDir, 'Procedure', '## Checklist\n\n- first step\n- [[Alpha Project]]\n- unmatched [link')
     await openTestVault(page)
     await expectUntitledNoteWithoutCrash(page, 'procedure', async () => {
       await openCommandPalette(page)
       await executeCommand(page, 'new procedure')
     })
+
+    await openCommandPalette(page)
+    await executeCommand(page, 'Toggle Raw')
+    const rawEditor = page.locator('.cm-content')
+    await expect(rawEditor).toContainText('## Checklist')
+    await expect(rawEditor).toContainText('[[Alpha Project]]')
   })
 })

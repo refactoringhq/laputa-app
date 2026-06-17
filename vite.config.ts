@@ -287,6 +287,47 @@ function markdownBodyText(content: string): string {
   return content.replace(/^#+\s+.+$/gm, '').replace(/[\n\r]+/g, ' ').trim()
 }
 
+interface TypeTemplateSource {
+  body: string
+  explicitTemplate: string | null
+  isA: string | null
+  title: string
+}
+
+function resolveTypeTemplate(source: TypeTemplateSource): string | null {
+  if (source.explicitTemplate !== null) return source.explicitTemplate
+  if (source.isA !== 'Type') return null
+
+  const template = bodyAfterTypeTitle(source)?.trim()
+  if (!template) return null
+  return template.split(/\r?\n/).some((line) => templateLineHasStructure({ line }))
+    ? template
+    : null
+}
+
+function bodyAfterTypeTitle(source: Pick<TypeTemplateSource, 'body' | 'title'>): string | null {
+  const body = source.body.trimStart()
+  const lineEnd = body.indexOf('\n')
+  const firstLine = (lineEnd === -1 ? body : body.slice(0, lineEnd)).replace(/\r$/, '')
+  const heading = firstLine.startsWith('# ') ? firstLine.slice(2).trim() : null
+  if (heading !== source.title) return null
+  return lineEnd === -1 ? '' : body.slice(lineEnd + 1)
+}
+
+function templateLineHasStructure({ line }: { line: string }): boolean {
+  const trimmed = line.trimStart()
+  return trimmed.startsWith('## ')
+    || trimmed.startsWith('- [ ] ')
+    || templateLineIsField({ line: trimmed })
+}
+
+function templateLineIsField({ line }: { line: string }): boolean {
+  const trimmed = line.trim()
+  if (!trimmed.endsWith(':')) return false
+  const label = trimmed.replace(/:+$/, '').trim()
+  return label.length > 0 && !label.startsWith('-')
+}
+
 function frontmatterWikiLinks(frontmatter: Record<string, unknown>, ...keys: string[]): string[] {
   return frontmatterStringArray(frontmatter, ...keys).flatMap((value) => extractWikiLinks(value))
 }
@@ -344,14 +385,21 @@ function parseMarkdownFile(filePath: string): VaultEntry | null {
     const basename = filename.replace(/\.md$/, '')
 
     const title = markdownTitle(content, fm, basename)
+    const isA = frontmatterString(fm, 'is_a', 'is a', 'type')
     const bodyText = markdownBodyText(content)
     const snippet = bodyText.slice(0, 200)
+    const template = resolveTypeTemplate({
+      body: content,
+      explicitTemplate: frontmatterString(fm, 'template'),
+      isA,
+      title,
+    })
 
     return {
       path: filePath,
       filename,
       title,
-      isA: frontmatterString(fm, 'is_a', 'is a', 'type'),
+      isA,
       aliases: frontmatterStringArray(fm, 'aliases'),
       belongsTo: frontmatterWikiLinks(fm, 'belongs_to', 'belongs to'),
       relatedTo: frontmatterWikiLinks(fm, 'related_to', 'related to'),
@@ -369,7 +417,7 @@ function parseMarkdownFile(filePath: string): VaultEntry | null {
       color: frontmatterString(fm, 'color'),
       order: fm.order != null ? Number(fm.order) : null,
       sidebarLabel: frontmatterString(fm, 'sidebar label', 'sidebar_label'),
-      template: frontmatterString(fm, 'template'),
+      template,
       sort: frontmatterString(fm, 'sort'),
       view: frontmatterString(fm, 'view'),
       visible: frontmatterBool(fm, 'visible'),
