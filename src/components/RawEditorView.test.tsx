@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
+import { syntaxTree } from '@codemirror/language'
+import type { EditorView } from '@codemirror/view'
 import { RawEditorView } from './RawEditorView'
 
 function entry(title: string, path = `/vault/note/${title}.md`) {
@@ -22,6 +24,10 @@ const defaultProps = {
   onSave: vi.fn(),
 }
 
+type CodeMirrorHost = HTMLElement & {
+  __cmView?: EditorView
+}
+
 describe('RawEditorView', () => {
   it('renders CodeMirror container', () => {
     render(<RawEditorView {...defaultProps} />)
@@ -41,6 +47,17 @@ describe('RawEditorView', () => {
     const container = screen.getByTestId('raw-editor-codemirror')
     const content = container.querySelector('.cm-content')
     expect(content?.textContent).toContain('title: My Note')
+  })
+
+  it('uses the file extension to parse raw text files for syntax highlighting', () => {
+    render(<RawEditorView
+      {...defaultProps}
+      content="SELECT id FROM notes WHERE archived = false"
+      path="/vault/queries/open-notes.sql"
+    />)
+
+    const container = screen.getByTestId('raw-editor-codemirror') as CodeMirrorHost
+    expect(syntaxTree(container.__cmView!.state).toString()).toContain('Keyword')
   })
 
   it('keeps the editable CodeMirror surface out of spellcheck without disabling IME autocorrection', () => {
@@ -80,6 +97,16 @@ describe('RawEditorView', () => {
     render(<RawEditorView {...defaultProps} content="---\ntitle: Bad\n\n# Title" />)
     expect(screen.getByTestId('raw-editor-yaml-error')).toBeInTheDocument()
     expect(screen.getByTestId('raw-editor-yaml-error')).toHaveTextContent('Unclosed frontmatter')
+  })
+
+  it('does not treat YAML document delimiters as Markdown frontmatter errors', () => {
+    render(<RawEditorView
+      {...defaultProps}
+      content="---\nname: raw-yaml\nitems:\n  - one"
+      path="/vault/config/workflow.yaml"
+    />)
+
+    expect(screen.queryByTestId('raw-editor-yaml-error')).not.toBeInTheDocument()
   })
 
   it('does not show YAML error for valid content', () => {

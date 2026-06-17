@@ -22,6 +22,7 @@ import {
   registerPlainTextPasteTarget,
   type PlainTextPasteTarget,
 } from '../utils/plainTextPaste'
+import { rawEditorLanguageIdForPath } from '../utils/rawEditorLanguage'
 
 export interface RawEditorViewProps {
   content: string
@@ -398,6 +399,7 @@ export function RawEditorView({ content, path, entries, sourceEntry, onContentCh
   const [rawDoc, setRawDoc] = useState(content)
   const [findOpen, setFindOpen] = useState(false)
   const [replaceOpen, setReplaceOpen] = useState(false)
+  const showFrontmatterWarning = rawEditorLanguageIdForPath(path) === 'markdown'
   const pendingChanges = useRawEditorPendingChanges({ content, latestContentRef, onContentChange, onSave, path })
   const {
     autocomplete,
@@ -424,7 +426,7 @@ export function RawEditorView({ content, path, entries, sourceEntry, onContentCh
     onCursorActivity: handleCursorActivity,
     onSave: pendingChanges.handleSave,
     onEscape: handleEscape,
-  })
+  }, path)
   const activatePlainTextPaste = useRawEditorPlainTextPasteTarget({
     containerRef,
     setAutocomplete,
@@ -476,7 +478,7 @@ export function RawEditorView({ content, path, entries, sourceEntry, onContentCh
       className="flex flex-1 flex-col min-h-0 relative"
       style={{ background: 'var(--background)' }}
     >
-      <RawEditorYamlErrorBanner error={pendingChanges.yamlError} />
+      <RawEditorYamlErrorBanner error={showFrontmatterWarning ? pendingChanges.yamlError : null} />
       <RawEditorFindBar
         doc={rawDoc}
         locale={locale}
