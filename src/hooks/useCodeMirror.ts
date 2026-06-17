@@ -11,8 +11,7 @@ import {
 } from '@codemirror/view'
 import { EditorState, Prec } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import { frontmatterHighlightPlugin, frontmatterHighlightTheme } from '../extensions/frontmatterHighlight'
-import { markdownLanguage } from '../extensions/markdownHighlight'
+import { rawEditorLanguageExtensionsForPath } from '../extensions/rawEditorLanguage'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 import { resolveArrowLigatureInput } from '../utils/arrowLigatures'
 import { zoomCursorFix } from '../extensions/zoomCursorFix'
@@ -216,6 +215,7 @@ export function useCodeMirror(
   containerRef: React.RefObject<HTMLElement | null>,
   content: string,
   callbacks: CodeMirrorCallbacks,
+  sourcePath?: string | null,
 ) {
   const viewRef = useRef<EditorView | null>(null)
   const callbacksRef = useRef(callbacks)
@@ -255,9 +255,7 @@ export function useCodeMirror(
         buildBaseTheme(),
         EditorView.cspNonce.of(RUNTIME_STYLE_NONCE),
         EditorView.contentAttributes.of(rawEditorTextInputAttributes),
-        markdownLanguage(),
-        frontmatterHighlightTheme(),
-        frontmatterHighlightPlugin,
+        rawEditorLanguageExtensionsForPath(sourcePath),
         zoomCursorFix(),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !externalSyncRef.current) {
@@ -290,7 +288,7 @@ export function useCodeMirror(
       view.destroy()
       viewRef.current = null
     }
-  }, [containerRef])
+  }, [containerRef, sourcePath])
 
   return viewRef
 }
