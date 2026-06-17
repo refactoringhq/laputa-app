@@ -128,6 +128,7 @@ import { useAutoGitWork } from './hooks/useAutoGitWork'
 import { useAppAiWorkspaceBridge } from './hooks/useAppAiWorkspaceBridge'
 import { useAiWorkspaceWindowBridgeEvents } from './hooks/useAiWorkspaceWindowBridgeEvents'
 import { useMcpSetupDialogController } from './hooks/useMcpSetupDialogController'
+import { shouldReplaceSyncedTabEntry } from './utils/tabEntrySync'
 import {
   activeVaultModifiedFiles,
   aiWorkspaceWindowContextForPath,
@@ -622,7 +623,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       let changed = false
       const next = prev.map(tab => {
         const fresh = visibleEntries.find(e => e.path === tab.entry.path)
-        if (fresh && fresh !== tab.entry) {
+        if (fresh && shouldReplaceSyncedTabEntry(tab.entry, fresh)) {
           changed = true
           return { ...tab, entry: fresh }
         }
