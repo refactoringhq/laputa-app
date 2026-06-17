@@ -252,7 +252,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     registerVault: registerVaultSelection,
   }, vaultSwitcher.loaded)
   const aiAgentsStatus = useAiAgentsStatus({
-    enabled: aiFeaturesEnabled && !noteWindowParams && !aiWorkspaceWindow,
+    enabled: aiFeaturesEnabled && !aiWorkspaceWindow,
   })
   const aiAgentsOnboarding = useAiAgentsOnboarding(
     aiFeaturesEnabled && onboarding.state.status === 'ready' && !noteWindowParams && !aiWorkspaceWindow,

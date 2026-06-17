@@ -17,8 +17,7 @@ interface UseAiAgentsStatusOptions {
   /**
    * When false, the hook stays in its initial state and never calls the
    * Tauri probe. Used to skip the ~1 s discovery cost when AI features are
-   * disabled or when running in a detached note window where the result is
-   * never rendered.
+   * disabled or in lightweight window routes that never render agent-aware UI.
    *
    * Defaults to true to preserve existing behaviour for callers that pass
    * no options.
