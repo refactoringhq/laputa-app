@@ -258,6 +258,8 @@ Each entity type can have a corresponding **type document**: any markdown note w
 | `view` | string | Default view mode: "all", "editor-list", "editor-only" |
 | `visible` | bool | Whether type appears in sidebar (default: true) |
 
+Type templates can be stored explicitly in the `template` frontmatter property. For hand-edited Type documents, Tolaria also treats the body after the Type note's own matching `# TypeName` heading as a new-note template when that body looks like a template (for example field labels, secondary headings, or checklist starters). Plain descriptive Type bodies are ignored so type documentation does not leak into every new note.
+
 **Type relationship**: When any entry has an `isA` value (e.g., "Project"), the Rust backend automatically adds a `"Type"` entry to its `relationships` map pointing to `[[project]]`. This makes the type navigable from the Inspector panel while keeping location as an implementation detail.
 
 **Instance schema/defaults**: Custom scalar/scalar-array properties and relationship fields on a type document define the expected shape for notes of that type. Existing instances do not get mutated when a type changes; the Inspector enriches their real frontmatter with gray placeholders for missing type-defined properties/relationships. Valued type fields are copied into frontmatter only when Tolaria creates a new instance of that type. Blank type fields stay as placeholders.
