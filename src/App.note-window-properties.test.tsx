@@ -270,4 +270,23 @@ describe('App note windows', () => {
     expect(commandResults.reload_vault_entry).toHaveBeenCalledTimes(2)
     expect(vi.mocked(commandResults.list_vault).mock.calls.length).toBeGreaterThanOrEqual(2)
   })
+
+  it('probes installed AI agents in note windows for target-picker parity', async () => {
+    const getAiAgentsStatus = vi.fn(() => ({
+      claude_code: { installed: true, version: '2.1.90' },
+      codex: { installed: true, version: '0.122.0-alpha.1' },
+      opencode: { installed: true, version: '0.7.4' },
+      pi: { installed: false, version: null },
+      gemini: { installed: true, version: '0.3.2' },
+      kiro: { installed: false, version: null },
+      hermes: { installed: false, version: null },
+    }))
+    commandResults.get_ai_agents_status = getAiAgentsStatus
+
+    renderApp(<App />)
+
+    await waitFor(() => {
+      expect(getAiAgentsStatus).toHaveBeenCalled()
+    })
+  })
 })
