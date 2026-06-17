@@ -9,6 +9,7 @@ import { createTranslator, type AppLocale } from '../lib/i18n'
 import { canWritePathToVault } from '../utils/vaultPathContainment'
 import { vaultPathForEntry } from '../utils/workspaces'
 import { notePathsMatch } from '../utils/notePathIdentity'
+import { contentToEntryPatch } from './frontmatterOps'
 
 interface TabState {
   entry: VaultEntry
@@ -695,7 +696,8 @@ function useEditorPersistence({
     clearUnsaved(path)
     if (path.endsWith('.yml')) reloadViews?.()
     scheduleUntitledRename(path, content)
-  }, [clearUnsaved, onInternalVaultWrite, reloadViews, scheduleUntitledRename])
+    updateEntry(path, contentToEntryPatch(content))
+  }, [clearUnsaved, onInternalVaultWrite, reloadViews, scheduleUntitledRename, updateEntry])
 
   const {
     handleSave: handleSaveRaw,

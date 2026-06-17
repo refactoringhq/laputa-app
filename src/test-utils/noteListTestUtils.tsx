@@ -30,6 +30,7 @@ export const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   order: null,
   sidebarLabel: null,
   template: null,
+  filenameTemplate: null,
   sort: null,
   view: null,
   visible: null,

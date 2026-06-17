@@ -771,7 +771,7 @@ export function useNoteActions(config: NoteActionsConfig) {
     setTabs((prev) => prev.map((t) => notePathsMatch(t.entry.path, path) ? { ...t, content: newContent } : t))
   }, [setTabs])
 
-  const creation = useNoteCreation(config, { openTabWithContent })
+  const creation = useNoteCreation(config, { openTabWithContent, openExistingEntry: handleSelectNote })
   const rename = useNoteRename(
     { entries, setToastMessage, reloadVault: config.reloadVault, onPathRenamed: handlePathRenamed },
     { tabs: tabMgmt.tabs, setTabs, activeTabPathRef, handleSwitchTab, updateTabContent },

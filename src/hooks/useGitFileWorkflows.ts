@@ -58,6 +58,7 @@ const DELETED_NOTE_PREVIEW_DEFAULTS = {
   order: null,
   sidebarLabel: null,
   template: null,
+  filenameTemplate: null,
   sort: null,
   view: null,
   visible: null,

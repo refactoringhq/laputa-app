@@ -118,6 +118,8 @@ function knownFrontmatterUpdates(value: FrontmatterValue | undefined): Record<Fr
     _archived: { archived: Boolean(value) },
     _order: { order: frontmatterNumber(value) },
     template: { template: str },
+    filenameTemplate: { filenameTemplate: str },
+    subfolderPath: { subfolderPath: str },
     _sort: { sort: str },
     view: { view: str },
     _width: { noteWidth: normalizeNoteWidthMode(value) },

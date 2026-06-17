@@ -48,6 +48,14 @@ pub struct VaultEntry {
     /// Markdown template for notes of this Type. When a new note is created
     /// with this type, the template body is pre-filled after the frontmatter.
     pub template: Option<String>,
+    /// Filename pattern for notes of this Type. Tokens like `{{date:yyyy-MM-dd}}`
+    /// are resolved by the frontend when a new note is created. None = default naming.
+    #[serde(rename = "filenameTemplate")]
+    pub filename_template: Option<String>,
+    /// Subfolder pattern for notes of this Type. Tokens like `{{date:yyyy}}`
+    /// are resolved by the frontend at creation time. None = no subfolder (vault root).
+    #[serde(rename = "subfolderPath")]
+    pub subfolder_path: Option<String>,
     /// Default sort preference for the note list when viewing instances of this Type.
     /// Stored as "option:direction" (e.g. "modified:desc", "title:asc", "property:Priority:asc").
     pub sort: Option<String>,

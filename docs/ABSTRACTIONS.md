@@ -151,6 +151,8 @@ interface VaultEntry {
   trashedAt: number | null  // Kept for backward compatibility (Trash system removed)
   properties: Record<string, VaultPropertyValue>  // Scalar and scalar-array custom properties
   fileKind?: 'markdown' | 'text' | 'binary'  // Controls editor/raw/preview behavior
+  filenameTemplate: string | null  // Type `_filename_template` token pattern (Type entries only)
+  subfolderPath?: string | null    // Type `_subfolder_path` for new-note placement (Type entries only)
 }
 ```
 
@@ -254,6 +256,8 @@ Each entity type can have a corresponding **type document**: any markdown note w
 | `order` | number | Sidebar display order (lower = higher priority) |
 | `sidebar_label` | string | Custom label overriding auto-pluralization |
 | `template` | string | Markdown template for new notes of this type |
+| `_filename_template` | string | Filename pattern for new notes of this type. Tokens (`{{date}}`, `{{date:yyyy-MM-dd}}`, `{{time}}`, `{{type}}`) resolve at creation time; if the resulting file already exists, Tolaria opens it instead of creating a duplicate |
+| `_subfolder_path` | string | Subfolder for new notes of this type, using the same tokens as `_filename_template`. Precedence is explicit folder > type subfolder > vault root (an explicit empty folder overrides back to the root); `..`/`.` segments and shell-illegal characters are stripped, and existing notes are never moved |
 | `sort` | string | Default sort: "modified:desc", "title:asc", "property:Priority:asc"; bare custom-property form such as "Priority:asc" is accepted and normalized in the UI |
 | `view` | string | Default view mode: "all", "editor-list", "editor-only" |
 | `visible` | bool | Whether type appears in sidebar (default: true) |

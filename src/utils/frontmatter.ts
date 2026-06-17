@@ -30,7 +30,7 @@ function collapseList(items: FrontmatterText[]): FrontmatterValue {
   return items.length === 1 ? items[0] : items
 }
 
-function isBlockScalar(value: FrontmatterText): boolean {
+function isBlockScalar(value: FrontmatterText): value is '|' | '>' {
   return value === '|' || value === '>'
 }
 
@@ -156,6 +156,33 @@ function flushList(
   return []
 }
 
+function joinBlockScalar(mode: '|' | '>', rawLines: FrontmatterText[]): FrontmatterValue {
+  let indent = 0
+  for (const raw of rawLines) {
+    if (raw.trim() === '') continue
+    indent = raw.length - raw.trimStart().length
+    break
+  }
+  const prefix = ' '.repeat(indent)
+  const stripped = rawLines.map((raw) => (raw.startsWith(prefix) ? raw.slice(indent) : raw))
+  const trimmed = [...stripped]
+  while (trimmed.length > 0 && trimmed[trimmed.length - 1].trim() === '') trimmed.pop()
+  if (trimmed.length === 0) return ''
+  if (mode === '|') return `${trimmed.join('\n')}\n`
+
+  const paragraphs: FrontmatterText[][] = []
+  let current: FrontmatterText[] = []
+  for (const line of trimmed) {
+    if (line === '') {
+      if (current.length > 0) { paragraphs.push(current); current = [] }
+    } else {
+      current.push(line)
+    }
+  }
+  if (current.length > 0) paragraphs.push(current)
+  return `${paragraphs.map((p) => p.join(' ')).join('\n')}\n`
+}
+
 /** Parse YAML frontmatter from content */
 export function parseFrontmatter(content: MarkdownContent | null): ParsedFrontmatter {
   const frontmatterBody = extractFrontmatterBody(content)
@@ -165,8 +192,27 @@ export function parseFrontmatter(content: MarkdownContent | null): ParsedFrontma
   const collisionKeys = new Map<FrontmatterKey, FrontmatterKey>()
   let currentKey: FrontmatterKey | null = null
   let currentList: FrontmatterText[] = []
+  let blockKey: FrontmatterKey | null = null
+  let blockMode: '|' | '>' | null = null
+  let blockLines: FrontmatterText[] = []
+  const flushBlockScalar = (): void => {
+    if (blockKey !== null && blockMode !== null) {
+      assignFrontmatterValue(result, collisionKeys, blockKey, joinBlockScalar(blockMode, blockLines))
+    }
+    blockKey = null
+    blockMode = null
+    blockLines = []
+  }
 
   for (const line of frontmatterBody.split(/\r?\n/)) {
+    if (blockKey !== null) {
+      if (line === '' || line.startsWith(' ') || line.startsWith('\t')) {
+        blockLines.push(line)
+        continue
+      }
+      flushBlockScalar()
+    }
+
     const listItem = parseListItem(line)
     if (listItem !== null && currentKey) {
       currentList.push(listItem)
@@ -179,12 +225,20 @@ export function parseFrontmatter(content: MarkdownContent | null): ParsedFrontma
     if (!keyValue) continue
     currentKey = keyValue.key
 
+    if (isBlockScalar(keyValue.value)) {
+      blockKey = keyValue.key
+      blockMode = keyValue.value
+      blockLines = []
+      continue
+    }
+
     const parsedValue = parseFrontmatterValue(keyValue.value)
     if (parsedValue !== undefined) {
       assignFrontmatterValue(result, collisionKeys, currentKey, parsedValue)
     }
   }
 
+  flushBlockScalar()
   flushList(result, collisionKeys, currentKey, currentList)
   return result
 }

@@ -20,7 +20,8 @@ use super::{is_md_file, parse_md_file, parse_non_md_file, scan_vault, VaultEntry
 /// Bump this when VaultEntry fields change to force a full rescan.
 /// v12: fix gray_matter YAML sanitization (unquoted colons / hash comments in list items)
 /// v14: preserve scalar-array custom frontmatter properties in VaultEntry
-const CACHE_VERSION: u32 = 14;
+/// v15: parse Type _filename_template / _subfolder_path for templated note creation
+const CACHE_VERSION: u32 = 15;
 const CACHE_WRITE_LOCK_STALE_SECS: u64 = 30;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -1220,6 +1221,29 @@ mod tests {
         let (_lock, _cache_tmp, dir) = setup_git_vault();
         let vault = dir.path();
 
+        // Guards the cache's case-only-rename dedup (e.g. `Note.md` -> `note.md`),
+        // which is meaningful only on case-insensitive filesystems (macOS APFS
+        // default, Windows NTFS). On a case-sensitive filesystem (Linux ext4/
+        // btrfs) the two names are legitimately distinct files, so the dedup
+        // premise does not apply and the assertion fails for FS reasons rather
+        // than a cache defect — and because the panic happens while holding the
+        // process-global `ENV_LOCK`, it poisons the mutex and cascades
+        // `PoisonError` into every other cache test. Probe the real FS and skip.
+        // NOTE: skipping leaves the cache's handling of case-divergent paths on
+        // a case-sensitive FS unasserted; revisit if Tolaria targets such
+        // platforms as first-class.
+        let probe = vault.join("__TolariaCaseProbe__.tmp");
+        fs::write(&probe, b"").unwrap();
+        let case_insensitive = vault.join("__tolariacaseprobe__.tmp").exists();
+        let _ = fs::remove_file(&probe);
+        if !case_insensitive {
+            eprintln!(
+                "test_case_rename_no_duplicates: skipped — case-sensitive filesystem at {:?}",
+                vault
+            );
+            return;
+        }
+
         create_test_file(vault, "Note.md", "# Note\n\nOriginal case.");
         git_add_commit(vault, "init");
 
@@ -1346,6 +1370,68 @@ mod tests {
         assert!(
             entries[0].archived,
             "stale cache with old version must be invalidated, re-parsing 'Archived: Yes' as true"
+        );
+    }
+
+    /// Regression: `_filename_template` and `_subfolder_path` were added to
+    /// `VaultEntry` while `CACHE_VERSION` stayed at 14, so caches written by
+    /// older binaries stored Type entries with those fields missing. Such a
+    /// stale v14 cache must be invalidated and re-parsed from disk, otherwise
+    /// templated note creation silently no-ops on the first note of a type
+    /// (filename, subfolder, and body substitutions all see null templates)
+    /// until some later rescan happens to repopulate the fields.
+    #[test]
+    fn test_stale_cache_version_forces_rescan_of_type_template_fields() {
+        let (_lock, _cache_tmp, dir) = setup_git_vault();
+        let vault = dir.path();
+
+        create_test_file(
+            vault,
+            "journal.md",
+            "---\ntype: Type\ntemplate: \"Body\"\n_filename_template: \"{{date:yyyy-MM-dd}}\"\n_subfolder_path: \"journals/{{date:yyyy}}/{{date:MM}}\"\n---\n# Journal\n",
+        );
+        git_add_commit(vault, "init");
+
+        let hash = git_head_hash(vault).unwrap();
+
+        // Simulate a stale cache written by older code that did not parse
+        // these Type fields into VaultEntry.
+        let stale_entry = {
+            let mut e = parse_md_file(&vault.join("journal.md"), None).unwrap();
+            e.template = None;
+            e.filename_template = None;
+            e.subfolder_path = None;
+            e
+        };
+        let stale_cache = VaultCache {
+            version: 14, // version at which these fields shipped without a bump
+            vault_path: vault.to_string_lossy().to_string(),
+            commit_hash: hash,
+            entries: vec![stale_entry],
+        };
+        write_cache(vault, &stale_cache, None).unwrap();
+
+        // Load via cached path — the stale version must trigger a full rescan
+        // so the Type's templates are available for the first note creation.
+        let entries = scan_vault_cached(vault).unwrap();
+        let entry = entries
+            .iter()
+            .find(|e| e.title == "Journal")
+            .expect("Journal type entry must be present after rescan");
+        assert_eq!(
+            entry.template.as_deref(),
+            Some("Body"),
+            "stale cache must be invalidated so the Type body template is parsed",
+        );
+        assert_eq!(
+            entry.filename_template.as_deref(),
+            Some("{{date:yyyy-MM-dd}}"),
+            "stale cache must be invalidated so _filename_template is parsed",
+        );
+        assert_eq!(
+            entry.subfolder_path.as_deref(),
+            Some("journals/{{date:yyyy}}/{{date:MM}}"),
+            "stale cache must be invalidated so _subfolder_path is parsed",
         );
     }
 

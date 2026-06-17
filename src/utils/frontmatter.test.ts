@@ -96,6 +96,41 @@ describe('parseFrontmatter', () => {
     expect(fm['start date']).toBe('')
     expect(fm['rating']).toBe('')
   })
+
+  describe('block scalars', () => {
+    it('parses a literal block scalar (|) without leaking indented content lines as keys', () => {
+      const content = [
+        '---',
+        'type: Type',
+        'template: |',
+        '  # {{type}} {{date}}',
+        '',
+        '  **Yesterday:** ',
+        '  **Today:** ',
+        '  **Blockers:** ',
+        '_filename_template: "{{date:yyyy-MM-dd}}"',
+        '---',
+        '# Body',
+      ].join('\n')
+      const fm = parseFrontmatter(content)
+      expect(fm['template']).toBe('# {{type}} {{date}}\n\n**Yesterday:** \n**Today:** \n**Blockers:** \n')
+      expect(fm['_filename_template']).toBe('{{date:yyyy-MM-dd}}')
+      expect(fm['**Yesterday']).toBeUndefined()
+      expect(fm['**Today']).toBeUndefined()
+      expect(fm['**Blockers']).toBeUndefined()
+    })
+
+    it('parses a folded block scalar (>) by joining indented lines with spaces', () => {
+      const fm = parseFrontmatter('---\ntemplate: >\n  First line\n  second line\n---\n')
+      expect(fm['template']).toBe('First line second line\n')
+    })
+
+    it('ends a block scalar at the next top-level key', () => {
+      const fm = parseFrontmatter('---\ntemplate: |\n  Body line\nstatus: Active\n---\n')
+      expect(fm['template']).toBe('Body line\n')
+      expect(fm['status']).toBe('Active')
+    })
+  })
 })
 
 describe('detectFrontmatterState', () => {

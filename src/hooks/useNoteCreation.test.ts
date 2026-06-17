@@ -19,6 +19,7 @@ import {
 } from './useNoteCreation'
 import type { NoteCreationConfig } from './useNoteCreation'
 import { requestCreateNoteInFolder } from './noteCreationRequests'
+import { trackEvent } from '../lib/telemetry'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('../mock-tauri', () => ({
@@ -28,13 +29,14 @@ vi.mock('../mock-tauri', () => ({
   trackMockChange: vi.fn(),
   mockInvoke: vi.fn().mockResolvedValue(''),
 }))
+vi.mock('../lib/telemetry', () => ({ trackEvent: vi.fn() }))
 
 const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   path: '/vault/test.md', filename: 'test.md', title: 'Test Note', isA: 'Note',
   aliases: [], belongsTo: [], relatedTo: [], status: 'Active', archived: false,
   modifiedAt: 1700000000, createdAt: 1700000000, fileSize: 100, snippet: '',
   wordCount: 0, relationships: {}, icon: null, color: null, order: null,
-  outgoingLinks: [], template: null, sort: null, sidebarLabel: null,
+  outgoingLinks: [], template: null, filenameTemplate: null, sort: null, sidebarLabel: null,
   view: null, visible: null, properties: {}, organized: false, favorite: false,
   favoriteIndex: null, listPropertiesDisplay: [], hasH1: false,
   ...overrides,
@@ -170,6 +172,12 @@ describe('buildNoteContent', () => {
       initialEmptyHeading: true,
     })
     expect(content).toBe('---\ntype: Weekly\n---\n\n\n\n# Woche 2026.21\n')
+  })
+
+  it('substitutes template variables in the body', () => {
+    const content = buildNoteContent({ title: 'Standup', type: 'Meeting', template: '# Note ({{type}})\n\nDate: {{date}}', now: new Date('2026-06-06T00:00:00') })
+    expect(content).toContain('# Note (Meeting)')
+    expect(content).toContain('Date: 2026-06-06')
   })
 })
 
@@ -324,7 +332,8 @@ describe('useNoteCreation hook', () => {
     addEntry, removeEntry, entries, setToastMessage, vaultPath: '/test/vault',
   })
 
-  const tabDeps = { openTabWithContent }
+  const openExistingEntry = vi.fn()
+  const tabDeps = { openTabWithContent, openExistingEntry }
   const flushImmediateCreate = async () => {
     await Promise.resolve()
     await Promise.resolve()
@@ -630,6 +639,117 @@ describe('useNoteCreation hook', () => {
     )
   })
 
+  it('handleCreateNoteImmediate emits note_created with used_filename_template for a date-named type', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValue(undefined)
+    const todayIso = new Date().toLocaleDateString('en-CA')
+    const typeEntry = makeEntry({ isA: 'Type', title: 'Journal', filenameTemplate: '{{date}}', path: '/test/vault/journal.md', filename: 'journal.md' })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([typeEntry]), tabDeps))
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate('Journal')
+      await flushImmediateCreate()
+    })
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', expect.objectContaining({
+      path: expect.stringMatching(new RegExp(`${todayIso}\\.md$`)),
+    }))
+    expect(trackEvent).toHaveBeenCalledWith('note_created', expect.objectContaining({ used_filename_template: 1 }))
+  })
+
+  it('handleCreateNoteImmediate files the note under the type _subfolder_path', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValue(undefined)
+    const now = new Date()
+    const year = String(now.getFullYear())
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const todayIso = now.toLocaleDateString('en-CA')
+    const typeEntry = makeEntry({
+      isA: 'Type',
+      title: 'Journal',
+      filenameTemplate: '{{date}}',
+      subfolderPath: 'journals/{{date:yyyy}}/{{date:MM}}',
+      path: '/test/vault/journal.md',
+      filename: 'journal.md',
+    })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([typeEntry]), tabDeps))
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate('Journal')
+      await flushImmediateCreate()
+    })
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', expect.objectContaining({
+      path: `/test/vault/journals/${year}/${month}/${todayIso}.md`,
+    }))
+    expect(trackEvent).toHaveBeenCalledWith('note_created', expect.objectContaining({ used_subfolder_path: 1 }))
+  })
+
+  it('handleCreateNoteImmediate prefers an explicit folderPath over the type _subfolder_path', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValue(undefined)
+    const todayIso = new Date().toLocaleDateString('en-CA')
+    const typeEntry = makeEntry({
+      isA: 'Type',
+      title: 'Journal',
+      filenameTemplate: '{{date}}',
+      subfolderPath: 'journals/{{date:yyyy}}/{{date:MM}}',
+      path: '/test/vault/journal.md',
+      filename: 'journal.md',
+    })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([typeEntry]), tabDeps))
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate('Journal', {
+        creationPath: 'folder_header',
+        folderPath: 'projects/active',
+      })
+      await flushImmediateCreate()
+    })
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('create_note_content', expect.objectContaining({
+      path: `/test/vault/projects/active/${todayIso}.md`,
+    }))
+    expect(trackEvent).toHaveBeenCalledWith('note_created', expect.objectContaining({ used_subfolder_path: 0 }))
+  })
+
+  it('handleCreateNote files the note under the type _subfolder_path', async () => {
+    const now = new Date()
+    const year = String(now.getFullYear())
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const typeEntry = makeEntry({
+      isA: 'Type',
+      title: 'Journal',
+      subfolderPath: 'journals/{{date:yyyy}}/{{date:MM}}',
+      path: '/test/vault/journal.md',
+      filename: 'journal.md',
+    })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([typeEntry]), tabDeps))
+
+    await act(async () => {
+      await result.current.handleCreateNote('Morning Reflection', 'Journal')
+    })
+
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
+      path: `/test/vault/journals/${year}/${month}/morning-reflection.md`,
+    }))
+    expect(trackEvent).toHaveBeenCalledWith('note_created', expect.objectContaining({ used_subfolder_path: 1 }))
+  })
+
+  it('handleCreateNote stays at the vault root when the type has no _subfolder_path', async () => {
+    const typeEntry = makeEntry({ isA: 'Type', title: 'Note', path: '/test/vault/note.md', filename: 'note.md' })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([typeEntry]), tabDeps))
+
+    await act(async () => {
+      await result.current.handleCreateNote('Plain Note', 'Note')
+    })
+
+    expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/test/vault/plain-note.md',
+    }))
+    expect(trackEvent).toHaveBeenCalledWith('note_created', expect.objectContaining({ used_subfolder_path: 0 }))
+  })
+
   it('handleCreateNoteImmediate does not open an optimistic note when disk creation fails', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
     vi.mocked(invoke).mockRejectedValueOnce(new Error('disk full'))
@@ -894,6 +1014,44 @@ describe('useNoteCreation hook', () => {
     expect(addEntry).not.toHaveBeenCalled()
     expect(openTabWithContent).not.toHaveBeenCalled()
     expect(setToastMessage).toHaveBeenCalledWith('Cannot create note "Briefing" because briefing.md already exists')
+  })
+
+  it('handleCreateNote opens the existing note when a filename-stem type collides, and emits note_opened_existing (not note_created)', async () => {
+    const todayIso = new Date().toLocaleDateString('en-CA')
+    const typeEntry = makeEntry({ isA: 'Type', title: 'Journal', filenameTemplate: '{{date}}', path: '/test/vault/journal.md', filename: 'journal.md' })
+    const existing = makeEntry({ path: `/test/vault/${todayIso}.md`, filename: `${todayIso}.md`, title: todayIso, isA: 'Journal' })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([typeEntry, existing]), tabDeps))
+
+    let created = true
+    await act(async () => {
+      created = await result.current.handleCreateNote(todayIso, 'Journal')
+    })
+
+    expect(created).toBe(true)
+    expect(addEntry).not.toHaveBeenCalled()
+    expect(openExistingEntry).toHaveBeenCalledTimes(1)
+    expect(openExistingEntry.mock.calls[0][0].path).toBe(`/test/vault/${todayIso}.md`)
+    expect(trackEvent).toHaveBeenCalledWith('note_opened_existing', expect.anything())
+    expect(trackEvent).not.toHaveBeenCalledWith('note_created', expect.anything())
+  })
+
+  it("handleCreateNoteImmediate opens today's existing journal and emits note_opened_existing (not note_created)", async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    vi.mocked(invoke).mockResolvedValue(undefined)
+    const todayIso = new Date().toLocaleDateString('en-CA')
+    const typeEntry = makeEntry({ isA: 'Type', title: 'Journal', filenameTemplate: '{{date}}', path: '/test/vault/journal.md', filename: 'journal.md' })
+    const existing = makeEntry({ path: `/test/vault/${todayIso}.md`, filename: `${todayIso}.md`, title: todayIso, isA: 'Journal' })
+    const { result } = renderHook(() => useNoteCreation(makeConfig([typeEntry, existing]), tabDeps))
+
+    await act(async () => {
+      result.current.handleCreateNoteImmediate('Journal')
+      await flushImmediateCreate()
+    })
+
+    expect(openExistingEntry).toHaveBeenCalledTimes(1)
+    expect(trackEvent).toHaveBeenCalledWith('note_opened_existing', expect.anything())
+    expect(trackEvent).not.toHaveBeenCalledWith('note_created', expect.anything())
+    expect(vi.mocked(invoke)).not.toHaveBeenCalledWith('create_note_content', expect.anything())
   })
 
   it('reverts optimistic creation when disk write fails (Tauri)', async () => {

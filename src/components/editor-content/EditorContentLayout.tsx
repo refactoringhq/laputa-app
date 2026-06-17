@@ -66,6 +66,7 @@ const LOADING_BREADCRUMB_ENTRY: VaultEntry = {
   order: null,
   sidebarLabel: null,
   template: null,
+  filenameTemplate: null,
   sort: null,
   view: null,
   visible: true,

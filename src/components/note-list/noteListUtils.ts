@@ -181,6 +181,7 @@ function createDeletedNoteEntry(file: ModifiedFile): DeletedNoteEntry {
     order: null,
     sidebarLabel: null,
     template: null,
+    filenameTemplate: null,
     sort: null,
     view: null,
     visible: null,

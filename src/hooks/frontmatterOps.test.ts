@@ -14,6 +14,8 @@ describe('frontmatterToEntryPatch', () => {
     ['archived', true, { archived: true }],
     ['order', 5, { order: 5 }],
     ['template', '## Heading\n\n', { template: '## Heading\n\n' }],
+    ['_filename_template', '{{date}}', { filenameTemplate: '{{date}}' }],
+    ['_subfolder_path', 'journals/2026', { subfolderPath: 'journals/2026' }],
     ['_width', 'wide', { noteWidth: 'wide' }],
     ['width', 'normal', { noteWidth: 'normal' }],
     ['visible', false, { visible: false }],

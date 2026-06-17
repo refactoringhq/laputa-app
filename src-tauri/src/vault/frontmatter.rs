@@ -37,6 +37,10 @@ pub(crate) struct Frontmatter {
     pub sidebar_label: Option<StringOrList>,
     #[serde(default)]
     pub template: Option<StringOrList>,
+    #[serde(rename = "_filename_template", default)]
+    pub filename_template: Option<StringOrList>,
+    #[serde(rename = "_subfolder_path", default)]
+    pub subfolder_path: Option<StringOrList>,
     #[serde(rename = "_sort", alias = "sort", default)]
     pub sort: Option<StringOrList>,
     #[serde(default)]
