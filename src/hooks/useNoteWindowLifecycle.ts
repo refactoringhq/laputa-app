@@ -76,7 +76,9 @@ async function openNoteWindowEntry({
     if (openedRef.current) return
     openedRef.current = true
     missingPathRef.current = null
-    void actionsRef.current.handleSelectNote(entry)
+    void Promise.resolve(actionsRef.current.handleSelectNote(entry)).catch((selectError) => {
+      console.warn('Failed to select note after note-window content fallback:', selectError)
+    })
   }
 }
 
