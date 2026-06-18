@@ -864,178 +864,254 @@ def quarter_label_for_date(current_date: date) -> str:
     return "4"
 
 
+def person_name(slug: str) -> str:
+    return next((person[1] for person in PERSONS if person[0] == slug), slug)
+
+
+def in_biweekly_window(current_date: date, start_date: date) -> bool:
+    return (current_date - start_date).days % 14 < 7
+
+
+def write_event(
+    slug_prefix: str,
+    title: str,
+    current_date: date,
+    tags: list[str],
+    body: str,
+    related: list[str] | None = None,
+):
+    day_slug = current_date.isoformat()
+    fields = {
+        "aliases": [f"{title} — {day_slug}"],
+        "Is A": "Event",
+        "Date": day_slug,
+        "Belongs to": wl(current_date.strftime("%Y-%m")),
+    }
+    if related is not None:
+        fields["Related to"] = related
+    fields["Tags"] = tags
+    write_md("event", f"{slug_prefix}-{day_slug}", fields, f"# {title} — {day_slug}\n{body}")
+
+
+def generate_team_sync_event(current_date: date) -> int:
+    team = [wl("person-matteo-cellini"), wl("person-paco-furiani")]
+    if current_date >= date(2024, 4, 1):
+        team.append(wl("person-sara-ricci"))
+    write_event(
+        "event-team-sync",
+        "Team sync",
+        current_date,
+        ["Work"],
+        "Weekly Monday team alignment. Covered priorities, blockers, and sponsor updates.",
+        team,
+    )
+    return 1
+
+
+def generate_cycling_interval_event(current_date: date) -> int:
+    write_event(
+        "event-cycling",
+        "Cycling intervals",
+        current_date,
+        ["Health", "Sport"],
+        "60-min interval session. 4x8min at threshold power.",
+        [wl("person-luca-rossi")],
+    )
+    return 1
+
+
+def generate_wednesday_event(current_date: date) -> int:
+    if in_biweekly_window(current_date, date(2024, 1, 3)):
+        write_event(
+            "event-gym",
+            "Gym",
+            current_date,
+            ["Health"],
+            "Strength training. Squat, deadlift, pull-ups. 75 minutes.",
+        )
+        return 1
+
+    quarter_label = quarter_label_for_date(current_date)
+    write_event(
+        "event-1on1-matteo",
+        "1:1 Matteo",
+        current_date,
+        ["Work"],
+        f"Bi-weekly 1:1. Covered sponsor pipeline and Q{quarter_label} priorities.",
+        [wl("person-matteo-cellini")],
+    )
+    return 1
+
+
+def generate_cycling_endurance_event(current_date: date) -> int:
+    write_event(
+        "event-cycling-endurance",
+        "Cycling endurance",
+        current_date,
+        ["Health", "Sport"],
+        "90-min endurance ride at zone 2. Avg HR 135.",
+    )
+    return 1
+
+
+def generate_friday_workout_or_sponsor_event(current_date: date) -> int:
+    if in_biweekly_window(current_date, date(2024, 1, 5)):
+        sponsor = random.choice(SPONSOR_PERSONS)
+        write_event(
+            "event-sponsor-call",
+            "Sponsor call",
+            current_date,
+            ["Work"],
+            "Sponsor discovery/renewal call. Discussed placement and campaign goals.",
+            [wl(sponsor)],
+        )
+        return 1
+
+    write_event(
+        "event-gym-fri",
+        "Gym",
+        current_date,
+        ["Health"],
+        "Strength session. Bench press, rows, overhead press. Core work.",
+    )
+    return 1
+
+
+def generate_long_ride_event(current_date: date) -> int:
+    relations = [wl("person-luca-rossi")]
+    ride_note = "Solo long ride."
+    if random.random() < 0.4:
+        relations = [wl("person-luca-rossi"), wl("person-alessandro-ferrari")]
+        ride_note = "Long ride with Alessandro."
+    distance = random.randint(80, 130)
+    elevation = random.randint(800, 2000)
+    write_event(
+        "event-long-ride",
+        "Long ride",
+        current_date,
+        ["Health", "Sport"],
+        f"{ride_note} {distance}km, {elevation}m elevation.",
+        relations,
+    )
+    return 1
+
+
+def generate_sunday_event(current_date: date) -> int:
+    if in_biweekly_window(current_date, date(2024, 1, 7)):
+        write_event(
+            "event-reading",
+            "Reading session",
+            current_date,
+            ["Learning"],
+            "Sunday morning reading block. 2 hours with coffee.",
+        )
+        return 1
+
+    write_event(
+        "event-family-call",
+        "Family call",
+        current_date,
+        ["Personal", "Family"],
+        "Sunday family call with Elena and parents.",
+        [wl("person-elena-rossi"), wl("person-roberto-rossi")],
+    )
+    return 1
+
+
+WEEKDAY_EVENT_GENERATORS = {
+    0: generate_team_sync_event,
+    1: generate_cycling_interval_event,
+    2: generate_wednesday_event,
+    3: generate_cycling_endurance_event,
+    4: generate_friday_workout_or_sponsor_event,
+    5: generate_long_ride_event,
+    6: generate_sunday_event,
+}
+
+
+def generate_regular_weekday_event(current_date: date) -> int:
+    return WEEKDAY_EVENT_GENERATORS[current_date.weekday()](current_date)
+
+
+def generate_monthly_paco_event(current_date: date) -> int:
+    if current_date.weekday() != 3 or current_date.day > 7:
+        return 0
+    write_event(
+        "event-1on1-paco",
+        "1:1 Paco",
+        current_date,
+        ["Work"],
+        "Monthly 1:1. Operations review, tooling updates, and process improvements.",
+        [wl("person-paco-furiani")],
+    )
+    return 1
+
+
+def generate_nonna_visit_event(current_date: date) -> int:
+    if current_date.weekday() != 6 or current_date.day < 24:
+        return 0
+    write_event(
+        "event-nonna-visit",
+        "Visita dalla Nonna",
+        current_date,
+        ["Personal", "Family"],
+        "Visita mensile alla nonna a Lecco. Pranzo con risotto.",
+        [wl("person-nonna-lucia")],
+    )
+    return 1
+
+
+def generate_podcast_recording_event(current_date: date) -> int:
+    if current_date.weekday() != 3 or current_date < date(2024, 2, 1):
+        return 0
+    if not in_biweekly_window(current_date, date(2024, 2, 1)):
+        return 0
+
+    guest = random.choice(PODCAST_GUESTS)
+    write_event(
+        "event-podcast-rec",
+        "Podcast recording",
+        current_date,
+        ["Work", "Podcast"],
+        f"Recorded episode with {person_name(guest)}. Great conversation.",
+        [wl(guest)],
+    )
+    return 1
+
+
+def generate_dinner_event(current_date: date) -> int:
+    if current_date.weekday() != 4 or random.random() >= 0.5:
+        return 0
+
+    friend = random.choice(FRIEND_SLUGS + ["person-giulia-marchetti"])
+    write_event(
+        "event-dinner",
+        "Dinner",
+        current_date,
+        ["Personal"],
+        f"Evening dinner with {person_name(friend)}.",
+        [wl(friend)],
+    )
+    return 1
+
+
+def generate_extra_events(current_date: date) -> int:
+    return (
+        generate_monthly_paco_event(current_date)
+        + generate_nonna_visit_event(current_date)
+        + generate_podcast_recording_event(current_date)
+        + generate_dinner_event(current_date)
+    )
+
+
 def generate_events():
     current_date = date(2024, 1, 1)
     end_date = date(2025, 12, 31)
     event_count = 0
-    sara_joined = date(2024, 4, 1)
 
     while current_date <= end_date and event_count < 650:
-        weekday = current_date.weekday()
-        day_slug = current_date.isoformat()
-        month_slug = current_date.strftime("%Y-%m")
-
-        if weekday == 0:
-            team = [wl("person-matteo-cellini"), wl("person-paco-furiani")]
-            if current_date >= sara_joined:
-                team.append(wl("person-sara-ricci"))
-            write_md("event", f"event-team-sync-{day_slug}", {
-                "aliases": [f"Team sync — {day_slug}"],
-                "Is A": "Event",
-                "Date": day_slug,
-                "Belongs to": wl(month_slug),
-                "Related to": team,
-                "Tags": ["Work"],
-            }, f"# Team sync — {day_slug}\nWeekly Monday team alignment. Covered priorities, blockers, and sponsor updates.")
-            event_count += 1
-
-        if weekday == 1:
-            write_md("event", f"event-cycling-{day_slug}", {
-                "aliases": [f"Cycling intervals — {day_slug}"],
-                "Is A": "Event",
-                "Date": day_slug,
-                "Belongs to": wl(month_slug),
-                "Related to": [wl("person-luca-rossi")],
-                "Tags": ["Health", "Sport"],
-            }, f"# Cycling intervals — {day_slug}\n60-min interval session. 4x8min at threshold power.")
-            event_count += 1
-
-        if weekday == 2:
-            if (current_date - date(2024, 1, 3)).days % 14 < 7:
-                write_md("event", f"event-gym-{day_slug}", {
-                    "aliases": [f"Gym — {day_slug}"],
-                    "Is A": "Event",
-                    "Date": day_slug,
-                    "Belongs to": wl(month_slug),
-                    "Tags": ["Health"],
-                }, f"# Gym — {day_slug}\nStrength training. Squat, deadlift, pull-ups. 75 minutes.")
-            else:
-                quarter_label = quarter_label_for_date(current_date)
-                write_md("event", f"event-1on1-matteo-{day_slug}", {
-                    "aliases": [f"1:1 Matteo — {day_slug}"],
-                    "Is A": "Event",
-                    "Date": day_slug,
-                    "Belongs to": wl(month_slug),
-                    "Related to": [wl("person-matteo-cellini")],
-                    "Tags": ["Work"],
-                }, f"# 1:1 Matteo — {day_slug}\nBi-weekly 1:1. Covered sponsor pipeline and Q{quarter_label} priorities.")
-            event_count += 1
-
-        if weekday == 3:
-            write_md("event", f"event-cycling-endurance-{day_slug}", {
-                "aliases": [f"Cycling endurance — {day_slug}"],
-                "Is A": "Event",
-                "Date": day_slug,
-                "Belongs to": wl(month_slug),
-                "Tags": ["Health", "Sport"],
-            }, f"# Cycling endurance — {day_slug}\n90-min endurance ride at zone 2. Avg HR 135.")
-            event_count += 1
-
-        if weekday == 4:
-            if (current_date - date(2024, 1, 5)).days % 14 < 7:
-                sponsor = random.choice(SPONSOR_PERSONS)
-                write_md("event", f"event-sponsor-call-{day_slug}", {
-                    "aliases": [f"Sponsor call — {day_slug}"],
-                    "Is A": "Event",
-                    "Date": day_slug,
-                    "Belongs to": wl(month_slug),
-                    "Related to": [wl(sponsor)],
-                    "Tags": ["Work"],
-                }, f"# Sponsor call — {day_slug}\nSponsor discovery/renewal call. Discussed placement and campaign goals.")
-            else:
-                write_md("event", f"event-gym-fri-{day_slug}", {
-                    "aliases": [f"Gym — {day_slug}"],
-                    "Is A": "Event",
-                    "Date": day_slug,
-                    "Belongs to": wl(month_slug),
-                    "Tags": ["Health"],
-                }, f"# Gym — {day_slug}\nStrength session. Bench press, rows, overhead press. Core work.")
-            event_count += 1
-
-        if weekday == 5:
-            relations = [wl("person-luca-rossi")]
-            ride_note = "Solo long ride."
-            if random.random() < 0.4:
-                relations = [wl("person-luca-rossi"), wl("person-alessandro-ferrari")]
-                ride_note = "Long ride with Alessandro."
-            write_md("event", f"event-long-ride-{day_slug}", {
-                "aliases": [f"Long ride — {day_slug}"],
-                "Is A": "Event",
-                "Date": day_slug,
-                "Belongs to": wl(month_slug),
-                "Related to": relations,
-                "Tags": ["Health", "Sport"],
-            }, f"# Long ride — {day_slug}\n{ride_note} {random.randint(80, 130)}km, {random.randint(800, 2000)}m elevation.")
-            event_count += 1
-
-        if weekday == 6:
-            if (current_date - date(2024, 1, 7)).days % 14 < 7:
-                write_md("event", f"event-reading-{day_slug}", {
-                    "aliases": [f"Reading session — {day_slug}"],
-                    "Is A": "Event",
-                    "Date": day_slug,
-                    "Belongs to": wl(month_slug),
-                    "Tags": ["Learning"],
-                }, f"# Reading session — {day_slug}\nSunday morning reading block. 2 hours with coffee.")
-            else:
-                write_md("event", f"event-family-call-{day_slug}", {
-                    "aliases": [f"Family call — {day_slug}"],
-                    "Is A": "Event",
-                    "Date": day_slug,
-                    "Belongs to": wl(month_slug),
-                    "Related to": [wl("person-elena-rossi"), wl("person-roberto-rossi")],
-                    "Tags": ["Personal", "Family"],
-                }, f"# Family call — {day_slug}\nSunday family call with Elena and parents.")
-            event_count += 1
-
-        if weekday == 3 and current_date.day <= 7:
-            write_md("event", f"event-1on1-paco-{day_slug}", {
-                "aliases": [f"1:1 Paco — {day_slug}"],
-                "Is A": "Event",
-                "Date": day_slug,
-                "Belongs to": wl(month_slug),
-                "Related to": [wl("person-paco-furiani")],
-                "Tags": ["Work"],
-            }, f"# 1:1 Paco — {day_slug}\nMonthly 1:1. Operations review, tooling updates, and process improvements.")
-            event_count += 1
-
-        if weekday == 6 and current_date.day >= 24:
-            write_md("event", f"event-nonna-visit-{day_slug}", {
-                "aliases": [f"Visita dalla Nonna — {day_slug}"],
-                "Is A": "Event",
-                "Date": day_slug,
-                "Belongs to": wl(month_slug),
-                "Related to": [wl("person-nonna-lucia")],
-                "Tags": ["Personal", "Family"],
-            }, f"# Visita dalla Nonna — {day_slug}\nVisita mensile alla nonna a Lecco. Pranzo con risotto.")
-            event_count += 1
-
-        if weekday == 3 and current_date >= date(2024, 2, 1) and (current_date - date(2024, 2, 1)).days % 14 < 7:
-            guest = random.choice(PODCAST_GUESTS)
-            guest_name = next((person[1] for person in PERSONS if person[0] == guest), guest)
-            write_md("event", f"event-podcast-rec-{day_slug}", {
-                "aliases": [f"Podcast recording — {day_slug}"],
-                "Is A": "Event",
-                "Date": day_slug,
-                "Belongs to": wl(month_slug),
-                "Related to": [wl(guest)],
-                "Tags": ["Work", "Podcast"],
-            }, f"# Podcast recording — {day_slug}\nRecorded episode with {guest_name}. Great conversation.")
-            event_count += 1
-
-        if weekday == 4 and random.random() < 0.5:
-            friend = random.choice(FRIEND_SLUGS + ["person-giulia-marchetti"])
-            friend_name = next((person[1] for person in PERSONS if person[0] == friend), friend)
-            write_md("event", f"event-dinner-{day_slug}", {
-                "aliases": [f"Dinner — {day_slug}"],
-                "Is A": "Event",
-                "Date": day_slug,
-                "Belongs to": wl(month_slug),
-                "Related to": [wl(friend)],
-                "Tags": ["Personal"],
-            }, f"# Dinner — {day_slug}\nEvening dinner with {friend_name}.")
-            event_count += 1
-
+        event_count += generate_regular_weekday_event(current_date)
+        event_count += generate_extra_events(current_date)
         current_date += timedelta(days=1)
 
 
