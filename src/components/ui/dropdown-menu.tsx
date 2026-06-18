@@ -6,30 +6,89 @@ import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
-function DropdownMenu({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
-  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+const dropdownMenuContentMotionClass =
+  "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 origin-(--radix-dropdown-menu-content-transform-origin) rounded-md border p-1"
+
+const dropdownMenuCheckedItemClass =
+  "focus:bg-accent focus:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+
+const dropdownMenuItemIndicatorClass =
+  "pointer-events-none absolute left-2 flex size-3.5 items-center justify-center"
+
+function createDropdownMenuSlot<T extends React.ElementType>(
+  Component: T,
+  slot: string,
+  displayName: string
+) {
+  function DropdownMenuSlot(props: React.ComponentProps<T>) {
+    return React.createElement(Component, { "data-slot": slot, ...props })
+  }
+
+  DropdownMenuSlot.displayName = displayName
+  return DropdownMenuSlot
 }
 
-function DropdownMenuPortal({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>) {
+function DropdownMenuItemIndicator({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <DropdownMenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
+    <span className={dropdownMenuItemIndicatorClass}>
+      <DropdownMenuPrimitive.ItemIndicator>
+        {children}
+      </DropdownMenuPrimitive.ItemIndicator>
+    </span>
   )
 }
 
-function DropdownMenuTrigger({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
-  return (
-    <DropdownMenuPrimitive.Trigger
-      data-slot="dropdown-menu-trigger"
-      {...props}
-    />
-  )
+function createDropdownMenuCheckedItem<T extends React.ElementType>(
+  Component: T,
+  slot: string,
+  indicator: React.ReactNode,
+  displayName: string
+) {
+  type Props = React.ComponentProps<T> & {
+    className?: string
+    children?: React.ReactNode
+  }
+
+  function CheckedItem({ className, children, ...props }: Props) {
+    return React.createElement(
+      Component,
+      {
+        "data-slot": slot,
+        ...props,
+        className: cn(dropdownMenuCheckedItemClass, className),
+      },
+      <>
+        <DropdownMenuItemIndicator>{indicator}</DropdownMenuItemIndicator>
+        {children}
+      </>
+    )
+  }
+
+  CheckedItem.displayName = displayName
+  return CheckedItem
 }
+
+const DropdownMenu = createDropdownMenuSlot(
+  DropdownMenuPrimitive.Root,
+  "dropdown-menu",
+  "DropdownMenu"
+)
+
+const DropdownMenuPortal = createDropdownMenuSlot(
+  DropdownMenuPrimitive.Portal,
+  "dropdown-menu-portal",
+  "DropdownMenuPortal"
+)
+
+const DropdownMenuTrigger = createDropdownMenuSlot(
+  DropdownMenuPrimitive.Trigger,
+  "dropdown-menu-trigger",
+  "DropdownMenuTrigger"
+)
 
 function DropdownMenuContent({
   className,
@@ -42,7 +101,8 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md",
+          dropdownMenuContentMotionClass,
+          "max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] overflow-x-hidden overflow-y-auto shadow-md",
           className
         )}
         {...props}
@@ -51,13 +111,11 @@ function DropdownMenuContent({
   )
 }
 
-function DropdownMenuGroup({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Group>) {
-  return (
-    <DropdownMenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
-  )
-}
+const DropdownMenuGroup = createDropdownMenuSlot(
+  DropdownMenuPrimitive.Group,
+  "dropdown-menu-group",
+  "DropdownMenuGroup"
+)
 
 function DropdownMenuItem({
   className,
@@ -82,66 +140,25 @@ function DropdownMenuItem({
   )
 }
 
-function DropdownMenuCheckboxItem({
-  className,
-  children,
-  checked,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
-  return (
-    <DropdownMenuPrimitive.CheckboxItem
-      data-slot="dropdown-menu-checkbox-item"
-      className={cn(
-        "focus:bg-accent focus:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      checked={checked}
-      {...props}
-    >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-        <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
-        </DropdownMenuPrimitive.ItemIndicator>
-      </span>
-      {children}
-    </DropdownMenuPrimitive.CheckboxItem>
-  )
-}
+const DropdownMenuCheckboxItem = createDropdownMenuCheckedItem(
+  DropdownMenuPrimitive.CheckboxItem,
+  "dropdown-menu-checkbox-item",
+  <CheckIcon className="size-4" />,
+  "DropdownMenuCheckboxItem"
+)
 
-function DropdownMenuRadioGroup({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>) {
-  return (
-    <DropdownMenuPrimitive.RadioGroup
-      data-slot="dropdown-menu-radio-group"
-      {...props}
-    />
-  )
-}
+const DropdownMenuRadioGroup = createDropdownMenuSlot(
+  DropdownMenuPrimitive.RadioGroup,
+  "dropdown-menu-radio-group",
+  "DropdownMenuRadioGroup"
+)
 
-function DropdownMenuRadioItem({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.RadioItem>) {
-  return (
-    <DropdownMenuPrimitive.RadioItem
-      data-slot="dropdown-menu-radio-item"
-      className={cn(
-        "focus:bg-accent focus:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-        <DropdownMenuPrimitive.ItemIndicator>
-          <CircleIcon className="size-2 fill-current" />
-        </DropdownMenuPrimitive.ItemIndicator>
-      </span>
-      {children}
-    </DropdownMenuPrimitive.RadioItem>
-  )
-}
+const DropdownMenuRadioItem = createDropdownMenuCheckedItem(
+  DropdownMenuPrimitive.RadioItem,
+  "dropdown-menu-radio-item",
+  <CircleIcon className="size-2 fill-current" />,
+  "DropdownMenuRadioItem"
+)
 
 function DropdownMenuLabel({
   className,
@@ -192,11 +209,11 @@ function DropdownMenuShortcut({
   )
 }
 
-function DropdownMenuSub({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
-  return <DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />
-}
+const DropdownMenuSub = createDropdownMenuSlot(
+  DropdownMenuPrimitive.Sub,
+  "dropdown-menu-sub",
+  "DropdownMenuSub"
+)
 
 function DropdownMenuSubTrigger({
   className,
@@ -230,7 +247,8 @@ function DropdownMenuSubContent({
     <DropdownMenuPrimitive.SubContent
       data-slot="dropdown-menu-sub-content"
       className={cn(
-        "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-md border p-1 shadow-lg",
+        dropdownMenuContentMotionClass,
+        "min-w-[8rem] overflow-hidden shadow-lg",
         className
       )}
       {...props}
