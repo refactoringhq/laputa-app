@@ -1,6 +1,15 @@
 //! Pure text-processing helpers for markdown content parsing.
 //! Snippet extraction, markdown stripping, date parsing, and string utilities.
 
+#[derive(Clone, Copy)]
+struct TextSlice<'a>(&'a str);
+
+impl<'a> TextSlice<'a> {
+    fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
 /// Derive a human-readable title from a filename stem (slug).
 /// Converts hyphens to spaces and title-cases each word.
 /// Example: `career-tracks-depend-on-company-shape` → `Career Tracks Depend on Company Shape`
@@ -24,22 +33,30 @@ pub(super) fn slug_to_title(stem: &str) -> String {
 /// Extract the H1 title from the first non-empty line of the body (after frontmatter).
 /// Returns `None` if no H1 is found on the first non-empty line.
 pub(super) fn extract_h1_title(content: &str) -> Option<String> {
-    let body = strip_frontmatter(content);
-    let title = first_non_empty_line(body).and_then(markdown_h1_text)?;
-    non_empty_trimmed(&strip_markdown_chars(title)).map(str::to_string)
+    let body = strip_frontmatter(TextSlice(content));
+    let title =
+        first_non_empty_line(TextSlice(body)).and_then(|line| markdown_h1_text(TextSlice(line)))?;
+    let stripped = strip_markdown_chars(TextSlice(title));
+    non_empty_trimmed(TextSlice(&stripped)).map(str::to_string)
 }
 
-fn non_empty_trimmed(value: &str) -> Option<&str> {
-    let trimmed = value.trim();
+fn non_empty_trimmed(value: TextSlice<'_>) -> Option<&str> {
+    let trimmed = value.as_str().trim();
     (!trimmed.is_empty()).then_some(trimmed)
 }
 
-fn first_non_empty_line(value: &str) -> Option<&str> {
-    value.lines().map(str::trim).find(|line| !line.is_empty())
+fn first_non_empty_line(value: TextSlice<'_>) -> Option<&str> {
+    value
+        .as_str()
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
 }
 
-fn markdown_h1_text(line: &str) -> Option<&str> {
-    line.strip_prefix("# ").and_then(non_empty_trimmed)
+fn markdown_h1_text(line: TextSlice<'_>) -> Option<&str> {
+    line.as_str()
+        .strip_prefix("# ")
+        .and_then(|text| non_empty_trimmed(TextSlice(text)))
 }
 
 /// Extract the display title for a note.
@@ -63,9 +80,10 @@ pub(super) fn extract_title(fm_title: Option<&str>, content: &str, filename: &st
 /// Remove YAML frontmatter (triple-dash delimited) from content.
 /// The closing `---` must appear at the start of a line to avoid matching
 /// occurrences inside frontmatter values (e.g. `title: foo---bar`).
-fn strip_frontmatter(content: &str) -> &str {
-    let Some(rest) = content.strip_prefix("---") else {
-        return content;
+fn strip_frontmatter(content: TextSlice<'_>) -> &str {
+    let value = content.as_str();
+    let Some(rest) = value.strip_prefix("---") else {
+        return value;
     };
     // Find closing `---` at the start of a line (preceded by newline)
     match rest.find("\n---") {
@@ -73,19 +91,19 @@ fn strip_frontmatter(content: &str) -> &str {
             let after = end + 4; // skip past "\n---"
             rest[after..].trim_start()
         }
-        None => content,
+        None => value,
     }
 }
 
 /// Check if a line is useful for snippet extraction (not blank, heading, code fence, or rule).
-fn is_snippet_line(line: &str) -> bool {
-    let t = line.trim();
+fn is_snippet_line(line: TextSlice<'_>) -> bool {
+    let t = line.as_str().trim();
     !t.is_empty() && !t.starts_with('#') && !t.starts_with("```") && !t.starts_with("---")
 }
 
 /// Extract sub-heading text (## , ### , etc.) stripped of the `#` prefix.
-fn extract_subheading_text(line: &str) -> Option<&str> {
-    let t = line.trim();
+fn extract_subheading_text(line: TextSlice<'_>) -> Option<&str> {
+    let t = line.as_str().trim();
     let stripped = t.trim_start_matches('#');
     if stripped.len() < t.len() && stripped.starts_with(' ') {
         let text = stripped.trim();
@@ -97,46 +115,48 @@ fn extract_subheading_text(line: &str) -> Option<&str> {
 }
 
 /// Strip leading list markers (*, -, +, 1.) from a line.
-fn strip_list_marker(line: &str) -> &str {
-    let t = line.trim_start();
-    strip_unordered_marker(t)
-        .or_else(|| strip_ordered_marker(t))
+fn strip_list_marker(line: TextSlice<'_>) -> &str {
+    let t = line.as_str().trim_start();
+    strip_unordered_marker(TextSlice(t))
+        .or_else(|| strip_ordered_marker(TextSlice(t)))
         .unwrap_or(t)
 }
 
 /// Strip unordered list markers: "* ", "- ", "+ "
-fn strip_unordered_marker(s: &str) -> Option<&str> {
+fn strip_unordered_marker(s: TextSlice<'_>) -> Option<&str> {
     ["* ", "- ", "+ "]
         .iter()
-        .find_map(|prefix| s.strip_prefix(prefix))
+        .find_map(|prefix| s.as_str().strip_prefix(prefix))
 }
 
 /// Strip ordered list markers: "1. ", "2. ", etc.
-fn strip_ordered_marker(s: &str) -> Option<&str> {
-    let dot_pos = s.find(". ")?;
-    if dot_pos <= 3 && s[..dot_pos].chars().all(|c| c.is_ascii_digit()) {
-        Some(&s[dot_pos + 2..])
+fn strip_ordered_marker(s: TextSlice<'_>) -> Option<&str> {
+    let value = s.as_str();
+    let dot_pos = value.find(". ")?;
+    if dot_pos <= 3 && value[..dot_pos].chars().all(|c| c.is_ascii_digit()) {
+        Some(&value[dot_pos + 2..])
     } else {
         None
     }
 }
 
 /// Truncate a string to `max_len` bytes at a valid UTF-8 boundary, appending "...".
-fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        return s.to_string();
+fn truncate_with_ellipsis(s: TextSlice<'_>, max_len: usize) -> String {
+    let value = s.as_str();
+    if value.len() <= max_len {
+        return value.to_string();
     }
     let mut idx = max_len;
-    while idx > 0 && !s.is_char_boundary(idx) {
+    while idx > 0 && !value.is_char_boundary(idx) {
         idx -= 1;
     }
-    format!("{}...", &s[..idx])
+    format!("{}...", &value[..idx])
 }
 
 /// Count the number of words in the note body (excluding frontmatter and H1 title).
 pub(super) fn count_body_words(content: &str) -> u32 {
-    let without_fm = strip_frontmatter(content);
-    let body = without_h1_line(without_fm).unwrap_or(without_fm);
+    let without_fm = strip_frontmatter(TextSlice(content));
+    let body = without_h1_line(TextSlice(without_fm)).unwrap_or(without_fm);
     body.split_whitespace()
         .filter(|w| {
             !w.chars()
@@ -147,39 +167,40 @@ pub(super) fn count_body_words(content: &str) -> u32 {
 
 /// Extract a snippet: first ~160 chars of content after frontmatter/title, stripped of markdown.
 pub(super) fn extract_snippet(content: &str) -> String {
-    let without_fm = strip_frontmatter(content);
-    let body = without_h1_line(without_fm).unwrap_or(without_fm);
+    let without_fm = strip_frontmatter(TextSlice(content));
+    let body = without_h1_line(TextSlice(without_fm)).unwrap_or(without_fm);
     let clean: String = body
         .lines()
-        .filter(|line| is_snippet_line(line))
-        .map(strip_list_marker)
+        .filter(|line| is_snippet_line(TextSlice(line)))
+        .map(|line| strip_list_marker(TextSlice(line)))
         .collect::<Vec<&str>>()
         .join(" ");
-    let stripped = strip_markdown_chars(&clean);
+    let stripped = strip_markdown_chars(TextSlice(&clean));
     let trimmed = stripped.trim();
     if !trimmed.is_empty() {
-        return truncate_with_ellipsis(trimmed, 160);
+        return truncate_with_ellipsis(TextSlice(trimmed), 160);
     }
     // Fallback: collect sub-heading text when no paragraph content exists
     let heading_text: String = body
         .lines()
-        .filter_map(extract_subheading_text)
+        .filter_map(|line| extract_subheading_text(TextSlice(line)))
         .collect::<Vec<&str>>()
         .join(" ");
-    let heading_trimmed = strip_markdown_chars(&heading_text);
+    let heading_trimmed = strip_markdown_chars(TextSlice(&heading_text));
     let heading_trimmed = heading_trimmed.trim();
     if heading_trimmed.is_empty() {
         return String::new();
     }
-    truncate_with_ellipsis(heading_trimmed, 160)
+    truncate_with_ellipsis(TextSlice(heading_trimmed), 160)
 }
 
-fn without_h1_line(s: &str) -> Option<&str> {
+fn without_h1_line(s: TextSlice<'_>) -> Option<&str> {
+    let value = s.as_str();
     let mut offset = 0;
-    for line in s.split_inclusive('\n') {
+    for line in value.split_inclusive('\n') {
         let trimmed = line.trim_end_matches(['\r', '\n']).trim();
         if trimmed.starts_with("# ") {
-            return Some(&s[offset + line.len()..]);
+            return Some(&value[offset + line.len()..]);
         }
         // If we hit non-empty non-heading content first, there's no H1 to skip
         if !trimmed.is_empty() {
@@ -216,9 +237,10 @@ fn is_markdown_formatting(ch: char) -> bool {
     matches!(ch, '*' | '_' | '`' | '~')
 }
 
-fn strip_markdown_chars(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    let mut chars = s.chars().peekable();
+fn strip_markdown_chars(s: TextSlice<'_>) -> String {
+    let value = s.as_str();
+    let mut result = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
     while let Some(ch) = chars.next() {
         match ch {
             '[' if chars.peek() == Some(&'[') => {
@@ -322,6 +344,10 @@ pub(super) fn extract_outgoing_links(content: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn text(value: &str) -> TextSlice<'_> {
+        TextSlice(value)
+    }
 
     // --- slug_to_title tests ---
 
@@ -541,22 +567,22 @@ mod tests {
 
     #[test]
     fn test_strip_list_marker_unordered() {
-        assert_eq!(strip_list_marker("* Item one"), "Item one");
-        assert_eq!(strip_list_marker("- Item two"), "Item two");
-        assert_eq!(strip_list_marker("+ Item three"), "Item three");
+        assert_eq!(strip_list_marker(text("* Item one")), "Item one");
+        assert_eq!(strip_list_marker(text("- Item two")), "Item two");
+        assert_eq!(strip_list_marker(text("+ Item three")), "Item three");
     }
 
     #[test]
     fn test_strip_list_marker_ordered() {
-        assert_eq!(strip_list_marker("1. First item"), "First item");
-        assert_eq!(strip_list_marker("10. Tenth item"), "Tenth item");
-        assert_eq!(strip_list_marker("99. Large number"), "Large number");
+        assert_eq!(strip_list_marker(text("1. First item")), "First item");
+        assert_eq!(strip_list_marker(text("10. Tenth item")), "Tenth item");
+        assert_eq!(strip_list_marker(text("99. Large number")), "Large number");
     }
 
     #[test]
     fn test_strip_list_marker_preserves_non_list() {
-        assert_eq!(strip_list_marker("Regular text"), "Regular text");
-        assert_eq!(strip_list_marker("  Indented text"), "Indented text");
+        assert_eq!(strip_list_marker(text("Regular text")), "Regular text");
+        assert_eq!(strip_list_marker(text("  Indented text")), "Indented text");
     }
 
     #[test]
@@ -666,32 +692,32 @@ mod tests {
     #[test]
     fn test_strip_frontmatter_basic() {
         let content = "---\ntitle: Test\n---\nBody content.";
-        assert_eq!(strip_frontmatter(content), "Body content.");
+        assert_eq!(strip_frontmatter(text(content)), "Body content.");
     }
 
     #[test]
     fn test_strip_frontmatter_no_frontmatter() {
         let content = "Just plain content.";
-        assert_eq!(strip_frontmatter(content), "Just plain content.");
+        assert_eq!(strip_frontmatter(text(content)), "Just plain content.");
     }
 
     #[test]
     fn test_strip_frontmatter_dashes_in_value() {
         // The closing --- must be at line start, not inside a value
         let content = "---\ntitle: foo---bar\nstatus: active\n---\nBody here.";
-        assert_eq!(strip_frontmatter(content), "Body here.");
+        assert_eq!(strip_frontmatter(text(content)), "Body here.");
     }
 
     #[test]
     fn test_strip_frontmatter_unclosed() {
         let content = "---\ntitle: Test\nNo closing fence";
-        assert_eq!(strip_frontmatter(content), content);
+        assert_eq!(strip_frontmatter(text(content)), content);
     }
 
     #[test]
     fn test_strip_frontmatter_empty_body() {
         let content = "---\ntitle: Test\n---\n";
-        assert_eq!(strip_frontmatter(content), "");
+        assert_eq!(strip_frontmatter(text(content)), "");
     }
 
     #[test]
@@ -705,94 +731,103 @@ mod tests {
 
     #[test]
     fn test_strip_markdown_chars_plain_text() {
-        assert_eq!(strip_markdown_chars("hello world"), "hello world");
+        assert_eq!(strip_markdown_chars(text("hello world")), "hello world");
     }
 
     #[test]
     fn test_strip_markdown_chars_emphasis() {
         assert_eq!(
-            strip_markdown_chars("**bold** and *italic*"),
+            strip_markdown_chars(text("**bold** and *italic*")),
             "bold and italic"
         );
     }
 
     #[test]
     fn test_strip_markdown_chars_backticks() {
-        assert_eq!(strip_markdown_chars("use `code` here"), "use code here");
+        assert_eq!(
+            strip_markdown_chars(text("use `code` here")),
+            "use code here"
+        );
     }
 
     #[test]
     fn test_strip_markdown_chars_strikethrough() {
-        assert_eq!(strip_markdown_chars("~~deleted~~"), "deleted");
+        assert_eq!(strip_markdown_chars(text("~~deleted~~")), "deleted");
     }
 
     #[test]
     fn test_strip_markdown_chars_link_with_url() {
         assert_eq!(
-            strip_markdown_chars("[click here](https://example.com)"),
+            strip_markdown_chars(text("[click here](https://example.com)")),
             "click here"
         );
     }
 
     #[test]
     fn test_strip_markdown_chars_wikilink() {
-        assert_eq!(strip_markdown_chars("see [[my note]]"), "see my note");
+        assert_eq!(strip_markdown_chars(text("see [[my note]]")), "see my note");
     }
 
     #[test]
     fn test_strip_markdown_chars_wikilink_alias() {
         assert_eq!(
-            strip_markdown_chars("visit [[project/alpha|Alpha Project]]"),
+            strip_markdown_chars(text("visit [[project/alpha|Alpha Project]]")),
             "visit Alpha Project"
         );
     }
 
     #[test]
     fn test_strip_markdown_chars_wikilink_unclosed() {
-        assert_eq!(strip_markdown_chars("see [[broken link"), "see broken link");
+        assert_eq!(
+            strip_markdown_chars(text("see [[broken link")),
+            "see broken link"
+        );
     }
 
     #[test]
     fn test_strip_markdown_chars_bracket_without_url() {
-        assert_eq!(strip_markdown_chars("[just brackets]"), "[just brackets]");
+        assert_eq!(
+            strip_markdown_chars(text("[just brackets]")),
+            "[just brackets]"
+        );
     }
 
     #[test]
     fn test_strip_markdown_chars_empty() {
-        assert_eq!(strip_markdown_chars(""), "");
+        assert_eq!(strip_markdown_chars(text("")), "");
     }
 
     // --- without_h1_line tests ---
 
     #[test]
     fn test_without_h1_line_starts_with_h1() {
-        let result = without_h1_line("# Title\nBody text");
+        let result = without_h1_line(text("# Title\nBody text"));
         assert!(result.is_some());
         assert_eq!(result.unwrap(), "Body text");
     }
 
     #[test]
     fn test_without_h1_line_blank_lines_then_h1() {
-        let result = without_h1_line("\n\n# Title\nBody");
+        let result = without_h1_line(text("\n\n# Title\nBody"));
         assert!(result.is_some());
         assert_eq!(result.unwrap(), "Body");
     }
 
     #[test]
     fn test_without_h1_line_non_heading_first() {
-        let result = without_h1_line("Some text\n# Title\n");
+        let result = without_h1_line(text("Some text\n# Title\n"));
         assert!(result.is_none());
     }
 
     #[test]
     fn test_without_h1_line_empty() {
-        let result = without_h1_line("");
+        let result = without_h1_line(text(""));
         assert!(result.is_none());
     }
 
     #[test]
     fn test_without_h1_line_only_blank_lines() {
-        let result = without_h1_line("\n\n\n");
+        let result = without_h1_line(text("\n\n\n"));
         assert!(result.is_none());
     }
 
