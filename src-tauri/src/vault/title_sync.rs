@@ -6,6 +6,8 @@ use crate::frontmatter::{update_frontmatter_content, FrontmatterValue};
 use super::parsing::slug_to_title;
 use super::rename::title_to_slug;
 
+const TITLE_PREFIXES: [&str; 2] = ["title:", "\"title\":"];
+
 /// Result of a title sync check.
 #[derive(Debug, PartialEq)]
 pub enum SyncAction {
@@ -21,18 +23,23 @@ fn extract_raw_title(content: &str) -> Option<String> {
         return None;
     }
     let fm = content[4..].split("\n---").next()?;
-    for line in fm.lines() {
-        let t = line.trim_start();
-        for prefix in &["title:", "\"title\":"] {
-            if let Some(rest) = t.strip_prefix(prefix) {
-                let val = rest.trim().trim_matches('"').trim_matches('\'');
-                if !val.is_empty() {
-                    return Some(val.to_string());
-                }
-            }
-        }
-    }
-    None
+    fm.lines().find_map(extract_title_from_line)
+}
+
+fn extract_title_from_line(line: &str) -> Option<String> {
+    TITLE_PREFIXES
+        .iter()
+        .find_map(|prefix| line.trim_start().strip_prefix(prefix))
+        .map(clean_title_value)
+        .filter(|value| !value.is_empty())
+}
+
+fn clean_title_value(raw_value: &str) -> String {
+    raw_value
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .to_string()
 }
 
 /// Sync the `title` frontmatter field with the filename.
@@ -81,22 +88,27 @@ mod tests {
         path
     }
 
-    #[test]
-    fn test_sync_adds_title_when_absent() {
-        let dir = TempDir::new().unwrap();
-        let path = write_note(
-            dir.path(),
-            "career-tracks.md",
-            "---\ntype: Note\n---\n# Career Tracks\n",
-        );
+    fn assert_title_update(dir: &Path, name: &str, content: &str, expected_title: &str) -> String {
+        let path = write_note(dir, name, content);
         let result = sync_title_on_open(&path).unwrap();
         assert_eq!(
             result,
             SyncAction::Updated {
-                title: "Career Tracks".to_string()
+                title: expected_title.to_string()
             }
         );
-        let content = fs::read_to_string(&path).unwrap();
+        fs::read_to_string(&path).unwrap()
+    }
+
+    #[test]
+    fn test_sync_adds_title_when_absent() {
+        let dir = TempDir::new().unwrap();
+        let content = assert_title_update(
+            dir.path(),
+            "career-tracks.md",
+            "---\ntype: Note\n---\n# Career Tracks\n",
+            "Career Tracks",
+        );
         assert!(content.contains("title: Career Tracks"));
     }
 
@@ -116,19 +128,12 @@ mod tests {
     fn test_sync_overwrites_desynced_title() {
         let dir = TempDir::new().unwrap();
         // Filename says "new-name" but title says "Old Name"
-        let path = write_note(
+        let content = assert_title_update(
             dir.path(),
             "new-name.md",
             "---\ntitle: Old Name\ntype: Note\n---\n# Old Name\n",
+            "New Name",
         );
-        let result = sync_title_on_open(&path).unwrap();
-        assert_eq!(
-            result,
-            SyncAction::Updated {
-                title: "New Name".to_string()
-            }
-        );
-        let content = fs::read_to_string(&path).unwrap();
         assert!(content.contains("title: New Name"));
         assert!(!content.contains("title: Old Name"));
     }
@@ -136,19 +141,12 @@ mod tests {
     #[test]
     fn test_sync_adds_frontmatter_when_none_exists() {
         let dir = TempDir::new().unwrap();
-        let path = write_note(
+        let content = assert_title_update(
             dir.path(),
             "plain-note.md",
             "# Plain Note\n\nSome content.\n",
+            "Plain Note",
         );
-        let result = sync_title_on_open(&path).unwrap();
-        assert_eq!(
-            result,
-            SyncAction::Updated {
-                title: "Plain Note".to_string()
-            }
-        );
-        let content = fs::read_to_string(&path).unwrap();
         assert!(content.starts_with("---\n"));
         assert!(content.contains("title: Plain Note"));
     }
@@ -156,13 +154,11 @@ mod tests {
     #[test]
     fn test_sync_e2e_filename() {
         let dir = TempDir::new().unwrap();
-        let path = write_note(dir.path(), "e2e-test.md", "---\ntype: Note\n---\n");
-        let result = sync_title_on_open(&path).unwrap();
-        assert_eq!(
-            result,
-            SyncAction::Updated {
-                title: "E2e Test".to_string()
-            }
+        assert_title_update(
+            dir.path(),
+            "e2e-test.md",
+            "---\ntype: Note\n---\n",
+            "E2e Test",
         );
     }
 
