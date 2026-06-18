@@ -4,6 +4,13 @@ import { Select as SelectPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+function selectSlotProps(slot: string, baseClassName: string, className?: string) {
+  return {
+    "data-slot": slot,
+    className: cn(baseClassName, className),
+  }
+}
+
 function Select({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
@@ -87,17 +94,34 @@ function SelectContent({
   )
 }
 
-function SelectLabel({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Label>) {
+type SelectStaticPartProps =
+  | (React.ComponentProps<typeof SelectPrimitive.Label> & { staticPart: "label" })
+  | (React.ComponentProps<typeof SelectPrimitive.Separator> & { staticPart: "separator" })
+
+function SelectStaticPart(props: SelectStaticPartProps) {
+  if (props.staticPart === "label") {
+    const { staticPart, className, ...labelProps } = props
+    void staticPart
+    return (
+      <SelectPrimitive.Label
+        {...selectSlotProps("select-label", "text-muted-foreground px-2 py-1.5 text-xs", className)}
+        {...labelProps}
+      />
+    )
+  }
+
+  const { staticPart, className, ...separatorProps } = props
+  void staticPart
   return (
-    <SelectPrimitive.Label
-      data-slot="select-label"
-      className={cn("text-muted-foreground px-2 py-1.5 text-xs", className)}
-      {...props}
+    <SelectPrimitive.Separator
+      {...selectSlotProps("select-separator", "bg-border pointer-events-none -mx-1 my-1 h-px", className)}
+      {...separatorProps}
     />
   )
+}
+
+function SelectLabel(props: React.ComponentProps<typeof SelectPrimitive.Label>) {
+  return <SelectStaticPart staticPart="label" {...props} />
 }
 
 function SelectItem({
@@ -127,53 +151,41 @@ function SelectItem({
   )
 }
 
-function SelectSeparator({
+function SelectSeparator(props: React.ComponentProps<typeof SelectPrimitive.Separator>) {
+  return <SelectStaticPart staticPart="separator" {...props} />
+}
+
+function SelectScrollButton({
   className,
+  direction,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Separator>) {
+}: React.ComponentProps<typeof SelectPrimitive.ScrollUpButton> & {
+  direction: "down" | "up"
+}) {
+  const Primitive = direction === "up"
+    ? SelectPrimitive.ScrollUpButton
+    : SelectPrimitive.ScrollDownButton
+  const Icon = direction === "up" ? ChevronUpIcon : ChevronDownIcon
+  const slot = direction === "up" ? "select-scroll-up-button" : "select-scroll-down-button"
+
   return (
-    <SelectPrimitive.Separator
-      data-slot="select-separator"
-      className={cn("bg-border pointer-events-none -mx-1 my-1 h-px", className)}
+    <Primitive
+      {...selectSlotProps(slot, "flex cursor-default items-center justify-center py-1", className)}
       {...props}
-    />
+    >
+      <Icon className="size-4" />
+    </Primitive>
   )
 }
 
-function SelectScrollUpButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollUpButton>) {
-  return (
-    <SelectPrimitive.ScrollUpButton
-      data-slot="select-scroll-up-button"
-      className={cn(
-        "flex cursor-default items-center justify-center py-1",
-        className
-      )}
-      {...props}
-    >
-      <ChevronUpIcon className="size-4" />
-    </SelectPrimitive.ScrollUpButton>
-  )
+function SelectScrollUpButton(props: React.ComponentProps<typeof SelectPrimitive.ScrollUpButton>) {
+  return <SelectScrollButton direction="up" {...props} />
 }
 
 function SelectScrollDownButton({
-  className,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.ScrollDownButton>) {
-  return (
-    <SelectPrimitive.ScrollDownButton
-      data-slot="select-scroll-down-button"
-      className={cn(
-        "flex cursor-default items-center justify-center py-1",
-        className
-      )}
-      {...props}
-    >
-      <ChevronDownIcon className="size-4" />
-    </SelectPrimitive.ScrollDownButton>
-  )
+  return <SelectScrollButton direction="down" {...props} />
 }
 
 export {
