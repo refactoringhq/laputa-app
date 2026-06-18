@@ -4,16 +4,14 @@ struct StartupEnvOverride {
     value: &'static str,
 }
 
-const LINUX_WEBKIT_RENDERING_OVERRIDES: [StartupEnvOverride; 2] = [
-    StartupEnvOverride {
-        key: "WEBKIT_DISABLE_DMABUF_RENDERER",
-        value: "1",
-    },
-    StartupEnvOverride {
-        key: "WEBKIT_DISABLE_COMPOSITING_MODE",
-        value: "1",
-    },
-];
+const WEBKIT_DISABLE_DMABUF_RENDERER_OVERRIDE: StartupEnvOverride = StartupEnvOverride {
+    key: "WEBKIT_DISABLE_DMABUF_RENDERER",
+    value: "1",
+};
+const WEBKIT_DISABLE_COMPOSITING_MODE_OVERRIDE: StartupEnvOverride = StartupEnvOverride {
+    key: "WEBKIT_DISABLE_COMPOSITING_MODE",
+    value: "1",
+};
 
 const FCITX_GTK_IM_MODULE_OVERRIDE: StartupEnvOverride = StartupEnvOverride {
     key: "GTK_IM_MODULE",
@@ -63,11 +61,21 @@ pub(crate) fn is_running() -> bool {
     is_linux_appimage_launch(|key| std::env::var(key).ok())
 }
 
-fn should_disable_unstable_webkit_rendering<F>(get_var: &mut F) -> bool
+fn webkit_rendering_overrides_with<F>(get_var: &mut F) -> Vec<StartupEnvOverride>
 where
     F: FnMut(&str) -> Option<String>,
 {
-    is_linux_appimage_launch(&mut *get_var) || is_wayland_session(&mut *get_var)
+    if is_linux_appimage_launch(&mut *get_var) {
+        return vec![
+            WEBKIT_DISABLE_DMABUF_RENDERER_OVERRIDE,
+            WEBKIT_DISABLE_COMPOSITING_MODE_OVERRIDE,
+        ];
+    }
+    if is_wayland_session(&mut *get_var) {
+        return vec![WEBKIT_DISABLE_DMABUF_RENDERER_OVERRIDE];
+    }
+
+    Vec::new()
 }
 
 fn has_non_empty_env<F>(get_var: &mut F, key: &str) -> bool
@@ -300,11 +308,7 @@ fn startup_env_overrides_with<F>(mut get_var: F) -> Vec<StartupEnvOverride>
 where
     F: FnMut(&str) -> Option<String>,
 {
-    if !should_disable_unstable_webkit_rendering(&mut get_var) {
-        return Vec::new();
-    }
-
-    let mut overrides: Vec<_> = LINUX_WEBKIT_RENDERING_OVERRIDES
+    let mut overrides: Vec<_> = webkit_rendering_overrides_with(&mut get_var)
         .into_iter()
         .filter(|env_override| !has_non_empty_env(&mut get_var, env_override.key))
         .collect();
@@ -538,13 +542,19 @@ mod tests {
     }
 
     #[test]
-    fn startup_env_overrides_disable_unstable_webkit_rendering_for_native_wayland_launches() {
+    fn startup_env_overrides_keep_compositing_enabled_for_native_wayland_launches() {
         let overrides = startup_env_overrides_with(|key| match key {
             "XDG_SESSION_TYPE" => Some("wayland".to_string()),
             _ => None,
         });
 
-        assert_eq!(overrides, default_webkit_overrides());
+        assert_eq!(
+            overrides,
+            vec![StartupEnvOverride {
+                key: "WEBKIT_DISABLE_DMABUF_RENDERER",
+                value: "1",
+            }]
+        );
     }
 
     #[test]
