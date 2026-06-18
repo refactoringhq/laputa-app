@@ -5,6 +5,7 @@
  */
 
 import http from 'http'
+import { log } from 'console'
 import {
   closeSync,
   createReadStream,
@@ -14,13 +15,23 @@ import {
   readFileSync,
 } from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, URL } from 'url'
 import matter from 'gray-matter'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DIST_DIR = path.join(__dirname, '..', 'dist')
 const REPO_DIR = path.resolve(__dirname, '..')
 const PORT = 5173
+const DEDICATED_FRONTMATTER_KEYS = new Set([
+  'aliases',
+  'Is A',
+  'Belongs to',
+  'Related to',
+  'Status',
+  'Owner',
+  'Cadence',
+  'Created at',
+])
 
 function isAllowedPath(p) {
   return isInsideRelativePath(path.relative(REPO_DIR, p))
@@ -120,28 +131,54 @@ function extractWikiLinks(value) {
   return [...str.matchAll(/\[\[([^\]]+)\]\]/g)].map(m => `[[${m[1]}]]`)
 }
 
+function frontmatterRelationships(frontmatter) {
+  const relationships = {}
+  for (const [key, value] of Object.entries(frontmatter)) {
+    if (DEDICATED_FRONTMATTER_KEYS.has(key)) continue
+    const links = extractWikiLinks(value)
+    if (links.length) relationships[key] = links
+  }
+  return relationships
+}
+
+function aliasesFrom(frontmatter) {
+  if (Array.isArray(frontmatter.aliases)) return frontmatter.aliases
+  return frontmatter.aliases ? [frontmatter.aliases] : []
+}
+
+function markdownBodyText(content) {
+  return content.replace(/---[\s\S]*?---/, '').trim()
+}
+
+function markdownTitle(bodyText, aliases, filePath) {
+  const h1 = bodyText.match(/^#\s+(.+)/m)?.[1]
+  return h1 || aliases[0] || path.basename(filePath, '.md')
+}
+
+function createdAtMillis(frontmatter) {
+  return frontmatter['Created at'] ? new Date(frontmatter['Created at']).getTime() : null
+}
+
+function snippetFrom(bodyText) {
+  return bodyText
+    .replace(/^#+\s+.+/gm, '')
+    .replace(/\n+/g, ' ')
+    .trim()
+    .slice(0, 200)
+}
+
 function parseMarkdownFile(filePath) {
   try {
     const raw = readUtf8File(filePath)
     const { data: fm, content } = matter(raw)
     const stat = pathStats(filePath)
-
-    const DEDICATED = new Set(['aliases','Is A','Belongs to','Related to','Status','Owner','Cadence','Created at'])
-    const relationships = {}
-    for (const [k, v] of Object.entries(fm)) {
-      if (DEDICATED.has(k)) continue
-      const links = extractWikiLinks(v)
-      if (links.length) relationships[k] = links
-    }
-
-    const bodyText = content.replace(/---[\s\S]*?---/, '').trim()
-    const h1 = bodyText.match(/^#\s+(.+)/m)?.[1]
-    const aliases = Array.isArray(fm.aliases) ? fm.aliases : fm.aliases ? [fm.aliases] : []
+    const bodyText = markdownBodyText(content)
+    const aliases = aliasesFrom(fm)
 
     return {
       path: filePath,
       filename: path.basename(filePath),
-      title: h1 || aliases[0] || path.basename(filePath, '.md'),
+      title: markdownTitle(bodyText, aliases, filePath),
       isA: fm['Is A'] ?? null,
       aliases,
       belongsTo: extractWikiLinks(fm['Belongs to']),
@@ -150,59 +187,74 @@ function parseMarkdownFile(filePath) {
       owner: fm['Owner'] ?? null,
       cadence: fm['Cadence'] ?? null,
       modifiedAt: stat.mtimeMs,
-      createdAt: fm['Created at'] ? new Date(fm['Created at']).getTime() : null,
+      createdAt: createdAtMillis(fm),
       fileSize: stat.size,
-      snippet: bodyText.replace(/^#+\s+.+/gm, '').replace(/\n+/g, ' ').trim().slice(0, 200),
-      relationships,
+      snippet: snippetFrom(bodyText),
+      relationships: frontmatterRelationships(fm),
     }
   } catch { return null }
 }
 
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' })
+  res.end(JSON.stringify(payload))
+}
+
+function badPath(res) {
+  sendJson(res, 400, { error: 'bad path' })
+}
+
+function existingAllowedPath(params) {
+  const requestedPath = params.searchParams.get('path')
+  return requestedPath && isAllowedPath(requestedPath) && pathExists(requestedPath)
+    ? requestedPath
+    : null
+}
+
+function handleVaultPing(_params, res) {
+  sendJson(res, 200, { ok: true })
+}
+
+function handleVaultList(params, res) {
+  const dir = existingAllowedPath(params)
+  if (!dir) return badPath(res)
+  const entries = findMarkdownFiles(dir).map(parseMarkdownFile).filter(Boolean)
+  sendJson(res, 200, entries)
+}
+
+function handleVaultContent(params, res) {
+  const file = existingAllowedPath(params)
+  if (!file) return badPath(res)
+  sendJson(res, 200, { content: readUtf8File(file) })
+}
+
+function allVaultContent(dir) {
+  const map = {}
+  for (const filePath of findMarkdownFiles(dir)) {
+    try { map[filePath] = readUtf8File(filePath) } catch {}
+  }
+  return map
+}
+
+function handleVaultAllContent(params, res) {
+  const dir = existingAllowedPath(params)
+  if (!dir) return badPath(res)
+  sendJson(res, 200, allVaultContent(dir))
+}
+
+const VAULT_API_ROUTES = new Map([
+  ['/api/vault/ping', handleVaultPing],
+  ['/api/vault/list', handleVaultList],
+  ['/api/vault/content', handleVaultContent],
+  ['/api/vault/all-content', handleVaultAllContent],
+])
+
 function serveVaultApi(url, res) {
   const params = new URL(url, 'http://localhost')
-
-  if (params.pathname === '/api/vault/ping') {
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ ok: true }))
-    return true
-  }
-
-  if (params.pathname === '/api/vault/list') {
-    const dir = params.searchParams.get('path')
-    if (!dir || !isAllowedPath(dir) || !pathExists(dir)) {
-      res.writeHead(400); res.end(JSON.stringify({ error: 'bad path' })); return true
-    }
-    const entries = findMarkdownFiles(dir).map(parseMarkdownFile).filter(Boolean)
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify(entries))
-    return true
-  }
-
-  if (params.pathname === '/api/vault/content') {
-    const file = params.searchParams.get('path')
-    if (!file || !isAllowedPath(file) || !pathExists(file)) {
-      res.writeHead(400); res.end(JSON.stringify({ error: 'bad path' })); return true
-    }
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ content: readUtf8File(file) }))
-    return true
-  }
-
-  if (params.pathname === '/api/vault/all-content') {
-    const dir = params.searchParams.get('path')
-    if (!dir || !isAllowedPath(dir) || !pathExists(dir)) {
-      res.writeHead(400); res.end(JSON.stringify({ error: 'bad path' })); return true
-    }
-    const map = {}
-    for (const f of findMarkdownFiles(dir)) {
-      try { map[f] = readUtf8File(f) } catch {}
-    }
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify(map))
-    return true
-  }
-
-  return false
+  const handler = VAULT_API_ROUTES.get(params.pathname)
+  if (!handler) return false
+  handler(params, res)
+  return true
 }
 
 const server = http.createServer((req, res) => {
@@ -227,6 +279,6 @@ const server = http.createServer((req, res) => {
 })
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Laputa demo server running on http://0.0.0.0:${PORT}`)
-  console.log(`   Tailscale: https://mac-mini.tail7cbc15.ts.net`)
+  log(`✅ Laputa demo server running on http://0.0.0.0:${PORT}`)
+  log(`   Tailscale: https://mac-mini.tail7cbc15.ts.net`)
 })
