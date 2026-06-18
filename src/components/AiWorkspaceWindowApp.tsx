@@ -40,6 +40,27 @@ type ResizeDirection =
   | 'SouthWest'
   | 'West'
 
+interface ResizeEdges {
+  nearBottom: boolean
+  nearLeft: boolean
+  nearRight: boolean
+  nearTop: boolean
+}
+
+const RESIZE_DIRECTION_CHECKS: Array<{
+  direction: ResizeDirection
+  matches: (edges: ResizeEdges) => boolean
+}> = [
+  { direction: 'NorthWest', matches: ({ nearTop, nearLeft }) => nearTop && nearLeft },
+  { direction: 'NorthEast', matches: ({ nearTop, nearRight }) => nearTop && nearRight },
+  { direction: 'SouthWest', matches: ({ nearBottom, nearLeft }) => nearBottom && nearLeft },
+  { direction: 'SouthEast', matches: ({ nearBottom, nearRight }) => nearBottom && nearRight },
+  { direction: 'North', matches: ({ nearTop }) => nearTop },
+  { direction: 'South', matches: ({ nearBottom }) => nearBottom },
+  { direction: 'West', matches: ({ nearLeft }) => nearLeft },
+  { direction: 'East', matches: ({ nearRight }) => nearRight },
+]
+
 function useAiWorkspaceWindowContext() {
   const [context, setContext] = useState(() => readAiWorkspaceWindowContext())
 
@@ -99,20 +120,13 @@ function useAiWorkspaceSettingsSaver(
 }
 
 function resizeDirectionForPoint(x: number, y: number, rect: DOMRect): ResizeDirection | null {
-  const nearLeft = Math.abs(x - rect.left) <= RESIZE_EDGE
-  const nearRight = Math.abs(x - rect.right) <= RESIZE_EDGE
-  const nearTop = Math.abs(y - rect.top) <= RESIZE_EDGE
-  const nearBottom = Math.abs(y - rect.bottom) <= RESIZE_EDGE
-
-  if (nearTop && nearLeft) return 'NorthWest'
-  if (nearTop && nearRight) return 'NorthEast'
-  if (nearBottom && nearLeft) return 'SouthWest'
-  if (nearBottom && nearRight) return 'SouthEast'
-  if (nearTop) return 'North'
-  if (nearBottom) return 'South'
-  if (nearLeft) return 'West'
-  if (nearRight) return 'East'
-  return null
+  const edges = {
+    nearLeft: Math.abs(x - rect.left) <= RESIZE_EDGE,
+    nearRight: Math.abs(x - rect.right) <= RESIZE_EDGE,
+    nearTop: Math.abs(y - rect.top) <= RESIZE_EDGE,
+    nearBottom: Math.abs(y - rect.bottom) <= RESIZE_EDGE,
+  }
+  return RESIZE_DIRECTION_CHECKS.find(({ matches }) => matches(edges))?.direction ?? null
 }
 
 function isInteractiveResizeTarget(target: EventTarget | null): boolean {
