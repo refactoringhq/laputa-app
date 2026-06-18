@@ -13,7 +13,9 @@ export interface AiWorkspaceSessionSnapshot {
   status: AgentStatus
 }
 
-type SessionMap = Record<string, AiWorkspaceSessionSnapshot>
+type MessageId = string
+type SessionId = string
+type SessionMap = Record<SessionId, AiWorkspaceSessionSnapshot>
 
 const EMPTY_SESSION: AiWorkspaceSessionSnapshot = {
   messages: [],
@@ -128,6 +130,17 @@ function publishSessions(nextSessions: SessionMap): void {
   scheduleNativeSessionsWrite(nextSessions)
 }
 
+function publishSessionUpdate(
+  sessionId: SessionId,
+  update: (current: AiWorkspaceSessionSnapshot) => AiWorkspaceSessionSnapshot,
+): void {
+  const current = aiWorkspaceSessionSnapshot(sessionId)
+  publishSessions({
+    ...sessionStore.getSnapshot(),
+    [sessionId]: update(current),
+  })
+}
+
 async function syncFromNativeStorage(): Promise<void> {
   const loadVersion = storeVersion
   const nativeSessions = await readNativeSessions()
@@ -156,52 +169,52 @@ function ensureSessionStoreSync(): void {
 ensureSessionStoreSync()
 void syncFromNativeStorage()
 
-export function aiWorkspaceSessionSnapshot(sessionId: string): AiWorkspaceSessionSnapshot {
+export function aiWorkspaceSessionSnapshot(sessionId: SessionId): AiWorkspaceSessionSnapshot {
   return sessionStore.getSnapshot()[sessionId] ?? EMPTY_SESSION
 }
 
-export function subscribeAiWorkspaceSession(_sessionId: string, listener: () => void): () => void {
+export function subscribeAiWorkspaceSession(_sessionId: SessionId, listener: () => void): () => void {
   return sessionStore.subscribe(listener)
 }
 
 export function setAiWorkspaceSessionMessages(
-  sessionId: string,
+  sessionId: SessionId,
   next: SetStateAction<AiAgentMessage[]>,
 ): void {
-  const current = aiWorkspaceSessionSnapshot(sessionId)
-  const messages = typeof next === 'function' ? next(current.messages) : next
-  publishSessions({
-    ...sessionStore.getSnapshot(),
-    [sessionId]: {
+  publishSessionUpdate(sessionId, (current) => {
+    const messages = typeof next === 'function' ? next(current.messages) : next
+    return {
       ...current,
       messages,
-    },
+    }
   })
 }
 
 export function setAiWorkspaceSessionStatus(
-  sessionId: string,
+  sessionId: SessionId,
   next: SetStateAction<AgentStatus>,
 ): void {
-  const current = aiWorkspaceSessionSnapshot(sessionId)
-  const status = typeof next === 'function' ? next(current.status) : next
-  publishSessions({
-    ...sessionStore.getSnapshot(),
-    [sessionId]: {
+  publishSessionUpdate(sessionId, (current) => {
+    const status = typeof next === 'function' ? next(current.status) : next
+    return {
       ...current,
       status,
-    },
+    }
   })
 }
 
-export function resetAiWorkspaceSession(sessionId: string): void {
+export function resetAiWorkspaceSession(sessionId: SessionId): void {
   publishSessions({
     ...sessionStore.getSnapshot(),
     [sessionId]: EMPTY_SESSION,
   })
 }
 
-export function cloneAiWorkspaceSessionUntilMessage(sourceSessionId: string, targetSessionId: string, messageId: string): void {
+export function cloneAiWorkspaceSessionUntilMessage(
+  sourceSessionId: SessionId,
+  targetSessionId: SessionId,
+  messageId: MessageId,
+): void {
   const source = aiWorkspaceSessionSnapshot(sourceSessionId)
   const messageIndex = source.messages.findIndex((message) => message.id === messageId)
   const messages = messageIndex >= 0 ? source.messages.slice(0, messageIndex + 1) : source.messages
@@ -214,7 +227,7 @@ export function cloneAiWorkspaceSessionUntilMessage(sourceSessionId: string, tar
   })
 }
 
-export function aiWorkspaceSessionDispatchers(sessionId: string): {
+export function aiWorkspaceSessionDispatchers(sessionId: SessionId): {
   setMessages: Dispatch<SetStateAction<AiAgentMessage[]>>
   setStatus: Dispatch<SetStateAction<AgentStatus>>
 } {
