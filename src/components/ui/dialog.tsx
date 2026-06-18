@@ -5,6 +5,13 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
+function dialogSlotProps(slot: string, baseClassName: string, className?: string) {
+  return {
+    "data-slot": slot,
+    className: cn(baseClassName, className),
+  }
+}
+
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -116,30 +123,38 @@ function DialogFooter({
   )
 }
 
-function DialogTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Title>) {
+type DialogTextPartProps =
+  | (React.ComponentProps<typeof DialogPrimitive.Title> & { textPart: "title" })
+  | (React.ComponentProps<typeof DialogPrimitive.Description> & { textPart: "description" })
+
+function DialogTextPart(props: DialogTextPartProps) {
+  if (props.textPart === "title") {
+    const { textPart, className, ...titleProps } = props
+    void textPart
+    return (
+      <DialogPrimitive.Title
+        {...dialogSlotProps("dialog-title", "text-lg leading-none font-semibold", className)}
+        {...titleProps}
+      />
+    )
+  }
+
+  const { textPart, className, ...descriptionProps } = props
+  void textPart
   return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
-      {...props}
+    <DialogPrimitive.Description
+      {...dialogSlotProps("dialog-description", "text-muted-foreground text-sm", className)}
+      {...descriptionProps}
     />
   )
 }
 
-function DialogDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
-      {...props}
-    />
-  )
+function DialogTitle(props: React.ComponentProps<typeof DialogPrimitive.Title>) {
+  return <DialogTextPart textPart="title" {...props} />
+}
+
+function DialogDescription(props: React.ComponentProps<typeof DialogPrimitive.Description>) {
+  return <DialogTextPart textPart="description" {...props} />
 }
 
 export {
