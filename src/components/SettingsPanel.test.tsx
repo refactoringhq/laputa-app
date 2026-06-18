@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
@@ -235,6 +235,29 @@ describe('SettingsPanel', () => {
       multi_workspace_enabled: false,
     }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('waits for async settings saves before closing', async () => {
+    let resolveSave: (() => void) | null = null
+    const asyncSave = vi.fn(() => new Promise<void>((resolve) => {
+      resolveSave = resolve
+    }))
+
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={asyncSave} onClose={onClose} />
+    )
+
+    fireEvent.click(screen.getByTestId('settings-save'))
+
+    expect(asyncSave).toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByTestId('settings-save')).toBeDisabled()
+
+    await act(async () => {
+      resolveSave?.()
+    })
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
   it('keeps vault identity management hidden until multiple vaults are enabled', () => {

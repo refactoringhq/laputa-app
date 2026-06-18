@@ -116,8 +116,9 @@ index abc1234..${shortHash} 100644
 
 let mockHasChanges = true
 const mockSavedSinceCommit = new Set<string>()
+const MOCK_SETTINGS_STORAGE_KEY = 'tolaria:mock-settings'
 
-let mockSettings: Settings = {
+const DEFAULT_MOCK_SETTINGS: Settings = {
   auto_pull_interval_minutes: 5,
   git_enabled: null,
   autogit_enabled: false,
@@ -147,6 +148,31 @@ let mockSettings: Settings = {
   all_notes_show_unsupported: null,
   multi_workspace_enabled: null,
 }
+
+function readStoredMockSettings(): Settings | null {
+  if (typeof localStorage === 'undefined') return null
+
+  try {
+    const raw = localStorage.getItem(MOCK_SETTINGS_STORAGE_KEY)
+    if (!raw) return null
+    const stored = JSON.parse(raw) as Partial<Settings>
+    return { ...DEFAULT_MOCK_SETTINGS, ...stored }
+  } catch {
+    return null
+  }
+}
+
+function writeStoredMockSettings(settings: Settings): void {
+  if (typeof localStorage === 'undefined') return
+
+  try {
+    localStorage.setItem(MOCK_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+  } catch {
+    // Mock persistence should never make browser-only development unusable.
+  }
+}
+
+let mockSettings: Settings = readStoredMockSettings() ?? { ...DEFAULT_MOCK_SETTINGS }
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const DEFAULT_MOCK_VAULT = {
@@ -569,6 +595,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       all_notes_show_unsupported: s.all_notes_show_unsupported ?? null,
       multi_workspace_enabled: s.multi_workspace_enabled ?? null,
     }
+    writeStoredMockSettings(mockSettings)
     return null
   },
   load_vault_list: () => ({ ...mockVaultList, vaults: [...mockVaultList.vaults] }),
