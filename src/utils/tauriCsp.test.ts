@@ -8,6 +8,7 @@ describe('Tauri Content Security Policy', () => {
 
     expect(csp['style-src']).toContain("'unsafe-inline'")
     expect(csp['style-src-elem']).toContain(RUNTIME_STYLE_NONCE_SOURCE)
+    expect(csp['style-src-elem']).toContain("'unsafe-inline'")
     expect(csp['style-src-elem']).toContain('https://fonts.googleapis.com')
     expect(csp['style-src-attr']).toBe("'unsafe-inline'")
   })

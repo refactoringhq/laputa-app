@@ -38,7 +38,7 @@
         "connect-src": "'self' ipc: http://ipc.localhost data: ws://localhost:9710 ws://127.0.0.1:9710 ws://localhost:9711 ws://127.0.0.1:9711 https:",
         "img-src": "'self' asset: http://asset.localhost data: blob: https:",
         "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "style-src-elem": "'self' 'nonce-tolaria-runtime-style' https://fonts.googleapis.com",
+        "style-src-elem": "'self' 'unsafe-inline' 'nonce-tolaria-runtime-style' https://fonts.googleapis.com",
         "style-src-attr": "'unsafe-inline'",
         "font-src": "'self' data: https://fonts.gstatic.com",
         "media-src": "'self' asset: http://asset.localhost data: blob: https:",
