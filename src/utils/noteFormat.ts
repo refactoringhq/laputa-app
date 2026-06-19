@@ -34,6 +34,14 @@ export function noteFormatFromContent(content: string | null | undefined): NoteF
   return noteFormatFromFrontmatter(parseFrontmatter(content ?? null))
 }
 
+export function contentHasDisplayMetadata(content: string | null | undefined): boolean {
+  const frontmatter = parseFrontmatter(content ?? null)
+  return Object.keys(frontmatter).some((key) => {
+    const canonicalKey = canonicalFrontmatterKey(key)
+    return canonicalKey === NOTE_DISPLAY_FRONTMATTER_KEY || canonicalKey === LEGACY_NOTE_FORMAT_FRONTMATTER_KEY
+  })
+}
+
 export function contentHasSheetFormat(content: string | null | undefined): boolean {
   return noteFormatFromContent(content) === NOTE_FORMAT_SHEET
 }

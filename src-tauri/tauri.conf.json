@@ -34,7 +34,7 @@
     "security": {
       "csp": {
         "default-src": "'self' ipc: http://ipc.localhost",
-        "script-src": "'self' https://us.i.posthog.com https://eu.i.posthog.com https://us-assets.i.posthog.com https://eu-assets.i.posthog.com",
+        "script-src": "'self' 'wasm-unsafe-eval' https://us.i.posthog.com https://eu.i.posthog.com https://us-assets.i.posthog.com https://eu-assets.i.posthog.com",
         "connect-src": "'self' ipc: http://ipc.localhost data: ws://localhost:9710 ws://127.0.0.1:9710 ws://localhost:9711 ws://127.0.0.1:9711 https:",
         "img-src": "'self' asset: http://asset.localhost data: blob: https:",
         "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",

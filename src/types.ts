@@ -45,6 +45,8 @@ export interface VaultEntry {
   view: string | null
   /** Rich-editor note width mode from `_width` frontmatter. null means use the default. */
   noteWidth?: NoteWidthMode | null
+  /** Editor display mode from `_display` frontmatter. null means text/default. */
+  display?: NoteDisplayMode | null
   /** Whether this Type is visible in the sidebar. Defaults to true when absent. */
   visible: boolean | null
   /** Whether this note has been explicitly organized (removed from Inbox). */
@@ -210,6 +212,7 @@ export interface AllNotesConfig {
 export type NoteLayout = 'centered' | 'left'
 
 export type NoteWidthMode = 'normal' | 'wide'
+export type NoteDisplayMode = 'text' | 'sheet'
 export type GitSetupPreference = 'prompt' | 'never'
 
 /** Vault-scoped UI configuration stored locally per vault path. */

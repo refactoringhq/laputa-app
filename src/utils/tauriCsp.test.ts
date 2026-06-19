@@ -42,6 +42,7 @@ describe('Tauri Content Security Policy', () => {
 
     expect(productionCsp['script-src']).not.toContain("'unsafe-inline'")
     expect(productionCsp['script-src']).not.toContain("'unsafe-eval'")
+    expect(productionCsp['script-src']).toContain("'wasm-unsafe-eval'")
     expect(devCsp).toContain("'unsafe-inline'")
     expect(devCsp).toContain("'unsafe-eval'")
     expect(devCsp).toContain('ws://localhost:5202')

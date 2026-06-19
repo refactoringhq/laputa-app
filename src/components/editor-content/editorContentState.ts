@@ -1,6 +1,6 @@
 import type { NoteStatus, VaultEntry } from '../../types'
 import { extractH1TitleFromContent } from '../../utils/noteTitle'
-import { contentHasSheetFormat } from '../../utils/noteFormat'
+import { contentHasDisplayMetadata, contentHasSheetFormat, normalizeNoteFormat } from '../../utils/noteFormat'
 import { countWords } from '../../utils/wikilinks'
 
 export interface EditorContentTab {
@@ -64,9 +64,14 @@ function resolveHasH1(activeTab: EditorContentTab | null, freshEntry: VaultEntry
   return contentHasTopLevelH1(activeTab) || freshEntry?.hasH1 === true || activeTab?.entry.hasH1 === true
 }
 
-function resolveIsSheet(activeTab: EditorContentTab | null): boolean {
+function entryHasSheetDisplay(entry: VaultEntry | undefined): boolean {
+  return normalizeNoteFormat(entry?.display) === 'sheet'
+}
+
+function resolveIsSheet(activeTab: EditorContentTab | null, freshEntry: VaultEntry | undefined): boolean {
   if (!activeTab || activeTab.entry.fileKind === 'binary') return false
-  return contentHasSheetFormat(activeTab.content)
+  if (contentHasDisplayMetadata(activeTab.content)) return contentHasSheetFormat(activeTab.content)
+  return entryHasSheetDisplay(freshEntry) || entryHasSheetDisplay(activeTab.entry)
 }
 
 function deriveVisibilityState(input: {
@@ -80,7 +85,7 @@ function deriveVisibilityState(input: {
     rawMode,
   } = input
   const isDeletedPreview = !!activeTab && !freshEntry
-  const isSheet = resolveIsSheet(activeTab)
+  const isSheet = resolveIsSheet(activeTab, freshEntry)
   const isNonMarkdownText = activeTab?.entry.fileKind === 'text' && !isSheet
   const effectiveRawMode = rawMode || isNonMarkdownText
 

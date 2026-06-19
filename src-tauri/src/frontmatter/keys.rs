@@ -103,6 +103,12 @@ const KNOWN_FRONTMATTER_KEYS: &[FrontmatterKeyRule] = &[
         canonicalize_on_write: true,
     },
     FrontmatterKeyRule {
+        read_key: "_display",
+        write_key: "_display",
+        aliases: &["_display"],
+        canonicalize_on_write: false,
+    },
+    FrontmatterKeyRule {
         read_key: "visible",
         write_key: "visible",
         aliases: &["visible"],

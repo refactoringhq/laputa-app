@@ -162,6 +162,48 @@ describe('deriveEditorContentState', () => {
     expect(state.showEditor).toBe(true)
   })
 
+  it('uses indexed display metadata when loaded content is temporarily missing frontmatter', () => {
+    const activeEntry = {
+      ...baseEntry,
+      display: 'sheet' as const,
+      fileKind: 'markdown' as const,
+    }
+
+    const state = deriveEditorContentState({
+      activeTab: {
+        entry: activeEntry,
+        content: 'Metric,January',
+      },
+      entries: [activeEntry],
+      rawMode: false,
+      activeStatus: 'clean',
+    })
+
+    expect(state.isSheet).toBe(true)
+    expect(state.showEditor).toBe(true)
+  })
+
+  it('lets loaded display metadata override stale indexed display metadata', () => {
+    const activeEntry = {
+      ...baseEntry,
+      display: 'sheet' as const,
+      fileKind: 'markdown' as const,
+    }
+
+    const state = deriveEditorContentState({
+      activeTab: {
+        entry: activeEntry,
+        content: '---\n_display: text\n---\nMetric,January',
+      },
+      entries: [activeEntry],
+      rawMode: false,
+      activeStatus: 'clean',
+    })
+
+    expect(state.isSheet).toBe(false)
+    expect(state.showEditor).toBe(true)
+  })
+
   it('does not let text file classification override sheet display frontmatter', () => {
     const textState = deriveState({
       entry: {

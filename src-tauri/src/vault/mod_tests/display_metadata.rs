@@ -18,6 +18,31 @@ fn test_parse_sidebar_label_from_type_entry() {
 }
 
 #[test]
+fn test_parse_display_from_note_entry() {
+    let dir = TempDir::new().unwrap();
+    let content = "---\ntype: Project\n_display: sheet\n---\nMetric,January\n";
+    let entry = parse_test_entry(&dir, "project.md", content);
+    assert_eq!(entry.display, Some("sheet".to_string()));
+}
+
+#[test]
+fn test_parse_display_text_from_note_entry() {
+    let dir = TempDir::new().unwrap();
+    let content = "---\ntype: Project\n_display: text\n---\nMetric,January\n";
+    let entry = parse_test_entry(&dir, "project.md", content);
+    assert_eq!(entry.display, Some("text".to_string()));
+}
+
+#[test]
+fn test_display_metadata_not_in_properties_or_relationships() {
+    let dir = TempDir::new().unwrap();
+    let content = "---\ntype: Project\n_display: sheet\n---\nMetric,January\n";
+    let entry = parse_test_entry(&dir, "project.md", content);
+    assert!(!entry.properties.contains_key("_display"));
+    assert!(!entry.relationships.contains_key("_display"));
+}
+
+#[test]
 fn test_parse_sidebar_label_missing_defaults_to_none() {
     let dir = TempDir::new().unwrap();
     let content = "---\ntype: Type\n---\n# Project\n";

@@ -9,6 +9,7 @@ const SYSTEM_METADATA_ALIAS_GROUPS = {
   _sidebar_label: ['_sidebar_label', 'sidebar_label', 'sidebar label'],
   _sort: ['_sort', 'sort'],
   _width: ['_width', 'width'],
+  _display: ['_display'],
 } as const
 
 const FRONTMATTER_ALIAS_GROUPS = {

@@ -5,6 +5,7 @@ import type { FrontmatterValue } from '../components/Inspector'
 import { updateMockFrontmatter, deleteMockFrontmatterProperty } from './mockFrontmatterHelpers'
 import { updateMockContent, trackMockChange } from '../mock-tauri'
 import { parseFrontmatter } from '../utils/frontmatter'
+import { normalizeNoteFormat } from '../utils/noteFormat'
 import { canonicalFrontmatterKey, isSystemMetadataKey } from '../utils/systemMetadata'
 import { normalizeNoteWidthMode } from '../utils/noteWidth'
 
@@ -25,7 +26,7 @@ const ENTRY_DELETE_MAP: Record<string, Partial<VaultEntry>> = {
   _archived: { archived: false },
   _order: { order: null },
   template: { template: null }, _sort: { sort: null }, view: { view: null },
-  _width: { noteWidth: null }, visible: { visible: null },
+  _width: { noteWidth: null }, _display: { display: null }, visible: { visible: null },
   _organized: { organized: false },
   _favorite: { favorite: false }, _favorite_index: { favoriteIndex: null },
   _list_properties_display: { listPropertiesDisplay: [] },
@@ -121,6 +122,7 @@ function knownFrontmatterUpdates(value: FrontmatterValue | undefined): Record<Fr
     _sort: { sort: str },
     view: { view: str },
     _width: { noteWidth: normalizeNoteWidthMode(value) },
+    _display: { display: normalizeNoteFormat(value) },
     visible: { visible: visibleValue(value) },
     _organized: { organized: Boolean(value) },
     _favorite: { favorite: Boolean(value) },

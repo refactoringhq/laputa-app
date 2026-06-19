@@ -43,6 +43,8 @@ pub(crate) struct Frontmatter {
     pub view: Option<StringOrList>,
     #[serde(rename = "_width", alias = "width", default)]
     pub note_width: Option<StringOrList>,
+    #[serde(rename = "_display", default)]
+    pub display: Option<StringOrList>,
     #[serde(default)]
     pub visible: Option<bool>,
     #[serde(
@@ -352,6 +354,16 @@ pub(crate) fn resolve_note_width(note_width: Option<StringOrList>) -> Option<Str
         .map(|value| value.trim().to_ascii_lowercase())
     {
         Some(mode) if mode == "normal" || mode == "wide" => Some(mode),
+        _ => None,
+    }
+}
+
+pub(crate) fn resolve_note_display(display: Option<StringOrList>) -> Option<String> {
+    match display
+        .and_then(StringOrList::into_scalar)
+        .map(|value| value.trim().to_ascii_lowercase())
+    {
+        Some(mode) if mode == "text" || mode == "sheet" => Some(mode),
         _ => None,
     }
 }
