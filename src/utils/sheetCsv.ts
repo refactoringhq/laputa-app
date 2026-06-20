@@ -44,68 +44,126 @@ export function mergeSheetDocument(frontmatter: string, body: string): string {
   return `${frontmatter}${body}`
 }
 
+class CsvRowParser {
+  private cell = ''
+  private index = 0
+  private quoted = false
+  private row: string[] = []
+  private rowStart = 0
+  private readonly rawRows: string[] = []
+  private readonly rowTerminators: string[] = []
+  private readonly rows: string[][] = []
+  private readonly source: string
+
+  constructor(source: string) {
+    this.source = source
+  }
+
+  parse(): ParsedCsvRows {
+    while (this.index < this.source.length) {
+      this.consumeCurrentCharacter()
+      this.index += 1
+    }
+
+    this.appendFinalRowWhenNeeded()
+    return { rawRows: this.rawRows, rowTerminators: this.rowTerminators, rows: this.rows }
+  }
+
+  private appendCurrentCell(): void {
+    this.row.push(this.cell)
+    this.cell = ''
+  }
+
+  private appendCurrentRow(rowTerminator: string): void {
+    this.appendCurrentCell()
+    this.rows.push(this.row)
+    this.rawRows.push(this.source.slice(this.rowStart, this.index))
+    this.rowTerminators.push(rowTerminator)
+    this.row = []
+  }
+
+  private appendFinalRowWhenNeeded(): void {
+    if (!this.hasPendingFinalRow()) return
+    this.appendCurrentCell()
+    this.rows.push(this.row)
+    this.rawRows.push(this.source.slice(this.rowStart))
+    this.rowTerminators.push('')
+  }
+
+  private consumeCurrentCharacter(): void {
+    if (this.quoted) {
+      this.consumeQuotedCharacter()
+      return
+    }
+
+    if (this.startsQuotedCell()) {
+      this.quoted = true
+      return
+    }
+
+    if (this.currentChar() === ',') {
+      this.appendCurrentCell()
+      return
+    }
+
+    if (this.currentCharIsRowBreak()) {
+      this.consumeRowBreak()
+      return
+    }
+
+    this.cell += this.currentChar()
+  }
+
+  private consumeQuotedCharacter(): void {
+    if (this.currentChar() === '"' && this.nextChar() === '"') {
+      this.cell += '"'
+      this.index += 1
+      return
+    }
+
+    if (this.currentChar() === '"') {
+      this.quoted = false
+      return
+    }
+
+    this.cell += this.currentChar()
+  }
+
+  private consumeRowBreak(): void {
+    const rowTerminator = this.currentRowTerminator()
+    this.appendCurrentRow(rowTerminator)
+    if (rowTerminator === '\r\n') this.index += 1
+    this.rowStart = this.index + 1
+  }
+
+  private currentChar(): string {
+    return this.source[this.index] ?? ''
+  }
+
+  private currentCharIsRowBreak(): boolean {
+    return this.currentChar() === '\n' || this.currentChar() === '\r'
+  }
+
+  private currentRowTerminator(): string {
+    return this.currentChar() === '\r' && this.nextChar() === '\n' ? '\r\n' : this.currentChar()
+  }
+
+  private hasPendingFinalRow(): boolean {
+    return this.cell.length > 0 || this.row.length > 0 || this.source.endsWith(',')
+  }
+
+  private nextChar(): string {
+    return this.source[this.index + 1] ?? ''
+  }
+
+  private startsQuotedCell(): boolean {
+    return this.currentChar() === '"' && this.cell.length === 0
+  }
+}
+
 export function parseCsvRowsWithSource(source: string): ParsedCsvRows {
   if (source.length === 0) return { rawRows: [], rowTerminators: [], rows: [] }
-
-  const rows: string[][] = []
-  const rawRows: string[] = []
-  const rowTerminators: string[] = []
-  let row: string[] = []
-  let cell = ''
-  let quoted = false
-  let rowStart = 0
-
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index]
-    const next = source[index + 1]
-
-    if (quoted) {
-      if (char === '"' && next === '"') {
-        cell += '"'
-        index += 1
-      } else if (char === '"') {
-        quoted = false
-      } else {
-        cell += char
-      }
-      continue
-    }
-
-    if (char === '"' && cell.length === 0) {
-      quoted = true
-      continue
-    }
-
-    if (char === ',') {
-      row.push(cell)
-      cell = ''
-      continue
-    }
-
-    if (char === '\n' || char === '\r') {
-      const rowTerminator = char === '\r' && next === '\n' ? '\r\n' : char
-      row.push(cell)
-      rows.push(row)
-      rawRows.push(source.slice(rowStart, index))
-      rowTerminators.push(rowTerminator)
-      row = []
-      cell = ''
-      if (char === '\r' && next === '\n') index += 1
-      rowStart = index + 1
-      continue
-    }
-
-    cell += char
-  }
-
-  if (cell.length > 0 || row.length > 0 || source.endsWith(',')) {
-    row.push(cell)
-    rows.push(row)
-    rawRows.push(source.slice(rowStart))
-    rowTerminators.push('')
-  }
-
-  return { rawRows, rowTerminators, rows }
+  return new CsvRowParser(source).parse()
 }
 
 export function parseCsvRows(source: string): string[][] {

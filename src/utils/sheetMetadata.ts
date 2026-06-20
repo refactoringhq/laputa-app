@@ -42,8 +42,57 @@ export interface SheetMetadata {
 
 type MetadataSection = 'columns' | 'rows' | 'cells'
 type MetadataValue = string | number | boolean
+type MetadataAssignment = {
+  key: string
+  property: string
+  section: MetadataSection
+  value: MetadataValue
+}
+type MetadataParseCursor = {
+  key: string | null
+  section: MetadataSection | null
+}
+type CellMetadataUpdater = (value: MetadataValue) => Partial<SheetCellMetadata> | null
+type SheetSettingAssigner = (metadata: SheetMetadata, value: MetadataValue) => void
+type ScalarCellMetadataKey = {
+  key: string
+  property: Exclude<{
+    [Key in keyof SheetCellMetadata]: SheetCellMetadata[Key] extends MetadataValue | undefined ? Key : never
+  }[keyof SheetCellMetadata], undefined>
+}
+type BorderCellMetadataKey = {
+  key: string
+  property: Exclude<{
+    [Key in keyof SheetCellMetadata]: SheetCellMetadata[Key] extends SheetBorderMetadata | undefined ? Key : never
+  }[keyof SheetCellMetadata], undefined>
+}
 
 const SHEET_METADATA_KEY = '_sheet'
+const SCALAR_NUMBER_PATTERN = /^-?\d+(\.\d+)?$/
+const TOP_LEVEL_SHEET_SETTINGS = [
+  { key: 'show_grid_lines', property: 'showGridLines' },
+  { key: 'frozen_rows', property: 'frozenRows' },
+  { key: 'frozen_columns', property: 'frozenColumns' },
+] as const
+const CELL_SCALAR_METADATA_KEYS: ScalarCellMetadataKey[] = [
+  { key: 'num_fmt', property: 'numFmt' },
+  { key: 'bold', property: 'bold' },
+  { key: 'italic', property: 'italic' },
+  { key: 'underline', property: 'underline' },
+  { key: 'strike', property: 'strike' },
+  { key: 'font_size', property: 'fontSize' },
+  { key: 'font_color', property: 'fontColor' },
+  { key: 'fill_color', property: 'fillColor' },
+  { key: 'horizontal_align', property: 'horizontalAlign' },
+  { key: 'vertical_align', property: 'verticalAlign' },
+  { key: 'wrap_text', property: 'wrapText' },
+]
+const CELL_BORDER_METADATA_KEYS: BorderCellMetadataKey[] = [
+  { key: 'border_top', property: 'borderTop' },
+  { key: 'border_right', property: 'borderRight' },
+  { key: 'border_bottom', property: 'borderBottom' },
+  { key: 'border_left', property: 'borderLeft' },
+]
 
 export function emptySheetMetadata(): SheetMetadata {
   return { columns: {}, rows: {}, cells: {} }
@@ -92,12 +141,20 @@ export function metadataCellAddress(row: number, column: number): string {
   return cellAddress(row - 1, column - 1)
 }
 
+function hasMatchingQuote(value: string, quote: '"' | "'"): boolean {
+  return value.startsWith(quote) && value.endsWith(quote)
+}
+
+function isQuotedScalar(value: string): boolean {
+  return hasMatchingQuote(value, '"') || hasMatchingQuote(value, "'")
+}
+
 function parseScalar(value: string): MetadataValue {
   const trimmed = value.trim()
   if (trimmed === 'true') return true
   if (trimmed === 'false') return false
-  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed)
-  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+  if (SCALAR_NUMBER_PATTERN.test(trimmed)) return Number(trimmed)
+  if (isQuotedScalar(trimmed)) {
     try {
       return JSON.parse(trimmed)
     } catch {
@@ -125,7 +182,7 @@ function borderMetadataString(value: SheetBorderMetadata): string {
 
 function metadataPropertyName(source: string): string {
   const trimmed = source.trim()
-  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+  if (isQuotedScalar(trimmed)) {
     return String(parseScalar(trimmed))
   }
   return trimmed
@@ -144,64 +201,128 @@ function assignRowMetadata(metadata: SheetMetadata, key: string, property: strin
   metadata.rows[key] = { ...metadata.rows[key], height: value }
 }
 
+const CELL_METADATA_UPDATERS: Record<string, CellMetadataUpdater> = {
+  num_fmt: (value) => typeof value === 'string' ? { numFmt: value } : null,
+  bold: (value) => typeof value === 'boolean' ? { bold: value } : null,
+  italic: (value) => typeof value === 'boolean' ? { italic: value } : null,
+  underline: (value) => typeof value === 'boolean' ? { underline: value } : null,
+  strike: (value) => typeof value === 'boolean' ? { strike: value } : null,
+  font_size: (value) => typeof value === 'number' ? { fontSize: value } : null,
+  font_color: (value) => typeof value === 'string' ? { fontColor: value } : null,
+  fill_color: (value) => typeof value === 'string' ? { fillColor: value } : null,
+  horizontal_align: (value) => typeof value === 'string' ? { horizontalAlign: value } : null,
+  vertical_align: (value) => typeof value === 'string' ? { verticalAlign: value } : null,
+  wrap_text: (value) => typeof value === 'boolean' ? { wrapText: value } : null,
+  border_top: (value) => {
+    const border = parseBorderMetadata(value)
+    return border ? { borderTop: border } : null
+  },
+  border_right: (value) => {
+    const border = parseBorderMetadata(value)
+    return border ? { borderRight: border } : null
+  },
+  border_bottom: (value) => {
+    const border = parseBorderMetadata(value)
+    return border ? { borderBottom: border } : null
+  },
+  border_left: (value) => {
+    const border = parseBorderMetadata(value)
+    return border ? { borderLeft: border } : null
+  },
+}
+
 function assignCellMetadata(metadata: SheetMetadata, key: string, property: string, value: MetadataValue): void {
   const cell = normalizeCellAddress(key)
   if (!cell) return
 
-  const current = metadata.cells[cell] ?? {}
-  if (property === 'num_fmt' && typeof value === 'string') metadata.cells[cell] = { ...current, numFmt: value }
-  if (property === 'bold' && typeof value === 'boolean') metadata.cells[cell] = { ...current, bold: value }
-  if (property === 'italic' && typeof value === 'boolean') metadata.cells[cell] = { ...current, italic: value }
-  if (property === 'underline' && typeof value === 'boolean') metadata.cells[cell] = { ...current, underline: value }
-  if (property === 'strike' && typeof value === 'boolean') metadata.cells[cell] = { ...current, strike: value }
-  if (property === 'font_size' && typeof value === 'number') metadata.cells[cell] = { ...current, fontSize: value }
-  if (property === 'font_color' && typeof value === 'string') metadata.cells[cell] = { ...current, fontColor: value }
-  if (property === 'fill_color' && typeof value === 'string') metadata.cells[cell] = { ...current, fillColor: value }
-  if (property === 'horizontal_align' && typeof value === 'string') {
-    metadata.cells[cell] = { ...current, horizontalAlign: value }
-  }
-  if (property === 'vertical_align' && typeof value === 'string') {
-    metadata.cells[cell] = { ...current, verticalAlign: value }
-  }
-  if (property === 'wrap_text' && typeof value === 'boolean') metadata.cells[cell] = { ...current, wrapText: value }
-  if (property === 'border_top') {
-    const border = parseBorderMetadata(value)
-    if (border) metadata.cells[cell] = { ...current, borderTop: border }
-  }
-  if (property === 'border_right') {
-    const border = parseBorderMetadata(value)
-    if (border) metadata.cells[cell] = { ...current, borderRight: border }
-  }
-  if (property === 'border_bottom') {
-    const border = parseBorderMetadata(value)
-    if (border) metadata.cells[cell] = { ...current, borderBottom: border }
-  }
-  if (property === 'border_left') {
-    const border = parseBorderMetadata(value)
-    if (border) metadata.cells[cell] = { ...current, borderLeft: border }
-  }
+  const update = CELL_METADATA_UPDATERS[property]?.(value)
+  if (!update) return
+
+  metadata.cells[cell] = { ...metadata.cells[cell], ...update }
+}
+
+function isNonNegativeInteger(value: MetadataValue): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
+const SHEET_SETTING_ASSIGNERS: Record<string, SheetSettingAssigner> = {
+  show_grid_lines: (metadata, value) => {
+    if (typeof value === 'boolean') metadata.showGridLines = value
+  },
+  frozen_rows: (metadata, value) => {
+    if (isNonNegativeInteger(value)) metadata.frozenRows = value
+  },
+  frozen_columns: (metadata, value) => {
+    if (isNonNegativeInteger(value)) metadata.frozenColumns = value
+  },
 }
 
 function assignSheetSetting(metadata: SheetMetadata, property: string, value: MetadataValue): void {
-  if (property === 'show_grid_lines' && typeof value === 'boolean') metadata.showGridLines = value
-  if (property === 'frozen_rows' && typeof value === 'number' && Number.isInteger(value) && value >= 0) {
-    metadata.frozenRows = value
-  }
-  if (property === 'frozen_columns' && typeof value === 'number' && Number.isInteger(value) && value >= 0) {
-    metadata.frozenColumns = value
+  SHEET_SETTING_ASSIGNERS[property]?.(metadata, value)
+}
+
+function assignMetadataValue(metadata: SheetMetadata, assignment: MetadataAssignment): void {
+  switch (assignment.section) {
+    case 'columns':
+      assignColumnMetadata(metadata, assignment.key, assignment.property, assignment.value)
+      break
+    case 'rows':
+      assignRowMetadata(metadata, assignment.key, assignment.property, assignment.value)
+      break
+    case 'cells':
+      assignCellMetadata(metadata, assignment.key, assignment.property, assignment.value)
+      break
   }
 }
 
-function assignMetadataValue(
-  metadata: SheetMetadata,
-  section: MetadataSection,
-  key: string,
-  property: string,
-  value: MetadataValue,
-): void {
-  if (section === 'columns') assignColumnMetadata(metadata, key, property, value)
-  if (section === 'rows') assignRowMetadata(metadata, key, property, value)
-  if (section === 'cells') assignCellMetadata(metadata, key, property, value)
+function parseSectionLine(line: string): MetadataSection | null {
+  const sectionMatch = line.match(/^ {2}(columns|rows|cells):\s*$/)
+  return sectionMatch ? sectionMatch[1] as MetadataSection : null
+}
+
+function parseSheetSettingLine(line: string): { property: string; value: MetadataValue } | null {
+  const sheetSettingMatch = line.match(/^ {2}([A-Za-z_]+):\s*(.+)$/)
+  if (!sheetSettingMatch) return null
+  return {
+    property: metadataPropertyName(sheetSettingMatch[1]),
+    value: parseScalar(sheetSettingMatch[2]),
+  }
+}
+
+function parseEntryKeyLine(line: string): string | null {
+  const keyMatch = line.match(/^ {4}([^:]+):\s*$/)
+  return keyMatch ? metadataPropertyName(keyMatch[1]) : null
+}
+
+function parseValueLine(line: string, cursor: MetadataParseCursor): MetadataAssignment | null {
+  const valueMatch = line.match(/^ {6}([^:]+):\s*(.*)$/)
+  if (!valueMatch || !cursor.section || !cursor.key) return null
+  return {
+    key: cursor.key,
+    property: metadataPropertyName(valueMatch[1]),
+    section: cursor.section,
+    value: parseScalar(valueMatch[2]),
+  }
+}
+
+function parseMetadataLine(metadata: SheetMetadata, line: string, cursor: MetadataParseCursor): MetadataParseCursor {
+  if (line.trim() === '') return cursor
+
+  const section = parseSectionLine(line)
+  if (section) return { key: null, section }
+
+  const sheetSetting = parseSheetSettingLine(line)
+  if (sheetSetting) {
+    assignSheetSetting(metadata, sheetSetting.property, sheetSetting.value)
+    return { key: null, section: null }
+  }
+
+  const key = parseEntryKeyLine(line)
+  if (key) return { ...cursor, key }
+
+  const assignment = parseValueLine(line, cursor)
+  if (assignment) assignMetadataValue(metadata, assignment)
+  return cursor
 }
 
 export function parseSheetMetadata(frontmatter: string): SheetMetadata {
@@ -210,119 +331,109 @@ export function parseSheetMetadata(frontmatter: string): SheetMetadata {
   const startIndex = lines.findIndex((line) => line.trim() === `${SHEET_METADATA_KEY}:`)
   if (startIndex < 0) return metadata
 
-  let section: MetadataSection | null = null
-  let key: string | null = null
+  let cursor: MetadataParseCursor = { key: null, section: null }
 
   for (let index = startIndex + 1; index < lines.length; index += 1) {
     const line = lines[index] ?? ''
-    if (line.trim() === '') continue
     if (!line.startsWith(' ')) break
-
-    const sectionMatch = line.match(/^ {2}(columns|rows|cells):\s*$/)
-    if (sectionMatch) {
-      section = sectionMatch[1] as MetadataSection
-      key = null
-      continue
-    }
-
-    const sheetSettingMatch = line.match(/^ {2}([A-Za-z_]+):\s*(.+)$/)
-    if (sheetSettingMatch) {
-      assignSheetSetting(metadata, metadataPropertyName(sheetSettingMatch[1]), parseScalar(sheetSettingMatch[2]))
-      section = null
-      key = null
-      continue
-    }
-
-    const keyMatch = line.match(/^ {4}([^:]+):\s*$/)
-    if (keyMatch) {
-      key = metadataPropertyName(keyMatch[1])
-      continue
-    }
-
-    const valueMatch = line.match(/^ {6}([^:]+):\s*(.*)$/)
-    if (!valueMatch || !section || !key) continue
-    assignMetadataValue(metadata, section, key, metadataPropertyName(valueMatch[1]), parseScalar(valueMatch[2]))
+    cursor = parseMetadataLine(metadata, line, cursor)
   }
 
   return metadata
 }
 
-function metadataBlockLines(metadata: SheetMetadata): string[] {
-  const lines = [`${SHEET_METADATA_KEY}:`]
+function appendScalarLine(lines: string[], indent: string, key: string, value: MetadataValue | undefined): void {
+  if (value !== undefined) lines.push(`${indent}${key}: ${scalarString(value)}`)
+}
 
-  if (metadata.showGridLines !== undefined) {
-    lines.push(`  show_grid_lines: ${scalarString(metadata.showGridLines)}`)
+function appendSheetSettingLines(lines: string[], metadata: SheetMetadata): void {
+  for (const setting of TOP_LEVEL_SHEET_SETTINGS) {
+    appendScalarLine(lines, '  ', setting.key, metadata[setting.property])
   }
-  if (metadata.frozenRows !== undefined) {
-    lines.push(`  frozen_rows: ${scalarString(metadata.frozenRows)}`)
-  }
-  if (metadata.frozenColumns !== undefined) {
-    lines.push(`  frozen_columns: ${scalarString(metadata.frozenColumns)}`)
-  }
+}
 
-  const columnEntries = Object.entries(metadata.columns)
+function sortedColumnEntries(metadata: SheetMetadata): Array<[string, SheetColumnMetadata]> {
+  return Object.entries(metadata.columns)
     .filter(([, value]) => value.width !== undefined)
     .sort(([left], [right]) => (columnIndexFromName(left) ?? 0) - (columnIndexFromName(right) ?? 0))
+}
+
+function appendColumnMetadataLines(lines: string[], metadata: SheetMetadata): void {
+  const columnEntries = sortedColumnEntries(metadata)
   if (columnEntries.length > 0) {
     lines.push('  columns:')
     for (const [column, value] of columnEntries) {
       lines.push(`    ${column}:`)
-      if (value.width !== undefined) lines.push(`      width: ${scalarString(value.width)}`)
+      appendScalarLine(lines, '      ', 'width', value.width)
     }
   }
+}
 
-  const rowEntries = Object.entries(metadata.rows)
+function sortedRowEntries(metadata: SheetMetadata): Array<[string, SheetRowMetadata]> {
+  return Object.entries(metadata.rows)
     .filter(([, value]) => value.height !== undefined)
     .sort(([left], [right]) => Number(left) - Number(right))
+}
+
+function appendRowMetadataLines(lines: string[], metadata: SheetMetadata): void {
+  const rowEntries = sortedRowEntries(metadata)
   if (rowEntries.length > 0) {
     lines.push('  rows:')
     for (const [row, value] of rowEntries) {
       lines.push(`    "${row}":`)
-      if (value.height !== undefined) lines.push(`      height: ${scalarString(value.height)}`)
+      appendScalarLine(lines, '      ', 'height', value.height)
     }
   }
+}
 
-  const cellEntries = Object.entries(metadata.cells)
+function compareCellMetadataAddresses(left: string, right: string): number {
+  const leftIndexes = cellAddressToIndexes(left)
+  const rightIndexes = cellAddressToIndexes(right)
+  if (!leftIndexes || !rightIndexes) return left.localeCompare(right)
+  if (leftIndexes.row !== rightIndexes.row) return leftIndexes.row - rightIndexes.row
+  return leftIndexes.column - rightIndexes.column
+}
+
+function sortedCellEntries(metadata: SheetMetadata): Array<[string, SheetCellMetadata]> {
+  return Object.entries(metadata.cells)
     .filter(([, value]) => Object.keys(value).length > 0)
-    .sort(([left], [right]) => {
-      const leftIndexes = cellAddressToIndexes(left)
-      const rightIndexes = cellAddressToIndexes(right)
-      if (!leftIndexes || !rightIndexes) return left.localeCompare(right)
-      return leftIndexes.row === rightIndexes.row
-        ? leftIndexes.column - rightIndexes.column
-        : leftIndexes.row - rightIndexes.row
-    })
+    .sort(([left], [right]) => compareCellMetadataAddresses(left, right))
+}
+
+function appendScalarCellMetadataLines(lines: string[], metadata: SheetCellMetadata): void {
+  for (const field of CELL_SCALAR_METADATA_KEYS) {
+    appendScalarLine(lines, '      ', field.key, metadata[field.property])
+  }
+}
+
+function appendBorderCellMetadataLines(lines: string[], metadata: SheetCellMetadata): void {
+  for (const field of CELL_BORDER_METADATA_KEYS) {
+    const border = metadata[field.property]
+    if (border !== undefined) {
+      lines.push(`      ${field.key}: ${scalarString(borderMetadataString(border))}`)
+    }
+  }
+}
+
+function appendCellMetadataLines(lines: string[], metadata: SheetMetadata): void {
+  const cellEntries = sortedCellEntries(metadata)
   if (cellEntries.length > 0) {
     lines.push('  cells:')
     for (const [cell, value] of cellEntries) {
       lines.push(`    ${cell}:`)
-      if (value.numFmt !== undefined) lines.push(`      num_fmt: ${scalarString(value.numFmt)}`)
-      if (value.bold !== undefined) lines.push(`      bold: ${scalarString(value.bold)}`)
-      if (value.italic !== undefined) lines.push(`      italic: ${scalarString(value.italic)}`)
-      if (value.underline !== undefined) lines.push(`      underline: ${scalarString(value.underline)}`)
-      if (value.strike !== undefined) lines.push(`      strike: ${scalarString(value.strike)}`)
-      if (value.fontSize !== undefined) lines.push(`      font_size: ${scalarString(value.fontSize)}`)
-      if (value.fontColor !== undefined) lines.push(`      font_color: ${scalarString(value.fontColor)}`)
-      if (value.fillColor !== undefined) lines.push(`      fill_color: ${scalarString(value.fillColor)}`)
-      if (value.horizontalAlign !== undefined) {
-        lines.push(`      horizontal_align: ${scalarString(value.horizontalAlign)}`)
-      }
-      if (value.verticalAlign !== undefined) {
-        lines.push(`      vertical_align: ${scalarString(value.verticalAlign)}`)
-      }
-      if (value.wrapText !== undefined) lines.push(`      wrap_text: ${scalarString(value.wrapText)}`)
-      if (value.borderTop !== undefined) lines.push(`      border_top: ${scalarString(borderMetadataString(value.borderTop))}`)
-      if (value.borderRight !== undefined) {
-        lines.push(`      border_right: ${scalarString(borderMetadataString(value.borderRight))}`)
-      }
-      if (value.borderBottom !== undefined) {
-        lines.push(`      border_bottom: ${scalarString(borderMetadataString(value.borderBottom))}`)
-      }
-      if (value.borderLeft !== undefined) {
-        lines.push(`      border_left: ${scalarString(borderMetadataString(value.borderLeft))}`)
-      }
+      appendScalarCellMetadataLines(lines, value)
+      appendBorderCellMetadataLines(lines, value)
     }
   }
+}
+
+function metadataBlockLines(metadata: SheetMetadata): string[] {
+  const lines = [`${SHEET_METADATA_KEY}:`]
+
+  appendSheetSettingLines(lines, metadata)
+  appendColumnMetadataLines(lines, metadata)
+  appendRowMetadataLines(lines, metadata)
+  appendCellMetadataLines(lines, metadata)
 
   return lines
 }

@@ -18,50 +18,121 @@ const WS_UI_URL = 'ws://localhost:9711'
 const HIGHLIGHT_DURATION_MS = 800
 const RECONNECT_DELAY_MS = 3000
 
-/**
- * Listens on the UI WebSocket bridge (port 9711) for UI action events
- * from the MCP server. Handles highlight, open_note, open_tab, set_filter,
- * and vault_changed actions.
- */
-export function useAiActivity(callbacks?: AiActivityCallbacks): AiActivity {
+type UiActionMessage = Record<string, unknown> & {
+  action: string
+  type: 'ui_action'
+}
+type StringPayloadAction = 'open_note' | 'open_tab' | 'set_filter'
+type StringPayloadCallback = 'onOpenNote' | 'onOpenTab' | 'onSetFilter'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
+}
+
+function parseUiActionMessage(event: MessageEvent): UiActionMessage | null {
+  try {
+    const data = JSON.parse(String(event.data))
+    if (!isRecord(data) || data.type !== 'ui_action' || typeof data.action !== 'string') return null
+    return data as UiActionMessage
+  } catch {
+    return null
+  }
+}
+
+function highlightElementFromValue(value: unknown): HighlightElement {
+  if (value === 'editor' || value === 'tab' || value === 'properties' || value === 'notelist') return value
+  return null
+}
+
+function useLatestAiActivityCallbacks(callbacks?: AiActivityCallbacks) {
+  const callbacksRef = useRef(callbacks)
+  useEffect(() => { callbacksRef.current = callbacks })
+  return callbacksRef
+}
+
+function useAiHighlightState() {
   const [highlightElement, setHighlightElement] = useState<HighlightElement>(null)
   const [highlightPath, setHighlightPath] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const callbacksRef = useRef(callbacks)
-  useEffect(() => { callbacksRef.current = callbacks })
 
-  const handleMessage = useCallback((event: MessageEvent) => {
-    try {
-      const data = JSON.parse(event.data as string)
-      if (data.type !== 'ui_action') return
-      switch (data.action) {
-        case 'highlight':
-          setHighlightElement(data.element ?? null)
-          setHighlightPath(data.path ?? null)
-          if (timerRef.current) clearTimeout(timerRef.current)
-          timerRef.current = setTimeout(() => {
-            setHighlightElement(null)
-            setHighlightPath(null)
-          }, HIGHLIGHT_DURATION_MS)
-          break
-        case 'open_note':
-          if (data.path) callbacksRef.current?.onOpenNote?.(data.path)
-          break
-        case 'open_tab':
-          if (data.path) callbacksRef.current?.onOpenTab?.(data.path)
-          break
-        case 'set_filter':
-          if (data.filterType) callbacksRef.current?.onSetFilter?.(data.filterType)
-          break
-        case 'vault_changed':
-          callbacksRef.current?.onVaultChanged?.(data.path)
-          break
-      }
-    } catch {
-      // Ignore parse errors from malformed messages
-    }
+  const clearHighlightTimer = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = null
   }, [])
 
+  const clearHighlight = useCallback(() => {
+    setHighlightElement(null)
+    setHighlightPath(null)
+  }, [])
+
+  const showHighlight = useCallback((message: UiActionMessage) => {
+    setHighlightElement(highlightElementFromValue(message.element))
+    setHighlightPath(optionalString(message.path) ?? null)
+    clearHighlightTimer()
+    timerRef.current = setTimeout(clearHighlight, HIGHLIGHT_DURATION_MS)
+  }, [clearHighlight, clearHighlightTimer])
+
+  return {
+    clearHighlightTimer,
+    highlightElement,
+    highlightPath,
+    showHighlight,
+  }
+}
+
+function dispatchStringPayload(value: unknown, callback?: (value: string) => void): void {
+  const payload = optionalString(value)
+  if (payload) callback?.(payload)
+}
+
+const STRING_PAYLOAD_CALLBACKS: Record<StringPayloadAction, StringPayloadCallback> = {
+  open_note: 'onOpenNote',
+  open_tab: 'onOpenTab',
+  set_filter: 'onSetFilter',
+}
+
+function isStringPayloadAction(action: string): action is StringPayloadAction {
+  return action === 'open_note' || action === 'open_tab' || action === 'set_filter'
+}
+
+function stringPayloadValue(message: UiActionMessage): unknown {
+  return message.action === 'set_filter' ? message.filterType : message.path
+}
+
+function dispatchUiActionMessage(
+  message: UiActionMessage,
+  callbacksRef: ReturnType<typeof useLatestAiActivityCallbacks>,
+  showHighlight: (message: UiActionMessage) => void,
+): void {
+  if (message.action === 'highlight') {
+    showHighlight(message)
+    return
+  }
+  if (message.action === 'vault_changed') {
+    callbacksRef.current?.onVaultChanged?.(optionalString(message.path))
+    return
+  }
+  if (!isStringPayloadAction(message.action)) return
+
+  const callbackName = STRING_PAYLOAD_CALLBACKS[message.action]
+  dispatchStringPayload(stringPayloadValue(message), callbacksRef.current?.[callbackName])
+}
+
+function useUiActionMessageHandler(
+  callbacksRef: ReturnType<typeof useLatestAiActivityCallbacks>,
+  showHighlight: (message: UiActionMessage) => void,
+) {
+  return useCallback((event: MessageEvent) => {
+    const message = parseUiActionMessage(event)
+    if (message) dispatchUiActionMessage(message, callbacksRef, showHighlight)
+  }, [callbacksRef, showHighlight])
+}
+
+function useUiActionSocket(handleMessage: (event: MessageEvent) => void, clearHighlightTimer: () => void): void {
   useEffect(() => {
     let ws: WebSocket | null = null
     let mounted = true
@@ -86,10 +157,28 @@ export function useAiActivity(callbacks?: AiActivityCallbacks): AiActivity {
     return () => {
       mounted = false
       ws?.close()
-      if (timerRef.current) clearTimeout(timerRef.current)
+      clearHighlightTimer()
       if (reconnectTimer) clearTimeout(reconnectTimer)
     }
-  }, [handleMessage])
+  }, [clearHighlightTimer, handleMessage])
+}
+
+/**
+ * Listens on the UI WebSocket bridge (port 9711) for UI action events
+ * from the MCP server. Handles highlight, open_note, open_tab, set_filter,
+ * and vault_changed actions.
+ */
+export function useAiActivity(callbacks?: AiActivityCallbacks): AiActivity {
+  const callbacksRef = useLatestAiActivityCallbacks(callbacks)
+  const {
+    clearHighlightTimer,
+    highlightElement,
+    highlightPath,
+    showHighlight,
+  } = useAiHighlightState()
+  const handleMessage = useUiActionMessageHandler(callbacksRef, showHighlight)
+
+  useUiActionSocket(handleMessage, clearHighlightTimer)
 
   return { highlightElement, highlightPath }
 }

@@ -22,6 +22,25 @@ interface SheetExternalCellReferenceParts {
   rowAbsolute: boolean
 }
 
+interface ShiftedExternalCellReference {
+  column: number
+  row: number
+}
+
+interface ExternalFormulaMatch {
+  columnAbsolute: string
+  match: string
+  rawColumn: string
+  rawRow: string
+  rawTarget: string
+  rowAbsolute: string
+}
+
+interface ExternalFormulaShift {
+  columnDelta: number
+  rowDelta: number
+}
+
 function parseExternalCellReferenceParts(
   columnAbsolute: string,
   rawColumn: string,
@@ -59,22 +78,70 @@ export function extractSheetExternalCellReferences(value: string): SheetExternal
   return references
 }
 
+function externalReferenceColumnPrefix(parsed: SheetExternalCellReferenceParts): string {
+  return parsed.columnAbsolute ? '$' : ''
+}
+
+function externalReferenceRowPrefix(parsed: SheetExternalCellReferenceParts): string {
+  return parsed.rowAbsolute ? '$' : ''
+}
+
+function isWithinSheetBounds(reference: ShiftedExternalCellReference): boolean {
+  return reference.column >= 1
+    && reference.column <= MAX_SHEET_COLUMNS
+    && reference.row >= 1
+    && reference.row <= MAX_SHEET_ROWS
+}
+
+function shiftedExternalCellReference(
+  parsed: SheetExternalCellReferenceParts,
+  rowDelta: number,
+  columnDelta: number,
+): ShiftedExternalCellReference {
+  return {
+    column: parsed.columnAbsolute ? parsed.column : parsed.column + columnDelta,
+    row: parsed.rowAbsolute ? parsed.row : parsed.row + rowDelta,
+  }
+}
+
+function shiftedExternalFormulaReference(
+  rawTarget: string,
+  parsed: SheetExternalCellReferenceParts,
+  shifted: ShiftedExternalCellReference,
+): string {
+  return `[[${rawTarget}]].${externalReferenceColumnPrefix(parsed)}${columnNameFromOneBasedIndex(shifted.column)}${externalReferenceRowPrefix(parsed)}${shifted.row}`
+}
+
+function shiftExternalFormulaMatch(reference: ExternalFormulaMatch, shift: ExternalFormulaShift): string {
+  const parsed = parseExternalCellReferenceParts(
+    reference.columnAbsolute,
+    reference.rawColumn,
+    reference.rowAbsolute,
+    reference.rawRow,
+  )
+  if (!reference.rawTarget || !parsed) return reference.match
+
+  const shifted = shiftedExternalCellReference(parsed, shift.rowDelta, shift.columnDelta)
+  return isWithinSheetBounds(shifted)
+    ? shiftedExternalFormulaReference(reference.rawTarget, parsed, shifted)
+    : reference.match
+}
+
 export function shiftExternalFormulaReferences(value: string, rowDelta: number, columnDelta: number): string {
   if (!isExternalFormulaInput(value)) return value
 
   return value.replace(
     SHEET_EXTERNAL_CELL_REFERENCE_PATTERN,
-    (match, rawTarget, columnAbsolute, rawColumn, rowAbsolute, rawRow) => {
-      const parsed = parseExternalCellReferenceParts(columnAbsolute, rawColumn, rowAbsolute, rawRow)
-      if (!rawTarget || !parsed) return match
-
-      const nextColumn = parsed.columnAbsolute ? parsed.column : parsed.column + columnDelta
-      const nextRow = parsed.rowAbsolute ? parsed.row : parsed.row + rowDelta
-      if (nextColumn < 1 || nextColumn > MAX_SHEET_COLUMNS || nextRow < 1 || nextRow > MAX_SHEET_ROWS) {
-        return match
-      }
-
-      return `[[${rawTarget}]].${parsed.columnAbsolute ? '$' : ''}${columnNameFromOneBasedIndex(nextColumn)}${parsed.rowAbsolute ? '$' : ''}${nextRow}`
-    },
+    (match, rawTarget, columnAbsolute, rawColumn, rowAbsolute, rawRow) => shiftExternalFormulaMatch(
+      {
+        columnAbsolute,
+        match,
+        rawColumn,
+        rawRow,
+        rawTarget,
+        rowAbsolute,
+      },
+      { columnDelta, rowDelta },
+    ),
   )
 }

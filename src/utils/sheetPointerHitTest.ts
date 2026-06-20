@@ -6,6 +6,25 @@ const ROW_HEADER_WIDTH_PX = 30
 const COLUMN_HEADER_HEIGHT_PX = 28
 const FROZEN_SEPARATOR_WIDTH_PX = 3
 
+type SheetAxis = 'column' | 'row'
+
+interface SheetAxisHitTestOptions {
+  coordinate: number
+  firstVisibleIndex: number
+  frozenCount: number
+  frozenSize: number
+  headerSize: number
+  maxIndex: number
+  sizeAtIndex: (index: number) => number
+}
+
+interface SheetAxisHitTestRequest {
+  axis: SheetAxis
+  coordinate: number
+  model: Model
+  sheet: number
+}
+
 function sheetColumnWidth(model: Model, sheet: number, column: number): number {
   return Math.round(model.getColumnWidth(sheet, column))
 }
@@ -50,46 +69,67 @@ function indexAtOffset(
   return null
 }
 
-function sheetColumnAtCanvasX(model: Model, sheet: number, x: number): number | null {
-  if (x < ROW_HEADER_WIDTH_PX) return null
+function sheetAxisIndexAtCanvasCoordinate({
+  coordinate,
+  firstVisibleIndex,
+  frozenCount,
+  frozenSize,
+  headerSize,
+  maxIndex,
+  sizeAtIndex,
+}: SheetAxisHitTestOptions): number | null {
+  if (coordinate < headerSize) return null
 
-  const view = model.getSelectedView()
-  const frozenColumns = model.getFrozenColumnsCount(sheet)
-  const frozenWidth = frozenColumnWidth(model, sheet, frozenColumns)
-  const cellX = x - ROW_HEADER_WIDTH_PX
-
-  if (frozenColumns > 0 && cellX < frozenWidth) {
-    return indexAtOffset(cellX, 1, frozenColumns, (column) => sheetColumnWidth(model, sheet, column))
+  const cellOffset = coordinate - headerSize
+  if (frozenCount > 0 && cellOffset < frozenSize) {
+    return indexAtOffset(cellOffset, 1, frozenCount, sizeAtIndex)
   }
 
-  const firstVisibleColumn = Math.max(frozenColumns + 1, view.left_column)
-  return indexAtOffset(
-    cellX - frozenWidth,
-    firstVisibleColumn,
-    MAX_SHEET_COLUMNS,
-    (column) => sheetColumnWidth(model, sheet, column),
-  )
+  return indexAtOffset(cellOffset - frozenSize, firstVisibleIndex, maxIndex, sizeAtIndex)
 }
 
-function sheetRowAtCanvasY(model: Model, sheet: number, y: number): number | null {
-  if (y < COLUMN_HEADER_HEIGHT_PX) return null
+function sheetAxisFrozenCount(model: Model, sheet: number, axis: SheetAxis): number {
+  return axis === 'column' ? model.getFrozenColumnsCount(sheet) : model.getFrozenRowsCount(sheet)
+}
 
+function sheetAxisFrozenSize(model: Model, sheet: number, axis: SheetAxis, frozenCount: number): number {
+  return axis === 'column'
+    ? frozenColumnWidth(model, sheet, frozenCount)
+    : frozenRowHeight(model, sheet, frozenCount)
+}
+
+function sheetAxisHeaderSize(axis: SheetAxis): number {
+  return axis === 'column' ? ROW_HEADER_WIDTH_PX : COLUMN_HEADER_HEIGHT_PX
+}
+
+function sheetAxisMaxIndex(axis: SheetAxis): number {
+  return axis === 'column' ? MAX_SHEET_COLUMNS : MAX_SHEET_ROWS
+}
+
+function sheetAxisSizeAtIndex(model: Model, sheet: number, axis: SheetAxis): (index: number) => number {
+  return axis === 'column'
+    ? (column) => sheetColumnWidth(model, sheet, column)
+    : (row) => sheetRowHeight(model, sheet, row)
+}
+
+function sheetAxisVisibleIndex(model: Model, frozenCount: number, axis: SheetAxis): number {
   const view = model.getSelectedView()
-  const frozenRows = model.getFrozenRowsCount(sheet)
-  const frozenHeight = frozenRowHeight(model, sheet, frozenRows)
-  const cellY = y - COLUMN_HEADER_HEIGHT_PX
+  return axis === 'column'
+    ? Math.max(frozenCount + 1, view.left_column)
+    : Math.max(frozenCount + 1, view.top_row)
+}
 
-  if (frozenRows > 0 && cellY < frozenHeight) {
-    return indexAtOffset(cellY, 1, frozenRows, (row) => sheetRowHeight(model, sheet, row))
-  }
-
-  const firstVisibleRow = Math.max(frozenRows + 1, view.top_row)
-  return indexAtOffset(
-    cellY - frozenHeight,
-    firstVisibleRow,
-    MAX_SHEET_ROWS,
-    (row) => sheetRowHeight(model, sheet, row),
-  )
+function sheetAxisIndexAtCanvasPoint({ axis, coordinate, model, sheet }: SheetAxisHitTestRequest): number | null {
+  const frozenCount = sheetAxisFrozenCount(model, sheet, axis)
+  return sheetAxisIndexAtCanvasCoordinate({
+    coordinate,
+    firstVisibleIndex: sheetAxisVisibleIndex(model, frozenCount, axis),
+    frozenCount,
+    frozenSize: sheetAxisFrozenSize(model, sheet, axis, frozenCount),
+    headerSize: sheetAxisHeaderSize(axis),
+    maxIndex: sheetAxisMaxIndex(axis),
+    sizeAtIndex: sheetAxisSizeAtIndex(model, sheet, axis),
+  })
 }
 
 export function sheetCellFromCanvasPoint(
@@ -98,7 +138,7 @@ export function sheetCellFromCanvasPoint(
   x: number,
   y: number,
 ): { column: number; row: number } | null {
-  const column = sheetColumnAtCanvasX(model, sheet, x)
-  const row = sheetRowAtCanvasY(model, sheet, y)
+  const column = sheetAxisIndexAtCanvasPoint({ axis: 'column', coordinate: x, model, sheet })
+  const row = sheetAxisIndexAtCanvasPoint({ axis: 'row', coordinate: y, model, sheet })
   return row && column ? { column, row } : null
 }
