@@ -9,8 +9,8 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from 'react'
 import ironCalcWasmUrl from '@ironcalc/wasm/wasm_bg.wasm?url'
-import { init as initIronCalc, IronCalc, Model } from '@ironcalc/workbook'
-import { BorderType, type Area as IronCalcArea, type CellStyle } from '@ironcalc/wasm'
+import { init as initIronCalc, IronCalc, type Model } from '@ironcalc/workbook'
+import { type Area as IronCalcArea, type CellStyle } from '@ironcalc/wasm'
 import { getDocumentZoom } from '../extensions/zoomCursorFix'
 import {
   getCachedNoteContentEntry,
@@ -37,27 +37,10 @@ import {
   replaceActiveWikilinkQuery,
 } from '../utils/rawEditorUtils'
 import {
-  mergeSheetDocument,
-  parseCsvRows,
-  parseCsvRowsWithSource,
   serializeCsvRows,
-  serializeCsvRowsPreservingParsedSourceRows,
-  serializeCsvRowsReplacingParsedSourceRows,
-  splitSheetDocument,
-  type ParsedCsvRows,
 } from '../utils/sheetCsv'
 import {
-  cellAddressToIndexes,
-  columnIndexFromName,
-  columnNameFromOneBasedIndex,
-  emptySheetMetadata,
-  isSheetMetadataEmpty,
-  mergeSheetMetadata,
   metadataCellAddress,
-  parseSheetMetadata,
-  type SheetCellMetadata,
-  type SheetBorderMetadata,
-  type SheetMetadata,
 } from '../utils/sheetMetadata'
 import {
   applyFormulaSuggestion,
@@ -66,11 +49,8 @@ import {
 } from '../utils/sheetFormulaAutocomplete'
 import { parseSheetMarkdownCell } from '../utils/sheetMarkdownCell'
 import {
-  extractSheetExternalCellReferences,
   isExternalFormulaInput,
-  SHEET_EXTERNAL_CELL_REFERENCE_PATTERN,
   shiftExternalFormulaReferences,
-  type SheetExternalCellReference,
 } from '../utils/sheetExternalReferences'
 import {
   canUseNativeSheetFormulaWorker,
@@ -84,16 +64,26 @@ import {
   markSheetWorkbookDirty,
 } from '../utils/sheetDirtyState'
 import {
-  sheetCellContainsPlainWikilink,
-  sheetWikilinkDisplayValue,
-} from '../utils/sheetWikilinks'
-import {
   applySheetWikilinkStyle,
-  bridgeSheetWikilinkFormattedValues,
-  sheetWikilinkFormattedValueKey,
   sheetWikilinkCanvasColor,
-  SHEET_WIKILINK_FONT_COLOR,
 } from '../utils/sheetWikilinkModelBridge'
+import {
+  boundedSheetIndex,
+  buildSheetContent,
+  buildWorkbook,
+  MAX_EXTERNAL_FORMULA_DEPTH,
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
+  resolveExternalFormulaInput,
+  resolveExternalSheetDependencyEntries,
+  resolveExternalSheetEntriesForFormula,
+  sheetExternalFormulaContext,
+  sheetExternalFormulaWorkerSignature,
+  sheetHasExternalFormulaReferences,
+  SHEET_INDEX,
+  summarizeSheetContent,
+  type SheetBodyDirtyRows,
+} from '../utils/sheetWorkbook'
 import {
   elementCoordinateScale,
   localElementCoordinate,
@@ -112,28 +102,13 @@ import { sheetCellFromCanvasPoint } from '../utils/sheetPointerHitTest'
 import { MIN_QUERY_LENGTH, preFilterWikilinks } from '../utils/wikilinkSuggestions'
 import { notePathsMatch } from '../utils/notePathIdentity'
 import { isSecondaryPointerButton } from '../utils/pointerButtons'
-import { resolveEntry, wikilinkTarget } from '../utils/wikilink'
 import { SheetContextMenu } from './SheetContextMenu'
 import { WikilinkSuggestionMenu, type WikilinkSuggestionItem } from './WikilinkSuggestionMenu'
 import type { VaultEntry } from '../types'
 import './SheetEditor.css'
 
-const SHEET_INDEX = 0
 const SERIALIZE_DEBOUNCE_MS = 450
 const SHEET_PASTE_CHUNK_SIZE = 100
-const DEFAULT_SERIALIZATION_SCAN_ROWS = 1000
-const DEFAULT_SERIALIZATION_SCAN_COLUMNS = 200
-const MAX_SHEET_ROWS = 1048576
-const MAX_SHEET_COLUMNS = 16384
-const DEFAULT_COLUMN_WIDTH = 125
-const DEFAULT_ROW_HEIGHT = 28
-const DEFAULT_FONT_SIZE = 13
-const DEFAULT_FONT_COLOR = '#000000'
-const DEFAULT_VERTICAL_ALIGN = 'bottom'
-const DEFAULT_SHOW_GRID_LINES = true
-const DEFAULT_FROZEN_ROWS = 0
-const DEFAULT_FROZEN_COLUMNS = 0
-const SELECTED_METADATA_CELL_LIMIT = 5000
 const TOLARIA_SHEET_CLIPBOARD_MIME = 'application/x-tolaria-sheet-clipboard'
 const TOLARIA_SHEET_CLIPBOARD_VERSION = 1
 const IRONCALC_SELECTION_ORANGE = 'rgb(242, 153, 74)'
@@ -151,8 +126,6 @@ const SHEET_ROW_HEADER_BORDER_FALLBACK = '#E0E0E0'
 const ACTIVE_SELECTION_BORDER_WIDTH_PX = 2
 const RANGE_SELECTION_BORDER_WIDTH_PX = 1
 const ACTIVE_EDITOR_BORDER_OFFSET_PX = -1
-const MAX_EXTERNAL_FORMULA_DEPTH = 4
-const SHEET_EXTERNAL_FORMULA_CONTENT_BRIDGE = Symbol('sheetExternalFormulaContentBridge')
 const EMPTY_VAULT_ENTRIES: VaultEntry[] = []
 
 interface SheetEditorProps {
@@ -173,26 +146,6 @@ interface WorkbookState {
   model: Model
   path: string
   refreshId: number
-}
-
-interface UsedBounds {
-  rowCount: number
-  columnCount: number
-}
-
-interface UsedCell {
-  row: number
-  column: number
-}
-
-interface UsedArea extends UsedBounds {
-  cells: UsedCell[]
-}
-
-type SheetBodyDirtyRows = Set<number> | 'all' | null
-
-interface SheetContentBuildOptions {
-  bodyRows?: SheetBodyDirtyRows
 }
 
 interface ScheduleSheetSerializeOptions {
@@ -218,33 +171,6 @@ interface SheetWikilinkAutocompleteState {
   width: number
 }
 
-interface SheetContentSummary {
-  columnCount: number
-  hasMetadata: boolean
-  rowCount: number
-}
-
-interface SheetExternalWorkbookCache {
-  buildsByPath: Map<string, SheetWorkbookBuild>
-  ownedModels: Set<Model>
-}
-
-interface SheetExternalFormulaContext {
-  contentsByPath: Map<string, string>
-  currentPath: string
-  depth: number
-  entries: VaultEntry[]
-  entryResolutionCache: Map<string, VaultEntry | null>
-  resolvingPaths: Set<string>
-  sourceEntry?: VaultEntry | null
-  workbookCache?: SheetExternalWorkbookCache
-}
-
-interface SheetWorkbookBuild {
-  externalFormulaInputs: Map<string, SheetExternalFormulaInput>
-  model: Model
-}
-
 interface NativeExternalFormulaResolutionState {
   inputs: Map<string, SheetExternalFormulaInput>
   signature: string
@@ -263,10 +189,6 @@ interface TolariaSheetClipboardPayload {
   }
   type: 'tolaria-sheet-clipboard'
   version: number
-}
-
-type SheetExternalFormulaContentBridgeState = {
-  [SHEET_EXTERNAL_FORMULA_CONTENT_BRIDGE]?: Model['getCellContent']
 }
 
 interface SheetCanvasHeaderPaintTheme {
@@ -606,851 +528,6 @@ function patchIronCalcSelectionChrome(container: HTMLDivElement | null): void {
   if (!container) return
   registerSheetCanvasHeaderPaint(container)
   patchIronCalcSelectionSubtree(container.querySelector<HTMLElement>('.sheet-container') ?? container)
-}
-
-function parseSheetRows(content: string): string[][] {
-  return parseCsvRows(splitSheetDocument(content).body.trimEnd())
-}
-
-function sheetHasExternalFormulaReferences(content: string): boolean {
-  return extractSheetExternalCellReferences(splitSheetDocument(content).body).length > 0
-}
-
-function hashSheetWorkerString(seed: number, value: string): number {
-  let hash = seed
-  for (let index = 0; index < value.length; index += 1) {
-    hash = Math.imul(hash ^ value.charCodeAt(index), 16777619)
-  }
-  return hash >>> 0
-}
-
-function sheetExternalFormulaWorkerSignature({
-  content,
-  dependencies,
-  path,
-}: {
-  content: string
-  dependencies: SheetExternalFormulaWorkerDependency[]
-  path: string
-}): string {
-  let hash = hashSheetWorkerString(2166136261, path)
-  hash = hashSheetWorkerString(hash, content)
-  for (const dependency of [...dependencies].sort((left, right) => left.entry.path.localeCompare(right.entry.path))) {
-    hash = hashSheetWorkerString(hash, dependency.entry.path)
-    hash = hashSheetWorkerString(hash, dependency.content)
-  }
-  return `${path}:${hash.toString(16)}`
-}
-
-function sheetCellContainsWikilink(value: string): boolean {
-  return sheetCellContainsPlainWikilink(value)
-}
-
-function sheetEntryResolutionCacheKey(target: string, sourceEntry?: VaultEntry | null): string {
-  return `${sourceEntry?.path ?? ''}\n${target}`
-}
-
-function resolveSheetEntry(
-  entries: VaultEntry[],
-  target: string,
-  sourceEntry?: VaultEntry | null,
-  cache?: Map<string, VaultEntry | null>,
-): VaultEntry | undefined {
-  const cacheKey = sheetEntryResolutionCacheKey(target, sourceEntry)
-  if (cache?.has(cacheKey)) return cache.get(cacheKey) ?? undefined
-
-  const entry = resolveEntry(entries, target, sourceEntry ?? undefined)
-    ?? (sourceEntry ? resolveEntry([sourceEntry], target, sourceEntry) : undefined)
-  cache?.set(cacheKey, entry ?? null)
-  return entry
-}
-
-function resolveExternalSheetDependencyEntries({
-  content,
-  contentsByPath,
-  currentPath,
-  entries,
-  sourceEntry,
-}: {
-  content: string
-  contentsByPath: Map<string, string>
-  currentPath: string
-  entries: VaultEntry[]
-  sourceEntry: VaultEntry | null
-}): VaultEntry[] {
-  const resolved = new Map<string, VaultEntry>()
-  const resolutionCache = new Map<string, VaultEntry | null>()
-  const visitedBodies = new Set<string>([currentPath])
-  const queue = [{
-    body: splitSheetDocument(content).body,
-    depth: 0,
-    sourceEntry,
-  }]
-
-  for (let index = 0; index < queue.length; index += 1) {
-    const item = queue[index]
-    if (!item || item.depth > MAX_EXTERNAL_FORMULA_DEPTH) continue
-
-    const referencedTargets = new Set(extractSheetExternalCellReferences(item.body).map((reference) => reference.target))
-    for (const target of referencedTargets) {
-      const entry = resolveSheetEntry(entries, target, item.sourceEntry, resolutionCache)
-      if (!entry || notePathsMatch(entry.path, currentPath)) continue
-
-      resolved.set(entry.path, entry)
-      if (visitedBodies.has(entry.path) || item.depth >= MAX_EXTERNAL_FORMULA_DEPTH) continue
-
-      const nestedContent = contentsByPath.get(entry.path)
-      if (nestedContent === undefined) continue
-
-      visitedBodies.add(entry.path)
-      queue.push({
-        body: splitSheetDocument(nestedContent).body,
-        depth: item.depth + 1,
-        sourceEntry: entry,
-      })
-    }
-  }
-
-  return Array.from(resolved.values())
-}
-
-function resolveExternalSheetEntriesForFormula(
-  formula: string,
-  entries: VaultEntry[],
-  sourceEntry: VaultEntry | null,
-  currentPath: string,
-): VaultEntry[] {
-  const resolved = new Map<string, VaultEntry>()
-  const resolutionCache = new Map<string, VaultEntry | null>()
-  for (const reference of extractSheetExternalCellReferences(formula)) {
-    const entry = resolveSheetEntry(entries, reference.target, sourceEntry, resolutionCache)
-    if (!entry) continue
-    if (notePathsMatch(entry.path, currentPath)) continue
-    resolved.set(entry.path, entry)
-  }
-  return Array.from(resolved.values())
-}
-
-function sheetExternalFormulaContext(options: {
-  contentsByPath: Map<string, string>
-  currentPath: string
-  entries: VaultEntry[]
-  sourceEntry?: VaultEntry | null
-}): SheetExternalFormulaContext {
-  return {
-    contentsByPath: options.contentsByPath,
-    currentPath: options.currentPath,
-    depth: 0,
-    entries: options.entries,
-    entryResolutionCache: new Map(),
-    resolvingPaths: new Set([options.currentPath]),
-    sourceEntry: options.sourceEntry,
-  }
-}
-
-function sheetExternalFormulaNestedContext(
-  context: SheetExternalFormulaContext,
-  entry: VaultEntry,
-): SheetExternalFormulaContext {
-  return {
-    ...context,
-    currentPath: entry.path,
-    depth: context.depth + 1,
-    resolvingPaths: new Set([...context.resolvingPaths, entry.path]),
-    sourceEntry: entry,
-  }
-}
-
-function withExternalWorkbookCache(context: SheetExternalFormulaContext): {
-  context: SheetExternalFormulaContext
-  dispose: () => void
-} {
-  if (context.workbookCache) return { context, dispose: () => undefined }
-
-  const workbookCache: SheetExternalWorkbookCache = {
-    buildsByPath: new Map(),
-    ownedModels: new Set(),
-  }
-
-  return {
-    context: { ...context, workbookCache },
-    dispose: () => {
-      for (const model of workbookCache.ownedModels) model.free()
-      workbookCache.ownedModels.clear()
-      workbookCache.buildsByPath.clear()
-    },
-  }
-}
-
-function isProbablyNumericFormulaLiteral(value: string): boolean {
-  return /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value)
-}
-
-function normalizedNumericFormulaLiteral(value: string): string | null {
-  const trimmed = value.trim()
-  if (trimmed === '') return '0'
-  if (isProbablyNumericFormulaLiteral(trimmed)) return trimmed
-
-  const percent = trimmed.match(/^-?[$€£]?\s*[\d,]+(?:\.\d+)?%$/)
-  if (percent) {
-    const parsed = Number.parseFloat(trimmed.replace(/[$€£,\s%]/g, ''))
-    if (Number.isFinite(parsed)) return String(parsed / 100)
-  }
-
-  const normalized = trimmed.replace(/^[$€£]\s*/, '').replace(/,/g, '')
-  if (isProbablyNumericFormulaLiteral(normalized)) return normalized
-  return null
-}
-
-function textFormulaLiteral(value: string): string {
-  return JSON.stringify(value)
-}
-
-function externalCellFormulaLiteral(model: Model, row: number, column: number): string {
-  const rawContent = model.getCellContent(SHEET_INDEX, row, column)
-  if (!rawContent.trimStart().startsWith('=')) {
-    return normalizedNumericFormulaLiteral(rawContent) ?? textFormulaLiteral(rawContent)
-  }
-
-  const formattedValue = model.getFormattedCellValue(SHEET_INDEX, row, column)
-  return normalizedNumericFormulaLiteral(formattedValue) ?? textFormulaLiteral(formattedValue)
-}
-
-function externalWorkbookBuild(
-  entry: VaultEntry,
-  content: string,
-  context: SheetExternalFormulaContext,
-): { build: SheetWorkbookBuild; cached: boolean } {
-  const cached = context.workbookCache?.buildsByPath.get(entry.path)
-  if (cached) return { build: cached, cached: true }
-
-  const build = buildWorkbook(content, entry.path, sheetExternalFormulaNestedContext(context, entry))
-  if (!context.workbookCache) return { build, cached: false }
-
-  context.workbookCache.buildsByPath.set(entry.path, build)
-  context.workbookCache.ownedModels.add(build.model)
-  return { build, cached: true }
-}
-
-function resolveExternalCellReference(
-  reference: SheetExternalCellReference,
-  context: SheetExternalFormulaContext,
-): string | null {
-  const entry = resolveSheetEntry(
-    context.entries,
-    reference.target,
-    context.sourceEntry,
-    context.entryResolutionCache,
-  )
-  if (!entry) return null
-  if (notePathsMatch(entry.path, context.currentPath)) return null
-  if (context.resolvingPaths.has(entry.path) || context.depth > MAX_EXTERNAL_FORMULA_DEPTH) return null
-
-  const content = context.contentsByPath.get(entry.path)
-  if (content === undefined) return null
-
-  const cell = cellAddressToIndexes(reference.address)
-  if (!cell) return null
-
-  const nested = externalWorkbookBuild(entry, content, context)
-  try {
-    return externalCellFormulaLiteral(nested.build.model, cell.row, cell.column)
-  } finally {
-    if (!nested.cached) nested.build.model.free()
-  }
-}
-
-function localSheetCellReference(
-  columnAbsolute: string,
-  rawColumn: string,
-  rowAbsolute: string,
-  row: string,
-): string {
-  return `${columnAbsolute}${rawColumn.toUpperCase()}${rowAbsolute}${row}`
-}
-
-function resolveExternalFormulaInput(
-  value: string,
-  context?: SheetExternalFormulaContext,
-): SheetExternalFormulaInput | null {
-  if (!context || !isExternalFormulaInput(value)) return null
-
-  const cacheRun = withExternalWorkbookCache(context)
-  let unresolved = false
-  try {
-    const evaluated = value.replace(SHEET_EXTERNAL_CELL_REFERENCE_PATTERN, (match, rawTarget, columnAbsolute, rawColumn, rowAbsolute, row) => {
-      const address = cellAddressToIndexes(`${rawColumn}${row}`)
-      const target = wikilinkTarget(`[[${rawTarget}]]`)
-      if (!address) {
-        unresolved = true
-        return match
-      }
-
-      const entry = resolveSheetEntry(
-        cacheRun.context.entries,
-        target,
-        cacheRun.context.sourceEntry,
-        cacheRun.context.entryResolutionCache,
-      )
-      if (entry && notePathsMatch(entry.path, cacheRun.context.currentPath)) {
-        return localSheetCellReference(columnAbsolute, rawColumn, rowAbsolute, row)
-      }
-
-      const literal = resolveExternalCellReference(
-        { address: metadataCellAddress(address.row, address.column), target },
-        cacheRun.context,
-      )
-      if (literal === null) {
-        unresolved = true
-        return match
-      }
-      return literal
-    })
-
-    if (unresolved || evaluated === value) return null
-    return { evaluated, source: value }
-  } finally {
-    cacheRun.dispose()
-  }
-}
-
-function userFacingExternalCellContent(
-  rawContent: string,
-  row: number,
-  column: number,
-  externalFormulaInputs: Map<string, SheetExternalFormulaInput>,
-): string {
-  const externalFormula = externalFormulaInputs.get(metadataCellAddress(row, column))
-  return externalFormula && rawContent === externalFormula.evaluated
-    ? externalFormula.source
-    : rawContent
-}
-
-function bridgeExternalFormulaCellContent(
-  model: Model,
-  externalFormulaInputs: Map<string, SheetExternalFormulaInput>,
-): void {
-  const bridgedModel = model as Model & SheetExternalFormulaContentBridgeState
-  if (bridgedModel[SHEET_EXTERNAL_FORMULA_CONTENT_BRIDGE]) return
-
-  const rawGetCellContent = model.getCellContent.bind(model)
-  const bridgedGetCellContent: Model['getCellContent'] = (sheet, row, column) => {
-    const rawContent = rawGetCellContent(sheet, row, column)
-    if (sheet !== SHEET_INDEX) return rawContent
-    return userFacingExternalCellContent(rawContent, row, column, externalFormulaInputs)
-  }
-
-  bridgedModel[SHEET_EXTERNAL_FORMULA_CONTENT_BRIDGE] = rawGetCellContent
-  try {
-    Object.defineProperty(bridgedModel, 'getCellContent', {
-      configurable: true,
-      value: bridgedGetCellContent,
-    })
-  } catch {
-    bridgedModel.getCellContent = bridgedGetCellContent
-  }
-}
-
-function workbookNameFromPath(path: string): string {
-  const filename = path.split(/[\\/]/).at(-1) ?? 'Tolaria Sheet'
-  return filename.replace(/\.md$/i, '') || 'Tolaria Sheet'
-}
-
-function summarizeSheetContent(content: string): SheetContentSummary {
-  const parts = splitSheetDocument(content)
-  const rows = parseCsvRows(parts.body.trimEnd())
-  return {
-    columnCount: rows.reduce((max, row) => Math.max(max, row.length), 0),
-    hasMetadata: !isSheetMetadataEmpty(parseSheetMetadata(parts.frontmatter)),
-    rowCount: rows.length,
-  }
-}
-
-function sheetContentBoundsFromRows(rows: string[][]): UsedBounds {
-  return {
-    columnCount: rows.reduce((max, row) => Math.max(max, row.length), 0),
-    rowCount: rows.length,
-  }
-}
-
-function buildWorkbook(
-  content: string,
-  path: string,
-  externalFormulaContext?: SheetExternalFormulaContext,
-  nativeExternalFormulaInputs?: Map<string, SheetExternalFormulaInput> | null,
-): SheetWorkbookBuild {
-  const rows = parseSheetRows(content)
-  const metadata = parseSheetMetadata(splitSheetDocument(content).frontmatter)
-  const markdownMetadata = emptySheetMetadata()
-  const externalFormulaInputs = new Map<string, SheetExternalFormulaInput>()
-  const wikilinkFormattedValues = new Map<string, string>()
-  const externalFormulaCacheRun = externalFormulaContext ? withExternalWorkbookCache(externalFormulaContext) : null
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  const model = new Model(workbookNameFromPath(path), 'en', timezone)
-  const entries = externalFormulaContext?.entries ?? EMPTY_VAULT_ENTRIES
-  const sourceEntry = externalFormulaContext?.sourceEntry
-
-  model.pauseEvaluation()
-  try {
-    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
-      const row = rows[rowIndex] ?? []
-      for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
-        const value = row[columnIndex] ?? ''
-        const markdownCell = parseSheetMarkdownCell(value)
-        const address = metadataCellAddress(rowIndex + 1, columnIndex + 1)
-        const nativeExternalFormula = nativeExternalFormulaInputs?.get(address)
-        const externalFormula = nativeExternalFormula?.source === markdownCell.value
-          ? nativeExternalFormula
-          : resolveExternalFormulaInput(markdownCell.value, externalFormulaCacheRun?.context)
-        const modelInput = externalFormula?.evaluated ?? markdownCell.value
-        if (markdownCell.value !== '') {
-          model.setUserInput(SHEET_INDEX, rowIndex + 1, columnIndex + 1, modelInput)
-        }
-        if (externalFormula) {
-          externalFormulaInputs.set(address, externalFormula)
-        }
-        if (sheetCellContainsWikilink(markdownCell.value)) {
-          wikilinkFormattedValues.set(
-            sheetWikilinkFormattedValueKey(SHEET_INDEX, rowIndex + 1, columnIndex + 1),
-            sheetWikilinkDisplayValue(markdownCell.value, entries, sourceEntry),
-          )
-          applySheetWikilinkStyle(model, {
-            sheet: SHEET_INDEX,
-            row: rowIndex + 1,
-            column: columnIndex + 1,
-            width: 1,
-            height: 1,
-          }, sheetWikilinkCanvasColor(markdownCell.value, entries, sourceEntry))
-        }
-        if (Object.keys(markdownCell.metadata).length > 0) {
-          markdownMetadata.cells[metadataCellAddress(rowIndex + 1, columnIndex + 1)] = markdownCell.metadata
-        }
-      }
-    }
-    applySheetMetadata(model, markdownMetadata)
-    applySheetMetadata(model, metadata)
-  } finally {
-    model.resumeEvaluation()
-    externalFormulaCacheRun?.dispose()
-  }
-
-  model.evaluate()
-  model.setSelectedSheet(SHEET_INDEX)
-  bridgeExternalFormulaCellContent(model, externalFormulaInputs)
-  bridgeSheetWikilinkFormattedValues({
-    entries,
-    formattedValues: wikilinkFormattedValues,
-    model,
-    sheetIndex: SHEET_INDEX,
-    sourceEntry,
-  })
-  return { externalFormulaInputs, model }
-}
-
-function applyCellMetadata(model: Model, cell: string, metadata: SheetCellMetadata): void {
-  const indexes = cellAddressToIndexes(cell)
-  if (!indexes) return
-
-  const area = {
-    sheet: SHEET_INDEX,
-    row: indexes.row,
-    column: indexes.column,
-    width: 1,
-    height: 1,
-  }
-
-  if (metadata.numFmt !== undefined) model.updateRangeStyle(area, 'num_fmt', metadata.numFmt)
-  if (metadata.bold !== undefined) model.updateRangeStyle(area, 'font.b', String(metadata.bold))
-  if (metadata.italic !== undefined) model.updateRangeStyle(area, 'font.i', String(metadata.italic))
-  if (metadata.underline !== undefined) model.updateRangeStyle(area, 'font.u', String(metadata.underline))
-  if (metadata.strike !== undefined) model.updateRangeStyle(area, 'font.strike', String(metadata.strike))
-  if (metadata.fontSize !== undefined) {
-    const currentFontSize = model.getCellStyle(SHEET_INDEX, indexes.row, indexes.column).font.sz ?? DEFAULT_FONT_SIZE
-    const delta = metadata.fontSize - currentFontSize
-    if (delta !== 0) model.updateRangeStyle(area, 'font.size_delta', String(delta))
-  }
-  if (metadata.fontColor !== undefined) model.updateRangeStyle(area, 'font.color', metadata.fontColor)
-  if (metadata.fillColor !== undefined) model.updateRangeStyle(area, 'fill.fg_color', metadata.fillColor)
-  if (metadata.horizontalAlign !== undefined) {
-    model.updateRangeStyle(area, 'alignment.horizontal', metadata.horizontalAlign)
-  }
-  if (metadata.verticalAlign !== undefined) {
-    model.updateRangeStyle(area, 'alignment.vertical', metadata.verticalAlign)
-  }
-  if (metadata.wrapText !== undefined) {
-    model.updateRangeStyle(area, 'alignment.wrap_text', String(metadata.wrapText))
-  }
-  if (metadata.borderTop !== undefined) applyCellBorderMetadata(model, area, BorderType.Top, metadata.borderTop)
-  if (metadata.borderRight !== undefined) applyCellBorderMetadata(model, area, BorderType.Right, metadata.borderRight)
-  if (metadata.borderBottom !== undefined) applyCellBorderMetadata(model, area, BorderType.Bottom, metadata.borderBottom)
-  if (metadata.borderLeft !== undefined) applyCellBorderMetadata(model, area, BorderType.Left, metadata.borderLeft)
-}
-
-function applyCellBorderMetadata(
-  model: Model,
-  area: { sheet: number; row: number; column: number; width: number; height: number },
-  type: BorderType,
-  metadata: SheetBorderMetadata,
-): void {
-  model.setAreaWithBorder(area, {
-    type,
-    item: {
-      color: metadata.color ?? DEFAULT_FONT_COLOR,
-      style: metadata.style,
-    },
-  })
-}
-
-function applySheetMetadata(model: Model, metadata: SheetMetadata): void {
-  if (metadata.showGridLines !== undefined) model.setShowGridLines(SHEET_INDEX, metadata.showGridLines)
-  if (metadata.frozenRows !== undefined) model.setFrozenRowsCount(SHEET_INDEX, metadata.frozenRows)
-  if (metadata.frozenColumns !== undefined) model.setFrozenColumnsCount(SHEET_INDEX, metadata.frozenColumns)
-
-  for (const [columnName, column] of Object.entries(metadata.columns)) {
-    if (column.width === undefined) continue
-    const columnIndex = columnIndexFromName(columnName)
-    if (columnIndex === null) continue
-    model.setColumnsWidth(SHEET_INDEX, columnIndex, columnIndex, column.width)
-  }
-
-  for (const [rowName, row] of Object.entries(metadata.rows)) {
-    if (row.height === undefined) continue
-    const rowIndex = Number(rowName)
-    if (!Number.isInteger(rowIndex) || rowIndex < 1) continue
-    model.setRowsHeight(SHEET_INDEX, rowIndex, rowIndex, row.height)
-  }
-
-  for (const [cell, cellMetadata] of Object.entries(metadata.cells)) {
-    applyCellMetadata(model, cell, cellMetadata)
-  }
-}
-
-function workbookUsedArea(
-  model: Model,
-  scanBounds: UsedBounds = {
-    rowCount: DEFAULT_SERIALIZATION_SCAN_ROWS,
-    columnCount: DEFAULT_SERIALIZATION_SCAN_COLUMNS,
-  },
-): UsedArea {
-  let rowCount = 0
-  let columnCount = 0
-  const cells = new Map<string, UsedCell>()
-  const maxRows = Math.max(1, Math.min(scanBounds.rowCount, MAX_SHEET_ROWS))
-  const maxColumns = Math.max(1, Math.min(scanBounds.columnCount, MAX_SHEET_COLUMNS))
-
-  if (maxRows <= maxColumns) {
-    for (let row = 1; row <= maxRows; row += 1) {
-      let rowHasData = false
-      for (const column of model.getColumnsWithData(SHEET_INDEX, row)) {
-        if (column <= 0 || column > maxColumns) continue
-        rowHasData = true
-        columnCount = Math.max(columnCount, column)
-        cells.set(metadataCellAddress(row, column), { row, column })
-      }
-      if (rowHasData) rowCount = row
-    }
-
-    return { cells: Array.from(cells.values()), rowCount, columnCount }
-  }
-
-  for (let column = 1; column <= maxColumns; column += 1) {
-    let columnHasData = false
-    for (const row of model.getRowsWithData(SHEET_INDEX, column)) {
-      if (row <= 0 || row > maxRows) continue
-      columnHasData = true
-      rowCount = Math.max(rowCount, row)
-      cells.set(metadataCellAddress(row, column), { row, column })
-    }
-    if (columnHasData) columnCount = column
-  }
-
-  return { cells: Array.from(cells.values()), rowCount, columnCount }
-}
-
-function workbookUsedAreaForRows(model: Model, dirtyRows: Set<number>): UsedArea {
-  let rowCount = 0
-  let columnCount = 0
-  const cells = new Map<string, UsedCell>()
-
-  for (const row of dirtyRows) {
-    if (row < 1 || row > MAX_SHEET_ROWS) continue
-    for (const column of model.getColumnsWithData(SHEET_INDEX, row)) {
-      if (column <= 0 || column > MAX_SHEET_COLUMNS) continue
-      rowCount = Math.max(rowCount, row)
-      columnCount = Math.max(columnCount, column)
-      cells.set(metadataCellAddress(row, column), { row, column })
-    }
-  }
-
-  return { cells: Array.from(cells.values()), rowCount, columnCount }
-}
-
-function workbookUsedAreaForSheetSave(model: Model, sourceBounds: UsedBounds, dirtyRows: SheetBodyDirtyRows): UsedArea {
-  if (dirtyRows === null) return { cells: [], rowCount: 0, columnCount: 0 }
-  if (dirtyRows instanceof Set) return workbookUsedAreaForRows(model, dirtyRows)
-  return workbookUsedArea(model, combinedBounds(
-    sourceBounds,
-    { rowCount: DEFAULT_SERIALIZATION_SCAN_ROWS, columnCount: DEFAULT_SERIALIZATION_SCAN_COLUMNS },
-  ))
-}
-
-function workbookUsedBounds(model: Model): UsedBounds {
-  return workbookUsedArea(model)
-}
-
-function boundedSheetIndex(value: number, max: number): number {
-  if (!Number.isFinite(value) || value < 1) return 0
-  return Math.min(Math.floor(value), max)
-}
-
-function combinedBounds(left: UsedBounds, right: UsedBounds): UsedBounds {
-  return {
-    rowCount: Math.max(left.rowCount, right.rowCount),
-    columnCount: Math.max(left.columnCount, right.columnCount),
-  }
-}
-
-function previousMetadataBounds(metadata: SheetMetadata): UsedBounds {
-  const rowCount = Object.keys(metadata.rows)
-    .reduce((max, row) => Math.max(max, boundedSheetIndex(Number(row), MAX_SHEET_ROWS)), 0)
-  const columnCount = Object.keys(metadata.columns)
-    .reduce((max, column) => Math.max(max, boundedSheetIndex(columnIndexFromName(column) ?? 0, MAX_SHEET_COLUMNS)), 0)
-
-  return { rowCount, columnCount }
-}
-
-function serializeWorkbookCell(
-  model: Model,
-  row: number,
-  column: number,
-  externalFormulaInputs?: Map<string, SheetExternalFormulaInput>,
-): string {
-  const content = model.getCellContent(SHEET_INDEX, row, column)
-  const externalFormula = externalFormulaInputs?.get(metadataCellAddress(row, column))
-  if (externalFormula && content === externalFormula.evaluated) return externalFormula.source
-  return parseSheetMarkdownCell(content).value
-}
-
-function serializeWorkbookRows(
-  model: Model,
-  bounds: UsedBounds = workbookUsedBounds(model),
-  externalFormulaInputs?: Map<string, SheetExternalFormulaInput>,
-): string[][] {
-  const { rowCount, columnCount } = bounds
-  const rows: string[][] = []
-
-  for (let row = 1; row <= rowCount; row += 1) {
-    const cells: string[] = []
-    for (let column = 1; column <= columnCount; column += 1) {
-      cells.push(serializeWorkbookCell(model, row, column, externalFormulaInputs))
-    }
-    rows.push(cells)
-  }
-
-  return rows
-}
-
-function serializeWorkbookRow(
-  model: Model,
-  row: number,
-  columnCount: number,
-  externalFormulaInputs?: Map<string, SheetExternalFormulaInput>,
-): string[] {
-  return Array.from({ length: columnCount }, (_, columnIndex) => (
-    serializeWorkbookCell(model, row, columnIndex + 1, externalFormulaInputs)
-  ))
-}
-
-function serializeWorkbookDirtyRows(
-  model: Model,
-  dirtyRows: Set<number>,
-  columnCount: number,
-  externalFormulaInputs?: Map<string, SheetExternalFormulaInput>,
-): Map<number, string[]> {
-  const rows = new Map<number, string[]>()
-  for (const row of dirtyRows) {
-    if (row < 1 || row > MAX_SHEET_ROWS) continue
-    rows.set(row - 1, serializeWorkbookRow(model, row, columnCount, externalFormulaInputs))
-  }
-  return rows
-}
-
-function extractBorderMetadata(
-  border: CellStyle['border'],
-  side: 'bottom' | 'left' | 'right' | 'top',
-): SheetBorderMetadata | undefined {
-  const item = border[side] as { color?: string; style?: string } | undefined
-  if (!item?.style) return undefined
-  return item.color ? { color: item.color, style: item.style } : { style: item.style }
-}
-
-function extractCellMetadata(style: CellStyle): SheetCellMetadata {
-  const metadata: SheetCellMetadata = {}
-  if (style.num_fmt && style.num_fmt !== 'general') metadata.numFmt = style.num_fmt
-  if (style.font.b) metadata.bold = true
-  if (style.font.i) metadata.italic = true
-  if (style.font.u) metadata.underline = true
-  if (style.font.strike) metadata.strike = true
-  if (style.font.sz && style.font.sz !== DEFAULT_FONT_SIZE) metadata.fontSize = style.font.sz
-  if (style.font.color && style.font.color !== DEFAULT_FONT_COLOR) metadata.fontColor = style.font.color
-  if (style.fill.fg_color) metadata.fillColor = style.fill.fg_color
-  if (style.alignment?.horizontal && style.alignment.horizontal !== 'general') {
-    metadata.horizontalAlign = style.alignment.horizontal
-  }
-  if (style.alignment?.vertical && style.alignment.vertical !== DEFAULT_VERTICAL_ALIGN) {
-    metadata.verticalAlign = style.alignment.vertical
-  }
-  if (style.alignment?.wrap_text) metadata.wrapText = true
-  const borderTop = extractBorderMetadata(style.border, 'top')
-  const borderRight = extractBorderMetadata(style.border, 'right')
-  const borderBottom = extractBorderMetadata(style.border, 'bottom')
-  const borderLeft = extractBorderMetadata(style.border, 'left')
-  if (borderTop !== undefined) metadata.borderTop = borderTop
-  if (borderRight !== undefined) metadata.borderRight = borderRight
-  if (borderBottom !== undefined) metadata.borderBottom = borderBottom
-  if (borderLeft !== undefined) metadata.borderLeft = borderLeft
-  return metadata
-}
-
-function hasCellMetadata(metadata: SheetCellMetadata): boolean {
-  return Object.keys(metadata).length > 0
-}
-
-function mergeCellMetadata(left: SheetCellMetadata, right: SheetCellMetadata): SheetCellMetadata {
-  return { ...left, ...right }
-}
-
-function removeDefaultWikilinkVisualMetadata(metadata: SheetCellMetadata): SheetCellMetadata {
-  const cleaned = { ...metadata }
-  if (cleaned.fontColor?.toLowerCase() === SHEET_WIKILINK_FONT_COLOR) Reflect.deleteProperty(cleaned, 'fontColor')
-  if (cleaned.underline === true) Reflect.deleteProperty(cleaned, 'underline')
-  return cleaned
-}
-
-function addCellCandidate(candidates: Map<string, UsedCell>, row: number, column: number): void {
-  if (row < 1 || row > MAX_SHEET_ROWS || column < 1 || column > MAX_SHEET_COLUMNS) return
-  candidates.set(metadataCellAddress(row, column), { row, column })
-}
-
-function addSelectedCellCandidates(model: Model, candidates: Map<string, UsedCell>): void {
-  const view = model.getSelectedView()
-  if (view.sheet !== SHEET_INDEX) return
-
-  const startRow = boundedSheetIndex(Math.min(view.range[0], view.range[2]), MAX_SHEET_ROWS)
-  const endRow = boundedSheetIndex(Math.max(view.range[0], view.range[2]), MAX_SHEET_ROWS)
-  const startColumn = boundedSheetIndex(Math.min(view.range[1], view.range[3]), MAX_SHEET_COLUMNS)
-  const endColumn = boundedSheetIndex(Math.max(view.range[1], view.range[3]), MAX_SHEET_COLUMNS)
-  if (startRow === 0 || endRow === 0 || startColumn === 0 || endColumn === 0) return
-  const selectedCellCount = (endRow - startRow + 1) * (endColumn - startColumn + 1)
-  if (selectedCellCount > SELECTED_METADATA_CELL_LIMIT) return
-
-  for (let row = startRow; row <= endRow; row += 1) {
-    for (let column = startColumn; column <= endColumn; column += 1) {
-      addCellCandidate(candidates, row, column)
-    }
-  }
-}
-
-function metadataCellCandidates(model: Model, previousMetadata: SheetMetadata, usedArea: UsedArea): UsedCell[] {
-  const candidates = new Map<string, UsedCell>()
-
-  for (const cell of usedArea.cells) addCellCandidate(candidates, cell.row, cell.column)
-  for (const cell of Object.keys(previousMetadata.cells)) {
-    const indexes = cellAddressToIndexes(cell)
-    if (indexes) addCellCandidate(candidates, indexes.row, indexes.column)
-  }
-  addSelectedCellCandidates(model, candidates)
-
-  return Array.from(candidates.values())
-}
-
-function extractSheetMetadata(model: Model, previousMetadata: SheetMetadata, usedArea: UsedArea): SheetMetadata {
-  const bounds = combinedBounds(usedArea, previousMetadataBounds(previousMetadata))
-  const metadata = emptySheetMetadata()
-  const showGridLines = model.getShowGridLines(SHEET_INDEX)
-  const frozenRows = model.getFrozenRowsCount(SHEET_INDEX)
-  const frozenColumns = model.getFrozenColumnsCount(SHEET_INDEX)
-
-  if (showGridLines !== DEFAULT_SHOW_GRID_LINES) metadata.showGridLines = showGridLines
-  if (frozenRows !== DEFAULT_FROZEN_ROWS) metadata.frozenRows = frozenRows
-  if (frozenColumns !== DEFAULT_FROZEN_COLUMNS) metadata.frozenColumns = frozenColumns
-
-  for (let column = 1; column <= bounds.columnCount; column += 1) {
-    const width = model.getColumnWidth(SHEET_INDEX, column)
-    if (width !== DEFAULT_COLUMN_WIDTH) {
-      metadata.columns[columnNameFromOneBasedIndex(column)] = { width }
-    }
-  }
-
-  for (let row = 1; row <= bounds.rowCount; row += 1) {
-    const height = model.getRowHeight(SHEET_INDEX, row)
-    if (height !== DEFAULT_ROW_HEIGHT) {
-      metadata.rows[String(row)] = { height }
-    }
-  }
-
-  for (const { row, column } of metadataCellCandidates(model, previousMetadata, usedArea)) {
-    const markdownCell = parseSheetMarkdownCell(model.getCellContent(SHEET_INDEX, row, column))
-    const extractedMetadata = mergeCellMetadata(
-      extractCellMetadata(model.getCellStyle(SHEET_INDEX, row, column)),
-      markdownCell.metadata,
-    )
-    const cellMetadata = sheetCellContainsWikilink(markdownCell.value)
-      ? removeDefaultWikilinkVisualMetadata(extractedMetadata)
-      : extractedMetadata
-    if (hasCellMetadata(cellMetadata)) {
-      metadata.cells[metadataCellAddress(row, column)] = cellMetadata
-    }
-  }
-
-  return metadata
-}
-
-function serializeSheetBody(
-  model: Model,
-  source: ParsedCsvRows,
-  bounds: UsedBounds,
-  externalFormulaInputs: Map<string, SheetExternalFormulaInput> | undefined,
-  dirtyRows: SheetBodyDirtyRows,
-): string {
-  if (dirtyRows === null) {
-    return source.rawRows.map((row, index) => `${row}${source.rowTerminators[index] ?? ''}`).join('')
-  }
-
-  if (dirtyRows instanceof Set) {
-    return serializeCsvRowsReplacingParsedSourceRows(
-      source,
-      serializeWorkbookDirtyRows(model, dirtyRows, bounds.columnCount, externalFormulaInputs),
-    )
-  }
-
-  return serializeCsvRowsPreservingParsedSourceRows(
-    serializeWorkbookRows(model, bounds, externalFormulaInputs),
-    source,
-  )
-}
-
-function buildSheetContent(
-  content: string,
-  model: Model,
-  externalFormulaInputs?: Map<string, SheetExternalFormulaInput>,
-  options: SheetContentBuildOptions = {},
-): string {
-  const { body, frontmatter } = splitSheetDocument(content)
-  const sourceRows = parseCsvRowsWithSource(body)
-  const previousMetadata = parseSheetMetadata(frontmatter)
-  const sourceBounds = sheetContentBoundsFromRows(sourceRows.rows)
-  const bodyRows = options.bodyRows === undefined ? 'all' : options.bodyRows
-  const usedArea = workbookUsedAreaForSheetSave(model, sourceBounds, bodyRows)
-  const serializedBounds = combinedBounds(sourceBounds, usedArea)
-  const frontmatterWithMetadata = mergeSheetMetadata(
-    frontmatter,
-    extractSheetMetadata(model, previousMetadata, usedArea),
-  )
-  return mergeSheetDocument(
-    frontmatterWithMetadata,
-    serializeSheetBody(model, sourceRows, serializedBounds, externalFormulaInputs, bodyRows),
-  )
 }
 
 function selectedRangeArea(model: Model): IronCalcArea {
