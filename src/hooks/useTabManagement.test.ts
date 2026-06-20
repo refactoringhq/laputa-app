@@ -578,6 +578,31 @@ describe('useTabManagement (single-note model)', () => {
       expect(result.current.tabs[0].content).toBe('# New note')
       expect(result.current.activeTabPath).toBe('/vault/new.md')
     })
+
+    it('waits for the current note save before opening a newly created note', async () => {
+      const deferred = createDeferred<void>()
+      const beforeNavigate = vi.fn().mockReturnValueOnce(deferred.promise)
+
+      const { result } = renderHook(() => useTabManagement({ beforeNavigate }))
+      await selectNote(result, { path: '/vault/a.md', title: 'A' })
+
+      act(() => {
+        result.current.openTabWithContent(makeEntry({ path: '/vault/new.md', title: 'New' }), '# New note')
+      })
+
+      expect(beforeNavigate).toHaveBeenCalledWith('/vault/a.md', '/vault/new.md')
+      expect(result.current.activeTabPath).toBe('/vault/a.md')
+      expect(result.current.tabs[0].content).toBe('# Mock content')
+
+      await act(async () => {
+        deferred.resolve(undefined)
+        await Promise.resolve()
+      })
+
+      await vi.waitFor(() => expect(result.current.activeTabPath).toBe('/vault/new.md'))
+      expect(result.current.tabs).toHaveLength(1)
+      expect(result.current.tabs[0].content).toBe('# New note')
+    })
   })
 
   describe('setTabs entry sync', () => {
