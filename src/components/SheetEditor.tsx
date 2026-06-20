@@ -127,6 +127,25 @@ import './SheetEditor.css'
 const SERIALIZE_DEBOUNCE_MS = 450
 const SHEET_PASTE_CHUNK_SIZE = 100
 const EMPTY_VAULT_ENTRIES: VaultEntry[] = []
+const SPREADSHEET_MODIFIED_SHORTCUT_KEYS = new Set(['b', 'c', 'i', 'u', 'v', 'x', 'y', 'z'])
+const SERIALIZE_SHORTCUT_KEYS = new Set(['b', 'i', 'u', 'v', 'x', 'y', 'z'])
+const SERIALIZE_DIRECT_KEYS = new Set(['Backspace', 'Delete', 'Enter'])
+const WORKBOOK_NAVIGATION_KEYS = new Set([
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'Backspace',
+  'Delete',
+  'End',
+  'Enter',
+  'F2',
+  'Home',
+  'PageDown',
+  'PageUp',
+  'Return',
+  'Tab',
+])
 
 interface SheetEditorProps {
   content: string
@@ -278,26 +297,11 @@ function isPlainCellClearKey(event: ReactKeyboardEvent<HTMLDivElement>): boolean
 }
 
 function isSpreadsheetKey(event: ReactKeyboardEvent<HTMLDivElement>): boolean {
-  if ((event.metaKey || event.ctrlKey) && ['c', 'v', 'x', 'z', 'y', 'b', 'i', 'u'].includes(event.key.toLowerCase())) {
+  if ((event.metaKey || event.ctrlKey) && SPREADSHEET_MODIFIED_SHORTCUT_KEYS.has(event.key.toLowerCase())) {
     return true
   }
   if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) return true
-  return [
-    'ArrowDown',
-    'ArrowLeft',
-    'ArrowRight',
-    'ArrowUp',
-    'Backspace',
-    'Delete',
-    'End',
-    'Enter',
-    'F2',
-    'Home',
-    'PageDown',
-    'PageUp',
-    'Return',
-    'Tab',
-  ].includes(event.key)
+  return WORKBOOK_NAVIGATION_KEYS.has(event.key)
 }
 
 function workbookKeyboardRoot(container: HTMLDivElement | null): HTMLElement | null {
@@ -309,6 +313,16 @@ function workbookKeyboardRoot(container: HTMLDivElement | null): HTMLElement | n
 function isWorkbookKeyboardTarget(container: HTMLDivElement | null, target: EventTarget | null): boolean {
   const root = workbookKeyboardRoot(container)
   return !!root && target instanceof Node && (target === root || root.contains(target))
+}
+
+function isEditableWorkbookKeyboardTarget(container: HTMLDivElement | null, target: EventTarget | null): boolean {
+  return isEditableTarget(target) && isWorkbookKeyboardTarget(container, target)
+}
+
+function isSheetCellKeyboardTarget(container: HTMLDivElement | null, target: EventTarget | null): boolean {
+  return isWorkbookKeyboardTarget(container, target)
+    && !isEditableTarget(target)
+    && !isSheetCommandTarget(target)
 }
 
 function focusWorkbookRoot(container: HTMLDivElement | null): HTMLElement | null {
@@ -452,8 +466,8 @@ function setFormulaInputValue(input: HTMLInputElement | HTMLTextAreaElement, val
 }
 
 function shouldScheduleSerializeForKey(event: ReactKeyboardEvent<HTMLDivElement>): boolean {
-  if (event.key === 'Backspace' || event.key === 'Delete' || event.key === 'Enter') return true
-  if ((event.metaKey || event.ctrlKey) && ['b', 'i', 'u', 'v', 'x', 'y', 'z'].includes(event.key.toLowerCase())) {
+  if (SERIALIZE_DIRECT_KEYS.has(event.key)) return true
+  if ((event.metaKey || event.ctrlKey) && SERIALIZE_SHORTCUT_KEYS.has(event.key.toLowerCase())) {
     return true
   }
   return event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey
@@ -1527,6 +1541,8 @@ export function SheetEditor({
   }, [applyAutocompleteSuggestion, formulaAutocomplete])
 
   const handleKeyDownCapture = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const sheetElement = sheetElementRef.current
+
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
       cancelScheduledSerialize()
       serializeCurrentWorkbook()
@@ -1542,7 +1558,7 @@ export function SheetEditor({
       event.stopPropagation()
       setFormulaAutocomplete(null)
       setWikilinkAutocomplete(null)
-      window.setTimeout(() => focusWorkbookRoot(sheetElementRef.current), 0)
+      window.setTimeout(() => focusWorkbookRoot(sheetElement), 0)
       return
     }
 
@@ -1553,7 +1569,7 @@ export function SheetEditor({
     if (event.defaultPrevented) return
 
     if (sheetKeyboardCapturedRef.current && event.key === 'Escape') {
-      if (isEditableTarget(event.target) && isWorkbookKeyboardTarget(sheetElementRef.current, event.target)) {
+      if (isEditableWorkbookKeyboardTarget(sheetElement, event.target)) {
         restoreSheetKeyboardFocus()
         return
       }
@@ -1563,9 +1579,7 @@ export function SheetEditor({
 
     if (
       isPlainCellClearKey(event)
-      && isWorkbookKeyboardTarget(sheetElementRef.current, event.target)
-      && !isEditableTarget(event.target)
-      && !isSheetCommandTarget(event.target)
+      && isSheetCellKeyboardTarget(sheetElement, event.target)
     ) {
       const current = workbookRef.current
       if (!current) return
@@ -1584,14 +1598,12 @@ export function SheetEditor({
 
     if (
       isPlainEnterKey(event)
-      && isWorkbookKeyboardTarget(sheetElementRef.current, event.target)
-      && !isEditableTarget(event.target)
-      && !isSheetCommandTarget(event.target)
+      && isSheetCellKeyboardTarget(sheetElement, event.target)
     ) {
       captureSheetKeyboard()
       event.preventDefault()
       event.stopPropagation()
-      startCellEdit(sheetElementRef.current)
+      startCellEdit(sheetElement)
       scheduleSelectionChromePatch()
     }
   }, [

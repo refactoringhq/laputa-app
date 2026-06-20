@@ -28,15 +28,25 @@ interface MockCreateTLStoreOptions {
   onMount?: (editor: Editor) => void | (() => void)
 }
 
+interface MockTldrawStore {
+  document: unknown
+  getStoreSnapshot: ReturnType<typeof vi.fn>
+  listen: ReturnType<typeof vi.fn>
+}
+
 const tldrawMock = vi.hoisted(() => ({
   Tldraw: vi.fn(),
 }))
 
 const tldrawStoreMock = vi.hoisted(() => ({
-  createTLStore: vi.fn(() => ({
-    document: { records: {} },
-    listen: vi.fn(() => vi.fn()),
-  })),
+  createTLStore: vi.fn(() => {
+    const store: MockTldrawStore = {
+      document: { records: {} },
+      getStoreSnapshot: vi.fn(() => store.document),
+      listen: vi.fn(() => vi.fn()),
+    }
+    return store
+  }),
   getSnapshot: vi.fn((store: { document?: unknown }) => ({ document: store.document ?? { records: {} } })),
   loadSnapshot: vi.fn((store: { document?: unknown }, snapshot: unknown) => {
     store.document = snapshot
@@ -122,6 +132,12 @@ function renderedStoreOnMount(): NonNullable<MockCreateTLStoreOptions['onMount']
 
   expect(onMount).toEqual(expect.any(Function))
   return onMount
+}
+
+function renderedPrimaryStore(): MockTldrawStore {
+  const store = tldrawStoreMock.createTLStore.mock.results[0]?.value as MockTldrawStore | undefined
+  expect(store).toBeDefined()
+  return store
 }
 
 function mockEditor(): Editor {
@@ -339,5 +355,39 @@ describe('TldrawWhiteboard', () => {
     )
 
     expect(tldrawStoreMock.loadSnapshot).toHaveBeenLastCalledWith(expect.any(Object), { records: {} })
+  })
+
+  it('does not read tldraw session snapshots while restoring a blank board', () => {
+    tldrawStoreMock.getSnapshot.mockImplementation(() => {
+      throw new Error('Session state is not ready yet')
+    })
+
+    expect(() => renderWhiteboard()).not.toThrow()
+
+    expect(tldrawStoreMock.loadSnapshot).toHaveBeenLastCalledWith(expect.any(Object), { records: {} })
+    expect(tldrawStoreMock.getSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('does not read tldraw session snapshots while saving document changes', () => {
+    vi.useFakeTimers()
+    tldrawStoreMock.getSnapshot.mockImplementation(() => {
+      throw new Error('Session state is not ready yet')
+    })
+    const onSnapshotChange = vi.fn()
+
+    renderWhiteboard({ onSnapshotChange })
+    const store = renderedPrimaryStore()
+    store.document = { records: { shape: 'changed' } }
+    const scheduleSnapshotFlush = store.listen.mock.calls[0]?.[0] as (() => void) | undefined
+
+    expect(scheduleSnapshotFlush).toEqual(expect.any(Function))
+    act(() => {
+      scheduleSnapshotFlush?.()
+      vi.advanceTimersByTime(350)
+    })
+
+    expect(onSnapshotChange).toHaveBeenCalledWith('{\n  "records": {\n    "shape": "changed"\n  }\n}\n')
+    expect(tldrawStoreMock.getSnapshot).not.toHaveBeenCalled()
+    vi.useRealTimers()
   })
 })

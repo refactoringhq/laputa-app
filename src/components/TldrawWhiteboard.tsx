@@ -7,7 +7,6 @@ import {
   Tldraw,
   createTLStore,
   defaultUserPreferences,
-  getSnapshot,
   loadSnapshot,
   useDialogs,
   useTldrawUser,
@@ -169,6 +168,10 @@ function createBoardStore(boardId: string) {
 
 function serializeSnapshot(snapshot: TLStoreSnapshot): string {
   return `${JSON.stringify(snapshot, null, 2)}\n`
+}
+
+function getDocumentSnapshot(store: ReturnType<typeof createTLStore>): TLStoreSnapshot {
+  return store.getStoreSnapshot()
 }
 
 function documentZoom(): number {
@@ -519,8 +522,7 @@ export function TldrawWhiteboard({
       }
     }
 
-    const emptyStore = createTLStore()
-    const emptySnapshot = getSnapshot(emptyStore).document
+    const emptySnapshot = getDocumentSnapshot(createTLStore())
     loadSnapshot(store, emptySnapshot)
     savedBoardIdRef.current = boardId
     savedSnapshotRef.current = serializeSnapshot(emptySnapshot)
@@ -531,7 +533,7 @@ export function TldrawWhiteboard({
 
     const flushSnapshot = () => {
       timeoutId = null
-      const nextSnapshot = serializeSnapshot(getSnapshot(store).document)
+      const nextSnapshot = serializeSnapshot(getDocumentSnapshot(store))
       if (nextSnapshot === savedSnapshotRef.current) return
 
       savedBoardIdRef.current = boardId
