@@ -10,7 +10,6 @@ import type {
 } from 'react'
 import ironCalcWasmUrl from '@ironcalc/wasm/wasm_bg.wasm?url'
 import { init as initIronCalc, IronCalc, type Model } from '@ironcalc/workbook'
-import { type Area as IronCalcArea, type CellStyle } from '@ironcalc/wasm'
 import { getDocumentZoom } from '../extensions/zoomCursorFix'
 import {
   getCachedNoteContentEntry,
@@ -37,20 +36,24 @@ import {
   replaceActiveWikilinkQuery,
 } from '../utils/rawEditorUtils'
 import {
-  serializeCsvRows,
-} from '../utils/sheetCsv'
-import {
   metadataCellAddress,
 } from '../utils/sheetMetadata'
+import {
+  buildTolariaSheetClipboardPayload,
+  parseTolariaSheetClipboardPayload,
+  rangesIntersect,
+  shiftedClipboardCellInput,
+  TOLARIA_SHEET_CLIPBOARD_MIME,
+  writeTolariaSheetClipboard,
+  type TolariaSheetClipboardPayload,
+} from '../utils/sheetClipboard'
 import {
   applyFormulaSuggestion,
   matchFormulaAutocomplete,
   type SheetFormulaSuggestion,
 } from '../utils/sheetFormulaAutocomplete'
-import { parseSheetMarkdownCell } from '../utils/sheetMarkdownCell'
 import {
   isExternalFormulaInput,
-  shiftExternalFormulaReferences,
 } from '../utils/sheetExternalReferences'
 import {
   canUseNativeSheetFormulaWorker,
@@ -64,16 +67,25 @@ import {
   markSheetWorkbookDirty,
 } from '../utils/sheetDirtyState'
 import {
+  clearSelectedRangeContents,
+  decreaseDecimalPlaces,
+  dirtyRowsForArea,
+  dirtyRowsForSelectedRange,
+  increaseDecimalPlaces,
+  mergeDirtyBodyRows,
+  selectedCellIndexes,
+  selectedCellStyle,
+  selectedRangeArea,
+  type SheetBodyRowsUpdate,
+} from '../utils/sheetSelection'
+import {
   applySheetWikilinkStyle,
   sheetWikilinkCanvasColor,
 } from '../utils/sheetWikilinkModelBridge'
 import {
-  boundedSheetIndex,
   buildSheetContent,
   buildWorkbook,
   MAX_EXTERNAL_FORMULA_DEPTH,
-  MAX_SHEET_COLUMNS,
-  MAX_SHEET_ROWS,
   resolveExternalFormulaInput,
   resolveExternalSheetDependencyEntries,
   resolveExternalSheetEntriesForFormula,
@@ -109,8 +121,6 @@ import './SheetEditor.css'
 
 const SERIALIZE_DEBOUNCE_MS = 450
 const SHEET_PASTE_CHUNK_SIZE = 100
-const TOLARIA_SHEET_CLIPBOARD_MIME = 'application/x-tolaria-sheet-clipboard'
-const TOLARIA_SHEET_CLIPBOARD_VERSION = 1
 const IRONCALC_SELECTION_ORANGE = 'rgb(242, 153, 74)'
 const IRONCALC_SELECTION_ORANGE_LIGHT = 'rgba(242, 153, 74, 0.1)'
 const IRONCALC_SELECTION_ORANGE_HEX = '#f2994a'
@@ -149,7 +159,7 @@ interface WorkbookState {
 }
 
 interface ScheduleSheetSerializeOptions {
-  bodyRows?: Iterable<number> | 'all' | 'none'
+  bodyRows?: SheetBodyRowsUpdate
   dirty?: boolean
 }
 
@@ -175,20 +185,6 @@ interface NativeExternalFormulaResolutionState {
   inputs: Map<string, SheetExternalFormulaInput>
   signature: string
   status: 'pending' | 'resolved' | 'unavailable'
-}
-
-interface TolariaSheetClipboardPayload {
-  action: 'copy' | 'cut'
-  cells: string[][]
-  source: {
-    column: number
-    height: number
-    path: string
-    row: number
-    width: number
-  }
-  type: 'tolaria-sheet-clipboard'
-  version: number
 }
 
 interface SheetCanvasHeaderPaintTheme {
@@ -530,132 +526,6 @@ function patchIronCalcSelectionChrome(container: HTMLDivElement | null): void {
   patchIronCalcSelectionSubtree(container.querySelector<HTMLElement>('.sheet-container') ?? container)
 }
 
-function selectedRangeArea(model: Model): IronCalcArea {
-  const {
-    sheet,
-    range: [startRow, startColumn, endRow, endColumn],
-  } = model.getSelectedView()
-  const row = Math.min(startRow, endRow)
-  const column = Math.min(startColumn, endColumn)
-
-  return {
-    sheet,
-    row,
-    column,
-    width: Math.abs(endColumn - startColumn) + 1,
-    height: Math.abs(endRow - startRow) + 1,
-  }
-}
-
-function dirtyRowsForArea(area: IronCalcArea): Set<number> {
-  const rows = new Set<number>()
-  if (area.sheet !== SHEET_INDEX) return rows
-  for (let row = area.row; row < area.row + area.height; row += 1) {
-    if (row >= 1 && row <= MAX_SHEET_ROWS) rows.add(row)
-  }
-  return rows
-}
-
-function dirtyRowsForSelectedRange(model: Model): Set<number> {
-  return dirtyRowsForArea(selectedRangeArea(model))
-}
-
-function mergeDirtyBodyRows(current: SheetBodyDirtyRows, update: ScheduleSheetSerializeOptions['bodyRows']): SheetBodyDirtyRows {
-  if (update === 'none') return current
-  if (update === undefined || update === 'all' || current === 'all') return 'all'
-
-  const next = current instanceof Set ? new Set(current) : new Set<number>()
-  for (const row of update) {
-    if (row >= 1 && row <= MAX_SHEET_ROWS) next.add(row)
-  }
-  return next.size === 0 ? current : next
-}
-
-function selectedRangeHasExternalFormulas(
-  model: Model,
-  area: IronCalcArea,
-  externalFormulaInputs: Map<string, SheetExternalFormulaInput>,
-): boolean {
-  if (area.sheet !== SHEET_INDEX) return false
-
-  for (let rowOffset = 0; rowOffset < area.height; rowOffset += 1) {
-    for (let columnOffset = 0; columnOffset < area.width; columnOffset += 1) {
-      const row = area.row + rowOffset
-      const column = area.column + columnOffset
-      const content = model.getCellContent(SHEET_INDEX, row, column)
-      if (externalFormulaInputs.has(metadataCellAddress(row, column)) || isExternalFormulaInput(content)) return true
-    }
-  }
-
-  return false
-}
-
-function buildTolariaSheetClipboardPayload(
-  current: WorkbookState,
-  path: string,
-  action: TolariaSheetClipboardPayload['action'],
-): TolariaSheetClipboardPayload | null {
-  const area = selectedRangeArea(current.model)
-  if (!selectedRangeHasExternalFormulas(current.model, area, current.externalFormulaInputs)) return null
-
-  const cells: string[][] = []
-  for (let rowOffset = 0; rowOffset < area.height; rowOffset += 1) {
-    const row: string[] = []
-    for (let columnOffset = 0; columnOffset < area.width; columnOffset += 1) {
-      row.push(parseSheetMarkdownCell(current.model.getCellContent(
-        SHEET_INDEX,
-        area.row + rowOffset,
-        area.column + columnOffset,
-      )).value)
-    }
-    cells.push(row)
-  }
-
-  return {
-    action,
-    cells,
-    source: {
-      column: area.column,
-      height: area.height,
-      path,
-      row: area.row,
-      width: area.width,
-    },
-    type: 'tolaria-sheet-clipboard',
-    version: TOLARIA_SHEET_CLIPBOARD_VERSION,
-  }
-}
-
-function parseTolariaSheetClipboardPayload(value: string): TolariaSheetClipboardPayload | null {
-  if (!value) return null
-
-  try {
-    const parsed = JSON.parse(value) as Partial<TolariaSheetClipboardPayload>
-    if (
-      parsed.type !== 'tolaria-sheet-clipboard'
-      || parsed.version !== TOLARIA_SHEET_CLIPBOARD_VERSION
-      || (parsed.action !== 'copy' && parsed.action !== 'cut')
-      || !Array.isArray(parsed.cells)
-      || !parsed.source
-      || typeof parsed.source.row !== 'number'
-      || typeof parsed.source.column !== 'number'
-      || typeof parsed.source.path !== 'string'
-    ) {
-      return null
-    }
-    return parsed as TolariaSheetClipboardPayload
-  } catch {
-    return null
-  }
-}
-
-function writeTolariaSheetClipboard(dataTransfer: DataTransfer, payload: TolariaSheetClipboardPayload): void {
-  const text = serializeCsvRows(payload.cells)
-  dataTransfer.setData(TOLARIA_SHEET_CLIPBOARD_MIME, JSON.stringify(payload))
-  dataTransfer.setData('text/plain', text)
-  dataTransfer.setData('text/csv', text)
-}
-
 function wikilinkSuggestionKey(item: WikilinkSuggestionItem): string {
   return item.path ?? `${item.title}\n${item.noteType ?? ''}`
 }
@@ -693,71 +563,6 @@ function nextFormulaAutocompleteState(
       ? matchingIndex
       : Math.min(previous.selectedIndex, Math.max(next.suggestions.length - 1, 0)),
   }
-}
-
-function shiftedClipboardCellInput(
-  input: string,
-  payload: TolariaSheetClipboardPayload,
-  rowOffset: number,
-  columnOffset: number,
-  destinationRow: number,
-  destinationColumn: number,
-): string {
-  if (payload.action === 'cut') return input
-
-  const sourceRow = payload.source.row + rowOffset
-  const sourceColumn = payload.source.column + columnOffset
-  return shiftExternalFormulaReferences(input, destinationRow - sourceRow, destinationColumn - sourceColumn)
-}
-
-function rangesIntersect(left: IronCalcArea, right: IronCalcArea): boolean {
-  const leftEndRow = left.row + left.height - 1
-  const leftEndColumn = left.column + left.width - 1
-  const rightEndRow = right.row + right.height - 1
-  const rightEndColumn = right.column + right.width - 1
-  return left.sheet === right.sheet
-    && left.row <= rightEndRow
-    && leftEndRow >= right.row
-    && left.column <= rightEndColumn
-    && leftEndColumn >= right.column
-}
-
-function selectedCellIndexes(model: Model): { column: number; row: number; sheet: number } | null {
-  const { column, row, sheet } = model.getSelectedView()
-  const boundedRow = boundedSheetIndex(row, MAX_SHEET_ROWS)
-  const boundedColumn = boundedSheetIndex(column, MAX_SHEET_COLUMNS)
-  if (sheet !== SHEET_INDEX || boundedRow === 0 || boundedColumn === 0) return null
-  return { column: boundedColumn, row: boundedRow, sheet }
-}
-
-function clearSelectedRangeContents(model: Model): void {
-  const area = selectedRangeArea(model)
-  model.rangeClearContents(
-    area.sheet,
-    area.row,
-    area.column,
-    area.row + area.height - 1,
-    area.column + area.width - 1,
-  )
-}
-
-function selectedCellStyle(model: Model): CellStyle {
-  const { sheet, row, column } = model.getSelectedView()
-  return model.getCellStyle(sheet, row, column)
-}
-
-function increaseDecimalPlaces(format: string): string {
-  if (format === 'general') return '#,##0.000'
-  const expanded = format.replace(/\.0/g, '.00')
-  if (expanded.includes('.')) return expanded
-  if (expanded.includes('0')) return expanded.replace(/0/g, '0.0')
-  if (expanded.includes('#')) return expanded.replace(/#([^#,]|$)/g, '0.0$1')
-  return expanded
-}
-
-function decreaseDecimalPlaces(format: string): string {
-  if (format === 'general') return '#,##0.0'
-  return format.replace(/\.0/g, '.').replace(/0\.([^0]|$)/, '0$1')
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -1704,14 +1509,13 @@ export function SheetEditor({
 
     const operations = payload.cells.flatMap((row, rowOffset) => row.map((input, columnOffset) => ({
       column: targetArea.column + columnOffset,
-      input: shiftedClipboardCellInput(
-        input,
+      input: shiftedClipboardCellInput(input, {
+        columnOffset,
+        destinationColumn: targetArea.column + columnOffset,
+        destinationRow: targetArea.row + rowOffset,
         payload,
         rowOffset,
-        columnOffset,
-        targetArea.row + rowOffset,
-        targetArea.column + columnOffset,
-      ),
+      }),
       row: targetArea.row + rowOffset,
     })))
     if (operations.length === 0) return false
@@ -1813,7 +1617,12 @@ export function SheetEditor({
     const current = workbookRef.current
     if (!current) return false
 
-    const payload = buildTolariaSheetClipboardPayload(current, current.path, action)
+    const payload = buildTolariaSheetClipboardPayload(
+      current.model,
+      current.path,
+      action,
+      current.externalFormulaInputs,
+    )
     if (!payload) return false
 
     writeTolariaSheetClipboard(event.clipboardData, payload)
