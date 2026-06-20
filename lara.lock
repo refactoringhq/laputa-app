@@ -578,6 +578,56 @@ files:
     editor.sheet.context.wrapText: bcd38c54cc299e7f9d5d37f9b999c027
     editor.sheet.context.unwrapText: bde49101f3872b8d2bf6b08cccc6c667
     editor.sheet.context.clearFormatting: 4494691b92e1f195feb25bd63ee5468b
+    editor.sheet.formula.category.logical: e7a731a6342f126055b89b80d800a180
+    editor.sheet.formula.category.math: b6980ca593af7e22633cafaa2afbd14a
+    editor.sheet.formula.category.lookup: 222642b2096833929903c20111fbd29d
+    editor.sheet.formula.category.text: 9dffbf69ffba8bc38bc4e01abf4b1675
+    editor.sheet.formula.category.information: a82be0f551b8708bc08eb33cd9ded0cf
+    editor.sheet.formula.category.statistical: ad2ee48af836d71513e02e3b82b34e48
+    editor.sheet.formula.category.dateTime: 2b0b7c9cbd6d6e9fa6b99aa06e828673
+    editor.sheet.formula.category.financial: 35f156073cb9314e5ddcabd2d16f443c
+    editor.sheet.formula.category.engineering: ab0268fb8036a892dc341945cb7ae3be
+    editor.sheet.formula.description.generic: 0c79cdd955d17cfe5e586a4e14907be6
+    editor.sheet.formula.description.abs: e49ccb55e16059eda228ec3a10f03ac9
+    editor.sheet.formula.description.and: 86314c9bc9282ef7234090eb3428271e
+    editor.sheet.formula.description.average: 725636fff01291d97c3ff6c221a2859b
+    editor.sheet.formula.description.concat: 0706d31060e4b6d013351d606d783cc7
+    editor.sheet.formula.description.concatenate: 0706d31060e4b6d013351d606d783cc7
+    editor.sheet.formula.description.count: 3a44e7f9d53ba4b9043767837b703a42
+    editor.sheet.formula.description.counta: cff7cefde504a7bfda26f6b025250647
+    editor.sheet.formula.description.countif: a7f8ec539622fb56ad1a69a8f0749b99
+    editor.sheet.formula.description.date: b0a194b65fecd9326ea5682824d78372
+    editor.sheet.formula.description.day: 939afa1fa3226d5de31605a68bf5b504
+    editor.sheet.formula.description.if: 0ed6716d89deab3daf691b52eac43da2
+    editor.sheet.formula.description.iferror: 78985d37abb3c595234f2f0eebd49647
+    editor.sheet.formula.description.ifs: 3260bbc522a06128a1b12e61512490e6
+    editor.sheet.formula.description.index: 8074638b36f662023374715a46212475
+    editor.sheet.formula.description.left: ba11420ae9f98af2d32e478623432ba8
+    editor.sheet.formula.description.len: b2e40842023453512efd37aac98d0509
+    editor.sheet.formula.description.lookup: 6bbaf0ac03847d9b9370fea658fdf996
+    editor.sheet.formula.description.lower: c2a995fa02ce7f13a234e1d941dd4dbc
+    editor.sheet.formula.description.match: fd0a986f7a5d74695c8926c060da6bbd
+    editor.sheet.formula.description.max: 8a6b16d3edf2adf0b14b48ea681f7fca
+    editor.sheet.formula.description.min: e9b1a7cc7aab7c814fc3199a50486fbd
+    editor.sheet.formula.description.month: 0e1de9df4811e0f39e6dd1df237ad97b
+    editor.sheet.formula.description.not: af45222aa223d8464769ab8e92aa068d
+    editor.sheet.formula.description.now: b079b385cd81adf67130fe02cd0b70c3
+    editor.sheet.formula.description.or: fd1436942b6c9d5d03331e98072b98b0
+    editor.sheet.formula.description.right: 86696dc97461745b60f015851e900a6e
+    editor.sheet.formula.description.round: c55ffe7fccf229e07738384dd1941391
+    editor.sheet.formula.description.rounddown: b5f24d2cb58ec0829680e4567b4d8a7d
+    editor.sheet.formula.description.roundup: e9770aba9a743b397694e26b3fa1b8e7
+    editor.sheet.formula.description.sum: f3e468f4b6279f941b37a40d1799a4af
+    editor.sheet.formula.description.sumif: bf24baec6c2916df7328f0f244758225
+    editor.sheet.formula.description.sumifs: e590b9b3b695a9e70192f60baeae5a76
+    editor.sheet.formula.description.text: b35a184f1978cdd14355a31c8bc17a2b
+    editor.sheet.formula.description.today: 34b315129b960fc5616e33ab582d403d
+    editor.sheet.formula.description.trim: ed6e316cd71dc0e96a437e47834691d4
+    editor.sheet.formula.description.upper: 68dc8fd2dd906b5ca5462fe1c2bd1479
+    editor.sheet.formula.description.value: b1168b1edcb926027d0d939c2f61e91b
+    editor.sheet.formula.description.vlookup: d7b75f9a4829a2310d654e8e2ad9753d
+    editor.sheet.formula.description.xlookup: 6bbaf0ac03847d9b9370fea658fdf996
+    editor.sheet.formula.description.year: 1bafda4ca42f9bc0002c2c63129bbe90
     editor.find.findLabel: 4cfa6c981549e990fe2344e4c805405e
     editor.find.findPlaceholder: 4cfa6c981549e990fe2344e4c805405e
     editor.find.replaceLabel: 0ebe6df8a3ac338e0512acc741823fdb

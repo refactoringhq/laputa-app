@@ -92,7 +92,8 @@
   display: grid;
   grid-template-columns: 84px minmax(0, 1fr);
   align-items: baseline;
-  gap: 10px;
+  column-gap: 10px;
+  row-gap: 2px;
   padding: 7px 9px;
   cursor: pointer;
 }
@@ -110,6 +111,24 @@
   min-width: 0;
   overflow: hidden;
   color: var(--muted-foreground, var(--text-secondary));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-formula-autocomplete__category {
+  overflow: hidden;
+  color: var(--muted-foreground, var(--text-secondary));
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-formula-autocomplete__description {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

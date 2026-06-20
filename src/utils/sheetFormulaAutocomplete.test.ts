@@ -4,6 +4,7 @@ import {
   matchFormulaAutocomplete,
   SHEET_FORMULA_SUGGESTIONS,
 } from './sheetFormulaAutocomplete'
+import { translate } from '../lib/i18n'
 
 describe('sheetFormulaAutocomplete', () => {
   it('suggests function names from a formula prefix', () => {
@@ -12,6 +13,31 @@ describe('sheetFormulaAutocomplete', () => {
     expect(match?.prefix).toBe('SU')
     expect(match?.tokenStart).toBe(1)
     expect(match?.suggestions.map((suggestion) => suggestion.name)).toContain('SUM')
+  })
+
+  it('uses English formula metadata by default', () => {
+    const match = matchFormulaAutocomplete('=SU', 3)
+    const sum = match?.suggestions.find((suggestion) => suggestion.name === 'SUM')
+
+    expect(sum?.category).toBe(translate('en', 'editor.sheet.formula.category.math'))
+    expect(sum?.description).toBe(translate('en', 'editor.sheet.formula.description.sum'))
+  })
+
+  it('localizes formula metadata for the active locale', () => {
+    const match = matchFormulaAutocomplete('=SU', 3, 'it-IT')
+    const sum = match?.suggestions.find((suggestion) => suggestion.name === 'SUM')
+
+    expect(sum?.category).toBe(translate('it-IT', 'editor.sheet.formula.category.math'))
+    expect(sum?.description).toBe(translate('it-IT', 'editor.sheet.formula.description.sum'))
+    expect(sum?.description).not.toBe(translate('en', 'editor.sheet.formula.description.sum'))
+  })
+
+  it('localizes generic descriptions with the translated category placeholder', () => {
+    const match = matchFormulaAutocomplete('=AC', 3, 'it-IT')
+    const acos = match?.suggestions.find((suggestion) => suggestion.name === 'ACOS')
+    const category = translate('it-IT', 'editor.sheet.formula.category.math')
+
+    expect(acos?.description).toBe(translate('it-IT', 'editor.sheet.formula.description.generic', { category }))
   })
 
   it('does not suggest while typing ordinary cell references', () => {

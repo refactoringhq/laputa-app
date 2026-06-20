@@ -103,6 +103,7 @@ import {
   patchSheetPointerEventCoordinates,
   sheetCoordinateOrigin,
 } from '../utils/sheetPointerCoordinates'
+import { patchIronCalcSelectionChrome } from '../utils/sheetSelectionChrome'
 import { cancelFrame, cancelIdle, type IdleHandle, requestFrame, scheduleIdle } from '../utils/sheetBrowserScheduling'
 import {
   applySheetStructureAction,
@@ -115,27 +116,16 @@ import { MIN_QUERY_LENGTH, preFilterWikilinks } from '../utils/wikilinkSuggestio
 import { notePathsMatch } from '../utils/notePathIdentity'
 import { isSecondaryPointerButton } from '../utils/pointerButtons'
 import { SheetContextMenu } from './SheetContextMenu'
+import {
+  SheetFormulaAutocompleteMenu,
+  type SheetFormulaAutocompleteMenuState,
+} from './SheetFormulaAutocompleteMenu'
 import { WikilinkSuggestionMenu, type WikilinkSuggestionItem } from './WikilinkSuggestionMenu'
 import type { VaultEntry } from '../types'
 import './SheetEditor.css'
 
 const SERIALIZE_DEBOUNCE_MS = 450
 const SHEET_PASTE_CHUNK_SIZE = 100
-const IRONCALC_SELECTION_ORANGE = 'rgb(242, 153, 74)'
-const IRONCALC_SELECTION_ORANGE_LIGHT = 'rgba(242, 153, 74, 0.1)'
-const IRONCALC_SELECTION_ORANGE_HEX = '#f2994a'
-const IRONCALC_HEADER_CELL_FILL_COLORS = new Set(['#fff', '#ffffff', '#eeeeee', 'rgb(255,255,255)', 'rgb(238,238,238)'])
-const IRONCALC_ROW_HEADER_WIDTH_PX = 30
-const IRONCALC_COLUMN_HEADER_HEIGHT_PX = 28
-const IRONCALC_ROW_HEADER_RIGHT_BORDER_X_PX = IRONCALC_ROW_HEADER_WIDTH_PX - 1
-const SHEET_CANVAS_COLOR_EPSILON = 0.01
-const SHEET_SELECTION_ACCENT = 'var(--accent-blue)'
-const SHEET_SELECTION_ACCENT_FALLBACK = '#155DFF'
-const SHEET_SELECTION_ACCENT_LIGHT = 'var(--accent-blue-light)'
-const SHEET_ROW_HEADER_BORDER_FALLBACK = '#E0E0E0'
-const ACTIVE_SELECTION_BORDER_WIDTH_PX = 2
-const RANGE_SELECTION_BORDER_WIDTH_PX = 1
-const ACTIVE_EDITOR_BORDER_OFFSET_PX = -1
 const EMPTY_VAULT_ENTRIES: VaultEntry[] = []
 
 interface SheetEditorProps {
@@ -163,14 +153,9 @@ interface ScheduleSheetSerializeOptions {
   dirty?: boolean
 }
 
-interface FormulaAutocompleteState {
-  suggestions: SheetFormulaSuggestion[]
-  selectedIndex: number
+interface FormulaAutocompleteState extends SheetFormulaAutocompleteMenuState {
   tokenStart: number
   tokenEnd: number
-  left: number
-  top: number
-  width: number
 }
 
 interface SheetWikilinkAutocompleteState {
@@ -187,263 +172,15 @@ interface NativeExternalFormulaResolutionState {
   status: 'pending' | 'resolved' | 'unavailable'
 }
 
-interface SheetCanvasHeaderPaintTheme {
-  activeBorderColor: string
-  gutterBorderColor: string
-}
-
 let ironCalcInitPromise: Promise<void> | null = null
-let sheetCanvasHeaderPaintPatchInstalled = false
-let originalSheetCanvasFillRect: CanvasRenderingContext2D['fillRect'] | null = null
-
-const sheetCanvasesWithHeaderPaint = new WeakMap<HTMLCanvasElement, SheetCanvasHeaderPaintTheme>()
 
 const MemoizedIronCalc = memo(IronCalc)
-
-function parsePixelValue(value: string): number | null {
-  if (!value.endsWith('px')) return null
-  const parsed = Number.parseFloat(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-function normalizeCanvasColor(value: unknown): string {
-  return typeof value === 'string' ? value.toLowerCase().replace(/\s+/g, '') : ''
-}
-
-function nearlyEqual(left: number, right: number): boolean {
-  return Math.abs(left - right) < SHEET_CANVAS_COLOR_EPSILON
-}
-
-function resolveCanvasThemeColor(container: HTMLElement, variableName: string, fallback: string): string {
-  const color = window.getComputedStyle(container).getPropertyValue(variableName).trim()
-  return color === '' ? fallback : color
-}
-
-function sheetCanvasHeaderPaintTheme(container: HTMLElement): SheetCanvasHeaderPaintTheme {
-  return {
-    activeBorderColor: resolveCanvasThemeColor(container, '--accent-blue', SHEET_SELECTION_ACCENT_FALLBACK),
-    gutterBorderColor: resolveCanvasThemeColor(container, '--border-default', SHEET_ROW_HEADER_BORDER_FALLBACK),
-  }
-}
-
-function sheetCanvasHeaderPaintThemeForCanvas(canvas: HTMLCanvasElement): SheetCanvasHeaderPaintTheme | undefined {
-  const cachedTheme = sheetCanvasesWithHeaderPaint.get(canvas)
-  if (cachedTheme) return cachedTheme
-
-  const container = canvas.closest<HTMLElement>('.sheet-editor--single-sheet')
-  if (!container) return undefined
-
-  const theme = sheetCanvasHeaderPaintTheme(container)
-  sheetCanvasesWithHeaderPaint.set(canvas, theme)
-  return theme
-}
-
-function isIronCalcHeaderCellFill(color: unknown): boolean {
-  return IRONCALC_HEADER_CELL_FILL_COLORS.has(normalizeCanvasColor(color))
-}
-
-function isIronCalcSelectionOrange(color: unknown): boolean {
-  const normalized = normalizeCanvasColor(color)
-  return normalized === IRONCALC_SELECTION_ORANGE_HEX
-    || normalized === normalizeCanvasColor(IRONCALC_SELECTION_ORANGE)
-}
-
-function isIronCalcRowHeaderInteriorRect(x: number, y: number, width: number, height: number): boolean {
-  return nearlyEqual(x, 0.5)
-    && nearlyEqual(width, IRONCALC_ROW_HEADER_WIDTH_PX)
-    && y > IRONCALC_COLUMN_HEADER_HEIGHT_PX
-    && height > 0
-}
-
-function isIronCalcActiveRowHeaderBorderRect(x: number, y: number, width: number, height: number): boolean {
-  return nearlyEqual(x, IRONCALC_ROW_HEADER_RIGHT_BORDER_X_PX)
-    && nearlyEqual(width, 1)
-    && y >= IRONCALC_COLUMN_HEADER_HEIGHT_PX
-    && height > 0
-}
-
-function ensureSheetCanvasHeaderPaintPatchInstalled(): void {
-  if (sheetCanvasHeaderPaintPatchInstalled) return
-  if (typeof CanvasRenderingContext2D === 'undefined') return
-
-  originalSheetCanvasFillRect = CanvasRenderingContext2D.prototype.fillRect
-  CanvasRenderingContext2D.prototype.fillRect = function patchedSheetCanvasFillRect(
-    this: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-  ): void {
-    const originalFillRect = originalSheetCanvasFillRect
-    if (!originalFillRect) return
-
-    const theme = this.canvas instanceof HTMLCanvasElement
-      ? sheetCanvasHeaderPaintThemeForCanvas(this.canvas)
-      : undefined
-    if (!theme) {
-      originalFillRect.call(this, x, y, width, height)
-      return
-    }
-
-    if (isIronCalcRowHeaderInteriorRect(x, y, width, height) && isIronCalcHeaderCellFill(this.fillStyle)) {
-      originalFillRect.call(this, x, y, width, height)
-      const previousFillStyle = this.fillStyle
-      this.fillStyle = theme.gutterBorderColor
-      originalFillRect.call(
-        this,
-        IRONCALC_ROW_HEADER_RIGHT_BORDER_X_PX,
-        y - 0.5,
-        1,
-        height + 1,
-      )
-      this.fillStyle = previousFillStyle
-      return
-    }
-
-    if (isIronCalcActiveRowHeaderBorderRect(x, y, width, height) && isIronCalcSelectionOrange(this.fillStyle)) {
-      const previousFillStyle = this.fillStyle
-      this.fillStyle = theme.activeBorderColor
-      originalFillRect.call(this, x, y, width, height)
-      this.fillStyle = previousFillStyle
-      return
-    }
-
-    originalFillRect.call(this, x, y, width, height)
-  }
-  sheetCanvasHeaderPaintPatchInstalled = true
-}
-
-function registerSheetCanvasHeaderPaint(container: HTMLDivElement): void {
-  ensureSheetCanvasHeaderPaintPatchInstalled()
-  const theme = sheetCanvasHeaderPaintTheme(container)
-  for (const canvas of container.querySelectorAll<HTMLCanvasElement>('.sheet-container canvas')) {
-    sheetCanvasesWithHeaderPaint.set(canvas, theme)
-  }
-}
-
-if (typeof window !== 'undefined') ensureSheetCanvasHeaderPaintPatchInstalled()
 
 function ensureIronCalcReady(): Promise<void> {
   if (!ironCalcInitPromise) {
     ironCalcInitPromise = initIronCalc(ironCalcWasmUrl).then(() => undefined)
   }
   return ironCalcInitPromise
-}
-
-function normalizeSelectionOutline(element: HTMLElement): void {
-  if (element.style.borderRadius !== '0px') element.style.borderRadius = '0px'
-  if (element.style.boxShadow !== '') element.style.boxShadow = ''
-}
-
-function patchCellOutlineGeometry(element: HTMLElement, expansion: number, offset = 0): void {
-  const currentWidth = parsePixelValue(element.style.width)
-  const currentHeight = parsePixelValue(element.style.height)
-  if (currentWidth === null || currentHeight === null) return
-
-  const currentLeft = parsePixelValue(element.style.left)
-  const currentTop = parsePixelValue(element.style.top)
-  const previousBaseWidth = parsePixelValue(element.dataset.tolariaSelectionBaseWidth ?? '')
-  const previousBaseHeight = parsePixelValue(element.dataset.tolariaSelectionBaseHeight ?? '')
-  const previousBaseLeft = parsePixelValue(element.dataset.tolariaSelectionBaseLeft ?? '')
-  const previousBaseTop = parsePixelValue(element.dataset.tolariaSelectionBaseTop ?? '')
-  const previousPatchedWidth = previousBaseWidth === null ? null : previousBaseWidth + expansion
-  const previousPatchedHeight = previousBaseHeight === null ? null : previousBaseHeight + expansion
-  const previousPatchedLeft = previousBaseLeft === null ? null : previousBaseLeft + offset
-  const previousPatchedTop = previousBaseTop === null ? null : previousBaseTop + offset
-  const alreadyPatchedPosition = (currentLeft === null || previousPatchedLeft === null || Math.abs(currentLeft - previousPatchedLeft) < 0.01)
-    && (currentTop === null || previousPatchedTop === null || Math.abs(currentTop - previousPatchedTop) < 0.01)
-
-  if (
-    previousPatchedWidth !== null
-    && previousPatchedHeight !== null
-    && Math.abs(currentWidth - previousPatchedWidth) < 0.01
-    && Math.abs(currentHeight - previousPatchedHeight) < 0.01
-    && alreadyPatchedPosition
-    && element.style.boxSizing === 'border-box'
-  ) {
-    return
-  }
-
-  element.dataset.tolariaSelectionBaseWidth = `${currentWidth}px`
-  element.dataset.tolariaSelectionBaseHeight = `${currentHeight}px`
-  element.style.boxSizing = 'border-box'
-  element.style.width = `${currentWidth + expansion}px`
-  element.style.height = `${currentHeight + expansion}px`
-
-  if (currentLeft !== null) {
-    element.dataset.tolariaSelectionBaseLeft = `${currentLeft}px`
-    element.style.left = `${currentLeft + offset}px`
-  }
-  if (currentTop !== null) {
-    element.dataset.tolariaSelectionBaseTop = `${currentTop}px`
-    element.style.top = `${currentTop + offset}px`
-  }
-}
-
-function patchSelectedCellOutlineGeometry(element: HTMLElement): void {
-  patchCellOutlineGeometry(element, ACTIVE_SELECTION_BORDER_WIDTH_PX * 2)
-}
-
-function patchEditingCellOutlineGeometry(element: HTMLElement): void {
-  patchCellOutlineGeometry(element, ACTIVE_SELECTION_BORDER_WIDTH_PX * 3, ACTIVE_EDITOR_BORDER_OFFSET_PX)
-}
-
-function patchRangeSelectionOutlineGeometry(element: HTMLElement): void {
-  patchCellOutlineGeometry(element, RANGE_SELECTION_BORDER_WIDTH_PX * 2)
-}
-
-function isIronCalcEditingCellOutline(element: HTMLElement, style: CSSStyleDeclaration): boolean {
-  return style.position === 'absolute'
-    && style.visibility === 'visible'
-    && hasSelectionTintBorder(element, style)
-    && element.querySelector('textarea') !== null
-}
-
-function isSelectionTint(color: string): boolean {
-  return color === IRONCALC_SELECTION_ORANGE || color === SHEET_SELECTION_ACCENT
-}
-
-function isSelectionFill(color: string): boolean {
-  return color === IRONCALC_SELECTION_ORANGE_LIGHT || color === SHEET_SELECTION_ACCENT_LIGHT
-}
-
-function hasSelectionTintBorder(element: HTMLElement, style: CSSStyleDeclaration): boolean {
-  return (isSelectionTint(style.borderTopColor) || element.style.borderTopColor === SHEET_SELECTION_ACCENT)
-    && (isSelectionTint(style.borderRightColor) || element.style.borderRightColor === SHEET_SELECTION_ACCENT)
-    && (isSelectionTint(style.borderBottomColor) || element.style.borderBottomColor === SHEET_SELECTION_ACCENT)
-    && (isSelectionTint(style.borderLeftColor) || element.style.borderLeftColor === SHEET_SELECTION_ACCENT)
-}
-
-function hasSelectionFill(element: HTMLElement, style: CSSStyleDeclaration): boolean {
-  return isSelectionFill(style.backgroundColor) || element.style.backgroundColor === SHEET_SELECTION_ACCENT_LIGHT
-}
-
-function isIronCalcRangeSelectionOutline(element: HTMLElement, style: CSSStyleDeclaration): boolean {
-  return style.position === 'absolute'
-    && style.visibility !== 'hidden'
-    && hasSelectionTintBorder(element, style)
-    && hasSelectionFill(element, style)
-    && parsePixelValue(element.style.width) !== null
-    && parsePixelValue(element.style.height) !== null
-}
-
-function isIronCalcFillHandle(style: CSSStyleDeclaration): boolean {
-  const width = parsePixelValue(style.width)
-  const height = parsePixelValue(style.height)
-  return (
-    style.position === 'absolute'
-    && style.cursor === 'crosshair'
-    && width !== null
-    && height !== null
-    && width <= 6
-    && height <= 6
-    && style.backgroundColor === IRONCALC_SELECTION_ORANGE
-  )
-}
-
-function hideIronCalcFillHandle(element: HTMLElement): void {
-  if (element.style.visibility !== 'hidden') element.style.visibility = 'hidden'
-  if (element.style.pointerEvents !== 'none') element.style.pointerEvents = 'none'
 }
 
 function sheetCellFromPointer(
@@ -461,69 +198,6 @@ function sheetCellFromPointer(
   const x = localElementCoordinate(event.clientX, originRect, scale.x, 'x')
   const y = localElementCoordinate(event.clientY, originRect, scale.y, 'y')
   return sheetCellFromCanvasPoint(model, view.sheet, x, y)
-}
-
-function patchIronCalcSelectionElement(element: HTMLElement): void {
-  const style = window.getComputedStyle(element)
-  if (isIronCalcFillHandle(style)) {
-    hideIronCalcFillHandle(element)
-    return
-  }
-
-  if (style.borderTopColor === IRONCALC_SELECTION_ORANGE && element.style.borderTopColor !== SHEET_SELECTION_ACCENT) {
-    element.style.borderTopColor = SHEET_SELECTION_ACCENT
-  }
-  if (style.borderRightColor === IRONCALC_SELECTION_ORANGE && element.style.borderRightColor !== SHEET_SELECTION_ACCENT) {
-    element.style.borderRightColor = SHEET_SELECTION_ACCENT
-  }
-  if (style.borderBottomColor === IRONCALC_SELECTION_ORANGE && element.style.borderBottomColor !== SHEET_SELECTION_ACCENT) {
-    element.style.borderBottomColor = SHEET_SELECTION_ACCENT
-  }
-  if (style.borderLeftColor === IRONCALC_SELECTION_ORANGE && element.style.borderLeftColor !== SHEET_SELECTION_ACCENT) {
-    element.style.borderLeftColor = SHEET_SELECTION_ACCENT
-  }
-  if (style.backgroundColor === IRONCALC_SELECTION_ORANGE && element.style.backgroundColor !== SHEET_SELECTION_ACCENT) {
-    element.style.backgroundColor = SHEET_SELECTION_ACCENT
-  }
-  if (style.backgroundColor === IRONCALC_SELECTION_ORANGE_LIGHT && element.style.backgroundColor !== SHEET_SELECTION_ACCENT_LIGHT) {
-    element.style.backgroundColor = SHEET_SELECTION_ACCENT_LIGHT
-  }
-  if (style.caretColor === IRONCALC_SELECTION_ORANGE && element.style.caretColor !== SHEET_SELECTION_ACCENT) {
-    element.style.caretColor = SHEET_SELECTION_ACCENT
-  }
-  if (style.outlineColor === IRONCALC_SELECTION_ORANGE && element.style.outlineColor !== SHEET_SELECTION_ACCENT) {
-    element.style.outlineColor = SHEET_SELECTION_ACCENT
-  }
-
-  if (
-    element.style.background === 'none'
-    && element.style.lineHeight !== ''
-    && hasSelectionTintBorder(element, style)
-  ) {
-    normalizeSelectionOutline(element)
-    patchSelectedCellOutlineGeometry(element)
-  }
-  if (isIronCalcRangeSelectionOutline(element, style)) {
-    normalizeSelectionOutline(element)
-    patchRangeSelectionOutlineGeometry(element)
-  }
-  if (isIronCalcEditingCellOutline(element, style)) {
-    normalizeSelectionOutline(element)
-    patchEditingCellOutlineGeometry(element)
-  }
-}
-
-function patchIronCalcSelectionSubtree(root: HTMLElement): void {
-  patchIronCalcSelectionElement(root)
-  for (const element of root.querySelectorAll<HTMLElement>('*')) {
-    patchIronCalcSelectionElement(element)
-  }
-}
-
-function patchIronCalcSelectionChrome(container: HTMLDivElement | null): void {
-  if (!container) return
-  registerSheetCanvasHeaderPaint(container)
-  patchIronCalcSelectionSubtree(container.querySelector<HTMLElement>('.sheet-container') ?? container)
 }
 
 function wikilinkSuggestionKey(item: WikilinkSuggestionItem): string {
@@ -1744,7 +1418,7 @@ export function SheetEditor({
     }
 
     const cursor = input.selectionStart ?? input.value.length
-    const match = matchFormulaAutocomplete(input.value, cursor)
+    const match = matchFormulaAutocomplete(input.value, cursor, locale)
     if (!match) {
       formulaInputRef.current = input
       setFormulaAutocomplete(null)
@@ -1759,7 +1433,7 @@ export function SheetEditor({
       tokenEnd: match.tokenEnd,
       ...formulaAutocompletePosition(input, container, cursor),
     }))
-  }, [])
+  }, [locale])
 
   const applyAutocompleteSuggestion = useCallback((suggestion: SheetFormulaSuggestion) => {
     const input = formulaInputRef.current
@@ -2152,38 +1826,16 @@ export function SheetEditor({
     >
       <MemoizedIronCalc model={workbook.model} refreshId={workbook.refreshId} />
       {formulaAutocomplete && (
-        <div
-          className="sheet-formula-autocomplete"
-          role="listbox"
-          style={{
-            left: formulaAutocomplete.left,
-            top: formulaAutocomplete.top,
-            minWidth: formulaAutocomplete.width,
+        <SheetFormulaAutocompleteMenu
+          onApplySuggestion={applyAutocompleteSuggestion}
+          onSelectIndex={(index) => {
+            setFormulaAutocomplete((current) => {
+              if (!current) return null
+              return { ...current, selectedIndex: index }
+            })
           }}
-        >
-          {formulaAutocomplete.suggestions.map((suggestion, index) => (
-            <div
-              aria-selected={index === formulaAutocomplete.selectedIndex}
-              className="sheet-formula-autocomplete__item"
-              key={suggestion.name}
-              onMouseDown={(event) => {
-                event.preventDefault()
-                applyAutocompleteSuggestion(suggestion)
-              }}
-              onMouseEnter={() => {
-                setFormulaAutocomplete((current) => {
-                  if (!current) return null
-                  return { ...current, selectedIndex: index }
-                })
-              }}
-              role="option"
-              tabIndex={-1}
-            >
-              <span className="sheet-formula-autocomplete__name">{suggestion.name}</span>
-              <span className="sheet-formula-autocomplete__signature">{suggestion.signature}</span>
-            </div>
-          ))}
-        </div>
+          state={formulaAutocomplete}
+        />
       )}
       {wikilinkAutocomplete && (
         <div
