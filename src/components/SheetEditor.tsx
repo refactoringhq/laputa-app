@@ -26,11 +26,6 @@ import {
 } from '../lib/productAnalytics'
 import { buildTypeEntryMap } from '../utils/typeColors'
 import {
-  attachClickHandlers,
-  enrichSuggestionItems,
-  hasMultipleSuggestionWorkspaces,
-} from '../utils/suggestionEnrichment'
-import {
   buildRawEditorBaseItems,
   extractWikilinkQuery,
   replaceActiveWikilinkQuery,
@@ -101,7 +96,6 @@ import {
   localElementCoordinate,
   patchReactSheetPointerEvent,
   patchSheetPointerEventCoordinates,
-  sheetCoordinateOrigin,
 } from '../utils/sheetPointerCoordinates'
 import { patchIronCalcSelectionChrome } from '../utils/sheetSelectionChrome'
 import { cancelFrame, cancelIdle, type IdleHandle, requestFrame, scheduleIdle } from '../utils/sheetBrowserScheduling'
@@ -111,41 +105,45 @@ import {
   type SheetContextMenuState,
   type SheetStructureAction,
 } from '../utils/sheetContextMenuState'
-import { sheetCellFromCanvasPoint } from '../utils/sheetPointerHitTest'
-import { MIN_QUERY_LENGTH, preFilterWikilinks } from '../utils/wikilinkSuggestions'
 import { notePathsMatch } from '../utils/notePathIdentity'
 import { isSecondaryPointerButton } from '../utils/pointerButtons'
 import { SheetContextMenu } from './SheetContextMenu'
+import { SheetFormulaAutocompleteMenu } from './SheetFormulaAutocompleteMenu'
+import { WikilinkSuggestionMenu } from './WikilinkSuggestionMenu'
 import {
-  SheetFormulaAutocompleteMenu,
-  type SheetFormulaAutocompleteMenuState,
-} from './SheetFormulaAutocompleteMenu'
-import { WikilinkSuggestionMenu, type WikilinkSuggestionItem } from './WikilinkSuggestionMenu'
+  dispatchFormulaInput,
+  dispatchSheetInput,
+  focusWorkbookRoot,
+  formulaAutocompletePosition,
+  formulaInputFromTarget,
+  isActiveWikilinkQueryInsideFormulaString,
+  isEditableTarget,
+  isEditableWorkbookKeyboardTarget,
+  isInsideFormulaStringLiteral,
+  isPlainCellClearKey,
+  isPlainEnterKey,
+  isSheetCellKeyboardTarget,
+  isSheetCommandTarget,
+  isSpreadsheetKey,
+  nextFormulaAutocompleteState,
+  nextWikilinkAutocompleteState,
+  setFormulaInputValue,
+  sheetCellFromPointer,
+  sheetHasEditableFocus,
+  sheetWikilinkAutocompleteItems,
+  shouldScheduleSerializeForKey,
+  startCellEdit,
+  type FormulaAutocompleteState,
+  type SheetWikilinkAutocompleteState,
+  visibleFormulaInput,
+  visibleSheetTextInput,
+} from './sheet-editor/sheetEditorHelpers'
 import type { VaultEntry } from '../types'
 import './SheetEditor.css'
 
 const SERIALIZE_DEBOUNCE_MS = 450
 const SHEET_PASTE_CHUNK_SIZE = 100
 const EMPTY_VAULT_ENTRIES: VaultEntry[] = []
-const SPREADSHEET_MODIFIED_SHORTCUT_KEYS = new Set(['b', 'c', 'i', 'u', 'v', 'x', 'y', 'z'])
-const SERIALIZE_SHORTCUT_KEYS = new Set(['b', 'i', 'u', 'v', 'x', 'y', 'z'])
-const SERIALIZE_DIRECT_KEYS = new Set(['Backspace', 'Delete', 'Enter'])
-const WORKBOOK_NAVIGATION_KEYS = new Set([
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'ArrowUp',
-  'Backspace',
-  'Delete',
-  'End',
-  'Enter',
-  'F2',
-  'Home',
-  'PageDown',
-  'PageUp',
-  'Return',
-  'Tab',
-])
 
 interface SheetEditorProps {
   content: string
@@ -172,19 +170,6 @@ interface ScheduleSheetSerializeOptions {
   dirty?: boolean
 }
 
-interface FormulaAutocompleteState extends SheetFormulaAutocompleteMenuState {
-  tokenStart: number
-  tokenEnd: number
-}
-
-interface SheetWikilinkAutocompleteState {
-  items: WikilinkSuggestionItem[]
-  selectedIndex: number
-  left: number
-  top: number
-  width: number
-}
-
 interface NativeExternalFormulaResolutionState {
   inputs: Map<string, SheetExternalFormulaInput>
   signature: string
@@ -200,306 +185,6 @@ function ensureIronCalcReady(): Promise<void> {
     ironCalcInitPromise = initIronCalc(ironCalcWasmUrl).then(() => undefined)
   }
   return ironCalcInitPromise
-}
-
-function sheetCellFromPointer(
-  event: ReactPointerEvent<HTMLDivElement>,
-  container: HTMLDivElement,
-  model: Model,
-): { column: number; row: number } | null {
-  const view = model.getSelectedView()
-  if (view.sheet !== SHEET_INDEX) return null
-
-  const originElement = sheetCoordinateOrigin(container)
-  const originRect = originElement.getBoundingClientRect()
-  const zoom = getDocumentZoom()
-  const scale = elementCoordinateScale(originElement, originRect, zoom)
-  const x = localElementCoordinate(event.clientX, originRect, scale.x, 'x')
-  const y = localElementCoordinate(event.clientY, originRect, scale.y, 'y')
-  return sheetCellFromCanvasPoint(model, view.sheet, x, y)
-}
-
-function wikilinkSuggestionKey(item: WikilinkSuggestionItem): string {
-  return item.path ?? `${item.title}\n${item.noteType ?? ''}`
-}
-
-function nextWikilinkAutocompleteState(
-  previous: SheetWikilinkAutocompleteState | null,
-  next: SheetWikilinkAutocompleteState,
-): SheetWikilinkAutocompleteState {
-  if (!previous) return next
-  const previousSelected = previous.items[previous.selectedIndex]
-  const previousSelectedKey = previousSelected ? wikilinkSuggestionKey(previousSelected) : null
-  const matchingIndex = previousSelectedKey === null
-    ? -1
-    : next.items.findIndex((item) => wikilinkSuggestionKey(item) === previousSelectedKey)
-  return {
-    ...next,
-    selectedIndex: matchingIndex >= 0
-      ? matchingIndex
-      : Math.min(previous.selectedIndex, Math.max(next.items.length - 1, 0)),
-  }
-}
-
-function nextFormulaAutocompleteState(
-  previous: FormulaAutocompleteState | null,
-  next: FormulaAutocompleteState,
-): FormulaAutocompleteState {
-  if (!previous) return next
-  const previousSelected = previous.suggestions[previous.selectedIndex]
-  const matchingIndex = previousSelected
-    ? next.suggestions.findIndex((suggestion) => suggestion.name === previousSelected.name)
-    : -1
-  return {
-    ...next,
-    selectedIndex: matchingIndex >= 0
-      ? matchingIndex
-      : Math.min(previous.selectedIndex, Math.max(next.suggestions.length - 1, 0)),
-  }
-}
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target.isContentEditable) return true
-  return target.closest('input, textarea, [contenteditable="true"]') !== null
-}
-
-function sheetHasEditableFocus(container: HTMLDivElement | null): boolean {
-  const activeElement = document.activeElement
-  return activeElement instanceof HTMLElement
-    && container?.contains(activeElement) === true
-    && isEditableTarget(activeElement)
-}
-
-function isSheetCommandTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  return target.closest('button, a[href], [role="button"], [role="menuitem"], [role="option"], [data-radix-collection-item]') !== null
-}
-
-function isPlainEnterKey(event: ReactKeyboardEvent<HTMLDivElement>): boolean {
-  return (
-    (event.key === 'Enter' || event.key === 'Return')
-    && !event.metaKey
-    && !event.ctrlKey
-    && !event.altKey
-    && !event.shiftKey
-  )
-}
-
-function isPlainCellClearKey(event: ReactKeyboardEvent<HTMLDivElement>): boolean {
-  return (
-    (event.key === 'Backspace' || event.key === 'Delete')
-    && !event.metaKey
-    && !event.ctrlKey
-    && !event.altKey
-    && !event.shiftKey
-  )
-}
-
-function isSpreadsheetKey(event: ReactKeyboardEvent<HTMLDivElement>): boolean {
-  if ((event.metaKey || event.ctrlKey) && SPREADSHEET_MODIFIED_SHORTCUT_KEYS.has(event.key.toLowerCase())) {
-    return true
-  }
-  if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) return true
-  return WORKBOOK_NAVIGATION_KEYS.has(event.key)
-}
-
-function workbookKeyboardRoot(container: HTMLDivElement | null): HTMLElement | null {
-  const sheetSurface = container?.querySelector<HTMLElement>('.sheet-container') ?? null
-  const root = sheetSurface?.closest<HTMLElement>('[tabindex="0"]') ?? null
-  return root && container?.contains(root) ? root : (container?.querySelector<HTMLElement>('[tabindex="0"]') ?? null)
-}
-
-function isWorkbookKeyboardTarget(container: HTMLDivElement | null, target: EventTarget | null): boolean {
-  const root = workbookKeyboardRoot(container)
-  return !!root && target instanceof Node && (target === root || root.contains(target))
-}
-
-function isEditableWorkbookKeyboardTarget(container: HTMLDivElement | null, target: EventTarget | null): boolean {
-  return isEditableTarget(target) && isWorkbookKeyboardTarget(container, target)
-}
-
-function isSheetCellKeyboardTarget(container: HTMLDivElement | null, target: EventTarget | null): boolean {
-  return isWorkbookKeyboardTarget(container, target)
-    && !isEditableTarget(target)
-    && !isSheetCommandTarget(target)
-}
-
-function focusWorkbookRoot(container: HTMLDivElement | null): HTMLElement | null {
-  const workbookRoot = workbookKeyboardRoot(container)
-  workbookRoot?.focus()
-  return workbookRoot
-}
-
-function startCellEdit(container: HTMLDivElement | null): void {
-  const workbookRoot = focusWorkbookRoot(container)
-  workbookRoot?.dispatchEvent(new KeyboardEvent('keydown', {
-    bubbles: true,
-    cancelable: true,
-    code: 'F2',
-    key: 'F2',
-  }))
-}
-
-function formulaInputFromTarget(target: EventTarget | null): HTMLInputElement | HTMLTextAreaElement | null {
-  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return target
-  return null
-}
-
-function visibleFormulaInput(container: HTMLDivElement | null): HTMLInputElement | HTMLTextAreaElement | null {
-  if (!container) return null
-
-  const inputs = Array.from(container.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'))
-  return inputs.find((input): input is HTMLInputElement | HTMLTextAreaElement => {
-    const rect = input.getBoundingClientRect()
-    return rect.width > 0
-      && rect.height > 0
-      && input.value.trimStart().startsWith('=')
-  }) ?? null
-}
-
-function visibleSheetTextInput(container: HTMLDivElement | null): HTMLInputElement | HTMLTextAreaElement | null {
-  if (!container) return null
-
-  const activeElement = document.activeElement
-  if (
-    (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement)
-    && container.contains(activeElement)
-  ) {
-    return activeElement
-  }
-
-  const inputs = Array.from(container.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'))
-  return inputs.find((input): input is HTMLInputElement | HTMLTextAreaElement => {
-    const rect = input.getBoundingClientRect()
-    return rect.width > 0 && rect.height > 0
-  }) ?? null
-}
-
-function isInsideFormulaStringLiteral(value: string, cursor: number): boolean {
-  if (!value.trimStart().startsWith('=')) return false
-
-  let insideString = false
-  for (let index = 0; index < cursor; index += 1) {
-    if (value[index] !== '"') continue
-    if (insideString && value[index + 1] === '"') {
-      index += 1
-      continue
-    }
-    insideString = !insideString
-  }
-  return insideString
-}
-
-function isActiveWikilinkQueryInsideFormulaString(value: string, cursor: number): boolean {
-  if (!value.trimStart().startsWith('=')) return false
-  const activeQueryStart = value.slice(0, cursor).lastIndexOf('[[')
-  return activeQueryStart >= 0 && isInsideFormulaStringLiteral(value, activeQueryStart)
-}
-
-function formulaAutocompletePosition(
-  input: HTMLInputElement | HTMLTextAreaElement,
-  container: HTMLDivElement,
-  cursor: number,
-): Pick<FormulaAutocompleteState, 'left' | 'top' | 'width'> {
-  const inputRect = input.getBoundingClientRect()
-  const containerRect = container.getBoundingClientRect()
-  const inputStyle = window.getComputedStyle(input)
-  const paddingLeft = Number.parseFloat(inputStyle.paddingLeft) || 0
-  const font = [
-    inputStyle.fontStyle,
-    inputStyle.fontVariant,
-    inputStyle.fontWeight,
-    inputStyle.fontSize,
-    inputStyle.fontFamily,
-  ].join(' ')
-  const measuredCursorOffset = measureFormulaTextWidth(input.value.slice(0, cursor), font) - input.scrollLeft
-  const clampedCursorOffset = Math.max(0, Math.min(measuredCursorOffset, inputRect.width - paddingLeft - 24))
-  const width = Math.max(240, Math.min(inputRect.width, 360))
-  const rawLeft = inputRect.left - containerRect.left + paddingLeft + clampedCursorOffset
-
-  return {
-    left: Math.max(8, Math.min(rawLeft, containerRect.width - width - 8)),
-    top: Math.max(8, inputRect.bottom - containerRect.top + 4),
-    width,
-  }
-}
-
-function measureFormulaTextWidth(text: string, font: string): number {
-  const measurer = document.createElement('span')
-  measurer.textContent = text
-  measurer.style.contain = 'layout style paint'
-  measurer.style.font = font
-  measurer.style.position = 'absolute'
-  measurer.style.visibility = 'hidden'
-  measurer.style.whiteSpace = 'pre'
-  document.body.append(measurer)
-  const width = measurer.getBoundingClientRect().width
-  measurer.remove()
-  return width
-}
-
-function dispatchSheetInput(input: HTMLInputElement | HTMLTextAreaElement, data: string): void {
-  const event = typeof InputEvent === 'function'
-    ? new InputEvent('input', {
-      bubbles: true,
-      data,
-      inputType: 'insertReplacementText',
-    })
-    : new Event('input', { bubbles: true })
-
-  input.dispatchEvent(event)
-  input.dispatchEvent(new Event('change', { bubbles: true }))
-}
-
-function dispatchFormulaInput(input: HTMLInputElement | HTMLTextAreaElement, suggestion: SheetFormulaSuggestion): void {
-  dispatchSheetInput(input, suggestion.name)
-}
-
-function setFormulaInputValue(input: HTMLInputElement | HTMLTextAreaElement, value: string): void {
-  const valueDescriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')
-  if (valueDescriptor?.set) {
-    valueDescriptor.set.call(input, value)
-    return
-  }
-  input.value = value
-}
-
-function shouldScheduleSerializeForKey(event: ReactKeyboardEvent<HTMLDivElement>): boolean {
-  if (SERIALIZE_DIRECT_KEYS.has(event.key)) return true
-  if ((event.metaKey || event.ctrlKey) && SERIALIZE_SHORTCUT_KEYS.has(event.key.toLowerCase())) {
-    return true
-  }
-  return event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey
-}
-
-function sheetWikilinkCandidates(
-  baseItems: ReturnType<typeof buildRawEditorBaseItems>,
-  query: string,
-) {
-  return query.length >= MIN_QUERY_LENGTH ? preFilterWikilinks(baseItems, query) : baseItems
-}
-
-function sheetWikilinkAutocompleteItems({
-  baseItems,
-  insertWikilink,
-  query,
-  sourceEntry,
-  typeEntryMap,
-  vaultPath,
-}: {
-  baseItems: ReturnType<typeof buildRawEditorBaseItems>
-  insertWikilink: (target: string) => void
-  query: string
-  sourceEntry?: VaultEntry
-  typeEntryMap: Record<string, VaultEntry>
-  vaultPath: string
-}): WikilinkSuggestionItem[] {
-  const candidates = sheetWikilinkCandidates(baseItems, query)
-  const withHandlers = attachClickHandlers(candidates, insertWikilink, vaultPath, sourceEntry)
-  return enrichSuggestionItems(withHandlers, query, typeEntryMap, {
-    showWorkspace: hasMultipleSuggestionWorkspaces(baseItems),
-  })
 }
 
 export function SheetEditor({
