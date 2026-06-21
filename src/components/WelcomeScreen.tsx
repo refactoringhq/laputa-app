@@ -1,13 +1,17 @@
-import { CircleNotch as Loader2, FolderOpen, Plus, Rocket, Warning as AlertTriangle } from '@phosphor-icons/react'
+import { ArrowUpRight, CircleNotch as Loader2, FolderOpen, Plus, Rocket } from '@phosphor-icons/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { OnboardingShell } from './OnboardingShell'
 import { Button } from '@/components/ui/button'
 import tolariaIcon from '@/assets/tolaria-icon.svg'
+import { TOLARIA_FIRST_LAUNCH_DOCS_URL } from '@/constants/feedback'
+import { translate, type AppLocale } from '@/lib/i18n'
+import { openExternalUrl } from '@/utils/url'
 
 interface WelcomeScreenProps {
   mode: 'welcome' | 'vault-missing'
   missingPath?: string
+  locale?: AppLocale
   defaultVaultPath: string
   onCreateVault: () => void
   onRetryCreateVault: () => void
@@ -115,7 +119,7 @@ const BRAND_ICON_STYLE: React.CSSProperties = {
 const TITLE_STYLE: React.CSSProperties = {
   fontSize: 28,
   fontWeight: 700,
-  letterSpacing: -0.5,
+  letterSpacing: 0,
   color: 'var(--foreground)',
   textAlign: 'center',
   margin: 0,
@@ -185,6 +189,17 @@ const STATUS_STYLE: React.CSSProperties = {
   color: 'var(--muted-foreground)',
   textAlign: 'center',
   margin: 0,
+}
+
+const DOCS_PROMPT_STYLE: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  fontSize: 12,
+  color: 'var(--muted-foreground)',
+  textAlign: 'center',
 }
 
 const ERROR_BLOCK_STYLE: React.CSSProperties = {
@@ -271,29 +286,30 @@ function getWelcomeScreenPresentation(
   mode: WelcomeScreenProps['mode'],
   defaultVaultPath: string,
   isOffline: boolean,
+  locale: AppLocale,
 ): WelcomeScreenPresentation {
   if (mode === 'welcome') {
     return {
       heroBackground: 'transparent',
       heroIcon: <img src={tolariaIcon} alt="Tolaria icon" style={BRAND_ICON_STYLE} />,
-      openFolderLabel: 'Open existing vault',
-      subtitle: 'Markdown knowledge management for the age of AI',
+      openFolderLabel: translate(locale, 'onboarding.welcome.openExisting'),
+      subtitle: translate(locale, 'onboarding.welcome.subtitle'),
       templateDescription: isOffline
-        ? `Requires internet — clone later. Suggested path: ${defaultVaultPath}`
-        : 'Download the getting started vault',
-      title: 'Welcome to Tolaria',
+        ? translate(locale, 'onboarding.welcome.templateOffline', { path: defaultVaultPath })
+        : translate(locale, 'onboarding.welcome.templateDescription'),
+      title: translate(locale, 'onboarding.welcome.title'),
     }
   }
 
   return {
-    heroBackground: 'var(--accent-yellow-light)',
-    heroIcon: <AlertTriangle size={28} style={{ color: 'var(--accent-orange)' }} />,
-    openFolderLabel: 'Choose a different folder',
-    subtitle: 'The vault folder could not be found on disk.\nIt may have been moved or deleted.',
+    heroBackground: 'transparent',
+    heroIcon: <img src={tolariaIcon} alt="Tolaria icon" style={BRAND_ICON_STYLE} />,
+    openFolderLabel: translate(locale, 'onboarding.welcome.openExisting'),
+    subtitle: translate(locale, 'onboarding.welcome.missingSubtitle'),
     templateDescription: isOffline
-      ? `Requires internet — clone later. Suggested path: ${defaultVaultPath}`
-      : 'Download the getting started vault',
-    title: 'Vault not found',
+      ? translate(locale, 'onboarding.welcome.templateOffline', { path: defaultVaultPath })
+      : translate(locale, 'onboarding.welcome.templateDescription'),
+    title: translate(locale, 'onboarding.welcome.title'),
   }
 }
 
@@ -369,8 +385,166 @@ function useWelcomeActionButtons({
   }
 }
 
+function WelcomeHeader({
+  presentation,
+}: {
+  presentation: WelcomeScreenPresentation
+}) {
+  return (
+    <>
+      <div
+        style={{
+          ...ICON_WRAP_STYLE,
+          background: presentation.heroBackground,
+        }}
+      >
+        {presentation.heroIcon}
+      </div>
+
+      <div style={{ textAlign: 'center' }}>
+        <h1 style={TITLE_STYLE}>{presentation.title}</h1>
+        <p style={{ ...SUBTITLE_STYLE, marginTop: 8 }}>
+          {presentation.subtitle}
+        </p>
+      </div>
+    </>
+  )
+}
+
+function WelcomeActions({
+  busy,
+  createEmptyActionRef,
+  creatingAction,
+  isOffline,
+  locale,
+  onCreateEmptyVault,
+  onCreateVault,
+  onOpenFolder,
+  openFolderActionRef,
+  presentation,
+  templateActionRef,
+}: Pick<
+  WelcomeScreenProps,
+  'creatingAction' | 'isOffline' | 'onCreateEmptyVault' | 'onCreateVault' | 'onOpenFolder'
+> & {
+  busy: boolean
+  createEmptyActionRef: WelcomeActionButtonRef
+  locale: AppLocale
+  openFolderActionRef: WelcomeActionButtonRef
+  presentation: WelcomeScreenPresentation
+  templateActionRef: WelcomeActionButtonRef
+}) {
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <OptionButton
+        icon={<Rocket size={18} style={{ color: 'var(--accent-purple)' }} />}
+        iconBg="var(--accent-purple-light)"
+        label={translate(locale, 'onboarding.welcome.templateTitle')}
+        description={presentation.templateDescription}
+        loadingLabel={translate(locale, 'onboarding.welcome.templateLoading')}
+        loadingDescription={translate(locale, 'onboarding.welcome.templateLoadingDescription')}
+        onClick={onCreateVault}
+        disabled={busy || isOffline}
+        loading={creatingAction === 'template'}
+        testId="welcome-create-vault"
+        autoFocus
+        buttonRef={templateActionRef}
+      />
+
+      <OptionButton
+        icon={<Plus size={18} style={{ color: 'var(--accent-blue)' }} />}
+        iconBg="var(--accent-blue-light)"
+        label={translate(locale, 'onboarding.welcome.createEmpty')}
+        description={translate(locale, 'onboarding.welcome.createEmptyDescription')}
+        loadingLabel={translate(locale, 'onboarding.welcome.createEmptyLoading')}
+        loadingDescription={translate(locale, 'onboarding.welcome.createEmptyLoadingDescription')}
+        onClick={onCreateEmptyVault}
+        disabled={busy}
+        loading={creatingAction === 'empty'}
+        testId="welcome-create-new"
+        buttonRef={createEmptyActionRef}
+      />
+
+      <OptionButton
+        icon={<FolderOpen size={18} style={{ color: 'var(--accent-green)' }} />}
+        iconBg="var(--accent-green-light)"
+        label={presentation.openFolderLabel}
+        description={translate(locale, 'onboarding.welcome.openExistingDescription')}
+        onClick={onOpenFolder}
+        disabled={busy}
+        testId="welcome-open-folder"
+        buttonRef={openFolderActionRef}
+      />
+    </div>
+  )
+}
+
+function WelcomeTemplateStatus({
+  creatingAction,
+  locale,
+}: Pick<WelcomeScreenProps, 'creatingAction'> & { locale: AppLocale }) {
+  if (creatingAction !== 'template') return null
+
+  return (
+    <p style={STATUS_STYLE} data-testid="welcome-status" role="status" aria-live="polite">
+      {translate(locale, 'onboarding.welcome.templateStatus')}
+    </p>
+  )
+}
+
+function WelcomeError({
+  canRetryTemplate,
+  error,
+  locale,
+  onRetryCreateVault,
+}: Pick<WelcomeScreenProps, 'canRetryTemplate' | 'error' | 'onRetryCreateVault'> & {
+  locale: AppLocale
+}) {
+  if (!error) return null
+
+  return (
+    <div style={ERROR_BLOCK_STYLE}>
+      <p style={ERROR_STYLE} data-testid="welcome-error" role="alert" aria-live="assertive">
+        {error}
+      </p>
+      {canRetryTemplate && (
+        <Button
+          type="button"
+          variant="outline"
+          style={RETRY_BUTTON_STYLE}
+          onClick={onRetryCreateVault}
+          data-testid="welcome-retry-template"
+          className="shadow-none"
+        >
+          {translate(locale, 'onboarding.welcome.retryDownload')}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function WelcomeDocsLink({ locale }: { locale: AppLocale }) {
+  return (
+    <div style={DOCS_PROMPT_STYLE}>
+      <span>{translate(locale, 'onboarding.welcome.docsPrompt')}</span>
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        className="h-auto gap-1 px-0 py-0 text-xs"
+        onClick={() => void openExternalUrl(TOLARIA_FIRST_LAUNCH_DOCS_URL)}
+        data-testid="welcome-docs-link"
+      >
+        {translate(locale, 'onboarding.welcome.docsLink')}
+        <ArrowUpRight className="size-3" />
+      </Button>
+    </div>
+  )
+}
+
 export function WelcomeScreen({
   mode,
+  locale = 'en',
   defaultVaultPath,
   onCreateVault,
   onRetryCreateVault,
@@ -382,7 +556,7 @@ export function WelcomeScreen({
   canRetryTemplate,
 }: WelcomeScreenProps) {
   const busy = creatingAction !== null
-  const presentation = getWelcomeScreenPresentation(mode, defaultVaultPath, isOffline)
+  const presentation = getWelcomeScreenPresentation(mode, defaultVaultPath, isOffline, locale)
   const { templateActionRef, createEmptyActionRef, openFolderActionRef } = useWelcomeActionButtons({
     mode,
     busy,
@@ -399,91 +573,29 @@ export function WelcomeScreen({
       testId="welcome-screen"
     >
       <>
-        <div
-          style={{
-            ...ICON_WRAP_STYLE,
-            background: presentation.heroBackground,
-          }}
-        >
-          {presentation.heroIcon}
-        </div>
-
-        <div style={{ textAlign: 'center' }}>
-          <h1 style={TITLE_STYLE}>{presentation.title}</h1>
-          <p style={{ ...SUBTITLE_STYLE, marginTop: 8 }}>
-            {presentation.subtitle}
-          </p>
-        </div>
-
+        <WelcomeHeader presentation={presentation} />
         <div style={DIVIDER_STYLE} />
-
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <OptionButton
-            icon={<Rocket size={18} style={{ color: 'var(--accent-purple)' }} />}
-            iconBg="var(--accent-purple-light)"
-            label="Get started with a template"
-            description={presentation.templateDescription}
-            loadingLabel="Downloading template…"
-            loadingDescription="Cloning the Getting Started vault template"
-            onClick={onCreateVault}
-            disabled={busy || isOffline}
-            loading={creatingAction === 'template'}
-            testId="welcome-create-vault"
-            autoFocus
-            buttonRef={templateActionRef}
-          />
-
-          <OptionButton
-            icon={<Plus size={18} style={{ color: 'var(--accent-blue)' }} />}
-            iconBg="var(--accent-blue-light)"
-            label="Create empty vault"
-            description="Start fresh in an empty folder with Tolaria defaults"
-            loadingLabel="Creating vault…"
-            loadingDescription="Preparing Tolaria defaults in the selected folder"
-            onClick={onCreateEmptyVault}
-            disabled={busy}
-            loading={creatingAction === 'empty'}
-            testId="welcome-create-new"
-            buttonRef={createEmptyActionRef}
-          />
-
-          <OptionButton
-            icon={<FolderOpen size={18} style={{ color: 'var(--accent-green)' }} />}
-            iconBg="var(--accent-green-light)"
-            label={presentation.openFolderLabel}
-            description="Point to a folder you already have"
-            onClick={onOpenFolder}
-            disabled={busy}
-            testId="welcome-open-folder"
-            buttonRef={openFolderActionRef}
-          />
-        </div>
-
-        {creatingAction === 'template' && (
-          <p style={STATUS_STYLE} data-testid="welcome-status" role="status" aria-live="polite">
-            Downloading the Getting Started vault template…
-          </p>
-        )}
-
-        {error && (
-          <div style={ERROR_BLOCK_STYLE}>
-            <p style={ERROR_STYLE} data-testid="welcome-error" role="alert" aria-live="assertive">
-              {error}
-            </p>
-            {canRetryTemplate && (
-              <Button
-                type="button"
-                variant="outline"
-                style={RETRY_BUTTON_STYLE}
-                onClick={onRetryCreateVault}
-                data-testid="welcome-retry-template"
-                className="shadow-none"
-              >
-                Retry download
-              </Button>
-            )}
-          </div>
-        )}
+        <WelcomeActions
+          busy={busy}
+          createEmptyActionRef={createEmptyActionRef}
+          creatingAction={creatingAction}
+          isOffline={isOffline}
+          locale={locale}
+          onCreateEmptyVault={onCreateEmptyVault}
+          onCreateVault={onCreateVault}
+          onOpenFolder={onOpenFolder}
+          openFolderActionRef={openFolderActionRef}
+          presentation={presentation}
+          templateActionRef={templateActionRef}
+        />
+        <WelcomeTemplateStatus creatingAction={creatingAction} locale={locale} />
+        <WelcomeError
+          canRetryTemplate={canRetryTemplate}
+          error={error}
+          locale={locale}
+          onRetryCreateVault={onRetryCreateVault}
+        />
+        <WelcomeDocsLink locale={locale} />
       </>
     </OnboardingShell>
   )

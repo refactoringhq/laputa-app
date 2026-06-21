@@ -1,25 +1,19 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AiAgentStatuses } from '../lib/aiAgents'
+import type { AiAgentsStatus } from '../lib/aiAgents'
 import { AiAgentsOnboardingPrompt } from './AiAgentsOnboardingPrompt'
 
 const openExternalUrl = vi.fn()
 const dragRegionMouseDown = vi.fn()
-const missingStatuses: AiAgentStatuses = {
+const missingStatuses: AiAgentsStatus = {
   claude_code: { status: 'missing', version: null },
   codex: { status: 'missing', version: null },
   opencode: { status: 'missing', version: null },
   pi: { status: 'missing', version: null },
   gemini: { status: 'missing', version: null },
   kiro: { status: 'missing', version: null },
+  hermes: { status: 'missing', version: null },
 }
-const missingAgentInstallTestIds = [
-  'ai-agents-onboarding-install-codex',
-  'ai-agents-onboarding-install-opencode',
-  'ai-agents-onboarding-install-pi',
-  'ai-agents-onboarding-install-gemini',
-  'ai-agents-onboarding-install-kiro',
-] as const
 const installLinkTargets = [
   ['ai-agents-onboarding-install-claude_code', 'https://docs.anthropic.com/en/docs/claude-code'],
   ['ai-agents-onboarding-install-codex', 'https://developers.openai.com/codex/cli'],
@@ -27,6 +21,7 @@ const installLinkTargets = [
   ['ai-agents-onboarding-install-pi', 'https://pi.dev'],
   ['ai-agents-onboarding-install-gemini', 'https://google-gemini.github.io/gemini-cli/'],
   ['ai-agents-onboarding-install-kiro', 'https://kiro.dev/docs/cli'],
+  ['ai-agents-onboarding-install-hermes', 'https://hermes-agent.nousresearch.com/docs/getting-started/quickstart'],
 ] as const
 
 vi.mock('../utils/url', () => ({
@@ -36,7 +31,7 @@ vi.mock('../hooks/useDragRegion', () => ({
   useDragRegion: () => ({ onMouseDown: dragRegionMouseDown }),
 }))
 
-function renderPrompt(statuses: Partial<AiAgentStatuses> = {}) {
+function renderPrompt(statuses: Partial<AiAgentsStatus> = {}) {
   return render(
     <AiAgentsOnboardingPrompt
       statuses={{ ...missingStatuses, ...statuses }}
@@ -45,10 +40,8 @@ function renderPrompt(statuses: Partial<AiAgentStatuses> = {}) {
   )
 }
 
-function expectMissingAgentInstallLinks() {
-  missingAgentInstallTestIds.forEach(testId => {
-    expect(screen.getByTestId(testId)).toBeInTheDocument()
-  })
+function openSupportedAgentsMenu() {
+  fireEvent.pointerDown(screen.getByTestId('ai-agents-onboarding-supported-menu'))
 }
 
 describe('AiAgentsOnboardingPrompt', () => {
@@ -62,25 +55,28 @@ describe('AiAgentsOnboardingPrompt', () => {
     })
 
     expect(screen.getByText('AI is ready')).toBeInTheDocument()
-    expectMissingAgentInstallLinks()
+    expect(screen.getByText('Detected on this machine')).toBeInTheDocument()
+    expect(screen.getByText('Claude Code')).toBeInTheDocument()
+    expect(screen.queryByTestId('ai-agents-onboarding-install-codex')).not.toBeInTheDocument()
     expect(screen.getByTestId('ai-agents-onboarding-continue')).toHaveTextContent('Continue')
   })
 
   it('shows the missing state when no agents are installed', () => {
     renderPrompt()
 
-    expect(screen.getByText('Choose how Tolaria should use AI')).toBeInTheDocument()
-    expect(screen.getByTestId('claude-onboarding-screen')).toBeInTheDocument()
-    expect(screen.getByText('Claude Code not detected')).toBeInTheDocument()
-    expect(screen.getByTestId('ai-agents-onboarding-install-claude_code')).toBeInTheDocument()
-    expectMissingAgentInstallLinks()
+    expect(screen.getByText('AI setup is optional')).toBeInTheDocument()
+    expect(screen.queryByTestId('ai-agents-onboarding-empty')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ai-agents-onboarding-detected-list')).not.toBeInTheDocument()
+    expect(screen.getByText('More AI options')).toBeInTheDocument()
+    expect(screen.queryByTestId('ai-agents-onboarding-install-claude_code')).not.toBeInTheDocument()
     expect(screen.getByTestId('ai-agents-onboarding-continue')).toHaveTextContent('Set up later')
   })
 
-  it('opens the agent install links', () => {
+  it('opens the supported agent install links from the menu', () => {
     renderPrompt()
 
     installLinkTargets.forEach(([testId]) => {
+      openSupportedAgentsMenu()
       fireEvent.click(screen.getByTestId(testId))
     })
 

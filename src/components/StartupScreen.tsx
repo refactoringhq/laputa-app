@@ -8,6 +8,7 @@ import type { useOnboarding } from '../hooks/useOnboarding'
 import type { useVaultSwitcher } from '../hooks/useVaultSwitcher'
 import type { Settings } from '../types'
 import type { NoteWindowParams } from '../utils/windowMode'
+import type { AppLocale } from '../lib/i18n'
 
 type OnboardingState = ReturnType<typeof useOnboarding>
 type VaultSwitcherState = ReturnType<typeof useVaultSwitcher>
@@ -18,6 +19,7 @@ export interface StartupScreenParams {
   aiAgentsStatus: ReturnType<typeof useAiAgentsStatus>
   isOffline: boolean
   isStartupLoading: boolean
+  locale?: AppLocale
   noteWindowParams: NoteWindowParams | null
   onboarding: OnboardingState
   runtimeMissingVaultPath: string | null
@@ -72,13 +74,14 @@ function shouldShowAiAgentsOnboarding(params: StartupScreenParams): boolean {
     && !params.showMcpSetupDialog
 }
 
-function WelcomeView({ onboarding, isOffline }: { onboarding: OnboardingState; isOffline: boolean }) {
+function WelcomeView({ onboarding, isOffline, locale }: { onboarding: OnboardingState; isOffline: boolean; locale?: AppLocale }) {
   const state = onboarding.state as { status: 'welcome' | 'vault-missing'; defaultPath: string; vaultPath?: string }
   return (
     <div className="app-shell">
       <WelcomeScreen
         mode={state.status === 'welcome' ? 'welcome' : 'vault-missing'}
         missingPath={state.status === 'vault-missing' ? state.vaultPath : undefined}
+        locale={locale}
         defaultVaultPath={state.defaultPath}
         onCreateVault={onboarding.handleCreateVault}
         onRetryCreateVault={onboarding.retryCreateVault}
@@ -94,15 +97,17 @@ function WelcomeView({ onboarding, isOffline }: { onboarding: OnboardingState; i
 }
 
 function AiAgentsOnboardingView({
+  locale,
   statuses,
   onContinue,
 }: {
   statuses: ReturnType<typeof useAiAgentsStatus>
+  locale?: AppLocale
   onContinue: () => void
 }) {
   return (
     <div className="app-shell">
-      <AiAgentsOnboardingPrompt statuses={statuses} onContinue={onContinue} />
+      <AiAgentsOnboardingPrompt statuses={statuses} locale={locale} onContinue={onContinue} />
     </div>
   )
 }
@@ -139,6 +144,7 @@ export function StartupScreen(params: StartupScreenParams) {
       <WelcomeView
         onboarding={welcomeOnboardingState(params)}
         isOffline={params.isOffline}
+        locale={params.locale}
       />
     )
   }
@@ -148,6 +154,7 @@ export function StartupScreen(params: StartupScreenParams) {
     <>
       <AiAgentsOnboardingView
         statuses={params.aiAgentsStatus}
+        locale={params.locale}
         onContinue={params.aiAgentsOnboarding.dismissPrompt}
       />
       <Toast message={params.toastMessage} onDismiss={() => params.setToastMessage(null)} />

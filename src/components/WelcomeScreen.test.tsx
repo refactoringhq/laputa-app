@@ -2,11 +2,16 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { WelcomeScreen } from './WelcomeScreen'
 import tolariaIcon from '@/assets/tolaria-icon.svg'
+import { TOLARIA_FIRST_LAUNCH_DOCS_URL } from '@/constants/feedback'
 
 const dragRegionMouseDown = vi.fn()
+const openExternalUrl = vi.fn()
 
 vi.mock('../hooks/useDragRegion', () => ({
   useDragRegion: () => ({ onMouseDown: dragRegionMouseDown }),
+}))
+vi.mock('@/utils/url', () => ({
+  openExternalUrl: (...args: unknown[]) => openExternalUrl(...args),
 }))
 
 const defaultProps = {
@@ -57,14 +62,14 @@ describe('WelcomeScreen', () => {
 
     it('shows the simplified template option description', () => {
       render(<WelcomeScreen {...defaultProps} />)
-      expect(screen.getByText('Download the getting started vault')).toBeInTheDocument()
+      expect(screen.getByText('Download the Getting Started vault')).toBeInTheDocument()
       expect(screen.queryByText(/~\/Documents\/Laputa/)).not.toBeInTheDocument()
     })
 
     it('shows offline guidance and disables the template option when offline', () => {
       render(<WelcomeScreen {...defaultProps} isOffline={true} />)
       expect(screen.getByTestId('welcome-create-vault')).toBeDisabled()
-      expect(screen.getByText(/Requires internet — clone later/)).toBeInTheDocument()
+      expect(screen.getByText(/Requires internet - clone later/)).toBeInTheDocument()
     })
 
     it('calls onCreateEmptyVault when create empty button is clicked', () => {
@@ -168,6 +173,12 @@ describe('WelcomeScreen', () => {
       render(<WelcomeScreen {...defaultProps} />)
       expect(screen.queryByText('~/Laputa')).not.toBeInTheDocument()
     })
+
+    it('opens the first-launch docs from the welcome card', () => {
+      render(<WelcomeScreen {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('welcome-docs-link'))
+      expect(openExternalUrl).toHaveBeenCalledWith(TOLARIA_FIRST_LAUNCH_DOCS_URL)
+    })
   })
 
   describe('vault-missing mode', () => {
@@ -177,10 +188,10 @@ describe('WelcomeScreen', () => {
       missingPath: '~/Laputa',
     }
 
-    it('renders vault not found title', () => {
+    it('keeps the missing-vault state framed as welcome', () => {
       render(<WelcomeScreen {...missingProps} />)
-      expect(screen.getByText('Vault not found')).toBeInTheDocument()
-      expect(screen.getByText(/could not be found on disk/)).toBeInTheDocument()
+      expect(screen.getByText('Welcome to Tolaria')).toBeInTheDocument()
+      expect(screen.getByText(/folder may have moved or been deleted/)).toBeInTheDocument()
     })
 
     it('does not show the missing vault path in a badge', () => {
@@ -188,9 +199,9 @@ describe('WelcomeScreen', () => {
       expect(screen.queryByText('~/Laputa')).not.toBeInTheDocument()
     })
 
-    it('shows "Choose a different folder" instead of "Open existing vault"', () => {
+    it('keeps the existing-vault action label in the friendly recovery state', () => {
       render(<WelcomeScreen {...missingProps} />)
-      expect(screen.getByTestId('welcome-open-folder')).toHaveTextContent('Choose a different folder')
+      expect(screen.getByTestId('welcome-open-folder')).toHaveTextContent('Open existing vault')
     })
   })
 

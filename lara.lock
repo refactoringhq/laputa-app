@@ -74,6 +74,41 @@ files:
     feedback.diagnosticsCopied: 9c7f3f37df9c000fc67c1a6ee35f40e5
     feedback.diagnosticsCopiedSentence: 6f8ebe492dbb95827ccf7536965dc672
     feedback.clipboardUnavailable: 8e25a424420687ed8e0dc2b1be8c7406
+    onboarding.welcome.title: 4e146a5fbd84f4282d608683de0a2d67
+    onboarding.welcome.subtitle: 5e490bfb589bd74b043c330f90d806cc
+    onboarding.welcome.missingSubtitle: e0b59bce6bbcc8dd56722e25c2a60485
+    onboarding.welcome.templateTitle: 30ddd36173006e5db734f878bf12b9ea
+    onboarding.welcome.templateDescription: a142a395648f742c6b39d8391e30ec9f
+    onboarding.welcome.templateOffline: cf717aaf6b6b9afeda233ce4bc86189f
+    onboarding.welcome.templateLoading: 2ab31cd86895006363298fe680e64e9c
+    onboarding.welcome.templateLoadingDescription: d246a8a2d8c53a65c34359ba503cbc7c
+    onboarding.welcome.templateStatus: 6a0789a3d9ba4dd326202663a74129fc
+    onboarding.welcome.createEmpty: f37c03f236fbf1516222360a936249e8
+    onboarding.welcome.createEmptyDescription: 9fe50bc53b609c5f734abaa3a58b2a17
+    onboarding.welcome.createEmptyLoading: 20e33d4be622b4eb0af517900937ee68
+    onboarding.welcome.createEmptyLoadingDescription: 759757ef559c94a4c232e1093041a897
+    onboarding.welcome.openExisting: 4cbce894cee19b239fd88ae2fafedaab
+    onboarding.welcome.openExistingDescription: 969a090bf259323830d733d0141b0b2a
+    onboarding.welcome.retryDownload: aa0d36f85911dde10fbe345ae1fa13de
+    onboarding.welcome.docsPrompt: 4a7dc2be7890babade71476e9910c58d
+    onboarding.welcome.docsLink: 1ae3906f2bb3da58cecf9db8375952e4
+    onboarding.ai.checkingTitle: 62a4f35979899c0492a5be91f0172b98
+    onboarding.ai.checkingDescription: 67e6fbe3aa24ec68e88d05def752b47a
+    onboarding.ai.missingTitle: 194d3777688e137188ad8949c097f441
+    onboarding.ai.missingDescription: 217cf33df5cbcbcf4ce1d2808470903a
+    onboarding.ai.readyTitle: ced601bb8aae12a4a1a8dd9b6440c36a
+    onboarding.ai.readyDescription: 5d05f1ad0c8af7a9d78146b840cecb90
+    onboarding.ai.checkingLocalTitle: d61e8c908156195767eb4729fe377471
+    onboarding.ai.checkingLocalDescription: 1048df882350972acbad709dcdd8e6cd
+    onboarding.ai.detectedHeader: 52d48f0516070836e91a3e53a1c9b693
+    onboarding.ai.installed: 2c8bb57a0b1dff255f3d6684a9fddda3
+    onboarding.ai.installedVersion: 5e12a26fd64792c6798e5fa9580e2e3f
+    onboarding.ai.installedBadge: 98dd43dfae05b11befe1f140e0ec787a
+    onboarding.ai.otherOptionsTitle: cdbde4ccb0c9f57e955d3d3e2a02a2c4
+    onboarding.ai.otherOptionsDescription: 57f4ccb3d3ab15693d7d8a047acab618
+    onboarding.ai.supportedAgents: 88dcd8c5d8602ae7bd84b7d2463d1286
+    onboarding.ai.continue: a0bfb8e59e6c13fc8d990781f77694fe
+    onboarding.ai.setUpLater: 31aa06160419d713441c155cd2ed1f90
     command.group.navigation: 846495f9ceed11accf8879f555936a7d
     command.group.note: 3b0649c72650c313a357338dcdfb64ec
     command.group.git: 0bcc70105ad279503e31fe7b3f47b665

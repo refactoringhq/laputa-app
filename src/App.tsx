@@ -1573,6 +1573,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         aiAgentsStatus={aiAgentsStatus}
         isOffline={networkStatus.isOffline}
         isStartupLoading={isStartupLoading}
+        locale={appLocale}
         noteWindowParams={noteWindowParams}
         onboarding={onboarding}
         runtimeMissingVaultPath={runtimeMissingVaultPath}

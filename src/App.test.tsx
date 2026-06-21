@@ -924,7 +924,6 @@ describe('App', () => {
     expect(screen.getByTestId('breadcrumb-title-skeleton')).toBeInTheDocument()
     expect(screen.getByTestId('editor-content-skeleton')).toBeInTheDocument()
     expect(screen.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
-    expect(screen.queryByText('Vault not found')).not.toBeInTheDocument()
 
     await act(async () => {
       resolveVaultList?.({
@@ -938,7 +937,6 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.getByTestId('status-vault-trigger')).toHaveTextContent('Work Vault')
     })
-    expect(screen.queryByText('Vault not found')).not.toBeInTheDocument()
   })
 
   it('shows the missing-vault screen once the resolved active vault is confirmed missing', async () => {
@@ -953,9 +951,9 @@ describe('App', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByText('Vault not found')).toBeInTheDocument()
+      expect(screen.getByText(/folder may have moved or been deleted/)).toBeInTheDocument()
     })
-    expect(screen.getByTestId('welcome-open-folder')).toHaveTextContent('Choose a different folder')
+    expect(screen.getByTestId('welcome-open-folder')).toHaveTextContent('Open existing vault')
   })
 
   it('shows welcome instead of vault-missing when the missing path was not a persisted active vault', async () => {
@@ -972,18 +970,18 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.getByText('Welcome to Tolaria')).toBeInTheDocument()
     })
-    expect(screen.queryByText('Vault not found')).not.toBeInTheDocument()
     expect(screen.getByTestId('welcome-open-folder')).toHaveTextContent('Open existing vault')
   })
 
-  it('persists and opens an existing vault chosen from onboarding', async () => {
+  it('persists an existing vault and shows AI onboarding after first-run open', async () => {
     const selectedVaultPath = '/Users/mock/Documents/Work Vault'
-    const selectedVaultUrl = 'file:///Users/mock/Documents/Work%20Vault'
     const saveVaultList = vi.fn()
-    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(selectedVaultUrl)
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('file:///Users/mock/Documents/Work%20Vault')
 
+    localStorage.removeItem(CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME)
     mockCommandResults.load_vault_list = { vaults: [], active_vault: null, hidden_defaults: [] }
     mockCommandResults.check_vault_exists = (args?: { path?: string }) => args?.path === selectedVaultPath
+    mockCommandResults.get_ai_agents_status = {}
     mockCommandResults.save_vault_list = (args?: {
       list?: { vaults?: Array<{ label: string; path: string }>; active_vault?: string | null }
     }) => {
@@ -1019,8 +1017,9 @@ describe('App', () => {
     expect(saveVaultList).toHaveBeenCalledTimes(1)
 
     await waitFor(() => {
-      expect(screen.getByTestId('status-vault-trigger')).toHaveTextContent('Work Vault')
-    })
+      expect(screen.getByTestId('ai-agents-onboarding-screen')).toBeInTheDocument()
+    }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
+    expect(screen.getByText('AI setup is optional')).toBeInTheDocument()
 
     promptSpy.mockRestore()
   })

@@ -1,110 +1,125 @@
-import { ArrowUpRight, CheckCircle as CheckCircle2, CircleNotch as Loader2, Cloud, HardDrive, Robot as Bot, Terminal } from '@phosphor-icons/react'
+import { ArrowUpRight, CaretDown, CheckCircle as CheckCircle2, CircleNotch as Loader2, Robot as Bot } from '@phosphor-icons/react'
 import {
   AI_AGENT_DEFINITIONS,
   getAiAgentAvailability,
   getAiAgentDefinition,
   hasAnyInstalledAiAgent,
   isAiAgentsStatusChecking,
+  type AiAgentDefinition,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
+import { translate, type AppLocale } from '../lib/i18n'
 import { openExternalUrl } from '../utils/url'
 import { AiAgentIcon } from './AiAgentIcon'
 import { OnboardingShell } from './OnboardingShell'
 import { Button } from './ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 
 interface AiAgentsOnboardingPromptProps {
   statuses: AiAgentsStatus
   onContinue: () => void
+  locale?: AppLocale
 }
 
-function getPromptCopy(statuses: AiAgentsStatus) {
+interface InfoPanelProps {
+  description: string
+  testId?: string
+  textAlign?: 'left' | 'center'
+  title: string
+}
+
+function getPromptCopy(statuses: AiAgentsStatus, locale: AppLocale) {
   if (isAiAgentsStatusChecking(statuses)) {
     return {
       accentClassName: 'bg-muted text-muted-foreground',
-      description: 'Checking local agents. You can also use a local model or API provider.',
+      description: translate(locale, 'onboarding.ai.checkingDescription'),
       icon: <Loader2 className="size-7 animate-spin" />,
-      title: 'Checking AI agents',
+      title: translate(locale, 'onboarding.ai.checkingTitle'),
     }
   }
 
   if (!hasAnyInstalledAiAgent(statuses)) {
     return {
       accentClassName: 'bg-[var(--feedback-warning-bg)] text-[var(--feedback-warning-text)]',
-      description: 'Connect a local model, an API provider, or a desktop coding agent.',
+      description: translate(locale, 'onboarding.ai.missingDescription'),
       icon: <Bot className="size-7" />,
-      title: 'Choose how Tolaria should use AI',
+      title: translate(locale, 'onboarding.ai.missingTitle'),
     }
   }
 
   return {
     accentClassName: 'bg-[var(--feedback-success-bg)] text-[var(--feedback-success-text)]',
-    description: 'You can use the detected local agents, or add local/API models in Settings.',
+    description: translate(locale, 'onboarding.ai.readyDescription'),
     icon: <CheckCircle2 className="size-7" />,
-    title: 'AI is ready',
+    title: translate(locale, 'onboarding.ai.readyTitle'),
   }
 }
 
-function AiModeChoices() {
-  const choices = [
-    {
-      icon: <HardDrive className="size-4" />,
-      title: 'Local model',
-      description: 'Use Ollama, LM Studio, or another local OpenAI-compatible endpoint. API keys are usually not needed.',
-    },
-    {
-      icon: <Cloud className="size-4" />,
-      title: 'API provider',
-      description: 'Use OpenAI, Anthropic, OpenRouter, or a gateway. API keys are read from environment variables, not saved in settings.',
-    },
-    {
-      icon: <Terminal className="size-4" />,
-      title: 'Local agent',
-      description: 'Use Claude Code, Codex, OpenCode, Gemini CLI, or Pi for tool-capable vault editing on desktop.',
-    },
-  ]
+function installedAgentDefinitions(statuses: AiAgentsStatus): AiAgentDefinition[] {
+  return AI_AGENT_DEFINITIONS.filter((definition) => {
+    return getAiAgentAvailability(statuses, definition.id).status === 'installed'
+  })
+}
 
+function InfoPanel({
+  description,
+  testId,
+  textAlign = 'left',
+  title,
+}: InfoPanelProps) {
+  const textAlignClass = textAlign === 'center' ? 'text-center' : 'text-left'
   return (
-    <div className="grid gap-3 md:grid-cols-3">
-      {choices.map((choice) => (
-        <div key={choice.title} className="rounded-lg border border-border bg-muted/20 p-3 text-left">
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
-            {choice.icon}
-            {choice.title}
-          </div>
-          <div className="text-xs leading-5 text-muted-foreground">{choice.description}</div>
-        </div>
-      ))}
+    <div className={`rounded-lg border border-border bg-muted/20 px-4 py-4 ${textAlignClass}`} data-testid={testId}>
+      <div className="text-sm font-medium text-foreground">
+        {title}
+      </div>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        {description}
+      </p>
     </div>
   )
 }
 
-function AgentStatusList({ statuses }: { statuses: AiAgentsStatus }) {
+function DetectedAgentsList({
+  agents,
+  locale,
+  statuses,
+}: {
+  agents: AiAgentDefinition[]
+  locale: AppLocale
+  statuses: AiAgentsStatus
+}) {
   return (
-    <div className="space-y-3">
-      {AI_AGENT_DEFINITIONS.map((definition) => {
+    <div className="space-y-2" data-testid="ai-agents-onboarding-detected-list">
+      <div className="text-xs font-semibold uppercase text-muted-foreground">
+        {translate(locale, 'onboarding.ai.detectedHeader')}
+      </div>
+      {agents.map((definition) => {
         const status = getAiAgentAvailability(statuses, definition.id)
-        const ready = status.status === 'installed'
         return (
           <div
             key={definition.id}
-            className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm"
+            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm"
           >
-            <div className="flex min-w-0 items-start gap-3 text-left">
-              <AiAgentIcon agent={definition.id} size={18} className="mt-0.5" />
-              <div className="min-w-0 space-y-1">
+            <div className="flex min-w-0 items-center gap-3 text-left">
+              <AiAgentIcon agent={definition.id} size={18} />
+              <div className="min-w-0">
                 <div className="font-medium text-foreground">{definition.label}</div>
                 <div className="text-xs text-muted-foreground">
-                  {ready
-                    ? `${definition.label}${status.version ? ` ${status.version}` : ''} is ready.`
-                    : `${definition.label} is not installed yet.`}
+                  {status.version
+                    ? translate(locale, 'onboarding.ai.installedVersion', { version: status.version })
+                    : translate(locale, 'onboarding.ai.installed')}
                 </div>
               </div>
             </div>
-            <span
-              className={`rounded-full px-2 py-1 text-[11px] font-medium ${ready ? 'bg-[var(--feedback-success-bg)] text-[var(--feedback-success-text)]' : 'bg-[var(--feedback-warning-bg)] text-[var(--feedback-warning-text)]'}`}
-            >
-              {ready ? 'Installed' : 'Missing'}
+            <span className="rounded-full bg-[var(--feedback-success-bg)] px-2 py-1 text-[11px] font-medium text-[var(--feedback-success-text)]">
+              {translate(locale, 'onboarding.ai.installedBadge')}
             </span>
           </div>
         )
@@ -113,13 +128,62 @@ function AgentStatusList({ statuses }: { statuses: AiAgentsStatus }) {
   )
 }
 
+function SupportedAgentsMenu({ locale }: { locale: AppLocale }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" data-testid="ai-agents-onboarding-supported-menu">
+          {translate(locale, 'onboarding.ai.supportedAgents')}
+          <CaretDown className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="center" className="min-w-[240px]">
+        {AI_AGENT_DEFINITIONS.map((definition) => (
+          <DropdownMenuItem
+            key={definition.id}
+            className="gap-2"
+            onSelect={() => void openExternalUrl(getAiAgentDefinition(definition.id).installUrl)}
+            data-testid={`ai-agents-onboarding-install-${definition.id}`}
+          >
+            <AiAgentIcon agent={definition.id} size={16} />
+            <span className="min-w-0 flex-1">{definition.label}</span>
+            <ArrowUpRight className="size-4" />
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function AiSetupSummary({ locale }: { locale: AppLocale }) {
+  return (
+    <InfoPanel
+      title={translate(locale, 'onboarding.ai.otherOptionsTitle')}
+      description={translate(locale, 'onboarding.ai.otherOptionsDescription')}
+    />
+  )
+}
+
+function CheckingAgents({ locale }: { locale: AppLocale }) {
+  return (
+    <InfoPanel
+      title={translate(locale, 'onboarding.ai.checkingLocalTitle')}
+      description={translate(locale, 'onboarding.ai.checkingLocalDescription')}
+      textAlign="center"
+      testId="ai-agents-onboarding-checking"
+    />
+  )
+}
+
 export function AiAgentsOnboardingPrompt({
   statuses,
   onContinue,
+  locale = 'en',
 }: AiAgentsOnboardingPromptProps) {
-  const copy = getPromptCopy(statuses)
-  const showLegacyClaudeCompatibility = getAiAgentAvailability(statuses, 'claude_code').status !== 'installed'
-  const missingAgents = AI_AGENT_DEFINITIONS.filter((definition) => getAiAgentAvailability(statuses, definition.id).status === 'missing')
+  const copy = getPromptCopy(statuses, locale)
+  const checking = isAiAgentsStatusChecking(statuses)
+  const installedAgents = installedAgentDefinitions(statuses)
+  const showDetectedAgents = !checking && installedAgents.length > 0
 
   return (
     <OnboardingShell
@@ -136,7 +200,7 @@ export function AiAgentsOnboardingPrompt({
             {copy.icon}
           </div>
           <div className="space-y-2">
-            <CardTitle className="text-3xl tracking-tight">
+            <CardTitle className="text-3xl">
               {copy.title}
             </CardTitle>
             <p className="text-sm leading-6 text-muted-foreground" data-testid="ai-agents-onboarding-description">
@@ -149,43 +213,24 @@ export function AiAgentsOnboardingPrompt({
           className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain"
           data-testid="ai-agents-onboarding-scroll"
         >
-          <AiModeChoices />
-          {showLegacyClaudeCompatibility ? (
-            <div
-              className="rounded-lg border border-[var(--feedback-warning-border)] bg-[var(--feedback-warning-bg)] px-4 py-3 text-left"
-              data-testid="claude-onboarding-screen"
-            >
-              <div className="text-sm font-medium text-[var(--feedback-warning-text)]">Claude Code not detected</div>
-              <p className="mt-1 text-xs leading-5 text-[var(--feedback-warning-text)]">
-                Install Claude Code or continue without it.
-              </p>
-            </div>
+          {checking ? <CheckingAgents locale={locale} /> : null}
+          {showDetectedAgents ? (
+            <DetectedAgentsList agents={installedAgents} statuses={statuses} locale={locale} />
           ) : null}
-          <AgentStatusList statuses={statuses} />
+          <AiSetupSummary locale={locale} />
         </CardContent>
 
         <CardFooter className="shrink-0 flex-wrap justify-center gap-3">
-          {missingAgents.map((definition) => (
-            <Button
-              key={definition.id}
-              type="button"
-              variant="outline"
-              onClick={() => void openExternalUrl(getAiAgentDefinition(definition.id).installUrl)}
-              data-testid={`ai-agents-onboarding-install-${definition.id}`}
-            >
-              <AiAgentIcon agent={definition.id} size={16} />
-              Install {definition.label}
-              <ArrowUpRight className="size-4" />
-            </Button>
-          ))}
+          <SupportedAgentsMenu locale={locale} />
           <div data-testid="ai-agents-onboarding-continue">
             <Button
               type="button"
               onClick={onContinue}
-              disabled={isAiAgentsStatusChecking(statuses)}
-              data-testid={showLegacyClaudeCompatibility ? 'claude-onboarding-continue' : undefined}
+              disabled={checking}
             >
-              {hasAnyInstalledAiAgent(statuses) ? 'Continue' : 'Set up later'}
+              {hasAnyInstalledAiAgent(statuses)
+                ? translate(locale, 'onboarding.ai.continue')
+                : translate(locale, 'onboarding.ai.setUpLater')}
             </Button>
           </div>
         </CardFooter>
