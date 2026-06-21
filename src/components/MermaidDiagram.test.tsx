@@ -155,6 +155,40 @@ describe('MermaidDiagram', () => {
     expect(screen.getByText('Employeeclocks in')).not.toHaveAttribute('onclick')
   })
 
+  it('adds explicit centered anchors to Mermaid node labels for WebKit SVG layout', async () => {
+    mermaidMock.render.mockResolvedValueOnce({
+      svg: [
+        '<svg aria-label="Rendered Mermaid">',
+        '<g class="node default">',
+        '<path class="basic label-container outer-path" d="M0,9 a35,9 0,0,0 70,0 l0,60 a35,9 0,0,0 -70,0z" />',
+        '<g class="label">',
+        '<text y="-10.1">',
+        '<tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em">DB Type</tspan>',
+        '<tspan class="text-outer-tspan row" x="0" y="1em" dy="1.1em">rows</tspan>',
+        '</text>',
+        '</g>',
+        '</g>',
+        '</svg>',
+      ].join(''),
+    })
+
+    render(
+      <MermaidDiagram
+        diagram={'flowchart TB\ndb[("DB Type<br/>rows")]'}
+        source={'```mermaid\nflowchart TB\ndb[("DB Type<br/>rows")]\n```'}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram-viewport')).toHaveTextContent('DB Typerows')
+    })
+
+    const label = screen.getByText('DB Type').closest('text')
+    expect(label).toHaveAttribute('text-anchor', 'middle')
+    expect(screen.getByText('DB Type')).toHaveAttribute('text-anchor', 'middle')
+    expect(screen.getByText('rows')).toHaveAttribute('text-anchor', 'middle')
+  })
+
   it('falls back to the original source when Mermaid cannot render', async () => {
     mermaidMock.render.mockRejectedValueOnce(new Error('parse error'))
 

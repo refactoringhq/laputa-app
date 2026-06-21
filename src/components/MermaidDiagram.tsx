@@ -82,6 +82,24 @@ function removeMermaidRenderArtifacts(renderId: string, host: HTMLElement): void
   document.getElementById(`i${renderId}`)?.remove()
 }
 
+function hasSvgParseError(document: Document): boolean {
+  return document.getElementsByTagName('parsererror').length > 0
+}
+
+function centerMermaidNodeLabels(svg: string): string {
+  const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
+  if (hasSvgParseError(parsed)) return svg
+
+  parsed.querySelectorAll('.node .label text, .node text').forEach((label) => {
+    label.setAttribute('text-anchor', 'middle')
+    label.querySelectorAll('tspan').forEach((row) => {
+      row.setAttribute('text-anchor', 'middle')
+    })
+  })
+
+  return new XMLSerializer().serializeToString(parsed.documentElement)
+}
+
 async function renderMermaidDiagram({
   diagram,
   renderId,
@@ -95,7 +113,7 @@ async function renderMermaidDiagram({
     const renderHost = appendMermaidRenderHost()
     try {
       const result = await mermaid.render(renderId, diagram, renderHost)
-      return result.svg
+      return centerMermaidNodeLabels(result.svg)
     } finally {
       removeMermaidRenderArtifacts(renderId, renderHost)
     }

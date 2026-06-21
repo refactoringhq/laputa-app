@@ -37,6 +37,12 @@ const REPORTED_THEME_DIAGRAM = [
   '    class C,D,E,F path;',
   '```',
 ].join('\n')
+const REPORTED_DATABASE_DIAGRAM = [
+  '```mermaid',
+  'flowchart TB',
+  '  app["app<br/>api"] --> db[("DB Type<br/>rows")]',
+  '```',
+].join('\n')
 const SYSTEM_OVERVIEW_DIAGRAM = [
   '```mermaid',
   'flowchart TD',
@@ -117,6 +123,20 @@ test.beforeEach(async ({ page }, testInfo) => {
       '# Mermaid Reported',
       '',
       REPORTED_THEME_DIAGRAM,
+      '',
+    ].join('\n'),
+  )
+  fs.writeFileSync(
+    path.join(tempVaultDir, 'note', 'mermaid-database.md'),
+    [
+      '---',
+      'Status: Active',
+      'Date: 2026-06-21T00:00:00',
+      '---',
+      '',
+      '# Mermaid Database',
+      '',
+      REPORTED_DATABASE_DIAGRAM,
       '',
     ].join('\n'),
   )
@@ -298,6 +318,18 @@ async function labelFitsNode(node: Locator): Promise<boolean> {
   })
 }
 
+async function labelIsHorizontallyCenteredInNode(node: Locator): Promise<boolean> {
+  return node.evaluate((element) => {
+    const shape = element.querySelector<SVGGraphicsElement>('rect, polygon, circle, ellipse, path')!
+    const label = element.querySelector<SVGGraphicsElement | HTMLElement>('.nodeLabel, text')!
+    const shapeBox = shape.getBoundingClientRect()
+    const labelBox = label.getBoundingClientRect()
+    const shapeCenter = shapeBox.left + shapeBox.width / 2
+    const labelCenter = labelBox.left + labelBox.width / 2
+    return Math.abs(shapeCenter - labelCenter) <= 2
+  })
+}
+
 async function readReportedDiagramMetrics(page: Page, diagramIndex: number) {
   const svg = mermaidSvg(page, diagramIndex)
   const scheduledNode = mermaidNode(page, diagramIndex, 'Other path')
@@ -321,6 +353,20 @@ async function readReportedDiagramMetrics(page: Page, diagramIndex: number) {
   }
 }
 
+async function readDatabaseDiagramMetrics(page: Page, diagramIndex: number) {
+  const svg = mermaidSvg(page, diagramIndex)
+  const appNode = mermaidNode(page, diagramIndex, 'app')
+  const databaseNode = mermaidNode(page, diagramIndex, 'DB Type')
+
+  return {
+    rectangleLabelCentered: await labelIsHorizontallyCenteredInNode(appNode),
+    databaseLabelCentered: await labelIsHorizontallyCenteredInNode(databaseNode),
+    databaseLabelFits: await labelFitsNode(databaseNode),
+    foreignObjectCount: await svg.locator('foreignObject').count(),
+    text: await svg.evaluate((element) => element.textContent ?? ''),
+  }
+}
+
 function readNoteBFile(): string {
   return fs.readFileSync(path.join(tempVaultDir, 'note', 'note-b.md'), 'utf8')
 }
@@ -338,6 +384,18 @@ test('Mermaid diagrams render when opening saved notes directly', async ({ page 
     labelsFit: true,
     styleNonce: RUNTIME_STYLE_NONCE,
     text: expect.stringContaining('Linked to a planned shift?'),
+  })
+})
+
+test('Mermaid database node labels stay centered inside cylinders', async ({ page }) => {
+  await openNote(page, 'Mermaid Database')
+  await expectRenderedDiagramCount(page, 1)
+  await expect.poll(() => readDatabaseDiagramMetrics(page, 0)).toMatchObject({
+    rectangleLabelCentered: true,
+    databaseLabelCentered: true,
+    databaseLabelFits: true,
+    foreignObjectCount: 0,
+    text: expect.stringContaining('DB Type'),
   })
 })
 
