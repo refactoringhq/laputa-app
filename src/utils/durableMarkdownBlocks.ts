@@ -66,6 +66,8 @@ interface SerializeDurableBlocksOptions {
   serializeOrdinaryBlocks: (blocks: unknown[]) => string
 }
 
+const MARKDOWN_ACTIVE_URI_CHARACTERS = /[!'()*_~]/gu
+
 export function lineEnding({ line }: MarkdownLine): string {
   if (line.endsWith('\r\n')) return '\r\n'
   return line.endsWith('\n') ? '\n' : ''
@@ -82,7 +84,10 @@ function splitMarkdownLines(markdown: string): string[] {
 }
 
 function encodePayload(payload: unknown): string {
-  return encodeURIComponent(JSON.stringify(payload))
+  return encodeURIComponent(JSON.stringify(payload)).replace(
+    MARKDOWN_ACTIVE_URI_CHARACTERS,
+    character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
 }
 
 function decodePayload(codec: DurableBlockCodec, encoded: string): unknown | null {

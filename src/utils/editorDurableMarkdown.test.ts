@@ -1,4 +1,6 @@
+import { BlockNoteEditor } from '@blocknote/core'
 import { describe, expect, it, vi } from 'vitest'
+import { schema } from '../components/editorSchema'
 import {
   injectDurableEditorMarkdownBlocks,
   preProcessDurableEditorMarkdown,
@@ -41,5 +43,31 @@ describe('editor durable markdown blocks', () => {
     }
 
     expect(serializeDurableEditorBlocks(editor, blocks)).toBe(markdown)
+  })
+
+  it('restores Mermaid placeholders after Markdown-active diagram text passes through BlockNote', async () => {
+    const editor = BlockNoteEditor.create({ schema })
+    const markdown = [
+      '```mermaid',
+      'flowchart TB',
+      '  a["events: run.* thread.* and field_value"] --> b["ok"]',
+      '```',
+    ].join('\n')
+
+    const parsed = await editor.tryParseMarkdownToBlocks(
+      preProcessDurableEditorMarkdown({ markdown }),
+    )
+    const [block] = injectDurableEditorMarkdownBlocks(parsed) as Array<{
+      type: string
+      props?: Record<string, string>
+    }>
+
+    expect(block).toMatchObject({
+      type: MERMAID_BLOCK_TYPE,
+      props: {
+        source: markdown,
+        diagram: 'flowchart TB\n  a["events: run.* thread.* and field_value"] --> b["ok"]\n',
+      },
+    })
   })
 })
