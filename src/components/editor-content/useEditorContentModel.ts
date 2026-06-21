@@ -22,6 +22,7 @@ export interface EditorContentProps {
   diffMode: boolean
   diffContent: string | null
   diffLoading: boolean
+  richEditorContentReady: boolean
   onToggleDiff: () => void
   rawMode: boolean
   onToggleRaw: () => void

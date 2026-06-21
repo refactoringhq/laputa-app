@@ -157,6 +157,10 @@ vi.mock('./tolariaEditorFormatting', () => ({
   TolariaFormattingToolbarController: () => null,
 }))
 
+vi.mock('./SheetEditor', () => ({
+  SheetEditor: ({ path }: { path: string }) => <div data-testid="sheet-editor" data-path={path} />,
+}))
+
 import { Editor } from './Editor'
 import type { VaultEntry } from '../types'
 import { bindVaultConfigStore, resetVaultConfigStore } from '../utils/vaultConfigStore'
@@ -517,6 +521,30 @@ describe('Editor', () => {
     } finally {
       mockEditor.blocksToMarkdownLossy.mockImplementation(originalMarkdownSerializer)
     }
+  })
+
+  it('does not parse active sheets through the hidden rich editor', async () => {
+    const sheetEntry: VaultEntry = {
+      ...mockEntry,
+      path: '/vault/project/model.md',
+      filename: 'model.md',
+      title: 'Model',
+      display: 'sheet',
+    }
+    mockEditor.tryParseMarkdownToBlocks.mockClear()
+
+    renderEditor({
+      tabs: [{
+        entry: sheetEntry,
+        content: '---\n_display: sheet\n---\nMetric,January\nRevenue,1200',
+      }],
+      activeTabPath: sheetEntry.path,
+      entries: [sheetEntry],
+    })
+    await flushEditorSwapWork()
+
+    expect(screen.getByTestId('sheet-editor')).toHaveAttribute('data-path', sheetEntry.path)
+    expect(mockEditor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
   })
 
   it('keeps the rich editor out of spellcheck without disabling IME autocorrection', () => {

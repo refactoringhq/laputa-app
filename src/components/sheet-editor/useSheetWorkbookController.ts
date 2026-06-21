@@ -32,6 +32,7 @@ interface UseSheetWorkbookControllerOptions {
   onContentChange: (path: string, content: string) => void
   path: string
   pendingExternalFormulaCommitRef: MutableRefObject<number>
+  shouldWaitForInitialExternalFormulaResolution?: (workbookAlreadyBuilt: boolean) => boolean
 }
 
 function ensureIronCalcReady(): Promise<void> {
@@ -324,6 +325,43 @@ interface WorkbookBuildLifecycleOptions extends UseSheetWorkbookControllerOption
   workbookRef: MutableRefObject<SheetWorkbookState | null>
 }
 
+function deferInitialWorkbookBuildIfNeeded({
+  content,
+  dirtyBodyRowsRef,
+  dirtyWorkbookGenerationRef,
+  latestContentPathRef,
+  latestContentRef,
+  path,
+  setError,
+  shouldWaitForInitialExternalFormulaResolution,
+  workbookPathRef,
+  workbookRef,
+}: Pick<WorkbookBuildLifecycleOptions,
+  | 'content'
+  | 'dirtyBodyRowsRef'
+  | 'dirtyWorkbookGenerationRef'
+  | 'latestContentPathRef'
+  | 'latestContentRef'
+  | 'path'
+  | 'setError'
+  | 'shouldWaitForInitialExternalFormulaResolution'
+  | 'workbookPathRef'
+  | 'workbookRef'
+>) {
+  if (!shouldWaitForInitialExternalFormulaResolution?.(workbookRef.current !== null)) return false
+  setError(null)
+  syncIncomingWorkbookContent({
+    content,
+    dirtyBodyRowsRef,
+    dirtyWorkbookGenerationRef,
+    latestContentPathRef,
+    latestContentRef,
+    path,
+    workbookPathRef,
+  })
+  return true
+}
+
 function runWorkbookBuildLifecycle({
   cancelScheduledSerialize,
   content,
@@ -340,11 +378,17 @@ function runWorkbookBuildLifecycle({
   serializeCurrentWorkbook,
   setError,
   setWorkbook,
+  shouldWaitForInitialExternalFormulaResolution,
   trackedOpenPathRef,
   workbookGenerationRef,
   workbookPathRef,
   workbookRef,
 }: WorkbookBuildLifecycleOptions) {
+  if (deferInitialWorkbookBuildIfNeeded({
+    content, dirtyBodyRowsRef, dirtyWorkbookGenerationRef, latestContentPathRef, latestContentRef, path, setError,
+    shouldWaitForInitialExternalFormulaResolution, workbookPathRef, workbookRef,
+  })) return undefined
+
   cancelScheduledSerialize()
   serializeCurrentWorkbook()
   pendingExternalFormulaCommitRef.current += 1
@@ -387,70 +431,22 @@ function runWorkbookBuildLifecycle({
 
 function useWorkbookBuildLifecycle(options: WorkbookBuildLifecycleOptions) {
   const {
-    cancelScheduledSerialize,
-    content,
-    dirtyBodyRowsRef,
-    dirtyWorkbookGenerationRef,
-    externalFormulaContextForBuild,
-    lastEmittedContentRef,
-    lastEmittedPathRef,
-    latestContentPathRef,
-    latestContentRef,
-    nativeExternalFormulaInputsForBuild,
-    onContentChange,
-    path,
-    pendingExternalFormulaCommitRef,
-    serializeCurrentWorkbook,
-    setError,
-    setWorkbook,
-    trackedOpenPathRef,
-    workbookGenerationRef,
-    workbookPathRef,
-    workbookRef,
+    cancelScheduledSerialize, content, dirtyBodyRowsRef, dirtyWorkbookGenerationRef, externalFormulaContextForBuild,
+    lastEmittedContentRef, lastEmittedPathRef, latestContentPathRef, latestContentRef, nativeExternalFormulaInputsForBuild,
+    onContentChange, path, pendingExternalFormulaCommitRef, serializeCurrentWorkbook, setError, setWorkbook,
+    shouldWaitForInitialExternalFormulaResolution, trackedOpenPathRef, workbookGenerationRef, workbookPathRef, workbookRef,
   } = options
 
   useEffect(() => runWorkbookBuildLifecycle({
-    cancelScheduledSerialize,
-    content,
-    dirtyBodyRowsRef,
-    dirtyWorkbookGenerationRef,
-    externalFormulaContextForBuild,
-    lastEmittedContentRef,
-    lastEmittedPathRef,
-    latestContentPathRef,
-    latestContentRef,
-    nativeExternalFormulaInputsForBuild,
-    onContentChange,
-    path,
-    pendingExternalFormulaCommitRef,
-    serializeCurrentWorkbook,
-    setError,
-    setWorkbook,
-    trackedOpenPathRef,
-    workbookGenerationRef,
-    workbookPathRef,
-    workbookRef,
+    cancelScheduledSerialize, content, dirtyBodyRowsRef, dirtyWorkbookGenerationRef, externalFormulaContextForBuild,
+    lastEmittedContentRef, lastEmittedPathRef, latestContentPathRef, latestContentRef, nativeExternalFormulaInputsForBuild,
+    onContentChange, path, pendingExternalFormulaCommitRef, serializeCurrentWorkbook, setError, setWorkbook,
+    shouldWaitForInitialExternalFormulaResolution, trackedOpenPathRef, workbookGenerationRef, workbookPathRef, workbookRef,
   }), [
-    cancelScheduledSerialize,
-    content,
-    dirtyBodyRowsRef,
-    dirtyWorkbookGenerationRef,
-    externalFormulaContextForBuild,
-    lastEmittedContentRef,
-    lastEmittedPathRef,
-    latestContentPathRef,
-    latestContentRef,
-    nativeExternalFormulaInputsForBuild,
-    onContentChange,
-    path,
-    pendingExternalFormulaCommitRef,
-    serializeCurrentWorkbook,
-    setError,
-    setWorkbook,
-    trackedOpenPathRef,
-    workbookGenerationRef,
-    workbookPathRef,
-    workbookRef,
+    cancelScheduledSerialize, content, dirtyBodyRowsRef, dirtyWorkbookGenerationRef, externalFormulaContextForBuild,
+    lastEmittedContentRef, lastEmittedPathRef, latestContentPathRef, latestContentRef, nativeExternalFormulaInputsForBuild,
+    onContentChange, path, pendingExternalFormulaCommitRef, serializeCurrentWorkbook, setError, setWorkbook,
+    shouldWaitForInitialExternalFormulaResolution, trackedOpenPathRef, workbookGenerationRef, workbookPathRef, workbookRef,
   ])
 }
 
@@ -522,6 +518,7 @@ export function useSheetWorkbookController({
   onContentChange,
   path,
   pendingExternalFormulaCommitRef,
+  shouldWaitForInitialExternalFormulaResolution,
 }: UseSheetWorkbookControllerOptions) {
   const [workbook, setWorkbook] = useState<SheetWorkbookState | null>(null), [error, setError] = useState<string | null>(null)
   const dirtyBodyRowsRef = useRef<SheetBodyDirtyRows>(null), dirtyWorkbookGenerationRef = useRef<number | null>(null)
@@ -546,7 +543,7 @@ export function useSheetWorkbookController({
     cancelScheduledSerialize, content, dirtyBodyRowsRef, dirtyWorkbookGenerationRef, externalFormulaContextForBuild,
     lastEmittedContentRef, lastEmittedPathRef, latestContentPathRef, latestContentRef, nativeExternalFormulaInputsForBuild,
     onContentChange, path, pendingExternalFormulaCommitRef, serializeCurrentWorkbook, setError, setWorkbook,
-    trackedOpenPathRef, workbookGenerationRef, workbookPathRef, workbookRef,
+    shouldWaitForInitialExternalFormulaResolution, trackedOpenPathRef, workbookGenerationRef, workbookPathRef, workbookRef,
   })
 
   useWorkbookCleanup({

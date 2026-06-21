@@ -51,6 +51,7 @@ function createModel(overrides: Record<string, unknown> = {}) {
     diffMode: false,
     diffContent: null,
     diffLoading: false,
+    richEditorContentReady: true,
     onToggleDiff: vi.fn(),
     effectiveRawMode: false,
     onToggleRaw: vi.fn(),
@@ -108,6 +109,28 @@ describe('EditorContentLayout', () => {
 
     expect(container.querySelector('.animate-pulse')).not.toBeNull()
     expect(screen.queryByTestId('title-field-input')).not.toBeInTheDocument()
+  })
+
+  it('keeps stale rich-editor content hidden until the selected note swap is applied', () => {
+    const { container } = render(
+      <EditorContentLayout
+        {...createModel({
+          richEditorContentReady: false,
+          activeTab: {
+            entry: {
+              path: '/vault/project/new-note.md',
+              filename: 'new-note.md',
+              title: 'New Note',
+            },
+            content: '# New Note',
+          },
+        })}
+      />,
+    )
+
+    expect(screen.queryByTestId('single-editor-view')).not.toBeInTheDocument()
+    expect(container.querySelector('.animate-pulse')).not.toBeNull()
+    expect(screen.getByTestId('breadcrumb-bar')).toHaveAttribute('data-content', '# New Note')
   })
 
   it('marks the editor content root and breadcrumb with the note width mode', () => {

@@ -46,6 +46,7 @@ import {
   type SwapToken,
 } from './editorSwapToken'
 import { useParsedBlockPreload } from './editorParsedBlockPreload'
+import { useEditorContentPathSignal } from './useEditorContentPathSignal'
 export { extractEditorBody, getH1TextFromBlocks, replaceTitleInFrontmatter } from './editorTabContent'
 export { RICH_EDITOR_CHANGE_DEBOUNCE_MS } from './editorChangeDebounce'
 
@@ -1133,6 +1134,7 @@ export function useEditorTabSwap({ tabs, activeTabPath, editor, onContentChange,
   const pendingLocalContentRef = useRef<PendingLocalContent | null>(null)
   const prevActivePathRef = useRef<string | null>(null)
   const activeTabPathLatestRef = useLatestRef(activeTabPath)
+  const editorContentSignal = useEditorContentPathSignal()
   const editorContentPathRef = useRef<string | null>(null)
   const editorMountedRef = useRef(false)
   const pendingSwapRef = useRef<(() => void) | null>(null)
@@ -1185,5 +1187,11 @@ export function useEditorTabSwap({ tabs, activeTabPath, editor, onContentChange,
     flushPendingEditorChange,
   })
 
-  return { handleEditorChange: handleForegroundEditorChange, flushPendingEditorChange, editorMountedRef }
+  return {
+    editorContentPath: editorContentSignal.path,
+    editorContentVersion: editorContentSignal.version,
+    handleEditorChange: handleForegroundEditorChange,
+    flushPendingEditorChange,
+    editorMountedRef,
+  }
 }

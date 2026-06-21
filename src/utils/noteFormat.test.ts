@@ -4,6 +4,7 @@ import {
   NOTE_FORMAT_TEXT,
   contentHasDisplayMetadata,
   contentHasSheetFormat,
+  noteDisplaysAsSheet,
   noteFormatFromContent,
 } from './noteFormat'
 
@@ -26,5 +27,28 @@ describe('noteFormat', () => {
 
   it('prefers _display when both display markers are present', () => {
     expect(noteFormatFromContent('---\n_display: text\n_format: sheet\n---\nMetric,January')).toBe(NOTE_FORMAT_TEXT)
+  })
+
+  it('resolves sheet display from content before entry metadata', () => {
+    expect(noteDisplaysAsSheet({
+      content: '---\n_display: sheet\n---\nMetric,January',
+      display: 'text',
+    })).toBe(true)
+    expect(noteDisplaysAsSheet({
+      content: '---\n_display: text\n---\nMetric,January',
+      display: 'sheet',
+    })).toBe(false)
+  })
+
+  it('falls back to entry display metadata when content has no display marker', () => {
+    expect(noteDisplaysAsSheet({
+      content: '---\ntype: Project\n---\nMetric,January',
+      display: 'sheet',
+    })).toBe(true)
+    expect(noteDisplaysAsSheet({
+      content: '---\ntype: Project\n---\nMetric,January',
+      display: 'sheet',
+      fileKind: 'binary',
+    })).toBe(false)
   })
 })

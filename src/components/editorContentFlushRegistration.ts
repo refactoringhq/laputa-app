@@ -1,8 +1,9 @@
 import { useCallback, useEffect } from 'react'
 import type React from 'react'
+import { noteDisplaysAsSheet } from '../utils/noteFormat'
 
 type Tab = {
-  entry: { path: string }
+  entry: { path: string; display?: unknown; fileKind?: string | null }
   content: string
 }
 
@@ -42,7 +43,14 @@ function useRegisterRichContentFlush({
 }) {
   const flushPendingEditorContent = useCallback((path: string) => {
     if (!activeTab || activeTab.entry.path !== path) return
-    sheetFlushRef?.current?.(path)
+    if (noteDisplaysAsSheet({
+      content: activeTab.content,
+      display: activeTab.entry.display,
+      fileKind: activeTab.entry.fileKind,
+    })) {
+      sheetFlushRef?.current?.(path)
+      return
+    }
     flushPendingEditorChange()
   }, [activeTab, flushPendingEditorChange, sheetFlushRef])
 

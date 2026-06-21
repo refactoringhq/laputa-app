@@ -4,6 +4,22 @@ import { SheetEditor } from './SheetEditor'
 import { cacheNoteContent, clearNoteContentCache } from '../hooks/noteContentCache'
 import type { VaultEntry } from '../types'
 
+const nativeWorkerMock = vi.hoisted(() => ({
+  canUse: false,
+  resolve: vi.fn(async () => new Map()),
+}))
+
+vi.mock('../utils/sheetExternalFormulaWorker', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/sheetExternalFormulaWorker')>()
+  return {
+    ...actual,
+    canUseNativeSheetFormulaWorker: () => nativeWorkerMock.canUse,
+    resolveExternalFormulaInputsWithNativeWorker: (...args: Parameters<typeof actual.resolveExternalFormulaInputsWithNativeWorker>) => (
+      nativeWorkerMock.resolve(...args)
+    ),
+  }
+})
+
 interface MockCellStyle {
   alignment?: {
     horizontal?: string
@@ -432,6 +448,16 @@ function createClipboardData(): DataTransfer {
   }
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+  return { promise, reject, resolve }
+}
+
 async function openFormulaAutocomplete(value = '=su'): Promise<HTMLInputElement> {
   render(
     <SheetEditor
@@ -479,6 +505,9 @@ describe('SheetEditor', () => {
       top_row: 1,
     }
     ironCalcMock.state.workbookRenders = 0
+    nativeWorkerMock.canUse = false
+    nativeWorkerMock.resolve.mockReset()
+    nativeWorkerMock.resolve.mockResolvedValue(new Map())
     document.documentElement.style.removeProperty('zoom')
     clearNoteContentCache()
   })
@@ -1237,6 +1266,44 @@ describe('SheetEditor', () => {
       expect(ironCalcMock.state.lastModel?.getCellContent(0, 2, 1)).toBe('=[[revenue-sheet]].B3+5')
     })
     expect(ironCalcMock.state.lastModel?.getFormattedCellValue(0, 2, 1)).toBe('1305')
+  })
+
+  it('keeps the initial workbook hidden while native external formula resolution is pending', async () => {
+    nativeWorkerMock.canUse = true
+    const targetEntry = makeEntry({
+      path: '/vault/revenue-sheet.md',
+      filename: 'revenue-sheet.md',
+      title: 'Revenue Sheet',
+      isA: 'Sheet',
+    })
+    cacheNoteContent(targetEntry.path, '---\ntype: Sheet\n---\nMetric,January\nRevenue,1200', targetEntry)
+    const pendingResolution = deferred<Map<string, { evaluated: string; source: string }>>()
+    nativeWorkerMock.resolve.mockReturnValueOnce(pendingResolution.promise)
+
+    render(
+      <SheetEditor
+        content={'---\ntype: Sheet\n---\n=[[revenue-sheet]].B2'}
+        entries={[targetEntry]}
+        path="/vault/budget.md"
+        sourceEntry={makeEntry({ path: '/vault/budget.md', filename: 'budget.md', title: 'Budget', isA: 'Sheet' })}
+        onContentChange={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(nativeWorkerMock.resolve).toHaveBeenCalled()
+    })
+    expect(screen.queryByTestId('ironcalc-workbook')).not.toBeInTheDocument()
+
+    await act(async () => {
+      pendingResolution.resolve(new Map([
+        ['A1', { evaluated: '=1200', source: '=[[revenue-sheet]].B2' }],
+      ]))
+    })
+
+    await screen.findByTestId('ironcalc-workbook')
+    expect(ironCalcMock.state.lastModel?.getCellContent(0, 1, 1)).toBe('=[[revenue-sheet]].B2')
+    expect(ironCalcMock.state.lastModel?.getFormattedCellValue(0, 1, 1)).toBe('1200')
   })
 
   it('rebuilds external sheet formulas when a referenced sheet body is loaded', async () => {

@@ -12,6 +12,7 @@ import {
   type SheetExternalFormulaInput,
   type SheetExternalFormulaWorkerDependency,
 } from '../../utils/sheetExternalFormulaWorker'
+import { shouldWaitForInitialSheetExternalFormulaResolution } from '../../utils/sheetInitialWorkbookReadiness'
 import {
   MAX_EXTERNAL_FORMULA_DEPTH,
   resolveExternalSheetDependencyEntries,
@@ -213,7 +214,7 @@ function useExternalSheetContents({
     [contentsByPath, sheetEntries],
   )
 
-  return { contentsByPath, dependencies }
+  return { contentsByPath, dependencies, dependencyCount: sheetEntries.length }
 }
 
 function useNativeExternalFormulaResolution({
@@ -298,8 +299,9 @@ function useBuildLiveExternalFormulaContext({
 
 export function useSheetExternalFormulaResolution(options: UseSheetExternalFormulaResolutionOptions) {
   const { content, entries, path, sourceEntry } = options
-  const { contentsByPath, dependencies } = useExternalSheetContents(options)
+  const { contentsByPath, dependencies, dependencyCount } = useExternalSheetContents(options)
   const hasExternalFormulaReferences = useMemo(() => sheetHasExternalFormulaReferences(content), [content])
+  const nativeWorkerEnabled = canResolveNativeExternalFormulas(hasExternalFormulaReferences)
   const nativeSignature = useMemo(() => sheetExternalFormulaWorkerSignature({
     content,
     dependencies,
@@ -323,10 +325,29 @@ export function useSheetExternalFormulaResolution(options: UseSheetExternalFormu
     nativeResolution,
     nativeSignature,
   )
+  const shouldWaitForInitialExternalFormulaResolution = useCallback((workbookAlreadyBuilt: boolean) => (
+    shouldWaitForInitialSheetExternalFormulaResolution({
+      dependencyCount,
+      hasExternalFormulaReferences,
+      nativeWorkerEnabled,
+      resolution: nativeResolution,
+      resolvedDependencyCount: dependencies.length,
+      signature: nativeSignature,
+      workbookAlreadyBuilt,
+    })
+  ), [
+    dependencies.length,
+    dependencyCount,
+    hasExternalFormulaReferences,
+    nativeResolution,
+    nativeSignature,
+    nativeWorkerEnabled,
+  ])
 
   return {
     buildLiveExternalFormulaContext: useBuildLiveExternalFormulaContext({ contentsByPath, entries, path, sourceEntry }),
     externalFormulaContextForBuild: shouldUseJsResolver ? externalFormulaContext : undefined,
     nativeExternalFormulaInputsForBuild,
+    shouldWaitForInitialExternalFormulaResolution,
   }
 }

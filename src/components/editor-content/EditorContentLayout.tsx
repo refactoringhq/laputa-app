@@ -371,6 +371,7 @@ function EditorChrome({
 function EditorCanvas({
   showEditor,
   isSheet,
+  richEditorContentReady,
   cssVars,
   editor,
   activeTab,
@@ -386,6 +387,7 @@ function EditorCanvas({
   EditorContentModel,
   | 'showEditor'
   | 'isSheet'
+  | 'richEditorContentReady'
   | 'cssVars'
   | 'editor'
   | 'activeTab'
@@ -399,6 +401,7 @@ function EditorCanvas({
   | 'locale'
 >) {
   if (!showEditor) return null
+  if (!isSheet && !richEditorContentReady) return null
 
   if (isSheet && activeTab) {
     return (
@@ -478,6 +481,21 @@ function EditorFindScope({
   )
 }
 
+function shouldShowEditorLoadingContent({
+  activeTab,
+  isLoadingNewTab,
+  isSheet,
+  isVaultLoading,
+  richEditorContentReady,
+  showEditor,
+}: Pick<EditorContentModel, 'activeTab' | 'isLoadingNewTab' | 'isSheet' | 'isVaultLoading' | 'richEditorContentReady' | 'showEditor'>) {
+  if (isVaultLoading) return true
+  if (!showEditor) return false
+  if (isLoadingNewTab) return true
+
+  return !isSheet && !!activeTab && !richEditorContentReady
+}
+
 export function EditorContentLayout(model: EditorContentModel) {
   const {
     activeTab,
@@ -509,6 +527,7 @@ export function EditorContentLayout(model: EditorContentModel) {
     rawModeContent,
     noteWidth,
     isSheet,
+    richEditorContentReady,
     findRequest,
     locale,
     isVaultLoading,
@@ -521,7 +540,14 @@ export function EditorContentLayout(model: EditorContentModel) {
   const chromePath = chromeTab?.entry.path ?? path
   const chromeWordCount = activeTab ? wordCount : 0
   const showActiveContent = activeTab && !isVaultLoading
-  const showLoadingContent = isVaultLoading || (isLoadingNewTab && showEditor)
+  const showLoadingContent = shouldShowEditorLoadingContent({
+    activeTab,
+    isLoadingNewTab,
+    isSheet,
+    isVaultLoading,
+    richEditorContentReady,
+    showEditor,
+  })
   const breadcrumbActions = buildBreadcrumbActions(model)
 
   return (
@@ -563,6 +589,7 @@ export function EditorContentLayout(model: EditorContentModel) {
           />
           <EditorCanvas
             showEditor={showEditor}
+            richEditorContentReady={richEditorContentReady}
             cssVars={cssVars}
             activeTab={activeTab}
             vaultPath={vaultPath}

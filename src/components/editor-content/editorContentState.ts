@@ -1,6 +1,6 @@
 import type { NoteStatus, VaultEntry } from '../../types'
 import { extractH1TitleFromContent } from '../../utils/noteTitle'
-import { contentHasDisplayMetadata, contentHasSheetFormat, normalizeNoteFormat } from '../../utils/noteFormat'
+import { noteDisplaysAsSheet } from '../../utils/noteFormat'
 import { countWords } from '../../utils/wikilinks'
 
 export interface EditorContentTab {
@@ -64,14 +64,13 @@ function resolveHasH1(activeTab: EditorContentTab | null, freshEntry: VaultEntry
   return contentHasTopLevelH1(activeTab) || freshEntry?.hasH1 === true || activeTab?.entry.hasH1 === true
 }
 
-function entryHasSheetDisplay(entry: VaultEntry | undefined): boolean {
-  return normalizeNoteFormat(entry?.display) === 'sheet'
-}
-
 function resolveIsSheet(activeTab: EditorContentTab | null, freshEntry: VaultEntry | undefined): boolean {
-  if (!activeTab || activeTab.entry.fileKind === 'binary') return false
-  if (contentHasDisplayMetadata(activeTab.content)) return contentHasSheetFormat(activeTab.content)
-  return entryHasSheetDisplay(freshEntry) || entryHasSheetDisplay(activeTab.entry)
+  if (!activeTab) return false
+  return noteDisplaysAsSheet({
+    content: activeTab.content,
+    display: freshEntry?.display ?? activeTab.entry.display,
+    fileKind: activeTab.entry.fileKind,
+  })
 }
 
 function deriveVisibilityState(input: {

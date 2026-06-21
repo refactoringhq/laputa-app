@@ -86,6 +86,7 @@ function useSheetEditorWorkbookRuntime({
     buildLiveExternalFormulaContext,
     externalFormulaContextForBuild,
     nativeExternalFormulaInputsForBuild,
+    shouldWaitForInitialExternalFormulaResolution,
   } = useSheetExternalFormulaResolution({
     content,
     entries,
@@ -100,6 +101,7 @@ function useSheetEditorWorkbookRuntime({
     onContentChange,
     path,
     pendingExternalFormulaCommitRef,
+    shouldWaitForInitialExternalFormulaResolution,
   })
   const scheduleSelectionChromePatch = useSheetSelectionChrome({
     refreshWorkbook: workbookRuntime.refreshWorkbook,

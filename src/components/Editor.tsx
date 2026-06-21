@@ -25,7 +25,6 @@ import { schema } from './editorSchema'
 import { useRightPanelExclusion } from './useRightPanelExclusion'
 import type { RawEditorFindRequest } from './RawEditorFindBar'
 import {
-  applyPendingRawExitContent,
   resolvePendingRawExitContent,
   resolveRawModeContent,
 } from './editorRawModeSync'
@@ -38,6 +37,10 @@ import { createRichEditorTransformErrorRecoveryExtension } from './richEditorTra
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
 import { useEditorPdfExport } from './useEditorPdfExport'
 import type { NotePdfExportSource } from '../utils/notePdfExport'
+import {
+  useRichEditorContentReadiness,
+  useRichEditorSheetSwapState,
+} from './useRichEditorSheetTransition'
 import './Editor.css'
 import './EditorTheme.css'
 
@@ -248,7 +251,6 @@ function useEditorSetup({
     vaultPath,
     flushPendingEditorChangeRef,
   )
-  const tabsForEditorSwap = applyPendingRawExitContent(tabs, pendingRawExitContent)
   const rawModeContent = resolveRawModeContent({ activeTab, rawModeContentOverride })
 
   useEffect(() => {
@@ -259,8 +261,34 @@ function useEditorSetup({
     }))
   }, [activeTabPath, setPendingRawExitContent, tabs])
 
-  const { handleEditorChange, flushPendingEditorChange, editorMountedRef } = useEditorTabSwap({
-    tabs: tabsForEditorSwap, activeTabPath, editor, onContentChange, rawMode, vaultPath,
+  const {
+    activeTabIsSheet,
+    richEditorActiveTabPath,
+    tabsForEditorSwap,
+  } = useRichEditorSheetSwapState({
+    activeTab,
+    activeTabPath,
+    tabs,
+    pendingRawExitContent,
+  })
+
+  const {
+    editorContentPath,
+    handleEditorChange,
+    flushPendingEditorChange,
+    editorMountedRef,
+  } = useEditorTabSwap({
+    tabs: tabsForEditorSwap,
+    activeTabPath: richEditorActiveTabPath,
+    editor,
+    onContentChange,
+    rawMode,
+    vaultPath,
+  })
+  const richEditorContentReady = useRichEditorContentReadiness({
+    activeTab,
+    activeTabIsSheet,
+    editorContentPath,
   })
   useEffect(() => {
     flushPendingEditorChangeRef.current = flushPendingEditorChange
@@ -293,7 +321,7 @@ function useEditorSetup({
     rawMode, diffMode, diffContent, diffLoading,
     handleToggleDiffExclusive, handleToggleRawExclusive,
     handleEditorChange, flushPendingEditorChange, handleViewCommitDiff,
-    isLoadingNewTab, activeStatus, showDiffToggle, sheetFlushRef,
+    isLoadingNewTab, activeStatus, showDiffToggle, sheetFlushRef, richEditorContentReady,
   }
 }
 
@@ -345,6 +373,7 @@ function EditorLayout({
   diffMode,
   diffContent,
   diffLoading,
+  richEditorContentReady,
   handleToggleDiffExclusive,
   rawMode,
   handleToggleRawExclusive,
@@ -421,6 +450,7 @@ function EditorLayout({
   diffMode: boolean
   diffContent: string | null
   diffLoading: boolean
+  richEditorContentReady: boolean
   handleToggleDiffExclusive: () => void | Promise<void>
   rawMode: boolean
   handleToggleRawExclusive: () => void
@@ -517,6 +547,7 @@ function EditorLayout({
               diffMode={diffMode}
               diffContent={diffContent}
               diffLoading={diffLoading}
+              richEditorContentReady={richEditorContentReady}
               onToggleDiff={handleToggleDiffExclusive}
               rawMode={rawMode}
               onToggleRaw={handleToggleRawExclusive}

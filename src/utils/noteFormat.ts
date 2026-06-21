@@ -45,3 +45,15 @@ export function contentHasDisplayMetadata(content: string | null | undefined): b
 export function contentHasSheetFormat(content: string | null | undefined): boolean {
   return noteFormatFromContent(content) === NOTE_FORMAT_SHEET
 }
+
+export function noteDisplaysAsSheet(input: {
+  content?: string | null
+  display?: unknown
+  fileKind?: string | null
+}): boolean {
+  if (input.fileKind === 'binary') return false
+  if (contentHasDisplayMetadata(input.content)) {
+    return contentHasSheetFormat(input.content)
+  }
+  return normalizeNoteFormat(input.display) === NOTE_DISPLAY_SHEET
+}
