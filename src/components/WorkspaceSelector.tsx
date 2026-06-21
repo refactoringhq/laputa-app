@@ -1,9 +1,9 @@
 import { CaretUpDown, Check, Cube } from '@phosphor-icons/react'
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { WorkspaceIdentity } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../lib/i18n'
 import { PROPERTY_CHIP_STYLE } from './propertyChipStyles'
@@ -14,7 +14,7 @@ import {
 } from './propertyPanelLayout'
 
 const MIN_POPOVER_WIDTH = 220
-const OPEN_COMBOBOX_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Enter', ' '])
+const OPEN_COMBOBOX_KEYS = new Set(['ArrowDown', 'ArrowUp'])
 
 interface WorkspaceSelectorProps {
   currentWorkspace?: WorkspaceIdentity | null
@@ -189,7 +189,7 @@ function EditableWorkspaceSelector({
   const [query, setQuery] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const [contentWidth, setContentWidth] = useState(MIN_POPOVER_WIDTH)
-  const rootRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const listboxId = useId()
@@ -256,12 +256,6 @@ function EditableWorkspaceSelector({
     })
   }
 
-  const handleTriggerPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return
-    event.preventDefault()
-    openCombobox()
-  }
-
   const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!shouldOpenCombobox(event)) return
     event.preventDefault()
@@ -309,36 +303,34 @@ function EditableWorkspaceSelector({
       <WorkspaceRowLabel locale={locale} />
       <div className="flex min-w-0 items-center justify-start">
         <Popover open={open} onOpenChange={handleOpenChange}>
-          <PopoverAnchor asChild>
-            <div ref={rootRef} className="min-w-0">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                role="combobox"
-                aria-label={currentWorkspace.label}
-                aria-controls={listboxId}
-                aria-expanded={open}
-                aria-haspopup="listbox"
-                className={cn(
-                  'h-auto max-w-full justify-between gap-1 border-none px-2 shadow-none ring-inset [&_svg]:text-current',
-                  'hover:ring-1 hover:ring-current',
-                )}
-                style={{
-                  ...PROPERTY_CHIP_STYLE,
-                  background: workspaceLightColor(currentWorkspace) ?? undefined,
-                  color: workspaceColor(currentWorkspace) ?? undefined,
-                }}
-                onPointerDown={handleTriggerPointerDown}
-                onKeyDown={handleTriggerKeyDown}
-              >
-                <span className="flex min-w-0 items-center truncate">
-                  <WorkspaceSelectorValue currentWorkspace={currentWorkspace} locale={locale} />
-                </span>
-                <CaretUpDown size={14} aria-hidden="true" />
-              </Button>
-            </div>
-          </PopoverAnchor>
+          <PopoverTrigger asChild>
+            <Button
+              ref={rootRef}
+              type="button"
+              variant="ghost"
+              size="sm"
+              role="combobox"
+              aria-label={currentWorkspace.label}
+              aria-controls={listboxId}
+              aria-expanded={open}
+              aria-haspopup="listbox"
+              className={cn(
+                'h-auto max-w-full justify-between gap-1 border-none px-2 shadow-none ring-inset [&_svg]:text-current',
+                'hover:ring-1 hover:ring-current',
+              )}
+              style={{
+                ...PROPERTY_CHIP_STYLE,
+                background: workspaceLightColor(currentWorkspace) ?? undefined,
+                color: workspaceColor(currentWorkspace) ?? undefined,
+              }}
+              onKeyDown={handleTriggerKeyDown}
+            >
+              <span className="flex min-w-0 items-center truncate">
+                <WorkspaceSelectorValue currentWorkspace={currentWorkspace} locale={locale} />
+              </span>
+              <CaretUpDown size={14} aria-hidden="true" />
+            </Button>
+          </PopoverTrigger>
           <PopoverContent
             align="start"
             side="left"

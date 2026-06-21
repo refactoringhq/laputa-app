@@ -229,7 +229,7 @@ Status: Evergreened
       onChangeWorkspace,
     })
 
-    fireEvent.pointerDown(screen.getByRole('combobox', { name: 'Laputa' }), { button: 0, pointerType: 'mouse' })
+    fireEvent.click(screen.getByRole('combobox', { name: 'Laputa' }))
     fireEvent.click(screen.getByRole('option', { name: 'Refactoring' }))
 
     expect(onChangeWorkspace).toHaveBeenCalledWith(

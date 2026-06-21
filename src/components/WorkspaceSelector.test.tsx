@@ -44,7 +44,7 @@ function renderWorkspaceSelector(overrides: Partial<ComponentProps<typeof Worksp
 }
 
 function openWorkspaceCombobox() {
-  fireEvent.pointerDown(screen.getByRole('combobox'), { button: 0, pointerType: 'mouse' })
+  fireEvent.click(screen.getByRole('combobox'))
 }
 
 describe('WorkspaceSelector', () => {
@@ -55,6 +55,14 @@ describe('WorkspaceSelector', () => {
     const trigger = screen.getByRole('combobox', { name: /personal/i })
     expect(trigger.getAttribute('style')).toContain('color: var(--accent-green)')
     expect(trigger.getAttribute('style')).toContain('background: var(--accent-green-light)')
+  })
+
+  it('keeps the workspace dropdown open after clicking the trigger', () => {
+    renderWorkspaceSelector()
+
+    fireEvent.click(screen.getByRole('combobox', { name: /personal/i }))
+
+    expect(screen.getByTestId('workspace-selector-search-input')).toBeInTheDocument()
   })
 
   it('filters workspaces and selects a different workspace', () => {
