@@ -1,9 +1,9 @@
 import { CaretUpDown, Check, StackSimple, WarningCircle } from '@phosphor-icons/react'
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { FrontmatterValue } from './Inspector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
@@ -41,9 +41,7 @@ function buildTypeOptions({
   query: string
 }) {
   const normalized = normalizeTypeQuery({ query })
-  const types = currentType && !availableTypes.includes(currentType)
-    ? [...availableTypes, currentType]
-    : [...availableTypes]
+  const types = Array.from(new Set(currentType ? [...availableTypes, currentType] : availableTypes))
   const sortedTypes = types.sort((left, right) => left.localeCompare(right))
   const filteredTypes = sortedTypes.filter((type) => normalized === '' || type.toLowerCase().includes(normalized))
 
@@ -291,7 +289,7 @@ function EditableTypeSelector({
   const [query, setQuery] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const [contentWidth, setContentWidth] = useState(MIN_POPOVER_WIDTH)
-  const rootRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const listboxId = useId()
@@ -356,12 +354,6 @@ function EditableTypeSelector({
     })
   }
 
-  const handleTriggerPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return
-    event.preventDefault()
-    openCombobox()
-  }
-
   const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!shouldOpenCombobox(event)) return
     event.preventDefault()
@@ -407,35 +399,33 @@ function EditableTypeSelector({
       <TypeRowLabel />
       <TypeRowValue missingTypeName={missingTypeName} locale={locale} onCreateMissingType={onCreateMissingType}>
         <Popover open={open} onOpenChange={handleOpenChange}>
-          <PopoverAnchor asChild>
-            <div ref={rootRef} className="min-w-0">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                role="combobox"
-                aria-controls={listboxId}
-                aria-expanded={open}
-                aria-haspopup="listbox"
-                className={cn(
-                  'h-auto max-w-full justify-between gap-1 border-none px-2 shadow-none ring-inset [&_svg]:text-current',
-                  isA ? 'hover:ring-1 hover:ring-current' : 'bg-muted hover:bg-muted/80',
-                )}
-                style={{
-                  ...PROPERTY_CHIP_STYLE,
-                  background: typeLightColor ?? undefined,
-                  color: typeColor ?? undefined,
-                }}
-                onPointerDown={handleTriggerPointerDown}
-                onKeyDown={handleTriggerKeyDown}
-              >
-                <span className="flex min-w-0 items-center gap-1 truncate">
-                  <TypeSelectorValue isA={isA} typeColorKeys={typeColorKeys} typeIconKeys={typeIconKeys} locale={locale} />
-                </span>
-                <CaretUpDown size={14} aria-hidden="true" />
-              </Button>
-            </div>
-          </PopoverAnchor>
+          <PopoverTrigger asChild>
+            <Button
+              ref={rootRef}
+              type="button"
+              variant="ghost"
+              size="sm"
+              role="combobox"
+              aria-controls={listboxId}
+              aria-expanded={open}
+              aria-haspopup="listbox"
+              className={cn(
+                'h-auto max-w-full justify-between gap-1 border-none px-2 shadow-none ring-inset [&_svg]:text-current',
+                isA ? 'hover:ring-1 hover:ring-current' : 'bg-muted hover:bg-muted/80',
+              )}
+              style={{
+                ...PROPERTY_CHIP_STYLE,
+                background: typeLightColor ?? undefined,
+                color: typeColor ?? undefined,
+              }}
+              onKeyDown={handleTriggerKeyDown}
+            >
+              <span className="flex min-w-0 items-center gap-1 truncate">
+                <TypeSelectorValue isA={isA} typeColorKeys={typeColorKeys} typeIconKeys={typeIconKeys} locale={locale} />
+              </span>
+              <CaretUpDown size={14} aria-hidden="true" />
+            </Button>
+          </PopoverTrigger>
           <PopoverContent
             align="start"
             side="left"

@@ -73,6 +73,7 @@ describe('usePropertyPanelState', () => {
     const entries = [
       makeEntry({ title: 'Topic', isA: 'Type', color: '#334455', icon: 'book' }),
       makeEntry({ title: 'Project', isA: 'Type', color: '#112233', icon: 'rocket' }),
+      makeEntry({ path: '/other-vault/project.md', title: 'Project', isA: 'Type', color: '#556677', icon: 'briefcase' }),
       makeEntry({
         title: 'Alpha',
         status: 'Doing',

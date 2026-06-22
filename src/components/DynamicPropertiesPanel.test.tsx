@@ -378,7 +378,7 @@ describe('DynamicPropertiesPanel', () => {
 
     it('shows available types in dropdown', () => {
       renderPanel({ entries: typeEntries, onUpdateProperty })
-      fireEvent.pointerDown(screen.getByRole('combobox'), { button: 0, pointerType: 'mouse' })
+      fireEvent.click(screen.getByRole('combobox'))
       expect(screen.getByRole('option', { name: 'None' })).toBeInTheDocument()
       expect(screen.getByRole('option', { name: 'Person' })).toBeInTheDocument()
       expect(screen.getByRole('option', { name: 'Project' })).toBeInTheDocument()
@@ -386,7 +386,7 @@ describe('DynamicPropertiesPanel', () => {
     })
 
     function openAndSelect(optionName: string) {
-      fireEvent.pointerDown(screen.getByRole('combobox'), { button: 0, pointerType: 'mouse' })
+      fireEvent.click(screen.getByRole('combobox'))
       fireEvent.click(screen.getByRole('option', { name: optionName }))
     }
 
@@ -412,7 +412,7 @@ describe('DynamicPropertiesPanel', () => {
         entries: typeEntries,
         onUpdateProperty,
       })
-      fireEvent.pointerDown(screen.getByRole('combobox'), { button: 0, pointerType: 'mouse' })
+      fireEvent.click(screen.getByRole('combobox'))
       expect(screen.getByRole('option', { name: 'CustomType' })).toBeInTheDocument()
     })
 

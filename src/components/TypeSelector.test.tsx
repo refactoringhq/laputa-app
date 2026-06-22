@@ -22,7 +22,7 @@ function renderTypeSelector(overrides: Partial<ComponentProps<typeof TypeSelecto
 }
 
 function openTypeCombobox() {
-  fireEvent.pointerDown(screen.getByRole('combobox'), { button: 0, pointerType: 'mouse' })
+  fireEvent.click(screen.getByRole('combobox'))
 }
 
 describe('TypeSelector', () => {
@@ -52,6 +52,26 @@ describe('TypeSelector', () => {
     expect(screen.getByRole('option', { name: 'Person' })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: 'Project' })).not.toBeInTheDocument()
     expect(screen.queryByRole('option', { name: 'Topic' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the type dropdown open after clicking the trigger', () => {
+    renderTypeSelector({ isA: 'Project' })
+
+    fireEvent.click(screen.getByRole('combobox'))
+
+    expect(screen.getByTestId('type-selector-search-input')).toBeInTheDocument()
+  })
+
+  it('deduplicates repeated type names before rendering options', () => {
+    renderTypeSelector({
+      availableTypes: ['Project', 'Person', 'Project'],
+      typeColorKeys: { Project: null, Person: null },
+      typeIconKeys: { Project: null, Person: null },
+    })
+
+    openTypeCombobox()
+
+    expect(screen.getAllByRole('option', { name: 'Project' })).toHaveLength(1)
   })
 
   it('selects the highlighted type with ArrowDown and Enter', () => {

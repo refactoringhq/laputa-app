@@ -1,8 +1,8 @@
 import { Browsers, CaretUpDown, Check, FileText, Table } from '@phosphor-icons/react'
-import { useId, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useId, useState, type KeyboardEvent } from 'react'
 import type { FrontmatterValue } from './Inspector'
 import { Button } from '@/components/ui/button'
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../lib/i18n'
 import {
@@ -133,12 +133,6 @@ function EditableFormatSelector({
     closeCombobox()
   }
 
-  const handleTriggerPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return
-    event.preventDefault()
-    openCombobox()
-  }
-
   const handleOpenTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     switch (event.key) {
       case 'ArrowDown':
@@ -186,7 +180,7 @@ function EditableFormatSelector({
       <FormatRowLabel locale={locale} />
       <div className="flex min-w-0 items-center justify-start">
         <Popover open={open} onOpenChange={handleOpenChange}>
-          <PopoverAnchor asChild>
+          <PopoverTrigger asChild>
             <Button
               type="button"
               variant="ghost"
@@ -201,7 +195,6 @@ function EditableFormatSelector({
                 'h-auto max-w-full justify-between gap-1 border-none px-2 shadow-none ring-inset [&_svg]:text-current hover:ring-1 hover:ring-current',
               )}
               style={PROPERTY_CHIP_STYLE}
-              onPointerDown={handleTriggerPointerDown}
               onKeyDown={handleTriggerKeyDown}
             >
               <span className="flex min-w-0 items-center gap-1 truncate">
@@ -210,7 +203,7 @@ function EditableFormatSelector({
               </span>
               <CaretUpDown size={14} aria-hidden="true" />
             </Button>
-          </PopoverAnchor>
+          </PopoverTrigger>
           <PopoverContent
             align="start"
             side="left"

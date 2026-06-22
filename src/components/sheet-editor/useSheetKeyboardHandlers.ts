@@ -19,6 +19,7 @@ import {
   type FormulaAutocompleteState,
   type SheetWikilinkAutocompleteState,
 } from './sheetEditorHelpers'
+import { canSheetClaimFocus } from './sheetEditorFocusOwnership'
 
 interface UseSheetKeyboardHandlersOptions {
   cancelScheduledSerialize: () => void
@@ -67,6 +68,10 @@ function dismissFormulaAutocomplete({
   setWikilinkAutocomplete(null)
 }
 
+function focusWorkbookRootWhenSheetStillOwnsFocus(sheetElement: HTMLDivElement | null) {
+  if (canSheetClaimFocus(sheetElement)) focusWorkbookRoot(sheetElement)
+}
+
 function commitEditableFormulaInput(
   event: ReactKeyboardEvent<HTMLDivElement>,
   sheetElement: HTMLDivElement | null,
@@ -83,7 +88,7 @@ function commitEditableFormulaInput(
   event.preventDefault()
   event.stopPropagation()
   dismissFormulaAutocomplete(options)
-  window.setTimeout(() => focusWorkbookRoot(sheetElement), 0)
+  window.setTimeout(() => focusWorkbookRootWhenSheetStillOwnsFocus(sheetElement), 0)
   return true
 }
 

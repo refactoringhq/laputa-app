@@ -1,5 +1,6 @@
 import { trySelectFirstHeading } from './editorTitleSelection'
 import type { TitleHeadingTextBlock } from './editorTitleHeadingText'
+import { canEditorClaimFocus } from './editorFocusOwnership'
 
 const ROOT_EDITABLE_SELECTOR = '.ProseMirror[contenteditable="true"]'
 const FALLBACK_EDITABLE_SELECTOR = '.bn-editor [contenteditable="true"]'
@@ -106,6 +107,7 @@ export function focusEditorWithRetries(
   t0: number | undefined,
   attempt = 0,
 ): void {
+  if (!canEditorClaimFocus()) return
   editor.focus()
   const hasFocus = ensureEditableFocus()
   if (!hasFocus && attempt < MAX_FOCUS_ATTEMPTS) {

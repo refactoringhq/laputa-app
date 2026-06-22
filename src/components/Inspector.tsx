@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { VaultEntry, GitCommit, WorkspaceIdentity } from '../types'
 import { cn } from '@/lib/utils'
 import { Separator } from './ui/separator'
@@ -14,13 +14,15 @@ import {
   NoteInfoPanel,
 } from './InspectorPanels'
 import { normalizeNotePathForIdentity } from '../utils/notePathIdentity'
-import type { ReferencedByItem } from './InspectorPanels'
 import { EmptyInspector, InitializePropertiesPrompt, InspectorHeader, InvalidFrontmatterNotice } from './inspector/InspectorChrome'
 import { useBacklinks, useReferencedBy } from './inspector/useInspectorData'
+import { useInspectorFocusBoundary } from '../hooks/editorFocusOwnership'
 import { useInspectorPropertyActions } from './inspector/useInspectorPropertyActions'
 import type { AppLocale } from '../lib/i18n'
 
 export type FrontmatterValue = string | number | boolean | string[] | null
+
+const INSPECTOR_REFERENCE_DELAY_MS = 150
 
 interface InspectorProps {
   collapsed: boolean
@@ -76,13 +78,46 @@ function entryWithInferredWorkspace(entry: VaultEntry, workspaces: WorkspaceIden
   return workspace && workspace !== entry.workspace ? { ...entry, workspace } : entry
 }
 
+interface DeferredInspectorReferenceKey {
+  entries: VaultEntry[]
+  entry: VaultEntry
+}
+
+function scheduleInspectorReferences(callback: () => void): () => void {
+  const requestIdle = typeof window !== 'undefined' ? window.requestIdleCallback?.bind(window) : undefined
+  if (typeof requestIdle === 'function') {
+    const id = requestIdle(callback, { timeout: 1_000 })
+    return () => window.cancelIdleCallback?.(id)
+  }
+
+  const id = window.setTimeout(callback, INSPECTOR_REFERENCE_DELAY_MS)
+  return () => window.clearTimeout(id)
+}
+
+function useDeferredInspectorReferences(entry: VaultEntry, entries: VaultEntry[]): boolean {
+  const [readyFor, setReadyFor] = useState<DeferredInspectorReferenceKey | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const cancel = scheduleInspectorReferences(() => {
+      if (!cancelled) setReadyFor({ entries, entry })
+    })
+
+    return () => {
+      cancelled = true
+      cancel()
+    }
+  }, [entries, entry])
+
+  return readyFor?.entry === entry && readyFor.entries === entries
+}
+
 function ValidFrontmatterPanels({
   entry,
   entries,
   frontmatter,
   typeEntryMap,
   vaultPath,
-  referencedBy,
   onNavigate,
   onCreateAndOpenNote,
   onUpdateProperty,
@@ -98,7 +133,6 @@ function ValidFrontmatterPanels({
   frontmatter: ReturnType<typeof parseFrontmatter>
   typeEntryMap: Record<string, VaultEntry>
   vaultPath?: string
-  referencedBy: ReferencedByItem[]
   onNavigate: (target: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   onUpdateProperty?: (key: string, value: FrontmatterValue) => void
@@ -139,10 +173,42 @@ function ValidFrontmatterPanels({
         onCreateAndOpenNote={onCreateAndOpenNote}
         locale={locale}
       />
-      <InstancesPanel entry={entry} entries={entries} typeEntryMap={typeEntryMap} onNavigate={onNavigate} />
-      <ReferencedByPanel items={referencedBy} typeEntryMap={typeEntryMap} onNavigate={onNavigate} />
     </>
   )
+}
+
+function InspectorReferencePanels({
+  entries,
+  entry,
+  onNavigate,
+  typeEntryMap,
+}: {
+  entries: VaultEntry[]
+  entry: VaultEntry
+  onNavigate: (target: string) => void
+  typeEntryMap: Record<string, VaultEntry>
+}) {
+  const referencedBy = useReferencedBy(entry, entries)
+  const backlinks = useBacklinks(entry, entries, referencedBy)
+
+  return (
+    <>
+      <InstancesPanel entry={entry} entries={entries} typeEntryMap={typeEntryMap} onNavigate={onNavigate} />
+      <ReferencedByPanel items={referencedBy} typeEntryMap={typeEntryMap} onNavigate={onNavigate} />
+      {backlinks.length > 0 && <Separator />}
+      <BacklinksPanel backlinks={backlinks} onNavigate={onNavigate} />
+    </>
+  )
+}
+
+function DeferredInspectorReferencePanels(props: {
+  entries: VaultEntry[]
+  entry: VaultEntry
+  onNavigate: (target: string) => void
+  typeEntryMap: Record<string, VaultEntry>
+}) {
+  const ready = useDeferredInspectorReferences(props.entry, props.entries)
+  return ready ? <InspectorReferencePanels {...props} /> : null
 }
 
 function PrimaryInspectorPanel({
@@ -152,7 +218,6 @@ function PrimaryInspectorPanel({
   entries,
   typeEntryMap,
   vaultPath,
-  referencedBy,
   onNavigate,
   onToggleRawEditor,
   onInitializeProperties,
@@ -171,7 +236,6 @@ function PrimaryInspectorPanel({
   entries: VaultEntry[]
   typeEntryMap: Record<string, VaultEntry>
   vaultPath?: string
-  referencedBy: ReferencedByItem[]
   onNavigate: (target: string) => void
   onToggleRawEditor?: () => void
   onInitializeProperties?: (path: string) => void
@@ -192,7 +256,6 @@ function PrimaryInspectorPanel({
         frontmatter={frontmatter}
         typeEntryMap={typeEntryMap}
         vaultPath={vaultPath}
-        referencedBy={referencedBy}
         onNavigate={onNavigate}
         onCreateAndOpenNote={onCreateAndOpenNote}
         onUpdateProperty={onUpdateProperty}
@@ -232,8 +295,6 @@ function InspectorBody({
   workspaces,
   locale = 'en',
 }: Omit<InspectorProps, 'collapsed' | 'onToggle'>) {
-  const referencedBy = useReferencedBy(entry, entries)
-  const backlinks = useBacklinks(entry, entries, referencedBy)
   const frontmatter = useMemo(() => parseFrontmatter(content), [content])
   const frontmatterState = useMemo(() => detectFrontmatterState(content), [content])
   const typeEntryMap = useMemo(() => buildTypeEntryMap(entries), [entries])
@@ -264,7 +325,6 @@ function InspectorBody({
           entries={entries}
           typeEntryMap={typeEntryMap}
           vaultPath={vaultPath}
-          referencedBy={referencedBy}
           onNavigate={onNavigate}
           onToggleRawEditor={onToggleRawEditor}
           onInitializeProperties={onInitializeProperties}
@@ -278,8 +338,12 @@ function InspectorBody({
           locale={locale}
         />
       )}
-      {backlinks.length > 0 && <Separator />}
-      <BacklinksPanel backlinks={backlinks} onNavigate={onNavigate} />
+      <DeferredInspectorReferencePanels
+        entries={entries}
+        entry={entry}
+        onNavigate={onNavigate}
+        typeEntryMap={typeEntryMap}
+      />
       <Separator />
       <NoteInfoPanel entry={entry} content={content} locale={locale} />
       {gitHistory.length > 0 && <Separator />}
@@ -289,13 +353,18 @@ function InspectorBody({
 }
 
 export function Inspector({ collapsed, onToggle, ...bodyProps }: InspectorProps) {
+  const inspectorRef = useRef<HTMLElement | null>(null)
+  useInspectorFocusBoundary(inspectorRef)
   const frontmatterWarnings = useMemo(
     () => detectFrontmatterWarnings(bodyProps.content),
     [bodyProps.content],
   )
 
   return (
-    <aside className={cn('flex flex-1 flex-col overflow-hidden border-l border-border bg-background text-foreground transition-[width] duration-200', collapsed && '!w-10 !min-w-10')}>
+    <aside
+      ref={inspectorRef}
+      className={cn('flex flex-1 flex-col overflow-hidden border-l border-border bg-background text-foreground transition-[width] duration-200', collapsed && '!w-10 !min-w-10')}
+    >
       <InspectorHeader
         collapsed={collapsed}
         frontmatterWarnings={frontmatterWarnings}

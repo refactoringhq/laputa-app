@@ -13,6 +13,11 @@ interface EntryLookup {
   pathSuffixEntries: Map<string, VaultEntry[]>
 }
 
+interface EntryTargetMatcher {
+  exactTargets: Set<string>
+  pathSuffixes: Set<string>
+}
+
 const inspectorLinkIndexCache = new WeakMap<VaultEntry[], InspectorLinkIndex>()
 
 function pushToEntryLookup(map: Map<string, VaultEntry[]>, key: string, entry: VaultEntry): void {
@@ -50,12 +55,7 @@ function buildEntryLookup(entries: VaultEntry[]): EntryLookup {
   const pathSuffixEntries = new Map<string, VaultEntry[]>()
 
   for (const entry of entries) {
-    const exactTargets = new Set([
-      entry.filename.replace(/\.md$/, ''),
-      entry.title,
-      ...entry.aliases,
-    ])
-    const pathSuffixes = new Set(getEntryPathSuffixes(entry.path))
+    const { exactTargets, pathSuffixes } = buildEntryTargetMatcher(entry)
 
     for (const target of exactTargets) {
       pushToEntryLookup(exactTargetEntries, target, entry)
@@ -66,6 +66,17 @@ function buildEntryLookup(entries: VaultEntry[]): EntryLookup {
   }
 
   return { exactTargetEntries, pathSuffixEntries }
+}
+
+function buildEntryTargetMatcher(entry: VaultEntry): EntryTargetMatcher {
+  return {
+    exactTargets: new Set([
+      entry.filename.replace(/\.md$/, ''),
+      entry.title,
+      ...entry.aliases,
+    ]),
+    pathSuffixes: new Set(getEntryPathSuffixes(entry.path)),
+  }
 }
 
 function findMatchedEntries(target: string, lookup: EntryLookup): VaultEntry[] {
@@ -106,6 +117,18 @@ function collectMatchedPaths(
   return [...matchedPaths]
 }
 
+function targetMatchesEntry(
+  rawTarget: string,
+  matcher: EntryTargetMatcher,
+  resolveTarget: (target: string) => string,
+): boolean {
+  const target = resolveTarget(rawTarget)
+  const lastSegment = target.split('/').pop() ?? ''
+  return matcher.exactTargets.has(target)
+    || matcher.exactTargets.has(lastSegment)
+    || (target.includes('/') && matcher.pathSuffixes.has(target.toLowerCase()))
+}
+
 function indexReferencedByEntries(
   sourceEntry: VaultEntry,
   lookup: EntryLookup,
@@ -120,6 +143,24 @@ function indexReferencedByEntries(
   }
 }
 
+function collectReferencedByForEntry(entry: VaultEntry, entries: VaultEntry[]): ReferencedByItem[] {
+  const matcher = buildEntryTargetMatcher(entry)
+  const referencedBy: ReferencedByItem[] = []
+
+  for (const sourceEntry of entries) {
+    if (sourceEntry.path === entry.path) continue
+
+    for (const [viaKey, refs] of Object.entries(sourceEntry.relationships)) {
+      if (viaKey === 'Type') continue
+      if (refs.some((ref) => targetMatchesEntry(ref, matcher, wikilinkTarget))) {
+        referencedBy.push({ entry: sourceEntry, viaKey })
+      }
+    }
+  }
+
+  return referencedBy
+}
+
 function indexBacklinkEntries(
   sourceEntry: VaultEntry,
   lookup: EntryLookup,
@@ -128,6 +169,25 @@ function indexBacklinkEntries(
   for (const matchedPath of collectMatchedPaths(sourceEntry.outgoingLinks, lookup, sourceEntry.path, (target) => target)) {
     pushToResultMap(backlinks, matchedPath, { entry: sourceEntry, context: null })
   }
+}
+
+function collectBacklinksForEntry(
+  entry: VaultEntry,
+  entries: VaultEntry[],
+  referencedBy: ReferencedByItem[],
+): BacklinkItem[] {
+  const matcher = buildEntryTargetMatcher(entry)
+  const referencedByPaths = new Set(referencedBy.map((item) => item.entry.path))
+  const backlinks: BacklinkItem[] = []
+
+  for (const sourceEntry of entries) {
+    if (sourceEntry.path === entry.path || referencedByPaths.has(sourceEntry.path)) continue
+    if (sourceEntry.outgoingLinks.some((target) => targetMatchesEntry(target, matcher, (value) => value))) {
+      backlinks.push({ entry: sourceEntry, context: null })
+    }
+  }
+
+  return backlinks
 }
 
 export function buildInspectorLinkIndex(entries: VaultEntry[]): InspectorLinkIndex {
@@ -153,24 +213,12 @@ export function getInspectorLinkIndex(entries: VaultEntry[]): InspectorLinkIndex
 }
 
 export function useReferencedBy(entry: VaultEntry | null, entries: VaultEntry[]): ReferencedByItem[] {
-  const linkIndex = useMemo(() => getInspectorLinkIndex(entries), [entries])
-
-  return useMemo(() => {
-    if (!entry) return []
-    return linkIndex.referencedBy.get(entry.path) ?? []
-  }, [entry, linkIndex])
+  return useMemo(() => (entry ? collectReferencedByForEntry(entry, entries) : []), [entry, entries])
 }
 
 export function useBacklinks(entry: VaultEntry | null, entries: VaultEntry[], referencedBy: ReferencedByItem[]): BacklinkItem[] {
-  const linkIndex = useMemo(() => getInspectorLinkIndex(entries), [entries])
-
-  return useMemo(() => {
-    if (!entry) return []
-
-    const backlinks = linkIndex.backlinks.get(entry.path) ?? []
-    if (referencedBy.length === 0) return backlinks
-
-    const referencedByPaths = new Set(referencedBy.map((item) => item.entry.path))
-    return backlinks.filter((item) => !referencedByPaths.has(item.entry.path))
-  }, [entry, linkIndex, referencedBy])
+  return useMemo(
+    () => (entry ? collectBacklinksForEntry(entry, entries, referencedBy) : []),
+    [entry, entries, referencedBy],
+  )
 }

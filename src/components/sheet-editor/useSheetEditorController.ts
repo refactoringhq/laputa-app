@@ -21,6 +21,7 @@ import { useSheetClipboardActions } from './useSheetClipboardActions'
 import { useSheetContextMenuActions } from './useSheetContextMenuActions'
 import { useSheetContextMenuCapture } from './useSheetContextMenuCapture'
 import { useSheetExternalFormulaResolution } from './useSheetExternalFormulaResolution'
+import { useGuardedWorkbookFocus } from './useGuardedWorkbookFocus'
 import { useSheetInputActivityHandlers } from './useSheetInputActivityHandlers'
 import { useSheetInlineAutocompletes } from './useSheetInlineAutocompletes'
 import { useSheetKeyboardFocus } from './useSheetKeyboardFocus'
@@ -480,6 +481,11 @@ export function useSheetEditorController(options: SheetEditorControllerOptions) 
   }, [setFormulaAutocomplete])
   const workbookRuntime = useSheetEditorWorkbookRuntime({ ...options, ...state })
   const keyboardRuntime = useSheetEditorKeyboardRuntime({ ...workbookRuntime, ...state })
+  useGuardedWorkbookFocus({
+    sheetFocusSuppressedRef: keyboardRuntime.sheetFocusSuppressedRef,
+    sheetElementRef: state.sheetElementRef,
+    sheetKeyboardCapturedRef: keyboardRuntime.sheetKeyboardCapturedRef,
+  })
   const contextRuntime = useSheetEditorContextRuntime({ ...keyboardRuntime, ...workbookRuntime, ...state })
   const commitRuntime = useSheetEditorCommitRuntime({ ...options, ...state, ...workbookRuntime })
   const clipboardRuntime = useSheetEditorClipboardRuntime({ ...state, ...workbookRuntime, ...commitRuntime })

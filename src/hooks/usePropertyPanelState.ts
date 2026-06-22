@@ -53,14 +53,17 @@ function reconcileListUpdate(
 
 function deriveTypeInfo(entries: VaultEntry[] | undefined, entryIsA: string | null) {
   const typeEntries = (entries ?? []).filter(e => e.isA === 'Type')
+  const availableTypes = new Set<string>()
   const typeColorKeys: Record<string, string | null> = {}
   const typeIconKeys: Record<string, string | null> = {}
   for (const e of typeEntries) {
+    if (availableTypes.has(e.title)) continue
+    availableTypes.add(e.title)
     Reflect.set(typeColorKeys, e.title, e.color ?? null)
     Reflect.set(typeIconKeys, e.title, e.icon ?? null)
   }
   return {
-    availableTypes: typeEntries.map(e => e.title).sort((a, b) => a.localeCompare(b)),
+    availableTypes: Array.from(availableTypes).sort((a, b) => a.localeCompare(b)),
     customColorKey: entryIsA ? ((Reflect.get(typeColorKeys, entryIsA) as string | null | undefined) ?? null) : null,
     typeColorKeys,
     typeIconKeys,

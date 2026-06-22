@@ -6,6 +6,7 @@ import type {
 } from './sheetEditorHelpers'
 import { focusWorkbookRoot } from './sheetEditorHelpers'
 import type { SheetContextMenuState } from '../../utils/sheetContextMenuState'
+import { canSheetClaimFocus } from './sheetEditorFocusOwnership'
 
 interface UseSheetKeyboardFocusOptions {
   scheduleSelectionChromePatch: () => void
@@ -24,13 +25,16 @@ export function useSheetKeyboardFocus({
 }: UseSheetKeyboardFocusOptions) {
   const sheetKeyboardCapturedRef = useRef(false)
   const sheetFocusRequestRef = useRef(0)
+  const sheetFocusSuppressedRef = useRef(false)
 
   const captureSheetKeyboard = useCallback(() => {
+    sheetFocusSuppressedRef.current = false
     sheetKeyboardCapturedRef.current = true
   }, [])
 
   const releaseSheetKeyboard = useCallback(() => {
     sheetFocusRequestRef.current += 1
+    sheetFocusSuppressedRef.current = true
     sheetKeyboardCapturedRef.current = false
     setFormulaAutocomplete(null)
     setWikilinkAutocomplete(null)
@@ -42,6 +46,7 @@ export function useSheetKeyboardFocus({
   }, [setFormulaAutocomplete, setSheetContextMenu, setWikilinkAutocomplete, sheetElementRef])
 
   const restoreSheetKeyboardFocus = useCallback(() => {
+    sheetFocusSuppressedRef.current = false
     sheetKeyboardCapturedRef.current = true
     const focusRequestId = sheetFocusRequestRef.current + 1
     sheetFocusRequestRef.current = focusRequestId
@@ -49,6 +54,10 @@ export function useSheetKeyboardFocus({
     window.setTimeout(() => {
       const container = sheetElementRef.current
       if (!container || sheetFocusRequestRef.current !== focusRequestId) return
+      if (!canSheetClaimFocus(container)) {
+        sheetKeyboardCapturedRef.current = false
+        return
+      }
       focusWorkbookRoot(container)
       scheduleSelectionChromePatch()
     }, 0)
@@ -59,6 +68,7 @@ export function useSheetKeyboardFocus({
     releaseSheetKeyboard,
     restoreSheetKeyboardFocus,
     sheetFocusRequestRef,
+    sheetFocusSuppressedRef,
     sheetKeyboardCapturedRef,
   }
 }

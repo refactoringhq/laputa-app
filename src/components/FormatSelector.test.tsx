@@ -26,7 +26,7 @@ function renderFormatSelector(overrides: Partial<ComponentProps<typeof FormatSel
 }
 
 function openFormatCombobox() {
-  fireEvent.pointerDown(screen.getByRole('combobox', { name: 'Display as' }), { button: 0, pointerType: 'mouse' })
+  fireEvent.click(screen.getByRole('combobox', { name: 'Display as' }))
 }
 
 describe('FormatSelector', () => {
@@ -38,6 +38,14 @@ describe('FormatSelector', () => {
 
     expect(onUpdateProperty).toHaveBeenCalledWith(NOTE_FORMAT_FRONTMATTER_KEY, NOTE_FORMAT_SHEET)
     expect(onDeleteProperty).toHaveBeenCalledWith(LEGACY_NOTE_FORMAT_FRONTMATTER_KEY)
+  })
+
+  it('keeps the display mode dropdown open after clicking the trigger', () => {
+    renderFormatSelector({ format: NOTE_FORMAT_SHEET })
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Display as' }))
+
+    expect(screen.getByRole('option', { name: 'Sheet' })).toBeInTheDocument()
   })
 
   it('removes the explicit display mode when the user selects Text', () => {

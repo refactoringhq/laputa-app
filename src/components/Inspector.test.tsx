@@ -281,7 +281,7 @@ This is a test note with some words to count.
     expect(screen.queryByText('No relationships')).not.toBeInTheDocument()
   })
 
-  it('shows backlinks from notes that reference the current note via outgoingLinks', () => {
+  it('shows backlinks from notes that reference the current note via outgoingLinks', async () => {
     render(
       <Inspector
         {...defaultProps}
@@ -290,11 +290,13 @@ This is a test note with some words to count.
         entries={[mockEntry, referrerEntry]}
       />
     )
-    expect(screen.getByText('Backlinks')).toBeInTheDocument()
-    expect(screen.getByText('Referrer Note')).toBeInTheDocument()
+    expect(screen.getByText('Type')).toBeInTheDocument()
+    expect(screen.queryByText('Backlinks')).not.toBeInTheDocument()
+    expect(await screen.findByText('Backlinks')).toBeInTheDocument()
+    expect(await screen.findByText('Referrer Note')).toBeInTheDocument()
   })
 
-  it('updates backlinks reactively when outgoingLinks changes', () => {
+  it('updates backlinks reactively when outgoingLinks changes', async () => {
     const { rerender } = render(
       <Inspector
         {...defaultProps}
@@ -313,8 +315,8 @@ This is a test note with some words to count.
         entries={[mockEntry, { ...referrerEntry, outgoingLinks: ['Test Project'] }]}
       />
     )
-    expect(screen.getByText('Backlinks')).toBeInTheDocument()
-    expect(screen.getByText('Referrer Note')).toBeInTheDocument()
+    expect(await screen.findByText('Backlinks')).toBeInTheDocument()
+    expect(await screen.findByText('Referrer Note')).toBeInTheDocument()
   })
 
   it('hides backlinks section when no notes reference the current note', () => {
@@ -322,13 +324,13 @@ This is a test note with some words to count.
     expect(screen.queryByText('Backlinks')).not.toBeInTheDocument()
   })
 
-  it('navigates when a backlink is clicked', () => {
+  it('navigates when a backlink is clicked', async () => {
     const onNavigate = vi.fn()
     renderSelectedInspector({
       entries: [mockEntry, referrerEntry],
       onNavigate,
     })
-    fireEvent.click(screen.getByText('Referrer Note'))
+    fireEvent.click(await screen.findByText('Referrer Note'))
     expect(onNavigate).toHaveBeenCalledWith('Referrer Note')
   })
 
@@ -507,7 +509,7 @@ Status: Active
 # Grow Newsletter
 `
 
-    it('shows entries that reference the current note via frontmatter relationships', () => {
+    it('shows entries that reference the current note via frontmatter relationships', async () => {
       render(
         <Inspector
           {...defaultProps}
@@ -517,12 +519,12 @@ Status: Active
 
         />
       )
-      expect(screen.getByText('On Writing Well')).toBeInTheDocument()
-      expect(screen.getByText('Write Weekly Essays')).toBeInTheDocument()
-      expect(screen.getByText('SEO Experiment')).toBeInTheDocument()
+      expect(await screen.findByText('On Writing Well')).toBeInTheDocument()
+      expect(await screen.findByText('Write Weekly Essays')).toBeInTheDocument()
+      expect(await screen.findByText('SEO Experiment')).toBeInTheDocument()
     })
 
-    it('groups referenced-by entries by relationship key', () => {
+    it('groups referenced-by entries by relationship key', async () => {
       render(
         <Inspector
           {...defaultProps}
@@ -532,8 +534,8 @@ Status: Active
 
         />
       )
-      expect(screen.getByText('Children')).toBeInTheDocument()
-      expect(screen.getByText('Referenced by')).toBeInTheDocument()
+      expect(await screen.findByText('Children')).toBeInTheDocument()
+      expect(await screen.findByText('Referenced by')).toBeInTheDocument()
     })
 
     it('hides referenced-by section when no entries reference the current note', () => {
@@ -546,7 +548,7 @@ Status: Active
       expect(screen.queryByText('Referenced by')).not.toBeInTheDocument()
     })
 
-    it('navigates when clicking a referenced-by entry', () => {
+    it('navigates when clicking a referenced-by entry', async () => {
       const onNavigate = vi.fn()
       renderInspector({
         entry: targetEntry,
@@ -554,7 +556,7 @@ Status: Active
         entries: [targetEntry, essayEntry],
         onNavigate,
       })
-      fireEvent.click(screen.getByText('On Writing Well'))
+      fireEvent.click(await screen.findByText('On Writing Well'))
       expect(onNavigate).toHaveBeenCalledWith('On Writing Well')
     })
 
@@ -583,7 +585,7 @@ Status: Active
       expect(screen.queryByText('Referenced by')).not.toBeInTheDocument()
     })
 
-    it('resolves references via aliased wikilinks', () => {
+    it('resolves references via aliased wikilinks', async () => {
       const aliasedTarget: VaultEntry = {
         ...targetEntry,
         aliases: ['Newsletter'],
@@ -601,11 +603,11 @@ Status: Active
 
         />
       )
-      expect(screen.getByText('On Writing Well')).toBeInTheDocument()
-      expect(screen.getByText(/← Topics/i)).toBeInTheDocument()
+      expect(await screen.findByText('On Writing Well')).toBeInTheDocument()
+      expect(await screen.findByText(/← Topics/i)).toBeInTheDocument()
     })
 
-    it('excludes entries from backlinks when already shown in referenced-by', () => {
+    it('excludes entries from backlinks when already shown in referenced-by', async () => {
       const noteA: VaultEntry = {
         path: '/Users/luca/Laputa/essay/on-writing.md',
         filename: 'on-writing.md',
@@ -640,8 +642,8 @@ Status: Active
         />
       )
       // noteA shows in Referenced By (via Belongs to)
-      expect(screen.getByText('Children')).toBeInTheDocument()
-      expect(screen.getByText('On Writing Well')).toBeInTheDocument()
+      expect(await screen.findByText('Children')).toBeInTheDocument()
+      expect(await screen.findByText('On Writing Well')).toBeInTheDocument()
       // But NOT in Backlinks (even though outgoingLinks matches) — section hidden
       expect(screen.queryByTestId('backlinks-toggle')).not.toBeInTheDocument()
     })
@@ -765,7 +767,7 @@ Status: Active
       expect(onToggle).toHaveBeenCalledOnce()
     })
 
-    it('still shows backlinks and history for notes without frontmatter', () => {
+    it('still shows backlinks and history for notes without frontmatter', async () => {
       render(
         <Inspector
           {...defaultProps}
@@ -777,7 +779,7 @@ Status: Active
         />
       )
       expect(screen.getByText('Initialize properties')).toBeInTheDocument()
-      expect(screen.getByText('Backlinks')).toBeInTheDocument()
+      expect(await screen.findByText('Backlinks')).toBeInTheDocument()
       expect(screen.getByText('History')).toBeInTheDocument()
     })
   })

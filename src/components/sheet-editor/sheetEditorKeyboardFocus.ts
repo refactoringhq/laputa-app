@@ -3,7 +3,7 @@ import {
   isSheetCommandTarget,
 } from './sheetEditorTargetGuards'
 
-function workbookKeyboardRoot(container: HTMLDivElement | null): HTMLElement | null {
+export function workbookKeyboardRoot(container: HTMLDivElement | null): HTMLElement | null {
   const sheetSurface = container?.querySelector<HTMLElement>('.sheet-container') ?? null
   const root = sheetSurface?.closest<HTMLElement>('[tabindex="0"]') ?? null
   return root && container?.contains(root) ? root : (container?.querySelector<HTMLElement>('[tabindex="0"]') ?? null)

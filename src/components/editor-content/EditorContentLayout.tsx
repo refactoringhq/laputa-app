@@ -3,6 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../../lib/i18n'
 import type { VaultEntry } from '../../types'
+import { useEditorFocusScope } from '../../hooks/editorFocusOwnership'
 import { dispatchEditorFindAvailability } from '../../utils/editorFindEvents'
 import { DiffView } from '../DiffView'
 import { BreadcrumbBar } from '../BreadcrumbBar'
@@ -458,6 +459,7 @@ function EditorFindScope({
   style?: React.CSSProperties
 }) {
   const scopeRef = useRef<HTMLDivElement | null>(null)
+  useEditorFocusScope(scopeRef)
   const syncAvailability = useCallback(() => {
     const activeElement = document.activeElement
     const enabled = activeElement instanceof Node
