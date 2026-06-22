@@ -25,6 +25,18 @@ describe('useAppNavigation', () => {
     )
   }
 
+  function renderAfterNavigatingToSecondEntry() {
+    const entries = [makeEntry('/a.md'), makeEntry('/b.md')]
+    const hook = renderHook(
+      ({ activeTabPath }) =>
+        useAppNavigation({ entries, activeTabPath, onSelectNote }),
+      { initialProps: { activeTabPath: '/a.md' as string | null } },
+    )
+
+    hook.rerender({ activeTabPath: '/b.md' })
+    return { entries, ...hook }
+  }
+
   // --- entriesByPath ---
 
   describe('entriesByPath', () => {
@@ -67,15 +79,7 @@ describe('useAppNavigation', () => {
     })
 
     it('handleGoBack calls onSelectNote with the previous entry', () => {
-      const entries = [makeEntry('/a.md'), makeEntry('/b.md')]
-
-      const { result, rerender } = renderHook(
-        ({ activeTabPath }) =>
-          useAppNavigation({ entries, activeTabPath, onSelectNote }),
-        { initialProps: { activeTabPath: '/a.md' as string | null } },
-      )
-
-      rerender({ activeTabPath: '/b.md' })
+      const { entries, result } = renderAfterNavigatingToSecondEntry()
 
       act(() => { result.current.handleGoBack() })
 
@@ -83,15 +87,7 @@ describe('useAppNavigation', () => {
     })
 
     it('handleGoForward works after going back', () => {
-      const entries = [makeEntry('/a.md'), makeEntry('/b.md')]
-
-      const { result, rerender } = renderHook(
-        ({ activeTabPath }) =>
-          useAppNavigation({ entries, activeTabPath, onSelectNote }),
-        { initialProps: { activeTabPath: '/a.md' as string | null } },
-      )
-
-      rerender({ activeTabPath: '/b.md' })
+      const { entries, result } = renderAfterNavigatingToSecondEntry()
       act(() => { result.current.handleGoBack() })
 
       expect(result.current.canGoForward).toBe(true)
