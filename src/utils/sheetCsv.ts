@@ -1,27 +1,56 @@
 export interface SheetDocumentParts {
-  frontmatter: string
-  body: string
+  frontmatter: SheetDocumentFrontmatter
+  body: SheetDocumentBody
 }
 
 export interface ParsedCsvRows {
-  rawRows: string[]
-  rowTerminators: string[]
-  rows: string[][]
+  rawRows: CsvSource[]
+  rowTerminators: CsvRowTerminator[]
+  rows: CsvRows
+}
+
+type CsvCell = string
+type CsvRow = CsvCell[]
+type CsvRows = CsvRow[]
+type CsvRowTerminator = string
+type CsvSource = string
+type SheetDocumentBody = string
+type SheetDocumentContent = string
+type SheetDocumentFrontmatter = string
+type ZeroBasedIndex = number
+
+interface CsvCellValue {
+  value: CsvCell
+}
+
+interface CsvRowComparison {
+  left: CsvRow | undefined
+  right: CsvRow | undefined
+}
+
+interface CsvRowSerialization {
+  minimumWidth: number
+  row: CsvRow
+}
+
+interface LineBreakLookup {
+  content: SheetDocumentContent
+  index: number
 }
 
 const FRONTMATTER_OPEN = '---'
 const FRONTMATTER_DELIMITER_RE = /^---[ \t]*$/m
 
-function firstLineBreakLength(content: string, index: number): number {
+function firstLineBreakLength({ content, index }: LineBreakLookup): number {
   if (content[index] === '\r' && content[index + 1] === '\n') return 2
   if (content[index] === '\n' || content[index] === '\r') return 1
   return 0
 }
 
-export function splitSheetDocument(content: string): SheetDocumentParts {
+export function splitSheetDocument(content: SheetDocumentContent): SheetDocumentParts {
   if (!content.startsWith(FRONTMATTER_OPEN)) return { frontmatter: '', body: content }
 
-  const openingLineBreak = firstLineBreakLength(content, FRONTMATTER_OPEN.length)
+  const openingLineBreak = firstLineBreakLength({ content, index: FRONTMATTER_OPEN.length })
   if (openingLineBreak === 0) return { frontmatter: '', body: content }
 
   const searchStart = FRONTMATTER_OPEN.length + openingLineBreak
@@ -31,7 +60,7 @@ export function splitSheetDocument(content: string): SheetDocumentParts {
 
   const closeStart = searchStart + closeMatch.index
   const closeEnd = closeStart + closeMatch[0].length
-  const closingLineBreak = firstLineBreakLength(content, closeEnd)
+  const closingLineBreak = firstLineBreakLength({ content, index: closeEnd })
   const bodyStart = closeEnd + closingLineBreak
 
   return {
@@ -40,7 +69,7 @@ export function splitSheetDocument(content: string): SheetDocumentParts {
   }
 }
 
-export function mergeSheetDocument(frontmatter: string, body: string): string {
+export function mergeSheetDocument(frontmatter: SheetDocumentFrontmatter, body: SheetDocumentBody): SheetDocumentContent {
   return `${frontmatter}${body}`
 }
 
@@ -48,14 +77,14 @@ class CsvRowParser {
   private cell = ''
   private index = 0
   private quoted = false
-  private row: string[] = []
+  private row: CsvRow = []
   private rowStart = 0
-  private readonly rawRows: string[] = []
-  private readonly rowTerminators: string[] = []
-  private readonly rows: string[][] = []
-  private readonly source: string
+  private readonly rawRows: CsvSource[] = []
+  private readonly rowTerminators: CsvRowTerminator[] = []
+  private readonly rows: CsvRows = []
+  private readonly source: CsvSource
 
-  constructor(source: string) {
+  constructor(source: CsvSource) {
     this.source = source
   }
 
@@ -74,7 +103,7 @@ class CsvRowParser {
     this.cell = ''
   }
 
-  private appendCurrentRow(rowTerminator: string): void {
+  private appendCurrentRow(rowTerminator: CsvRowTerminator): void {
     this.appendCurrentCell()
     this.rows.push(this.row)
     this.rawRows.push(this.source.slice(this.rowStart, this.index))
@@ -136,7 +165,7 @@ class CsvRowParser {
     this.rowStart = this.index + 1
   }
 
-  private currentChar(): string {
+  private currentChar(): CsvCell {
     return this.source[this.index] ?? ''
   }
 
@@ -144,7 +173,7 @@ class CsvRowParser {
     return this.currentChar() === '\n' || this.currentChar() === '\r'
   }
 
-  private currentRowTerminator(): string {
+  private currentRowTerminator(): CsvRowTerminator {
     return this.currentChar() === '\r' && this.nextChar() === '\n' ? '\r\n' : this.currentChar()
   }
 
@@ -152,7 +181,7 @@ class CsvRowParser {
     return this.cell.length > 0 || this.row.length > 0 || this.source.endsWith(',')
   }
 
-  private nextChar(): string {
+  private nextChar(): CsvCell {
     return this.source[this.index + 1] ?? ''
   }
 
@@ -161,16 +190,16 @@ class CsvRowParser {
   }
 }
 
-export function parseCsvRowsWithSource(source: string): ParsedCsvRows {
+export function parseCsvRowsWithSource(source: CsvSource): ParsedCsvRows {
   if (source.length === 0) return { rawRows: [], rowTerminators: [], rows: [] }
   return new CsvRowParser(source).parse()
 }
 
-export function parseCsvRows(source: string): string[][] {
+export function parseCsvRows(source: CsvSource): CsvRows {
   return parseCsvRowsWithSource(source).rows
 }
 
-function shouldQuoteCsvCell(value: string): boolean {
+function shouldQuoteCsvCell({ value }: CsvCellValue): boolean {
   return value.includes(',')
     || value.includes('"')
     || value.includes('\n')
@@ -178,19 +207,19 @@ function shouldQuoteCsvCell(value: string): boolean {
     || value !== value.trim()
 }
 
-function serializeCsvCell(value: string): string {
-  if (!shouldQuoteCsvCell(value)) return value
-  return `"${value.replace(/"/g, '""')}"`
+function serializeCsvCell(cell: CsvCellValue): string {
+  if (!shouldQuoteCsvCell(cell)) return cell.value
+  return `"${cell.value.replace(/"/g, '""')}"`
 }
 
-function lastMeaningfulRowIndex(rows: string[][]): number {
+function lastMeaningfulRowIndex(rows: CsvRows): number {
   for (let rowIndex = rows.length - 1; rowIndex >= 0; rowIndex -= 1) {
     if (rows[rowIndex]?.some((cell) => cell !== '') === true) return rowIndex
   }
   return -1
 }
 
-function lastMeaningfulColumnIndex(row: string[]): number {
+function lastMeaningfulColumnIndex(row: CsvRow): number {
   for (let columnIndex = row.length - 1; columnIndex >= 0; columnIndex -= 1) {
     if (row[columnIndex] !== '') {
       return columnIndex
@@ -199,51 +228,51 @@ function lastMeaningfulColumnIndex(row: string[]): number {
   return -1
 }
 
-function serializeCsvRow(row: string[], minimumWidth = 0): string {
+function serializeCsvRow({ minimumWidth, row }: CsvRowSerialization): string {
   const lastColumn = lastMeaningfulColumnIndex(row)
   const columnCount = Math.max(lastColumn + 1, minimumWidth)
   if (columnCount <= 0) return ''
 
   return row
     .slice(0, columnCount)
-    .map((cell) => serializeCsvCell(cell ?? ''))
+    .map((cell) => serializeCsvCell({ value: cell ?? '' }))
     .join(',')
 }
 
-export function serializeCsvRows(rows: string[][]): string {
+export function serializeCsvRows(rows: CsvRows): CsvSource {
   const lastRow = lastMeaningfulRowIndex(rows)
   if (lastRow < 0) return ''
 
   return rows.slice(0, lastRow + 1)
-    .map((row) => serializeCsvRow(row))
+    .map((row) => serializeCsvRow({ minimumWidth: 0, row }))
     .join('\n')
 }
 
-function csvRowsEqual(left: string[] | undefined, right: string[] | undefined): boolean {
+function csvRowsEqual({ left, right }: CsvRowComparison): boolean {
   const leftCells = left ?? []
   const rightCells = right ?? []
   if (leftCells.length !== rightCells.length) return false
   return leftCells.every((cell, index) => cell === rightCells[index])
 }
 
-export function serializeCsvRowsPreservingSourceRows(rows: string[][], source: string): string {
+export function serializeCsvRowsPreservingSourceRows(rows: CsvRows, source: CsvSource): CsvSource {
   return serializeCsvRowsPreservingParsedSourceRows(rows, parseCsvRowsWithSource(source))
 }
 
-function sourceRowTerminator(parsedSource: ParsedCsvRows): string {
+function sourceRowTerminator(parsedSource: ParsedCsvRows): CsvRowTerminator {
   return parsedSource.rowTerminators.find((terminator) => terminator !== '') ?? '\n'
 }
 
-export function serializeCsvRowsPreservingParsedSourceRows(rows: string[][], parsedSource: ParsedCsvRows): string {
+export function serializeCsvRowsPreservingParsedSourceRows(rows: CsvRows, parsedSource: ParsedCsvRows): CsvSource {
   const lastRow = Math.max(lastMeaningfulRowIndex(rows), parsedSource.rows.length - 1)
   if (lastRow < 0) return ''
   const rowTerminator = sourceRowTerminator(parsedSource)
 
   return Array.from({ length: lastRow + 1 }, (_, rowIndex) => {
     const row = rows[rowIndex] ?? []
-    const serializedRow = csvRowsEqual(row, parsedSource.rows[rowIndex])
+    const serializedRow = csvRowsEqual({ left: row, right: parsedSource.rows[rowIndex] })
       ? parsedSource.rawRows[rowIndex] ?? ''
-      : serializeCsvRow(row, parsedSource.rows[rowIndex]?.length ?? 0)
+      : serializeCsvRow({ minimumWidth: parsedSource.rows[rowIndex]?.length ?? 0, row })
     const terminator = parsedSource.rowTerminators[rowIndex] ?? (rowIndex < lastRow ? rowTerminator : '')
     return `${serializedRow}${terminator}`
   }).join('')
@@ -251,8 +280,8 @@ export function serializeCsvRowsPreservingParsedSourceRows(rows: string[][], par
 
 export function serializeCsvRowsReplacingParsedSourceRows(
   parsedSource: ParsedCsvRows,
-  replacements: Map<number, string[]>,
-): string {
+  replacements: Map<number, CsvRow>,
+): CsvSource {
   if (replacements.size === 0) {
     return parsedSource.rawRows.map((row, index) => `${row}${parsedSource.rowTerminators[index] ?? ''}`).join('')
   }
@@ -264,15 +293,15 @@ export function serializeCsvRowsReplacingParsedSourceRows(
 
   return Array.from({ length: lastRow + 1 }, (_, rowIndex) => {
     const replacement = replacements.get(rowIndex)
-    const serializedRow = replacement && !csvRowsEqual(replacement, parsedSource.rows[rowIndex])
-      ? serializeCsvRow(replacement, parsedSource.rows[rowIndex]?.length ?? 0)
+    const serializedRow = replacement && !csvRowsEqual({ left: replacement, right: parsedSource.rows[rowIndex] })
+      ? serializeCsvRow({ minimumWidth: parsedSource.rows[rowIndex]?.length ?? 0, row: replacement })
       : parsedSource.rawRows[rowIndex] ?? ''
     const terminator = parsedSource.rowTerminators[rowIndex] ?? (rowIndex < lastRow ? rowTerminator : '')
     return `${serializedRow}${terminator}`
   }).join('')
 }
 
-export function columnNameFromIndex(index: number): string {
+export function columnNameFromIndex(index: ZeroBasedIndex): string {
   let value = index + 1
   let name = ''
   while (value > 0) {
@@ -283,6 +312,6 @@ export function columnNameFromIndex(index: number): string {
   return name
 }
 
-export function cellAddress(rowIndex: number, columnIndex: number): string {
+export function cellAddress(rowIndex: ZeroBasedIndex, columnIndex: ZeroBasedIndex): string {
   return `${columnNameFromIndex(columnIndex)}${rowIndex + 1}`
 }
