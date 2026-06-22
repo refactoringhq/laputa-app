@@ -335,7 +335,7 @@ function relativePathFromNoteDirectory(request: NoteDirectoryRelativePathRequest
 function resolvePortableAttachmentUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
   const { url, vaultPath } = request
   if (!isPortableAttachmentPath({ path: url })) return null
-  return vaultAttachmentAssetUrl({ vaultPath, attachmentPath: url })
+  return vaultAttachmentAssetUrl({ vaultPath, attachmentPath: decodePathUrl({ url }) })
 }
 
 function resolveLegacyAttachmentAssetUrl(request: ImageUrlRequest): MarkdownImageUrl | null {

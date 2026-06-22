@@ -43,6 +43,20 @@ describe('resolveImageUrls', () => {
     )
   })
 
+  it('converts literal-space and encoded relative attachment paths to the same asset file', () => {
+    tauriMode = true
+
+    expect(resolveImageUrls('![shot](attachments/Meeting Snapshot.png)', '/vault')).toBe(
+      `![shot](${assetUrl('/vault/attachments/Meeting Snapshot.png')})`,
+    )
+    expect(resolveImageUrls('![shot](attachments/Meeting%20Snapshot.png)', '/vault')).toBe(
+      `![shot](${assetUrl('/vault/attachments/Meeting Snapshot.png')})`,
+    )
+    expect(resolveImageUrls('![shot](attachments/Team%20 Sync%20 Diagram.png)', '/vault')).toBe(
+      `![shot](${assetUrl('/vault/attachments/Team  Sync  Diagram.png')})`,
+    )
+  })
+
   it('converts Windows relative attachment paths without mixed separators', () => {
     tauriMode = true
     const vaultPath = 'C:\\Users\\lnq12\\Documents\\tolaria-test\\Getting Started'
