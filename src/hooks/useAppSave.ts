@@ -577,22 +577,28 @@ function useFlushBeforeAction({
 async function preparePathForManualRename({
   path,
   resolveCurrentPath,
+  resolvePathBeforeSave,
   savePendingForPath,
   cancelPendingUntitledRename,
 }: {
   path: string
   resolveCurrentPath: (path: string) => string
+  resolvePathBeforeSave: (path: string) => Promise<string>
   savePendingForPath: (path: string) => Promise<boolean>
   cancelPendingUntitledRename: (path?: string) => boolean
 }): Promise<string> {
   const currentPath = resolveCurrentPath(path)
-  await savePendingForPath(currentPath)
   cancelPendingUntitledRename(currentPath)
-  return currentPath
+  await savePendingForPath(currentPath)
+  const settledPath = await resolvePathBeforeSave(currentPath)
+  cancelPendingUntitledRename(currentPath)
+  cancelPendingUntitledRename(settledPath)
+  return settledPath
 }
 
 function useRenameHandlers({
   resolveCurrentPath,
+  resolvePathBeforeSave,
   savePendingForPath,
   cancelPendingUntitledRename,
   handleRenameNote,
@@ -603,6 +609,7 @@ function useRenameHandlers({
   loadModifiedFiles,
 }: {
   resolveCurrentPath: (path: string) => string
+  resolvePathBeforeSave: (path: string) => Promise<string>
   savePendingForPath: (path: string) => Promise<boolean>
   cancelPendingUntitledRename: (path?: string) => boolean
   handleRenameNote: AppSaveDeps['handleRenameNote']
@@ -616,17 +623,19 @@ function useRenameHandlers({
     const currentPath = await preparePathForManualRename({
       path,
       resolveCurrentPath,
+      resolvePathBeforeSave,
       savePendingForPath,
       cancelPendingUntitledRename,
     })
     const renameVaultPath = vaultPathForTabPath(tabsRef.current, currentPath, resolvedPath)
     await handleRenameFilename(currentPath, newFilenameStem, renameVaultPath, replaceRenamedEntry).then(loadModifiedFiles)
-  }, [resolveCurrentPath, savePendingForPath, cancelPendingUntitledRename, tabsRef, resolvedPath, handleRenameFilename, replaceRenamedEntry, loadModifiedFiles])
+  }, [resolveCurrentPath, resolvePathBeforeSave, savePendingForPath, cancelPendingUntitledRename, tabsRef, resolvedPath, handleRenameFilename, replaceRenamedEntry, loadModifiedFiles])
 
   const handleTitleSync = useCallback((path: string, newTitle: string) => {
     void preparePathForManualRename({
       path,
       resolveCurrentPath,
+      resolvePathBeforeSave,
       savePendingForPath,
       cancelPendingUntitledRename,
     })
@@ -636,7 +645,7 @@ function useRenameHandlers({
       })
       .then(loadModifiedFiles)
       .catch((err) => console.error('Title rename failed:', err))
-  }, [resolveCurrentPath, savePendingForPath, cancelPendingUntitledRename, tabsRef, resolvedPath, handleRenameNote, replaceRenamedEntry, loadModifiedFiles])
+  }, [resolveCurrentPath, resolvePathBeforeSave, savePendingForPath, cancelPendingUntitledRename, tabsRef, resolvedPath, handleRenameNote, replaceRenamedEntry, loadModifiedFiles])
 
   return { handleFilenameRename, handleTitleSync }
 }
@@ -755,6 +764,7 @@ function useAppSaveHandlers({
   pendingUntitledRenameRef,
   activeTabPath,
   resolveCurrentPath,
+  resolvePathBeforeSave,
   savePendingForPath,
   tabsRef,
   unsavedPathsRef,
@@ -778,6 +788,7 @@ function useAppSaveHandlers({
   pendingUntitledRenameRef: MutableRefObject<PendingUntitledRename | null>
   activeTabPath: string | null
   resolveCurrentPath: (path: string) => string
+  resolvePathBeforeSave: (path: string) => Promise<string>
   savePendingForPath: (path: string) => Promise<boolean>
   tabsRef: MutableRefObject<TabState[]>
   unsavedPathsRef: MutableRefObject<Set<string>>
@@ -815,6 +826,7 @@ function useAppSaveHandlers({
   })
   const { handleFilenameRename, handleTitleSync } = useRenameHandlers({
     resolveCurrentPath,
+    resolvePathBeforeSave,
     savePendingForPath,
     cancelPendingUntitledRename,
     handleRenameNote,
@@ -867,7 +879,7 @@ export function useAppSave({
     pendingUntitledRenameRef, activeTabPath, resolveCurrentPath, savePendingForPath,
     tabsRef, unsavedPathsRef, clearUnsaved, setToastMessage, flushPendingUntitledRename, locale, handleRenameNote,
     handleRenameFilename: handleRenameFilenameRaw,
-    resolvedPath, replaceRenamedEntry, loadModifiedFiles, handleSaveRaw, tabs, unsavedPaths,
+    resolvedPath, resolvePathBeforeSave, replaceRenamedEntry, loadModifiedFiles, handleSaveRaw, tabs, unsavedPaths,
   })
 
   return {

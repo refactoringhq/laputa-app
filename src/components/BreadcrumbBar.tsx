@@ -587,8 +587,9 @@ function normalizeFilenameStemInput(value: string): string {
   return trimmed.replace(/\.md$/i, '').trim()
 }
 
-function deriveSyncStem(entry: VaultEntry): string | null {
-  const expectedStem = slugify(entry.title.trim())
+function deriveSyncStem(entry: VaultEntry, content?: string | null): string | null {
+  const titleState = deriveContentDisplayTitleState(content) ?? deriveEntryDisplayTitleState(entry)
+  const expectedStem = slugify(titleState.title.trim())
   const filenameStem = entry.filename.replace(/\.md$/, '')
   if (!expectedStem || expectedStem === filenameStem) return null
   return expectedStem
@@ -753,7 +754,7 @@ function FilenameDisplay({
 
 function FilenameCrumb({ content, entry, locale = 'en', onRenameFilename }: Pick<BreadcrumbBarProps, 'content' | 'entry' | 'locale' | 'onRenameFilename'>) {
   const filenameStem = useMemo(() => entry.filename.replace(/\.md$/, ''), [entry.filename])
-  const syncStem = useMemo(() => deriveSyncStem(entry), [entry])
+  const syncStem = useMemo(() => deriveSyncStem(entry, content), [entry, content])
   const [isEditing, setIsEditing] = useState(false)
   const [draftStem, setDraftStem] = useState(filenameStem)
   const inputRef = useRef<HTMLInputElement>(null)

@@ -487,6 +487,27 @@ describe('BreadcrumbBar — filename controls', () => {
     expect(screen.queryByTestId('breadcrumb-sync-button')).not.toBeInTheDocument()
   })
 
+  it('uses live content title state to hide stale entry-title sync actions', () => {
+    renderEditableFilenameBreadcrumb(
+      { title: 'Old Title', filename: 'fresh-title.md', hasH1: false },
+      { content: '# Fresh Title\n\nBody' },
+    )
+
+    expect(screen.queryByTestId('breadcrumb-display-title')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('breadcrumb-sync-button')).not.toBeInTheDocument()
+  })
+
+  it('uses the live H1 as the sync target while the entry title is stale', () => {
+    const { entry, onRenameFilename } = renderEditableFilenameBreadcrumb(
+      { title: 'Old Title', filename: 'old-title.md', hasH1: false },
+      { content: '# Fresh Title\n\nBody' },
+    )
+
+    fireEvent.click(screen.getByTestId('breadcrumb-sync-button'))
+
+    expect(onRenameFilename).toHaveBeenCalledWith(entry.path, 'fresh-title')
+  })
+
   it('clicking the sync button renames the file to the title slug', () => {
     const { entry, onRenameFilename } = renderEditableFilenameBreadcrumb({
       title: 'Fresh Title',

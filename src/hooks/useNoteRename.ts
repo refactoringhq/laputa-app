@@ -10,6 +10,7 @@ import {
   notePathsMatch,
   vaultRelativePathLabel,
 } from '../utils/notePathIdentity'
+import { filenameStemToTitle } from '../utils/noteTitle'
 import { vaultPathForEntry } from '../utils/workspaces'
 import { relativePathStem } from '../utils/wikilink'
 
@@ -236,7 +237,11 @@ export function buildRenamedEntry(entry: VaultEntry, newTitle: string, newPath: 
 
 export function buildFilenameRenamedEntry(entry: VaultEntry, newPath: string): VaultEntry {
   const filename = notePathFilename(newPath)
-  return { ...entry, path: newPath, filename }
+  const oldFallbackTitle = filenameStemToTitle(entry.filename)
+  const title = !entry.hasH1 && entry.title === oldFallbackTitle
+    ? filenameStemToTitle(filename)
+    : entry.title
+  return { ...entry, path: newPath, filename, title }
 }
 
 export function buildWorkspaceMovedEntry(

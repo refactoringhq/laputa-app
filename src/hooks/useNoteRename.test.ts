@@ -311,6 +311,40 @@ describe('useNoteRename hook', () => {
     expect(setToastMessage).toHaveBeenCalledWith('Updated 1 note')
   })
 
+  it('handleRenameFilename refreshes filename-derived fallback titles', async () => {
+    const entry = makeEntry({
+      path: '/vault/plan-assumptions.md',
+      filename: 'plan-assumptions.md',
+      title: 'Plan Assumptions',
+      hasH1: false,
+    })
+    vi.mocked(mockInvoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'rename_note_filename') return { new_path: '/vault/business-plan-assumptions.md', updated_files: 0, failed_updates: 0 }
+      if (cmd === 'get_note_content') return 'Body without an H1\n'
+      return ''
+    })
+
+    const { result } = renderHook(() => useNoteRename(
+      { entries: [entry], setToastMessage },
+      { tabs: [], setTabs, activeTabPathRef, handleSwitchTab, updateTabContent },
+    ))
+
+    const onEntryRenamed = vi.fn()
+    await act(async () => {
+      await result.current.handleRenameFilename('/vault/plan-assumptions.md', 'business-plan-assumptions', '/vault', onEntryRenamed)
+    })
+
+    expect(onEntryRenamed).toHaveBeenCalledWith(
+      '/vault/plan-assumptions.md',
+      expect.objectContaining({
+        path: '/vault/business-plan-assumptions.md',
+        filename: 'business-plan-assumptions.md',
+        title: 'Business Plan Assumptions',
+      }),
+      'Body without an H1\n',
+    )
+  })
+
   it('preserves active tab metadata when filename rename lands after a stale vault reload', async () => {
     const entry = makeEntry({ path: '/vault/untitled-1.md', filename: 'untitled-1.md', title: 'Fresh Title' })
     let tabs = [{ entry, content: '# Fresh Title\n' }]

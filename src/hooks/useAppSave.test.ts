@@ -914,4 +914,37 @@ describe('useAppSave', () => {
       { path: oldPath, content: bodyDuringRename },
     ])
   })
+
+  it('waits for an in-flight untitled rename before manual filename rename', async () => {
+    const renameDeferred = createDeferred<{ new_path: string; updated_files: number } | null>()
+    const { result, oldPath, newPath } = setupUntitledRenameHarness({
+      autoRenameResult: renameDeferred.promise,
+    })
+
+    deps.handleRenameFilename.mockImplementation(async (path, newFilenameStem, vaultPath, onEntryRenamed) => {
+      expect(path).toBe(newPath)
+      expect(newFilenameStem).toBe('manual-name')
+      expect(vaultPath).toBe('/vault')
+      onEntryRenamed(path, { path: '/vault/manual-name.md', filename: 'manual-name.md' }, '# Fresh Title\n\nBody')
+    })
+
+    await act(async () => {
+      result.current.handleContentChange(oldPath, '# Fresh Title\n\nBody')
+      await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 2_500)
+    })
+
+    let manualRenamePromise!: Promise<void>
+    act(() => {
+      manualRenamePromise = result.current.handleFilenameRename(oldPath, 'manual-name')
+    })
+
+    expect(deps.handleRenameFilename).not.toHaveBeenCalled()
+
+    await act(async () => {
+      renameDeferred.resolve({ new_path: newPath, updated_files: 0 })
+      await manualRenamePromise
+    })
+
+    expect(deps.handleRenameFilename).toHaveBeenCalledOnce()
+  })
 })
