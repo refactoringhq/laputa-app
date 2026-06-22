@@ -39,6 +39,11 @@ function expectFilterTitles(
   expect(titlesFor(makeFilterView(filter, name), entries)).toEqual(expectedTitles)
 }
 
+const MONDAY_RELATIONSHIP_ENTRIES = [
+  makeEntry({ title: 'Match', relationships: { 'belongs to': ['[[monday-112|Monday #112]]'] } }),
+  makeEntry({ title: 'No match', relationships: { 'belongs to': ['[[tuesday-200|Tuesday]]'] } }),
+]
+
 describe('evaluateView', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -278,46 +283,13 @@ describe('evaluateView', () => {
     expect(titlesFor(view, entries)).toEqual(['Yes'])
   })
 
-  it('wikilink filter matches frontmatter with alias via path', () => {
-    const entries = [
-      makeEntry({ title: 'Match', relationships: { 'belongs to': ['[[monday-112|Monday #112]]'] } }),
-      makeEntry({ title: 'No match', relationships: { 'belongs to': ['[[tuesday-200|Tuesday]]'] } }),
-    ]
-    expectFilterTitles({ field: 'belongs to', op: 'contains', value: '[[monday-112]]' }, entries, ['Match'], 'By path')
-  })
-
-  it('wikilink filter matches frontmatter with alias via alias', () => {
-    const entries = [
-      makeEntry({ title: 'Match', relationships: { 'belongs to': ['[[monday-112|Monday #112]]'] } }),
-      makeEntry({ title: 'No match', relationships: { 'belongs to': ['[[tuesday-200|Tuesday]]'] } }),
-    ]
-    expectFilterTitles({ field: 'belongs to', op: 'contains', value: '[[Monday #112]]' }, entries, ['Match'], 'By alias')
-  })
-
-  it('wikilink filter with stem|title format matches frontmatter path', () => {
-    const entries = [
-      makeEntry({ title: 'Match', relationships: { 'belongs to': ['[[monday-112|Monday #112]]'] } }),
-      makeEntry({ title: 'No match', relationships: { 'belongs to': ['[[other]]'] } }),
-    ]
-    expectFilterTitles(
-      { field: 'belongs to', op: 'contains', value: '[[monday-112|Monday 112]]' },
-      entries,
-      ['Match'],
-      'Stem format',
-    )
-  })
-
-  it('any_of on relationship uses alias matching', () => {
-    const entries = [
-      makeEntry({ title: 'Match', relationships: { 'belongs to': ['[[monday-112|Monday #112]]'] } }),
-      makeEntry({ title: 'No', relationships: { 'belongs to': ['[[other]]'] } }),
-    ]
-    expectFilterTitles(
-      { field: 'belongs to', op: 'any_of', value: ['[[monday-112|Monday 112]]'] },
-      entries,
-      ['Match'],
-      'Any of',
-    )
+  it.each([
+    ['matches frontmatter with alias via path', { field: 'belongs to', op: 'contains', value: '[[monday-112]]' }],
+    ['matches frontmatter with alias via alias', { field: 'belongs to', op: 'contains', value: '[[Monday #112]]' }],
+    ['matches stem|title filter format via path', { field: 'belongs to', op: 'contains', value: '[[monday-112|Monday 112]]' }],
+    ['matches any_of values via alias-aware relationship matching', { field: 'belongs to', op: 'any_of', value: ['[[monday-112|Monday 112]]'] }],
+  ] satisfies Array<[string, FilterNode]>)('wikilink filter %s', (_label, filter) => {
+    expectFilterTitles(filter, MONDAY_RELATIONSHIP_ENTRIES, ['Match'], 'Wikilink relationship')
   })
 
   it('body is_empty matches notes with empty snippet', () => {
