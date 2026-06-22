@@ -1,451 +1,56 @@
+import {
+  appendToolbarButton,
+  clipboardDataFor,
+  createCodeBlockFixture,
+  createEditor,
+  createListItemFixture,
+  createParagraphFixture,
+  createTitleHeadingFixture,
+  getSingleEditorViewTestState,
+  makeEntry,
+  mockOpenExternalUrl,
+  mockOpenLocalFile,
+  renderEditorHarness,
+  renderEditorHarnessInScrollArea,
+  renderLinkToolbarOpenButton,
+  selectNodeContents,
+} from './SingleEditorView.testUtils'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
 import type { VaultEntry } from '../types'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 import { insertPlainTextFromClipboardText } from '../utils/plainTextPaste'
+import { SingleEditorView } from './SingleEditorView'
 import { TooltipProvider } from './ui/tooltip'
 
-const state = vi.hoisted(() => ({
-  capturedLinkToolbarProps: null as null | Record<string, unknown>,
-  capturedToolbarProps: null as null | Record<string, unknown>,
-  capturedSuggestionProps: {} as Record<string, Record<string, unknown>>,
-  capturedImageDropArgs: null as null | Record<string, unknown>,
-  capturedBlockNoteOnChange: null as null | (() => void),
-  capturedMantineGetStyleNonce: null as null | (() => string),
-  blockNoteViewError: null as Error | null,
-  blockNoteViewErrorOnce: false,
-  hoverGuardMock: vi.fn(),
-  imageDropState: { isDragOver: false },
-  linkActivationMock: vi.fn(),
-  personMentionCandidates: [] as Record<string, unknown>[],
-  wikilinkEntriesRef: { current: [] as VaultEntry[] },
-  wikilinkCandidates: [] as Record<string, unknown>[],
-}))
+const state = getSingleEditorViewTestState()
 
-vi.mock('@blocknote/react', () => ({
-  ComponentsContext: {
-    Provider: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  },
-  BlockNoteViewRaw: (props: {
-    children?: ReactNode
-    editable?: boolean
-    className?: string
-    emojiPicker?: boolean
-    formattingToolbar?: boolean
-    linkToolbar?: boolean
-    slashMenu?: boolean
-    sideMenu?: boolean
-    onChange?: () => void
-    theme?: string
-  }) => {
-    if (state.blockNoteViewError) {
-      const error = state.blockNoteViewError
-      if (state.blockNoteViewErrorOnce) {
-        state.blockNoteViewError = null
-        state.blockNoteViewErrorOnce = false
-      }
-      throw error
-    }
+async function expectSelectedParagraphCopy(sourceText: string, expectedText: string) {
+  const { container } = renderEditorHarness()
+  const { paragraph, textNode } = createParagraphFixture(sourceText)
+  await act(async () => {
+    container.appendChild(paragraph)
+    await Promise.resolve()
+  })
+  selectNodeContents(textNode)
 
-    const {
-      children,
-      editable,
-      className,
-      emojiPicker,
-      formattingToolbar,
-      linkToolbar,
-      slashMenu,
-      sideMenu,
-      ...restProps
-    } = props
-    state.capturedBlockNoteOnChange = props.onChange ?? null
-    void emojiPicker
-    void formattingToolbar
-    void slashMenu
-    void sideMenu
+  const clipboardData = { setData: vi.fn() }
+  fireEvent.copy(paragraph, { clipboardData })
 
-    return (
-      <div
-        data-testid="blocknote-view"
-        data-editable={editable !== false ? 'true' : 'false'}
-        data-link-toolbar={linkToolbar !== false ? 'true' : 'false'}
-        className={className}
-        {...restProps}
-      >
-        {children}
-      </div>
-    )
-  },
-  LinkToolbarController: (props: Record<string, unknown>) => {
-    state.capturedLinkToolbarProps = props
-    return <div data-testid="link-toolbar-controller" />
-  },
-  LinkToolbar: ({ children }: { children?: ReactNode }) => (
-    <div className="bn-link-toolbar">{children}</div>
-  ),
-  EditLinkButton: () => <button type="button">Edit Link</button>,
-  DeleteLinkButton: () => <button type="button">Remove Link</button>,
-  SideMenuController: () => <div data-testid="side-menu-controller" />,
-  SuggestionMenuController: (props: Record<string, unknown>) => {
-    state.capturedSuggestionProps[String(props.triggerCharacter)] = props
-    return <div data-testid={`suggestion-${String(props.triggerCharacter)}`} />
-  },
-  GridSuggestionMenuController: (props: Record<string, unknown>) => {
-    state.capturedSuggestionProps[String(props.triggerCharacter)] = props
-    return <div data-testid={`grid-suggestion-${String(props.triggerCharacter)}`} />
-  },
-  useComponentsContext: () => ({
-    LinkToolbar: {
-      Button: ({
-        children,
-        icon,
-        label,
-        onClick,
-      }: {
-        children?: ReactNode
-        icon?: ReactNode
-        label?: string
-        onClick?: () => void
-      }) => (
-        <button onClick={onClick} type="button">
-          {icon}
-          {label}
-          {children}
-        </button>
-      ),
-    },
-  }),
-  useCreateBlockNote: vi.fn(),
-  useDictionary: () => ({
-    link_toolbar: {
-      open: { tooltip: 'Open in a new tab' },
-    },
-  }),
-}))
-
-vi.mock('@blocknote/mantine', () => ({
-  components: {},
-}))
-
-vi.mock('@mantine/core', async () => {
-  const React = await vi.importActual<typeof import('react')>('react')
-  return {
-    MantineContext: React.createContext(null),
-    MantineProvider: ({
-      children,
-      getStyleNonce,
-    }: {
-      children?: ReactNode
-      getStyleNonce?: () => string
-    }) => {
-      state.capturedMantineGetStyleNonce = getStyleNonce ?? null
-      return <>{children}</>
-    },
-  }
-})
-
-vi.mock('../hooks/useTheme', () => ({
-  useEditorTheme: () => ({ cssVars: { '--editor-accent': '#abc' } }),
-}))
-
-vi.mock('../hooks/useImageDrop', () => ({
-  useImageDrop: (args: Record<string, unknown>) => {
-    state.capturedImageDropArgs = args
-    return state.imageDropState
-  },
-}))
-
-vi.mock('../utils/url', () => ({
-  normalizeExternalUrl: vi.fn((url: string) => (
-    url.startsWith('http://') || url.startsWith('https://') ? url : null
-  )),
-  openExternalUrl: vi.fn().mockResolvedValue(undefined),
-  openLocalFile: vi.fn().mockResolvedValue(undefined),
-}))
-
-vi.mock('../utils/typeColors', () => ({
-  buildTypeEntryMap: () => ({}),
-}))
-
-vi.mock('../utils/wikilinkSuggestions', () => ({
-  MIN_QUERY_LENGTH: 2,
-  deduplicateByPath: <T,>(items: T[]) => items,
-  preFilterWikilinks: () => state.wikilinkCandidates,
-}))
-
-vi.mock('../utils/personMentionSuggestions', () => ({
-  PERSON_MENTION_MIN_QUERY: 1,
-  filterPersonMentions: () => state.personMentionCandidates,
-}))
-
-vi.mock('../utils/suggestionEnrichment', () => ({
-  attachClickHandlers: <T,>(items: T[]) => items,
-  enrichSuggestionItems: <T,>(items: T[]) => items,
-  hasMultipleSuggestionWorkspaces: () => false,
-}))
-
-vi.mock('./WikilinkSuggestionMenu', () => ({
-  WikilinkSuggestionMenu: () => <div data-testid="wikilink-suggestion-menu" />,
-}))
-
-vi.mock('./editorSchema', () => ({
-  _wikilinkEntriesRef: state.wikilinkEntriesRef,
-}))
-
-vi.mock('./blockNoteSideMenuHoverGuard', () => ({
-  useBlockNoteSideMenuHoverGuard: (containerRef: unknown) => state.hoverGuardMock(containerRef),
-}))
-
-vi.mock('./tolariaEditorFormattingConfig', () => ({
-  getTolariaSlashMenuItems: vi.fn(async () => []),
-}))
-
-vi.mock('./tolariaEditorFormatting', () => ({
-  TolariaFormattingToolbar: () => <div data-testid="tolaria-formatting-toolbar" />,
-  TolariaFormattingToolbarController: (props: Record<string, unknown>) => {
-    state.capturedToolbarProps = props
-    return <div data-testid="tolaria-formatting-toolbar-controller" />
-  },
-}))
-
-vi.mock('./tolariaBlockNoteSideMenu', () => ({
-  TolariaSideMenu: () => <div data-testid="tolaria-side-menu" />,
-}))
-
-vi.mock('./useEditorLinkActivation', () => ({
-  useEditorLinkActivation: (containerRef: unknown, onNavigateWikilink: unknown, vaultPath: unknown) => (
-    state.linkActivationMock(containerRef, onNavigateWikilink, vaultPath)
-  ),
-}))
-
-import { openExternalUrl, openLocalFile } from '../utils/url'
-import { SingleEditorView } from './SingleEditorView'
-
-const mockOpenExternalUrl = vi.mocked(openExternalUrl)
-const mockOpenLocalFile = vi.mocked(openLocalFile)
-
-function makeEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {
-  return {
-    path: '/vault/project/alpha.md',
-    filename: 'alpha.md',
-    title: 'Alpha',
-    isA: 'Project',
-    aliases: [],
-    belongsTo: [],
-    relatedTo: [],
-    status: 'Active',
-    archived: false,
-    modifiedAt: 1,
-    createdAt: 1,
-    fileSize: 10,
-    snippet: '',
-    wordCount: 0,
-    relationships: {},
-    icon: null,
-    color: null,
-    order: null,
-    sidebarLabel: null,
-    template: null,
-    sort: null,
-    view: null,
-    visible: null,
-    organized: false,
-    favorite: false,
-    favoriteIndex: null,
-    listPropertiesDisplay: [],
-    outgoingLinks: [],
-    properties: {},
-    hasH1: true,
-    fileKind: 'markdown',
-    ...overrides,
-  }
+  expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', expectedText)
 }
 
-function createEditor() {
-  const cursorBlock = { id: 'cursor-block', type: 'paragraph', content: [], children: [] }
-  const tiptapDom = document.createElement('div')
-  tiptapDom.getBoundingClientRect = vi.fn(() => ({
-    bottom: 420,
-    height: 360,
-    left: 120,
-    right: 720,
-    toJSON: () => ({}),
-    top: 60,
-    width: 600,
-    x: 120,
-    y: 60,
-  }))
-
-  return {
-    document: [
-      { id: 'heading-block', type: 'heading', content: [], children: [] },
-      cursorBlock,
-    ],
-    domElement: undefined as HTMLElement | undefined,
-    tryParseMarkdownToBlocks: vi.fn(async () => [
-      { type: 'table', content: { type: 'tableContent' } },
-    ]),
-    blocksToHTMLLossy: vi.fn(() => '<table>seeded</table>'),
-    _tiptapEditor: {
-      commands: {
-        setContent: vi.fn(),
-        setTextSelection: vi.fn(),
-      },
-      state: { doc: { content: { size: 100 } } },
-      view: {
-        dom: tiptapDom,
-        posAtCoords: vi.fn(() => ({ pos: 1 })),
-      },
-    },
-    focus: vi.fn(),
-    getBlock: vi.fn(() => null),
-    getTextCursorPosition: vi.fn(() => ({ block: cursorBlock })),
-    insertBlocks: vi.fn(),
-    insertInlineContent: vi.fn(),
-    replaceBlocks: vi.fn(() => {
-      state.blockNoteViewError = null
-    }),
-    setTextCursorPosition: vi.fn(),
-  }
+function seedMouseSelectionPositions(editor: ReturnType<typeof createEditor>, firstPosition: number, finalPosition: number) {
+  editor._tiptapEditor.view.posAtCoords
+    .mockReturnValueOnce({ pos: firstPosition })
+    .mockReturnValueOnce({ pos: finalPosition })
+    .mockReturnValueOnce({ pos: finalPosition })
 }
 
-function renderEditorHarness(editor = createEditor(), options: { vaultPath?: string } = {}) {
-  render(
-    <SingleEditorView
-      editor={editor as never}
-      entries={[makeEntry()]}
-      onNavigateWikilink={vi.fn()}
-      vaultPath={options.vaultPath}
-    />,
-    { wrapper: TooltipProvider },
-  )
-
-  const container = screen.getByTestId('blocknote-view').closest('.editor__blocknote-container')
-  expect(container).toBeTruthy()
-  return { container: container!, editor }
-}
-
-function renderEditorHarnessInScrollArea(editor = createEditor()) {
-  render(
-    <div className="editor-scroll-area" data-testid="editor-scroll-area">
-      <div className="editor-content-wrapper">
-        <SingleEditorView
-          editor={editor as never}
-          entries={[makeEntry()]}
-          onNavigateWikilink={vi.fn()}
-        />
-      </div>
-    </div>,
-    { wrapper: TooltipProvider },
-  )
-
-  const scrollArea = screen.getByTestId('editor-scroll-area')
-  const container = screen.getByTestId('blocknote-view').closest('.editor__blocknote-container')
-  expect(container).toBeTruthy()
-  return { container: container!, editor, scrollArea }
-}
-
-function createCodeBlockFixture(text: string) {
-  const codeBlock = document.createElement('div')
-  codeBlock.setAttribute('data-content-type', 'codeBlock')
-  const pre = document.createElement('pre')
-  const code = document.createElement('code')
-  code.textContent = text
-  pre.appendChild(code)
-  codeBlock.appendChild(pre)
-  return { codeBlock, code }
-}
-
-function createParagraphFixture(text: string) {
-  const paragraph = document.createElement('p')
-  const textNode = document.createTextNode(text)
-  paragraph.appendChild(textNode)
-  return { paragraph, textNode }
-}
-
-function selectNodeContents(node: Node) {
-  const range = document.createRange()
-  range.selectNodeContents(node)
-  const selection = window.getSelection()
-  selection?.removeAllRanges()
-  selection?.addRange(range)
-}
-
-function appendToolbarButton(container: Element, className: string, text: string) {
-  const toolbar = document.createElement('div')
-  toolbar.className = className
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.textContent = text
-  toolbar.appendChild(button)
-  container.appendChild(toolbar)
-  return button
-}
-
-function createTitleHeadingFixture(container: Element) {
-  const titleHeading = document.createElement('div')
-  titleHeading.setAttribute('data-content-type', 'heading')
-  titleHeading.setAttribute('data-level', '1')
-
-  const inlineHeading = document.createElement('div')
-  inlineHeading.className = 'bn-inline-content'
-  titleHeading.appendChild(inlineHeading)
-  container.appendChild(titleHeading)
-
-  return inlineHeading
-}
-
-function createListItemFixture(container: Element, contentType: 'bulletListItem' | 'checkListItem', text = '') {
-  const listItem = document.createElement('div')
-  listItem.setAttribute('data-content-type', contentType)
-
-  const inlineContent = document.createElement('div')
-  inlineContent.className = 'bn-inline-content'
-  inlineContent.textContent = text
-  listItem.appendChild(inlineContent)
-  container.appendChild(listItem)
-
-  return inlineContent
-}
-
-function clipboardDataFor(formats: Record<string, string>) {
-  return {
-    getData: vi.fn((format: string) => formats[format] ?? ''),
-  }
-}
-
-type LinkToolbarHarnessProps = {
-  url: string
-  text: string
-  range: { from: number; to: number }
-  setToolbarOpen?: (open: boolean) => void
-  setToolbarPositionFrozen?: (open: boolean) => void
-}
-
-function renderLinkToolbarOpenButton(options: {
-  url: string
-  text?: string
-  vaultPath?: string
-}) {
-  render(
-    <SingleEditorView
-      editor={createEditor() as never}
-      entries={[makeEntry()]}
-      onNavigateWikilink={vi.fn()}
-      vaultPath={options.vaultPath}
-    />,
-  )
-
-  const LinkToolbarComponent = state.capturedLinkToolbarProps?.linkToolbar as React.ComponentType<LinkToolbarHarnessProps>
-
-  render(
-    <LinkToolbarComponent
-      url={options.url}
-      text={options.text ?? 'Example'}
-      range={{ from: 1, to: 8 }}
-    />,
-  )
+function dragPrimarySelection(target: Element, start: { clientX: number; clientY: number }, end: { clientX: number; clientY: number }) {
+  fireEvent.mouseDown(target, { button: 0, ...start })
+  fireEvent.mouseMove(window, { buttons: 1, ...end })
+  fireEvent.mouseUp(window, end)
 }
 
 describe('SingleEditorView', () => {
@@ -936,34 +541,19 @@ describe('SingleEditorView', () => {
     expect(clipboardData.setData).not.toHaveBeenCalledWith('text/plain', 'const value = 1')
   })
 
-  it('copies ordinary selected editor text without appending a newline', async () => {
-    const { container } = renderEditorHarness()
-    const { paragraph, textNode } = createParagraphFixture('Only copied words')
-    await act(async () => {
-      container.appendChild(paragraph)
-      await Promise.resolve()
-    })
-    selectNodeContents(textNode)
-
-    const clipboardData = { setData: vi.fn() }
-    fireEvent.copy(paragraph, { clipboardData })
-
-    expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', 'Only copied words')
-  })
-
-  it('removes one synthetic terminal newline while preserving internal newlines', async () => {
-    const { container } = renderEditorHarness()
-    const { paragraph, textNode } = createParagraphFixture('First line\nSecond line\n')
-    await act(async () => {
-      container.appendChild(paragraph)
-      await Promise.resolve()
-    })
-    selectNodeContents(textNode)
-
-    const clipboardData = { setData: vi.fn() }
-    fireEvent.copy(paragraph, { clipboardData })
-
-    expect(clipboardData.setData).toHaveBeenCalledWith('text/plain', 'First line\nSecond line')
+  it.each([
+    {
+      expectedText: 'Only copied words',
+      name: 'copies ordinary selected editor text without appending a newline',
+      sourceText: 'Only copied words',
+    },
+    {
+      expectedText: 'First line\nSecond line',
+      name: 'removes one synthetic terminal newline while preserving internal newlines',
+      sourceText: 'First line\nSecond line\n',
+    },
+  ])('$name', async ({ expectedText, sourceText }) => {
+    await expectSelectedParagraphCopy(sourceText, expectedText)
   })
 
   it('keeps selected rich text available as HTML when normalizing plain copy text', async () => {
@@ -1143,14 +733,8 @@ describe('SingleEditorView', () => {
 
   it('extends mouse selections from editor whitespace using clamped BlockNote coordinates', () => {
     const { container, editor } = renderEditorHarness()
-    editor._tiptapEditor.view.posAtCoords
-      .mockReturnValueOnce({ pos: 4 })
-      .mockReturnValueOnce({ pos: 18 })
-      .mockReturnValueOnce({ pos: 18 })
-
-    fireEvent.mouseDown(container, { button: 0, clientX: 12, clientY: 72 })
-    fireEvent.mouseMove(window, { buttons: 1, clientX: 680, clientY: 180 })
-    fireEvent.mouseUp(window, { clientX: 680, clientY: 180 })
+    seedMouseSelectionPositions(editor, 4, 18)
+    dragPrimarySelection(container, { clientX: 12, clientY: 72 }, { clientX: 680, clientY: 180 })
 
     expect(editor.focus).toHaveBeenCalled()
     expect(editor._tiptapEditor.view.posAtCoords).toHaveBeenNthCalledWith(1, {
@@ -1173,14 +757,8 @@ describe('SingleEditorView', () => {
 
   it('extends mouse selections from the surrounding editor scroll whitespace', () => {
     const { editor, scrollArea } = renderEditorHarnessInScrollArea()
-    editor._tiptapEditor.view.posAtCoords
-      .mockReturnValueOnce({ pos: 5 })
-      .mockReturnValueOnce({ pos: 22 })
-      .mockReturnValueOnce({ pos: 22 })
-
-    fireEvent.mouseDown(scrollArea, { button: 0, clientX: 24, clientY: 96 })
-    fireEvent.mouseMove(window, { buttons: 1, clientX: 920, clientY: 190 })
-    fireEvent.mouseUp(window, { clientX: 920, clientY: 190 })
+    seedMouseSelectionPositions(editor, 5, 22)
+    dragPrimarySelection(scrollArea, { clientX: 24, clientY: 96 }, { clientX: 920, clientY: 190 })
 
     expect(editor.focus).toHaveBeenCalled()
     expect(editor._tiptapEditor.view.posAtCoords).toHaveBeenNthCalledWith(1, {
