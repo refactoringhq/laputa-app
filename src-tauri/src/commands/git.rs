@@ -74,7 +74,7 @@ pub fn get_vault_pulse(
     let vault_path = expand_tilde(&vault_path);
     let limit = limit.unwrap_or(20);
     let skip = skip.unwrap_or(0);
-    crate::git::get_vault_pulse(&vault_path, limit, skip)
+    crate::git::get_vault_pulse(vault_path.as_ref(), limit, skip)
 }
 
 #[cfg(desktop)]
@@ -95,7 +95,7 @@ pub fn git_author_identity(vault_path: VaultPathArg) -> Result<GitAuthorIdentity
 #[tauri::command]
 pub fn get_last_commit_info(vault_path: VaultPathArg) -> Result<Option<LastCommitInfo>, String> {
     let vault_path = expand_tilde(&vault_path);
-    crate::git::get_last_commit_info(&vault_path)
+    crate::git::get_last_commit_info(vault_path.as_ref())
 }
 
 #[cfg(desktop)]

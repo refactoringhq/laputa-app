@@ -54,11 +54,11 @@ fn parse_file_status(code: &str) -> &str {
 /// Get the pulse (commit activity feed) for a vault, showing only .md file changes.
 /// `skip` offsets into the commit list for pagination; `limit` caps how many to return.
 pub fn get_vault_pulse(
-    vault_path: &str,
+    vault_path: impl AsRef<Path>,
     limit: usize,
     skip: usize,
 ) -> Result<Vec<PulseCommit>, String> {
-    let vault = Path::new(vault_path);
+    let vault = vault_path.as_ref();
 
     if !vault.join(".git").exists() {
         return Err("Not a git repository".to_string());
@@ -91,13 +91,12 @@ pub fn get_vault_pulse(
         return Err(format!("git log failed: {}", stderr));
     }
 
-    let github_base = get_github_base_url(vault_path);
+    let github_base = get_github_base_url(vault);
     let stdout = String::from_utf8_lossy(&output.stdout);
     Ok(parse_pulse_output(&stdout, &github_base))
 }
 
-fn get_github_base_url(vault_path: &str) -> Option<String> {
-    let vault = Path::new(vault_path);
+fn get_github_base_url(vault: &Path) -> Option<String> {
     let output = git_command()
         .args(["remote", "get-url", "origin"])
         .current_dir(vault)
@@ -202,8 +201,10 @@ fn add_file_change(commit: &mut PulseCommit, line: &str) {
 }
 
 /// Get the last commit's short hash and a GitHub URL (if remote is GitHub).
-pub fn get_last_commit_info(vault_path: &str) -> Result<Option<LastCommitInfo>, String> {
-    let vault = Path::new(vault_path);
+pub fn get_last_commit_info(
+    vault_path: impl AsRef<Path>,
+) -> Result<Option<LastCommitInfo>, String> {
+    let vault = vault_path.as_ref();
 
     let output = git_command()
         .args(["log", "-1", "--format=%H|%h"])
@@ -233,7 +234,7 @@ pub fn get_last_commit_info(vault_path: &str) -> Result<Option<LastCommitInfo>, 
     let full_hash = parts[0];
     let short_hash = parts[1].to_string();
 
-    let commit_url = get_github_commit_url(vault_path, full_hash);
+    let commit_url = get_github_commit_url(vault, full_hash);
 
     Ok(Some(LastCommitInfo {
         short_hash,
@@ -242,8 +243,8 @@ pub fn get_last_commit_info(vault_path: &str) -> Result<Option<LastCommitInfo>, 
 }
 
 /// Try to build a GitHub commit URL from the origin remote URL.
-fn get_github_commit_url(vault_path: &str, full_hash: &str) -> Option<String> {
-    get_github_base_url(vault_path).map(|base| format!("{}/commit/{}", base, full_hash))
+fn get_github_commit_url(vault: &Path, full_hash: &str) -> Option<String> {
+    get_github_base_url(vault).map(|base| format!("{}/commit/{}", base, full_hash))
 }
 
 #[cfg(test)]
@@ -255,14 +256,106 @@ mod tests {
     use std::process::Command;
     use tempfile::TempDir;
 
+    #[derive(Clone, Copy)]
+    enum GitHubRemote {
+        OwnerRepo,
+        LaputaVault,
+    }
+
+    enum NoteRepoChange {
+        ConfigOnlyCommit,
+        NoteUpdateCommit,
+    }
+
+    enum CommitUrlSource {
+        Pulse,
+        LastCommitInfo,
+    }
+
+    impl GitHubRemote {
+        fn url(&self) -> &'static str {
+            match self {
+                GitHubRemote::OwnerRepo => "https://github.com/owner/repo.git",
+                GitHubRemote::LaputaVault => "https://github.com/lucaong/laputa-vault.git",
+            }
+        }
+
+        fn commit_prefix(&self) -> &'static str {
+            match self {
+                GitHubRemote::OwnerRepo => "https://github.com/owner/repo/commit/",
+                GitHubRemote::LaputaVault => "https://github.com/lucaong/laputa-vault/commit/",
+            }
+        }
+    }
+
+    impl NoteRepoChange {
+        fn apply(self, dir: &TempDir) {
+            let vault = dir.path();
+            let vp = vault_path(dir);
+
+            match self {
+                NoteRepoChange::ConfigOnlyCommit => {
+                    fs::write(vault.join("config.json"), "{}").unwrap();
+                    git_commit(vp, "Add config").unwrap();
+                }
+                NoteRepoChange::NoteUpdateCommit => {
+                    fs::write(vault.join("note.md"), "# Updated\n").unwrap();
+                    git_commit(vp, "Update note").unwrap();
+                }
+            }
+        }
+    }
+
+    fn vault_path(dir: &TempDir) -> &str {
+        dir.path().to_str().unwrap()
+    }
+
+    fn repo_with_committed_note() -> TempDir {
+        let dir = setup_git_repo();
+
+        fs::write(dir.path().join("note.md"), "# Note\n").unwrap();
+        git_commit(vault_path(&dir), "Add note").unwrap();
+
+        dir
+    }
+
+    fn add_origin_remote(vault: &Path, remote: GitHubRemote) {
+        Command::new("git")
+            .args(["remote", "add", "origin", remote.url()])
+            .current_dir(vault)
+            .output()
+            .unwrap();
+    }
+
+    fn pulse_after_note_repo_change(change: NoteRepoChange) -> Vec<PulseCommit> {
+        let dir = repo_with_committed_note();
+        change.apply(&dir);
+
+        get_vault_pulse(vault_path(&dir), 30, 0).unwrap()
+    }
+
+    fn commit_url_for(source: CommitUrlSource, remote: GitHubRemote) -> String {
+        let dir = repo_with_committed_note();
+        add_origin_remote(dir.path(), remote);
+
+        match source {
+            CommitUrlSource::Pulse => get_vault_pulse(vault_path(&dir), 30, 0).unwrap()[0]
+                .github_url
+                .clone()
+                .unwrap(),
+            CommitUrlSource::LastCommitInfo => get_last_commit_info(vault_path(&dir))
+                .unwrap()
+                .unwrap()
+                .commit_url
+                .unwrap(),
+        }
+    }
+
     #[test]
     fn test_get_vault_pulse_with_commits() {
-        let dir = setup_git_repo();
+        let dir = repo_with_committed_note();
         let vault = dir.path();
-        let vp = vault.to_str().unwrap();
-
-        fs::write(vault.join("note.md"), "# Note\n").unwrap();
-        git_commit(vp, "Add note").unwrap();
+        let vp = vault_path(&dir);
 
         fs::write(vault.join("project.md"), "# Project\n").unwrap();
         git_commit(vp, "Add project").unwrap();
@@ -293,7 +386,7 @@ mod tests {
     #[test]
     fn test_get_vault_pulse_empty_repo() {
         let dir = setup_git_repo();
-        let vp = dir.path().to_str().unwrap();
+        let vp = vault_path(&dir);
 
         let pulse = get_vault_pulse(vp, 30, 0).unwrap();
         assert!(pulse.is_empty());
@@ -301,15 +394,8 @@ mod tests {
 
     #[test]
     fn test_get_vault_pulse_only_md_files() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vp = vault.to_str().unwrap();
+        let pulse = pulse_after_note_repo_change(NoteRepoChange::ConfigOnlyCommit);
 
-        fs::write(vault.join("note.md"), "# Note\n").unwrap();
-        fs::write(vault.join("config.json"), "{}").unwrap();
-        git_commit(vp, "Add files").unwrap();
-
-        let pulse = get_vault_pulse(vp, 30, 0).unwrap();
         assert_eq!(pulse.len(), 1);
         assert_eq!(pulse[0].files.len(), 1);
         assert_eq!(pulse[0].files[0].path, "note.md");
@@ -319,7 +405,7 @@ mod tests {
     fn test_get_vault_pulse_respects_limit() {
         let dir = setup_git_repo();
         let vault = dir.path();
-        let vp = vault.to_str().unwrap();
+        let vp = vault_path(&dir);
 
         for i in 0..5 {
             fs::write(
@@ -336,17 +422,8 @@ mod tests {
 
     #[test]
     fn test_get_vault_pulse_modified_and_deleted() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vp = vault.to_str().unwrap();
+        let pulse = pulse_after_note_repo_change(NoteRepoChange::NoteUpdateCommit);
 
-        fs::write(vault.join("note.md"), "# Note\n").unwrap();
-        git_commit(vp, "Add note").unwrap();
-
-        fs::write(vault.join("note.md"), "# Updated\n").unwrap();
-        git_commit(vp, "Update note").unwrap();
-
-        let pulse = get_vault_pulse(vp, 30, 0).unwrap();
         assert_eq!(pulse[0].message, "Update note");
         assert_eq!(pulse[0].files[0].status, "modified");
         assert_eq!(pulse[0].modified, 1);
@@ -354,38 +431,16 @@ mod tests {
 
     #[test]
     fn test_get_vault_pulse_github_url() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vp = vault.to_str().unwrap();
+        let remote = GitHubRemote::OwnerRepo;
+        let url = commit_url_for(CommitUrlSource::Pulse, remote);
 
-        fs::write(vault.join("note.md"), "# Note\n").unwrap();
-        git_commit(vp, "Add note").unwrap();
-
-        Command::new("git")
-            .args([
-                "remote",
-                "add",
-                "origin",
-                "https://github.com/owner/repo.git",
-            ])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-
-        let pulse = get_vault_pulse(vp, 30, 0).unwrap();
-        assert!(pulse[0].github_url.is_some());
-        let url = pulse[0].github_url.as_ref().unwrap();
-        assert!(url.starts_with("https://github.com/owner/repo/commit/"));
+        assert!(url.starts_with(remote.commit_prefix()));
     }
 
     #[test]
     fn test_get_vault_pulse_no_github_url_without_remote() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vp = vault.to_str().unwrap();
-
-        fs::write(vault.join("note.md"), "# Note\n").unwrap();
-        git_commit(vp, "Add note").unwrap();
+        let dir = repo_with_committed_note();
+        let vp = vault_path(&dir);
 
         let pulse = get_vault_pulse(vp, 30, 0).unwrap();
         assert!(pulse[0].github_url.is_none());
@@ -440,12 +495,8 @@ mod tests {
 
     #[test]
     fn test_get_last_commit_info_with_commit() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vp = vault.to_str().unwrap();
-
-        fs::write(vault.join("note.md"), "# Note\n").unwrap();
-        git_commit(vp, "initial").unwrap();
+        let dir = repo_with_committed_note();
+        let vp = vault_path(&dir);
 
         let info = get_last_commit_info(vp).unwrap();
         assert!(info.is_some());
@@ -457,7 +508,7 @@ mod tests {
     #[test]
     fn test_get_last_commit_info_no_commits() {
         let dir = setup_git_repo();
-        let vp = dir.path().to_str().unwrap();
+        let vp = vault_path(&dir);
 
         let info = get_last_commit_info(vp).unwrap();
         assert!(info.is_none());
@@ -465,27 +516,9 @@ mod tests {
 
     #[test]
     fn test_get_last_commit_info_with_github_remote() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vp = vault.to_str().unwrap();
+        let remote = GitHubRemote::LaputaVault;
+        let url = commit_url_for(CommitUrlSource::LastCommitInfo, remote);
 
-        fs::write(vault.join("note.md"), "# Note\n").unwrap();
-        git_commit(vp, "initial").unwrap();
-
-        Command::new("git")
-            .args([
-                "remote",
-                "add",
-                "origin",
-                "https://github.com/lucaong/laputa-vault.git",
-            ])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-
-        let info = get_last_commit_info(vp).unwrap().unwrap();
-        assert!(info.commit_url.is_some());
-        let url = info.commit_url.unwrap();
-        assert!(url.starts_with("https://github.com/lucaong/laputa-vault/commit/"));
+        assert!(url.starts_with(remote.commit_prefix()));
     }
 }

@@ -31,6 +31,7 @@ import {
 import { useRegisterEditorContentFlushes } from './editorContentFlushRegistration'
 import { useRawModeWithFlush } from './useRawModeWithFlush'
 import { createImeCompositionKeyGuardExtension } from './imeCompositionKeyGuardExtension'
+import { createMarkdownHighlightShortcutExtension } from './markdownHighlightShortcutExtension'
 import { handleRichEditorPaste } from './richEditorPaste'
 import { createRichEditorMarkdownInputTransformExtension } from './richEditorInputTransformExtension'
 import { createRichEditorTextDirectionExtension } from './richEditorTextDirection'
@@ -232,6 +233,7 @@ function useEditorSetup({
     extensions: [
       createRichEditorTransformErrorRecoveryExtension(),
       createImeCompositionKeyGuardExtension(),
+      createMarkdownHighlightShortcutExtension(),
       createRichEditorMarkdownInputTransformExtension(),
       createRichEditorTextDirectionExtension(),
     ],

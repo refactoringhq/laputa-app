@@ -19,17 +19,17 @@ pub struct GitPullResult {
 }
 
 /// Check whether the vault repo has at least one remote configured.
-pub fn has_remote(vault_path: &str) -> Result<bool, String> {
-    let vault = Path::new(vault_path);
+pub fn has_remote(vault_path: impl AsRef<Path>) -> Result<bool, String> {
+    let vault = vault_path.as_ref();
     has_configured_remote(vault)
 }
 
 /// Pull latest changes from remote. Uses --no-rebase to merge.
 /// Returns a structured result with status and affected files.
-pub fn git_pull(vault_path: &str) -> Result<GitPullResult, String> {
-    let vault = Path::new(vault_path);
+pub fn git_pull(vault_path: impl AsRef<Path>) -> Result<GitPullResult, String> {
+    let vault = vault_path.as_ref();
 
-    if !has_remote(vault_path)? {
+    if !has_remote(vault)? {
         return Ok(GitPullResult {
             status: NO_REMOTE_STATUS.to_string(),
             message: NO_REMOTE_MESSAGE.to_string(),
@@ -63,7 +63,8 @@ pub fn git_pull(vault_path: &str) -> Result<GitPullResult, String> {
     }
 
     // Check for merge conflicts
-    let conflicts = get_conflict_files(vault_path).unwrap_or_default();
+    let vault_text = vault.to_string_lossy();
+    let conflicts = get_conflict_files(vault_text.as_ref()).unwrap_or_default();
     if !conflicts.is_empty() {
         return Ok(GitPullResult {
             status: "conflict".to_string(),
@@ -115,10 +116,10 @@ pub struct GitRemoteStatus {
 }
 
 /// Get the current branch name, and how many commits ahead/behind the upstream.
-pub fn git_remote_status(vault_path: &str) -> Result<GitRemoteStatus, String> {
-    let vault = Path::new(vault_path);
+pub fn git_remote_status(vault_path: impl AsRef<Path>) -> Result<GitRemoteStatus, String> {
+    let vault = vault_path.as_ref();
 
-    if !has_remote(vault_path)? {
+    if !has_remote(vault)? {
         let branch = current_branch(vault)?;
         return Ok(GitRemoteStatus {
             branch,
@@ -284,10 +285,10 @@ fn push_error_detail(stderr: &str) -> String {
 }
 
 /// Push to remote.
-pub fn git_push(vault_path: &str) -> Result<GitPushResult, String> {
-    let vault = Path::new(vault_path);
+pub fn git_push(vault_path: impl AsRef<Path>) -> Result<GitPushResult, String> {
+    let vault = vault_path.as_ref();
 
-    if !has_remote(vault_path)? {
+    if !has_remote(vault)? {
         return Ok(GitPushResult {
             status: NO_REMOTE_STATUS.to_string(),
             message: NO_REMOTE_MESSAGE.to_string(),
@@ -315,6 +316,72 @@ mod tests {
     use crate::git::git_commit;
     use crate::git::tests::{setup_git_repo, setup_remote_pair};
     use std::fs;
+    use tempfile::TempDir;
+
+    struct RemotePair {
+        _bare: TempDir,
+        clone_a: TempDir,
+        clone_b: TempDir,
+    }
+
+    impl RemotePair {
+        fn new() -> Self {
+            let (_bare, clone_a, clone_b) = setup_remote_pair();
+
+            Self {
+                _bare,
+                clone_a,
+                clone_b,
+            }
+        }
+
+        fn seeded() -> Self {
+            let pair = Self::new();
+            commit_default_note(pair.clone_a.path());
+            git_push(pair.vault_a()).unwrap();
+            pair
+        }
+
+        fn vault_a(&self) -> &str {
+            path_text(self.clone_a.path())
+        }
+
+        fn vault_b(&self) -> &str {
+            path_text(self.clone_b.path())
+        }
+
+        fn sync_b(&self) {
+            git_pull(self.vault_b()).unwrap();
+        }
+
+        fn update_a_note(&self) {
+            fs::write(self.clone_a.path().join("note.md"), "# Updated\n").unwrap();
+            git_commit(self.vault_a(), "update").unwrap();
+        }
+
+        fn update_b_note(&self) {
+            fs::write(self.clone_b.path().join("note.md"), "# B update\n").unwrap();
+            git_commit(self.vault_b(), "from B").unwrap();
+        }
+
+        fn push_a(&self) {
+            git_push(self.vault_a()).unwrap();
+        }
+
+        fn push_b(&self) {
+            git_push(self.vault_b()).unwrap();
+        }
+    }
+
+    fn path_text(path: &Path) -> &str {
+        path.to_str().unwrap()
+    }
+
+    fn local_repo_with_note() -> TempDir {
+        let dir = setup_git_repo();
+        commit_default_note(dir.path());
+        dir
+    }
 
     fn commit_default_note(vault_path: &Path) {
         fs::write(vault_path.join("note.md"), "# Note\n").unwrap();
@@ -325,7 +392,7 @@ mod tests {
     fn test_has_remote_returns_false_for_local_repo() {
         let dir = setup_git_repo();
         let vault = dir.path();
-        let vp = vault.to_str().unwrap();
+        let vp = path_text(vault);
 
         assert!(!has_remote(vp).unwrap());
     }
@@ -334,7 +401,7 @@ mod tests {
     fn test_has_remote_returns_true_when_remote_exists() {
         let dir = setup_git_repo();
         let vault = dir.path();
-        let vp = vault.to_str().unwrap();
+        let vp = path_text(vault);
 
         git_command()
             .args(["remote", "add", "origin", "https://example.com/repo.git"])
@@ -349,7 +416,7 @@ mod tests {
     fn test_has_remote_ignores_name_only_remote_without_url() {
         let dir = setup_git_repo();
         let vault = dir.path();
-        let vp = vault.to_str().unwrap();
+        let vp = path_text(vault);
 
         git_command()
             .args(["config", "remote.origin.prune", "true"])
@@ -368,12 +435,8 @@ mod tests {
 
     #[test]
     fn test_git_pull_no_remote_returns_no_remote() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vp = vault.to_str().unwrap();
-
-        fs::write(vault.join("note.md"), "# Note\n").unwrap();
-        git_commit(vp, "initial").unwrap();
+        let dir = local_repo_with_note();
+        let vp = path_text(dir.path());
 
         let result = git_pull(vp).unwrap();
         assert_eq!(result.status, "no_remote");
@@ -383,34 +446,20 @@ mod tests {
 
     #[test]
     fn test_git_pull_up_to_date() {
-        let (_bare, clone_a, _clone_b) = setup_remote_pair();
-        let vp_a = clone_a.path().to_str().unwrap();
+        let pair = RemotePair::seeded();
 
-        fs::write(clone_a.path().join("note.md"), "# Note\n").unwrap();
-        git_commit(vp_a, "initial").unwrap();
-        git_push(vp_a).unwrap();
-
-        let result = git_pull(vp_a).unwrap();
+        let result = git_pull(pair.vault_a()).unwrap();
         assert_eq!(result.status, "up_to_date");
     }
 
     #[test]
     fn test_git_pull_updated_files() {
-        let (_bare, clone_a, clone_b) = setup_remote_pair();
-        let vp_a = clone_a.path().to_str().unwrap();
-        let vp_b = clone_b.path().to_str().unwrap();
+        let pair = RemotePair::seeded();
+        pair.sync_b();
+        pair.update_a_note();
+        pair.push_a();
 
-        fs::write(clone_a.path().join("note.md"), "# Note\n").unwrap();
-        git_commit(vp_a, "initial").unwrap();
-        git_push(vp_a).unwrap();
-
-        git_pull(vp_b).unwrap();
-
-        fs::write(clone_a.path().join("note.md"), "# Updated Note\n").unwrap();
-        git_commit(vp_a, "update note").unwrap();
-        git_push(vp_a).unwrap();
-
-        let result = git_pull(vp_b).unwrap();
+        let result = git_pull(pair.vault_b()).unwrap();
         assert_eq!(result.status, "updated");
         assert!(result.conflict_files.is_empty());
     }
@@ -503,21 +552,17 @@ hint: have locally."#;
 
     #[test]
     fn test_git_push_success_returns_ok() {
-        let (_bare, clone_a, _clone_b) = setup_remote_pair();
-        let vp_a = clone_a.path().to_str().unwrap();
+        let pair = RemotePair::new();
 
-        commit_default_note(clone_a.path());
-        let result = git_push(vp_a).unwrap();
+        commit_default_note(pair.clone_a.path());
+        let result = git_push(pair.vault_a()).unwrap();
         assert_eq!(result.status, "ok");
     }
 
     #[test]
     fn test_git_push_no_remote_returns_no_remote() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vp = vault.to_str().unwrap();
-
-        commit_default_note(vault);
+        let dir = local_repo_with_note();
+        let vp = path_text(dir.path());
 
         let result = git_push(vp).unwrap();
         assert_eq!(result.status, "no_remote");
@@ -525,22 +570,22 @@ hint: have locally."#;
 
     #[test]
     fn test_git_push_rejected_returns_rejected() {
-        let (_bare, clone_a, clone_b) = setup_remote_pair();
-        let vp_a = clone_a.path().to_str().unwrap();
-        let vp_b = clone_b.path().to_str().unwrap();
+        let pair = RemotePair::new();
+        let vp_a = pair.vault_a();
+        let vp_b = pair.vault_b();
 
         // Both clones commit and push — second push should be rejected
-        fs::write(clone_a.path().join("note.md"), "# A\n").unwrap();
+        fs::write(pair.clone_a.path().join("note.md"), "# A\n").unwrap();
         git_commit(vp_a, "from A").unwrap();
         git_push(vp_a).unwrap();
 
         git_pull(vp_b).unwrap();
-        fs::write(clone_b.path().join("note.md"), "# B\n").unwrap();
+        fs::write(pair.clone_b.path().join("note.md"), "# B\n").unwrap();
         git_commit(vp_b, "from B").unwrap();
         git_push(vp_b).unwrap();
 
         // Now A has a new commit but hasn't pulled B's changes
-        fs::write(clone_a.path().join("other.md"), "# Other\n").unwrap();
+        fs::write(pair.clone_a.path().join("other.md"), "# Other\n").unwrap();
         git_commit(vp_a, "from A again").unwrap();
         let result = git_push(vp_a).unwrap();
         assert_eq!(result.status, "rejected");
@@ -549,12 +594,8 @@ hint: have locally."#;
 
     #[test]
     fn test_git_remote_status_no_remote() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vp = vault.to_str().unwrap();
-
-        fs::write(vault.join("note.md"), "# Note\n").unwrap();
-        git_commit(vp, "initial").unwrap();
+        let dir = local_repo_with_note();
+        let vp = path_text(dir.path());
 
         let status = git_remote_status(vp).unwrap();
         assert!(!status.has_remote);
@@ -564,14 +605,9 @@ hint: have locally."#;
 
     #[test]
     fn test_git_remote_status_up_to_date() {
-        let (_bare, clone_a, _clone_b) = setup_remote_pair();
-        let vp_a = clone_a.path().to_str().unwrap();
+        let pair = RemotePair::seeded();
 
-        fs::write(clone_a.path().join("note.md"), "# Note\n").unwrap();
-        git_commit(vp_a, "initial").unwrap();
-        git_push(vp_a).unwrap();
-
-        let status = git_remote_status(vp_a).unwrap();
+        let status = git_remote_status(pair.vault_a()).unwrap();
         assert!(status.has_remote);
         assert_eq!(status.ahead, 0);
         assert_eq!(status.behind, 0);
@@ -579,39 +615,25 @@ hint: have locally."#;
 
     #[test]
     fn test_git_remote_status_ahead() {
-        let (_bare, clone_a, _clone_b) = setup_remote_pair();
-        let vp_a = clone_a.path().to_str().unwrap();
-
-        fs::write(clone_a.path().join("note.md"), "# Note\n").unwrap();
-        git_commit(vp_a, "initial").unwrap();
-        git_push(vp_a).unwrap();
+        let pair = RemotePair::seeded();
 
         // Make a new commit without pushing
-        fs::write(clone_a.path().join("note.md"), "# Updated\n").unwrap();
-        git_commit(vp_a, "update").unwrap();
+        pair.update_a_note();
 
-        let status = git_remote_status(vp_a).unwrap();
+        let status = git_remote_status(pair.vault_a()).unwrap();
         assert_eq!(status.ahead, 1);
         assert_eq!(status.behind, 0);
     }
 
     #[test]
     fn test_git_remote_status_behind() {
-        let (_bare, clone_a, clone_b) = setup_remote_pair();
-        let vp_a = clone_a.path().to_str().unwrap();
-        let vp_b = clone_b.path().to_str().unwrap();
-
-        fs::write(clone_a.path().join("note.md"), "# Note\n").unwrap();
-        git_commit(vp_a, "initial").unwrap();
-        git_push(vp_a).unwrap();
-
-        git_pull(vp_b).unwrap();
-        fs::write(clone_b.path().join("note.md"), "# B update\n").unwrap();
-        git_commit(vp_b, "from B").unwrap();
-        git_push(vp_b).unwrap();
+        let pair = RemotePair::seeded();
+        pair.sync_b();
+        pair.update_b_note();
+        pair.push_b();
 
         // A is now behind by 1
-        let status = git_remote_status(vp_a).unwrap();
+        let status = git_remote_status(pair.vault_a()).unwrap();
         assert_eq!(status.behind, 1);
         assert_eq!(status.ahead, 0);
     }

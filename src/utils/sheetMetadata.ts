@@ -48,9 +48,17 @@ type MetadataAssignment = {
   section: MetadataSection
   value: MetadataValue
 }
+type SheetSettingAssignment = {
+  property: string
+  value: MetadataValue
+}
 type MetadataParseCursor = {
   key: string | null
   section: MetadataSection | null
+}
+type MetadataLineWriter = {
+  indent: string
+  lines: string[]
 }
 type CellMetadataUpdater = (value: MetadataValue) => Partial<SheetCellMetadata> | null
 type SheetSettingAssigner = (metadata: SheetMetadata, value: MetadataValue) => void
@@ -188,14 +196,16 @@ function metadataPropertyName(source: string): string {
   return trimmed
 }
 
-function assignColumnMetadata(metadata: SheetMetadata, key: string, property: string, value: MetadataValue): void {
+function assignColumnMetadata(metadata: SheetMetadata, assignment: MetadataAssignment): void {
+  const { key, property, value } = assignment
   if (property !== 'width' || typeof value !== 'number') return
   const column = key.toUpperCase()
   if (columnIndexFromName(column) === null) return
   metadata.columns[column] = { ...metadata.columns[column], width: value }
 }
 
-function assignRowMetadata(metadata: SheetMetadata, key: string, property: string, value: MetadataValue): void {
+function assignRowMetadata(metadata: SheetMetadata, assignment: MetadataAssignment): void {
+  const { key, property, value } = assignment
   if (property !== 'height' || typeof value !== 'number') return
   if (!/^[1-9]\d*$/.test(key)) return
   metadata.rows[key] = { ...metadata.rows[key], height: value }
@@ -231,7 +241,8 @@ const CELL_METADATA_UPDATERS: Record<string, CellMetadataUpdater> = {
   },
 }
 
-function assignCellMetadata(metadata: SheetMetadata, key: string, property: string, value: MetadataValue): void {
+function assignCellMetadata(metadata: SheetMetadata, assignment: MetadataAssignment): void {
+  const { key, property, value } = assignment
   const cell = normalizeCellAddress(key)
   if (!cell) return
 
@@ -257,20 +268,20 @@ const SHEET_SETTING_ASSIGNERS: Record<string, SheetSettingAssigner> = {
   },
 }
 
-function assignSheetSetting(metadata: SheetMetadata, property: string, value: MetadataValue): void {
-  SHEET_SETTING_ASSIGNERS[property]?.(metadata, value)
+function assignSheetSetting(metadata: SheetMetadata, assignment: SheetSettingAssignment): void {
+  SHEET_SETTING_ASSIGNERS[assignment.property]?.(metadata, assignment.value)
 }
 
 function assignMetadataValue(metadata: SheetMetadata, assignment: MetadataAssignment): void {
   switch (assignment.section) {
     case 'columns':
-      assignColumnMetadata(metadata, assignment.key, assignment.property, assignment.value)
+      assignColumnMetadata(metadata, assignment)
       break
     case 'rows':
-      assignRowMetadata(metadata, assignment.key, assignment.property, assignment.value)
+      assignRowMetadata(metadata, assignment)
       break
     case 'cells':
-      assignCellMetadata(metadata, assignment.key, assignment.property, assignment.value)
+      assignCellMetadata(metadata, assignment)
       break
   }
 }
@@ -280,7 +291,7 @@ function parseSectionLine(line: string): MetadataSection | null {
   return sectionMatch ? sectionMatch[1] as MetadataSection : null
 }
 
-function parseSheetSettingLine(line: string): { property: string; value: MetadataValue } | null {
+function parseSheetSettingLine(line: string): SheetSettingAssignment | null {
   const sheetSettingMatch = line.match(/^ {2}([A-Za-z_]+):\s*(.+)$/)
   if (!sheetSettingMatch) return null
   return {
@@ -313,7 +324,7 @@ function parseMetadataLine(metadata: SheetMetadata, line: string, cursor: Metada
 
   const sheetSetting = parseSheetSettingLine(line)
   if (sheetSetting) {
-    assignSheetSetting(metadata, sheetSetting.property, sheetSetting.value)
+    assignSheetSetting(metadata, sheetSetting)
     return { key: null, section: null }
   }
 
@@ -342,13 +353,18 @@ export function parseSheetMetadata(frontmatter: string): SheetMetadata {
   return metadata
 }
 
-function appendScalarLine(lines: string[], indent: string, key: string, value: MetadataValue | undefined): void {
-  if (value !== undefined) lines.push(`${indent}${key}: ${scalarString(value)}`)
+function metadataLineWriter(lines: string[], indent: string): MetadataLineWriter {
+  return { indent, lines }
+}
+
+function appendScalarLine(writer: MetadataLineWriter, key: string, value: MetadataValue | undefined): void {
+  if (value !== undefined) writer.lines.push(`${writer.indent}${key}: ${scalarString(value)}`)
 }
 
 function appendSheetSettingLines(lines: string[], metadata: SheetMetadata): void {
+  const writer = metadataLineWriter(lines, '  ')
   for (const setting of TOP_LEVEL_SHEET_SETTINGS) {
-    appendScalarLine(lines, '  ', setting.key, metadata[setting.property])
+    appendScalarLine(writer, setting.key, metadata[setting.property])
   }
 }
 
@@ -361,10 +377,11 @@ function sortedColumnEntries(metadata: SheetMetadata): Array<[string, SheetColum
 function appendColumnMetadataLines(lines: string[], metadata: SheetMetadata): void {
   const columnEntries = sortedColumnEntries(metadata)
   if (columnEntries.length > 0) {
+    const writer = metadataLineWriter(lines, '      ')
     lines.push('  columns:')
     for (const [column, value] of columnEntries) {
       lines.push(`    ${column}:`)
-      appendScalarLine(lines, '      ', 'width', value.width)
+      appendScalarLine(writer, 'width', value.width)
     }
   }
 }
@@ -378,10 +395,11 @@ function sortedRowEntries(metadata: SheetMetadata): Array<[string, SheetRowMetad
 function appendRowMetadataLines(lines: string[], metadata: SheetMetadata): void {
   const rowEntries = sortedRowEntries(metadata)
   if (rowEntries.length > 0) {
+    const writer = metadataLineWriter(lines, '      ')
     lines.push('  rows:')
     for (const [row, value] of rowEntries) {
       lines.push(`    "${row}":`)
-      appendScalarLine(lines, '      ', 'height', value.height)
+      appendScalarLine(writer, 'height', value.height)
     }
   }
 }
@@ -401,8 +419,9 @@ function sortedCellEntries(metadata: SheetMetadata): Array<[string, SheetCellMet
 }
 
 function appendScalarCellMetadataLines(lines: string[], metadata: SheetCellMetadata): void {
+  const writer = metadataLineWriter(lines, '      ')
   for (const field of CELL_SCALAR_METADATA_KEYS) {
-    appendScalarLine(lines, '      ', field.key, metadata[field.property])
+    appendScalarLine(writer, field.key, metadata[field.property])
   }
 }
 

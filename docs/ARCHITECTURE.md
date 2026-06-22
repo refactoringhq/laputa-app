@@ -918,6 +918,7 @@ Data flows unidirectionally: `App` passes data and callbacks as props to child c
 | Cmd+F | Find in current note when the editor is focused; otherwise note-list search can claim it |
 | Cmd+Shift+F | Find in vault |
 | Cmd+Shift+V | Paste without Formatting into the active supported editing surface |
+| Cmd+Shift+M | Toggle Markdown highlight on selected rich-editor text |
 | Cmd+[ / Cmd+] | Navigate back / forward (replaces tabs) |
 | Cmd+Z / Cmd+Shift+Z | Undo / Redo |
 | Cmd+1–9 | Switch to tab N |
@@ -935,6 +936,7 @@ Shortcut routing is explicit:
 - macOS browser-reserved chords such as `Cmd+O`, `Cmd+F`, and `Cmd+Shift+L` are unblocked at webview init via `tauri-plugin-prevent-default`, then continue through the same renderer-first command path
 - `Cmd+Shift+V` uses the same command path for "Paste without Formatting"; `plainTextPaste.ts` reads text through the native clipboard command in Tauri and inserts it through the active rich/raw editor target or the focused browser text control
 - `Cmd+F` is surface-aware: editor focus opens current-note find/replace in raw CodeMirror, note-list focus preserves note-list search, and native menu enablement follows focus availability events so only one `Cmd+F` menu item is active
+- Rich-editor inline formatting shortcuts that are owned by BlockNote or editor extensions stay local to the editor surface; `createMarkdownHighlightShortcutExtension()` handles Cmd/Ctrl+Shift+M and toggles the durable `==highlight==` style without entering the app-command manifest.
 - `menu.rs`, `useMenuEvents`, and the custom titlebar `LinuxMenuButton` emit the same manifest-derived command IDs for native menu clicks, accelerators, and custom titlebar menu actions
 - `appCommandDispatcher.ts` suppresses the paired native-menu/renderer echo from a single shortcut so the command runs once
 - Deterministic QA uses two explicit proof paths from the shared manifest:

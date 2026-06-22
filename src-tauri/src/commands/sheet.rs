@@ -83,6 +83,11 @@ struct SheetBuildInputs {
     unresolved_external_cells: HashSet<String>,
 }
 
+struct SheetRows<'a> {
+    path: &'a str,
+    rows: &'a [Vec<String>],
+}
+
 impl ResolveStack {
     fn new(root_path: &str) -> Self {
         Self {
@@ -270,7 +275,8 @@ impl ExternalFormulaResolver {
         let timezone = self.timezone.clone();
         let mut model = Model::new_empty(workbook_name.as_str(), "en", timezone.as_str(), "en")?;
 
-        let build_inputs = self.populate_model_from_rows(&mut model, path, &rows, stack)?;
+        let sheet_rows = SheetRows { path, rows: &rows };
+        let build_inputs = self.populate_model_from_rows(&mut model, &sheet_rows, stack)?;
         model.evaluate();
         self.sheet_literal_cache.insert(
             path.to_string(),
@@ -282,14 +288,13 @@ impl ExternalFormulaResolver {
     fn populate_model_from_rows(
         &mut self,
         model: &mut Model<'_>,
-        path: &str,
-        rows: &[Vec<String>],
+        sheet_rows: &SheetRows<'_>,
         stack: &mut ResolveStack,
     ) -> Result<SheetBuildInputs, String> {
         let mut external_inputs = HashMap::<String, String>::new();
         let mut unresolved_external_cells = HashSet::<String>::new();
 
-        for (row_index, row) in rows.iter().enumerate() {
+        for (row_index, row) in sheet_rows.rows.iter().enumerate() {
             for (column_index, value) in row.iter().enumerate() {
                 let source = parse_sheet_markdown_cell_value(value);
                 if source.is_empty() {
@@ -297,18 +302,19 @@ impl ExternalFormulaResolver {
                 }
 
                 let address = cell_address(row_index + 1, column_index + 1);
-                let model_input = match self.resolve_external_formula_input(&source, path, stack)? {
-                    Some(evaluated) => {
-                        external_inputs.insert(address, evaluated.clone());
-                        evaluated
-                    }
-                    None => {
-                        if is_external_formula_input(&source) {
-                            unresolved_external_cells.insert(address);
+                let model_input =
+                    match self.resolve_external_formula_input(&source, sheet_rows.path, stack)? {
+                        Some(evaluated) => {
+                            external_inputs.insert(address, evaluated.clone());
+                            evaluated
                         }
-                        source
-                    }
-                };
+                        None => {
+                            if is_external_formula_input(&source) {
+                                unresolved_external_cells.insert(address);
+                            }
+                            source
+                        }
+                    };
 
                 model.set_user_input(
                     SHEET_INDEX,
