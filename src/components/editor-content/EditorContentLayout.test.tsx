@@ -22,8 +22,21 @@ vi.mock('../RawEditorView', () => ({
 }))
 
 vi.mock('../SheetEditor', () => ({
-  SheetEditor: ({ content, path }: { content: string; path: string }) => (
-    <div data-testid="sheet-editor" data-content={content} data-path={path} />
+  SheetEditor: ({
+    content,
+    flushContentRef,
+    path,
+  }: {
+    content: string
+    flushContentRef?: React.MutableRefObject<((path: string) => void) | null>
+    path: string
+  }) => (
+    <div
+      data-testid="sheet-editor"
+      data-content={content}
+      data-has-flush-ref={String(Boolean(flushContentRef))}
+      data-path={path}
+    />
   ),
 }))
 
@@ -173,9 +186,11 @@ describe('EditorContentLayout', () => {
   })
 
   it('routes sheet notes to the sheet editor without the rich-editor wrapper', async () => {
+    const sheetFlushRef = { current: null }
     render(<EditorContentLayout {...createModel({
       cssVars: { '--editor-accent': '#155dff' },
       isSheet: true,
+      sheetFlushRef,
       activeTab: {
         entry: {
           path: '/vault/project/budget.md',
@@ -190,6 +205,7 @@ describe('EditorContentLayout', () => {
 
     expect(sheetEditor).toHaveAttribute('data-path', '/vault/project/budget.md')
     expect(sheetEditor).toHaveAttribute('data-content', 'Metric,January\nRevenue,1200')
+    expect(sheetEditor).toHaveAttribute('data-has-flush-ref', 'true')
     expect(screen.queryByTestId('single-editor-view')).not.toBeInTheDocument()
     expect(sheetEditor.closest('.editor-content-wrapper')).toBeNull()
     const findScope = sheetEditor.closest('[data-editor-find-scope="true"]')

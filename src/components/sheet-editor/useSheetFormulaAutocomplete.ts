@@ -69,7 +69,7 @@ function useFormulaSuggestion({
     const applied = applyFormulaSuggestion(input.value, formulaAutocomplete.tokenStart, formulaAutocomplete.tokenEnd, suggestion)
     setFormulaInputValue(input, applied.value)
     input.setSelectionRange(applied.cursor, applied.cursor)
-    dispatchFormulaInput(input, suggestion)
+    dispatchFormulaInput(input)
     trackSheetFormulaAutocompleteUsed(suggestion.name)
     input.focus()
     setFormulaAutocomplete(null)
@@ -113,4 +113,3 @@ export function useSheetFormulaAutocomplete(options: UseSheetInlineAutocompletes
     updateFormulaAutocomplete: useFormulaUpdater(options),
   }
 }
-

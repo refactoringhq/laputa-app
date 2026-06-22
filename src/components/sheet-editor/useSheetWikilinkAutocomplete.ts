@@ -51,7 +51,7 @@ function useWikilinkTarget({
 
     setFormulaInputValue(input, replacement.text)
     input.setSelectionRange(replacement.cursor, replacement.cursor)
-    dispatchSheetInput(input, target)
+    dispatchSheetInput(input)
     trackEvent('wikilink_inserted')
     input.focus()
     setWikilinkAutocomplete(null)
@@ -177,4 +177,3 @@ export function useSheetWikilinkAutocomplete(options: UseSheetInlineAutocomplete
     updateWikilinkAutocomplete: useWikilinkUpdater(options, applyWikilinkAutocompleteTarget),
   }
 }
-

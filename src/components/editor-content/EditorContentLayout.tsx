@@ -525,6 +525,7 @@ export function EditorContentLayout(model: EditorContentModel) {
     isDeletedPreview,
     rawLatestContentRef,
     rawModeContent,
+    sheetFlushRef,
     noteWidth,
     isSheet,
     richEditorContentReady,
@@ -598,6 +599,7 @@ export function EditorContentLayout(model: EditorContentModel) {
             onNavigateWikilink={onNavigateWikilink}
             onEditorChange={onEditorChange}
             onRawContentChange={onRawContentChange}
+            sheetFlushRef={sheetFlushRef}
             isDeletedPreview={isDeletedPreview}
             isSheet={isSheet}
             locale={locale}

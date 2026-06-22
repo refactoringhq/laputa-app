@@ -1,10 +1,7 @@
-import type { SheetFormulaSuggestion } from '../../utils/sheetFormulaAutocomplete'
-
-export function dispatchSheetInput(input: HTMLInputElement | HTMLTextAreaElement, data: string): void {
+export function dispatchSheetInput(input: HTMLInputElement | HTMLTextAreaElement): void {
   const event = typeof InputEvent === 'function'
     ? new InputEvent('input', {
       bubbles: true,
-      data,
       inputType: 'insertReplacementText',
     })
     : new Event('input', { bubbles: true })
@@ -13,8 +10,8 @@ export function dispatchSheetInput(input: HTMLInputElement | HTMLTextAreaElement
   input.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
-export function dispatchFormulaInput(input: HTMLInputElement | HTMLTextAreaElement, suggestion: SheetFormulaSuggestion): void {
-  dispatchSheetInput(input, suggestion.name)
+export function dispatchFormulaInput(input: HTMLInputElement | HTMLTextAreaElement): void {
+  dispatchSheetInput(input)
 }
 
 export function setFormulaInputValue(input: HTMLInputElement | HTMLTextAreaElement, value: string): void {
