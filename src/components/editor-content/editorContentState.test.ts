@@ -45,6 +45,16 @@ function deriveState(tab: EditorContentTab | null, overrides?: Partial<VaultEntr
   })
 }
 
+function deriveStateForContent(entryOverrides: Partial<VaultEntry>, content: string) {
+  const entry = { ...baseEntry, ...entryOverrides }
+  return deriveEditorContentState({
+    activeTab: { entry, content },
+    entries: [entry],
+    rawMode: false,
+    activeStatus: 'clean',
+  })
+}
+
 describe('deriveEditorContentState', () => {
   it('marks loaded content with a top-level H1 as titled', () => {
     const state = deriveState({
@@ -108,33 +118,15 @@ describe('deriveEditorContentState', () => {
     expect(state.showEditor).toBe(true)
   })
 
-  it('marks markdown notes with sheet display as sheet editor content', () => {
-    const state = deriveState({
-      entry: {
-        ...baseEntry,
-        isA: 'Note',
-        fileKind: 'markdown',
-      },
-      content: '---\ntype: Note\n_display: sheet\n---\nMetric,January',
-    })
+  it.each([
+    ['marks markdown notes with sheet display as sheet editor content', 'Note', '---\ntype: Note\n_display: sheet\n---\nMetric,January', true],
+    ['does not treat Sheet type metadata as sheet editor content', 'Sheet', '---\ntype: Sheet\n---\nMetric,January', false],
+  ])('%s', (_label, isA, content, expectedIsSheet) => {
+    const state = deriveStateForContent({ isA, fileKind: 'markdown' }, content)
 
-    expect(state.isSheet).toBe(true)
+    expect(state.isSheet).toBe(expectedIsSheet)
     expect(state.showEditor).toBe(true)
-    expect(state.effectiveRawMode).toBe(false)
-  })
-
-  it('does not treat Sheet type metadata as sheet editor content', () => {
-    const state = deriveState({
-      entry: {
-        ...baseEntry,
-        isA: 'Sheet',
-        fileKind: 'markdown',
-      },
-      content: '---\ntype: Sheet\n---\nMetric,January',
-    })
-
-    expect(state.isSheet).toBe(false)
-    expect(state.showEditor).toBe(true)
+    if (expectedIsSheet) expect(state.effectiveRawMode).toBe(false)
   })
 
   it('does not use fresh entry type metadata as sheet editor content', () => {
@@ -162,45 +154,13 @@ describe('deriveEditorContentState', () => {
     expect(state.showEditor).toBe(true)
   })
 
-  it('uses indexed display metadata when loaded content is temporarily missing frontmatter', () => {
-    const activeEntry = {
-      ...baseEntry,
-      display: 'sheet' as const,
-      fileKind: 'markdown' as const,
-    }
+  it.each([
+    ['uses indexed display metadata when loaded content is temporarily missing frontmatter', 'Metric,January', true],
+    ['lets loaded display metadata override stale indexed display metadata', '---\n_display: text\n---\nMetric,January', false],
+  ])('%s', (_label, content, expectedIsSheet) => {
+    const state = deriveStateForContent({ display: 'sheet', fileKind: 'markdown' }, content)
 
-    const state = deriveEditorContentState({
-      activeTab: {
-        entry: activeEntry,
-        content: 'Metric,January',
-      },
-      entries: [activeEntry],
-      rawMode: false,
-      activeStatus: 'clean',
-    })
-
-    expect(state.isSheet).toBe(true)
-    expect(state.showEditor).toBe(true)
-  })
-
-  it('lets loaded display metadata override stale indexed display metadata', () => {
-    const activeEntry = {
-      ...baseEntry,
-      display: 'sheet' as const,
-      fileKind: 'markdown' as const,
-    }
-
-    const state = deriveEditorContentState({
-      activeTab: {
-        entry: activeEntry,
-        content: '---\n_display: text\n---\nMetric,January',
-      },
-      entries: [activeEntry],
-      rawMode: false,
-      activeStatus: 'clean',
-    })
-
-    expect(state.isSheet).toBe(false)
+    expect(state.isSheet).toBe(expectedIsSheet)
     expect(state.showEditor).toBe(true)
   })
 
