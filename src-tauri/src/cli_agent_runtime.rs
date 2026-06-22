@@ -24,8 +24,23 @@ pub struct AgentStreamRequest {
 
 pub(crate) struct JsonLineRun {
     pub session_id: String,
+    pub parsed_json_lines: usize,
+    pub ignored_stdout_output: String,
     pub stderr_output: String,
     pub status: ExitStatus,
+}
+
+impl JsonLineRun {
+    pub(crate) fn diagnostic_output(&self) -> String {
+        self.ignored_stdout_output
+            .lines()
+            .chain(self.stderr_output.lines())
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 
 pub(crate) struct AgentCommandTarget {
@@ -242,6 +257,7 @@ pub(crate) fn has_windows_cli_extension(path: &Path) -> bool {
         })
 }
 
+#[cfg(test)]
 pub(crate) fn parse_json_line(
     line: Result<String, std::io::Error>,
 ) -> Result<Option<serde_json::Value>, String> {
@@ -252,6 +268,31 @@ pub(crate) fn parse_json_line(
     }
 
     Ok(serde_json::from_str::<serde_json::Value>(trimmed).ok())
+}
+
+fn parse_process_stdout_line(
+    line: Result<String, std::io::Error>,
+    ignored_stdout_lines: &mut Vec<String>,
+) -> Result<Option<serde_json::Value>, String> {
+    let line = line.map_err(|error| format!("Read error: {error}"))?;
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    match serde_json::from_str::<serde_json::Value>(trimmed) {
+        Ok(json) => Ok(Some(json)),
+        Err(_) => {
+            push_ignored_stdout_line(ignored_stdout_lines, trimmed);
+            Ok(None)
+        }
+    }
+}
+
+fn push_ignored_stdout_line(lines: &mut Vec<String>, line: &str) {
+    if lines.len() < 3 {
+        lines.push(line.to_string());
+    }
 }
 
 #[cfg(test)]
@@ -313,10 +354,15 @@ where
     let stdout = child.stdout.take().ok_or("No stdout handle")?;
     let reader = std::io::BufReader::new(stdout);
     let mut session_id = String::new();
+    let mut ignored_stdout_lines = Vec::new();
+    let mut parsed_json_lines = 0;
 
     for line in reader.lines() {
-        match parse_json_line(line) {
-            Ok(Some(json)) => handle_json(&json, emit, &mut session_id),
+        match parse_process_stdout_line(line, &mut ignored_stdout_lines) {
+            Ok(Some(json)) => {
+                parsed_json_lines += 1;
+                handle_json(&json, emit, &mut session_id);
+            }
             Ok(None) => {}
             Err(message) => {
                 emit(error_event(message));
@@ -337,6 +383,8 @@ where
 
     Ok(JsonLineRun {
         session_id,
+        parsed_json_lines,
+        ignored_stdout_output: ignored_stdout_lines.join("\n"),
         stderr_output,
         status,
     })
@@ -385,10 +433,33 @@ fn format_spawn_error(process_name: &str, error: &std::io::Error) -> String {
 pub(crate) fn run_ai_agent_json_stream<F>(
     command: Command,
     process_name: &'static str,
+    emit: F,
+    session_id: impl Fn(&serde_json::Value) -> Option<&str>,
+    dispatch_event: impl Fn(&serde_json::Value, &mut F),
+    format_error: impl Fn(String, String) -> String,
+) -> Result<String, String>
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    run_ai_agent_json_stream_with_success_check(
+        command,
+        process_name,
+        emit,
+        session_id,
+        dispatch_event,
+        format_error,
+        |_| None,
+    )
+}
+
+pub(crate) fn run_ai_agent_json_stream_with_success_check<F>(
+    command: Command,
+    process_name: &'static str,
     mut emit: F,
     session_id: impl Fn(&serde_json::Value) -> Option<&str>,
     dispatch_event: impl Fn(&serde_json::Value, &mut F),
     format_error: impl Fn(String, String) -> String,
+    success_check: impl Fn(&JsonLineRun) -> Option<String>,
 ) -> Result<String, String>
 where
     F: FnMut(AiAgentStreamEvent),
@@ -406,14 +477,17 @@ where
         },
     )?;
 
+    let session_id = run.session_id.clone();
     if !run.status.success() {
         emit(AiAgentStreamEvent::Error {
-            message: format_error(run.stderr_output, run.status.to_string()),
+            message: format_error(run.stderr_output.clone(), run.status.to_string()),
         });
+    } else if let Some(message) = success_check(&run) {
+        emit(AiAgentStreamEvent::Error { message });
     }
 
     emit(AiAgentStreamEvent::Done);
-    Ok(run.session_id)
+    Ok(session_id)
 }
 
 /// Shared binary discovery: look up a CLI command by name using PATH, login shell, then candidates.

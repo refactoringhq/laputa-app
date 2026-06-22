@@ -48,6 +48,16 @@ pub(crate) fn format_error(stderr_output: String, status: String) -> String {
     }
 }
 
+pub(crate) fn format_empty_success(diagnostic_output: &str) -> String {
+    if diagnostic_output.is_empty() {
+        return "Pi CLI exited without agent output. Tolaria expected JSON stream events from `pi --mode json`; run Pi in a terminal to inspect the setup.".into();
+    }
+
+    format!(
+        "Pi CLI exited without agent output. Tolaria expected JSON stream events from `pi --mode json`, but Pi only wrote:\n{diagnostic_output}"
+    )
+}
+
 fn emit_session_event<F>(json: &serde_json::Value, emit: &mut F)
 where
     F: FnMut(AiAgentStreamEvent),

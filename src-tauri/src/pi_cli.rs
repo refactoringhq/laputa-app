@@ -27,13 +27,17 @@ where
         .tempdir()
         .map_err(|error| format!("Failed to create Pi config directory: {error}"))?;
     let command = crate::pi_config::build_command(binary, &request, agent_dir.path())?;
-    crate::cli_agent_runtime::run_ai_agent_json_stream(
+    crate::cli_agent_runtime::run_ai_agent_json_stream_with_success_check(
         command,
         "pi",
         emit,
         crate::pi_events::session_id,
         crate::pi_events::dispatch_event,
         crate::pi_events::format_error,
+        |run| {
+            (run.parsed_json_lines == 0)
+                .then(|| crate::pi_events::format_empty_success(&run.diagnostic_output()))
+        },
     )
 }
 
@@ -119,6 +123,36 @@ exit 4
         assert!(events.iter().any(|event| matches!(
             event,
             AiAgentStreamEvent::Error { message } if message.contains("not authenticated")
+        )));
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_agent_stream_reports_success_without_pi_events() {
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        let binary = executable_script(
+            dir.path(),
+            r#"printf '%s\n' 'npm warn exec installing pi-mcp-adapter'
+printf '%s\n' 'pi completed without json output' >&2
+"#,
+        );
+
+        let mut events = Vec::new();
+        let session_id = run_agent_stream_with_binary(
+            &binary,
+            request(vault.path().to_string_lossy().into_owned()),
+            |event| events.push(event),
+        )
+        .unwrap();
+
+        assert_eq!(session_id, "");
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AiAgentStreamEvent::Error { message }
+                if message.contains("Pi CLI exited without agent output")
+                    && message.contains("npm warn exec")
         )));
         assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
     }
