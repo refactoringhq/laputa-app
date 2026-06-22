@@ -18,6 +18,50 @@ interface UseAiWorkspacePublishedContextParams {
   views: ViewFile[]
 }
 
+type NoteListFilter = {
+  query: string
+  type: string | null
+}
+
+function isInboxSelection(selection: SidebarSelection): boolean {
+  return selection.kind === 'filter' && selection.filter === 'inbox'
+}
+
+function noteListItemsFromEntries(entries: VaultEntry[]): NoteListItem[] {
+  return entries.map((entry) => ({
+    path: entry.path,
+    title: entry.title,
+    type: entry.isA ?? 'Note',
+  }))
+}
+
+function noteListFilterForSelection(selection: SidebarSelection): NoteListFilter {
+  if (selection.kind === 'sectionGroup') return { type: selection.type, query: '' }
+  if (selection.kind === 'entity') return { type: null, query: selection.entry.title }
+  return { type: null, query: '' }
+}
+
+function usePublishedNoteList({
+  allNotesFileVisibility,
+  effectiveSelection,
+  entries,
+  inboxPeriod,
+  views,
+}: Pick<
+  UseAiWorkspacePublishedContextParams,
+  'allNotesFileVisibility' | 'effectiveSelection' | 'entries' | 'inboxPeriod' | 'views'
+>): NoteListItem[] {
+  return useMemo<NoteListItem[]>(() => {
+    const filtered = isInboxSelection(effectiveSelection)
+      ? filterInboxEntries(entries, inboxPeriod)
+      : filterEntries(entries, effectiveSelection, {
+        views,
+        allNotesFileVisibility,
+      })
+    return noteListItemsFromEntries(filtered)
+  }, [allNotesFileVisibility, effectiveSelection, entries, inboxPeriod, views])
+}
+
 export function useAiWorkspacePublishedContext({
   activeTab,
   allNotesFileVisibility,
@@ -30,26 +74,15 @@ export function useAiWorkspacePublishedContext({
 }: UseAiWorkspacePublishedContextParams) {
   const inboxCount = useMemo(() => filterInboxEntries(entries, inboxPeriod).length, [entries, inboxPeriod])
 
-  const noteList = useMemo<NoteListItem[]>(() => {
-    const isInbox = effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'inbox'
-    const filtered = isInbox
-      ? filterInboxEntries(entries, inboxPeriod)
-      : filterEntries(entries, effectiveSelection, {
-        views,
-        allNotesFileVisibility,
-      })
-    return filtered.map((entry) => ({
-      path: entry.path,
-      title: entry.title,
-      type: entry.isA ?? 'Note',
-    }))
-  }, [allNotesFileVisibility, effectiveSelection, entries, inboxPeriod, views])
+  const noteList = usePublishedNoteList({
+    allNotesFileVisibility,
+    effectiveSelection,
+    entries,
+    inboxPeriod,
+    views,
+  })
 
-  const noteListFilter = useMemo(() => {
-    if (effectiveSelection.kind === 'sectionGroup') return { type: effectiveSelection.type, query: '' }
-    if (effectiveSelection.kind === 'entity') return { type: null, query: effectiveSelection.entry.title }
-    return { type: null, query: '' }
-  }, [effectiveSelection])
+  const noteListFilter = useMemo(() => noteListFilterForSelection(effectiveSelection), [effectiveSelection])
 
   useEffect(() => {
     publishAiWorkspaceWindowSharedContext({

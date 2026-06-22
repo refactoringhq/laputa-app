@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 
@@ -14,6 +14,10 @@ export interface ConflictFileState {
   resolving: boolean
 }
 
+type ConflictStrategy = Exclude<FileResolution, 'manual' | null>
+type SetConflictFileStates = Dispatch<SetStateAction<ConflictFileState[]>>
+type SetConflictError = Dispatch<SetStateAction<string | null>>
+
 interface UseConflictResolverConfig {
   vaultPath: string
   onResolved: () => void
@@ -21,52 +25,65 @@ interface UseConflictResolverConfig {
   onOpenFile: (relativePath: string) => void
 }
 
-export function useConflictResolver({
-  vaultPath,
-  onResolved,
-  onToast,
-  onOpenFile,
-}: UseConflictResolverConfig) {
-  const [fileStates, setFileStates] = useState<ConflictFileState[]>([])
-  const [committing, setCommitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+function initialConflictFileState(file: string): ConflictFileState {
+  return { file, resolution: null, resolving: false }
+}
 
-  const initFiles = useCallback((files: string[]) => {
-    setFileStates(files.map(file => ({ file, resolution: null, resolving: false })))
-    setError(null)
-    setCommitting(false)
-  }, [])
+function updateConflictFile(
+  states: ConflictFileState[],
+  file: string,
+  patch: Partial<ConflictFileState>,
+): ConflictFileState[] {
+  return states.map((state) => state.file === file ? { ...state, ...patch } : state)
+}
 
-  const resolveFile = useCallback(async (file: string, strategy: 'ours' | 'theirs') => {
-    setFileStates(prev => prev.map(f =>
-      f.file === file ? { ...f, resolving: true } : f
-    ))
+function useResolveConflictFile(
+  vaultPath: string,
+  setFileStates: SetConflictFileStates,
+  setError: SetConflictError,
+): (file: string, strategy: ConflictStrategy) => Promise<void> {
+  return useCallback(async (file: string, strategy: ConflictStrategy) => {
+    setFileStates((prev) => updateConflictFile(prev, file, { resolving: true }))
     setError(null)
 
     try {
       await tauriCall<void>('git_resolve_conflict', { vaultPath, file, strategy })
-      setFileStates(prev => prev.map(f =>
-        f.file === file ? { ...f, resolution: strategy, resolving: false } : f
-      ))
+      setFileStates((prev) => updateConflictFile(prev, file, { resolution: strategy, resolving: false }))
     } catch (err) {
-      setFileStates(prev => prev.map(f =>
-        f.file === file ? { ...f, resolving: false } : f
-      ))
+      setFileStates((prev) => updateConflictFile(prev, file, { resolving: false }))
       setError(`Failed to resolve ${file}: ${err}`)
     }
-  }, [vaultPath])
+  }, [setError, setFileStates, vaultPath])
+}
 
-  const openInEditor = useCallback((file: string) => {
+function useOpenConflictFile(
+  onOpenFile: UseConflictResolverConfig['onOpenFile'],
+  setFileStates: SetConflictFileStates,
+): (file: string) => void {
+  return useCallback((file: string) => {
     onOpenFile(file)
-    setFileStates(prev => prev.map(f =>
-      f.file === file ? { ...f, resolution: 'manual' } : f
-    ))
-  }, [onOpenFile])
+    setFileStates((prev) => updateConflictFile(prev, file, { resolution: 'manual' }))
+  }, [onOpenFile, setFileStates])
+}
 
-  const allResolved = fileStates.length > 0 && fileStates.every(f => f.resolution !== null)
-  const anyResolving = fileStates.some(f => f.resolving)
-
-  const commitResolution = useCallback(async () => {
+function useCommitConflictResolution({
+  allResolved,
+  committing,
+  onResolved,
+  onToast,
+  setCommitting,
+  setError,
+  vaultPath,
+}: {
+  allResolved: boolean
+  committing: boolean
+  onResolved: UseConflictResolverConfig['onResolved']
+  onToast: UseConflictResolverConfig['onToast']
+  setCommitting: Dispatch<SetStateAction<boolean>>
+  setError: SetConflictError
+  vaultPath: string
+}): () => Promise<void> {
+  return useCallback(async () => {
     if (!allResolved || committing) return
     setCommitting(true)
     setError(null)
@@ -80,7 +97,39 @@ export function useConflictResolver({
     } finally {
       setCommitting(false)
     }
-  }, [vaultPath, allResolved, committing, onResolved, onToast])
+  }, [allResolved, committing, onResolved, onToast, setCommitting, setError, vaultPath])
+}
+
+export function useConflictResolver({
+  vaultPath,
+  onResolved,
+  onToast,
+  onOpenFile,
+}: UseConflictResolverConfig) {
+  const [fileStates, setFileStates] = useState<ConflictFileState[]>([])
+  const [committing, setCommitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const initFiles = useCallback((files: string[]) => {
+    setFileStates(files.map(initialConflictFileState))
+    setError(null)
+    setCommitting(false)
+  }, [])
+
+  const resolveFile = useResolveConflictFile(vaultPath, setFileStates, setError)
+  const openInEditor = useOpenConflictFile(onOpenFile, setFileStates)
+
+  const allResolved = fileStates.length > 0 && fileStates.every(f => f.resolution !== null)
+  const anyResolving = fileStates.some(f => f.resolving)
+  const commitResolution = useCommitConflictResolution({
+    allResolved,
+    committing,
+    onResolved,
+    onToast,
+    setCommitting,
+    setError,
+    vaultPath,
+  })
 
   return {
     fileStates,
