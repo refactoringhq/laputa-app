@@ -1,9 +1,8 @@
 import { renderHook, act } from '@testing-library/react'
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest'
 import { useNoteListKeyboard } from './useNoteListKeyboard'
-import type { VaultEntry } from '../types'
 
-function makeEntry(path: string, title: string): VaultEntry {
+function makeEntry(path, title) {
   return {
     path,
     title,
@@ -26,20 +25,20 @@ function makeEntry(path: string, title: string): VaultEntry {
   }
 }
 
-function keyEvent(key: string, opts: Partial<React.KeyboardEvent> = {}): React.KeyboardEvent {
-  return { key, preventDefault: vi.fn(), metaKey: false, ctrlKey: false, altKey: false, ...opts } as unknown as React.KeyboardEvent
+function keyEvent(key, opts = {}) {
+  return { key, preventDefault: vi.fn(), metaKey: false, ctrlKey: false, altKey: false, ...opts }
 }
 
 function installAnimationFrameStub() {
   let nextId = 1
-  const callbacks = new Map<number, FrameRequestCallback>()
+  const callbacks = new Map()
 
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+  vi.stubGlobal('requestAnimationFrame', (callback) => {
     const id = nextId++
     callbacks.set(id, callback)
     return id
   })
-  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+  vi.stubGlobal('cancelAnimationFrame', (id) => {
     callbacks.delete(id)
   })
 
@@ -55,7 +54,30 @@ function installAnimationFrameStub() {
 describe('useNoteListKeyboard', () => {
   const items = [makeEntry('/a.md', 'A'), makeEntry('/b.md', 'B'), makeEntry('/c.md', 'C')]
   const onOpen = vi.fn()
-  let flushAnimationFrame: () => void
+  let flushAnimationFrame
+
+  function renderKeyboard(options = {}) {
+    const open = options.onOpen ?? vi.fn()
+    const hook = renderHook(() =>
+      useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true, ...options }),
+    )
+    return { ...hook, open }
+  }
+
+  function pressKey(result, key, opts = {}) {
+    act(() => result.current.handleKeyDown(keyEvent(key, opts)))
+  }
+
+  function pressKeyTimes(result, key, times) {
+    for (let index = 0; index < times; index++) pressKey(result, key)
+  }
+
+  function expectDeferredOpen(open, entry) {
+    expect(open).not.toHaveBeenCalled()
+    act(() => flushAnimationFrame())
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(open).toHaveBeenCalledWith(entry)
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -74,56 +96,31 @@ describe('useNoteListKeyboard', () => {
   })
 
   it('ArrowDown highlights first item from no selection', () => {
-    const open = vi.fn()
-    const { result } = renderHook(() =>
-      useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true }),
-    )
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
+    const { result, open } = renderKeyboard()
+    pressKey(result, 'ArrowDown')
     expect(result.current.highlightedPath).toBe('/a.md')
-    expect(open).not.toHaveBeenCalled()
-    act(() => flushAnimationFrame())
-    expect(open).toHaveBeenCalledWith(items[0])
+    expectDeferredOpen(open, items[0])
   })
 
   it('ArrowDown advances highlight and opens the latest highlighted note on the next frame', () => {
-    const open = vi.fn()
-    const { result } = renderHook(() =>
-      useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true }),
-    )
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
+    const { result, open } = renderKeyboard()
+    pressKeyTimes(result, 'ArrowDown', 2)
     expect(result.current.highlightedPath).toBe('/b.md')
-    expect(open).not.toHaveBeenCalled()
-    act(() => flushAnimationFrame())
-    expect(open).toHaveBeenCalledTimes(1)
-    expect(open).toHaveBeenCalledWith(items[1])
+    expectDeferredOpen(open, items[1])
   })
 
   it('ArrowDown clamps at end of list', () => {
-    const open = vi.fn()
-    const { result } = renderHook(() =>
-      useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true }),
-    )
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
+    const { result, open } = renderKeyboard()
+    pressKeyTimes(result, 'ArrowDown', 4)
     expect(result.current.highlightedPath).toBe('/c.md')
-    act(() => flushAnimationFrame())
-    expect(open).toHaveBeenCalledTimes(1)
-    expect(open).toHaveBeenCalledWith(items[2])
+    expectDeferredOpen(open, items[2])
   })
 
   it('ArrowUp highlights last item from no selection', () => {
-    const open = vi.fn()
-    const { result } = renderHook(() =>
-      useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true }),
-    )
-    act(() => result.current.handleKeyDown(keyEvent('ArrowUp')))
+    const { result, open } = renderKeyboard()
+    pressKey(result, 'ArrowUp')
     expect(result.current.highlightedPath).toBe('/c.md')
-    expect(open).not.toHaveBeenCalled()
-    act(() => flushAnimationFrame())
-    expect(open).toHaveBeenCalledWith(items[2])
+    expectDeferredOpen(open, items[2])
   })
 
   it('scrolls the highlighted item into view with nearest-style behavior', () => {
@@ -132,9 +129,9 @@ describe('useNoteListKeyboard', () => {
       useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true }),
     )
     const scrollIntoView = vi.fn()
-    result.current.virtuosoRef.current = { scrollIntoView } as never
+    result.current.virtuosoRef.current = { scrollIntoView }
 
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
+    pressKey(result, 'ArrowDown')
 
     expect(scrollIntoView).toHaveBeenCalledWith({ index: 0, behavior: 'auto' })
   })
@@ -143,8 +140,8 @@ describe('useNoteListKeyboard', () => {
     const { result } = renderHook(() =>
       useNoteListKeyboard({ items, selectedNotePath: null, onOpen, enabled: true }),
     )
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
-    act(() => result.current.handleKeyDown(keyEvent('ArrowUp')))
+    pressKey(result, 'ArrowDown')
+    pressKey(result, 'ArrowUp')
     expect(result.current.highlightedPath).toBe('/a.md')
   })
 
@@ -153,8 +150,8 @@ describe('useNoteListKeyboard', () => {
     const { result } = renderHook(() =>
       useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true }),
     )
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
-    act(() => result.current.handleKeyDown(keyEvent('Enter')))
+    pressKey(result, 'ArrowDown')
+    pressKey(result, 'Enter')
     expect(open).toHaveBeenCalledTimes(1)
     expect(open).toHaveBeenCalledWith(items[0])
     act(() => flushAnimationFrame())
@@ -166,7 +163,7 @@ describe('useNoteListKeyboard', () => {
     const { result } = renderHook(() =>
       useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true }),
     )
-    act(() => result.current.handleKeyDown(keyEvent('Enter')))
+    pressKey(result, 'Enter')
     expect(open).not.toHaveBeenCalled()
   })
 
@@ -174,7 +171,7 @@ describe('useNoteListKeyboard', () => {
     const { result } = renderHook(() =>
       useNoteListKeyboard({ items, selectedNotePath: null, onOpen, enabled: false }),
     )
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
+    pressKey(result, 'ArrowDown')
     expect(result.current.highlightedPath).toBeNull()
   })
 
@@ -182,7 +179,7 @@ describe('useNoteListKeyboard', () => {
     const { result } = renderHook(() =>
       useNoteListKeyboard({ items, selectedNotePath: null, onOpen, enabled: true }),
     )
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown', { metaKey: true } as Partial<React.KeyboardEvent>)))
+    pressKey(result, 'ArrowDown', { metaKey: true })
     expect(result.current.highlightedPath).toBeNull()
   })
 
@@ -191,7 +188,7 @@ describe('useNoteListKeyboard', () => {
       ({ items: hookItems }) => useNoteListKeyboard({ items: hookItems, selectedNotePath: null, onOpen, enabled: true }),
       { initialProps: { items } },
     )
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
+    pressKey(result, 'ArrowDown')
     expect(result.current.highlightedPath).toBe('/a.md')
 
     rerender({ items: [makeEntry('/d.md', 'D')] })
@@ -229,7 +226,7 @@ describe('useNoteListKeyboard', () => {
     )
 
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }))
+      globalThis.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key: 'ArrowDown' }))
     })
 
     expect(result.current.highlightedPath).toBe('/a.md')
@@ -239,9 +236,9 @@ describe('useNoteListKeyboard', () => {
 
   it('ignores global arrow keys while an editable element is focused', () => {
     const open = vi.fn()
-    const editor = document.createElement('div')
+    const editor = globalThis.document.createElement('div')
     editor.setAttribute('contenteditable', 'true')
-    document.body.appendChild(editor)
+    globalThis.document.body.appendChild(editor)
     editor.focus()
 
     const { result } = renderHook(() =>
@@ -249,7 +246,7 @@ describe('useNoteListKeyboard', () => {
     )
 
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }))
+      globalThis.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key: 'ArrowDown' }))
     })
 
     expect(result.current.highlightedPath).toBeNull()
@@ -259,21 +256,10 @@ describe('useNoteListKeyboard', () => {
   })
 
   it('coalesces rapid arrow navigation into a single open for the latest highlighted note', () => {
-    const open = vi.fn()
-    const { result } = renderHook(() =>
-      useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true }),
-    )
-
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
+    const { result, open } = renderKeyboard()
+    pressKeyTimes(result, 'ArrowDown', 3)
 
     expect(result.current.highlightedPath).toBe('/c.md')
-    expect(open).not.toHaveBeenCalled()
-
-    act(() => flushAnimationFrame())
-
-    expect(open).toHaveBeenCalledTimes(1)
-    expect(open).toHaveBeenCalledWith(items[2])
+    expectDeferredOpen(open, items[2])
   })
 })
