@@ -9,8 +9,28 @@ import { parseDateFilterInput } from '@/utils/filterDates'
 
 const DATE_PREVIEW_DEBOUNCE_MS = 250
 
-export function DateValueInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const selected = value ? parseDateFilterInput(value) ?? undefined : undefined
+interface DateValueInputProps {
+  value: string
+  onChange: (v: string) => void
+}
+
+interface DatePreviewState {
+  previewLabel: string | null
+  resolvedPreview: Date | null
+  selected?: Date
+  setShowPreview: (showPreview: boolean) => void
+}
+
+function resolvedDate(value: string): Date | undefined {
+  return value ? parseDateFilterInput(value) ?? undefined : undefined
+}
+
+function previewLabelForValue(previewValue: string, resolvedPreview: Date | null): string | null {
+  if (resolvedPreview) return format(resolvedPreview, 'MMMM d, yyyy')
+  return previewValue ? 'Not recognized' : null
+}
+
+function useDatePreview(value: string): DatePreviewState {
   const [showPreview, setShowPreview] = useState(false)
   const [debouncedValue, setDebouncedValue] = useState(value)
 
@@ -21,11 +41,34 @@ export function DateValueInput({ value, onChange }: { value: string; onChange: (
 
   const previewValue = showPreview ? debouncedValue.trim() : ''
   const resolvedPreview = previewValue ? parseDateFilterInput(previewValue) : null
-  const previewLabel = resolvedPreview
-    ? format(resolvedPreview, 'MMMM d, yyyy')
-    : previewValue
-      ? 'Not recognized'
-      : null
+  return {
+    previewLabel: previewLabelForValue(previewValue, resolvedPreview),
+    resolvedPreview,
+    selected: resolvedDate(value),
+    setShowPreview,
+  }
+}
+
+function DatePreview({ label, resolved }: { label: string | null; resolved: Date | null }) {
+  if (!label) return null
+
+  return (
+    <div
+      className="pl-1 text-[11px] text-muted-foreground"
+      data-testid={resolved ? 'date-value-preview' : 'date-value-preview-unrecognized'}
+    >
+      {resolved ? `Resolves to ${label}` : label}
+    </div>
+  )
+}
+
+export function DateValueInput({ value, onChange }: DateValueInputProps) {
+  const {
+    previewLabel,
+    resolvedPreview,
+    selected,
+    setShowPreview,
+  } = useDatePreview(value)
 
   return (
     <div className="flex flex-1 min-w-0 flex-col gap-1">
@@ -65,14 +108,7 @@ export function DateValueInput({ value, onChange }: { value: string; onChange: (
           </PopoverContent>
         </Popover>
       </div>
-      {previewLabel && (
-        <div
-          className="pl-1 text-[11px] text-muted-foreground"
-          data-testid={resolvedPreview ? 'date-value-preview' : 'date-value-preview-unrecognized'}
-        >
-          {resolvedPreview ? `Resolves to ${previewLabel}` : previewLabel}
-        </div>
-      )}
+      <DatePreview label={previewLabel} resolved={resolvedPreview} />
     </div>
   )
 }

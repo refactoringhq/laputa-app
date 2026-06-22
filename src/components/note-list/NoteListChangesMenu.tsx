@@ -4,6 +4,7 @@ import {
   useCallback,
   useRef,
   type MouseEvent as ReactMouseEvent,
+  type RefObject,
 } from 'react'
 import type { ModifiedFile, VaultEntry } from '../../types'
 import type { AppLocale } from '../../lib/i18n'
@@ -30,6 +31,8 @@ export type ChangesContextMenuState = {
   entry: VaultEntry
 }
 
+type SetActionTarget = (target: ChangeActionTarget | null) => void
+
 function resolveChangeActionTarget(
   entry: VaultEntry,
   modifiedFiles?: ModifiedFile[],
@@ -43,6 +46,52 @@ function resolveChangeActionTarget(
     action: file.status === 'deleted' ? 'restore' : 'discard',
     relativePath: file.relativePath,
   }
+}
+
+function useContextMenuDismissal(
+  ctxMenu: ChangesContextMenuState | null,
+  ctxMenuRef: RefObject<HTMLDivElement | null>,
+  closeCtxMenu: () => void,
+): void {
+  useEffect(() => {
+    if (!ctxMenu) return
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (ctxMenuRef.current && !ctxMenuRef.current.contains(event.target as Node)) closeCtxMenu()
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [ctxMenu, closeCtxMenu, ctxMenuRef])
+}
+
+function useChangeConfirmHandler(
+  actionTarget: ChangeActionTarget | null,
+  onDiscardFile: ChangesContextMenuParams['onDiscardFile'],
+  setActionTarget: SetActionTarget,
+): () => Promise<void> {
+  return useCallback(async () => {
+    if (!actionTarget || !onDiscardFile) return
+    await onDiscardFile(actionTarget.relativePath)
+    setActionTarget(null)
+  }, [actionTarget, onDiscardFile, setActionTarget])
+}
+
+function useMenuActionSelection(
+  menuActionTarget: ChangeActionTarget | null,
+  setActionTarget: SetActionTarget,
+  closeCtxMenu: () => void,
+): () => void {
+  return useCallback(() => {
+    if (!menuActionTarget) return
+    setActionTarget(menuActionTarget)
+    closeCtxMenu()
+  }, [closeCtxMenu, menuActionTarget, setActionTarget])
+}
+
+function activeMenuActionTarget(
+  ctxMenu: ChangesContextMenuState | null,
+  resolveActionTarget: (entry: VaultEntry) => ChangeActionTarget | null,
+): ChangeActionTarget | null {
+  return ctxMenu ? resolveActionTarget(ctxMenu.entry) : null
 }
 
 export function useChangesContextMenu({
@@ -71,29 +120,11 @@ export function useChangesContextMenu({
   }, [openContextMenuForEntry])
 
   const closeCtxMenu = useCallback(() => setCtxMenu(null), [])
+  useContextMenuDismissal(ctxMenu, ctxMenuRef, closeCtxMenu)
 
-  useEffect(() => {
-    if (!ctxMenu) return
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (ctxMenuRef.current && !ctxMenuRef.current.contains(event.target as Node)) closeCtxMenu()
-    }
-    document.addEventListener('mousedown', handleOutsideClick)
-    return () => document.removeEventListener('mousedown', handleOutsideClick)
-  }, [ctxMenu, closeCtxMenu])
-
-  const handleChangeConfirm = useCallback(async () => {
-    if (!actionTarget || !onDiscardFile) return
-    await onDiscardFile(actionTarget.relativePath)
-    setActionTarget(null)
-  }, [actionTarget, onDiscardFile])
-
-  const menuActionTarget = ctxMenu ? resolveActionTarget(ctxMenu.entry) : null
-
-  const selectMenuAction = () => {
-    if (!menuActionTarget) return
-    setActionTarget(menuActionTarget)
-    closeCtxMenu()
-  }
+  const handleChangeConfirm = useChangeConfirmHandler(actionTarget, onDiscardFile, setActionTarget)
+  const menuActionTarget = activeMenuActionTarget(ctxMenu, resolveActionTarget)
+  const selectMenuAction = useMenuActionSelection(menuActionTarget, setActionTarget, closeCtxMenu)
 
   const contextMenuNode = (
     <ChangesContextMenuNode

@@ -12,43 +12,57 @@ import type { useLayoutPanels } from './useLayoutPanels'
 import type { NotePdfExportSource } from '../utils/notePdfExport'
 import { isWindows } from '../utils/platform'
 
+type FindInNoteHandler = (options?: { replace?: boolean }) => void
+type PdfExportHandler = (source?: NotePdfExportSource) => void
+type WindowConstraintUpdater = (
+  nextSidebarVisible: boolean,
+  nextNoteListVisible: boolean,
+  nextInspectorCollapsed?: boolean,
+) => void
+
 interface UseAppWindowControlsParams {
   layout: ReturnType<typeof useLayoutPanels>
   windowMode: boolean
 }
 
+interface AppWindowActionRefs {
+  diffToggleRef: MutableRefObject<() => void>
+  findInNoteRef: MutableRefObject<FindInNoteHandler | null>
+  pdfExportRef: MutableRefObject<PdfExportHandler | null>
+  rawToggleRef: MutableRefObject<() => void>
+  tableOfContentsToggleRef: MutableRefObject<() => void>
+}
+
 interface AppWindowControls {
   buildNumber: string | undefined
   diffToggleRef: MutableRefObject<() => void>
-  findInNoteRef: MutableRefObject<((options?: { replace?: boolean }) => void) | null>
+  findInNoteRef: MutableRefObject<FindInNoteHandler | null>
   handleCollapseSidebar: () => void
   handleSetViewMode: (mode: ViewMode) => void
   handleToggleInspector: () => void
   noteListVisible: boolean
-  pdfExportRef: MutableRefObject<((source?: NotePdfExportSource) => void) | null>
+  pdfExportRef: MutableRefObject<PdfExportHandler | null>
   rawToggleRef: MutableRefObject<() => void>
   sidebarVisible: boolean
   tableOfContentsToggleRef: MutableRefObject<() => void>
   zoom: ReturnType<typeof useZoom>
 }
 
-export function useAppWindowControls({
-  layout,
-  windowMode,
-}: UseAppWindowControlsParams): AppWindowControls {
-  const rawToggleRef = useRef<() => void>(() => {})
-  const tableOfContentsToggleRef = useRef<() => void>(() => {})
-  const diffToggleRef = useRef<() => void>(() => {})
-  const findInNoteRef = useRef<((options?: { replace?: boolean }) => void) | null>(null)
-  const pdfExportRef = useRef<((source?: NotePdfExportSource) => void) | null>(null)
+function useAppWindowActionRefs(): AppWindowActionRefs {
+  return {
+    diffToggleRef: useRef<() => void>(() => {}),
+    findInNoteRef: useRef<FindInNoteHandler | null>(null),
+    pdfExportRef: useRef<PdfExportHandler | null>(null),
+    rawToggleRef: useRef<() => void>(() => {}),
+    tableOfContentsToggleRef: useRef<() => void>(() => {}),
+  }
+}
 
-  const { setViewMode, sidebarVisible, noteListVisible } = useViewMode(
-    windowMode ? 'editor-only' : undefined,
-  )
-  const zoom = useZoom()
-  const buildNumber = useBuildNumber()
-
-  const updateMainWindowConstraints = useCallback((
+function useMainWindowConstraintUpdater(
+  layout: ReturnType<typeof useLayoutPanels>,
+  windowMode: boolean,
+): WindowConstraintUpdater {
+  return useCallback((
     nextSidebarVisible: boolean,
     nextNoteListVisible: boolean,
     nextInspectorCollapsed: boolean = layout.inspectorCollapsed,
@@ -73,6 +87,26 @@ export function useAppWindowControls({
     layout.sidebarWidth,
     windowMode,
   ])
+}
+
+export function useAppWindowControls({
+  layout,
+  windowMode,
+}: UseAppWindowControlsParams): AppWindowControls {
+  const {
+    diffToggleRef,
+    findInNoteRef,
+    pdfExportRef,
+    rawToggleRef,
+    tableOfContentsToggleRef,
+  } = useAppWindowActionRefs()
+
+  const { setViewMode, sidebarVisible, noteListVisible } = useViewMode(
+    windowMode ? 'editor-only' : undefined,
+  )
+  const zoom = useZoom()
+  const buildNumber = useBuildNumber()
+  const updateMainWindowConstraints = useMainWindowConstraintUpdater(layout, windowMode)
 
   const handleSetViewMode = useCallback((mode: ViewMode) => {
     setViewMode(mode)

@@ -101,17 +101,29 @@ function withInferredLanguage(block: UnknownRecord, children: unknown, language:
   }
 }
 
+function shouldCanonicalizeCodeBlockLanguage(
+  block: UnknownRecord,
+  canonicalLanguage: string | null,
+  rawLanguage: string,
+): canonicalLanguage is string {
+  return block.type === 'codeBlock' && Boolean(canonicalLanguage) && canonicalLanguage !== rawLanguage
+}
+
+function shouldInferCodeBlockLanguage(block: UnknownRecord, language: string): boolean {
+  return block.type === 'codeBlock' && isPlainTextLanguage(language)
+}
+
 function inferBlockLanguage(block: UnknownRecord): UnknownRecord {
   const children = inferChildren(block.children)
   const rawLanguage = readLanguage(block.props)
   const language = rawLanguage.toLowerCase()
   const canonicalLanguage = canonicalKnownCodeBlockLanguage(rawLanguage)
 
-  if (block.type === 'codeBlock' && canonicalLanguage && canonicalLanguage !== rawLanguage) {
+  if (shouldCanonicalizeCodeBlockLanguage(block, canonicalLanguage, rawLanguage)) {
     return withInferredLanguage(block, children, canonicalLanguage)
   }
 
-  if (!isPlainTextLanguage(language) || block.type !== 'codeBlock') return withInferredChildren(block, children)
+  if (!shouldInferCodeBlockLanguage(block, language)) return withInferredChildren(block, children)
 
   const inferred = inferCodeBlockLanguage(textFromInlineContent(block.content))
   if (!inferred) return withInferredChildren(block, children)
