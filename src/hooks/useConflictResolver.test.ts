@@ -43,31 +43,20 @@ describe('useConflictResolver', () => {
     expect(result.current.allResolved).toBe(false)
   })
 
-  it('resolves a file with ours strategy', async () => {
+  it.each([
+    { file: 'note.md', index: 0, strategy: 'ours' as const },
+    { file: 'plan.md', index: 1, strategy: 'theirs' as const },
+  ])('resolves a file with $strategy strategy', async ({ file, index, strategy }) => {
     const { result } = renderResolver()
 
     await act(async () => {
-      await result.current.resolveFile('note.md', 'ours')
+      await result.current.resolveFile(file, strategy)
     })
 
     expect(mockInvokeFn).toHaveBeenCalledWith('git_resolve_conflict', {
-      vaultPath: '/vault', file: 'note.md', strategy: 'ours',
+      vaultPath: '/vault', file, strategy,
     })
-    expect(result.current.fileStates[0].resolution).toBe('ours')
-    expect(result.current.allResolved).toBe(false) // plan.md still unresolved
-  })
-
-  it('resolves a file with theirs strategy', async () => {
-    const { result } = renderResolver()
-
-    await act(async () => {
-      await result.current.resolveFile('plan.md', 'theirs')
-    })
-
-    expect(mockInvokeFn).toHaveBeenCalledWith('git_resolve_conflict', {
-      vaultPath: '/vault', file: 'plan.md', strategy: 'theirs',
-    })
-    expect(result.current.fileStates[1].resolution).toBe('theirs')
+    expect(result.current.fileStates[index].resolution).toBe(strategy)
   })
 
   it('marks allResolved when all files are resolved', async () => {

@@ -74,6 +74,19 @@ describe('useKeyboardNavigation', () => {
     )
   }
 
+  function dispatchKeydown(eventInit: KeyboardEventInit) {
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        ...eventInit,
+      }))
+    })
+  }
+
+  function dispatchNoteNavigation(key: 'ArrowDown' | 'ArrowUp') {
+    dispatchKeydown({ key, metaKey: true, altKey: true })
+  }
+
   it('registers keydown listener on mount', () => {
     renderNav('/vault/a.md')
     expect(addedListeners.some(l => l.type === 'keydown')).toBe(true)
@@ -82,11 +95,7 @@ describe('useKeyboardNavigation', () => {
   it('navigates to next note on Cmd+Alt+ArrowDown', () => {
     renderNav('/vault/a.md')
 
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'ArrowDown', metaKey: true, altKey: true, bubbles: true,
-      }))
-    })
+    dispatchNoteNavigation('ArrowDown')
 
     expect(onReplaceActiveTab).toHaveBeenCalledWith(entries[1])
   })
@@ -94,11 +103,7 @@ describe('useKeyboardNavigation', () => {
   it('navigates to previous note on Cmd+Alt+ArrowUp', () => {
     renderNav('/vault/b.md')
 
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'ArrowUp', metaKey: true, altKey: true, bubbles: true,
-      }))
-    })
+    dispatchNoteNavigation('ArrowUp')
 
     expect(onReplaceActiveTab).toHaveBeenCalledWith(entries[0])
   })
@@ -106,11 +111,7 @@ describe('useKeyboardNavigation', () => {
   it('does not wrap when at the last note and pressing Down', () => {
     renderNav('/vault/c.md')
 
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'ArrowDown', metaKey: true, altKey: true, bubbles: true,
-      }))
-    })
+    dispatchNoteNavigation('ArrowDown')
 
     expect(onReplaceActiveTab).not.toHaveBeenCalled()
     expect(onSelectNote).not.toHaveBeenCalled()
@@ -119,11 +120,7 @@ describe('useKeyboardNavigation', () => {
   it('does not wrap when at the first note and pressing Up', () => {
     renderNav('/vault/a.md')
 
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'ArrowUp', metaKey: true, altKey: true, bubbles: true,
-      }))
-    })
+    dispatchNoteNavigation('ArrowUp')
 
     expect(onReplaceActiveTab).not.toHaveBeenCalled()
     expect(onSelectNote).not.toHaveBeenCalled()
@@ -132,11 +129,7 @@ describe('useKeyboardNavigation', () => {
   it('selects first note when no active tab and pressing Down', () => {
     renderNav(null)
 
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'ArrowDown', metaKey: true, altKey: true, bubbles: true,
-      }))
-    })
+    dispatchNoteNavigation('ArrowDown')
 
     expect(onSelectNote).toHaveBeenCalledWith(entries[0])
   })
@@ -144,11 +137,7 @@ describe('useKeyboardNavigation', () => {
   it('selects last note when no active tab and pressing Up', () => {
     renderNav(null)
 
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'ArrowUp', metaKey: true, altKey: true, bubbles: true,
-      }))
-    })
+    dispatchNoteNavigation('ArrowUp')
 
     expect(onSelectNote).toHaveBeenCalledWith(entries[2])
   })
@@ -156,11 +145,7 @@ describe('useKeyboardNavigation', () => {
   it('does nothing without modifier keys', () => {
     renderNav('/vault/a.md')
 
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'ArrowRight', bubbles: true,
-      }))
-    })
+    dispatchKeydown({ key: 'ArrowRight' })
 
     expect(onReplaceActiveTab).not.toHaveBeenCalled()
     expect(onSelectNote).not.toHaveBeenCalled()
@@ -171,11 +156,7 @@ describe('useKeyboardNavigation', () => {
     const customOrder = [entries[2], entries[1], entries[0]]
     renderNav('/vault/c.md', customOrder)
 
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'ArrowDown', metaKey: true, altKey: true, bubbles: true,
-      }))
-    })
+    dispatchNoteNavigation('ArrowDown')
 
     // Should navigate to B (next in custom order), not based on modifiedAt
     expect(onReplaceActiveTab).toHaveBeenCalledWith(entries[1])
@@ -184,11 +165,7 @@ describe('useKeyboardNavigation', () => {
   it('does nothing when note list is empty', () => {
     renderNav('/vault/a.md', [])
 
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'ArrowDown', metaKey: true, altKey: true, bubbles: true,
-      }))
-    })
+    dispatchNoteNavigation('ArrowDown')
 
     expect(onReplaceActiveTab).not.toHaveBeenCalled()
     expect(onSelectNote).not.toHaveBeenCalled()
