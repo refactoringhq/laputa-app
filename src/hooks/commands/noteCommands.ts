@@ -274,44 +274,63 @@ function buildActivePathCommand(config: NoteCommandsConfig, command: ActivePathC
   })
 }
 
+function buildRevealActiveFileCommand(config: NoteCommandsConfig): CommandAction {
+  return buildActivePathCommand(config, {
+    id: 'reveal-active-file',
+    label: 'Reveal in Finder',
+    keywords: ['file', 'folder', 'finder', 'reveal', 'show', 'filesystem'],
+    enabled: !!config.onRevealActiveFile,
+    run: (path) => config.onRevealActiveFile?.(path),
+  })
+}
+
+function buildCopyActiveFilePathCommand(config: NoteCommandsConfig): CommandAction {
+  return buildActivePathCommand(config, {
+    id: 'copy-active-file-path',
+    label: 'Copy File Path',
+    keywords: ['file', 'path', 'copy', 'clipboard', 'filesystem'],
+    enabled: !!config.onCopyActiveFilePath,
+    run: (path) => config.onCopyActiveFilePath?.(path),
+  })
+}
+
+function buildCopyActiveDeepLinkCommand(config: NoteCommandsConfig): CommandAction {
+  return buildActivePathCommand(config, {
+    id: 'copy-active-deep-link',
+    label: 'Copy deep link to current item',
+    keywords: ['deeplink', 'deep link', 'url', 'link', 'copy', 'clipboard'],
+    enabled: !!config.onCopyActiveDeepLink,
+    run: (path) => config.onCopyActiveDeepLink?.(path),
+  })
+}
+
+function buildExportNotePdfCommand(config: NoteCommandsConfig): CommandAction {
+  return createNoteCommand({
+    id: 'export-note-pdf',
+    label: translate(config.locale ?? 'en', 'editor.toolbar.exportPdf'),
+    keywords: ['export', 'pdf', 'print', 'share', 'archive'],
+    enabled: config.hasActiveNote && (config.activeFileKind ?? 'markdown') === 'markdown' && !!config.onExportNoteAsPdf,
+    execute: () => config.onExportNoteAsPdf?.(),
+  })
+}
+
+function buildOpenActiveFileExternalCommand(config: NoteCommandsConfig): CommandAction {
+  return buildActivePathCommand(config, {
+    id: 'open-active-file-external',
+    label: 'Open in Default App',
+    keywords: ['file', 'open', 'external', 'default', 'attachment'],
+    enabled: (config.activeFileKind ?? 'markdown') !== 'markdown' && !!config.onOpenActiveFileExternal,
+    run: (path) => config.onOpenActiveFileExternal?.(path),
+  })
+}
+
 function buildFileActionCommands(config: NoteCommandsConfig): CommandAction[] {
-  const activeFileKind = config.activeFileKind ?? 'markdown'
   return [
-    buildActivePathCommand(config, {
-      id: 'reveal-active-file',
-      label: 'Reveal in Finder',
-      keywords: ['file', 'folder', 'finder', 'reveal', 'show', 'filesystem'],
-      enabled: !!config.onRevealActiveFile,
-      run: (path) => config.onRevealActiveFile?.(path),
-    }),
-    buildActivePathCommand(config, {
-      id: 'copy-active-file-path',
-      label: 'Copy File Path',
-      keywords: ['file', 'path', 'copy', 'clipboard', 'filesystem'],
-      enabled: !!config.onCopyActiveFilePath,
-      run: (path) => config.onCopyActiveFilePath?.(path),
-    }),
-    buildActivePathCommand(config, {
-      id: 'copy-active-deep-link',
-      label: 'Copy deep link to current item',
-      keywords: ['deeplink', 'deep link', 'url', 'link', 'copy', 'clipboard'],
-      enabled: !!config.onCopyActiveDeepLink,
-      run: (path) => config.onCopyActiveDeepLink?.(path),
-    }),
-    createNoteCommand({
-      id: 'export-note-pdf',
-      label: translate(config.locale ?? 'en', 'editor.toolbar.exportPdf'),
-      keywords: ['export', 'pdf', 'print', 'share', 'archive'],
-      enabled: config.hasActiveNote && activeFileKind === 'markdown' && !!config.onExportNoteAsPdf,
-      execute: () => config.onExportNoteAsPdf?.(),
-    }),
-    buildActivePathCommand(config, {
-      id: 'open-active-file-external',
-      label: 'Open in Default App',
-      keywords: ['file', 'open', 'external', 'default', 'attachment'],
-      enabled: activeFileKind !== 'markdown' && !!config.onOpenActiveFileExternal,
-      run: (path) => config.onOpenActiveFileExternal?.(path),
-    }),
+    buildRevealActiveFileCommand(config),
+    buildCopyActiveFilePathCommand(config),
+    buildCopyActiveDeepLinkCommand(config),
+    buildExportNotePdfCommand(config),
+    buildOpenActiveFileExternalCommand(config),
   ]
 }
 
