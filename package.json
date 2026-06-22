@@ -67,6 +67,7 @@
     "@tauri-apps/plugin-opener": "^2.5.3",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.0",
+    "@tiptap/pm": "3.22.5",
     "@tldraw/assets": "4.5.10",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

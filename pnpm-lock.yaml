@@ -164,6 +164,9 @@ importers:
       '@tauri-apps/plugin-updater':
         specifier: ^2.10.0
         version: 2.10.0
+      '@tiptap/pm':
+        specifier: 3.22.5
+        version: 3.22.5
       '@tldraw/assets':
         specifier: 4.5.10
         version: 4.5.10

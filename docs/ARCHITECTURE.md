@@ -133,6 +133,7 @@ The note list opportunistically preloads visible and adjacent markdown/text entr
 | Desktop shell | Tauri v2 | 2.10.0 |
 | Frontend | React + TypeScript | React 19, TS 5.9 |
 | Editor | BlockNote | 0.46.2 |
+| Editor render extensions | @tiptap/pm | ProseMirror decorations for rich-editor node presentation |
 | Code block highlighting | @blocknote/code-block | 0.46.2 |
 | Additional code grammars | @shikijs/langs | 3.23.0 |
 | Diagram rendering | Mermaid | 11.14.0 |

@@ -478,7 +478,7 @@
 .ai-markdown ul,
 .ai-markdown ol {
   margin: 0.4em 0;
-  padding-left: 1.5em;
+  padding-inline-start: 1.5em;
 }
 .ai-markdown li { margin: 0.15em 0; }
 .ai-markdown li > ul,
@@ -518,7 +518,7 @@
 .ai-markdown blockquote {
   margin: 0.5em 0;
   padding: 0.25em 0.75em;
-  border-left: 3px solid var(--border);
+  border-inline-start: 3px solid var(--border);
   color: var(--muted-foreground);
 }
 
@@ -563,7 +563,7 @@
 .ai-markdown td {
   border: 1px solid var(--border);
   padding: 0.35em 0.6em;
-  text-align: left;
+  text-align: start;
 }
 .ai-markdown th {
   background: var(--muted);

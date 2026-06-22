@@ -33,6 +33,7 @@ import { useRawModeWithFlush } from './useRawModeWithFlush'
 import { createImeCompositionKeyGuardExtension } from './imeCompositionKeyGuardExtension'
 import { handleRichEditorPaste } from './richEditorPaste'
 import { createRichEditorMarkdownInputTransformExtension } from './richEditorInputTransformExtension'
+import { createRichEditorTextDirectionExtension } from './richEditorTextDirection'
 import { createRichEditorTransformErrorRecoveryExtension } from './richEditorTransformErrorRecoveryExtension'
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
 import { useEditorPdfExport } from './useEditorPdfExport'
@@ -232,6 +233,7 @@ function useEditorSetup({
       createRichEditorTransformErrorRecoveryExtension(),
       createImeCompositionKeyGuardExtension(),
       createRichEditorMarkdownInputTransformExtension(),
+      createRichEditorTextDirectionExtension(),
     ],
   })
   useFilenameAutolinkGuard(editor)

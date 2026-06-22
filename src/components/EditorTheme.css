@@ -35,6 +35,19 @@
   text-align: start;
 }
 
+.tolaria-rich-editor-text-direction-rtl,
+[data-tolaria-text-direction="rtl"],
+[data-tolaria-text-direction="rtl"] :is(blockquote, .bn-inline-content, .tola-callout) {
+  direction: rtl;
+}
+
+[data-tolaria-text-direction="rtl"]:is(blockquote),
+[data-tolaria-text-direction="rtl"] blockquote {
+  border-left-width: 0;
+  border-inline-start: var(--blockquote-border-left-width, 3px) solid var(--blockquote-border-left-color, var(--border));
+  padding-inline-start: var(--blockquote-padding-left, 0.75em);
+}
+
 /* Override BlockNote's default line-height on block-outer so our theme controls it */
 .editor__blocknote-container .bn-block-outer {
   line-height: var(--editor-line-height) !important;

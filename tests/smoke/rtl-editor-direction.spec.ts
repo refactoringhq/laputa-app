@@ -8,7 +8,10 @@ const RTL_TITLE = 'RTL Mixed Direction'
 const RTL_PARAGRAPH = 'مرحبا بالعالم'
 const MIXED_PARAGRAPH = 'English then مرحبا'
 const RTL_LIST_ITEM = 'רשימת בדיקה'
+const RTL_TODO_ITEM = 'משימת בדיקה'
 const RTL_QUOTE = 'ציטוט חשוב'
+const RTL_CALLOUT_TITLE = 'כותרת חשובה'
+const RTL_CALLOUT_BODY = 'גוף הודעה חשוב'
 const RTL_TABLE_CELL = 'תא בטבלה'
 
 let tempVaultDir: string
@@ -30,8 +33,12 @@ test.beforeEach(async ({ page }, testInfo) => {
       MIXED_PARAGRAPH,
       '',
       `- ${RTL_LIST_ITEM}`,
+      `- [ ] ${RTL_TODO_ITEM}`,
       '',
       `> ${RTL_QUOTE}`,
+      '',
+      `> [!note] ${RTL_CALLOUT_TITLE}`,
+      `> ${RTL_CALLOUT_BODY}`,
       '',
       '| Field | Value |',
       '| --- | --- |',
@@ -86,6 +93,21 @@ test('rich editor uses logical spacing for RTL block elements', async ({ page })
     return Number.parseFloat(style.paddingRight) > Number.parseFloat(style.paddingLeft)
   })).toBe(true)
 
+  const rtlTodoItem = page.locator('[data-content-type="checkListItem"]', { hasText: RTL_TODO_ITEM }).first()
+  await expect(rtlTodoItem).toBeVisible({ timeout: 5_000 })
+  await expect(rtlTodoItem).toHaveAttribute('dir', 'auto')
+  await expect(rtlTodoItem).toHaveCSS('direction', 'rtl')
+  await expect.poll(async () => rtlTodoItem.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return Number.parseFloat(style.paddingRight) === 0 && Number.parseFloat(style.paddingLeft) === 0
+  })).toBe(true)
+  await expect.poll(async () => rtlTodoItem.evaluate((element) => {
+    const checkbox = element.querySelector('input[type="checkbox"]')
+    const text = element.querySelector('.bn-inline-content')
+    if (!checkbox || !text) return false
+    return checkbox.getBoundingClientRect().left > text.getBoundingClientRect().right
+  })).toBe(true)
+
   const rtlQuote = page.locator('.bn-block-content', { hasText: RTL_QUOTE }).first()
   await expect(rtlQuote).toBeVisible({ timeout: 5_000 })
   await expect(rtlQuote).toHaveAttribute('dir', 'auto')
@@ -94,6 +116,16 @@ test('rich editor uses logical spacing for RTL block elements', async ({ page })
   await expect(rtlQuoteElement).toBeVisible({ timeout: 5_000 })
   await expect.poll(async () => rtlQuoteElement.evaluate((element) => {
     const style = getComputedStyle(element)
+    return Number.parseFloat(style.borderRightWidth) > Number.parseFloat(style.borderLeftWidth)
+  })).toBe(true)
+
+  const rtlCalloutMarkerQuote = page.locator('.bn-block-content', { hasText: RTL_CALLOUT_TITLE }).first()
+  await expect(rtlCalloutMarkerQuote).toBeVisible({ timeout: 5_000 })
+  await expect(rtlCalloutMarkerQuote).toHaveCSS('direction', 'rtl')
+  await expect.poll(async () => rtlCalloutMarkerQuote.evaluate((element) => {
+    const blockquote = element.querySelector('blockquote')
+    if (!blockquote) return false
+    const style = getComputedStyle(blockquote)
     return Number.parseFloat(style.borderRightWidth) > Number.parseFloat(style.borderLeftWidth)
   })).toBe(true)
 
