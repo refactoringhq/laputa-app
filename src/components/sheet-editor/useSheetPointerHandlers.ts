@@ -12,7 +12,7 @@ import {
 } from './sheetEditorHelpers'
 
 interface UseSheetPointerHandlersOptions {
-  captureSheetKeyboard: () => void
+  captureSheetKeyboard: (options?: { deferActiveState?: boolean }) => void
   commitExternalFormulaEditorInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
   handleSheetWikilinkPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => boolean
   scheduleSelectionChromePatch: () => void
@@ -35,7 +35,7 @@ function stopSecondaryPointer(event: ReactPointerEvent<HTMLDivElement>) {
   return true
 }
 
-function requestWorkbookFocusAfterPointerDown({
+function focusWorkbookForPointerDown({
   sheetElementRef,
   sheetFocusRequestRef,
   sheetKeyboardCapturedRef,
@@ -44,15 +44,10 @@ function requestWorkbookFocusAfterPointerDown({
   | 'sheetFocusRequestRef'
   | 'sheetKeyboardCapturedRef'
 >) {
-  const focusRequestId = sheetFocusRequestRef.current + 1
-  sheetFocusRequestRef.current = focusRequestId
-  window.setTimeout(() => {
-    const container = sheetElementRef.current
-    if (!container || !sheetKeyboardCapturedRef.current || sheetFocusRequestRef.current !== focusRequestId) return
-    const activeElement = document.activeElement
-    if (activeElement instanceof HTMLElement && !container.contains(activeElement) && activeElement !== document.body) return
-    focusWorkbookRoot(container)
-  }, 0)
+  sheetFocusRequestRef.current += 1
+  const container = sheetElementRef.current
+  if (!container || !sheetKeyboardCapturedRef.current) return
+  focusWorkbookRoot(container)
 }
 
 function shouldRequestWorkbookFocus(
@@ -82,11 +77,11 @@ export function useSheetPointerHandlers(options: UseSheetPointerHandlersOptions)
     commitExternalFormulaEditorInput(visibleSheetTextInput(sheetElementRef.current))
     patchReactSheetPointerEvent(event, sheetElementRef.current)
     sheetPointerActiveRef.current = true
-    captureSheetKeyboard()
+    captureSheetKeyboard({ deferActiveState: true })
     scheduleSelectionChromePatch()
     setSheetContextMenu(null)
     setWikilinkAutocomplete(null)
-    if (shouldRequestWorkbookFocus(event, sheetElementRef)) requestWorkbookFocusAfterPointerDown(options)
+    if (shouldRequestWorkbookFocus(event, sheetElementRef)) focusWorkbookForPointerDown(options)
   }, [
     captureSheetKeyboard,
     commitExternalFormulaEditorInput,

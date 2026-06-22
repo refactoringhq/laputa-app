@@ -372,6 +372,10 @@ function hideIronCalcFillHandle(element: HTMLElement): void {
   if (element.style.pointerEvents !== 'none') element.style.pointerEvents = 'none'
 }
 
+function markSelectionChrome(element: HTMLElement): void {
+  if (element.dataset.tolariaSelectionChrome !== 'true') element.dataset.tolariaSelectionChrome = 'true'
+}
+
 function replaceSelectionColor(element: HTMLElement, style: CSSStyleDeclaration): void {
   for (const replacement of SELECTION_COLOR_REPLACEMENTS) {
     if (style[replacement.property] === replacement.source && element.style[replacement.property] !== replacement.target) {
@@ -389,6 +393,7 @@ function shouldPatchSelectedCellOutline(element: HTMLElement, style: CSSStyleDec
 function patchIronCalcSelectionElement(element: HTMLElement): void {
   const style = window.getComputedStyle(element)
   if (isIronCalcFillHandle(style)) {
+    markSelectionChrome(element)
     hideIronCalcFillHandle(element)
     return
   }
@@ -396,14 +401,17 @@ function patchIronCalcSelectionElement(element: HTMLElement): void {
   replaceSelectionColor(element, style)
 
   if (shouldPatchSelectedCellOutline(element, style)) {
+    markSelectionChrome(element)
     normalizeSelectionOutline(element)
     patchSelectedCellOutlineGeometry(element)
   }
   if (isIronCalcRangeSelectionOutline(element, style)) {
+    markSelectionChrome(element)
     normalizeSelectionOutline(element)
     patchRangeSelectionOutlineGeometry(element)
   }
   if (isIronCalcEditingCellOutline(element, style)) {
+    markSelectionChrome(element)
     normalizeSelectionOutline(element)
     patchEditingCellOutlineGeometry(element)
   }

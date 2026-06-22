@@ -45,6 +45,8 @@ function isSaveShortcut(event: ReactKeyboardEvent<HTMLDivElement>) {
   return (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's'
 }
 
+const PASSIVE_WORKBOOK_NAVIGATION_KEYS = new Set(['ArrowDown', 'ArrowUp'])
+
 function saveWorkbookNow({
   cancelScheduledSerialize,
   serializeCurrentWorkbook,
@@ -72,11 +74,54 @@ function focusWorkbookRootWhenSheetStillOwnsFocus(sheetElement: HTMLDivElement |
   if (canSheetClaimFocus(sheetElement)) focusWorkbookRoot(sheetElement)
 }
 
+function restoreCommittedCellFocus(
+  sheetElement: HTMLDivElement | null,
+  sheetKeyboardCapturedRef: MutableRefObject<boolean>,
+) {
+  if (sheetKeyboardCapturedRef.current) focusWorkbookRootWhenSheetStillOwnsFocus(sheetElement)
+}
+
+function dispatchWindowNavigationKey(event: ReactKeyboardEvent<HTMLDivElement>) {
+  window.dispatchEvent(new KeyboardEvent('keydown', {
+    altKey: event.altKey,
+    bubbles: true,
+    cancelable: true,
+    code: event.code,
+    ctrlKey: event.ctrlKey,
+    key: event.key,
+    location: event.location,
+    metaKey: event.metaKey,
+    repeat: event.repeat,
+    shiftKey: event.shiftKey,
+  }))
+}
+
+function redirectPassiveWorkbookNavigation(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  sheetElement: HTMLDivElement | null,
+  options: Pick<UseSheetKeyboardHandlersOptions,
+    | 'releaseSheetKeyboard'
+    | 'sheetKeyboardCapturedRef'
+  >,
+) {
+  if (options.sheetKeyboardCapturedRef.current) return false
+  if (!PASSIVE_WORKBOOK_NAVIGATION_KEYS.has(event.key)) return false
+  if (!isSheetCellKeyboardTarget(sheetElement, event.target)) return false
+
+  event.preventDefault()
+  event.stopPropagation()
+  event.nativeEvent.stopImmediatePropagation()
+  options.releaseSheetKeyboard()
+  dispatchWindowNavigationKey(event)
+  return true
+}
+
 function commitEditableFormulaInput(
   event: ReactKeyboardEvent<HTMLDivElement>,
   sheetElement: HTMLDivElement | null,
   options: Pick<UseSheetKeyboardHandlersOptions,
     | 'commitExternalFormulaEditorInput'
+    | 'sheetKeyboardCapturedRef'
     | 'setFormulaAutocomplete'
     | 'setWikilinkAutocomplete'
   >,
@@ -88,7 +133,7 @@ function commitEditableFormulaInput(
   event.preventDefault()
   event.stopPropagation()
   dismissFormulaAutocomplete(options)
-  window.setTimeout(() => focusWorkbookRootWhenSheetStillOwnsFocus(sheetElement), 0)
+  window.setTimeout(() => restoreCommittedCellFocus(sheetElement, options.sheetKeyboardCapturedRef), 0)
   return true
 }
 
@@ -99,18 +144,9 @@ function shouldHandleCapturedEscape(
   return sheetKeyboardCapturedRef.current && event.key === 'Escape'
 }
 
-function restoreOrReleaseCapturedKeyboard(
-  event: ReactKeyboardEvent<HTMLDivElement>,
-  sheetElement: HTMLDivElement | null,
-  options: Pick<UseSheetKeyboardHandlersOptions,
-    | 'releaseSheetKeyboard'
-    | 'restoreSheetKeyboardFocus'
-  >,
+function scheduleCapturedKeyboardRelease(
+  options: Pick<UseSheetKeyboardHandlersOptions, 'releaseSheetKeyboard'>,
 ) {
-  if (isEditableWorkbookKeyboardTarget(sheetElement, event.target)) {
-    options.restoreSheetKeyboardFocus()
-    return
-  }
   window.setTimeout(options.releaseSheetKeyboard, 0)
 }
 
@@ -124,7 +160,11 @@ function handleCapturedEscape(
   >,
 ) {
   if (!shouldHandleCapturedEscape(event, options.sheetKeyboardCapturedRef)) return false
-  restoreOrReleaseCapturedKeyboard(event, sheetElement, options)
+  if (isEditableWorkbookKeyboardTarget(sheetElement, event.target)) {
+    options.restoreSheetKeyboardFocus()
+    return true
+  }
+  scheduleCapturedKeyboardRelease(options)
   return true
 }
 
@@ -203,18 +243,11 @@ function startSelectedCellEdit(
 
 function stopEscapeKeyPropagation(
   event: ReactKeyboardEvent<HTMLDivElement>,
-  options: Pick<UseSheetKeyboardHandlersOptions,
-    | 'releaseSheetKeyboard'
-    | 'restoreSheetKeyboardFocus'
-  >,
+  options: Pick<UseSheetKeyboardHandlersOptions, 'releaseSheetKeyboard'>,
 ) {
   if (event.key !== 'Escape') return false
   event.stopPropagation()
-  if (isEditableTarget(event.target)) {
-    options.restoreSheetKeyboardFocus()
-    return true
-  }
-  options.releaseSheetKeyboard()
+  if (!isEditableTarget(event.target)) options.releaseSheetKeyboard()
   return true
 }
 
@@ -234,27 +267,42 @@ function stopWorkbookKeyPropagation(
   stopSpreadsheetKeyPropagation(event)
 }
 
+function processKeyDownCapture(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  options: UseSheetKeyboardHandlersOptions,
+) {
+  const sheetElement = options.sheetElementRef.current
+
+  if (isSaveShortcut(event)) saveWorkbookNow(options)
+  if (redirectPassiveWorkbookNavigation(event, sheetElement, options)) return
+  if (commitEditableFormulaInput(event, sheetElement, options)) return
+
+  options.handleWikilinkKeyDown(event)
+  if (event.defaultPrevented) return
+
+  options.handleFormulaKeyDown(event)
+  if (event.defaultPrevented) return
+
+  if (handleCapturedEscape(event, sheetElement, options)) return
+  if (clearSelectedCells(event, sheetElement, options)) return
+  startSelectedCellEdit(event, sheetElement, options)
+}
+
+function processSheetKeyDown(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  options: UseSheetKeyboardHandlersOptions,
+) {
+  if (!options.sheetKeyboardCapturedRef.current) return
+  stopWorkbookKeyPropagation(event, options)
+}
+
 export function useSheetKeyboardHandlers(options: UseSheetKeyboardHandlersOptions) {
   const handleKeyDownCapture = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const sheetElement = options.sheetElementRef.current
-
-    if (isSaveShortcut(event)) saveWorkbookNow(options)
-    if (commitEditableFormulaInput(event, sheetElement, options)) return
-
-    options.handleWikilinkKeyDown(event)
-    if (event.defaultPrevented) return
-
-    options.handleFormulaKeyDown(event)
-    if (event.defaultPrevented) return
-
-    if (handleCapturedEscape(event, sheetElement, options)) return
-    if (clearSelectedCells(event, sheetElement, options)) return
-    startSelectedCellEdit(event, sheetElement, options)
+    processKeyDownCapture(event, options)
   }, [options])
 
   const handleSheetKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!options.sheetKeyboardCapturedRef.current) return
-    stopWorkbookKeyPropagation(event, options)
+    processSheetKeyDown(event, options)
   }, [options])
 
   return { handleKeyDownCapture, handleSheetKeyDown }

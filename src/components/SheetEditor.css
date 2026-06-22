@@ -56,6 +56,11 @@
   pointer-events: none !important;
 }
 
+.sheet-editor--passive .sheet-container [data-tolaria-selection-chrome="true"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 .sheet-editor--single-sheet > div > .scroll {
   top: 40px !important;
   height: calc(100% - 40px) !important;

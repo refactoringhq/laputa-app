@@ -27,6 +27,11 @@ interface SheetEditorProps {
 
 const MemoizedIronCalc = memo(IronCalc)
 
+function workbookEditorClassName(sheetKeyboardActive: boolean) {
+  const focusClassName = sheetKeyboardActive ? 'sheet-editor--keyboard-active' : 'sheet-editor--passive'
+  return `sheet-editor sheet-editor--workbook sheet-editor--single-sheet ${focusClassName}`
+}
+
 export function SheetEditor({
   content,
   entries = EMPTY_VAULT_ENTRIES,
@@ -59,6 +64,7 @@ export function SheetEditor({
     setSheetContextMenu,
     sheetContextMenu,
     sheetElementRef,
+    sheetKeyboardActive,
     wikilinkAutocomplete,
     workbook,
   } = useSheetEditorController({
@@ -92,7 +98,7 @@ export function SheetEditor({
   return (
     <div
       ref={sheetElementRef}
-      className="sheet-editor sheet-editor--workbook sheet-editor--single-sheet"
+      className={workbookEditorClassName(sheetKeyboardActive)}
       data-testid="sheet-editor"
       {...interactionHandlers}
     >

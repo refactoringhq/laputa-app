@@ -1,8 +1,9 @@
 import { useLayoutEffect } from 'react'
 import type { MutableRefObject } from 'react'
-import { canSheetClaimFocus } from './sheetEditorFocusOwnership'
+import { canSheetClaimCapturedFocus } from './sheetEditorFocusOwnership'
 
 interface UseGuardedWorkbookFocusOptions {
+  onWorkbookFocusBlocked?: () => void
   sheetFocusSuppressedRef: MutableRefObject<boolean>
   sheetElementRef: MutableRefObject<HTMLDivElement | null>
   sheetKeyboardCapturedRef: MutableRefObject<boolean>
@@ -20,8 +21,15 @@ function canFocusWorkbook({
   sheetElementRef,
   sheetKeyboardCapturedRef,
 }: UseGuardedWorkbookFocusOptions): boolean {
-  return sheetKeyboardCapturedRef.current
-    || (!sheetFocusSuppressedRef.current && canSheetClaimFocus(sheetElementRef.current))
+  return canSheetClaimCapturedFocus(sheetElementRef.current)
+    && sheetKeyboardCapturedRef.current
+    && !sheetFocusSuppressedRef.current
+}
+
+function releaseFocusOwnership(options: FocusGuardOptions): void {
+  options.sheetFocusSuppressedRef.current = true
+  options.sheetKeyboardCapturedRef.current = false
+  options.onWorkbookFocusBlocked?.()
 }
 
 function findWorkbookFocusGuard(target: HTMLElement): FocusGuardOptions | null {
@@ -67,7 +75,7 @@ function updateFocusOwnershipFromEvent(event: Event, options: FocusGuardOptions)
   if (!container) return
   const targetIsInsideSheet = event.target instanceof Node && container.contains(event.target)
   options.sheetFocusSuppressedRef.current = !targetIsInsideSheet
-  if (!targetIsInsideSheet) options.sheetKeyboardCapturedRef.current = false
+  if (!targetIsInsideSheet) releaseFocusOwnership(options)
 }
 
 function restoreOutsideFocus(target: HTMLElement | null, container: HTMLDivElement): void {
@@ -82,47 +90,92 @@ function restoreOutsideFocus(target: HTMLElement | null, container: HTMLDivEleme
   }
 }
 
+function shouldRestoreBlockedWorkbookFocus(
+  container: HTMLDivElement,
+  guardOptions: FocusGuardOptions,
+): boolean {
+  const activeElement = document.activeElement
+  return activeElement instanceof HTMLElement
+    && container.contains(activeElement)
+    && !canFocusWorkbook(guardOptions)
+}
+
+function addFocusOwnershipListeners(
+  handleFocusIntoSheet: (event: FocusEvent) => void,
+  handleOutsideInteraction: (event: Event) => void,
+) {
+  document.addEventListener('focus', handleFocusIntoSheet, true)
+  document.addEventListener('focus', handleOutsideInteraction, true)
+  document.addEventListener('focusin', handleFocusIntoSheet, true)
+  document.addEventListener('focusin', handleOutsideInteraction, true)
+  document.addEventListener('pointerdown', handleOutsideInteraction, true)
+  return () => {
+    document.removeEventListener('focus', handleOutsideInteraction, true)
+    document.removeEventListener('focus', handleFocusIntoSheet, true)
+    document.removeEventListener('focusin', handleOutsideInteraction, true)
+    document.removeEventListener('focusin', handleFocusIntoSheet, true)
+    document.removeEventListener('pointerdown', handleOutsideInteraction, true)
+  }
+}
+
+function installFocusOwnershipGuard(container: HTMLDivElement, guardOptions: FocusGuardOptions) {
+  const removeGlobalFocusGuard = installWorkbookFocusGuard()
+  guardedWorkbookSheets.add(guardOptions)
+  let lastOutsideFocusTarget: HTMLElement | null = null
+  const restoreBlockedWorkbookFocus = () => {
+    if (!shouldRestoreBlockedWorkbookFocus(container, guardOptions)) return
+    releaseFocusOwnership(guardOptions)
+    restoreOutsideFocus(lastOutsideFocusTarget, container)
+  }
+
+  const handleOutsideInteraction = (event: Event) => {
+    updateFocusOwnershipFromEvent(event, guardOptions)
+    const target = event.target
+    if (target instanceof HTMLElement && !container.contains(target)) {
+      lastOutsideFocusTarget = target
+    }
+  }
+  const handleFocusIntoSheet = (event: FocusEvent) => {
+    if (canFocusWorkbook(guardOptions)) return
+    const target = event.target
+    if (!(target instanceof Node) || !container.contains(target)) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.stopImmediatePropagation()
+    releaseFocusOwnership(guardOptions)
+    restoreOutsideFocus(lastOutsideFocusTarget, container)
+  }
+  const removeFocusOwnershipListeners = addFocusOwnershipListeners(
+    handleFocusIntoSheet,
+    handleOutsideInteraction,
+  )
+  restoreBlockedWorkbookFocus()
+  const reconcileTimer = window.setTimeout(restoreBlockedWorkbookFocus, 0)
+  return () => {
+    window.clearTimeout(reconcileTimer)
+    removeFocusOwnershipListeners()
+    guardedWorkbookSheets.delete(guardOptions)
+    removeGlobalFocusGuard()
+  }
+}
+
 export function useGuardedWorkbookFocus(options: UseGuardedWorkbookFocusOptions) {
-  const { sheetElementRef, sheetFocusSuppressedRef, sheetKeyboardCapturedRef } = options
+  const {
+    onWorkbookFocusBlocked,
+    sheetElementRef,
+    sheetFocusSuppressedRef,
+    sheetKeyboardCapturedRef,
+  } = options
 
   useLayoutEffect(() => {
     const container = sheetElementRef.current
     if (!container) return
 
-    const guardOptions = {
+    return installFocusOwnershipGuard(container, {
+      onWorkbookFocusBlocked,
       sheetElementRef,
       sheetFocusSuppressedRef,
       sheetKeyboardCapturedRef,
-    }
-    const removeGlobalFocusGuard = installWorkbookFocusGuard()
-    guardedWorkbookSheets.add(guardOptions)
-    let lastOutsideFocusTarget: HTMLElement | null = null
-
-    const handleOutsideInteraction = (event: Event) => {
-      updateFocusOwnershipFromEvent(event, guardOptions)
-      const target = event.target
-      if (target instanceof HTMLElement && !container.contains(target)) {
-        lastOutsideFocusTarget = target
-      }
-    }
-    const handleFocusIntoSheet = (event: FocusEvent) => {
-      if (canFocusWorkbook(guardOptions)) return
-      const target = event.target
-      if (!(target instanceof Node) || !container.contains(target)) return
-      event.preventDefault()
-      event.stopPropagation()
-      event.stopImmediatePropagation()
-      restoreOutsideFocus(lastOutsideFocusTarget, container)
-    }
-    document.addEventListener('focusin', handleFocusIntoSheet, true)
-    document.addEventListener('focusin', handleOutsideInteraction, true)
-    document.addEventListener('pointerdown', handleOutsideInteraction, true)
-    return () => {
-      document.removeEventListener('focusin', handleOutsideInteraction, true)
-      document.removeEventListener('focusin', handleFocusIntoSheet, true)
-      document.removeEventListener('pointerdown', handleOutsideInteraction, true)
-      guardedWorkbookSheets.delete(guardOptions)
-      removeGlobalFocusGuard()
-    }
-  }, [sheetElementRef, sheetFocusSuppressedRef, sheetKeyboardCapturedRef])
+    })
+  })
 }

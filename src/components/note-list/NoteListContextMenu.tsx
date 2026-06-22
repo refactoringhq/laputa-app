@@ -9,7 +9,7 @@ import type { AppLocale } from '../../lib/i18n'
 import { trackEvent } from '../../lib/telemetry'
 import type { VaultEntry } from '../../types'
 import { isMarkdownEntry } from '../../utils/typeDefinitions'
-import { NoteListContextMenuNode } from './NoteListContextMenuView'
+import { NoteListContextMenuNode, NoteListRenameDialog } from './NoteListContextMenuView'
 
 export type NoteListContextMenuState = {
   x: number
@@ -21,6 +21,7 @@ interface NoteListContextMenuParams {
   locale?: AppLocale
   onEnterNeighborhood?: (entry: VaultEntry) => void
   onOpenInNewWindow?: (entry: VaultEntry) => void
+  onRenameFilename?: (path: string, newFilenameStem: string) => void
   onArchivePaths?: (paths: string[]) => void
   onDeletePaths?: (paths: string[]) => void
   onExportPdf?: (entry: VaultEntry) => void
@@ -36,6 +37,7 @@ function hasNoteListContextActions({
   entry,
   onEnterNeighborhood,
   onOpenInNewWindow,
+  onRenameFilename,
   onArchivePaths,
   onDeletePaths,
   onExportPdf,
@@ -48,6 +50,7 @@ function hasNoteListContextActions({
 }: NoteListContextMenuParams & { entry: VaultEntry }) {
   return [
     onOpenInNewWindow,
+    onRenameFilename && isMarkdownEntry(entry),
     onEnterNeighborhood && entry.fileKind !== 'binary',
     onExportPdf && isMarkdownEntry(entry),
     onArchivePaths && !entry.archived,
@@ -64,6 +67,7 @@ export function useNoteListContextMenu({
   locale = 'en',
   onEnterNeighborhood,
   onOpenInNewWindow,
+  onRenameFilename,
   onArchivePaths,
   onDeletePaths,
   onExportPdf,
@@ -75,8 +79,16 @@ export function useNoteListContextMenu({
   onCopyGitUrl,
 }: NoteListContextMenuParams) {
   const [ctxMenu, setCtxMenu] = useState<NoteListContextMenuState | null>(null)
+  const [renameEntry, setRenameEntry] = useState<VaultEntry | null>(null)
   const ctxMenuRef = useRef<HTMLDivElement>(null)
   const closeContextMenu = useCallback(() => setCtxMenu(null), [])
+  const closeRenameDialog = useCallback(() => setRenameEntry(null), [])
+  const requestRename = useCallback((entry: VaultEntry) => setRenameEntry(entry), [])
+  const submitRename = useCallback((newFilenameStem: string) => {
+    if (!renameEntry) return
+    onRenameFilename?.(renameEntry.path, newFilenameStem)
+    setRenameEntry(null)
+  }, [onRenameFilename, renameEntry])
 
   useEffect(() => {
     if (!ctxMenu) return
@@ -101,6 +113,7 @@ export function useNoteListContextMenu({
       entry,
       onEnterNeighborhood,
       onOpenInNewWindow,
+      onRenameFilename,
       onArchivePaths,
       onDeletePaths,
       onExportPdf,
@@ -122,6 +135,7 @@ export function useNoteListContextMenu({
     onDeletePaths,
     onEnterNeighborhood,
     onExportPdf,
+    onRenameFilename,
     onOpenInNewWindow,
     onCopyGitUrl,
     onRevealFile,
@@ -130,23 +144,32 @@ export function useNoteListContextMenu({
   ])
 
   const contextMenuNode = (
-    <NoteListContextMenuNode
-      ctxMenu={ctxMenu}
-      ctxMenuRef={ctxMenuRef}
-      locale={locale}
-      onEnterNeighborhood={onEnterNeighborhood}
-      onOpenInNewWindow={onOpenInNewWindow}
-      onArchivePaths={onArchivePaths}
-      onDeletePaths={onDeletePaths}
-      onExportPdf={onExportPdf}
-      onToggleFavorite={onToggleFavorite}
-      onToggleOrganized={onToggleOrganized}
-      onRevealFile={onRevealFile}
-      onCopyFilePath={onCopyFilePath}
-      canCopyGitUrl={canCopyGitUrl}
-      onCopyGitUrl={onCopyGitUrl}
-      onClose={closeContextMenu}
-    />
+    <>
+      <NoteListContextMenuNode
+        ctxMenu={ctxMenu}
+        ctxMenuRef={ctxMenuRef}
+        locale={locale}
+        onEnterNeighborhood={onEnterNeighborhood}
+        onOpenInNewWindow={onOpenInNewWindow}
+        onRequestRename={onRenameFilename ? requestRename : undefined}
+        onArchivePaths={onArchivePaths}
+        onDeletePaths={onDeletePaths}
+        onExportPdf={onExportPdf}
+        onToggleFavorite={onToggleFavorite}
+        onToggleOrganized={onToggleOrganized}
+        onRevealFile={onRevealFile}
+        onCopyFilePath={onCopyFilePath}
+        canCopyGitUrl={canCopyGitUrl}
+        onCopyGitUrl={onCopyGitUrl}
+        onClose={closeContextMenu}
+      />
+      <NoteListRenameDialog
+        entry={renameEntry}
+        locale={locale}
+        onClose={closeRenameDialog}
+        onRename={submitRename}
+      />
+    </>
   )
 
   return {

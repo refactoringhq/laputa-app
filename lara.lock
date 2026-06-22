@@ -548,6 +548,12 @@ files:
     noteList.clearSearch: 9983381c21069a3d6e4432e0aaea0079
     noteList.quickOpenCreate: a4e964a3bc5b25e7ae87163624731e05
     noteList.createNote: f1484bc40bd3fe3430c13fb89e2ce1af
+    noteList.context.renameNote: c31c2b468229232ad6287e734fe67d96
+    noteList.rename.title: c31c2b468229232ad6287e734fe67d96
+    noteList.rename.description: dad38b42b70ad1518d65a3063bba6708
+    noteList.rename.nameLabel: 1351017ac6423911223bc19a8cb7c653
+    noteList.rename.cancel: ea4788705e6873b424c65e91c2846b19
+    noteList.rename.confirm: 904a8304056d77e4547744781b7ceb50
     noteList.empty.changesError: 4fca500c4b70f61f7d9413c57c34bdc4
     noteList.empty.noChanges: ad82ac153532f5625760c29c176c5d5f
     noteList.empty.noArchived: 75fa9e2aaa902f65d433be856a2e8331

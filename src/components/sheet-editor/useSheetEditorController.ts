@@ -482,6 +482,7 @@ export function useSheetEditorController(options: SheetEditorControllerOptions) 
   const workbookRuntime = useSheetEditorWorkbookRuntime({ ...options, ...state })
   const keyboardRuntime = useSheetEditorKeyboardRuntime({ ...workbookRuntime, ...state })
   useGuardedWorkbookFocus({
+    onWorkbookFocusBlocked: keyboardRuntime.releaseSheetKeyboard,
     sheetFocusSuppressedRef: keyboardRuntime.sheetFocusSuppressedRef,
     sheetElementRef: state.sheetElementRef,
     sheetKeyboardCapturedRef: keyboardRuntime.sheetKeyboardCapturedRef,
@@ -519,5 +520,6 @@ export function useSheetEditorController(options: SheetEditorControllerOptions) 
     ...autocompleteRuntime,
     interactionHandlers,
     selectFormulaAutocompleteIndex,
+    sheetKeyboardActive: keyboardRuntime.sheetKeyboardActive,
   }
 }

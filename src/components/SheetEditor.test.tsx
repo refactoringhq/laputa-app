@@ -61,6 +61,7 @@ const ironCalcMock = vi.hoisted(() => {
     deletedRows: Array<{ row: number; sheet: number }>
     downMoves: number
     editStarts: number
+    focusBeforeGuardOnRender: boolean
     insertedColumns: Array<{ column: number; sheet: number }>
     insertedRows: Array<{ row: number; sheet: number }>
     lastModel: MockModel | null
@@ -83,6 +84,7 @@ const ironCalcMock = vi.hoisted(() => {
     deletedRows: [],
     downMoves: 0,
     editStarts: 0,
+    focusBeforeGuardOnRender: false,
     insertedColumns: [],
     insertedRows: [],
     lastModel: null,
@@ -310,6 +312,9 @@ vi.mock('@ironcalc/workbook', () => ({
       <div
         className="sheet-container"
         data-testid="ironcalc-workbook"
+        ref={(node) => {
+          if (node && ironCalcMock.state.focusBeforeGuardOnRender) node.focus()
+        }}
         onKeyDown={(event) => {
           if (event.key === 'F2') ironCalcMock.state.editStarts += 1
           if (event.key === 'Enter') ironCalcMock.state.downMoves += 1
@@ -321,6 +326,18 @@ vi.mock('@ironcalc/workbook', () => ({
               left_column: 1,
               range: [9, 9, 9, 9],
               row: 9,
+              sheet: 0,
+              top_row: 1,
+            }
+          }
+          if (event.button === 0 && document.activeElement === event.currentTarget) {
+            const column = Math.max(1, Math.floor(event.clientX / 100))
+            const row = Math.max(1, Math.floor(event.clientY / 30))
+            ironCalcMock.state.selectedView = {
+              column,
+              left_column: 1,
+              range: [row, column, row, column],
+              row,
               sheet: 0,
               top_row: 1,
             }
@@ -387,6 +404,21 @@ vi.mock('@ironcalc/workbook', () => ({
   },
   Model: ironCalcMock.MockModel,
 }))
+
+async function activateWorkbookRoot() {
+  const editor = await screen.findByTestId('sheet-editor')
+  const workbookRoot = await screen.findByTestId('ironcalc-workbook')
+  act(() => {
+    fireEvent.pointerDown(editor)
+    workbookRoot.focus()
+  })
+  return { editor, workbookRoot }
+}
+
+function focusFormulaInputForTest(formulaInput: HTMLInputElement) {
+  fireEvent.pointerDown(formulaInput)
+  formulaInput.focus()
+}
 
 function makeEntry(overrides: Partial<VaultEntry>): VaultEntry {
   return {
@@ -469,7 +501,7 @@ async function openFormulaAutocomplete(value = '=su'): Promise<HTMLInputElement>
 
   await screen.findByTestId('ironcalc-workbook')
   const formulaInput = screen.getByLabelText<HTMLInputElement>('Formula')
-  formulaInput.focus()
+  focusFormulaInputForTest(formulaInput)
   formulaInput.value = value
   formulaInput.setSelectionRange(value.length, value.length)
   fireEvent.input(formulaInput)
@@ -490,6 +522,7 @@ describe('SheetEditor', () => {
     ironCalcMock.state.deletedRows = []
     ironCalcMock.state.downMoves = 0
     ironCalcMock.state.editStarts = 0
+    ironCalcMock.state.focusBeforeGuardOnRender = false
     ironCalcMock.state.insertedColumns = []
     ironCalcMock.state.insertedRows = []
     ironCalcMock.state.lastModel = null
@@ -847,7 +880,7 @@ describe('SheetEditor', () => {
 
     await screen.findByTestId('ironcalc-workbook')
     const formulaInput = screen.getByLabelText<HTMLInputElement>('Formula')
-    formulaInput.focus()
+    focusFormulaInputForTest(formulaInput)
 
     formulaInput.value = '[['
     formulaInput.setSelectionRange(2, 2)
@@ -887,7 +920,7 @@ describe('SheetEditor', () => {
 
     await screen.findByTestId('ironcalc-workbook')
     const formulaInput = screen.getByLabelText<HTMLInputElement>('Formula')
-    formulaInput.focus()
+    focusFormulaInputForTest(formulaInput)
     formulaInput.value = '[[Pro'
     formulaInput.setSelectionRange(5, 5)
     fireEvent.input(formulaInput)
@@ -918,7 +951,7 @@ describe('SheetEditor', () => {
 
     await screen.findByTestId('ironcalc-workbook')
     const formulaInput = screen.getByLabelText<HTMLInputElement>('Formula')
-    formulaInput.focus()
+    focusFormulaInputForTest(formulaInput)
     formulaInput.value = '[[Shee'
     formulaInput.setSelectionRange(7, 7)
     fireEvent.input(formulaInput)
@@ -954,7 +987,7 @@ describe('SheetEditor', () => {
 
     await screen.findByTestId('ironcalc-workbook')
     const formulaInput = screen.getByLabelText<HTMLInputElement>('Formula')
-    formulaInput.focus()
+    focusFormulaInputForTest(formulaInput)
 
     formulaInput.value = '=[['
     formulaInput.setSelectionRange(3, 3)
@@ -986,7 +1019,7 @@ describe('SheetEditor', () => {
 
     await screen.findByTestId('ironcalc-workbook')
     const formulaInput = screen.getByLabelText<HTMLInputElement>('Formula')
-    formulaInput.focus()
+    focusFormulaInputForTest(formulaInput)
 
     formulaInput.value = '=CONCAT("[[Pr")'
     formulaInput.setSelectionRange(formulaInput.value.length, formulaInput.value.length)
@@ -1220,7 +1253,7 @@ describe('SheetEditor', () => {
 
     await screen.findByTestId('ironcalc-workbook')
     const formulaInput = screen.getByLabelText<HTMLInputElement>('Formula')
-    formulaInput.focus()
+    focusFormulaInputForTest(formulaInput)
     formulaInput.value = '=[[revenue-sheet]].B2+5'
     formulaInput.setSelectionRange(formulaInput.value.length, formulaInput.value.length)
 
@@ -1438,7 +1471,7 @@ describe('SheetEditor', () => {
     await screen.findByTestId('ironcalc-workbook')
     const formulaInput = screen.getByLabelText<HTMLInputElement>('Formula')
     const rendersBeforeAutocomplete = ironCalcMock.state.workbookRenders
-    formulaInput.focus()
+    focusFormulaInputForTest(formulaInput)
 
     formulaInput.value = '=su'
     formulaInput.setSelectionRange(3, 3)
@@ -1580,10 +1613,7 @@ describe('SheetEditor', () => {
       </div>,
     )
 
-    const editor = await screen.findByTestId('sheet-editor')
-    const workbookRoot = await screen.findByTestId('ironcalc-workbook')
-    fireEvent.pointerDown(editor)
-    workbookRoot.focus()
+    const { workbookRoot } = await activateWorkbookRoot()
     fireEvent.keyDown(workbookRoot, { key: 'ArrowDown', shiftKey: true })
 
     expect(onParentKeyDown).not.toHaveBeenCalled()
@@ -1602,13 +1632,12 @@ describe('SheetEditor', () => {
       </div>,
     )
 
-    const editor = await screen.findByTestId('sheet-editor')
-    const workbookRoot = await screen.findByTestId('ironcalc-workbook')
+    await activateWorkbookRoot()
     const aiPrompt = screen.getByLabelText('AI prompt')
-    fireEvent.pointerDown(editor)
-    workbookRoot.focus()
-    fireEvent.pointerDown(aiPrompt)
-    aiPrompt.focus()
+    act(() => {
+      fireEvent.pointerDown(aiPrompt)
+      aiPrompt.focus()
+    })
     fireEvent.keyDown(aiPrompt, { key: 'a' })
 
     await waitFor(() => {
@@ -1631,12 +1660,106 @@ describe('SheetEditor', () => {
 
     const editor = await screen.findByTestId('sheet-editor')
     const panelInput = screen.getByLabelText('Panel input')
-    fireEvent.pointerDown(editor)
-    panelInput.focus()
+    act(() => {
+      fireEvent.pointerDown(editor)
+      panelInput.focus()
+    })
 
     await waitFor(() => {
       expect(document.activeElement).toBe(panelInput)
     })
+  })
+
+  it('releases passive workbook focus claimed before the guard layout effect runs', async () => {
+    ironCalcMock.state.focusBeforeGuardOnRender = true
+    render(
+      <SheetEditor
+        content={'---\ntype: Sheet\n---\nMetric,January'}
+        path="/vault/budget.md"
+        onContentChange={vi.fn()}
+      />,
+    )
+
+    await screen.findByTestId('ironcalc-workbook')
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(document.body)
+    })
+  })
+
+  it('redirects passive workbook arrow navigation back to the global app handler', async () => {
+    const windowKeyDown = vi.fn()
+    window.addEventListener('keydown', windowKeyDown)
+
+    try {
+      render(
+        <SheetEditor
+          content={'---\ntype: Sheet\n---\nMetric,January'}
+          path="/vault/budget.md"
+          onContentChange={vi.fn()}
+        />,
+      )
+
+      const workbookRoot = await screen.findByTestId('ironcalc-workbook')
+      fireEvent.keyDown(workbookRoot, { code: 'ArrowDown', key: 'ArrowDown' })
+
+      expect(windowKeyDown).toHaveBeenCalledTimes(1)
+      expect(windowKeyDown.mock.calls[0]?.[0]).toMatchObject({ key: 'ArrowDown' })
+    } finally {
+      window.removeEventListener('keydown', windowKeyDown)
+    }
+  })
+
+  it('promotes a passive sheet to grid-active focus when clicking a cell', async () => {
+    const windowKeyDown = vi.fn()
+    window.addEventListener('keydown', windowKeyDown)
+
+    try {
+      render(
+        <div>
+          <input aria-label="Note list focus" />
+          <SheetEditor
+            content={'---\ntype: Sheet\n---\nMetric,January'}
+            path="/vault/budget.md"
+            onContentChange={vi.fn()}
+          />
+        </div>,
+      )
+
+      const noteListFocus = screen.getByLabelText('Note list focus')
+      const editor = await screen.findByTestId('sheet-editor')
+      const workbookRoot = await screen.findByTestId('ironcalc-workbook')
+
+      act(() => {
+        noteListFocus.focus()
+      })
+      act(() => {
+        fireEvent.pointerDown(workbookRoot, {
+          clientX: 320,
+          clientY: 180,
+          pageX: 320,
+          pageY: 180,
+        })
+      })
+
+      await waitFor(() => {
+        expect(document.activeElement).toBe(workbookRoot)
+        expect(editor).toHaveClass('sheet-editor--keyboard-active')
+      })
+      expect(ironCalcMock.state.selectedView).toEqual({
+        column: 3,
+        left_column: 1,
+        range: [6, 3, 6, 3],
+        row: 6,
+        sheet: 0,
+        top_row: 1,
+      })
+
+      fireEvent.keyDown(workbookRoot, { key: 'ArrowDown' })
+      expect(windowKeyDown).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('keydown', windowKeyDown)
+    }
   })
 
   it('does not steal focus from the active formula editor when clicking another cell', async () => {
@@ -1650,7 +1773,7 @@ describe('SheetEditor', () => {
 
     const canvas = await screen.findByTestId('mock-sheet-canvas')
     const formulaInput = screen.getByLabelText<HTMLInputElement>('Formula')
-    formulaInput.focus()
+    focusFormulaInputForTest(formulaInput)
 
     fireEvent.pointerDown(canvas)
 
@@ -1668,9 +1791,7 @@ describe('SheetEditor', () => {
       />,
     )
 
-    const editor = await screen.findByTestId('sheet-editor')
-    const workbookRoot = await screen.findByTestId('ironcalc-workbook')
-    workbookRoot.focus()
+    const { editor, workbookRoot } = await activateWorkbookRoot()
     fireEvent.keyDown(workbookRoot, { key: 'Enter' })
 
     expect(ironCalcMock.state.editStarts).toBe(1)
@@ -1678,7 +1799,7 @@ describe('SheetEditor', () => {
     expect(editor).toContainElement(document.activeElement)
   })
 
-  it('keeps workbook focus after Escape exits active cell editing', async () => {
+  it('returns from cell editing to grid focus before Escape releases the sheet', async () => {
     const windowKeyDown = vi.fn()
     window.addEventListener('keydown', windowKeyDown)
 
@@ -1691,16 +1812,23 @@ describe('SheetEditor', () => {
         />,
       )
 
-      const workbookRoot = await screen.findByTestId('ironcalc-workbook')
+      const { editor, workbookRoot } = await activateWorkbookRoot()
       const cellEditor = screen.getByLabelText<HTMLTextAreaElement>('Cell editor')
 
-      fireEvent.pointerDown(workbookRoot)
       cellEditor.focus()
       fireEvent.keyDown(cellEditor, { key: 'Escape' })
 
       await waitFor(() => {
         expect(document.activeElement).toBe(workbookRoot)
       })
+      expect(editor).toHaveClass('sheet-editor--keyboard-active')
+
+      fireEvent.keyDown(workbookRoot, { key: 'Escape' })
+
+      await waitFor(() => {
+        expect(document.activeElement).toBe(document.body)
+      })
+      expect(editor).toHaveClass('sheet-editor--passive')
       expect(windowKeyDown).not.toHaveBeenCalled()
     } finally {
       window.removeEventListener('keydown', windowKeyDown)
@@ -1716,8 +1844,7 @@ describe('SheetEditor', () => {
       />,
     )
 
-    const workbookRoot = await screen.findByTestId('ironcalc-workbook')
-    workbookRoot.focus()
+    const { workbookRoot } = await activateWorkbookRoot()
     ironCalcMock.state.selectedView = {
       column: 2,
       left_column: 1,
@@ -1787,31 +1914,23 @@ describe('SheetEditor', () => {
     expect(formulaInput.style.caretColor).toBe('var(--accent-blue)')
   })
 
-  it('normalizes IronCalc pointer coordinates when app zoom is active', async () => {
-    const originalGetComputedStyle = window.getComputedStyle.bind(window)
-    const getComputedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudoElement) => {
-      const style = originalGetComputedStyle(element, pseudoElement)
-      if (element === document.documentElement) {
-        Object.defineProperty(style, 'zoom', {
-          configurable: true,
-          value: '150%',
-        })
-      }
-      return style
-    })
-
-    try {
-      render(
-        <SheetEditor
-          content={'---\ntype: Sheet\n---\nMetric,January'}
-          path="/vault/budget.md"
-          onContentChange={vi.fn()}
-        />,
-      )
-
-      const workbookRoot = await screen.findByTestId('ironcalc-workbook')
-      const canvas = screen.getByTestId('mock-sheet-canvas')
-      canvas.getBoundingClientRect = () => ({
+  it.each([
+    {
+      canvasSize: null,
+      expectedPointer: {
+        clientX: 200,
+        clientY: 140,
+        pageX: 200,
+        pageY: 140,
+      },
+      name: 'normalizes IronCalc pointer coordinates when app zoom is active',
+      pointer: {
+        clientX: 250,
+        clientY: 190,
+        pageX: 250,
+        pageY: 190,
+      },
+      rect: {
         bottom: 440,
         height: 400,
         left: 100,
@@ -1820,37 +1939,47 @@ describe('SheetEditor', () => {
         width: 600,
         x: 100,
         y: 40,
-        toJSON: () => ({}),
-      })
-
-      fireEvent.pointerDown(workbookRoot, {
-        clientX: 250,
-        clientY: 190,
-        pageX: 250,
-        pageY: 190,
-        pointerId: 1,
-        pointerType: 'mouse',
-      })
-
-      expect(ironCalcMock.state.lastPointer).toEqual({
-        clientX: 200,
-        clientY: 140,
-        pageX: 200,
-        pageY: 140,
-      })
-    } finally {
-      getComputedStyleSpy.mockRestore()
-    }
-  })
-
-  it('uses the rendered canvas scale when normalizing zoomed pointer coordinates', async () => {
+      },
+      zoom: '150%',
+    },
+    {
+      canvasSize: {
+        height: 860,
+        width: 1600,
+      },
+      expectedPointer: {
+        clientX: 592.5,
+        clientY: 214.5,
+        pageX: 592.5,
+        pageY: 214.5,
+      },
+      name: 'uses the rendered canvas scale when normalizing zoomed pointer coordinates',
+      pointer: {
+        clientX: 474,
+        clientY: 178,
+        pageX: 474,
+        pageY: 178,
+      },
+      rect: {
+        bottom: 720,
+        height: 688,
+        left: 0,
+        right: 1280,
+        top: 32,
+        width: 1280,
+        x: 0,
+        y: 32,
+      },
+      zoom: '80%',
+    },
+  ])('$name', async ({ canvasSize, expectedPointer, pointer, rect, zoom }) => {
     const originalGetComputedStyle = window.getComputedStyle.bind(window)
     const getComputedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudoElement) => {
       const style = originalGetComputedStyle(element, pseudoElement)
       if (element === document.documentElement) {
         Object.defineProperty(style, 'zoom', {
           configurable: true,
-          value: '80%',
+          value: zoom,
         })
       }
       return style
@@ -1867,41 +1996,28 @@ describe('SheetEditor', () => {
 
       const workbookRoot = await screen.findByTestId('ironcalc-workbook')
       const canvas = screen.getByTestId('mock-sheet-canvas')
-      Object.defineProperty(canvas, 'clientWidth', {
-        configurable: true,
-        value: 1600,
-      })
-      Object.defineProperty(canvas, 'clientHeight', {
-        configurable: true,
-        value: 860,
-      })
+      if (canvasSize) {
+        Object.defineProperty(canvas, 'clientWidth', {
+          configurable: true,
+          value: canvasSize.width,
+        })
+        Object.defineProperty(canvas, 'clientHeight', {
+          configurable: true,
+          value: canvasSize.height,
+        })
+      }
       canvas.getBoundingClientRect = () => ({
-        bottom: 720,
-        height: 688,
-        left: 0,
-        right: 1280,
-        top: 32,
-        width: 1280,
-        x: 0,
-        y: 32,
+        ...rect,
         toJSON: () => ({}),
       })
 
       fireEvent.pointerDown(workbookRoot, {
-        clientX: 474,
-        clientY: 178,
-        pageX: 474,
-        pageY: 178,
+        ...pointer,
         pointerId: 1,
         pointerType: 'mouse',
       })
 
-      expect(ironCalcMock.state.lastPointer).toEqual({
-        clientX: 592.5,
-        clientY: 214.5,
-        pageX: 592.5,
-        pageY: 214.5,
-      })
+      expect(ironCalcMock.state.lastPointer).toEqual(expectedPointer)
     } finally {
       getComputedStyleSpy.mockRestore()
     }

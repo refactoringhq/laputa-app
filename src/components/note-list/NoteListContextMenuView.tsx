@@ -1,4 +1,4 @@
-import type { RefObject } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } from 'react'
 import {
   Archive,
   ArrowSquareOut,
@@ -8,11 +8,14 @@ import {
   FolderOpen,
   GitBranch,
   MapTrifold,
+  PencilSimple,
   Star,
   Trash,
   type Icon,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../../hooks/appCommandCatalog'
 import { translate, type AppLocale } from '../../lib/i18n'
 import { trackEvent } from '../../lib/telemetry'
@@ -38,6 +41,7 @@ interface NoteListContextMenuNodeProps {
   locale: AppLocale
   onEnterNeighborhood?: (entry: VaultEntry) => void
   onOpenInNewWindow?: (entry: VaultEntry) => void
+  onRequestRename?: (entry: VaultEntry) => void
   onArchivePaths?: (paths: string[]) => void
   onDeletePaths?: (paths: string[]) => void
   onExportPdf?: (entry: VaultEntry) => void
@@ -55,6 +59,7 @@ type BuildContextMenuItemsParams = Pick<
   | 'locale'
   | 'onEnterNeighborhood'
   | 'onOpenInNewWindow'
+  | 'onRequestRename'
   | 'onArchivePaths'
   | 'onDeletePaths'
   | 'onExportPdf'
@@ -110,6 +115,20 @@ function organizedItem(
     label: translate(locale, entry.organized ? 'command.note.markUnorganized' : 'command.note.markOrganized'),
     onSelect: () => selectAction('toggle_organized', () => onToggleOrganized(entry.path)),
     shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteToggleOrganized),
+  }]
+}
+
+function renameItem(
+  entry: VaultEntry,
+  locale: AppLocale,
+  onRequestRename: ((entry: VaultEntry) => void) | undefined,
+  selectAction: SelectContextAction,
+) {
+  if (!onRequestRename || !isMarkdownEntry(entry)) return []
+  return [{
+    icon: PencilSimple,
+    label: translate(locale, 'noteList.context.renameNote'),
+    onSelect: () => selectAction('rename_filename', () => onRequestRename(entry)),
   }]
 }
 
@@ -224,6 +243,7 @@ function buildContextMenuItems(
     ...openWindowItem(entry, props.locale, props.onOpenInNewWindow, selectAction),
     ...favoriteItem(entry, props.locale, props.onToggleFavorite, selectAction),
     ...organizedItem(entry, props.locale, props.onToggleOrganized, selectAction),
+    ...renameItem(entry, props.locale, props.onRequestRename, selectAction),
     ...neighborhoodItem(entry, props.locale, props.onEnterNeighborhood, selectAction),
     ...revealFileItem(entry, props.locale, props.onRevealFile, selectAction),
     ...copyFilePathItem(entry, props.locale, props.onCopyFilePath, selectAction),
@@ -257,6 +277,7 @@ export function NoteListContextMenuNode(props: NoteListContextMenuNodeProps) {
     locale,
     onEnterNeighborhood,
     onOpenInNewWindow,
+    onRequestRename,
     onArchivePaths,
     onDeletePaths,
     onExportPdf,
@@ -281,6 +302,7 @@ export function NoteListContextMenuNode(props: NoteListContextMenuNodeProps) {
     locale,
     onEnterNeighborhood,
     onOpenInNewWindow,
+    onRequestRename,
     onArchivePaths,
     onDeletePaths,
     onExportPdf,
@@ -301,5 +323,116 @@ export function NoteListContextMenuNode(props: NoteListContextMenuNodeProps) {
     >
       {items.map((item) => <NoteListContextMenuButton key={item.label} item={item} />)}
     </div>
+  )
+}
+
+function renameDialogInitialFilenameStem(entry: VaultEntry): string {
+  return entry.filename.replace(/\.md$/i, '').trim()
+}
+
+function normalizeRenameFilenameStem(value: string): string {
+  return value.trim().replace(/\.md$/i, '').trim()
+}
+
+function renameDialogTargetFilenameStem(draftFilenameStem: string, initialFilenameStem: string): string | null {
+  const nextFilenameStem = normalizeRenameFilenameStem(draftFilenameStem)
+  if (!nextFilenameStem || nextFilenameStem === initialFilenameStem) return null
+  return nextFilenameStem
+}
+
+function NoteListRenameForm({
+  entry,
+  locale,
+  onClose,
+  onRename,
+}: {
+  entry: VaultEntry
+  locale: AppLocale
+  onClose: () => void
+  onRename: (newFilenameStem: string) => void
+}) {
+  const inputId = useId()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const initialFilenameStem = renameDialogInitialFilenameStem(entry)
+  const [draftFilenameStem, setDraftFilenameStem] = useState(initialFilenameStem)
+
+  useEffect(() => {
+    const focusTimer = window.setTimeout(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }, 50)
+
+    return () => window.clearTimeout(focusTimer)
+  }, [])
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const nextFilenameStem = renameDialogTargetFilenameStem(draftFilenameStem, initialFilenameStem)
+    if (!nextFilenameStem) {
+      onClose()
+      return
+    }
+
+    trackEvent('note_item_context_menu_rename_filename_submitted')
+    onRename(nextFilenameStem)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-1.5">
+        <label htmlFor={inputId} className="text-xs font-medium text-muted-foreground">
+          {translate(locale, 'noteList.rename.nameLabel')}
+        </label>
+        <Input
+          id={inputId}
+          ref={inputRef}
+          value={draftFilenameStem}
+          onChange={(event) => setDraftFilenameStem(event.target.value)}
+          data-testid="note-list-rename-input"
+        />
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          {translate(locale, 'noteList.rename.cancel')}
+        </Button>
+        <Button type="submit" disabled={!renameDialogTargetFilenameStem(draftFilenameStem, initialFilenameStem)}>
+          {translate(locale, 'noteList.rename.confirm')}
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+export function NoteListRenameDialog({
+  entry,
+  locale,
+  onClose,
+  onRename,
+}: {
+  entry: VaultEntry | null
+  locale: AppLocale
+  onClose: () => void
+  onRename: (newFilenameStem: string) => void
+}) {
+  return (
+    <Dialog open={Boolean(entry)} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+      <DialogContent showCloseButton={false} className="sm:max-w-[420px]" data-testid="note-list-rename-dialog">
+        <DialogHeader>
+          <DialogTitle>{translate(locale, 'noteList.rename.title')}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {translate(locale, 'noteList.rename.description')}
+          </DialogDescription>
+        </DialogHeader>
+        {entry && (
+          <NoteListRenameForm
+            key={entry.path}
+            entry={entry}
+            locale={locale}
+            onClose={onClose}
+            onRename={onRename}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }

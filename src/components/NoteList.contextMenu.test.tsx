@@ -18,6 +18,7 @@ function renderNoteListWithFullActionMenu() {
     onEnterNeighborhood: vi.fn(),
     onExportPdf: vi.fn(),
     onOpenInNewWindow: vi.fn(),
+    onRenameFilename: vi.fn(),
     onRevealFile: vi.fn(),
     onToggleFavorite: vi.fn(),
     onToggleOrganized: vi.fn(),
@@ -42,6 +43,7 @@ describe('NoteList context menu', () => {
     const onExportPdf = vi.fn()
     const onToggleFavorite = vi.fn()
     const onToggleOrganized = vi.fn()
+    const onRenameFilename = vi.fn()
     const onRevealFile = vi.fn()
     const onCopyFilePath = vi.fn()
     const canCopyGitUrl = vi.fn(() => true)
@@ -55,6 +57,7 @@ describe('NoteList context menu', () => {
       onExportPdf,
       onToggleFavorite,
       onToggleOrganized,
+      onRenameFilename,
       onRevealFile,
       onCopyFilePath,
       canCopyGitUrl,
@@ -78,6 +81,13 @@ describe('NoteList context menu', () => {
 
     clickBuildLaputaAction('Mark as Organized')
     expect(onToggleOrganized).toHaveBeenCalledWith(mockEntries[0].path)
+
+    clickBuildLaputaAction('Rename filename')
+    expect(screen.getByTestId('note-list-rename-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('note-list-rename-input')).toHaveValue('26q1-laputa-app')
+    fireEvent.change(screen.getByTestId('note-list-rename-input'), { target: { value: 'renamed-from-menu.md ' } })
+    fireEvent.click(screen.getByText('Rename'))
+    expect(onRenameFilename).toHaveBeenCalledWith(mockEntries[0].path, 'renamed-from-menu')
 
     clickBuildLaputaAction("Open note's neighborhood")
     expect(onEnterNeighborhood).toHaveBeenCalledWith(mockEntries[0])
@@ -131,12 +141,14 @@ describe('NoteList context menu', () => {
     })
     const onCopyFilePath = vi.fn()
     const onRevealFile = vi.fn()
+    const onRenameFilename = vi.fn()
     const onToggleOrganized = vi.fn()
 
     renderNoteList({
       allNotesFileVisibility: { pdfs: true, images: false, unsupported: false },
       entries: [pdfEntry],
       onCopyFilePath,
+      onRenameFilename,
       onRevealFile,
       onToggleOrganized,
     })
@@ -145,6 +157,7 @@ describe('NoteList context menu', () => {
 
     expect(screen.getByTestId('note-list-context-menu')).toBeInTheDocument()
     expect(screen.queryByText('Mark as Organized')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rename filename')).not.toBeInTheDocument()
     expect(screen.getByText('Reveal in Finder')).toBeInTheDocument()
 
     fireEvent.click(screen.getByText('Copy file path'))

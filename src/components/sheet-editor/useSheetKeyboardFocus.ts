@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import type {
   FormulaAutocompleteState,
@@ -16,6 +16,40 @@ interface UseSheetKeyboardFocusOptions {
   sheetElementRef: MutableRefObject<HTMLDivElement | null>
 }
 
+interface SheetKeyboardCaptureOptions {
+  deferActiveState?: boolean
+}
+
+function useSheetKeyboardActiveState(
+  sheetKeyboardCapturedRef: MutableRefObject<boolean>,
+) {
+  const pendingActiveStateTimerRef = useRef<number | null>(null)
+  const [sheetKeyboardActive, setSheetKeyboardActive] = useState(false)
+
+  const cancelPendingActiveState = useCallback(() => {
+    if (pendingActiveStateTimerRef.current === null) return
+    window.clearTimeout(pendingActiveStateTimerRef.current)
+    pendingActiveStateTimerRef.current = null
+  }, [])
+
+  useEffect(() => cancelPendingActiveState, [cancelPendingActiveState])
+
+  const setSheetKeyboardCaptured = useCallback((captured: boolean, options: SheetKeyboardCaptureOptions = {}) => {
+    cancelPendingActiveState()
+    sheetKeyboardCapturedRef.current = captured
+    if (!captured || !options.deferActiveState) {
+      setSheetKeyboardActive(captured)
+      return
+    }
+    pendingActiveStateTimerRef.current = window.setTimeout(() => {
+      pendingActiveStateTimerRef.current = null
+      if (sheetKeyboardCapturedRef.current) setSheetKeyboardActive(true)
+    }, 0)
+  }, [cancelPendingActiveState, sheetKeyboardCapturedRef])
+
+  return { setSheetKeyboardCaptured, sheetKeyboardActive }
+}
+
 export function useSheetKeyboardFocus({
   scheduleSelectionChromePatch,
   setFormulaAutocomplete,
@@ -25,17 +59,18 @@ export function useSheetKeyboardFocus({
 }: UseSheetKeyboardFocusOptions) {
   const sheetKeyboardCapturedRef = useRef(false)
   const sheetFocusRequestRef = useRef(0)
-  const sheetFocusSuppressedRef = useRef(false)
+  const sheetFocusSuppressedRef = useRef(true)
+  const { setSheetKeyboardCaptured, sheetKeyboardActive } = useSheetKeyboardActiveState(sheetKeyboardCapturedRef)
 
-  const captureSheetKeyboard = useCallback(() => {
+  const captureSheetKeyboard = useCallback((options: SheetKeyboardCaptureOptions = {}) => {
     sheetFocusSuppressedRef.current = false
-    sheetKeyboardCapturedRef.current = true
-  }, [])
+    setSheetKeyboardCaptured(true, options)
+  }, [setSheetKeyboardCaptured])
 
   const releaseSheetKeyboard = useCallback(() => {
     sheetFocusRequestRef.current += 1
     sheetFocusSuppressedRef.current = true
-    sheetKeyboardCapturedRef.current = false
+    setSheetKeyboardCaptured(false)
     setFormulaAutocomplete(null)
     setWikilinkAutocomplete(null)
     setSheetContextMenu(null)
@@ -43,11 +78,11 @@ export function useSheetKeyboardFocus({
     if (activeElement instanceof HTMLElement && sheetElementRef.current?.contains(activeElement)) {
       activeElement.blur()
     }
-  }, [setFormulaAutocomplete, setSheetContextMenu, setWikilinkAutocomplete, sheetElementRef])
+  }, [setFormulaAutocomplete, setSheetContextMenu, setSheetKeyboardCaptured, setWikilinkAutocomplete, sheetElementRef])
 
   const restoreSheetKeyboardFocus = useCallback(() => {
     sheetFocusSuppressedRef.current = false
-    sheetKeyboardCapturedRef.current = true
+    setSheetKeyboardCaptured(true)
     const focusRequestId = sheetFocusRequestRef.current + 1
     sheetFocusRequestRef.current = focusRequestId
 
@@ -55,18 +90,20 @@ export function useSheetKeyboardFocus({
       const container = sheetElementRef.current
       if (!container || sheetFocusRequestRef.current !== focusRequestId) return
       if (!canSheetClaimFocus(container)) {
-        sheetKeyboardCapturedRef.current = false
+        sheetFocusSuppressedRef.current = true
+        setSheetKeyboardCaptured(false)
         return
       }
       focusWorkbookRoot(container)
       scheduleSelectionChromePatch()
     }, 0)
-  }, [scheduleSelectionChromePatch, sheetElementRef])
+  }, [scheduleSelectionChromePatch, setSheetKeyboardCaptured, sheetElementRef])
 
   return {
     captureSheetKeyboard,
     releaseSheetKeyboard,
     restoreSheetKeyboardFocus,
+    sheetKeyboardActive,
     sheetFocusRequestRef,
     sheetFocusSuppressedRef,
     sheetKeyboardCapturedRef,

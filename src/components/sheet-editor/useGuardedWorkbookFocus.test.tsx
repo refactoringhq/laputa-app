@@ -1,14 +1,22 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useRef, useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { useGuardedWorkbookFocus } from './useGuardedWorkbookFocus'
+
+const nativeHTMLElementFocus = HTMLElement.prototype.focus
 
 function GuardedWorkbookFocusHarness({
   captured = false,
+  dialogOpen = false,
+  focusBeforeGuard = false,
+  onWorkbookFocusBlocked,
   replaceable = false,
   suppressed = false,
 }: {
   captured?: boolean
+  dialogOpen?: boolean
+  focusBeforeGuard?: boolean
+  onWorkbookFocusBlocked?: () => void
   replaceable?: boolean
   suppressed?: boolean
 }) {
@@ -17,12 +25,20 @@ function GuardedWorkbookFocusHarness({
   const sheetFocusSuppressedRef = useRef(suppressed)
   const sheetKeyboardCapturedRef = useRef(captured)
 
-  useGuardedWorkbookFocus({ sheetElementRef, sheetFocusSuppressedRef, sheetKeyboardCapturedRef })
+  useGuardedWorkbookFocus({
+    onWorkbookFocusBlocked,
+    sheetElementRef,
+    sheetFocusSuppressedRef,
+    sheetKeyboardCapturedRef,
+  })
+  const assignWorkbookRoot = (node: HTMLDivElement | null) => {
+    if (node && focusBeforeGuard) nativeHTMLElementFocus.call(node)
+  }
 
   return (
     <>
       <div ref={sheetElementRef} data-testid="sheet">
-        <div key={rootVersion} data-testid="workbook-root" tabIndex={0}>
+        <div ref={assignWorkbookRoot} key={rootVersion} data-testid="workbook-root" tabIndex={0}>
           <div className="sheet-container">
             <button data-testid="workbook-inner-control">Inner control</button>
           </div>
@@ -30,6 +46,11 @@ function GuardedWorkbookFocusHarness({
       </div>
       {replaceable && <button onClick={() => setRootVersion((version) => version + 1)}>Replace root</button>}
       <input aria-label="Properties input" />
+      {dialogOpen && (
+        <div role="dialog" aria-modal="true">
+          <input aria-label="Rename filename" />
+        </div>
+      )}
     </>
   )
 }
@@ -41,12 +62,12 @@ function focusWorkbookRoot() {
 }
 
 describe('useGuardedWorkbookFocus', () => {
-  it('allows the workbook to focus itself before another app surface has focus', () => {
+  it('blocks workbook autofocus before sheet keyboard capture is active', () => {
     render(<GuardedWorkbookFocusHarness />)
 
-    const root = focusWorkbookRoot()
+    focusWorkbookRoot()
 
-    expect(document.activeElement).toBe(root)
+    expect(document.activeElement).toBe(document.body)
   })
 
   it('blocks workbook autofocus after focus moves into the properties panel', () => {
@@ -65,6 +86,21 @@ describe('useGuardedWorkbookFocus', () => {
     focusWorkbookRoot()
 
     expect(document.activeElement).toBe(document.body)
+  })
+
+  it('releases workbook focus claimed before the guard layout effect runs', () => {
+    const onWorkbookFocusBlocked = vi.fn()
+
+    render(
+      <GuardedWorkbookFocusHarness
+        focusBeforeGuard
+        onWorkbookFocusBlocked={onWorkbookFocusBlocked}
+        suppressed
+      />,
+    )
+
+    expect(document.activeElement).toBe(document.body)
+    expect(onWorkbookFocusBlocked).toHaveBeenCalledOnce()
   })
 
   it('blocks workbook autofocus after an outside pointer interaction', () => {
@@ -115,5 +151,23 @@ describe('useGuardedWorkbookFocus', () => {
     const root = focusWorkbookRoot()
 
     expect(document.activeElement).toBe(root)
+  })
+
+  it('blocks captured workbook autofocus while a dialog owns focus', () => {
+    render(<GuardedWorkbookFocusHarness captured dialogOpen />)
+    const renameInput = screen.getByLabelText('Rename filename')
+    renameInput.focus()
+
+    focusWorkbookRoot()
+
+    expect(document.activeElement).toBe(renameInput)
+  })
+
+  it('blocks captured workbook autofocus while a dialog is opening', () => {
+    render(<GuardedWorkbookFocusHarness captured dialogOpen />)
+
+    const root = focusWorkbookRoot()
+
+    expect(document.activeElement).not.toBe(root)
   })
 })
