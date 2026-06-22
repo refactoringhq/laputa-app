@@ -31,34 +31,49 @@ export interface SheetCellMetadata {
   borderLeft?: SheetBorderMetadata
 }
 
+type FrontmatterSource = string
+type MetadataLine = string
+type MetadataLines = MetadataLine[]
+type MetadataIndent = string
+type MetadataKey = string
+type MetadataProperty = string
+type QuotedScalarText = string
+type ScalarText = string
+type SerializedScalarText = string
+type SheetColumnName = string
+type SheetRowKey = string
+type SheetCellAddress = string
+type OneBasedRowIndex = number
+type OneBasedColumnIndex = number
+
 export interface SheetMetadata {
   frozenColumns?: number
   frozenRows?: number
   showGridLines?: boolean
-  columns: Record<string, SheetColumnMetadata>
-  rows: Record<string, SheetRowMetadata>
-  cells: Record<string, SheetCellMetadata>
+  columns: Record<SheetColumnName, SheetColumnMetadata>
+  rows: Record<SheetRowKey, SheetRowMetadata>
+  cells: Record<SheetCellAddress, SheetCellMetadata>
 }
 
 type MetadataSection = 'columns' | 'rows' | 'cells'
 type MetadataValue = string | number | boolean
 type MetadataAssignment = {
-  key: string
-  property: string
+  key: MetadataKey
+  property: MetadataProperty
   section: MetadataSection
   value: MetadataValue
 }
 type SheetSettingAssignment = {
-  property: string
+  property: MetadataProperty
   value: MetadataValue
 }
 type MetadataParseCursor = {
-  key: string | null
+  key: MetadataKey | null
   section: MetadataSection | null
 }
 type MetadataLineWriter = {
-  indent: string
-  lines: string[]
+  indent: MetadataIndent
+  lines: MetadataLines
 }
 type CellMetadataUpdater = (value: MetadataValue) => Partial<SheetCellMetadata> | null
 type SheetSettingAssigner = (metadata: SheetMetadata, value: MetadataValue) => void
@@ -115,7 +130,7 @@ export function isSheetMetadataEmpty(metadata: SheetMetadata): boolean {
     && Object.keys(metadata.cells).length === 0
 }
 
-export function columnIndexFromName(name: string): number | null {
+export function columnIndexFromName(name: SheetColumnName): OneBasedColumnIndex | null {
   const normalized = name.trim().toUpperCase()
   if (!/^[A-Z]+$/.test(normalized)) return null
 
@@ -126,13 +141,15 @@ export function columnIndexFromName(name: string): number | null {
   return value
 }
 
-export function normalizeCellAddress(address: string): string | null {
+export function normalizeCellAddress(address: SheetCellAddress): SheetCellAddress | null {
   const match = address.trim().toUpperCase().match(/^([A-Z]+)([1-9]\d*)$/)
   if (!match) return null
   return `${match[1]}${match[2]}`
 }
 
-export function cellAddressToIndexes(address: string): { row: number; column: number } | null {
+export function cellAddressToIndexes(
+  address: SheetCellAddress,
+): { row: OneBasedRowIndex; column: OneBasedColumnIndex } | null {
   const normalized = normalizeCellAddress(address)
   if (!normalized) return null
 
@@ -145,19 +162,19 @@ export function cellAddressToIndexes(address: string): { row: number; column: nu
   return { row: Number(match[2]), column }
 }
 
-export function metadataCellAddress(row: number, column: number): string {
+export function metadataCellAddress(row: OneBasedRowIndex, column: OneBasedColumnIndex): SheetCellAddress {
   return cellAddress(row - 1, column - 1)
 }
 
-function hasMatchingQuote(value: string, quote: '"' | "'"): boolean {
+function hasMatchingQuote(value: ScalarText, quote: '"' | "'"): boolean {
   return value.startsWith(quote) && value.endsWith(quote)
 }
 
-function isQuotedScalar(value: string): boolean {
+function isQuotedScalar(value: ScalarText): boolean {
   return hasMatchingQuote(value, '"') || hasMatchingQuote(value, "'")
 }
 
-function parseScalar(value: string): MetadataValue {
+function parseScalar(value: ScalarText): MetadataValue {
   const trimmed = value.trim()
   if (trimmed === 'true') return true
   if (trimmed === 'false') return false
@@ -172,7 +189,7 @@ function parseScalar(value: string): MetadataValue {
   return trimmed
 }
 
-function scalarString(value: string | number | boolean): string {
+function scalarString(value: MetadataValue): SerializedScalarText {
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   return JSON.stringify(value)
 }
@@ -184,11 +201,11 @@ function parseBorderMetadata(value: MetadataValue): SheetBorderMetadata | null {
   return color ? { color, style } : { style }
 }
 
-function borderMetadataString(value: SheetBorderMetadata): string {
+function borderMetadataString(value: SheetBorderMetadata): SerializedScalarText {
   return value.color ? `${value.style} ${value.color}` : value.style
 }
 
-function metadataPropertyName(source: string): string {
+function metadataPropertyName(source: MetadataProperty | QuotedScalarText): MetadataProperty {
   const trimmed = source.trim()
   if (isQuotedScalar(trimmed)) {
     return String(parseScalar(trimmed))
@@ -286,12 +303,12 @@ function assignMetadataValue(metadata: SheetMetadata, assignment: MetadataAssign
   }
 }
 
-function parseSectionLine(line: string): MetadataSection | null {
+function parseSectionLine(line: MetadataLine): MetadataSection | null {
   const sectionMatch = line.match(/^ {2}(columns|rows|cells):\s*$/)
   return sectionMatch ? sectionMatch[1] as MetadataSection : null
 }
 
-function parseSheetSettingLine(line: string): SheetSettingAssignment | null {
+function parseSheetSettingLine(line: MetadataLine): SheetSettingAssignment | null {
   const sheetSettingMatch = line.match(/^ {2}([A-Za-z_]+):\s*(.+)$/)
   if (!sheetSettingMatch) return null
   return {
@@ -300,12 +317,12 @@ function parseSheetSettingLine(line: string): SheetSettingAssignment | null {
   }
 }
 
-function parseEntryKeyLine(line: string): string | null {
+function parseEntryKeyLine(line: MetadataLine): MetadataKey | null {
   const keyMatch = line.match(/^ {4}([^:]+):\s*$/)
   return keyMatch ? metadataPropertyName(keyMatch[1]) : null
 }
 
-function parseValueLine(line: string, cursor: MetadataParseCursor): MetadataAssignment | null {
+function parseValueLine(line: MetadataLine, cursor: MetadataParseCursor): MetadataAssignment | null {
   const valueMatch = line.match(/^ {6}([^:]+):\s*(.*)$/)
   if (!valueMatch || !cursor.section || !cursor.key) return null
   return {
@@ -316,7 +333,11 @@ function parseValueLine(line: string, cursor: MetadataParseCursor): MetadataAssi
   }
 }
 
-function parseMetadataLine(metadata: SheetMetadata, line: string, cursor: MetadataParseCursor): MetadataParseCursor {
+function parseMetadataLine(
+  metadata: SheetMetadata,
+  line: MetadataLine,
+  cursor: MetadataParseCursor,
+): MetadataParseCursor {
   if (line.trim() === '') return cursor
 
   const section = parseSectionLine(line)
@@ -336,7 +357,7 @@ function parseMetadataLine(metadata: SheetMetadata, line: string, cursor: Metada
   return cursor
 }
 
-export function parseSheetMetadata(frontmatter: string): SheetMetadata {
+export function parseSheetMetadata(frontmatter: FrontmatterSource): SheetMetadata {
   const metadata = emptySheetMetadata()
   const lines = frontmatter.replace(/\r\n/g, '\n').split('\n')
   const startIndex = lines.findIndex((line) => line.trim() === `${SHEET_METADATA_KEY}:`)
@@ -353,15 +374,19 @@ export function parseSheetMetadata(frontmatter: string): SheetMetadata {
   return metadata
 }
 
-function metadataLineWriter(lines: string[], indent: string): MetadataLineWriter {
+function metadataLineWriter(lines: MetadataLines, indent: MetadataIndent): MetadataLineWriter {
   return { indent, lines }
 }
 
-function appendScalarLine(writer: MetadataLineWriter, key: string, value: MetadataValue | undefined): void {
+function appendScalarLine(
+  writer: MetadataLineWriter,
+  key: MetadataProperty,
+  value: MetadataValue | undefined,
+): void {
   if (value !== undefined) writer.lines.push(`${writer.indent}${key}: ${scalarString(value)}`)
 }
 
-function appendSheetSettingLines(lines: string[], metadata: SheetMetadata): void {
+function appendSheetSettingLines(lines: MetadataLines, metadata: SheetMetadata): void {
   const writer = metadataLineWriter(lines, '  ')
   for (const setting of TOP_LEVEL_SHEET_SETTINGS) {
     appendScalarLine(writer, setting.key, metadata[setting.property])
@@ -374,7 +399,7 @@ function sortedColumnEntries(metadata: SheetMetadata): Array<[string, SheetColum
     .sort(([left], [right]) => (columnIndexFromName(left) ?? 0) - (columnIndexFromName(right) ?? 0))
 }
 
-function appendColumnMetadataLines(lines: string[], metadata: SheetMetadata): void {
+function appendColumnMetadataLines(lines: MetadataLines, metadata: SheetMetadata): void {
   const columnEntries = sortedColumnEntries(metadata)
   if (columnEntries.length > 0) {
     const writer = metadataLineWriter(lines, '      ')
@@ -392,7 +417,7 @@ function sortedRowEntries(metadata: SheetMetadata): Array<[string, SheetRowMetad
     .sort(([left], [right]) => Number(left) - Number(right))
 }
 
-function appendRowMetadataLines(lines: string[], metadata: SheetMetadata): void {
+function appendRowMetadataLines(lines: MetadataLines, metadata: SheetMetadata): void {
   const rowEntries = sortedRowEntries(metadata)
   if (rowEntries.length > 0) {
     const writer = metadataLineWriter(lines, '      ')
@@ -404,7 +429,7 @@ function appendRowMetadataLines(lines: string[], metadata: SheetMetadata): void 
   }
 }
 
-function compareCellMetadataAddresses(left: string, right: string): number {
+function compareCellMetadataAddresses(left: SheetCellAddress, right: SheetCellAddress): number {
   const leftIndexes = cellAddressToIndexes(left)
   const rightIndexes = cellAddressToIndexes(right)
   if (!leftIndexes || !rightIndexes) return left.localeCompare(right)
@@ -418,14 +443,14 @@ function sortedCellEntries(metadata: SheetMetadata): Array<[string, SheetCellMet
     .sort(([left], [right]) => compareCellMetadataAddresses(left, right))
 }
 
-function appendScalarCellMetadataLines(lines: string[], metadata: SheetCellMetadata): void {
+function appendScalarCellMetadataLines(lines: MetadataLines, metadata: SheetCellMetadata): void {
   const writer = metadataLineWriter(lines, '      ')
   for (const field of CELL_SCALAR_METADATA_KEYS) {
     appendScalarLine(writer, field.key, metadata[field.property])
   }
 }
 
-function appendBorderCellMetadataLines(lines: string[], metadata: SheetCellMetadata): void {
+function appendBorderCellMetadataLines(lines: MetadataLines, metadata: SheetCellMetadata): void {
   for (const field of CELL_BORDER_METADATA_KEYS) {
     const border = metadata[field.property]
     if (border !== undefined) {
@@ -434,7 +459,7 @@ function appendBorderCellMetadataLines(lines: string[], metadata: SheetCellMetad
   }
 }
 
-function appendCellMetadataLines(lines: string[], metadata: SheetMetadata): void {
+function appendCellMetadataLines(lines: MetadataLines, metadata: SheetMetadata): void {
   const cellEntries = sortedCellEntries(metadata)
   if (cellEntries.length > 0) {
     lines.push('  cells:')
@@ -446,7 +471,7 @@ function appendCellMetadataLines(lines: string[], metadata: SheetMetadata): void
   }
 }
 
-function metadataBlockLines(metadata: SheetMetadata): string[] {
+function metadataBlockLines(metadata: SheetMetadata): MetadataLines {
   const lines = [`${SHEET_METADATA_KEY}:`]
 
   appendSheetSettingLines(lines, metadata)
@@ -457,7 +482,7 @@ function metadataBlockLines(metadata: SheetMetadata): string[] {
   return lines
 }
 
-function removeExistingMetadataBlock(lines: string[]): string[] {
+function removeExistingMetadataBlock(lines: MetadataLines): MetadataLines {
   const startIndex = lines.findIndex((line) => line.trim() === `${SHEET_METADATA_KEY}:`)
   if (startIndex < 0) return lines
 
@@ -471,7 +496,7 @@ function removeExistingMetadataBlock(lines: string[]): string[] {
   return [...lines.slice(0, startIndex), ...lines.slice(endIndex)]
 }
 
-export function mergeSheetMetadata(frontmatter: string, metadata: SheetMetadata): string {
+export function mergeSheetMetadata(frontmatter: FrontmatterSource, metadata: SheetMetadata): FrontmatterSource {
   if (!frontmatter.startsWith('---')) return frontmatter
 
   const lineEnding = frontmatter.includes('\r\n') ? '\r\n' : '\n'
@@ -489,6 +514,6 @@ export function mergeSheetMetadata(frontmatter: string, metadata: SheetMetadata)
   return hasTrailingLineBreak && !merged.endsWith(lineEnding) ? `${merged}${lineEnding}` : merged
 }
 
-export function columnNameFromOneBasedIndex(column: number): string {
+export function columnNameFromOneBasedIndex(column: OneBasedColumnIndex): SheetColumnName {
   return columnNameFromIndex(column - 1)
 }
