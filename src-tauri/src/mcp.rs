@@ -109,12 +109,17 @@ fn verify_runtime_version(kind: McpRuntimeKind, path: &Path) -> Result<(), Strin
 }
 
 fn find_on_path(command: &str) -> Vec<PathBuf> {
-    lookup_command(command)
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .map(|output| lookup_paths(&output.stdout))
-        .unwrap_or_default()
+    let cmd = lookup_command(command);
+    // use tokio timeout wrap
+    let output = match tokio::time::timeout(
+        Duration::from_secs(3),
+        tokio::task::spawn_blocking(move || cmd.output())
+    ).await {
+        Ok(Ok(Ok(output))) if output.status.success() => output,
+        _ => return Vec::new(),
+    };
+    
+    lookup_paths(&output.stdout)
 }
 
 fn find_in_user_shell(command: &str) -> Vec<PathBuf> {
