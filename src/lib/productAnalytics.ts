@@ -14,6 +14,10 @@ type AiWorkspaceMode = 'docked' | 'side' | 'window'
 type AiWorkspaceTitleSource = 'generated' | 'manual'
 type NotePdfExportFailureReason = 'export_unavailable' | 'export_error'
 type NotePdfExportSource = 'breadcrumb' | 'app_command' | 'note_list_context_menu'
+type AnalyticsBoolean = boolean
+type AiAgentResponseText = string
+type AiAgentToolCount = number
+type SheetFormulaFunctionName = string
 
 const ALL_NOTES_VISIBILITY_CATEGORIES: ReadonlyArray<keyof AllNotesFileVisibility> = [
   'pdfs',
@@ -25,7 +29,7 @@ function trackedPreviewKind(previewKind: FilePreviewKind | null): TrackedPreview
   return previewKind ?? 'unsupported'
 }
 
-function numericFlag(value: boolean): number {
+function numericFlag(value: AnalyticsBoolean): number {
   return value ? 1 : 0
 }
 
@@ -72,13 +76,13 @@ export function trackAllNotesVisibilityChanged(
   }
 }
 
-export function trackAiFeaturesEnabledChanged(enabled: boolean): void {
+export function trackAiFeaturesEnabledChanged(enabled: AnalyticsBoolean): void {
   trackEvent('ai_features_visibility_changed', {
     enabled: numericFlag(enabled),
   })
 }
 
-export function trackGitFeaturesEnabledChanged(enabled: boolean): void {
+export function trackGitFeaturesEnabledChanged(enabled: AnalyticsBoolean): void {
   trackEvent('git_features_visibility_changed', {
     enabled: numericFlag(enabled),
   })
@@ -92,7 +96,7 @@ export function trackDateDisplayFormatChanged(format: DateDisplayFormat): void {
   trackEvent('date_display_format_changed', { format })
 }
 
-export function trackSidebarTypePluralizationChanged(enabled: boolean): void {
+export function trackSidebarTypePluralizationChanged(enabled: AnalyticsBoolean): void {
   trackEvent('sidebar_type_pluralization_changed', {
     enabled: numericFlag(enabled),
   })
@@ -122,7 +126,7 @@ export function trackSheetEditorOpened(params: {
   })
 }
 
-export function trackSheetFormulaAutocompleteUsed(functionName: string): void {
+export function trackSheetFormulaAutocompleteUsed(functionName: SheetFormulaFunctionName): void {
   trackEvent('sheet_formula_autocomplete_used', { function_name: functionName })
 }
 
@@ -148,9 +152,9 @@ export function trackAiAgentMessageSent(params: {
 
 export function trackAiAgentResponseCompleted(
   agent: AiAgentId,
-  response: string,
-  toolCount: number,
-  skipped: boolean,
+  response: AiAgentResponseText,
+  toolCount: AiAgentToolCount,
+  skipped: AnalyticsBoolean,
 ): void {
   if (skipped) return
   trackEvent('ai_agent_response_completed', {
@@ -160,7 +164,11 @@ export function trackAiAgentResponseCompleted(
   })
 }
 
-export function trackAiAgentResponseFailed(agent: AiAgentId, response: string, toolCount: number): void {
+export function trackAiAgentResponseFailed(
+  agent: AiAgentId,
+  response: AiAgentResponseText,
+  toolCount: AiAgentToolCount,
+): void {
   trackEvent('ai_agent_response_failed', {
     agent,
     error_kind: 'stream_error',
@@ -176,7 +184,7 @@ export function trackAiAgentPermissionModeChanged(agent: AiAgentId, permissionMo
   })
 }
 
-export function trackAiWorkspaceSidebarToggled(collapsed: boolean, mode: AiWorkspaceMode): void {
+export function trackAiWorkspaceSidebarToggled(collapsed: AnalyticsBoolean, mode: AiWorkspaceMode): void {
   trackEvent('ai_workspace_sidebar_toggled', {
     collapsed: numericFlag(collapsed),
     mode,

@@ -1,39 +1,44 @@
 import { parseFrontmatter } from './frontmatter'
 import { splitFrontmatter } from './wikilinks'
 
+type DisplayTitle = string
+type MarkdownContent = string
+type MarkdownLine = string
+type NoteFilename = string
+
 interface ResolvedContentTitle {
   source: 'h1' | 'frontmatter'
-  title: string
+  title: DisplayTitle
 }
 
 interface DisplayTitleInput {
-  content: string
-  filename: string
-  frontmatterTitle?: string | null
+  content: MarkdownContent
+  filename: NoteFilename
+  frontmatterTitle?: DisplayTitle | null
 }
 
 interface DisplayTitleState {
-  title: string
+  title: DisplayTitle
   hasH1: boolean
 }
 
-function replaceWikilinkAliases(text: string): string {
+function replaceWikilinkAliases(text: MarkdownLine): MarkdownLine {
   return text.replace(/\[\[[^|\]]+\|([^\]]+)\]\]/g, '$1')
 }
 
-function replacePlainWikilinks(text: string): string {
+function replacePlainWikilinks(text: MarkdownLine): MarkdownLine {
   return text.replace(/\[\[([^\]]+)\]\]/g, '$1')
 }
 
-function replaceMarkdownLinks(text: string): string {
+function replaceMarkdownLinks(text: MarkdownLine): MarkdownLine {
   return text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
 }
 
-function removeInlineMarkdownMarkers(text: string): string {
+function removeInlineMarkdownMarkers(text: MarkdownLine): MarkdownLine {
   return text.replace(/[*_`~]/g, '')
 }
 
-function stripMarkdownFormatting(text: string): string {
+function stripMarkdownFormatting(text: MarkdownLine): DisplayTitle {
   return removeInlineMarkdownMarkers(
     replaceMarkdownLinks(
       replacePlainWikilinks(
@@ -43,7 +48,7 @@ function stripMarkdownFormatting(text: string): string {
   )
 }
 
-export function filenameStemToTitle(filename: string): string {
+export function filenameStemToTitle(filename: NoteFilename): DisplayTitle {
   const stem = filename.replace(/\.[^.]+$/, '')
   return stem
     .split('-')
@@ -52,7 +57,7 @@ export function filenameStemToTitle(filename: string): string {
     .join(' ')
 }
 
-export function extractH1TitleFromContent(content: string): string | null {
+export function extractH1TitleFromContent(content: MarkdownContent): DisplayTitle | null {
   const [, body] = splitFrontmatter(content)
 
   for (const line of body.split('\n')) {
@@ -66,14 +71,17 @@ export function extractH1TitleFromContent(content: string): string | null {
   return null
 }
 
-export function extractFrontmatterTitleFromContent(content: string): string | null {
+export function extractFrontmatterTitleFromContent(content: MarkdownContent): DisplayTitle | null {
   const title = parseFrontmatter(content).title
   if (typeof title !== 'string') return null
   const trimmed = title.trim()
   return trimmed || null
 }
 
-function resolveContentTitle(content: string, frontmatterTitle?: string | null): ResolvedContentTitle | null {
+function resolveContentTitle(
+  content: MarkdownContent,
+  frontmatterTitle?: DisplayTitle | null,
+): ResolvedContentTitle | null {
   const h1Title = extractH1TitleFromContent(content)
   if (h1Title) {
     return { title: h1Title, source: 'h1' }
@@ -87,7 +95,7 @@ function resolveContentTitle(content: string, frontmatterTitle?: string | null):
   return null
 }
 
-export function contentDefinesDisplayTitle(content: string): boolean {
+export function contentDefinesDisplayTitle(content: MarkdownContent): boolean {
   return resolveContentTitle(content) !== null
 }
 
