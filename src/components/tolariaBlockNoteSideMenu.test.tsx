@@ -418,6 +418,22 @@ describe('TolariaSideMenu', () => {
     expect(mockEditor.insertBlocks).not.toHaveBeenCalled()
   })
 
+  it('ignores pointer reorders when the dragged block disappears during the final drop mutation', () => {
+    const { draggedBlock, dragHandle } = renderPointerReorderFixture()
+    const missingBlockError = staleBlockError(draggedBlock)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    mockEditor.removeBlocks.mockImplementation(() => {
+      throw missingBlockError
+    })
+
+    expect(() => dispatchHandlePointerReorder(dragHandle)).not.toThrow()
+
+    expect(mockEditor.removeBlocks).toHaveBeenCalledWith([draggedBlock.id])
+    expect(mockEditor.insertBlocks).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith('[editor] Ignored stale block side-menu action:', missingBlockError)
+    warn.mockRestore()
+  })
+
   it('shows and clears pointer reorder affordances while dragging', () => {
     const { draggedElement, dragHandle } = renderPointerReorderFixture()
 

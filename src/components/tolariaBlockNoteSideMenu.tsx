@@ -499,16 +499,18 @@ function moveBlockByPointerDrop({
   if (!draggedBlock || !targetBlock || hasChildBlock(draggedBlock, targetBlockId)) return false
 
   let moved = false
-  editor.focus()
-  editor.transact(() => {
-    const currentDraggedBlock = liveSideMenuBlock(editor, { id: draggedBlockId, type: '' })
-    const currentTargetBlock = liveSideMenuBlock(editor, { id: targetBlockId, type: '' })
-    if (!currentDraggedBlock || !currentTargetBlock) return
-    if (hasChildBlock(currentDraggedBlock, targetBlockId)) return
+  runSideMenuAction(() => {
+    editor.focus()
+    editor.transact(() => {
+      const currentDraggedBlock = liveSideMenuBlock(editor, { id: draggedBlockId, type: '' })
+      const currentTargetBlock = liveSideMenuBlock(editor, { id: targetBlockId, type: '' })
+      if (!currentDraggedBlock || !currentTargetBlock) return
+      if (hasChildBlock(currentDraggedBlock, targetBlockId)) return
 
-    editor.removeBlocks([currentDraggedBlock.id])
-    editor.insertBlocks([currentDraggedBlock], currentTargetBlock.id, placement)
-    moved = true
+      editor.removeBlocks([currentDraggedBlock.id])
+      editor.insertBlocks([currentDraggedBlock], currentTargetBlock.id, placement)
+      moved = true
+    })
   })
 
   return moved
