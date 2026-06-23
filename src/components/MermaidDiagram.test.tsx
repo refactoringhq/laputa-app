@@ -4,6 +4,19 @@ import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../hooks/appCommandDisp
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 import { MermaidDiagram } from './MermaidDiagram'
 
+const REPORTED_GANTT_DIAGRAM = [
+  'gantt',
+  '    title Project Plan',
+  '    dateFormat YYYY-MM-DD',
+  '    section Phase 1',
+  '    Requirements Analysis:a1, 2026-06-24, 7d',
+  '    Design:a2, after a1, 5d',
+  '    section Phase 2',
+  '    Development:b1, after a2, 14d',
+  '    Testing & Deployment:b2, after b1, 7d',
+  '',
+].join('\n')
+
 const mermaidMock = vi.hoisted(() => ({
   initialize: vi.fn(),
   render: vi.fn(),
@@ -187,6 +200,35 @@ describe('MermaidDiagram', () => {
     expect(label).toHaveAttribute('text-anchor', 'middle')
     expect(screen.getByText('DB Type')).toHaveAttribute('text-anchor', 'middle')
     expect(screen.getByText('rows')).toHaveAttribute('text-anchor', 'middle')
+  })
+
+  it('renders Gantt diagrams with a measurable offscreen host', async () => {
+    mermaidMock.render.mockImplementationOnce(async (_renderId: string, _diagram: string, container?: HTMLElement) => {
+      const hostWidth = container ? parseFloat(getComputedStyle(container).width) : 0
+      return {
+        svg: [
+          `<svg aria-label="Rendered Mermaid" viewBox="0 0 ${hostWidth} 196" aria-roledescription="gantt">`,
+          '<text>Testing &amp; Deployment</text>',
+          '</svg>',
+        ].join(''),
+      }
+    })
+
+    render(
+      <MermaidDiagram
+        diagram={REPORTED_GANTT_DIAGRAM}
+        source={`\`\`\`mermaid\n${REPORTED_GANTT_DIAGRAM}\`\`\``}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram-viewport').querySelector('svg')).not.toBeNull()
+    })
+
+    const svg = screen.getByTestId('mermaid-diagram-viewport').querySelector('svg')
+    const [, , width] = svg?.getAttribute('viewBox')?.split(/\s+/u).map(Number) ?? []
+    expect(width).toBeGreaterThan(0)
+    expect(screen.getByTestId('mermaid-diagram-viewport')).toHaveTextContent('Testing & Deployment')
   })
 
   it('falls back to the original source when Mermaid cannot render', async () => {

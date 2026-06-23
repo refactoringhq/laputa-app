@@ -40,8 +40,8 @@ const MERMAID_RENDER_HOST_STYLE = [
   'position:absolute',
   'left:-10000px',
   'top:-10000px',
-  'width:0',
-  'height:0',
+  'width:960px',
+  'min-height:1px',
   'overflow:hidden',
 ].join(';')
 const OPEN_RAW_EDITOR_LABEL = translate('en', 'editor.toolbar.rawOpen')

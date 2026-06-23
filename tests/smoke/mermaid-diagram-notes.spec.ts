@@ -43,6 +43,19 @@ const REPORTED_DATABASE_DIAGRAM = [
   '  app["app<br/>api"] --> db[("DB Type<br/>rows")]',
   '```',
 ].join('\n')
+const REPORTED_GANTT_DIAGRAM = [
+  '```mermaid',
+  'gantt',
+  '    title Project Plan',
+  '    dateFormat YYYY-MM-DD',
+  '    section Phase 1',
+  '    Requirements Analysis:a1, 2026-06-24, 7d',
+  '    Design:a2, after a1, 5d',
+  '    section Phase 2',
+  '    Development:b1, after a2, 14d',
+  '    Testing & Deployment:b2, after b1, 7d',
+  '```',
+].join('\n')
 const SYSTEM_OVERVIEW_DIAGRAM = [
   '```mermaid',
   'flowchart TD',
@@ -137,6 +150,20 @@ test.beforeEach(async ({ page }, testInfo) => {
       '# Mermaid Database',
       '',
       REPORTED_DATABASE_DIAGRAM,
+      '',
+    ].join('\n'),
+  )
+  fs.writeFileSync(
+    path.join(tempVaultDir, 'note', 'mermaid-gantt.md'),
+    [
+      '---',
+      'Status: Active',
+      'Date: 2026-06-24T00:00:00',
+      '---',
+      '',
+      '# Mermaid Gantt',
+      '',
+      REPORTED_GANTT_DIAGRAM,
       '',
     ].join('\n'),
   )
@@ -367,6 +394,21 @@ async function readDatabaseDiagramMetrics(page: Page, diagramIndex: number) {
   }
 }
 
+async function readGanttDiagramMetrics(page: Page, diagramIndex: number) {
+  const svg = mermaidSvg(page, diagramIndex)
+  return svg.evaluate((element) => {
+    const viewBox = element.getAttribute('viewBox')?.split(/\s+/u).map(Number) ?? []
+    const [, , width, height] = viewBox
+    return {
+      roleDescription: element.getAttribute('aria-roledescription'),
+      width,
+      height,
+      text: element.textContent ?? '',
+      taskCount: element.querySelectorAll('.task').length,
+    }
+  })
+}
+
 function readNoteBFile(): string {
   return fs.readFileSync(path.join(tempVaultDir, 'note', 'note-b.md'), 'utf8')
 }
@@ -397,6 +439,19 @@ test('Mermaid database node labels stay centered inside cylinders', async ({ pag
     foreignObjectCount: 0,
     text: expect.stringContaining('DB Type'),
   })
+})
+
+test('Mermaid Gantt diagrams render with a nonzero timeline width', async ({ page }) => {
+  await openNote(page, 'Mermaid Gantt')
+  await expectRenderedDiagramCount(page, 1)
+  await expect.poll(() => readGanttDiagramMetrics(page, 0)).toMatchObject({
+    roleDescription: 'gantt',
+    width: expect.any(Number),
+    height: expect.any(Number),
+    taskCount: 4,
+    text: expect.stringContaining('Testing & Deployment'),
+  })
+  expect((await readGanttDiagramMetrics(page, 0)).width).toBeGreaterThan(0)
 })
 
 test('fullscreen Mermaid diagrams keep the active Tolaria surface in dark mode', async ({ page }) => {
