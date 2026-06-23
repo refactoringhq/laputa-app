@@ -72,6 +72,80 @@ describe('createMcpToolService', () => {
     ])
   })
 
+  it('updates an existing note and emits a vault_changed action', async () => {
+    const emittedActions = []
+    const service = makeService({ emittedActions })
+    const absolutePath = path.join(firstVault, 'note/alpha.md')
+    const newContent = '---\ntitle: "Alpha"\ntype: Note\n---\n\n# Alpha\n\nRewritten.\n'
+
+    const note = await service.updateNote({
+      path: 'note/alpha.md',
+      content: newContent,
+      vaultPath: firstVault,
+    })
+
+    assert.equal(note.path, 'note/alpha.md')
+    assert.equal(note.vaultPath, firstVault)
+    assert.equal(await readFile(absolutePath, 'utf-8'), newContent)
+    assert.deepEqual(emittedActions, [
+      { action: 'vault_changed', payload: { path: absolutePath } },
+    ])
+  })
+
+  it('fails updateNote with ENOENT-style error for missing notes', async () => {
+    const service = makeService()
+
+    await assert.rejects(
+      () => service.updateNote({ path: 'note/ghost.md', content: '# Ghost\n', vaultPath: firstVault }),
+      (error) => error.code === 'ENOENT' || /not found/i.test(error.message),
+    )
+  })
+
+  it('rejects updateNote when expectedMtime does not match the on-disk note', async () => {
+    const service = makeService()
+    await writeFile(
+      path.join(firstVault, 'note/alpha.md'),
+      '---\ntitle: "Alpha"\ntype: Note\n---\n\n# Alpha\nOriginal.\n',
+      'utf-8',
+    )
+
+    await assert.rejects(
+      () => service.updateNote({
+        path: 'note/alpha.md',
+        content: '# Replaced\n',
+        vaultPath: firstVault,
+        expectedMtime: 1,
+      }),
+      /expectedMtime/,
+    )
+
+    // The conflict must leave the original note untouched.
+    const after = await readFile(path.join(firstVault, 'note/alpha.md'), 'utf-8')
+    assert.match(after, /Original\./)
+  })
+
+  it('appends content to an existing note and emits a vault_changed action', async () => {
+    const emittedActions = []
+    const service = makeService({ emittedActions })
+    const absolutePath = path.join(secondVault, 'note/beta.md')
+
+    const note = await service.appendToNote({
+      path: 'note/beta.md',
+      content: 'Follow-up bullet.\n',
+      vaultPath: secondVault,
+    })
+
+    assert.equal(note.path, 'note/beta.md')
+    assert.equal(note.vaultPath, secondVault)
+    assert.equal(
+      await readFile(absolutePath, 'utf-8'),
+      '---\ntitle: "Beta Project"\ntype: Note\n---\n\n# Beta Project\n\nProject planning in the second vault.\nFollow-up bullet.\n',
+    )
+    assert.deepEqual(emittedActions, [
+      { action: 'vault_changed', payload: { path: absolutePath } },
+    ])
+  })
+
   it('searches active vaults with consistent vault metadata', async () => {
     const service = makeService()
 

@@ -150,6 +150,7 @@ export interface Settings {
 export interface AiWorkspaceConversationSetting {
   archived?: boolean | null
   id: string
+  last_activity_at?: number | null
   target_id?: string | null
   title: string
 }

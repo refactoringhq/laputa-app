@@ -66,6 +66,7 @@ describe('aiWorkspaceSessionStore', () => {
           response: 'Still here',
         }),
       ],
+      lastMessageAt: expect.any(Number),
       status: 'done',
     })
   })
@@ -96,6 +97,7 @@ describe('aiWorkspaceSessionStore', () => {
           isStreaming: false,
         }),
       ],
+      lastMessageAt: expect.any(Number),
       status: 'idle',
     })
   })

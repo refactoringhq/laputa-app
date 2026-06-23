@@ -14,6 +14,7 @@ export interface AiConversation {
   archived: boolean
   hasActivity: boolean
   id: string
+  lastActivityAt?: number
   targetId: string
   title: string
   usesDefaultTitle: boolean
@@ -131,6 +132,7 @@ function conversationFromSetting(
     archived: setting.archived === true,
     hasActivity: !usesDefaultTitle,
     id,
+    lastActivityAt: setting.last_activity_at ?? undefined,
     targetId: setting.target_id?.trim() || fallbackTarget.id,
     title,
     usesDefaultTitle,
@@ -153,6 +155,7 @@ function conversationsToSettings(conversations: AiConversation[]): AiWorkspaceCo
   return conversations.map((conversation) => ({
     archived: conversation.archived,
     id: conversation.id,
+    last_activity_at: conversation.lastActivityAt ?? null,
     target_id: conversation.usesDefaultTarget ? null : conversation.targetId,
     title: conversation.title,
   }))
@@ -279,6 +282,7 @@ function markConversationActivityState(current: AiConversation[], id: Conversati
       ? {
           ...conversation,
           hasActivity: true,
+          lastActivityAt: Date.now(),
         }
       : conversation
   ))

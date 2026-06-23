@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import {
-  createNote, findMarkdownFiles, getNote, searchNotes, vaultContext,
+  appendToNote, createNote, findMarkdownFiles, getNote, searchNotes, updateNote, vaultContext,
 } from './vault.js'
 import { requireVaultPath, requireVaultPaths } from './vault-path.js'
 import { vaultContextWithInstructions } from './agent-instructions.js'
@@ -187,6 +187,139 @@ type: Note
         { message: ACTIVE_VAULT_ERROR },
       )
       await assert.rejects(() => access(outsideParent), { code: 'ENOENT' })
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+      await rm(outsideDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('updateNote', () => {
+  it('replaces the content of an existing note', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-update-'))
+    const notePath = path.join(vaultDir, 'note', 'existing.md')
+    await mkdir(path.dirname(notePath), { recursive: true })
+    await writeFile(notePath, '---\ntype: Note\n---\n\n# Old\n', 'utf-8')
+    const newContent = '---\ntype: Project\n---\n\n# Updated\n'
+
+    try {
+      const note = await updateNote(vaultDir, 'note/existing.md', newContent)
+      assert.equal(note.path, 'note/existing.md')
+      assert.equal(await readFile(notePath, 'utf-8'), newContent)
+      assert.ok(note.mtime > 0)
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+    }
+  })
+
+  it('throws ENOENT when updating a missing note', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-update-missing-'))
+
+    try {
+      await assert.rejects(
+        () => updateNote(vaultDir, 'note/missing.md', '# New\n'),
+        { code: 'ENOENT' },
+      )
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+    }
+  })
+
+  it('fails with a clear conflict message when expectedMtime does not match', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-update-conflict-'))
+    const notePath = path.join(vaultDir, 'stale.md')
+    await writeFile(notePath, '# Stale\n', 'utf-8')
+
+    try {
+      await assert.rejects(
+        () => updateNote(vaultDir, 'stale.md', '# New\n', { expectedMtime: 1 }),
+        /expectedMtime/,
+      )
+      // Original content survives the failed update.
+      assert.equal(await readFile(notePath, 'utf-8'), '# Stale\n')
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+    }
+  })
+
+  it('succeeds when expectedMtime matches the on-disk mtimeMs', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-update-match-'))
+    const notePath = path.join(vaultDir, 'match.md')
+    await writeFile(notePath, '# Original\n', 'utf-8')
+    const handle = await open(notePath, 'r')
+    const stat = await handle.stat()
+    await handle.close()
+    const newContent = '# Updated\n'
+
+    try {
+      const note = await updateNote(vaultDir, 'match.md', newContent, {
+        expectedMtime: stat.mtimeMs,
+      })
+      assert.equal(await readFile(notePath, 'utf-8'), newContent)
+      assert.ok(note.mtime >= stat.mtimeMs)
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects absolute paths outside the vault', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-update-vault-'))
+    const outsideDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-update-outside-'))
+    await writeFile(path.join(outsideDir, 'outside.md'), '# Outside\n', 'utf-8')
+
+    try {
+      await assert.rejects(
+        () => updateNote(vaultDir, path.join(outsideDir, 'outside.md'), '# Outside\n'),
+        { message: ACTIVE_VAULT_ERROR },
+      )
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+      await rm(outsideDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('appendToNote', () => {
+  it('appends content to an existing note body', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-append-'))
+    const notePath = path.join(vaultDir, 'log.md')
+    await writeFile(notePath, '---\ntype: Note\n---\n\n# Log\n\nFirst entry.\n', 'utf-8')
+
+    try {
+      const note = await appendToNote(vaultDir, 'log.md', 'Second entry.\n')
+      assert.equal(
+        await readFile(notePath, 'utf-8'),
+        '---\ntype: Note\n---\n\n# Log\n\nFirst entry.\nSecond entry.\n',
+      )
+      assert.ok(note.mtime > 0)
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+    }
+  })
+
+  it('throws ENOENT when appending to a missing note', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-append-missing-'))
+
+    try {
+      await assert.rejects(
+        () => appendToNote(vaultDir, 'missing.md', 'More'),
+        { code: 'ENOENT' },
+      )
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects absolute paths outside the vault', async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-append-vault-'))
+    const outsideDir = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-append-outside-'))
+    await writeFile(path.join(outsideDir, 'outside.md'), '# Outside\n', 'utf-8')
+
+    try {
+      await assert.rejects(
+        () => appendToNote(vaultDir, path.join(outsideDir, 'outside.md'), 'More'),
+        { message: ACTIVE_VAULT_ERROR },
+      )
     } finally {
       await rm(vaultDir, { recursive: true, force: true })
       await rm(outsideDir, { recursive: true, force: true })
@@ -399,11 +532,14 @@ describe('stdio process lifecycle', () => {
         assert.equal(tool.annotations?.openWorldHint, false, `${name} should stay scoped to local active vaults`)
       }
 
-      const createTool = toolsByName.get('create_note')
-      assert.ok(createTool, 'Missing MCP tool: create_note')
-      assert.equal(createTool.annotations?.readOnlyHint, false)
-      assert.equal(createTool.annotations?.destructiveHint, false)
-      assert.equal(createTool.annotations?.openWorldHint, false)
+      const writableTools = ['create_note', 'update_note', 'append_to_note']
+      for (const name of writableTools) {
+        const tool = toolsByName.get(name)
+        assert.ok(tool, `Missing MCP tool: ${name}`)
+        assert.equal(tool.annotations?.readOnlyHint, false)
+        assert.equal(tool.annotations?.destructiveHint, false)
+        assert.equal(tool.annotations?.openWorldHint, false)
+      }
     } finally {
       await closeMcpClient(client, stderr)
     }
@@ -429,6 +565,74 @@ type: Note
 
       assert.equal(await readFile(absolutePath, 'utf-8'), content)
       assert.match(JSON.stringify(result.content), /mcp-tool-created\.md/)
+    } finally {
+      await rm(absolutePath, { force: true })
+      await closeMcpClient(client, stderr)
+    }
+  })
+
+  it('exposes update_note and append_to_note as writable, non-destructive tools', async () => {
+    const { client, stderr } = await connectMcpClient()
+
+    try {
+      const { tools } = await client.listTools()
+      const toolsByName = new Map(tools.map(tool => [tool.name, tool]))
+
+      for (const name of ['update_note', 'append_to_note']) {
+        const tool = toolsByName.get(name)
+        assert.ok(tool, `Missing MCP tool: ${name}`)
+        assert.equal(tool.annotations?.readOnlyHint, false, `${name} must declare itself writable`)
+        assert.equal(tool.annotations?.destructiveHint, false, `${name} must not be flagged destructive`)
+        assert.equal(tool.annotations?.openWorldHint, false, `${name} must stay scoped to active vaults`)
+        assert.ok(tool.inputSchema?.properties?.path, `${name} must accept a path`)
+        assert.ok(tool.inputSchema?.properties?.content, `${name} must accept content`)
+        assert.deepEqual(tool.inputSchema?.required ?? [], ['path', 'content'])
+      }
+    } finally {
+      await closeMcpClient(client, stderr)
+    }
+  })
+
+  it('replaces a note through the MCP update_note tool', async () => {
+    const { client, stderr } = await connectMcpClient()
+    const relativePath = 'note/mcp-updated.md'
+    const absolutePath = path.join(tmpDir, relativePath)
+    const original = '# Original\n'
+    const updated = '---\ntype: Note\n---\n\n# MCP Updated\n'
+
+    try {
+      await mkdir(path.dirname(absolutePath), { recursive: true })
+      await writeFile(absolutePath, original, 'utf-8')
+
+      const result = await client.callTool({
+        name: 'update_note',
+        arguments: { path: relativePath, content: updated },
+      })
+
+      assert.equal(await readFile(absolutePath, 'utf-8'), updated)
+      assert.match(JSON.stringify(result.content), /mcp-updated\.md/)
+    } finally {
+      await rm(absolutePath, { force: true })
+      await closeMcpClient(client, stderr)
+    }
+  })
+
+  it('appends content through the MCP append_to_note tool', async () => {
+    const { client, stderr } = await connectMcpClient()
+    const relativePath = 'note/mcp-appended.md'
+    const absolutePath = path.join(tmpDir, relativePath)
+    const original = '# Original\n'
+
+    try {
+      await mkdir(path.dirname(absolutePath), { recursive: true })
+      await writeFile(absolutePath, original, 'utf-8')
+
+      await client.callTool({
+        name: 'append_to_note',
+        arguments: { path: relativePath, content: 'Appended line.\n' },
+      })
+
+      assert.equal(await readFile(absolutePath, 'utf-8'), `${original}Appended line.\n`)
     } finally {
       await rm(absolutePath, { force: true })
       await closeMcpClient(client, stderr)

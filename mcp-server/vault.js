@@ -4,7 +4,7 @@
  * permission profile and native file-edit tools; createNote is intentionally
  * narrow so read-only agents can create a new Markdown file without overwrite.
  */
-import { mkdir, open, opendir, realpath } from 'node:fs/promises'
+import { mkdir, open, opendir, realpath, rename, rm } from 'node:fs/promises'
 import path from 'node:path'
 import matter from 'gray-matter'
 
@@ -74,6 +74,49 @@ export async function createNote(vaultPath, notePath, content) {
   return {
     path: relativePath,
     absolutePath: requestedPath,
+  }
+}
+
+/**
+ * Replace the full content of an existing vault note.
+ *
+ * Writes are atomic (temp file + rename) so a crashed write never leaves a
+ * truncated note on disk. Pass {@link options.expectedMtime} (note mtimeMs
+ * from get_note) to fail-fast when the note changed between read and write.
+ *
+ * @param {string} vaultPath
+ * @param {string} notePath
+ * @param {string} content
+ * @param {{ expectedMtime?: number }} [options]
+ * @returns {Promise<{path: string, absolutePath: string, mtime: number}>}
+ */
+export async function updateNote(vaultPath, notePath, content, options = {}) {
+  const { noteRealPath, relativePath } = await resolveVaultNotePath(vaultPath, notePath)
+  const mtime = await assertNoteMatchesExpectedMtime(noteRealPath, options.expectedMtime)
+  await writeExistingUtf8File(noteRealPath, content)
+  return {
+    path: relativePath,
+    absolutePath: noteRealPath,
+    mtime,
+  }
+}
+
+/**
+ * Append markdown to an existing vault note body. Safer than {@link updateNote}
+ * for agents that only want to log/extend content without replacing the file.
+ *
+ * @param {string} vaultPath
+ * @param {string} notePath
+ * @param {string} content
+ * @returns {Promise<{path: string, absolutePath: string, mtime: number}>}
+ */
+export async function appendToNote(vaultPath, notePath, content) {
+  const { noteRealPath, relativePath } = await resolveVaultNotePath(vaultPath, notePath)
+  const mtime = await appendUtf8File(noteRealPath, content)
+  return {
+    path: relativePath,
+    absolutePath: noteRealPath,
+    mtime,
   }
 }
 
@@ -417,6 +460,46 @@ async function writeNewUtf8File(filePath, content) {
   } finally {
     await handle.close()
   }
+}
+
+async function writeExistingUtf8File(filePath, content) {
+  // Atomic swap: write alongside, then rename over the target so a crash
+  // mid-write never leaves a truncated note on disk.
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`
+  const handle = await open(tempPath, 'wx')
+  try {
+    await handle.writeFile(content, 'utf-8')
+  } finally {
+    await handle.close()
+  }
+  try {
+    await rename(tempPath, filePath)
+  } catch (error) {
+    // Never leak a half-written temp file behind a failed rename.
+    await rm(tempPath, { force: true })
+    throw error
+  }
+}
+
+async function appendUtf8File(filePath, content) {
+  const handle = await open(filePath, 'a')
+  try {
+    await handle.writeFile(content, 'utf-8')
+    const stat = await handle.stat()
+    return stat.mtimeMs
+  } finally {
+    await handle.close()
+  }
+}
+
+async function assertNoteMatchesExpectedMtime(noteRealPath, expectedMtime) {
+  const stat = await statFile(noteRealPath)
+  if (expectedMtime !== undefined && expectedMtime !== null && stat.mtimeMs !== expectedMtime) {
+    throw new Error(
+      `Note was modified since read: expectedMtime ${expectedMtime} but on-disk mtimeMs is ${stat.mtimeMs}. Re-read the note and retry.`,
+    )
+  }
+  return stat.mtimeMs
 }
 
 async function statFile(filePath) {

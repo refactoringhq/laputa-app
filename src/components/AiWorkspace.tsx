@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowsInLineHorizontal, ArrowsOutLineHorizontal, CaretDown, GearSix, Plus, SidebarSimple, X } from '@phosphor-icons/react'
+import { ArrowsInLineHorizontal, ArrowsOutLineHorizontal, CaretDown, ClockCounterClockwise, GearSix, Plus, SidebarSimple, X } from '@phosphor-icons/react'
 import {
   DndContext,
   PointerSensor,
@@ -55,9 +55,10 @@ import type { NoteListItem } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 import { NEW_AI_CHAT_EVENT } from '../utils/aiPromptBridge'
 import { type GenerateAiConversationTitleRequest } from '../utils/aiConversationTitle'
-import { cloneAiWorkspaceSessionUntilMessage } from '../lib/aiWorkspaceSessionStore'
+import { aiWorkspaceSessionSnapshot, cloneAiWorkspaceSessionUntilMessage } from '../lib/aiWorkspaceSessionStore'
 import { AiPanelView } from './AiPanel'
 import { GuidanceWarning, WorkspaceHeader } from './AiWorkspaceChrome'
+import { formatConversationTimestamp } from '../utils/conversationTimestamp'
 import { WorkspaceResizeHandles } from './AiWorkspaceResizeHandles'
 import { AiAgentIcon } from './AiAgentIcon'
 import { ConversationSidebar } from './AiWorkspaceSidebar'
@@ -1011,6 +1012,7 @@ function SideWorkspaceHeader({
   onNewChat,
   onRename,
   onReorder,
+  onRestore,
   onSelect,
   onToggleExpanded,
   separated,
@@ -1025,12 +1027,15 @@ function SideWorkspaceHeader({
   onNewChat: () => void
   onRename: (id: string, title: string) => void
   onReorder: (activeId: string, overId: string) => void
+  onRestore: (id: string) => void
   onSelect: (id: string) => void
   onToggleExpanded: () => void
   separated: boolean
   statuses: Record<string, AgentStatus>
 }) {
   const expandLabel = translate(locale, expanded ? 'ai.workspace.restorePanel' : 'ai.workspace.expandPanel')
+  const activeConversations = conversations.filter((c) => !c.archived)
+  const archivedConversations = conversations.filter((c) => c.archived)
 
   return (
     <div
@@ -1051,6 +1056,68 @@ function SideWorkspaceHeader({
         onSelect={onSelect}
         statuses={statuses}
       />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={translate(locale, 'ai.workspace.chatHistory')}
+            title={translate(locale, 'ai.workspace.chatHistory')}
+          >
+            <ClockCounterClockwise size={17} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="text-xs">{translate(locale, 'ai.workspace.activeChats')}</DropdownMenuLabel>
+          {activeConversations.length === 0 ? (
+            <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+              {translate(locale, 'ai.workspace.noActiveChats')}
+            </DropdownMenuItem>
+          ) : (
+            activeConversations.map((conversation) => {
+              const ts = conversation.lastActivityAt ?? aiWorkspaceSessionSnapshot(conversation.id).lastMessageAt
+              return (
+                <DropdownMenuItem
+                  key={conversation.id}
+                  className={cn('text-xs', conversation.id === activeId && 'font-medium')}
+                  onClick={() => onSelect(conversation.id)}
+                >
+                  <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
+                  {ts && (
+                    <span className="ml-2 shrink-0 text-[11px] text-muted-foreground">
+                      {formatConversationTimestamp(ts)}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+              )
+            })
+          )}
+          {archivedConversations.length > 0 && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs">{translate(locale, 'ai.workspace.archivedChats')}</DropdownMenuLabel>
+              {archivedConversations.map((conversation) => {
+                const ts = conversation.lastActivityAt ?? aiWorkspaceSessionSnapshot(conversation.id).lastMessageAt
+                return (
+                  <DropdownMenuItem
+                    key={conversation.id}
+                    className="text-xs text-muted-foreground"
+                    onClick={() => { onRestore(conversation.id); onSelect(conversation.id) }}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
+                    {ts && (
+                      <span className="ml-2 shrink-0 text-[11px]">
+                        {formatConversationTimestamp(ts)}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                )
+              })}
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Button
         type="button"
         variant="ghost"
@@ -1109,6 +1176,7 @@ function SideAiWorkspaceLayout({
           onNewChat={model.addDefaultConversation}
           onRename={model.renameConversation}
           onReorder={model.reorderConversation}
+          onRestore={model.restoreConversation}
           onSelect={model.setActiveId}
           onToggleExpanded={() => setExpanded((current) => !current)}
           separated={headerSeparated}

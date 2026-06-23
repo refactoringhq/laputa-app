@@ -10,6 +10,7 @@ const NATIVE_WRITE_DEBOUNCE_MS = 250
 
 export interface AiWorkspaceSessionSnapshot {
   messages: AiAgentMessage[]
+  lastMessageAt?: number
   status: AgentStatus
 }
 
@@ -67,13 +68,21 @@ function normalizeStoredSessions(value: unknown, resetRunningStatus: boolean): S
   return Object.fromEntries(
     Object.entries(value).filter((entry): entry is [string, AiWorkspaceSessionSnapshot] => (
       typeof entry[0] === 'string' && isSessionSnapshot(entry[1])
-    )).map(([sessionId, session]) => [
-      sessionId,
-      {
-        messages: normalizeStoredMessages(session.messages, resetRunningStatus),
-        status: normalizeStoredStatus(session.status, resetRunningStatus),
-      },
-    ]),
+    )).map(([sessionId, session]) => {
+      const messages = normalizeStoredMessages(session.messages, resetRunningStatus)
+      const storedTs = typeof (session as AiWorkspaceSessionSnapshot).lastMessageAt === 'number'
+        ? (session as AiWorkspaceSessionSnapshot).lastMessageAt
+        : undefined
+      const lastMessageAt = storedTs ?? (messages.length > 0 ? Date.now() : undefined)
+      return [
+        sessionId,
+        {
+          messages,
+          lastMessageAt,
+          status: normalizeStoredStatus(session.status, resetRunningStatus),
+        },
+      ]
+    }),
   )
 }
 
@@ -186,6 +195,7 @@ export function setAiWorkspaceSessionMessages(
     return {
       ...current,
       messages,
+      lastMessageAt: messages.length > 0 ? Date.now() : current.lastMessageAt,
     }
   })
 }
