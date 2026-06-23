@@ -131,7 +131,7 @@ describe('raw-mode sync content guards', () => {
     expect(rawLatestContentRef.current).toBe(result)
   })
 
-  it('keeps raw-mode serialization portable for vault attachment images', () => {
+  it('keeps raw-mode serialization note-relative for vault attachment images', () => {
     const rawLatestContentRef = { current: null as string | null }
     mockEditor.blocksToMarkdownLossy.mockReturnValueOnce(
       '# Test Project\n\n![shot](asset://localhost/%2Fvault%2Fattachments%2Fshot.png)\n',
@@ -146,7 +146,7 @@ describe('raw-mode sync content guards', () => {
     })
 
     expect(result).toBe(
-      '---\ntitle: Test Project\nis_a: Project\nStatus: Active\n---\n# Test Project\n\n![shot](attachments/shot.png)\n',
+      '---\ntitle: Test Project\nis_a: Project\nStatus: Active\n---\n# Test Project\n\n![shot](../attachments/shot.png)\n',
     )
     expect(rawLatestContentRef.current).toBe(result)
   })

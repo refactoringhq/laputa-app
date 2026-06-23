@@ -460,8 +460,8 @@ function portableFallbackFilesystemPath(request: UrlOnlyRequest): MarkdownImageU
 
 function portableImageUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
   if (!isTauriAssetUrl({ url: request.url })) return null
-  return portableCurrentAttachmentPath(request)
-    ?? portableCurrentVaultImagePath(request)
+  return portableCurrentVaultImagePath(request)
+    ?? portableCurrentAttachmentPath(request)
     ?? portableFallbackFilesystemPath({ url: request.url })
 }
 

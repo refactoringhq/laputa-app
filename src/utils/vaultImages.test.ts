@@ -302,6 +302,22 @@ describe('portableImageUrls', () => {
     )
   })
 
+  it('serializes root attachment asset URLs relative to nested notes', () => {
+    const markdown = `![shot](${assetUrl('/vault/attachments/shot.png')})`
+
+    expect(portableImageUrls(markdown, '/vault', '/vault/projects/notes/plan.md')).toBe(
+      '![shot](../../attachments/shot.png)',
+    )
+  })
+
+  it('serializes Windows root attachment asset URLs relative to nested notes', () => {
+    const markdown = `![shot](${assetUrl('C:\\Vault\\attachments\\shot.png')})`
+
+    expect(portableImageUrls(markdown, 'c:\\vault', 'C:\\Vault\\Projects\\Notes\\plan.md')).toBe(
+      '![shot](../../attachments/shot.png)',
+    )
+  })
+
   it('unwraps external asset URLs to filesystem paths instead of saving asset scheme URLs', () => {
     const markdown = `![external](${assetUrl('/Users/luca/Pictures/photo.png')})`
 
