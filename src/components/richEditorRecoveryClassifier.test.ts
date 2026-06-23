@@ -35,9 +35,9 @@ describe('richEditorRecoveryClassifier', () => {
     expect(richEditorRecoveryErrorNeedsDocumentRepair(new Error("Block doesn't have id"))).toBe(true)
   })
 
-  it('keeps surface-specific recovery errors separate', () => {
+  it('classifies DOM NotFoundError across editor recovery surfaces', () => {
     expect(classifyRichEditorRecoveryError(webkitNotFoundError(), 'transform')).toBe('dom_not_found')
-    expect(classifyRichEditorRecoveryError(webkitNotFoundError(), 'render')).toBeNull()
+    expect(classifyRichEditorRecoveryError(webkitNotFoundError(), 'render')).toBe('dom_not_found')
     expect(classifyRichEditorRecoveryError(transformError(), 'transform')).toBe('transform_error')
     expect(classifyRichEditorRecoveryError(transformError(), 'render')).toBeNull()
   })
@@ -48,6 +48,7 @@ describe('richEditorRecoveryClassifier', () => {
     )
 
     expect(classifyRichEditorRecoveryError(error, 'transform')).toBe('dom_not_found')
+    expect(classifyRichEditorRecoveryError(error, 'render')).toBe('dom_not_found')
   })
 
   it('separates document repair decisions from telemetry reason names', () => {

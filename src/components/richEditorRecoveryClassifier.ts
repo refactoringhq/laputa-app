@@ -11,6 +11,7 @@ const WEBKIT_DOM_NOT_FOUND_MESSAGES = [
 export type BlockNoteRenderRecoveryReason =
   | 'block_type_mismatch'
   | 'block_missing_id'
+  | 'dom_not_found'
   | 'paragraph_index_out_of_range'
   | 'stale_block_reference'
   | 'table_row_index_out_of_range'
@@ -134,7 +135,7 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
   {
     matches: isWebKitDomNotFoundError,
     reason: 'dom_not_found',
-    surfaces: ['transform'],
+    surfaces: ['render', 'transform'],
   },
   {
     matches: isMismatchedTransactionError,

@@ -206,6 +206,21 @@ describe('main entrypoint', () => {
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '' })
   })
 
+  it('suppresses caught WebKit DOM NotFoundError render recoveries from Sentry', async () => {
+    await importEntrypoint()
+
+    const error = new Error('The object can not be found here.')
+    error.name = 'NotFoundError'
+    window.__tolariaFrontendReady = true
+
+    rootOptions().onCaughtError?.(error, {
+      componentStack: '\n    in BlockNoteView\n    in BlockNoteRenderRecoveryBoundary',
+    })
+
+    expect(mocks.sentryHandler).not.toHaveBeenCalled()
+    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+  })
+
   it('suppresses recovered action tooltip render errors from Sentry', async () => {
     await importEntrypoint()
 

@@ -74,6 +74,19 @@ describe('blockNoteRenderRecovery', () => {
     expect(isRecoverableBlockNoteRenderError(error)).toBe(true)
   })
 
+  it('recognizes recovered WebKit DOM NotFoundError render races', () => {
+    const error = new Error('The object can not be found here.')
+    error.name = 'NotFoundError'
+
+    expect(blockNoteRenderRecoveryReason(error)).toBe('dom_not_found')
+    expect(isRecoverableBlockNoteRenderError(error)).toBe(true)
+    expect(isRecoveredBlockNoteRenderError(error, '')).toBe(false)
+
+    markRecoveredBlockNoteRenderError(error)
+
+    expect(isRecoveredBlockNoteRenderError(error, '')).toBe(true)
+  })
+
   it('recognizes recovered BlockNote errors from the React component stack fallback', () => {
     expect(isRecoveredBlockNoteRenderError(
       new Error("Block doesn't have id"),
