@@ -192,3 +192,5 @@ proposed → active → superseded
 | [0139](0139-temporary-windows-authenticode-soft-gate.md) | Temporary Windows Authenticode soft gate | active |
 | [0140](0140-extension-based-raw-text-syntax-highlighting.md) | Extension-based raw text syntax highlighting | active |
 | [0141](0141-scoped-linux-webkit-rendering-safeguards.md) | Scoped Linux WebKit rendering safeguards | active |
+| [0142](0142-rich-editor-prosemirror-decoration-dependency.md) | Rich editor ProseMirror decoration dependency | active |
+| [0143](0143-shared-focus-ownership-guard.md) | Shared focus ownership guard | active |
