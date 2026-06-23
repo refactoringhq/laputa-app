@@ -23,7 +23,14 @@ interface FilePreviewFallbackProps {
   icon: 'warning' | 'file'
   title: string
   description: string
+  canOpenExternal?: boolean
   onOpenExternal: () => void
+}
+
+interface FilePreviewState {
+  canUseFileActions: boolean
+  previewKind: FilePreviewKind | null
+  previewPath: string | null
 }
 
 const EMPTY_CAPTIONS_TRACK = 'data:text/vtt,WEBVTT'
@@ -40,6 +47,32 @@ function appendPdfPreviewLoadKey(assetSrc: string, loadKey: string): string {
   const hash = hashIndex === -1 ? '' : assetSrc.slice(hashIndex)
   const separator = baseSrc.includes('?') ? '&' : '?'
   return `${baseSrc}${separator}tolaria_pdf_preview=${encodeURIComponent(loadKey)}${hash}`
+}
+
+function filePreviewPath(path: unknown): string | null {
+  if (typeof path !== 'string') return null
+  return path.trim().length > 0 ? path : null
+}
+
+function filePreviewState(entry: VaultEntry): FilePreviewState {
+  const previewPath = filePreviewPath(entry.path)
+  if (previewPath === null) {
+    return { canUseFileActions: false, previewKind: null, previewPath }
+  }
+
+  const previewEntry = previewPath === entry.path ? entry : { ...entry, path: previewPath }
+  return {
+    canUseFileActions: true,
+    previewKind: filePreviewKind(previewEntry),
+    previewPath,
+  }
+}
+
+function filePreviewAssetSrc(previewKind: FilePreviewKind | null, previewPath: string | null, pdfPreviewLoadKey: string): string | null {
+  if (!previewKind || previewPath === null) return null
+
+  const src = convertFileSrc(previewPath)
+  return previewKind === 'pdf' ? appendPdfPreviewLoadKey(src, pdfPreviewLoadKey) : src
 }
 
 function usePdfPreviewLoadKey(): string {
@@ -91,7 +124,7 @@ function FilePreviewHeaderIcon({ previewKind }: { previewKind: FilePreviewKind |
   return <FileDashed size={17} className="shrink-0 text-muted-foreground" aria-hidden="true" />
 }
 
-function FilePreviewFallback({ icon, title, description, onOpenExternal }: FilePreviewFallbackProps) {
+function FilePreviewFallback({ icon, title, description, canOpenExternal = true, onOpenExternal }: FilePreviewFallbackProps) {
   const Icon = icon === 'warning' ? WarningCircle : FileDashed
 
   return (
@@ -104,7 +137,7 @@ function FilePreviewFallback({ icon, title, description, onOpenExternal }: FileP
         <h2 className="m-0 text-[15px] font-semibold text-foreground">{title}</h2>
         <p className="m-0 max-w-md text-[13px] leading-6 text-muted-foreground">{description}</p>
       </div>
-      <Button type="button" variant="outline" size="sm" onClick={onOpenExternal}>
+      <Button type="button" variant="outline" size="sm" onClick={onOpenExternal} disabled={!canOpenExternal}>
         <ArrowSquareOut size={15} />
         Open in default app
       </Button>
@@ -115,6 +148,7 @@ function FilePreviewFallback({ icon, title, description, onOpenExternal }: FileP
 function FilePreviewHeader({
   entry,
   previewKind,
+  canUseFileActions,
   fileTypeLabel,
   locale = 'en',
   onOpenExternal,
@@ -124,6 +158,7 @@ function FilePreviewHeader({
 }: {
   entry: VaultEntry
   previewKind: FilePreviewKind | null
+  canUseFileActions: boolean
   fileTypeLabel: string
   locale?: AppLocale
   onOpenExternal: () => void
@@ -145,24 +180,24 @@ function FilePreviewHeader({
       </div>
       <div className="flex items-center gap-1">
         {onRevealFile && (
-          <Button type="button" variant="ghost" size="sm" onClick={onRevealFile}>
+          <Button type="button" variant="ghost" size="sm" onClick={onRevealFile} disabled={!canUseFileActions}>
             <FolderOpen size={15} />
             Reveal
           </Button>
         )}
         {onCopyFilePath && (
-          <Button type="button" variant="ghost" size="sm" onClick={onCopyFilePath}>
+          <Button type="button" variant="ghost" size="sm" onClick={onCopyFilePath} disabled={!canUseFileActions}>
             <ClipboardText size={15} />
             Copy path
           </Button>
         )}
         {onCopyDeepLink && (
-          <Button type="button" variant="ghost" size="sm" onClick={onCopyDeepLink}>
+          <Button type="button" variant="ghost" size="sm" onClick={onCopyDeepLink} disabled={!canUseFileActions}>
             <Link size={15} />
             {translate(locale, 'filePreview.copyDeepLink')}
           </Button>
         )}
-        <Button type="button" variant="ghost" size="sm" onClick={onOpenExternal}>
+        <Button type="button" variant="ghost" size="sm" onClick={onOpenExternal} disabled={!canUseFileActions}>
           <ArrowSquareOut size={15} />
           Open
         </Button>
@@ -291,6 +326,7 @@ function FilePreviewBody({
   previewKind,
   assetSrc,
   imageFailed,
+  canOpenExternal,
   onImageError,
   onAudioError,
   onVideoError,
@@ -300,6 +336,7 @@ function FilePreviewBody({
   previewKind: FilePreviewKind | null
   assetSrc: string | null
   imageFailed: boolean
+  canOpenExternal: boolean
   onImageError: () => void
   onAudioError: () => void
   onVideoError: () => void
@@ -328,6 +365,7 @@ function FilePreviewBody({
       icon={fallback.icon}
       title={fallback.title}
       description={fallback.description}
+      canOpenExternal={canOpenExternal}
       onOpenExternal={onOpenExternal}
     />
   )
@@ -428,21 +466,17 @@ export function FilePreview({
   onRevealFile,
 }: FilePreviewProps) {
   const previewRef = useRef<HTMLElement | null>(null)
-  const previewKind = filePreviewKind(entry)
-  const previewPath = entry.path
+  const { canUseFileActions, previewKind, previewPath } = filePreviewState(entry)
   const pdfPreviewLoadKey = usePdfPreviewLoadKey()
   const assetSrc = useMemo(() => {
-    if (!previewKind) return null
-
-    const src = convertFileSrc(entry.path)
-    return previewKind === 'pdf' ? appendPdfPreviewLoadKey(src, pdfPreviewLoadKey) : src
-  }, [entry.path, pdfPreviewLoadKey, previewKind])
+    return filePreviewAssetSrc(previewKind, previewPath, pdfPreviewLoadKey)
+  }, [pdfPreviewLoadKey, previewKind, previewPath])
   const fileTypeLabel = previewFileTypeLabel(entry)
   const externalMediaPreview = useExternalMediaPreview()
-  const failures = useFilePreviewFailureState(entry.path)
+  const failures = useFilePreviewFailureState(previewPath ?? '')
   const actions = useFilePreviewActions({
     entry,
-    entryPath: entry.path,
+    entryPath: previewPath ?? '',
     onCopyFilePath,
     onCopyDeepLink,
     onOpenExternalFile,
@@ -480,6 +514,7 @@ export function FilePreview({
       <FilePreviewHeader
         entry={entry}
         previewKind={previewKind}
+        canUseFileActions={canUseFileActions}
         fileTypeLabel={fileTypeLabel}
         locale={locale}
         onOpenExternal={actions.handleOpenExternal}
@@ -493,6 +528,7 @@ export function FilePreview({
           previewKind={previewKindForBody(previewKind, failures.mediaFailed, externalMediaPreview)}
           assetSrc={assetSrc}
           imageFailed={failures.imageFailed}
+          canOpenExternal={canUseFileActions}
           onImageError={failures.handleImageError}
           onAudioError={failures.handleAudioError}
           onVideoError={failures.handleVideoError}

@@ -3,13 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FilePreview } from './FilePreview'
 import type { VaultEntry } from '../types'
 
-const { externalMediaPreviewMock, trackEventMock } = vi.hoisted(() => ({
+const { convertFileSrcMock, externalMediaPreviewMock, trackEventMock } = vi.hoisted(() => ({
+  convertFileSrcMock: vi.fn((path: string) => `asset://${path}`),
   externalMediaPreviewMock: vi.fn(() => false),
   trackEventMock: vi.fn(),
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({
-  convertFileSrc: (path: string) => `asset://${path}`,
+  convertFileSrc: convertFileSrcMock,
 }))
 
 vi.mock('../lib/telemetry', () => ({
@@ -80,6 +81,14 @@ const videoEntry: VaultEntry = {
 
 describe('FilePreview', () => {
   beforeEach(() => {
+    convertFileSrcMock.mockReset()
+    convertFileSrcMock.mockImplementation((path: string) => {
+      if (typeof path !== 'string' || path.trim().length === 0) {
+        throw new Error('null pointer passed to rust')
+      }
+
+      return `asset://${path}`
+    })
     externalMediaPreviewMock.mockReturnValue(false)
     trackEventMock.mockClear()
   })
@@ -187,6 +196,20 @@ describe('FilePreview', () => {
     expect(screen.getByTestId('video-file-preview')).toHaveAttribute('src', 'asset:///vault/Attachments/demo.mp4')
     expect(screen.getByTestId('video-file-preview')).toHaveAttribute('title', 'demo.mp4')
     expect(trackEventMock).toHaveBeenCalledWith('file_preview_opened', { preview_kind: 'video' })
+  })
+
+  it('does not call the Tauri asset bridge for malformed file paths', () => {
+    const malformedEntry = {
+      ...imageEntry,
+      path: null,
+      filename: 'photo.png',
+      title: 'photo.png',
+    } as unknown as VaultEntry
+
+    expect(() => render(<FilePreview entry={malformedEntry} />)).not.toThrow()
+
+    expect(convertFileSrcMock).not.toHaveBeenCalled()
+    expect(screen.getByTestId('file-preview-fallback')).toHaveTextContent('Preview unavailable')
   })
 
   it('uses the external-open fallback for media when native playback is unsafe', () => {
