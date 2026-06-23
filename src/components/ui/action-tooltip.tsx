@@ -21,7 +21,6 @@ interface ActionTooltipProps {
 interface ActionTooltipBoundaryProps {
   children: ReactNode
   fallback: ReactNode
-  resetKey: string
 }
 
 interface ActionTooltipBoundaryState {
@@ -39,11 +38,6 @@ class ActionTooltipBoundary extends Component<ActionTooltipBoundaryProps, Action
     markRecoveredActionTooltipError(error)
   }
 
-  componentDidUpdate(previousProps: ActionTooltipBoundaryProps) {
-    if (previousProps.resetKey === this.props.resetKey || !this.state.failed) return
-    this.setState({ failed: false })
-  }
-
   render() {
     return this.state.failed ? this.props.fallback : this.props.children
   }
@@ -58,10 +52,8 @@ export function ActionTooltip({
   align = 'center',
   sideOffset = 6,
 }: ActionTooltipProps) {
-  const resetKey = `${copy.label}\n${copy.shortcut ?? ''}`
-
   return (
-    <ActionTooltipBoundary fallback={children} resetKey={resetKey}>
+    <ActionTooltipBoundary fallback={children}>
       <Tooltip>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent
