@@ -546,6 +546,31 @@ describe('useTabManagement (single-note model)', () => {
       expectSingleActiveTab(result, '/vault/a.md')
     })
 
+    it('waits for the active note save before replacing it from note-list navigation', async () => {
+      const deferred = createDeferred<void>()
+      const beforeNavigate = vi.fn().mockReturnValueOnce(deferred.promise)
+
+      const { result } = renderHook(() => useTabManagement({ beforeNavigate }))
+      await selectNote(result, { path: '/vault/a.md', title: 'A' })
+
+      act(() => {
+        void result.current.handleReplaceActiveTab(makeEntry({ path: '/vault/b.md', title: 'B' }))
+      })
+
+      expect(beforeNavigate).toHaveBeenCalledWith('/vault/a.md', '/vault/b.md')
+      expect(result.current.activeTabPath).toBe('/vault/a.md')
+      expect(result.current.tabs[0].content).toBe('# Mock content')
+
+      await act(async () => {
+        deferred.resolve(undefined)
+        await Promise.resolve()
+      })
+
+      await vi.waitFor(() => expect(result.current.activeTabPath).toBe('/vault/b.md'))
+      expect(result.current.tabs).toHaveLength(1)
+      expect(result.current.tabs[0].entry.title).toBe('B')
+    })
+
     it('validates cached content before replacing with a different active note', async () => {
       cacheNoteContent('/vault/b.md', '# Stale cached B')
       vi.mocked(mockInvoke).mockImplementation((cmd: string) => {
