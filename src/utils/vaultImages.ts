@@ -20,6 +20,8 @@ const URL_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z0-9+.-]*:/
 const WINDOWS_DRIVE_PATH_PATTERN = /^[A-Za-z]:[\\/]/
 const BACKSLASH_CODE = 92
 const MARKDOWN_IMAGE_URL_FORBIDDEN_CHARS = ['\t', '\n', '\r', '"']
+const IMAGE_FILE_EXTENSION_PATTERN = /\.(?:avif|bmp|gif|jpe?g|png|svg|webp|tiff?)$/iu
+const WIKILINK_IMAGE_EMBED_PATTERN = /!\[\[([^\]\n]+)\]\]/g
 
 interface MarkdownImageToken {
   alt: string
@@ -60,6 +62,15 @@ interface MarkdownDestinationRequest {
 interface MarkdownDestinationScanState {
   inTitle: boolean
   parenthesisDepth: number
+}
+
+interface WikilinkImageEmbed {
+  alt: string
+  url: MarkdownImageUrl
+}
+
+interface WikilinkImageRequest {
+  target: string
 }
 
 interface UrlOnlyRequest {
@@ -210,6 +221,56 @@ function parseMarkdownImageDestination(request: MarkdownDestinationRequest): Mar
   if (MARKDOWN_IMAGE_URL_FORBIDDEN_CHARS.some(char => url.includes(char))) return null
   if (title && !title.endsWith('"')) return null
   return { title, url }
+}
+
+function wikilinkImagePath(request: WikilinkImageRequest): string {
+  const pipeIndex = request.target.indexOf('|')
+  return (pipeIndex === -1 ? request.target : request.target.slice(0, pipeIndex)).trim()
+}
+
+function wikilinkImageDisplay(request: WikilinkImageRequest): string {
+  const pipeIndex = request.target.indexOf('|')
+  return pipeIndex === -1 ? '' : request.target.slice(pipeIndex + 1).trim()
+}
+
+function imageAltFromPath(path: string): string {
+  const decodedPath = decodePathUrl({ url: path })
+  return decodedPath.split(/[\\/]/u).filter(Boolean).at(-1) ?? decodedPath
+}
+
+function isExplicitWikilinkImagePath(path: string): boolean {
+  if (hasUrlScheme({ url: path })) return true
+  if (isFilesystemAbsolutePath({ path })) return true
+  return path.startsWith('.')
+}
+
+function portableWikilinkImageUrl(path: string): MarkdownImageUrl {
+  if (isExplicitWikilinkImagePath(path)) return path
+  return path.includes('/') || path.includes('\\') ? path : `attachments/${path}`
+}
+
+function parseWikilinkImageEmbed(request: WikilinkImageRequest): WikilinkImageEmbed | null {
+  const path = wikilinkImagePath(request)
+  if (!IMAGE_FILE_EXTENSION_PATTERN.test(path)) return null
+
+  const display = wikilinkImageDisplay(request)
+  return {
+    alt: display || imageAltFromPath(path),
+    url: portableWikilinkImageUrl(path),
+  }
+}
+
+function rewriteWikilinkImageEmbeds(
+  markdown: Markdown,
+  transformUrl: (url: MarkdownImageUrl) => MarkdownImageUrl | null,
+): Markdown {
+  return markdown.replace(WIKILINK_IMAGE_EMBED_PATTERN, (match, target: string) => {
+    const image = parseWikilinkImageEmbed({ target })
+    if (!image) return match
+
+    const nextUrl = transformUrl(image.url)
+    return nextUrl ? `![${image.alt}](${nextUrl})` : match
+  })
 }
 
 function hasUrlScheme(request: UrlOnlyRequest): boolean {
@@ -363,8 +424,8 @@ function resolveNoteRelativeUrl(request: ImageUrlRequest): MarkdownImageUrl | nu
 function resolveImageUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
   return resolveLegacyAttachmentAssetUrl(request)
     ?? resolveAbsoluteFilesystemUrl({ url: request.url })
-    ?? resolveNoteRelativeUrl(request)
     ?? resolvePortableAttachmentUrl(request)
+    ?? resolveNoteRelativeUrl(request)
 }
 
 export function resolveImageUrls(
@@ -374,7 +435,8 @@ export function resolveImageUrls(
 ): Markdown {
   if (!isTauri() || !vaultPath) return markdown
 
-  return rewriteMarkdownImages(markdown, url => resolveImageUrl({ url, vaultPath, notePath }))
+  const transformUrl = (url: MarkdownImageUrl) => resolveImageUrl({ url, vaultPath, notePath })
+  return rewriteMarkdownImages(rewriteWikilinkImageEmbeds(markdown, transformUrl), transformUrl)
 }
 
 function portableCurrentAttachmentPath(request: ImageUrlRequest): MarkdownImageUrl | null {

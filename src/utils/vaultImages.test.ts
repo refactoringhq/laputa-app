@@ -140,16 +140,28 @@ describe('resolveImageUrls', () => {
     )
   })
 
-  it('resolves bare attachment subdirectory image paths against the active note directory', () => {
+  it('resolves portable attachment image paths against the vault root from subfolder notes', () => {
     tauriMode = true
     const notePath = '/vault/projects/notes/plan.md'
 
     expect(resolveImageUrls('![shot](attachments/shot.png)', '/vault', notePath)).toBe(
-      resolveImageUrls('![shot](./attachments/shot.png)', '/vault', notePath),
+      `![shot](${assetUrl('/vault/attachments/shot.png')})`,
     )
-    expect(resolveImageUrls('![shot](attachments/shot.png)', '/vault', notePath)).toBe(
+    expect(resolveImageUrls('![shot](./attachments/shot.png)', '/vault', notePath)).toBe(
       `![shot](${assetUrl('/vault/projects/notes/attachments/shot.png')})`,
     )
+  })
+
+  it('resolves image wikilink embeds through vault attachments', () => {
+    tauriMode = true
+
+    expect(resolveImageUrls('![[diagram.png]]', '/vault', '/vault/projects/notes/plan.md')).toBe(
+      `![diagram.png](${assetUrl('/vault/attachments/diagram.png')})`,
+    )
+    expect(resolveImageUrls('![[attachments/diagram.png|System diagram]]', '/vault')).toBe(
+      `![System diagram](${assetUrl('/vault/attachments/diagram.png')})`,
+    )
+    expect(resolveImageUrls('![[Project Note]]', '/vault')).toBe('![[Project Note]]')
   })
 
   it('resolves parenthesized and percent-encoded note-relative image paths', () => {
