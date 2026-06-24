@@ -90,6 +90,7 @@ import { focusNoteIconPropertyEditor } from './components/noteIconPropertyEvents
 import { trackEvent } from './lib/telemetry'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
 import { areAiFeaturesEnabled } from './lib/aiFeatures'
+import { aiTargetReady, type AiTarget } from './lib/aiTargets'
 import { areGitFeaturesEnabled } from './lib/gitSettings'
 import { useAppCommandAiActions } from './hooks/useAppCommandAiActions'
 import { TOLARIA_DOCS_URL } from './constants/feedback'
@@ -292,6 +293,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleActiveAiWorkspaceConversationChange = useCallback((id: string) => {
     setLastAiWorkspaceConversationId(id)
   }, [])
+  const [lastAiWorkspaceTarget, setLastAiWorkspaceTarget] = useState<AiTarget | null>(null)
+  const handleActiveAiWorkspaceTargetChange = useCallback((target: AiTarget) => {
+    setLastAiWorkspaceTarget(target)
+  }, [])
   const {
     folderVaults,
     graphDefaultWorkspacePath,
@@ -412,6 +417,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     settings,
     settingsLoaded,
   })
+  const quickPromptTarget = lastAiWorkspaceTarget ?? aiAgentPreferences.defaultAiTarget
+  const quickPromptTargetReady = aiTargetReady(quickPromptTarget, aiAgentsStatus)
 
   useVaultOpenedTelemetry({
     entryCount: vault.entries.length,
@@ -1551,6 +1558,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       noteList={aiNoteList}
       noteListFilter={aiNoteListFilter}
       onActiveConversationChange={handleActiveAiWorkspaceConversationChange}
+      onActiveTargetChange={handleActiveAiWorkspaceTargetChange}
       onClose={closeAIChat}
       onConversationSettingsChange={handleAiWorkspaceConversationsChange}
       onOpenAiSettings={handleOpenAiSettings}
@@ -1725,9 +1733,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           open={dialogs.showCommandPalette}
           commands={commands}
           entries={visibleEntries}
-          aiAgentReady={aiAgentPreferences.defaultAiAgentReady}
-          aiAgentLabel={aiAgentPreferences.defaultAiAgentLabel}
+          aiAgentReady={quickPromptTargetReady}
+          aiAgentLabel={quickPromptTarget.label}
           aiModeEnabled={aiFeaturesEnabled}
+          aiPromptTargetId={quickPromptTarget.id}
           locale={appLocale}
           onClose={dialogs.closeCommandPalette}
         />

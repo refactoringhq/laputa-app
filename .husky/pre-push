@@ -195,7 +195,8 @@ if ! run_sidecar_automatic_checks; then
   # ── 2. Frontend coverage (≥70%) — includes all unit tests ───────────────
   echo ""
   echo "📊 [2/6] Frontend tests + coverage (≥70%)..."
-  pnpm test:coverage --silent
+  FRONTEND_COVERAGE_CONCURRENCY="${FRONTEND_COVERAGE_CONCURRENCY:-1}" \
+    node scripts/run-vitest-coverage-shards.mjs --silent
   echo "  ✅ Frontend coverage OK"
 
   # ── 3. Rust lint (clippy + fmt) — fast, run before coverage ─────────────

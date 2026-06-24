@@ -61,8 +61,10 @@ interface AiPanelViewProps {
   surface?: 'default' | 'sidebar'
   composerControls?: ReactNode
   onForkMessage?: (messageId: string) => void
+  onQueuedPromptTarget?: (targetId: string) => void
   onSendPrompt?: (text: string) => void
   onMessageHistoryScrollStateChange?: (scrolled: boolean) => void
+  targetId?: string
 }
 
 function readinessFromReadyFlag(ready: boolean | undefined): AiAgentReadiness {
@@ -155,8 +157,10 @@ export function AiPanelView({
   surface = 'default',
   composerControls,
   onForkMessage,
+  onQueuedPromptTarget,
   onSendPrompt,
   onMessageHistoryScrollStateChange,
+  targetId,
 }: AiPanelViewProps) {
   const view = resolveAiPanelViewModel({
     defaultAiAgent: providedDefaultAiAgent,
@@ -179,7 +183,15 @@ export function AiPanelView({
     handleNewChat,
   } = controller
 
-  useAiPanelPromptQueue({ agent, input, isActive, setInput, enabled: interactive })
+  useAiPanelPromptQueue({
+    agent,
+    currentTargetId: targetId,
+    input,
+    isActive,
+    onTargetChange: onQueuedPromptTarget,
+    setInput,
+    enabled: interactive,
+  })
   useAiPanelFocus({
     inputRef,
     panelRef,
@@ -295,6 +307,7 @@ export function AiPanel({
       locale={locale}
       activeEntry={activeEntry}
       entries={entries}
+      targetId={defaultAiTarget?.id}
     />
   )
 }

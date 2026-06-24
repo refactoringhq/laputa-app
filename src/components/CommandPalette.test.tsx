@@ -516,6 +516,27 @@ describe('CommandPalette', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('queues AI prompts with the selected workspace target id', () => {
+    render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        entries={entries}
+        aiAgentLabel="Codex"
+        aiPromptTargetId="agent:codex"
+        onClose={onClose}
+      />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    const editor = updateAiInput(' ask the selected agent')
+    fireEvent.keyDown(editor, { key: 'Enter' })
+
+    expect(screen.getAllByText('Ask Codex').length).toBeGreaterThan(0)
+    expect(queueAiPrompt).toHaveBeenCalledWith('ask the selected agent', [], 'agent:codex')
+    expect(requestOpenAiChat).toHaveBeenCalledOnce()
+  })
+
   it('closes without queueing when AI mode only contains the trigger space', () => {
     render(<CommandPalette open={true} commands={commands} onClose={onClose} />)
 

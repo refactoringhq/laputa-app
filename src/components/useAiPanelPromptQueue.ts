@@ -10,16 +10,56 @@ interface AiAgentBridge {
 
 interface UseAiPanelPromptQueueArgs {
   agent: AiAgentBridge
+  currentTargetId?: string
   input: string
   isActive: boolean
+  onTargetChange?: (targetId: string) => void
   setInput: (value: string) => void
   enabled?: boolean
 }
 
-export function useAiPanelPromptQueue({
-  agent,
+function queuedPromptTargetChange(prompt: QueuedAiPrompt, currentTargetId: string | undefined): string | null {
+  if (!prompt.targetId || !currentTargetId) return null
+  return prompt.targetId === currentTargetId ? null : prompt.targetId
+}
+
+function shouldWaitForTargetChange(
+  prompt: QueuedAiPrompt,
+  currentTargetId: string | undefined,
+  onTargetChange: ((targetId: string) => void) | undefined,
+): boolean {
+  return !!onTargetChange && queuedPromptTargetChange(prompt, currentTargetId) !== null
+}
+
+function readyQueuedPrompt({
+  currentTargetId,
+  enabled,
   input,
   isActive,
+  onTargetChange,
+  queuedPrompt,
+}: {
+  currentTargetId?: string
+  enabled: boolean
+  input: string
+  isActive: boolean
+  onTargetChange?: (targetId: string) => void
+  queuedPrompt: QueuedAiPrompt | null
+}): QueuedAiPrompt | null {
+  if (!enabled) return null
+  if (!queuedPrompt) return null
+  if (isActive) return null
+  if (input !== queuedPrompt.text) return null
+  if (shouldWaitForTargetChange(queuedPrompt, currentTargetId, onTargetChange)) return null
+  return queuedPrompt
+}
+
+export function useAiPanelPromptQueue({
+  agent,
+  currentTargetId,
+  input,
+  isActive,
+  onTargetChange,
   setInput,
   enabled = true,
 }: UseAiPanelPromptQueueArgs) {
@@ -28,20 +68,21 @@ export function useAiPanelPromptQueue({
   const handleQueuedPrompt = useCallback((prompt: QueuedAiPrompt) => {
     setInput(prompt.text)
     setQueuedPrompt(prompt)
-    agent.clearConversation()
-  }, [agent, setInput])
+    const nextTargetId = queuedPromptTargetChange(prompt, currentTargetId)
+    if (nextTargetId) onTargetChange?.(nextTargetId)
+  }, [currentTargetId, onTargetChange, setInput])
 
   useQueuedAiPrompt(handleQueuedPrompt, enabled)
 
   useEffect(() => {
-    if (!enabled) return
-    if (!queuedPrompt || isActive) return
-    if (input !== queuedPrompt.text) return
+    const prompt = readyQueuedPrompt({ currentTargetId, enabled, input, isActive, onTargetChange, queuedPrompt })
+    if (!prompt) return
 
-    agent.sendMessage(queuedPrompt.text, queuedPrompt.references)
+    agent.clearConversation()
+    agent.sendMessage(prompt.text, prompt.references)
     startTransition(() => {
       setInput('')
       setQueuedPrompt(null)
     })
-  }, [agent, enabled, input, isActive, queuedPrompt, setInput])
+  }, [agent, currentTargetId, enabled, input, isActive, onTargetChange, queuedPrompt, setInput])
 }

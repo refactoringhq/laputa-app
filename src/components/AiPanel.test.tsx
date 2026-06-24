@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render as rtlRender, screen, fireEvent, act, waitFor } from '@testing-library/react'
-import { AiPanel } from './AiPanel'
+import { AiPanel, AiPanelView } from './AiPanel'
 import { UNSUPPORTED_INLINE_PASTE_MESSAGE } from './InlineWikilinkInput'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import type { AiPanelController } from './useAiPanelController'
 import type { VaultEntry } from '../types'
 import { queueAiPrompt } from '../utils/aiPromptBridge'
+import type { NoteReference } from '../utils/ai-context'
 import { bindVaultConfigStore, getVaultConfig, resetVaultConfigStore } from '../utils/vaultConfigStore'
 
 const { trackEventMock } = vi.hoisted(() => ({
@@ -78,6 +81,55 @@ const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
 
 function render(ui: Parameters<typeof rtlRender>[0]) {
   return rtlRender(ui, { wrapper: TooltipProvider })
+}
+
+function QueuedPromptTargetHarness({ onTargetChange }: { onTargetChange: (targetId: string) => void }) {
+  const [input, setInput] = useState('')
+  const [targetId, setTargetId] = useState('agent:claude_code')
+  const handleTargetChange = (nextTargetId: string) => {
+    onTargetChange(nextTargetId)
+    setTargetId(nextTargetId)
+  }
+  const controller: AiPanelController = {
+    agent: {
+      messages: [],
+      status: 'idle',
+      sendMessage: (text: string, references?: NoteReference[]) => {
+        mockSendMessage(text, references)
+        return Promise.resolve()
+      },
+      regenerateMessage: () => Promise.resolve(),
+      clearConversation: () => {
+        mockClearConversation()
+      },
+      addLocalMarker: (text: string) => {
+        mockAddLocalMarker(text)
+      },
+    },
+    input,
+    setInput,
+    linkedEntries: [],
+    hasContext: false,
+    isActive: false,
+    permissionMode: 'safe',
+    handleSend: (text: string, references: NoteReference[]) => {
+      mockSendMessage(text, references)
+      setInput('')
+    },
+    handleNavigateWikilink: vi.fn(),
+    handlePermissionModeChange: vi.fn(),
+    handleNewChat: vi.fn(),
+  }
+
+  return (
+    <AiPanelView
+      controller={controller}
+      onClose={vi.fn()}
+      onQueuedPromptTarget={handleTargetChange}
+      showHeader={false}
+      targetId={targetId}
+    />
+  )
 }
 
 describe('AiPanel', () => {
@@ -439,6 +491,21 @@ describe('AiPanel', () => {
       { title: 'Alpha', path: '/vault/alpha.md', type: 'Project' },
     ])
     expect(screen.getByTestId('agent-send')).toBeDisabled()
+  })
+
+  it('retargets a queued prompt before sending when the active target differs', async () => {
+    const onTargetChange = vi.fn()
+    render(<QueuedPromptTargetHarness onTargetChange={onTargetChange} />)
+
+    await act(async () => {
+      queueAiPrompt('ask codex', [], 'agent:codex')
+    })
+
+    await waitFor(() => {
+      expect(onTargetChange).toHaveBeenCalledWith('agent:codex')
+      expect(mockClearConversation).toHaveBeenCalledOnce()
+      expect(mockSendMessage).toHaveBeenCalledWith('ask codex', [])
+    })
   })
 
   it('surfaces an unsupported image paste notice without locking the composer', () => {

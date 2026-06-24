@@ -97,6 +97,7 @@ proposed → active → superseded
 | [0039](0039-git-history-for-note-dates.md) | Git history as source of truth for note creation/modification dates | active |
 | [0040](0040-custom-views-yml-filter-engine.md) | Custom Views — .laputa/views/*.yml with YAML filter engine | active |
 | [0041](0041-filekind-all-files-in-vault-scanner.md) | fileKind field — scan all vault files, not just markdown | active |
+| [0042](0042-posthog-release-channels-feature-flags.md) | PostHog-based release channels and feature flags | superseded → [0057](0057-alpha-stable-release-channels-and-beta-cohorts.md) |
 | [0042](0042-trash-auto-purge-safety-model.md) | Trash auto-purge safety model | superseded → [0045](0045-permanent-delete-no-trash.md) |
 | [0043](0043-reactive-vault-state-on-save.md) | Reactive vault state: editor changes propagate immediately to all UI | active |
 | [0044](0044-h1-as-title-primary-source.md) | H1 as primary title source — filename as stable identifier | superseded → [0055](0055-h1-is-the-only-editor-title-surface.md) |
@@ -139,7 +140,10 @@ proposed → active → superseded
 | [0081](0081-internal-light-dark-theme-runtime.md) | Internal light and dark theme runtime | active |
 | [0082](0082-markdown-durable-math-notes.md) | Markdown-durable math in notes | active |
 | [0083](0083-dual-architecture-macos-release-artifacts.md) | Dual-architecture macOS release artifacts | active |
+| [0084](0084-app-localization-foundation.md) | App-owned localization foundation | superseded → [0087](0087-json-catalogs-and-lara-cli-localization.md) |
 | [0085](0085-non-git-vault-support.md) | Non-git vaults open with explicit later Git initialization | active |
+| [0086](0086-in-app-image-file-preview.md) | In-app image previews for binary vault files | superseded → [0098](0098-in-app-image-and-pdf-file-previews.md) |
+| [0087](0087-json-catalogs-and-lara-cli-localization.md) | JSON locale catalogs with Lara CLI synchronization | active |
 | [0088](0088-markdown-durable-mermaid-diagrams.md) | Markdown-durable Mermaid diagrams in notes | active |
 | [0089](0089-active-vault-filesystem-watcher.md) | Active vault filesystem watcher | active |
 | [0090](0090-pi-cli-agent-adapter.md) | Pi CLI agent adapter | active |
@@ -161,6 +165,7 @@ proposed → active → superseded
 | [0106](0106-shared-app-command-manifest.md) | Shared app command manifest | active |
 | [0107](0107-markdown-durable-tldraw-whiteboards.md) | Markdown-durable tldraw whiteboards in notes | active |
 | [0107](0107-pointer-owned-editor-block-reordering.md) | Pointer-owned editor block reordering | active |
+| [0108](0108-direct-model-ai-targets.md) | Direct model AI targets alongside coding agents | active |
 | [0108](0108-sanitized-rendered-markup-and-safe-regex.md) | Sanitized rendered markup and safe user regex | active |
 | [0109](0109-debounced-worker-derived-editor-indexes.md) | Debounced worker-derived editor indexes | active |
 | [0110](0110-in-app-media-and-pdf-file-previews.md) | In-app media and PDF previews for binary vault files | superseded → [0121](0121-appimage-external-fallback-for-audio-and-video-previews.md) |
@@ -170,6 +175,7 @@ proposed → active → superseded
 | [0114](0114-mounted-workspaces-unified-graph.md) | Mounted workspaces unified graph | active |
 | [0115](0115-scoped-react-context-for-shared-ui-preferences.md) | Scoped React Context for shared UI preferences | active |
 | [0116](0116-rich-raw-transition-and-serialization-ownership.md) | Rich/raw transition and serialization ownership | active |
+| [0117](0117-appimage-fcitx-gtk3-frontend-bundle.md) | Bundle the fcitx GTK3 frontend in Linux AppImages | active |
 | [0118](0118-entry-scoped-note-windows-without-vault-index-scans.md) | Entry-scoped note windows without vault index scans | superseded -> [0123](0123-full-vault-graph-for-secondary-note-windows.md) |
 | [0119](0119-vault-neutral-mcp-registration-with-mounted-workspace-guidance.md) | Vault-neutral MCP registration with mounted workspace guidance | active |
 | [0120](0120-stable-appimage-mcp-server-path-with-opencode-registration.md) | Stable AppImage MCP server path with OpenCode registration | active |
@@ -185,8 +191,10 @@ proposed → active → superseded
 | [0131](0131-reusable-release-artifact-build-workflow.md) | Reusable release artifact build workflow | active |
 | [0132](0132-alpha-authenticode-soft-gate.md) | Alpha Authenticode soft gate | superseded -> [0139](0139-temporary-windows-authenticode-soft-gate.md) |
 | [0133](0133-request-scoped-ai-stream-events.md) | Request-scoped AI stream event channels | active |
+| [0134](0134-sheet-nodes-with-plain-text-workbook-storage.md) | Sheet nodes with plain-text workbook storage | experimental |
 | [0134](0134-direct-shiki-language-registrations.md) | Direct Shiki language registrations for code blocks | active |
 | [0135](0135-clean-active-note-refresh-after-external-edit.md) | Clean active notes refresh immediately after external edits | active |
+| [0136](0136-macos-webview-pdf-export.md) | macOS Webview PDF export | active |
 | [0137](0137-shared-rich-editor-input-transforms.md) | Shared rich-editor input transforms | active |
 | [0138](0138-authenticode-required-for-all-release-channels.md) | Require Authenticode signing for all Windows release channels | superseded -> [0139](0139-temporary-windows-authenticode-soft-gate.md) |
 | [0139](0139-temporary-windows-authenticode-soft-gate.md) | Temporary Windows Authenticode soft gate | active |

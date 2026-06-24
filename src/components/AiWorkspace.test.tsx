@@ -492,6 +492,45 @@ describe('AiWorkspace', () => {
     expect(within(menu).getByText('OpenAI · GPT-4.1')).toBeTruthy()
   })
 
+  it('reports the selected workspace target to parent surfaces', async () => {
+    const onActiveTargetChange = vi.fn()
+    render(
+      <AiWorkspace
+        open
+        mode="docked"
+        aiAgentsStatus={installedStatuses()}
+        aiModelProviders={providers}
+        vaultPath="/tmp/vault"
+        onActiveTargetChange={onActiveTargetChange}
+        onClose={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(onActiveTargetChange).toHaveBeenCalledWith(expect.objectContaining({
+        agent: 'claude_code',
+        id: 'agent:claude_code',
+        kind: 'agent',
+      }))
+    })
+
+    const trigger = screen.getByTestId('ai-workspace-target-trigger')
+    act(() => {
+      trigger.focus()
+      fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    })
+    const menu = await screen.findByRole('menu')
+    fireEvent.click(within(menu).getByRole('menuitemradio', { name: /Codex/i }))
+
+    await waitFor(() => {
+      expect(onActiveTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({
+        agent: 'codex',
+        id: 'agent:codex',
+        kind: 'agent',
+      }))
+    })
+  })
+
   it('marks the first chat active when a prompt is submitted', () => {
     const onConversationSettingsChange = vi.fn()
     render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} onConversationSettingsChange={onConversationSettingsChange} />)

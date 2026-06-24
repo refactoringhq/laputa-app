@@ -23,6 +23,7 @@ interface CommandPaletteProps {
   aiAgentReady?: boolean
   aiAgentLabel?: string
   aiModeEnabled?: boolean
+  aiPromptTargetId?: string
   locale?: AppLocale
   onClose: () => void
 }
@@ -288,6 +289,7 @@ function OpenCommandPalette({
   aiAgentReady,
   aiAgentLabel = 'Claude Code',
   aiModeEnabled = true,
+  aiPromptTargetId,
   locale = 'en',
   onClose,
 }: Omit<CommandPaletteProps, 'open'>) {
@@ -414,7 +416,8 @@ function OpenCommandPalette({
 
     if (!resolvedAiAgentReady) return
 
-    queueAiPrompt(text, references)
+    if (aiPromptTargetId) queueAiPrompt(text, references, aiPromptTargetId)
+    else queueAiPrompt(text, references)
     requestOpenAiChat()
     onClose()
   }

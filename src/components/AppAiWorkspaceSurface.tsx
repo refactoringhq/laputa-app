@@ -24,6 +24,7 @@ interface AppAiWorkspaceSurfaceProps {
   noteList: NoteListItem[]
   noteListFilter: { type: string | null; query: string }
   onActiveConversationChange?: (id: string) => void
+  onActiveTargetChange?: (target: AiTarget) => void
   onClose: () => void
   onConversationSettingsChange?: (conversations: AiWorkspaceConversationSetting[]) => void
   onDock?: () => void
@@ -60,6 +61,7 @@ export function AppAiWorkspaceSurface({
   noteList,
   noteListFilter,
   onActiveConversationChange,
+  onActiveTargetChange,
   onClose,
   onConversationSettingsChange,
   onDock,
@@ -97,6 +99,7 @@ export function AppAiWorkspaceSurface({
       noteList={noteList}
       noteListFilter={noteListFilter}
       onActiveConversationChange={onActiveConversationChange}
+      onActiveTargetChange={onActiveTargetChange}
       onClose={onClose}
       onConversationSettingsChange={onConversationSettingsChange}
       onDock={onDock}

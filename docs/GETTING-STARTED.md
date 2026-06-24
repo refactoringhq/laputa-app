@@ -158,6 +158,7 @@ tolaria/
 │   │   ├── AiWorkspace.tsx       # Multi-chat AI workspace orchestration (docked or native window)
 │   │   ├── AiWorkspaceChrome.tsx # AI workspace header and vault-guidance chrome
 │   │   ├── AiWorkspaceResizeHandles.tsx # AI workspace edge resize handles
+│   │   ├── AiWorkspaceSideHeader.tsx # Side-mode AI workspace chat tabs and chrome
 │   │   ├── AiPanel.tsx           # AI transcript/composer surface (selected target + per-vault permission mode)
 │   │   ├── AiMessage.tsx         # Agent message display
 │   │   ├── AiActionCard.tsx      # Agent tool action cards
@@ -373,6 +374,7 @@ tolaria/
 | `src/components/AiWorkspace.tsx` | Multi-chat AI workspace orchestration — chat sessions, sidebar tabs, target/permission controls, and dock/pop-out wiring. |
 | `src/components/AiWorkspaceChrome.tsx` | Header and vault-guidance chrome shared by docked and popped-out AI workspace modes. |
 | `src/components/AiWorkspaceResizeHandles.tsx` | Edge resize affordances for docked/side AI workspace layouts. |
+| `src/components/AiWorkspaceSideHeader.tsx` | Side-mode AI workspace chat tabs, rename controls, and compact header chrome. |
 | `src/components/aiWorkspaceConversations.ts` | Conversation metadata state, settings persistence, default title generation, and target resolution. |
 | `src/components/aiWorkspaceSizing.ts` | AI workspace sizing, localStorage persistence, class names, and layout style helpers. |
 | `src/components/AiPanel.tsx` | Reusable AI transcript/composer surface — selected target with tool execution, reasoning, actions, and per-vault permission mode. |

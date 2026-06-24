@@ -13,16 +13,22 @@ export interface QueuedAiPrompt {
   id: number
   text: string
   references: NoteReference[]
+  targetId?: string
 }
 
 let nextQueuedPromptId = 1
 let pendingPrompt: QueuedAiPrompt | null = null
 
-export function queueAiPrompt(text: string, references: NoteReference[]): QueuedAiPrompt {
+export function queueAiPrompt(
+  text: string,
+  references: NoteReference[],
+  targetId?: string,
+): QueuedAiPrompt {
   const queuedPrompt = {
     id: nextQueuedPromptId++,
     text,
     references,
+    targetId,
   }
   pendingPrompt = queuedPrompt
   window.dispatchEvent(new Event(AI_PROMPT_QUEUED_EVENT))
