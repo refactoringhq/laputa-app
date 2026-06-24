@@ -1,3 +1,5 @@
+import fs from 'fs'
+import path from 'path'
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from '../helpers/fixtureVault'
 
@@ -22,18 +24,18 @@ async function blockOuterForText(page: Page, text: string): Promise<Locator> {
 async function visibleLeftBlockHandle(page: Page, block: Locator): Promise<Locator> {
   await block.hover()
 
-  const addButton = page.locator('.bn-side-menu button:has([data-test="dragHandleAdd"])').first()
+  const sectionControl = page.locator('.bn-side-menu button:has([data-test="headingCollapseToggle"])').first()
   const handle = page.locator('.bn-side-menu button:has([data-test="dragHandle"])').first()
-  await expect(addButton).toBeVisible({ timeout: 5_000 })
+  await expect(sectionControl).toBeVisible({ timeout: 5_000 })
   await expect(handle).toBeVisible({ timeout: 5_000 })
   await expect(handle).not.toHaveAttribute('draggable', 'true')
 
-  const addBox = await addButton.boundingBox()
+  const controlBox = await sectionControl.boundingBox()
   const handleBox = await handle.boundingBox()
-  expect(addBox).not.toBeNull()
+  expect(controlBox).not.toBeNull()
   expect(handleBox).not.toBeNull()
-  expect(addBox!.x).toBeLessThan(handleBox!.x)
-  expect(Math.abs((addBox!.y + addBox!.height / 2) - (handleBox!.y + handleBox!.height / 2))).toBeLessThanOrEqual(2)
+  expect(handleBox!.x).toBeLessThan(controlBox!.x)
+  expect(Math.abs((controlBox!.y + controlBox!.height / 2) - (handleBox!.y + handleBox!.height / 2))).toBeLessThanOrEqual(2)
 
   return handle
 }
@@ -132,6 +134,52 @@ async function dragHandleToBlock(page: Page, handle: Locator, targetBlock: Locat
   await expect(dropIndicator).toHaveCount(0)
 }
 
+async function collapsedHeadingEllipsisPoint(heading: Locator): Promise<{ x: number; y: number }> {
+  const point = await heading.evaluate((headingElement) => {
+    const inlineHeading = headingElement.querySelector('.bn-inline-content')
+    if (!(inlineHeading instanceof HTMLElement)) return null
+
+    const range = document.createRange()
+    range.selectNodeContents(inlineHeading)
+    const textRect = Array.from(range.getClientRects())
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+      .at(-1)
+    range.detach()
+    if (!textRect) return null
+
+    const parseLength = (value: string) => {
+      const parsed = Number.parseFloat(value)
+      return Number.isFinite(parsed) ? parsed : 0
+    }
+    const afterStyle = window.getComputedStyle(inlineHeading, '::after')
+    const marginStart = parseLength(afterStyle.getPropertyValue('margin-inline-start'))
+    const dotsWidth = Math.max(
+      parseLength(afterStyle.width),
+      parseLength(afterStyle.minWidth),
+    ) + parseLength(afterStyle.paddingLeft) + parseLength(afterStyle.paddingRight)
+    const isRtl = window.getComputedStyle(inlineHeading).direction === 'rtl'
+
+    return {
+      x: isRtl
+        ? textRect.left - marginStart - dotsWidth / 2
+        : textRect.right + marginStart + dotsWidth / 2,
+      y: textRect.top + textRect.height / 2,
+    }
+  })
+
+  expect(point).not.toBeNull()
+  return point!
+}
+
+async function clickCollapsedHeadingEllipsis(page: Page, heading: Locator): Promise<void> {
+  const point = await collapsedHeadingEllipsisPoint(heading)
+  await page.mouse.click(point.x, point.y)
+}
+
+function writeAlphaProjectContent(content: string): void {
+  fs.writeFileSync(path.join(tempVaultDir, 'project', 'alpha-project.md'), content, 'utf8')
+}
+
 test('dragging the left block handle reorders editor blocks', async ({ page }) => {
   await page.getByText('Alpha Project', { exact: true }).first().click()
   const editor = page.locator('.bn-editor')
@@ -164,4 +212,102 @@ test('left block handle aligns with the first line of wrapped text', async ({ pa
     page,
     'This is a test project that references other notes.',
   )
+})
+
+test('heading caret collapses the following section blocks and ellipsis expands them', async ({ page }) => {
+  await page.getByText('Alpha Project', { exact: true }).first().click()
+  const editor = page.locator('.bn-editor')
+  await expect(editor).toBeVisible({ timeout: 5_000 })
+
+  const notesHeading = await blockOuterForText(page, 'Notes')
+  const detailsBlock = editor.locator('.bn-block-outer').filter({ hasText: 'See' }).first()
+  await expect(detailsBlock).toBeVisible()
+
+  await notesHeading.hover()
+  const collapseButton = page.locator('.bn-side-menu button:has([data-test="headingCollapseToggle"])').first()
+  await expect(collapseButton).toBeVisible({ timeout: 5_000 })
+  await collapseButton.click()
+
+  await expect(detailsBlock).toBeHidden()
+
+  const dotsContent = await notesHeading.evaluate((heading) => {
+    const inlineHeading = heading.querySelector('.bn-inline-content')
+    if (!inlineHeading) return ''
+    return window.getComputedStyle(inlineHeading, '::after').content
+  })
+  expect(dotsContent).toBe('"..."')
+
+  const baseDotsBackground = await notesHeading.evaluate((heading) => {
+    const inlineHeading = heading.querySelector('.bn-inline-content')
+    if (!inlineHeading) return ''
+    return window.getComputedStyle(inlineHeading, '::after').backgroundColor
+  })
+  const ellipsisPoint = await collapsedHeadingEllipsisPoint(notesHeading)
+  await page.mouse.move(ellipsisPoint.x, ellipsisPoint.y)
+  await expect.poll(async () => notesHeading.evaluate((heading) => {
+    const inlineHeading = heading.querySelector('.bn-inline-content')
+    if (!inlineHeading) return ''
+    return window.getComputedStyle(inlineHeading).cursor
+  })).toBe('pointer')
+  const hoverDotsBackground = await notesHeading.evaluate((heading) => {
+    const inlineHeading = heading.querySelector('.bn-inline-content')
+    if (!inlineHeading) return ''
+    return window.getComputedStyle(inlineHeading, '::after').backgroundColor
+  })
+  expect(hoverDotsBackground).not.toBe(baseDotsBackground)
+
+  await clickCollapsedHeadingEllipsis(page, notesHeading)
+  await expect(detailsBlock).toBeVisible()
+})
+
+test('list item caret collapses child list items and ellipsis expands them', async ({ page }) => {
+  writeAlphaProjectContent(`---
+Is A: Project
+Status: Active
+Owner: "Test User"
+---
+
+# Alpha Project
+
+## Nested List
+
+- Parent item
+  - Child item
+    - Grandchild item
+  - Second child item
+- Sibling item
+`)
+
+  await page.getByText('Alpha Project', { exact: true }).first().click()
+  const editor = page.locator('.bn-editor')
+  await expect(editor).toBeVisible({ timeout: 5_000 })
+
+  const parentItem = await blockOuterForText(page, 'Parent item')
+  const childItem = await blockOuterForText(page, 'Child item')
+  const grandchildItem = await blockOuterForText(page, 'Grandchild item')
+  const secondChildItem = await blockOuterForText(page, 'Second child item')
+  const siblingItem = await blockOuterForText(page, 'Sibling item')
+
+  await editor.getByText('Parent item', { exact: true }).hover()
+  const collapseButton = page.locator('.bn-side-menu button:has([data-test="headingCollapseToggle"])').first()
+  await expect(collapseButton).toBeVisible({ timeout: 5_000 })
+  await collapseButton.click()
+
+  await expect(childItem).toBeHidden()
+  await expect(grandchildItem).toBeHidden()
+  await expect(secondChildItem).toBeHidden()
+  await expect(siblingItem).toBeVisible()
+
+  const dotsContent = await parentItem.evaluate((item) => {
+    const inlineContent = item.querySelector('.bn-inline-content')
+    if (!inlineContent) return ''
+    return window.getComputedStyle(inlineContent, '::after').content
+  })
+  expect(dotsContent).toBe('"..."')
+
+  await clickCollapsedHeadingEllipsis(page, parentItem)
+  await expect(childItem).toBeVisible()
+  await expect(grandchildItem).toBeVisible()
+  await expect(secondChildItem).toBeVisible()
+  await expect(siblingItem).toBeVisible()
 })

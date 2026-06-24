@@ -87,6 +87,7 @@ vi.mock('@blocknote/react', () => ({
     blockNoteCreation.options.push(options)
     return mockEditor
   },
+  useBlockNoteEditor: () => mockEditor,
   FormattingToolbar: ({ children }: PropsWithChildren) => <>{children}</>,
   LinkToolbar: ({ children }: PropsWithChildren) => <>{children}</>,
   getFormattingToolbarItems: () => [],

@@ -46,7 +46,10 @@ import {
   TolariaFormattingToolbar,
   TolariaFormattingToolbarController,
 } from './tolariaEditorFormatting'
-import { TolariaSideMenu } from './tolariaBlockNoteSideMenu'
+import {
+  TolariaCollapsedHeadingsController,
+  TolariaSideMenu,
+} from './tolariaBlockNoteSideMenu'
 import { useEditorLinkActivation } from './useEditorLinkActivation'
 import { findNearestTextCursorBlock } from './blockNoteCursorTarget'
 import { ImageLightbox } from './ImageLightbox'
@@ -1002,6 +1005,7 @@ function EditorInteractionControllers({
 }: EditorInteractionControllersProps) {
   return (
     <>
+      <TolariaCollapsedHeadingsController />
       <SideMenuController sideMenu={TolariaSideMenu} />
       <TolariaFormattingToolbarController
         formattingToolbar={(props) => (

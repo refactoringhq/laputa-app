@@ -212,6 +212,7 @@ vi.mock('./tolariaEditorFormatting', () => ({
 }))
 
 vi.mock('./tolariaBlockNoteSideMenu', () => ({
+  TolariaCollapsedHeadingsController: () => <div data-testid="tolaria-collapsed-headings-controller" />,
   TolariaSideMenu: () => <div data-testid="tolaria-side-menu" />,
 }))
 
