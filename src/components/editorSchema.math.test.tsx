@@ -113,4 +113,12 @@ describe('MathBlockEditor', () => {
     expect(editorThemeCss).toContain('.editor__blocknote-container .math-block-shell--editing {')
     expect(editorThemeCss).toContain('width: 100%;')
   })
+
+  it('does not stack divider bottom spacing with following heading top spacing', () => {
+    const editorThemeCss = readFileSync(`${process.cwd()}/src/components/EditorTheme.css`, 'utf8')
+
+    expect(editorThemeCss).toContain('.editor__blocknote-container .bn-block-outer:has(hr)')
+    expect(editorThemeCss).toContain('+ .bn-block-outer:has(> .bn-block > [data-content-type="heading"])')
+    expect(editorThemeCss).toContain('margin-top: var(--editor-divider-followed-by-heading-margin-top) !important;')
+  })
 })

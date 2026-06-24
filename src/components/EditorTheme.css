@@ -672,3 +672,8 @@ body.tldraw-whiteboard-fullscreen-open {
   border-top: var(--horizontal-rule-thickness) solid var(--horizontal-rule-color);
   margin: var(--horizontal-rule-margin-vertical) 0;
 }
+
+.editor__blocknote-container .bn-block-outer:has(hr)
+  + .bn-block-outer:has(> .bn-block > [data-content-type="heading"]) {
+  margin-top: var(--editor-divider-followed-by-heading-margin-top) !important;
+}

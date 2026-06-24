@@ -3,10 +3,11 @@
     "fontFamily": "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
     "fontSize": 15,
     "lineHeight": 1.5,
-    "maxWidth": 720,
+    "maxWidth": 820,
     "paddingHorizontal": 40,
     "paddingVertical": 20,
-    "paragraphSpacing": 8
+    "paragraphSpacing": 8,
+    "dividerFollowedByHeadingMarginTop": 8
   },
   "headings": {
     "h1": {
@@ -37,7 +38,7 @@
       "letterSpacing": -0.5
     },
     "h4": {
-      "fontSize": 20,
+      "fontSize": 17,
       "fontWeight": 600,
       "lineHeight": 1.4,
       "marginTop": 20,

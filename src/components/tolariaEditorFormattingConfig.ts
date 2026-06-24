@@ -72,7 +72,6 @@ const UNSUPPORTED_FORMATTING_TOOLBAR_KEYS = new Set([
 ])
 
 const UNSUPPORTED_SLASH_MENU_KEYS = new Set([
-  'heading_4',
   'heading_5',
   'heading_6',
   'toggle_heading',
@@ -107,6 +106,7 @@ const TOLARIA_SLASH_MENU_ICONS: Partial<Record<string, PhosphorIcon>> = {
   heading: TextHOne,
   heading_2: TextHTwo,
   heading_3: TextHThree,
+  heading_4: TextHFour,
   image: ImageSquare,
   math: Pi,
   mermaid: FlowArrow,

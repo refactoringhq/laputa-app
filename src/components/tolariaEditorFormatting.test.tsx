@@ -70,19 +70,21 @@ describe('tolariaEditorFormatting', () => {
       { key: 'toggle_heading', title: 'Toggle heading', onItemClick: () => {} },
       { key: 'toggle_list', title: 'Toggle list', onItemClick: () => {} },
       { key: 'heading', title: 'Heading', subtext: 'Default heading copy', onItemClick: () => {} },
+      { key: 'heading_4', title: 'Heading 4', onItemClick: () => {} },
       { key: 'bullet_list', title: 'Bullet List', subtext: 'Default list copy', onItemClick: () => {} },
       { key: 'code_block', title: 'Code Block', subtext: 'Default code copy', onItemClick: () => {} },
-      { key: 'heading_4', title: 'Heading 4', onItemClick: () => {} },
       { key: 'heading_5', title: 'Heading 5', onItemClick: () => {} },
       { key: 'heading_6', title: 'Heading 6', onItemClick: () => {} },
     ] satisfies TolariaSlashMenuTestItem[])
 
     expect(items.map((item) => item.key)).toEqual([
       'heading',
+      'heading_4',
       'bullet_list',
       'code_block',
     ])
     expect(items.map((item) => item.subtext)).toEqual([
+      undefined,
       undefined,
       undefined,
       undefined,
