@@ -17,6 +17,22 @@ function requestBody(init?: RequestInit) {
   return JSON.parse(String(init?.body)) as Record<string, unknown>
 }
 
+function mockNoteContentFetch(content: string) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = requestUrl(input)
+    if (url === '/api/vault/ping') {
+      return jsonResponse({ ok: true })
+    }
+    if (url === '/api/vault/content') {
+      expect(requestBody(init)).toEqual({ path: '/fixture/alpha.md' })
+      return jsonResponse({ content })
+    }
+    throw new Error(`Unexpected fetch: ${url}`)
+  })
+  globalThis.fetch = fetchMock as typeof fetch
+  return fetchMock
+}
+
 describe('tryVaultApi', () => {
   afterEach(() => {
     vi.resetModules()
@@ -50,19 +66,7 @@ describe('tryVaultApi', () => {
   })
 
   it('unwraps note content responses from the vault API', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input)
-      if (url === '/api/vault/ping') {
-        return jsonResponse({ ok: true })
-      }
-      if (url === '/api/vault/content') {
-        expect(requestBody(init)).toEqual({ path: '/fixture/alpha.md' })
-        return jsonResponse({ content: '# Alpha Project' })
-      }
-      throw new Error(`Unexpected fetch: ${url}`)
-    })
-    globalThis.fetch = fetchMock as typeof fetch
-
+    const fetchMock = mockNoteContentFetch('# Alpha Project')
     const { tryVaultApi } = await import('./vault-api')
 
     await expect(tryVaultApi('get_note_content', { path: '/fixture/alpha.md' })).resolves.toBe('# Alpha Project')
@@ -70,19 +74,7 @@ describe('tryVaultApi', () => {
   })
 
   it('validates cached note content through the vault API', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input)
-      if (url === '/api/vault/ping') {
-        return jsonResponse({ ok: true })
-      }
-      if (url === '/api/vault/content') {
-        expect(requestBody(init)).toEqual({ path: '/fixture/alpha.md' })
-        return jsonResponse({ content: '# Alpha Project' })
-      }
-      throw new Error(`Unexpected fetch: ${url}`)
-    })
-    globalThis.fetch = fetchMock as typeof fetch
-
+    mockNoteContentFetch('# Alpha Project')
     const { tryVaultApi } = await import('./vault-api')
 
     await expect(tryVaultApi('validate_note_content', {

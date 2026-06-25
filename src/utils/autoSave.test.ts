@@ -13,6 +13,19 @@ vi.mock('../mock-tauri', () => ({
   updateMockContent: vi.fn(),
 }))
 
+async function expectUnsavedContentFlushes(deps: FlushDeps, content: string) {
+  ;(deps.getTabContent as ReturnType<typeof vi.fn>).mockReturnValue(content)
+  ;(deps.isUnsaved as ReturnType<typeof vi.fn>).mockReturnValue(true)
+
+  await flushEditorContent('/vault/note.md', deps)
+
+  expect(mockInvokeFn).toHaveBeenCalledWith('save_note_content', {
+    path: '/vault/note.md',
+    content,
+  })
+  expect(deps.onSaved).toHaveBeenCalledWith('/vault/note.md', content)
+}
+
 describe('flushEditorContent', () => {
   let deps: FlushDeps
 
@@ -38,29 +51,11 @@ describe('flushEditorContent', () => {
   })
 
   it('saves tab content when note is unsaved (newly created)', async () => {
-    ;(deps.getTabContent as ReturnType<typeof vi.fn>).mockReturnValue('# New note content')
-    ;(deps.isUnsaved as ReturnType<typeof vi.fn>).mockReturnValue(true)
-
-    await flushEditorContent('/vault/note.md', deps)
-
-    expect(mockInvokeFn).toHaveBeenCalledWith('save_note_content', {
-      path: '/vault/note.md',
-      content: '# New note content',
-    })
-    expect(deps.onSaved).toHaveBeenCalledWith('/vault/note.md', '# New note content')
+    await expectUnsavedContentFlushes(deps, '# New note content')
   })
 
   it('saves tab content when note is marked unsaved (dirty editor)', async () => {
-    ;(deps.getTabContent as ReturnType<typeof vi.fn>).mockReturnValue('edited body')
-    ;(deps.isUnsaved as ReturnType<typeof vi.fn>).mockReturnValue(true)
-
-    await flushEditorContent('/vault/note.md', deps)
-
-    expect(mockInvokeFn).toHaveBeenCalledWith('save_note_content', {
-      path: '/vault/note.md',
-      content: 'edited body',
-    })
-    expect(deps.onSaved).toHaveBeenCalledWith('/vault/note.md', 'edited body')
+    await expectUnsavedContentFlushes(deps, 'edited body')
   })
 
   it('does not save when note is not unsaved (clean editor)', async () => {

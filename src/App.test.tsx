@@ -378,58 +378,65 @@ vi.mock('@blocknote/code-block', () => ({ codeBlockOptions: {} }))
 
 vi.mock('@blocknote/core/extensions', () => ({ filterSuggestionItems: vi.fn(() => []) }))
 
-vi.mock('@blocknote/react', () => ({
-  AudioBlock: () => null, AudioToExternalHTML: () => null,
-  createReactBlockSpec: () => () => ({}),
-  createReactInlineContentSpec: () => ({ render: () => null }),
-  VideoBlock: () => null, VideoToExternalHTML: () => null,
-  BlockNoteViewRaw: ({ children, editable }: { children?: ReactNode; editable?: boolean }) => (
-    <div data-testid="blocknote-view" data-editable={editable !== false ? 'true' : 'false'}>
-      <div contentEditable={editable !== false} suppressContentEditableWarning data-testid="mock-editor">
-        mock editor
-      </div>
-      {children}
-    </div>
-  ),
-  LinkToolbar: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  ComponentsContext: {
-    Provider: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  },
-  useCreateBlockNote: () => ({
+vi.mock('@blocknote/react', () => {
+  const blockNoteEditor = {
     tryParseMarkdownToBlocks: async () => [],
     replaceBlocks: () => {},
     document: [],
     insertInlineContent: () => {},
     setTextCursorPosition: () => {},
     focus: () => {},
+    domElement: null,
+    onChange: () => () => {},
     onMount: (cb: () => void) => { cb(); return () => {} },
-  }),
-  LinkToolbarController: () => null,
-  EditLinkButton: () => null,
-  DeleteLinkButton: () => null,
-  SideMenuController: () => null,
-  SuggestionMenuController: () => null,
-  GridSuggestionMenuController: () => null,
-  useComponentsContext: () => ({
-    LinkToolbar: {
-      Button: ({
-        children,
-        label,
-        onClick,
-      }: { children?: ReactNode; label?: string; onClick?: () => void }) => (
-        <button onClick={onClick} type="button">
-          {label}
-          {children}
-        </button>
-      ),
+  }
+
+  return {
+    AudioBlock: () => null, AudioToExternalHTML: () => null,
+    createReactBlockSpec: () => () => ({}),
+    createReactInlineContentSpec: () => ({ render: () => null }),
+    VideoBlock: () => null, VideoToExternalHTML: () => null,
+    BlockNoteViewRaw: ({ children, editable }: { children?: ReactNode; editable?: boolean }) => (
+      <div data-testid="blocknote-view" data-editable={editable !== false ? 'true' : 'false'}>
+        <div contentEditable={editable !== false} suppressContentEditableWarning data-testid="mock-editor">
+          mock editor
+        </div>
+        {children}
+      </div>
+    ),
+    LinkToolbar: ({ children }: { children?: ReactNode }) => <>{children}</>,
+    ComponentsContext: {
+      Provider: ({ children }: { children?: ReactNode }) => <>{children}</>,
     },
-  }),
-  useDictionary: () => ({
-    link_toolbar: {
-      open: { tooltip: 'Open in a new tab' },
-    },
-  }),
-}))
+    useCreateBlockNote: () => blockNoteEditor,
+    useBlockNoteEditor: () => blockNoteEditor,
+    LinkToolbarController: () => null,
+    EditLinkButton: () => null,
+    DeleteLinkButton: () => null,
+    SideMenuController: () => null,
+    SuggestionMenuController: () => null,
+    GridSuggestionMenuController: () => null,
+    useComponentsContext: () => ({
+      LinkToolbar: {
+        Button: ({
+          children,
+          label,
+          onClick,
+        }: { children?: ReactNode; label?: string; onClick?: () => void }) => (
+          <button onClick={onClick} type="button">
+            {label}
+            {children}
+          </button>
+        ),
+      },
+    }),
+    useDictionary: () => ({
+      link_toolbar: {
+        open: { tooltip: 'Open in a new tab' },
+      },
+    }),
+  }
+})
 
 vi.mock('@blocknote/mantine', () => ({
   components: {},

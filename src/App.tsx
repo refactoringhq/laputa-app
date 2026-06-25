@@ -295,7 +295,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }, [])
   const [lastAiWorkspaceTarget, setLastAiWorkspaceTarget] = useState<AiTarget | null>(null)
   const handleActiveAiWorkspaceTargetChange = useCallback((target: AiTarget) => {
-    setLastAiWorkspaceTarget(target)
+    setLastAiWorkspaceTarget((current) => (current?.id === target.id ? current : target))
   }, [])
   const {
     folderVaults,
