@@ -531,6 +531,49 @@ describe('AiWorkspace', () => {
     })
   })
 
+  it('does not repeat active target notifications when equivalent target props are recreated', async () => {
+    const onActiveTargetChange = vi.fn()
+    const { rerender } = render(
+      <AiWorkspace
+        open
+        mode="docked"
+        aiAgentsStatus={installedStatuses()}
+        aiModelProviders={[]}
+        defaultAiAgent="codex"
+        vaultPath="/tmp/vault"
+        onActiveTargetChange={onActiveTargetChange}
+        onClose={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(onActiveTargetChange).toHaveBeenCalledTimes(1)
+    })
+    expect(onActiveTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      agent: 'codex',
+      id: 'agent:codex',
+      kind: 'agent',
+    }))
+
+    await act(async () => {
+      rerender(
+        <AiWorkspace
+          open
+          mode="docked"
+          aiAgentsStatus={installedStatuses()}
+          aiModelProviders={[]}
+          defaultAiAgent="codex"
+          vaultPath="/tmp/vault"
+          onActiveTargetChange={onActiveTargetChange}
+          onClose={vi.fn()}
+        />,
+      )
+      await Promise.resolve()
+    })
+
+    expect(onActiveTargetChange).toHaveBeenCalledTimes(1)
+  })
+
   it('marks the first chat active when a prompt is submitted', () => {
     const onConversationSettingsChange = vi.fn()
     render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} onConversationSettingsChange={onConversationSettingsChange} />)

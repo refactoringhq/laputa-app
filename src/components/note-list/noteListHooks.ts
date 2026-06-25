@@ -4,7 +4,7 @@ import type { ImmediateCreateOptions } from '../../hooks/useNoteCreation'
 import {
   type SortOption, type SortDirection, type SortConfig, type NoteListFilter,
   getSortComparator, extractSortableProperties,
-  buildRelationshipGroups, filterEntries, filterInboxEntries,
+  filterEntries, filterInboxEntries,
   loadSortPreferences, saveSortPreferences,
   parseSortConfig, serializeSortConfig, clearListSortFromLocalStorage,
 } from '../../utils/noteListHelpers'
@@ -21,6 +21,8 @@ import { prefetchNoteContent } from '../../hooks/useTabManagement'
 import type { NoteListPropertiesScope } from './noteListPropertiesEvents'
 import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
 import { viewMatchesSelection } from '../../utils/viewIdentity'
+import { collectionFromSelection } from '../../collections/collectionFromSelection'
+import { resolveCollectionEntries } from '../../collections/resolveCollectionEntries'
 
 // --- useTypeEntryMap ---
 
@@ -45,7 +47,6 @@ interface FilteredEntriesParams {
 function buildFilteredEntries({
   entries,
   selection,
-  isEntityView,
   isChangesView,
   isInboxView,
   modifiedPathSet,
@@ -56,21 +57,23 @@ function buildFilteredEntries({
   views,
   allNotesFileVisibility,
 }: FilteredEntriesParams & {
-  isEntityView: boolean
   isChangesView: boolean
   isInboxView: boolean
 }) {
-  if (isEntityView) return []
+  let changesEntries: VaultEntry[] | undefined
   if (isChangesView) {
     if (modifiedFiles) return buildChangesEntries(entries, modifiedFiles)
-    return entries.filter((entry) => isModifiedEntry(entry.path, modifiedPathSet, modifiedSuffixes))
+    changesEntries = entries.filter((entry) => isModifiedEntry(entry.path, modifiedPathSet, modifiedSuffixes))
   }
-  if (isInboxView) return filterInboxEntries(entries, inboxPeriod ?? 'month')
-  return filterEntries(entries, selection, {
+
+  const collection = collectionFromSelection(selection, { views })
+  return resolveCollectionEntries(collection, entries, {
     subFilter,
     views,
     allNotesFileVisibility,
-  })
+    changesEntries,
+    inboxEntries: isInboxView ? filterInboxEntries(entries, inboxPeriod ?? 'month') : undefined,
+  }).entries
 }
 
 export function useFilteredEntries({
@@ -84,14 +87,12 @@ export function useFilteredEntries({
   views,
   allNotesFileVisibility,
 }: FilteredEntriesParams) {
-  const isEntityView = selection.kind === 'entity'
   const isChangesView = selection.kind === 'filter' && selection.filter === 'changes'
   const isInboxView = selection.kind === 'filter' && selection.filter === 'inbox'
   return useMemo(() => {
     return buildFilteredEntries({
       entries,
       selection,
-      isEntityView,
       isChangesView,
       isInboxView,
       modifiedPathSet,
@@ -102,7 +103,7 @@ export function useFilteredEntries({
       views,
       allNotesFileVisibility,
     })
-  }, [allNotesFileVisibility, entries, inboxPeriod, isChangesView, isEntityView, isInboxView, modifiedFiles, modifiedPathSet, modifiedSuffixes, selection, subFilter, views])
+  }, [allNotesFileVisibility, entries, inboxPeriod, isChangesView, isInboxView, modifiedFiles, modifiedPathSet, modifiedSuffixes, selection, subFilter, views])
 }
 
 // --- useNoteListData ---
@@ -158,9 +159,9 @@ export function useNoteListData({
 
   const searchedGroups = useMemo(() => {
     if (!entityEntry) return []
-    const groups = buildRelationshipGroups(entityEntry, entries)
-    return filterGroupsByQuery(groups, query)
-  }, [entityEntry, entries, query])
+    const collection = collectionFromSelection(selection, { views })
+    return filterGroupsByQuery(resolveCollectionEntries(collection, entries).relationshipGroups, query)
+  }, [entityEntry, entries, query, selection, views])
 
   return { entityEntry, isEntityView, isArchivedView, searched, searchedGroups }
 }

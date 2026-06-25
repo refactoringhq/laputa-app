@@ -830,9 +830,16 @@ function useActiveTargetChange({
     () => (conversation ? resolveTarget(conversation, groups, fallbackTarget) : undefined),
     [conversation, fallbackTarget, groups],
   )
+  const notifiedTargetIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!open || !activeTarget) return
+    if (!open || !activeTarget) {
+      notifiedTargetIdRef.current = null
+      return
+    }
+    if (notifiedTargetIdRef.current === activeTarget.id) return
+
+    notifiedTargetIdRef.current = activeTarget.id
     onActiveTargetChange?.(activeTarget)
   }, [activeTarget, onActiveTargetChange, open])
 }
