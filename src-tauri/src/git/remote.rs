@@ -174,44 +174,66 @@ pub struct GitPushResult {
     pub message: String,
 }
 
+#[derive(Clone, Copy)]
+enum PushStatus {
+    Rejected,
+    AuthError,
+    NetworkError,
+    NoRemote,
+    Error,
+}
+
+impl PushStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Rejected => "rejected",
+            Self::AuthError => "auth_error",
+            Self::NetworkError => "network_error",
+            Self::NoRemote => "no_remote",
+            Self::Error => "error",
+        }
+    }
+}
+
 /// Classify a git push stderr message into a user-friendly status and message.
-pub fn classify_push_error(stderr: &str) -> GitPushResult {
+pub fn classify_push_error(stderr: impl AsRef<str>) -> GitPushResult {
+    let stderr = stderr.as_ref();
     let lower = stderr.to_lowercase();
 
     if is_rejected_push_error(&lower) {
         return push_error(
-            "rejected",
+            PushStatus::Rejected,
             "Push rejected: remote has new commits. Pull first, then push.",
         );
     }
 
     if is_auth_push_error(&lower) {
         return push_error(
-            "auth_error",
+            PushStatus::AuthError,
             "Push failed: authentication error. Check your credentials.",
         );
     }
 
     if is_network_push_error(&lower) {
         return push_error(
-            "network_error",
+            PushStatus::NetworkError,
             "Push failed: network error. Check your connection and try again.",
         );
     }
 
     if is_no_remote_push_error(&lower) {
-        return push_error("no_remote", "No remote configured");
+        return push_error(PushStatus::NoRemote, "No remote configured");
     }
 
     push_error(
-        "error",
+        PushStatus::Error,
         format!("Push failed: {}", push_error_detail(stderr)),
     )
 }
 
-fn push_error(status: &str, message: impl Into<String>) -> GitPushResult {
+fn push_error(status: PushStatus, message: impl Into<String>) -> GitPushResult {
     GitPushResult {
-        status: status.to_string(),
+        status: status.as_str().to_string(),
         message: message.into(),
     }
 }
@@ -220,15 +242,20 @@ fn contains_any(haystack: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| haystack.contains(needle))
 }
 
-fn is_rejected_push_error(lower: &str) -> bool {
-    contains_any(lower, &["non-fast-forward", "[rejected]", "fetch first"])
-        || (lower.contains("failed to push some refs")
-            && contains_any(lower, &["updates were rejected", "non-fast-forward"]))
+fn is_rejected_push_error(lower: impl AsRef<str>) -> bool {
+    let lower = lower.as_ref();
+    if contains_any(lower, &["non-fast-forward", "[rejected]", "fetch first"]) {
+        return true;
+    }
+    if !lower.contains("failed to push some refs") {
+        return false;
+    }
+    contains_any(lower, &["updates were rejected", "non-fast-forward"])
 }
 
-fn is_auth_push_error(lower: &str) -> bool {
+fn is_auth_push_error(lower: impl AsRef<str>) -> bool {
     contains_any(
-        lower,
+        lower.as_ref(),
         &[
             "authentication failed",
             "could not read username",
@@ -239,9 +266,9 @@ fn is_auth_push_error(lower: &str) -> bool {
     )
 }
 
-fn is_network_push_error(lower: &str) -> bool {
+fn is_network_push_error(lower: impl AsRef<str>) -> bool {
     contains_any(
-        lower,
+        lower.as_ref(),
         &[
             "could not resolve host",
             "unable to access",
@@ -252,9 +279,9 @@ fn is_network_push_error(lower: &str) -> bool {
     )
 }
 
-fn is_no_remote_push_error(lower: &str) -> bool {
+fn is_no_remote_push_error(lower: impl AsRef<str>) -> bool {
     contains_any(
-        lower,
+        lower.as_ref(),
         &[
             "no configured push destination",
             "does not appear to be a git repository",
