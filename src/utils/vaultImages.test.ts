@@ -195,6 +195,17 @@ describe('resolveImageUrls', () => {
     )
   })
 
+  it('resolves CommonMark angle-bracket image destinations', () => {
+    tauriMode = true
+
+    expect(resolveImageUrls('![diagram](<../assets/foo bar.png>)', '/vault', '/vault/notes/a.md')).toBe(
+      `![diagram](${assetUrl('/vault/assets/foo bar.png')})`,
+    )
+    expect(resolveImageUrls('![diagram](<../assets/foo bar.png> "diagram")', '/vault', '/vault/notes/a.md')).toBe(
+      `![diagram](${assetUrl('/vault/assets/foo bar.png')} "diagram")`,
+    )
+  })
+
   it('keeps remote and data image URLs unchanged when notePath is present', () => {
     tauriMode = true
     const httpImage = '![logo](https://example.com/logo.png)'

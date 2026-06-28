@@ -215,12 +215,17 @@ function nextMarkdownImage(markdown: Markdown, startIndex: number): MarkdownImag
 function parseMarkdownImageDestination(request: MarkdownDestinationRequest): MarkdownImageDestination | null {
   const { destination } = request
   const titleStart = destination.indexOf(' "')
-  const url = titleStart === -1 ? destination : destination.slice(0, titleStart)
+  const rawUrl = titleStart === -1 ? destination : destination.slice(0, titleStart)
+  const url = unwrapAngleBracketDestination(rawUrl)
   const title = titleStart === -1 ? '' : destination.slice(titleStart)
   if (url.length === 0) return null
   if (MARKDOWN_IMAGE_URL_FORBIDDEN_CHARS.some(char => url.includes(char))) return null
   if (title && !title.endsWith('"')) return null
   return { title, url }
+}
+
+function unwrapAngleBracketDestination(url: MarkdownImageUrl): MarkdownImageUrl {
+  return url.startsWith('<') && url.endsWith('>') ? url.slice(1, -1) : url
 }
 
 function wikilinkImagePath(request: WikilinkImageRequest): string {
