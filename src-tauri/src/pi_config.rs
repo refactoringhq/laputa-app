@@ -5,6 +5,8 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
+const INJECTED_EXTENSION: &str = "npm:pi-mcp-adapter";
+
 pub(crate) fn build_command(
     binary: &Path,
     request: &AgentStreamRequest,
@@ -25,7 +27,7 @@ pub(crate) fn build_command(
         command.arg(first_arg);
     }
     command
-        .args(build_args())
+        .args(build_args(agent_dir))
         .arg(build_prompt(request))
         .env("PI_CODING_AGENT_DIR", agent_dir)
         .current_dir(&request.vault_path)
@@ -141,14 +143,18 @@ fn copy_agent_file(
     })
 }
 
-fn build_args() -> Vec<String> {
-    vec![
-        "--mode".into(),
-        "json".into(),
-        "--no-session".into(),
-        "--extension".into(),
-        "npm:pi-mcp-adapter".into(),
-    ]
+fn build_args(agent_dir: &Path) -> Vec<String> {
+    let mut args = vec!["--mode".into(), "json".into(), "--no-session".into()];
+    if !config_declares_extension(agent_dir) {
+        args.push("--extension".into());
+        args.push(INJECTED_EXTENSION.into());
+    }
+    args
+}
+
+fn config_declares_extension(agent_dir: &Path) -> bool {
+    std::fs::read_to_string(agent_dir.join("settings.json"))
+        .is_ok_and(|contents| contents.contains(INJECTED_EXTENSION))
 }
 
 fn build_prompt(request: &AgentStreamRequest) -> String {
@@ -296,7 +302,7 @@ mod tests {
 
     #[test]
     fn args_use_documented_json_mode_with_mcp_adapter() {
-        let args = build_args();
+        let args = build_args(tempfile::tempdir().unwrap().path());
 
         assert_pi_json_mode_args(&args);
         assert!(args.contains(&"npm:pi-mcp-adapter".to_string()));
@@ -463,6 +469,18 @@ mod tests {
             mcp["mcpServers"]["tolaria"]["env"]["VAULT_PATH"],
             "/tmp/vault"
         );
+    }
+
+    #[test]
+    fn extension_is_not_injected_when_user_config_declares_it() {
+        let agent_dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            agent_dir.path().join("settings.json"),
+            r#"{"packages":["npm:pi-mcp-adapter"]}"#,
+        )
+        .unwrap();
+
+        assert!(!build_args(agent_dir.path()).contains(&"--extension".to_string()));
     }
 
     #[test]
