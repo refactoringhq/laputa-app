@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "傳送匿名錯誤報告",
   "settings.privacy.analytics": "使用分析",
   "settings.privacy.analyticsDescription": "分享匿名使用模式",
-  "settings.footerShortcut": "⌘, 開啟設定",
+  "settings.footerShortcut": "{shortcut} 開啟設定",
   "settings.cancel": "取消",
   "settings.save": "儲存",
   "common.cancel": "取消",

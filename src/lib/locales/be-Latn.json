@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "Adpraŭliać ananimnyja spravazdačy ab zbojach",
   "settings.privacy.analytics": "Analityka vykarystannia",
   "settings.privacy.analyticsDescription": "Abahuĺvać ananimnyja danyja ab vykarystanni",
-  "settings.footerShortcut": "⌘, kab adkryć nalady",
+  "settings.footerShortcut": "{shortcut} kab adkryć nalady",
   "settings.cancel": "Skasavać",
   "settings.save": "Zachavać",
   "common.cancel": "Skasavać",

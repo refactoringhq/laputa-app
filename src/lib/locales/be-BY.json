@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "Адпраўляць ананімныя справаздачы аб збоях",
   "settings.privacy.analytics": "Аналітыка выкарыстання",
   "settings.privacy.analyticsDescription": "Абагульваць ананімныя даныя аб выкарыстанні",
-  "settings.footerShortcut": "⌘, каб адкрыць налады",
+  "settings.footerShortcut": "{shortcut} каб адкрыць налады",
   "settings.cancel": "Скасаваць",
   "settings.save": "Захаваць",
   "common.cancel": "Скасаваць",

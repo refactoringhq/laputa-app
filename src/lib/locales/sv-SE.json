@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "Skicka anonyma felrapporter",
   "settings.privacy.analytics": "Användningsanalys",
   "settings.privacy.analyticsDescription": "Dela anonyma användningsmönster",
-  "settings.footerShortcut": "⌘, för att öppna inställningar",
+  "settings.footerShortcut": "{shortcut} för att öppna inställningar",
   "settings.cancel": "Avbryt",
   "settings.save": "Spara",
   "common.cancel": "Avbryt",

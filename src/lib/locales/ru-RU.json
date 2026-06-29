@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "Отправлять анонимные отчеты об ошибках",
   "settings.privacy.analytics": "Аналитика использования",
   "settings.privacy.analyticsDescription": "Передача анонимных данных о характере использования",
-  "settings.footerShortcut": "⌘, чтобы открыть настройки",
+  "settings.footerShortcut": "{shortcut} чтобы открыть настройки",
   "settings.cancel": "Отменить",
   "settings.save": "Сохранить",
   "common.cancel": "Отменить",

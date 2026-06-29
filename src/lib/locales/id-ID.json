@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "Kirim laporan kesalahan anonim",
   "settings.privacy.analytics": "Analitik penggunaan",
   "settings.privacy.analyticsDescription": "Bagikan pola penggunaan anonim",
-  "settings.footerShortcut": "⌘, untuk membuka pengaturan",
+  "settings.footerShortcut": "{shortcut} untuk membuka pengaturan",
   "settings.cancel": "Batal",
   "settings.save": "Simpan",
   "common.cancel": "Batal",

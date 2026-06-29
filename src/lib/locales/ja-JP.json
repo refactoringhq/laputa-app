@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "匿名のエラーレポートを送信する",
   "settings.privacy.analytics": "利用状況分析",
   "settings.privacy.analyticsDescription": "匿名の使用パターンを共有する",
-  "settings.footerShortcut": "⌘、設定を開く",
+  "settings.footerShortcut": "{shortcut} 設定を開く",
   "settings.cancel": "キャンセル",
   "settings.save": "保存",
   "common.cancel": "キャンセル",

@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "Wysyłaj anonimowe raporty o błędach",
   "settings.privacy.analytics": "Analityka użytkowania",
   "settings.privacy.analyticsDescription": "Udostępniaj anonimowe wzorce użytkowania",
-  "settings.footerShortcut": "⌘, aby otworzyć ustawienia",
+  "settings.footerShortcut": "{shortcut} aby otworzyć ustawienia",
   "settings.cancel": "Anuluj",
   "settings.save": "Zapisz",
   "common.cancel": "Anuluj",

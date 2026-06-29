@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "Gửi báo cáo lỗi ẩn danh",
   "settings.privacy.analytics": "Phân tích sử dụng",
   "settings.privacy.analyticsDescription": "Chia sẻ mẫu sử dụng ẩn danh",
-  "settings.footerShortcut": "⌘, để mở cài đặt",
+  "settings.footerShortcut": "{shortcut} để mở cài đặt",
   "settings.cancel": "Hủy",
   "settings.save": "Lưu",
   "common.cancel": "Hủy",

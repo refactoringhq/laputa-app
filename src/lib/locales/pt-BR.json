@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "Enviar relatórios de erros anônimos",
   "settings.privacy.analytics": "Análise de uso",
   "settings.privacy.analyticsDescription": "Compartilhar padrões de uso anônimos",
-  "settings.footerShortcut": "⌘, para abrir as configurações",
+  "settings.footerShortcut": "{shortcut} para abrir as configurações",
   "settings.cancel": "Cancelar",
   "settings.save": "Salvar",
   "common.cancel": "Cancelar",

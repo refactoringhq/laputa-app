@@ -354,7 +354,7 @@
   "settings.privacy.crashReportingDescription": "익명 오류 보고서 전송",
   "settings.privacy.analytics": "사용 분석",
   "settings.privacy.analyticsDescription": "익명의 사용 패턴 공유",
-  "settings.footerShortcut": "⌘, 설정 열기",
+  "settings.footerShortcut": "{shortcut} 설정 열기",
   "settings.cancel": "취소",
   "settings.save": "저장",
   "common.cancel": "취소",
