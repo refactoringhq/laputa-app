@@ -102,9 +102,20 @@ pub fn get_last_commit_info(vault_path: VaultPathArg) -> Result<Option<LastCommi
 #[tauri::command]
 pub async fn git_pull(vault_path: VaultPathArg) -> Result<GitPullResult, String> {
     let vault_path = expand_tilde(&vault_path).into_owned();
-    tokio::task::spawn_blocking(move || crate::git::git_pull(&vault_path))
-        .await
-        .map_err(|e| format!("Task panicked: {e}"))?
+    tokio::task::spawn_blocking(move || {
+        if !crate::git::is_inside_work_tree(std::path::Path::new(&vault_path)) {
+            return Ok(GitPullResult {
+                status: "no_remote".to_string(),
+                message: "No remote configured".to_string(),
+                updated_files: vec![],
+                conflict_files: vec![],
+            });
+        }
+
+        crate::git::git_pull(&vault_path)
+    })
+    .await
+    .map_err(|e| format!("Task panicked: {e}"))?
 }
 
 #[cfg(desktop)]
@@ -143,18 +154,38 @@ pub fn git_commit_conflict_resolution(vault_path: VaultPathArg) -> Result<String
 #[tauri::command]
 pub async fn git_push(vault_path: VaultPathArg) -> Result<GitPushResult, String> {
     let vault_path = expand_tilde(&vault_path).into_owned();
-    tokio::task::spawn_blocking(move || crate::git::git_push(&vault_path))
-        .await
-        .map_err(|e| format!("Task panicked: {e}"))?
+    tokio::task::spawn_blocking(move || {
+        if !crate::git::is_inside_work_tree(std::path::Path::new(&vault_path)) {
+            return Ok(GitPushResult {
+                status: "no_remote".to_string(),
+                message: "No remote configured".to_string(),
+            });
+        }
+
+        crate::git::git_push(&vault_path)
+    })
+    .await
+    .map_err(|e| format!("Task panicked: {e}"))?
 }
 
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn git_remote_status(vault_path: VaultPathArg) -> Result<GitRemoteStatus, String> {
     let vault_path = expand_tilde(&vault_path).into_owned();
-    tokio::task::spawn_blocking(move || crate::git::git_remote_status(&vault_path))
-        .await
-        .map_err(|e| format!("Task panicked: {e}"))?
+    tokio::task::spawn_blocking(move || {
+        if !crate::git::is_inside_work_tree(std::path::Path::new(&vault_path)) {
+            return Ok(GitRemoteStatus {
+                branch: String::new(),
+                has_remote: false,
+                ahead: 0,
+                behind: 0,
+            });
+        }
+
+        crate::git::git_remote_status(&vault_path)
+    })
+    .await
+    .map_err(|e| format!("Task panicked: {e}"))?
 }
 
 #[cfg(desktop)]
@@ -184,9 +215,7 @@ pub fn git_discard_file(
 #[tauri::command]
 pub fn is_git_repo(vault_path: VaultPathArg) -> bool {
     let vault_path = expand_tilde(&vault_path);
-    std::path::Path::new(vault_path.as_ref())
-        .join(".git")
-        .is_dir()
+    crate::git::is_inside_work_tree(std::path::Path::new(vault_path.as_ref()))
 }
 
 #[cfg(desktop)]
@@ -205,6 +234,13 @@ fn validate_git_init_target(vault_path: &str) -> Result<(), String> {
             path.display(),
             path.join("Tolaria").display()
         ));
+    }
+
+    if crate::git::is_inside_work_tree(path) && !crate::git::has_direct_git_metadata(path) {
+        return Err(
+            "This vault is already inside a Git work tree. Tolaria will use the parent repository instead of creating an embedded repository."
+                .to_string(),
+        );
     }
 
     Ok(())
@@ -502,6 +538,37 @@ mod tests {
         assert!(is_git_repo(vault));
     }
 
+    #[test]
+    fn is_git_repo_accepts_vault_nested_inside_parent_worktree() {
+        let parent = TempDir::new().unwrap();
+        fs::write(parent.path().join("README.md"), "# Parent\n").unwrap();
+        crate::git::init_repo(parent.path()).unwrap();
+
+        let nested_vault = parent.path().join("demo-vault-v2");
+        fs::create_dir_all(&nested_vault).unwrap();
+        fs::write(nested_vault.join("note.md"), "# Nested\n").unwrap();
+
+        assert!(is_git_repo(nested_vault.to_string_lossy().into_owned()));
+        assert!(!nested_vault.join(".git").exists());
+    }
+
+    #[test]
+    fn init_git_repo_rejects_nested_worktree_vault_without_direct_git_metadata() {
+        let parent = TempDir::new().unwrap();
+        fs::write(parent.path().join("README.md"), "# Parent\n").unwrap();
+        crate::git::init_repo(parent.path()).unwrap();
+
+        let nested_vault = parent.path().join("demo-vault-v2");
+        fs::create_dir_all(&nested_vault).unwrap();
+        fs::write(nested_vault.join("note.md"), "# Nested\n").unwrap();
+
+        let err = init_git_repo(nested_vault.to_string_lossy().into_owned())
+            .expect_err("expected nested vault to reuse the parent worktree");
+
+        assert!(err.contains("inside a Git work tree"));
+        assert!(!nested_vault.join(".git").exists());
+    }
+
     #[tokio::test]
     async fn desktop_remote_commands_report_no_remote() {
         let (_dir, vault) = create_initialized_vault();
@@ -514,6 +581,26 @@ mod tests {
 
         let status = git_remote_status(vault.clone()).await.unwrap();
         assert!(!status.has_remote);
+        assert_eq!((status.ahead, status.behind), (0, 0));
+    }
+
+    #[tokio::test]
+    async fn desktop_remote_commands_report_no_remote_for_gitless_vault() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("note.md"), "# Note\n").unwrap();
+        let vault = vault_path(&dir);
+
+        let pull = git_pull(vault.clone()).await.unwrap();
+        assert_eq!(pull.status, "no_remote");
+        assert!(pull.updated_files.is_empty());
+        assert!(pull.conflict_files.is_empty());
+
+        let push = git_push(vault.clone()).await.unwrap();
+        assert_eq!(push.status, "no_remote");
+
+        let status = git_remote_status(vault).await.unwrap();
+        assert!(!status.has_remote);
+        assert_eq!(status.branch, "");
         assert_eq!((status.ahead, status.behind), (0, 0));
     }
 }

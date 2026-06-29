@@ -120,6 +120,27 @@ pub(crate) fn git_command() -> Command {
     command
 }
 
+pub fn has_direct_git_metadata(path: impl AsRef<Path>) -> bool {
+    path.as_ref().join(".git").exists()
+}
+
+pub fn is_inside_work_tree(path: impl AsRef<Path>) -> bool {
+    let path = path.as_ref();
+    if !path.is_dir() {
+        return false;
+    }
+
+    let Ok(output) = git_command()
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .current_dir(path)
+        .output()
+    else {
+        return false;
+    };
+
+    output.status.success() && String::from_utf8_lossy(&output.stdout).trim() == "true"
+}
+
 fn apply_git_shell_env(command: &mut Command) {
     for binding in git_shell_env_bindings() {
         command.env(binding.name, &binding.value);

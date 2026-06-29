@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   TableHandlesExtension,
   TableHandlesView,
-} from '../../node_modules/@blocknote/core/src/extensions/TableHandles/TableHandles'
+} from '@blocknote/core/extensions'
 
 function createTableBlock() {
   return {
@@ -268,13 +268,15 @@ describe('BlockNote table handles regression', () => {
     view.destroy()
   })
 
-  it('hides table handles instead of throwing when hover resolves a stale block id', () => {
+  it('hides table handles instead of throwing when hover lookup sees a stale block id', () => {
     const block = createTableBlock()
     const { cell, editorRoot } = createTableDom(block.id)
     const emitUpdate = vi.fn()
     const editor = {
       isEditable: true,
-      transact: vi.fn(() => undefined),
+      transact: vi.fn(() => {
+        throw new Error(`Block with ID ${block.id} not found`)
+      }),
     }
 
     const view = new TableHandlesView(

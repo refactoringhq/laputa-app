@@ -36,6 +36,7 @@ import { handleRichEditorPaste } from './richEditorPaste'
 import { createRichEditorMarkdownInputTransformExtension } from './richEditorInputTransformExtension'
 import { createRichEditorTextDirectionExtension } from './richEditorTextDirection'
 import { createRichEditorTransformErrorRecoveryExtension } from './richEditorTransformErrorRecoveryExtension'
+import { createRichEditorBlockSelectionExtension } from './richEditorBlockSelectionExtension'
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
 import { useEditorPdfExport } from './useEditorPdfExport'
 import type { NotePdfExportSource } from '../utils/notePdfExport'
@@ -250,6 +251,7 @@ function useEditorSetup({
       createMarkdownHighlightShortcutExtension(),
       createRichEditorMarkdownInputTransformExtension(),
       createRichEditorTextDirectionExtension(),
+      createRichEditorBlockSelectionExtension(),
     ],
   })
   installDirectMarkdownForRealEditor(editor)
