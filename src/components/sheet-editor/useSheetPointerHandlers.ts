@@ -88,11 +88,14 @@ function restoreSheetScrollAfterPointerDown(
   workbookRef: MutableRefObject<SheetWorkbookState | null>,
 ) {
   if (!snapshot) return
+  const targetWindow = snapshot.element.ownerDocument.defaultView
+  if (!targetWindow) return
 
   SHEET_SCROLL_RESTORE_DELAYS_MS.forEach((delay) => {
-    window.setTimeout(() => {
+    targetWindow.setTimeout(() => {
       restoreSheetScrollPosition(snapshot, workbookRef)
-      window.requestAnimationFrame(() => restoreSheetScrollPosition(snapshot, workbookRef))
+      if (!snapshot.element.isConnected) return
+      targetWindow.requestAnimationFrame(() => restoreSheetScrollPosition(snapshot, workbookRef))
     }, delay)
   })
 }
