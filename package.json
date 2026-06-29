@@ -33,6 +33,7 @@
     "@blocknote/core": "^0.46.2",
     "@blocknote/mantine": "^0.46.2",
     "@blocknote/react": "^0.46.2",
+    "@blocknote/xl-multi-column": "0.46.2",
     "@codemirror/commands": "^6.10.2",
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/lang-json": "^6.0.2",

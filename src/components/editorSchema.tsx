@@ -9,6 +9,7 @@ import {
   defaultInlineContentSpecs,
   videoParse,
 } from '@blocknote/core'
+import { withMultiColumn } from '@blocknote/xl-multi-column'
 import {
   AudioBlock,
   AudioToExternalHTML,
@@ -434,7 +435,7 @@ const MarkdownHighlightStyle = createStyleSpec(
   },
 )
 
-export const schema = BlockNoteSchema.create({
+const baseSchema = BlockNoteSchema.create({
   inlineContentSpecs: {
     ...defaultInlineContentSpecs,
     wikilink: WikiLink,
@@ -453,3 +454,11 @@ export const schema = BlockNoteSchema.create({
     video: videoBlock,
   },
 })
+
+function withMultiColumnWhenAvailable<T>(currentSchema: T): T {
+  return typeof (currentSchema as { extend?: unknown }).extend === 'function'
+    ? withMultiColumn(currentSchema as Parameters<typeof withMultiColumn>[0]) as T
+    : currentSchema
+}
+
+export const schema = withMultiColumnWhenAvailable(baseSchema)

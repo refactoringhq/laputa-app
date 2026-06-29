@@ -1,4 +1,6 @@
+import { combineByGroup } from '@blocknote/core'
 import { filterSuggestionItems } from '@blocknote/core/extensions'
+import { getMultiColumnSlashMenuItems } from '@blocknote/xl-multi-column'
 import {
   getDefaultReactSlashMenuItems,
   type DefaultReactSuggestionItem,
@@ -20,6 +22,7 @@ import {
   Smiley,
   SpeakerHigh,
   Table,
+  TextColumns,
   TextHOne,
   TextHTwo,
   TextHThree,
@@ -114,6 +117,8 @@ const TOLARIA_SLASH_MENU_ICONS: Partial<Record<string, PhosphorIcon>> = {
   paragraph: Paragraph,
   quote: Quotes,
   table: Table,
+  three_columns: TextColumns,
+  two_columns: TextColumns,
   toggle_heading: TextHOne,
   toggle_heading_2: TextHTwo,
   toggle_heading_3: TextHThree,
@@ -268,13 +273,26 @@ export function getTolariaSlashMenuItems(
   query: string,
   labels?: TolariaSlashMenuLabels,
 ) {
-  const items = addItemsToMediaGroup(
-    getDefaultReactSlashMenuItems(editor) as TolariaSlashMenuItem[],
-    [
-      createMermaidSlashMenuItem(editor),
-      createMathSlashMenuItem(editor, labels),
-      createWhiteboardSlashMenuItem(editor),
-    ],
+  const multiColumnItems = getMultiColumnSlashMenuItems(editor).map((item, index) => ({
+    ...item,
+    key: index === 0 ? 'two_columns' : 'three_columns',
+    onItemClick: () => {
+      item.onItemClick()
+      trackEvent(index === 0
+        ? 'editor_two_columns_slash_command_used'
+        : 'editor_three_columns_slash_command_used')
+    },
+  })) as TolariaSlashMenuItem[]
+  const items = combineByGroup(
+    addItemsToMediaGroup(
+      getDefaultReactSlashMenuItems(editor) as TolariaSlashMenuItem[],
+      [
+        createMermaidSlashMenuItem(editor),
+        createMathSlashMenuItem(editor, labels),
+        createWhiteboardSlashMenuItem(editor),
+      ],
+    ),
+    multiColumnItems,
   )
 
   return filterSuggestionItems(

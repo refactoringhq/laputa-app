@@ -1,10 +1,42 @@
 import { Children, isValidElement, type ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { getFormattingToolbarItems } from '@blocknote/react'
+import { getMultiColumnSlashMenuItems } from '@blocknote/xl-multi-column'
 
 vi.mock('../lib/telemetry', () => ({
   trackEvent: vi.fn(),
 }))
+
+vi.mock('@blocknote/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@blocknote/react')>()
+  return {
+    ...actual,
+    getDefaultReactSlashMenuItems: vi.fn(() => [
+      {
+        key: 'paragraph',
+        title: 'Paragraph',
+        aliases: ['text'],
+        group: 'Basic blocks',
+        onItemClick: vi.fn(),
+      },
+      {
+        key: 'emoji',
+        title: 'Emoji',
+        aliases: ['smile'],
+        group: 'Others',
+        onItemClick: vi.fn(),
+      },
+    ]),
+  }
+})
+
+vi.mock('@blocknote/xl-multi-column', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@blocknote/xl-multi-column')>()
+  return {
+    ...actual,
+    getMultiColumnSlashMenuItems: vi.fn(() => []),
+  }
+})
 
 import {
   addItemsToMediaGroup,
@@ -12,6 +44,7 @@ import {
   filterTolariaFormattingToolbarItems,
   filterTolariaSlashMenuItems,
   getTolariaBlockTypeSelectItems,
+  getTolariaSlashMenuItems,
   MATH_SLASH_COMMAND_LATEX,
   MERMAID_SLASH_COMMAND_DIAGRAM,
 } from './tolariaEditorFormattingConfig'
@@ -166,6 +199,52 @@ describe('tolariaEditorFormatting', () => {
       aliases: ['tldraw', 'drawing', 'canvas', 'sketch'],
     }))
     expect(items.map((item) => isValidElement(item.icon))).toEqual([true, true, true])
+  })
+
+  it('adds searchable multi-column slash commands with analytics', () => {
+    const twoColumnClick = vi.fn()
+    const threeColumnClick = vi.fn()
+    vi.mocked(getMultiColumnSlashMenuItems).mockReturnValue([
+      {
+        title: 'Two Columns',
+        aliases: ['columns', 'row', 'split'],
+        group: 'Basic blocks',
+        onItemClick: twoColumnClick,
+      },
+      {
+        title: 'Three Columns',
+        aliases: ['columns', 'row', 'split'],
+        group: 'Basic blocks',
+        onItemClick: threeColumnClick,
+      },
+    ])
+    const editor = {
+      getTextCursorPosition: () => ({ block: { id: 'active-block' } }),
+      replaceBlocks: () => {},
+    }
+
+    const items = getTolariaSlashMenuItems(editor as never, 'columns')
+
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'two_columns',
+        title: 'Two Columns',
+        aliases: ['columns', 'row', 'split'],
+      }),
+      expect.objectContaining({
+        key: 'three_columns',
+        title: 'Three Columns',
+        aliases: ['columns', 'row', 'split'],
+      }),
+    ]))
+
+    items.find((item) => item.key === 'two_columns')?.onItemClick()
+    items.find((item) => item.key === 'three_columns')?.onItemClick()
+
+    expect(twoColumnClick).toHaveBeenCalledOnce()
+    expect(threeColumnClick).toHaveBeenCalledOnce()
+    expect(trackEvent).toHaveBeenCalledWith('editor_two_columns_slash_command_used')
+    expect(trackEvent).toHaveBeenCalledWith('editor_three_columns_slash_command_used')
   })
 
   it('uses a valid placeholder diagram for new Mermaid blocks', () => {

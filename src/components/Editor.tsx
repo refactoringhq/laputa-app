@@ -22,6 +22,8 @@ import { EditorContent } from './EditorContent'
 import { EditorMemoryProbe } from './EditorMemoryProbe'
 import { FilePreview } from './FilePreview'
 import { schema } from './editorSchema'
+import { blockNoteDictionaryForLocale } from './blockNoteDictionary'
+import { multiColumnDropCursor } from '@blocknote/xl-multi-column'
 import { useRightPanelExclusion } from './useRightPanelExclusion'
 import type { RawEditorFindRequest } from './RawEditorFindBar'
 import {
@@ -212,12 +214,13 @@ interface EditorSetupParams {
   getNoteStatus?: (path: string) => NoteStatus
   rawToggleRef?: React.MutableRefObject<() => void>
   diffToggleRef?: React.MutableRefObject<() => void>
+  locale?: AppLocale
 }
 
 function useEditorSetup({
   tabs, activeTabPath, vaultPath, onContentChange,
   onLoadDiff, onLoadDiffAtCommit, pendingCommitDiffRequest, onPendingCommitDiffHandled, getNoteStatus,
-  rawToggleRef, diffToggleRef,
+  rawToggleRef, diffToggleRef, locale,
 }: EditorSetupParams) {
   const vaultPathRef = useRef(vaultPath)
   const flushPendingEditorChangeRef = useRef<(() => boolean) | null>(null)
@@ -226,6 +229,8 @@ function useEditorSetup({
 
   const editor = useCreateBlockNote({
     schema,
+    dictionary: blockNoteDictionaryForLocale(locale ?? 'en'),
+    dropCursor: multiColumnDropCursor,
     domAttributes: RICH_EDITOR_BIDI_DOM_ATTRIBUTES,
     uploadFile: (file: File) => uploadImageFile(file, vaultPathRef.current),
     pasteHandler: handleRichEditorPaste,
@@ -237,7 +242,7 @@ function useEditorSetup({
       createRichEditorMarkdownInputTransformExtension(),
       createRichEditorTextDirectionExtension(),
     ],
-  })
+  }, [locale])
   useFilenameAutolinkGuard(editor)
   const activeTab = tabs.find((t) => t.entry.path === activeTabPath) ?? null
   const {
@@ -670,6 +675,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
     getNoteStatus: props.getNoteStatus,
     rawToggleRef: props.rawToggleRef,
     diffToggleRef: props.diffToggleRef,
+    locale: props.locale,
   })
   const findRequest = useEditorFindCommand({
     activeTab: runtime.activeTab,

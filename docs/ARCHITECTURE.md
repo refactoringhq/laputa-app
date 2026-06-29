@@ -134,6 +134,7 @@ The note list opportunistically preloads visible and adjacent markdown/text entr
 | Frontend | React + TypeScript | React 19, TS 5.9 |
 | Editor | BlockNote | 0.46.2 |
 | Editor render extensions | @tiptap/pm | ProseMirror decorations for rich-editor node presentation |
+| Editor layout extensions | @blocknote/xl-multi-column | Native BlockNote column-list blocks, slash menu, and side-aware drop cursor |
 | Code block highlighting | @blocknote/code-block | 0.46.2 |
 | Additional code grammars | @shikijs/langs | 3.23.0 |
 | Diagram rendering | Mermaid | 11.14.0 |
