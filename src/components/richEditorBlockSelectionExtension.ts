@@ -19,6 +19,11 @@ type BlockLike = {
   id: string
 }
 
+type DocumentBlockEntry = {
+  id: string
+  parentId: string | null
+}
+
 type BlockSelectionState = {
   blockIds: string[]
 }
@@ -44,6 +49,7 @@ type RichEditorBlockSelectionEditor = {
   removeBlocks?: (blocks: string[]) => unknown
   setSelection?: (anchorBlock: string, headBlock: string) => void
   setTextCursorPosition?: (targetBlock: string, placement?: 'start' | 'end') => void
+  transact?: <T>(callback: () => T) => T
   tryParseHTMLToBlocks?: (html: string) => unknown[]
   tryParseMarkdownToBlocks?: (markdown: string) => unknown[]
 }
@@ -79,6 +85,23 @@ function nestedBlockIds(block: BlockLike): string[] {
 export function documentBlockIds(blocks: readonly unknown[] | undefined): string[] {
   if (!blocks) return []
   return uniqueBlockIds(blocks.filter(isBlockLike).flatMap(nestedBlockIds))
+}
+
+function documentBlockEntries(
+  blocks: readonly unknown[] | undefined,
+  parentId: string | null = null,
+): DocumentBlockEntry[] {
+  if (!blocks) return []
+
+  return blocks.flatMap((value) => {
+    const block = clipboardBlock(value)
+    if (!block) return []
+
+    return [
+      { id: block.id, parentId },
+      ...documentBlockEntries(block.children, block.id),
+    ]
+  })
 }
 
 function navigableDocumentBlockIds(editor: RichEditorBlockSelectionEditor): string[] {
@@ -380,6 +403,153 @@ function insertedBlockIds(blocks: readonly unknown[]): string[] {
   return uniqueBlockIds(blocks.filter(isBlockLike).map((block) => block.id))
 }
 
+function parentIdsByBlockId(entries: readonly DocumentBlockEntry[]): Map<string, string | null> {
+  return new Map(entries.map((entry) => [entry.id, entry.parentId]))
+}
+
+function hasSelectedAncestor(
+  blockId: string,
+  selectedBlockIds: ReadonlySet<string>,
+  parentIds: ReadonlyMap<string, string | null>,
+): boolean {
+  let parentId = parentIds.get(blockId) ?? null
+
+  while (parentId !== null) {
+    if (selectedBlockIds.has(parentId)) return true
+    parentId = parentIds.get(parentId) ?? null
+  }
+
+  return false
+}
+
+function pruneNestedOperationBlockIds(
+  blockIds: readonly string[],
+  entries: readonly DocumentBlockEntry[],
+): string[] {
+  const uniqueIds = uniqueBlockIds(blockIds)
+  const selectedBlockIds = new Set(uniqueIds)
+  const parentIds = parentIdsByBlockId(entries)
+
+  return uniqueIds.filter((blockId) => !hasSelectedAncestor(blockId, selectedBlockIds, parentIds))
+}
+
+function coveredOperationBlockIds(
+  blockIds: readonly string[],
+  entries: readonly DocumentBlockEntry[],
+): ReadonlySet<string> {
+  const operationBlockIds = new Set(blockIds)
+  const parentIds = parentIdsByBlockId(entries)
+
+  return new Set(
+    entries
+      .filter((entry) => (
+        operationBlockIds.has(entry.id)
+        || hasSelectedAncestor(entry.id, operationBlockIds, parentIds)
+      ))
+      .map((entry) => entry.id),
+  )
+}
+
+function collapsedContentOperationBlockIds(
+  editor: RichEditorBlockSelectionEditor,
+  selectedBlockIds: readonly string[],
+): string[] {
+  const selected = new Set(selectedBlockIds)
+  const hiddenBlockIds = collapsedSectionHiddenBlockIds(editor as unknown as TolariaBlockNoteEditor)
+  const entries = documentBlockEntries(editor.document)
+  const operationBlockIds: string[] = []
+
+  entries.forEach((entry, index) => {
+    if (!selected.has(entry.id)) return
+
+    operationBlockIds.push(entry.id)
+    let cursor = index + 1
+    while (cursor < entries.length && hiddenBlockIds.has(entries[cursor].id)) {
+      operationBlockIds.push(entries[cursor].id)
+      cursor += 1
+    }
+  })
+
+  return pruneNestedOperationBlockIds(operationBlockIds, entries)
+}
+
+function hasSameBlockIds(leftBlockIds: readonly string[], rightBlockIds: readonly string[]): boolean {
+  const left = uniqueBlockIds(leftBlockIds)
+  const right = uniqueBlockIds(rightBlockIds)
+
+  return left.length === right.length && left.every((blockId, index) => right[index] === blockId)
+}
+
+function movePlacementForSelection(
+  editor: RichEditorBlockSelectionEditor,
+  operationBlockIds: readonly string[],
+  direction: 'down' | 'up',
+): {
+  placement: 'after' | 'before'
+  referenceBlockId: string
+  targetBlockId: string
+  targetOperationBlockIds: string[]
+} | null {
+  const entries = documentBlockEntries(editor.document)
+  const coveredBlockIds = coveredOperationBlockIds(operationBlockIds, entries)
+  const visibleBlockIds = navigableDocumentBlockIds(editor)
+  const selectedIndexes = visibleBlockIds
+    .map((blockId, index) => coveredBlockIds.has(blockId) ? index : -1)
+    .filter((index) => index >= 0)
+  if (selectedIndexes.length === 0) return null
+
+  if (direction === 'up') {
+    const targetBlockId = visibleBlockIds[Math.min(...selectedIndexes) - 1]
+    if (!targetBlockId) return null
+
+    return {
+      placement: 'before',
+      referenceBlockId: targetBlockId,
+      targetBlockId,
+      targetOperationBlockIds: collapsedContentOperationBlockIds(editor, [targetBlockId]),
+    }
+  }
+
+  const targetBlockId = visibleBlockIds[Math.max(...selectedIndexes) + 1]
+  if (!targetBlockId) return null
+
+  const targetOperationBlockIds = collapsedContentOperationBlockIds(editor, [targetBlockId])
+  return {
+    placement: 'after',
+    referenceBlockId: targetOperationBlockIds[targetOperationBlockIds.length - 1] ?? targetBlockId,
+    targetBlockId,
+    targetOperationBlockIds,
+  }
+}
+
+function moveSelectedDocumentBlocks(
+  editor: RichEditorBlockSelectionEditor,
+  selectedBlockIds: readonly string[],
+  direction: 'down' | 'up',
+): boolean {
+  if (!editor.insertBlocks || !editor.removeBlocks || !editor.transact) return false
+
+  const operationBlockIds = collapsedContentOperationBlockIds(editor, selectedBlockIds)
+  const blocks = selectedDocumentBlocks(editor.document, operationBlockIds)
+  if (operationBlockIds.length === 0 || blocks.length === 0) return false
+
+  const placement = movePlacementForSelection(editor, operationBlockIds, direction)
+  if (!placement) return true
+  if (
+    hasSameBlockIds(operationBlockIds, selectedBlockIds)
+    && hasSameBlockIds(placement.targetOperationBlockIds, [placement.targetBlockId])
+  ) {
+    return false
+  }
+
+  editor.transact(() => {
+    editor.removeBlocks?.(operationBlockIds)
+    editor.insertBlocks?.(blocks, placement.referenceBlockId, placement.placement)
+  })
+  editor.focus?.()
+  return true
+}
+
 function collapsibleDocumentBlock(
   block: (BlockLike & Record<string, unknown>) | null,
 ): CollapsibleBlock | undefined {
@@ -392,7 +562,8 @@ function handleCopySelection(
   selection: BlockSelectionState,
 ): boolean {
   if (!event.clipboardData) return false
-  if (!writeSelectedBlocksToClipboard(editor, event.clipboardData, selection.blockIds)) return false
+  const operationBlockIds = collapsedContentOperationBlockIds(editor, selection.blockIds)
+  if (!writeSelectedBlocksToClipboard(editor, event.clipboardData, operationBlockIds)) return false
 
   stopClipboardEvent(event)
   return true
@@ -419,7 +590,9 @@ function handlePasteSelection(
   if (!event.clipboardData || !editor.insertBlocks) return false
 
   const blocks = parseClipboardBlocks(editor, event.clipboardData)
-  const referenceBlockId = selection.blockIds[selection.blockIds.length - 1]
+  const operationBlockIds = collapsedContentOperationBlockIds(editor, selection.blockIds)
+  const referenceBlockId = operationBlockIds[operationBlockIds.length - 1]
+    ?? selection.blockIds[selection.blockIds.length - 1]
   if (blocks.length === 0 || !referenceBlockId) return false
 
   try {
@@ -557,11 +730,16 @@ function handleDeleteSelection(
   view: EditorView,
   selectedBlockIds: readonly string[],
 ): void {
-  const currentDocumentIds = documentBlockIds(editor.document)
+  const operationBlockIds = collapsedContentOperationBlockIds(editor, selectedBlockIds)
+  const currentDocumentIds = navigableDocumentBlockIds(editor)
   const nextSelection = blockSelectionAfterDelete(selectedBlockIds, currentDocumentIds)
+  if (operationBlockIds.length === 0) {
+    clearBlockSelection(view)
+    return
+  }
 
   try {
-    editor.removeBlocks?.([...selectedBlockIds])
+    editor.removeBlocks?.(operationBlockIds)
     editor.focus?.()
   } catch {
     clearBlockSelection(view)
@@ -608,9 +786,12 @@ function handleMoveSelection(
   if (!moveBlocks) return
 
   try {
-    selectBlocksForMove(editor, view, selectedBlockIds)
-    moveBlocks.call(editor)
-    editor.focus?.()
+    if (!moveSelectedDocumentBlocks(editor, selectedBlockIds, direction)) {
+      const operationBlockIds = collapsedContentOperationBlockIds(editor, selectedBlockIds)
+      selectBlocksForMove(editor, view, operationBlockIds.length > 0 ? operationBlockIds : selectedBlockIds)
+      moveBlocks.call(editor)
+      editor.focus?.()
+    }
   } finally {
     if (!dispatchBlockSelection(view, selectedBlockIds)) {
       clearBlockSelection(view)
