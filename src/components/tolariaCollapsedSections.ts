@@ -459,6 +459,27 @@ function applyCollapsedSectionRendering(
   )
 }
 
+export function collapsedSectionHiddenBlockIds(editor: TolariaBlockNoteEditor): ReadonlySet<string> {
+  const store = collapsedHeadingStore(editor)
+  if (store.collapsedHeadingIds.size === 0) return new Set()
+
+  const fallbackBlocks = editor.document as readonly CollapsibleBlock[]
+  const editorElement = editorBlockElement(editor)
+  if (!editorElement) {
+    return collapsedSectionRenderState(fallbackBlocks, store.collapsedHeadingIds).hiddenBlockIds
+  }
+
+  const blockElements = renderedSectionBlockElements(editorElement)
+  return mergeCollapsedSectionRenderStates(
+    fallbackBlocks.length > 0
+      ? collapsedSectionRenderState(fallbackBlocks, store.collapsedHeadingIds)
+      : emptyCollapsedSectionRenderState(),
+    blockElements.length > 0
+      ? collapsedSectionRenderStateFromElements(blockElements, store.collapsedHeadingIds)
+      : emptyCollapsedSectionRenderState(),
+  ).hiddenBlockIds
+}
+
 export function isCollapsibleSectionBlockForEditor(
   editor: TolariaBlockNoteEditor,
   block: CollapsibleBlock | undefined,
