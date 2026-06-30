@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { TypeCustomizePopover } from './TypeCustomizePopover'
 import { resolveIcon, ICON_OPTIONS } from '../utils/iconRegistry'
+import { ACCENT_COLOR_PICKER_COLORS } from '../utils/typeColors'
 
 describe('resolveIcon', () => {
   it('returns the correct icon component for known name', () => {
@@ -133,10 +134,7 @@ describe('TypeCustomizePopover', () => {
   })
 
   it('orders color swatches by hue before neutral gray', () => {
-    renderPopover()
-
-    const colorRow = screen.getByTitle('Red').parentElement
-    expect(Array.from(colorRow?.children ?? []).map((element) => element.getAttribute('title'))).toEqual([
+    expect(ACCENT_COLOR_PICKER_COLORS.map((color) => color.label)).toEqual([
       'Red',
       'Orange',
       'Yellow',

@@ -2,9 +2,17 @@ import { createExtension } from '@blocknote/core'
 import type { Node as ProsemirrorNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, Selection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
+import { editorBlockElement, type TolariaBlockNoteEditor } from './tolariaBlockNoteDom'
+import {
+  collapsedSectionHiddenBlockIds,
+  type CollapsibleBlock,
+  isCollapsibleSectionBlockForEditor,
+  toggleCollapsedHeading,
+} from './tolariaCollapsedSections'
 
 export const RICH_EDITOR_BLOCK_SELECTION_CLASS = 'tolaria-rich-editor-block-selected'
 const RICH_EDITOR_BLOCK_SELECTION_META = 'tolariaRichEditorBlockSelection'
+const TOLARIA_BLOCK_CLIPBOARD_MIME = 'application/x-tolaria-blocknote-blocks+json'
 
 type BlockLike = {
   children?: unknown[]
@@ -19,17 +27,25 @@ type BlockSelectionMeta =
   | { blockIds: string[]; type: 'set' }
   | { type: 'clear' }
 
+type ClipboardDataLike = Pick<DataTransfer, 'clearData' | 'getData' | 'setData'>
+
 type RichEditorBlockSelectionEditor = {
   document?: unknown[]
   focus?: () => void
   getSelection?: () => unknown
   getTextCursorPosition?: () => unknown
+  blocksToFullHTML?: (blocks: unknown[]) => string
+  blocksToHTMLLossy?: (blocks: unknown[]) => string
+  blocksToMarkdownLossy?: (blocks: unknown[]) => string
+  insertBlocks?: (blocks: unknown[], referenceBlock: string, placement?: 'after' | 'before') => BlockLike[]
   isEditable?: boolean
   moveBlocksDown?: () => unknown
   moveBlocksUp?: () => unknown
   removeBlocks?: (blocks: string[]) => unknown
   setSelection?: (anchorBlock: string, headBlock: string) => void
   setTextCursorPosition?: (targetBlock: string, placement?: 'start' | 'end') => void
+  tryParseHTMLToBlocks?: (html: string) => unknown[]
+  tryParseMarkdownToBlocks?: (markdown: string) => unknown[]
 }
 
 export const richEditorBlockSelectionPluginKey = new PluginKey<BlockSelectionState | null>(
@@ -42,6 +58,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isBlockLike(value: unknown): value is BlockLike {
   return isRecord(value) && typeof value.id === 'string' && value.id.length > 0
+}
+
+function clipboardBlock(value: unknown): (BlockLike & Record<string, unknown>) | null {
+  return isBlockLike(value) ? value : null
 }
 
 function uniqueBlockIds(blockIds: readonly string[]): string[] {
@@ -59,6 +79,14 @@ function nestedBlockIds(block: BlockLike): string[] {
 export function documentBlockIds(blocks: readonly unknown[] | undefined): string[] {
   if (!blocks) return []
   return uniqueBlockIds(blocks.filter(isBlockLike).flatMap(nestedBlockIds))
+}
+
+function navigableDocumentBlockIds(editor: RichEditorBlockSelectionEditor): string[] {
+  const blockIds = documentBlockIds(editor.document)
+  const hiddenBlockIds = collapsedSectionHiddenBlockIds(editor as unknown as TolariaBlockNoteEditor)
+  return hiddenBlockIds.size === 0
+    ? blockIds
+    : blockIds.filter((id) => !hiddenBlockIds.has(id))
 }
 
 function blockIdFromNode(node: ProsemirrorNode): string | null {
@@ -210,6 +238,203 @@ function stopEditorKey(event: KeyboardEvent): void {
   event.stopPropagation()
 }
 
+function stopClipboardEvent(event: ClipboardEvent): void {
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function findDocumentBlock(
+  blocks: readonly unknown[] | undefined,
+  blockId: string,
+): (BlockLike & Record<string, unknown>) | null {
+  if (!blocks) return null
+
+  for (const value of blocks) {
+    const block = clipboardBlock(value)
+    if (!block) continue
+    if (block.id === blockId) return block
+
+    const childMatch = findDocumentBlock(block.children, blockId)
+    if (childMatch) return childMatch
+  }
+
+  return null
+}
+
+function selectedDocumentBlocks(
+  blocks: readonly unknown[] | undefined,
+  blockIds: readonly string[],
+): unknown[] {
+  if (!blocks) return []
+
+  const selected = new Set(blockIds)
+  const result: unknown[] = []
+  const visit = (value: unknown): void => {
+    const block = clipboardBlock(value)
+    if (!block) return
+
+    if (selected.has(block.id)) {
+      result.push(block)
+      return
+    }
+
+    block.children?.forEach(visit)
+  }
+
+  blocks.forEach(visit)
+  return result
+}
+
+function blockWithoutId(block: unknown): unknown {
+  const source = clipboardBlock(block)
+  if (!source) return block
+
+  const clone: Record<string, unknown> = {}
+  Object.entries(source).forEach(([key, value]) => {
+    if (key === 'id') return
+    clone[key] = key === 'children' && Array.isArray(value)
+      ? value.map(blockWithoutId)
+      : value
+  })
+  return clone
+}
+
+function blocksWithoutIds(blocks: readonly unknown[]): unknown[] {
+  return blocks.map(blockWithoutId)
+}
+
+function writeSelectedBlocksToClipboard(
+  editor: RichEditorBlockSelectionEditor,
+  clipboardData: ClipboardDataLike,
+  selectedBlockIds: readonly string[],
+): boolean {
+  const blocks = selectedDocumentBlocks(editor.document, selectedBlockIds)
+  if (blocks.length === 0) return false
+
+  const fullHTML = editor.blocksToFullHTML?.(blocks) ?? ''
+  const externalHTML = editor.blocksToHTMLLossy?.(blocks) ?? fullHTML
+  const markdown = editor.blocksToMarkdownLossy?.(blocks) ?? ''
+
+  clipboardData.clearData()
+  clipboardData.setData(TOLARIA_BLOCK_CLIPBOARD_MIME, JSON.stringify(blocks))
+  if (fullHTML) clipboardData.setData('blocknote/html', fullHTML)
+  if (externalHTML) clipboardData.setData('text/html', externalHTML)
+  if (markdown) {
+    clipboardData.setData('text/markdown', markdown)
+    clipboardData.setData('text/plain', markdown)
+  }
+  return true
+}
+
+function parseTolariaClipboardBlocks(clipboardData: ClipboardDataLike): unknown[] {
+  const serialized = clipboardData.getData(TOLARIA_BLOCK_CLIPBOARD_MIME)
+  if (!serialized) return []
+
+  try {
+    const parsed = JSON.parse(serialized)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function parseHTMLClipboardBlocks(
+  editor: RichEditorBlockSelectionEditor,
+  clipboardData: ClipboardDataLike,
+  mimeType: string,
+): unknown[] {
+  const html = clipboardData.getData(mimeType)
+  return html ? editor.tryParseHTMLToBlocks?.(html) ?? [] : []
+}
+
+function parseMarkdownClipboardBlocks(
+  editor: RichEditorBlockSelectionEditor,
+  clipboardData: ClipboardDataLike,
+): unknown[] {
+  const markdown = clipboardData.getData('text/markdown') || clipboardData.getData('text/plain')
+  return markdown ? editor.tryParseMarkdownToBlocks?.(markdown) ?? [] : []
+}
+
+function firstParsedClipboardBlocks(parsers: readonly (() => unknown[])[]): unknown[] {
+  for (const parse of parsers) {
+    const blocks = parse()
+    if (blocks.length > 0) return blocks
+  }
+
+  return []
+}
+
+function parseClipboardBlocks(
+  editor: RichEditorBlockSelectionEditor,
+  clipboardData: ClipboardDataLike,
+): unknown[] {
+  return firstParsedClipboardBlocks([
+    () => parseTolariaClipboardBlocks(clipboardData),
+    () => parseHTMLClipboardBlocks(editor, clipboardData, 'blocknote/html'),
+    () => parseHTMLClipboardBlocks(editor, clipboardData, 'text/html'),
+    () => parseMarkdownClipboardBlocks(editor, clipboardData),
+  ])
+}
+
+function insertedBlockIds(blocks: readonly unknown[]): string[] {
+  return uniqueBlockIds(blocks.filter(isBlockLike).map((block) => block.id))
+}
+
+function collapsibleDocumentBlock(
+  block: (BlockLike & Record<string, unknown>) | null,
+): CollapsibleBlock | undefined {
+  return block ? block as CollapsibleBlock : undefined
+}
+
+function handleCopySelection(
+  editor: RichEditorBlockSelectionEditor,
+  event: ClipboardEvent,
+  selection: BlockSelectionState,
+): boolean {
+  if (!event.clipboardData) return false
+  if (!writeSelectedBlocksToClipboard(editor, event.clipboardData, selection.blockIds)) return false
+
+  stopClipboardEvent(event)
+  return true
+}
+
+function handleCutSelection(
+  editor: RichEditorBlockSelectionEditor,
+  view: EditorView,
+  event: ClipboardEvent,
+  selection: BlockSelectionState,
+): boolean {
+  if (!handleCopySelection(editor, event, selection)) return false
+
+  handleDeleteSelection(editor, view, selection.blockIds)
+  return true
+}
+
+function handlePasteSelection(
+  editor: RichEditorBlockSelectionEditor,
+  view: EditorView,
+  event: ClipboardEvent,
+  selection: BlockSelectionState,
+): boolean {
+  if (!event.clipboardData || !editor.insertBlocks) return false
+
+  const blocks = parseClipboardBlocks(editor, event.clipboardData)
+  const referenceBlockId = selection.blockIds[selection.blockIds.length - 1]
+  if (blocks.length === 0 || !referenceBlockId) return false
+
+  try {
+    const insertedBlocks = editor.insertBlocks(blocksWithoutIds(blocks), referenceBlockId, 'after')
+    editor.focus?.()
+    stopClipboardEvent(event)
+
+    const nextSelection = insertedBlockIds(insertedBlocks)
+    if (!dispatchBlockSelection(view, nextSelection)) dispatchBlockSelection(view, [referenceBlockId])
+    return true
+  } catch {
+    return false
+  }
+}
+
 function isPlainEscape(event: KeyboardEvent): boolean {
   return event.key === 'Escape'
     && !event.isComposing
@@ -225,6 +450,14 @@ function isPlainEnter(event: KeyboardEvent): boolean {
     && !event.altKey
     && !event.ctrlKey
     && !event.metaKey
+    && !event.shiftKey
+}
+
+function isToggleCollapsedBlockKey(event: KeyboardEvent): boolean {
+  return event.key === 'Enter'
+    && !event.isComposing
+    && !event.altKey
+    && (event.ctrlKey || event.metaKey)
     && !event.shiftKey
 }
 
@@ -404,11 +637,34 @@ function handleActiveNavigationKey(
   const direction = event.key === 'ArrowUp' ? 'up' : 'down'
   const nextSelection = blockSelectionAfterArrow(
     selection.blockIds,
-    documentBlockIds(editor.document),
+    navigableDocumentBlockIds(editor),
     direction,
     event.shiftKey,
   )
   dispatchBlockSelection(view, nextSelection)
+  return true
+}
+
+function handleActiveToggleCollapsedKey(
+  editor: RichEditorBlockSelectionEditor,
+  view: EditorView,
+  event: KeyboardEvent,
+  selection: BlockSelectionState,
+): boolean {
+  if (!isToggleCollapsedBlockKey(event)) return false
+
+  const tolariaEditor = editor as unknown as TolariaBlockNoteEditor
+  const collapsibleBlockIds = selection.blockIds.filter((blockId) => {
+    const block = findDocumentBlock(editor.document, blockId)
+    return isCollapsibleSectionBlockForEditor(tolariaEditor, collapsibleDocumentBlock(block))
+  })
+  if (collapsibleBlockIds.length === 0) return false
+
+  stopEditorKey(event)
+  const editorElement = editorBlockElement(tolariaEditor) ?? undefined
+  collapsibleBlockIds.forEach((blockId) => toggleCollapsedHeading(tolariaEditor, blockId, editorElement))
+  editor.focus?.()
+  dispatchBlockSelection(view, selection.blockIds)
   return true
 }
 
@@ -473,6 +729,7 @@ function handleActiveBlockSelectionKey(
   return handleActiveEscapeKey(view, event)
     || handleActiveNavigationKey(editor, view, event, selection)
     || handleActiveMoveKey(editor, view, event, selection)
+    || handleActiveToggleCollapsedKey(editor, view, event, selection)
     || handleActiveEnterKey(editor, view, event, selection)
     || handleActiveDeleteKey(editor, view, event, selection)
     || handleActivePrintableKey(event)
@@ -558,6 +815,20 @@ export const createRichEditorBlockSelectionExtension = createExtension(({ editor
         key: richEditorBlockSelectionPluginKey,
         props: {
           decorations: blockSelectionDecorations,
+          handleDOMEvents: {
+            copy: (view, event) => {
+              const selection = readBlockSelection(view.state)
+              return selection ? handleCopySelection(blockSelectionEditor, event, selection) : false
+            },
+            cut: (view, event) => {
+              const selection = readBlockSelection(view.state)
+              return selection ? handleCutSelection(blockSelectionEditor, view, event, selection) : false
+            },
+            paste: (view, event) => {
+              const selection = readBlockSelection(view.state)
+              return selection ? handlePasteSelection(blockSelectionEditor, view, event, selection) : false
+            },
+          },
           handleKeyDown: (view, event) => {
             const selection = readBlockSelection(view.state)
             return selection

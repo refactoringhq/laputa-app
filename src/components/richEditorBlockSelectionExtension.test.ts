@@ -1,4 +1,4 @@
-import { BlockNoteEditor } from '@blocknote/core'
+import { BlockNoteEditor, type PartialBlock } from '@blocknote/core'
 import type { Node as ProsemirrorNode } from '@tiptap/pm/model'
 import { afterEach, describe, expect, it } from 'vitest'
 import { schema } from './editorSchema'
@@ -7,6 +7,7 @@ import {
   createRichEditorBlockSelectionExtension,
   richEditorBlockSelectionPluginKey,
 } from './richEditorBlockSelectionExtension'
+import { toggleCollapsedHeading } from './tolariaCollapsedSections'
 
 type MountedEditor = {
   cleanup: () => void
@@ -14,17 +15,39 @@ type MountedEditor = {
   mount: HTMLElement
 }
 
-function createMountedEditor(): MountedEditor {
+type FixtureBlock = PartialBlock<typeof schema.blockSchema, typeof schema.inlineContentSchema, typeof schema.styleSchema>
+
+class TestClipboardData {
+  private readonly data = new Map<string, string>()
+
+  clearData() {
+    this.data.clear()
+  }
+
+  getData(type: string) {
+    return this.data.get(type) ?? ''
+  }
+
+  setData(type: string, value: string) {
+    this.data.set(type, value)
+  }
+}
+
+function defaultBlocks(): FixtureBlock[] {
+  return [
+    { id: 'one', type: 'paragraph', content: 'One' },
+    { id: 'two', type: 'paragraph', content: 'Two' },
+    { id: 'three', type: 'paragraph', content: 'Three' },
+  ]
+}
+
+function createMountedEditor(initialContent: FixtureBlock[] = defaultBlocks()): MountedEditor {
   const mount = document.createElement('div')
   document.body.appendChild(mount)
 
   const editor = BlockNoteEditor.create({
     extensions: [createRichEditorBlockSelectionExtension()],
-    initialContent: [
-      { id: 'one', type: 'paragraph', content: 'One' },
-      { id: 'two', type: 'paragraph', content: 'Two' },
-      { id: 'three', type: 'paragraph', content: 'Three' },
-    ],
+    initialContent,
     schema,
   })
   editor.mount(mount)
@@ -52,6 +75,25 @@ function dispatchEditorKey(editor: MountedEditor['editor'], key: string, options
   return { event, handled: handled === true }
 }
 
+function dispatchEditorClipboardEvent(
+  editor: MountedEditor['editor'],
+  type: 'copy' | 'cut' | 'paste',
+  clipboardData = new TestClipboardData(),
+) {
+  const view = editor._tiptapEditor.view
+  const event = new Event(type, {
+    bubbles: true,
+    cancelable: true,
+  })
+  Object.defineProperty(event, 'clipboardData', { value: clipboardData })
+  const handled = view.someProp('handleDOMEvents', (handlers) => {
+    const handler = handlers[type]
+    return handler?.(view, event) === true ? true : undefined
+  })
+
+  return { clipboardData, event, handled: handled === true }
+}
+
 function selectedBlockIds(editor: MountedEditor['editor']): string[] {
   return richEditorBlockSelectionPluginKey.getState(editor._tiptapEditor.state)?.blockIds ?? []
 }
@@ -64,6 +106,26 @@ function fixtureBlockIds(editor: MountedEditor['editor']): string[] {
 
 function documentSnapshot(editor: MountedEditor['editor']): string {
   return JSON.stringify(editor.document)
+}
+
+function textFromContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+
+  return content.map((part) => (
+    typeof part === 'object'
+      && part !== null
+      && 'text' in part
+      && typeof part.text === 'string'
+      ? part.text
+      : ''
+  )).join('')
+}
+
+function nonEmptyDocumentText(editor: MountedEditor['editor']): string[] {
+  return editor.document
+    .map((block) => textFromContent(block.content))
+    .filter((text) => text.length > 0)
 }
 
 function blockIdFromNode(node: ProsemirrorNode): string | null {
@@ -222,6 +284,81 @@ describe('rich editor block selection extension', () => {
     expect(up.event.defaultPrevented).toBe(true)
     expect(fixtureBlockIds(editor)).toEqual(['one', 'two', 'three'])
     expect(selectedBlockIds(editor)).toEqual(['two'])
+  })
+
+  it('copies and pastes selected blocks after the selected block', () => {
+    const editor = mountEditor()
+    editor.setTextCursorPosition('two', 'end')
+    dispatchEditorKey(editor, 'Escape')
+
+    const copy = dispatchEditorClipboardEvent(editor, 'copy')
+
+    expect(copy.handled).toBe(true)
+    expect(copy.event.defaultPrevented).toBe(true)
+    expect(copy.clipboardData.getData('text/plain')).toContain('Two')
+
+    const paste = dispatchEditorClipboardEvent(editor, 'paste', copy.clipboardData)
+
+    expect(paste.handled).toBe(true)
+    expect(paste.event.defaultPrevented).toBe(true)
+    expect(nonEmptyDocumentText(editor)).toEqual(['One', 'Two', 'Two', 'Three'])
+  })
+
+  it('skips hidden heading section blocks when navigating block selection', () => {
+    const mounted = createMountedEditor([
+      { id: 'heading', type: 'heading', content: 'Heading', props: { level: 2 } },
+      { id: 'hidden', type: 'paragraph', content: 'Hidden paragraph' },
+      { id: 'next', type: 'heading', content: 'Next heading', props: { level: 2 } },
+    ])
+    mountedEditors.push(mounted)
+    const { editor } = mounted
+    toggleCollapsedHeading(editor, 'heading')
+    editor.setTextCursorPosition('heading', 'end')
+    dispatchEditorKey(editor, 'Escape')
+
+    dispatchEditorKey(editor, 'ArrowDown')
+
+    expect(selectedBlockIds(editor)).toEqual(['next'])
+  })
+
+  it('skips hidden list item children when navigating block selection', () => {
+    const mounted = createMountedEditor([
+      {
+        id: 'parent',
+        type: 'bulletListItem',
+        content: 'Parent',
+        children: [{ id: 'child', type: 'bulletListItem', content: 'Child' }],
+      },
+      { id: 'next', type: 'paragraph', content: 'Next paragraph' },
+    ])
+    mountedEditors.push(mounted)
+    const { editor } = mounted
+    toggleCollapsedHeading(editor, 'parent')
+    editor.setTextCursorPosition('parent', 'end')
+    dispatchEditorKey(editor, 'Escape')
+
+    dispatchEditorKey(editor, 'ArrowDown')
+
+    expect(selectedBlockIds(editor)).toEqual(['next'])
+  })
+
+  it('toggles collapsible selected blocks with Mod+Enter', () => {
+    const mounted = createMountedEditor([
+      { id: 'heading', type: 'heading', content: 'Heading', props: { level: 2 } },
+      { id: 'hidden', type: 'paragraph', content: 'Hidden paragraph' },
+      { id: 'next', type: 'heading', content: 'Next heading', props: { level: 2 } },
+    ])
+    mountedEditors.push(mounted)
+    const { editor } = mounted
+    editor.setTextCursorPosition('heading', 'end')
+    dispatchEditorKey(editor, 'Escape')
+
+    const collapse = dispatchEditorKey(editor, 'Enter', { metaKey: true })
+
+    expect(collapse.handled).toBe(true)
+    expect(collapse.event.defaultPrevented).toBe(true)
+    dispatchEditorKey(editor, 'ArrowDown')
+    expect(selectedBlockIds(editor)).toEqual(['next'])
   })
 })
 
