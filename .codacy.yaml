@@ -1,13 +1,17 @@
 ---
 exclude_paths:
+  - ".chunk/**"
   - "coverage/**"
   - "dist/**"
   - "e2e/**"
   - "node_modules/**"
   - "scripts/**"
+  - "site/.vitepress/cache/**"
+  - "site/.vitepress/dist/**"
   - "src/test/**"
   - "src-tauri/gen/**"
   - "src-tauri/resources/agent-docs/**"
+  - "src-tauri/resources/mcp-server/**"
   - "src-tauri/target/**"
   - "target/**"
   - "test-results/**"
