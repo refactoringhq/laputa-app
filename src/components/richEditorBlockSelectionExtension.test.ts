@@ -41,6 +41,26 @@ function defaultBlocks(): FixtureBlock[] {
   ]
 }
 
+function headingSectionBlocks(): FixtureBlock[] {
+  return [
+    { id: 'heading', type: 'heading', content: 'Heading', props: { level: 2 } },
+    { id: 'hidden', type: 'paragraph', content: 'Hidden paragraph' },
+    { id: 'next', type: 'heading', content: 'Next heading', props: { level: 2 } },
+  ]
+}
+
+function collapsedListBlocks(): FixtureBlock[] {
+  return [
+    {
+      id: 'parent',
+      type: 'bulletListItem',
+      content: 'Parent',
+      children: [{ id: 'child', type: 'bulletListItem', content: 'Child' }],
+    },
+    { id: 'next', type: 'paragraph', content: 'Next paragraph' },
+  ]
+}
+
 function createMountedEditor(initialContent: FixtureBlock[] = defaultBlocks()): MountedEditor {
   const mount = document.createElement('div')
   document.body.appendChild(mount)
@@ -122,10 +142,22 @@ function textFromContent(content: unknown): string {
   )).join('')
 }
 
+function blockTextEntries(blocks: readonly unknown[] | undefined): string[] {
+  if (!blocks) return []
+
+  return blocks.flatMap((block) => {
+    if (typeof block !== 'object' || block === null) return []
+
+    const entry = block as { children?: unknown[]; content?: unknown }
+    return [
+      textFromContent(entry.content),
+      ...blockTextEntries(entry.children),
+    ].filter((text) => text.length > 0)
+  })
+}
+
 function nonEmptyDocumentText(editor: MountedEditor['editor']): string[] {
-  return editor.document
-    .map((block) => textFromContent(block.content))
-    .filter((text) => text.length > 0)
+  return blockTextEntries(editor.document)
 }
 
 function blockIdFromNode(node: ProsemirrorNode): string | null {
@@ -164,6 +196,22 @@ describe('rich editor block selection extension', () => {
     const mounted = createMountedEditor()
     mountedEditors.push(mounted)
     return mounted.editor
+  }
+
+  function mountEditorWithContent(initialContent: FixtureBlock[]) {
+    const mounted = createMountedEditor(initialContent)
+    mountedEditors.push(mounted)
+    return mounted.editor
+  }
+
+  function selectBlock(editor: MountedEditor['editor'], blockId: string) {
+    editor.setTextCursorPosition(blockId, 'end')
+    dispatchEditorKey(editor, 'Escape')
+  }
+
+  function collapseAndSelectBlock(editor: MountedEditor['editor'], blockId: string) {
+    toggleCollapsedHeading(editor, blockId)
+    selectBlock(editor, blockId)
   }
 
   it('promotes the current cursor block to editor-owned block selection on Escape', () => {
@@ -305,16 +353,8 @@ describe('rich editor block selection extension', () => {
   })
 
   it('skips hidden heading section blocks when navigating block selection', () => {
-    const mounted = createMountedEditor([
-      { id: 'heading', type: 'heading', content: 'Heading', props: { level: 2 } },
-      { id: 'hidden', type: 'paragraph', content: 'Hidden paragraph' },
-      { id: 'next', type: 'heading', content: 'Next heading', props: { level: 2 } },
-    ])
-    mountedEditors.push(mounted)
-    const { editor } = mounted
-    toggleCollapsedHeading(editor, 'heading')
-    editor.setTextCursorPosition('heading', 'end')
-    dispatchEditorKey(editor, 'Escape')
+    const editor = mountEditorWithContent(headingSectionBlocks())
+    collapseAndSelectBlock(editor, 'heading')
 
     dispatchEditorKey(editor, 'ArrowDown')
 
@@ -322,20 +362,8 @@ describe('rich editor block selection extension', () => {
   })
 
   it('skips hidden list item children when navigating block selection', () => {
-    const mounted = createMountedEditor([
-      {
-        id: 'parent',
-        type: 'bulletListItem',
-        content: 'Parent',
-        children: [{ id: 'child', type: 'bulletListItem', content: 'Child' }],
-      },
-      { id: 'next', type: 'paragraph', content: 'Next paragraph' },
-    ])
-    mountedEditors.push(mounted)
-    const { editor } = mounted
-    toggleCollapsedHeading(editor, 'parent')
-    editor.setTextCursorPosition('parent', 'end')
-    dispatchEditorKey(editor, 'Escape')
+    const editor = mountEditorWithContent(collapsedListBlocks())
+    collapseAndSelectBlock(editor, 'parent')
 
     dispatchEditorKey(editor, 'ArrowDown')
 
@@ -343,15 +371,8 @@ describe('rich editor block selection extension', () => {
   })
 
   it('toggles collapsible selected blocks with Mod+Enter', () => {
-    const mounted = createMountedEditor([
-      { id: 'heading', type: 'heading', content: 'Heading', props: { level: 2 } },
-      { id: 'hidden', type: 'paragraph', content: 'Hidden paragraph' },
-      { id: 'next', type: 'heading', content: 'Next heading', props: { level: 2 } },
-    ])
-    mountedEditors.push(mounted)
-    const { editor } = mounted
-    editor.setTextCursorPosition('heading', 'end')
-    dispatchEditorKey(editor, 'Escape')
+    const editor = mountEditorWithContent(headingSectionBlocks())
+    selectBlock(editor, 'heading')
 
     const collapse = dispatchEditorKey(editor, 'Enter', { metaKey: true })
 
@@ -359,6 +380,96 @@ describe('rich editor block selection extension', () => {
     expect(collapse.event.defaultPrevented).toBe(true)
     dispatchEditorKey(editor, 'ArrowDown')
     expect(selectedBlockIds(editor)).toEqual(['next'])
+  })
+
+  it('copies hidden section blocks with a selected collapsed heading', () => {
+    const editor = mountEditorWithContent(headingSectionBlocks())
+    collapseAndSelectBlock(editor, 'heading')
+
+    const copy = dispatchEditorClipboardEvent(editor, 'copy')
+
+    expect(copy.handled).toBe(true)
+    expect(copy.clipboardData.getData('text/plain')).toContain('Heading')
+    expect(copy.clipboardData.getData('text/plain')).toContain('Hidden paragraph')
+    expect(copy.clipboardData.getData('text/plain')).not.toContain('Next heading')
+  })
+
+  it('cuts hidden section blocks with a selected collapsed heading', () => {
+    const editor = mountEditorWithContent(headingSectionBlocks())
+    collapseAndSelectBlock(editor, 'heading')
+
+    const cut = dispatchEditorClipboardEvent(editor, 'cut')
+
+    expect(cut.handled).toBe(true)
+    expect(cut.clipboardData.getData('text/plain')).toContain('Hidden paragraph')
+    expect(nonEmptyDocumentText(editor)).toEqual(['Next heading'])
+    expect(selectedBlockIds(editor)).toEqual(['next'])
+  })
+
+  it('moves hidden section blocks with a selected collapsed heading', () => {
+    const mounted = createMountedEditor([
+      { id: 'first', type: 'heading', content: 'First', props: { level: 2 } },
+      { id: 'first-body', type: 'paragraph', content: 'First body' },
+      { id: 'second', type: 'heading', content: 'Second', props: { level: 2 } },
+      { id: 'second-body', type: 'paragraph', content: 'Second body' },
+      { id: 'third', type: 'heading', content: 'Third', props: { level: 2 } },
+    ])
+    mountedEditors.push(mounted)
+    const { editor } = mounted
+    toggleCollapsedHeading(editor, 'first')
+    toggleCollapsedHeading(editor, 'second')
+    editor.setTextCursorPosition('first', 'end')
+    dispatchEditorKey(editor, 'Escape')
+
+    const down = dispatchEditorKey(editor, 'ArrowDown', { metaKey: true, shiftKey: true })
+
+    expect(down.handled).toBe(true)
+    expect(nonEmptyDocumentText(editor)).toEqual(['Second', 'Second body', 'First', 'First body', 'Third'])
+    expect(selectedBlockIds(editor)).toEqual(['first'])
+  })
+
+  it('pastes after a selected collapsed heading section', () => {
+    const editor = mountEditorWithContent([
+      { id: 'source', type: 'paragraph', content: 'Source paragraph' },
+      ...headingSectionBlocks(),
+    ])
+    selectBlock(editor, 'source')
+    const copy = dispatchEditorClipboardEvent(editor, 'copy')
+
+    collapseAndSelectBlock(editor, 'heading')
+    const paste = dispatchEditorClipboardEvent(editor, 'paste', copy.clipboardData)
+
+    expect(paste.handled).toBe(true)
+    expect(nonEmptyDocumentText(editor)).toEqual([
+      'Source paragraph',
+      'Heading',
+      'Hidden paragraph',
+      'Source paragraph',
+      'Next heading',
+    ])
+  })
+
+  it('cuts hidden list item children with a selected collapsed parent', () => {
+    const editor = mountEditorWithContent(collapsedListBlocks())
+    collapseAndSelectBlock(editor, 'parent')
+
+    const cut = dispatchEditorClipboardEvent(editor, 'cut')
+
+    expect(cut.handled).toBe(true)
+    expect(cut.clipboardData.getData('text/plain')).toContain('Child')
+    expect(nonEmptyDocumentText(editor)).toEqual(['Next paragraph'])
+    expect(selectedBlockIds(editor)).toEqual(['next'])
+  })
+
+  it('moves hidden list item children with a selected collapsed parent', () => {
+    const editor = mountEditorWithContent(collapsedListBlocks())
+    collapseAndSelectBlock(editor, 'parent')
+
+    const down = dispatchEditorKey(editor, 'ArrowDown', { metaKey: true, shiftKey: true })
+
+    expect(down.handled).toBe(true)
+    expect(nonEmptyDocumentText(editor)).toEqual(['Next paragraph', 'Parent', 'Child'])
+    expect(selectedBlockIds(editor)).toEqual(['parent'])
   })
 })
 
