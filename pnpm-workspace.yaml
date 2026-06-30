@@ -9,3 +9,6 @@ patchedDependencies:
   '@blocknote/react@0.46.2': patches/@blocknote__react@0.46.2.patch
   '@tiptap/extension-link@3.19.0': patches/@tiptap__extension-link@3.19.0.patch
   prosemirror-tables@1.8.5: patches/prosemirror-tables@1.8.5.patch
+
+overrides:
+  ip-address: 10.1.1

@@ -345,7 +345,7 @@ function InspectorBody({
         typeEntryMap={typeEntryMap}
       />
       <Separator />
-      <NoteInfoPanel entry={entry} content={content} locale={locale} />
+      <NoteInfoPanel entry={entry} content={content} frontmatter={frontmatter} locale={locale} />
       {gitHistory.length > 0 && <Separator />}
       <GitHistoryPanel commits={gitHistory} onViewCommitDiff={onViewCommitDiff} />
     </>

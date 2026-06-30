@@ -20,7 +20,8 @@ const STATUS_VALUES = new Set<PropertyValueText>([
 ])
 
 const STATUS_KEY_PATTERNS: PropertyKeyPatterns = ['status']
-const DATE_KEY_PATTERNS: PropertyKeyPatterns = ['date', 'deadline', 'due', 'start', 'end', 'scheduled']
+const DATE_KEY_PATTERNS: PropertyKeyPatterns = ['date', 'deadline', 'due', 'start', 'end', 'scheduled', 'timestamp']
+const URL_KEY_PATTERNS: PropertyKeyPatterns = ['resource', 'url', 'link', 'href', 'website']
 const TAGS_KEY_PATTERNS: PropertyKeyPatterns = ['tags', 'keywords', 'categories', 'labels']
 
 function isIconKey(key: PropertyKey): boolean {
@@ -44,6 +45,10 @@ function isDateKey(key: PropertyKey): boolean {
   return keyMatchesPatterns(key, DATE_KEY_PATTERNS)
 }
 
+function isUrlKey(key: PropertyKey): boolean {
+  return keyMatchesPatterns(key, URL_KEY_PATTERNS)
+}
+
 function isStatusString(key: PropertyKey, value: PropertyValueText): boolean {
   if (isStatusKey(key)) return true
   if (isDateKey(key)) return false
@@ -57,6 +62,7 @@ function isColorString(key: PropertyKey, value: PropertyValueText): boolean {
 function detectStringType(key: PropertyKey, strValue: PropertyValueText): PropertyDisplayMode {
   if (isIconKey(key)) return 'text'
   if (isStatusString(key, strValue)) return 'status'
+  if (isUrlKey(key)) return 'url'
   if (isDateString(strValue)) return 'date'
   if (isColorString(key, strValue)) return 'color'
   return 'text'

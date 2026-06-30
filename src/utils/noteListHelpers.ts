@@ -511,7 +511,9 @@ function filterRootEntries(entries: VaultEntry[], rootPath: string | undefined, 
 
 function filterFolderEntries(entries: VaultEntry[], selection: Extract<SidebarSelection, { kind: 'folder' }>, subFilter?: NoteListFilter): VaultEntry[] {
   if (!selection.path) return filterRootEntries(entries, selection.rootPath, subFilter)
-  // Folder view shows ALL files (text + binary), not just markdown
+  // Folder view shows ALL files (text + binary), not just markdown.
+  // OKF reserved files (index.md, log.md) are visible so users can open them
+  // as structural documents (directory listing / update history).
   const folderEntries = entries.filter((entry) => isEntryInSelectedFolder(entry.path, selection.path, selection.rootPath))
   return subFilter ? applySubFilter(folderEntries, subFilter) : folderEntries.filter(isActive)
 }
