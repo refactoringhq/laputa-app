@@ -1,11 +1,11 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useDocumentThemeMode } from './useDocumentThemeMode'
 
 describe('useDocumentThemeMode', () => {
   beforeEach(() => {
-    document.documentElement.removeAttribute('data-theme')
-    document.documentElement.classList.remove('dark')
+    globalThis.document.documentElement.removeAttribute('data-theme')
+    globalThis.document.documentElement.classList.remove('dark')
   })
 
   it('defaults to light when no document theme is applied', () => {
@@ -17,13 +17,12 @@ describe('useDocumentThemeMode', () => {
   it('updates when the document theme changes', async () => {
     const { result } = renderHook(() => useDocumentThemeMode())
 
-    act(() => {
-      document.documentElement.setAttribute('data-theme', 'dark')
-      document.documentElement.classList.add('dark')
+    await act(async () => {
+      globalThis.document.documentElement.setAttribute('data-theme', 'dark')
+      globalThis.document.documentElement.classList.add('dark')
+      await Promise.resolve()
     })
 
-    await waitFor(() => {
-      expect(result.current).toBe('dark')
-    })
+    expect(result.current).toBe('dark')
   })
 })
