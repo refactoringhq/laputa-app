@@ -604,6 +604,37 @@ describe('BreadcrumbBar — action buttons always right-aligned', () => {
     expect(tooltip).toHaveTextContent('Add to favorites')
   })
 
+  it('updates the visible tooltip when the pointer slides between adjacent action icons', async () => {
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        onToggleFavorite={vi.fn()}
+        onToggleOrganized={vi.fn()}
+      />,
+    )
+
+    const favoriteButton = screen.getByRole('button', { name: 'Add to favorites' })
+    const organizedButton = screen.getByRole('button', { name: 'Set note as organized' })
+
+    act(() => {
+      fireEvent.pointerEnter(favoriteButton)
+    })
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Add to favorites')
+
+    act(() => {
+      fireEvent.pointerMove(organizedButton)
+    })
+
+    await waitFor(() => {
+      const visibleTooltips = screen.getAllByRole('tooltip')
+      expect(visibleTooltips).toHaveLength(1)
+      expect(visibleTooltips[0]).toHaveTextContent('Set note as organized')
+      expect(visibleTooltips[0]).not.toHaveTextContent('Add to favorites')
+    })
+  })
+
   it('lets the title use the free space before the fixed drag gap', () => {
     const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
 
