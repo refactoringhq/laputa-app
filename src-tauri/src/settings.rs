@@ -89,6 +89,7 @@ pub struct AiWorkspaceConversationSetting {
 pub struct Settings {
     pub auto_pull_interval_minutes: Option<u32>,
     pub git_enabled: Option<bool>,
+    pub git_path: Option<String>,
     pub autogit_enabled: Option<bool>,
     pub autogit_idle_threshold_seconds: Option<u32>,
     pub autogit_inactive_threshold_seconds: Option<u32>,
@@ -203,6 +204,7 @@ fn normalize_settings(settings: Settings) -> Settings {
     Settings {
         auto_pull_interval_minutes: settings.auto_pull_interval_minutes,
         git_enabled: settings.git_enabled,
+        git_path: normalize_optional_string(settings.git_path),
         autogit_enabled: settings.autogit_enabled,
         autogit_idle_threshold_seconds: normalize_optional_positive_u32(
             settings.autogit_idle_threshold_seconds,
@@ -428,6 +430,7 @@ mod tests {
         let settings = Settings {
             auto_pull_interval_minutes: Some(10),
             git_enabled: Some(false),
+            git_path: Some("/opt/homebrew/bin/git".to_string()),
             autogit_enabled: Some(true),
             autogit_idle_threshold_seconds: Some(90),
             autogit_inactive_threshold_seconds: Some(30),
@@ -534,6 +537,7 @@ mod tests {
     fn test_save_trims_whitespace() {
         let loaded = save_and_reload(Settings {
             anonymous_id: Some("  test-uuid  ".to_string()),
+            git_path: Some("  /opt/homebrew/bin/git  ".to_string()),
             release_channel: Some("  alpha  ".to_string()),
             theme_mode: Some("  dark  ".to_string()),
             ui_language: Some("  zh-cn  ".to_string()),
@@ -543,6 +547,7 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(loaded.anonymous_id.as_deref(), Some("test-uuid"));
+        assert_eq!(loaded.git_path.as_deref(), Some("/opt/homebrew/bin/git"));
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
         assert_eq!(loaded.ui_language.as_deref(), Some("zh-CN"));

@@ -14,6 +14,8 @@ mod remote_config;
 mod status;
 
 use std::ffi::{OsStr, OsString};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
@@ -191,21 +193,90 @@ fn git_launch_config() -> &'static GitLaunchConfig {
 
 fn detect_git_launch_config() -> GitLaunchConfig {
     let parent_path = std::env::var_os("PATH");
-    git_launch_config_from_parts(parent_path, shell_git_config())
+    git_launch_config_from_sources(
+        parent_path,
+        configured_git_path(),
+        shell_git_config(),
+        standard_git_candidates(),
+    )
 }
 
-fn git_launch_config_from_parts(
+fn git_launch_config_from_sources(
     parent_path: Option<OsString>,
+    configured_git_path: Option<PathBuf>,
     shell: Option<ShellGitConfig>,
+    standard_candidates: Vec<PathBuf>,
 ) -> GitLaunchConfig {
     let shell = shell.unwrap_or_default();
-    let program = shell
-        .git_path
+    let program = configured_git_path
+        .or(shell.git_path)
+        .or_else(|| standard_candidates.into_iter().next())
         .map(PathBuf::into_os_string)
         .unwrap_or_else(|| OsString::from("git"));
     let path = path_with_git_parent(shell.path.or(parent_path), &program);
 
     GitLaunchConfig { program, path }
+}
+
+fn configured_git_path() -> Option<PathBuf> {
+    crate::settings::get_settings()
+        .ok()
+        .and_then(|settings| settings.git_path)
+        .map(PathBuf::from)
+        .filter(|path| is_executable_file(path))
+}
+
+fn is_executable_file(path: &Path) -> bool {
+    let Ok(metadata) = path.metadata() else {
+        return false;
+    };
+
+    metadata.is_file() && has_executable_bit(&metadata)
+}
+
+#[cfg(unix)]
+fn has_executable_bit(metadata: &std::fs::Metadata) -> bool {
+    metadata.permissions().mode() & 0o111 != 0
+}
+
+#[cfg(not(unix))]
+fn has_executable_bit(metadata: &std::fs::Metadata) -> bool {
+    metadata.is_file()
+}
+
+#[cfg(target_os = "macos")]
+fn standard_git_candidates() -> Vec<PathBuf> {
+    let mut candidates = vec![
+        PathBuf::from("/opt/homebrew/bin/git"),
+        PathBuf::from("/usr/local/bin/git"),
+        PathBuf::from("/usr/bin/git"),
+    ];
+    candidates.extend(cellar_git_candidates("/opt/homebrew/Cellar/git"));
+    candidates.extend(cellar_git_candidates("/usr/local/Cellar/git"));
+    candidates
+        .into_iter()
+        .filter(|path| is_executable_file(path))
+        .collect()
+}
+
+#[cfg(not(target_os = "macos"))]
+fn standard_git_candidates() -> Vec<PathBuf> {
+    Vec::new()
+}
+
+#[cfg(target_os = "macos")]
+fn cellar_git_candidates(root: &str) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut candidates = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path().join("bin").join("git"))
+        .filter(|path| is_executable_file(path))
+        .collect::<Vec<_>>();
+    candidates.sort();
+    candidates.reverse();
+    candidates
 }
 
 fn path_with_git_parent(base: Option<OsString>, program: &OsStr) -> Option<OsString> {
@@ -731,29 +802,72 @@ mod tests {
             .collect()
     }
 
-    #[test]
-    fn test_git_launch_config_prefers_login_shell_git_and_path() {
-        let config = git_launch_config_from_parts(
-            Some(OsString::from("/usr/bin:/bin")),
-            Some(ShellGitConfig {
-                git_path: Some(PathBuf::from("/opt/homebrew/bin/git")),
-                path: Some(OsString::from("/opt/homebrew/bin:/usr/bin:/bin")),
-            }),
+    struct GitLaunchConfigCase<'a> {
+        parent_path: Option<&'a str>,
+        configured_git_path: Option<&'a str>,
+        shell: Option<(&'a str, &'a str)>,
+        standard_candidates: &'a [&'a str],
+        expected_program: &'a str,
+        expected_path: Option<&'a str>,
+    }
+
+    fn assert_git_launch_config(case: GitLaunchConfigCase<'_>) {
+        let shell = case.shell.map(|(git_path, path)| ShellGitConfig {
+            git_path: Some(PathBuf::from(git_path)),
+            path: Some(OsString::from(path)),
+        });
+        let config = git_launch_config_from_sources(
+            case.parent_path.map(OsString::from),
+            case.configured_git_path.map(PathBuf::from),
+            shell,
+            case.standard_candidates
+                .iter()
+                .map(|candidate| PathBuf::from(*candidate))
+                .collect(),
         );
 
-        assert_eq!(config.program, OsString::from("/opt/homebrew/bin/git"));
-        assert_eq!(
-            config.path,
-            Some(OsString::from("/opt/homebrew/bin:/usr/bin:/bin"))
-        );
+        assert_eq!(config.program, OsString::from(case.expected_program));
+        assert_eq!(config.path, case.expected_path.map(OsString::from));
     }
 
     #[test]
-    fn test_git_launch_config_keeps_default_git_when_shell_is_unavailable() {
-        let config = git_launch_config_from_parts(Some(OsString::from("/usr/bin:/bin")), None);
-
-        assert_eq!(config.program, OsString::from("git"));
-        assert_eq!(config.path, Some(OsString::from("/usr/bin:/bin")));
+    fn test_git_launch_config_source_precedence() {
+        for case in [
+            GitLaunchConfigCase {
+                parent_path: Some("/usr/bin:/bin"),
+                configured_git_path: Some("/custom/bin/git"),
+                shell: Some(("/opt/homebrew/bin/git", "/opt/homebrew/bin:/usr/bin:/bin")),
+                standard_candidates: &["/usr/local/bin/git"],
+                expected_program: "/custom/bin/git",
+                expected_path: Some("/opt/homebrew/bin:/usr/bin:/bin:/custom/bin"),
+            },
+            GitLaunchConfigCase {
+                parent_path: Some("/usr/bin:/bin"),
+                configured_git_path: None,
+                shell: Some(("/opt/homebrew/bin/git", "/opt/homebrew/bin:/usr/bin:/bin")),
+                standard_candidates: &[],
+                expected_program: "/opt/homebrew/bin/git",
+                expected_path: Some("/opt/homebrew/bin:/usr/bin:/bin"),
+            },
+            GitLaunchConfigCase {
+                parent_path: Some("/usr/bin:/bin"),
+                configured_git_path: None,
+                shell: None,
+                standard_candidates: &["/opt/homebrew/bin/git"],
+                expected_program: "/opt/homebrew/bin/git",
+                expected_path: Some("/usr/bin:/bin:/opt/homebrew/bin"),
+            },
+            GitLaunchConfigCase {
+                parent_path: Some("/usr/bin:/bin"),
+                configured_git_path: None,
+                shell: None,
+                standard_candidates: &[],
+                expected_program: "git",
+                expected_path: Some("/usr/bin:/bin"),
+            },
+        ] {
+            assert_git_launch_config(case);
+        }
     }
 
     #[test]
