@@ -62,7 +62,7 @@ const featureSections: FeatureSection[] = [
   {
     icon: "pen",
     label: "Editor",
-    title: "Writes richly, saves as Markdown",
+    title: "Writes like Notion, saves as Markdown",
     description:
       "Block-based editing with slash commands, wikilinks, raw Markdown, whiteboards, media previews, table navigation, and note width controls. Everything durable stays in vault files.",
     cards: [
