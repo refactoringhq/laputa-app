@@ -596,4 +596,25 @@ describe('tolariaEditorFormatting behavior', () => {
       )
     }).not.toThrow()
   })
+
+  it('stays stable when BlockNote exposes malformed selection blocks during remount churn', () => {
+    const editor = createMockEditor('paragraph')
+
+    editor.getSelection = vi.fn(() => ({
+      blocks: [undefined, { id: 'partial-block' }],
+    }) as never)
+    editor.getTextCursorPosition = vi.fn(() => ({
+      block: undefined,
+    }) as never)
+    useBlockNoteEditorMock.mockReturnValue(editor)
+
+    expect(() => {
+      render(
+        <>
+          <TolariaFormattingToolbar />
+          <TolariaFormattingToolbarController />
+        </>,
+      )
+    }).not.toThrow()
+  })
 })
