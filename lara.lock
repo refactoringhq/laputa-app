@@ -50,6 +50,13 @@ files:
     feedback.sponsor.description: 6517e0c5d4e4801814a6034dd54862b6
     feedback.sponsor.cta: a2c71ec076796ab6af0ba0ea882303fc
     feedback.sponsor.linkLabel: 7fbe24a8f025219f4d165aeb75352125
+    feedback.newsletter.title: ffb7e666a70151215b4c55c6268d7d72
+    feedback.newsletter.description: 939ab3adc8c7ad0bca8b27a10462055d
+    feedback.newsletter.cta: a2c71ec076796ab6af0ba0ea882303fc
+    feedback.newsletter.linkLabel: 7fbe24a8f025219f4d165aeb75352125
+    feedback.sponsors.title: e881053494ad211d02cdde59c3ab59d9
+    feedback.sponsors.description: e748f640be55858af848a87e7ce59920
+    feedback.sponsors.logoLinkLabel: e5744ab47880f7d488bbb06af085aa07
     feedback.featureRequests.title: 73ea5953d68b2c20a82bb94240f6fe17
     feedback.featureRequests.description: 9583575bdef16e12927b0a5acfa84307
     feedback.featureRequests.cta: c19ef0158349da249920b0d9f67d7d48
