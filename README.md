@@ -14,7 +14,7 @@ Personally, I use it to **run my life** (hey 👋 [Luca here](http://x.com/lucar
 
 ## Sponsors
 
-Tolaria is supported by a small panel of engineering tools that help keep the project healthy, tested, and ready for AI-assisted development.
+Tolaria is supported by a small panel of tools that help keep the project healthy, tested, and ready for AI-assisted development. I use these tools every day.
 
 <table>
   <tr>
