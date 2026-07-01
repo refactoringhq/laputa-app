@@ -27,6 +27,14 @@ type DocsLink = {
   link: string;
 };
 
+type Sponsor = {
+  name: string;
+  url: string;
+  logo: string;
+  lightLogo: string;
+  text: string;
+};
+
 const asset = (path: string) => withBase(`/landing/${path}`);
 const route = (path: string) => withBase(path);
 
@@ -167,6 +175,37 @@ const testimonials = [
     alt: "Jordan C.",
     quote:
       "There's a reason Refactoring has over 100k subscribers. It's a newsletter you CANNOT miss as a software engineer. Follow the advice here and you will see huge wins throughout your career.",
+  },
+];
+
+const sponsors: Sponsor[] = [
+  {
+    name: "Codacy",
+    url: "https://www.codacy.com/",
+    logo: "sponsors/codacy-dark.svg",
+    lightLogo: "sponsors/codacy-light.svg",
+    text: "Quality and security checks that keep AI-assisted engineering accountable.",
+  },
+  {
+    name: "CodeScene",
+    url: "https://codescene.com/",
+    logo: "sponsors/codescene-dark.svg",
+    lightLogo: "sponsors/codescene-light.svg",
+    text: "Code Health insight for keeping technical debt visible and actionable.",
+  },
+  {
+    name: "CircleCI",
+    url: "https://circleci.com/",
+    logo: "sponsors/circleci-dark.svg",
+    lightLogo: "sponsors/circleci-light.svg",
+    text: "Reliable CI infrastructure for build, test, and release confidence.",
+  },
+  {
+    name: "Unblocked",
+    url: "https://getunblocked.com/",
+    logo: "sponsors/unblocked-dark.svg",
+    lightLogo: "sponsors/unblocked-light.svg",
+    text: "Engineering context that helps developers and agents understand the codebase.",
   },
 ];
 </script>
@@ -322,6 +361,44 @@ const testimonials = [
             </span>
             <h3>{{ link.title }}</h3>
             <p>{{ link.text }}</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section id="sponsors" class="sponsors-band">
+      <div class="landing-container sponsors-inner">
+        <div class="section-heading compact">
+          <span class="section-label">Sponsors</span>
+          <h2>Backed by the tools behind the work</h2>
+          <p>
+            Tolaria is supported by engineering platforms that help keep the
+            project healthy, tested, documented, and ready for AI-assisted work.
+          </p>
+        </div>
+        <div class="sponsors-grid">
+          <a
+            v-for="sponsor in sponsors"
+            :key="sponsor.name"
+            class="sponsor-card"
+            :href="sponsor.url"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span class="sponsor-logo-mark">
+              <img
+                class="sponsor-logo-image sponsor-logo-dark"
+                :src="asset(sponsor.logo)"
+                :alt="`${sponsor.name} logo`"
+              />
+              <img
+                class="sponsor-logo-image sponsor-logo-light"
+                :src="asset(sponsor.lightLogo)"
+                alt=""
+                aria-hidden="true"
+              />
+            </span>
+            <p>{{ sponsor.text }}</p>
           </a>
         </div>
       </div>
@@ -749,6 +826,70 @@ const testimonials = [
   line-height: 1.5;
 }
 
+.sponsors-band {
+  padding: 72px 0;
+  border-bottom: 1px solid var(--landing-border);
+  background: var(--landing-bg);
+}
+
+.sponsors-inner {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+}
+
+.sponsors-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.sponsor-card {
+  display: flex;
+  min-height: 178px;
+  padding: 22px;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid var(--landing-border);
+  border-radius: 8px;
+  color: var(--landing-text);
+  background: var(--landing-surface);
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.sponsor-card:hover {
+  border-color: rgba(21, 93, 255, 0.32);
+  transform: translateY(-2px);
+}
+
+.sponsor-logo-mark {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+}
+
+.sponsor-logo-image {
+  display: block;
+  width: auto;
+  max-width: min(100%, 190px);
+  max-height: 42px;
+  object-fit: contain;
+}
+
+.sponsor-logo-light {
+  display: none;
+}
+
+.sponsor-card p {
+  margin: 24px 0 0;
+  color: var(--landing-muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
 .about-section {
   padding: 56px 0;
   border-top: 1px solid var(--landing-border);
@@ -1036,6 +1177,14 @@ const testimonials = [
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .sponsors-inner {
+    gap: 40px;
+  }
+
+  .sponsors-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .about-section {
     padding: 80px 0;
   }
@@ -1114,6 +1263,14 @@ const testimonials = [
 }
 
 .dark .tolaria-landing .screenshot-image.dark {
+  display: block;
+}
+
+.dark .tolaria-landing .sponsor-logo-dark {
+  display: none;
+}
+
+.dark .tolaria-landing .sponsor-logo-light {
   display: block;
 }
 </style>
