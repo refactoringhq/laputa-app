@@ -106,6 +106,36 @@ describe('SheetEditor serialization', () => {
     await expectNoSaveOnUnmount('---\n_display: sheet\n---\nMetric,January,,\nRevenue,1200,,')
   })
 
+  it('keeps a replaced workbook model alive until the replacement can commit', async () => {
+    const rendered = await renderLoadedSheet('---\n_display: sheet\n---\nMetric,January')
+    const firstModel = ironCalcMock.state.lastModel
+    expect(firstModel).not.toBeNull()
+
+    vi.useFakeTimers()
+    rendered.rerender(
+      <SheetEditor
+        content={'---\n_display: sheet\n---\nMetric,February'}
+        path={rendered.path}
+        onContentChange={rendered.onContentChange}
+      />,
+    )
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(ironCalcMock.state.modelConstructs).toBe(2)
+    expect(firstModel?.getSelectedSheet()).toBe(0)
+    expect(ironCalcMock.state.freedModels.has(firstModel!)).toBe(false)
+
+    act(() => {
+      vi.runOnlyPendingTimers()
+    })
+
+    expect(ironCalcMock.state.freedModels.has(firstModel!)).toBe(true)
+    expect(() => firstModel?.getSelectedSheet()).toThrow('null pointer passed to rust')
+  })
+
   it('preserves trailing empty cells when saving an edited row', async () => {
     await expectSaveAfterDirtyEdit({
       content: '---\n_display: sheet\n---\nMetric,January,,\nRevenue,1200,,',
