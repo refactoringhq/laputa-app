@@ -579,7 +579,7 @@ After the clone completes, Tolaria removes every configured git remote from the 
 
 ### Remote Clone & Auth Model
 
-Tolaria no longer implements provider-specific OAuth or remote-repository APIs. All remote git work goes through the user's existing system git configuration. On macOS, git subprocesses prefer the user's login-shell `git` and `PATH` so Homebrew/Xcode Git, Git Credential Manager, and `git-credential-osxkeychain` resolve the same way they do in Terminal.
+Tolaria no longer implements provider-specific OAuth or remote-repository APIs. All remote git work goes through the user's existing system git configuration. Git subprocesses first honor an installation-local `git_path` in `settings.json` when it points at an existing executable. On macOS, they then prefer the user's login-shell `git` and `PATH`, fall back to standard Apple/Homebrew locations such as `/opt/homebrew/bin/git`, `/usr/local/bin/git`, and `/usr/bin/git`, and only then use the inherited `PATH`. This keeps Homebrew/Xcode Git, Git Credential Manager, and `git-credential-osxkeychain` resolving the same way they do in Terminal even when Tolaria is launched from Finder, Dock, or Homebrew Cask.
 
 **Flow:**
 1. User opens `CloneVaultModal` from onboarding or the vault menu
