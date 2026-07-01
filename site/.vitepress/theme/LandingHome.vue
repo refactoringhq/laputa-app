@@ -198,7 +198,7 @@ const sponsors: Sponsor[] = [
     url: "https://circleci.com/",
     logo: "sponsors/circleci-dark.svg",
     lightLogo: "sponsors/circleci-light.svg",
-    text: "Reliable CI infrastructure for build, test, and release confidence.",
+    text: "Reliable CI infrastructure for build, test, and release confidence, now also locally for agents.",
   },
   {
     name: "Unblocked",
@@ -261,6 +261,46 @@ const sponsors: Sponsor[] = [
             alt="Tolaria app in dark mode"
             draggable="false"
           />
+        </div>
+      </div>
+    </section>
+
+    <section id="sponsors" class="sponsors-band">
+      <div class="landing-container sponsors-inner">
+        <div class="section-heading compact">
+          <span class="section-label">Sponsors</span>
+          <h2>Backed by the tools behind the work</h2>
+          <p>
+            Tolaria is supported by engineering platforms that help keep the
+            project healthy, tested, documented, and ready for AI-assisted work.
+          </p>
+        </div>
+        <div class="sponsors-grid">
+          <a
+            v-for="sponsor in sponsors"
+            :key="sponsor.name"
+            class="sponsor-card"
+            :href="sponsor.url"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span class="sponsor-logo-mark">
+              <img
+                class="sponsor-logo-image sponsor-logo-dark"
+                :class="{ 'sponsor-logo-unblocked': sponsor.name === 'Unblocked' }"
+                :src="asset(sponsor.logo)"
+                :alt="`${sponsor.name} logo`"
+              />
+              <img
+                class="sponsor-logo-image sponsor-logo-light"
+                :class="{ 'sponsor-logo-unblocked': sponsor.name === 'Unblocked' }"
+                :src="asset(sponsor.lightLogo)"
+                alt=""
+                aria-hidden="true"
+              />
+            </span>
+            <p>{{ sponsor.text }}</p>
+          </a>
         </div>
       </div>
     </section>
@@ -361,44 +401,6 @@ const sponsors: Sponsor[] = [
             </span>
             <h3>{{ link.title }}</h3>
             <p>{{ link.text }}</p>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <section id="sponsors" class="sponsors-band">
-      <div class="landing-container sponsors-inner">
-        <div class="section-heading compact">
-          <span class="section-label">Sponsors</span>
-          <h2>Backed by the tools behind the work</h2>
-          <p>
-            Tolaria is supported by engineering platforms that help keep the
-            project healthy, tested, documented, and ready for AI-assisted work.
-          </p>
-        </div>
-        <div class="sponsors-grid">
-          <a
-            v-for="sponsor in sponsors"
-            :key="sponsor.name"
-            class="sponsor-card"
-            :href="sponsor.url"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span class="sponsor-logo-mark">
-              <img
-                class="sponsor-logo-image sponsor-logo-dark"
-                :src="asset(sponsor.logo)"
-                :alt="`${sponsor.name} logo`"
-              />
-              <img
-                class="sponsor-logo-image sponsor-logo-light"
-                :src="asset(sponsor.lightLogo)"
-                alt=""
-                aria-hidden="true"
-              />
-            </span>
-            <p>{{ sponsor.text }}</p>
           </a>
         </div>
       </div>
@@ -877,6 +879,12 @@ const sponsors: Sponsor[] = [
   max-width: min(100%, 190px);
   max-height: 42px;
   object-fit: contain;
+}
+
+.sponsor-logo-unblocked {
+  height: 32px;
+  max-width: min(100%, 220px);
+  max-height: none;
 }
 
 .sponsor-logo-light {
