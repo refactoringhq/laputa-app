@@ -14,7 +14,7 @@ type ProductAnalyticsEventName = string
 type ProductAnalyticsProperties = Record<string, string | number>
 
 const STALE_TAURI_LISTENER_CLEANUP_SIGNATURE = "listeners[eventId].handlerId"
-const BLOCKNOTE_STALE_BLOCK_REFERENCE_PATTERN = /(^|: )Block with ID .+ not found$/
+const BLOCKNOTE_STALE_BLOCK_REFERENCE_PATTERN = /\bBlock with ID [^|\n]+? not found\b/
 const RESIZE_OBSERVER_LOOP_MESSAGES = [
   'ResizeObserver loop completed with undelivered notifications',
   'ResizeObserver loop limit exceeded',

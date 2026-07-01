@@ -194,6 +194,21 @@ describe('main entrypoint', () => {
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack })
   })
 
+  it('suppresses recovered BlockNote stale block-reference render errors from Sentry', async () => {
+    await importEntrypoint()
+
+    const error = new Error('Block with ID 669f337a-dee2-4d92-b5cb-9a4e9828ecf9 not found')
+    const componentStack = '\n    in BlockNoteView\n    in BlockNoteRenderRecoveryBoundary'
+    window.__tolariaFrontendReady = true
+
+    rootOptions().onCaughtError?.(error, { componentStack })
+    expect(mocks.sentryHandler).not.toHaveBeenCalled()
+    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+
+    rootOptions().onUncaughtError?.(error, { componentStack })
+    expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack })
+  })
+
   it('suppresses caught BlockNote block-type mismatch render errors without component stacks', async () => {
     await importEntrypoint()
 
