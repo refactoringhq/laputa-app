@@ -271,8 +271,9 @@ const sponsors: Sponsor[] = [
           <span class="section-label">Sponsors</span>
           <h2>Backed by the tools behind the work</h2>
           <p>
-            Tolaria is supported by engineering platforms that help keep the
-            project healthy, tested, documented, and ready for AI-assisted work.
+            Tolaria is supported by a small panel of tools that help keep the
+            project healthy, tested, and ready for AI-assisted development. I
+            use these tools every day.
           </p>
         </div>
         <div class="sponsors-grid">
