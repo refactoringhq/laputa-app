@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir, platform } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 
 const APP_CONFIG_DIR = 'com.tolaria.app'
 const LEGACY_APP_CONFIG_DIR = 'com.laputa.app'
@@ -31,18 +31,49 @@ function uniqueVaultPaths(paths) {
   return unique
 }
 
-function appConfigBaseDir(env = process.env) {
-  if (platform() === 'darwin') return join(homedir(), 'Library', 'Application Support')
-  if (platform() === 'win32') return env.APPDATA || join(homedir(), 'AppData', 'Roaming')
-  return env.XDG_CONFIG_HOME || join(homedir(), '.config')
+function absolutePath(path) {
+  return typeof path === 'string' && isAbsolute(path) ? path : null
 }
 
-export function vaultsJsonPath({ configDir = appConfigBaseDir() } = {}) {
-  const preferred = join(configDir, APP_CONFIG_DIR, 'vaults.json')
-  if (existsSync(preferred)) return preferred
+function defaultXdgConfigHome(platformName, homeDir) {
+  if (platformName === 'win32') return null
+  return absolutePath(homeDir) ? join(homeDir, '.config') : null
+}
 
-  const legacy = join(configDir, LEGACY_APP_CONFIG_DIR, 'vaults.json')
-  return existsSync(legacy) ? legacy : preferred
+function platformConfigDir(env, platformName, homeDir) {
+  if (platformName === 'darwin') return join(homeDir, 'Library', 'Application Support')
+  if (platformName === 'win32') return absolutePath(env.APPDATA) || join(homeDir, 'AppData', 'Roaming')
+  return absolutePath(env.XDG_CONFIG_HOME) || defaultXdgConfigHome(platformName, homeDir)
+}
+
+export function appConfigBaseDirs({
+  env = process.env,
+  homeDir = homedir(),
+  platformName = platform(),
+  platformDir = platformConfigDir(env, platformName, homeDir),
+} = {}) {
+  const primary = absolutePath(env.XDG_CONFIG_HOME)
+    || defaultXdgConfigHome(platformName, homeDir)
+    || platformDir
+  const dirs = primary ? [primary] : []
+  if (platformDir && platformDir !== primary) dirs.push(platformDir)
+  return dirs
+}
+
+function existingOrPreferredVaultsPath(configDirs) {
+  for (const configDir of configDirs) {
+    const preferred = join(configDir, APP_CONFIG_DIR, 'vaults.json')
+    if (existsSync(preferred)) return preferred
+
+    const legacy = join(configDir, LEGACY_APP_CONFIG_DIR, 'vaults.json')
+    if (existsSync(legacy)) return legacy
+  }
+
+  return join(configDirs[0], APP_CONFIG_DIR, 'vaults.json')
+}
+
+export function vaultsJsonPath({ configDir, configDirs = configDir ? [configDir] : appConfigBaseDirs() } = {}) {
+  return existingOrPreferredVaultsPath(configDirs)
 }
 
 function pushUniquePath(paths, value) {
@@ -63,8 +94,8 @@ function activeVaultPathsFromList(list) {
   return paths
 }
 
-export function configuredVaultPaths({ configDir } = {}) {
-  const filePath = vaultsJsonPath({ configDir })
+export function configuredVaultPaths(options = {}) {
+  const filePath = vaultsJsonPath(options)
   if (!existsSync(filePath)) return []
 
   return activeVaultPathsFromList(JSON.parse(readFileSync(filePath, 'utf-8')))

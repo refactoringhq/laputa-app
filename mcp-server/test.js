@@ -14,7 +14,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import {
   createNote, findMarkdownFiles, getNote, searchNotes, vaultContext,
 } from './vault.js'
-import { requireVaultPath, requireVaultPaths } from './vault-path.js'
+import { appConfigBaseDirs, requireVaultPath, requireVaultPaths } from './vault-path.js'
 import { vaultContextWithInstructions } from './agent-instructions.js'
 import { evaluateBridgeRequest } from './ws-bridge.js'
 
@@ -370,6 +370,40 @@ describe('requireVaultPath', () => {
       )
     } finally {
       await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it('loads macOS vault registry from the XDG-backed Tolaria config before Application Support', async () => {
+    const homeDir = await mkdtemp(path.join(os.tmpdir(), 'tolaria-mcp-macos-home-'))
+    const primaryVault = path.join(homeDir, 'Primary Vault')
+    const legacyPlatformVault = path.join(homeDir, 'Legacy Platform Vault')
+    const xdgConfigPath = path.join(homeDir, '.config', 'com.tolaria.app', 'vaults.json')
+    const platformConfigPath = path.join(
+      homeDir,
+      'Library',
+      'Application Support',
+      'com.tolaria.app',
+      'vaults.json',
+    )
+
+    await mkdir(path.dirname(xdgConfigPath), { recursive: true })
+    await mkdir(path.dirname(platformConfigPath), { recursive: true })
+    await writeFile(xdgConfigPath, JSON.stringify({ active_vault: primaryVault, vaults: [] }), 'utf-8')
+    await writeFile(
+      platformConfigPath,
+      JSON.stringify({ active_vault: legacyPlatformVault, vaults: [] }),
+      'utf-8',
+    )
+
+    try {
+      assert.deepEqual(
+        requireVaultPaths({}, {
+          configDirs: appConfigBaseDirs({ env: {}, homeDir, platformName: 'darwin' }),
+        }),
+        [primaryVault],
+      )
+    } finally {
+      await rm(homeDir, { recursive: true, force: true })
     }
   })
 })
