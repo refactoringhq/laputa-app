@@ -213,6 +213,21 @@ type TolariaSelectedFileBlock = {
   url: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isTolariaSelectedBlock(value: unknown): value is TolariaSelectedBlock {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.type === 'string'
+    && isRecord(value.props)
+}
+
+function tolariaSelectedBlocks(value: unknown): TolariaSelectedBlock[] {
+  return Array.isArray(value) ? value.filter(isTolariaSelectedBlock) : []
+}
+
 const FORMATTING_TOOLBAR_FILE_BLOCK_TYPES = new Set([
   'audio',
   'file',
@@ -297,16 +312,15 @@ function getSelectedBlocksSafely(
   editor: BlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>,
 ): TolariaSelectedBlock[] {
   try {
-    const selectionBlocks = editor.getSelection()?.blocks
-    if (selectionBlocks?.length) {
-      return selectionBlocks as TolariaSelectedBlock[]
-    }
+    const selectionBlocks = tolariaSelectedBlocks(editor.getSelection()?.blocks)
+    if (selectionBlocks.length) return selectionBlocks
   } catch {
     // BlockNote can briefly expose an invalid selection while inline actions remount blocks.
   }
 
   try {
-    return [editor.getTextCursorPosition().block as TolariaSelectedBlock]
+    const block = editor.getTextCursorPosition().block
+    return isTolariaSelectedBlock(block) ? [block] : []
   } catch {
     return []
   }
@@ -316,7 +330,8 @@ function getCursorBlockSafely(
   editor: BlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>,
 ): TolariaSelectedBlock | null {
   try {
-    return editor.getTextCursorPosition().block as TolariaSelectedBlock
+    const block = editor.getTextCursorPosition().block
+    return isTolariaSelectedBlock(block) ? block : null
   } catch {
     return null
   }
