@@ -4,113 +4,42 @@ import { Plugin, PluginKey, Selection, type EditorState, type Transaction } from
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import { editorBlockElement, type TolariaBlockNoteEditor } from './tolariaBlockNoteDom'
 import {
-  collapsedSectionHiddenBlockIds,
   type CollapsibleBlock,
   isCollapsibleSectionBlockForEditor,
   toggleCollapsedHeading,
 } from './tolariaCollapsedSections'
+import {
+  blockSelectionAfterArrow,
+  blockSelectionAfterDelete,
+  collapsedContentOperationBlockIds,
+  documentBlockIds,
+  findDocumentBlock,
+  insertedBlockIds,
+  moveSelectedDocumentBlocks,
+  navigableDocumentBlockIds,
+} from './richEditorBlockSelectionDocument'
+import {
+  blocksWithoutIds,
+  parseClipboardBlocks,
+  writeSelectedBlocksToClipboard,
+} from './richEditorBlockSelectionClipboard'
+import {
+  isBlockLike,
+  isRecord,
+  uniqueBlockIds,
+  type BlockLike,
+  type BlockSelectionMeta,
+  type BlockSelectionState,
+  type RichEditorBlockSelectionEditor,
+} from './richEditorBlockSelectionTypes'
 
 export const RICH_EDITOR_BLOCK_SELECTION_CLASS = 'tolaria-rich-editor-block-selected'
 const RICH_EDITOR_BLOCK_SELECTION_META = 'tolariaRichEditorBlockSelection'
-const TOLARIA_BLOCK_CLIPBOARD_MIME = 'application/x-tolaria-blocknote-blocks+json'
-
-type BlockLike = {
-  children?: unknown[]
-  id: string
-}
-
-type DocumentBlockEntry = {
-  id: string
-  parentId: string | null
-}
-
-type BlockSelectionState = {
-  blockIds: string[]
-}
-
-type BlockSelectionMeta =
-  | { blockIds: string[]; type: 'set' }
-  | { type: 'clear' }
-
-type ClipboardDataLike = Pick<DataTransfer, 'clearData' | 'getData' | 'setData'>
-
-type RichEditorBlockSelectionEditor = {
-  document?: unknown[]
-  focus?: () => void
-  getSelection?: () => unknown
-  getTextCursorPosition?: () => unknown
-  blocksToFullHTML?: (blocks: unknown[]) => string
-  blocksToHTMLLossy?: (blocks: unknown[]) => string
-  blocksToMarkdownLossy?: (blocks: unknown[]) => string
-  insertBlocks?: (blocks: unknown[], referenceBlock: string, placement?: 'after' | 'before') => BlockLike[]
-  isEditable?: boolean
-  moveBlocksDown?: () => unknown
-  moveBlocksUp?: () => unknown
-  removeBlocks?: (blocks: string[]) => unknown
-  setSelection?: (anchorBlock: string, headBlock: string) => void
-  setTextCursorPosition?: (targetBlock: string, placement?: 'start' | 'end') => void
-  transact?: <T>(callback: () => T) => T
-  tryParseHTMLToBlocks?: (html: string) => unknown[]
-  tryParseMarkdownToBlocks?: (markdown: string) => unknown[]
-}
 
 export const richEditorBlockSelectionPluginKey = new PluginKey<BlockSelectionState | null>(
   RICH_EDITOR_BLOCK_SELECTION_META,
 )
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function isBlockLike(value: unknown): value is BlockLike {
-  return isRecord(value) && typeof value.id === 'string' && value.id.length > 0
-}
-
-function clipboardBlock(value: unknown): (BlockLike & Record<string, unknown>) | null {
-  return isBlockLike(value) ? value : null
-}
-
-function uniqueBlockIds(blockIds: readonly string[]): string[] {
-  return Array.from(new Set(blockIds.filter((id) => id.length > 0)))
-}
-
-function nestedBlockIds(block: BlockLike): string[] {
-  const childBlocks = Array.isArray(block.children)
-    ? block.children.filter(isBlockLike).flatMap(nestedBlockIds)
-    : []
-
-  return [block.id, ...childBlocks]
-}
-
-export function documentBlockIds(blocks: readonly unknown[] | undefined): string[] {
-  if (!blocks) return []
-  return uniqueBlockIds(blocks.filter(isBlockLike).flatMap(nestedBlockIds))
-}
-
-function documentBlockEntries(
-  blocks: readonly unknown[] | undefined,
-  parentId: string | null = null,
-): DocumentBlockEntry[] {
-  if (!blocks) return []
-
-  return blocks.flatMap((value) => {
-    const block = clipboardBlock(value)
-    if (!block) return []
-
-    return [
-      { id: block.id, parentId },
-      ...documentBlockEntries(block.children, block.id),
-    ]
-  })
-}
-
-function navigableDocumentBlockIds(editor: RichEditorBlockSelectionEditor): string[] {
-  const blockIds = documentBlockIds(editor.document)
-  const hiddenBlockIds = collapsedSectionHiddenBlockIds(editor as unknown as TolariaBlockNoteEditor)
-  return hiddenBlockIds.size === 0
-    ? blockIds
-    : blockIds.filter((id) => !hiddenBlockIds.has(id))
-}
+export { blockSelectionAfterArrow, documentBlockIds }
 
 function blockIdFromNode(node: ProsemirrorNode): string | null {
   const attrs = node.attrs as Record<string, unknown>
@@ -218,44 +147,6 @@ function readBlockSelection(state: EditorState): BlockSelectionState | null {
   return richEditorBlockSelectionPluginKey.getState(state) ?? null
 }
 
-export function blockSelectionAfterArrow(
-  selectedBlockIds: readonly string[],
-  allBlockIds: readonly string[],
-  direction: 'down' | 'up',
-  extend: boolean,
-): string[] {
-  const selected = uniqueBlockIds(selectedBlockIds).filter((id) => allBlockIds.includes(id))
-  if (selected.length === 0) return allBlockIds[0] ? [allBlockIds[0]] : []
-
-  const firstIndex = allBlockIds.indexOf(selected[0])
-  const lastIndex = allBlockIds.indexOf(selected[selected.length - 1])
-  if (firstIndex < 0 || lastIndex < 0) return allBlockIds[0] ? [allBlockIds[0]] : []
-
-  if (extend) {
-    const nextFirstIndex = direction === 'up' ? Math.max(0, firstIndex - 1) : firstIndex
-    const nextLastIndex = direction === 'down' ? Math.min(allBlockIds.length - 1, lastIndex + 1) : lastIndex
-    return allBlockIds.slice(nextFirstIndex, nextLastIndex + 1)
-  }
-
-  const targetIndex = direction === 'up'
-    ? Math.max(0, firstIndex - 1)
-    : Math.min(allBlockIds.length - 1, lastIndex + 1)
-  return allBlockIds[targetIndex] ? [allBlockIds[targetIndex]] : selected
-}
-
-function blockSelectionAfterDelete(
-  selectedBlockIds: readonly string[],
-  allBlockIds: readonly string[],
-): string[] {
-  const selected = new Set(selectedBlockIds)
-  const firstSelectedIndex = allBlockIds.findIndex((id) => selected.has(id))
-  const remaining = allBlockIds.filter((id) => !selected.has(id))
-  if (remaining.length === 0) return []
-
-  const nextIndex = Math.min(Math.max(firstSelectedIndex, 0), remaining.length - 1)
-  return [remaining[nextIndex]]
-}
-
 function stopEditorKey(event: KeyboardEvent): void {
   event.preventDefault()
   event.stopPropagation()
@@ -264,290 +155,6 @@ function stopEditorKey(event: KeyboardEvent): void {
 function stopClipboardEvent(event: ClipboardEvent): void {
   event.preventDefault()
   event.stopPropagation()
-}
-
-function findDocumentBlock(
-  blocks: readonly unknown[] | undefined,
-  blockId: string,
-): (BlockLike & Record<string, unknown>) | null {
-  if (!blocks) return null
-
-  for (const value of blocks) {
-    const block = clipboardBlock(value)
-    if (!block) continue
-    if (block.id === blockId) return block
-
-    const childMatch = findDocumentBlock(block.children, blockId)
-    if (childMatch) return childMatch
-  }
-
-  return null
-}
-
-function selectedDocumentBlocks(
-  blocks: readonly unknown[] | undefined,
-  blockIds: readonly string[],
-): unknown[] {
-  if (!blocks) return []
-
-  const selected = new Set(blockIds)
-  const result: unknown[] = []
-  const visit = (value: unknown): void => {
-    const block = clipboardBlock(value)
-    if (!block) return
-
-    if (selected.has(block.id)) {
-      result.push(block)
-      return
-    }
-
-    block.children?.forEach(visit)
-  }
-
-  blocks.forEach(visit)
-  return result
-}
-
-function blockWithoutId(block: unknown): unknown {
-  const source = clipboardBlock(block)
-  if (!source) return block
-
-  const clone: Record<string, unknown> = {}
-  Object.entries(source).forEach(([key, value]) => {
-    if (key === 'id') return
-    clone[key] = key === 'children' && Array.isArray(value)
-      ? value.map(blockWithoutId)
-      : value
-  })
-  return clone
-}
-
-function blocksWithoutIds(blocks: readonly unknown[]): unknown[] {
-  return blocks.map(blockWithoutId)
-}
-
-function writeSelectedBlocksToClipboard(
-  editor: RichEditorBlockSelectionEditor,
-  clipboardData: ClipboardDataLike,
-  selectedBlockIds: readonly string[],
-): boolean {
-  const blocks = selectedDocumentBlocks(editor.document, selectedBlockIds)
-  if (blocks.length === 0) return false
-
-  const fullHTML = editor.blocksToFullHTML?.(blocks) ?? ''
-  const externalHTML = editor.blocksToHTMLLossy?.(blocks) ?? fullHTML
-  const markdown = editor.blocksToMarkdownLossy?.(blocks) ?? ''
-
-  clipboardData.clearData()
-  clipboardData.setData(TOLARIA_BLOCK_CLIPBOARD_MIME, JSON.stringify(blocks))
-  if (fullHTML) clipboardData.setData('blocknote/html', fullHTML)
-  if (externalHTML) clipboardData.setData('text/html', externalHTML)
-  if (markdown) {
-    clipboardData.setData('text/markdown', markdown)
-    clipboardData.setData('text/plain', markdown)
-  }
-  return true
-}
-
-function parseTolariaClipboardBlocks(clipboardData: ClipboardDataLike): unknown[] {
-  const serialized = clipboardData.getData(TOLARIA_BLOCK_CLIPBOARD_MIME)
-  if (!serialized) return []
-
-  try {
-    const parsed = JSON.parse(serialized)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function parseHTMLClipboardBlocks(
-  editor: RichEditorBlockSelectionEditor,
-  clipboardData: ClipboardDataLike,
-  mimeType: string,
-): unknown[] {
-  const html = clipboardData.getData(mimeType)
-  return html ? editor.tryParseHTMLToBlocks?.(html) ?? [] : []
-}
-
-function parseMarkdownClipboardBlocks(
-  editor: RichEditorBlockSelectionEditor,
-  clipboardData: ClipboardDataLike,
-): unknown[] {
-  const markdown = clipboardData.getData('text/markdown') || clipboardData.getData('text/plain')
-  return markdown ? editor.tryParseMarkdownToBlocks?.(markdown) ?? [] : []
-}
-
-function firstParsedClipboardBlocks(parsers: readonly (() => unknown[])[]): unknown[] {
-  for (const parse of parsers) {
-    const blocks = parse()
-    if (blocks.length > 0) return blocks
-  }
-
-  return []
-}
-
-function parseClipboardBlocks(
-  editor: RichEditorBlockSelectionEditor,
-  clipboardData: ClipboardDataLike,
-): unknown[] {
-  return firstParsedClipboardBlocks([
-    () => parseTolariaClipboardBlocks(clipboardData),
-    () => parseHTMLClipboardBlocks(editor, clipboardData, 'blocknote/html'),
-    () => parseHTMLClipboardBlocks(editor, clipboardData, 'text/html'),
-    () => parseMarkdownClipboardBlocks(editor, clipboardData),
-  ])
-}
-
-function insertedBlockIds(blocks: readonly unknown[]): string[] {
-  return uniqueBlockIds(blocks.filter(isBlockLike).map((block) => block.id))
-}
-
-function parentIdsByBlockId(entries: readonly DocumentBlockEntry[]): Map<string, string | null> {
-  return new Map(entries.map((entry) => [entry.id, entry.parentId]))
-}
-
-function hasSelectedAncestor(
-  blockId: string,
-  selectedBlockIds: ReadonlySet<string>,
-  parentIds: ReadonlyMap<string, string | null>,
-): boolean {
-  let parentId = parentIds.get(blockId) ?? null
-
-  while (parentId !== null) {
-    if (selectedBlockIds.has(parentId)) return true
-    parentId = parentIds.get(parentId) ?? null
-  }
-
-  return false
-}
-
-function pruneNestedOperationBlockIds(
-  blockIds: readonly string[],
-  entries: readonly DocumentBlockEntry[],
-): string[] {
-  const uniqueIds = uniqueBlockIds(blockIds)
-  const selectedBlockIds = new Set(uniqueIds)
-  const parentIds = parentIdsByBlockId(entries)
-
-  return uniqueIds.filter((blockId) => !hasSelectedAncestor(blockId, selectedBlockIds, parentIds))
-}
-
-function coveredOperationBlockIds(
-  blockIds: readonly string[],
-  entries: readonly DocumentBlockEntry[],
-): ReadonlySet<string> {
-  const operationBlockIds = new Set(blockIds)
-  const parentIds = parentIdsByBlockId(entries)
-
-  return new Set(
-    entries
-      .filter((entry) => (
-        operationBlockIds.has(entry.id)
-        || hasSelectedAncestor(entry.id, operationBlockIds, parentIds)
-      ))
-      .map((entry) => entry.id),
-  )
-}
-
-function collapsedContentOperationBlockIds(
-  editor: RichEditorBlockSelectionEditor,
-  selectedBlockIds: readonly string[],
-): string[] {
-  const selected = new Set(selectedBlockIds)
-  const hiddenBlockIds = collapsedSectionHiddenBlockIds(editor as unknown as TolariaBlockNoteEditor)
-  const entries = documentBlockEntries(editor.document)
-  const operationBlockIds: string[] = []
-
-  entries.forEach((entry, index) => {
-    if (!selected.has(entry.id)) return
-
-    operationBlockIds.push(entry.id)
-    let cursor = index + 1
-    while (cursor < entries.length && hiddenBlockIds.has(entries[cursor].id)) {
-      operationBlockIds.push(entries[cursor].id)
-      cursor += 1
-    }
-  })
-
-  return pruneNestedOperationBlockIds(operationBlockIds, entries)
-}
-
-function hasSameBlockIds(leftBlockIds: readonly string[], rightBlockIds: readonly string[]): boolean {
-  const left = uniqueBlockIds(leftBlockIds)
-  const right = uniqueBlockIds(rightBlockIds)
-
-  return left.length === right.length && left.every((blockId, index) => right[index] === blockId)
-}
-
-function movePlacementForSelection(
-  editor: RichEditorBlockSelectionEditor,
-  operationBlockIds: readonly string[],
-  direction: 'down' | 'up',
-): {
-  placement: 'after' | 'before'
-  referenceBlockId: string
-  targetBlockId: string
-  targetOperationBlockIds: string[]
-} | null {
-  const entries = documentBlockEntries(editor.document)
-  const coveredBlockIds = coveredOperationBlockIds(operationBlockIds, entries)
-  const visibleBlockIds = navigableDocumentBlockIds(editor)
-  const selectedIndexes = visibleBlockIds
-    .map((blockId, index) => coveredBlockIds.has(blockId) ? index : -1)
-    .filter((index) => index >= 0)
-  if (selectedIndexes.length === 0) return null
-
-  if (direction === 'up') {
-    const targetBlockId = visibleBlockIds[Math.min(...selectedIndexes) - 1]
-    if (!targetBlockId) return null
-
-    return {
-      placement: 'before',
-      referenceBlockId: targetBlockId,
-      targetBlockId,
-      targetOperationBlockIds: collapsedContentOperationBlockIds(editor, [targetBlockId]),
-    }
-  }
-
-  const targetBlockId = visibleBlockIds[Math.max(...selectedIndexes) + 1]
-  if (!targetBlockId) return null
-
-  const targetOperationBlockIds = collapsedContentOperationBlockIds(editor, [targetBlockId])
-  return {
-    placement: 'after',
-    referenceBlockId: targetOperationBlockIds[targetOperationBlockIds.length - 1] ?? targetBlockId,
-    targetBlockId,
-    targetOperationBlockIds,
-  }
-}
-
-function moveSelectedDocumentBlocks(
-  editor: RichEditorBlockSelectionEditor,
-  selectedBlockIds: readonly string[],
-  direction: 'down' | 'up',
-): boolean {
-  if (!editor.insertBlocks || !editor.removeBlocks || !editor.transact) return false
-
-  const operationBlockIds = collapsedContentOperationBlockIds(editor, selectedBlockIds)
-  const blocks = selectedDocumentBlocks(editor.document, operationBlockIds)
-  if (operationBlockIds.length === 0 || blocks.length === 0) return false
-
-  const placement = movePlacementForSelection(editor, operationBlockIds, direction)
-  if (!placement) return true
-  if (
-    hasSameBlockIds(operationBlockIds, selectedBlockIds)
-    && hasSameBlockIds(placement.targetOperationBlockIds, [placement.targetBlockId])
-  ) {
-    return false
-  }
-
-  editor.transact(() => {
-    editor.removeBlocks?.(operationBlockIds)
-    editor.insertBlocks?.(blocks, placement.referenceBlockId, placement.placement)
-  })
-  editor.focus?.()
-  return true
 }
 
 function collapsibleDocumentBlock(
