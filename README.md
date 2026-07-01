@@ -12,13 +12,6 @@ Personally, I use it to **run my life** (hey 👋 [Luca here](http://x.com/lucar
 
 <img width="1000" height="656" alt="1776506856823-CleanShot_2026-04-18_at_12 06 57_2x" src="https://github.com/user-attachments/assets/8aeafb0a-b236-43c2-a083-ec111f903c38" />
 
-## Walkthroughs
-
-You can find some Loom walkthroughs below — they are short and to the point:
-- [How I Organize My Own Tolaria Workspace](https://www.loom.com/share/bb3aaffa238b4be0bd62e4464bca2528)
-- [My Inbox Workflow](https://www.loom.com/share/dffda263317b4fa8b47b59cdf9330571)
-- [How I Save Web Resources to Tolaria](https://www.loom.com/share/8a3c1776f801402ebbf4d7b0f31e9882)
-
 ## Sponsors
 
 Tolaria is supported by a small panel of engineering tools that help keep the project healthy, tested, and ready for AI-assisted development.
@@ -59,6 +52,13 @@ Tolaria is supported by a small panel of engineering tools that help keep the pr
     </td>
   </tr>
 </table>
+
+## Walkthroughs
+
+You can find some Loom walkthroughs below — they are short and to the point:
+- [How I Organize My Own Tolaria Workspace](https://www.loom.com/share/bb3aaffa238b4be0bd62e4464bca2528)
+- [My Inbox Workflow](https://www.loom.com/share/dffda263317b4fa8b47b59cdf9330571)
+- [How I Save Web Resources to Tolaria](https://www.loom.com/share/8a3c1776f801402ebbf4d7b0f31e9882)
 
 ## Principles
 
