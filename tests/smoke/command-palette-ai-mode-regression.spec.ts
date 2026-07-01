@@ -76,6 +76,24 @@ test.describe('Command palette AI mode regression', () => {
     await expectNoPageErrors(pageErrors)
   })
 
+  test('submits an arbitrary prompt and opens the AI workspace without a render error', async ({ page }) => {
+    const pageErrors = trackPageErrors(page)
+    await openCommandPalette(page)
+    await page.locator('input[placeholder="Type a command..."]').pressSequentially(' ')
+
+    const aiInput = page.getByTestId('command-palette-ai-input')
+    await expect(aiInput).toBeVisible()
+    await expect(aiInput).toBeFocused()
+
+    await aiInput.pressSequentially('random prompt')
+    await expectNormalizedEditorText(aiInput, 'random prompt')
+    await page.keyboard.press('Enter')
+
+    await expect(page.locator('[data-command-palette="true"]')).toHaveCount(0)
+    await expect(page.getByTestId('ai-workspace')).toBeVisible()
+    await expectNoPageErrors(pageErrors)
+  })
+
   test('keeps pasted text, caret movement, and selection replacement stable in AI mode', async ({ page }) => {
     const pageErrors = trackPageErrors(page)
     const aiInputTarget = { dataTestId: 'command-palette-ai-input' }
