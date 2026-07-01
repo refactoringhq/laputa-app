@@ -151,6 +151,7 @@ interface SheetEditorMockState {
   downMoves: number
   editStarts: number
   focusBeforeGuardOnRender: boolean
+  freedModels: Set<MockSheetModel>
   insertedColumns: ColumnMutation[]
   insertedRows: RowMutation[]
   lastModel: MockSheetModel | null
@@ -199,6 +200,7 @@ const ironCalcMock = vi.hoisted(() => {
     downMoves: 0,
     editStarts: 0,
     focusBeforeGuardOnRender: false,
+    freedModels: new Set(),
     insertedColumns: [],
     insertedRows: [],
     lastModel: null,
@@ -247,19 +249,29 @@ const ironCalcMock = vi.hoisted(() => {
     evaluate(): void {}
     setSelectedSheet(): void {}
     getSelectedSheet(): SheetIndex {
+      this.assertLive()
       return state.selectedView.sheet
     }
-    free(): void {}
+    free(): void {
+      state.freedModels.add(this)
+    }
+
+    private assertLive(): void {
+      if (state.freedModels.has(this)) throw new Error('null pointer passed to rust')
+    }
 
     setUserInput(_sheet: SheetIndex, row: RowIndex, column: ColumnIndex, input: string): void {
+      this.assertLive()
       this.cells.set(cellKey(row, column), input)
     }
 
     getCellContent(_sheet: SheetIndex, row: RowIndex, column: ColumnIndex): string {
+      this.assertLive()
       return this.cells.get(cellKey(row, column)) ?? ''
     }
 
     getRawCellContent(_sheet: SheetIndex, row: RowIndex, column: ColumnIndex): string {
+      this.assertLive()
       return this.cells.get(cellKey(row, column)) ?? ''
     }
 
@@ -669,6 +681,7 @@ export function resetSheetEditorTestState(): void {
   ironCalcMock.state.downMoves = 0
   ironCalcMock.state.editStarts = 0
   ironCalcMock.state.focusBeforeGuardOnRender = false
+  ironCalcMock.state.freedModels = new Set()
   ironCalcMock.state.insertedColumns = []
   ironCalcMock.state.insertedRows = []
   ironCalcMock.state.lastModel = null
