@@ -199,6 +199,19 @@ describe('initSentry', () => {
     const messageOnlyEvent = {
       message: 'Error: Block with ID 15e8eb56-0947-4d4a-85c2-1611a864465a not found',
     }
+    const joinedStableEvent = {
+      exception: {
+        values: [{
+          type: 'Error',
+          value: [
+            'Error: Block with ID 669f337a-dee2-4d92-b5cb-9a4e9828ecf9 not found',
+            'Block with ID 669f337a-dee2-4d92-b5cb-9a4e9828ecf9 not found',
+            'fIt(tauri://localhost/assets/App-BmzAl58b.js)',
+            'Error: Block with ID 1dcc3557-09d6-4d0d-b513-4fb07b9f451f not found',
+          ].join(' | '),
+        }],
+      },
+    }
     const hintedEvent = {
       message: 'Script error.',
     }
@@ -213,6 +226,7 @@ describe('initSentry', () => {
 
     expect(beforeSend(staleBlockEvent)).toBeNull()
     expect(beforeSend(messageOnlyEvent)).toBeNull()
+    expect(beforeSend(joinedStableEvent)).toBeNull()
     expect(beforeSend(hintedEvent, {
       originalException: new Error('Block with ID 15e8eb56-0947-4d4a-85c2-1611a864465a not found'),
     })).toBeNull()
