@@ -49,6 +49,16 @@ describe('anchoredDropdown', () => {
     expect(position).toEqual({ left: 130, top: 104, maxHeight: 280 })
   })
 
+  it('normalizes anchor and viewport coordinates while the app is zoomed', () => {
+    const position = resolveAnchoredDropdownPosition(
+      makeRect({ left: 1170, right: 1261, top: 650, bottom: 681.2 }),
+      { width: 208, offset: 4, viewportPadding: 8 },
+      { width: 1600, height: 900, zoom: 1.3 },
+    )
+
+    expect(position).toEqual({ left: 762, top: 528 })
+  })
+
   it('opens above the anchor and clamps horizontally when there is not enough room below', () => {
     const position = resolveAnchoredDropdownPosition(
       makeRect({ left: 650, right: 820, top: 580, bottom: 604 }),

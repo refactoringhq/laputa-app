@@ -22,6 +22,15 @@ function seedDateProperty(notePath: string, value: string): void {
   fs.writeFileSync(notePath, content.replace('Status: Active\n', `Status: Active\nDate: ${value}\n`))
 }
 
+async function setAppZoom(page: Page, percent: number): Promise<void> {
+  await page.evaluate((level) => {
+    document.documentElement.style.setProperty('zoom', `${level}%`)
+    document.documentElement.style.setProperty('--tolaria-overlay-zoom-factor', String(level / 100))
+    document.documentElement.style.setProperty('--tolaria-overlay-zoom-inverse', String(100 / level))
+    window.dispatchEvent(new Event('laputa-zoom-change'))
+  }, percent)
+}
+
 async function calendarDay(page: Page, year: number, monthIndex: number, day: number): Promise<Locator> {
   const dateLabel = await page.evaluate(
     ({ y, m, d }) => new Date(y, m, d).toLocaleDateString(),
@@ -65,11 +74,13 @@ test.describe('Frontmatter date picker', () => {
     seedDateProperty(notePath, '2026-04-29T00:00:00')
 
     await openAlphaProjectProperties(page)
+    await setAppZoom(page, 130)
 
     const dateRow = page.getByTestId('editable-property').filter({ hasText: 'Date' })
     await dateRow.getByTestId('date-display').click()
 
     await expect(page.getByTestId('date-picker-input')).toHaveValue('2026-04-29')
+    await expect(page.getByTestId('date-picker-popover')).toBeInViewport()
     const triggerBox = await dateRow.getByTestId('date-display').boundingBox()
     const popoverBox = await page.getByTestId('date-picker-popover').boundingBox()
     const rowBox = await dateRow.boundingBox()

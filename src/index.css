@@ -18,6 +18,17 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+[data-radix-popper-content-wrapper] {
+  zoom: var(--tolaria-overlay-zoom-inverse, 1);
+}
+
+[data-radix-popper-content-wrapper] > [data-slot="dropdown-menu-content"],
+[data-radix-popper-content-wrapper] > [data-slot="popover-content"],
+[data-radix-popper-content-wrapper] > [data-slot="select-content"],
+[data-radix-popper-content-wrapper] > [data-slot="tooltip-content"] {
+  zoom: var(--tolaria-overlay-zoom-factor, 1);
+}
+
 :root,
 [data-theme="light"] {
   color-scheme: light;
