@@ -2,12 +2,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FeedbackDialog } from './FeedbackDialog'
 import {
+  CIRCLECI_HOME_URL,
+  CODACY_HOME_URL,
+  CODESCENE_HOME_URL,
   REFACTORING_HOME_URL,
   TOLARIA_GITHUB_CONTRIBUTING_URL,
   TOLARIA_GITHUB_DISCUSSIONS_URL,
   TOLARIA_GITHUB_ISSUES_URL,
   TOLARIA_GITHUB_PULL_REQUESTS_URL,
   TOLARIA_PRODUCT_BOARD_URL,
+  UNBLOCKED_HOME_URL,
 } from '../constants/feedback'
 import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../hooks/appCommandDispatcher'
 import { rememberFeedbackDialogOpener } from '../lib/feedbackDialogOpener'
@@ -36,14 +40,18 @@ describe('FeedbackDialog', () => {
     expect(screen.getByTestId('feedback-dialog')).toBeInTheDocument()
     expect(screen.getByText('Contribute to Tolaria')).toBeInTheDocument()
     expect(screen.getByText('Pick the path that fits what you want to do! Any type of help is appreciated')).toBeInTheDocument()
-    expect(screen.getByText('Sponsor / Support')).toBeInTheDocument()
+    expect(screen.getByText('Newsletter')).toBeInTheDocument()
+    expect(screen.getByText('Sponsors')).toBeInTheDocument()
     expect(screen.getByText('Feature requests')).toBeInTheDocument()
     expect(screen.getByText('Discussions')).toBeInTheDocument()
     expect(screen.getByText('Contribute code')).toBeInTheDocument()
     expect(screen.getByText('Report a bug')).toBeInTheDocument()
-    expect(screen.getByText(/Luca here .* newsletter for 170K\+ engineers/i)).toBeInTheDocument()
-    expect(screen.getByText(/private community of 2000\+ engineers/i)).toBeInTheDocument()
-    expect(screen.getByText(/Tolaria is FOSS and always will be/i)).toBeInTheDocument()
+    expect(screen.getByText(/Refactoring is my newsletter and community/i)).toBeInTheDocument()
+    expect(screen.getByText(/Tolaria is supported by a panel of tools/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Codacy' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open CodeScene' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open CircleCI' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Unblocked' })).toBeInTheDocument()
     expect(screen.getByText('Search on the board first, upvote existing ideas, and create new posts when genuinely new!')).toBeInTheDocument()
     expect(screen.getByText('Use Discussions for questions, conversations, show & tell, and community context.')).toBeInTheDocument()
     expect(screen.getByText('Small, focused PRs are welcome. Check the board first so you build the right things!')).toBeInTheDocument()
@@ -73,6 +81,10 @@ describe('FeedbackDialog', () => {
     render(<FeedbackDialog open={true} onClose={onClose} buildNumber="b281" releaseChannel={null} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Check out Refactoring' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Codacy' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open CodeScene' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open CircleCI' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Unblocked' }))
     fireEvent.click(screen.getByRole('button', { name: 'Open Product Board' }))
     fireEvent.click(screen.getByRole('button', { name: 'Open Discussions' }))
     fireEvent.click(screen.getByRole('button', { name: 'Open Pull Requests' }))
@@ -80,11 +92,15 @@ describe('FeedbackDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open GitHub Issues' }))
 
     await waitFor(() => expect(openExternalUrl).toHaveBeenNthCalledWith(1, REFACTORING_HOME_URL))
-    expect(openExternalUrl).toHaveBeenNthCalledWith(2, TOLARIA_PRODUCT_BOARD_URL)
-    expect(openExternalUrl).toHaveBeenNthCalledWith(3, TOLARIA_GITHUB_DISCUSSIONS_URL)
-    expect(openExternalUrl).toHaveBeenNthCalledWith(4, TOLARIA_GITHUB_PULL_REQUESTS_URL)
-    expect(openExternalUrl).toHaveBeenNthCalledWith(5, TOLARIA_GITHUB_CONTRIBUTING_URL)
-    expect(openExternalUrl).toHaveBeenNthCalledWith(6, TOLARIA_GITHUB_ISSUES_URL)
+    expect(openExternalUrl).toHaveBeenNthCalledWith(2, CODACY_HOME_URL)
+    expect(openExternalUrl).toHaveBeenNthCalledWith(3, CODESCENE_HOME_URL)
+    expect(openExternalUrl).toHaveBeenNthCalledWith(4, CIRCLECI_HOME_URL)
+    expect(openExternalUrl).toHaveBeenNthCalledWith(5, UNBLOCKED_HOME_URL)
+    expect(openExternalUrl).toHaveBeenNthCalledWith(6, TOLARIA_PRODUCT_BOARD_URL)
+    expect(openExternalUrl).toHaveBeenNthCalledWith(7, TOLARIA_GITHUB_DISCUSSIONS_URL)
+    expect(openExternalUrl).toHaveBeenNthCalledWith(8, TOLARIA_GITHUB_PULL_REQUESTS_URL)
+    expect(openExternalUrl).toHaveBeenNthCalledWith(9, TOLARIA_GITHUB_CONTRIBUTING_URL)
+    expect(openExternalUrl).toHaveBeenNthCalledWith(10, TOLARIA_GITHUB_ISSUES_URL)
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByTestId('feedback-dialog')).toBeInTheDocument()
   })

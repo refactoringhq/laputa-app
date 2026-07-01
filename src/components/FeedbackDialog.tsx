@@ -1,5 +1,13 @@
-import { ArrowUpRight, Bug, Chats as MessagesSquare, Check, Copy, GitPullRequest, Lightbulb, Megaphone, Newspaper } from '@phosphor-icons/react'
+import { ArrowUpRight, Bug, Chats as MessagesSquare, Check, Copy, GitPullRequest, Handshake, Lightbulb, Megaphone, Newspaper } from '@phosphor-icons/react'
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import circleCiDarkLogo from '@/assets/sponsors/circleci-dark.svg'
+import circleCiLightLogo from '@/assets/sponsors/circleci-light.svg'
+import codacyDarkLogo from '@/assets/sponsors/codacy-dark.svg'
+import codacyLightLogo from '@/assets/sponsors/codacy-light.svg'
+import codeSceneDarkLogo from '@/assets/sponsors/codescene-dark.svg'
+import codeSceneLightLogo from '@/assets/sponsors/codescene-light.svg'
+import unblockedDarkLogo from '@/assets/sponsors/unblocked-dark.svg'
+import unblockedLightLogo from '@/assets/sponsors/unblocked-light.svg'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -17,12 +25,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  CIRCLECI_HOME_URL,
+  CODACY_HOME_URL,
+  CODESCENE_HOME_URL,
   REFACTORING_HOME_URL,
   TOLARIA_GITHUB_CONTRIBUTING_URL,
   TOLARIA_GITHUB_DISCUSSIONS_URL,
   TOLARIA_GITHUB_ISSUES_URL,
   TOLARIA_GITHUB_PULL_REQUESTS_URL,
   TOLARIA_PRODUCT_BOARD_URL,
+  UNBLOCKED_HOME_URL,
 } from '../constants/feedback'
 import {
   buildSanitizedDiagnosticBundle,
@@ -76,6 +88,13 @@ interface ContributionLink {
   url: string
 }
 
+interface SponsorLogo {
+  name: string
+  url: string
+  darkLogo: string
+  lightLogo: string
+}
+
 const EMPTY_DIALOG_OPENER: ReturnType<typeof takeFeedbackDialogOpener> = {
   element: null,
   reopenCommandPalette: false,
@@ -99,15 +118,42 @@ const CONTRIBUTION_BUTTON_CLASSES: Record<ContributionTone, string> = {
   red: 'border-[var(--accent-red)] hover:bg-[var(--accent-red-light)] [&_svg]:text-[var(--accent-red)]',
 }
 
-const SPONSOR_SUPPORT_PATH = {
-  titleKey: 'feedback.sponsor.title',
-  descriptionKey: 'feedback.sponsor.description',
-  ctaLabelKey: 'feedback.sponsor.cta',
-  labelKey: 'feedback.sponsor.linkLabel',
+const NEWSLETTER_PATH = {
+  titleKey: 'feedback.newsletter.title',
+  descriptionKey: 'feedback.newsletter.description',
+  ctaLabelKey: 'feedback.newsletter.cta',
+  labelKey: 'feedback.newsletter.linkLabel',
   url: REFACTORING_HOME_URL,
   icon: Newspaper,
   tone: 'blue',
 } satisfies ContributionPath
+
+const SPONSOR_LOGOS: SponsorLogo[] = [
+  {
+    name: 'Codacy',
+    url: CODACY_HOME_URL,
+    darkLogo: codacyDarkLogo,
+    lightLogo: codacyLightLogo,
+  },
+  {
+    name: 'CodeScene',
+    url: CODESCENE_HOME_URL,
+    darkLogo: codeSceneDarkLogo,
+    lightLogo: codeSceneLightLogo,
+  },
+  {
+    name: 'CircleCI',
+    url: CIRCLECI_HOME_URL,
+    darkLogo: circleCiDarkLogo,
+    lightLogo: circleCiLightLogo,
+  },
+  {
+    name: 'Unblocked',
+    url: UNBLOCKED_HOME_URL,
+    darkLogo: unblockedDarkLogo,
+    lightLogo: unblockedLightLogo,
+  },
+]
 
 const CONTRIBUTION_PATHS: ContributionPath[] = [
   {
@@ -202,6 +248,54 @@ function ContributionCard({
         <ContributionLinkButton label={ctaLabel} tone={tone} autoFocus={autoFocus} onAction={onAction} />
       </CardContent>
       {secondaryAction ? <CardFooter className="px-4 pt-0">{secondaryAction}</CardFooter> : null}
+    </Card>
+  )
+}
+
+function SponsorLogoCard({
+  onOpenLink,
+  t,
+}: {
+  onOpenLink: (label: string, url: string) => void
+  t: Translate
+}) {
+  return (
+    <Card className="gap-4 border-border/70 py-4 shadow-none">
+      <CardHeader className="gap-3 px-4">
+        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <span className={cn('rounded-md p-2', CONTRIBUTION_TONE_CLASSES.blue)}>
+            <Handshake size={16} />
+          </span>
+          <CardTitle className="text-sm font-semibold">{t('feedback.sponsors.title')}</CardTitle>
+        </div>
+        <CardDescription className="text-sm leading-6 text-muted-foreground">
+          {t('feedback.sponsors.description')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid grid-cols-2 gap-2 px-4">
+        {SPONSOR_LOGOS.map((sponsor) => (
+          <Button
+            key={sponsor.name}
+            type="button"
+            variant="outline"
+            className={cn(
+              'h-11 bg-background px-2 text-foreground hover:text-foreground',
+              CONTRIBUTION_BUTTON_CLASSES.blue,
+            )}
+            aria-label={t('feedback.sponsors.logoLinkLabel', { sponsor: sponsor.name })}
+            title={sponsor.name}
+            onClick={() => onOpenLink(sponsor.name, sponsor.url)}
+          >
+            <img className="max-h-5 max-w-28 object-contain dark:hidden" src={sponsor.darkLogo} alt="" />
+            <img
+              className="hidden max-h-5 max-w-28 object-contain dark:block"
+              src={sponsor.lightLogo}
+              alt=""
+              aria-hidden="true"
+            />
+          </Button>
+        ))}
+      </CardContent>
     </Card>
   )
 }
@@ -357,17 +451,16 @@ function ContributionGrid({
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="sm:col-span-2">
-        <ContributionCard
-          title={t(SPONSOR_SUPPORT_PATH.titleKey)}
-          description={t(SPONSOR_SUPPORT_PATH.descriptionKey)}
-          ctaLabel={t(SPONSOR_SUPPORT_PATH.ctaLabelKey)}
-          icon={SPONSOR_SUPPORT_PATH.icon}
-          tone={SPONSOR_SUPPORT_PATH.tone}
-          autoFocus={true}
-          onAction={() => onOpenLink(t(SPONSOR_SUPPORT_PATH.labelKey), SPONSOR_SUPPORT_PATH.url)}
-        />
-      </div>
+      <ContributionCard
+        title={t(NEWSLETTER_PATH.titleKey)}
+        description={t(NEWSLETTER_PATH.descriptionKey)}
+        ctaLabel={t(NEWSLETTER_PATH.ctaLabelKey)}
+        icon={NEWSLETTER_PATH.icon}
+        tone={NEWSLETTER_PATH.tone}
+        autoFocus={true}
+        onAction={() => onOpenLink(t(NEWSLETTER_PATH.labelKey), NEWSLETTER_PATH.url)}
+      />
+      <SponsorLogoCard onOpenLink={onOpenLink} t={t} />
       {CONTRIBUTION_PATHS.map((path) => {
         const secondaryLink = path.secondaryLink
 

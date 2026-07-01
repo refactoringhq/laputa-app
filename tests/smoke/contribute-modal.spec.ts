@@ -45,6 +45,26 @@ test.describe('Contribute modal', () => {
     await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://refactoring.fm/')
 
     await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'Open Codacy' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://www.codacy.com/')
+
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'Open CodeScene' })).toBeFocused()
+    await page.keyboard.press('Space')
+    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://codescene.com/')
+
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'Open CircleCI' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://circleci.com/')
+
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'Open Unblocked' })).toBeFocused()
+    await page.keyboard.press('Space')
+    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://getunblocked.com/')
+
+    await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Open Product Board' })).toBeFocused()
     await page.keyboard.press('Enter')
     await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://tolaria.canny.io/')
