@@ -8,7 +8,7 @@ export interface ActionTooltipCopy {
   shortcut?: string
 }
 
-interface ActionTooltipProps {
+export interface ActionTooltipProps {
   copy: ActionTooltipCopy
   children: ReactNode
   className?: string
@@ -16,6 +16,8 @@ interface ActionTooltipProps {
   side?: ComponentProps<typeof TooltipContent>['side']
   align?: ComponentProps<typeof TooltipContent>['align']
   sideOffset?: number
+  open?: ComponentProps<typeof Tooltip>['open']
+  onOpenChange?: ComponentProps<typeof Tooltip>['onOpenChange']
 }
 
 interface ActionTooltipBoundaryProps {
@@ -51,10 +53,12 @@ export function ActionTooltip({
   side = 'top',
   align = 'center',
   sideOffset = 6,
+  open,
+  onOpenChange,
 }: ActionTooltipProps) {
   return (
     <ActionTooltipBoundary fallback={children}>
-      <Tooltip>
+      <Tooltip open={open} onOpenChange={onOpenChange}>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent
           side={side}
