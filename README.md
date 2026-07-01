@@ -19,6 +19,47 @@ You can find some Loom walkthroughs below — they are short and to the point:
 - [My Inbox Workflow](https://www.loom.com/share/dffda263317b4fa8b47b59cdf9330571)
 - [How I Save Web Resources to Tolaria](https://www.loom.com/share/8a3c1776f801402ebbf4d7b0f31e9882)
 
+## Sponsors
+
+Tolaria is supported by a small panel of engineering tools that help keep the project healthy, tested, and ready for AI-assisted development.
+
+<table>
+  <tr>
+    <td align="center" width="25%">
+      <a href="https://www.codacy.com/">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codacy-light.svg">
+          <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codacy-dark.svg" alt="Codacy" height="32">
+        </picture>
+      </a>
+    </td>
+    <td align="center" width="25%">
+      <a href="https://codescene.com/">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codescene-light.svg">
+          <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codescene-dark.svg" alt="CodeScene" height="32">
+        </picture>
+      </a>
+    </td>
+    <td align="center" width="25%">
+      <a href="https://circleci.com/">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/circleci-light.svg">
+          <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/circleci-dark.svg" alt="CircleCI" height="32">
+        </picture>
+      </a>
+    </td>
+    <td align="center" width="25%">
+      <a href="https://getunblocked.com/">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/unblocked-light.svg">
+          <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/unblocked-dark.svg" alt="Unblocked" height="32">
+        </picture>
+      </a>
+    </td>
+  </tr>
+</table>
+
 ## Principles
 
 - 📑 **Files-first** — Your notes are plain markdown files. They're portable, work with any editor, and require no export step. Your data belongs to you, not to any app.
