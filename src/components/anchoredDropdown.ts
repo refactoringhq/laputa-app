@@ -17,6 +17,7 @@ export interface AnchoredDropdownPosition {
 export interface AnchoredDropdownViewport {
   width: number
   height: number
+  zoom?: number
 }
 
 export interface AnchoredDropdownOptions {
@@ -43,9 +44,51 @@ export function getAnchoredDropdownLeft(
 }
 
 function getViewport(): AnchoredDropdownViewport {
+  const zoom = getRootZoom()
   return {
     width: window.innerWidth || document.documentElement.clientWidth,
     height: window.innerHeight || document.documentElement.clientHeight,
+    zoom,
+  }
+}
+
+function parseZoomValue(source: string | undefined): number | null {
+  if (!source || source === 'normal') return null
+  const value = source.endsWith('%')
+    ? Number.parseFloat(source) / 100
+    : Number.parseFloat(source)
+  return Number.isFinite(value) && value > 0 ? value : null
+}
+
+function getRootZoom(): number {
+  const style = getComputedStyle(document.documentElement)
+  const overlayZoom = parseZoomValue(style.getPropertyValue('--tolaria-overlay-zoom-factor').trim())
+  if (overlayZoom !== null) return overlayZoom
+  return parseZoomValue(style.getPropertyValue('zoom')) ??
+    parseZoomValue(document.documentElement.style.getPropertyValue('zoom')) ??
+    1
+}
+
+function zoomAdjustedViewport({ height, width, zoom = 1 }: AnchoredDropdownViewport): AnchoredDropdownViewport {
+  return { height: height / zoom, width: width / zoom }
+}
+
+function zoomAdjustedAnchorRect(rect: DOMRectReadOnly, zoom = 1): DOMRectReadOnly {
+  if (zoom === 1) return rect
+  const left = rect.left / zoom
+  const right = rect.right / zoom
+  const top = rect.top / zoom
+  const bottom = rect.bottom / zoom
+  return {
+    bottom,
+    height: bottom - top,
+    left,
+    right,
+    top,
+    width: right - left,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
   }
 }
 
@@ -60,26 +103,29 @@ export function resolveAnchoredDropdownPosition(
   }: AnchoredDropdownOptions,
   viewport = getViewport(),
 ): AnchoredDropdownPosition {
-  const left = getAnchoredDropdownLeft(anchorRect.right, width, viewport.width, viewportPadding)
-  const belowTop = anchorRect.bottom + offset
+  const zoom = viewport.zoom ?? 1
+  const adjustedRect = zoomAdjustedAnchorRect(anchorRect, zoom)
+  const adjustedViewport = zoomAdjustedViewport(viewport)
+  const left = getAnchoredDropdownLeft(adjustedRect.right, width, adjustedViewport.width, viewportPadding)
+  const belowTop = adjustedRect.bottom + offset
 
   if (maxHeight === undefined) {
-    const maxTop = Math.max(viewportPadding, viewport.height - viewportPadding)
+    const maxTop = Math.max(viewportPadding, adjustedViewport.height - viewportPadding)
     return { left, top: Math.min(Math.max(viewportPadding, belowTop), maxTop) }
   }
 
-  const availableBelow = viewport.height - belowTop - viewportPadding
-  const availableAbove = anchorRect.top - viewportPadding - offset
+  const availableBelow = adjustedViewport.height - belowTop - viewportPadding
+  const availableAbove = adjustedRect.top - viewportPadding - offset
   const openAbove = minHeight !== undefined && availableBelow < minHeight && availableAbove > availableBelow
   const availableHeight = openAbove ? availableAbove : availableBelow
   const viewportBoundedMinHeight = Math.min(
     minHeight ?? 0,
-    Math.max(0, viewport.height - (viewportPadding * 2)),
+    Math.max(0, adjustedViewport.height - (viewportPadding * 2)),
   )
   const resolvedMaxHeight = Math.max(viewportBoundedMinHeight, Math.min(maxHeight, availableHeight))
   const top = openAbove
-    ? Math.max(viewportPadding, anchorRect.top - offset - resolvedMaxHeight)
-    : Math.min(belowTop, viewport.height - viewportPadding - resolvedMaxHeight)
+    ? Math.max(viewportPadding, adjustedRect.top - offset - resolvedMaxHeight)
+    : Math.min(belowTop, adjustedViewport.height - viewportPadding - resolvedMaxHeight)
 
   return { left, top, maxHeight: resolvedMaxHeight }
 }
