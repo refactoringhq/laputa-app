@@ -275,6 +275,7 @@ describe('App note windows', () => {
     const getAiAgentsStatus = vi.fn(() => ({
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
+      copilot: { installed: true, version: '1.0.58' },
       opencode: { installed: true, version: '0.7.4' },
       pi: { installed: false, version: null },
       antigravity: { installed: true, version: '0.3.2' },
