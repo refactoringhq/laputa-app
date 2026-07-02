@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { CommitDialog } from './CommitDialog'
 import { formatShortcutDisplay } from '../hooks/appCommandCatalog'
 
@@ -103,6 +103,67 @@ describe('CommitDialog', () => {
     fireEvent.change(textarea, { target: { value: 'fix: corrected typo in alpha' } })
     fireEvent.click(getActionButton())
     expect(onCommit).toHaveBeenCalledWith('fix: corrected typo in alpha')
+  })
+
+  it('generates a message into the editable field and focuses it', async () => {
+    const onGenerateMessage = vi.fn().mockResolvedValue('Update generated draft')
+    render(
+      <CommitDialog
+        open={true}
+        modifiedCount={3}
+        onGenerateMessage={onGenerateMessage}
+        onCommit={onCommit}
+        onClose={onClose}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate commit message from diff' }))
+    const textarea = screen.getByPlaceholderText('Commit message...')
+
+    await waitFor(() => expect(textarea).toHaveValue('Update generated draft'))
+    await waitFor(() => expect(textarea).toHaveFocus())
+    fireEvent.change(textarea, { target: { value: 'Update edited draft' } })
+    fireEvent.click(getActionButton())
+
+    expect(onGenerateMessage).toHaveBeenCalledTimes(1)
+    expect(onCommit).toHaveBeenCalledWith('Update edited draft')
+  })
+
+  it('applies a generated message from command-palette state updates', async () => {
+    const { rerender } = render(
+      <CommitDialog open={true} modifiedCount={3} onCommit={onCommit} onClose={onClose} />,
+    )
+    const textarea = screen.getByPlaceholderText('Commit message...')
+
+    rerender(
+      <CommitDialog
+        open={true}
+        modifiedCount={3}
+        generatedMessage="Update from command palette"
+        generatedMessageKey={1}
+        onCommit={onCommit}
+        onClose={onClose}
+      />,
+    )
+
+    await waitFor(() => expect(textarea).toHaveValue('Update from command palette'))
+    await waitFor(() => expect(textarea).toHaveFocus())
+  })
+
+  it('disables generation while a message is being drafted', () => {
+    render(
+      <CommitDialog
+        open={true}
+        modifiedCount={3}
+        isGeneratingMessage={true}
+        onGenerateMessage={vi.fn()}
+        onCommit={onCommit}
+        onClose={onClose}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Generate commit message from diff' })).toBeDisabled()
+    expect(screen.getByText('Generating…')).toBeInTheDocument()
   })
 
   it('switches to local-only copy when commitMode is local', () => {

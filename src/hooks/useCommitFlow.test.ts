@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useCommitFlow } from './useCommitFlow'
+import type { ModifiedFile } from '../types'
 
 const mockInvokeFn = vi.fn()
 const mockTrackEvent = vi.fn()
@@ -37,6 +38,10 @@ const testAuthorIdentity = {
   email: 'test@example.com',
   source: 'global',
   warning: null,
+}
+
+function modifiedFile(relativePath: string, status: ModifiedFile['status'] = 'modified'): ModifiedFile {
+  return { path: `/vault/${relativePath}`, relativePath, status }
 }
 
 describe('useCommitFlow', () => {
@@ -245,6 +250,63 @@ describe('useCommitFlow', () => {
     expect(resolveRemoteStatusForVaultPath).toHaveBeenCalledTimes(2)
     expect(mockTrackEvent).toHaveBeenCalledWith('commit_made', undefined)
     expect(result.current.showCommitDialog).toBe(false)
+  })
+
+  it('generateCommitMessageForDialog prefills an editable draft without committing', async () => {
+    loadModifiedFilesForVaultPath.mockResolvedValueOnce([
+      modifiedFile('docs/a.md'),
+      modifiedFile('docs/b.md'),
+      modifiedFile('docs/c.md'),
+      modifiedFile('docs/d.md'),
+    ])
+    const { result } = renderCommitFlow({ aiFeaturesEnabled: false })
+    let draft = ''
+
+    await act(async () => {
+      draft = await result.current.generateCommitMessageForDialog()
+    })
+
+    expect(draft).toBe('Update 4 notes in docs')
+    expect(savePending).toHaveBeenCalledTimes(1)
+    expect(loadModifiedFilesForVaultPath).toHaveBeenCalledWith('/vault', { includeStats: true })
+    expect(result.current.generatedCommitMessage).toBe('Update 4 notes in docs')
+    expect(result.current.generatedCommitMessageKey).toBe(1)
+    expect(result.current.isGeneratingCommitMessage).toBe(false)
+    expect(setToastMessage).toHaveBeenCalledWith('Drafted commit message from changed files')
+    expect(mockTrackEvent).toHaveBeenCalledWith('commit_message_generated', {
+      ai_attempted: 0,
+      file_count: 4,
+      source: 'fallback',
+    })
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('git_commit', expect.anything())
+  })
+
+  it('openCommitDialogWithGeneratedMessage opens the dialog and inserts a draft', async () => {
+    const { result } = renderCommitFlow({ aiFeaturesEnabled: false })
+
+    await act(async () => {
+      await result.current.openCommitDialogWithGeneratedMessage()
+    })
+
+    expect(result.current.showCommitDialog).toBe(true)
+    expect(result.current.generatedCommitMessage).toBe('Update a')
+    expect(result.current.generatedCommitMessageKey).toBe(1)
+    expect(loadModifiedFiles).toHaveBeenCalledTimes(1)
+    expect(loadModifiedFilesForVaultPath).toHaveBeenCalledWith('/vault', { includeStats: true })
+  })
+
+  it('generateCommitMessageForDialog reports when there are no changed files', async () => {
+    loadModifiedFilesForVaultPath.mockResolvedValueOnce([])
+    const { result } = renderCommitFlow()
+
+    await act(async () => {
+      await result.current.generateCommitMessageForDialog()
+    })
+
+    expect(result.current.generatedCommitMessage).toBe('')
+    expect(result.current.generatedCommitMessageKey).toBe(0)
+    expect(setToastMessage).toHaveBeenCalledWith('No changed files to summarize')
+    expect(mockTrackEvent).not.toHaveBeenCalled()
   })
 
   it('runAutomaticCheckpoint saves pending first and uses the deterministic automatic message', async () => {
