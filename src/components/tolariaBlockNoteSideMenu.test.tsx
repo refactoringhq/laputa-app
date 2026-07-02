@@ -69,6 +69,20 @@ let mockSideMenu: {
 let mockSuggestionMenu: { openSuggestionMenu: ReturnType<typeof vi.fn> }
 let sideMenuBlock: MockBlock | undefined
 const originalElementsFromPoint = document.elementsFromPoint
+const turnIntoButtonLabels = [
+  'Turn into Paragraph',
+  'Turn into Heading 1',
+  'Turn into Heading 2',
+  'Turn into Heading 3',
+  'Turn into Heading 4',
+  'Turn into Heading 5',
+  'Turn into Heading 6',
+  'Turn into Quote',
+  'Turn into Bullet List',
+  'Turn into Numbered List',
+  'Turn into Checklist',
+  'Turn into Code Block',
+]
 
 beforeAll(() => {
   if (typeof globalThis.PointerEvent !== 'undefined') return
@@ -166,13 +180,12 @@ vi.mock('@blocknote/react', () => ({
           <button type="button" onClick={onClick}>{children}</button>
         ),
         Root: ({ children, onOpenChange }: PropsWithChildren<{ onOpenChange?: (open: boolean) => void }>) => (
-          <button
-            type="button"
+          <div
             data-testid="menu-root"
             onClick={() => onOpenChange?.(true)}
           >
             {children}
-          </button>
+          </div>
         ),
         Trigger: ({ children }: PropsWithChildren) => <div>{children}</div>,
       },
@@ -430,6 +443,7 @@ describe('TolariaSideMenu', () => {
 
     expect(sideMenuButtons.map((button) => button.textContent)).toEqual([
       'Drag block',
+      ...turnIntoButtonLabels,
       'Add block',
     ])
 
@@ -510,6 +524,33 @@ describe('TolariaSideMenu', () => {
     expect(mockEditor.updateBlock).toHaveBeenCalledWith(liveTable.id, {
       content: { ...liveTable.content, headerRows: 1 },
     })
+  })
+
+  it('turns a live side-menu block into another markdown-safe block type', () => {
+    const liveBlock = {
+      id: 'paragraph-block',
+      type: 'paragraph',
+      content: ['Existing text'],
+      props: {},
+      children: [],
+    }
+    mockEditor.getBlock.mockReturnValue(liveBlock)
+
+    renderSideMenuWithBlock(liveBlock)
+    fireEvent.click(screen.getByRole('button', { name: 'Turn into Heading 2' }))
+
+    expect(mockEditor.focus).toHaveBeenCalledOnce()
+    expect(mockEditor.updateBlock).toHaveBeenCalledWith(liveBlock.id, {
+      type: 'heading',
+      props: { level: 2 },
+    })
+  })
+
+  it('ignores turn-into clicks when reload churn leaves a stale side-menu block', () => {
+    renderSideMenuWithBlock(sideMenuBlock)
+
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'Turn into Heading 2' }))).not.toThrow()
+    expect(mockEditor.updateBlock).not.toHaveBeenCalled()
   })
 
   it('hides table header actions when the live block lookup throws after reload churn', () => {
@@ -636,6 +677,7 @@ describe('TolariaSideMenu', () => {
 
     expect(sideMenuButtons.map((button) => button.textContent)).toEqual([
       'Drag block',
+      ...turnIntoButtonLabels,
       'Collapse section',
     ])
   })
@@ -678,6 +720,7 @@ describe('TolariaSideMenu', () => {
 
     expect(sideMenuButtons.map((button) => button.textContent)).toEqual([
       'Drag block',
+      ...turnIntoButtonLabels,
       'Collapse item',
     ])
   })
