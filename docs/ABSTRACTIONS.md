@@ -529,6 +529,9 @@ interface ModifiedFile {
   path: string          // Absolute path
   relativePath: string  // Relative to vault root
   status: 'modified' | 'added' | 'deleted' | 'untracked' | 'renamed'
+  addedLines?: number | null
+  deletedLines?: number | null
+  binary?: boolean
 }
 
 interface GitRemoteStatus {
@@ -597,6 +600,7 @@ External vault mutations are any disk writes Tolaria did not just perform throug
 `useGitRepositories` is the commit-time companion to `useAutoSync`:
 - Owns repository picker validation plus `get_modified_files` and `git_remote_status` loading for active Git repositories
 - Re-checks the selected repository when the Commit dialog opens and right before submit
+- Reloads the selected repository with line stats when the user asks to generate a commit-message draft
 - Converts `hasRemote: false` into a local-only commit path
 - Keeps the normal push path unchanged for repositories that do have a remote
 
@@ -616,7 +620,8 @@ External vault mutations are any disk writes Tolaria did not just perform throug
 - **Modified file badges**: Orange dots in sidebar
 - **Diff view**: Toggle in breadcrumb bar → shows unified diff
 - **Git history**: Shown in Inspector panel for active note
-- **Commit dialog**: Triggered from sidebar or Cmd+K
+- **Commit dialog**: Triggered from sidebar or Cmd+K; can prefill an editable generated message from current changed-file metadata before any commit runs
+- **Generate commit message command**: Cmd+K action that opens the commit dialog, reloads the selected repository with line stats, and fills the message field. Direct configured model targets receive only structured path/status/line-count metadata with a bounded path list; disabled AI, offline AI, agent targets, or model failures use a deterministic changed-file summary instead.
 - **Branch indicator**: Current Git branch chip in the bottom bar for Git-backed vaults
 - **No remote indicator**: Neutral chip in the bottom bar when `GitRemoteStatus.hasRemote === false`
 - **Pulse view**: Activity feed when Pulse filter is selected

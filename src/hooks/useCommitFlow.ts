@@ -1,10 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { GitAuthorIdentity, GitPushResult, GitRemoteStatus, ModifiedFile } from '../types'
 import { trackEvent } from '../lib/telemetry'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { generateAutomaticCommitMessage } from '../utils/automaticCommitMessage'
 import { createTranslator, type AppLocale } from '../lib/i18n'
+import type { AiTarget } from '../lib/aiTargets'
+import { trackCommitMessageGenerated } from '../lib/productAnalytics'
+import { generateCommitMessageDraft } from '../utils/commitMessageDraft'
 
 export type CommitMode = 'push' | 'local'
 
@@ -20,10 +32,17 @@ interface AutomaticCheckpointOptions {
   savePendingBeforeCommit?: boolean
 }
 
+interface LoadModifiedFilesOptions {
+  includeStats?: boolean
+}
+
 interface CommitFlowConfig {
+  aiFeaturesEnabled?: boolean
+  commitMessageTarget?: AiTarget
+  commitMessageTargetReady?: boolean
   savePending: () => Promise<void | boolean>
   loadModifiedFiles: () => Promise<void>
-  loadModifiedFilesForVaultPath: (vaultPath: string) => Promise<ModifiedFile[]>
+  loadModifiedFilesForVaultPath: (vaultPath: string, options?: LoadModifiedFilesOptions) => Promise<ModifiedFile[]>
   resolveRemoteStatusForVaultPath: (vaultPath: string) => Promise<GitRemoteStatus | null>
   setToastMessage: (msg: string | null) => void
   onPushRejected?: () => void
@@ -73,6 +92,27 @@ interface RepositoryCheckpointResult {
   result?: CommitResult
   status: 'executed' | 'failed' | 'skipped'
   vaultPath: string
+}
+
+interface CommitMessageDraftSetters {
+  setGeneratedCommitMessage: (message: string) => void
+  setGeneratedCommitMessageKey: Dispatch<SetStateAction<number>>
+  setGeneratingCommitMessage: (generating: boolean) => void
+}
+
+interface CommitMessageDraftActionConfig extends Pick<
+  CommitFlowConfig,
+  | 'aiFeaturesEnabled'
+  | 'commitMessageTarget'
+  | 'commitMessageTargetReady'
+  | 'loadModifiedFilesForVaultPath'
+  | 'manualVaultPath'
+  | 'savePending'
+  | 'setToastMessage'
+  | 'vaultPath'
+>, CommitMessageDraftSetters {
+  commitMessageGenerationRef: MutableRefObject<boolean>
+  t: Translator
 }
 
 type AutomaticCheckpointRunConfig = Pick<
@@ -537,6 +577,118 @@ function useManualCommitPushAction({
   ])
 }
 
+function draftToastKey(source: 'ai_model' | 'fallback') {
+  return source === 'ai_model'
+    ? 'git.commitMessage.generatedAi'
+    : 'git.commitMessage.generatedFallback'
+}
+
+async function runCommitMessageDraftAction({
+  aiFeaturesEnabled,
+  commitMessageGenerationRef,
+  commitMessageTarget,
+  commitMessageTargetReady,
+  loadModifiedFilesForVaultPath,
+  manualVaultPath,
+  savePending,
+  setGeneratedCommitMessage,
+  setGeneratedCommitMessageKey,
+  setGeneratingCommitMessage,
+  setToastMessage,
+  t,
+  vaultPath,
+}: CommitMessageDraftActionConfig): Promise<string> {
+  if (commitMessageGenerationRef.current) return ''
+  commitMessageGenerationRef.current = true
+  setGeneratingCommitMessage(true)
+
+  try {
+    await savePending()
+    const targetVaultPath = manualVaultPath || vaultPath
+    const files = await loadModifiedFilesForVaultPath(targetVaultPath, { includeStats: true })
+    if (files.length === 0) {
+      setToastMessage(t('git.commitMessage.noChanges'))
+      return ''
+    }
+
+    const result = await generateCommitMessageDraft({
+      aiFeaturesEnabled,
+      files,
+      target: commitMessageTarget,
+      targetReady: commitMessageTargetReady,
+    })
+    if (!result.message) {
+      setToastMessage(t('git.commitMessage.noChanges'))
+      return ''
+    }
+
+    setGeneratedCommitMessage(result.message)
+    setGeneratedCommitMessageKey((key) => key + 1)
+    trackCommitMessageGenerated({
+      aiAttempted: result.aiAttempted,
+      fileCount: result.fileCount,
+      source: result.source,
+    })
+    setToastMessage(t(draftToastKey(result.source)))
+    return result.message
+  } catch (err) {
+    console.error('Commit message generation failed:', err)
+    setToastMessage(t('git.commitMessage.failed'))
+    return ''
+  } finally {
+    commitMessageGenerationRef.current = false
+    setGeneratingCommitMessage(false)
+  }
+}
+
+function useCommitMessageDraftAction(config: CommitMessageDraftActionConfig) {
+  const {
+    aiFeaturesEnabled,
+    commitMessageGenerationRef,
+    commitMessageTarget,
+    commitMessageTargetReady,
+    loadModifiedFilesForVaultPath,
+    manualVaultPath,
+    savePending,
+    setGeneratedCommitMessage,
+    setGeneratedCommitMessageKey,
+    setGeneratingCommitMessage,
+    setToastMessage,
+    t,
+    vaultPath,
+  } = config
+
+  return useCallback(() => runCommitMessageDraftAction({
+    aiFeaturesEnabled,
+    commitMessageGenerationRef,
+    commitMessageTarget,
+    commitMessageTargetReady,
+    loadModifiedFilesForVaultPath,
+    manualVaultPath,
+    savePending,
+    setGeneratedCommitMessage,
+    setGeneratedCommitMessageKey,
+    setGeneratingCommitMessage,
+    setToastMessage,
+    t,
+    vaultPath,
+  }), [
+    aiFeaturesEnabled,
+    commitMessageGenerationRef,
+    commitMessageTarget,
+    commitMessageTargetReady,
+    loadModifiedFilesForVaultPath,
+    manualVaultPath,
+    savePending,
+    setGeneratedCommitMessage,
+    setGeneratedCommitMessageKey,
+    setGeneratingCommitMessage,
+    setToastMessage,
+    t,
+    vaultPath,
+  ])
+}
+
 function useCommitModeRefresh({
   commitModeVaultPathRef,
   loadAuthorIdentityForVaultPath,
@@ -650,6 +802,9 @@ function useOpenCommitDialog({
 
 /** Manages the commit dialog state and the save→commit→push/local flow. */
 export function useCommitFlow({
+  aiFeaturesEnabled,
+  commitMessageTarget,
+  commitMessageTargetReady,
   savePending,
   loadModifiedFiles,
   loadModifiedFilesForVaultPath,
@@ -665,8 +820,12 @@ export function useCommitFlow({
   const [commitMode, setCommitMode] = useState<CommitMode>('push')
   const [authorIdentity, setAuthorIdentity] = useState<GitAuthorIdentity | null>(null)
   const [isOpeningCommitDialog, setOpeningCommitDialog] = useState(false)
+  const [generatedCommitMessage, setGeneratedCommitMessage] = useState('')
+  const [generatedCommitMessageKey, setGeneratedCommitMessageKey] = useState(0)
+  const [isGeneratingCommitMessage, setGeneratingCommitMessage] = useState(false)
   const checkpointInFlightRef = useRef(false)
   const dialogOpeningRef = useRef(false)
+  const commitMessageGenerationRef = useRef(false)
   const commitModeVaultPathRef = useRef<string | null>(null)
   const authorIdentityCacheRef = useRef(new Map<string, GitAuthorIdentity>())
   const authorIdentityInFlightRef = useRef(new Map<string, Promise<GitAuthorIdentity>>())
@@ -731,6 +890,28 @@ export function useCommitFlow({
     setShowCommitDialog,
     t,
   })
+
+  const generateCommitMessageForDialog = useCommitMessageDraftAction({
+    aiFeaturesEnabled,
+    commitMessageGenerationRef,
+    commitMessageTarget,
+    commitMessageTargetReady,
+    loadModifiedFilesForVaultPath,
+    manualVaultPath,
+    savePending,
+    setGeneratedCommitMessage,
+    setGeneratedCommitMessageKey,
+    setGeneratingCommitMessage,
+    setToastMessage,
+    t,
+    vaultPath,
+  })
+
+  const openCommitDialogWithGeneratedMessage = useCallback(async () => {
+    await openCommitDialog()
+    await generateCommitMessageForDialog()
+  }, [generateCommitMessageForDialog, openCommitDialog])
+
   useCommitModeRefresh({
     commitModeVaultPathRef,
     loadAuthorIdentityForVaultPath,
@@ -748,7 +929,12 @@ export function useCommitFlow({
     commitMode,
     authorIdentity,
     isOpeningCommitDialog,
+    generatedCommitMessage,
+    generatedCommitMessageKey,
+    isGeneratingCommitMessage,
     openCommitDialog,
+    openCommitDialogWithGeneratedMessage,
+    generateCommitMessageForDialog,
     handleCommitPush,
     closeCommitDialog,
     runAutomaticCheckpoint,

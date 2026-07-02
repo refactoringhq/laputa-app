@@ -95,6 +95,7 @@ interface CommandRegistryConfig {
   onArchiveNote: (path: string) => void
   onUnarchiveNote: (path: string) => void
   onCommitPush: () => void
+  onGenerateCommitMessage?: () => void
   onPull?: () => void
   onPullRepository?: (path: string) => void
   onResolveConflicts?: () => void
@@ -155,7 +156,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     onQuickOpen, onCreateNote, onCreateNoteOfType, onSave, onUndo, onRedo, canUndo, canRedo, undoLabel, redoLabel,
     onPastePlainText, onOpenSettings, onOpenFeedback,
     onDeleteNote, onArchiveNote, onUnarchiveNote,
-    onCommitPush, onPull, onResolveConflicts, onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor, onFindInNote, onReplaceInNote,
+    onCommitPush, onGenerateCommitMessage, onPull, onResolveConflicts, onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor, onFindInNote, onReplaceInNote,
     noteWidth, defaultNoteWidth, onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, onToggleTableOfContents, onOpenVault, onCreateEmptyVault,
     selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown, canMoveSelectedViewUp, canMoveSelectedViewDown,
     activeNoteModified,
@@ -249,6 +250,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     canAddRemote: config.canAddRemote ?? false,
     onAddRemote: config.onAddRemote,
     onCommitPush,
+    onGenerateCommitMessage,
     onInitializeGit,
     onPull,
     onPullRepository,
@@ -256,7 +258,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     onSelect,
   }), [
     modifiedCount, gitFeaturesEnabled, isGitVault, gitRepositories, config.canAddRemote, config.onAddRemote,
-    onCommitPush, onInitializeGit, onPull, onPullRepository, onResolveConflicts, onSelect,
+    onCommitPush, onGenerateCommitMessage, onInitializeGit, onPull, onPullRepository, onResolveConflicts, onSelect,
   ])
 
   const viewCommands = useMemo(() => buildViewCommands({

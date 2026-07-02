@@ -5,6 +5,7 @@ import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import type { DateDisplayFormat } from '../utils/dateDisplay'
 import type { FilePreviewKind } from '../utils/filePreview'
 import type { NoteWidthMode } from '../types'
+import type { CommitMessageDraftSource } from '../utils/commitMessageDraft'
 import type { ThemeMode } from './themeMode'
 
 type TrackedPreviewKind = FilePreviewKind | 'unsupported'
@@ -99,6 +100,18 @@ export function trackAiFeaturesEnabledChanged(enabled: AnalyticsBoolean): void {
 export function trackGitFeaturesEnabledChanged(enabled: AnalyticsBoolean): void {
   trackEvent('git_features_visibility_changed', {
     enabled: numericFlag(enabled),
+  })
+}
+
+export function trackCommitMessageGenerated(params: {
+  aiAttempted: AnalyticsBoolean
+  fileCount: number
+  source: CommitMessageDraftSource
+}): void {
+  trackEvent('commit_message_generated', {
+    ai_attempted: numericFlag(params.aiAttempted),
+    file_count: params.fileCount,
+    source: params.source,
   })
 }
 

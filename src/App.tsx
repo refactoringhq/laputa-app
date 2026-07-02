@@ -918,6 +918,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   })
 
   const commitFlow = useCommitFlow({
+    aiFeaturesEnabled,
+    commitMessageTarget: quickPromptTarget,
+    commitMessageTargetReady: quickPromptTargetReady,
     savePending: appSave.savePending,
     loadModifiedFiles: refreshGitModifiedFiles,
     loadModifiedFilesForVaultPath: loadModifiedFilesForRepository,
@@ -1452,6 +1455,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onDeleteNote: deleteActions.handleDeleteNote,
     onArchiveNote: entryActions.handleArchiveNote, onUnarchiveNote: entryActions.handleUnarchiveNote,
     onCommitPush: handleCommitPush,
+    onGenerateCommitMessage: commitFlow.openCommitDialogWithGeneratedMessage,
     gitRepositories,
     gitFeaturesEnabled,
     isGitVault,
@@ -1767,7 +1771,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           locale={appLocale}
           repositories={gitRepositories}
           selectedRepositoryPath={gitSurfaces.commitRepositoryPath}
+          generatedMessage={commitFlow.generatedCommitMessage}
+          generatedMessageKey={commitFlow.generatedCommitMessageKey}
+          isGeneratingMessage={commitFlow.isGeneratingCommitMessage}
           suggestedMessage={suggestedCommitMessage}
+          onGenerateMessage={commitFlow.generateCommitMessageForDialog}
           onRepositoryChange={gitSurfaces.setCommitRepositoryPath}
           onCommit={commitFlow.handleCommitPush}
           onClose={commitFlow.closeCommitDialog}
