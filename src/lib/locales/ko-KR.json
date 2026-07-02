@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria는 이 화이트보드에 필요한 데스크톱 기능을 사용할 수 없습니다. 시스템 설정에서 권한을 허용한 다음 메모를 다시 여세요.",
   "editor.exportPdf.unavailable": "PDF로 내보내기 전에 Markdown 노트를 여세요.",
   "editor.exportPdf.failed": "PDF 내보내기를 시작할 수 없습니다: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename}은(는) HEIC 이미지입니다. Tolaria는 아직 HEIC 또는 HEIF 파일을 가져올 수 없습니다. 사진을 JPG 또는 PNG로 내보내고 해당 파일을 삽입하세요.",
+  "editor.imageImport.unsupported": "{filename}은(는) {format} 이미지입니다. Tolaria는 아직 이 형식을 가져올 수 없습니다. JPG, PNG, GIF, WebP, SVG, BMP 또는 TIFF를 사용하세요.",
   "filePreview.copyDeepLink": "링크 복사",
   "deepLinks.copied": "딥 링크 복사됨",
   "deepLinks.error.ambiguousVault": "딥 링크가 둘 이상의 보관소와 일치합니다. 설정에서 Vault 별칭 하나를 변경하세요.",

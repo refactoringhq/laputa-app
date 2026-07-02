@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria non ha potuto utilizzare una funzionalità desktop necessaria per questa lavagna. Concedi l'autorizzazione nelle impostazioni di sistema, quindi riapri la nota.",
   "editor.exportPdf.unavailable": "Apri una nota Markdown prima di esportare un PDF.",
   "editor.exportPdf.failed": "Impossibile avviare l'esportazione in PDF: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} è un'immagine HEIC. Tolaria non può ancora importare file HEIC o HEIF. Esporta la foto in formato JPG o PNG e inserisci quel file.",
+  "editor.imageImport.unsupported": "{filename} è un'immagine in formato {format}. Tolaria non può ancora importare questo formato. Utilizza JPG, PNG, GIF, WebP, SVG, BMP o TIFF.",
   "filePreview.copyDeepLink": "Copia link",
   "deepLinks.copied": "Deep link copiato",
   "deepLinks.error.ambiguousVault": "Il deep link corrisponde a più di un vault. Rinomina un alias del vault in Impostazioni.",

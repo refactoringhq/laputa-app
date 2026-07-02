@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria kunde inte använda en skrivbordsfunktion som den här whiteboardtavlan behöver. Tillåt behörigheten i dina systeminställningar och öppna sedan anteckningen igen.",
   "editor.exportPdf.unavailable": "Öppna en Markdown-anteckning innan du exporterar en PDF.",
   "editor.exportPdf.failed": "Det gick inte att starta PDF-exporten: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} är en HEIC-bild. Tolaria kan ännu inte importera HEIC- eller HEIF-filer. Exportera fotot som JPG eller PNG och infoga den filen.",
+  "editor.imageImport.unsupported": "{filename} är en {format}-bild. Tolaria kan ännu inte importera det här formatet. Använd JPG, PNG, GIF, WebP, SVG, BMP eller TIFF.",
   "filePreview.copyDeepLink": "Kopiera länk",
   "deepLinks.copied": "Djuplänk kopierad",
   "deepLinks.error.ambiguousVault": "Djuplänken matchar fler än ett valv. Byt namn på ett valvalias i Inställningar.",

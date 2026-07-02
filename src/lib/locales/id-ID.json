@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria tidak dapat menggunakan fitur desktop yang dibutuhkan papan tulis ini. Izinkan di pengaturan sistem Anda, lalu buka kembali catatan tersebut.",
   "editor.exportPdf.unavailable": "Buka catatan Markdown sebelum mengekspor PDF.",
   "editor.exportPdf.failed": "Tidak dapat memulai ekspor PDF: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} adalah gambar HEIC. Tolaria belum dapat mengimpor file HEIC atau HEIF. Ekspor foto sebagai JPG atau PNG dan sisipkan file tersebut.",
+  "editor.imageImport.unsupported": "{filename} adalah gambar {format}. Tolaria belum dapat mengimpor format ini. Gunakan JPG, PNG, GIF, WebP, SVG, BMP, atau TIFF.",
   "filePreview.copyDeepLink": "Salin tautan",
   "deepLinks.copied": "Tautan dalam disalin",
   "deepLinks.error.ambiguousVault": "Tautan dalam cocok dengan lebih dari satu vault. Ubah nama satu alias vault di Pengaturan.",
