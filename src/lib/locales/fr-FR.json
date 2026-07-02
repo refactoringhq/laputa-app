@@ -9,7 +9,7 @@
   "command.openSettings": "Ouvrir les paramètres",
   "command.openSettings.keywords": "préférences config",
   "command.openLanguageSettings": "Ouvrir les paramètres de langue",
-  "command.openLanguageSettings.keywords": "langue paramètres régionaux i18n internationalisation localisation anglais italien français allemand russe espagnol portugais chinois simplifié traditionnel japonais coréen polonais 中文 繁體中文 zh-tw",
+  "command.openLanguageSettings.keywords": "langue locale i18n internationalisation localisation anglais italien français allemand russe espagnol portugais chinois simplifié traditionnel japonais coréen polonais slovaque slovencina slovenčina sk-sk 中文 繁體中文 zh-tw",
   "command.useSystemLanguage": "Utiliser la langue du système",
   "command.openH1Setting": "Ouvrir le paramètre de renommage automatique des titres H1",
   "command.toggleGitignoredFilesVisibility": "Activer/désactiver la visibilité des fichiers Gitignored",
@@ -980,5 +980,6 @@
   "locale.beLatn": "Biélorusse (Latin)",
   "locale.idID": "Indonésien",
   "locale.ukUA": "Ukrainien",
-  "locale.svSE": "Suédois"
+  "locale.svSE": "Suédois",
+  "locale.skSK": "Slovaque"
 }
