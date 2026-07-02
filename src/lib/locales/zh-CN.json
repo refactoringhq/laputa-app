@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria 无法使用此白板所需的桌面功能。在系统设置中授予权限，然后重新打开笔记。",
   "editor.exportPdf.unavailable": "在导出 PDF 之前，请先打开 Markdown 笔记。",
   "editor.exportPdf.failed": "无法开始 PDF 导出：{error}",
+  "editor.imageImport.unsupportedHeic": "{filename} 是一张 HEIC 图像。Tolaria 目前还无法导入 HEIC 或 HEIF 文件。请将照片导出为 JPG 或 PNG 格式，然后插入该文件。",
+  "editor.imageImport.unsupported": "{filename} 是一张 {format} 图像。Tolaria 目前还无法导入此格式。请使用 JPG、PNG、GIF、WebP、SVG、BMP 或 TIFF。",
   "filePreview.copyDeepLink": "复制链接",
   "deepLinks.copied": "深层链接已复制",
   "deepLinks.error.ambiguousVault": "深层链接匹配多个保管库。在“设置”中重命名一个保管库别名。",

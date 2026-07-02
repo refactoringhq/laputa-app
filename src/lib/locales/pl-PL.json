@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria nie mogła użyć funkcji pulpitu, której potrzebuje ta tablica. Przyznaj uprawnienie w ustawieniach systemowych, a następnie ponownie otwórz notatkę.",
   "editor.exportPdf.unavailable": "Otwórz notatkę Markdown przed wyeksportowaniem pliku PDF.",
   "editor.exportPdf.failed": "Nie można rozpocząć eksportu do PDF: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} to obraz HEIC. Tolaria nie może jeszcze importować plików HEIC ani HEIF. Wyeksportuj zdjęcie jako JPG lub PNG i wstaw ten plik.",
+  "editor.imageImport.unsupported": "{filename} to obraz w formacie {format}. Tolaria nie może jeszcze importować tego formatu. Użyj formatu JPG, PNG, GIF, WebP, SVG, BMP lub TIFF.",
   "filePreview.copyDeepLink": "Kopiuj link",
   "deepLinks.copied": "Głęboki link skopiowany",
   "deepLinks.error.ambiguousVault": "Głęboki link pasuje do więcej niż jednego skarbca. Zmień nazwę jednego aliasu skarbca w Ustawieniach.",

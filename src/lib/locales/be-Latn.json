@@ -709,6 +709,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria nie zmahla vykarystać mahčymaść nastolnaj systemy, patrebnuju hetaj došcy. Dazvolcie hety dostup u sistemnych naladach, potym adkryjcie natatku nanoŭ.",
   "editor.exportPdf.unavailable": "Adkryjcie natatku Markdown pierad ekspartam u PDF.",
   "editor.exportPdf.failed": "Nie ŭdalosia pačać ekspart PDF: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} — heta vyjava HEIC. Tolaria pakul nie moža impartavać fajly HEIC abo HEIF. Ekspartujcie fotazdymak u farmacie JPG abo PNG i ŭstaŭcie hety fajl.",
+  "editor.imageImport.unsupported": "{filename} — heta vyjava ŭ farmacie {format}. Tolaria pakul nie moža impartavać hety farmat. Vykarystoŭvajcie JPG, PNG, GIF, WebP, SVG, BMP abo TIFF.",
   "editor.sideMenu.expandSection": "Razharnuć razdziel",
   "editor.sideMenu.collapseSection": "Zharnuć razdziel",
   "editor.sideMenu.expandItem": "Razharnuć element",

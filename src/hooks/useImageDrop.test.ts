@@ -107,6 +107,23 @@ describe('uploadImageFile', () => {
     tauriMode = false
   })
 
+  it('rejects HEIC uploads before writing unsupported attachments', async () => {
+    tauriMode = true
+
+    const { invoke } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockClear()
+    const file = new File(['heic-data'], 'iphone.HEIC', { type: 'image/heic' })
+
+    await expect(uploadImageFile(file, '/vault')).rejects.toMatchObject({
+      name: 'UnsupportedImageFormatError',
+      fileName: 'iphone.HEIC',
+      format: 'HEIC',
+    })
+    expect(invoke).not.toHaveBeenCalled()
+
+    tauriMode = false
+  })
+
   it('resolves unreadable local files to an empty upload state', async () => {
     tauriMode = true
     const { invoke } = await import('@tauri-apps/api/core')
@@ -232,7 +249,11 @@ describe('useImageDrop — Tauri native drag-drop', () => {
     container.remove()
   })
 
-  function renderImageDropTauri(opts?: { onImageUrl?: (url: string) => void; vaultPath?: string }) {
+  function renderImageDropTauri(opts?: {
+    onImageImportError?: (error: { fileName: string; format: string; kind: string }) => void
+    onImageUrl?: (url: string) => void
+    vaultPath?: string
+  }) {
     const ref = createRef<HTMLDivElement>()
     Object.defineProperty(ref, 'current', { value: container, writable: true })
     return renderHook(() => useImageDrop({ containerRef: ref, ...opts }))
@@ -320,6 +341,32 @@ describe('useImageDrop — Tauri native drag-drop', () => {
       sourcePath: '/tmp/photo.png',
     })
     expect(invoke).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports unsupported HEIC native drops without copying them into the vault', async () => {
+    const onImageImportError = vi.fn()
+    const onImageUrl = vi.fn()
+    const { invoke } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockClear()
+    renderImageDropTauri({ onImageImportError, onImageUrl, vaultPath: '/vault' })
+
+    await waitForNativeDropListeners()
+
+    act(() => {
+      emitNativeDropEvent({
+        type: 'drop',
+        paths: ['/tmp/iphone.HEIC'],
+        position: { x: 100, y: 100 },
+      } satisfies NativeDropPayload)
+    })
+
+    expect(onImageImportError).toHaveBeenCalledWith({
+      kind: 'unsupported-heic',
+      fileName: 'iphone.HEIC',
+      format: 'HEIC',
+    })
+    expect(invoke).not.toHaveBeenCalled()
+    expect(onImageUrl).not.toHaveBeenCalled()
   })
 
   it('handles active-vault boundary failures from native image drops', async () => {
