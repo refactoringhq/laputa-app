@@ -1,4 +1,4 @@
-export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi' | 'antigravity' | 'kiro' | 'hermes'
+export type AiAgentId = 'claude_code' | 'codex' | 'copilot' | 'opencode' | 'pi' | 'antigravity' | 'kiro' | 'hermes'
 type LegacyAiAgentId = 'gemini'
 type AiAgentsStatusPayload = Partial<Record<AiAgentId | LegacyAiAgentId, { installed?: boolean | null; version?: string | null }>>
 
@@ -33,6 +33,12 @@ export const AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] = [
     label: 'Codex',
     shortLabel: 'Codex',
     installUrl: 'https://developers.openai.com/codex/cli',
+  },
+  {
+    id: 'copilot',
+    label: 'GitHub Copilot',
+    shortLabel: 'Copilot',
+    installUrl: 'https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli',
   },
   {
     id: 'opencode',

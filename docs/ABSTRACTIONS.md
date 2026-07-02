@@ -917,7 +917,7 @@ Vault guidance is intentionally short and vault-specific. General Tolaria produc
 `useAiAgentsOnboarding(enabled)` adds a separate first-launch agent step:
 - Reads a local dismissal flag for the AI agents prompt (with a legacy fallback to the older Claude-only key)
 - Only shows after vault onboarding has already resolved to a ready state
-- Uses `get_ai_agents_status`, whose backend checks Claude Code, Codex, OpenCode, Pi, Antigravity, Kiro, and Hermes Agent by treating the app process path, login-shell path, and supported local/toolchain/app install locations, including nvm-managed Node installs plus Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
+- Uses `get_ai_agents_status`, whose backend checks Claude Code, Codex, GitHub Copilot, OpenCode, Pi, Antigravity, Kiro, and Hermes Agent by treating the app process path, login-shell path, and supported local/toolchain/app install locations, including nvm-managed Node installs plus Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
 - App-managed Claude Code runs preserve the same user-managed Anthropic/provider env behavior by forwarding selected exported variables from the app process or the user's zsh/bash startup files without persisting those secrets
 - The shared `useAiAgentsStatus` hook defers that command until after the first render, skips it when AI features are disabled or the current window cannot render AI status surfaces, and falls back to missing-agent statuses if the native probe does not return promptly so first-launch onboarding keeps a recovery path
 - Persists dismissal locally once the user continues
@@ -966,7 +966,7 @@ interface Settings {
   sidebar_type_pluralization_enabled: boolean | null // null = default true
   ai_features_enabled: boolean | null // null = default true
   git_enabled: boolean | null // null = default true
-  default_ai_agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | 'antigravity' | 'kiro' | 'hermes' | null
+  default_ai_agent: 'claude_code' | 'codex' | 'copilot' | 'opencode' | 'pi' | 'antigravity' | 'kiro' | 'hermes' | null
   default_ai_target: string | null // "agent:codex" or "model:<provider>/<model>"
   ai_model_providers: AiModelProvider[] | null
   ai_workspace_conversations: AiWorkspaceConversationSetting[] | null

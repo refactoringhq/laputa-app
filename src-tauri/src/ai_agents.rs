@@ -9,6 +9,7 @@ const AI_AGENT_STATUS_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 pub enum AiAgentId {
     ClaudeCode,
     Codex,
+    Copilot,
     Opencode,
     Pi,
     #[serde(alias = "gemini")]
@@ -35,6 +36,7 @@ pub struct AiAgentAvailability {
 pub struct AiAgentsStatus {
     pub claude_code: AiAgentAvailability,
     pub codex: AiAgentAvailability,
+    pub copilot: AiAgentAvailability,
     pub opencode: AiAgentAvailability,
     pub pi: AiAgentAvailability,
     pub antigravity: AiAgentAvailability,
@@ -106,15 +108,17 @@ impl AiAgentStreamRequest {
 pub async fn get_ai_agents_status() -> AiAgentsStatus {
     let claude = tokio::task::spawn_blocking(availability_from_claude);
     let codex = tokio::task::spawn_blocking(crate::codex_cli::check_cli);
+    let copilot = tokio::task::spawn_blocking(crate::copilot_cli::check_cli);
     let opencode = tokio::task::spawn_blocking(crate::opencode_cli::check_cli);
     let pi = tokio::task::spawn_blocking(crate::pi_cli::check_cli);
     let antigravity = tokio::task::spawn_blocking(crate::antigravity_cli::check_cli);
     let kiro = tokio::task::spawn_blocking(crate::kiro_cli::check_cli);
     let hermes = tokio::task::spawn_blocking(crate::hermes_cli::check_cli);
 
-    let (claude, codex, opencode, pi, antigravity, kiro, hermes) = tokio::join!(
+    let (claude, codex, copilot, opencode, pi, antigravity, kiro, hermes) = tokio::join!(
         availability_or_missing(claude, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(codex, AI_AGENT_STATUS_PROBE_TIMEOUT),
+        availability_or_missing(copilot, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(opencode, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(pi, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(antigravity, AI_AGENT_STATUS_PROBE_TIMEOUT),
@@ -125,6 +129,7 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
     AiAgentsStatus {
         claude_code: claude,
         codex,
+        copilot,
         opencode,
         pi,
         antigravity,
@@ -161,6 +166,12 @@ where
             request,
             permission_mode,
             crate::codex_cli::run_agent_stream,
+            emit,
+        ),
+        AiAgentId::Copilot => run_shared_agent_stream(
+            request,
+            permission_mode,
+            crate::copilot_cli::run_agent_stream,
             emit,
         ),
         AiAgentId::Opencode => run_shared_agent_stream(
@@ -316,6 +327,7 @@ mod tests {
         let install_flags = [
             status.claude_code.installed,
             status.codex.installed,
+            status.copilot.installed,
             status.opencode.installed,
             status.pi.installed,
             status.antigravity.installed,

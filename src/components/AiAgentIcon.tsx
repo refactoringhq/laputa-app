@@ -20,6 +20,7 @@ const ICON_STYLE: CSSProperties = {
 const AI_AGENT_ICON_SOURCES: Record<AiAgentId, string> = {
   claude_code: '/ai-agent-icons/claude-code.svg',
   codex: '/ai-agent-icons/codex.svg',
+  copilot: '/ai-agent-icons/copilot.svg',
   opencode: '/ai-agent-icons/opencode.svg',
   pi: '/ai-agent-icons/pi.svg',
   antigravity: '/ai-agent-icons/gemini.svg',
