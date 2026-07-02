@@ -153,7 +153,7 @@ Editor responsiveness is also protected by a synthetic browser benchmark. `pnpm 
 | Backend language | Rust (edition 2021) | 1.77.2 |
 | Frontmatter parsing | gray_matter | 0.2 |
 | Filesystem watcher | notify | 6.1 |
-| AI (workspace) | CLI agent adapters (Claude Code + Codex + OpenCode + Pi + Antigravity + Kiro + Hermes Agent) plus configured local/API model targets | - |
+| AI (workspace) | CLI agent adapters (Claude Code + Codex + GitHub Copilot + OpenCode + Pi + Antigravity + Kiro + Hermes Agent) plus configured local/API model targets | - |
 | Search | Keyword (walkdir-based file scan) | - |
 | Localization | App-owned runtime + JSON catalogs (`src/lib/i18n.ts`, `src/lib/locales/*.json`, `lara.yaml`) | English fallback + Lara CLI sync |
 | MCP | @modelcontextprotocol/sdk | 1.0 |
@@ -194,7 +194,7 @@ flowchart TD
         end
 
         subgraph EXT["External Services"]
-            CCLI["Claude / Codex / OpenCode / Pi / Antigravity / Kiro / Hermes CLI\n(agent subprocesses)"]
+            CCLI["Claude / Codex / Copilot / OpenCode / Pi / Antigravity / Kiro / Hermes CLI\n(agent subprocesses)"]
             MCP["MCP Server\n(ws://9710, 9711)"]
             GCLI["git CLI\n(system executable)"]
             REMOTE["Git remotes\n(GitHub/GitLab/Gitea/etc.)"]
@@ -288,8 +288,8 @@ Full agent mode — spawns the selected local CLI agent as a subprocess with too
 1. **Frontend** (`AiPanel` + `useCliAiAgent` + `aiAgentSession.ts` + `aiAgents.ts` + `aiTargets.ts`) — one normalized session lifecycle for message state, reasoning blocks, tool action cards, response display, onboarding, default-target selection, bundled-docs prompt injection, and the per-vault Safe / Power User permission mode shown in the panel header for coding agents
 2. **Backend orchestration** (`ai_agents.rs`) — normalizes agent availability, streaming, and the request permission mode before dispatching to per-agent adapters
 3. **Shared runtime scaffold** (`cli_agent_runtime.rs` and submodules) — owns the common request shape, prompt wrapping, JSON-line and line-oriented subprocess lifecycle, stdout/stderr/stdin plumbing, normalized error/done handling, version probing, Tolaria stdio MCP server entry generation, and MCP server path resolution used by app-managed CLI agents
-4. **Agent adapters** — Shared prompts are mode-aware on every turn, including turns with note context snapshots: Vault Safe tells agents not to use or advertise shell, while Power User tells shell-capable agents to keep local commands scoped to the active vault. Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, and a scoped tool list: Safe enables file/search/edit tools only, while Power User adds Bash to the available tools and pre-approves Bash with `--allowedTools` without using dangerous permission-bypass flags. Codex runtime specifics live in `codex_cli.rs`; Safe runs `codex --sandbox read-only --ask-for-approval untrusted exec --json`, while Power User runs `codex --sandbox workspace-write --ask-for-approval never exec --json` so shell execution stays enabled across repeated turns. OpenCode runs through `opencode run --format json` with transient permissions: Safe denies bash and external directories, while Power User allows bash but still denies external directories. Pi runs through `pi --mode json --no-session` with `npm:pi-mcp-adapter`; both modes currently share the same transient MCP config and the prompt does not promise shell for Pi Power User. Antigravity runs through `agy -p <prompt> --cwd <vault>`, streams line-oriented stdout, and writes Tolaria MCP into the active vault's `.agents/mcp_config.json`; Safe uses `--sandbox=true --toolPermission=proceed-in-sandbox`, while Power User uses `--sandbox=false --toolPermission=always-proceed` without `--dangerously-skip-permissions`. Kiro runs through `kiro-cli chat --no-interactive --trust-all-tools`, streams line-oriented stdout, drains stderr concurrently, and writes prompt content through stdin to avoid OS argument length limits. Hermes Agent runs through `hermes chat --quiet --source tolaria -q`, streams line-oriented stdout, and uses the user's existing Hermes profile/configuration without mutating `~/.hermes/config.yaml`; setup errors point users to `hermes setup`, `hermes model`, and `hermes doctor`. Codex, OpenCode, Pi, Antigravity, Kiro, and Hermes all launch from the active vault cwd; Codex, OpenCode, Pi, Antigravity, and Kiro receive transient Tolaria MCP config. Pi seeds its transient agent directory from the user's Pi agent directory before merging Tolaria MCP, so app-managed runs keep standalone Pi provider/auth settings. All app-launched paths use hidden Windows launches and avoid dangerous permission-bypass flags.
-5. **MCP Integration** — Claude receives the generated MCP config file path, Codex receives the same Tolaria MCP server via transient `-c mcp_servers.tolaria.*` config overrides using Tolaria's resolved Node path plus `VAULT_PATH` and `WS_UI_PORT`, OpenCode receives it through `OPENCODE_CONFIG_CONTENT`, Pi receives it through a temporary `PI_CODING_AGENT_DIR/mcp.json` consumed by `pi-mcp-adapter` after copying and merging the user's Pi agent config, Antigravity receives it through `.agents/mcp_config.json` in the active vault, and Kiro receives it through `.kiro/settings/mcp.json` in the active vault. Hermes uses the user's own Hermes MCP/profile configuration; Tolaria does not rewrite third-party Hermes config files.
+4. **Agent adapters** — Shared prompts are mode-aware on every turn, including turns with note context snapshots: Vault Safe tells agents not to use or advertise shell, while Power User tells shell-capable agents to keep local commands scoped to the active vault. Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, and a scoped tool list: Safe enables file/search/edit tools only, while Power User adds Bash to the available tools and pre-approves Bash with `--allowedTools` without using dangerous permission-bypass flags. Codex runtime specifics live in `codex_cli.rs`; Safe runs `codex --sandbox read-only --ask-for-approval untrusted exec --json`, while Power User runs `codex --sandbox workspace-write --ask-for-approval never exec --json` so shell execution stays enabled across repeated turns. GitHub Copilot runs through `copilot -p <prompt> -s --no-ask-user` from the active vault, streams line-oriented stdout, passes Tolaria MCP through `--additional-mcp-config`, uses Safe mode with only write and Tolaria MCP tools preapproved, and maps Power User to `--allow-all-tools` without `--allow-all`, `--yolo`, or global path/URL bypasses. OpenCode runs through `opencode run --format json` with transient permissions: Safe denies bash and external directories, while Power User allows bash but still denies external directories. Pi runs through `pi --mode json --no-session` with `npm:pi-mcp-adapter`; both modes currently share the same transient MCP config and the prompt does not promise shell for Pi Power User. Antigravity runs through `agy -p <prompt> --cwd <vault>`, streams line-oriented stdout, and writes Tolaria MCP into the active vault's `.agents/mcp_config.json`; Safe uses `--sandbox=true --toolPermission=proceed-in-sandbox`, while Power User uses `--sandbox=false --toolPermission=always-proceed` without `--dangerously-skip-permissions`. Kiro runs through `kiro-cli chat --no-interactive --trust-all-tools`, streams line-oriented stdout, drains stderr concurrently, and writes prompt content through stdin to avoid OS argument length limits. Hermes Agent runs through `hermes chat --quiet --source tolaria -q`, streams line-oriented stdout, and uses the user's existing Hermes profile/configuration without mutating `~/.hermes/config.yaml`; setup errors point users to `hermes setup`, `hermes model`, and `hermes doctor`. Codex, GitHub Copilot, OpenCode, Pi, Antigravity, Kiro, and Hermes all launch from the active vault cwd; Codex, GitHub Copilot, OpenCode, Pi, Antigravity, and Kiro receive transient Tolaria MCP config. Pi seeds its transient agent directory from the user's Pi agent directory before merging Tolaria MCP, so app-managed runs keep standalone Pi provider/auth settings. All app-launched paths use hidden Windows launches and avoid dangerous permission-bypass flags.
+5. **MCP Integration** — Claude receives the generated MCP config file path, Codex receives the same Tolaria MCP server via transient `-c mcp_servers.tolaria.*` config overrides using Tolaria's resolved Node path plus `VAULT_PATH` and `WS_UI_PORT`, GitHub Copilot receives an inline session MCP config through `--additional-mcp-config`, OpenCode receives it through `OPENCODE_CONFIG_CONTENT`, Pi receives it through a temporary `PI_CODING_AGENT_DIR/mcp.json` consumed by `pi-mcp-adapter` after copying and merging the user's Pi agent config, Antigravity receives it through `.agents/mcp_config.json` in the active vault, and Kiro receives it through `.kiro/settings/mcp.json` in the active vault. Hermes uses the user's own Hermes MCP/profile configuration; Tolaria does not rewrite third-party Hermes config files.
 
 Each `stream_ai_agent` call also receives a request-scoped `ai-agent-stream-*` event name. Desktop runs bind that scoped name to any spawned CLI child through `ai_agent_processes.rs`, and `abort_ai_agent_stream` validates the same scoped name before killing the registered child. Renderer stop controls therefore cancel the local subprocess instead of only ignoring stale events, while natural completion and repeated stop requests remain no-ops.
 
@@ -317,7 +317,7 @@ sequenceDiagram
     R->>R: register child under scoped eventName
 
     loop Normalized stream
-        C-->>R: Claude NDJSON, Codex JSONL, OpenCode JSON, Pi JSON, Antigravity text, Kiro text, or Hermes text events
+        C-->>R: Claude NDJSON, Codex JSONL, Copilot text, OpenCode JSON, Pi JSON, Antigravity text, Kiro text, or Hermes text events
         R-->>FE: emit(eventName, event)
         alt TextDelta
             FE->>FE: accumulate response (revealed on Done)
@@ -372,7 +372,7 @@ Provider secrets are not written to `settings.json`. Hosted API targets can use 
 
 ### Authentication
 
-Each CLI agent authenticates itself outside Tolaria. Claude Code uses its existing CLI login or user-managed Anthropic/provider environment variables; Codex surfaces a friendly prompt to run `codex login` when needed; OpenCode surfaces a friendly prompt to run `opencode auth login` or configure a provider when needed; Pi surfaces a friendly prompt to run `pi /login` or configure a provider API key when needed. Tolaria does not store model-provider API keys in app settings; direct provider secrets stay in local app data or user-managed environment variables. App-managed Pi sessions copy that local Pi agent config into a per-run temporary directory before adding Tolaria MCP, so Tolaria does not overwrite global Pi files and does not drop a working standalone Pi setup.
+Each CLI agent authenticates itself outside Tolaria. Claude Code uses its existing CLI login or user-managed Anthropic/provider environment variables; Codex surfaces a friendly prompt to run `codex login` when needed; GitHub Copilot surfaces a friendly prompt to run `copilot login`, open `copilot` in the vault, and trust the directory when needed; OpenCode surfaces a friendly prompt to run `opencode auth login` or configure a provider when needed; Pi surfaces a friendly prompt to run `pi /login` or configure a provider API key when needed. Tolaria does not store model-provider API keys in app settings; direct provider secrets stay in local app data or user-managed environment variables. App-managed Pi sessions copy that local Pi agent config into a per-run temporary directory before adding Tolaria MCP, so Tolaria does not overwrite global Pi files and does not drop a working standalone Pi setup.
 
 ## MCP Server
 
@@ -570,7 +570,7 @@ When an opened folder is not yet a git repo, Tolaria can show a Git setup dialog
 
 When the user enables Git later, `init_git_repo` runs `git init`, ensures Tolaria's default `.gitignore`, stages the vault, and writes the initial `Initial vault setup` commit. Before app-managed setup, remote-connection, manual/automatic, and conflict-resolution commits, Tolaria ensures Git can resolve an author identity without overriding one the user configured: it heals the legacy repo-local `vault@tolaria.md` email earlier versions wrote, respects identities resolvable from local, global, or system scope, skips the legacy email wherever it resolves, and only when nothing resolves writes a repo-local `Tolaria <vault@tolaria.default>` fallback. That app-managed setup commit explicitly disables commit signing for the single command so inherited global or local `commit.gpgsign` preferences cannot strand onboarding when GPG is missing or misconfigured. Later `git_commit` calls honor the user's signing configuration first, then retry the same app-managed commit once with `commit.gpgsign=false` only when Git reports a signing-helper failure, so working GPG/SSH signing setups continue to sign while broken GPG setups do not create repeated opaque commit failures.
 
-Once a vault is ready, `useAiAgentsOnboarding` can show a one-time `AiAgentsOnboardingPrompt`. That prompt reads `useAiAgentsStatus` so first launch surfaces whether Claude Code, Codex, OpenCode, Pi, Antigravity, Kiro, and Hermes Agent CLI are installed, offers per-agent install links when they are missing, and stores local dismissal so the prompt does not repeat on every launch.
+Once a vault is ready, `useAiAgentsOnboarding` can show a one-time `AiAgentsOnboardingPrompt`. That prompt reads `useAiAgentsStatus` so first launch surfaces whether Claude Code, Codex, GitHub Copilot, OpenCode, Pi, Antigravity, Kiro, and Hermes Agent CLI are installed, offers per-agent install links when they are missing, and stores local dismissal so the prompt does not repeat on every launch.
 
 `useGettingStartedClone` reuses the same parent-folder semantics for the status-bar / command-palette clone action, and `Toast` is rendered through the AI-agents onboarding gate so the resolved destination path stays visible right after a successful clone.
 
@@ -756,7 +756,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `search.rs` | Keyword search — walkdir-based vault file scan with Gitignored-content visibility filtering |
 | `ai_agents.rs` | CLI-agent request normalization and adapter dispatch |
 | `cli_agent_runtime.rs` | Shared CLI-agent request, prompt, subprocess, version, and MCP path helpers |
-| `claude_cli.rs`, `codex_cli.rs`, `opencode_cli.rs`, `pi_cli.rs`, `antigravity_cli.rs` | CLI-agent command/config/event adapters |
+| `claude_cli.rs`, `codex_cli.rs`, `copilot_cli.rs`, `opencode_cli.rs`, `pi_cli.rs`, `antigravity_cli.rs` | CLI-agent command/config/event adapters |
 | `pi_cli.rs`, `pi_config.rs`, `pi_discovery.rs`, `pi_events.rs` | Pi subprocess launch, user-config-seeded transient MCP adapter config, discovery, and JSON stream parsing |
 | `mcp.rs` | MCP server spawning + explicit config registration/removal |
 | `commands/` | Tauri command handlers (split into submodules) |
@@ -844,9 +844,9 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 |---------|-------------|
 | `stream_claude_chat` | Claude CLI chat mode (streaming) |
 | `check_claude_cli` | Check if Claude CLI is available |
-| `get_ai_agents_status` | Check Claude Code + Codex + OpenCode + Pi + Antigravity + Kiro + Hermes Agent availability |
+| `get_ai_agents_status` | Check Claude Code + Codex + GitHub Copilot + OpenCode + Pi + Antigravity + Kiro + Hermes Agent availability |
 | `get_agent_docs_path` | Resolve the bundled local Tolaria docs folder used in AI-agent system prompts |
-| `stream_ai_agent` | Stream Claude Code, Codex, OpenCode, Pi, Antigravity, Kiro, or Hermes Agent through the normalized agent event layer |
+| `stream_ai_agent` | Stream Claude Code, Codex, GitHub Copilot, OpenCode, Pi, Antigravity, Kiro, or Hermes Agent through the normalized agent event layer |
 | `abort_ai_agent_stream` | Stop an active app-managed CLI agent stream by its validated request-scoped event name |
 | `register_mcp_tools` | Register vault-neutral MCP in Claude/Antigravity/Cursor/OpenCode/generic config |
 | `remove_mcp_tools` | Remove Tolaria's MCP entry from Claude/Antigravity/Cursor/OpenCode/generic config |
@@ -1153,7 +1153,7 @@ Desktop-only modules gated at the crate level:
 Desktop-only features gated at the function level in `commands/`:
 - Git operations (commit, pull, push, status, history, diff, conflicts)
 - Clone-by-URL via system git (`clone_repo`)
-- CLI AI agent streaming (Claude, Codex, OpenCode, Pi, Antigravity, Kiro)
+- CLI AI agent streaming (Claude, Codex, GitHub Copilot, OpenCode, Pi, Antigravity, Kiro)
 - MCP registration and status
 - Menu state updates
 

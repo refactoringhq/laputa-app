@@ -39,10 +39,12 @@ export async function installMockAiAgent(page: Page): Promise<void> {
       handlers.get_ai_agents_status = () => ({
         claude_code: { installed: true, version: 'mock' },
         codex: { installed: false, version: null },
+        copilot: { installed: false, version: null },
         opencode: { installed: false, version: null },
         pi: { installed: false, version: null },
-        gemini: { installed: false, version: null },
+        antigravity: { installed: false, version: null },
         kiro: { installed: false, version: null },
+        hermes: { installed: false, version: null },
       })
       return handlers
     }

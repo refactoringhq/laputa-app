@@ -8,6 +8,7 @@ const dragRegionMouseDown = vi.fn()
 const missingStatuses: AiAgentsStatus = {
   claude_code: { status: 'missing', version: null },
   codex: { status: 'missing', version: null },
+  copilot: { status: 'missing', version: null },
   opencode: { status: 'missing', version: null },
   pi: { status: 'missing', version: null },
   antigravity: { status: 'missing', version: null },
@@ -17,6 +18,7 @@ const missingStatuses: AiAgentsStatus = {
 const installLinkTargets = [
   ['ai-agents-onboarding-install-claude_code', 'https://docs.anthropic.com/en/docs/claude-code'],
   ['ai-agents-onboarding-install-codex', 'https://developers.openai.com/codex/cli'],
+  ['ai-agents-onboarding-install-copilot', 'https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli'],
   ['ai-agents-onboarding-install-opencode', 'https://opencode.ai/docs/'],
   ['ai-agents-onboarding-install-pi', 'https://pi.dev'],
   ['ai-agents-onboarding-install-antigravity', 'https://antigravity.google/docs/cli/install'],

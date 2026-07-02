@@ -7,6 +7,7 @@ use crate::ai_models::{normalize_ai_model_providers, AiModelProvider};
 const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &[
     "claude_code",
     "codex",
+    "copilot",
     "opencode",
     "pi",
     "antigravity",
@@ -601,6 +602,15 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("opencode"));
+    }
+
+    #[test]
+    fn test_copilot_default_ai_agent_is_preserved() {
+        let loaded = normalize_settings(Settings {
+            default_ai_agent: Some("copilot".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("copilot"));
     }
 
     #[test]
