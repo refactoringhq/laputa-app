@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Sparkle } from '@phosphor-icons/react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -55,6 +56,20 @@ const formatOptionalAuthorIdentity = (identity: GitAuthorIdentity | null): strin
   identity ? formatAuthorIdentity(identity) : ''
 )
 
+const focusMessageInput = (inputRef: React.RefObject<HTMLTextAreaElement | null>): void => {
+  setTimeout(() => inputRef.current?.focus(), 50)
+}
+
+const generationButtonDisabled = ({
+  isGenerating,
+  modifiedCount,
+  onGenerateMessage,
+}: {
+  isGenerating: boolean
+  modifiedCount: number
+  onGenerateMessage?: () => Promise<string> | string
+}): boolean => !onGenerateMessage || isGenerating || modifiedCount === 0
+
 const authorWarningText = (identity: GitAuthorIdentity, locale: AppLocale): string | null => {
   if (identity.warning === 'local_overrides_global') {
     return translate(locale, 'git.author.warning.localOverridesGlobal')
@@ -86,6 +101,102 @@ const CommitAuthorIdentity = ({
   )
 }
 
+function useGeneratedCommitMessage({
+  generatedMessage,
+  generatedMessageKey,
+  inputRef,
+  open,
+  setMessage,
+}: {
+  generatedMessage?: string
+  generatedMessageKey: number
+  inputRef: React.RefObject<HTMLTextAreaElement | null>
+  open: boolean
+  setMessage: (message: string) => void
+}) {
+  useEffect(() => {
+    if (!open || generatedMessageKey === 0 || !generatedMessage) return
+    setMessage(generatedMessage)
+    focusMessageInput(inputRef)
+  }, [generatedMessage, generatedMessageKey, inputRef, open, setMessage])
+}
+
+function CommitMessageGenerateButton({
+  isGeneratingMessage,
+  locale,
+  modifiedCount,
+  onGenerateMessage,
+  onGeneratedMessage,
+}: {
+  isGeneratingMessage: boolean
+  locale: AppLocale
+  modifiedCount: number
+  onGenerateMessage?: () => Promise<string> | string
+  onGeneratedMessage: (message: string) => void
+}) {
+  const handleGenerateMessage = async () => {
+    const generated = await onGenerateMessage?.()
+    if (generated) onGeneratedMessage(generated)
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={() => { void handleGenerateMessage() }}
+      disabled={generationButtonDisabled({ isGenerating: isGeneratingMessage, modifiedCount, onGenerateMessage })}
+      aria-label={translate(locale, 'git.commitMessage.generateFromDiff')}
+      title={translate(locale, 'git.commitMessage.generateFromDiff')}
+    >
+      <Sparkle size={14} weight="fill" className="shrink-0" />
+      {translate(locale, isGeneratingMessage ? 'git.commitMessage.generating' : 'git.commitMessage.generate')}
+    </Button>
+  )
+}
+
+function CommitDialogActions({
+  actionLabel,
+  isGeneratingMessage,
+  locale,
+  message,
+  modifiedCount,
+  onClose,
+  onGenerateMessage,
+  onGeneratedMessage,
+  onSubmit,
+  shortcutHint,
+}: CommitDialogCopy & {
+  isGeneratingMessage: boolean
+  locale: AppLocale
+  message: string
+  modifiedCount: number
+  onClose: () => void
+  onGenerateMessage?: () => Promise<string> | string
+  onGeneratedMessage: (message: string) => void
+  onSubmit: () => void
+}) {
+  return (
+    <DialogFooter className="flex-row items-center justify-between sm:justify-between">
+      <span className="text-[11px] text-muted-foreground">{shortcutHint}</span>
+      <div className="flex gap-2">
+        <CommitMessageGenerateButton
+          isGeneratingMessage={isGeneratingMessage}
+          locale={locale}
+          modifiedCount={modifiedCount}
+          onGenerateMessage={onGenerateMessage}
+          onGeneratedMessage={onGeneratedMessage}
+        />
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={onSubmit} disabled={!message.trim()}>
+          {actionLabel}
+        </Button>
+      </div>
+    </DialogFooter>
+  )
+}
+
 interface CommitDialogProps {
   open: boolean
   modifiedCount: number
@@ -94,7 +205,11 @@ interface CommitDialogProps {
   locale?: AppLocale
   repositories?: GitRepositoryOption[]
   selectedRepositoryPath?: string
+  generatedMessage?: string
+  generatedMessageKey?: number
+  isGeneratingMessage?: boolean
   suggestedMessage?: string
+  onGenerateMessage?: () => Promise<string> | string
   onRepositoryChange?: (path: string) => void
   onCommit: (message: string) => void
   onClose: () => void
@@ -109,7 +224,11 @@ export function CommitDialog(props: CommitDialogProps) {
     locale = 'en',
     repositories = [],
     selectedRepositoryPath = '',
+    generatedMessage,
+    generatedMessageKey = 0,
+    isGeneratingMessage = false,
     suggestedMessage,
+    onGenerateMessage,
     onRepositoryChange,
     onCommit,
     onClose,
@@ -126,9 +245,11 @@ export function CommitDialog(props: CommitDialogProps) {
   useEffect(() => {
     if (open) {
       setMessage(suggestedMessageRef.current ?? '') // eslint-disable-line react-hooks/set-state-in-effect -- reset on dialog open
-      setTimeout(() => inputRef.current?.focus(), 50)
+      focusMessageInput(inputRef)
     }
   }, [open])
+
+  useGeneratedCommitMessage({ generatedMessage, generatedMessageKey, inputRef, open, setMessage })
 
   const handleSubmit = () => {
     const trimmed = message.trim()
@@ -143,6 +264,11 @@ export function CommitDialog(props: CommitDialogProps) {
     } else if (isCloseShortcut(e)) {
       onClose()
     }
+  }
+
+  const handleGeneratedMessage = (generated: string) => {
+    setMessage(generated)
+    focusMessageInput(inputRef)
   }
 
   return (
@@ -176,17 +302,17 @@ export function CommitDialog(props: CommitDialogProps) {
           onKeyDown={handleKeyDown}
           rows={3}
         />
-        <DialogFooter className="flex-row items-center justify-between sm:justify-between">
-          <span className="text-[11px] text-muted-foreground">{copy.shortcutHint}</span>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={!message.trim()}>
-              {copy.actionLabel}
-            </Button>
-          </div>
-        </DialogFooter>
+        <CommitDialogActions
+          {...copy}
+          isGeneratingMessage={isGeneratingMessage}
+          locale={locale}
+          message={message}
+          modifiedCount={modifiedCount}
+          onClose={onClose}
+          onGenerateMessage={onGenerateMessage}
+          onGeneratedMessage={handleGeneratedMessage}
+          onSubmit={handleSubmit}
+        />
       </DialogContent>
     </Dialog>
   )
