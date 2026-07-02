@@ -218,6 +218,22 @@ describe('useSettings', () => {
     expect(settings.date_display_format).toBeNull()
   })
 
+  it('drops malformed AI workspace conversation settings while preserving valid rows', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      ai_workspace_conversations: [
+        { id: null, title: 'Broken chat', target_id: null },
+        { id: '  thread-1  ', title: '  Research plan  ', target_id: null, archived: false },
+        { id: 'thread-2', title: null, target_id: 'agent:codex' },
+      ] as unknown as Settings['ai_workspace_conversations'],
+    }
+
+    const settings = await renderLoadedSettings()
+    expect(settings.ai_workspace_conversations).toEqual([
+      { archived: false, id: 'thread-1', target_id: null, title: 'Research plan' },
+    ])
+  })
+
   it('saves settings via backend', async () => {
     const { result } = renderHook(() => useSettings())
 
