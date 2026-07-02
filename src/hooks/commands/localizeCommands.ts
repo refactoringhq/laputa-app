@@ -43,6 +43,7 @@ const STATIC_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
   'open-in-new-window': 'command.note.openNewWindow',
   'initialize-git': 'command.git.initialize',
   'commit-push': 'command.git.commitPush',
+  'generate-commit-message': 'command.git.generateCommitMessage',
   'add-remote': 'command.git.addRemote',
   'git-pull': 'command.git.pull',
   'resolve-conflicts': 'command.git.resolveConflicts',
