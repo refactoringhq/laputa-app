@@ -9,7 +9,7 @@
   "command.openSettings": "Öppna inställningar",
   "command.openSettings.keywords": "inställningar konfiguration preferenser",
   "command.openLanguageSettings": "Öppna språkinställningar",
-  "command.openLanguageSettings.keywords": "språk lokal i18n internationalisering lokalisering översättning engelska italienska franska tyska ryska spanska portugisiska kinesiska förenklad traditionell japanska koreanska polska svenska 中文 繁體中文 zh-tw",
+  "command.openLanguageSettings.keywords": "språk språkkonvention i18n internationalisering lokalisering engelska italienska franska tyska ryska spanska portugisiska kinesiska förenklad traditionell japanska koreanska polska slovakiska slovenska slovenčina sk-sk 中文 繁體中文 zh-tw",
   "command.useSystemLanguage": "Använd systemspråk",
   "command.openH1Setting": "Öppna inställning för automatiskt H1-namnbyte",
   "command.toggleGitignoredFilesVisibility": "Visa/dölj Git-ignorerade filer",
@@ -980,5 +980,6 @@
   "locale.beLatn": "Vitryska (latinsk)",
   "locale.idID": "Indonesiska",
   "locale.ukUA": "Ukrainska",
-  "locale.svSE": "Svenska"
+  "locale.svSE": "Svenska",
+  "locale.skSK": "Slovakiska"
 }

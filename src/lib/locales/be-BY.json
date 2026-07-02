@@ -9,7 +9,7 @@
   "command.openSettings": "Адкрыць налады",
   "command.openSettings.keywords": "preferences config налады прэферэнцыі",
   "command.openLanguageSettings": "Адкрыць налады мовы",
-  "command.openLanguageSettings.keywords": "language locale i18n internationalization localization мова лакаль беларуская англійская італьянская французcкая нямецкая руская іспанская партугальская кітайская японская карэйская польская 中文 繁體中文 zh-tw",
+  "command.openLanguageSettings.keywords": "мова лакаль i18n інтэрнацыяналізацыя лакалізацыя англійская італьянская французская нямецкая руская іспанская партугальская кітайская спрошчаная традыцыйная японская карэйская польская славацкая словенская slovenčina sk-sk 中文 繁體中文 zh-tw",
   "command.useSystemLanguage": "Выкарыстоўваць сістэмную мову",
   "command.openH1Setting": "Налады аўтаматычнага перайменавання па H1",
   "command.toggleGitignoredFilesVisibility": "Паказаць/схаваць файлы, якія ігнаруюцца Git",
@@ -980,5 +980,6 @@
   "locale.beLatn": "Беларуская (Лацінка)",
   "locale.idID": "Інданезійская",
   "locale.ukUA": "Украінская",
-  "locale.svSE": "Шведская"
+  "locale.svSE": "Шведская",
+  "locale.skSK": "Славацкая"
 }
