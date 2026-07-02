@@ -923,13 +923,14 @@ Vault guidance is intentionally short and vault-specific. General Tolaria produc
 ### Remote Git Operations
 
 Tolaria delegates remote auth to the user's system git setup:
-- `CloneVaultModal` captures a remote URL and local destination
+- `CloneVaultModal` captures a supported remote URL (`https://`, `http://`, `ssh://`, or `git@host:path`) and local destination
 - `clone_git_repo` and `create_getting_started_vault` both run system git clone work in blocking Tokio tasks so clone UIs stay responsive
 - On macOS, system-git commands prefer the user's login-shell `git` and `PATH`, and `git_add_remote` preflights HTTPS remotes through `git credential fill` so Keychain can prompt/grant access before the first fetch or push
 - On Linux AppImage launches, every system-git command and MCP runtime subprocess (Node.js or Bun) removes AppImage loader overrides such as `LD_LIBRARY_PATH`, `LD_PRELOAD`, and `GIT_EXEC_PATH` before spawning, so helpers like `git-remote-https` and the system MCP runtime bind against the host library stack instead of Tolaria's bundled WebKit/AppImage libraries
 - On native Linux Wayland launches, startup environment safeguards set `WEBKIT_DISABLE_DMABUF_RENDERER=1` unless the user already provided it, keeping the broad WebKitGTK DMABUF crash workaround while avoiding the last-resort compositing fallback that can make WebKitGTK windows feel unresponsive. Linux AppImage launches still set both `WEBKIT_DISABLE_DMABUF_RENDERER=1` and `WEBKIT_DISABLE_COMPOSITING_MODE=1` unless overridden because the sealed AppImage path has the verified rendering failure this fallback protects.
 - On Linux AppImage launches, release packaging bundles the GTK3 fcitx immodule into the AppImage and startup environment safeguards write a cache-local `GTK_IM_MODULE_FILE` that points GTK at the mounted module whenever fcitx is configured. If the user has not explicitly chosen a GTK IM module, Tolaria also sets `GTK_IM_MODULE=fcitx`, allowing WebKitGTK editor input to reach fcitx5 on both Wayland and X11 fallback launches without relying on host GTK module cache paths.
-- `git_add_remote` uses the same system git path and refuses remotes whose history is unrelated or ahead of the local vault
+- `git_add_remote` uses the same system git path, validates the pasted URL at the Tauri command boundary, and refuses remotes whose history is unrelated or ahead of the local vault
+- Shared git subprocess setup rejects the `ext::` transport, inserts an end-of-options separator for clone URLs, disables repo-configured fsmonitor hooks, and ignores repo-configured SSH command overrides
 - Existing `git_pull` / `git_push` commands keep surfacing raw git errors, and clone commands fail fast when git wants interactive terminal input
 - No provider-specific token or username is stored in app settings
 
