@@ -703,10 +703,10 @@ flowchart TD
     GP2 --> RM
 
     CMD["Cmd+K → Pull\nor Menu → Pull"] --> PULL
-    STATUS["Click sync badge"] --> POPUP["GitStatusPopup\n(branch, ahead/behind)"]
+    STATUS["Click sync badge"] --> POPUP["GitStatusPopup\n(branch, upstream, ahead/behind)"]
 ```
 
-Manual Sync forces a visible-state refresh even when `git_pull` reports `up_to_date`, because the working tree may have already changed through another process while the app still holds stale vault and History state. Updated pulls refresh the vault index, folders, saved views, clean active-editor content, and Git history surfaces; manual up-to-date pulls refresh the vault/sidebar surfaces with unknown changed files and bump the History refresh key without showing a "Pulled 0 updates" toast. Automatic mount/focus/interval up-to-date checks stay cheap and do not reload the vault.
+Manual Sync resolves the current branch's configured upstream and pulls that remote/branch explicitly, so non-`main` vault branches and local branches that track differently named remote branches follow normal Git tracking configuration instead of assuming `origin/main`. Missing upstreams and detached HEAD states return actionable sync errors while leaving branch creation, checkout, and tracking setup to external Git tooling. Manual Sync still forces a visible-state refresh even when `git_pull` reports `up_to_date`, because the working tree may have already changed through another process while the app still holds stale vault and History state. Updated pulls refresh the vault index, folders, saved views, clean active-editor content, and Git history surfaces; manual up-to-date pulls refresh the vault/sidebar surfaces with unknown changed files and bump the History refresh key without showing a "Pulled 0 updates" toast. Automatic mount/focus/interval up-to-date checks stay cheap and do not reload the vault.
 
 `useGitRemoteStatus` re-checks `git_remote_status` for the default repository, and `useCommitFlow` can resolve remote status for an explicit selected repository when the commit dialog opens and again right before submit. If `hasRemote` is false, Tolaria keeps that repository's flow local-only: the status bar shows a neutral `No remote` chip for the default repository, the dialog copy switches from "Commit & Push" to "Commit", and no `git_push` call is attempted.
 

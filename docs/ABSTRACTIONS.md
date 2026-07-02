@@ -536,6 +536,8 @@ interface GitRemoteStatus {
   ahead: number
   behind: number
   hasRemote: boolean
+  hasUpstream: boolean
+  upstream: string | null
 }
 
 interface GitAddRemoteResult {
@@ -566,7 +568,7 @@ interface PulseCommit {
 | `file_url.rs` | File URL | Builds a copyable remote URL from the primary remote, current branch, and vault-relative path without exposing remote credentials |
 | `author.rs` | Author identity | Resolves the exact commit author Tolaria will use, heals the legacy Tolaria fallback email, and reports when repo-local identity shadows the global Git identity |
 | `commit.rs` | Commit | Ensures a local author fallback when needed, then runs `git add -A && git commit -m "..."`; broken signing helpers trigger one unsigned retry for the same app-managed commit |
-| `remote.rs` | Pull / Push | `git pull --rebase` / `git push` |
+| `remote.rs` | Pull / Push | Resolves the current branch's configured upstream, then runs explicit pull/push commands against that remote branch; missing upstream and detached HEAD states return actionable sync errors |
 | `connect.rs` | Add remote | Adds `origin`, fetches it, validates history compatibility, and only starts tracking when the remote is safe |
 | `conflict.rs` | Conflict resolution | Detect conflicts, resolve with ours/theirs/manual, and ensure a local author fallback before commit/rebase continuation |
 | `pulse.rs` | Activity feed | `git log` with `--name-status` for file changes |
@@ -583,6 +585,7 @@ interface PulseCommit {
 - Reopens the clean active tab from disk only when the pull changed that active note, then restores editor focus if the editor owned focus before the remount
 - Detects merge conflicts → opens `ConflictResolverModal`
 - Tracks aggregate remote status (ahead/behind via `git_remote_status`)
+- Tracks the active branch and whether it has an upstream, so status UI can explain non-main branches and missing tracking setup before pull/push
 - Handles push rejection (divergence) → sets `pull_required` status
 - `pullAndPush()`: pulls then auto-pushes each active repository for divergence recovery
 - `ConflictNoteBanner`: inline banner in editor for conflicted notes (Keep mine / Keep theirs)
@@ -614,10 +617,11 @@ External vault mutations are any disk writes Tolaria did not just perform throug
 - **Diff view**: Toggle in breadcrumb bar → shows unified diff
 - **Git history**: Shown in Inspector panel for active note
 - **Commit dialog**: Triggered from sidebar or Cmd+K
+- **Branch indicator**: Current Git branch chip in the bottom bar for Git-backed vaults
 - **No remote indicator**: Neutral chip in the bottom bar when `GitRemoteStatus.hasRemote === false`
 - **Pulse view**: Activity feed when Pulse filter is selected
 - **Pull command**: Cmd+K → "Pull from Remote", also in Vault menu
-- **Git status popup**: Click sync badge → shows aggregate ahead/behind and a Pull button for the active repository set
+- **Git status popup**: Click sync badge → shows active branch, upstream/missing-upstream state, aggregate ahead/behind, and a Pull button when tracking is configured for the active repository set
 - **Conflict banner**: Inline banner in editor with Keep mine / Keep theirs for conflicted notes
 
 ## BlockNote Customization
