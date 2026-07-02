@@ -9,7 +9,7 @@
   "command.openSettings": "Buka Pengaturan",
   "command.openSettings.keywords": "preferences config",
   "command.openLanguageSettings": "Buka Pengaturan Bahasa",
-  "command.openLanguageSettings.keywords": "language locale i18n internationalization localization english italian french german russian spanish portuguese chinese simplified traditional japanese korean polish 中文 繁體中文 zh-tw",
+  "command.openLanguageSettings.keywords": "bahasa lokal i18n internasionalisasi lokalisasi Inggris Italia Prancis Jerman Rusia Spanyol Portugis Cina Sederhana Tradisional Jepang Korea Polandia Slowakia Slovenia Slowakia sk-sk 中文 繁體中文 zh-tw",
   "command.useSystemLanguage": "Gunakan Bahasa Sistem",
   "command.openH1Setting": "Buka Pengaturan Ganti Nama Otomatis H1",
   "command.toggleGitignoredFilesVisibility": "Alihkan Visibilitas File yang Diabaikan Git",
@@ -980,5 +980,6 @@
   "locale.beLatn": "Belarusia (Latin)",
   "locale.idID": "Bahasa Indonesia",
   "locale.ukUA": "Ukraina",
-  "locale.svSE": "Swedia"
+  "locale.svSE": "Swedia",
+  "locale.skSK": "Slovakia"
 }

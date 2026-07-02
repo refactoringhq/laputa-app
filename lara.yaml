@@ -27,6 +27,7 @@ locales:
     - id-ID
     - uk-UA
     - sv-SE
+    - sk-SK
 
 files:
   json:
