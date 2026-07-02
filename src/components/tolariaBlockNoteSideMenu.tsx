@@ -21,6 +21,7 @@ import {
   type SideMenuProps,
 } from '@blocknote/react'
 import { translate, type AppLocale } from '../lib/i18n'
+import { richEditorBlockTypeName } from '../utils/richEditorBlockTypes'
 import {
   useCallback,
   type ComponentType,
@@ -42,6 +43,8 @@ import {
   runSideMenuAction,
   type SideMenuBlock,
 } from './tolariaSideMenuBlocks'
+import { turnBlockIntoType } from './richEditorBlockTypeCommands'
+import { getTolariaBlockTypeSelectItems } from './tolariaEditorFormattingConfig'
 
 type TableHeaderContent = Record<string, unknown> & {
   headerCols?: unknown
@@ -273,7 +276,8 @@ function TolariaSectionControlButton({ locale }: { locale: AppLocale }) {
 function TolariaDragHandleButton({
   children,
   dragHandleMenu,
-}: SideMenuProps & { children?: ReactNode }) {
+  locale = 'en',
+}: SideMenuProps & { children?: ReactNode; locale?: AppLocale }) {
   const Components = useComponentsContext()!
   const dict = useDictionary()
   const sideMenu = useExtension(SideMenuExtension)
@@ -307,7 +311,9 @@ function TolariaDragHandleButton({
           />
         </span>
       </Components.Generic.Menu.Trigger>
-      <MenuComponent>{children}</MenuComponent>
+      {dragHandleMenu
+        ? <MenuComponent>{children}</MenuComponent>
+        : <TolariaDragHandleMenu locale={locale}>{children}</TolariaDragHandleMenu>}
     </Components.Generic.Menu.Root>
   )
 }
@@ -376,12 +382,43 @@ function TolariaTableHeaderItem({
   )
 }
 
-function TolariaDragHandleMenu() {
+function TolariaTurnBlockIntoItems({ locale }: { locale: AppLocale }) {
+  const Components = useComponentsContext()!
+  const { block, editor } = useSideMenuBlock()
+
+  if (!block) return null
+
+  return getTolariaBlockTypeSelectItems().map((item) => (
+    <Components.Generic.Menu.Item
+      key={item.key}
+      className="bn-menu-item"
+      onClick={() => {
+        runSideMenuAction(() => {
+          turnBlockIntoType(editor, block.id, item, 'block_menu')
+        })
+      }}
+    >
+      {translate(locale, 'editor.sideMenu.turnInto', {
+        type: richEditorBlockTypeName(locale, item),
+      })}
+    </Components.Generic.Menu.Item>
+  ))
+}
+
+function TolariaDragHandleMenu({
+  children,
+  locale = 'en',
+}: {
+  children?: ReactNode
+  locale?: AppLocale
+}) {
   const dict = useDictionary()
 
   return (
     <DragHandleMenu>
+      {children}
       <TolariaRemoveBlockItem>{dict.drag_handle.delete_menuitem}</TolariaRemoveBlockItem>
+      <TolariaTurnBlockIntoItems locale={locale} />
       <TolariaTableHeaderItem header="row">{dict.drag_handle.header_row_menuitem}</TolariaTableHeaderItem>
       <TolariaTableHeaderItem header="column">{dict.drag_handle.header_column_menuitem}</TolariaTableHeaderItem>
     </DragHandleMenu>
@@ -394,7 +431,7 @@ export function TolariaSideMenu({ locale = 'en', ...props }: TolariaSideMenuProp
 
   return (
     <SideMenu {...props}>
-      <TolariaDragHandleButton dragHandleMenu={TolariaDragHandleMenu} />
+      <TolariaDragHandleButton locale={locale} />
       <TolariaSectionControlButton locale={locale} />
     </SideMenu>
   )
