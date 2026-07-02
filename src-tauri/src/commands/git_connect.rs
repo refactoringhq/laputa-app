@@ -14,7 +14,16 @@ pub struct GitAddRemoteRequest {
 #[tauri::command]
 pub async fn git_add_remote(request: GitAddRemoteRequest) -> Result<GitAddRemoteResult, String> {
     let vault_path = expand_tilde(&request.vault_path).into_owned();
-    let remote_url = request.remote_url;
+    let remote_url = match crate::git::validate_user_remote_url(&request.remote_url) {
+        Ok(url) => url.to_string(),
+        Err(message) => {
+            return Ok(GitAddRemoteResult {
+                status: "error".to_string(),
+                message,
+            });
+        }
+    };
+
     tokio::task::spawn_blocking(move || crate::git::git_add_remote(&vault_path, &remote_url))
         .await
         .map_err(|e| format!("Task panicked: {e}"))?

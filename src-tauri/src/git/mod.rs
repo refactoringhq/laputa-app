@@ -11,6 +11,7 @@ mod history;
 mod pulse;
 mod remote;
 mod remote_config;
+mod remote_url;
 mod status;
 
 use std::ffi::{OsStr, OsString};
@@ -47,6 +48,7 @@ pub use remote::{
     git_pull, git_push, git_remote_status, has_remote, GitPullResult, GitPushResult,
     GitRemoteStatus,
 };
+pub(crate) use remote_url::validate_user_remote_url;
 pub use status::{
     discard_file_changes, get_modified_files, get_modified_files_with_stats, ModifiedFile,
 };
@@ -118,7 +120,18 @@ pub(crate) fn git_command() -> Command {
     apply_git_shell_env(&mut command);
     #[cfg(test)]
     apply_test_git_config_env(&mut command);
-    command.args(["-c", "core.quotePath=false"]);
+    command.args([
+        "-c",
+        "core.quotePath=false",
+        "-c",
+        "protocol.ext.allow=never",
+        "-c",
+        "protocol.file.allow=user",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.sshCommand=ssh",
+    ]);
     command
 }
 
@@ -917,6 +930,26 @@ mod tests {
         for key in LINUX_APPIMAGE_GIT_ENV_REMOVALS {
             assert!(!envs.contains_key(key));
         }
+    }
+
+    #[test]
+    fn test_git_command_applies_security_config() {
+        let args = git_command()
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+
+        assert_has_config_arg(&args, "core.quotePath=false");
+        assert_has_config_arg(&args, "protocol.ext.allow=never");
+        assert_has_config_arg(&args, "protocol.file.allow=user");
+        assert_has_config_arg(&args, "core.fsmonitor=false");
+        assert_has_config_arg(&args, "core.sshCommand=ssh");
+    }
+
+    fn assert_has_config_arg(args: &[String], value: &str) {
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "-c" && pair[1] == value));
     }
 
     #[test]
