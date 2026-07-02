@@ -1,0 +1,20 @@
+{
+  "current_namespace": "com.tolaria.app",
+  "legacy_namespace": "com.laputa.app",
+  "namespace_read_order": ["current", "legacy"],
+  "files": {
+    "settings": "settings.json",
+    "vaults": "vaults.json",
+    "last_vault": "last-vault.txt",
+    "ai_workspace_sessions": "ai-workspace-sessions.json",
+    "window_state": "window-state.json",
+    "ai_provider_secrets": "ai-provider-secrets.json"
+  },
+  "read_order": [
+    "preferred config root/current namespace",
+    "preferred config root/legacy namespace",
+    "platform config root/current namespace when different",
+    "platform config root/legacy namespace when different"
+  ],
+  "write_target": "preferred config root/current namespace"
+}
