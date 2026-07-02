@@ -9,7 +9,7 @@
   "command.openSettings": "Mở cài đặt",
   "command.openSettings.keywords": "preferences config",
   "command.openLanguageSettings": "Mở cài đặt ngôn ngữ",
-  "command.openLanguageSettings.keywords": "language locale i18n internationalization localization english italian french german russian spanish portuguese chinese japanese korean vietnamese tiếng việt việt nam 中文",
+  "command.openLanguageSettings.keywords": "ngôn ngữ bản địa hóa i18n quốc tế hóa bản địa hóa tiếng Anh tiếng Ý tiếng Pháp tiếng Đức tiếng Nga tiếng Tây Ban Nha tiếng Bồ Đào Nha tiếng Trung giản thể tiếng Trung phồn thể tiếng Nhật tiếng Hàn tiếng Ba Lan tiếng Slovak tiếng Slovenia tiếng Slovak sk-sk 中文 繁體中文 zh-tw",
   "command.useSystemLanguage": "Dùng ngôn ngữ hệ thống",
   "command.openH1Setting": "Mở cài đặt tự đổi tên H1",
   "command.toggleGitignoredFilesVisibility": "Bật/tắt hiển thị Git Ignored",
@@ -980,5 +980,6 @@
   "locale.beLatn": "Tiếng Belarus (Latinh)",
   "locale.idID": "Tiếng Indonesia",
   "locale.ukUA": "Tiếng Ukraina",
-  "locale.svSE": "Tiếng Thụy Điển"
+  "locale.svSE": "Tiếng Thụy Điển",
+  "locale.skSK": "Tiếng Slovak"
 }

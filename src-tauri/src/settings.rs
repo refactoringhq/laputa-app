@@ -76,6 +76,8 @@ const SUPPORTED_UI_LANGUAGE_ALIASES: &[(&str, &str)] = &[
     ("be-latn", "be-Latn"),
     ("id", "id-ID"),
     ("id-id", "id-ID"),
+    ("sk", "sk-SK"),
+    ("sk-sk", "sk-SK"),
 ];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -714,6 +716,7 @@ mod tests {
             ("be-BY", "be-BY"),
             ("be-Latn", "be-Latn"),
             ("id-ID", "id-ID"),
+            ("sk-SK", "sk-SK"),
         ];
 
         for (input, expected) in expected_languages {
@@ -743,6 +746,7 @@ mod tests {
             Some("be-Latn")
         );
         assert_eq!(normalize_ui_language(Some("id")).as_deref(), Some("id-ID"));
+        assert_eq!(normalize_ui_language(Some("sk")).as_deref(), Some("sk-SK"));
     }
 
     #[test]

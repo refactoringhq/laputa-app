@@ -9,7 +9,7 @@
   "command.openSettings": "開啟設定",
   "command.openSettings.keywords": "設定 偏好 配置",
   "command.openLanguageSettings": "開啟語言設定",
-  "command.openLanguageSettings.keywords": "語言 地區設定 i18n 国际化 本地化 英語 意大利語 法語 德語 俄語 西班牙語 葡萄牙語 中文 簡體中文 繁體中文 日語 韓語 波蘭語 中文 繁體中文 zh-tw",
+  "command.openLanguageSettings.keywords": "語言 區域設定 i18n 國際化 本地化 英語 義大利語 法語 德語 俄語 西班牙語 葡萄牙語 中文簡體 中文繁體 日語 韓語 波蘭語 斯洛伐克語 斯洛文尼亞語 斯洛伐克語 sk-sk 中文 繁體中文 zh-tw",
   "command.useSystemLanguage": "使用系統語言",
   "command.openH1Setting": "開啟 H1 自動重新命名設定",
   "command.toggleGitignoredFilesVisibility": "切換 Gitignored 檔案的顯示狀態",
@@ -980,5 +980,6 @@
   "locale.beLatn": "白俄羅斯語（拉丁語）",
   "locale.idID": "印尼",
   "locale.ukUA": "烏克蘭語",
-  "locale.svSE": "瑞典語"
+  "locale.svSE": "瑞典語",
+  "locale.skSK": "斯洛伐克語"
 }

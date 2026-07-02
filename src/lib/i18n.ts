@@ -24,6 +24,7 @@ export const APP_LOCALES = [
   'id-ID',
   'uk-UA',
   'sv-SE',
+  'sk-SK',
 ] as const
 
 export type AppLocale = typeof APP_LOCALES[number]
@@ -202,6 +203,13 @@ const LOCALE_DEFINITIONS: Record<AppLocale, LocaleDefinition> = {
     labelKey: 'locale.svSE',
     aliases: ['sv', 'sv-se'],
     searchKeywords: ['swedish', 'svenska', 'sverige', 'sv', 'sv-se'],
+  },
+  'sk-SK': {
+    code: 'sk-SK',
+    dateLocale: 'sk-SK',
+    labelKey: 'locale.skSK',
+    aliases: ['sk', 'sk-sk'],
+    searchKeywords: ['slovak', 'slovencina', 'slovenčina', 'slovensko', 'sk', 'sk-sk'],
   },
 }
 
