@@ -9,9 +9,20 @@ const MAX_SHEET_ROWS = 1048576
 const MAX_SHEET_COLUMNS = 16384
 
 export const SHEET_EXTERNAL_CELL_REFERENCE_PATTERN = /\[\[([^\]\n]+?)\]\]\.(\$?)([A-Za-z]+)(\$?)([1-9]\d*)/g
+export const SHEET_EXTERNAL_FRONTMATTER_REFERENCE_PATTERN = /\[\[([^\]\n]+?)\]\]\.([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*)/g
+
+type SheetFormulaText = string
+type SheetFrontmatterPropertyPathText = string
+type SheetRawReferenceTarget = string
 
 export interface SheetExternalCellReference {
   address: string
+  target: string
+}
+
+export interface SheetExternalFrontmatterReference {
+  path: string[]
+  propertyPath: string
   target: string
 }
 
@@ -48,6 +59,11 @@ interface ExternalFormulaShift {
   rowDelta: number
 }
 
+interface ExternalFrontmatterReferenceToken {
+  propertyPath: SheetFrontmatterPropertyPathText
+  rawTarget: SheetRawReferenceTarget
+}
+
 interface ShiftedExternalFormulaReference {
   parsed: SheetExternalCellReferenceParts
   shifted: ShiftedExternalCellReference
@@ -67,12 +83,38 @@ function parseExternalCellReferenceParts(token: ExternalFormulaReferenceToken): 
   }
 }
 
-export function isExternalFormulaInput(value: string): boolean {
-  SHEET_EXTERNAL_CELL_REFERENCE_PATTERN.lastIndex = 0
-  return value.trimStart().startsWith('=') && SHEET_EXTERNAL_CELL_REFERENCE_PATTERN.test(value)
+function isCellAddressLikePropertyPath(path: string[]): boolean {
+  return path.length === 1 && /^[A-Za-z]+[1-9]\d*$/.test(path[0] ?? '')
 }
 
-export function extractSheetExternalCellReferences(value: string): SheetExternalCellReference[] {
+export function parseSheetExternalFrontmatterReference(
+  token: ExternalFrontmatterReferenceToken,
+): SheetExternalFrontmatterReference | null {
+  const { propertyPath, rawTarget } = token
+  const path = propertyPath.split('.').filter(Boolean)
+  if (path.length === 0 || isCellAddressLikePropertyPath(path)) return null
+  return {
+    path,
+    propertyPath,
+    target: wikilinkTarget(`[[${rawTarget}]]`),
+  }
+}
+
+function hasExternalCellReferences(value: SheetFormulaText): boolean {
+  SHEET_EXTERNAL_CELL_REFERENCE_PATTERN.lastIndex = 0
+  return SHEET_EXTERNAL_CELL_REFERENCE_PATTERN.test(value)
+}
+
+export function hasSheetExternalFrontmatterReferences({ value }: { value: SheetFormulaText }): boolean {
+  return extractSheetExternalFrontmatterReferences(value).length > 0
+}
+
+export function isExternalFormulaInput(value: SheetFormulaText): boolean {
+  return value.trimStart().startsWith('=')
+    && (hasExternalCellReferences(value) || hasSheetExternalFrontmatterReferences({ value }))
+}
+
+export function extractSheetExternalCellReferences(value: SheetFormulaText): SheetExternalCellReference[] {
   const references: SheetExternalCellReference[] = []
   SHEET_EXTERNAL_CELL_REFERENCE_PATTERN.lastIndex = 0
   for (const match of value.matchAll(SHEET_EXTERNAL_CELL_REFERENCE_PATTERN)) {
@@ -90,6 +132,27 @@ export function extractSheetExternalCellReferences(value: string): SheetExternal
     })
   }
   return references
+}
+
+export function extractSheetExternalFrontmatterReferences(value: SheetFormulaText): SheetExternalFrontmatterReference[] {
+  const references: SheetExternalFrontmatterReference[] = []
+  SHEET_EXTERNAL_FRONTMATTER_REFERENCE_PATTERN.lastIndex = 0
+  for (const match of value.matchAll(SHEET_EXTERNAL_FRONTMATTER_REFERENCE_PATTERN)) {
+    const rawTarget = match[1]
+    const propertyPath = match[2]
+    if (!rawTarget || !propertyPath) continue
+
+    const reference = parseSheetExternalFrontmatterReference({ propertyPath, rawTarget })
+    if (reference) references.push(reference)
+  }
+  return references
+}
+
+export function extractSheetExternalReferenceTargets(value: SheetFormulaText): string[] {
+  const targets = new Set<string>()
+  for (const reference of extractSheetExternalCellReferences(value)) targets.add(reference.target)
+  for (const reference of extractSheetExternalFrontmatterReferences(value)) targets.add(reference.target)
+  return Array.from(targets)
 }
 
 function externalReferenceColumnPrefix(parsed: SheetExternalCellReferenceParts): string {
@@ -136,7 +199,7 @@ function shiftExternalFormulaMatch(reference: ExternalFormulaMatch, shift: Exter
     : reference.match
 }
 
-export function shiftExternalFormulaReferences(value: string, rowDelta: number, columnDelta: number): string {
+export function shiftExternalFormulaReferences(value: SheetFormulaText, rowDelta: number, columnDelta: number): string {
   if (!isExternalFormulaInput(value)) return value
 
   return value.replace(
