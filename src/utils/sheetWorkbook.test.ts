@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { resolveExternalSheetDependencyEntries, sheetHasExternalFormulaReferences } from './sheetWorkbook'
+import {
+  resolveExternalFormulaInput,
+  resolveExternalSheetDependencyEntries,
+  sheetExternalFormulaContext,
+  sheetHasExternalFormulaReferences,
+} from './sheetWorkbook'
 import type { VaultEntry } from '../types'
 
 vi.mock('@ironcalc/workbook', () => ({
@@ -16,11 +21,24 @@ function entry(path: string, title: string): VaultEntry {
   }
 }
 
+function frontmatterFormulaContext(deviceContent: string) {
+  const sourceEntry = entry('/vault/loadout.md', 'Loadout')
+  const deviceEntry = entry('/vault/device.md', 'Device')
+  return sheetExternalFormulaContext({
+    contentsByPath: new Map([[deviceEntry.path, deviceContent]]),
+    currentPath: sourceEntry.path,
+    entries: [sourceEntry, deviceEntry],
+    sourceEntry,
+  })
+}
+
 describe('sheetWorkbook', () => {
   it('detects external formula references in the sheet body only', () => {
     expect(sheetHasExternalFormulaReferences('---\n_sheet: [[not-a-body-reference]].B2\n---\nMetric,Value'))
       .toBe(false)
     expect(sheetHasExternalFormulaReferences('---\ntype: Sheet\n---\nMetric,Value\nRevenue,=[[revenue]].B2'))
+      .toBe(true)
+    expect(sheetHasExternalFormulaReferences('---\ntype: Sheet\n---\nMetric,Value\nWatts,=[[device]].power.watts'))
       .toBe(true)
   })
 
@@ -46,5 +64,63 @@ describe('sheetWorkbook', () => {
       modelEntry.path,
       assumptionsEntry.path,
     ])
+  })
+
+  it('resolves external note frontmatter references into literals or spreadsheet errors', () => {
+    const context = frontmatterFormulaContext([
+      '---',
+      'power:',
+      '  watts: 120',
+      'status: Active',
+      'enabled: true',
+      'tags:',
+      '  - hardware',
+      '---',
+      '# Device',
+    ].join('\n'))
+
+    expect(resolveExternalFormulaInput('=[[device]].power.watts*2', context)).toEqual({
+      evaluated: '=120*2',
+      source: '=[[device]].power.watts*2',
+    })
+    expect(resolveExternalFormulaInput('=[[device.md]].status', context)?.evaluated).toBe('="Active"')
+    expect(resolveExternalFormulaInput('=[[device]].enabled', context)?.evaluated).toBe('=TRUE()')
+    expect(resolveExternalFormulaInput('=[[device]].power.volts', context)?.evaluated).toBe('=NA()')
+    expect(resolveExternalFormulaInput('=[[device]].power', context)?.evaluated).toBe('=NA()')
+    expect(resolveExternalFormulaInput('=[[device]].tags', context)?.evaluated).toBe('=NA()')
+  })
+
+  it('treats ambiguous frontmatter note references as spreadsheet errors', () => {
+    const sourceEntry = entry('/vault/loadout.md', 'Loadout')
+    const firstDevice = entry('/vault/a/device.md', 'Device')
+    const secondDevice = entry('/vault/b/device.md', 'Device')
+    const context = sheetExternalFormulaContext({
+      contentsByPath: new Map([
+        [firstDevice.path, '---\nstatus: Active\n---\n# Device'],
+        [secondDevice.path, '---\nstatus: Blocked\n---\n# Device'],
+      ]),
+      currentPath: sourceEntry.path,
+      entries: [sourceEntry, firstDevice, secondDevice],
+      sourceEntry,
+    })
+
+    expect(resolveExternalFormulaInput('=[[device]].status', context)?.evaluated).toBe('=NA()')
+    expect(resolveExternalFormulaInput('=[[a/device]].status', context)?.evaluated).toBe('="Active"')
+  })
+
+  it('loads dependencies for frontmatter references', () => {
+    const sourceEntry = entry('/vault/loadout.md', 'Loadout')
+    const deviceEntry = entry('/vault/device.md', 'Device')
+    const dependencies = resolveExternalSheetDependencyEntries({
+      content: '---\ntype: Sheet\n---\nMetric,Value\nWatts,=[[device]].power.watts',
+      contentsByPath: new Map([
+        [deviceEntry.path, '---\npower:\n  watts: 120\n---\n# Device'],
+      ]),
+      currentPath: sourceEntry.path,
+      entries: [sourceEntry, deviceEntry],
+      sourceEntry,
+    })
+
+    expect(dependencies.map((dependency) => dependency.path)).toEqual([deviceEntry.path])
   })
 })

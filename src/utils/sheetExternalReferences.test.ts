@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   extractSheetExternalCellReferences,
+  extractSheetExternalFrontmatterReferences,
+  extractSheetExternalReferenceTargets,
+  hasSheetExternalFrontmatterReferences,
   isExternalFormulaInput,
   shiftExternalFormulaReferences,
 } from './sheetExternalReferences'
@@ -8,6 +11,7 @@ import {
 describe('sheetExternalReferences', () => {
   it('detects formula inputs with sheet wikilink cell references', () => {
     expect(isExternalFormulaInput('=[[revenue]].B2')).toBe(true)
+    expect(isExternalFormulaInput('=[[device]].power.watts')).toBe(true)
     expect(isExternalFormulaInput(' [[revenue]].B2')).toBe(false)
     expect(isExternalFormulaInput('[[revenue]].B2')).toBe(false)
   })
@@ -19,9 +23,29 @@ describe('sheetExternalReferences', () => {
     ])
   })
 
+  it('extracts canonical targets and frontmatter property paths', () => {
+    expect(extractSheetExternalFrontmatterReferences('=[[device.md]].power.watts+[[project-alpha|Project]].status')).toEqual([
+      { path: ['power', 'watts'], propertyPath: 'power.watts', target: 'device.md' },
+      { path: ['status'], propertyPath: 'status', target: 'project-alpha' },
+    ])
+  })
+
+  it('keeps cell references out of frontmatter property extraction', () => {
+    expect(hasSheetExternalFrontmatterReferences({ value: '=[[revenue]].B2+[[revenue]].$B$2' })).toBe(false)
+    expect(extractSheetExternalReferenceTargets('=[[device]].power.watts+[[revenue]].B2')).toEqual([
+      'revenue',
+      'device',
+    ])
+  })
+
   it('shifts relative references while preserving absolute row and column markers', () => {
     expect(shiftExternalFormulaReferences('=[[revenue]].B2+[[revenue]].$C$3+[[revenue]].D$4+[[revenue]].$E5', 2, 1))
       .toBe('=[[revenue]].C4+[[revenue]].$C$3+[[revenue]].E$4+[[revenue]].$E7')
+  })
+
+  it('leaves frontmatter property references unchanged when shifting formulas', () => {
+    expect(shiftExternalFormulaReferences('=[[device]].power.watts+[[revenue]].B2', 2, 1))
+      .toBe('=[[device]].power.watts+[[revenue]].C4')
   })
 
   it('leaves references unchanged when a relative shift would leave the sheet bounds', () => {

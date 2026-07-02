@@ -86,7 +86,7 @@ When the cell is not being edited, Tolaria renders the wikilink like other note 
 
 Command-click a wikilink in a sheet cell to open the linked note.
 
-## Reference Another Sheet Note
+## Reference Another Note
 
 Formulas can read a cell from another sheet note with Tolaria's wikilink cell syntax:
 
@@ -108,6 +108,16 @@ Use absolute markers when copying formulas:
 | `[[revenue]].$B5` | column fixed, row can shift |
 
 Cross-sheet references currently resolve single cells. Keep range formulas inside one sheet note.
+
+Formulas can read scalar frontmatter properties from a note with dot notation:
+
+```txt
+=[[device]].power.watts
+=[[project-alpha]].status
+=[[book-notes/the-design-of-everyday-things.md]].rating
+```
+
+Numbers, booleans, and text properties can be used in formulas. Missing or ambiguous note targets, missing properties, and non-scalar values such as lists or nested objects show as spreadsheet errors.
 
 ## Work With The Raw File
 
