@@ -10,9 +10,13 @@ mod file_url;
 mod history;
 mod pulse;
 mod remote;
+#[cfg(test)]
+mod remote_branch_tests;
 mod remote_config;
+mod remote_status;
 mod remote_url;
 mod status;
+mod upstream;
 
 use std::ffi::{OsStr, OsString};
 #[cfg(unix)]
@@ -44,10 +48,8 @@ pub use dates::{get_all_file_dates, GitDates};
 pub use file_url::git_file_url;
 pub use history::{get_file_diff, get_file_diff_at_commit, get_file_history};
 pub use pulse::{get_last_commit_info, get_vault_pulse, LastCommitInfo, PulseCommit, PulseFile};
-pub use remote::{
-    git_pull, git_push, git_remote_status, has_remote, GitPullResult, GitPushResult,
-    GitRemoteStatus,
-};
+pub use remote::{git_pull, git_push, has_remote, GitPullResult, GitPushResult};
+pub use remote_status::{git_remote_status, GitRemoteStatus};
 pub(crate) use remote_url::validate_user_remote_url;
 pub use status::{
     discard_file_changes, get_modified_files, get_modified_files_with_stats, ModifiedFile,

@@ -75,6 +75,35 @@ describe('useAutoSync', () => {
     })
   })
 
+  it('preserves upstream metadata from remote status refreshes', async () => {
+    mockInvokeFn.mockImplementation((cmd: string) => {
+      if (cmd === 'get_last_commit_info') return Promise.resolve(MOCK_COMMIT_INFO)
+      if (cmd === 'get_conflict_files') return Promise.resolve([])
+      if (cmd === 'git_remote_status') {
+        return Promise.resolve({
+          branch: 'feature/sync-upstream',
+          ahead: 0,
+          behind: 0,
+          hasRemote: true,
+          hasUpstream: false,
+          upstream: null,
+        })
+      }
+      return Promise.resolve(upToDate())
+    })
+
+    const { result } = renderSync()
+
+    await waitFor(() => {
+      expect(result.current.remoteStatus).toMatchObject({
+        branch: 'feature/sync-upstream',
+        hasRemote: true,
+        hasUpstream: false,
+        upstream: null,
+      })
+    })
+  })
+
   it('dedupes automatic mount, focus, and interval remote-status refreshes within cooldown', async () => {
     const now = vi.spyOn(Date, 'now')
     let clock = 1_000_000
