@@ -2,6 +2,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useEditorFocus } from './useEditorFocus'
 import type { FocusableEditor } from './editorFocusUtils'
+import { trackEvent } from '../lib/telemetry'
+
+vi.mock('../lib/telemetry', () => ({
+  trackEvent: vi.fn(),
+}))
 
 function makeTiptapMock(hasHeading: boolean | Array<number | null> = true, headingNodeSize = 15) {
   const headingSizes = Array.isArray(hasHeading)
@@ -287,6 +292,28 @@ describe('useEditorFocus', () => {
       callbacks[2](0)
 
       expectSelectionRange(tiptap, { from: 3, to: 16 })
+    })
+
+    it('recovers and retries a mismatched title-selection transaction', () => {
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
+      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const tiptap = makeTiptapMock(true)
+      tiptap._chainResult.run.mockImplementationOnce(() => {
+        throw new RangeError('Applying a mismatched transaction')
+      })
+      const { editor } = setup(true, tiptap)
+
+      window.dispatchEvent(new CustomEvent('laputa:focus-editor', { detail: { selectTitle: true } }))
+
+      expect(editor.focus).toHaveBeenCalled()
+      expect(tiptap._chainResult.run).toHaveBeenCalledTimes(2)
+      expect(consoleWarn).toHaveBeenCalledWith(
+        '[editor] Recovered rich-editor transform error:',
+        expect.any(RangeError),
+      )
+      expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+        reason: 'mismatched_transaction',
+      })
     })
 
     it('collapses selection to the caret for an empty H1', () => {

@@ -516,6 +516,22 @@ describe('CommandPalette', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('submits the latest AI editor DOM text when Enter arrives before state catches up', () => {
+    render(
+      <CommandPalette open={true} commands={commands} entries={entries} onClose={onClose} />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    const editor = screen.getByTestId('command-palette-ai-input')
+    editor.textContent = ' fast prompt'
+    setSelection(editor, ' fast prompt'.length)
+    fireEvent.keyDown(editor, { key: 'Enter' })
+
+    expect(queueAiPrompt).toHaveBeenCalledWith('fast prompt', [])
+    expect(requestOpenAiChat).toHaveBeenCalledOnce()
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
   it('queues AI prompts with the selected workspace target id', () => {
     render(
       <CommandPalette

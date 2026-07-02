@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EXTRA_CODE_BLOCK_LANGUAGES } from '../utils/codeBlockLanguageCatalog'
 
 const nativeRegExpDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'RegExp')
 const NativeRegExp = RegExp
+const originalUserAgent = navigator.userAgent
+const CHROMIUM_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36'
 
 function setRegExpConstructor(value: RegExpConstructor) {
   Object.defineProperty(globalThis, 'RegExp', {
@@ -16,6 +18,13 @@ function restoreRegExpConstructor() {
   if (nativeRegExpDescriptor) {
     Object.defineProperty(globalThis, 'RegExp', nativeRegExpDescriptor)
   }
+}
+
+function setUserAgent(userAgent: string) {
+  Object.defineProperty(window.navigator, 'userAgent', {
+    configurable: true,
+    value: userAgent,
+  })
 }
 
 function installMockRegExp(shouldReject: (pattern: string | RegExp | undefined, flags: string | undefined) => boolean) {
@@ -41,9 +50,14 @@ function installLookbehindMissingRegExp() {
   installMockRegExp((pattern) => typeof pattern === 'string' && pattern.includes('(?<'))
 }
 
+beforeEach(() => {
+  setUserAgent(CHROMIUM_USER_AGENT)
+})
+
 afterEach(() => {
   document.documentElement.classList.remove('dark')
   delete document.documentElement.dataset.theme
+  setUserAgent(originalUserAgent)
   restoreRegExpConstructor()
   vi.resetModules()
 })
@@ -155,6 +169,15 @@ describe('editor schema code block highlighting', () => {
 
   it('omits the Shiki highlighter when WebKit lacks regex lookbehind syntax', async () => {
     installLookbehindMissingRegExp()
+    vi.resetModules()
+
+    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
+
+    expect(createTolariaCodeBlockOptions()).not.toHaveProperty('createHighlighter')
+  })
+
+  it('omits the Shiki highlighter on WebKit even when the simple regex probe passes', async () => {
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15')
     vi.resetModules()
 
     const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')

@@ -523,8 +523,21 @@ export function InlineWikilinkInput({
     pendingCompositionInputRef.current = false
     syncValueFromEditor()
   }
-  const submitValue = () =>
-    submitInlineValue({ onSubmit, submitOnEmpty, value, references })
+  const submitValue = () => {
+    const currentValue = editorRef.current
+      ? normalizeInlineWikilinkValue(serializeInlineNode(editorRef.current))
+      : value
+    const currentReferences = currentValue === value
+      ? references
+      : extractInlineWikilinkReferences(currentValue, entries)
+
+    submitInlineValue({
+      onSubmit,
+      submitOnEmpty,
+      value: currentValue,
+      references: currentReferences,
+    })
+  }
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!disabled && isLineBreakShortcut(event, isComposingRef.current)) {
       event.preventDefault()

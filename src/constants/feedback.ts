@@ -1,4 +1,8 @@
 export const REFACTORING_HOME_URL = 'https://refactoring.fm/'
+export const CODACY_HOME_URL = 'https://www.codacy.com/'
+export const CODESCENE_HOME_URL = 'https://codescene.com/'
+export const CIRCLECI_HOME_URL = 'https://circleci.com/'
+export const UNBLOCKED_HOME_URL = 'https://getunblocked.com/'
 export const TOLARIA_DOCS_URL = 'https://refactoringhq.github.io/tolaria/'
 export const TOLARIA_FIRST_LAUNCH_DOCS_URL = `${TOLARIA_DOCS_URL}start/first-launch`
 export const TOLARIA_PRODUCT_BOARD_URL = 'https://tolaria.canny.io/'

@@ -47,6 +47,10 @@ async function appendTextToSegment(page: Page, segment: string, text: string): P
   await expect(page.locator('.bn-editor')).toContainText(text.trim(), { timeout: 5_000 })
 }
 
+async function editorScrollTop(page: Page): Promise<number> {
+  return page.locator('.editor-scroll-area').evaluate((element) => element.scrollTop)
+}
+
 test.beforeEach(async ({ page }, testInfo) => {
   testInfo.setTimeout(120_000)
   tempVaultDir = createFixtureVaultCopy()
@@ -98,4 +102,30 @@ test('long rich-editor notes stay editable across typing, wikilinks, save, and n
   await expect.poll(() => fs.readFileSync(longNotePath, 'utf8'), { timeout: 5_000 }).toContain(beginningEdit.trim())
   await expect.poll(() => fs.readFileSync(longNotePath, 'utf8'), { timeout: 5_000 }).toContain(middleEdit.trim())
   await expect.poll(() => fs.readFileSync(longNotePath, 'utf8'), { timeout: 5_000 }).toContain(endEdit.trim())
+})
+
+test('opening the plus menu at the end of a long note preserves scroll position', async ({ page }) => {
+  await openNote(page, LONG_NOTE_TITLE)
+
+  const tailParagraph = page.locator('.bn-editor p').filter({ hasText: segmentLabel(PARAGRAPH_COUNT) }).first()
+  await tailParagraph.scrollIntoViewIfNeeded()
+  const beforeScrollTop = await editorScrollTop(page)
+  const beforeTailTop = await tailParagraph.evaluate((element) => element.getBoundingClientRect().top)
+  expect(beforeScrollTop).toBeGreaterThan(0)
+
+  const tailParagraphBox = await tailParagraph.boundingBox()
+  if (!tailParagraphBox) throw new Error('Tail paragraph was not visible')
+  await page.mouse.move(tailParagraphBox.x + 12, tailParagraphBox.y + 12)
+  const addBlockButton = page.locator('.bn-side-menu button:has([data-test="dragHandleAdd"])').first()
+  await expect(addBlockButton).toBeVisible({ timeout: 5_000 })
+  const addBlockButtonBox = await addBlockButton.boundingBox()
+  if (!addBlockButtonBox) throw new Error('Add block button was not visible')
+  await page.mouse.click(
+    addBlockButtonBox.x + addBlockButtonBox.width / 2,
+    addBlockButtonBox.y + addBlockButtonBox.height / 2,
+  )
+  await expect(page.locator('.bn-suggestion-menu')).toBeVisible({ timeout: 5_000 })
+
+  const afterTailTop = await tailParagraph.evaluate((element) => element.getBoundingClientRect().top)
+  expect(Math.abs(afterTailTop - beforeTailTop)).toBeLessThanOrEqual(2)
 })

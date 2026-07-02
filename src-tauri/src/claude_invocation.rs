@@ -223,17 +223,14 @@ fn stdin_prompt(message: &str, system_prompt: Option<&str>) -> String {
 
 fn mcp_config(vault_path: &str, vault_paths: &[String]) -> Result<String, String> {
     let mcp_server_path = crate::cli_agent_runtime::mcp_server_path_string()?;
-    let vault_paths = crate::cli_agent_runtime::active_vault_paths_json(vault_path, vault_paths);
     let config = serde_json::json!({
         "mcpServers": {
-            "tolaria": {
-                "command": "node",
-                "args": [mcp_server_path],
-                "env": {
-                    "VAULT_PATH": vault_path,
-                    "VAULT_PATHS": vault_paths
-                }
-            }
+            "tolaria": crate::cli_agent_runtime::tolaria_node_mcp_server(
+                &mcp_server_path,
+                vault_path,
+                vault_paths,
+                false,
+            )
         }
     });
     serde_json::to_string(&config).map_err(|e| format!("Failed to serialise MCP config: {e}"))

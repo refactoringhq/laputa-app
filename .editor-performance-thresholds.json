@@ -1,0 +1,83 @@
+{
+  "scenarios": {
+    "small": {
+      "contentBytes": 1451,
+      "metrics": {
+        "blockApplyMs": {
+          "baselineMs": 12.3,
+          "maxMs": 37
+        },
+        "blockResolveMs": {
+          "baselineMs": 11.6,
+          "maxMs": 37
+        },
+        "editFrameMs": {
+          "baselineMs": 3.2,
+          "maxMs": 16
+        },
+        "editorVisibleMs": {
+          "baselineMs": 223.2,
+          "maxMs": 282
+        },
+        "firstContentMs": {
+          "baselineMs": 237.4,
+          "maxMs": 293
+        },
+        "fullAppliedMs": {
+          "baselineMs": 240.6,
+          "maxMs": 294
+        },
+        "noteOpenEditorSwapMs": {
+          "baselineMs": 90.4,
+          "maxMs": 115
+        },
+        "noteOpenTotalMs": {
+          "baselineMs": 138.7,
+          "maxMs": 180
+        }
+      },
+      "sectionCount": 5
+    },
+    "large": {
+      "contentBytes": 130377,
+      "metrics": {
+        "blockApplyMs": {
+          "baselineMs": 279.1,
+          "maxMs": 362
+        },
+        "blockResolveMs": {
+          "baselineMs": 37.8,
+          "maxMs": 63
+        },
+        "editFrameMs": {
+          "baselineMs": 5,
+          "maxMs": 16
+        },
+        "editorVisibleMs": {
+          "baselineMs": 197.9,
+          "maxMs": 261
+        },
+        "firstContentMs": {
+          "baselineMs": 305.1,
+          "maxMs": 401
+        },
+        "fullAppliedMs": {
+          "baselineMs": 508.4,
+          "maxMs": 664
+        },
+        "noteOpenEditorSwapMs": {
+          "baselineMs": 384.3,
+          "maxMs": 498
+        },
+        "noteOpenTotalMs": {
+          "baselineMs": 448.4,
+          "maxMs": 587
+        }
+      },
+      "sectionCount": 460
+    }
+  },
+  "version": 1,
+  "updatedAt": "2026-06-29T07:53:27.234Z",
+  "description": "Ratcheted editor performance budgets for synthetic small and large note opens. Lower is better; maxMs values should only move down unless intentionally rebaselined."
+}

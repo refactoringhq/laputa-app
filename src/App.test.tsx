@@ -553,7 +553,7 @@ describe('App', () => {
     expect(screen.getByTestId('sidebar-loading-folders')).toBeInTheDocument()
     expect(screen.getByTestId('note-list-loading-skeleton')).toBeInTheDocument()
     expect(screen.getByTestId('breadcrumb-title-skeleton')).toBeInTheDocument()
-    expect(screen.getByTestId('editor-content-skeleton')).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-content-skeleton')).not.toBeInTheDocument()
     expect(screen.queryByText('Select a note to start editing')).not.toBeInTheDocument()
     expect(screen.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
     await act(async () => {
@@ -929,7 +929,7 @@ describe('App', () => {
     expect(screen.getByTestId('sidebar-loading-favorites')).toBeInTheDocument()
     expect(screen.getByTestId('note-list-loading-skeleton')).toBeInTheDocument()
     expect(screen.getByTestId('breadcrumb-title-skeleton')).toBeInTheDocument()
-    expect(screen.getByTestId('editor-content-skeleton')).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-content-skeleton')).not.toBeInTheDocument()
     expect(screen.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
 
     await act(async () => {

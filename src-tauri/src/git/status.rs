@@ -291,6 +291,10 @@ pub fn get_modified_files_with_stats(
 }
 
 fn get_modified_files_impl(vault: &Path, include_stats: bool) -> Result<Vec<ModifiedFile>, String> {
+    if !super::is_inside_work_tree(vault) {
+        return Ok(Vec::new());
+    }
+
     let output = git_command()
         .args(["status", "--porcelain=v1", "-z", "--untracked-files=all"])
         .current_dir(vault)
@@ -415,6 +419,17 @@ mod tests {
         change(vault, vp);
 
         expect_modified_file(vp, relative_path, status)
+    }
+
+    #[test]
+    fn test_get_modified_files_returns_empty_for_gitless_folder() {
+        let dir = tempfile::TempDir::new().unwrap();
+        fs::write(dir.path().join("note.md"), "# Note\n").unwrap();
+
+        assert!(get_modified_files(dir.path()).unwrap().is_empty());
+        assert!(get_modified_files_with_stats(dir.path())
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

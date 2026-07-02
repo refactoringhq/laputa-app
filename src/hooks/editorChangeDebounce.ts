@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 
-export const RICH_EDITOR_CHANGE_DEBOUNCE_MS = 500
+export const RICH_EDITOR_CHANGE_DEBOUNCE_MS = 1_500
 
 export function useDebouncedEditorChange({
   onFlush,

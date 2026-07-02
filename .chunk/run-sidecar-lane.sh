@@ -28,6 +28,11 @@ run_job() {
   printf '%s:%s\n' "$name" "$!" >> "$jobs_file"
 }
 
+sync_node_dependencies() {
+  log_lane "syncing pnpm dependencies with lockfile"
+  pnpm install --frozen-lockfile
+}
+
 terminate_jobs() {
   local pids
   pids="$(jobs -pr || true)"
@@ -76,6 +81,8 @@ run_frontend_lane() {
   : > "$jobs_file"
   trap terminate_jobs INT TERM
 
+  sync_node_dependencies
+
   export VITEST_COVERAGE_MAX_WORKERS="${VITEST_COVERAGE_MAX_WORKERS:-2}"
   log_lane "vitest workers=${VITEST_COVERAGE_MAX_WORKERS}; coverage shards=${FRONTEND_COVERAGE_SHARDS:-1}"
   run_job frontend-lint pnpm lint
@@ -100,6 +107,8 @@ run_rust_lane() {
 }
 
 run_playwright_lane() {
+  sync_node_dependencies
+
   export PLAYWRIGHT_SHARED_SERVER="${PLAYWRIGHT_SHARED_SERVER:-1}"
   export PLAYWRIGHT_CONCURRENCY="${PLAYWRIGHT_CONCURRENCY:-4}"
   local shards="${PLAYWRIGHT_SHARDS:-8}"

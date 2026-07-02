@@ -370,6 +370,8 @@ describe('useAppSave', () => {
     await act(async () => {
       result.current.handleContentChange(entry.path, '# Note\n\nAfter')
       await result.current.handleSave()
+      vi.advanceTimersByTime(200)
+      await Promise.resolve()
     })
 
     expect(deps.updateEntry).toHaveBeenCalledWith(

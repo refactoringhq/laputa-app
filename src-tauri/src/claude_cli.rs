@@ -30,6 +30,8 @@ const CLAUDE_PROVIDER_ENV_KEYS: &[EnvName<'static>] = &[
     EnvName::trusted("SSL_CERT_DIR"),
     EnvName::trusted("NODE_EXTRA_CA_CERTS"),
 ];
+const LOCALIZED_ERROR_PREFIX: &str = "tolaria:i18n-error:";
+const CLAUDE_TOO_MANY_REDIRECTS_KEY: &str = "ai.error.claude.tooManyRedirects";
 
 /// Status returned by `check_claude_cli`.
 #[derive(Debug, Serialize, Clone)]
@@ -441,6 +443,10 @@ fn configure_claude_command_environment(cmd: &mut std::process::Command, bin: &P
 }
 
 fn format_failed_claude_exit(failure: ClaudeFailure<'_>) -> String {
+    if is_claude_too_many_redirects_error(failure.stderr) {
+        return localized_error(CLAUDE_TOO_MANY_REDIRECTS_KEY);
+    }
+
     if is_claude_auth_error(failure.stderr) {
         return "Claude CLI is not authenticated. Run `claude auth login` in your terminal.".into();
     }
@@ -455,6 +461,19 @@ fn format_failed_claude_exit(failure: ClaudeFailure<'_>) -> String {
             .collect::<Vec<_>>()
             .join("\n")
     }
+}
+
+fn localized_error(key: &str) -> String {
+    let payload = serde_json::json!({
+        "key": key,
+        "values": {},
+    });
+    format!("{LOCALIZED_ERROR_PREFIX}{payload}")
+}
+
+fn is_claude_too_many_redirects_error(stderr: ClaudeStderr<'_>) -> bool {
+    let lower = stderr.to_ascii_lowercase();
+    lower.contains("toomanyredirects") || lower.contains("too many redirects")
 }
 
 fn is_claude_auth_error(stderr: ClaudeStderr<'_>) -> bool {
@@ -784,7 +803,41 @@ mod tests {
         )));
     }
 
+    #[test]
+    fn format_failed_claude_exit_sanitizes_too_many_redirects() {
+        let message = format_failed_claude_exit(ClaudeFailure {
+            stderr: ClaudeStderr(
+                "API Error: Unable to connect to API (TooManyRedirects)\nredirected to https://example.invalid/callback?token=secret",
+            ),
+            status: failed_exit_status(),
+        });
+
+        assert_eq!(
+            (
+                message.starts_with("tolaria:i18n-error:"),
+                message.contains(r#""key":"ai.error.claude.tooManyRedirects""#),
+                message.contains("https://example.invalid"),
+                message.contains("secret"),
+            ),
+            (true, true, false, false)
+        );
+    }
+
     // --- dispatch_event / dispatch_stream_event ---
+
+    #[cfg(unix)]
+    fn failed_exit_status() -> ExitStatus {
+        use std::os::unix::process::ExitStatusExt;
+
+        ExitStatus::from_raw(1 << 8)
+    }
+
+    #[cfg(windows)]
+    fn failed_exit_status() -> ExitStatus {
+        use std::os::windows::process::ExitStatusExt;
+
+        ExitStatus::from_raw(1)
+    }
 
     fn new_state() -> StreamState {
         StreamState {

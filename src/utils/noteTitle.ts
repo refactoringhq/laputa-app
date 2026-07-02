@@ -48,6 +48,21 @@ function stripMarkdownFormatting(text: MarkdownLine): DisplayTitle {
   )
 }
 
+function firstNonBlankLine(body: MarkdownContent): MarkdownLine | null {
+  let start = 0
+
+  while (start <= body.length) {
+    const end = body.indexOf('\n', start)
+    const lineEnd = end === -1 ? body.length : end
+    const line = body.slice(start, lineEnd).trim()
+    if (line) return line
+    if (end === -1) return null
+    start = end + 1
+  }
+
+  return null
+}
+
 export function filenameStemToTitle(filename: NoteFilename): DisplayTitle {
   const stem = filename.replace(/\.[^.]+$/, '')
   return stem
@@ -59,16 +74,11 @@ export function filenameStemToTitle(filename: NoteFilename): DisplayTitle {
 
 export function extractH1TitleFromContent(content: MarkdownContent): DisplayTitle | null {
   const [, body] = splitFrontmatter(content)
+  const firstLine = firstNonBlankLine(body)
 
-  for (const line of body.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    if (!trimmed.startsWith('# ')) return null
-    const title = stripMarkdownFormatting(trimmed.slice(2)).trim()
-    return title || null
-  }
-
-  return null
+  if (!firstLine?.startsWith('# ')) return null
+  const title = stripMarkdownFormatting(firstLine.slice(2)).trim()
+  return title || null
 }
 
 export function extractFrontmatterTitleFromContent(content: MarkdownContent): DisplayTitle | null {

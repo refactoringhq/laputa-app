@@ -59,6 +59,8 @@ const EMPTY_REMOTE_STATUS: RepositoryRemoteStatus = {
   status: null,
 }
 
+const REPOSITORY_PATH_SEPARATOR = '\u0000'
+
 type RepositoryLoadIds = Map<string, number>
 
 function tauriCall<T>(command: string, args: Record<string, unknown>): Promise<T> {
@@ -87,6 +89,14 @@ function repositoryErrorMessage(error: unknown, fallback: string): string {
   return typeof error === 'string' ? error : fallback
 }
 
+function repositoryPathSignature(repositories: GitRepositoryOption[]): string {
+  return repositories.map((repository) => repository.path).join(REPOSITORY_PATH_SEPARATOR)
+}
+
+function repositoryPathsFromSignature(signature: string): string[] {
+  return signature ? signature.split(REPOSITORY_PATH_SEPARATOR) : []
+}
+
 function useValidatedRepositoryPath({
   repositories,
   fallbackPath,
@@ -104,6 +114,11 @@ function useValidatedRepositoryPath({
 function useRepositoryModifiedFiles(repositories: GitRepositoryOption[]) {
   const [byRepository, setByRepository] = useState<ReadonlyMap<string, RepositoryModifiedFiles>>(() => new Map())
   const loadIdsRef = useRef<RepositoryLoadIds>(new Map())
+  const repositorySignature = repositoryPathSignature(repositories)
+  const repositoryPaths = useMemo(
+    () => repositoryPathsFromSignature(repositorySignature),
+    [repositorySignature],
+  )
 
   const loadModifiedFilesForRepository = useCallback(async (
     vaultPath: string,
@@ -132,13 +147,13 @@ function useRepositoryModifiedFiles(repositories: GitRepositoryOption[]) {
   }, [])
 
   const loadAllModifiedFiles = useCallback(async (options: LoadModifiedFilesOptions = {}) => {
-    await Promise.all(repositories.map((repository) => loadModifiedFilesForRepository(repository.path, options)))
-  }, [loadModifiedFilesForRepository, repositories])
+    await Promise.all(repositoryPaths.map((path) => loadModifiedFilesForRepository(path, options)))
+  }, [loadModifiedFilesForRepository, repositoryPaths])
 
   useEffect(() => {
-    if (repositories.length === 0) return
+    if (repositoryPaths.length === 0) return
     void loadAllModifiedFiles()
-  }, [loadAllModifiedFiles, repositories.length])
+  }, [loadAllModifiedFiles, repositoryPaths.length])
 
   return { byRepository, loadAllModifiedFiles, loadModifiedFilesForRepository }
 }
@@ -146,6 +161,11 @@ function useRepositoryModifiedFiles(repositories: GitRepositoryOption[]) {
 function useRepositoryRemoteStatuses(repositories: GitRepositoryOption[]) {
   const [byRepository, setByRepository] = useState<ReadonlyMap<string, RepositoryRemoteStatus>>(() => new Map())
   const loadIdsRef = useRef<RepositoryLoadIds>(new Map())
+  const repositorySignature = repositoryPathSignature(repositories)
+  const repositoryPaths = useMemo(
+    () => repositoryPathsFromSignature(repositorySignature),
+    [repositorySignature],
+  )
 
   const refreshRemoteStatusForRepository = useCallback(async (vaultPath: string) => {
     if (!vaultPath.trim()) return null
@@ -167,8 +187,8 @@ function useRepositoryRemoteStatuses(repositories: GitRepositoryOption[]) {
   }, [])
 
   const refreshAllRemoteStatuses = useCallback(async () => {
-    await Promise.all(repositories.map((repository) => refreshRemoteStatusForRepository(repository.path)))
-  }, [refreshRemoteStatusForRepository, repositories])
+    await Promise.all(repositoryPaths.map((path) => refreshRemoteStatusForRepository(path)))
+  }, [refreshRemoteStatusForRepository, repositoryPaths])
 
   return { byRepository, refreshAllRemoteStatuses, refreshRemoteStatusForRepository }
 }

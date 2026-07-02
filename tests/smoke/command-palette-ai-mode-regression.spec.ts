@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { openCommandPalette } from './helpers'
+import { installMockAiAgent, openCommandPalette } from './helpers'
 import {
   expectEditorSelectionRange,
   expectNoPageErrors,
@@ -37,6 +37,7 @@ async function expectCaretAfterChip(page: Page) {
 
 test.describe('Command palette AI mode regression', () => {
   test.beforeEach(async ({ page }) => {
+    await installMockAiAgent(page)
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await expect(page.getByTestId('note-list-container')).toBeVisible({ timeout: 5_000 })
@@ -72,6 +73,24 @@ test.describe('Command palette AI mode regression', () => {
     await page.keyboard.press('Backspace')
 
     await expect(aiInput).toBeVisible()
+    await expectNoPageErrors(pageErrors)
+  })
+
+  test('submits an arbitrary prompt and opens the AI workspace without a render error', async ({ page }) => {
+    const pageErrors = trackPageErrors(page)
+    await openCommandPalette(page)
+    await page.locator('input[placeholder="Type a command..."]').pressSequentially(' ')
+
+    const aiInput = page.getByTestId('command-palette-ai-input')
+    await expect(aiInput).toBeVisible()
+    await expect(aiInput).toBeFocused()
+
+    await aiInput.pressSequentially('random prompt')
+    await expectNormalizedEditorText(aiInput, 'random prompt')
+    await page.keyboard.press('Enter')
+
+    await expect(page.locator('[data-command-palette="true"]')).toHaveCount(0)
+    await expect(page.getByTestId('ai-workspace')).toBeVisible()
     await expectNoPageErrors(pageErrors)
   })
 
@@ -125,6 +144,27 @@ test.describe('Command palette AI mode regression', () => {
 
     await page.keyboard.press('Backspace')
     await expectNormalizedEditorText(aiInput, 'hello XYrl')
+    await expectNoPageErrors(pageErrors)
+  })
+
+  test('submits a quick prompt and opens the AI workspace without render errors', async ({ page }) => {
+    const pageErrors = trackPageErrors(page)
+    await openCommandPalette(page)
+    await page.locator('input[placeholder="Type a command..."]').pressSequentially(' ')
+
+    const aiInput = page.getByTestId('command-palette-ai-input')
+    await expect(aiInput).toBeVisible()
+    await expect(aiInput).toBeFocused()
+
+    await page.keyboard.type('summarize the active note')
+    await page.keyboard.press('Enter')
+
+    await expect(page.getByTestId('ai-workspace')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByTestId('ai-panel')).toBeVisible()
+    await expect(page.getByTestId('ai-message').first()).toContainText(
+      'summarize the active note',
+      { timeout: 5_000 },
+    )
     await expectNoPageErrors(pageErrors)
   })
 })

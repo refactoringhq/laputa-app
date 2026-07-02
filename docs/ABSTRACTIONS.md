@@ -58,13 +58,27 @@ The frontmatter parser (Rust: `vault/mod.rs`, TS: `utils/frontmatter.ts`) must f
 
 All data lives in markdown files with YAML frontmatter. There is no database — the filesystem is the source of truth.
 
+### Rich-Editor Markdown Serialization
+
+`src/utils/richEditorMarkdown.ts` is the canonical owner for turning a BlockNote document back into vault Markdown. It restores Tolaria's durable Markdown syntax for wikilinks, math, highlights, attachments, Mermaid, and tldraw blocks before the save path writes bytes to disk. Hot save paths should pass an already-read block snapshot when they have one; a debounced rich-editor flush should not ask BlockNote for `editor.document` twice.
+
+Real BlockNote editor instances install the experimental direct serializer from `src/utils/blockNoteDirectMarkdown.ts`. Callers should go through `serializeBlockNoteMarkdown()` rather than invoking `blocksToMarkdownLossy()` directly: the helper uses the direct serializer when every block shape is supported and falls back to BlockNote's exporter when a custom or unknown block appears.
+
+The direct serializer cache is derived state, scoped to the editor instance, and disposable. Bridge helpers that transform blocks for Markdown restoration should preserve object identity when a block, its children, and table cells are unchanged; that lets frequent debounced saves reuse cached Markdown for stable subtrees without treating the cache as the source of truth.
+
+Opening a Markdown note goes through `resolveBlocksForTarget()` rather than calling BlockNote's parser unconditionally. The resolver first checks exact-source block caches, then uses cheap blank/H1 recognition, then tries Tolaria's worker-backed direct parser for large common Markdown. Unsupported Markdown returns to BlockNote's parser with the same durable-token injection path, preserving correctness while keeping the common large-note path off BlockNote's heavier import lifecycle. Large block sets are then mounted through `applyBlocksToEditorProgressively()`, which locks the editor while chunks append over animation frames and commits the path only after the full document is present. Ordinary BlockNote block wrappers remain fully measurable after mount so side menus and dialogs can preserve viewport position in long documents.
+
+Hot edit paths should avoid document-wide BlockNote lifecycle work. `richEditorBlockNoteOptions.ts` disables BlockNote's previous-block animation tracker for Tolaria editors because it scans the full old and new ProseMirror documents for every doc-changing transaction. `richEditorDispatchPerformance.ts` wraps the ProseMirror dispatch function once and logs `richEditorDispatch` timings for large or slow transactions without traversing the document. Feature code that subscribes to `editor.onChange` must either be debounced/coalesced or active only while its UI state requires it; collapsed-heading rendering follows this rule by subscribing only while sections are collapsed.
+
+Block-selection behavior keeps UI/plugin wiring separate from block operations. `richEditorBlockSelectionExtension.ts` owns the ProseMirror plugin, state reducer, decorations, and keyboard/clipboard event dispatch. `richEditorBlockSelectionDocument.ts` owns BlockNote document traversal, nested-selection pruning, collapsed hidden-content operation IDs, and block-move helpers. `richEditorBlockSelectionClipboard.ts` owns Tolaria clipboard MIME data, BlockNote HTML/Markdown fallback parsing, and ID stripping before paste.
+
 ### Vault Git Capability
 
 Git is a per-vault capability, not a prerequisite for the document model. A vault can be:
 
 | State | Meaning | UI behavior |
 |---|---|---|
-| Git-backed | The vault path contains a Git repository | History, changes, commits, sync, conflict resolution, remotes, AutoGit, and auto-sync are available according to remote/config state |
+| Git-backed | The vault path is inside a Git work tree, including a parent repository above the mounted folder | History, changes, commits, sync, conflict resolution, remotes, AutoGit, and auto-sync are available according to remote/config state |
 | Non-git | The vault path is a plain folder | Markdown scanning, editing, search, and navigation work; Git-dependent status-bar controls and command-palette entries are replaced by `Git disabled` + `Initialize Git for Current Vault` |
 
 Plain folders become Git-backed only when the user explicitly runs Git initialization from the setup dialog, status bar, or command palette. The setup dialog supports "not now" for a one-time dismissal and "never for this vault" for a local per-vault opt-out from future automatic prompts. Features that depend on Git must check both the vault capability and the installation-local `git_enabled` setting instead of assuming every vault has `.git` or that Git chrome is globally visible.
@@ -216,6 +230,8 @@ For import ergonomics, simple Markdown wrappers in non-formula CSV cells are int
 The renderer may cache recently opened or preloaded markdown content, but cached content is only a performance hint. `useTabManagement` can reuse cached text immediately when it carries the same `modifiedAt` and `fileSize` identity as the current `VaultEntry`; otherwise it validates the cached string with the `validate_note_content` Tauri command. That command re-enters the same vault path boundary checks as `get_note_content` and compares the cached text against the current on-disk file bytes. A mismatch, missing file, or unreadable file falls back to the normal fresh-read path and existing missing/unreadable recovery. Background note prefetch is bounded to a small number of concurrent native reads, and a note opened while queued is promoted to foreground instead of waiting behind the prefetch backlog. Note-open entry objects are re-normalized at the tab boundary, so transient reload or bridge payloads with missing display metadata fall back to filename/title defaults before editor chrome renders; entries without a usable path are ignored instead of opening a broken tab.
 
 `useEditorTabSwap` may reuse BlockNote blocks that were already opened successfully or warmed from prefetched raw content, keyed by vault, path, and exact source content. Background warming is limited to likely next large Markdown notes and defers while the editor is unmounted, raw mode is active, or recent typing/navigation is still inside the foreground idle window. Every async editor swap carries a generation and source-content token so stale conversion results cannot overwrite newer file content or dirty editor state.
+
+`scripts/editor-performance-benchmark.mjs` exercises the same renderer note-open path without touching a real vault. It injects synthetic small and large Markdown notes through the browser/Tauri mock boundary, measures editor visibility, first rendered content, full block application, edit frame latency, and DEV-only editor timing logs, then compares medians against `.editor-performance-thresholds.json`. The threshold file is a ratchet: normal runs fail when medians exceed stored `maxMs` values, while `pnpm perf:editor:update` records the current baseline and only tightens existing maxima.
 
 ### Table of Contents Outline
 
@@ -671,11 +687,12 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 - `SingleEditorView` disables BlockNote's default formatting toolbar, `/` menu, and side menu, then mounts Tolaria-owned controllers so the visible formatting surface matches Tolaria's markdown round-trip guarantees.
 - `SingleEditorView` owns a whitespace mouse-selection bridge around BlockNote and its rich-editor scroll area: drag starts that land outside the editable text DOM are remapped through the ProseMirror view with clamped coordinates, while drags below the rendered document fall back to the document end. Drags that begin inside BlockNote's contenteditable surface, toolbars, side menu, dialogs, or non-primary mouse buttons stay on BlockNote/native handling.
 - `editorRichCopy.ts` owns rich-editor copy serialization for external apps. Normal selections use BlockNote's external clipboard HTML so tables, lists, checklists, and inline marks paste as rich content outside Tolaria, while `SingleEditorView` still normalizes `text/plain` and keeps fenced code-block selections on raw code text.
-- The formatting toolbar only exposes inline controls that persist through `blocksToMarkdownLossy()` in Tolaria's save pipeline: bold, italic, strike, inline code, `==highlight==`, nesting, and link creation. Controls that BlockNote can render temporarily but Tolaria cannot faithfully persist, such as underline, color, alignment, and the block-type dropdown, are hidden instead of appearing to work and later disappearing.
+- The formatting toolbar only exposes inline controls that persist through Tolaria's Markdown serialization pipeline: bold, italic, strike, inline code, `==highlight==`, nesting, and link creation. Controls that BlockNote can render temporarily but Tolaria cannot faithfully persist, such as underline, color, alignment, and the block-type dropdown, are hidden instead of appearing to work and later disappearing.
 - Tolaria's formatting-toolbar controller also keeps file/image actions mounted across the tiny hover gap between an image block and the floating toolbar, and while the toolbar itself is hovered, so image controls remain usable instead of collapsing mid-interaction.
 - `useEditorComposing` tracks editor-owned IME composition events and closes the floating formatting toolbar during composition plus a short post-composition settle window, keeping CJK candidate windows unobstructed without changing normal selection toolbar behavior.
 - `createImeCompositionKeyGuardExtension()` intercepts composing `Enter` keydown events before BlockNote's list shortcuts see them, so Korean/Japanese/Chinese IMEs can commit text at the start of list items without Tolaria splitting the current bullet. It stops editor shortcut propagation only; it does not prevent the browser/IME default composition action.
 - `createMarkdownHighlightShortcutExtension()` owns the rich-editor Cmd/Ctrl+Shift+M formatting shortcut. It skips IME composition and read-only editors, calls the same highlight style toggle as the formatting toolbar, and records `markdown_highlight_shortcut_used` with keyboard-only metadata.
+- `richEditorBlockSelectionExtension.ts` owns Notion-style block selection as an editor-level ProseMirror plugin. A first `Escape` promotes the current caret or native text selection into one or more selected blocks, renders block-level decoration chrome, and keeps arrow/delete/enter handling inside the editor; a second `Escape` clears the block selection without preventing the app-level note-list escape path from taking over. Native drag text selection remains content selection, while block mode uses decoration chrome so empty spacer lines are not treated as selected content.
 - `richEditorRecoveryClassifier.ts` is the shared taxonomy for recoverable BlockNote/ProseMirror failures used by render recovery and transform recovery. Missing block IDs plus paragraph and table-row index failures keep one canonical reason across `editor_render_recovered` and `rich_editor_transform_error_recovered`; the two recovery surfaces differ only in retry, repair, and dispatch behavior.
 - `richEditorInputTransform.ts` is the shared execution shell for rich-editor Markdown `beforeinput` transforms. It reads the live ProseMirror view, skips IME composition, resets state when a stale view is detected, dispatches transform transactions, prevents native input only after successful dispatch, and reports recoverable editor-transform errors through the shared classifier. Arrow ligatures, inline math conversion, and `==highlight==` keep their syntax-specific matching in their feature files and are composed for the main editor by `richEditorInputTransformExtension.ts`.
 - `richEditorTextDirection.ts` uses a BlockNote extension with ProseMirror decorations for per-node RTL quote rendering. It handles callout-marker quotes such as `[!note] כותרת` at the editor render layer, so BlockNote does not strip post-render DOM mutations and quote rails can follow logical inline-start.
@@ -696,15 +713,22 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 ```mermaid
 flowchart LR
     A["📄 Raw markdown\n(from disk)"] --> B["splitFrontmatter()\n→ yaml + body"]
-    B --> C["preProcessDurableEditorMarkdown(body)\nmermaid/tldraw fences + file links → tokens"]
-    C --> D["preProcessWikilinks(body)\n[[target]] → ‹token›"]
-    D --> E["preProcessMathMarkdown(body)\n$...$ / $$...$$ → tokens"]
-    E --> F["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
-    F --> G["injectWikilinks + injectMathInBlocks + injectDurableEditorMarkdownBlocks\n tokens → schema nodes"]
-    G --> H["editor.replaceBlocks()\n→ rendered editor"]
+    B --> C{"exact-source\nblock cache?"}
+    C -->|"hit"| D["reuse cached blocks"]
+    C -->|"miss"| E["preprocess durable blocks,\nwikilinks, math, images"]
+    E --> F{"large common\nMarkdown?"}
+    F -->|"yes"| G["worker-backed direct Markdown parser\n→ block tree"]
+    F -->|"unsupported or small"| H["tryParseMarkdownToBlocks()\n→ BlockNote block tree"]
+    G --> I["inject wikilinks, math, highlights,\nand durable schema nodes"]
+    H --> I
+    D --> J{"large block set?"}
+    I --> J
+    J -->|"yes"| K["progressive locked apply\nfirst chunk + frame-yielded appends"]
+    J -->|"no"| L["single replaceBlocks()\nsmall/fast swap"]
 
     style A fill:#f8f9fa,stroke:#6c757d,color:#000
-    style H fill:#d4edda,stroke:#28a745,color:#000
+    style K fill:#d4edda,stroke:#28a745,color:#000
+    style L fill:#d4edda,stroke:#28a745,color:#000
 ```
 
 > Wikilink placeholder tokens use `\u2039` and `\u203A`; math, Mermaid, tldraw, and standalone file-attachment link placeholders use ASCII sentinels with URI-encoded payloads.
@@ -713,13 +737,16 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["✏️ BlockNote blocks\n(editor state)"] --> B["blocksToMarkdownLossy()"]
-    B --> C["restoreWikilinks + serializeDurableEditorBlocks()\nschema nodes → Markdown source"]
-    C --> D["prepend frontmatter yaml"]
-    D --> E["invoke('save_note_content')\n→ disk write"]
+    A["✏️ BlockNote blocks\n(editor state)"] --> B["restore durable Markdown tokens\nwhile preserving block identity"]
+    B --> C{"all block shapes\nsupported directly?"}
+    C -->|"yes"| D["direct serializer\nwith per-editor WeakMap cache"]
+    C -->|"no"| E["BlockNote Markdown exporter fallback"]
+    D --> F["prepend frontmatter yaml"]
+    E --> F
+    F --> G["invoke('save_note_content')\n→ disk write"]
 
     style A fill:#cce5ff,stroke:#004085,color:#000
-    style E fill:#d4edda,stroke:#28a745,color:#000
+    style G fill:#d4edda,stroke:#28a745,color:#000
 ```
 
 Rich-editor change events are coalesced before this serialization runs. `useEditorTabSwap` keeps the latest BlockNote state in the editor, schedules one Markdown serialization for a short idle window, and exposes an explicit flush hook for save, note switch, raw-mode entry, and destructive note actions. `src/utils/richEditorMarkdown.ts` is the shared BlockNote-to-Markdown owner for autosave/tab-swap and raw-mode entry, so wikilink restoration, durable schema-node serialization, frontmatter preservation, file-attachment block round-tripping, and portable attachment paths cannot drift between editor modes. This keeps long notes from paying full-document Markdown serialization on every keystroke while preserving the disk-first save path.
@@ -829,7 +856,7 @@ No indexing step required — search runs directly against the filesystem.
 ### Vault Switching
 
 `useVaultSwitcher` hook manages multiple vaults:
-- Persists vault list to `$XDG_CONFIG_HOME/com.tolaria.app/vaults.json`, defaulting to `$HOME/.config/com.tolaria.app/vaults.json` on Unix platforms (reads legacy `com.laputa.app` and the previous platform config directory on upgrade)
+- Persists vault list to `$XDG_CONFIG_HOME/com.tolaria.app/vaults.json`, defaulting to `$HOME/.config/com.tolaria.app/vaults.json` on Unix platforms. App config path policy is declared once in `mcp-server/app-config-policy.json` and consumed by both the Rust app helper and Node MCP server: reads check the current Tolaria namespace, then legacy `com.laputa.app`, first in the preferred config root and then in the platform config root when it differs; writes target the current namespace in the preferred root.
 - Switching closes all tabs and resets sidebar
 - Supports adding, removing, hiding/restoring vaults
 - Persists workspace aliases, colors, mount state, and the default new-note destination for the unified graph
@@ -908,7 +935,7 @@ Tolaria delegates remote auth to the user's system git setup:
 
 ## Settings
 
-App-level settings persisted at `$XDG_CONFIG_HOME/com.tolaria.app/settings.json`, defaulting to `$HOME/.config/com.tolaria.app/settings.json` on Unix platforms (reads legacy `com.laputa.app` and the previous platform config directory on upgrade):
+App-level settings persisted at `$XDG_CONFIG_HOME/com.tolaria.app/settings.json`, defaulting to `$HOME/.config/com.tolaria.app/settings.json` on Unix platforms. `settings.json` and `vaults.json` share the same `mcp-server/app-config-policy.json` search order used by Rust and the external MCP server, so durable agent registrations resolve mounted workspaces the same way the app resolves installation-local settings:
 
 ```typescript
 interface AiWorkspaceConversationSetting {

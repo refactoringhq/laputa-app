@@ -1,4 +1,20 @@
-import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import {
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type KeyboardEvent,
+  type ReactNode,
+  type SetStateAction,
+} from 'react'
 import type { NoteWidthMode, VaultEntry } from '../types'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../lib/i18n'
@@ -79,6 +95,64 @@ interface BreadcrumbBarProps {
 const BREADCRUMB_ICON_CLASS = 'size-[16px]'
 const TITLE_ACTION_GAP_PX = 24
 
+interface BreadcrumbTooltipController {
+  activeTooltipLabel: string | null
+  setActiveTooltipLabel: Dispatch<SetStateAction<string | null>>
+}
+
+interface BreadcrumbTooltipControl {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  onPointerEnter?: () => void
+  onPointerMove?: () => void
+  onPointerLeave?: () => void
+  onFocus?: () => void
+  onBlur?: () => void
+}
+
+const BreadcrumbTooltipContext = createContext<BreadcrumbTooltipController | null>(null)
+
+function clearBreadcrumbTooltip(controller: BreadcrumbTooltipController, label: string) {
+  controller.setActiveTooltipLabel((current) => current === label ? null : current)
+}
+
+function setBreadcrumbTooltipOpen(controller: BreadcrumbTooltipController, label: string, open: boolean) {
+  if (open) {
+    controller.setActiveTooltipLabel(label)
+    return
+  }
+  clearBreadcrumbTooltip(controller, label)
+}
+
+function useBreadcrumbTooltipControl(label: string): BreadcrumbTooltipControl {
+  const controller = useContext(BreadcrumbTooltipContext)
+  const activate = useCallback(() => {
+    controller?.setActiveTooltipLabel(label)
+  }, [controller, label])
+  const deactivate = useCallback(() => {
+    if (!controller) return
+    clearBreadcrumbTooltip(controller, label)
+  }, [controller, label])
+  const onOpenChange = useCallback((open: boolean) => {
+    if (!controller) return
+    setBreadcrumbTooltipOpen(controller, label, open)
+  }, [controller, label])
+
+  if (!controller) {
+    return {}
+  }
+
+  return {
+    open: controller.activeTooltipLabel === label,
+    onOpenChange,
+    onPointerEnter: activate,
+    onPointerMove: activate,
+    onPointerLeave: deactivate,
+    onFocus: activate,
+    onBlur: deactivate,
+  }
+}
+
 function focusFilenameInput(
   isEditing: boolean,
   inputRef: React.RefObject<HTMLInputElement | null>,
@@ -141,8 +215,16 @@ function IconActionButton({
   testId?: string
   tooltipAlign?: 'start' | 'center' | 'end'
 }) {
+  const tooltipControl = useBreadcrumbTooltipControl(copy.label)
+
   return (
-    <ActionTooltip copy={copy} side="bottom" align={tooltipAlign}>
+    <ActionTooltip
+      copy={copy}
+      side="bottom"
+      align={tooltipAlign}
+      open={tooltipControl.open}
+      onOpenChange={tooltipControl.onOpenChange}
+    >
       <Button
         type="button"
         variant="ghost"
@@ -150,6 +232,11 @@ function IconActionButton({
         className={cn('text-muted-foreground [&_svg:not([class*=size-])]:size-4', className)}
         style={style}
         onClick={onClick}
+        onPointerEnter={tooltipControl.onPointerEnter}
+        onPointerMove={tooltipControl.onPointerMove}
+        onPointerLeave={tooltipControl.onPointerLeave}
+        onFocus={tooltipControl.onFocus}
+        onBlur={tooltipControl.onBlur}
         aria-label={copy.label}
         aria-disabled={onClick ? undefined : true}
         data-testid={testId}
@@ -695,9 +782,17 @@ function SyncFilenameButton({
   locale?: AppLocale
   onRenameFilename?: (path: string, newFilenameStem: string) => void
 }) {
+  const tooltipLabel = translate(locale, 'editor.filename.renameToTitle')
+  const tooltipControl = useBreadcrumbTooltipControl(tooltipLabel)
+
   if (!syncStem || !onRenameFilename) return null
   return (
-    <ActionTooltip copy={{ label: translate(locale, 'editor.filename.renameToTitle') }} side="bottom">
+    <ActionTooltip
+      copy={{ label: tooltipLabel }}
+      side="bottom"
+      open={tooltipControl.open}
+      onOpenChange={tooltipControl.onOpenChange}
+    >
       <Button
         type="button"
         variant="ghost"
@@ -705,7 +800,12 @@ function SyncFilenameButton({
         className="text-muted-foreground hover:text-foreground"
         onClick={() => onRenameFilename(entryPath, syncStem)}
         data-testid="breadcrumb-sync-button"
-        aria-label={translate(locale, 'editor.filename.renameToTitle')}
+        aria-label={tooltipLabel}
+        onPointerEnter={tooltipControl.onPointerEnter}
+        onPointerMove={tooltipControl.onPointerMove}
+        onPointerLeave={tooltipControl.onPointerLeave}
+        onFocus={tooltipControl.onFocus}
+        onBlur={tooltipControl.onBlur}
       >
         <ArrowsClockwise size={14} />
       </Button>
@@ -954,23 +1054,11 @@ function BreadcrumbOverflowMenu({
   const archiveLabel = translate(locale, archiveLabelKey(entry.archived))
   const tableOfContentsLabel = translate(locale, showTableOfContents ? 'editor.toolbar.closeTableOfContents' : 'editor.toolbar.openTableOfContents')
   const neighborhoodLabel = translate(locale, 'editor.toolbar.openNeighborhood')
+  const moreActionsLabel = translate(locale, 'editor.toolbar.moreActions')
 
   return (
     <DropdownMenu>
-      <ActionTooltip copy={{ label: translate(locale, 'editor.toolbar.moreActions') }} side="bottom" align="end">
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="breadcrumb-bar__overflow-menu text-muted-foreground hover:text-foreground"
-            aria-label={translate(locale, 'editor.toolbar.moreActions')}
-            data-testid="breadcrumb-overflow-menu-trigger"
-          >
-            <DotsThree size={18} weight="bold" className={BREADCRUMB_ICON_CLASS} />
-          </Button>
-        </DropdownMenuTrigger>
-      </ActionTooltip>
+      <BreadcrumbOverflowMenuTrigger label={moreActionsLabel} />
       <DropdownMenuContent align="end" className="min-w-44">
         <DropdownMenuItem disabled={!runDiffAction} onSelect={runDiffAction}>
           <GitBranch size={16} />
@@ -1019,6 +1107,38 @@ function BreadcrumbOverflowMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+function BreadcrumbOverflowMenuTrigger({ label }: { label: string }) {
+  const tooltipControl = useBreadcrumbTooltipControl(label)
+
+  return (
+    <ActionTooltip
+      copy={{ label }}
+      side="bottom"
+      align="end"
+      open={tooltipControl.open}
+      onOpenChange={tooltipControl.onOpenChange}
+    >
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="breadcrumb-bar__overflow-menu text-muted-foreground hover:text-foreground"
+          aria-label={label}
+          data-testid="breadcrumb-overflow-menu-trigger"
+          onPointerEnter={tooltipControl.onPointerEnter}
+          onPointerMove={tooltipControl.onPointerMove}
+          onPointerLeave={tooltipControl.onPointerLeave}
+          onFocus={tooltipControl.onFocus}
+          onBlur={tooltipControl.onBlur}
+        >
+          <DotsThree size={18} weight="bold" className={BREADCRUMB_ICON_CLASS} />
+        </Button>
+      </DropdownMenuTrigger>
+    </ActionTooltip>
   )
 }
 
@@ -1098,6 +1218,11 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
   const actionsRef = useRef<HTMLDivElement | null>(null)
   const titleRef = useRef<HTMLDivElement | null>(null)
   const overflowCollapsed = useBreadcrumbOverflow(titleRef, actionsRef)
+  const [activeTooltipLabel, setActiveTooltipLabel] = useState<string | null>(null)
+  const tooltipController = useMemo(() => ({
+    activeTooltipLabel,
+    setActiveTooltipLabel,
+  }), [activeTooltipLabel])
   useImperativeHandle(barRef, () => breadcrumbDragRegionRef.current as HTMLDivElement, [breadcrumbDragRegionRef])
 
   useEffect(() => {
@@ -1111,40 +1236,42 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
 
   return (
     <TooltipProvider>
-      <div
-        ref={breadcrumbDragRegionRef}
-        data-tauri-drag-region
-        data-title-hidden=""
-        className="breadcrumb-bar flex shrink-0 items-center border-b border-transparent"
-        style={{
-          height: 52,
-          background: 'var(--background)',
-          padding: '6px 16px 6px var(--breadcrumb-bar-left-padding, 16px)',
-          boxSizing: 'border-box',
-        }}
-      >
-        <div ref={titleRef} className="breadcrumb-bar__title min-w-0 flex-1 overflow-hidden">
-          <BreadcrumbTitle
-            content={content}
+      <BreadcrumbTooltipContext.Provider value={tooltipController}>
+        <div
+          ref={breadcrumbDragRegionRef}
+          data-tauri-drag-region
+          data-title-hidden=""
+          className="breadcrumb-bar flex shrink-0 items-center border-b border-transparent"
+          style={{
+            height: 52,
+            background: 'var(--background)',
+            padding: '6px 16px 6px var(--breadcrumb-bar-left-padding, 16px)',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div ref={titleRef} className="breadcrumb-bar__title min-w-0 flex-1 overflow-hidden">
+            <BreadcrumbTitle
+              content={content}
+              entry={entry}
+              locale={locale}
+              loadingTitle={loadingTitle}
+              onRenameFilename={onRenameFilename}
+            />
+          </div>
+          <div
+            aria-hidden="true"
+            data-tauri-drag-region
+            className="breadcrumb-bar__drag-spacer w-6 shrink-0"
+          />
+          <BreadcrumbActions
+            actionsRef={actionsRef}
             entry={entry}
             locale={locale}
-            loadingTitle={loadingTitle}
-            onRenameFilename={onRenameFilename}
+            overflowCollapsed={overflowCollapsed}
+            {...actionProps}
           />
         </div>
-        <div
-          aria-hidden="true"
-          data-tauri-drag-region
-          className="breadcrumb-bar__drag-spacer w-6 shrink-0"
-        />
-        <BreadcrumbActions
-          actionsRef={actionsRef}
-          entry={entry}
-          locale={locale}
-          overflowCollapsed={overflowCollapsed}
-          {...actionProps}
-        />
-      </div>
+      </BreadcrumbTooltipContext.Provider>
     </TooltipProvider>
   )
 })

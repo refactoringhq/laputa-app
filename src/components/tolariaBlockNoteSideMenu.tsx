@@ -101,14 +101,88 @@ function editorElementFromSideMenuControl(control: Element): HTMLElement | undef
   }) ?? documentEditors.at(-1)
 }
 
+type EditorScrollSnapshot = {
+  scrollArea: HTMLElement
+  scrollLeft: number
+  scrollTop: number
+}
+
+function visibleRichEditorScrollArea(ownerDocument: Document): HTMLElement | null {
+  const scrollAreas = Array.from(ownerDocument.querySelectorAll('.editor-scroll-area'))
+    .filter((element): element is HTMLElement => element instanceof HTMLElement)
+
+  return scrollAreas.find((scrollArea) => {
+    if (scrollArea.classList.contains('editor-scroll-area--sheet')) return false
+    if (!scrollArea.querySelector('.editor__blocknote-container .bn-editor')) return false
+
+    const rect = scrollArea.getBoundingClientRect()
+    return rect.width > 0 && rect.height > 0
+  }) ?? null
+}
+
+function scrollAreaFromSideMenuControl(control: Element): HTMLElement | null {
+  const directScrollArea = control.closest('.editor-scroll-area')
+  if (directScrollArea instanceof HTMLElement) return directScrollArea
+
+  const editorElement = editorElementFromSideMenuControl(control)
+  const editorScrollArea = editorElement?.closest('.editor-scroll-area')
+  return editorScrollArea instanceof HTMLElement
+    ? editorScrollArea
+    : visibleRichEditorScrollArea(control.ownerDocument)
+}
+
+function captureSideMenuScroll(control: Element): EditorScrollSnapshot | null {
+  const scrollArea = scrollAreaFromSideMenuControl(control)
+  return scrollArea
+    ? {
+        scrollArea,
+        scrollLeft: scrollArea.scrollLeft,
+        scrollTop: scrollArea.scrollTop,
+      }
+    : null
+}
+
+function restoreEditorScroll(snapshot: EditorScrollSnapshot | null) {
+  if (!snapshot?.scrollArea.isConnected) return
+  snapshot.scrollArea.scrollLeft = snapshot.scrollLeft
+  snapshot.scrollArea.scrollTop = snapshot.scrollTop
+}
+
+function scheduleEditorScrollRestore(snapshot: EditorScrollSnapshot | null) {
+  restoreEditorScroll(snapshot)
+  queueMicrotask(() => restoreEditorScroll(snapshot))
+
+  const ownerWindow = snapshot?.scrollArea.ownerDocument.defaultView
+  if (!ownerWindow) return
+
+  ownerWindow.setTimeout(() => restoreEditorScroll(snapshot), 0)
+  ownerWindow.setTimeout(() => restoreEditorScroll(snapshot), 32)
+  ownerWindow.setTimeout(() => restoreEditorScroll(snapshot), 96)
+  ownerWindow.setTimeout(() => restoreEditorScroll(snapshot), 192)
+  ownerWindow.requestAnimationFrame(() => {
+    restoreEditorScroll(snapshot)
+    ownerWindow.requestAnimationFrame(() => restoreEditorScroll(snapshot))
+  })
+}
+
+function runSideMenuActionPreservingScroll(
+  action: () => void,
+  snapshot: EditorScrollSnapshot | null,
+) {
+  runSideMenuAction(() => {
+    action()
+    scheduleEditorScrollRestore(snapshot)
+  })
+}
+
 function TolariaAddBlockButton() {
   const Components = useComponentsContext()!
   const dict = useDictionary()
   const suggestionMenu = useExtension(SuggestionMenu)
   const { block, editor } = useSideMenuBlock()
 
-  const addBlock = useCallback(() => {
-    runSideMenuAction(() => {
+  const addBlock = useCallback((snapshot: EditorScrollSnapshot | null) => {
+    runSideMenuActionPreservingScroll(() => {
       const liveBlock = liveSideMenuBlock(editor, block)
       if (!liveBlock) return
 
@@ -122,11 +196,11 @@ function TolariaAddBlockButton() {
       if (!insertedBlock) return
       editor.setTextCursorPosition(insertedBlock.id)
       suggestionMenu.openSuggestionMenu('/')
-    })
+    }, snapshot)
   }, [block, editor, suggestionMenu])
   const onButtonClick = useCallback((event: ReactMouseEvent<Element>) => {
     stopSideMenuClick(event)
-    addBlock()
+    addBlock(captureSideMenuScroll(event.currentTarget))
   }, [addBlock])
 
   if (!block) return null
@@ -136,7 +210,7 @@ function TolariaAddBlockButton() {
       className="bn-button"
       label={dict.side_menu.add_block_label}
       onClick={onButtonClick}
-      icon={<Plus size={20} onClick={onButtonClick} data-test="dragHandleAdd" />}
+      icon={<Plus size={20} data-test="dragHandleAdd" />}
     />
   )
 }

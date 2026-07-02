@@ -6,7 +6,7 @@ import {
   EXTRA_CODE_BLOCK_LANGUAGES,
   GO_CODE_BLOCK_LANGUAGE,
 } from '../utils/codeBlockLanguageCatalog'
-import { supportsModernRegexFeatures } from '../utils/regexCapabilities'
+import { supportsShikiRegexFeatures } from '../utils/regexCapabilities'
 
 const LIGHT_CODE_THEME = 'github-light'
 const DARK_CODE_THEME = 'github-dark'
@@ -172,7 +172,7 @@ export function createTolariaCodeBlockOptions(): Partial<CodeBlockOptions> {
     },
   }
 
-  if (supportsModernRegexFeatures()) return options
+  if (supportsShikiRegexFeatures()) return options
 
   delete options.createHighlighter
   return options

@@ -5,9 +5,15 @@ use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
+mod line_stream;
+mod mcp_config;
 mod shell_env;
 mod windows_cmd_shim;
 
+#[cfg(test)]
+pub(crate) use line_stream::strip_ansi_codes;
+pub(crate) use line_stream::{run_ai_agent_line_stream, LineStreamProcess};
+pub(crate) use mcp_config::tolaria_node_mcp_server;
 pub(crate) use shell_env::{
     apply_user_shell_env_vars_if_missing, env_value_from_process_or_user_shell, EnvName,
 };

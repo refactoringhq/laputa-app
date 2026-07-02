@@ -71,7 +71,14 @@ function filePreviewState(entry: VaultEntry): FilePreviewState {
 function filePreviewAssetSrc(previewKind: FilePreviewKind | null, previewPath: string | null, pdfPreviewLoadKey: string): string | null {
   if (!previewKind || previewPath === null) return null
 
-  const src = convertFileSrc(previewPath)
+  let src: string
+  try {
+    src = convertFileSrc(previewPath)
+  } catch (error) {
+    console.warn('[file-preview] Failed to prepare asset preview source:', error)
+    return null
+  }
+
   return previewKind === 'pdf' ? appendPdfPreviewLoadKey(src, pdfPreviewLoadKey) : src
 }
 

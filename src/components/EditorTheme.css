@@ -87,6 +87,71 @@
   background: var(--colors-selection);
 }
 
+.editor__blocknote-container
+  .bn-editor
+  :is(.bn-block-group, .bn-block-outer, .bn-block, .bn-block-content)::selection {
+  background: transparent;
+}
+
+.editor__blocknote-container .ProseMirror-trailingBreak::selection,
+.editor__blocknote-container .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::selection {
+  background: transparent;
+}
+
+.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected {
+  --tolaria-block-selection-right-outset: 10px;
+  --tolaria-block-selection-top-outset: 2px;
+
+  caret-color: transparent;
+  isolation: isolate;
+  outline: none;
+  position: relative;
+}
+
+.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected *,
+.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected,
+.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected * {
+  caret-color: transparent;
+}
+
+.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected::after {
+  background: color-mix(in srgb, var(--colors-selection) 82%, transparent);
+  border-radius: 6px;
+  content: "";
+  inset:
+    calc(var(--tolaria-block-selection-top-outset) * -1)
+    calc(var(--tolaria-block-selection-right-outset) * -1)
+    calc(var(--tolaria-block-selection-top-outset) * -1)
+    0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+
+.editor__blocknote-container
+  .bn-block-outer.tolaria-rich-editor-block-selected:has(> .bn-block > .bn-block-content[data-content-type="paragraph"])::after {
+  bottom: calc(var(--editor-paragraph-spacing) - 2px);
+}
+
+.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected:has(hr)::after {
+  content: none;
+}
+
+.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected > .bn-block {
+  position: relative;
+  z-index: 1;
+}
+
+.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected {
+  background: color-mix(in srgb, var(--colors-selection) 82%, transparent);
+  border-radius: 6px;
+  box-decoration-break: clone;
+}
+
+.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected:has(hr) {
+  background: transparent;
+}
+
 /* Keep BlockNote toolbar/menu icons at a stable size.
    Some default React Icons-based controls inherit `1em` sizing and can blow up
    when upstream toolbar styling changes. */

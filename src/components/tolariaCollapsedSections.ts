@@ -32,6 +32,11 @@ type CollapsedHeadingDotsHit = {
   blockId: string
   inlineContent: HTMLElement
 }
+type CollapsedHeadingRenderingController = {
+  attachedEditorElement: HTMLElement | null
+  frame: number | null
+  ownerWindow: Window | undefined
+}
 
 const COLLAPSIBLE_LIST_ITEM_TYPES = new Set(['bulletListItem', 'numberedListItem', 'checkListItem'])
 const headingCollapseStores = new WeakMap<TolariaBlockNoteEditor, CollapsedHeadingStore>()
@@ -454,6 +459,27 @@ function applyCollapsedSectionRendering(
   )
 }
 
+export function collapsedSectionHiddenBlockIds(editor: TolariaBlockNoteEditor): ReadonlySet<string> {
+  const store = collapsedHeadingStore(editor)
+  if (store.collapsedHeadingIds.size === 0) return new Set()
+
+  const fallbackBlocks = editor.document as readonly CollapsibleBlock[]
+  const editorElement = editorBlockElement(editor)
+  if (!editorElement) {
+    return collapsedSectionRenderState(fallbackBlocks, store.collapsedHeadingIds).hiddenBlockIds
+  }
+
+  const blockElements = renderedSectionBlockElements(editorElement)
+  return mergeCollapsedSectionRenderStates(
+    fallbackBlocks.length > 0
+      ? collapsedSectionRenderState(fallbackBlocks, store.collapsedHeadingIds)
+      : emptyCollapsedSectionRenderState(),
+    blockElements.length > 0
+      ? collapsedSectionRenderStateFromElements(blockElements, store.collapsedHeadingIds)
+      : emptyCollapsedSectionRenderState(),
+  ).hiddenBlockIds
+}
+
 export function isCollapsibleSectionBlockForEditor(
   editor: TolariaBlockNoteEditor,
   block: CollapsibleBlock | undefined,
@@ -698,52 +724,130 @@ function releaseCollapsedHeadingRenderer(editorElement: HTMLElement) {
   headingCollapseRenderers.delete(editorElement)
 }
 
+function toggledCollapsedHeadingIds(collapsedHeadingIds: ReadonlySet<string>, headingId: string) {
+  const nextCollapsedHeadingIds = new Set(collapsedHeadingIds)
+  if (nextCollapsedHeadingIds.has(headingId)) nextCollapsedHeadingIds.delete(headingId)
+  else nextCollapsedHeadingIds.add(headingId)
+  return nextCollapsedHeadingIds
+}
+
+function releaseCurrentCollapsedHeadingRenderer(editor: TolariaBlockNoteEditor) {
+  const currentEditorElement = editorBlockElement(editor)
+  if (currentEditorElement) releaseCollapsedHeadingRenderer(currentEditorElement)
+}
+
+function releaseCollapsedHeadingRendererForToggle(
+  editor: TolariaBlockNoteEditor,
+  editorElement: HTMLElement | undefined,
+) {
+  if (editorElement) releaseCollapsedHeadingRenderer(editorElement)
+  else releaseCurrentCollapsedHeadingRenderer(editor)
+}
+
+function applyCollapsedHeadingToggleRendering(options: {
+  editor: TolariaBlockNoteEditor
+  editorElement?: HTMLElement
+  store: CollapsedHeadingStore
+}) {
+  const { editor, editorElement, store } = options
+
+  if (store.collapsedHeadingIds.size === 0) {
+    releaseCollapsedHeadingRendererForToggle(editor, editorElement)
+    return
+  }
+
+  if (!editorElement) {
+    applyCollapsedSectionRendering(editor, store.collapsedHeadingIds)
+    return
+  }
+
+  ensureCollapsedHeadingRenderer(editor, editorElement, store)
+  applyCollapsedSectionRenderingFromHeadingIds(
+    editorElement,
+    store.collapsedHeadingIds,
+    editor.document as readonly CollapsibleBlock[],
+  )
+}
+
+function releaseAttachedCollapsedHeadingRenderer(controller: CollapsedHeadingRenderingController) {
+  if (controller.attachedEditorElement) releaseCollapsedHeadingRenderer(controller.attachedEditorElement)
+  controller.attachedEditorElement = null
+}
+
+function scheduleCollapsedHeadingController(
+  controller: CollapsedHeadingRenderingController,
+  attachController: () => void,
+) {
+  if (controller.frame !== null || !controller.ownerWindow) return
+  controller.frame = controller.ownerWindow.requestAnimationFrame(attachController)
+}
+
+function cleanupCollapsedHeadingController(
+  controller: CollapsedHeadingRenderingController,
+  unsubscribeStore: () => void,
+) {
+  unsubscribeStore()
+  if (controller.frame !== null && controller.ownerWindow) {
+    controller.ownerWindow.cancelAnimationFrame(controller.frame)
+  }
+  releaseAttachedCollapsedHeadingRenderer(controller)
+}
+
+function attachCollapsedHeadingController(options: {
+  attachController: () => void
+  controller: CollapsedHeadingRenderingController
+  editor: TolariaBlockNoteEditor
+  store: CollapsedHeadingStore
+}) {
+  const { attachController, controller, editor, store } = options
+  controller.frame = null
+
+  if (store.collapsedHeadingIds.size === 0) {
+    releaseAttachedCollapsedHeadingRenderer(controller)
+    return
+  }
+
+  const editorElement = editorBlockElement(editor)
+  if (!editorElement) {
+    scheduleCollapsedHeadingController(controller, attachController)
+    return
+  }
+
+  controller.attachedEditorElement = editorElement
+  ensureCollapsedHeadingRenderer(editor, editorElement)
+}
+
 export function toggleCollapsedHeading(
   editor: TolariaBlockNoteEditor,
   headingId: string,
   editorElement?: HTMLElement,
 ) {
   const store = collapsedHeadingStore(editor)
-  const collapsedHeadingIds = new Set(store.collapsedHeadingIds)
-  if (collapsedHeadingIds.has(headingId)) collapsedHeadingIds.delete(headingId)
-  else collapsedHeadingIds.add(headingId)
-  store.collapsedHeadingIds = collapsedHeadingIds
-
-  if (editorElement) {
-    ensureCollapsedHeadingRenderer(editor, editorElement, store)
-    applyCollapsedSectionRenderingFromHeadingIds(
-      editorElement,
-      store.collapsedHeadingIds,
-      editor.document as readonly CollapsibleBlock[],
-    )
-  } else {
-    applyCollapsedSectionRendering(editor, store.collapsedHeadingIds)
-  }
+  store.collapsedHeadingIds = toggledCollapsedHeadingIds(store.collapsedHeadingIds, headingId)
+  applyCollapsedHeadingToggleRendering({ editor, editorElement, store })
   store.emit()
 }
 
 export function useCollapsedHeadingRendering(editor: TolariaBlockNoteEditor) {
   useLayoutEffect(() => {
-    let attachFrame: number | null = null
-    let attachedEditorElement: HTMLElement | null = null
-    const fallbackWindow = typeof window === 'undefined' ? undefined : window
-    const attachController = () => {
-      attachFrame = null
-      const editorElement = editorBlockElement(editor)
-      if (!editorElement) {
-        if (fallbackWindow) attachFrame = fallbackWindow.requestAnimationFrame(attachController)
-        return
-      }
-
-      attachedEditorElement = editorElement
-      ensureCollapsedHeadingRenderer(editor, editorElement)
+    const store = collapsedHeadingStore(editor)
+    const controller: CollapsedHeadingRenderingController = {
+      attachedEditorElement: null,
+      frame: null,
+      ownerWindow: typeof window === 'undefined' ? undefined : window,
     }
+    const attachController = () => {
+      attachCollapsedHeadingController({ attachController, controller, editor, store })
+    }
+    const scheduleAttachController = () => {
+      scheduleCollapsedHeadingController(controller, attachController)
+    }
+    const unsubscribeStore = store.subscribe(scheduleAttachController)
 
     attachController()
 
     return () => {
-      if (attachFrame !== null && fallbackWindow) fallbackWindow.cancelAnimationFrame(attachFrame)
-      if (attachedEditorElement) releaseCollapsedHeadingRenderer(attachedEditorElement)
+      cleanupCollapsedHeadingController(controller, unsubscribeStore)
     }
   }, [editor])
 }

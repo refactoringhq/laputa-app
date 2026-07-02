@@ -82,32 +82,10 @@ const LOADING_BREADCRUMB_ENTRY: VaultEntry = {
 
 const LazySheetEditor = lazy(() => import('../SheetEditor').then((module) => ({ default: module.SheetEditor })))
 
-function EditorLoadingSkeleton() {
-  return (
-    <div data-testid="editor-content-skeleton" className="flex flex-1 flex-col gap-3 py-5 animate-pulse" style={{ minHeight: 0 }}>
-      <div className="h-6 w-2/5 rounded bg-muted" />
-      <div className="h-4 w-4/5 rounded bg-muted" />
-      <div className="h-4 w-3/5 rounded bg-muted" />
-      <div className="h-4 w-4/5 rounded bg-muted" />
-      <div className="h-4 w-2/5 rounded bg-muted" />
-    </div>
-  )
-}
-
 function SheetEditorLoading({ locale = 'en' }: { locale?: AppLocale }) {
   return (
     <div className="flex flex-1 items-center justify-center px-6 py-5 text-sm text-muted-foreground" data-testid="sheet-editor-loading">
       {translate(locale, 'editor.sheet.loading')}
-    </div>
-  )
-}
-
-function EditorLoadingCanvas({ cssVars }: Pick<EditorContentModel, 'cssVars'>) {
-  return (
-    <div className="editor-scroll-area" style={cssVars as React.CSSProperties}>
-      <div className="editor-content-wrapper">
-        <EditorLoadingSkeleton />
-      </div>
     </div>
   )
 }
@@ -483,26 +461,10 @@ function EditorFindScope({
   )
 }
 
-function shouldShowEditorLoadingContent({
-  activeTab,
-  isLoadingNewTab,
-  isSheet,
-  isVaultLoading,
-  richEditorContentReady,
-  showEditor,
-}: Pick<EditorContentModel, 'activeTab' | 'isLoadingNewTab' | 'isSheet' | 'isVaultLoading' | 'richEditorContentReady' | 'showEditor'>) {
-  if (isVaultLoading) return true
-  if (!showEditor) return false
-  if (isLoadingNewTab) return true
-
-  return !isSheet && !!activeTab && !richEditorContentReady
-}
-
 export function EditorContentLayout(model: EditorContentModel) {
   const {
     activeTab,
     loadingTab,
-    isLoadingNewTab,
     entries,
     editor,
     diffMode,
@@ -543,14 +505,6 @@ export function EditorContentLayout(model: EditorContentModel) {
   const chromePath = chromeTab?.entry.path ?? path
   const chromeWordCount = activeTab ? wordCount : 0
   const showActiveContent = activeTab && !isVaultLoading
-  const showLoadingContent = shouldShowEditorLoadingContent({
-    activeTab,
-    isLoadingNewTab,
-    isSheet,
-    isVaultLoading,
-    richEditorContentReady,
-    showEditor,
-  })
   const breadcrumbActions = buildBreadcrumbActions(model)
 
   return (
@@ -608,7 +562,6 @@ export function EditorContentLayout(model: EditorContentModel) {
           />
         </>
       )}
-      {showLoadingContent && <EditorLoadingCanvas cssVars={cssVars} />}
     </div>
   )
 }

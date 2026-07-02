@@ -82,4 +82,68 @@ describe('useEditorTabSwap rich-editor serialization performance', () => {
 
     expect(editor.blocksToMarkdownLossy).toHaveBeenCalledTimes(1)
   })
+
+  it('does not reserialize a stable active note on unrelated tab-array rerenders', async () => {
+    installEditorDomSpies()
+    const tab = makeTab('a.md', 'Note A')
+    const docRef = { current: initialBlocks as unknown[] }
+    const editor = makeMockEditor(docRef)
+    const { rerender } = renderHook(
+      ({ tabs }) => useEditorTabSwap({
+        tabs,
+        activeTabPath: 'a.md',
+        rawMode: false,
+        editor: editor as never,
+      }),
+      { initialProps: { tabs: [tab] } },
+    )
+    await flushEditorTick()
+    editor.blocksToMarkdownLossy.mockClear()
+
+    rerender({ tabs: [{ ...tab }] })
+    await flushEditorTick()
+
+    expect(editor.blocksToMarkdownLossy).not.toHaveBeenCalled()
+  })
+
+  it('reads the BlockNote document only once when flushing a rich-editor change', async () => {
+    installEditorDomSpies()
+    const tab = makeTab('a.md', 'Note A')
+    const onContentChange = vi.fn()
+    const docRef = { current: initialBlocks as unknown[] }
+    let documentReads = 0
+    const editor = makeMockEditor(docRef)
+    Object.defineProperty(editor, 'document', {
+      get() {
+        documentReads += 1
+        return docRef.current
+      },
+    })
+    const { result } = renderHook(
+      () => useEditorTabSwap({
+        tabs: [tab],
+        activeTabPath: 'a.md',
+        rawMode: false,
+        editor: editor as never,
+        onContentChange,
+      }),
+    )
+    await flushEditorTick()
+    documentReads = 0
+
+    docRef.current = [{
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Changed body', styles: {} }],
+      children: [],
+    }]
+    editor.blocksToMarkdownLossy.mockReturnValue('Changed body\n')
+
+    act(() => {
+      result.current.handleEditorChange()
+      result.current.flushPendingEditorChange()
+    })
+
+    expect(onContentChange).toHaveBeenCalledOnce()
+    expect(documentReads).toBe(1)
+  })
 })

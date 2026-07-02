@@ -19,6 +19,22 @@ export type SheetStructureAction =
   | 'insertRowAbove'
   | 'insertRowBelow'
 
+function isSingleRowDeleteError(caught: unknown, row: number): caught is Error {
+  return row === 1
+    && caught instanceof Error
+    && caught.message === "Row number '1' is not valid."
+}
+
+function deleteSelectedRow(model: Model, sheet: number, row: number): void {
+  try {
+    model.deleteRow(sheet, row)
+  } catch (caught) {
+    if (!isSingleRowDeleteError(caught, row)) throw caught
+    model.insertRow(sheet, row + 1)
+    model.deleteRow(sheet, row)
+  }
+}
+
 export function sheetContextMenuSelectionState(model: Model, left: number, top: number): SheetContextMenuState {
   const view = model.getSelectedView()
   return {
@@ -37,7 +53,7 @@ export function applySheetStructureAction(model: Model, action: SheetStructureAc
   if (action === 'deleteColumn') {
     model.deleteColumn(sheet, column)
   } else if (action === 'deleteRow') {
-    model.deleteRow(sheet, row)
+    deleteSelectedRow(model, sheet, row)
   } else if (action === 'insertColumnLeft') {
     model.insertColumn(sheet, column)
   } else if (action === 'insertColumnRight') {

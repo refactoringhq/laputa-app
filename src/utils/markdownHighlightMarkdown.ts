@@ -1,3 +1,8 @@
+import {
+  serializeBlockNoteMarkdown,
+  type DirectMarkdownCapableSerializer,
+} from './blockNoteDirectMarkdown'
+
 export const MARKDOWN_HIGHLIGHT_STYLE = 'highlight' as const
 
 interface TextStyles {
@@ -37,9 +42,7 @@ interface TableCellLike {
   [key: string]: unknown
 }
 
-interface MarkdownSerializer {
-  blocksToMarkdownLossy: (blocks: unknown[]) => string
-}
+type MarkdownSerializer = DirectMarkdownCapableSerializer
 
 type BlockContent = InlineItem[] | TableContentLike | unknown
 type TableCellValue = TableCellLike | string
@@ -134,12 +137,14 @@ function restoreHighlightedTextItem(item: InlineItem): InlineItem {
 function restoreMarkdownHighlights(content: InlineItem[]): InlineItem[] {
   const restored: InlineItem[] = []
   let openHighlight = false
+  let changed = false
 
   for (const item of content) {
     if (isHighlightedTextItem(item)) {
       if (!openHighlight) restored.push(highlightMarker())
       restored.push(restoreHighlightedTextItem(item))
       openHighlight = true
+      changed = true
       continue
     }
 
@@ -149,7 +154,7 @@ function restoreMarkdownHighlights(content: InlineItem[]): InlineItem[] {
   }
 
   if (openHighlight) restored.push(highlightMarker())
-  return restored
+  return changed ? restored : content
 }
 
 function isTableContent(content: BlockContent): content is TableContentLike {
@@ -164,19 +169,31 @@ function isTableContent(content: BlockContent): content is TableContentLike {
 
 function transformTableCell(cell: TableCellValue, transform: InlineContentTransform): TableCellValue {
   if (typeof cell === 'string' || !Array.isArray(cell.content)) return cell
-  return { ...cell, content: transform(cell.content) }
+  const content = transform(cell.content)
+  return content === cell.content ? cell : { ...cell, content }
 }
 
 function transformTableContent(
   content: TableContentLike,
   transform: InlineContentTransform,
 ): TableContentLike {
+  let changed = false
+  const rows = content.rows?.map(row => {
+    let rowChanged = false
+    const cells = row.cells?.map(cell => {
+      const nextCell = transformTableCell(cell, transform)
+      if (nextCell !== cell) rowChanged = true
+      return nextCell
+    })
+    if (!rowChanged) return row
+    changed = true
+    return { ...row, cells }
+  })
+
+  if (!changed) return content
   return {
     ...content,
-    rows: content.rows?.map(row => ({
-      ...row,
-      cells: row.cells?.map(cell => transformTableCell(cell, transform)),
-    })),
+    rows,
   }
 }
 
@@ -197,10 +214,22 @@ function transformBlock(block: BlockLike, transform: InlineContentTransform): Bl
   const content = shouldTransformBlockContent(block)
     ? transformBlockContent(block.content, transform)
     : block.content
-  const children = Array.isArray(block.children)
-    ? block.children.map(child => transformBlock(child, transform))
-    : block.children
-  return { ...block, content, children }
+  const children = transformChildBlocks(block.children, child => transformBlock(child, transform))
+  return content === block.content && children === block.children ? block : { ...block, content, children }
+}
+
+function transformChildBlocks(
+  children: BlockLike[] | undefined,
+  transform: (block: BlockLike) => BlockLike,
+): BlockLike[] | undefined {
+  if (!Array.isArray(children)) return children
+  let changed = false
+  const nextChildren = children.map(child => {
+    const nextChild = transform(child)
+    if (nextChild !== child) changed = true
+    return nextChild
+  })
+  return changed ? nextChildren : children
 }
 
 export function injectMarkdownHighlightsInBlocks(blocks: unknown[]): unknown[] {
@@ -215,5 +244,5 @@ export function serializeMarkdownHighlightAwareBlocks(
   editor: MarkdownSerializer,
   blocks: unknown[],
 ): string {
-  return editor.blocksToMarkdownLossy(restoreMarkdownHighlightsInBlocks(blocks)).trimEnd()
+  return serializeBlockNoteMarkdown(editor, restoreMarkdownHighlightsInBlocks(blocks)).trimEnd()
 }

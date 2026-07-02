@@ -19,6 +19,8 @@ import {
   readParsedNoteBlocks,
   type EditorBlocks,
 } from './editorParsedBlockCache'
+import { tryParseFastMarkdownBlocksOffThread } from './editorFastMarkdownBlocks'
+import { logEditorBlockResolutionTrace } from '../utils/editorPerformanceTrace'
 
 export type { EditorBlocks }
 
@@ -27,6 +29,22 @@ type NoteContent = string
 type MarkdownBody = string
 type PreprocessedMarkdown = string
 type VaultPath = string
+type BlockResolutionStrategy =
+  | 'blank'
+  | 'blocknote-parser'
+  | 'direct-markdown'
+  | 'fast-h1'
+  | 'parsed-cache'
+  | 'tab-cache'
+
+interface BlockResolutionContext {
+  bytes: number
+  cache: Map<NotePath, CachedTabState>
+  content: NoteContent
+  startedAt: number
+  targetPath: NotePath
+  vaultPath?: VaultPath
+}
 
 export type CachedTabState = {
   blocks: EditorBlocks
@@ -35,6 +53,35 @@ export type CachedTabState = {
 }
 
 const TAB_STATE_CACHE_LIMIT = 8
+const DIRECT_MARKDOWN_PARSE_MIN_BYTES = 16 * 1024
+const sourceSizeEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null
+
+function now(): number {
+  return globalThis.performance?.now?.() ?? Date.now()
+}
+
+function sourceBytes(content: string): number {
+  return sourceSizeEncoder ? sourceSizeEncoder.encode(content).byteLength : content.length
+}
+
+function traceResolvedBlocks(options: {
+  blockCount: number
+  durationMs: number
+  fallbackReason?: string | null
+  path: NotePath
+  sourceBytes: number
+  strategy: BlockResolutionStrategy
+}): void {
+  const { blockCount, durationMs, fallbackReason, path, sourceBytes: bytes, strategy } = options
+  logEditorBlockResolutionTrace({
+    blockCount,
+    durationMs,
+    fallbackReason,
+    notePath: path,
+    sourceBytes: bytes,
+    strategy,
+  })
+}
 
 export function cacheEditorState(
   cache: Map<NotePath, CachedTabState>,
@@ -159,6 +206,100 @@ function repairParsedMarkdownBlocks(parsed: MarkdownParseResult): EditorBlocks {
   ) as EditorBlocks
 }
 
+function traceResolvedState(
+  context: BlockResolutionContext,
+  resolved: CachedTabState,
+  strategy: BlockResolutionStrategy,
+  fallbackReason?: string | null,
+): CachedTabState {
+  traceResolvedBlocks({
+    blockCount: resolved.blocks.length,
+    durationMs: now() - context.startedAt,
+    fallbackReason,
+    path: context.targetPath,
+    sourceBytes: context.bytes,
+    strategy,
+  })
+  return resolved
+}
+
+function cachedTabResolution(context: BlockResolutionContext): CachedTabState | null {
+  const cached = context.cache.get(context.targetPath)
+  if (cached?.sourceContent !== context.content) return null
+  return traceResolvedState(context, cached, 'tab-cache')
+}
+
+function parsedCacheResolution(context: BlockResolutionContext): CachedTabState | null {
+  const parsedCache = readParsedNoteBlocks({
+    path: context.targetPath,
+    content: context.content,
+    vaultPath: context.vaultPath,
+  })
+  if (!parsedCache) return null
+
+  const resolved = cacheResolvedEditorState(context.cache, context.targetPath, {
+    blocks: parsedCache.blocks,
+    scrollTop: parsedCache.scrollTop,
+    sourceContent: context.content,
+  }, context.vaultPath)
+  return traceResolvedState(context, resolved, 'parsed-cache')
+}
+
+function fastPathResolution(
+  context: BlockResolutionContext,
+  body: MarkdownBody,
+  preprocessed: PreprocessedMarkdown,
+): CachedTabState | null {
+  const fastPathBlocks = buildFastPathBlocks({ preprocessed })
+  if (!fastPathBlocks) return null
+
+  const resolved = cacheResolvedEditorState(context.cache, context.targetPath, {
+    blocks: repairMalformedEditorBlocks(injectEditorMarkdownBlocks(fastPathBlocks)) as EditorBlocks,
+    scrollTop: 0,
+    sourceContent: context.content,
+  }, context.vaultPath)
+  return traceResolvedState(context, resolved, body.trim() ? 'fast-h1' : 'blank')
+}
+
+async function directMarkdownResolution(
+  context: BlockResolutionContext,
+  preprocessed: PreprocessedMarkdown,
+): Promise<{ fallbackReason: string | null; resolved: CachedTabState | null }> {
+  if (context.bytes < DIRECT_MARKDOWN_PARSE_MIN_BYTES) return { fallbackReason: null, resolved: null }
+
+  const direct = await tryParseFastMarkdownBlocksOffThread(preprocessed)
+  if (!direct.supported) return { fallbackReason: direct.metrics.fallbackReason, resolved: null }
+
+  const resolved = cacheResolvedEditorState(context.cache, context.targetPath, {
+    blocks: repairParsedMarkdownBlocks({ blocks: direct.blocks, usedSourceFallback: false }),
+    scrollTop: 0,
+    sourceContent: context.content,
+  }, context.vaultPath)
+  return { fallbackReason: null, resolved: traceResolvedState(context, resolved, 'direct-markdown') }
+}
+
+async function blockNoteParserResolution(options: {
+  body: MarkdownBody
+  context: BlockResolutionContext
+  directFallbackReason: string | null
+  editor: ReturnType<typeof useCreateBlockNote>
+  preprocessed: PreprocessedMarkdown
+}): Promise<CachedTabState> {
+  const { body, context, directFallbackReason, editor, preprocessed } = options
+  const parsed = await parseMarkdownBlocksWithFallback({
+    parseMarkdownBlocks: markdown => parseMarkdownBlocks(editor, markdown),
+    preprocessed,
+    sourceMarkdown: body,
+    context: context.targetPath,
+  })
+  const resolved = cacheResolvedEditorState(context.cache, context.targetPath, {
+    blocks: repairParsedMarkdownBlocks(parsed),
+    scrollTop: 0,
+    sourceContent: context.content,
+  }, context.vaultPath)
+  return traceResolvedState(context, resolved, 'blocknote-parser', directFallbackReason)
+}
+
 export async function resolveBlocksForTarget(
   options: {
     editor: ReturnType<typeof useCreateBlockNote>
@@ -169,40 +310,25 @@ export async function resolveBlocksForTarget(
   },
 ): Promise<CachedTabState> {
   const { editor, cache, targetPath, content, vaultPath } = options
-  const cached = cache.get(targetPath)
-  if (cached?.sourceContent === content) return cached
-
-  const parsedCache = readParsedNoteBlocks({ path: targetPath, content, vaultPath })
-  if (parsedCache) {
-    return cacheResolvedEditorState(cache, targetPath, {
-      blocks: parsedCache.blocks,
-      scrollTop: parsedCache.scrollTop,
-      sourceContent: content,
-    }, vaultPath)
-  }
+  const context = { bytes: sourceBytes(content), cache, content, startedAt: now(), targetPath, vaultPath }
+  const cached = cachedTabResolution(context) ?? parsedCacheResolution(context)
+  if (cached) return cached
 
   const body = extractEditorBody(content)
   const preprocessed = preProcessEditorMarkdown(body, vaultPath, targetPath)
-  const fastPathBlocks = buildFastPathBlocks({ preprocessed })
-  if (fastPathBlocks) {
-    return cacheResolvedEditorState(cache, targetPath, {
-      blocks: repairMalformedEditorBlocks(injectEditorMarkdownBlocks(fastPathBlocks)) as EditorBlocks,
-      scrollTop: 0,
-      sourceContent: content,
-    }, vaultPath)
-  }
+  const fastPath = fastPathResolution(context, body, preprocessed)
+  if (fastPath) return fastPath
 
-  const parsed = await parseMarkdownBlocksWithFallback({
-    parseMarkdownBlocks: markdown => parseMarkdownBlocks(editor, markdown),
+  const direct = await directMarkdownResolution(context, preprocessed)
+  if (direct.resolved) return direct.resolved
+
+  return blockNoteParserResolution({
+    body,
+    context,
+    directFallbackReason: direct.fallbackReason,
+    editor,
     preprocessed,
-    sourceMarkdown: body,
-    context: targetPath,
   })
-  return cacheResolvedEditorState(cache, targetPath, {
-    blocks: repairParsedMarkdownBlocks(parsed),
-    scrollTop: 0,
-    sourceContent: content,
-  }, vaultPath)
 }
 
 export async function resolveEmptyHeadingBlocks(

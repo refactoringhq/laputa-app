@@ -666,6 +666,25 @@ describe('useVaultLoader', () => {
       expect(result.current.getNoteStatus('/vault/note/draft.md')).toBe('new')
     })
 
+    it('keeps unsaved state stable when repeated edits do not change tracked paths', async () => {
+      const { result } = await renderVaultLoader()
+      const path = '/vault/note/draft.md'
+
+      act(() => { result.current.trackUnsaved(path) })
+      const trackedPaths = result.current.unsavedPaths
+
+      act(() => { result.current.trackUnsaved(path) })
+
+      expect(result.current.unsavedPaths).toBe(trackedPaths)
+
+      act(() => { result.current.clearUnsaved(path) })
+      const clearedPaths = result.current.unsavedPaths
+
+      act(() => { result.current.clearUnsaved(path) })
+
+      expect(result.current.unsavedPaths).toBe(clearedPaths)
+    })
+
     it('tracks and clears pendingSave states separately from unsaved/new markers', async () => {
       const { result } = await renderVaultLoader()
 

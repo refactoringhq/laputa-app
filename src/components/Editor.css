@@ -67,6 +67,9 @@ body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadc
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Prevent browser scroll anchoring from shifting long BlockNote documents
+     when side menus appear near the viewport edge. */
+  overflow-anchor: none;
   display: flex;
   flex-direction: column;
 }

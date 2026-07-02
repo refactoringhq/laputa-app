@@ -22,12 +22,12 @@ function fileBlock(name: string, url: string) {
 }
 
 function serializeFileBlocks(blocks: unknown[], markdownLossy = '') {
-  return serializeRichEditorDocumentToMarkdown(
-    makeEditor(blocks, markdownLossy) as never,
-    '---\ntitle: Note A\n---\n',
-    '/vault',
-    'a.md',
-  )
+  return serializeRichEditorDocumentToMarkdown({
+    editor: makeEditor(blocks, markdownLossy) as never,
+    notePath: 'a.md',
+    tabContent: '---\ntitle: Note A\n---\n',
+    vaultPath: '/vault',
+  })
 }
 
 function parsePreprocessedParagraph(markdown: string) {
@@ -55,12 +55,12 @@ describe('file attachment Markdown roundtrip', () => {
       fileBlock('project brief.pdf', pdfPath),
     ], 'unreachable lossy markdown')
 
-    expect(serializeRichEditorDocumentToMarkdown(
-      editor as never,
-      '---\ntitle: Note A\n---\n',
-      '/vault',
-      'a.md',
-    )).toBe('---\ntitle: Note A\n---\n[project brief.pdf](<attachments/project brief.pdf>)\n')
+    expect(serializeRichEditorDocumentToMarkdown({
+      editor: editor as never,
+      notePath: 'a.md',
+      tabContent: '---\ntitle: Note A\n---\n',
+      vaultPath: '/vault',
+    })).toBe('---\ntitle: Note A\n---\n[project brief.pdf](<attachments/project brief.pdf>)\n')
     expect(editor.blocksToMarkdownLossy).not.toHaveBeenCalled()
   })
 

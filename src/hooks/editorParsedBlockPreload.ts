@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 import type { NoteContentResolvedEvent } from './noteContentCache'
 import { subscribeNoteContentResolved } from './noteContentCache'
+import { logParsedBlockPreloadTrace } from '../utils/editorPerformanceTrace'
 
 export const PARSED_BLOCK_PRELOAD_MIN_BYTES = 32 * 1024
 export const PARSED_BLOCK_PRELOAD_DELAY_MS = 1800
 export const PARSED_BLOCK_PRELOAD_FOREGROUND_IDLE_MS = 1500
-export const PARSED_BLOCK_PRELOAD_ENABLED = false
+export const PARSED_BLOCK_PRELOAD_ENABLED = true
 
 type PrepareParsedBlocks = (event: NoteContentResolvedEvent) => Promise<void>
 
@@ -26,6 +27,14 @@ function canPreloadParsedBlocks(event: NoteContentResolvedEvent, activeTabPath: 
   return entry.fileSize >= PARSED_BLOCK_PRELOAD_MIN_BYTES
 }
 
+function now(): number {
+  return globalThis.performance?.now?.() ?? Date.now()
+}
+
+function sourceBytes(event: NoteContentResolvedEvent): number {
+  return event.entry?.fileSize ?? event.content.length
+}
+
 function shouldDeferParsedPreload(options: {
   editorMountedRef: MutableRefObject<boolean>
   foregroundWorkAtRef: MutableRefObject<number>
@@ -34,6 +43,47 @@ function shouldDeferParsedPreload(options: {
   const { editorMountedRef, foregroundWorkAtRef, rawModeRef } = options
   if (!editorMountedRef.current || rawModeRef.current) return true
   return Date.now() - foregroundWorkAtRef.current < PARSED_BLOCK_PRELOAD_FOREGROUND_IDLE_MS
+}
+
+function parsedPreloadDeferralReason(options: {
+  editorMountedRef: MutableRefObject<boolean>
+  rawModeRef: MutableRefObject<boolean>
+}): string {
+  const { editorMountedRef, rawModeRef } = options
+  if (!editorMountedRef.current) return 'editor-unmounted'
+  return rawModeRef.current ? 'raw-mode' : 'foreground-active'
+}
+
+function logDeferredPreload(options: {
+  editorMountedRef: MutableRefObject<boolean>
+  pending?: NoteContentResolvedEvent
+  rawModeRef: MutableRefObject<boolean>
+}): void {
+  const { editorMountedRef, pending, rawModeRef } = options
+  if (!pending) return
+  logParsedBlockPreloadTrace({
+    notePath: pending.path,
+    reason: parsedPreloadDeferralReason({ editorMountedRef, rawModeRef }),
+    sourceBytes: sourceBytes(pending),
+    state: 'deferred',
+  })
+}
+
+function logQueuedPreload(event: NoteContentResolvedEvent): void {
+  logParsedBlockPreloadTrace({
+    notePath: event.path,
+    sourceBytes: sourceBytes(event),
+    state: 'queued',
+  })
+}
+
+function logPreparedPreload(event: NoteContentResolvedEvent, startedAt: number): void {
+  logParsedBlockPreloadTrace({
+    durationMs: now() - startedAt,
+    notePath: event.path,
+    sourceBytes: sourceBytes(event),
+    state: 'prepared',
+  })
 }
 
 function takeNextCandidate(
@@ -76,6 +126,11 @@ export function useParsedBlockPreload({
   const runNext = useCallback(async () => {
     if (runningRef.current) return
     if (shouldDeferParsedPreload({ editorMountedRef, foregroundWorkAtRef, rawModeRef })) {
+      logDeferredPreload({
+        editorMountedRef,
+        pending: queueRef.current.values().next().value as NoteContentResolvedEvent | undefined,
+        rawModeRef,
+      })
       scheduleNext()
       return
     }
@@ -83,8 +138,10 @@ export function useParsedBlockPreload({
     const next = takeNextCandidate(queueRef.current, activeTabPathRef.current)
     if (!next) return
     runningRef.current = true
+    const startedAt = now()
     try {
       await prepareParsedBlocks(next)
+      logPreparedPreload(next, startedAt)
     } catch (error) {
       console.warn('Failed to preload parsed note blocks:', error)
     } finally {
@@ -102,6 +159,7 @@ export function useParsedBlockPreload({
     const unsubscribe = subscribeNoteContentResolved((event) => {
       if (!canPreloadParsedBlocks(event, activeTabPathRef.current)) return
       queue.set(event.path, event)
+      logQueuedPreload(event)
       scheduleNext()
     })
     return () => {

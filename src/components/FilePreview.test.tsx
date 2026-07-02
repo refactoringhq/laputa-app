@@ -212,6 +212,26 @@ describe('FilePreview', () => {
     expect(screen.getByTestId('file-preview-fallback')).toHaveTextContent('Preview unavailable')
   })
 
+  it('falls back when the native asset bridge rejects a preview path', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    convertFileSrcMock.mockImplementationOnce(() => {
+      throw new Error('null pointer passed to rust')
+    })
+
+    try {
+      expect(() => render(<FilePreview entry={imageEntry} />)).not.toThrow()
+
+      expect(screen.queryByTestId('image-file-preview')).not.toBeInTheDocument()
+      expect(screen.getByTestId('file-preview-fallback')).toHaveTextContent('Image preview failed')
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[file-preview] Failed to prepare asset preview source:',
+        expect.any(Error),
+      )
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
   it('uses the external-open fallback for media when native playback is unsafe', () => {
     const onOpenExternalFile = vi.fn()
     externalMediaPreviewMock.mockReturnValue(true)

@@ -1,5 +1,5 @@
 import type React from 'react'
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import type { useCreateBlockNote } from '@blocknote/react'
 import type { AppLocale } from '../../lib/i18n'
 import type { NoteWidthMode, NoteStatus, VaultEntry } from '../../types'
@@ -82,12 +82,12 @@ export function useEditorContentModel(props: EditorContentProps) {
     showEditor: showContentEditor,
     path,
     wordCount,
-  } = deriveEditorContentState({
+  } = useMemo(() => deriveEditorContentState({
     activeTab,
     entries,
     rawMode,
     activeStatus: props.activeStatus,
-  })
+  }), [activeTab, entries, props.activeStatus, rawMode])
   const showEditor = !diffMode && showContentEditor
   const loadingEntry = !activeTab && activeTabPath
     ? entries.find((entry) => entry.path === activeTabPath) ?? null

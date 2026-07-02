@@ -110,7 +110,7 @@ describe('EditorContentLayout', () => {
     expect(screen.getByTestId('single-editor-view')).toBeInTheDocument()
   })
 
-  it('shows the loading skeleton instead of stale editor chrome while switching tabs', () => {
+  it('does not show stale editor chrome while switching tabs', () => {
     const { container } = render(
       <EditorContentLayout
         {...createModel({
@@ -120,7 +120,8 @@ describe('EditorContentLayout', () => {
       />,
     )
 
-    expect(container.querySelector('.animate-pulse')).not.toBeNull()
+    expect(container.querySelector('.animate-pulse')).toBeNull()
+    expect(screen.queryByTestId('single-editor-view')).not.toBeInTheDocument()
     expect(screen.queryByTestId('title-field-input')).not.toBeInTheDocument()
   })
 
@@ -142,7 +143,7 @@ describe('EditorContentLayout', () => {
     )
 
     expect(screen.queryByTestId('single-editor-view')).not.toBeInTheDocument()
-    expect(container.querySelector('.animate-pulse')).not.toBeNull()
+    expect(container.querySelector('.animate-pulse')).toBeNull()
     expect(screen.getByTestId('breadcrumb-bar')).toHaveAttribute('data-content', '# New Note')
   })
 

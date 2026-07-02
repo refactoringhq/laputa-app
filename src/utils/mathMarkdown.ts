@@ -1,4 +1,8 @@
 import katex from 'katex'
+import {
+  serializeBlockNoteMarkdown,
+  type DirectMarkdownCapableSerializer,
+} from './blockNoteDirectMarkdown'
 
 export const MATH_INLINE_TYPE = 'mathInline'
 export const MATH_BLOCK_TYPE = 'mathBlock'
@@ -46,9 +50,7 @@ interface TableCellLike {
 type TableCellValue = TableCellLike | string
 type InlineContentTransform = (content: InlineItem[]) => InlineItem[]
 
-interface MarkdownSerializer {
-  blocksToMarkdownLossy: (blocks: unknown[]) => string
-}
+type MarkdownSerializer = DirectMarkdownCapableSerializer
 
 interface LatexPayload {
   latex: string
@@ -351,10 +353,13 @@ function inlineMathPartToItem({ source, part, index }: { source: InlineItem; par
 }
 
 function restoreInlineMath(content: InlineItem[]): InlineItem[] {
-  return content.map((item) => {
+  let changed = false
+  const restored = content.map((item) => {
     if (item.type !== MATH_INLINE_TYPE || !item.props?.latex) return item
+    changed = true
     return { type: 'text', text: `$${item.props.latex}$` }
   })
+  return changed ? restored : content
 }
 
 function isTableContent(content: BlockContent): content is TableContentLike {
@@ -369,19 +374,31 @@ function isTableContent(content: BlockContent): content is TableContentLike {
 
 function transformTableCell(cell: TableCellValue, transform: InlineContentTransform): TableCellValue {
   if (typeof cell === 'string' || !Array.isArray(cell.content)) return cell
-  return { ...cell, content: transform(cell.content) }
+  const content = transform(cell.content)
+  return content === cell.content ? cell : { ...cell, content }
 }
 
 function transformTableContent(
   content: TableContentLike,
   transform: InlineContentTransform,
 ): TableContentLike {
+  let changed = false
+  const rows = content.rows?.map((row) => {
+    let rowChanged = false
+    const cells = row.cells?.map((cell) => {
+      const nextCell = transformTableCell(cell, transform)
+      if (nextCell !== cell) rowChanged = true
+      return nextCell
+    })
+    if (!rowChanged) return row
+    changed = true
+    return { ...row, cells }
+  })
+
+  if (!changed) return content
   return {
     ...content,
-    rows: content.rows?.map((row) => ({
-      ...row,
-      cells: row.cells?.map((cell) => transformTableCell(cell, transform)),
-    })),
+    rows,
   }
 }
 
@@ -396,14 +413,14 @@ function transformBlockContent(
 
 function injectMathInBlock(block: BlockLike): BlockLike {
   const content = transformBlockContent(block.content, expandInlineMath)
-  const children = Array.isArray(block.children) ? block.children.map(injectMathInBlock) : block.children
+  const children = transformChildBlocks(block.children, injectMathInBlock)
   const latex = Array.isArray(content) ? readDisplayMathToken(content) : null
 
   if (latex !== null) {
     return buildMathBlock({ block, latex })
   }
 
-  return { ...block, content, children }
+  return content === block.content && children === block.children ? block : { ...block, content, children }
 }
 
 function readDisplayMathToken(content: InlineItem[] | undefined): string | null {
@@ -424,8 +441,22 @@ function buildMathBlock({ block, latex }: { block: BlockLike } & LatexPayload): 
 
 function restoreInlineMathInBlock(block: BlockLike): BlockLike {
   const content = transformBlockContent(block.content, restoreInlineMath)
-  const children = Array.isArray(block.children) ? block.children.map(restoreInlineMathInBlock) : block.children
-  return { ...block, content, children }
+  const children = transformChildBlocks(block.children, restoreInlineMathInBlock)
+  return content === block.content && children === block.children ? block : { ...block, content, children }
+}
+
+function transformChildBlocks(
+  children: BlockLike[] | undefined,
+  transform: (block: BlockLike) => BlockLike,
+): BlockLike[] | undefined {
+  if (!Array.isArray(children)) return children
+  let changed = false
+  const nextChildren = children.map((child) => {
+    const nextChild = transform(child)
+    if (nextChild !== child) changed = true
+    return nextChild
+  })
+  return changed ? nextChildren : children
 }
 
 function isMathBlock(block: BlockLike): boolean {
@@ -450,7 +481,7 @@ export function serializeMathAwareBlocks(editor: MarkdownSerializer, blocks: unk
 
   const flushPending = () => {
     if (pending.length === 0) return
-    const markdown = editor.blocksToMarkdownLossy(restoreMathInBlocks(pending)).trimEnd()
+    const markdown = serializeBlockNoteMarkdown(editor, restoreMathInBlocks(pending)).trimEnd()
     if (markdown) chunks.push(markdown)
     pending = []
   }

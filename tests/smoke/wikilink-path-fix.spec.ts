@@ -16,12 +16,10 @@ async function insertWikilink(page: Page) {
   const firstParagraphBox = await firstParagraph.boundingBox()
   if (!firstParagraphBox) throw new Error('Source paragraph is not visible')
 
-  await firstParagraph.click({
-    position: {
-      x: Math.max(1, firstParagraphBox.width - 2),
-      y: Math.max(1, firstParagraphBox.height - 2),
-    },
-  })
+  await page.mouse.click(
+    firstParagraphBox.x + Math.max(1, firstParagraphBox.width - 2),
+    firstParagraphBox.y + Math.max(1, firstParagraphBox.height - 2),
+  )
   await page.keyboard.press('Enter')
   await page.waitForTimeout(200)
 

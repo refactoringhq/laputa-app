@@ -1,14 +1,7 @@
 use crate::ai_agents::{AiAgentAvailability, AiAgentStreamEvent};
-use crate::cli_agent_runtime::AgentStreamRequest;
-use regex::Regex;
-use std::io::{BufRead, Read};
+use crate::cli_agent_runtime::{AgentStreamRequest, LineStreamProcess};
 use std::path::Path;
-use std::process::{ChildStderr, ChildStdout, Command, Stdio};
-
-struct HermesProcessError {
-    stderr_output: String,
-    status: String,
-}
+use std::process::{Command, Stdio};
 
 pub fn check_cli() -> AiAgentAvailability {
     crate::hermes_discovery::check_cli()
@@ -25,39 +18,19 @@ where
 fn run_agent_stream_with_binary<F>(
     binary: &Path,
     request: AgentStreamRequest,
-    mut emit: F,
+    emit: F,
 ) -> Result<String, String>
 where
     F: FnMut(AiAgentStreamEvent),
 {
     let prompt =
         crate::cli_agent_runtime::build_prompt(&request.message, request.system_prompt.as_deref());
-    let mut child = build_hermes_command(binary, prompt, &request.vault_path)?
-        .spawn()
-        .map_err(|error| format!("Failed to spawn hermes: {error}"))?;
-    let stdout = child.stdout.take().ok_or("No stdout handle")?;
-    let stderr_handle = read_stderr_async(child.stderr.take().ok_or("No stderr handle")?);
-    let child = crate::ai_agent_processes::register_current_stream_child(child);
-    let session_id = hermes_session_id();
-
-    emit(AiAgentStreamEvent::Init {
-        session_id: session_id.clone(),
-    });
-    stream_stdout(stdout, &mut emit);
-
-    let stderr_output = stderr_handle.join().unwrap_or_default();
-    let status = child.wait()?;
-    if !status.success() {
-        emit(AiAgentStreamEvent::Error {
-            message: format_hermes_error(HermesProcessError {
-                stderr_output,
-                status: status.to_string(),
-            }),
-        });
-    }
-
-    emit(AiAgentStreamEvent::Done);
-    Ok(session_id)
+    let command = build_hermes_command(binary, prompt, &request.vault_path)?;
+    crate::cli_agent_runtime::run_ai_agent_line_stream(
+        LineStreamProcess::new(command, "hermes", "hermes"),
+        emit,
+        format_hermes_error,
+    )
 }
 
 fn build_hermes_command(
@@ -84,56 +57,14 @@ fn build_hermes_command(
     Ok(command)
 }
 
-fn hermes_session_id() -> String {
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_millis())
-        .unwrap_or(0);
-    format!("hermes-{}-{ts}", std::process::id())
-}
-
-fn stream_stdout<F>(stdout: ChildStdout, emit: &mut F)
-where
-    F: FnMut(AiAgentStreamEvent),
-{
-    let reader = std::io::BufReader::new(stdout);
-    for line in reader.lines() {
-        match line {
-            Ok(line) => emit(AiAgentStreamEvent::TextDelta {
-                text: format!("{}\n", strip_ansi_codes(&line)),
-            }),
-            Err(error) => {
-                emit(AiAgentStreamEvent::Error {
-                    message: format!("Read error: {error}"),
-                });
-                break;
-            }
-        }
-    }
-}
-
-fn read_stderr_async(mut stderr: ChildStderr) -> std::thread::JoinHandle<String> {
-    std::thread::spawn(move || {
-        let mut output = String::new();
-        let _ = stderr.read_to_string(&mut output);
-        output
-    })
-}
-
-fn strip_ansi_codes(input: &str) -> String {
-    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    let re = RE.get_or_init(|| Regex::new(r"\x1b\[[0-?]*[ -/]*[@-~]").unwrap());
-    re.replace_all(input, "").to_string()
-}
-
-fn format_hermes_error(error: HermesProcessError) -> String {
-    if is_auth_or_setup_error(&error.stderr_output) {
+fn format_hermes_error(stderr_output: &str, status: &str) -> String {
+    if is_auth_or_setup_error(stderr_output) {
         return "Hermes Agent is not ready. Run `hermes setup`, choose a model with `hermes model`, then run `hermes doctor` in your terminal before retrying in Tolaria.".into();
     }
 
-    let stderr = error.stderr_output.trim();
+    let stderr = stderr_output.trim();
     if stderr.is_empty() {
-        format!("hermes exited with status {}", error.status)
+        format!("hermes exited with status {status}")
     } else {
         stderr.lines().take(3).collect::<Vec<_>>().join("\n")
     }
@@ -263,16 +194,16 @@ exit 2
 
     #[test]
     fn format_hermes_error_returns_status_for_empty_stderr() {
-        let result = format_hermes_error(HermesProcessError {
-            stderr_output: String::new(),
-            status: "1".into(),
-        });
+        let result = format_hermes_error("", "1");
 
         assert!(result.contains("status 1"));
     }
 
     #[test]
     fn strip_ansi_codes_removes_terminal_colors() {
-        assert_eq!(strip_ansi_codes("\x1b[32mHermes\x1b[0m"), "Hermes");
+        assert_eq!(
+            crate::cli_agent_runtime::strip_ansi_codes("\x1b[32mHermes\x1b[0m"),
+            "Hermes"
+        );
     }
 }

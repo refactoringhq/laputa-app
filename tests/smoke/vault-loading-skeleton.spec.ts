@@ -107,7 +107,7 @@ async function expectResponsiveShellWhileVaultLoads(page: Page): Promise<void> {
   await expect(page.getByTestId('sidebar-loading-folders')).toBeVisible()
   await expect(page.getByTestId('note-list-loading-skeleton')).toBeVisible()
   await expect(page.getByTestId('breadcrumb-title-skeleton')).toBeVisible()
-  await expect(page.getByTestId('editor-content-skeleton')).toBeVisible()
+  await expect(page.getByTestId('editor-content-skeleton')).not.toBeVisible()
   await expect(page.getByText('Select a note to start editing')).not.toBeVisible()
   await expect(page.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
 

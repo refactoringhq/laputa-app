@@ -1,9 +1,7 @@
 use crate::ai_agents::{AiAgentAvailability, AiAgentStreamEvent};
-use crate::cli_agent_runtime::AgentStreamRequest;
-use regex::Regex;
-use std::io::{BufRead, Read, Write};
+use crate::cli_agent_runtime::{AgentStreamRequest, LineStreamProcess};
 use std::path::Path;
-use std::process::{ChildStderr, ChildStdin, ChildStdout, Stdio};
+use std::process::Stdio;
 
 struct KiroMcpConfig<'a> {
     vault_path: &'a str,
@@ -11,16 +9,11 @@ struct KiroMcpConfig<'a> {
     mcp_server_path: &'a str,
 }
 
-struct KiroError<'a> {
-    stderr_output: &'a str,
-    status: String,
-}
-
 pub fn check_cli() -> AiAgentAvailability {
     crate::kiro_discovery::check_cli()
 }
 
-pub fn run_agent_stream<F>(request: AgentStreamRequest, mut emit: F) -> Result<String, String>
+pub fn run_agent_stream<F>(request: AgentStreamRequest, emit: F) -> Result<String, String>
 where
     F: FnMut(AiAgentStreamEvent),
 {
@@ -28,42 +21,15 @@ where
     ensure_mcp_config(&request)?;
     let prompt =
         crate::cli_agent_runtime::build_prompt(&request.message, request.system_prompt.as_deref());
-
-    let mut child = spawn_kiro_process(&binary, Path::new(&request.vault_path))?;
-    let prompt_handle = write_prompt_async(
-        child.stdin.take().ok_or("No stdin handle")?,
-        prompt.into_bytes(),
-    );
-    let stdout = child.stdout.take().ok_or("No stdout handle")?;
-    let stderr_handle = read_stderr_async(child.stderr.take().ok_or("No stderr handle")?);
-    let child = crate::ai_agent_processes::register_current_stream_child(child);
-
-    let session_id = generate_session_id();
-    emit(AiAgentStreamEvent::Init {
-        session_id: session_id.clone(),
-    });
-
-    stream_stdout(stdout, &mut emit);
-
-    let mut stderr_output = stderr_handle.join().unwrap_or_default();
-    if let Some(error) = prompt_write_error(prompt_handle) {
-        append_stderr_line(&mut stderr_output, error);
-    }
-    let status = child.wait()?;
-    if !status.success() {
-        emit(AiAgentStreamEvent::Error {
-            message: format_kiro_error(KiroError {
-                stderr_output: &stderr_output,
-                status: status.to_string(),
-            }),
-        });
-    }
-
-    emit(AiAgentStreamEvent::Done);
-    Ok(session_id)
+    let command = build_kiro_command(&binary, Path::new(&request.vault_path));
+    crate::cli_agent_runtime::run_ai_agent_line_stream(
+        LineStreamProcess::new(command, "kiro-cli", "kiro").with_stdin(prompt),
+        emit,
+        format_kiro_error,
+    )
 }
 
-fn spawn_kiro_process(binary: &Path, vault_path: &Path) -> Result<std::process::Child, String> {
+fn build_kiro_command(binary: &Path, vault_path: &Path) -> std::process::Command {
     let mut command = crate::hidden_command(binary);
     crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
     command
@@ -75,78 +41,6 @@ fn spawn_kiro_process(binary: &Path, vault_path: &Path) -> Result<std::process::
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     command
-        .spawn()
-        .map_err(|e| format!("Failed to spawn kiro-cli: {e}"))
-}
-
-fn write_prompt_async(
-    mut stdin: ChildStdin,
-    prompt: Vec<u8>,
-) -> std::thread::JoinHandle<Result<(), String>> {
-    std::thread::spawn(move || {
-        stdin
-            .write_all(&prompt)
-            .map_err(|e| format!("Failed to write kiro-cli stdin: {e}"))
-    })
-}
-
-fn generate_session_id() -> String {
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    format!("kiro-{}-{}", std::process::id(), ts)
-}
-
-fn stream_stdout<F>(stdout: ChildStdout, emit: &mut F)
-where
-    F: FnMut(AiAgentStreamEvent),
-{
-    let reader = std::io::BufReader::new(stdout);
-
-    for line in reader.lines() {
-        match line {
-            Ok(l) if !l.is_empty() => {
-                emit(AiAgentStreamEvent::TextDelta {
-                    text: format!("{}\n", strip_ansi_codes(&l)),
-                });
-            }
-            Ok(_) => {
-                emit(AiAgentStreamEvent::TextDelta {
-                    text: "\n".to_string(),
-                });
-            }
-            Err(e) => {
-                emit(AiAgentStreamEvent::Error {
-                    message: format!("Read error: {e}"),
-                });
-                break;
-            }
-        }
-    }
-}
-
-fn read_stderr_async(mut stderr: ChildStderr) -> std::thread::JoinHandle<String> {
-    std::thread::spawn(move || {
-        let mut output = String::new();
-        let _ = stderr.read_to_string(&mut output);
-        output
-    })
-}
-
-fn prompt_write_error(handle: std::thread::JoinHandle<Result<(), String>>) -> Option<String> {
-    match handle.join() {
-        Ok(Ok(())) => None,
-        Ok(Err(error)) => Some(error),
-        Err(_) => Some("Failed to write kiro-cli stdin: writer thread panicked".into()),
-    }
-}
-
-fn append_stderr_line(stderr_output: &mut String, line: impl AsRef<str>) {
-    if !stderr_output.is_empty() {
-        stderr_output.push('\n');
-    }
-    stderr_output.push_str(line.as_ref());
 }
 
 fn ensure_mcp_config(request: &AgentStreamRequest) -> Result<(), String> {
@@ -176,18 +70,14 @@ fn write_mcp_json(config: KiroMcpConfig<'_>) -> Result<(), String> {
         .entry("mcpServers")
         .or_insert_with(|| serde_json::json!({}));
 
-    let active_vault_paths =
-        crate::cli_agent_runtime::active_vault_paths_json(config.vault_path, config.vault_paths);
-    servers["tolaria"] = serde_json::json!({
-        "command": "node",
-        "args": [config.mcp_server_path],
-        "env": {
-            "VAULT_PATH": config.vault_path,
-            "VAULT_PATHS": active_vault_paths,
-            "WS_UI_PORT": "9711"
-        },
-        "disabled": false
-    });
+    let mut server = crate::cli_agent_runtime::tolaria_node_mcp_server(
+        config.mcp_server_path,
+        config.vault_path,
+        config.vault_paths,
+        true,
+    );
+    server["disabled"] = serde_json::json!(false);
+    servers["tolaria"] = server;
 
     std::fs::write(
         &config_path,
@@ -199,26 +89,15 @@ fn write_mcp_json(config: KiroMcpConfig<'_>) -> Result<(), String> {
     Ok(())
 }
 
-fn strip_ansi_codes(input: &str) -> String {
-    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
-    let re = RE.get_or_init(|| Regex::new(r"\x1b\[[0-?]*[ -/]*[@-~]").unwrap());
-    re.replace_all(input, "").to_string()
-}
-
-fn format_kiro_error(error: KiroError<'_>) -> String {
-    if is_auth_error(error.stderr_output) {
+fn format_kiro_error(stderr_output: &str, status: &str) -> String {
+    if is_auth_error(stderr_output) {
         return "Kiro CLI is not authenticated. Run `kiro-cli login` in your terminal to sign in."
             .into();
     }
-    if error.stderr_output.trim().is_empty() {
-        format!("kiro-cli exited with status {}", error.status)
+    if stderr_output.trim().is_empty() {
+        format!("kiro-cli exited with status {status}")
     } else {
-        error
-            .stderr_output
-            .lines()
-            .take(3)
-            .collect::<Vec<_>>()
-            .join("\n")
+        stderr_output.lines().take(3).collect::<Vec<_>>().join("\n")
     }
 }
 
@@ -236,27 +115,24 @@ mod tests {
     #[test]
     fn strip_ansi_codes_removes_terminal_colors() {
         assert_eq!(
-            strip_ansi_codes("\x1b[38;5;141m>  \x1b[0mHello! \x1b[2K"),
+            crate::cli_agent_runtime::strip_ansi_codes("\x1b[38;5;141m>  \x1b[0mHello! \x1b[2K"),
             ">  Hello! "
         );
-        assert_eq!(strip_ansi_codes("plain text"), "plain text");
+        assert_eq!(
+            crate::cli_agent_runtime::strip_ansi_codes("plain text"),
+            "plain text"
+        );
     }
 
     #[test]
     fn format_kiro_error_detects_auth_errors() {
-        let result = format_kiro_error(KiroError {
-            stderr_output: "Error: auth token expired",
-            status: "1".into(),
-        });
+        let result = format_kiro_error("Error: auth token expired", "1");
         assert!(result.contains("kiro-cli login"));
     }
 
     #[test]
     fn format_kiro_error_returns_status_for_empty_stderr() {
-        let result = format_kiro_error(KiroError {
-            stderr_output: "",
-            status: "1".into(),
-        });
+        let result = format_kiro_error("", "1");
         assert!(result.contains("status 1"));
     }
 

@@ -206,11 +206,15 @@ function useUnsavedTracker() {
   const [unsavedPaths, setUnsavedPaths] = useState<Set<string>>(new Set())
 
   const trackUnsaved = useCallback((path: string) => {
-    setUnsavedPaths((prev) => new Set(prev).add(path))
+    setUnsavedPaths((prev) => {
+      if (prev.has(path)) return prev
+      return new Set(prev).add(path)
+    })
   }, [])
 
   const clearUnsaved = useCallback((path: string) => {
     setUnsavedPaths((prev) => {
+      if (!prev.has(path)) return prev
       const next = new Set(prev)
       next.delete(path)
       return next

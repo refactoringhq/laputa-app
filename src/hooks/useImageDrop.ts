@@ -13,6 +13,7 @@ const TAURI_DRAG_LEAVE_EVENT = 'tauri://drag-leave'
 
 type ImageUrlHandler = (url: string) => void
 type TauriDropEvent = TauriEvent<TauriDragDropPayload>
+export type UploadImageFileResult = string | { props: { name: string; url: string } }
 type CopyImageToVaultRequest = {
   sourcePath: string
   vaultPath: string
@@ -58,27 +59,64 @@ function isImagePath(path: string): boolean {
   return IMAGE_EXTENSIONS.includes(ext)
 }
 
-/** Upload an image file — saves to vault/attachments in Tauri, returns data URL in browser */
-export async function uploadImageFile(file: File, vaultPath?: string): Promise<string> {
-  if (isTauri() && vaultPath) {
-    const buf = await file.arrayBuffer()
-    const bytes = new Uint8Array(buf)
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes.at(i) ?? 0)
-    const base64 = btoa(binary)
-    const savedPath = await invoke<string>('save_image', {
-      vaultPath,
-      filename: file.name,
-      data: base64,
-    })
-    return attachmentAssetUrlFromPath({ path: savedPath })
-  }
+function unreadableUploadResult(file: File): UploadImageFileResult {
+  return { props: { name: file.name, url: '' } }
+}
+
+function uploadErrorText(error: unknown): string {
+  if (error instanceof Error) return [error.name, error.message].filter(Boolean).join(': ')
+  if (typeof error === 'string') return error
+  if (!isRecord(error)) return ''
+
+  const name = Reflect.get(error, 'name')
+  const message = Reflect.get(error, 'message')
+  return [
+    typeof name === 'string' ? name : undefined,
+    typeof message === 'string' ? message : undefined,
+  ].filter(Boolean).join(': ')
+}
+
+function isUnreadableFileUploadError(error: unknown): boolean {
+  const text = uploadErrorText(error)
+  return text.includes('NotReadableError') || text.includes('could not be read')
+}
+
+function handleUploadFailure(file: File, error: unknown): UploadImageFileResult {
+  if (!isUnreadableFileUploadError(error)) throw error
+
+  console.warn('[image-upload] Skipped unreadable file upload:', error)
+  return unreadableUploadResult(file)
+}
+
+function readBrowserImageFile(file: File): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(reader.result as string)
     reader.onerror = () => reject(reader.error)
     reader.readAsDataURL(file)
   })
+}
+
+/** Upload an image file — saves to vault/attachments in Tauri, returns data URL in browser */
+export async function uploadImageFile(file: File, vaultPath?: string): Promise<UploadImageFileResult> {
+  try {
+    if (isTauri() && vaultPath) {
+      const buf = await file.arrayBuffer()
+      const bytes = new Uint8Array(buf)
+      let binary = ''
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes.at(i) ?? 0)
+      const base64 = btoa(binary)
+      const savedPath = await invoke<string>('save_image', {
+        vaultPath,
+        filename: file.name,
+        data: base64,
+      })
+      return attachmentAssetUrlFromPath({ path: savedPath })
+    }
+    return await readBrowserImageFile(file)
+  } catch (error) {
+    return handleUploadFailure(file, error)
+  }
 }
 
 /** Copy a dropped file (by OS path) into vault/attachments and return its asset URL. */

@@ -1,5 +1,9 @@
 import { hasTitleHeadingText, headingBlockText } from './editorTitleHeadingText'
 import type { FocusableEditor, TiptapEditor } from './editorFocusUtils'
+import {
+  reportRecoveredEditorTransformError,
+  richEditorTransformRecoveryErrorReason,
+} from '../components/richEditorTransformErrorRecoveryExtension'
 
 interface HeadingRange {
   from: number
@@ -57,6 +61,24 @@ function trySelectEmptyFirstHeading(editor: FocusableEditor): boolean {
   return headingBlockId ? tryPlaceCursorInBlock(editor, headingBlockId) : false
 }
 
+function recoverTitleSelectionError(error: unknown): boolean {
+  const reason = richEditorTransformRecoveryErrorReason(error)
+  if (!reason) return false
+
+  reportRecoveredEditorTransformError(reason, error)
+  return true
+}
+
+function tryApplyHeadingRange(tiptap: TiptapEditor, range: HeadingRange): boolean {
+  try {
+    tiptap.chain().setTextSelection(range).run()
+    return true
+  } catch (error) {
+    if (recoverTitleSelectionError(error)) return false
+    throw error
+  }
+}
+
 export function trySelectFirstHeading(editor: FocusableEditor): boolean {
   if (hasTitleHeadingText(getFirstHeadingBlock(editor))) return true
   if (trySelectEmptyFirstHeading(editor)) return true
@@ -66,6 +88,5 @@ export function trySelectFirstHeading(editor: FocusableEditor): boolean {
   const range = findFirstHeadingRange(tiptap)
   if (!range) return false
 
-  tiptap.chain().setTextSelection(range).run()
-  return true
+  return tryApplyHeadingRange(tiptap, range)
 }

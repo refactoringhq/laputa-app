@@ -1,10 +1,11 @@
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MutableRefObject } from 'react'
 import type { VaultEntry } from '../types'
 import { cacheNoteContent, clearPrefetchCache } from './useTabManagement'
 import {
   PARSED_BLOCK_PRELOAD_DELAY_MS,
+  PARSED_BLOCK_PRELOAD_FOREGROUND_IDLE_MS,
   PARSED_BLOCK_PRELOAD_MIN_BYTES,
   useParsedBlockPreload,
 } from './editorParsedBlockPreload'
@@ -98,12 +99,13 @@ describe('useParsedBlockPreload', () => {
   })
 
   afterEach(() => {
+    cleanup()
     clearPrefetchCache()
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
-  it('does not preparse warmed large markdown notes while memory-heavy preload is disabled', async () => {
+  it('prepares warmed large markdown notes after the foreground editor is idle', async () => {
     const refs = makeRefs()
     const prepareParsedBlocks = vi.fn(async () => {})
     const entry = makeEntry()
@@ -111,7 +113,10 @@ describe('useParsedBlockPreload', () => {
     renderParsedPreload(refs, prepareParsedBlocks)
     await emitResolvedContent(entry, '# Large\n\nPrepared body.')
 
-    expect(prepareParsedBlocks).not.toHaveBeenCalled()
+    expect(prepareParsedBlocks).toHaveBeenCalledWith(expect.objectContaining({
+      content: '# Large\n\nPrepared body.',
+      path: entry.path,
+    }))
   })
 
   it('skips raw prefetches that are not parsed-block warmup candidates', async () => {
@@ -151,5 +156,26 @@ describe('useParsedBlockPreload', () => {
     })
 
     expect(prepareParsedBlocks).not.toHaveBeenCalled()
+  })
+
+  it('defers warm parsing while foreground editor work is still recent', async () => {
+    const entry = makeEntry({ path: '/vault/deferred.md' })
+    const refs = makeRefs({ foregroundWorkAt: Date.now() })
+    const prepareParsedBlocks = vi.fn(async () => {})
+
+    renderParsedPreload(refs, prepareParsedBlocks)
+    cacheNoteContent(entry.path, '# Deferred\n\nBody', entry)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PARSED_BLOCK_PRELOAD_DELAY_MS - 50)
+      refs.foregroundWorkAtRef.current = Date.now()
+      await vi.advanceTimersByTimeAsync(50)
+    })
+    expect(prepareParsedBlocks).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PARSED_BLOCK_PRELOAD_FOREGROUND_IDLE_MS + PARSED_BLOCK_PRELOAD_DELAY_MS)
+    })
+    expect(prepareParsedBlocks).toHaveBeenCalledWith(expect.objectContaining({ path: entry.path }))
   })
 })

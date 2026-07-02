@@ -401,7 +401,10 @@ function relativePathFromNoteDirectory(request: NoteDirectoryRelativePathRequest
 function resolvePortableAttachmentUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
   const { url, vaultPath } = request
   if (!isPortableAttachmentPath({ path: url })) return null
-  return vaultAttachmentAssetUrl({ vaultPath, attachmentPath: decodePathUrl({ url }) })
+  return resolveAssetUrl(() => vaultAttachmentAssetUrl({
+    vaultPath,
+    attachmentPath: decodePathUrl({ url }),
+  }))
 }
 
 function resolveLegacyAttachmentAssetUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
@@ -410,20 +413,31 @@ function resolveLegacyAttachmentAssetUrl(request: ImageUrlRequest): MarkdownImag
   if (isCurrentVaultAssetUrl({ url, vaultPath })) return null
 
   const attachmentPath = portableAttachmentPathFromAnyAssetUrl({ url })
-  return attachmentPath ? vaultAttachmentAssetUrl({ vaultPath, attachmentPath }) : null
+  return attachmentPath ? resolveAssetUrl(() => vaultAttachmentAssetUrl({ vaultPath, attachmentPath })) : null
 }
 
 function resolveAbsoluteFilesystemUrl(request: UrlOnlyRequest): MarkdownImageUrl | null {
   const { url } = request
   return isFilesystemAbsolutePath({ path: url })
-    ? attachmentAssetUrlFromPath({ path: decodePathUrl({ url }) })
+    ? resolveAssetUrl(() => attachmentAssetUrlFromPath({ path: decodePathUrl({ url }) }))
     : null
 }
 
 function resolveNoteRelativeUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
   const { url, notePath } = request
   if (!notePath || hasUrlScheme({ url })) return null
-  return attachmentAssetUrlFromPath({ path: joinNoteRelativePath({ notePath, relativeUrl: url }) })
+  return resolveAssetUrl(() => attachmentAssetUrlFromPath({
+    path: joinNoteRelativePath({ notePath, relativeUrl: url }),
+  }))
+}
+
+function resolveAssetUrl(resolve: () => MarkdownImageUrl): MarkdownImageUrl | null {
+  try {
+    return resolve()
+  } catch (error) {
+    console.warn('[image] Failed to prepare asset URL:', error)
+    return null
+  }
 }
 
 function resolveImageUrl(request: ImageUrlRequest): MarkdownImageUrl | null {

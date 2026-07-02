@@ -12,6 +12,47 @@ Personally, I use it to **run my life** (hey 👋 [Luca here](http://x.com/lucar
 
 <img width="1000" height="656" alt="1776506856823-CleanShot_2026-04-18_at_12 06 57_2x" src="https://github.com/user-attachments/assets/8aeafb0a-b236-43c2-a083-ec111f903c38" />
 
+## Sponsors
+
+Tolaria is supported by a small panel of tools that help keep the project healthy, tested, and ready for AI-assisted development. I use these tools every day.
+
+<table>
+  <tr>
+    <td align="center" width="25%">
+      <a href="https://www.codacy.com/">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codacy-light.svg">
+          <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codacy-dark.svg" alt="Codacy" height="32">
+        </picture>
+      </a>
+    </td>
+    <td align="center" width="25%">
+      <a href="https://codescene.com/">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codescene-light.svg">
+          <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codescene-dark.svg" alt="CodeScene" height="32">
+        </picture>
+      </a>
+    </td>
+    <td align="center" width="25%">
+      <a href="https://circleci.com/">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/circleci-light.svg">
+          <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/circleci-dark.svg" alt="CircleCI" height="32">
+        </picture>
+      </a>
+    </td>
+    <td align="center" width="25%">
+      <a href="https://getunblocked.com/">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/unblocked-light.svg">
+          <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/unblocked-dark.svg" alt="Unblocked" height="32">
+        </picture>
+      </a>
+    </td>
+  </tr>
+</table>
+
 ## Walkthroughs
 
 You can find some Loom walkthroughs below — they are short and to the point:

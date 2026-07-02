@@ -106,6 +106,35 @@ describe('uploadImageFile', () => {
 
     tauriMode = false
   })
+
+  it('resolves unreadable local files to an empty upload state', async () => {
+    tauriMode = true
+    const { invoke } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockClear()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const readError = new DOMException(
+      'The requested file could not be read, typically due to permission problems.',
+      'NotReadableError',
+    )
+    const arrayBuffer = vi.spyOn(File.prototype, 'arrayBuffer').mockRejectedValue(readError)
+
+    try {
+      const file = new File(['data'], 'protected.png', { type: 'image/png' })
+
+      await expect(uploadImageFile(file, '/vault')).resolves.toEqual({
+        props: { name: 'protected.png', url: '' },
+      })
+      expect(invoke).not.toHaveBeenCalled()
+      expect(warn).toHaveBeenCalledWith(
+        '[image-upload] Skipped unreadable file upload:',
+        readError,
+      )
+    } finally {
+      arrayBuffer.mockRestore()
+      warn.mockRestore()
+      tauriMode = false
+    }
+  })
 })
 
 describe('useImageDrop', () => {

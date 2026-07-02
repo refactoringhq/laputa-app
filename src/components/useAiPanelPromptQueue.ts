@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useState } from 'react'
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react'
 import type { NoteReference } from '../utils/ai-context'
 import type { QueuedAiPrompt } from '../utils/aiPromptBridge'
 import { useQueuedAiPrompt } from './useQueuedAiPrompt'
@@ -64,6 +64,7 @@ export function useAiPanelPromptQueue({
   enabled = true,
 }: UseAiPanelPromptQueueArgs) {
   const [queuedPrompt, setQueuedPrompt] = useState<QueuedAiPrompt | null>(null)
+  const consumedQueuedPromptIdRef = useRef<number | null>(null)
 
   const handleQueuedPrompt = useCallback((prompt: QueuedAiPrompt) => {
     setInput(prompt.text)
@@ -77,7 +78,9 @@ export function useAiPanelPromptQueue({
   useEffect(() => {
     const prompt = readyQueuedPrompt({ currentTargetId, enabled, input, isActive, onTargetChange, queuedPrompt })
     if (!prompt) return
+    if (consumedQueuedPromptIdRef.current === prompt.id) return
 
+    consumedQueuedPromptIdRef.current = prompt.id
     agent.clearConversation()
     agent.sendMessage(prompt.text, prompt.references)
     startTransition(() => {

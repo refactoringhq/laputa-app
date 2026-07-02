@@ -66,9 +66,6 @@ fn write_workspace_mcp_config(
 
     let config_path = config_dir.join("mcp_config.json");
     let mut config = read_json_object(&config_path)?;
-    let active_vault_paths =
-        crate::cli_agent_runtime::active_vault_paths_json(vault_path, vault_paths);
-
     let servers_value = config
         .as_object_mut()
         .ok_or("Invalid mcp_config.json: not an object")?
@@ -79,15 +76,12 @@ fn write_workspace_mcp_config(
         .ok_or("Invalid mcp_config.json: mcpServers is not an object")?;
     servers.insert(
         "tolaria".to_string(),
-        serde_json::json!({
-            "command": "node",
-            "args": [mcp_server_path],
-            "env": {
-                "VAULT_PATH": vault_path,
-                "VAULT_PATHS": active_vault_paths,
-                "WS_UI_PORT": "9711"
-            }
-        }),
+        crate::cli_agent_runtime::tolaria_node_mcp_server(
+            mcp_server_path,
+            vault_path,
+            vault_paths,
+            true,
+        ),
     );
 
     std::fs::write(

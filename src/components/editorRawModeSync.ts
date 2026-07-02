@@ -69,7 +69,7 @@ export function serializeEditorDocumentToMarkdown(
   vaultPath?: string,
   notePath?: string,
 ): string {
-  return serializeRichEditorDocumentToMarkdown(editor, tabContent, vaultPath, notePath)
+  return serializeRichEditorDocumentToMarkdown({ editor, notePath, tabContent, vaultPath })
 }
 
 export function applyPendingRawExitContent(

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useEditorSaveWithLinks } from './useEditorSaveWithLinks'
 
@@ -26,6 +26,22 @@ vi.mock('./useEditorSave', () => ({
   })),
 }))
 
+let idleCallbacks = new Map<number, IdleRequestCallback>()
+let nextIdleCallbackHandle = 1
+
+function flushDeferredMetadata() {
+  const callbacks = Array.from(idleCallbacks.values())
+  idleCallbacks.clear()
+  act(() => {
+    for (const callback of callbacks) {
+      callback({
+        didTimeout: false,
+        timeRemaining: () => 50,
+      })
+    }
+  })
+}
+
 describe('useEditorSaveWithLinks', () => {
   let updateEntry: Mock
   let setTabs: Mock
@@ -33,6 +49,17 @@ describe('useEditorSaveWithLinks', () => {
   let onAfterSave: Mock
 
   beforeEach(() => {
+    idleCallbacks = new Map()
+    nextIdleCallbackHandle = 1
+    vi.stubGlobal('requestIdleCallback', vi.fn((callback: IdleRequestCallback) => {
+      const handle = nextIdleCallbackHandle
+      nextIdleCallbackHandle += 1
+      idleCallbacks.set(handle, callback)
+      return handle
+    }))
+    vi.stubGlobal('cancelIdleCallback', vi.fn((handle: number) => {
+      idleCallbacks.delete(handle)
+    }))
     updateEntry = vi.fn()
     setTabs = vi.fn()
     setToastMessage = vi.fn()
@@ -41,6 +68,10 @@ describe('useEditorSaveWithLinks', () => {
     mockHandleContentChange.mockClear()
     mockHandleSave.mockClear()
     mockSavePendingForPath.mockClear()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   function renderHookWithLinks() {
@@ -71,6 +102,9 @@ describe('useEditorSaveWithLinks', () => {
       result.current.handleContentChange('/note.md', 'see [[PageA]] and [[PageB]]')
     })
 
+    expect(updateEntry).not.toHaveBeenCalled()
+    flushDeferredMetadata()
+
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       outgoingLinks: ['PageA', 'PageB'],
     })
@@ -82,6 +116,7 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/note.md', 'text [[Alpha]] more text')
     })
+    flushDeferredMetadata()
     expect(updateEntry).toHaveBeenCalledTimes(2)
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       outgoingLinks: ['Alpha'],
@@ -95,6 +130,7 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/note.md', 'different text [[Alpha]] still')
     })
+    flushDeferredMetadata()
     // updateEntry should NOT have been called again — links unchanged
     expect(updateEntry).toHaveBeenCalledTimes(2)
   })
@@ -105,6 +141,7 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/note.md', 'see [[Alpha]]')
     })
+    flushDeferredMetadata()
     expect(updateEntry).toHaveBeenCalledTimes(2)
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       outgoingLinks: ['Alpha'],
@@ -118,6 +155,7 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/note.md', 'see [[Alpha]] and [[Beta]]')
     })
+    flushDeferredMetadata()
     expect(updateEntry).toHaveBeenCalledTimes(3)
     expect(updateEntry).toHaveBeenLastCalledWith('/note.md', {
       outgoingLinks: ['Alpha', 'Beta'],
@@ -130,6 +168,8 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/note.md', 'plain text no links')
     })
+
+    flushDeferredMetadata()
 
     expect(updateEntry).toHaveBeenCalledTimes(1)
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
@@ -145,6 +185,8 @@ describe('useEditorSaveWithLinks', () => {
       result.current.handleContentChange('/note.md', 'see [[Target|Display Text]]')
     })
 
+    flushDeferredMetadata()
+
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       outgoingLinks: ['Target'],
     })
@@ -156,6 +198,8 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/note.md', '---\ntype: Project\nstatus: Active\n---\nBody')
     })
+
+    flushDeferredMetadata()
 
     expect(updateEntry).toHaveBeenCalledWith('/note.md', expect.objectContaining({
       isA: 'Project',
@@ -172,9 +216,11 @@ describe('useEditorSaveWithLinks', () => {
     const content = '---\ntype: Essay\n---\nBody text'
 
     act(() => { result.current.handleContentChange('/note.md', content) })
+    flushDeferredMetadata()
     const callCount = updateEntry.mock.calls.length
 
     act(() => { result.current.handleContentChange('/note.md', content + ' more') })
+    flushDeferredMetadata()
     // Same frontmatter, only body changed — no extra updateEntry for frontmatter
     expect(updateEntry).toHaveBeenCalledTimes(callCount)
   })
@@ -185,6 +231,7 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/note.md', '---\ntype: Essay\n---\nBody')
     })
+    flushDeferredMetadata()
     expect(updateEntry).toHaveBeenCalledWith('/note.md', expect.objectContaining({
       isA: 'Essay',
     }))
@@ -196,6 +243,7 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/note.md', '---\ntype: Note\n---\nBody')
     })
+    flushDeferredMetadata()
     expect(updateEntry).toHaveBeenCalledWith('/note.md', expect.objectContaining({
       isA: 'Note',
     }))
@@ -212,6 +260,8 @@ describe('useEditorSaveWithLinks', () => {
       result.current.handleContentChange('/note.md', '---\nOwner: [[person/alice]]\ncustom: value\n---\nBody')
     })
 
+    flushDeferredMetadata()
+
     expect(updateEntry).toHaveBeenCalledWith('/note.md', expect.objectContaining({
       properties: { Owner: '[[person/alice]]', custom: 'value' },
       relationships: { Owner: ['[[person/alice]]'] },
@@ -224,12 +274,14 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/note.md', '---\nstatus: Active\nOwner: [[person/alice]]\ncustom: value\n---\nBody')
     })
+    flushDeferredMetadata()
 
     updateEntry.mockClear()
 
     act(() => {
       result.current.handleContentChange('/note.md', 'Body without frontmatter')
     })
+    flushDeferredMetadata()
 
     expect(updateEntry).toHaveBeenCalledWith('/note.md', expect.objectContaining({
       belongsTo: [],
@@ -246,12 +298,14 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/note.md', '---\nstatus: Active\nOwner: [[person/alice]]\n---\nBody')
     })
+    flushDeferredMetadata()
 
     updateEntry.mockClear()
 
     act(() => {
       result.current.handleContentChange('/note.md', '---\nstatus: Active\nOwner: [[person/alice]]\nBody')
     })
+    flushDeferredMetadata()
 
     expect(updateEntry).not.toHaveBeenCalled()
   })
@@ -266,6 +320,8 @@ describe('useEditorSaveWithLinks', () => {
       result.current.handleContentChange(path, content)
     })
 
+    flushDeferredMetadata()
+
     expect(updateEntry).toHaveBeenCalledWith(path, expected)
   })
 
@@ -275,6 +331,10 @@ describe('useEditorSaveWithLinks', () => {
     act(() => {
       result.current.handleContentChange('/old-title.md', '# Renamed Note\n\nBody')
     })
+
+    expect(startTransitionMock).not.toHaveBeenCalled()
+    expect(updateEntry).not.toHaveBeenCalled()
+    flushDeferredMetadata()
 
     expect(startTransitionMock).toHaveBeenCalledTimes(1)
     expect(updateEntry).toHaveBeenCalledWith('/old-title.md', {
