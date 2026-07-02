@@ -72,6 +72,8 @@ Hot edit paths should avoid document-wide BlockNote lifecycle work. `richEditorB
 
 Block-selection behavior keeps UI/plugin wiring separate from block operations. `richEditorBlockSelectionExtension.ts` owns the ProseMirror plugin, state reducer, decorations, and keyboard/clipboard event dispatch. `richEditorBlockSelectionDocument.ts` owns BlockNote document traversal, nested-selection pruning, collapsed hidden-content operation IDs, and block-move helpers. `richEditorBlockSelectionClipboard.ts` owns Tolaria clipboard MIME data, BlockNote HTML/Markdown fallback parsing, and ID stripping before paste.
 
+Focused block type changes share the same block-type catalog in `src/utils/richEditorBlockTypes.ts` across the command palette and block handle menu. UI surfaces should call the helpers in `src/components/richEditorBlockTypeCommands.ts` instead of manually constructing BlockNote updates so conversion preserves the current block content, runs inside one editor transaction, and emits the shared `editor_block_type_changed` analytics event.
+
 ### Vault Git Capability
 
 Git is a per-vault capability, not a prerequisite for the document model. A vault can be:
