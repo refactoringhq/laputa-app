@@ -11,7 +11,7 @@ files:
     command.openSettings: 638c05f4f159a403e04aebe94b46a2a8
     command.openSettings.keywords: ab6b5e03395f4db955ed9cbfd4de33b7
     command.openLanguageSettings: e5a425aa6222fab3df66c0e1e0ca4183
-    command.openLanguageSettings.keywords: 6a910000cbf23eac3c7078e518cae66a
+    command.openLanguageSettings.keywords: c92bcfddcacf33ad7bdb6ccb88f0d4f4
     command.useSystemLanguage: b7f0315c47d4a59faa2a49571fcf1fca
     command.openH1Setting: 05b4f6edc0e98b29670e8ee902cdb9bf
     command.toggleGitignoredFilesVisibility: 0a2d3ea4e8ff8b00a801183caeb97a03
@@ -983,3 +983,4 @@ files:
     locale.idID: cc1c9b57607b4439578b68074a5e2d80
     locale.ukUA: e78a6fc14ad64f7a78386b20568ce95b
     locale.svSE: 41171a0fcd362ce98b5f0f11398713b6
+    locale.skSK: 9accc467b159e7ce158e53209c0cde2a
