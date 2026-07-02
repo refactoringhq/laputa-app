@@ -10,6 +10,7 @@ import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { AddRemoteModal } from '../AddRemoteModal'
 import { Button } from '@/components/ui/button'
 import {
+  BranchBadge,
   CommitButton,
   ConflictBadge,
   ChangesBadge,
@@ -188,6 +189,7 @@ function StatusBarPrimaryBadges({
       <VaultReloadingBadge isReloading={isVaultReloading} showSeparator={!compact} compact={compact} locale={locale} />
       {gitFeaturesEnabled && isGitVault ? (
         <>
+          <BranchBadge remoteStatus={visibleRemoteStatus} showSeparator={!compact} compact={compact} locale={locale} />
           <NoRemoteBadge remoteStatus={visibleRemoteStatus} onAddRemote={onAddRemote} showSeparator={!compact} compact={compact} locale={locale} />
           <ChangesBadge count={modifiedCount} onClick={onClickPending} showSeparator={!compact} compact={compact} locale={locale} />
           <CommitButton onClick={onCommitPush} remoteStatus={visibleRemoteStatus} pending={commitActionPending} showSeparator={!compact} compact={compact} locale={locale} />

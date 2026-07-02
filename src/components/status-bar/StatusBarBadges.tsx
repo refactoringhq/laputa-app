@@ -82,6 +82,11 @@ function hasRemote(remoteStatus: GitRemoteStatus | null): boolean {
   return remoteStatus?.hasRemote ?? false
 }
 
+function branchLabel(remoteStatus: GitRemoteStatus | null | undefined): string | null {
+  const branch = remoteStatus?.branch?.trim()
+  return branch ? branch : null
+}
+
 function isRemoteMissing(remoteStatus: GitRemoteStatus | null | undefined): boolean {
   return remoteStatus?.hasRemote === false
 }
@@ -384,20 +389,40 @@ function StatusWarningBadge(props: StatusWarningBadgeProps) {
 
 function RemoteStatusSummary({ remoteStatus, locale = 'en' }: { remoteStatus: GitRemoteStatus | null; locale?: AppLocale }) {
   const state = getRemoteSummaryState(remoteStatus)
+  const branch = branchLabel(remoteStatus)
 
   if (state.kind === 'missing') {
-    return <div style={{ color: 'var(--muted-foreground)', marginBottom: 6 }}>{translate(locale, 'status.remote.noneConfigured')}</div>
+    return (
+      <>
+        {branch && <RemoteSummaryLine>{translate(locale, 'status.git.branchLine', { branch })}</RemoteSummaryLine>}
+        <div style={{ color: 'var(--muted-foreground)', marginBottom: 6 }}>{translate(locale, 'status.remote.noneConfigured')}</div>
+      </>
+    )
   }
 
+  const upstreamMissing = remoteStatus?.hasUpstream === false
+
   if (state.kind === 'inSync') {
-    return <RemoteSummaryLine>{translate(locale, 'status.remote.inSync')}</RemoteSummaryLine>
+    return (
+      <>
+        {branch && <RemoteSummaryLine>{translate(locale, 'status.git.branchLine', { branch })}</RemoteSummaryLine>}
+        <RemoteSummaryLine>
+          {upstreamMissing
+            ? translate(locale, 'status.remote.noUpstream', { branch: branch ?? translate(locale, 'status.git.unknownBranch') })
+            : translate(locale, 'status.remote.inSync')}
+        </RemoteSummaryLine>
+      </>
+    )
   }
 
   return (
-    <RemoteSummaryLine>
-      <RemoteDivergenceItem count={state.ahead} direction="ahead" locale={locale} />
-      <RemoteDivergenceItem count={state.behind} direction="behind" locale={locale} />
-    </RemoteSummaryLine>
+    <>
+      {branch && <RemoteSummaryLine>{translate(locale, 'status.git.branchLine', { branch })}</RemoteSummaryLine>}
+      <RemoteSummaryLine>
+        <RemoteDivergenceItem count={state.ahead} direction="ahead" locale={locale} />
+        <RemoteDivergenceItem count={state.behind} direction="behind" locale={locale} />
+      </RemoteSummaryLine>
+    </>
   )
 }
 
@@ -413,6 +438,7 @@ function PullAction({
   onClose: () => void
 }) {
   if (!hasRemote(remoteStatus)) return null
+  if (remoteStatus?.hasUpstream === false) return null
 
   return (
     <div style={{ display: 'flex', gap: 4, marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
@@ -430,6 +456,38 @@ function PullAction({
         <ArrowDown size={11} />{translate(locale, 'status.sync.pull')}
       </Button>
     </div>
+  )
+}
+
+export function BranchBadge({
+  remoteStatus,
+  showSeparator = true,
+  compact = false,
+  locale = 'en',
+}: {
+  remoteStatus?: GitRemoteStatus | null
+  showSeparator?: boolean
+  compact?: boolean
+  locale?: AppLocale
+}) {
+  const branch = branchLabel(remoteStatus)
+  if (!branch) return null
+
+  return (
+    <>
+      <StatusBarSeparator show={showSeparator} />
+      <StatusBarAction
+        copy={{ label: translate(locale, 'status.git.currentBranch', { branch }) }}
+        testId="status-git-branch"
+        ariaLabel={translate(locale, 'status.git.currentBranch', { branch })}
+        compact={compact}
+      >
+        <span style={ICON_STYLE}>
+          <GitBranch size={12} />
+          {compact ? null : branch}
+        </span>
+      </StatusBarAction>
+    </>
   )
 }
 
@@ -482,18 +540,19 @@ export function CommitBadge({ info, locale = 'en' }: { info: LastCommitInfo; loc
 
   if (commitUrl) {
     return (
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
         onClick={() => openExternalUrl(commitUrl)}
-        style={{ ...ICON_STYLE, color: 'var(--muted-foreground)', textDecoration: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 3, border: 0, background: 'transparent' }}
+        className="h-auto gap-1 rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+        style={ICON_STYLE}
         title={translate(locale, 'status.commit.openOnGitHub', { hash: info.shortHash })}
         data-testid="status-commit-link"
-        onMouseEnter={(event) => { event.currentTarget.style.color = 'var(--foreground)' }}
-        onMouseLeave={(event) => { event.currentTarget.style.color = 'var(--muted-foreground)' }}
       >
         <GitCommitHorizontal size={13} />
         {info.shortHash}
-      </button>
+      </Button>
     )
   }
 

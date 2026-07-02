@@ -882,6 +882,10 @@ files:
     status.remote.add: f292f8ef85219f0acde6b66eb9c9c0f4
     status.remote.none: ed3f2ebe0d847584fd62fc9e0db2df33
     status.remote.noneDescription: f47636010c21c88a6f81cc41a962b26c
+    status.remote.noUpstream: 41c05263e8d71d526a70f01481ded660
+    status.git.currentBranch: db28ec1bca968fc1dc7a2d32006afc8e
+    status.git.branchLine: cfda131b88d16e9f47db17a9a8c40102
+    status.git.unknownBranch: 658240910e4c727d045070efe206beb6
     status.sync.syncing: b21888f3f83c224b3451901da243d00a
     status.sync.conflict: f1d4ac54357cc0932f385d56814ba7e4
     status.sync.failed: 85b08b086888f8ee2680ddd3398f3574
