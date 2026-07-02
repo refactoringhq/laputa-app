@@ -149,4 +149,47 @@ exit 3
         )));
         assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_agent_stream_uses_supported_antigravity_workspace_flag() {
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        let binary = executable_script(
+            dir.path(),
+            r#"seen_add_dir=false
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--cwd" ]; then
+    printf '%s\n' 'flags provided but not defined: -cwd' >&2
+    exit 2
+  fi
+  if [ "$1" = "--add-dir" ]; then
+    seen_add_dir=true
+    shift
+  fi
+  shift
+done
+if [ "$seen_add_dir" != "true" ]; then
+  printf '%s\n' 'missing --add-dir workspace argument' >&2
+  exit 3
+fi
+printf '%s\n' 'Antigravity accepted workspace'
+"#,
+        );
+
+        let mut events = Vec::new();
+        let session_id = run_agent_stream_with_binary(
+            &binary,
+            request(vault.path().to_string_lossy().into_owned()),
+            |event| events.push(event),
+        )
+        .unwrap();
+
+        assert!(session_id.starts_with("antigravity-"));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AiAgentStreamEvent::TextDelta { text } if text == "Antigravity accepted workspace\n"
+        )));
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+    }
 }

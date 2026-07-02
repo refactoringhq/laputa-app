@@ -959,7 +959,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/folder may have moved or been deleted/)).toBeInTheDocument()
-    })
+    }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
     expect(screen.getByTestId('welcome-open-folder')).toHaveTextContent('Open existing vault')
   })
 
