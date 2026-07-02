@@ -159,6 +159,7 @@ files:
     command.note.removeIcon: 4bccbad66025e506b37b4218498b299c
     command.note.changeType: 4a54ffd47ed1f65ee97f34bfe8c3de14
     command.note.moveToFolder: 3a0f26c42b9168ad839960d134065905
+    command.note.turnCurrentBlockInto: ffe5660e197b8cc6ea4220aef1cb8983
     command.note.copyDeepLink: 8de1795f59af124594dc4decf77909a1
     command.note.exportPdf: 7a39acf8742a59d1a4f7ae064b6219a0
     command.note.openNewWindow: 6f67b2857093fa0fd45b1122dff4865d
@@ -701,6 +702,18 @@ files:
     editor.find.close: b040fbda901d2135cad53e54e0127071
     editor.find.replace: 0ebe6df8a3ac338e0512acc741823fdb
     editor.find.replaceAll: b1c94ca2fbc3e78fc30069c8d0f01680
+    editor.blockType.paragraph: feaf0a320c3d678ad30dd179b7d21584
+    editor.blockType.heading1: fd7500ca2aba5ce6ba82e8dee1ffe5f4
+    editor.blockType.heading2: ea59935a58010a876f94374fb2f41d51
+    editor.blockType.heading3: 652864eb81a28bd7164f1605ab52a26a
+    editor.blockType.heading4: 553ddd7695ba37dc6f821067d9f5da30
+    editor.blockType.heading5: 8c08de90796fbc4c4aae36014c40eec4
+    editor.blockType.heading6: a24b3f7226370522c2a0e7ffd542a031
+    editor.blockType.quote: c48e929b2b1eabba2ba036884433345e
+    editor.blockType.bulletList: 0fc5eb4762a5088027c181896d394181
+    editor.blockType.numberedList: bf087c065d8d3f2e77bc07a82c07df52
+    editor.blockType.checklist: a5d727df2ce2d168bae39c78df4b9054
+    editor.blockType.codeBlock: febf6b24daaaeced55c4cc4db7dc931b
     editor.toolbar.rawReturn: 5ddcf5e0dc8b933b344bb6ca3d8e131d
     editor.toolbar.rawOpen: 89ad60735a649b60dacd2301cda0c4ec
     editor.toolbar.noteWidthNormal: 9bb55413ec536c4a8fa41c4c4464ab44
@@ -734,6 +747,7 @@ files:
     editor.sideMenu.collapseSection: 3d3b02981ab3390bf66247c92a2d8dd9
     editor.sideMenu.expandItem: 16291fbe2d88fc603b23f97ed2bc22a3
     editor.sideMenu.collapseItem: 91750c64ed8141fdb63ffb1e878a11ad
+    editor.sideMenu.turnInto: c2d2b328447c4974e839564b054c72f8
     editor.formatting.highlight: 0b90582f4589d84be89f5b847d4d1ed1
     editor.formatting.highlightTooltip: c27173fea9ec1718030c5fa8440b2c78
     editor.whiteboard.enterFullscreen: 606bf766125ecff4b33ca98122222c72

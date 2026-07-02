@@ -244,6 +244,44 @@ describe('useCommandRegistry', () => {
     expect(onChangeNoteType).toHaveBeenCalledOnce()
   })
 
+  it('exposes command palette actions for changing the focused editor block type', () => {
+    const onTurnCurrentBlockInto = vi.fn()
+    const config = makeConfig({ onTurnCurrentBlockInto })
+    const { result } = renderHook(() => useCommandRegistry(config))
+    const cmd = findCommand(result.current, 'turn-current-block-into-heading-2')
+
+    expect(cmd).toMatchObject({
+      enabled: true,
+      group: 'Note',
+      label: 'Turn Current Block into Heading 2',
+    })
+    expect(cmd?.keywords).toEqual(expect.arrayContaining([
+      'block',
+      'convert',
+      'heading',
+      'turn into',
+    ]))
+
+    cmd?.execute()
+
+    expect(onTurnCurrentBlockInto).toHaveBeenCalledWith(expect.objectContaining({
+      key: 'heading-2',
+      props: { level: 2 },
+      type: 'heading',
+    }))
+  })
+
+  it('disables focused block type commands outside markdown notes', () => {
+    const config = makeConfig({
+      activeTabPath: '/vault/Attachments/photo.png',
+      entries: [{ path: '/vault/Attachments/photo.png', title: 'photo.png', fileKind: 'binary' }],
+      onTurnCurrentBlockInto: vi.fn(),
+    })
+    const { result } = renderHook(() => useCommandRegistry(config))
+
+    expect(findCommand(result.current, 'turn-current-block-into-heading-2')?.enabled).toBe(false)
+  })
+
   it('enables Move Note to Folder only when another folder destination exists', () => {
     const onMoveNoteToFolder = vi.fn()
     const { result, rerender } = renderHook(
