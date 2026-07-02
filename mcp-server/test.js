@@ -14,7 +14,12 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import {
   createNote, findMarkdownFiles, getNote, searchNotes, vaultContext,
 } from './vault.js'
-import { appConfigBaseDirs, requireVaultPath, requireVaultPaths } from './vault-path.js'
+import {
+  appConfigBaseDirs,
+  appConfigFilePath,
+  requireVaultPath,
+  requireVaultPaths,
+} from './vault-path.js'
 import { vaultContextWithInstructions } from './agent-instructions.js'
 import { evaluateBridgeRequest } from './ws-bridge.js'
 
@@ -368,6 +373,28 @@ describe('requireVaultPath', () => {
         requireVaultPaths({}, { configDir }),
         [primaryVault, secondaryVault],
       )
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it('uses one app config resolver for settings and vault registry files', async () => {
+    const configDir = await mkdtemp(path.join(os.tmpdir(), 'tolaria-mcp-shared-config-'))
+    const files = ['settings.json', 'vaults.json']
+
+    for (const fileName of files) {
+      const legacyPath = path.join(configDir, 'com.laputa.app', fileName)
+      await mkdir(path.dirname(legacyPath), { recursive: true })
+      await writeFile(legacyPath, '{}', 'utf-8')
+    }
+
+    try {
+      for (const fileName of files) {
+        assert.equal(
+          appConfigFilePath(fileName, { configDir }),
+          path.join(configDir, 'com.laputa.app', fileName),
+        )
+      }
     } finally {
       await rm(configDir, { recursive: true, force: true })
     }

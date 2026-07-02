@@ -1,9 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir, platform } from 'node:os'
 import { isAbsolute, join } from 'node:path'
+import appConfigPolicy from './app-config-policy.json' with { type: 'json' }
 
-const APP_CONFIG_DIR = 'com.tolaria.app'
-const LEGACY_APP_CONFIG_DIR = 'com.laputa.app'
+const APP_CONFIG_DIR = appConfigPolicy.current_namespace
+const APP_CONFIG_FILES = Object.freeze(appConfigPolicy.files)
 
 function parseVaultPathList(rawValue) {
   if (!rawValue?.trim()) return []
@@ -60,20 +61,39 @@ export function appConfigBaseDirs({
   return dirs
 }
 
-function existingOrPreferredVaultsPath(configDirs) {
-  for (const configDir of configDirs) {
-    const preferred = join(configDir, APP_CONFIG_DIR, 'vaults.json')
-    if (existsSync(preferred)) return preferred
-
-    const legacy = join(configDir, LEGACY_APP_CONFIG_DIR, 'vaults.json')
-    if (existsSync(legacy)) return legacy
-  }
-
-  return join(configDirs[0], APP_CONFIG_DIR, 'vaults.json')
+function namespaceDir(namespace) {
+  if (namespace === 'current') return APP_CONFIG_DIR
+  if (namespace === 'legacy') return appConfigPolicy.legacy_namespace
+  throw new Error(`Unknown app config namespace: ${namespace}`)
 }
 
-export function vaultsJsonPath({ configDir, configDirs = configDir ? [configDir] : appConfigBaseDirs() } = {}) {
-  return existingOrPreferredVaultsPath(configDirs)
+function preferredAppConfigPath(configDir, fileName) {
+  return join(configDir, APP_CONFIG_DIR, fileName)
+}
+
+function existingOrPreferredAppConfigPath(configDirs, fileName) {
+  for (const configDir of configDirs) {
+    for (const namespace of appConfigPolicy.namespace_read_order) {
+      const candidate = join(configDir, namespaceDir(namespace), fileName)
+      if (existsSync(candidate)) return candidate
+    }
+  }
+
+  return preferredAppConfigPath(configDirs[0], fileName)
+}
+
+export function appConfigFilePath(
+  fileName,
+  { configDir, configDirs = configDir ? [configDir] : appConfigBaseDirs() } = {},
+) {
+  return existingOrPreferredAppConfigPath(configDirs, fileName)
+}
+
+export function vaultsJsonPath({
+  configDir,
+  configDirs = configDir ? [configDir] : appConfigBaseDirs(),
+} = {}) {
+  return existingOrPreferredAppConfigPath(configDirs, APP_CONFIG_FILES.vaults)
 }
 
 function pushUniquePath(paths, value) {
