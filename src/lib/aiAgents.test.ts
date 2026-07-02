@@ -10,6 +10,7 @@ describe('aiAgents helpers', () => {
   it('normalizes stored agent ids', () => {
     expect(normalizeStoredAiAgent('claude_code')).toBe('claude_code')
     expect(normalizeStoredAiAgent('codex')).toBe('codex')
+    expect(normalizeStoredAiAgent('copilot')).toBe('copilot')
     expect(normalizeStoredAiAgent('opencode')).toBe('opencode')
     expect(normalizeStoredAiAgent('pi')).toBe('pi')
     expect(normalizeStoredAiAgent('antigravity')).toBe('antigravity')
@@ -28,6 +29,7 @@ describe('aiAgents helpers', () => {
     const statuses = normalizeAiAgentsStatus({
       claude_code: { installed: true, version: '1.0.20' },
       codex: { installed: false, version: null },
+      copilot: { installed: true, version: '1.0.58' },
       opencode: { installed: true, version: '0.3.1' },
       pi: { installed: true, version: '0.70.2' },
       antigravity: { installed: true, version: 'Antigravity CLI 1.0.0' },
@@ -37,6 +39,7 @@ describe('aiAgents helpers', () => {
 
     expect(statuses.claude_code).toEqual({ status: 'installed', version: '1.0.20' })
     expect(statuses.codex).toEqual({ status: 'missing', version: null })
+    expect(statuses.copilot).toEqual({ status: 'installed', version: '1.0.58' })
     expect(statuses.opencode).toEqual({ status: 'installed', version: '0.3.1' })
     expect(statuses.pi).toEqual({ status: 'installed', version: '0.70.2' })
     expect(statuses.antigravity).toEqual({ status: 'installed', version: 'Antigravity CLI 1.0.0' })
@@ -54,7 +57,8 @@ describe('aiAgents helpers', () => {
 
   it('cycles through the supported agents', () => {
     expect(getNextAiAgentId('claude_code')).toBe('codex')
-    expect(getNextAiAgentId('codex')).toBe('opencode')
+    expect(getNextAiAgentId('codex')).toBe('copilot')
+    expect(getNextAiAgentId('copilot')).toBe('opencode')
     expect(getNextAiAgentId('opencode')).toBe('pi')
     expect(getNextAiAgentId('pi')).toBe('antigravity')
     expect(getNextAiAgentId('antigravity')).toBe('kiro')
