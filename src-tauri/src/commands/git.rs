@@ -10,8 +10,6 @@ type NotePathArg = String;
 type CommitHashArg = String;
 type CommitMessageArg = String;
 type ConflictStrategyArg = String;
-type RemoteUrlArg = String;
-type LocalPathArg = String;
 
 // ── Git commands (desktop) ──────────────────────────────────────────────────
 
@@ -284,13 +282,6 @@ pub fn init_git_repo(vault_path: VaultPathArg) -> Result<(), String> {
     crate::git::init_repo(std::path::Path::new(vault_path.as_ref()))
 }
 
-#[cfg(desktop)]
-#[tauri::command]
-pub fn clone_repo(url: RemoteUrlArg, local_path: LocalPathArg) -> Result<String, String> {
-    let local_path = expand_tilde(&local_path);
-    crate::git::clone_repo(&url, &local_path)
-}
-
 // ── Git commands (mobile stubs) ─────────────────────────────────────────────
 
 #[cfg(mobile)]
@@ -434,12 +425,6 @@ pub fn is_git_repo(_vault_path: VaultPathArg) -> bool {
 #[tauri::command]
 pub fn init_git_repo(_vault_path: VaultPathArg) -> Result<(), String> {
     Err("Git init is not available on mobile".into())
-}
-
-#[cfg(mobile)]
-#[tauri::command]
-pub fn clone_repo(_url: RemoteUrlArg, _local_path: LocalPathArg) -> Result<String, String> {
-    Err("Git clone is not available on mobile".into())
 }
 
 #[cfg(test)]

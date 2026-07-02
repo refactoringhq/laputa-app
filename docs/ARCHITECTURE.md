@@ -584,17 +584,18 @@ Tolaria no longer implements provider-specific OAuth or remote-repository APIs. 
 
 **Flow:**
 1. User opens `CloneVaultModal` from onboarding or the vault menu
-2. User pastes any git URL and chooses a local destination
-3. The `clone_git_repo()` Tauri command runs `git clone` inside a blocking Tokio task so the Tauri window stays responsive during slow or failing clones
+2. User pastes a supported remote URL (`https://`, `http://`, `ssh://`, or `git@host:path`) and chooses a local destination
+3. The `clone_git_repo()` Tauri command validates that URL, then runs `git clone -- <url> <destination>` inside a blocking Tokio task so the Tauri window stays responsive during slow or failing clones
 4. Linux AppImage builds strip AppImage loader variables from system-git and MCP Node subprocesses before spawning them, keeping `git-remote-https` and system `node` on the host library stack
 5. `git_push()` / `git_pull()` continue to use the same system git path
 6. On macOS, `git_add_remote()` asks Git's credential helper for HTTPS credentials before the first fetch so Keychain can grant access to the same saved credential item the shell uses
-7. Clone commands disable interactive terminal / askpass prompts and surface the git failure back to the UI instead of freezing the app waiting for input
+7. Every app-managed git subprocess disables the `ext::` transport, keeps file transport at Git's user-initiated policy, disables repo-configured fsmonitor hooks, ignores repo-configured SSH command overrides, and preserves quoted path output
+8. Clone commands disable interactive terminal / askpass prompts and surface the git failure back to the UI instead of freezing the app waiting for input
 
 **Auth model:**
 - SSH keys, Git Credential Manager, macOS Keychain helpers, `gh auth`, and other git helpers all work without app-specific setup
 - No provider tokens are stored in Tolaria settings
-- The same flow works for GitHub, GitLab, Bitbucket, Gitea, and self-hosted remotes
+- The same flow works for GitHub, GitLab, Bitbucket, Gitea, and self-hosted remotes over HTTPS or SSH
 
 ## Pulse View
 
@@ -713,7 +714,7 @@ If the current vault is not a Git repository, Tolaria treats Git as unavailable 
 
 The installation-local `git_enabled` setting is a broader visibility switch. When it is `false`, Tolaria hides Git status-bar entries and Git command-palette actions completely, disables AutoGit controls in Settings, and prevents background Git refresh/sync work even for repositories that are otherwise Git-backed. Settings remains the re-enable path.
 
-The same local-only state enables the explicit Add Remote flow. `AddRemoteModal` is reachable from the `No remote` chip and the command palette. The backend `git_add_remote` command ensures the local author identity, adds `origin`, fetches it, refuses incompatible histories, and only enables tracking after a safe push or fast-forward-compatible check succeeds.
+The same local-only state enables the explicit Add Remote flow. `AddRemoteModal` is reachable from the `No remote` chip and the command palette. The backend `git_add_remote` command validates the pasted remote URL, ensures the local author identity, adds `origin`, fetches it, refuses incompatible histories, and only enables tracking after a safe push or fast-forward-compatible check succeeds.
 
 `useCommitFlow` also exposes `runAutomaticCheckpoint()`, a dialog-free commit path shared by AutoGit and the bottom-bar Commit button. `useAutoGit` watches the last editor activity plus app focus/visibility state, and when the default vault is git-backed, all saves are flushed, and no unsaved edits remain, it triggers the deterministic `Updated N note(s)` / `Updated N file(s)` commit message path after the configured idle or inactive thresholds. In multiple-workspace mode, that checkpoint reads, commits, and pushes every active repository independently; one failed or rejected repository does not prevent the remaining repositories from being attempted. The manual commit dialog remains single-repository and requires the user to choose the target repository when more than one is active.
 
