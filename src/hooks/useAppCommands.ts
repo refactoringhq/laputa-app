@@ -46,6 +46,7 @@ interface AppCommandsConfig {
   onArchiveNote: (path: string) => void
   onUnarchiveNote: (path: string) => void
   onCommitPush: () => void
+  onGenerateCommitMessage?: () => void
   onPull?: () => void
   onPullRepository?: (path: string) => void
   onResolveConflicts?: () => void
@@ -184,6 +185,7 @@ type CommandRegistryCoreActions = Pick<
   | 'onArchiveNote'
   | 'onUnarchiveNote'
   | 'onCommitPush'
+  | 'onGenerateCommitMessage'
   | 'onPull'
   | 'onPullRepository'
   | 'onResolveConflicts'
@@ -492,6 +494,7 @@ function createCommandRegistryCoreConfig(
     onArchiveNote: config.onArchiveNote,
     onUnarchiveNote: config.onUnarchiveNote,
     onCommitPush: config.onCommitPush,
+    onGenerateCommitMessage: config.onGenerateCommitMessage,
     onPull: config.onPull,
     onPullRepository: config.onPullRepository,
     onResolveConflicts: config.onResolveConflicts,
