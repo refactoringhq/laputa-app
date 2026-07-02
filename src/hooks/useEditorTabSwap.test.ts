@@ -1155,6 +1155,39 @@ describe('useEditorTabSwap scroll position', () => {
 
   afterEach(() => { vi.restoreAllMocks() })
 
+  it('restores each note scroll position when switching tabs', async () => {
+    const { scrollEl } = installEditorDomSpies()
+    const docRef = { current: blocksA as unknown[] }
+    const mockEditor = makeMockEditor(docRef)
+
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = makeTab('b.md', 'Note B')
+
+    const rendered = renderHook(
+      ({ tabs, activeTabPath }) => useEditorTabSwap({
+        tabs,
+        activeTabPath,
+        editor: mockEditor as never,
+      }),
+      { initialProps: { tabs: [tabA, tabB], activeTabPath: 'a.md' } },
+    )
+    await flushEditorTick()
+
+    scrollEl.scrollTop = 240
+    rendered.rerender({ tabs: [tabA, tabB], activeTabPath: 'b.md' })
+    await flushEditorTick()
+    expect(scrollEl.scrollTop).toBe(0)
+
+    scrollEl.scrollTop = 75
+    rendered.rerender({ tabs: [tabA, tabB], activeTabPath: 'a.md' })
+    await flushEditorTick()
+    expect(scrollEl.scrollTop).toBe(240)
+
+    rendered.rerender({ tabs: [tabA, tabB], activeTabPath: 'b.md' })
+    await flushEditorTick()
+    expect(scrollEl.scrollTop).toBe(75)
+  })
+
   it('defaults to scroll top 0 for newly opened note', async () => {
     const scrollEl = { scrollTop: 0 }
     vi.spyOn(document, 'querySelector').mockReturnValue(scrollEl as unknown as Element)
