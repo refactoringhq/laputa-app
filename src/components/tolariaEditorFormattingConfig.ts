@@ -30,15 +30,17 @@ import {
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
 import { trackEvent } from '../lib/telemetry'
+import {
+  RICH_EDITOR_BLOCK_TYPE_DEFINITIONS,
+  type RichEditorBlockTypeDefinition,
+  type RichEditorBlockTypeKey,
+} from '../utils/richEditorBlockTypes'
 import { MATH_BLOCK_TYPE } from '../utils/mathMarkdown'
 import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
 import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
 
 type TolariaSlashMenuItem = DefaultReactSuggestionItem & { key: string }
-type TolariaBlockTypeSelectItem = {
-  name: string
-  type: string
-  props?: Record<string, boolean | number | string>
+type TolariaBlockTypeSelectItem = RichEditorBlockTypeDefinition & {
   icon: PhosphorIcon
 }
 type SlashInsertEditor = {
@@ -80,20 +82,20 @@ const UNSUPPORTED_SLASH_MENU_KEYS = new Set([
   'toggle_list',
 ])
 
-const TOLARIA_BLOCK_TYPE_SELECT_ITEMS: TolariaBlockTypeSelectItem[] = [
-  { name: 'Paragraph', type: 'paragraph', icon: Paragraph },
-  { name: 'Heading 1', type: 'heading', props: { level: 1 }, icon: TextHOne },
-  { name: 'Heading 2', type: 'heading', props: { level: 2 }, icon: TextHTwo },
-  { name: 'Heading 3', type: 'heading', props: { level: 3 }, icon: TextHThree },
-  { name: 'Heading 4', type: 'heading', props: { level: 4 }, icon: TextHFour },
-  { name: 'Heading 5', type: 'heading', props: { level: 5 }, icon: TextHFive },
-  { name: 'Heading 6', type: 'heading', props: { level: 6 }, icon: TextHSix },
-  { name: 'Quote', type: 'quote', icon: Quotes },
-  { name: 'Bullet List', type: 'bulletListItem', icon: ListBullets },
-  { name: 'Numbered List', type: 'numberedListItem', icon: ListNumbers },
-  { name: 'Checklist', type: 'checkListItem', icon: ListChecks },
-  { name: 'Code Block', type: 'codeBlock', icon: CodeBlock },
-]
+const TOLARIA_BLOCK_TYPE_SELECT_ICONS: Record<RichEditorBlockTypeKey, PhosphorIcon> = {
+  'bullet-list': ListBullets,
+  checklist: ListChecks,
+  'code-block': CodeBlock,
+  'heading-1': TextHOne,
+  'heading-2': TextHTwo,
+  'heading-3': TextHThree,
+  'heading-4': TextHFour,
+  'heading-5': TextHFive,
+  'heading-6': TextHSix,
+  'numbered-list': ListNumbers,
+  paragraph: Paragraph,
+  quote: Quotes,
+}
 
 const TOLARIA_SLASH_MENU_ICONS: Partial<Record<string, PhosphorIcon>> = {
   audio: SpeakerHigh,
@@ -236,7 +238,10 @@ function createTolariaSlashMenuIcon(Icon: PhosphorIcon) {
 }
 
 export function getTolariaBlockTypeSelectItems() {
-  return TOLARIA_BLOCK_TYPE_SELECT_ITEMS
+  return RICH_EDITOR_BLOCK_TYPE_DEFINITIONS.map((item): TolariaBlockTypeSelectItem => ({
+    ...item,
+    icon: TOLARIA_BLOCK_TYPE_SELECT_ICONS[item.key],
+  }))
 }
 
 export function filterTolariaFormattingToolbarItems<T extends ReactElement>(

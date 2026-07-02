@@ -15,6 +15,7 @@ import type { ViewMode } from './useViewMode'
 import type { ImmediateCreateOptions } from './useNoteCreation'
 import type { NoteListMultiSelectionCommands } from '../components/note-list/multiSelectionCommands'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
+import type { RichEditorBlockTypeDefinition } from '../utils/richEditorBlockTypes'
 
 interface AppCommandsConfig {
   activeTabPath: string | null
@@ -117,6 +118,7 @@ interface AppCommandsConfig {
   onChangeNoteType?: () => void
   onMoveNoteToFolder?: () => void
   canMoveNoteToFolder?: boolean
+  onTurnCurrentBlockInto?: (target: RichEditorBlockTypeDefinition) => void
   activeNoteHasIcon?: boolean
   noteListFilter?: NoteListFilter
   onSetNoteListFilter?: (filter: NoteListFilter) => void
@@ -175,6 +177,7 @@ type CommandRegistryCoreActions = Pick<
   | 'onFindInNote'
   | 'onReplaceInNote'
   | 'onPastePlainText'
+  | 'onTurnCurrentBlockInto'
   | 'onOpenSettings'
   | 'onOpenFeedback'
   | 'onDeleteNote'
@@ -252,6 +255,7 @@ type CommandRegistryNoteActions = Pick<
   | 'onChangeNoteType'
   | 'onMoveNoteToFolder'
   | 'canMoveNoteToFolder'
+  | 'onTurnCurrentBlockInto'
   | 'activeNoteHasIcon'
   | 'noteListFilter'
   | 'onSetNoteListFilter'
@@ -503,6 +507,7 @@ function createCommandRegistryCoreConfig(
     onFindInNote: config.onFindInNote,
     onReplaceInNote: config.onReplaceInNote,
     onPastePlainText: config.onPastePlainText,
+    onTurnCurrentBlockInto: config.onTurnCurrentBlockInto,
     noteWidth: config.noteWidth,
     defaultNoteWidth: config.defaultNoteWidth,
     onSetNoteWidth: config.onSetNoteWidth,

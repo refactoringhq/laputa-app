@@ -3,6 +3,11 @@ import { buildEditorFindCommands } from './editorFindCommands'
 import { translate, type AppLocale } from '../../lib/i18n'
 import type { ImmediateCreateOptions } from '../useNoteCreation'
 import type { CommandAction } from './types'
+import {
+  RICH_EDITOR_BLOCK_TYPE_DEFINITIONS,
+  richEditorBlockTypeName,
+  type RichEditorBlockTypeDefinition,
+} from '../../utils/richEditorBlockTypes'
 
 interface NoteCommandsConfig {
   hasActiveNote: boolean
@@ -29,6 +34,7 @@ interface NoteCommandsConfig {
   onChangeNoteType?: () => void
   onMoveNoteToFolder?: () => void
   canMoveNoteToFolder?: boolean
+  onTurnCurrentBlockInto?: (target: RichEditorBlockTypeDefinition) => void
   onSetNoteIcon?: () => void
   onRemoveNoteIcon?: () => void
   onOpenInNewWindow?: () => void
@@ -255,6 +261,32 @@ function buildRetargetingCommands(config: NoteCommandsConfig): CommandAction[] {
   ]
 }
 
+function buildFocusedBlockTypeCommands(config: NoteCommandsConfig): CommandAction[] {
+  const locale = config.locale ?? 'en'
+  const commandEnabled = config.hasActiveNote
+    && (config.activeFileKind ?? 'markdown') === 'markdown'
+    && !!config.onTurnCurrentBlockInto
+
+  return RICH_EDITOR_BLOCK_TYPE_DEFINITIONS.map((target) => createNoteCommand({
+    id: `turn-current-block-into-${target.key}`,
+    label: translate(locale, 'command.note.turnCurrentBlockInto', {
+      type: richEditorBlockTypeName(locale, target),
+    }),
+    keywords: [
+      'block',
+      'convert',
+      'current',
+      'editor',
+      'turn into',
+      target.key,
+      target.name.toLowerCase(),
+      target.type.toLowerCase(),
+    ],
+    enabled: commandEnabled,
+    execute: () => config.onTurnCurrentBlockInto?.(target),
+  }))
+}
+
 interface ActivePathCommandConfig {
   enabled: boolean
   id: string
@@ -358,6 +390,7 @@ export function buildNoteCommands(config: NoteCommandsConfig): CommandAction[] {
   return [
     ...buildCoreNoteCommands(config),
     ...buildPathNoteCommands(config),
+    ...buildFocusedBlockTypeCommands(config),
     ...buildOptionalNoteCommands(config),
   ]
 }

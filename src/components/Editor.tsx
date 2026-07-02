@@ -40,6 +40,7 @@ import { createRichEditorBlockSelectionExtension } from './richEditorBlockSelect
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
 import { useEditorPdfExport } from './useEditorPdfExport'
 import type { NotePdfExportSource } from '../utils/notePdfExport'
+import type { RichEditorBlockTypeDefinition } from '../utils/richEditorBlockTypes'
 import {
   useRichEditorContentReadiness,
   useRichEditorSheetSwapState,
@@ -50,6 +51,7 @@ import {
 } from '../utils/blockNoteDirectMarkdown'
 import { installRichEditorDispatchPerformanceProbe } from './richEditorDispatchPerformance'
 import { RICH_EDITOR_BLOCKNOTE_PERFORMANCE_OPTIONS } from './richEditorBlockNoteOptions'
+import { useTurnCurrentBlockIntoCommand } from './useTurnCurrentBlockIntoCommand'
 import './Editor.css'
 import './EditorTheme.css'
 
@@ -133,6 +135,8 @@ interface EditorProps {
   tableOfContentsToggleRef?: React.MutableRefObject<() => void>
   /** Mutable ref that Editor registers the PDF export command into, for command palette and native menu access. */
   pdfExportRef?: React.MutableRefObject<((source?: NotePdfExportSource) => void) | null>
+  /** Mutable ref that Editor registers focused-block type changes into, for command palette access. */
+  turnCurrentBlockIntoRef?: React.MutableRefObject<((target: RichEditorBlockTypeDefinition) => void) | null>
   /** Emits short user-visible messages for editor actions. */
   onToast?: (message: string | null) => void
   onFileCreated?: (relativePath: string) => void
@@ -696,6 +700,13 @@ export const Editor = memo(function Editor(props: EditorProps) {
     findInNoteRef: props.findInNoteRef,
     handleToggleRawExclusive: runtime.handleToggleRawExclusive,
     rawMode: runtime.rawMode,
+  })
+  useTurnCurrentBlockIntoCommand({
+    activeTab: runtime.activeTab,
+    diffMode: runtime.diffMode,
+    editor: runtime.editor,
+    rawMode: runtime.rawMode,
+    turnCurrentBlockIntoRef: props.turnCurrentBlockIntoRef,
   })
   const handleExportPdf = useEditorPdfExport({
     activeTab: runtime.activeTab,
