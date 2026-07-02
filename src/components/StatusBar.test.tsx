@@ -90,9 +90,18 @@ describe('StatusBar', () => {
     await expectTooltip(screen.getByRole('button', { name: 'Check for updates' }), 'Check for updates')
   }, 10_000)
 
-  it('does not display branch name', () => {
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} />)
-    expect(screen.queryByText('main')).not.toBeInTheDocument()
+  it('displays the active git branch in the status bar', () => {
+    render(
+      <StatusBar
+        noteCount={100}
+        vaultPath="/Users/luca/Laputa"
+        vaults={vaults}
+        onSwitchVault={vi.fn()}
+        remoteStatus={{ branch: 'feature/drafts', ahead: 0, behind: 0, hasRemote: true }}
+      />,
+    )
+    expect(screen.getByTestId('status-git-branch')).toHaveTextContent('feature/drafts')
+    expect(screen.getByTestId('status-git-branch')).toHaveAccessibleName('Current branch: feature/drafts')
   })
 
   it('shows Contribute button when callback is provided', () => {
@@ -739,8 +748,9 @@ describe('StatusBar', () => {
     )
     fireEvent.click(screen.getByTestId('status-sync'))
     expect(screen.getByTestId('status-bar')).toHaveStyle({ zIndex: '30' })
-    expect(screen.getByTestId('git-status-popup')).toBeInTheDocument()
-    expect(screen.queryByText('main')).not.toBeInTheDocument()
+    const popup = screen.getByTestId('git-status-popup')
+    expect(popup).toBeInTheDocument()
+    expect(within(popup).getByText('Branch: main')).toBeInTheDocument()
     expect(screen.getByText(/2 ahead/)).toBeInTheDocument()
     expect(screen.getByText(/1 behind/)).toBeInTheDocument()
   })

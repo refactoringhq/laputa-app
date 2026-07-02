@@ -175,6 +175,8 @@ pub async fn git_remote_status(vault_path: VaultPathArg) -> Result<GitRemoteStat
             return Ok(GitRemoteStatus {
                 branch: String::new(),
                 has_remote: false,
+                has_upstream: false,
+                upstream: None,
                 ahead: 0,
                 behind: 0,
             });
@@ -392,6 +394,8 @@ pub async fn git_remote_status(_vault_path: VaultPathArg) -> Result<GitRemoteSta
     Ok(GitRemoteStatus {
         branch: String::new(),
         has_remote: false,
+        has_upstream: false,
+        upstream: None,
         ahead: 0,
         behind: 0,
     })
