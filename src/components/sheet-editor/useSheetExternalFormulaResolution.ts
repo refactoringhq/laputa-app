@@ -19,6 +19,7 @@ import {
   resolveExternalSheetEntriesForFormula,
   sheetExternalFormulaContext,
   sheetExternalFormulaWorkerSignature,
+  sheetHasExternalFrontmatterReferences,
   sheetHasExternalFormulaReferences,
 } from '../../utils/sheetWorkbook'
 
@@ -121,8 +122,13 @@ function deferStateUpdate(update: () => void) {
   queueMicrotask(update)
 }
 
-function canResolveNativeExternalFormulas(hasExternalFormulaReferences: boolean) {
-  return hasExternalFormulaReferences && canUseNativeSheetFormulaWorker()
+function canResolveNativeExternalFormulas(
+  hasExternalFormulaReferences: boolean,
+  hasExternalFrontmatterReferences: boolean,
+) {
+  return hasExternalFormulaReferences
+    && !hasExternalFrontmatterReferences
+    && canUseNativeSheetFormulaWorker()
 }
 
 function nextPendingNativeResolution(
@@ -159,10 +165,12 @@ function resolvedNativeInputsForBuild(
 
 function shouldUseJsExternalFormulaResolver(
   hasExternalFormulaReferences: boolean,
+  hasExternalFrontmatterReferences: boolean,
   resolution: NativeExternalFormulaResolutionState | null,
   signature: string,
 ) {
   return !hasExternalFormulaReferences
+    || hasExternalFrontmatterReferences
     || !canUseNativeSheetFormulaWorker()
     || (resolution?.signature === signature && resolution.status === 'unavailable')
 }
@@ -220,6 +228,7 @@ function useExternalSheetContents({
 function useNativeExternalFormulaResolution({
   content,
   dependencies,
+  hasExternalFrontmatterReferences,
   entries,
   hasExternalFormulaReferences,
   nativeSignature,
@@ -227,6 +236,7 @@ function useNativeExternalFormulaResolution({
   sourceEntry,
 }: UseSheetExternalFormulaResolutionOptions & {
   dependencies: SheetExternalFormulaWorkerDependency[]
+  hasExternalFrontmatterReferences: boolean
   hasExternalFormulaReferences: boolean
   nativeSignature: string
 }) {
@@ -234,7 +244,7 @@ function useNativeExternalFormulaResolution({
 
   useEffect(() => {
     let cancelled = false
-    if (!canResolveNativeExternalFormulas(hasExternalFormulaReferences)) {
+    if (!canResolveNativeExternalFormulas(hasExternalFormulaReferences, hasExternalFrontmatterReferences)) {
       deferStateUpdate(() => {
         if (!cancelled) setResolution((current) => (current?.signature === nativeSignature ? null : current))
       })
@@ -262,7 +272,7 @@ function useNativeExternalFormulaResolution({
     return () => {
       cancelled = true
     }
-  }, [content, dependencies, entries, hasExternalFormulaReferences, nativeSignature, path, sourceEntry])
+  }, [content, dependencies, entries, hasExternalFormulaReferences, hasExternalFrontmatterReferences, nativeSignature, path, sourceEntry])
 
   return resolution
 }
@@ -301,7 +311,14 @@ export function useSheetExternalFormulaResolution(options: UseSheetExternalFormu
   const { content, entries, path, sourceEntry } = options
   const { contentsByPath, dependencies, dependencyCount } = useExternalSheetContents(options)
   const hasExternalFormulaReferences = useMemo(() => sheetHasExternalFormulaReferences(content), [content])
-  const nativeWorkerEnabled = canResolveNativeExternalFormulas(hasExternalFormulaReferences)
+  const hasExternalFrontmatterReferences = useMemo(() => (
+    sheetHasExternalFrontmatterReferences(content)
+    || dependencies.some((dependency) => sheetHasExternalFrontmatterReferences(dependency.content))
+  ), [content, dependencies])
+  const nativeWorkerEnabled = canResolveNativeExternalFormulas(
+    hasExternalFormulaReferences,
+    hasExternalFrontmatterReferences,
+  )
   const nativeSignature = useMemo(() => sheetExternalFormulaWorkerSignature({
     content,
     dependencies,
@@ -310,6 +327,7 @@ export function useSheetExternalFormulaResolution(options: UseSheetExternalFormu
   const nativeResolution = useNativeExternalFormulaResolution({
     ...options,
     dependencies,
+    hasExternalFrontmatterReferences,
     hasExternalFormulaReferences,
     nativeSignature,
   })
@@ -322,6 +340,7 @@ export function useSheetExternalFormulaResolution(options: UseSheetExternalFormu
   const nativeExternalFormulaInputsForBuild = resolvedNativeInputsForBuild(nativeResolution, nativeSignature)
   const shouldUseJsResolver = shouldUseJsExternalFormulaResolver(
     hasExternalFormulaReferences,
+    hasExternalFrontmatterReferences,
     nativeResolution,
     nativeSignature,
   )
