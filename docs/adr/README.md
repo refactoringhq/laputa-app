@@ -207,3 +207,4 @@ proposed → active → superseded
 | [0146](0146-cached-main-window-startup-with-empty-reload-recovery.md) | Cached main-window startup with empty reload recovery | active |
 | [0147](0147-antigravity-cli-agent-adapter.md) | Antigravity CLI agent adapter | active |
 | [0148](0148-cancellable-ai-agent-streams.md) | Cancellable AI agent streams | active |
+| [0149](0149-shared-app-config-policy-manifest.md) | Shared app config policy manifest | active |
