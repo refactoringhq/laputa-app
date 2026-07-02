@@ -17,7 +17,7 @@ pub(crate) fn build_command(
     command
         .arg("-p")
         .arg(build_prompt(request))
-        .arg("--cwd")
+        .arg("--add-dir")
         .arg(&request.vault_path)
         .arg(format!(
             "--sandbox={}",
@@ -136,7 +136,8 @@ mod tests {
             .any(|pair| pair == [OsStr::new("-p"), OsStr::new("Rename the note")]));
         assert!(args
             .windows(2)
-            .any(|pair| pair == [OsStr::new("--cwd"), vault.path().as_os_str()]));
+            .any(|pair| pair == [OsStr::new("--add-dir"), vault.path().as_os_str()]));
+        assert!(!args.contains(&OsStr::new("--cwd")));
         assert!(args.contains(&OsStr::new("--sandbox=true")));
         assert!(args.contains(&OsStr::new("--toolPermission=proceed-in-sandbox")));
         assert_eq!(command.get_current_dir(), Some(vault.path()));
