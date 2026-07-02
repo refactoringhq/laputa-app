@@ -6,6 +6,7 @@ import type { NoteWidthMode, NoteStatus, VaultEntry } from '../../types'
 import { useEditorTheme } from '../../hooks/useTheme'
 import { deriveEditorContentState } from './editorContentState'
 import type { RawEditorFindRequest } from '../RawEditorFindBar'
+import type { ImageImportError } from '../../hooks/useImageDrop'
 
 export interface Tab {
   entry: VaultEntry
@@ -60,6 +61,7 @@ export interface EditorContentProps {
   isConflicted?: boolean
   onKeepMine?: (path: string) => void
   onKeepTheirs?: (path: string) => void
+  onImageImportError?: (error: ImageImportError) => void
   locale?: AppLocale
 }
 

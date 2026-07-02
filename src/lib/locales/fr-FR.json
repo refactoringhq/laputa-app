@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria n'a pas pu utiliser une fonctionnalité de bureau dont ce tableau blanc a besoin. Autorisez l'accès dans les paramètres de votre système, puis rouvrez la note.",
   "editor.exportPdf.unavailable": "Ouvrez une note Markdown avant d'exporter un PDF.",
   "editor.exportPdf.failed": "Impossible de lancer l'exportation PDF : {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} est une image HEIC. Tolaria ne peut pas encore importer de fichiers HEIC ou HEIF. Exportez la photo au format JPG ou PNG et insérez ce fichier.",
+  "editor.imageImport.unsupported": "{filename} est une image au format {format}. Tolaria ne peut pas encore importer ce format. Utilisez JPG, PNG, GIF, WebP, SVG, BMP ou TIFF.",
   "filePreview.copyDeepLink": "Copier le lien",
   "deepLinks.copied": "Lien profond copié",
   "deepLinks.error.ambiguousVault": "Le lien profond correspond à plusieurs coffres. Renommez un alias de coffre-fort dans les Paramètres.",

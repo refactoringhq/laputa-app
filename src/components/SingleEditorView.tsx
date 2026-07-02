@@ -22,7 +22,7 @@ import { MantineContext, MantineProvider } from '@mantine/core'
 import { trackEvent } from '../lib/telemetry'
 import { useDocumentThemeMode } from '../hooks/useDocumentThemeMode'
 import { useEditorTheme } from '../hooks/useTheme'
-import { useImageDrop } from '../hooks/useImageDrop'
+import { useImageDrop, type ImageImportError } from '../hooks/useImageDrop'
 import { useImageLightbox } from '../hooks/useImageLightbox'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { writeClipboardText } from '../utils/clipboardText'
@@ -1166,11 +1166,12 @@ function refreshCodeBlockSyntaxHighlighting(editor: ReturnType<typeof useCreateB
 }
 
 /** Single BlockNote editor view — content is swapped via replaceBlocks */
-export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange, sourceEntry, vaultPath, editable = true, locale = 'en' }: {
+export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange, onImageImportError, sourceEntry, vaultPath, editable = true, locale = 'en' }: {
   editor: ReturnType<typeof useCreateBlockNote>
   entries: VaultEntry[]
   onNavigateWikilink: (target: string) => void
   onChange?: () => void
+  onImageImportError?: (error: ImageImportError) => void
   sourceEntry?: VaultEntry | null
   vaultPath?: string
   editable?: boolean
@@ -1195,7 +1196,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
   })
   const handleEditorChange = useCompositionAwareEditorChange({ containerRef, onChange })
   const onImageUrl = useInsertImageCallback(editor)
-  const { isDragOver } = useImageDrop({ containerRef, onImageUrl, vaultPath })
+  const { isDragOver } = useImageDrop({ containerRef, onImageImportError, onImageUrl, vaultPath })
   const lightbox = useImageLightbox({ containerRef })
   const {
     clearCopyTarget,

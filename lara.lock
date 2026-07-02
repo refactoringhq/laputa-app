@@ -764,6 +764,8 @@ files:
     editor.whiteboard.permissionDeniedBody: eb1399413cae00b1614695d3c5c7ac9f
     editor.exportPdf.unavailable: 2fce9834984172b64b66767485d815e9
     editor.exportPdf.failed: bf3fa78ff5725f5cbde8979b67ec2e2a
+    editor.imageImport.unsupportedHeic: 75481136eb7ca33ef4f82806765e406f
+    editor.imageImport.unsupported: 9008202219a82edb8e70700bf351ce60
     filePreview.copyDeepLink: b75833669968adbef634495636e3fe50
     deepLinks.copied: 6ada57681192daf3b4afa07ce7a30575
     deepLinks.error.ambiguousVault: 4365c6d5cf8c2c1165259b32d24a6274
