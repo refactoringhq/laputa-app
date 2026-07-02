@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria nemohla použiť funkciu pracovnej plochy, ktorú táto tabuľa vyžaduje. Povoľte povolenie v nastaveniach systému a potom znova otvorte poznámku.",
   "editor.exportPdf.unavailable": "Pred exportom PDF otvorte poznámku vo formáte Markdown.",
   "editor.exportPdf.failed": "Nepodarilo sa spustiť export PDF: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} je obrázok vo formáte HEIC. Tolaria zatiaľ nedokáže importovať súbory HEIC alebo HEIF. Exportujte fotografiu vo formáte JPG alebo PNG a vložte tento súbor.",
+  "editor.imageImport.unsupported": "{filename} je obrázok vo formáte {format}. Tolaria zatiaľ nedokáže importovať tento formát. Použite formát JPG, PNG, GIF, WebP, SVG, BMP alebo TIFF.",
   "filePreview.copyDeepLink": "Kopírovať odkaz",
   "deepLinks.copied": "Hlboký odkaz skopírovaný",
   "deepLinks.error.ambiguousVault": "Hlboký odkaz zodpovedá viac ako jednému trezoru. Premenujte jeden alias trezoru v Nastaveniach.",

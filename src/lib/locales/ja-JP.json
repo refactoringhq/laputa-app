@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolariaは、このホワイトボードに必要なデスクトップ機能を使用できませんでした。システム設定で権限を許可してから、ノートを再度開いてください。",
   "editor.exportPdf.unavailable": "PDFをエクスポートする前に、Markdownノートを開いてください。",
   "editor.exportPdf.failed": "PDFエクスポートを開始できませんでした：{error}",
+  "editor.imageImport.unsupportedHeic": "{filename}はHEIC画像です。TolariaはまだHEICまたはHEIFファイルをインポートできません。写真をJPGまたはPNGとしてエクスポートし、そのファイルを挿入してください。",
+  "editor.imageImport.unsupported": "{filename}は{format}画像です。Tolariaはまだこの形式をインポートできません。JPG、PNG、GIF、WebP、SVG、BMP、またはTIFFを使用してください。",
   "filePreview.copyDeepLink": "リンクをコピー",
   "deepLinks.copied": "ディープリンクをコピーしました",
   "deepLinks.error.ambiguousVault": "ディープリンクが複数のボールトに一致しています。設定で1つのVaultエイリアスの名前を変更してください。",

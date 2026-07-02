@@ -362,6 +362,7 @@ function EditorCanvas({
   isDeletedPreview,
   vaultPath,
   locale,
+  onImageImportError,
 }: Pick<
   EditorContentModel,
   | 'showEditor'
@@ -378,6 +379,7 @@ function EditorCanvas({
   | 'isDeletedPreview'
   | 'vaultPath'
   | 'locale'
+  | 'onImageImportError'
 >) {
   if (!showEditor) return null
   if (!isSheet && !richEditorContentReady) return null
@@ -417,6 +419,7 @@ function EditorCanvas({
           entries={entries}
           onNavigateWikilink={onNavigateWikilink}
           onChange={onEditorChange}
+          onImageImportError={onImageImportError}
           sourceEntry={activeTab?.entry ?? null}
           vaultPath={vaultPath}
           editable={!isDeletedPreview}
@@ -495,6 +498,7 @@ export function EditorContentLayout(model: EditorContentModel) {
     richEditorContentReady,
     findRequest,
     locale,
+    onImageImportError,
     isVaultLoading,
   } = model
   const rootClassName = cn(
@@ -555,6 +559,7 @@ export function EditorContentLayout(model: EditorContentModel) {
             onNavigateWikilink={onNavigateWikilink}
             onEditorChange={onEditorChange}
             onRawContentChange={onRawContentChange}
+            onImageImportError={onImageImportError}
             sheetFlushRef={sheetFlushRef}
             isDeletedPreview={isDeletedPreview}
             isSheet={isSheet}

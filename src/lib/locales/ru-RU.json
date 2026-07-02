@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria не удалось использовать функцию настольного компьютера, необходимую для этой доски. Разрешите доступ в настройках системы, а затем снова откройте заметку.",
   "editor.exportPdf.unavailable": "Откройте заметку Markdown перед экспортом в PDF.",
   "editor.exportPdf.failed": "Не удалось начать экспорт в PDF: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} — это изображение HEIC. Tolaria пока не может импортировать файлы HEIC или HEIF. Экспортируйте фотографию в формате JPG или PNG и вставьте этот файл.",
+  "editor.imageImport.unsupported": "{filename} — изображение в формате {format}. Tolaria пока не может импортировать этот формат. Используйте JPG, PNG, GIF, WebP, SVG, BMP или TIFF.",
   "filePreview.copyDeepLink": "Копировать ссылку",
   "deepLinks.copied": "Глубокая ссылка скопирована",
   "deepLinks.error.ambiguousVault": "Глубокая ссылка соответствует нескольким хранилищам. Переименуйте один псевдоним хранилища в настройках.",
