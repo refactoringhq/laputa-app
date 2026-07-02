@@ -3,7 +3,13 @@ import { useEditorTabSwap } from '../hooks/useEditorTabSwap'
 import { useCreateBlockNote } from '@blocknote/react'
 import '@blocknote/mantine/style.css'
 import 'katex/dist/katex.min.css'
-import { uploadImageFile } from '../hooks/useImageDrop'
+import {
+  emptyImageUploadResult,
+  isUnsupportedImageFormatError,
+  uploadImageFile,
+  type ImageImportError,
+  type UploadImageFileResult,
+} from '../hooks/useImageDrop'
 import { DEFAULT_AI_AGENT, type AiAgentId, type AiAgentReadiness } from '../lib/aiAgents'
 import type { AiTarget } from '../lib/aiTargets'
 import { translate, type AppLocale } from '../lib/i18n'
@@ -156,6 +162,8 @@ interface EditorProps {
   locale?: AppLocale
 }
 
+type ImageImportErrorHandler = (error: ImageImportError) => void
+
 function useEditorModeExclusion({
   diffMode, rawMode, handleToggleDiff, handleToggleRaw, rawToggleRef, diffToggleRef,
 }: {
@@ -223,6 +231,25 @@ interface EditorSetupParams {
   getNoteStatus?: (path: string) => NoteStatus
   rawToggleRef?: React.MutableRefObject<() => void>
   diffToggleRef?: React.MutableRefObject<() => void>
+  onImageImportError?: ImageImportErrorHandler
+}
+
+function imageImportErrorMessage(error: ImageImportError, locale: AppLocale | undefined): string {
+  if (error.kind === 'unsupported-heic') {
+    return translate(locale ?? 'en', 'editor.imageImport.unsupportedHeic', { filename: error.fileName })
+  }
+  return translate(locale ?? 'en', 'editor.imageImport.unsupported', { filename: error.fileName, format: error.format })
+}
+
+function handleEditorImageUploadFailure(
+  file: File,
+  error: unknown,
+  onImageImportError: ImageImportErrorHandler | undefined,
+): UploadImageFileResult {
+  if (!isUnsupportedImageFormatError(error)) throw error
+
+  onImageImportError?.(error)
+  return emptyImageUploadResult(file)
 }
 
 function installDirectMarkdownForRealEditor(editor: ReturnType<typeof useCreateBlockNote>) {
@@ -233,20 +260,28 @@ function installDirectMarkdownForRealEditor(editor: ReturnType<typeof useCreateB
 function useEditorSetup({
   tabs, activeTabPath, vaultPath, onContentChange,
   onLoadDiff, onLoadDiffAtCommit, pendingCommitDiffRequest, onPendingCommitDiffHandled, getNoteStatus,
-  rawToggleRef, diffToggleRef,
+  rawToggleRef, diffToggleRef, onImageImportError,
 }: EditorSetupParams) {
   const vaultPathRef = useRef(vaultPath)
   const activeTabPathRef = useRef(activeTabPath)
+  const onImageImportErrorRef = useRef(onImageImportError)
   const flushPendingEditorChangeRef = useRef<(() => boolean) | null>(null)
   const sheetFlushRef = useRef<((path: string) => void) | null>(null)
   useEffect(() => { vaultPathRef.current = vaultPath }, [vaultPath])
   useEffect(() => { activeTabPathRef.current = activeTabPath }, [activeTabPath])
+  useEffect(() => { onImageImportErrorRef.current = onImageImportError }, [onImageImportError])
 
   const editor = useCreateBlockNote({
     ...RICH_EDITOR_BLOCKNOTE_PERFORMANCE_OPTIONS,
     schema,
     domAttributes: RICH_EDITOR_BIDI_DOM_ATTRIBUTES,
-    uploadFile: (file: File) => uploadImageFile(file, vaultPathRef.current),
+    uploadFile: async (file: File) => {
+      try {
+        return await uploadImageFile(file, vaultPathRef.current)
+      } catch (error) {
+        return handleEditorImageUploadFailure(file, error, onImageImportErrorRef.current)
+      }
+    },
     pasteHandler: handleRichEditorPaste,
     _tiptapOptions: { injectNonce: RUNTIME_STYLE_NONCE },
     extensions: [
@@ -466,6 +501,7 @@ function EditorLayout({
   onVaultChanged,
   workspaces,
   onUnsupportedAiPaste,
+  onImageImportError,
   locale,
 }: {
   tabs: Tab[]
@@ -542,6 +578,7 @@ function EditorLayout({
   onVaultChanged?: () => void
   workspaces?: WorkspaceIdentity[]
   onUnsupportedAiPaste?: (message: string) => void
+  onImageImportError?: ImageImportErrorHandler
   locale?: AppLocale
   onExportPdf?: (source?: NotePdfExportSource) => void
 }) {
@@ -613,6 +650,7 @@ function EditorLayout({
               isConflicted={isConflicted}
               onKeepMine={onKeepMine}
               onKeepTheirs={onKeepTheirs}
+              onImageImportError={onImageImportError}
               locale={locale}
             />
         }
@@ -682,6 +720,10 @@ function buildEditorLayoutProps(
 }
 
 export const Editor = memo(function Editor(props: EditorProps) {
+  const { locale, onToast } = props
+  const handleImageImportError = useCallback((error: ImageImportError) => {
+    onToast?.(imageImportErrorMessage(error, locale))
+  }, [locale, onToast])
   const runtime = useEditorSetup({
     tabs: props.tabs,
     activeTabPath: props.activeTabPath,
@@ -694,6 +736,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
     getNoteStatus: props.getNoteStatus,
     rawToggleRef: props.rawToggleRef,
     diffToggleRef: props.diffToggleRef,
+    onImageImportError: handleImageImportError,
   })
   const findRequest = useEditorFindCommand({
     activeTab: runtime.activeTab,
@@ -739,6 +782,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
   return (
     <EditorLayout
       {...buildEditorLayoutProps(props, runtime, findRequest)}
+      onImageImportError={handleImageImportError}
       onToggleInspector={rightPanel.handleToggleInspectorPanel}
       showAIChat={props.showAIChat}
       onToggleAIChat={props.onToggleAIChat ? rightPanel.handleToggleAIChatPanel : undefined}

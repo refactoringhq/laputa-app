@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria не змагла выкарыстаць функцыю працоўнага стала, неабходную для гэтай дошкі. Дазвольце доступ у наладах сістэмы, а потым зноў адкрыйце нататку.",
   "editor.exportPdf.unavailable": "Адкрыйце нататку Markdown перад экспартам у PDF.",
   "editor.exportPdf.failed": "Немагчыма пачаць экспарт PDF: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} — гэта выява HEIC. Tolaria пакуль не можа імпартаваць файлы HEIC або HEIF. Экспартуйце фота ў фармаце JPG або PNG і ўстаўце гэты файл.",
+  "editor.imageImport.unsupported": "{filename} — гэта выява ў фармаце {format}. Tolaria пакуль не можа імпартаваць гэты фармат. Выкарыстоўвайце JPG, PNG, GIF, WebP, SVG, BMP або TIFF.",
   "filePreview.copyDeepLink": "Капіраваць спасылку",
   "deepLinks.copied": "Глыбокі спасылка скапіявана",
   "deepLinks.error.ambiguousVault": "Глыбокі спасылка адпавядае больш чым аднаму сховішчы. Пераймянуйце адзін псеўданім сховішча ў наладах.",

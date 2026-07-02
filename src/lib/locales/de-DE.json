@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria konnte eine Desktop-Funktion, die dieses Whiteboard benötigt, nicht nutzen. Erteilen Sie die Berechtigung in Ihren Systemeinstellungen und öffnen Sie die Notiz dann erneut.",
   "editor.exportPdf.unavailable": "Öffne eine Markdown-Notiz, bevor du sie als PDF exportierst.",
   "editor.exportPdf.failed": "PDF-Export konnte nicht gestartet werden: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} ist ein HEIC-Bild. Tolaria kann noch keine HEIC- oder HEIF-Dateien importieren. Exportiere das Foto als JPG oder PNG und füge diese Datei ein.",
+  "editor.imageImport.unsupported": "{filename} ist ein {format}-Bild. Tolaria kann dieses Format noch nicht importieren. Verwende JPG, PNG, GIF, WebP, SVG, BMP oder TIFF.",
   "filePreview.copyDeepLink": "Link kopieren",
   "deepLinks.copied": "Deep Link kopiert",
   "deepLinks.error.ambiguousVault": "Der Deep Link stimmt mit mehr als einem Vault überein. Benennen Sie einen Vault-Alias in den Einstellungen um.",

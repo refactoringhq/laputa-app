@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "Tolaria không thể sử dụng một tính năng trên máy tính mà bảng trắng này cần. Cho phép quyền trong cài đặt hệ thống của bạn, sau đó mở lại ghi chú.",
   "editor.exportPdf.unavailable": "Mở ghi chú Markdown trước khi xuất PDF.",
   "editor.exportPdf.failed": "Không thể bắt đầu xuất PDF: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} là một hình ảnh HEIC. Tolaria chưa thể nhập tệp HEIC hoặc HEIF. Xuất ảnh dưới dạng JPG hoặc PNG và chèn tệp đó.",
+  "editor.imageImport.unsupported": "{filename} là hình ảnh {format}. Tolaria chưa thể nhập định dạng này. Sử dụng JPG, PNG, GIF, WebP, SVG, BMP hoặc TIFF.",
   "filePreview.copyDeepLink": "Sao chép liên kết",
   "deepLinks.copied": "Đã sao chép liên kết sâu",
   "deepLinks.error.ambiguousVault": "Liên kết sâu khớp với nhiều hơn một vault. Đổi tên một bí danh vault trong phần Cài đặt.",

@@ -762,6 +762,8 @@
   "editor.whiteboard.permissionDeniedBody": "A Tolaria não conseguiu usar uma funcionalidade de ambiente de trabalho necessária para este quadro branco. Ative a permissão nas definições do sistema e, em seguida, reabra a nota.",
   "editor.exportPdf.unavailable": "Abra uma nota Markdown antes de exportar um PDF.",
   "editor.exportPdf.failed": "Não foi possível iniciar a exportação para PDF: {error}",
+  "editor.imageImport.unsupportedHeic": "{filename} é uma imagem HEIC. A Tolaria ainda não consegue importar ficheiros HEIC ou HEIF. Exporte a fotografia como JPG ou PNG e insira esse ficheiro.",
+  "editor.imageImport.unsupported": "{filename} é uma imagem {format}. A Tolaria ainda não consegue importar este formato. Use JPG, PNG, GIF, WebP, SVG, BMP ou TIFF.",
   "filePreview.copyDeepLink": "Copiar link",
   "deepLinks.copied": "Deep link copiado",
   "deepLinks.error.ambiguousVault": "O deep link corresponde a mais de um cofre. Mude o nome de um alias de cofre em Definições.",
