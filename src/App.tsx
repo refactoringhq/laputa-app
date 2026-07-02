@@ -115,6 +115,7 @@ import {
 } from './utils/workspaces'
 import { activeGitRepositories } from './utils/gitRepositories'
 import { isMarkdownEntry } from './utils/typeDefinitions'
+import type { RichEditorBlockTypeDefinition } from './utils/richEditorBlockTypes'
 import { resolveTypeDeleteRequest, typeDeleteBlockedMessageKey } from './utils/typeDeletion'
 import { useVisibleWorkspaceEntries, useWorkspaceGraphState } from './hooks/useWorkspaceGraphState'
 import { useGitSetupState } from './hooks/useGitSetupState'
@@ -1147,6 +1148,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     layout,
     windowMode: Boolean(noteWindowParams) || aiWorkspaceWindow,
   })
+  const turnCurrentBlockIntoRef = useRef<((target: RichEditorBlockTypeDefinition) => void) | null>(null)
 
   const { status: updateStatus, actions: updateActions } = useUpdater(
     settings.release_channel,
@@ -1281,6 +1283,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const replaceInNoteCommand = useCallback(() => {
     findInNoteRef.current?.({ replace: true })
   }, [findInNoteRef])
+  const turnCurrentBlockIntoCommand = useCallback((target: RichEditorBlockTypeDefinition) => {
+    turnCurrentBlockIntoRef.current?.(target)
+  }, [])
   const pastePlainTextCommand = useCallback(() => {
     void requestPlainTextPaste().catch((error) => {
       console.warn('[paste] Failed to paste plain text:', error)
@@ -1431,6 +1436,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onSearch: dialogs.openSearch,
     onFindInNote: findInNoteCommand,
     onReplaceInNote: activeDeletedFile ? undefined : replaceInNoteCommand,
+    onTurnCurrentBlockInto: activeDeletedFile ? undefined : turnCurrentBlockIntoCommand,
     onPastePlainText: pastePlainTextCommand,
     onCreateNote: notes.handleCreateNoteImmediate,
     onCreateNoteOfType: notes.handleCreateNoteImmediate,
@@ -1690,6 +1696,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               rawToggleRef={rawToggleRef}
               tableOfContentsToggleRef={tableOfContentsToggleRef}
               pdfExportRef={pdfExportRef}
+              turnCurrentBlockIntoRef={turnCurrentBlockIntoRef}
               findInNoteRef={findInNoteRef}
               diffToggleRef={diffToggleRef}
               canGoBack={canGoBack}

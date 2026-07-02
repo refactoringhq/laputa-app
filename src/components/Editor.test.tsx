@@ -30,6 +30,14 @@ const mockEditor = vi.hoisted(() => ({
   replaceBlocks: vi.fn(),
   insertBlocks: vi.fn(),
   document: [{ id: '1', type: 'paragraph', content: [], props: {}, children: [] }],
+  getBlock: vi.fn((id: string) => (
+    id === '1'
+      ? { id: '1', type: 'paragraph', content: [], props: {}, children: [] }
+      : undefined
+  )),
+  getTextCursorPosition: vi.fn(() => ({
+    block: { id: '1', type: 'paragraph', content: [], props: {}, children: [] },
+  })),
   insertInlineContent: vi.fn(),
   headless: false,
   onMount: vi.fn((cb: () => void) => { cb(); return () => {} }),
@@ -39,6 +47,8 @@ const mockEditor = vi.hoisted(() => ({
   _tiptapEditor: { commands: { setContent: vi.fn() } },
   focus: vi.fn(),
   setTextCursorPosition: vi.fn(),
+  transact: vi.fn((callback: () => void) => callback()),
+  updateBlock: vi.fn(),
 }))
 const blockNoteCreation = vi.hoisted(() => ({
   options: [] as unknown[],
@@ -908,6 +918,7 @@ describe('Editor', () => {
       resetVaultConfigStore()
     }
   })
+
 })
 
 describe('click empty editor space', () => {
