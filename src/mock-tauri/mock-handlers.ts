@@ -503,10 +503,12 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   get_ai_agents_status: () => ({
     claude_code: { installed: false, version: null },
     codex: { installed: false, version: null },
+    copilot: { installed: false, version: null },
     opencode: { installed: false, version: null },
     pi: { installed: false, version: null },
     antigravity: { installed: false, version: null },
     kiro: { installed: false, version: null },
+    hermes: { installed: false, version: null },
   }),
   get_agent_docs_path: () => '/mock/Tolaria/resources/agent-docs',
   get_vault_ai_guidance_status: () => ({ ...mockVaultAiGuidanceStatus }),

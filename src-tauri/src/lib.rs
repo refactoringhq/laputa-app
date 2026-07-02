@@ -13,6 +13,8 @@ mod claude_invocation;
 mod cli_agent_runtime;
 pub mod codex_cli;
 mod commands;
+pub mod copilot_cli;
+mod copilot_discovery;
 pub mod frontmatter;
 pub mod git;
 pub mod hermes_cli;
