@@ -209,3 +209,4 @@ proposed → active → superseded
 | [0148](0148-cancellable-ai-agent-streams.md) | Cancellable AI agent streams | active |
 | [0149](0149-shared-app-config-policy-manifest.md) | Shared app config policy manifest | active |
 | [0151](0151-antigravity-add-dir-workspace-flag.md) | Antigravity add-dir workspace flag | active |
+| [0152](0152-wsl2-git-provider.md) | WSL2 Git provider | active |
