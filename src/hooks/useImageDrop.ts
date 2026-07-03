@@ -148,6 +148,15 @@ function handleUploadFailure(file: File, error: unknown): UploadImageFileResult 
   return emptyImageUploadResult(file)
 }
 
+function uploadedImageAssetUrl(file: File, path: string): UploadImageFileResult {
+  try {
+    return attachmentAssetUrlFromPath({ path })
+  } catch (error) {
+    console.warn('[image-upload] Failed to prepare uploaded image asset URL:', error)
+    return emptyImageUploadResult(file)
+  }
+}
+
 function readBrowserImageFile(file: File): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -173,7 +182,7 @@ export async function uploadImageFile(file: File, vaultPath?: string): Promise<U
         filename: file.name,
         data: base64,
       })
-      return attachmentAssetUrlFromPath({ path: savedPath })
+      return uploadedImageAssetUrl(file, savedPath)
     }
     return await readBrowserImageFile(file)
   } catch (error) {
