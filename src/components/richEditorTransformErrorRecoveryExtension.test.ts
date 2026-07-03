@@ -111,6 +111,9 @@ describe('isRecoverableEditorTransformError', () => {
     expect(isRecoverableEditorTransformError(new Error(
       'Index 1 out of range for <paragraph("/")>',
     ))).toBe(true)
+    expect(isRecoverableEditorTransformError(new RangeError(
+      'Index 0 out of range for <>',
+    ))).toBe(true)
     expect(isRecoverableEditorTransformError(new Error(
       'Block with ID 6c1c3bb4-e218-4f00-aaf5-40606852d286 not found',
     ))).toBe(true)
@@ -273,6 +276,13 @@ describe('installRichEditorTransformErrorRecovery', () => {
     expectDocumentRepairRecovery(
       new RangeError('Index 1 out of range for <paragraph("/")>'),
       'paragraph_index_out_of_range',
+    )
+  })
+
+  it('recovers production empty-fragment index transactions from stale selections', () => {
+    expectDocumentRepairRecovery(
+      new RangeError('Index 0 out of range for <>'),
+      'empty_fragment_index_out_of_range',
     )
   })
 
