@@ -29,7 +29,6 @@ import { writeClipboardText } from '../utils/clipboardText'
 import { buildTypeEntryMap } from '../utils/typeColors'
 import { searchEmojis, type EmojiEntry } from '../utils/emoji'
 import { preFilterWikilinks, deduplicateByPath, MIN_QUERY_LENGTH } from '../utils/wikilinkSuggestions'
-import { filterPersonMentions, PERSON_MENTION_MIN_QUERY } from '../utils/personMentionSuggestions'
 import { attachClickHandlers, enrichSuggestionItems, hasMultipleSuggestionWorkspaces } from '../utils/suggestionEnrichment'
 import { observeNativeTextAssistanceDisabled } from '../lib/nativeTextAssistance'
 import { getRuntimeStyleNonce } from '../lib/runtimeStyleNonce'
@@ -130,6 +129,7 @@ type TestTableBlock = {
   content?: { type?: string; columnWidths?: Array<number | null> }
 }
 type SuggestionAction = () => void
+type WikilinkAutocompleteTrigger = '[[' | '@'
 type SuggestionItemWithClick = { onItemClick?: SuggestionAction }
 type EmojiSuggestionItem = DefaultReactGridSuggestionItem & {
   group: string
@@ -884,13 +884,15 @@ function useInsertWikilink(
   editor: ReturnType<typeof useCreateBlockNote>,
   runEditorAction: (action: SuggestionAction) => void,
 ) {
-  return useCallback((target: string) => {
+  return useCallback((target: string, triggerCharacter: WikilinkAutocompleteTrigger) => {
     runEditorAction(() => {
       editor.insertInlineContent([
         { type: 'wikilink' as const, props: { target } },
         " ",
       ], { updateSelection: true })
-      trackEvent('wikilink_inserted')
+      trackEvent('wikilink_inserted', {
+        trigger: triggerCharacter === '@' ? 'at' : 'brackets',
+      })
     })
   }, [editor, runEditorAction])
 }
@@ -898,7 +900,7 @@ function useInsertWikilink(
 function useSuggestionMenuItems(options: {
   baseItems: ReturnType<typeof buildBaseSuggestionItems>
   editor: ReturnType<typeof useCreateBlockNote>
-  insertWikilink: (target: string) => void
+  insertWikilink: (target: string, triggerCharacter: WikilinkAutocompleteTrigger) => void
   locale: AppLocale
   runEditorAction: (action: SuggestionAction) => void
   sourceEntry?: VaultEntry
@@ -917,16 +919,17 @@ function useSuggestionMenuItems(options: {
   } = options
   const t = useMemo(() => createTranslator(locale), [locale])
 
-  const buildItems = useCallback((query: string, triggerCharacter: '[[' | '@') => {
+  const buildItems = useCallback((query: string, triggerCharacter: WikilinkAutocompleteTrigger) => {
     const normalizedQuery = normalizeSuggestionQuery(query, triggerCharacter)
-    const minLength = triggerCharacter === '[[' ? MIN_QUERY_LENGTH : PERSON_MENTION_MIN_QUERY
-    if (normalizedQuery.length < minLength) return null
+    if (normalizedQuery.length < MIN_QUERY_LENGTH) return null
 
-    const candidates = triggerCharacter === '[['
-      ? preFilterWikilinks(baseItems, normalizedQuery)
-      : filterPersonMentions(baseItems, normalizedQuery)
-
-    const items = attachClickHandlers(candidates, insertWikilink, vaultPath ?? '', sourceEntry)
+    const candidates = preFilterWikilinks(baseItems, normalizedQuery)
+    const items = attachClickHandlers(
+      candidates,
+      (target) => insertWikilink(target, triggerCharacter),
+      vaultPath ?? '',
+      sourceEntry,
+    )
     return guardSuggestionMenuItems(
       enrichSuggestionItems(items, normalizedQuery, typeEntryMap, {
         showWorkspace: hasMultipleSuggestionWorkspaces(baseItems),
@@ -939,7 +942,7 @@ function useSuggestionMenuItems(options: {
     buildItems(query, '[[') ?? []
   ), [buildItems])
 
-  const getPersonMentionItems = useCallback(async (query: string): Promise<WikilinkSuggestionItem[]> => (
+  const getAtWikilinkItems = useCallback(async (query: string): Promise<WikilinkSuggestionItem[]> => (
     buildItems(query, '@') ?? []
   ), [buildItems])
 
@@ -983,8 +986,8 @@ function useSuggestionMenuItems(options: {
 
   return {
     getWikilinkItems,
+    getAtWikilinkItems,
     getEmojiItems,
-    getPersonMentionItems,
     getSlashMenuItems,
   }
 }
@@ -996,8 +999,8 @@ type EditorInteractionControllersProps = ReturnType<typeof useSuggestionMenuItem
 }
 
 function EditorInteractionControllers({
+  getAtWikilinkItems,
   getEmojiItems,
-  getPersonMentionItems,
   getSlashMenuItems,
   getWikilinkItems,
   locale,
@@ -1050,7 +1053,7 @@ function EditorInteractionControllers({
       />
       <SuggestionMenuController
         triggerCharacter="@"
-        getItems={getPersonMentionItems}
+        getItems={getAtWikilinkItems}
         suggestionMenuComponent={WikilinkSuggestionMenu}
         onItemClick={(item: WikilinkSuggestionItem) => runEditorAction(item.onItemClick)}
       />

@@ -1254,7 +1254,7 @@ describe('wikilink autocomplete', () => {
   })
 })
 
-describe('person @mention autocomplete', () => {
+describe('@ wikilink autocomplete', () => {
   const personEntry: VaultEntry = {
     ...mockEntry,
     title: 'Matteo Cellini',
@@ -1274,9 +1274,11 @@ describe('person @mention autocomplete', () => {
   const entries = [personEntry, nonPersonEntry]
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock
-  let getPersonItems: ((query: string) => Promise<any[]>) | null = null
+  let getAtItems: ((query: string) => Promise<any[]>) | null = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock
+  let getBracketItems: ((query: string) => Promise<any[]>) | null = null
 
-  function renderForMention() {
+  function renderForAtAutocomplete() {
     mockFilterSuggestionItems.mockClear()
     mockFilterSuggestionItems.mockImplementation((items: unknown[]) => items)
     render(
@@ -1287,49 +1289,43 @@ describe('person @mention autocomplete', () => {
         entries={entries}
       />
     )
-    getPersonItems = capturedGetItemsByTrigger['@'] ?? null
+    getAtItems = capturedGetItemsByTrigger['@'] ?? null
+    getBracketItems = capturedGetItemsByTrigger['[['] ?? null
   }
 
-  it('registers a SuggestionMenuController with @ trigger', () => {
-    renderForMention()
-    expect(getPersonItems).toBeTruthy()
+  it('returns the same generic note suggestions as [[ without limiting @ to people', async () => {
+    renderForAtAutocomplete()
+    const atItems = await getAtItems!('Lap')
+    const bracketItems = await getBracketItems!('Lap')
+
+    expect(getAtItems).toBeTruthy()
+    expect(atItems.map(item => item.title)).toEqual(bracketItems.map(item => item.title))
+    expect(atItems).toHaveLength(1)
+    expect(atItems[0].title).toBe('Build Laputa App')
+    expect(await getAtItems!('Mat')).toEqual([
+      expect.objectContaining({ title: 'Matteo Cellini' }),
+    ])
   })
 
-  it('returns only Person entries for matching query', async () => {
-    renderForMention()
-    const items = await getPersonItems!('Mat')
-    expect(items.length).toBe(1)
-    expect(items[0].title).toBe('Matteo Cellini')
-  })
+  it('uses the same minimum query length and trigger-prefix normalization as [[ autocomplete', async () => {
+    renderForAtAutocomplete()
 
-  it('excludes non-Person entries', async () => {
-    renderForMention()
-    const items = await getPersonItems!('Lap')
-    expect(items).toHaveLength(0)
-  })
-
-  it('works with single-character query', async () => {
-    renderForMention()
-    const items = await getPersonItems!('M')
+    expect(await getAtItems!('M')).toHaveLength(0)
+    const items = await getAtItems!('@Lap')
     expect(items.length).toBeGreaterThan(0)
+    expect(items[0].title).toBe('Build Laputa App')
   })
 
-  it('inserts a wikilink when person item is clicked', async () => {
-    renderForMention()
+  it('inserts a normal wikilink when an @ item is clicked', async () => {
+    renderForAtAutocomplete()
     mockEditor.insertInlineContent.mockClear()
-    const items = await getPersonItems!('Matteo')
+    const items = await getAtItems!('Laputa')
     expect(items.length).toBeGreaterThan(0)
     items[0].onItemClick()
     expect(mockEditor.insertInlineContent).toHaveBeenCalledWith([
-      { type: 'wikilink', props: { target: 'vault/person/matteo-cellini' } },
+      { type: 'wikilink', props: { target: 'vault/project/laputa-app' } },
       ' ',
     ], { updateSelection: true })
-  })
-
-  it('shows Person type badge on results', async () => {
-    renderForMention()
-    const items = await getPersonItems!('Matteo')
-    expect(items[0].noteType).toBe('Person')
-    expect(items[0].typeColor).toBeTruthy()
+    expect(items[0].noteType).toBe('Project')
   })
 })
