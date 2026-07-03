@@ -163,11 +163,18 @@ const OPTION_ICON_STYLE: React.CSSProperties = {
   flexShrink: 0,
 }
 
+const OPTION_TEXT_STYLE: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+}
+
 const OPTION_LABEL_STYLE: React.CSSProperties = {
   fontSize: 14,
   fontWeight: 600,
   color: 'var(--foreground)',
   margin: 0,
+  overflowWrap: 'anywhere',
+  whiteSpace: 'normal',
 }
 
 const OPTION_DESC_STYLE: React.CSSProperties = {
@@ -175,6 +182,8 @@ const OPTION_DESC_STYLE: React.CSSProperties = {
   color: 'var(--muted-foreground)',
   margin: 0,
   marginTop: 2,
+  overflowWrap: 'anywhere',
+  whiteSpace: 'normal',
 }
 
 const ERROR_STYLE: React.CSSProperties = {
@@ -274,7 +283,7 @@ function OptionButton({
       <div style={{ ...OPTION_ICON_STYLE, background: iconBg }}>
         {loading ? <Loader2 size={18} className="animate-spin" style={{ color: 'var(--muted-foreground)' }} /> : icon}
       </div>
-      <div>
+      <div style={OPTION_TEXT_STYLE}>
         <p style={OPTION_LABEL_STYLE}>{loading ? (loadingLabel ?? label) : label}</p>
         <p style={OPTION_DESC_STYLE}>{loading ? (loadingDescription ?? description) : description}</p>
       </div>
