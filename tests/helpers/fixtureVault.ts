@@ -17,6 +17,7 @@ interface FixtureVaultPageArgs {
   vaultPath: string
   isGitRepo: boolean
   folders: FolderNode[]
+  installedAiAgents: string[]
 }
 
 interface FixturePageArgs {
@@ -27,6 +28,7 @@ interface FixtureVaultOptions {
   isGitRepo?: boolean
   expectedReadyTitle?: string
   folders?: FolderNode[]
+  installedAiAgents?: string[]
 }
 
 interface CopyDirArgs {
@@ -71,11 +73,12 @@ export function removeFixtureVaultCopy(tempVaultDir: string | null | undefined):
   removeFixtureVaultDirectory({ tempVaultDir })
 }
 
-async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folders }: FixtureVaultPageArgs): Promise<void> {
-  await page.addInitScript(({ dismissedKey, fixtureFolders, initialIsGitRepo, resolvedVaultPath }: { dismissedKey: string; fixtureFolders: FolderNode[]; initialIsGitRepo: boolean; resolvedVaultPath: string }) => {
+async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folders, installedAiAgents }: FixtureVaultPageArgs): Promise<void> {
+  await page.addInitScript(({ dismissedKey, fixtureFolders, fixtureInstalledAiAgents, initialIsGitRepo, resolvedVaultPath }: { dismissedKey: string; fixtureFolders: FolderNode[]; fixtureInstalledAiAgents: string[]; initialIsGitRepo: boolean; resolvedVaultPath: string }) => {
     localStorage.clear()
     localStorage.setItem(dismissedKey, '1')
     let gitRepoReady = initialIsGitRepo
+    const installedAiAgentSet = new Set(fixtureInstalledAiAgents)
 
     const jsonHeaders = { 'Content-Type': 'application/json' }
     const FRONTMATTER_DELIMITER = '---'
@@ -362,6 +365,22 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
         anonymous_id: null,
         release_channel: null,
       }),
+      get_ai_agents_status: () => {
+        const availability = (agentId: string) => ({
+          installed: installedAiAgentSet.has(agentId),
+          version: installedAiAgentSet.has(agentId) ? 'mock' : null,
+        })
+        return {
+          claude_code: availability('claude_code'),
+          codex: availability('codex'),
+          copilot: availability('copilot'),
+          opencode: availability('opencode'),
+          pi: availability('pi'),
+          antigravity: availability('antigravity'),
+          kiro: availability('kiro'),
+          hermes: availability('hermes'),
+        }
+      },
     })
 
     const buildFixtureReadHandlers = () => ({
@@ -505,6 +524,7 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
   }, {
     dismissedKey: CLAUDE_CODE_ONBOARDING_DISMISSED_KEY,
     fixtureFolders: folders,
+    fixtureInstalledAiAgents: installedAiAgents,
     initialIsGitRepo: isGitRepo,
     resolvedVaultPath: vaultPath,
   })
@@ -529,6 +549,7 @@ export async function openFixtureVault(
     vaultPath,
     isGitRepo: options.isGitRepo ?? true,
     folders: options.folders ?? [],
+    installedAiAgents: options.installedAiAgents ?? [],
   })
   await waitForFixtureVaultReady({
     page,

@@ -167,7 +167,7 @@ test.beforeEach(async ({ page }, testInfo) => {
       '',
     ].join('\n'),
   )
-  await openFixtureVault(page, tempVaultDir)
+  await openFixtureVault(page, tempVaultDir, { installedAiAgents: ['claude_code'] })
 })
 
 test.afterEach(async () => {

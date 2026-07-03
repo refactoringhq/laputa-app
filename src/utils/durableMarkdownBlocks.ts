@@ -188,14 +188,19 @@ export function preProcessDurableMarkdownBlocks({
   return result.join('')
 }
 
-function readSingleTextContent(content: InlineItem[] | undefined): string | null {
-  const onlyItem = content?.length === 1 ? content[0] : null
-  if (onlyItem?.type !== 'text' || typeof onlyItem.text !== 'string') return null
-  return onlyItem.text
+function readTextOnlyContent(content: InlineItem[] | undefined): string | null {
+  if (!Array.isArray(content) || content.length === 0) return null
+
+  let text = ''
+  for (const item of content) {
+    if (item.type !== 'text' || typeof item.text !== 'string') return null
+    text += item.text
+  }
+  return text
 }
 
 function readTokenPayload(block: BlockLike, codecs: readonly DurableBlockCodec[]): { codec: DurableBlockCodec; payload: unknown } | null {
-  const text = readSingleTextContent(block.content)
+  const text = readTextOnlyContent(block.content)
   if (text === null) return null
 
   for (const codec of codecs) {
