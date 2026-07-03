@@ -1328,4 +1328,69 @@ describe('@ wikilink autocomplete', () => {
     ], { updateSelection: true })
     expect(items[0].noteType).toBe('Project')
   })
+
+  it('preserves cross-workspace wikilink targets when an @ item is clicked', async () => {
+    const personalWorkspace = {
+      id: 'personal',
+      label: 'Personal',
+      alias: 'personal',
+      path: '/personal',
+      shortLabel: 'PE',
+      color: null,
+      icon: null,
+      mounted: true,
+      available: true,
+      defaultForNewNotes: true,
+    }
+    const teamWorkspace = {
+      id: 'team',
+      label: 'Team',
+      alias: 'team',
+      path: '/team',
+      shortLabel: 'TE',
+      color: null,
+      icon: null,
+      mounted: true,
+      available: true,
+      defaultForNewNotes: false,
+    }
+    const source = {
+      ...mockEntry,
+      path: '/personal/source.md',
+      filename: 'source.md',
+      title: 'Source',
+      workspace: personalWorkspace,
+    }
+    const target = {
+      ...mockEntry,
+      path: '/team/projects/laputa-app.md',
+      filename: 'laputa-app.md',
+      title: 'Build Laputa App',
+      isA: 'Project',
+      aliases: [],
+      workspace: teamWorkspace,
+    }
+    mockFilterSuggestionItems.mockImplementation((items: unknown[]) => items)
+    render(
+      <Editor
+        {...defaultProps}
+        tabs={[{ entry: source, content: '# Source\n' }]}
+        activeTabPath={source.path}
+        entries={[source, target]}
+        vaultPath="/personal"
+      />,
+    )
+
+    getAtItems = capturedGetItemsByTrigger['@'] ?? null
+    mockEditor.insertInlineContent.mockClear()
+    const items = await getAtItems!('Laputa')
+    expect(items[0].workspace).toBe(teamWorkspace)
+    items[0].onItemClick()
+
+    expect(mockEditor.insertInlineContent).toHaveBeenCalledWith([
+      { type: 'wikilink', props: { target: 'team/projects/laputa-app' } },
+      ' ',
+    ], { updateSelection: true })
+    mockFilterSuggestionItems.mockImplementation((items: unknown[]) => items)
+  })
 })
