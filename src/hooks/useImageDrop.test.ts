@@ -107,6 +107,35 @@ describe('uploadImageFile', () => {
     tauriMode = false
   })
 
+  it('resolves native asset bridge failures to an empty upload state', async () => {
+    tauriMode = true
+
+    const nativeBridgeError = new Error('null pointer passed to rust')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { invoke, convertFileSrc } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockClear()
+    vi.mocked(invoke).mockResolvedValue('/vault/attachments/123-test.png')
+    vi.mocked(convertFileSrc).mockImplementation(() => {
+      throw nativeBridgeError
+    })
+
+    try {
+      const file = new File(['data'], 'test.png', { type: 'image/png' })
+
+      await expect(uploadImageFile(file, '/vault')).resolves.toEqual({
+        props: { name: 'test.png', url: '' },
+      })
+      expect(warn).toHaveBeenCalledWith(
+        '[image-upload] Failed to prepare uploaded image asset URL:',
+        nativeBridgeError,
+      )
+    } finally {
+      vi.mocked(convertFileSrc).mockImplementation((path: string) => `asset://localhost/${path}`)
+      warn.mockRestore()
+      tauriMode = false
+    }
+  })
+
   it('rejects HEIC uploads before writing unsupported attachments', async () => {
     tauriMode = true
 
