@@ -3,6 +3,8 @@ import {
   LOCAL_AI_PROVIDER_KINDS,
   agentTargetId,
   agentTargets,
+  aiTargetCanQueuePrompt,
+  aiTargetReady,
   aiModelProviderCatalog,
   aiModelProviderCatalogEntry,
   isLocalAiProvider,
@@ -10,7 +12,12 @@ import {
   resolveAiTarget,
   type AiModelProvider,
 } from './aiTargets'
-import { AI_AGENT_DEFINITIONS } from './aiAgents'
+import {
+  AI_AGENT_DEFINITIONS,
+  createCheckingAiAgentsStatus,
+  createMissingAiAgentsStatus,
+  normalizeAiAgentsStatus,
+} from './aiAgents'
 import type { Settings } from '../types'
 
 function provider(kind: AiModelProvider['kind']): AiModelProvider {
@@ -38,6 +45,10 @@ function provider(kind: AiModelProvider['kind']): AiModelProvider {
   }
 }
 
+function resolveTarget(settings: Partial<Settings>): ReturnType<typeof resolveAiTarget> {
+  return resolveAiTarget(settings as Settings)
+}
+
 describe('ai target provider contract', () => {
   it('builds selectable targets for every supported coding agent', () => {
     expect(agentTargets().map((target) => target.id)).toEqual(
@@ -46,10 +57,10 @@ describe('ai target provider contract', () => {
   })
 
   it('resolves Copilot as a persisted default agent target', () => {
-    const target = resolveAiTarget({
+    const target = resolveTarget({
       default_ai_agent: 'claude_code',
       default_ai_target: 'agent:copilot',
-    } as Settings)
+    })
 
     expect(target).toMatchObject({
       kind: 'agent',
@@ -59,30 +70,32 @@ describe('ai target provider contract', () => {
     })
   })
 
-  it('accepts legacy agent ids saved in the default target field', () => {
-    const target = resolveAiTarget({
-      default_ai_agent: 'claude_code',
-      default_ai_target: 'kiro',
-    } as Settings)
-
-    expect(target).toMatchObject({
-      kind: 'agent',
-      agent: 'kiro',
-      id: 'agent:kiro',
+  it('lets quick prompts queue while a local agent probe is still checking', () => {
+    const target = resolveTarget({
+      default_ai_target: 'agent:claude_code',
     })
+
+    expect(aiTargetReady(target, createCheckingAiAgentsStatus())).toBe(false)
+    expect(aiTargetCanQueuePrompt(target, createCheckingAiAgentsStatus())).toBe(true)
+    expect(aiTargetCanQueuePrompt(target, normalizeAiAgentsStatus({
+      claude_code: { installed: true, version: 'mock' },
+    }))).toBe(true)
+    expect(aiTargetCanQueuePrompt(target, createMissingAiAgentsStatus())).toBe(false)
   })
 
-  it('uses the legacy default agent when a saved agent target is stale', () => {
-    const target = resolveAiTarget({
-      default_ai_agent: 'kiro',
-      default_ai_target: 'agent:claude_code',
-    } as Settings)
+  it('resolves legacy and stale agent settings to the intended agent target', () => {
+    const cases: Partial<Settings>[] = [
+      { default_ai_agent: 'claude_code', default_ai_target: 'kiro' },
+      { default_ai_agent: 'kiro', default_ai_target: 'agent:claude_code' },
+    ]
 
-    expect(target).toMatchObject({
-      kind: 'agent',
-      agent: 'kiro',
-      id: 'agent:kiro',
-    })
+    for (const settings of cases) {
+      expect(resolveTarget(settings)).toMatchObject({
+        kind: 'agent',
+        agent: 'kiro',
+        id: 'agent:kiro',
+      })
+    }
   })
 
   it('keeps provider defaults in one catalog with stable grouping metadata', () => {
