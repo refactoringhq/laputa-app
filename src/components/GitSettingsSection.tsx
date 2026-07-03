@@ -1,4 +1,6 @@
 import type { createTranslator } from '../lib/i18n'
+import type { GitProviderId } from '../types'
+import { GitProviderSettingsRows } from './GitProviderSettingsRows'
 import {
   NumberInputControl,
   SectionHeading,
@@ -13,12 +15,16 @@ interface GitSettingsSectionProps {
   autoGitEnabled: boolean
   autoGitIdleThresholdSeconds: number
   autoGitInactiveThresholdSeconds: number
+  gitProvider: GitProviderId
   gitFeaturesEnabled: boolean
+  gitWslDistro: string | null
   isGitVault: boolean
   setAutoGitEnabled: (value: boolean) => void
   setAutoGitIdleThresholdSeconds: (value: number) => void
   setAutoGitInactiveThresholdSeconds: (value: number) => void
   setGitFeaturesEnabled: (value: boolean) => void
+  setGitProvider: (value: GitProviderId) => void
+  setGitWslDistro: (value: string | null) => void
   t: Translate
 }
 
@@ -38,12 +44,16 @@ export function GitSettingsSection(props: GitSettingsSectionProps) {
     autoGitEnabled,
     autoGitIdleThresholdSeconds,
     autoGitInactiveThresholdSeconds,
+    gitProvider,
     gitFeaturesEnabled,
+    gitWslDistro,
     isGitVault,
     setAutoGitEnabled,
     setAutoGitIdleThresholdSeconds,
     setAutoGitInactiveThresholdSeconds,
     setGitFeaturesEnabled,
+    setGitProvider,
+    setGitWslDistro,
     t,
   } = props
   const gitControlsAvailable = gitFeaturesEnabled && isGitVault
@@ -59,6 +69,14 @@ export function GitSettingsSection(props: GitSettingsSectionProps) {
           checked={gitFeaturesEnabled}
           onChange={setGitFeaturesEnabled}
           testId="settings-git-enabled"
+        />
+
+        <GitProviderSettingsRows
+          gitProvider={gitProvider}
+          gitWslDistro={gitWslDistro}
+          setGitProvider={setGitProvider}
+          setGitWslDistro={setGitWslDistro}
+          t={t}
         />
 
         <SettingsSwitchRow

@@ -160,6 +160,9 @@ describe('mockHandlers coverage', () => {
     expect(mockHandlers.get_settings()).toEqual({
       auto_pull_interval_minutes: 5,
       git_enabled: null,
+      git_path: null,
+      git_provider: null,
+      git_wsl_distro: null,
       autogit_enabled: true,
       autogit_idle_threshold_seconds: 90,
       autogit_inactive_threshold_seconds: 30,

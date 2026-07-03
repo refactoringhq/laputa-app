@@ -85,6 +85,8 @@ Git is a per-vault capability, not a prerequisite for the document model. A vaul
 
 Plain folders become Git-backed only when the user explicitly runs Git initialization from the setup dialog, status bar, or command palette. The setup dialog supports "not now" for a one-time dismissal and "never for this vault" for a local per-vault opt-out from future automatic prompts. Features that depend on Git must check both the vault capability and the installation-local `git_enabled` setting instead of assuming every vault has `.git` or that Git chrome is globally visible.
 
+The Git executable provider is an installation-local setting layered under that vault capability. Native Git is the default provider. On Windows, users may explicitly select WSL2 Git and a distribution in Settings; command launch then goes through the Rust Git provider abstraction, translates repository paths to WSL form, and never switches away from native Git without the stored provider setting.
+
 Git initialization is intentionally scoped to dedicated vault folders. When the current non-git folder looks like a broad personal root such as Documents, Desktop, or Downloads and does not already carry Tolaria-managed vault markers, `init_git_repo` refuses to run Git and asks the user to select or create a dedicated subfolder instead.
 
 ### VaultEntry
