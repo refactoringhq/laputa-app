@@ -27,6 +27,7 @@ When deciding where to persist a piece of data, ask: **"Would the user want this
 | Per-note `_width` rich-editor width override | Default rich-editor note width |
 | Vault-authored `.gitignore` patterns | Whether this installation hides Gitignored files |
 | N/A | Whether this installation shows Git features |
+| N/A | Git executable provider (`native` vs WSL2 distribution) |
 | Per-vault All Notes note-list column overrides | All Notes PDF/image/unsupported file visibility |
 | N/A | Per-vault Git setup prompt opt-out |
 | Type `_sidebar_label` overrides | Whether this installation auto-pluralizes type labels |
@@ -45,6 +46,7 @@ Examples:
 - ✅ App settings: `date_display_format: "friendly"` (installation-specific date rendering preference)
 - ✅ App settings: `sidebar_type_pluralization_enabled: false` (installation-specific sidebar label preference)
 - ✅ App settings: `all_notes_show_images: true` (installation-specific All Notes file-category visibility)
+- ✅ App settings: `git_provider: "wsl"` plus `git_wsl_distro: "Ubuntu"` (machine-specific Git executable location)
 
 ### No hardcoded exceptions
 
@@ -115,6 +117,8 @@ Vault item deep links use the registered vault list as their resolver namespace.
 Saved Views participate in that mounted graph as source-scoped chrome. `useVaultLoader` loads view definitions from every mounted vault, annotates each `ViewFile` with its owning `rootPath` and workspace identity, and keeps sidebar selection/persistence keyed by `(rootPath, filename)` so same-named view files from different vaults stay independent.
 
 Git surfaces resolve repository paths explicitly. `useGitRepositories` derives the active repository set from the mounted available workspaces, keeps separate selected repositories for Changes, Pulse/history, and manual commits, and exposes the combined modified-file count for status/commands. Native Git capability checks treat a mounted workspace as Git-backed when it is inside any Git work tree, so included vault folders can reuse a parent repository without creating embedded `.git` directories. Mounted folders outside Git return no changes/no remote for aggregate probes instead of failing workspace-wide sync. AutoGit checkpoints iterate that repository set, while manual commit, history, diff, and discard operations use the selected surface or the note's workspace provenance.
+
+Git command launch is also installation-local. The Rust Git module resolves a `GitLaunchConfig` from app settings before spawning Git, defaulting to native `git` while allowing Windows installations to explicitly select WSL2 Git and a distribution. WSL-selected launches go through `wsl.exe --exec git` and translate Windows/WSL UNC vault paths before passing repository paths across the command boundary; Tolaria never silently switches providers based on detection alone.
 
 Renderer git file workflows stay behind `useGitFileWorkflows`. The hook resolves per-note repository paths, queues editor diff requests, opens Pulse history entries including deleted-file previews, and keeps discard/reload handling close to the selected Git surface while `App.tsx` only wires the resulting callbacks into `NoteList`, `PulseView`, and `Editor`.
 
@@ -196,14 +200,14 @@ flowchart TD
         subgraph EXT["External Services"]
             CCLI["Claude / Codex / Copilot / OpenCode / Pi / Antigravity / Kiro / Hermes CLI\n(agent subprocesses)"]
             MCP["MCP Server\n(ws://9710, 9711)"]
-            GCLI["git CLI\n(system executable)"]
+            GCLI["git CLI\n(native or selected WSL2 executable)"]
             REMOTE["Git remotes\n(GitHub/GitLab/Gitea/etc.)"]
         end
 
         FE -->|"Tauri IPC"| RB
         CLI -->|"spawn subprocess"| CCLI
         LIB -->|"register / monitor"| MCP
-        GIT -->|"clone / fetch / push / pull"| GCLI
+        GIT -->|"clone / fetch / push / pull via GitLaunchConfig"| GCLI
         GCLI -->|"network auth via user config"| REMOTE
     end
 

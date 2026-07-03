@@ -6,7 +6,7 @@ use std::io::Write;
 use std::process::Stdio;
 
 #[cfg(target_os = "macos")]
-use super::git_command;
+use super::git_command_at;
 
 #[cfg(target_os = "macos")]
 pub(super) fn request_remote_credentials(vault: &Path, remote_url: &str) {
@@ -14,15 +14,15 @@ pub(super) fn request_remote_credentials(vault: &Path, remote_url: &str) {
         return;
     };
 
-    let mut child = match git_command()
-        .args(["credential", "fill"])
-        .current_dir(vault)
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-    {
+    let mut child = match git_command_at(vault).and_then(|mut command| {
+        command
+            .args(["credential", "fill"])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+    }) {
         Ok(child) => child,
         Err(_) => return,
     };
