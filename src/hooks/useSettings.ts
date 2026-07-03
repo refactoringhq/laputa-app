@@ -40,6 +40,9 @@ async function tauriCall<T>(command: string, tauriArgs: Record<string, unknown>,
 const EMPTY_SETTINGS: Settings = {
   auto_pull_interval_minutes: null,
   git_enabled: null,
+  git_path: null,
+  git_provider: null,
+  git_wsl_distro: null,
   autogit_enabled: null,
   autogit_idle_threshold_seconds: null,
   autogit_inactive_threshold_seconds: null,
@@ -73,6 +76,9 @@ function normalizeSettings(settings: Settings): Settings {
   return {
     ...settings,
     git_enabled: settings.git_enabled ?? null,
+    git_path: nullableTrimmedString(settings.git_path),
+    git_provider: normalizeGitProvider(settings.git_provider),
+    git_wsl_distro: nullableTrimmedString(settings.git_wsl_distro),
     release_channel: serializeReleaseChannel(
       normalizeReleaseChannel(settings.release_channel),
     ),
@@ -93,6 +99,11 @@ function normalizeSettings(settings: Settings): Settings {
     all_notes_show_unsupported: settings.all_notes_show_unsupported ?? null,
     multi_workspace_enabled: settings.multi_workspace_enabled ?? null,
   }
+}
+
+function normalizeGitProvider(value: unknown): Settings['git_provider'] {
+  const provider = trimmedString(value).toLowerCase()
+  return provider === 'native' || provider === 'wsl' ? provider : null
 }
 
 function isRecord(value: unknown): value is UnknownRecord {

@@ -4,7 +4,7 @@ import { trackEvent } from './telemetry'
 import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import type { DateDisplayFormat } from '../utils/dateDisplay'
 import type { FilePreviewKind } from '../utils/filePreview'
-import type { NoteWidthMode } from '../types'
+import type { GitProviderId, NoteWidthMode } from '../types'
 import type { CommitMessageDraftSource } from '../utils/commitMessageDraft'
 import type { ThemeMode } from './themeMode'
 
@@ -100,6 +100,23 @@ export function trackAiFeaturesEnabledChanged(enabled: AnalyticsBoolean): void {
 export function trackGitFeaturesEnabledChanged(enabled: AnalyticsBoolean): void {
   trackEvent('git_features_visibility_changed', {
     enabled: numericFlag(enabled),
+  })
+}
+
+export function trackGitProviderChanged(provider: GitProviderId): void {
+  trackEvent('git_provider_changed', { provider })
+}
+
+export function trackGitWslDistroChanged(hasDistro: AnalyticsBoolean): void {
+  trackEvent('git_wsl_distro_changed', {
+    has_distro: numericFlag(hasDistro),
+  })
+}
+
+export function trackGitProviderTested(provider: GitProviderId, available: AnalyticsBoolean): void {
+  trackEvent('git_provider_tested', {
+    available: numericFlag(available),
+    provider,
   })
 }
 

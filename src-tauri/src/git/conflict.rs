@@ -1,6 +1,7 @@
 use std::path::Path;
 
-use super::{ensure_author_config, git_command, run_git};
+use super::command::git_output_result;
+use super::{ensure_author_config, git_command_at, run_git};
 
 /// List files with merge conflicts (unmerged paths).
 ///
@@ -9,10 +10,7 @@ use super::{ensure_author_config, git_command, run_git};
 /// stale (e.g. after a reboot or when MERGE_HEAD is missing).
 pub fn get_conflict_files(vault_path: &str) -> Result<Vec<String>, String> {
     let vault = Path::new(vault_path);
-    let output = git_command()
-        .args(["ls-files", "--unmerged"])
-        .current_dir(vault)
-        .output()
+    let output = git_output_result(vault, &["ls-files", "--unmerged"])
         .map_err(|e| format!("Failed to check conflicts: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -94,16 +92,20 @@ pub fn git_commit_conflict_resolution(vault_path: &str) -> Result<String, String
 
     let mode = get_conflict_mode(vault_path);
     let output = match mode.as_str() {
-        "rebase" => git_command()
-            .args(["rebase", "--continue"])
-            .env("GIT_EDITOR", "true")
-            .current_dir(vault)
-            .output()
+        "rebase" => git_command_at(vault)
+            .and_then(|mut command| {
+                command
+                    .args(["rebase", "--continue"])
+                    .env("GIT_EDITOR", "true")
+                    .output()
+            })
             .map_err(|e| format!("Failed to run git rebase --continue: {}", e))?,
-        _ => git_command()
-            .args(["commit", "-m", "Resolve merge conflicts"])
-            .current_dir(vault)
-            .output()
+        _ => git_command_at(vault)
+            .and_then(|mut command| {
+                command
+                    .args(["commit", "-m", "Resolve merge conflicts"])
+                    .output()
+            })
             .map_err(|e| format!("Failed to run git commit: {}", e))?,
     };
 
@@ -129,6 +131,7 @@ pub fn git_commit_conflict_resolution(vault_path: &str) -> Result<String, String
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::git::git_command;
     use crate::git::tests::{setup_git_repo, setup_remote_pair, GitConfigEnvGuard};
     use crate::git::{git_commit, git_pull, git_push};
     use std::fs;
