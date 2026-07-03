@@ -974,6 +974,7 @@ function useSuggestionMenuItems(options: {
     try {
       return guardSuggestionMenuItems(
         await Promise.resolve(getTolariaSlashMenuItems(editor, query, {
+          htmlTitle: t('editor.slash.htmlBlock'),
           mathTitle: t('editor.slash.math'),
         })),
         runEditorAction,

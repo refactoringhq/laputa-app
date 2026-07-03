@@ -795,7 +795,18 @@ files:
     noteGitUrls.copied: 6832bf85abaa03a6304cd1cce073d747
     noteGitUrls.error.copyFailed: 1952ee267f473efe8e28ca90659f75f6
     noteGitUrls.error.unavailable: ed08c134bba26350fd28f780c6f1b55b
+    editor.slash.htmlBlock: 3ae2ca009c2969a3af7c0b4d1098eafb
     editor.slash.math: a49950aa047c2292e989e368a97a3aae
+    editor.htmlBlock.toolbar: f5430a69b23b29ca2917a63ea8d8b4c6
+    editor.htmlBlock.editSource: 74a854cf60c14b27b56b55ec6beb8281
+    editor.htmlBlock.doneEditing: 04e6def67d4705fa934c575c137f6151
+    editor.htmlBlock.copySource: 1743d8e43a40d31cdeeebc5016b7127e
+    editor.htmlBlock.openRawEditor: c64edd2ccd76992c9956c33279b9b2da
+    editor.htmlBlock.resetHeight: fad3a0112e0158b33399f360efe70c56
+    editor.htmlBlock.resizeHeight: b1e04c04e37ed535b0a92849f776532b
+    editor.htmlBlock.sourceLabel: 73af2c58f07f2eb07343b6bed68440d4
+    editor.htmlBlock.previewTitle: 9cdc9d596904070d7e489e1cf8650ed5
+    editor.htmlBlock.blockedFallback: 591ec71869a83e53a9a8e904cec5c86a
     tableOfContents.title: f61d6c3e3733db355168b7e1aee6780b
     tableOfContents.close: d3292972a10edd1a06a627f3552f760a
     tableOfContents.empty: e4f02ad69cbbce1ec65d14215e3d5871
