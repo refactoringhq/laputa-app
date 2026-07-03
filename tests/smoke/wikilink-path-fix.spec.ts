@@ -5,7 +5,7 @@ const INSERTED_WIKILINK_QUERY = '[[Mana'
 const INSERTED_WIKILINK_TITLE = 'Manage Sponsorships'
 const INSERTED_WIKILINK_TARGET = 'manage-sponsorships'
 
-async function insertWikilink(page: Page) {
+async function insertWikilink(page: Page, query = INSERTED_WIKILINK_QUERY) {
   const editor = page.locator('.bn-editor')
   await expect(editor).toBeVisible({ timeout: 5000 })
 
@@ -23,7 +23,7 @@ async function insertWikilink(page: Page) {
   await page.keyboard.press('Enter')
   await page.waitForTimeout(200)
 
-  await page.keyboard.type(INSERTED_WIKILINK_QUERY)
+  await page.keyboard.type(query)
 
   const suggestionMenu = page.locator('.wikilink-menu')
   await expect(suggestionMenu).toBeVisible({ timeout: 5000 })
@@ -38,14 +38,15 @@ async function insertWikilink(page: Page) {
 }
 
 test.describe('Wikilink insertion and navigation', () => {
+  test.describe.configure({ timeout: 60_000 })
+
   test.beforeEach(async ({ page }) => {
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
-    await page.goto('/')
-    await page.waitForTimeout(500)
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
 
     const noteItem = page.locator('.app__note-list .cursor-pointer').filter({ hasText: SOURCE_NOTE_TITLE }).first()
+    await expect(noteItem).toBeVisible({ timeout: 10_000 })
     await noteItem.click()
-    await page.waitForTimeout(1000)
   })
 
   test('[[ autocomplete inserts wikilink that is not broken', async ({ page }) => {
@@ -58,6 +59,14 @@ test.describe('Wikilink insertion and navigation', () => {
 
     const target = await wikilink.getAttribute('data-target')
     expect(target).toBeTruthy()
+  })
+
+  test('@smoke at-sign autocomplete inserts the same wikilink inline content as [[', async ({ page }) => {
+    const wikilink = await insertWikilink(page, '@Mana')
+
+    await expect(wikilink).toBeVisible()
+    await expect(wikilink).not.toHaveClass(/wikilink--broken/u)
+    await expect(wikilink).toHaveAttribute('data-target', INSERTED_WIKILINK_TARGET)
   })
 
   test('@smoke Cmd+clicking an inserted wikilink navigates to the note', async ({ page }) => {

@@ -65,7 +65,6 @@ describe('SingleEditorView', () => {
     state.blockNoteViewError = null
     state.blockNoteViewErrorOnce = false
     state.imageDropState.isDragOver = false
-    state.personMentionCandidates = []
     state.wikilinkEntriesRef.current = []
     state.wikilinkCandidates = []
     mockOpenExternalUrl.mockClear()
