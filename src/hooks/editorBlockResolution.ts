@@ -1,6 +1,7 @@
 import type { useCreateBlockNote } from '@blocknote/react'
 import { preProcessWikilinks, injectWikilinks } from '../utils/wikilinks'
 import { preProcessMathMarkdown, injectMathInBlocks } from '../utils/mathMarkdown'
+import { preProcessSingleTildeStrikethrough } from '../utils/markdownStrikethrough'
 import { injectDurableEditorMarkdownBlocks, preProcessDurableEditorMarkdown } from '../utils/editorDurableMarkdown'
 import { injectMarkdownHighlightsInBlocks } from '../utils/markdownHighlightMarkdown'
 import { resolveImageUrls } from '../utils/vaultImages'
@@ -180,7 +181,7 @@ async function parseMarkdownBlocks(
   return result as EditorBlocks
 }
 
-function preProcessEditorMarkdown(
+export function preProcessEditorMarkdown(
   markdown: MarkdownBody,
   vaultPath?: VaultPath,
   notePath?: NotePath,
@@ -188,7 +189,8 @@ function preProcessEditorMarkdown(
   const withDurableBlocks = preProcessDurableEditorMarkdown({ markdown })
   const withImages = vaultPath ? resolveImageUrls(withDurableBlocks, vaultPath, notePath) : withDurableBlocks
   const withWikilinks = preProcessWikilinks(withImages)
-  return preProcessMathMarkdown({ markdown: withWikilinks })
+  const withMath = preProcessMathMarkdown({ markdown: withWikilinks })
+  return preProcessSingleTildeStrikethrough({ markdown: withMath })
 }
 
 function injectEditorMarkdownBlocks(blocks: EditorBlocks): EditorBlocks {
