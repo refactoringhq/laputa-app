@@ -214,3 +214,8 @@ export function aiTargetReady(target: AiTarget, statuses: AiAgentsStatus): boole
   if (target.kind === 'api_model') return true
   return getAiAgentAvailability(statuses, target.agent).status === 'installed'
 }
+
+export function aiTargetCanQueuePrompt(target: AiTarget, statuses: AiAgentsStatus): boolean {
+  if (target.kind === 'api_model') return true
+  return getAiAgentAvailability(statuses, target.agent).status !== 'missing'
+}
