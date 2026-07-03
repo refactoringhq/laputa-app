@@ -15,6 +15,9 @@ const { trackEventMock } = vi.hoisted(() => ({
 const defaultSettings: Settings = {
   auto_pull_interval_minutes: null,
   git_enabled: null,
+  git_path: null,
+  git_provider: null,
+  git_wsl_distro: null,
   autogit_enabled: null,
   autogit_idle_threshold_seconds: null,
   autogit_inactive_threshold_seconds: null,
@@ -45,6 +48,9 @@ const defaultSettings: Settings = {
 const savedSettings: Settings = {
   auto_pull_interval_minutes: 15,
   git_enabled: null,
+  git_path: null,
+  git_provider: null,
+  git_wsl_distro: null,
   autogit_enabled: true,
   autogit_idle_threshold_seconds: 90,
   autogit_inactive_threshold_seconds: 30,
@@ -112,6 +118,9 @@ function changedSettings(): Settings {
   return {
     auto_pull_interval_minutes: null,
     git_enabled: null,
+    git_path: null,
+    git_provider: null,
+    git_wsl_distro: null,
     autogit_enabled: false,
     autogit_idle_threshold_seconds: 120,
     autogit_inactive_threshold_seconds: 45,

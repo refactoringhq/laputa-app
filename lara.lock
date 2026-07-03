@@ -265,6 +265,18 @@ files:
     settings.autogit.title: 0bcc70105ad279503e31fe7b3f47b665
     settings.git.enable: c40503e1b0f483eecf3aff2fd01665c4
     settings.git.enableDescription: a96a43dc4dbf1490d665eef437807b07
+    settings.git.provider: 6a38305c8010acae3c04706773e0546f
+    settings.git.providerDescription: 7f23d6e2c5e462daf774c700ad6af2b6
+    settings.git.providerNative: 2098510f1f33aa3fa4c1ea19ff543813
+    settings.git.providerWsl: c28d793001f0044df477bfdfe280f88c
+    settings.git.wslDistro: cd2dfc009491c44acaa7d1c0d62689bc
+    settings.git.wslDistroDescription: 3acc5588d7c36c4a4dff199048d20eb3
+    settings.git.wslDefaultDistro: 32266d0a0c5b47f0c7593ab569f21a2b
+    settings.git.providerTest: 96467c8e8ddf142f09616c1dcdb4193d
+    settings.git.providerTestDescription: cd60ba8d1135b9de4b5cdf1a19a3a31b
+    settings.git.providerTesting: 1e9731b0f033754e9df1973d1fd77b0f
+    settings.git.providerTestOk: 572542bead66201e0e49fa7c6ff18555
+    settings.git.providerTestFailed: 3d0b8c3ec6a5a258bb3d6af98652c979
     settings.autogit.description.enabled: e65bec70ca4d7921be56f84d10836018
     settings.autogit.description.disabled: 1143ef6ee00614816785e3c6fc299d51
     settings.autogit.description.gitDisabled: 55a1dd2d7f797062cde1374930221649

@@ -2,10 +2,10 @@ use std::io;
 use std::path::Path;
 use std::process::Output;
 
-use super::git_command;
+use super::git_command_at;
 
 pub(super) fn git_output(dir: &Path, args: &[&str]) -> io::Result<Output> {
-    git_command().args(args).current_dir(dir).output()
+    git_command_at(dir)?.args(args).output()
 }
 
 pub(super) fn git_output_result(dir: &Path, args: &[&str]) -> Result<Output, String> {

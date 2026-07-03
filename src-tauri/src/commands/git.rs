@@ -1,6 +1,6 @@
 use crate::git::{
-    GitAuthorIdentity, GitCommit, GitPullResult, GitPushResult, GitRemoteStatus, LastCommitInfo,
-    ModifiedFile, PulseCommit,
+    GitAuthorIdentity, GitCommit, GitProviderProbe, GitProviderStatus, GitPullResult,
+    GitPushResult, GitRemoteStatus, LastCommitInfo, ModifiedFile, PulseCommit,
 };
 
 use super::expand_tilde;
@@ -10,6 +10,7 @@ type NotePathArg = String;
 type CommitHashArg = String;
 type CommitMessageArg = String;
 type ConflictStrategyArg = String;
+const GIT_PROVIDER_PROBE_TIMEOUT_SECONDS: u64 = 12;
 
 // ── Git commands (desktop) ──────────────────────────────────────────────────
 
@@ -219,6 +220,36 @@ pub fn is_git_repo(vault_path: VaultPathArg) -> bool {
 }
 
 #[cfg(desktop)]
+#[tauri::command]
+pub async fn git_provider_status() -> Result<GitProviderStatus, String> {
+    tokio::time::timeout(
+        std::time::Duration::from_secs(GIT_PROVIDER_PROBE_TIMEOUT_SECONDS),
+        tokio::task::spawn_blocking(crate::git::git_provider_status),
+    )
+    .await
+    .map_err(|_| "Git provider detection timed out".to_string())?
+    .map_err(|e| format!("Task panicked: {e}"))
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn test_git_provider(
+    provider: String,
+    distro: Option<String>,
+    vault_path: Option<String>,
+) -> Result<GitProviderProbe, String> {
+    tokio::time::timeout(
+        std::time::Duration::from_secs(GIT_PROVIDER_PROBE_TIMEOUT_SECONDS),
+        tokio::task::spawn_blocking(move || {
+            crate::git::test_git_provider(&provider, distro.as_deref(), vault_path.as_deref())
+        }),
+    )
+    .await
+    .map_err(|_| "Git provider test timed out".to_string())?
+    .map_err(|e| format!("Task panicked: {e}"))
+}
+
+#[cfg(desktop)]
 fn validate_git_init_target(vault_path: &str) -> Result<(), String> {
     let path = std::path::Path::new(vault_path);
     if !path.exists() {
@@ -423,6 +454,26 @@ pub fn git_discard_file(
 #[tauri::command]
 pub fn is_git_repo(_vault_path: VaultPathArg) -> bool {
     false
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn git_provider_status() -> Result<GitProviderStatus, String> {
+    Ok(crate::git::git_provider_status())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn test_git_provider(
+    provider: String,
+    distro: Option<String>,
+    vault_path: Option<String>,
+) -> Result<GitProviderProbe, String> {
+    Ok(crate::git::test_git_provider(
+        &provider,
+        distro.as_deref(),
+        vault_path.as_deref(),
+    ))
 }
 
 #[cfg(mobile)]

@@ -93,6 +93,8 @@ pub struct Settings {
     pub auto_pull_interval_minutes: Option<u32>,
     pub git_enabled: Option<bool>,
     pub git_path: Option<String>,
+    pub git_provider: Option<String>,
+    pub git_wsl_distro: Option<String>,
     pub autogit_enabled: Option<bool>,
     pub autogit_idle_threshold_seconds: Option<u32>,
     pub autogit_inactive_threshold_seconds: Option<u32>,
@@ -181,6 +183,13 @@ pub fn should_hide_gitignored_files(settings: &Settings) -> bool {
         .unwrap_or(DEFAULT_HIDE_GITIGNORED_FILES)
 }
 
+pub fn normalize_git_provider(value: Option<&str>) -> Option<String> {
+    match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
+        Some(provider) if provider == "native" || provider == "wsl" => Some(provider),
+        _ => None,
+    }
+}
+
 pub fn hide_gitignored_files_enabled() -> bool {
     get_settings()
         .map(|settings| should_hide_gitignored_files(&settings))
@@ -208,6 +217,8 @@ fn normalize_settings(settings: Settings) -> Settings {
         auto_pull_interval_minutes: settings.auto_pull_interval_minutes,
         git_enabled: settings.git_enabled,
         git_path: normalize_optional_string(settings.git_path),
+        git_provider: normalize_git_provider(settings.git_provider.as_deref()),
+        git_wsl_distro: normalize_optional_string(settings.git_wsl_distro),
         autogit_enabled: settings.autogit_enabled,
         autogit_idle_threshold_seconds: normalize_optional_positive_u32(
             settings.autogit_idle_threshold_seconds,
@@ -434,6 +445,8 @@ mod tests {
             auto_pull_interval_minutes: Some(10),
             git_enabled: Some(false),
             git_path: Some("/opt/homebrew/bin/git".to_string()),
+            git_provider: Some("wsl".to_string()),
+            git_wsl_distro: Some("Ubuntu".to_string()),
             autogit_enabled: Some(true),
             autogit_idle_threshold_seconds: Some(90),
             autogit_inactive_threshold_seconds: Some(30),
@@ -537,10 +550,31 @@ mod tests {
     }
 
     #[test]
+    fn test_git_provider_settings_are_normalized() {
+        let loaded = save_and_reload(Settings {
+            git_provider: Some(" WSL ".to_string()),
+            git_wsl_distro: Some(" Ubuntu-24.04 ".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.git_provider.as_deref(), Some("wsl"));
+        assert_eq!(loaded.git_wsl_distro.as_deref(), Some("Ubuntu-24.04"));
+
+        let invalid = save_and_reload(Settings {
+            git_provider: Some("portable".to_string()),
+            git_wsl_distro: Some("   ".to_string()),
+            ..Default::default()
+        });
+        assert!(invalid.git_provider.is_none());
+        assert!(invalid.git_wsl_distro.is_none());
+    }
+
+    #[test]
     fn test_save_trims_whitespace() {
         let loaded = save_and_reload(Settings {
             anonymous_id: Some("  test-uuid  ".to_string()),
             git_path: Some("  /opt/homebrew/bin/git  ".to_string()),
+            git_provider: Some("  native  ".to_string()),
+            git_wsl_distro: Some("  Ubuntu  ".to_string()),
             release_channel: Some("  alpha  ".to_string()),
             theme_mode: Some("  dark  ".to_string()),
             ui_language: Some("  zh-cn  ".to_string()),
@@ -551,6 +585,8 @@ mod tests {
         });
         assert_eq!(loaded.anonymous_id.as_deref(), Some("test-uuid"));
         assert_eq!(loaded.git_path.as_deref(), Some("/opt/homebrew/bin/git"));
+        assert_eq!(loaded.git_provider.as_deref(), Some("native"));
+        assert_eq!(loaded.git_wsl_distro.as_deref(), Some("Ubuntu"));
         assert_eq!(loaded.release_channel.as_deref(), Some("alpha"));
         assert_eq!(loaded.theme_mode.as_deref(), Some("dark"));
         assert_eq!(loaded.ui_language.as_deref(), Some("zh-CN"));

@@ -1,7 +1,8 @@
 use serde::Serialize;
 use std::path::Path;
 
-use super::{git_command, run_git};
+use super::command::git_output_result;
+use super::run_git;
 
 pub(crate) const FALLBACK_AUTHOR_NAME: &str = "Tolaria";
 pub(crate) const FALLBACK_AUTHOR_EMAIL: &str = "vault@tolaria.default";
@@ -74,10 +75,7 @@ pub(crate) fn ensure_author_config(dir: &Path) -> Result<(), String> {
             AuthorConfigKey::Name => "user.name",
             AuthorConfigKey::Email => "user.email",
         };
-        let resolved = git_command()
-            .args(["config", key_name])
-            .current_dir(dir)
-            .output()
+        let resolved = git_output_result(dir, &["config", key_name])
             .map_err(|e| format!("Failed to check git config {key_name}: {e}"))?;
 
         let value = String::from_utf8_lossy(&resolved.stdout);
@@ -136,10 +134,7 @@ fn config_value(
         AuthorConfigKey::Name => "user.name",
         AuthorConfigKey::Email => "user.email",
     };
-    let output = git_command()
-        .args(["config", scope_flag, key_name])
-        .current_dir(dir)
-        .output()
+    let output = git_output_result(dir, &["config", scope_flag, key_name])
         .map_err(|e| format!("Failed to check git config {key_name}: {e}"))?;
 
     let value = String::from_utf8_lossy(&output.stdout);
@@ -148,10 +143,7 @@ fn config_value(
 }
 
 fn resolved_git_author_identity(dir: &Path) -> Result<AuthorIdentity, String> {
-    let output = git_command()
-        .args(["var", "GIT_AUTHOR_IDENT"])
-        .current_dir(dir)
-        .output()
+    let output = git_output_result(dir, &["var", "GIT_AUTHOR_IDENT"])
         .map_err(|e| format!("Failed to resolve git author identity: {e}"))?;
 
     if !output.status.success() {
@@ -215,10 +207,7 @@ fn scoped_config_value(
         AuthorConfigKey::Name => "user.name",
         AuthorConfigKey::Email => "user.email",
     };
-    let output = git_command()
-        .args(["config", "--show-scope", "--get", key_name])
-        .current_dir(dir)
-        .output()
+    let output = git_output_result(dir, &["config", "--show-scope", "--get", key_name])
         .map_err(|e| format!("Failed to check git config {key_name}: {e}"))?;
 
     if !output.status.success() {

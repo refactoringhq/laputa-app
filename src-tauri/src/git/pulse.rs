@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::path::Path;
 
-use super::{git_command, parse_github_repo_path};
+use super::{git_command_at, parse_github_repo_path};
 
 #[derive(Debug, Serialize, Clone)]
 pub struct PulseFile {
@@ -129,21 +129,23 @@ pub fn get_vault_pulse(
 
     let limit_str = limit.to_string();
     let skip_str = skip.to_string();
-    let output = git_command()
-        .args([
-            "log",
-            "--name-status",
-            "--pretty=format:%H|%h|%s|%aI",
-            "--diff-filter=ADM",
-            "-n",
-            &limit_str,
-            "--skip",
-            &skip_str,
-            "--",
-            "*.md",
-        ])
-        .current_dir(vault)
-        .output()
+    let output = git_command_at(vault)
+        .and_then(|mut command| {
+            command
+                .args([
+                    "log",
+                    "--name-status",
+                    "--pretty=format:%H|%h|%s|%aI",
+                    "--diff-filter=ADM",
+                    "-n",
+                    &limit_str,
+                    "--skip",
+                    &skip_str,
+                    "--",
+                    "*.md",
+                ])
+                .output()
+        })
         .map_err(|e| format!("Failed to run git log: {}", e))?;
 
     if !output.status.success() {
@@ -163,10 +165,8 @@ pub fn get_vault_pulse(
 }
 
 fn get_github_base_url(vault: &Path) -> Option<GitHubBaseUrl> {
-    let output = git_command()
-        .args(["remote", "get-url", "origin"])
-        .current_dir(vault)
-        .output()
+    let output = git_command_at(vault)
+        .and_then(|mut command| command.args(["remote", "get-url", "origin"]).output())
         .ok()?;
 
     if !output.status.success() {
@@ -277,10 +277,8 @@ pub fn get_last_commit_info(
 ) -> Result<Option<LastCommitInfo>, String> {
     let vault = vault_path.as_ref();
 
-    let output = git_command()
-        .args(["log", "-1", "--format=%H|%h"])
-        .current_dir(vault)
-        .output()
+    let output = git_command_at(vault)
+        .and_then(|mut command| command.args(["log", "-1", "--format=%H|%h"]).output())
         .map_err(|e| format!("Failed to run git log: {}", e))?;
 
     if !output.status.success() {

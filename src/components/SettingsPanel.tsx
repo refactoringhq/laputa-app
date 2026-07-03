@@ -22,7 +22,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Settings } from '../types'
+import type { GitProviderId, Settings } from '../types'
 import {
   APP_LOCALES,
   SYSTEM_UI_LANGUAGE,
@@ -105,6 +105,8 @@ interface SettingsPanelProps {
 interface SettingsDraft {
   pullInterval: number
   gitFeaturesEnabled: boolean
+  gitProvider: GitProviderId
+  gitWslDistro: string | null
   autoGitEnabled: boolean
   autoGitIdleThresholdSeconds: number
   autoGitInactiveThresholdSeconds: number
@@ -135,6 +137,10 @@ interface SettingsBodyProps {
   setPullInterval: (value: number) => void
   gitFeaturesEnabled: boolean
   setGitFeaturesEnabled: (value: boolean) => void
+  gitProvider: GitProviderId
+  setGitProvider: (value: GitProviderId) => void
+  gitWslDistro: string | null
+  setGitWslDistro: (value: string | null) => void
   isGitVault: boolean
   autoGitEnabled: boolean
   setAutoGitEnabled: (value: boolean) => void
@@ -205,6 +211,8 @@ function createSettingsDraft(
   return {
     pullInterval: settings.auto_pull_interval_minutes ?? 5,
     gitFeaturesEnabled: areGitFeaturesEnabled(settings),
+    gitProvider: normalizeSettingsGitProvider(settings.git_provider),
+    gitWslDistro: settings.git_wsl_distro?.trim() || null,
     autoGitEnabled: settings.autogit_enabled ?? false,
     autoGitIdleThresholdSeconds: sanitizePositiveInteger(
       settings.autogit_idle_threshold_seconds,
@@ -259,6 +267,8 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
   const nextSettings = {
     auto_pull_interval_minutes: draft.pullInterval,
     git_enabled: draft.gitFeaturesEnabled,
+    git_provider: draft.gitProvider === 'native' ? null : draft.gitProvider,
+    git_wsl_distro: draft.gitProvider === 'wsl' ? draft.gitWslDistro : null,
     autogit_enabled: draft.autoGitEnabled,
     autogit_idle_threshold_seconds: draft.autoGitIdleThresholdSeconds,
     autogit_inactive_threshold_seconds: draft.autoGitInactiveThresholdSeconds,
@@ -283,6 +293,10 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     multi_workspace_enabled: draft.multiWorkspaceEnabled,
   }
   return settingsWithAllNotesFileVisibility(nextSettings, draft.allNotesFileVisibility)
+}
+
+function normalizeSettingsGitProvider(value: Settings['git_provider']): GitProviderId {
+  return value === 'wsl' ? 'wsl' : 'native'
 }
 
 function sanitizePositiveInteger(value: number | null | undefined, fallback: number): number {
@@ -551,6 +565,10 @@ function SettingsBodyFromDraft({
       setPullInterval={(value) => updateDraft('pullInterval', value)}
       gitFeaturesEnabled={draft.gitFeaturesEnabled}
       setGitFeaturesEnabled={(value) => updateDraft('gitFeaturesEnabled', value)}
+      gitProvider={draft.gitProvider}
+      setGitProvider={(value) => updateDraft('gitProvider', value)}
+      gitWslDistro={draft.gitWslDistro}
+      setGitWslDistro={(value) => updateDraft('gitWslDistro', value)}
       isGitVault={isGitVault}
       autoGitEnabled={draft.autoGitEnabled}
       setAutoGitEnabled={(value) => updateDraft('autoGitEnabled', value)}
@@ -626,6 +644,10 @@ function SettingsSyncAndAppearanceSections({
   setPullInterval,
   gitFeaturesEnabled,
   setGitFeaturesEnabled,
+  gitProvider,
+  setGitProvider,
+  gitWslDistro,
+  setGitWslDistro,
   isGitVault,
   autoGitEnabled,
   setAutoGitEnabled,
@@ -679,6 +701,10 @@ function SettingsSyncAndAppearanceSections({
           t={t}
           gitFeaturesEnabled={gitFeaturesEnabled}
           setGitFeaturesEnabled={setGitFeaturesEnabled}
+          gitProvider={gitProvider}
+          setGitProvider={setGitProvider}
+          gitWslDistro={gitWslDistro}
+          setGitWslDistro={setGitWslDistro}
           isGitVault={isGitVault}
           autoGitEnabled={autoGitEnabled}
           setAutoGitEnabled={setAutoGitEnabled}

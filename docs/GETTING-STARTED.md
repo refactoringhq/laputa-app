@@ -6,7 +6,7 @@ How to navigate the codebase, run the app, and find what you need.
 
 - **Node.js** 18+ and **pnpm**
 - **Rust** 1.77.2+ (for the Tauri backend)
-- **git** CLI (required by the git integration features)
+- **git** CLI (required by the git integration features; Windows users may choose native Git or WSL2 Git in Settings)
 
 ### Linux system dependencies
 
@@ -120,6 +120,8 @@ The sidecar is Linux-based, so keep native macOS Tauri QA and app-focus screensh
 `create_getting_started_vault` clones the public starter repo and then removes every git remote from the new local copy. That means Getting Started vaults open local-only by default. Users connect a compatible remote later through the bottom-bar `No remote` chip or the command palette, both of which feed the same `AddRemoteModal` and `git_add_remote` backend flow.
 
 Linux AppImage builds still use the user's system `git` and `node`. Before Tolaria spawns those Git or MCP Node subprocesses, it removes AppImage loader overrides such as `LD_LIBRARY_PATH`, `LD_PRELOAD`, and `GIT_EXEC_PATH` so HTTPS clone helpers and MCP tooling use the host library stack instead of bundled AppImage libraries.
+
+On Windows, Settings > Git exposes an explicit Git provider choice. Native Git remains the default. Selecting WSL2 Git stores the chosen distribution in app settings, launches Git through `wsl.exe --exec git`, and translates vault paths before clone, status, commit, sync, and remote operations use them.
 
 ## Multiple Vaults At The Same Time
 

@@ -129,10 +129,8 @@ fn git_head_hash(vault: &Path) -> Option<String> {
 
 /// Run a git command in the given directory and return stdout if successful.
 fn run_git(vault: &Path, args: &[&str]) -> Option<String> {
-    let output = crate::git::git_command()
-        .args(args)
-        .current_dir(vault)
-        .output()
+    let output = crate::git::git_command_at(vault)
+        .and_then(|mut command| command.args(args).output())
         .ok()?;
     if !output.status.success() {
         return None;
