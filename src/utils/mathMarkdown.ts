@@ -74,6 +74,10 @@ interface TextPosition {
   index: number
 }
 
+interface LeadingAmount {
+  end: number
+}
+
 interface InlineMathMatch extends LatexPayload {
   end: number
 }
@@ -100,10 +104,18 @@ interface MathRenderRequest extends LatexPayload {
 }
 
 function encodeLatex({ latex }: LatexPayload): string {
-  return encodeURIComponent(latex)
+  return Array.from(latex, (char) => char.codePointAt(0)?.toString(16) ?? '').join('-')
 }
 
 function decodeLatex({ encoded }: EncodedPayload): string {
+  if (/^[0-9a-f-]+$/iu.test(encoded)) {
+    try {
+      return encoded.split('-').map((part) => String.fromCodePoint(Number.parseInt(part, 16))).join('')
+    } catch {
+      return encoded
+    }
+  }
+
   try {
     return decodeURIComponent(encoded)
   } catch {
@@ -154,6 +166,67 @@ function isValidInlineLatex({ latex }: LatexPayload): boolean {
   return Boolean(latex.trim())
     && !/^\s|\s$/.test(latex)
     && !looksLikeFinancialProse({ latex })
+    && looksLikeIntentionalMath({ latex })
+}
+
+function looksLikeIntentionalMath({ latex }: LatexPayload): boolean {
+  const trimmed = latex.trim()
+  if (isSimpleVariable(trimmed)) return true
+  if (startsWithLikelyCurrencyAmount(trimmed)) return false
+  if (hasCoefficientVariableSyntax(trimmed)) return true
+  if (!hasMathSyntax(trimmed)) return false
+  if (hasLatexCommand(trimmed)) return true
+  return !hasPlainProseWord(trimmed)
+}
+
+function isSimpleVariable(text: string): boolean {
+  return /^[A-Za-z](?:['’])?$/u.test(text)
+}
+
+function hasLatexCommand(text: string): boolean {
+  return /\\[A-Za-z]+/u.test(text)
+}
+
+function hasMathSyntax(text: string): boolean {
+  return hasLatexCommand(text)
+    || /[-+*/=<>^_{}~]/u.test(text)
+}
+
+function hasPlainProseWord(text: string): boolean {
+  const withoutCommands = text.replace(/\\[A-Za-z]+/gu, '')
+  return /[A-Za-z]{3,}/u.test(withoutCommands)
+}
+
+function startsWithLikelyCurrencyAmount(text: string): boolean {
+  const amount = readLeadingAmount(text)
+  return amount !== null && (
+    amountBoundaryLooksLikeCurrency({ text, amount })
+    || amountSpanLacksMathIntent(text)
+  )
+}
+
+function readLeadingAmount(text: string): LeadingAmount | null {
+  const match = /^[\d,]+(?:\.\d+)?(?:[KMBT%])?/iu.exec(text)
+  if (!match) return null
+  return { end: match[0].length }
+}
+
+function amountBoundaryLooksLikeCurrency({ text, amount }: { text: string; amount: LeadingAmount }): boolean {
+  const nextChar = text.charAt(amount.end)
+  if (!nextChar) return true
+  return (nextChar === '/' && isAsciiLetter(text.charAt(amount.end + 1)))
+    || nextChar === ','
+    || nextChar === ')'
+    || /\s/u.test(nextChar)
+}
+
+function amountSpanLacksMathIntent(text: string): boolean {
+  if (hasCoefficientVariableSyntax(text)) return false
+  return !hasMathSyntax(text) || hasPlainProseWord(text)
+}
+
+function hasCoefficientVariableSyntax(text: string): boolean {
+  return /^[\d,]+(?:\.\d+)?[A-Za-z]{1,2}\d?(?:[_^][A-Za-z0-9{}]+)?$/u.test(text)
 }
 
 function looksLikeFinancialProse({ latex }: LatexPayload): boolean {
@@ -217,6 +290,7 @@ function readInlineMath({ text, index }: TextPosition): InlineMathMatch | null {
 
   const end = findInlineMathEnd({ text, index })
   if (end === -1) return null
+  if (isAsciiLetter(text.charAt(end + 1)) || isAsciiDigit(text.charAt(end + 1))) return null
 
   const latex = text.slice(index + 1, end)
   return isValidInlineLatex({ latex }) ? { latex, end } : null
