@@ -1,4 +1,4 @@
-use super::git_command;
+use super::git_command_at;
 use chrono::DateTime;
 use std::collections::HashMap;
 use std::path::Path;
@@ -19,11 +19,11 @@ pub struct GitDates {
 /// Files not yet committed (untracked / only staged) will not appear in the map;
 /// callers should fall back to filesystem metadata for those.
 pub fn get_all_file_dates(vault_path: &Path) -> HashMap<String, GitDates> {
-    let output = match git_command()
-        .args(["log", "--format=COMMIT %aI", "--name-only"])
-        .current_dir(vault_path)
-        .output()
-    {
+    let output = match git_command_at(vault_path).and_then(|mut command| {
+        command
+            .args(["log", "--format=COMMIT %aI", "--name-only"])
+            .output()
+    }) {
         Ok(o) if o.status.success() => o,
         _ => return HashMap::new(),
     };

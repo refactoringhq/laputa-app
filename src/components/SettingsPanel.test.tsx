@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
@@ -17,6 +17,9 @@ vi.mock('../lib/telemetry', () => ({
 const emptySettings: Settings = {
   auto_pull_interval_minutes: null,
   git_enabled: null,
+  git_path: null,
+  git_provider: null,
+  git_wsl_distro: null,
   autogit_enabled: null,
   autogit_idle_threshold_seconds: null,
   autogit_inactive_threshold_seconds: null,
@@ -712,6 +715,75 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('switch', { name: 'Enable AutoGit' })).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByTestId('settings-autogit-idle-threshold')).toHaveValue(90)
     expect(screen.getByTestId('settings-autogit-inactive-threshold')).toHaveValue(30)
+  })
+
+  it('defaults the Git provider selector to native Git', () => {
+    renderOpenSettings()
+
+    expect(screen.getByTestId('settings-git-provider')).toHaveAttribute('data-value', 'native')
+    expect(screen.queryByTestId('settings-git-wsl-distro')).not.toBeInTheDocument()
+  })
+
+  it('saves an explicit WSL Git provider and distribution', async () => {
+    renderOpenSettings()
+
+    fireEvent.pointerDown(screen.getByTestId('settings-git-provider'), { button: 0, pointerType: 'mouse' })
+    fireEvent.click(screen.getByRole('option', { name: 'WSL2 Git' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-git-wsl-distro')).toHaveAttribute('data-value', 'Ubuntu')
+    })
+
+    saveSettingsPanel()
+
+    expectSettingsSaved({
+      git_provider: 'wsl',
+      git_wsl_distro: 'Ubuntu',
+    })
+    expect(trackEventMock).toHaveBeenCalledWith('git_provider_changed', { provider: 'wsl' })
+  })
+
+  it('tests the selected WSL Git provider without leaving settings', async () => {
+    renderOpenSettings()
+
+    fireEvent.pointerDown(screen.getByTestId('settings-git-provider'), { button: 0, pointerType: 'mouse' })
+    fireEvent.click(screen.getByRole('option', { name: 'WSL2 Git' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-git-wsl-distro')).toHaveAttribute('data-value', 'Ubuntu')
+    })
+
+    fireEvent.click(screen.getByTestId('settings-git-provider-test'))
+
+    expect(await screen.findByText('Connection works. git version 2.43.0')).toBeInTheDocument()
+    expect(trackEventMock).toHaveBeenCalledWith('git_provider_tested', {
+      available: 1,
+      provider: 'wsl',
+    })
+  })
+
+  it('tracks explicit WSL distribution changes without leaking distro names', async () => {
+    renderOpenSettings({
+      ...emptySettings,
+      git_provider: 'wsl',
+      git_wsl_distro: 'Ubuntu',
+    })
+
+    fireEvent.pointerDown(screen.getByTestId('settings-git-wsl-distro'), { button: 0, pointerType: 'mouse' })
+    fireEvent.click(screen.getByRole('option', { name: 'Default WSL distribution' }))
+
+    expect(trackEventMock).toHaveBeenCalledWith('git_wsl_distro_changed', {
+      has_distro: 0,
+    })
+  })
+
+  it('keeps the Git provider selector keyboard accessible', () => {
+    renderOpenSettings()
+
+    const trigger = screen.getByTestId('settings-git-provider')
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'ArrowDown', code: 'ArrowDown' })
+
+    expect(screen.getByRole('option', { name: 'WSL2 Git' })).toBeInTheDocument()
   })
 
   it('saves the global Git feature preference when toggled off', () => {

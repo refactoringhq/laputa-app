@@ -79,7 +79,8 @@ fn run_clone(request: &CloneRequest<'_>) -> Result<(), String> {
             request.dest.display()
         )
     })?;
-    let output = build_clone_command(request, destination)
+    let git_destination = super::git_path_argument(destination)?;
+    let output = build_clone_command(request, &git_destination)
         .output()
         .map_err(|e| format!("Failed to run git clone: {}", e))?;
 

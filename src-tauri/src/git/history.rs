@@ -1,4 +1,4 @@
-use super::git_command;
+use super::git_command_at;
 use crate::vault::path_identity::vault_relative_path_string;
 use std::path::Path;
 
@@ -10,17 +10,19 @@ pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitComm
     let file = Path::new(file_path);
     let relative_str = vault_relative_path_string(vault, file)?;
 
-    let output = git_command()
-        .args([
-            "log",
-            "--format=%H|%h|%an|%aI|%s",
-            "-n",
-            "20",
-            "--",
-            &relative_str,
-        ])
-        .current_dir(vault)
-        .output()
+    let output = git_command_at(vault)
+        .and_then(|mut command| {
+            command
+                .args([
+                    "log",
+                    "--format=%H|%h|%an|%aI|%s",
+                    "-n",
+                    "20",
+                    "--",
+                    &relative_str,
+                ])
+                .output()
+        })
         .map_err(|e| format!("Failed to run git log: {}", e))?;
 
     if !output.status.success() {
@@ -67,20 +69,20 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
     let relative_str = vault_relative_path_string(vault, file)?;
 
     // First try tracked file diff
-    let output = git_command()
-        .args(["diff", "--", &relative_str])
-        .current_dir(vault)
-        .output()
+    let output = git_command_at(vault)
+        .and_then(|mut command| command.args(["diff", "--", &relative_str]).output())
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 
     // If no diff (maybe staged or untracked), try diff --cached
     if stdout.is_empty() {
-        let cached = git_command()
-            .args(["diff", "--cached", "--", &relative_str])
-            .current_dir(vault)
-            .output()
+        let cached = git_command_at(vault)
+            .and_then(|mut command| {
+                command
+                    .args(["diff", "--cached", "--", &relative_str])
+                    .output()
+            })
             .map_err(|e| format!("Failed to run git diff --cached: {}", e))?;
 
         let cached_stdout = String::from_utf8_lossy(&cached.stdout).to_string();
@@ -89,10 +91,12 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
         }
 
         // Try showing untracked file as all-new
-        let status = git_command()
-            .args(["status", "--porcelain", "--", &relative_str])
-            .current_dir(vault)
-            .output()
+        let status = git_command_at(vault)
+            .and_then(|mut command| {
+                command
+                    .args(["status", "--porcelain", "--", &relative_str])
+                    .output()
+            })
             .map_err(|e| format!("Failed to run git status: {}", e))?;
 
         let status_out = String::from_utf8_lossy(&status.stdout);
@@ -124,16 +128,18 @@ pub fn get_file_diff_at_commit(
     let relative_str = vault_relative_path_string(vault, file)?;
 
     // Show diff between commit^ and commit for this file
-    let output = git_command()
-        .args([
-            "diff",
-            &format!("{}^", commit_hash),
-            commit_hash,
-            "--",
-            &relative_str,
-        ])
-        .current_dir(vault)
-        .output()
+    let output = git_command_at(vault)
+        .and_then(|mut command| {
+            command
+                .args([
+                    "diff",
+                    &format!("{}^", commit_hash),
+                    commit_hash,
+                    "--",
+                    &relative_str,
+                ])
+                .output()
+        })
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -141,10 +147,12 @@ pub fn get_file_diff_at_commit(
     // If diff is empty, it might be the initial commit (no parent).
     // Fall back to showing the full file content as added.
     if stdout.is_empty() {
-        let show = git_command()
-            .args(["show", &format!("{}:{}", commit_hash, relative_str)])
-            .current_dir(vault)
-            .output()
+        let show = git_command_at(vault)
+            .and_then(|mut command| {
+                command
+                    .args(["show", &format!("{}:{}", commit_hash, relative_str)])
+                    .output()
+            })
             .map_err(|e| format!("Failed to run git show: {}", e))?;
 
         if show.status.success() {
@@ -164,8 +172,8 @@ pub fn get_file_diff_at_commit(
 
 #[cfg(test)]
 mod tests {
-    use super::git_command;
     use super::*;
+    use crate::git::git_command;
     use crate::git::tests::setup_git_repo;
     use std::{fs, path::PathBuf};
 

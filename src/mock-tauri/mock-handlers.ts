@@ -7,6 +7,8 @@ import type {
   VaultEntry,
   ModifiedFile,
   Settings,
+  GitProviderProbe,
+  GitProviderStatus,
   GitAddRemoteResult,
   GitPullResult,
   GitPushResult,
@@ -120,6 +122,9 @@ const mockSavedSinceCommit = new Set<string>()
 let mockSettings: Settings = {
   auto_pull_interval_minutes: 5,
   git_enabled: null,
+  git_path: null,
+  git_provider: null,
+  git_wsl_distro: null,
   autogit_enabled: false,
   autogit_idle_threshold_seconds: 90,
   autogit_inactive_threshold_seconds: 30,
@@ -473,6 +478,50 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     const path = args?.path?.replace(/^.*?\/Laputa\//, '') ?? 'note.md'
     return `https://github.com/lucaong/laputa-vault/blob/main/${encodeURI(path)}`
   },
+  git_provider_status: (): GitProviderStatus => ({
+    selected_provider: mockSettings.git_provider ?? 'native',
+    selected_wsl_distro: mockSettings.git_wsl_distro ?? null,
+    native: {
+      provider: 'native',
+      label: 'Native Git',
+      available: true,
+      version: 'git version 2.45.0',
+      distro: null,
+      path: null,
+      message: 'Native Git is available: git version 2.45.0',
+    },
+    wsl_distributions: [{
+      provider: 'wsl',
+      label: 'WSL2 Git',
+      available: true,
+      version: 'git version 2.43.0',
+      distro: 'Ubuntu',
+      path: null,
+      message: 'WSL2 Git is available: git version 2.43.0',
+    }],
+  }),
+  test_git_provider: (args?: { provider?: string; distro?: string | null }): GitProviderProbe => {
+    const provider = args?.provider === 'wsl' ? 'wsl' : 'native'
+    return provider === 'wsl'
+      ? {
+          provider,
+          label: 'WSL2 Git',
+          available: true,
+          version: 'git version 2.43.0',
+          distro: args?.distro ?? 'Ubuntu',
+          path: null,
+          message: 'WSL2 Git is available: git version 2.43.0',
+        }
+      : {
+          provider,
+          label: 'Native Git',
+          available: true,
+          version: 'git version 2.45.0',
+          distro: null,
+          path: null,
+          message: 'Native Git is available: git version 2.45.0',
+        }
+  },
   git_add_remote: (args?: {
     request?: { vaultPath?: string; vault_path?: string; remoteUrl?: string }
     vaultPath?: string
@@ -545,6 +594,9 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     mockSettings = {
       auto_pull_interval_minutes: s.auto_pull_interval_minutes ?? 5,
       git_enabled: s.git_enabled ?? null,
+      git_path: s.git_path ?? null,
+      git_provider: s.git_provider ?? null,
+      git_wsl_distro: s.git_wsl_distro ?? null,
       autogit_enabled: s.autogit_enabled ?? false,
       autogit_idle_threshold_seconds: s.autogit_idle_threshold_seconds ?? 90,
       autogit_inactive_threshold_seconds: s.autogit_inactive_threshold_seconds ?? 30,

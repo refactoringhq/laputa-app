@@ -8,6 +8,7 @@ mod credentials;
 mod dates;
 mod file_url;
 mod history;
+mod provider;
 mod pulse;
 mod remote;
 #[cfg(test)]
@@ -19,6 +20,7 @@ mod status;
 mod upstream;
 
 use std::ffi::{OsStr, OsString};
+use std::io;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -47,6 +49,7 @@ pub use connect::{disconnect_all_remotes, git_add_remote, GitAddRemoteResult};
 pub use dates::{get_all_file_dates, GitDates};
 pub use file_url::git_file_url;
 pub use history::{get_file_diff, get_file_diff_at_commit, get_file_history};
+pub use provider::{git_provider_status, test_git_provider, GitProviderProbe, GitProviderStatus};
 pub use pulse::{get_last_commit_info, get_vault_pulse, LastCommitInfo, PulseCommit, PulseFile};
 pub use remote::{git_pull, git_push, has_remote, GitPullResult, GitPushResult};
 pub use remote_status::{git_remote_status, GitRemoteStatus};
@@ -98,6 +101,7 @@ const GIT_SHELL_ENV_NAMES: [EnvName<'static>; 8] = [
 #[derive(Clone)]
 struct GitLaunchConfig {
     program: OsString,
+    prefix_args: Vec<OsString>,
     path: Option<OsString>,
 }
 
@@ -115,6 +119,7 @@ struct GitShellEnvBinding {
 pub(crate) fn git_command() -> Command {
     let config = git_launch_config();
     let mut command = crate::hidden_command(&config.program);
+    command.args(config.prefix_args);
     if let Some(path) = &config.path {
         command.env("PATH", path);
     }
@@ -137,6 +142,20 @@ pub(crate) fn git_command() -> Command {
     command
 }
 
+pub(crate) fn git_command_at(path: &Path) -> io::Result<Command> {
+    let path = path.to_str().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Git path '{}' is not valid UTF-8", path.display()),
+        )
+    })?;
+    let path = git_path_argument(path)
+        .map_err(|message| io::Error::new(io::ErrorKind::InvalidInput, message))?;
+    let mut command = git_command();
+    command.args(["-C", &path]);
+    Ok(command)
+}
+
 pub fn has_direct_git_metadata(path: impl AsRef<Path>) -> bool {
     path.as_ref().join(".git").exists()
 }
@@ -147,11 +166,11 @@ pub fn is_inside_work_tree(path: impl AsRef<Path>) -> bool {
         return false;
     }
 
-    let Ok(output) = git_command()
-        .args(["rev-parse", "--is-inside-work-tree"])
-        .current_dir(path)
-        .output()
-    else {
+    let Ok(output) = git_command_at(path).and_then(|mut command| {
+        command
+            .args(["rev-parse", "--is-inside-work-tree"])
+            .output()
+    }) else {
         return false;
     };
 
@@ -201,13 +220,28 @@ fn apply_test_git_config_env(command: &mut Command) {
     });
 }
 
-fn git_launch_config() -> &'static GitLaunchConfig {
-    static CONFIG: OnceLock<GitLaunchConfig> = OnceLock::new();
-    CONFIG.get_or_init(detect_git_launch_config)
+pub(crate) fn git_path_argument(path: &str) -> Result<String, String> {
+    let settings = crate::settings::get_settings().ok();
+    provider::selected_git_path_argument(path, settings.as_ref())
+}
+
+fn git_launch_config() -> GitLaunchConfig {
+    detect_git_launch_config()
 }
 
 fn detect_git_launch_config() -> GitLaunchConfig {
     let parent_path = std::env::var_os("PATH");
+    let settings = crate::settings::get_settings().ok();
+    if let provider::GitProviderSelection::Wsl { distro } =
+        provider::GitProviderSelection::from_settings(settings.as_ref())
+    {
+        return GitLaunchConfig {
+            program: OsString::from("wsl.exe"),
+            prefix_args: provider::wsl_git_prefix_args(distro.as_deref()),
+            path: parent_path,
+        };
+    }
+
     git_launch_config_from_sources(
         parent_path,
         configured_git_path(),
@@ -230,7 +264,11 @@ fn git_launch_config_from_sources(
         .unwrap_or_else(|| OsString::from("git"));
     let path = path_with_git_parent(shell.path.or(parent_path), &program);
 
-    GitLaunchConfig { program, path }
+    GitLaunchConfig {
+        program,
+        prefix_args: Vec::new(),
+        path,
+    }
 }
 
 fn configured_git_path() -> Option<PathBuf> {
