@@ -664,7 +664,9 @@ Defined in `src/components/editorSchema.tsx` and styled in `src/components/Edito
 
 Defined in `src/utils/mathMarkdown.ts`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
 
-- `$...$` becomes a `mathInline` schema node and line-owned `$$...$$` / multiline `$$` blocks become `mathBlock` nodes.
+- `$...$` becomes a `mathInline` schema node only when deterministic math-intent checks reject likely currency/prose. Line-owned `$$...$$` / multiline `$$` blocks become `mathBlock` nodes.
+- Single `~` remains literal prose during rich-editor Markdown import; strikethrough requires `~~strike~~`.
+- Math placeholder payloads are encoded with Markdown-inert characters before BlockNote import so placeholder internals cannot be interpreted as formatting.
 - The rich editor renders both node types through KaTeX with `throwOnError: false`, so malformed formulas keep their source visible instead of breaking the note.
 - Double-clicking rendered display math edits the math block's `latex` property in-place; Markdown delimiters remain owned by serialization. Inline math can still be reopened as source text for direct editing.
 - `serializeMathAwareBlocks()` converts math nodes back to Markdown delimiters before save, raw-mode entry, and editor-position snapshots.
