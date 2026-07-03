@@ -703,6 +703,97 @@ body.tldraw-whiteboard-fullscreen-open {
   background-color: transparent !important;
 }
 
+.editor__blocknote-container .bn-block-content[data-content-type="htmlBlock"] {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+}
+
+.html-block {
+  background: var(--surface-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.04);
+  min-height: 180px;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.html-block:focus-within,
+.html-block:hover {
+  border-color: var(--border-strong);
+}
+
+.html-block__toolbar {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  transition: opacity 120ms ease;
+  z-index: 2;
+}
+
+.html-block:focus-within .html-block__toolbar,
+.html-block:hover .html-block__toolbar {
+  opacity: 1;
+}
+
+.html-block__toolbar [data-slot="button"] {
+  background: color-mix(in srgb, var(--surface-popover) 92%, transparent);
+  box-shadow: 0 1px 4px rgba(15, 15, 15, 0.1);
+}
+
+.html-block__frame,
+.html-block__source {
+  border: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.html-block__frame {
+  background: Canvas;
+  display: block;
+}
+
+.html-block__source {
+  border-radius: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  min-height: 100%;
+  padding: 16px;
+  resize: none;
+}
+
+.html-block__fallback {
+  align-items: center;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.html-block__resize-handle {
+  bottom: 6px;
+  cursor: ns-resize;
+  opacity: 0;
+  position: absolute;
+  right: 6px;
+  z-index: 2;
+}
+
+.html-block:focus-within .html-block__resize-handle,
+.html-block:hover .html-block__resize-handle {
+  opacity: 1;
+}
+
 /* --- Blockquote --- */
 .editor__blocknote-container [data-content-type="blockquote"],
 .editor__blocknote-container blockquote {
