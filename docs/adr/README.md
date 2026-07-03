@@ -210,3 +210,5 @@ proposed → active → superseded
 | [0149](0149-shared-app-config-policy-manifest.md) | Shared app config policy manifest | active |
 | [0151](0151-antigravity-add-dir-workspace-flag.md) | Antigravity add-dir workspace flag | active |
 | [0152](0152-wsl2-git-provider.md) | WSL2 Git provider | active |
+| [0153](0153-conservative-markdown-delimiter-parsing.md) | Conservative Markdown delimiter parsing | active |
+| [0154](0154-sandboxed-fenced-html-blocks.md) | Sandboxed fenced HTML blocks | active |

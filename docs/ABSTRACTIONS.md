@@ -60,7 +60,7 @@ All data lives in markdown files with YAML frontmatter. There is no database —
 
 ### Rich-Editor Markdown Serialization
 
-`src/utils/richEditorMarkdown.ts` is the canonical owner for turning a BlockNote document back into vault Markdown. It restores Tolaria's durable Markdown syntax for wikilinks, math, highlights, attachments, Mermaid, and tldraw blocks before the save path writes bytes to disk. Hot save paths should pass an already-read block snapshot when they have one; a debounced rich-editor flush should not ask BlockNote for `editor.document` twice.
+`src/utils/richEditorMarkdown.ts` is the canonical owner for turning a BlockNote document back into vault Markdown. It restores Tolaria's durable Markdown syntax for wikilinks, math, highlights, attachments, Mermaid, tldraw, and sandboxed HTML blocks before the save path writes bytes to disk. Hot save paths should pass an already-read block snapshot when they have one; a debounced rich-editor flush should not ask BlockNote for `editor.document` twice.
 
 Real BlockNote editor instances install the experimental direct serializer from `src/utils/blockNoteDirectMarkdown.ts`. Callers should go through `serializeBlockNoteMarkdown()` rather than invoking `blocksToMarkdownLossy()` directly: the helper uses the direct serializer when every block shape is supported and falls back to BlockNote's exporter when a custom or unknown block appears.
 
@@ -679,7 +679,7 @@ Defined in `src/utils/durableMarkdownBlocks.ts`, `src/utils/editorDurableMarkdow
 - Fenced `mermaid` blocks become `mermaidBlock` schema nodes before BlockNote sees the Markdown body.
 - Each `mermaidBlock` stores the original fenced Markdown plus the diagram body, so raw-mode entry and saves can restore the canonical source instead of serializing generated SVG.
 - The rich editor renders diagrams with the `mermaid` package and uses the original source as an inline fallback when rendering fails.
-- `serializeDurableEditorBlocks()` wraps the math-aware serializer so math, wikilinks, Mermaid diagrams, and whiteboards share the same Markdown-first save path.
+- `serializeDurableEditorBlocks()` wraps the math-aware serializer so math, wikilinks, Mermaid diagrams, sandboxed HTML blocks, and whiteboards share the same Markdown-first save path.
 - The `/mermaid` slash command inserts a placeholder rectangle diagram using the same schema-backed Markdown storage path, avoiding an invalid empty diagram state.
 
 ### Tldraw Whiteboards
@@ -694,6 +694,16 @@ Defined in `src/utils/durableMarkdownBlocks.ts`, `src/utils/editorDurableMarkdow
 - Embedded whiteboards expose a session-only full-window workspace that reuses the same tldraw store and Markdown snapshot; expanding or closing it does not persist camera, tool, or size state.
 - Mermaid and tldraw both register small codecs with the shared durable fenced-block pipeline; scanner, token, block injection, and mixed serialization mechanics live in one owner.
 - The `/whiteboard` slash command inserts an empty tldraw block using the same Markdown-durable storage path. Preview images are intentionally omitted; thumbnails can be added later as derived cache artifacts.
+
+### Sandboxed HTML Blocks
+
+Defined in `src/utils/durableMarkdownBlocks.ts`, `src/utils/editorDurableMarkdown.ts`, `src/utils/htmlBlockMarkdown.ts`, `src/utils/htmlBlockSandbox.ts`, `src/components/HtmlBlock.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
+
+- Fenced `html` blocks become `htmlBlock` schema nodes before BlockNote sees the Markdown body. A portable `height="..."` fence attribute stores the block's vertical size; missing or invalid values fall back to the default height.
+- The `/html` slash command inserts an empty `htmlBlock` and opens source editing immediately, while normal save serialization writes the block back to fenced Markdown.
+- Rendered HTML is sanitized, then mounted through iframe `srcdoc` with a restrictive CSP and sandbox tokens that omit scripts, forms, same-origin, parent DOM access, Tauri IPC, and top navigation.
+- Block controls support source editing, source copy, raw-editor fallback, keyboard/pointer height resize, and height reset without storing session-only UI state outside the Markdown fence.
+- Sandboxed HTML blocks share the durable fenced-block pipeline with Mermaid and tldraw; scanner, token, block injection, and mixed serialization mechanics stay in `src/utils/durableMarkdownBlocks.ts`.
 
 ### Formatting Surface Policy
 
@@ -713,7 +723,7 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 - `richEditorTextDirection.ts` uses a BlockNote extension with ProseMirror decorations for per-node RTL quote rendering. It handles callout-marker quotes such as `[!note] כותרת` at the editor render layer, so BlockNote does not strip post-render DOM mutations and quote rails can follow logical inline-start.
 - `focusOwnershipGuard.ts` is the shared global focus interception primitive for editor-like surfaces. It owns the single `HTMLElement.prototype.focus` patch, document focus/pointer listeners, outside-target restoration, and cleanup; rich-editor and sheet modules keep only their surface-specific focus-claim policy.
 - `useImageLightbox` listens for `dblclick` on the rich-editor container and opens `ImageLightbox` only when the event target resolves to a viewable BlockNote image. The target resolver handles media wrappers, ignores image captions/resize controls, missing sources, and tiny tracking-style images, preserving BlockNote's ordinary single-click image selection path.
-- The `/` slash menu remains the supported path for markdown-safe block transformations such as headings, quotes, list blocks, Mermaid diagrams, and whiteboards. Tolaria filters out BlockNote's toggle-heading and toggle-list variants because those do not map cleanly to the markdown note model.
+- The `/` slash menu remains the supported path for markdown-safe block transformations such as headings, quotes, list blocks, Mermaid diagrams, sandboxed HTML blocks, and whiteboards. Tolaria filters out BlockNote's toggle-heading and toggle-list variants because those do not map cleanly to the markdown note model.
 - The block-handle side menu keeps only actions that survive Tolaria's markdown round-trip. Delete and table-header toggles remain available; BlockNote's `Colors` submenu is removed because block colors are not part of Tolaria's supported markdown surface. Tolaria renders the add-block button outside the drag handle so the handle stays next to the block content. `tolariaSideMenuAlignment.ts` aligns the side menu to the first rendered text line for the hovered block, so H1/H2 typography, line-height, wrapping, and theme changes do not need per-heading offsets. `tolariaBlockReorder.ts` owns block reordering as a pointer gesture with direct BlockNote block moves instead of HTML5 `DataTransfer`, keeping it independent from Tauri's native file-drop system. `tolariaSideMenuBlocks.ts` owns stale-block lookup and mutation guards, so block-handle actions re-resolve the current live BlockNote block before mutating or dragging and note reloads/sync churn cannot leave controls acting on stale block references.
 - BlockNote's table row/column handles are patched so stale or missing hovered-table state cancels the drag and hides handles instead of throwing. Add/remove row and column actions also validate the table position and cell indexes before resolving a ProseMirror `CellSelection`, so reloads or menu lag cannot turn stale handles into invalid table-selection positions. Checklist checkbox handlers also re-resolve the live block before updating `checked`, making delayed clicks after note reloads a no-op instead of a stale block mutation. Browser and native table regressions should exercise row and column dragging plus add-menu actions because the state is tracked per orientation.
 - `SingleEditorView` wraps the BlockNote surface in a narrow render-recovery boundary for recoverable BlockNote node-view failures classified by `richEditorRecoveryClassifier.ts`. The boundary retries the BlockNote view once, records `editor_render_recovered`, and marks the recovered error so the React root handler does not send that handled case back to Sentry. Other render errors still propagate through the normal root error path.
@@ -746,7 +756,7 @@ flowchart LR
     style L fill:#d4edda,stroke:#28a745,color:#000
 ```
 
-> Wikilink placeholder tokens use `\u2039` and `\u203A`; math, Mermaid, tldraw, and standalone file-attachment link placeholders use ASCII sentinels with URI-encoded payloads.
+> Wikilink placeholder tokens use `\u2039` and `\u203A`; math, Mermaid, tldraw, sandboxed HTML, and standalone file-attachment link placeholders use ASCII sentinels with URI-encoded payloads.
 
 ### BlockNote-to-Markdown Pipeline (Save)
 

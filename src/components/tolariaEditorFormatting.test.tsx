@@ -8,16 +8,35 @@ vi.mock('../lib/telemetry', () => ({
 
 import {
   addItemsToMediaGroup,
+  createHtmlBlockSlashMenuItem,
   createMathSlashMenuItem,
   filterTolariaFormattingToolbarItems,
   filterTolariaSlashMenuItems,
   getTolariaBlockTypeSelectItems,
+  HTML_SLASH_COMMAND_SOURCE,
   MATH_SLASH_COMMAND_LATEX,
   MERMAID_SLASH_COMMAND_DIAGRAM,
 } from './tolariaEditorFormattingConfig'
+import { HTML_BLOCK_DEFAULT_HEIGHT, HTML_BLOCK_TYPE } from '../utils/htmlBlockMarkdown'
 import { trackEvent } from '../lib/telemetry'
 import { MATH_BLOCK_TYPE } from '../utils/mathMarkdown'
 import { mermaidFenceSource } from '../utils/mermaidMarkdown'
+
+function createSlashCommandEditorFixture() {
+  const block = { id: 'active-block' }
+  const editor = {
+    getTextCursorPosition: () => ({ block }),
+    replaceBlocks: () => {},
+    updateBlock: () => {},
+  }
+
+  return {
+    block,
+    editor: editor as never,
+    replaceBlocks: vi.spyOn(editor, 'replaceBlocks'),
+    updateBlock: vi.spyOn(editor, 'updateBlock'),
+  }
+}
 
 describe('tolariaEditorFormatting', () => {
   it('keeps the markdown-safe toolbar controls and block type select', () => {
@@ -143,6 +162,12 @@ describe('tolariaEditorFormatting', () => {
         onItemClick: () => {},
       },
       {
+        key: 'html',
+        title: 'HTML block',
+        aliases: ['embed', 'iframe', 'sandbox', 'html'],
+        onItemClick: () => {},
+      },
+      {
         key: 'whiteboard',
         title: 'Whiteboard',
         aliases: ['tldraw', 'drawing', 'canvas', 'sketch'],
@@ -161,11 +186,16 @@ describe('tolariaEditorFormatting', () => {
       aliases: ['equation', 'latex', 'formula', 'sqrt'],
     }))
     expect(items[2]).toEqual(expect.objectContaining({
+      key: 'html',
+      title: 'HTML block',
+      aliases: ['embed', 'iframe', 'sandbox', 'html'],
+    }))
+    expect(items[3]).toEqual(expect.objectContaining({
       key: 'whiteboard',
       title: 'Whiteboard',
       aliases: ['tldraw', 'drawing', 'canvas', 'sketch'],
     }))
-    expect(items.map((item) => isValidElement(item.icon))).toEqual([true, true, true])
+    expect(items.map((item) => isValidElement(item.icon))).toEqual([true, true, true, true])
   })
 
   it('uses a valid placeholder diagram for new Mermaid blocks', () => {
@@ -207,6 +237,12 @@ describe('tolariaEditorFormatting', () => {
         onItemClick: () => {},
       },
       {
+        key: 'html',
+        title: 'HTML block',
+        group: 'Media',
+        onItemClick: () => {},
+      },
+      {
         key: 'whiteboard',
         title: 'Whiteboard',
         group: 'Media',
@@ -219,22 +255,40 @@ describe('tolariaEditorFormatting', () => {
       'file',
       'mermaid',
       'math',
+      'html',
       'whiteboard',
       'emoji',
     ])
   })
 
-  it('creates a math slash command with a default display equation', () => {
-    const block = { id: 'active-block' }
-    const editor = {
-      getTextCursorPosition: () => ({ block }),
-      replaceBlocks: () => {},
-      updateBlock: () => {},
-    }
-    const replaceBlocks = vi.spyOn(editor, 'replaceBlocks')
-    const updateBlock = vi.spyOn(editor, 'updateBlock')
+  it('creates an empty HTML block slash command for immediate source editing', () => {
+    const { block, editor, replaceBlocks, updateBlock } = createSlashCommandEditorFixture()
 
-    const mathItem = createMathSlashMenuItem(editor as never)
+    const htmlItem = createHtmlBlockSlashMenuItem(editor, { htmlTitle: 'HTML block' })
+
+    expect(htmlItem).toEqual(expect.objectContaining({
+      key: 'html',
+      title: 'HTML block',
+      aliases: ['embed', 'iframe', 'sandbox', 'html'],
+    }))
+
+    htmlItem?.onItemClick()
+
+    expect(replaceBlocks).toHaveBeenCalledWith([block], [{
+      type: HTML_BLOCK_TYPE,
+      props: {
+        height: HTML_BLOCK_DEFAULT_HEIGHT,
+        html: HTML_SLASH_COMMAND_SOURCE,
+      },
+    }])
+    expect(updateBlock).not.toHaveBeenCalled()
+    expect(trackEvent).toHaveBeenCalledWith('editor_html_block_slash_command_used')
+  })
+
+  it('creates a math slash command with a default display equation', () => {
+    const { block, editor, replaceBlocks, updateBlock } = createSlashCommandEditorFixture()
+
+    const mathItem = createMathSlashMenuItem(editor)
 
     expect(mathItem).toEqual(expect.objectContaining({
       key: 'math',
