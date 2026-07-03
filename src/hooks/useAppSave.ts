@@ -8,7 +8,7 @@ import type { VaultEntry } from '../types'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { canWritePathToVault } from '../utils/vaultPathContainment'
 import { vaultPathForEntry } from '../utils/workspaces'
-import { notePathsMatch } from '../utils/notePathIdentity'
+import { notePathFilename, notePathsMatch } from '../utils/notePathIdentity'
 
 interface TabState {
   entry: VaultEntry
@@ -63,7 +63,7 @@ function trackRenamedPath(renamedPaths: RenamedPathMap, oldPath: string, newPath
 }
 
 function vaultPathForTabPath(tabs: TabState[], path: string, fallbackVaultPath: string): string {
-  const tab = tabs.find((candidate) => candidate.entry.path === path)
+  const tab = tabs.find((candidate) => notePathsMatch(candidate.entry.path, path))
   return tab ? vaultPathForEntry(tab.entry, fallbackVaultPath) : fallbackVaultPath
 }
 
@@ -104,7 +104,7 @@ function findUnsavedFallback({
 }
 
 function isUntitledRenameCandidate(path: string): boolean {
-  const filename = path.split('/').pop() ?? ''
+  const filename = notePathFilename(path)
   const stem = filename.replace(/\.md$/, '')
   return stem.startsWith('untitled-') && /\d+$/.test(stem)
 }
