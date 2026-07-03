@@ -32,6 +32,61 @@ describe('mermaid markdown round-trip', () => {
     expect(block.props.diagram).toBe('flowchart LR\n  A --> B\n')
   })
 
+  it('restores token paragraphs split across inline text spans', () => {
+    const markdown = [
+      '```mermaid',
+      'flowchart TD',
+      '  A["alpha_beta"] --> B["ok"]',
+      '```',
+    ].join('\n')
+    const token = preProcessMermaidMarkdown({ markdown })
+    const splitPoint = Math.floor(token.length / 2)
+    const [block] = injectMermaidInBlocks([{
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: token.slice(0, splitPoint), styles: {} },
+        { type: 'text', text: token.slice(splitPoint), styles: { italic: true } },
+      ],
+      children: [],
+    }]) as Array<{
+      type: string
+      props?: { source: string; diagram: string }
+      content?: Array<{ text?: string }>
+    }>
+
+    expect(block.type).toBe(MERMAID_BLOCK_TYPE)
+    expect(block.props).toMatchObject({
+      source: markdown,
+      diagram: 'flowchart TD\n  A["alpha_beta"] --> B["ok"]\n',
+    })
+  })
+
+  it('does not erase non-text inline content while reading durable tokens', () => {
+    const markdown = [
+      '```mermaid',
+      'flowchart TD',
+      '  A --> B',
+      '```',
+    ].join('\n')
+    const token = preProcessMermaidMarkdown({ markdown })
+    const splitPoint = Math.floor(token.length / 2)
+    const [block] = injectMermaidInBlocks([{
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: token.slice(0, splitPoint), styles: {} },
+        { type: 'link', content: [{ type: 'text', text: 'external', styles: {} }] },
+        { type: 'text', text: token.slice(splitPoint), styles: {} },
+      ],
+      children: [],
+    }]) as Array<{
+      type: string
+      content?: Array<{ type?: string; text?: string }>
+    }>
+
+    expect(block.type).toBe('paragraph')
+    expect(block.content).toHaveLength(3)
+  })
+
   it('preserves multiple Mermaid blocks independently when serializing', () => {
     const editor = {
       blocksToMarkdownLossy: vi.fn((blocks: unknown[]) => {
