@@ -15,6 +15,37 @@ describe('math markdown round-trip', () => {
     expect(preProcessMathMarkdown({ markdown })).toBe(markdown)
   })
 
+  it('does not treat monthly currency ranges as inline math', () => {
+    const markdown = [
+      '### 6. Stop new Pro/Business customers from quitting in months 1-2 (~$1.5k/mo now, ~$3k/mo by autumn)',
+      '',
+      'Monthly subscribers are worth ~$115 lifetime vs ~$223 for old Creator.',
+    ].join('\n')
+
+    expect(preProcessMathMarkdown({ markdown })).toBe(markdown)
+  })
+
+  it('keeps math placeholder payloads inert for Markdown parsing', () => {
+    const preprocessed = preProcessMathMarkdown({ markdown: 'Spacing math $x + y ~ z$ stays math.' })
+
+    expect(preprocessed).toContain('@@TOLARIA_MATH_INLINE:')
+    expect(preprocessed).not.toContain('~@@')
+  })
+
+  it('still treats compact mathematical expressions as inline math', () => {
+    const preprocessed = preProcessMathMarkdown({
+      markdown: 'Compute $2+2$, inspect $x_i$, simplify $2x$, and render $\\frac{a}{b}$.',
+    })
+
+    expect(preprocessed.match(/@@TOLARIA_MATH_INLINE:/g)).toHaveLength(4)
+  })
+
+  it('keeps finance suffix amounts literal even when they are compact', () => {
+    const markdown = 'Keep $2k$, $2M$, and $2%$ as finance prose.'
+
+    expect(preProcessMathMarkdown({ markdown })).toBe(markdown)
+  })
+
   it('injects inline math placeholders into BlockNote inline content', () => {
     const preprocessed = preProcessMathMarkdown({ markdown: 'Energy is $E=mc^2$ in prose.' })
     const blocks = [{
