@@ -1,6 +1,7 @@
+import { html } from '@codemirror/lang-html'
 import { markdown } from '@codemirror/lang-markdown'
 import { yamlFrontmatter } from '@codemirror/lang-yaml'
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { HighlightStyle, LanguageDescription, syntaxHighlighting } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 import type { Extension } from '@codemirror/state'
 
@@ -49,13 +50,22 @@ const markdownHighlightStyle = HighlightStyle.define([
   { tag: [tags.operator, tags.punctuation], color: SYNTAX_COLORS.operator },
 ])
 
+const markdownCodeLanguages = [
+  LanguageDescription.of({
+    name: 'html',
+    alias: ['htm'],
+    extensions: ['html', 'htm'],
+    support: html(),
+  }),
+]
+
 export function rawEditorSyntaxHighlighting(): Extension {
   return syntaxHighlighting(markdownHighlightStyle)
 }
 
 export function markdownLanguage(): Extension {
   return [
-    yamlFrontmatter({ content: markdown() }),
+    yamlFrontmatter({ content: markdown({ codeLanguages: markdownCodeLanguages }) }),
     rawEditorSyntaxHighlighting(),
   ]
 }

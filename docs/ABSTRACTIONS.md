@@ -700,7 +700,7 @@ Defined in `src/utils/durableMarkdownBlocks.ts`, `src/utils/editorDurableMarkdow
 Defined in `src/utils/durableMarkdownBlocks.ts`, `src/utils/editorDurableMarkdown.ts`, `src/utils/htmlBlockMarkdown.ts`, `src/utils/htmlBlockSandbox.ts`, `src/components/HtmlBlock.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/EditorTheme.css`:
 
 - Fenced `html` blocks become `htmlBlock` schema nodes before BlockNote sees the Markdown body. A portable `height="..."` fence attribute stores the block's vertical size; missing or invalid values fall back to the default height.
-- The `/html` slash command inserts an empty `htmlBlock` and opens source editing immediately, while normal save serialization writes the block back to fenced Markdown.
+- The `/html` slash command inserts an empty `htmlBlock`; source edits happen in raw CodeMirror mode through the block's raw-editor action, while normal save serialization writes the block back to fenced Markdown.
 - Rendered HTML is sanitized, then mounted through iframe `srcdoc` with a restrictive CSP and sandbox tokens that omit scripts, forms, same-origin, parent DOM access, Tauri IPC, and top navigation.
 - Block controls support source editing, source copy, raw-editor fallback, keyboard/pointer height resize, and height reset without storing session-only UI state outside the Markdown fence.
 - Sandboxed HTML blocks share the durable fenced-block pipeline with Mermaid and tldraw; scanner, token, block injection, and mixed serialization mechanics stay in `src/utils/durableMarkdownBlocks.ts`.
@@ -792,6 +792,7 @@ Wikilink resolution (`resolveEntry` in `src/utils/wikilink.ts`) uses multi-pass 
 Toggle via Cmd+K → "Raw Editor" or breadcrumb bar button. Uses CodeMirror 6 (`useCodeMirror` hook) to edit the raw markdown + frontmatter directly. Changes saved via the same `save_note_content` command.
 `useRawModeWithFlush` owns the rich/raw transition model: pending raw-exit content and raw-mode overrides move together as one content transition, while cursor/scroll restoration moves through one restore-transition ref consumed by `useEditorModePositionSync`. The raw editor should not carry independent pending-content or pending-position refs outside that handoff.
 While the user types, `useEditorSaveWithLinks` derives a transient `VaultEntry` patch from parseable frontmatter so the Inspector, relationship chips, and note-list-visible metadata stay in sync with the raw editor before the next vault reload. Temporarily invalid or half-typed frontmatter is ignored until it becomes parseable again, which avoids clobbering the last known good derived state.
+Raw CodeMirror keeps Markdown mode active for `.md` notes, uses the HTML language support for fenced `html` block contents, and handles `Tab` as a literal editor insertion instead of browser focus traversal.
 
 Current-note find/replace is intentionally backed by raw CodeMirror mode. `Cmd+F`, "Find in Note", and "Replace in Note" switch the active Markdown/text note to raw mode, show the compact find bar above CodeMirror, and operate on the current note only. Plain text matching is case-insensitive by default, `Aa` toggles case sensitivity, `.*` toggles JavaScript-regex matching, and regex replacement supports capture groups through JavaScript replacement syntax.
 
