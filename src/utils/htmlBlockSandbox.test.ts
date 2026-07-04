@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { htmlBlockIframeSrcDoc, sanitizeHtmlBlockMarkup } from './htmlBlockSandbox'
+import DOMPurify from 'dompurify'
+import { describe, expect, it, vi } from 'vitest'
+import { htmlBlockIframeSrcDoc, htmlBlockPreview, sanitizeHtmlBlockMarkup } from './htmlBlockSandbox'
 
 describe('HTML block sandbox', () => {
   it('removes script execution surfaces and keeps static interactive markup', () => {
@@ -43,5 +44,24 @@ describe('HTML block sandbox', () => {
     expect(srcDoc).toContain("script-src 'none'")
     expect(srcDoc).toContain("default-src 'none'")
     expect(srcDoc).toContain('<h1>Hello</h1>')
+  })
+
+  it('builds sanitized preview output with one DOMPurify pass', () => {
+    const sanitizeSpy = vi.spyOn(DOMPurify, 'sanitize')
+
+    try {
+      const preview = htmlBlockPreview([
+        '<script>window.parent.document.body.remove()</script>',
+        '<button onclick="window.parent.evil = true">Click</button>',
+      ].join(''))
+
+      expect(sanitizeSpy).toHaveBeenCalledTimes(1)
+      expect(preview.sanitizedHtml).toContain('<button>Click</button>')
+      expect(preview.srcDoc).toContain('<button>Click</button>')
+      expect(preview.srcDoc).not.toContain('<script')
+      expect(preview.srcDoc).not.toContain('onclick')
+    } finally {
+      sanitizeSpy.mockRestore()
+    }
   })
 })
