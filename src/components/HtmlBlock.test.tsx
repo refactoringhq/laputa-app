@@ -59,7 +59,7 @@ describe('HtmlBlock', () => {
       html: '<p>Preview me</p>',
     })
 
-    expect(screen.getByRole('group', { name: 'Sandboxed HTML block preview' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Sandboxed HTML block preview' })).toBeTruthy()
     expect(screen.getByRole('toolbar', { name: 'HTML block actions' })).toBeTruthy()
   })
 
