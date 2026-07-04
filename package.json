@@ -36,6 +36,7 @@
     "@blocknote/mantine": "^0.46.2",
     "@blocknote/react": "^0.46.2",
     "@codemirror/commands": "^6.10.2",
+    "@codemirror/lang-html": "^6.4.11",
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-markdown": "^6.5.0",
