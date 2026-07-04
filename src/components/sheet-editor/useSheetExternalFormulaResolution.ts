@@ -21,6 +21,7 @@ import {
   sheetExternalFormulaWorkerSignature,
   sheetHasExternalFrontmatterReferences,
   sheetHasExternalFormulaReferences,
+  sheetHasExternalLineReferences,
 } from '../../utils/sheetWorkbook'
 
 interface NativeExternalFormulaResolutionState {
@@ -34,6 +35,14 @@ interface UseSheetExternalFormulaResolutionOptions {
   entries: VaultEntry[]
   path: string
   sourceEntry: VaultEntry | null
+}
+
+interface JsExternalFormulaResolverOptions {
+  hasExternalFormulaReferences: boolean
+  hasExternalFrontmatterReferences: boolean
+  hasExternalLineReferences: boolean
+  resolution: NativeExternalFormulaResolutionState | null
+  signature: string
 }
 
 function retainResolvedDependencyContents(
@@ -125,9 +134,11 @@ function deferStateUpdate(update: () => void) {
 function canResolveNativeExternalFormulas(
   hasExternalFormulaReferences: boolean,
   hasExternalFrontmatterReferences: boolean,
+  hasExternalLineReferences: boolean,
 ) {
   return hasExternalFormulaReferences
     && !hasExternalFrontmatterReferences
+    && !hasExternalLineReferences
     && canUseNativeSheetFormulaWorker()
 }
 
@@ -163,14 +174,16 @@ function resolvedNativeInputsForBuild(
     : null
 }
 
-function shouldUseJsExternalFormulaResolver(
-  hasExternalFormulaReferences: boolean,
-  hasExternalFrontmatterReferences: boolean,
-  resolution: NativeExternalFormulaResolutionState | null,
-  signature: string,
-) {
+function shouldUseJsExternalFormulaResolver({
+  hasExternalFormulaReferences,
+  hasExternalFrontmatterReferences,
+  hasExternalLineReferences,
+  resolution,
+  signature,
+}: JsExternalFormulaResolverOptions) {
   return !hasExternalFormulaReferences
     || hasExternalFrontmatterReferences
+    || hasExternalLineReferences
     || !canUseNativeSheetFormulaWorker()
     || (resolution?.signature === signature && resolution.status === 'unavailable')
 }
@@ -229,6 +242,7 @@ function useNativeExternalFormulaResolution({
   content,
   dependencies,
   hasExternalFrontmatterReferences,
+  hasExternalLineReferences,
   entries,
   hasExternalFormulaReferences,
   nativeSignature,
@@ -238,13 +252,18 @@ function useNativeExternalFormulaResolution({
   dependencies: SheetExternalFormulaWorkerDependency[]
   hasExternalFrontmatterReferences: boolean
   hasExternalFormulaReferences: boolean
+  hasExternalLineReferences: boolean
   nativeSignature: string
 }) {
   const [resolution, setResolution] = useState<NativeExternalFormulaResolutionState | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    if (!canResolveNativeExternalFormulas(hasExternalFormulaReferences, hasExternalFrontmatterReferences)) {
+    if (!canResolveNativeExternalFormulas(
+      hasExternalFormulaReferences,
+      hasExternalFrontmatterReferences,
+      hasExternalLineReferences,
+    )) {
       deferStateUpdate(() => {
         if (!cancelled) setResolution((current) => (current?.signature === nativeSignature ? null : current))
       })
@@ -272,7 +291,17 @@ function useNativeExternalFormulaResolution({
     return () => {
       cancelled = true
     }
-  }, [content, dependencies, entries, hasExternalFormulaReferences, hasExternalFrontmatterReferences, nativeSignature, path, sourceEntry])
+  }, [
+    content,
+    dependencies,
+    entries,
+    hasExternalFormulaReferences,
+    hasExternalFrontmatterReferences,
+    hasExternalLineReferences,
+    nativeSignature,
+    path,
+    sourceEntry,
+  ])
 
   return resolution
 }
@@ -315,9 +344,14 @@ export function useSheetExternalFormulaResolution(options: UseSheetExternalFormu
     sheetHasExternalFrontmatterReferences(content)
     || dependencies.some((dependency) => sheetHasExternalFrontmatterReferences(dependency.content))
   ), [content, dependencies])
+  const hasExternalLineReferences = useMemo(() => (
+    sheetHasExternalLineReferences(content)
+    || dependencies.some((dependency) => sheetHasExternalLineReferences(dependency.content))
+  ), [content, dependencies])
   const nativeWorkerEnabled = canResolveNativeExternalFormulas(
     hasExternalFormulaReferences,
     hasExternalFrontmatterReferences,
+    hasExternalLineReferences,
   )
   const nativeSignature = useMemo(() => sheetExternalFormulaWorkerSignature({
     content,
@@ -329,6 +363,7 @@ export function useSheetExternalFormulaResolution(options: UseSheetExternalFormu
     dependencies,
     hasExternalFrontmatterReferences,
     hasExternalFormulaReferences,
+    hasExternalLineReferences,
     nativeSignature,
   })
   const externalFormulaContext = useMemo(() => sheetExternalFormulaContext({
@@ -338,12 +373,13 @@ export function useSheetExternalFormulaResolution(options: UseSheetExternalFormu
     sourceEntry,
   }), [contentsByPath, entries, path, sourceEntry])
   const nativeExternalFormulaInputsForBuild = resolvedNativeInputsForBuild(nativeResolution, nativeSignature)
-  const shouldUseJsResolver = shouldUseJsExternalFormulaResolver(
+  const shouldUseJsResolver = shouldUseJsExternalFormulaResolver({
     hasExternalFormulaReferences,
     hasExternalFrontmatterReferences,
-    nativeResolution,
-    nativeSignature,
-  )
+    hasExternalLineReferences,
+    resolution: nativeResolution,
+    signature: nativeSignature,
+  })
   const shouldWaitForInitialExternalFormulaResolution = useCallback((workbookAlreadyBuilt: boolean) => (
     shouldWaitForInitialSheetExternalFormulaResolution({
       dependencyCount,
