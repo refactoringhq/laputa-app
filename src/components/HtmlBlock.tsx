@@ -5,7 +5,10 @@ import {
   Copy,
 } from '@phosphor-icons/react'
 import {
+  useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent, SyntheticEvent } from 'react'
@@ -150,7 +153,13 @@ function heightFromKeyboard(currentHeight: string, key: string): string | null {
   return null
 }
 
+function restoreHtmlPreviewFocus(editor: HtmlBlockEditor, frame: HTMLIFrameElement): void {
+  frame.blur()
+  editor.focus?.()
+}
+
 export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
+  const frameRef = useRef<HTMLIFrameElement | null>(null)
   const currentHtml = block.props.html
   const currentHeight = normalizeHtmlBlockHeight(block.props.height)
   const preview = useMemo(() => htmlBlockPreview(currentHtml), [currentHtml])
@@ -158,6 +167,19 @@ export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
   const [resizingHeight, setResizingHeight] = useState<string | null>(null)
   const displayHeight = resizingHeight ?? currentHeight
   const blockedMarkup = currentHtml.trim().length > 0 && sanitizedHtml.trim().length === 0
+  const releasePreviewFocus = useCallback((frame = frameRef.current) => {
+    if (!frame) return
+    restoreHtmlPreviewFocus(editor, frame)
+  }, [editor])
+
+  useEffect(() => {
+    const releaseFocusedFrame = () => {
+      if (document.activeElement === frameRef.current) releasePreviewFocus()
+    }
+
+    window.addEventListener('blur', releaseFocusedFrame)
+    return () => window.removeEventListener('blur', releaseFocusedFrame)
+  }, [releasePreviewFocus])
 
   const updateHeight = (height: string, source: HeightChangeSource) => {
     const updated = updateHtmlBlockPropsSafely(editor, block.id, props => ({
@@ -216,6 +238,15 @@ export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
     event.preventDefault()
     event.stopPropagation()
     updateHeight(nextHeight, 'keyboard')
+  }
+
+  const handlePreviewFocus = (event: SyntheticEvent<HTMLIFrameElement>) => {
+    event.stopPropagation()
+    releasePreviewFocus(event.currentTarget)
+  }
+
+  const handlePreviewLoad = (event: SyntheticEvent<HTMLIFrameElement>) => {
+    if (document.activeElement === event.currentTarget) releasePreviewFocus(event.currentTarget)
   }
 
   return (
@@ -282,9 +313,13 @@ export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
       ) : (
         <iframe
           className="html-block__frame"
+          onFocus={handlePreviewFocus}
+          onLoad={handlePreviewLoad}
           referrerPolicy="no-referrer"
+          ref={frameRef}
           sandbox="allow-popups allow-popups-to-escape-sandbox"
           srcDoc={srcDoc}
+          tabIndex={-1}
           title={t('editor.htmlBlock.previewTitle')}
         />
       )}
