@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   extractSheetExternalCellReferences,
   extractSheetExternalFrontmatterReferences,
+  extractSheetExternalLineReferences,
   extractSheetExternalReferenceTargets,
   hasSheetExternalFrontmatterReferences,
   isExternalFormulaInput,
@@ -12,6 +13,7 @@ describe('sheetExternalReferences', () => {
   it('detects formula inputs with sheet wikilink cell references', () => {
     expect(isExternalFormulaInput('=[[revenue]].B2')).toBe(true)
     expect(isExternalFormulaInput('=[[device]].power.watts')).toBe(true)
+    expect(isExternalFormulaInput('=[[brief]].2')).toBe(true)
     expect(isExternalFormulaInput(' [[revenue]].B2')).toBe(false)
     expect(isExternalFormulaInput('[[revenue]].B2')).toBe(false)
   })
@@ -30,10 +32,18 @@ describe('sheetExternalReferences', () => {
     ])
   })
 
+  it('extracts canonical targets and raw body line references', () => {
+    expect(extractSheetExternalLineReferences('=[[brief|Brief]].1 & [[notes/daily]].12')).toEqual([
+      { line: 1, target: 'brief' },
+      { line: 12, target: 'notes/daily' },
+    ])
+  })
+
   it('keeps cell references out of frontmatter property extraction', () => {
-    expect(hasSheetExternalFrontmatterReferences({ value: '=[[revenue]].B2+[[revenue]].$B$2' })).toBe(false)
-    expect(extractSheetExternalReferenceTargets('=[[device]].power.watts+[[revenue]].B2')).toEqual([
+    expect(hasSheetExternalFrontmatterReferences({ value: '=[[revenue]].B2+[[revenue]].$B$2+[[brief]].1' })).toBe(false)
+    expect(extractSheetExternalReferenceTargets('=[[device]].power.watts+[[revenue]].B2+[[brief]].1')).toEqual([
       'revenue',
+      'brief',
       'device',
     ])
   })
@@ -44,8 +54,8 @@ describe('sheetExternalReferences', () => {
   })
 
   it('leaves frontmatter property references unchanged when shifting formulas', () => {
-    expect(shiftExternalFormulaReferences('=[[device]].power.watts+[[revenue]].B2', 2, 1))
-      .toBe('=[[device]].power.watts+[[revenue]].C4')
+    expect(shiftExternalFormulaReferences('=[[device]].power.watts+[[brief]].2+[[revenue]].B2', 2, 1))
+      .toBe('=[[device]].power.watts+[[brief]].2+[[revenue]].C4')
   })
 
   it('leaves references unchanged when a relative shift would leave the sheet bounds', () => {

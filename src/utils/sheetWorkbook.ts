@@ -30,9 +30,12 @@ import {
   isExternalFormulaInput,
   SHEET_EXTERNAL_CELL_REFERENCE_PATTERN,
   SHEET_EXTERNAL_FRONTMATTER_REFERENCE_PATTERN,
+  SHEET_EXTERNAL_LINE_REFERENCE_PATTERN,
   parseSheetExternalFrontmatterReference,
   type SheetExternalCellReference,
   type SheetExternalFrontmatterReference,
+  type SheetExternalLineReference,
+  hasSheetExternalLineReferences as bodyHasExternalLineReferences,
 } from './sheetExternalReferences'
 import { resolveSheetFrontmatterProperty } from './sheetFrontmatterProperties'
 import type { SheetExternalFormulaInput, SheetExternalFormulaWorkerDependency } from './sheetExternalFormulaWorker'
@@ -161,6 +164,10 @@ export function sheetHasExternalFormulaReferences(content: string): boolean {
 
 export function sheetHasExternalFrontmatterReferences(content: string): boolean {
   return bodyHasExternalFrontmatterReferences({ value: splitSheetDocument(content).body })
+}
+
+export function sheetHasExternalLineReferences(content: string): boolean {
+  return bodyHasExternalLineReferences({ value: splitSheetDocument(content).body })
 }
 
 function hashSheetWorkerString({ seed, value }: { seed: number; value: string }): number {
@@ -384,6 +391,10 @@ function frontmatterFormulaLiteral(value: boolean | number | string): string {
   return textFormulaLiteral({ value })
 }
 
+function lineFormulaLiteral(value: string): string {
+  return normalizedNumericFormulaLiteral({ value }) ?? textFormulaLiteral({ value })
+}
+
 function externalCellFormulaLiteral({
   column,
   model,
@@ -532,6 +543,32 @@ function resolveExternalFrontmatterReference(
   return value === null ? 'NA()' : frontmatterFormulaLiteral(value)
 }
 
+function bodyLine(content: string, line: number): string | null {
+  const lines = splitSheetDocument(content).body.split(/\r\n|\r|\n/)
+  return lines[line - 1] ?? null
+}
+
+function resolveExternalLineReference(
+  reference: SheetExternalLineReference,
+  context: SheetExternalFormulaContext,
+): string {
+  const entry = resolveSheetEntry(
+    context.entries,
+    reference.target,
+    context.sourceEntry,
+    context.entryResolutionCache,
+  )
+  if (!entry) return 'NA()'
+
+  const content = notePathsMatch(entry.path, context.currentPath)
+    ? context.contentsByPath.get(context.currentPath)
+    : context.contentsByPath.get(entry.path)
+  if (content === undefined) return 'NA()'
+
+  const line = bodyLine(content, reference.line)
+  return line === null ? 'NA()' : lineFormulaLiteral(line)
+}
+
 function localSheetCellReference(
   columnAbsolute: string,
   rawColumn: string,
@@ -606,6 +643,13 @@ export function resolveExternalFormulaInput(
       unresolved = unresolved || !resolved
       return replacement
     })
+
+    evaluated = evaluated.replace(SHEET_EXTERNAL_LINE_REFERENCE_PATTERN, (_match, rawTarget, rawLine) => (
+      resolveExternalLineReference({
+        line: Number.parseInt(rawLine, 10),
+        target: wikilinkTarget(`[[${rawTarget}]]`),
+      }, cacheRun.context)
+    ))
 
     evaluated = evaluated.replace(SHEET_EXTERNAL_FRONTMATTER_REFERENCE_PATTERN, (match, rawTarget, propertyPath) => {
       const reference = parseSheetExternalFrontmatterReference({ propertyPath, rawTarget })

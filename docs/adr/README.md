@@ -212,3 +212,5 @@ proposed → active → superseded
 | [0152](0152-wsl2-git-provider.md) | WSL2 Git provider | active |
 | [0153](0153-conservative-markdown-delimiter-parsing.md) | Conservative Markdown delimiter parsing | active |
 | [0154](0154-sandboxed-fenced-html-blocks.md) | Sandboxed fenced HTML blocks | active |
+| [0155](0155-html-block-source-edits-use-raw-editor.md) | HTML block source edits use the raw editor | active |
+| [0156](0156-vault-expression-html-blocks-and-line-references.md) | Vault expressions in sandboxed HTML blocks and line references | active |

@@ -32,6 +32,23 @@ function frontmatterFormulaContext(deviceContent: string) {
   })
 }
 
+function expectSingleLoadedDependencyPath(
+  content: string,
+  dependencyEntry: VaultEntry,
+  dependencyContent: string,
+) {
+  const sourceEntry = entry('/vault/loadout.md', 'Loadout')
+  const dependencies = resolveExternalSheetDependencyEntries({
+    content,
+    contentsByPath: new Map([[dependencyEntry.path, dependencyContent]]),
+    currentPath: sourceEntry.path,
+    entries: [sourceEntry, dependencyEntry],
+    sourceEntry,
+  })
+
+  expect(dependencies.map((dependency) => dependency.path)).toEqual([dependencyEntry.path])
+}
+
 describe('sheetWorkbook', () => {
   it('detects external formula references in the sheet body only', () => {
     expect(sheetHasExternalFormulaReferences('---\n_sheet: [[not-a-body-reference]].B2\n---\nMetric,Value'))
@@ -90,6 +107,29 @@ describe('sheetWorkbook', () => {
     expect(resolveExternalFormulaInput('=[[device]].tags', context)?.evaluated).toBe('=NA()')
   })
 
+  it('resolves raw body line references without treating commas as cell separators', () => {
+    const sourceEntry = entry('/vault/loadout.md', 'Loadout')
+    const briefEntry = entry('/vault/brief.md', 'Brief')
+    const context = sheetExternalFormulaContext({
+      contentsByPath: new Map([
+        [briefEntry.path, [
+          '---',
+          'status: Draft',
+          '---',
+          '# Brief',
+          'Budget: 1200, expected',
+          '42',
+        ].join('\n')],
+      ]),
+      currentPath: sourceEntry.path,
+      entries: [sourceEntry, briefEntry],
+      sourceEntry,
+    })
+
+    expect(resolveExternalFormulaInput('=[[brief]].2', context)?.evaluated).toBe('="Budget: 1200, expected"')
+    expect(resolveExternalFormulaInput('=[[brief]].3+8', context)?.evaluated).toBe('=42+8')
+  })
+
   it('treats ambiguous frontmatter note references as spreadsheet errors', () => {
     const sourceEntry = entry('/vault/loadout.md', 'Loadout')
     const firstDevice = entry('/vault/a/device.md', 'Device')
@@ -109,18 +149,20 @@ describe('sheetWorkbook', () => {
   })
 
   it('loads dependencies for frontmatter references', () => {
-    const sourceEntry = entry('/vault/loadout.md', 'Loadout')
     const deviceEntry = entry('/vault/device.md', 'Device')
-    const dependencies = resolveExternalSheetDependencyEntries({
-      content: '---\ntype: Sheet\n---\nMetric,Value\nWatts,=[[device]].power.watts',
-      contentsByPath: new Map([
-        [deviceEntry.path, '---\npower:\n  watts: 120\n---\n# Device'],
-      ]),
-      currentPath: sourceEntry.path,
-      entries: [sourceEntry, deviceEntry],
-      sourceEntry,
-    })
+    expectSingleLoadedDependencyPath(
+      '---\ntype: Sheet\n---\nMetric,Value\nWatts,=[[device]].power.watts',
+      deviceEntry,
+      '---\npower:\n  watts: 120\n---\n# Device',
+    )
+  })
 
-    expect(dependencies.map((dependency) => dependency.path)).toEqual([deviceEntry.path])
+  it('loads dependencies for raw body line references', () => {
+    const briefEntry = entry('/vault/brief.md', 'Brief')
+    expectSingleLoadedDependencyPath(
+      '---\ntype: Sheet\n---\nMetric,Value\nSummary,=[[brief]].2',
+      briefEntry,
+      '# Brief\nBudget: 1200, expected',
+    )
   })
 })

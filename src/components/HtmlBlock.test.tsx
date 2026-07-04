@@ -3,12 +3,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../hooks/appCommandDispatcher'
 import { HTML_BLOCK_DEFAULT_HEIGHT, HTML_BLOCK_TYPE } from '../utils/htmlBlockMarkdown'
 import { HtmlBlock, type HtmlBlockEditor, type HtmlBlockProps } from './HtmlBlock'
+import { VaultExpressionProvider } from './VaultExpressionContext'
 
 vi.mock('../utils/clipboardText', () => ({
   writeClipboardText: vi.fn().mockResolvedValue(undefined),
 }))
 
-function renderHtmlBlock(initialProps: HtmlBlockProps) {
+function renderHtmlBlock(initialProps: HtmlBlockProps, currentContent = '') {
   const liveBlock = {
     id: 'html-block',
     props: { ...initialProps },
@@ -25,7 +26,11 @@ function renderHtmlBlock(initialProps: HtmlBlockProps) {
     }),
   }
 
-  render(<HtmlBlock block={liveBlock} editor={editor} />)
+  render(
+    <VaultExpressionProvider currentContent={currentContent} entries={[]} locale="en-US" sourceEntry={null}>
+      <HtmlBlock block={liveBlock} editor={editor} />
+    </VaultExpressionProvider>,
+  )
   return { editor, liveBlock }
 }
 
@@ -51,6 +56,25 @@ describe('HtmlBlock', () => {
     expect(frame.srcdoc).not.toContain('<script')
     expect(frame.srcdoc).not.toContain('onclick')
     expect(frame.srcdoc).toContain('<button>Click</button>')
+  })
+
+  it('resolves current-note property expressions before sandboxing the preview', () => {
+    renderHtmlBlock({
+      height: HTML_BLOCK_DEFAULT_HEIGHT,
+      html: '<p>{{upper(status)}}</p><p>{{summary}}</p>',
+    }, [
+      '---',
+      'status: active',
+      'summary: <strong>unsafe</strong>',
+      '---',
+      '# Note',
+    ].join('\n'))
+
+    const frame = screen.getByTitle('Sandboxed HTML block preview') as HTMLIFrameElement
+
+    expect(frame.srcdoc).toContain('<p>ACTIVE</p>')
+    expect(frame.srcdoc).toContain('&lt;strong&gt;unsafe&lt;/strong&gt;')
+    expect(frame.srcdoc).not.toContain('<strong>unsafe</strong>')
   })
 
   it('keeps the iframe preview out of keyboard focus ownership', () => {
