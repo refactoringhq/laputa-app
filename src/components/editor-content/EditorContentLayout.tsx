@@ -415,6 +415,7 @@ function EditorCanvas({
     >
       <div className="editor-content-wrapper" data-note-pdf-export-root="true">
         <SingleEditorView
+          currentContent={activeTab?.content ?? ''}
           editor={editor}
           entries={entries}
           onNavigateWikilink={onNavigateWikilink}
