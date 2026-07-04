@@ -93,4 +93,19 @@ describe('blockNoteRenderRecovery', () => {
       '\n    in MermaidBlock\n    in BlockNoteRenderRecoveryBoundary',
     )).toBe(true)
   })
+
+  it('recognizes recovered BlockNote maximum update depth render errors', () => {
+    const error = new Error('Maximum update depth exceeded. This can happen when a component repeatedly calls setState.')
+
+    expect(blockNoteRenderRecoveryReason(error)).toBe('react_update_depth_exceeded')
+    expect(isRecoverableBlockNoteRenderError(error)).toBe(true)
+    expect(isRecoveredBlockNoteRenderError(error, '')).toBe(false)
+    expect(isRecoveredBlockNoteRenderError(
+      error,
+      '\n    in BlockNoteView\n    in BlockNoteRenderRecoveryBoundary',
+    )).toBe(true)
+    expect(blockNoteRenderRecoveryReason(new Error('Minified React error #185; visit https://react.dev/errors/185'))).toBe(
+      'react_update_depth_exceeded',
+    )
+  })
 })
