@@ -53,6 +53,16 @@ describe('HtmlBlock', () => {
     expect(frame.srcdoc).toContain('<button>Click</button>')
   })
 
+  it('exposes the preview container and controls with non-static roles', () => {
+    renderHtmlBlock({
+      height: HTML_BLOCK_DEFAULT_HEIGHT,
+      html: '<p>Preview me</p>',
+    })
+
+    expect(screen.getByRole('group', { name: 'Sandboxed HTML block preview' })).toBeTruthy()
+    expect(screen.getByRole('toolbar', { name: 'HTML block actions' })).toBeTruthy()
+  })
+
   it('persists keyboard height changes through the editor block update path', () => {
     const { editor, liveBlock } = renderHtmlBlock({
       height: HTML_BLOCK_DEFAULT_HEIGHT,

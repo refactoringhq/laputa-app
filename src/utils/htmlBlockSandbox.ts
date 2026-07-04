@@ -27,6 +27,11 @@ const HTML_BLOCK_SANITIZE_CONFIG = {
   FORBID_TAGS: ['base', 'embed', 'iframe', 'link', 'meta', 'object', 'script'],
 }
 
+interface HtmlBlockPreview {
+  sanitizedHtml: string
+  srcDoc: string
+}
+
 function stripCssRemoteLoads(css: string): string {
   return css
     .replace(/@import[^;]+;?/giu, '')
@@ -78,7 +83,7 @@ export function sanitizeHtmlBlockMarkup(markup: string): string {
   return sanitizeParsedHtml(parsed)
 }
 
-export function htmlBlockIframeSrcDoc(markup: string): string {
+function htmlBlockIframeSrcDocFromSanitizedHtml(sanitizedHtml: string): string {
   return [
     '<!doctype html>',
     '<html>',
@@ -94,8 +99,20 @@ export function htmlBlockIframeSrcDoc(markup: string): string {
     '</style>',
     '</head>',
     '<body>',
-    sanitizeHtmlBlockMarkup(markup),
+    sanitizedHtml,
     '</body>',
     '</html>',
   ].join('')
+}
+
+export function htmlBlockPreview(markup: string): HtmlBlockPreview {
+  const sanitizedHtml = sanitizeHtmlBlockMarkup(markup)
+  return {
+    sanitizedHtml,
+    srcDoc: htmlBlockIframeSrcDocFromSanitizedHtml(sanitizedHtml),
+  }
+}
+
+export function htmlBlockIframeSrcDoc(markup: string): string {
+  return htmlBlockPreview(markup).srcDoc
 }
