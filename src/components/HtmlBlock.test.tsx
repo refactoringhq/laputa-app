@@ -53,6 +53,23 @@ describe('HtmlBlock', () => {
     expect(frame.srcdoc).toContain('<button>Click</button>')
   })
 
+  it('keeps the iframe preview out of keyboard focus ownership', () => {
+    const { editor } = renderHtmlBlock({
+      height: HTML_BLOCK_DEFAULT_HEIGHT,
+      html: '<button>Focusable preview content</button>',
+    })
+
+    const frame = screen.getByTitle('Sandboxed HTML block preview') as HTMLIFrameElement
+
+    expect(frame.tabIndex).toBe(-1)
+
+    frame.focus()
+    fireEvent.focus(frame)
+
+    expect(editor.focus).toHaveBeenCalled()
+    expect(document.activeElement).not.toBe(frame)
+  })
+
   it('exposes the preview container and controls with non-static roles', () => {
     renderHtmlBlock({
       height: HTML_BLOCK_DEFAULT_HEIGHT,

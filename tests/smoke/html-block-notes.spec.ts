@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from '../helpers/fixtureVault'
+import {
+  createFixtureVaultCopy,
+  openFixtureVault,
+  removeFixtureVaultCopy,
+} from '../helpers/fixtureVault'
 import { APP_COMMAND_IDS } from '../../src/hooks/appCommandCatalog'
 import { triggerShortcutCommand } from './testBridge'
 
@@ -47,6 +51,16 @@ async function getRawEditorContent(page: Page): Promise<string> {
     const el = document.querySelector('.cm-content')
     const view = el ? (el as CodeMirrorHost).cmTile?.view : null
     return view?.state.doc.toString() ?? el?.textContent ?? ''
+  })
+}
+
+async function getActiveFocusScope(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const active = document.activeElement
+    if (!(active instanceof HTMLElement)) return 'none'
+    if (active.classList.contains('html-block__frame')) return 'iframe'
+    if (active.closest('.bn-editor')) return 'editor'
+    return active.tagName.toLowerCase()
   })
 }
 
@@ -125,6 +139,18 @@ test('slash command inserts a sandboxed HTML block whose source is edited in raw
   await expect(frame).not.toHaveAttribute('sandbox', /allow-scripts/)
   await expect(frame).not.toHaveAttribute('sandbox', /allow-same-origin/)
   await expect(frame).toHaveAttribute('srcdoc', /<button>Static button<\/button>/)
+
+  const openPropertiesButton = page.getByRole('button', { name: 'Open the properties panel' })
+  await expect(openPropertiesButton).toBeVisible({ timeout: 5_000 })
+
+  await frame.click()
+  await expect.poll(() => getActiveFocusScope(page)).toBe('editor')
+
+  await page.keyboard.press('Escape')
+  await expect.poll(() => getActiveFocusScope(page)).toBe('editor')
+
+  await triggerShortcutCommand(page, APP_COMMAND_IDS.viewToggleProperties)
+  await expect(openPropertiesButton).toHaveCount(0)
 
   await openRawMode(page)
 
