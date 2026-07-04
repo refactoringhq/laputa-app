@@ -685,6 +685,33 @@ describe('useEditorTabSwap raw mode sync', () => {
     )
   })
 
+  it('flushes pending rich-text edits before entering raw mode', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const onContentChange = vi.fn()
+    const { docRef, mockEditor, rerender, result } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+      onContentChange,
+    })
+
+    docRef.current = [makeTextParagraphBlock('Typed draft before raw mode')]
+    mockEditor.blocksToMarkdownLossy.mockReturnValue('Typed draft before raw mode\n')
+
+    act(() => {
+      result.current.handleEditorChange()
+    })
+    expect(onContentChange).not.toHaveBeenCalled()
+
+    act(() => {
+      rerender({ tabs: [tabA], activeTabPath: 'a.md', rawMode: true })
+    })
+    await act(async () => { await Promise.resolve() })
+
+    expect(onContentChange).toHaveBeenCalledWith(
+      'a.md',
+      '---\ntitle: Note A\n---\nTyped draft before raw mode\n',
+    )
+  })
+
   it('flushes unsaved file attachment blocks as portable links before switching notes', async () => {
     const tabA = makeTab('a.md', 'Note A')
     const tabB = makeTab('b.md', 'Note B')
