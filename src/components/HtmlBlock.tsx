@@ -276,14 +276,13 @@ export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
   }
 
   return (
-    <div
+    <section
       className="html-block"
       contentEditable={false}
       data-html-block
       aria-label={t('editor.htmlBlock.previewTitle')}
       onMouseDown={stopHtmlBlockEvent}
       onPointerDown={stopHtmlBlockEvent}
-      role="group"
       style={{ height: `${displayHeight}px` }}
       suppressContentEditableWarning
     >
@@ -375,6 +374,6 @@ export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
       >
         <ArrowsOutLineVertical aria-hidden="true" />
       </Button>
-    </div>
+    </section>
   )
 }
