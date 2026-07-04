@@ -702,7 +702,8 @@ Defined in `src/utils/durableMarkdownBlocks.ts`, `src/utils/editorDurableMarkdow
 - Fenced `html` blocks become `htmlBlock` schema nodes before BlockNote sees the Markdown body. A portable `height="..."` fence attribute stores the block's vertical size; missing or invalid values fall back to the default height.
 - The `/html` slash command inserts an empty `htmlBlock`; source edits happen in raw CodeMirror mode through the block's raw-editor action, while normal save serialization writes the block back to fenced Markdown.
 - Rendered HTML is sanitized, then mounted through iframe `srcdoc` with a restrictive CSP and sandbox tokens that omit scripts, forms, same-origin, parent DOM access, Tauri IPC, and top navigation.
-- Block controls support source editing, source copy, raw-editor fallback, keyboard/pointer height resize, and height reset without storing session-only UI state outside the Markdown fence.
+- The iframe is a pointer preview, not a nested keyboard scope: it stays out of the tab order and releases accidental iframe focus back to the rich editor so Escape and Tolaria shortcuts remain app-owned. The toolbar and resize controls remain normal focusable controls.
+- Block controls support raw-editor source access, source copy, raw-editor fallback, keyboard/pointer height resize, and height reset without storing session-only UI state outside the Markdown fence.
 - Sandboxed HTML blocks share the durable fenced-block pipeline with Mermaid and tldraw; scanner, token, block injection, and mixed serialization mechanics stay in `src/utils/durableMarkdownBlocks.ts`.
 
 ### Formatting Surface Policy
