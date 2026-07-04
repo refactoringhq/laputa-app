@@ -139,6 +139,30 @@ describe('useCodeMirror', () => {
     expect(onEscape).toHaveBeenCalledOnce()
   })
 
+  it('inserts a literal tab instead of letting Tab move focus away', () => {
+    const ref = { current: container }
+    const onDocChange = vi.fn()
+    const { result } = renderHook(() =>
+      useCodeMirror(ref, 'hello', { ...noopCallbacks, onDocChange }),
+    )
+    const view = result.current.current!
+
+    act(() => {
+      view.dispatch({ selection: { anchor: view.state.doc.length } })
+      view.focus()
+    })
+
+    const handled = !view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Tab',
+    }))
+
+    expect(handled).toBe(true)
+    expect(view.state.doc.toString()).toBe('hello\t')
+    expect(onDocChange).toHaveBeenCalledWith('hello\t')
+  })
+
   it('does not sync when content matches current editor state', () => {
     const ref = { current: container }
     const { result, rerender } = renderHook(
