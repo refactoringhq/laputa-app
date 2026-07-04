@@ -23,7 +23,7 @@ import {
   HTML_BLOCK_TYPE,
   normalizeHtmlBlockHeight,
 } from '../utils/htmlBlockMarkdown'
-import { htmlBlockIframeSrcDoc, sanitizeHtmlBlockMarkup } from '../utils/htmlBlockSandbox'
+import { htmlBlockPreview } from '../utils/htmlBlockSandbox'
 import { dispatchRichEditorExternalChange } from './editorExternalChangeEvents'
 import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
@@ -163,8 +163,8 @@ function isCommitHtmlEditShortcut(event: KeyboardEvent<HTMLTextAreaElement>): bo
 export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
   const currentHtml = block.props.html
   const currentHeight = normalizeHtmlBlockHeight(block.props.height)
-  const sanitizedHtml = useMemo(() => sanitizeHtmlBlockMarkup(currentHtml), [currentHtml])
-  const srcDoc = useMemo(() => htmlBlockIframeSrcDoc(currentHtml), [currentHtml])
+  const preview = useMemo(() => htmlBlockPreview(currentHtml), [currentHtml])
+  const { sanitizedHtml, srcDoc } = preview
   const startsInSourceMode = currentHtml.trim().length === 0
   const [draftHtml, setDraftHtml] = useState(currentHtml)
   const [editing, setEditing] = useState(startsInSourceMode)
@@ -280,14 +280,14 @@ export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
       className="html-block"
       contentEditable={false}
       data-html-block
-      onClick={stopHtmlBlockEvent}
-      onDoubleClick={stopHtmlBlockEvent}
+      aria-label={t('editor.htmlBlock.previewTitle')}
       onMouseDown={stopHtmlBlockEvent}
       onPointerDown={stopHtmlBlockEvent}
+      role="group"
       style={{ height: `${displayHeight}px` }}
       suppressContentEditableWarning
     >
-      <div className="html-block__toolbar" aria-label={t('editor.htmlBlock.toolbar')}>
+      <div className="html-block__toolbar" aria-label={t('editor.htmlBlock.toolbar')} role="toolbar">
         <Button
           aria-label={editing ? t('editor.htmlBlock.doneEditing') : t('editor.htmlBlock.editSource')}
           onClick={editing ? commitDraft : startEditing}
