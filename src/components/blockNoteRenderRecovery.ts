@@ -5,6 +5,7 @@ import {
 
 const BLOCKNOTE_RECOVERY_BOUNDARY_NAME = 'BlockNoteRenderRecoveryBoundary'
 const RECOVERED_BLOCKNOTE_RENDER_ERROR_MARK = '__tolariaRecoveredBlockNoteRenderError'
+const BLOCKNOTE_RENDER_UPDATE_DEPTH_REASON: BlockNoteRenderRecoveryReason = 'react_update_depth_exceeded'
 export type { BlockNoteRenderRecoveryReason } from './richEditorRecoveryClassifier'
 
 type MarkedRecoveredBlockNoteRenderError = Error & {
@@ -28,6 +29,10 @@ export function markRecoveredBlockNoteRenderError(error: unknown): void {
   if (!isRecoverableBlockNoteRenderError(error)) return
   const markedError = error as MarkedRecoveredBlockNoteRenderError
   Reflect.set(markedError, RECOVERED_BLOCKNOTE_RENDER_ERROR_MARK, true)
+}
+
+export function isBlockNoteRenderUpdateDepthError(error: unknown): boolean {
+  return blockNoteRenderRecoveryReason(error) === BLOCKNOTE_RENDER_UPDATE_DEPTH_REASON
 }
 
 export function isRecoveredBlockNoteRenderError(
