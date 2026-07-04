@@ -25,6 +25,7 @@ import {
 import { htmlBlockPreview } from '../utils/htmlBlockSandbox'
 import { dispatchRichEditorExternalChange } from './editorExternalChangeEvents'
 import { Button } from './ui/button'
+import { useResolvedVaultExpressionTemplate } from './VaultExpressionContext'
 
 export interface HtmlBlockProps {
   height: string
@@ -161,8 +162,9 @@ function restoreHtmlPreviewFocus(editor: HtmlBlockEditor, frame: HTMLIFrameEleme
 export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
   const frameRef = useRef<HTMLIFrameElement | null>(null)
   const currentHtml = block.props.html
+  const resolvedHtml = useResolvedVaultExpressionTemplate(currentHtml)
   const currentHeight = normalizeHtmlBlockHeight(block.props.height)
-  const preview = useMemo(() => htmlBlockPreview(currentHtml), [currentHtml])
+  const preview = useMemo(() => htmlBlockPreview(resolvedHtml.html), [resolvedHtml.html])
   const { sanitizedHtml, srcDoc } = preview
   const [resizingHeight, setResizingHeight] = useState<string | null>(null)
   const displayHeight = resizingHeight ?? currentHeight

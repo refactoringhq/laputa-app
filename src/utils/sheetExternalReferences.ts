@@ -9,6 +9,7 @@ const MAX_SHEET_ROWS = 1048576
 const MAX_SHEET_COLUMNS = 16384
 
 export const SHEET_EXTERNAL_CELL_REFERENCE_PATTERN = /\[\[([^\]\n]+?)\]\]\.(\$?)([A-Za-z]+)(\$?)([1-9]\d*)/g
+export const SHEET_EXTERNAL_LINE_REFERENCE_PATTERN = /\[\[([^\]\n]+?)\]\]\.([1-9]\d*)/g
 export const SHEET_EXTERNAL_FRONTMATTER_REFERENCE_PATTERN = /\[\[([^\]\n]+?)\]\]\.([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*)/g
 
 type SheetFormulaText = string
@@ -23,6 +24,11 @@ export interface SheetExternalCellReference {
 export interface SheetExternalFrontmatterReference {
   path: string[]
   propertyPath: string
+  target: string
+}
+
+export interface SheetExternalLineReference {
+  line: number
   target: string
 }
 
@@ -105,13 +111,26 @@ function hasExternalCellReferences(value: SheetFormulaText): boolean {
   return SHEET_EXTERNAL_CELL_REFERENCE_PATTERN.test(value)
 }
 
+function hasExternalLineReferences(value: SheetFormulaText): boolean {
+  SHEET_EXTERNAL_LINE_REFERENCE_PATTERN.lastIndex = 0
+  return SHEET_EXTERNAL_LINE_REFERENCE_PATTERN.test(value)
+}
+
 export function hasSheetExternalFrontmatterReferences({ value }: { value: SheetFormulaText }): boolean {
   return extractSheetExternalFrontmatterReferences(value).length > 0
 }
 
+export function hasSheetExternalLineReferences({ value }: { value: SheetFormulaText }): boolean {
+  return extractSheetExternalLineReferences(value).length > 0
+}
+
 export function isExternalFormulaInput(value: SheetFormulaText): boolean {
   return value.trimStart().startsWith('=')
-    && (hasExternalCellReferences(value) || hasSheetExternalFrontmatterReferences({ value }))
+    && (
+      hasExternalCellReferences(value)
+      || hasExternalLineReferences(value)
+      || hasSheetExternalFrontmatterReferences({ value })
+    )
 }
 
 export function extractSheetExternalCellReferences(value: SheetFormulaText): SheetExternalCellReference[] {
@@ -148,9 +167,26 @@ export function extractSheetExternalFrontmatterReferences(value: SheetFormulaTex
   return references
 }
 
+export function extractSheetExternalLineReferences(value: SheetFormulaText): SheetExternalLineReference[] {
+  const references: SheetExternalLineReference[] = []
+  SHEET_EXTERNAL_LINE_REFERENCE_PATTERN.lastIndex = 0
+  for (const match of value.matchAll(SHEET_EXTERNAL_LINE_REFERENCE_PATTERN)) {
+    const rawTarget = match[1]
+    const rawLine = match[2]
+    if (!rawTarget || !rawLine) continue
+
+    references.push({
+      line: Number.parseInt(rawLine, 10),
+      target: wikilinkTarget(`[[${rawTarget}]]`),
+    })
+  }
+  return references
+}
+
 export function extractSheetExternalReferenceTargets(value: SheetFormulaText): string[] {
   const targets = new Set<string>()
   for (const reference of extractSheetExternalCellReferences(value)) targets.add(reference.target)
+  for (const reference of extractSheetExternalLineReferences(value)) targets.add(reference.target)
   for (const reference of extractSheetExternalFrontmatterReferences(value)) targets.add(reference.target)
   return Array.from(targets)
 }
