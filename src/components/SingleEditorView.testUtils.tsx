@@ -166,6 +166,7 @@ vi.mock('../utils/url', () => ({
 }))
 
 vi.mock('../utils/typeColors', () => ({
+  ACCENT_COLOR_PICKER_KEYS: ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'gray'],
   buildTypeEntryMap: () => ({}),
 }))
 

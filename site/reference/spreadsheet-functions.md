@@ -32,6 +32,7 @@ Tolaria supports wikilink cell references for values that live in another sheet 
 =[[newsletter-revenue]].B5
 =SUM(B2:D2)+[[sponsorship-pipeline]].E12
 =ROUND([[business-plan]].$E$12, 2)
+=[[launch-brief]].2
 ```
 
 The target inside `[[...]]` resolves like a normal Tolaria wikilink. The cell address after the dot uses A1 notation.
@@ -58,6 +59,15 @@ Formulas can also read scalar frontmatter properties from a specific note:
 The target resolves like a wikilink, and the dot path reads nested frontmatter keys. Numbers, booleans, and strings become formula literals. Missing notes, ambiguous note targets, missing properties, arrays, maps, and other non-scalar values resolve to `#N/A`.
 
 A first segment that looks like an A1 cell address, such as `B2`, is treated as a cross-sheet cell reference. Use property names that do not collide with A1 notation for frontmatter formulas.
+
+Formulas can read one raw Markdown body line from any note with numeric dot notation:
+
+```txt
+=[[launch-brief]].1
+=[[launch-brief]].2
+```
+
+Line references exclude YAML frontmatter, are 1-based, and preserve commas as text. `[[note]].A1` still means grid/cell access and can split comma-separated content; `[[note]].1` means the whole first body line.
 
 ## Autocomplete Functions
 
@@ -162,6 +172,7 @@ Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 =[[newsletter-revenue]].E5
 =SUM(B2:D2)+[[sponsorship-pipeline]].E12
 =IF([[business-plan]].$E$12>0, [[business-plan]].$E$12, 0)
+=[[launch-brief]].2
 ```
 
 ## IronCalc Function Families
