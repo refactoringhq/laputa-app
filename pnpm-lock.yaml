@@ -66,6 +66,9 @@ importers:
       '@codemirror/commands':
         specifier: ^6.10.2
         version: 6.10.2
+      '@codemirror/lang-html':
+        specifier: ^6.4.11
+        version: 6.4.11
       '@codemirror/lang-javascript':
         specifier: ^6.2.5
         version: 6.2.5

@@ -1,15 +1,11 @@
 import {
   ArrowsClockwise,
   ArrowsOutLineVertical,
-  Check,
   Code,
   Copy,
-  PencilSimpleLine,
 } from '@phosphor-icons/react'
 import {
-  useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react'
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent, SyntheticEvent } from 'react'
@@ -26,7 +22,6 @@ import {
 import { htmlBlockPreview } from '../utils/htmlBlockSandbox'
 import { dispatchRichEditorExternalChange } from './editorExternalChangeEvents'
 import { Button } from './ui/button'
-import { Textarea } from './ui/textarea'
 
 export interface HtmlBlockProps {
   height: string
@@ -155,66 +150,14 @@ function heightFromKeyboard(currentHeight: string, key: string): string | null {
   return null
 }
 
-function isCommitHtmlEditShortcut(event: KeyboardEvent<HTMLTextAreaElement>): boolean {
-  if (event.key !== 'Enter') return false
-  return event.metaKey || event.ctrlKey
-}
-
 export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
   const currentHtml = block.props.html
   const currentHeight = normalizeHtmlBlockHeight(block.props.height)
   const preview = useMemo(() => htmlBlockPreview(currentHtml), [currentHtml])
   const { sanitizedHtml, srcDoc } = preview
-  const startsInSourceMode = currentHtml.trim().length === 0
-  const [draftHtml, setDraftHtml] = useState(currentHtml)
-  const [editing, setEditing] = useState(startsInSourceMode)
   const [resizingHeight, setResizingHeight] = useState<string | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const displayHeight = resizingHeight ?? currentHeight
   const blockedMarkup = currentHtml.trim().length > 0 && sanitizedHtml.trim().length === 0
-
-  useEffect(() => {
-    if (!editing) return
-    textareaRef.current?.focus()
-    textareaRef.current?.select()
-  }, [editing])
-
-  const commitDraft = () => {
-    setEditing(false)
-    if (draftHtml !== currentHtml) {
-      const updated = updateHtmlBlockPropsSafely(editor, block.id, props => ({
-        ...props,
-        html: draftHtml,
-      }))
-      if (updated) dispatchEditorChange(editor)
-    }
-    editor.focus?.()
-  }
-
-  const startEditing = (event: SyntheticEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setDraftHtml(currentHtml)
-    setEditing(true)
-    trackEvent('editor_html_block_source_edit_requested')
-  }
-
-  const handleEditorKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      setDraftHtml(currentHtml)
-      setEditing(false)
-      editor.focus?.()
-      return
-    }
-
-    if (isCommitHtmlEditShortcut(event)) {
-      event.preventDefault()
-      event.stopPropagation()
-      commitDraft()
-    }
-  }
 
   const updateHeight = (height: string, source: HeightChangeSource) => {
     const updated = updateHtmlBlockPropsSafely(editor, block.id, props => ({
@@ -288,17 +231,6 @@ export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
     >
       <div className="html-block__toolbar" aria-label={t('editor.htmlBlock.toolbar')} role="toolbar">
         <Button
-          aria-label={editing ? t('editor.htmlBlock.doneEditing') : t('editor.htmlBlock.editSource')}
-          onClick={editing ? commitDraft : startEditing}
-          onMouseDown={stopHtmlBlockEvent}
-          size="icon-xs"
-          title={editing ? t('editor.htmlBlock.doneEditing') : t('editor.htmlBlock.editSource')}
-          type="button"
-          variant="outline"
-        >
-          {editing ? <Check aria-hidden="true" /> : <PencilSimpleLine aria-hidden="true" />}
-        </Button>
-        <Button
           aria-label={t('editor.htmlBlock.copySource')}
           onClick={copySource}
           onMouseDown={stopHtmlBlockEvent}
@@ -333,22 +265,18 @@ export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
         </Button>
       </div>
 
-      {editing ? (
-        <Textarea
-          ref={textareaRef}
-          aria-label={t('editor.htmlBlock.sourceLabel')}
-          className="html-block__source"
-          onBlur={commitDraft}
-          onChange={(event) => setDraftHtml(event.target.value)}
-          onKeyDown={handleEditorKeyDown}
-          value={draftHtml}
-        />
-      ) : blockedMarkup ? (
+      {blockedMarkup ? (
         <div className="html-block__fallback" role="alert">
           <span>{t('editor.htmlBlock.blockedFallback')}</span>
-          <Button type="button" variant="outline" size="sm" onClick={startEditing}>
-            <PencilSimpleLine aria-hidden="true" />
-            {t('editor.htmlBlock.editSource')}
+          <Button
+            onClick={openRawEditorForHtmlSource}
+            onMouseDown={stopHtmlBlockEvent}
+            type="button"
+            variant="outline"
+            size="sm"
+          >
+            <Code aria-hidden="true" />
+            {t('editor.htmlBlock.openRawEditor')}
           </Button>
         </div>
       ) : (

@@ -10,7 +10,7 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import { EditorState, Prec } from '@codemirror/state'
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, insertTab } from '@codemirror/commands'
 import { rawEditorLanguageExtensionsForPath } from '../extensions/rawEditorLanguage'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 import { resolveArrowLigatureInput } from '../utils/arrowLigatures'
@@ -128,6 +128,9 @@ function buildSaveKeymap(callbacks: { current: CodeMirrorCallbacks }) {
   }, {
     key: 'Escape',
     run: () => callbacks.current.onEscape(),
+  }, {
+    key: 'Tab',
+    run: insertTab,
   }]))
 }
 

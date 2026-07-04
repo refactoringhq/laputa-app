@@ -108,6 +108,21 @@ describe('markdownLanguage', () => {
     parent.remove()
   })
 
+  it('parses fenced html block contents with HTML syntax nodes', () => {
+    const doc = [
+      '```html height="360"',
+      '<section class="note-card">Hello</section>',
+      '```',
+    ].join('\n')
+    const { view, parent } = createView(doc)
+
+    expect(nodeNamesAt(view, doc, 'section')).toContain('TagName')
+    expect(nodeNamesAt(view, doc, 'note-card')).toContain('AttributeValue')
+
+    view.destroy()
+    parent.remove()
+  })
+
   it('styles only list markers while leaving list item text as plain content', async () => {
     const doc = [
       '- item one',

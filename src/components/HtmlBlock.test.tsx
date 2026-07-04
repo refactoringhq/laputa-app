@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../hooks/appCommandDispatcher'
 import { HTML_BLOCK_DEFAULT_HEIGHT, HTML_BLOCK_TYPE } from '../utils/htmlBlockMarkdown'
 import { HtmlBlock, type HtmlBlockEditor, type HtmlBlockProps } from './HtmlBlock'
 
@@ -29,12 +30,11 @@ function renderHtmlBlock(initialProps: HtmlBlockProps) {
 }
 
 describe('HtmlBlock', () => {
-  it('starts empty slash-inserted blocks in source editing mode', async () => {
+  it('does not expose inline source editing for empty slash-inserted blocks', () => {
     renderHtmlBlock({ height: HTML_BLOCK_DEFAULT_HEIGHT, html: '' })
 
-    const source = screen.getByLabelText('HTML source')
-    expect(source).toBeTruthy()
-    await waitFor(() => expect(document.activeElement).toBe(source))
+    expect(screen.queryByLabelText('HTML source')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit source' })).not.toBeInTheDocument()
   })
 
   it('renders sanitized HTML in an iframe without script or same-origin sandbox permissions', () => {
@@ -61,6 +61,31 @@ describe('HtmlBlock', () => {
 
     expect(screen.getByRole('region', { name: 'Sandboxed HTML block preview' })).toBeTruthy()
     expect(screen.getByRole('toolbar', { name: 'HTML block actions' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Edit source' })).not.toBeInTheDocument()
+  })
+
+  it('routes blocked markup fixes to the raw editor instead of inline editing', () => {
+    const commands: unknown[] = []
+    const recordCommand = (event: Event) => {
+      commands.push((event as CustomEvent<unknown>).detail)
+    }
+    window.addEventListener(APP_COMMAND_EVENT_NAME, recordCommand)
+
+    try {
+      renderHtmlBlock({
+        height: HTML_BLOCK_DEFAULT_HEIGHT,
+        html: '<script>blocked()</script>',
+      })
+
+      expect(screen.getByRole('alert')).toHaveTextContent('This HTML was blocked by the sandbox rules.')
+      const rawEditorButtons = screen.getAllByRole('button', { name: 'Open raw editor' })
+      fireEvent.click(rawEditorButtons.at(-1)!)
+
+      expect(commands).toEqual([APP_COMMAND_IDS.editToggleRawEditor])
+      expect(screen.queryByLabelText('HTML source')).not.toBeInTheDocument()
+    } finally {
+      window.removeEventListener(APP_COMMAND_EVENT_NAME, recordCommand)
+    }
   })
 
   it('persists keyboard height changes through the editor block update path', () => {

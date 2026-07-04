@@ -25,6 +25,11 @@ async function openRawMode(page: Page) {
   await expect(page.locator('.cm-content')).toBeVisible({ timeout: 5_000 })
 }
 
+async function openBlockNoteMode(page: Page) {
+  await triggerShortcutCommand(page, APP_COMMAND_IDS.editToggleRawEditor)
+  await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
+}
+
 async function getRawEditorContent(page: Page): Promise<string> {
   return page.evaluate(() => {
     type CodeMirrorHost = Element & {
@@ -45,17 +50,74 @@ async function getRawEditorContent(page: Page): Promise<string> {
   })
 }
 
-test('slash command inserts a sandboxed resizable HTML block that persists as fenced markdown', async ({ page }) => {
+async function setRawEditorContent(page: Page, content: string): Promise<void> {
+  await page.evaluate((nextContent) => {
+    type CodeMirrorHost = Element & {
+      cmTile?: {
+        view?: {
+          state: {
+            doc: {
+              length: number
+            }
+          }
+          dispatch(update: {
+            changes: {
+              from: number
+              to: number
+              insert: string
+            }
+          }): void
+        }
+      }
+    }
+
+    const el = document.querySelector('.cm-content') as CodeMirrorHost | null
+    const view = el?.cmTile?.view
+    if (!view) {
+      throw new Error('CodeMirror view is missing')
+    }
+
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: nextContent },
+    })
+  }, content)
+}
+
+function withHtmlBlockSource(raw: string, fencedHtml: string): string {
+  const emptyHtmlFence = /```html[^\n]*\n\s*```/u
+  if (emptyHtmlFence.test(raw)) return raw.replace(emptyHtmlFence, fencedHtml)
+  return `${raw.trimEnd()}\n\n${fencedHtml}\n`
+}
+
+test('slash command inserts a sandboxed HTML block whose source is edited in raw mode', async ({ page }) => {
   await openNote(page, 'Note B')
   await page.locator('.bn-block-content').last().click()
   await page.keyboard.press('Enter')
   await page.keyboard.type('/html')
   await page.getByRole('option', { name: /HTML block/i }).click()
 
-  const source = page.getByLabel('HTML source')
-  await expect(source).toBeVisible({ timeout: 5_000 })
-  await source.fill('<button>Static button</button>')
-  await source.press('Control+Enter')
+  const htmlBlock = page.locator('[data-html-block]').last()
+  await expect(htmlBlock).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByLabel('HTML source')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Edit source' })).toHaveCount(0)
+
+  await page.mouse.move(1, 1)
+  await expect.poll(() =>
+    htmlBlock.evaluate(element => getComputedStyle(element).borderTopColor),
+  ).toBe('rgba(0, 0, 0, 0)')
+
+  await htmlBlock.hover()
+  await expect.poll(async () =>
+    (await htmlBlock.evaluate(element => getComputedStyle(element).borderTopColor)) !== 'rgba(0, 0, 0, 0)',
+  ).toBe(true)
+
+  await page.getByRole('button', { name: 'Open raw editor' }).click()
+  await expect(page.locator('.cm-content')).toBeVisible({ timeout: 5_000 })
+
+  const fencedHtml = '```html height="344"\n<button>Static button</button>\n```'
+  await setRawEditorContent(page, withHtmlBlockSource(await getRawEditorContent(page), fencedHtml))
+  await page.waitForTimeout(600)
+  await openBlockNoteMode(page)
 
   const frame = page.locator('.html-block__frame')
   await expect(frame).toBeVisible({ timeout: 5_000 })
@@ -64,7 +126,6 @@ test('slash command inserts a sandboxed resizable HTML block that persists as fe
   await expect(frame).not.toHaveAttribute('sandbox', /allow-same-origin/)
   await expect(frame).toHaveAttribute('srcdoc', /<button>Static button<\/button>/)
 
-  await page.getByRole('button', { name: 'Resize height' }).press('ArrowDown')
   await openRawMode(page)
 
   const raw = await getRawEditorContent(page)
