@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModifiedFile, SidebarSelection } from '../types'
 import {
   activeVaultModifiedFiles,
   aiWorkspaceWindowContextForPath,
   canCustomizeColumnsForSelection,
   mergeModifiedFiles,
+  runNativeTextHistoryCommand,
   shouldPreferOnboardingVaultPath,
 } from './appOrchestration'
 
@@ -17,7 +18,32 @@ function modifiedFile(overrides: Partial<ModifiedFile>): ModifiedFile {
   }
 }
 
+const originalExecCommand = document.execCommand
+
+function stubExecCommand(result = true) {
+  const execCommand = vi.fn(() => result)
+  Object.defineProperty(document, 'execCommand', {
+    configurable: true,
+    value: execCommand,
+  })
+  return execCommand
+}
+
+function focusElement(element: HTMLElement): void {
+  if (!element.isConnected) document.body.appendChild(element)
+  element.focus()
+}
+
 describe('app orchestration helpers', () => {
+  afterEach(() => {
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: originalExecCommand,
+    })
+    document.body.replaceChildren()
+    vi.restoreAllMocks()
+  })
+
   it('fills missing vault paths on active-vault modified files', () => {
     expect(activeVaultModifiedFiles([
       modifiedFile({ relativePath: 'a.md' }),
@@ -61,5 +87,29 @@ describe('app orchestration helpers', () => {
   it('builds AI workspace context from a resolved vault path', () => {
     expect(aiWorkspaceWindowContextForPath('/vault')).toEqual({ vaultPath: '/vault', vaultPaths: ['/vault'] })
     expect(aiWorkspaceWindowContextForPath('')).toEqual({ vaultPath: '', vaultPaths: [] })
+  })
+
+  it('uses native history commands for focused text fields', () => {
+    const execCommand = stubExecCommand()
+    const input = document.createElement('input')
+    focusElement(input)
+
+    expect(runNativeTextHistoryCommand('undo')).toBe(true)
+    expect(execCommand).toHaveBeenCalledWith('undo')
+  })
+
+  it('lets focused editor surfaces own history without native execCommand', () => {
+    const execCommand = stubExecCommand()
+    const container = document.createElement('div')
+    const editable = document.createElement('div')
+    container.className = 'editor__blocknote-container'
+    editable.tabIndex = 0
+    editable.setAttribute('contenteditable', 'true')
+    container.appendChild(editable)
+    focusElement(container)
+    focusElement(editable)
+
+    expect(runNativeTextHistoryCommand('undo')).toBe(true)
+    expect(execCommand).not.toHaveBeenCalled()
   })
 })
