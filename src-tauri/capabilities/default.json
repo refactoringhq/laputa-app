@@ -18,6 +18,7 @@
     "core:window:allow-close",
     "core:window:allow-set-title",
     "core:webview:allow-create-webview-window",
+    "core:webview:allow-print",
     "core:event:default",
     "dialog:default",
     "deep-link:default",
