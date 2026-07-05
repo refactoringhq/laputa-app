@@ -159,6 +159,30 @@ describe('BlockNote direct Markdown serialization', () => {
     ].join('\n'))
   })
 
+  it('keeps plain prose parentheses unescaped while protecting links and code spans', () => {
+    const blocks = [
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'Use citations (Smith, 2024) and ', styles: {} },
+          { type: 'text', text: 'inline_code(with_args)', styles: { code: true } },
+          { type: 'text', text: ' with ', styles: {} },
+          {
+            type: 'link',
+            props: { href: 'attachments/report (final).pdf' },
+            content: [{ type: 'text', text: 'report (final)', styles: {} }],
+          },
+          { type: 'text', text: '.', styles: {} },
+        ],
+        children: [],
+      },
+    ]
+
+    expect(blocksToMarkdownDirect(blocks).markdown).toBe(
+      'Use citations (Smith, 2024) and `inline_code(with_args)` with [report (final)](<attachments/report (final).pdf>).',
+    )
+  })
+
   it('caches unchanged block objects across rich-editor body serialization', () => {
     const block = {
       type: 'paragraph',
