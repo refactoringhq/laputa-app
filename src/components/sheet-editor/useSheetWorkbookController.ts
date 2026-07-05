@@ -66,7 +66,13 @@ function cancelPendingSerialize(
 
 function releaseWorkbookModel(model: Model | null | undefined): void {
   if (!model) return
-  window.setTimeout(() => model.free(), 0)
+  window.setTimeout(() => {
+    try {
+      model.free()
+    } catch (error) {
+      console.warn('[sheet-editor] Failed to release workbook model:', error)
+    }
+  }, 0)
 }
 
 function shouldSkipWorkbookRebuild({
