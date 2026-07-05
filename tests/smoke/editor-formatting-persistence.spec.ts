@@ -197,6 +197,19 @@ const slashMenuPersistenceScenarios = [
     },
     blockContentType: 'codeBlock',
   },
+  {
+    name: 'slash menu code blocks preserve literal markdown characters',
+    query: '/code',
+    optionName: /Code Block/i,
+    insertedText: 'container_name USER_UID markdown_chars=*_{}<>()#!',
+    rawAssertion: (raw: string) => {
+      expect(raw).toContain('container_name USER_UID markdown_chars=*_{}<>()#!')
+      expect(raw).not.toContain('container\\_name')
+      expect(raw).not.toContain('USER\\_UID')
+      expect(raw).not.toContain('markdown\\_chars')
+    },
+    blockContentType: 'codeBlock',
+  },
 ] as const
 
 test('toolbar only exposes audited markdown-safe formatting controls', async ({ page }) => {
