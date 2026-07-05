@@ -6,10 +6,11 @@ import {
   lineNumbers,
   highlightActiveLine,
   keymap,
+  type KeyBinding,
   ViewPlugin,
   type ViewUpdate,
 } from '@codemirror/view'
-import { EditorState, Prec } from '@codemirror/state'
+import { EditorSelection, EditorState, Prec, type SelectionRange } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, insertTab } from '@codemirror/commands'
 import { rawEditorLanguageExtensionsForPath } from '../extensions/rawEditorLanguage'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
@@ -17,6 +18,7 @@ import { resolveArrowLigatureInput } from '../utils/arrowLigatures'
 import { zoomCursorFix } from '../extensions/zoomCursorFix'
 import { rawEditorTextInputAttributes } from '../lib/nativeTextAssistance'
 import { isInsideMarkdownFence } from '../utils/markdownFences'
+import { isWindows } from '../utils/platform'
 
 const FONT_FAMILY = '"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
 const RAW_EDITOR_COLORS = {
@@ -31,6 +33,35 @@ const RAW_EDITOR_COLORS = {
 const AUTO_TEXT_DIRECTION_LINE = Decoration.line({
   attributes: { dir: 'auto' },
 })
+type LineBlock = ReturnType<EditorView['lineBlockAt']>
+
+interface LineBoundaryDirection {
+  assoc: -1 | 1
+  edge: (line: LineBlock) => number
+}
+
+interface BoundarySelectionMode {
+  extend: boolean
+}
+
+interface LineBoundaryContext {
+  view: EditorView
+  line: LineBlock
+  range: SelectionRange
+  direction: LineBoundaryDirection
+}
+
+const START_BOUNDARY: LineBoundaryDirection = {
+  assoc: 1,
+  edge: (line) => line.from,
+}
+const END_BOUNDARY: LineBoundaryDirection = {
+  assoc: -1,
+  edge: (line) => line.to,
+}
+const MOVE_SELECTION: BoundarySelectionMode = { extend: false }
+const EXTEND_SELECTION: BoundarySelectionMode = { extend: true }
+
 export interface CodeMirrorCallbacks {
   onDocChange: (doc: string) => void
   onCursorActivity: (view: EditorView) => void
@@ -134,6 +165,122 @@ function buildSaveKeymap(callbacks: { current: CodeMirrorCallbacks }) {
   }]))
 }
 
+function lineIndentBoundary({ view, line, head }: { view: EditorView; line: LineBlock; head: number }): number {
+  const leadingWhitespace = /^\s*/u.exec(view.state.sliceDoc(line.from, Math.min(line.from + 100, line.to)))?.[0].length ?? 0
+  const indentationEnd = line.from + leadingWhitespace
+  return leadingWhitespace > 0 && head !== indentationEnd ? indentationEnd : line.from
+}
+
+function logicalLineBoundary({ view, line, range, direction }: LineBoundaryContext): number {
+  return direction === END_BOUNDARY
+    ? line.to
+    : lineIndentBoundary({ view, line, head: range.head })
+}
+
+function middleY(rect: { top: number; bottom: number }): number {
+  return (rect.top + rect.bottom) / 2
+}
+
+function staysOnVisualRow(view: EditorView, from: number, to: number): boolean {
+  const startCoords = view.coordsAtPos(from)
+  const targetCoords = view.coordsAtPos(to)
+  if (!startCoords || !targetCoords) return true
+
+  const tolerance = Math.max(2, view.defaultLineHeight * 0.75)
+  return Math.abs(middleY(startCoords) - middleY(targetCoords)) <= tolerance
+}
+
+function shouldRetryLogicalBoundary(
+  context: LineBoundaryContext & { movedHead: number },
+): boolean {
+  return context.movedHead === context.range.head && context.movedHead !== context.direction.edge(context.line)
+}
+
+function readCodeMirrorLineBoundary(context: LineBoundaryContext): number {
+  const forward = context.direction === END_BOUNDARY
+  const moved = context.view.moveToLineBoundary(context.range, forward)
+  if (shouldRetryLogicalBoundary({ ...context, movedHead: moved.head })) {
+    return context.view.moveToLineBoundary(context.range, forward, false).head
+  }
+  return moved.head
+}
+
+function isSafeLineBoundary({ view, line, from, to }: { view: EditorView; line: LineBlock; from: number; to: number }): boolean {
+  if (to < line.from || to > line.to) return false
+  return staysOnVisualRow(view, from, to)
+}
+
+function normalizeBackwardBoundary(
+  context: LineBoundaryContext & { boundary: number },
+): number {
+  if (context.direction === END_BOUNDARY) return context.boundary
+  return context.boundary === context.line.from && context.line.length
+    ? lineIndentBoundary({ view: context.view, line: context.line, head: context.range.head })
+    : context.boundary
+}
+
+function readSafeLineBoundary(view: EditorView, range: SelectionRange, direction: LineBoundaryDirection): number {
+  const line = view.lineBlockAt(range.head)
+  const context = { view, line, range, direction }
+  const boundary = readCodeMirrorLineBoundary(context)
+  if (!isSafeLineBoundary({ view, line, from: range.head, to: boundary })) {
+    return logicalLineBoundary(context)
+  }
+  return normalizeBackwardBoundary({ ...context, boundary })
+}
+
+function moveWindowsLineBoundary(
+  view: EditorView,
+  direction: LineBoundaryDirection,
+  selectionMode: BoundarySelectionMode,
+): boolean {
+  const selection = EditorSelection.create(
+    view.state.selection.ranges.map((range) => {
+      const boundary = readSafeLineBoundary(view, range, direction)
+      return selectionMode.extend
+        ? EditorSelection.range(range.anchor, boundary)
+        : EditorSelection.cursor(boundary, direction.assoc)
+    }),
+    view.state.selection.mainIndex,
+  )
+
+  if (!selection.eq(view.state.selection, true)) {
+    view.dispatch({
+      selection,
+      scrollIntoView: true,
+      userEvent: 'select',
+    })
+  }
+  return true
+}
+
+function windowsLineBoundaryKeymap(): KeyBinding[] {
+  if (!isWindows()) return []
+  return [{
+    key: 'Home',
+    run: (view) => moveWindowsLineBoundary(view, START_BOUNDARY, MOVE_SELECTION),
+    shift: (view) => moveWindowsLineBoundary(view, START_BOUNDARY, EXTEND_SELECTION),
+    preventDefault: true,
+  }, {
+    key: 'End',
+    run: (view) => moveWindowsLineBoundary(view, END_BOUNDARY, MOVE_SELECTION),
+    shift: (view) => moveWindowsLineBoundary(view, END_BOUNDARY, EXTEND_SELECTION),
+    preventDefault: true,
+  }]
+}
+
+function buildRawEditorKeymap() {
+  const defaultBindings = isWindows()
+    ? defaultKeymap.filter((binding) => binding.key !== 'Home' && binding.key !== 'End')
+    : defaultKeymap
+
+  return keymap.of([
+    ...windowsLineBoundaryKeymap(),
+    ...defaultBindings,
+    ...historyKeymap,
+  ])
+}
+
 function buildArrowLigaturesExtension() {
   let literalAsciiCursor: number | null = null
 
@@ -214,7 +361,7 @@ export function useCodeMirror(
         buildAutoTextDirectionExtension(),
         history(),
         buildArrowLigaturesExtension(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        buildRawEditorKeymap(),
         buildSaveKeymap(callbacksRef),
         buildBaseTheme(),
         EditorView.cspNonce.of(RUNTIME_STYLE_NONCE),
