@@ -117,6 +117,48 @@ describe('BlockNote direct Markdown serialization', () => {
     ].join('\n'))
   })
 
+  it('keeps fenced code block content literal during direct Markdown serialization', () => {
+    const blocks = [
+      {
+        type: 'codeBlock',
+        props: { language: 'yaml' },
+        content: [{
+          type: 'text',
+          text: [
+            'services:',
+            '  server:',
+            '    container_name: forgejo',
+            '    environment:',
+            '      - USER_UID=1000',
+            '      - PATH_WITH_BACKSLASH=container\\_name',
+            '      - markdown_chars=*_{}<>()#!',
+          ].join('\n'),
+          styles: {},
+        }],
+        children: [],
+      },
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'Literal *still escapes* outside code.', styles: {} }],
+        children: [],
+      },
+    ]
+
+    expect(blocksToMarkdownDirect(blocks).markdown).toBe([
+      '```yaml',
+      'services:',
+      '  server:',
+      '    container_name: forgejo',
+      '    environment:',
+      '      - USER_UID=1000',
+      '      - PATH_WITH_BACKSLASH=container\\_name',
+      '      - markdown_chars=*_{}<>()#!',
+      '```',
+      '',
+      'Literal \\*still escapes\\* outside code.',
+    ].join('\n'))
+  })
+
   it('caches unchanged block objects across rich-editor body serialization', () => {
     const block = {
       type: 'paragraph',
