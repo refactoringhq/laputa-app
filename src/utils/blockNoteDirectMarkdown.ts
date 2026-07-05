@@ -73,7 +73,7 @@ interface SerializeContext {
 }
 
 const DIRECT_MARKDOWN_METHOD = 'blocksToMarkdownDirect'
-const ESCAPE_TEXT_RE = /([\\`*_{}<>()#!])/g
+const ESCAPE_TEXT_RE = /([\\`*_{}<>#!])/g
 const ESCAPE_TABLE_CELL_RE = /[|\n\r]/g
 const TEXT_CONTENT_BLOCK_TYPES = new Set([
   'bulletListItem',
