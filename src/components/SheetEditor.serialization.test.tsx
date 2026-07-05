@@ -136,6 +136,34 @@ describe('SheetEditor serialization', () => {
     expect(() => firstModel?.getSelectedSheet()).toThrow('null pointer passed to rust')
   })
 
+  it('does not surface workbook release failures when a stale model is already freed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { unmount } = await renderLoadedSheet('---\n_display: sheet\n---\nMetric,January')
+    const model = ironCalcMock.state.lastModel
+    expect(model).not.toBeNull()
+    vi.spyOn(model!, 'free').mockImplementation(() => {
+      throw new Error('null pointer passed to rust')
+    })
+
+    vi.useFakeTimers()
+    try {
+      unmount()
+
+      expect(() => {
+        act(() => {
+          vi.runOnlyPendingTimers()
+        })
+      }).not.toThrow()
+      expect(warn).toHaveBeenCalledWith(
+        '[sheet-editor] Failed to release workbook model:',
+        expect.any(Error),
+      )
+    } finally {
+      vi.useRealTimers()
+      warn.mockRestore()
+    }
+  })
+
   it('preserves trailing empty cells when saving an edited row', async () => {
     await expectSaveAfterDirtyEdit({
       content: '---\n_display: sheet\n---\nMetric,January,,\nRevenue,1200,,',
