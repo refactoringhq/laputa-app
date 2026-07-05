@@ -16,6 +16,7 @@ type ProductAnalyticsProperties = Record<string, string | number>
 
 const STALE_TAURI_LISTENER_CLEANUP_SIGNATURE = "listeners[eventId].handlerId"
 const BLOCKNOTE_STALE_BLOCK_REFERENCE_PATTERN = /\bBlock with ID [^|\n]+? not found\b/
+const NON_ERROR_MISSING_FILE_REJECTION_PATTERN = /\bNon-Error promise rejection captured with value:\s*File does not exist\b/i
 const RESIZE_OBSERVER_LOOP_MESSAGES = [
   'ResizeObserver loop completed with undelivered notifications',
   'ResizeObserver loop limit exceeded',
@@ -37,6 +38,19 @@ function isResizeObserverLoopText(value: string | undefined): boolean {
   return value
     ? RESIZE_OBSERVER_LOOP_MESSAGES.some((message) => value.includes(message))
     : false
+}
+
+function isMissingFileText(value: string | undefined): boolean {
+  return value ? /^File does not exist(?:\b|:)/i.test(value.trim()) : false
+}
+
+function isNonErrorMissingFileRejectionText(value: string | undefined): boolean {
+  return value ? NON_ERROR_MISSING_FILE_REJECTION_PATTERN.test(value) : false
+}
+
+function isUnhandledRejectionExceptionType(value: string | undefined): boolean {
+  const normalized = value?.toLowerCase() ?? ''
+  return normalized.includes('unhandled') || normalized.includes('promise')
 }
 
 function recoveredRichEditorDomNotFoundError(name: string | undefined, message: string | undefined): boolean {
@@ -122,12 +136,25 @@ function shouldDropResizeObserverLoopEvent(
     isResizeObserverLoopText(exception.value))
 }
 
+function shouldDropMissingFilePromiseRejectionEvent(
+  event: Sentry.ErrorEvent,
+  hint?: Sentry.EventHint,
+): boolean {
+  if (typeof hint?.originalException === 'string' && isMissingFileText(hint.originalException)) return true
+  if (isNonErrorMissingFileRejectionText(event.message)) return true
+
+  return (event.exception?.values ?? []).some((exception) =>
+    isNonErrorMissingFileRejectionText(exception.value)
+    || (isUnhandledRejectionExceptionType(exception.type) && isMissingFileText(exception.value)))
+}
+
 function shouldDropSentryEvent(event: Sentry.ErrorEvent, hint?: Sentry.EventHint): boolean {
   return shouldDropWhiteboardPlatformPermissionEvent(event, hint)
     || shouldDropStaleTauriListenerCleanupEvent(event, hint)
     || shouldDropBlockNoteStaleBlockReferenceEvent(event, hint)
     || shouldDropRichEditorDomNotFoundEvent(event, hint)
     || shouldDropResizeObserverLoopEvent(event, hint)
+    || shouldDropMissingFilePromiseRejectionEvent(event, hint)
 }
 
 function scrubEventMessage(event: Sentry.ErrorEvent): void {

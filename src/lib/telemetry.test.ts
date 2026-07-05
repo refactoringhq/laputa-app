@@ -307,6 +307,41 @@ describe('initSentry', () => {
     })).toBeNull()
     expect(beforeSend(unrelatedObserverEvent)).toBe(unrelatedObserverEvent)
   })
+
+  it('drops raw missing-file promise rejections before sending them to Sentry', () => {
+    const beforeSend = initSentryBeforeSend()
+    const event = {
+      message: 'Non-Error promise rejection captured with value: File does not exist',
+    }
+    const exceptionEvent = {
+      exception: {
+        values: [{
+          type: 'UnhandledRejection',
+          value: 'File does not exist: /Users/luca/Laputa/missing.md',
+        }],
+      },
+    }
+
+    expect(beforeSend(event, { originalException: 'File does not exist' })).toBeNull()
+    expect(beforeSend(exceptionEvent)).toBeNull()
+  })
+
+  it('keeps ordinary missing-file Errors after path scrubbing', () => {
+    const beforeSend = initSentryBeforeSend()
+    const event = {
+      exception: {
+        values: [{
+          type: 'Error',
+          value: 'File does not exist: /Users/luca/Laputa/missing.md',
+        }],
+      },
+    }
+
+    expect(beforeSend(event, {
+      originalException: new Error('File does not exist: /Users/luca/Laputa/missing.md'),
+    })).toBe(event)
+    expect(event.exception.values[0].value).toBe('File does not exist: [redacted-path]')
+  })
 })
 
 describe('isFeatureEnabled', () => {
