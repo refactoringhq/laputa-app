@@ -50,7 +50,6 @@ const TEXT_EDITING_BLOCKED_COMMANDS = new Set<AppCommandId>([
   APP_COMMAND_IDS.viewGoBack,
   APP_COMMAND_IDS.viewGoForward,
 ])
-const EDITOR_SURFACE_SELECTOR = '.editor__blocknote-container, .raw-editor-codemirror'
 
 function isTextInputFocused(): boolean {
   const active = document.activeElement
@@ -59,35 +58,12 @@ function isTextInputFocused(): boolean {
   return active.isContentEditable || active.closest('[contenteditable="true"]') !== null
 }
 
-function isEditorSurfaceFocused(): boolean {
-  const active = document.activeElement
-  if (!(active instanceof HTMLElement)) return false
-  return Boolean(active.closest(EDITOR_SURFACE_SELECTOR))
-}
-
-function hasAppHistoryForCommand(actions: KeyboardActions, commandId: AppCommandId): boolean {
-  if (commandId === APP_COMMAND_IDS.editUndo) return Boolean(actions.canUndo)
-  if (commandId === APP_COMMAND_IDS.editRedo) return Boolean(actions.canRedo)
-  return false
-}
-
-function shouldRunAppHistoryFromFocusedEditor(actions: KeyboardActions, commandId: AppCommandId): boolean {
-  return TEXT_EDITING_BLOCKED_COMMANDS.has(commandId)
-    && isEditorSurfaceFocused()
-    && hasAppHistoryForCommand(actions, commandId)
-}
-
 function shouldFocusedTextOwnCommand(commandId: AppCommandId, key: string): boolean {
   return TEXT_EDITING_KEYS.has(key) || TEXT_EDITING_BLOCKED_COMMANDS.has(commandId)
 }
 
-function handleFocusedTextCommand(actions: KeyboardActions, event: KeyboardEvent, commandId: AppCommandId): boolean {
+function handleFocusedTextCommand(event: KeyboardEvent, commandId: AppCommandId): boolean {
   if (!isTextInputFocused()) return false
-  if (shouldRunAppHistoryFromFocusedEditor(actions, commandId)) {
-    event.preventDefault()
-    executeAppCommand(commandId, actions, 'renderer-keyboard')
-    return true
-  }
   if (!shouldFocusedTextOwnCommand(commandId, event.key)) return false
   recordSuppressedShortcutCommand(commandId, 'renderer-keyboard')
   return true
@@ -104,7 +80,7 @@ export function handleAppKeyboardEvent(actions: KeyboardActions, event: Keyboard
   if (commandId === null) return
   if (commandId === APP_COMMAND_IDS.editFindInNote && !isEditorFindScopeFocused()) return
 
-  if (handleFocusedTextCommand(actions, event, commandId)) return
+  if (handleFocusedTextCommand(event, commandId)) return
 
   event.preventDefault()
   if (commandId === APP_COMMAND_IDS.editFindInVault) {

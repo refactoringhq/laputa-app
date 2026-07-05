@@ -18,8 +18,20 @@ export function isTextEditingElementFocused(): boolean {
     || activeElement.closest('[contenteditable="true"]') !== null
 }
 
+function isNativeTextFieldElement(element: HTMLElement): boolean {
+  return element.tagName === 'INPUT' || element.tagName === 'TEXTAREA'
+}
+
 export function runNativeTextHistoryCommand(command: 'undo' | 'redo'): boolean {
   if (!isTextEditingElementFocused()) return false
+  const activeElement = document.activeElement
+  if (
+    activeElement instanceof HTMLElement
+    && !isNativeTextFieldElement(activeElement)
+    && isActiveElementInsideEditorSurface()
+  ) {
+    return true
+  }
   return document.execCommand(command)
 }
 
