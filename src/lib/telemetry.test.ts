@@ -233,6 +233,48 @@ describe('initSentry', () => {
     expect(beforeSend(unrelatedNotFoundEvent)).toBe(unrelatedNotFoundEvent)
   })
 
+  it('drops recovered WebKit DOM NotFoundError events before sending them to Sentry', () => {
+    const beforeSend = initSentryBeforeSend()
+    const webKitDomEvent = {
+      exception: {
+        values: [{
+          type: 'NotFoundError',
+          value: 'The object can not be found here.',
+        }],
+      },
+    }
+    const webKitFilesystemEvent = {
+      exception: {
+        values: [{
+          type: 'NotFoundError',
+          value: 'A requested file or directory could not be found at the time an operation was processed.',
+        }],
+      },
+    }
+    const messageOnlyEvent = {
+      message: 'NotFoundError: The object can not be found here.',
+    }
+    const hintedEvent = {
+      message: 'Script error.',
+    }
+    const unrelatedNotFoundEvent = {
+      exception: {
+        values: [{
+          type: 'NotFoundError',
+          value: 'Vault file missing while resolving a deep link',
+        }],
+      },
+    }
+
+    expect(beforeSend(webKitDomEvent)).toBeNull()
+    expect(beforeSend(webKitFilesystemEvent)).toBeNull()
+    expect(beforeSend(messageOnlyEvent)).toBeNull()
+    const hintedError = new Error('The object can not be found here.')
+    hintedError.name = 'NotFoundError'
+    expect(beforeSend(hintedEvent, { originalException: hintedError })).toBeNull()
+    expect(beforeSend(unrelatedNotFoundEvent)).toBe(unrelatedNotFoundEvent)
+  })
+
   it('drops browser ResizeObserver loop notifications before sending them to Sentry', () => {
     const beforeSend = initSentryBeforeSend()
     const loopLimitEvent = {

@@ -5,6 +5,7 @@ import {
   hasActiveWhiteboardPlatformPermissionGuard,
   isWhiteboardPlatformPermissionRejection,
 } from '../utils/whiteboardPlatformPermissionRejection'
+import { classifyRichEditorRecoveryError } from '../components/richEditorRecoveryClassifier'
 
 type SensitiveTelemetryText = string
 type AnonymousTelemetryId = string
@@ -36,6 +37,19 @@ function isResizeObserverLoopText(value: string | undefined): boolean {
   return value
     ? RESIZE_OBSERVER_LOOP_MESSAGES.some((message) => value.includes(message))
     : false
+}
+
+function recoveredRichEditorDomNotFoundError(name: string | undefined, message: string | undefined): boolean {
+  if (!name || !message) return false
+
+  return classifyRichEditorRecoveryError({ name, message }, 'render') === 'dom_not_found'
+}
+
+function recoveredRichEditorDomNotFoundText(value: string | undefined): boolean {
+  const [name, ...messageParts] = value?.split(':') ?? []
+  const message = messageParts.join(':').trim()
+
+  return recoveredRichEditorDomNotFoundError(name, message)
 }
 
 function errorText(value: unknown): string | undefined {
@@ -86,6 +100,17 @@ function shouldDropBlockNoteStaleBlockReferenceEvent(
     isBlockNoteStaleBlockReferenceText(exception.value))
 }
 
+function shouldDropRichEditorDomNotFoundEvent(
+  event: Sentry.ErrorEvent,
+  hint?: Sentry.EventHint,
+): boolean {
+  if (classifyRichEditorRecoveryError(hint?.originalException, 'render') === 'dom_not_found') return true
+  if (recoveredRichEditorDomNotFoundText(event.message)) return true
+
+  return (event.exception?.values ?? []).some((exception) =>
+    recoveredRichEditorDomNotFoundError(exception.type, exception.value))
+}
+
 function shouldDropResizeObserverLoopEvent(
   event: Sentry.ErrorEvent,
   hint?: Sentry.EventHint,
@@ -101,6 +126,7 @@ function shouldDropSentryEvent(event: Sentry.ErrorEvent, hint?: Sentry.EventHint
   return shouldDropWhiteboardPlatformPermissionEvent(event, hint)
     || shouldDropStaleTauriListenerCleanupEvent(event, hint)
     || shouldDropBlockNoteStaleBlockReferenceEvent(event, hint)
+    || shouldDropRichEditorDomNotFoundEvent(event, hint)
     || shouldDropResizeObserverLoopEvent(event, hint)
 }
 
