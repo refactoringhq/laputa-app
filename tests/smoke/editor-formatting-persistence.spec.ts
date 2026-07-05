@@ -289,6 +289,23 @@ test('Obsidian-style highlight markdown typed in rich mode renders and persists'
   expect(await getRawEditorContent(page)).toContain('Plain ==rich-marked==')
 })
 
+test('plain prose parentheses typed in rich mode persist without escapes', async ({ page }) => {
+  await openNote(page, 'Note B')
+
+  const block = page.locator('.bn-block-content').nth(1)
+  await block.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' Plain parentheses (Smith, 2024) stay plain.')
+  await page.waitForTimeout(700)
+
+  await roundTripThroughAnotherNote(page)
+  await openRawMode(page)
+
+  const raw = await getRawEditorContent(page)
+  expect(raw).toContain('Plain parentheses (Smith, 2024) stay plain.')
+  expect(raw).not.toContain('Plain parentheses \\(Smith, 2024\\) stay plain.')
+})
+
 test('toolbar highlight button toggles selected text and persists removal', async ({ page }) => {
   await openNote(page, 'Note B')
   await selectWord(page, 1, 'referenced')
