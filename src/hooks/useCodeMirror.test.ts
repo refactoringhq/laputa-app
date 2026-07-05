@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { EditorSelection } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 import { useCodeMirror, type CodeMirrorCallbacks } from './useCodeMirror'
@@ -11,6 +12,14 @@ const noopCallbacks: CodeMirrorCallbacks = {
   onSave: noop,
   onEscape: () => false,
 }
+const originalUserAgent = navigator.userAgent
+
+function setUserAgent(userAgent: string) {
+  Object.defineProperty(window.navigator, 'userAgent', {
+    configurable: true,
+    value: userAgent,
+  })
+}
 
 describe('useCodeMirror', () => {
   let container: HTMLDivElement
@@ -21,6 +30,7 @@ describe('useCodeMirror', () => {
   })
 
   afterEach(() => {
+    setUserAgent(originalUserAgent)
     document.body.removeChild(container)
   })
 
@@ -161,6 +171,77 @@ describe('useCodeMirror', () => {
     expect(handled).toBe(true)
     expect(view.state.doc.toString()).toBe('hello\t')
     expect(onDocChange).toHaveBeenCalledWith('hello\t')
+  })
+
+  it('keeps Windows Home and End inside the current raw-editor line when visual boundary lookup crosses lines', () => {
+    setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+    const ref = { current: container }
+    const content = [
+      'previous paragraph',
+      'current paragraph with enough wrapped raw Markdown to expose WebView2 boundary drift',
+    ].join('\n')
+    const { result } = renderHook(() =>
+      useCodeMirror(ref, content, noopCallbacks),
+    )
+    const view = result.current.current!
+    const currentLine = view.state.doc.line(2)
+    const cursor = currentLine.from + 'current paragraph'.length
+    vi.spyOn(view, 'moveToLineBoundary').mockImplementation(() => EditorSelection.cursor(2))
+
+    act(() => {
+      view.dispatch({ selection: { anchor: cursor } })
+      view.focus()
+      view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'Home',
+      }))
+    })
+
+    expect(view.state.selection.main.head).toBe(currentLine.from)
+
+    act(() => {
+      view.dispatch({ selection: { anchor: cursor } })
+      view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'End',
+      }))
+    })
+
+    expect(view.state.selection.main.head).toBe(currentLine.to)
+  })
+
+  it('falls back when Windows Home visual boundary lookup stays in the paragraph but on the wrong row', () => {
+    setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+    const ref = { current: container }
+    const content = 'current paragraph with enough wrapped raw Markdown to expose WebView2 boundary drift'
+    const { result } = renderHook(() =>
+      useCodeMirror(ref, content, noopCallbacks),
+    )
+    const view = result.current.current!
+    const currentLine = view.state.doc.line(1)
+    const cursor = currentLine.from + 'current paragraph'.length
+    const driftedBoundary = currentLine.from + 'cur'.length
+    const originalCoordsAtPos = view.coordsAtPos.bind(view)
+    vi.spyOn(view, 'moveToLineBoundary').mockImplementation(() => EditorSelection.cursor(driftedBoundary))
+    vi.spyOn(view, 'coordsAtPos').mockImplementation((pos, side) => {
+      if (pos === cursor) return { left: 12, right: 12, top: 120, bottom: 136 }
+      if (pos === driftedBoundary) return { left: 12, right: 12, top: 40, bottom: 56 }
+      return originalCoordsAtPos(pos, side)
+    })
+
+    act(() => {
+      view.dispatch({ selection: { anchor: cursor } })
+      view.focus()
+      view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'Home',
+      }))
+    })
+
+    expect(view.state.selection.main.head).toBe(currentLine.from)
   })
 
   it('does not sync when content matches current editor state', () => {
