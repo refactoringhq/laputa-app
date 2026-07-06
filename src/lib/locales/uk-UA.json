@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit недоступний, доки вимкнено функції Git.",
   "settings.autogit.enable": "Увімкнути AutoGit",
   "settings.autogit.enableDescription": "Коли ввімкнено, Tolaria автоматично комітить і надсилає збережені локальні зміни після паузи в бездіяльності або після того, як застосунок стає неактивним.",
+  "settings.autogit.aiCommitMessages": "Використовуйте ШІ для повідомлень про коміти AutoGit",
+  "settings.autogit.aiCommitMessagesDescription": "Коли ввімкнено, AutoGit запитує у налаштованої моделі ШІ короткі семантичні повідомлення коміту і використовує детерміновані мітки, якщо ШІ недоступний.",
   "settings.autogit.idleThreshold": "Поріг бездіяльності (секунди)",
   "settings.autogit.idleThresholdDescription": "Скільки Tolaria чекає після паузи в редагуванні перед створенням контрольної точки.",
   "settings.autogit.inactiveThreshold": "Пільговий період неактивного застосунку (секунди)",

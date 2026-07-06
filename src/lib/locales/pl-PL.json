@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit jest niedostępny, gdy funkcje Git są wyłączone.",
   "settings.autogit.enable": "Włącz AutoGit",
   "settings.autogit.enableDescription": "Po włączeniu Tolaria automatycznie zatwierdzi i wypchnie zapisane lokalne zmiany po przerwie w aktywności lub gdy aplikacja stanie się nieaktywna.",
+  "settings.autogit.aiCommitMessages": "Użyj sztucznej inteligencji do tworzenia komunikatów commit w AutoGit",
+  "settings.autogit.aiCommitMessagesDescription": "Po włączeniu AutoGit prosi skonfigurowany model sztucznej inteligencji o krótkie, semantyczne komunikaty do commitów, a jeśli sztuczna inteligencja jest niedostępna, stosuje etykiety deterministyczne.",
   "settings.autogit.idleThreshold": "Próg bezczynności (sekundy)",
   "settings.autogit.idleThresholdDescription": "Jak długo Tolaria czeka po przerwach w edycji przed utworzeniem punktu kontrolnego.",
   "settings.autogit.inactiveThreshold": "Okres karencji nieaktywnej aplikacji (sekundy)",

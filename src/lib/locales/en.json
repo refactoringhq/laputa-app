@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit is unavailable while Git features are disabled.",
   "settings.autogit.enable": "Enable AutoGit",
   "settings.autogit.enableDescription": "When enabled, Tolaria will commit and push saved local changes automatically after an idle pause or after the app becomes inactive.",
+  "settings.autogit.aiCommitMessages": "Use AI for AutoGit commit messages",
+  "settings.autogit.aiCommitMessagesDescription": "When enabled, AutoGit asks the configured AI model for brief semantic commit messages and falls back to deterministic labels if AI is unavailable.",
   "settings.autogit.idleThreshold": "Idle threshold (seconds)",
   "settings.autogit.idleThresholdDescription": "How long Tolaria waits after editing pauses before checkpointing.",
   "settings.autogit.inactiveThreshold": "Inactive-app grace period (seconds)",

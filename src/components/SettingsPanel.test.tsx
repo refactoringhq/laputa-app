@@ -21,6 +21,7 @@ const emptySettings: Settings = {
   git_provider: null,
   git_wsl_distro: null,
   autogit_enabled: null,
+  autogit_use_ai_commit_messages: null,
   autogit_idle_threshold_seconds: null,
   autogit_inactive_threshold_seconds: null,
   auto_advance_inbox_after_organize: null,
@@ -83,6 +84,13 @@ function installMatchMedia(matches = false) {
       dispatchEvent: vi.fn(() => true),
     })),
   })
+}
+
+function expectAutoGitControlsDisabled() {
+  expect(screen.getByRole('switch', { name: 'Enable AutoGit' })).toBeDisabled()
+  expect(screen.getByRole('switch', { name: 'Use AI for AutoGit commit messages' })).toBeDisabled()
+  expect(screen.getByTestId('settings-autogit-idle-threshold')).toBeDisabled()
+  expect(screen.getByTestId('settings-autogit-inactive-threshold')).toBeDisabled()
 }
 
 describe('SettingsPanel', () => {
@@ -810,9 +818,7 @@ describe('SettingsPanel', () => {
     )
 
     expect(screen.getByRole('switch', { name: 'Enable Git features' })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByRole('switch', { name: 'Enable AutoGit' })).toBeDisabled()
-    expect(screen.getByTestId('settings-autogit-idle-threshold')).toBeDisabled()
-    expect(screen.getByTestId('settings-autogit-inactive-threshold')).toBeDisabled()
+    expectAutoGitControlsDisabled()
   })
 
   it('saves AutoGit preferences when toggled and edited', () => {
@@ -832,6 +838,22 @@ describe('SettingsPanel', () => {
     }))
   })
 
+  it('saves the AutoGit AI commit-message preference', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Use AI for AutoGit commit messages' }))
+    fireEvent.click(screen.getByTestId('settings-save'))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      autogit_use_ai_commit_messages: true,
+    }))
+    expect(trackEventMock).toHaveBeenCalledWith('autogit_ai_commit_messages_changed', {
+      enabled: 1,
+    })
+  })
+
   it('disables AutoGit controls when the current vault is not git-enabled', () => {
     render(
       <SettingsPanel
@@ -843,9 +865,7 @@ describe('SettingsPanel', () => {
       />
     )
 
-    expect(screen.getByRole('switch', { name: 'Enable AutoGit' })).toBeDisabled()
-    expect(screen.getByTestId('settings-autogit-idle-threshold')).toBeDisabled()
-    expect(screen.getByTestId('settings-autogit-inactive-threshold')).toBeDisabled()
+    expectAutoGitControlsDisabled()
   })
 
   it('saves the initial H1 auto-rename preference when toggled off', () => {

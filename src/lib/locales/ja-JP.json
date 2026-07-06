@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "Git機能が無効になっている間、AutoGitは利用できません。",
   "settings.autogit.enable": "AutoGitを有効にする",
   "settings.autogit.enableDescription": "有効にすると、Tolaria はアイドル状態になった後、またはアプリが非アクティブになった後に、保存されたローカル変更を自動的にコミットしてプッシュします。",
+  "settings.autogit.aiCommitMessages": "AutoGitのコミットメッセージにAIを使用する",
+  "settings.autogit.aiCommitMessagesDescription": "有効にすると、AutoGitは設定されたAIモデルに簡潔な意味論的コミットメッセージを要求し、AIが利用できない場合は決定論的ラベルにフォールバックします。",
   "settings.autogit.idleThreshold": "アイドルしきい値（秒）",
   "settings.autogit.idleThresholdDescription": "編集が止まってからチェックポイントを作成するまで Tolaria が待つ時間です。",
   "settings.autogit.inactiveThreshold": "アプリ非アクティブ後の猶予期間（秒）",
