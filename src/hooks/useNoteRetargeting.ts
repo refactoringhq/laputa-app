@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react'
 import type { FolderNode, SidebarSelection, VaultEntry } from '../types'
 import type { FrontmatterOpOptions } from './frontmatterOps'
 import { extractVaultTypes } from '../utils/vaultTypes'
+import { trackNoteRetargeted } from '../lib/productAnalytics'
 
 type RetargetResult = 'updated' | 'noop' | 'error'
 
@@ -120,6 +121,7 @@ async function changeEntryType({
   try {
     await updateFrontmatter(notePath, 'type', normalizedType, { silent: true })
     updateEntitySelection(selection, setSelection, notePath, { path: notePath, isA: normalizedType })
+    trackNoteRetargeted({ targetKind: 'type' })
     setToastMessage(`Type set to "${normalizedType}"`)
     return 'updated'
   } catch (error) {
@@ -156,7 +158,7 @@ async function moveEntryToFolder({
   ) => Promise<{ new_path: string } | null>
 }): Promise<RetargetResult> {
   const normalizedFolderPath = normalizeFolderPath({ folderPath })
-  if (!entry || !normalizedFolderPath) return 'error'
+  if (!entry) return 'error'
   if (folderPathForEntry({ entry, vaultPath }) === normalizedFolderPath) return 'noop'
 
   const result = await moveNoteToFolder(
@@ -166,7 +168,12 @@ async function moveEntryToFolder({
     (oldPath, newEntry) => updateEntitySelection(selection, setSelection, oldPath, newEntry),
   )
   if (!result) return 'error'
-  return result.new_path === notePath ? 'noop' : 'updated'
+  if (result.new_path === notePath) return 'noop'
+  trackNoteRetargeted({
+    targetKind: 'folder',
+    folderDestination: normalizedFolderPath ? 'folder' : 'root',
+  })
+  return 'updated'
 }
 
 export function useNoteRetargeting({

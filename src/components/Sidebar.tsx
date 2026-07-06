@@ -63,6 +63,8 @@ interface SidebarProps {
   renamingFolderPath?: string | null
   onStartRenameFolder?: (folderPath: string) => void
   onCancelRenameFolder?: () => void
+  onCanDropNoteOnFolder?: (notePath: string, folderPath: string) => boolean
+  onMoveNoteToFolder?: (notePath: string, folderPath: string) => Promise<unknown> | unknown
   vaultRootPath?: string
   workspaceOrder?: readonly string[]
   showInbox?: boolean
@@ -99,6 +101,8 @@ interface SidebarNavigationProps extends Pick<
   | 'renamingFolderPath'
   | 'onStartRenameFolder'
   | 'onCancelRenameFolder'
+  | 'onCanDropNoteOnFolder'
+  | 'onMoveNoteToFolder'
   | 'vaultRootPath'
   | 'workspaceOrder'
   | 'showInbox'
@@ -186,6 +190,8 @@ type SidebarFoldersNavigationProps = Pick<
   | 'renamingFolderPath'
   | 'onStartRenameFolder'
   | 'onCancelRenameFolder'
+  | 'onCanDropNoteOnFolder'
+  | 'onMoveNoteToFolder'
   | 'vaultRootPath'
   | 'groupCollapsed'
   | 'toggleGroup'
@@ -339,6 +345,8 @@ function SidebarFoldersNavigation({
   renamingFolderPath,
   onStartRenameFolder,
   onCancelRenameFolder,
+  onCanDropNoteOnFolder,
+  onMoveNoteToFolder,
   vaultRootPath,
   groupCollapsed,
   toggleGroup,
@@ -367,6 +375,8 @@ function SidebarFoldersNavigation({
       renamingFolderPath={renamingFolderPath}
       onStartRenameFolder={onStartRenameFolder}
       onCancelRenameFolder={onCancelRenameFolder}
+      onCanDropNote={onCanDropNoteOnFolder}
+      onMoveNoteToFolder={onMoveNoteToFolder}
       collapsed={groupCollapsed.folders}
       locale={locale}
       onToggle={() => toggleGroup('folders')}
@@ -468,6 +478,8 @@ function SidebarNavigation(props: SidebarNavigationProps) {
         renamingFolderPath={props.renamingFolderPath}
         onStartRenameFolder={props.onStartRenameFolder}
         onCancelRenameFolder={props.onCancelRenameFolder}
+        onCanDropNoteOnFolder={props.onCanDropNoteOnFolder}
+        onMoveNoteToFolder={props.onMoveNoteToFolder}
         vaultRootPath={props.vaultRootPath}
         groupCollapsed={props.groupCollapsed}
         toggleGroup={props.toggleGroup}
@@ -611,6 +623,8 @@ function SidebarRuntimeNavigation({
       renamingFolderPath={props.renamingFolderPath}
       onStartRenameFolder={props.onStartRenameFolder}
       onCancelRenameFolder={props.onCancelRenameFolder}
+      onCanDropNoteOnFolder={props.onCanDropNoteOnFolder}
+      onMoveNoteToFolder={props.onMoveNoteToFolder}
       vaultRootPath={props.vaultRootPath}
       workspaceOrder={props.workspaceOrder}
       showInbox={props.showInbox}
