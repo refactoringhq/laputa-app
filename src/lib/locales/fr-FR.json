@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit n'est pas disponible lorsque les fonctionnalités Git sont désactivées.",
   "settings.autogit.enable": "Activer AutoGit",
   "settings.autogit.enableDescription": "Lorsque cette option est activée, Tolaria valide et pousse automatiquement les modifications locales enregistrées après une pause d'inactivité ou lorsque l'application devient inactive.",
+  "settings.autogit.aiCommitMessages": "Utiliser l'IA pour les messages de validation AutoGit",
+  "settings.autogit.aiCommitMessagesDescription": "Lorsqu'elle est activée, AutoGit demande au modèle d'IA configuré de fournir de brefs messages de validation sémantiques et utilise des étiquettes déterministes si l'IA n'est pas disponible.",
   "settings.autogit.idleThreshold": "Seuil d'inactivité (secondes)",
   "settings.autogit.idleThresholdDescription": "Durée pendant laquelle Tolaria attend après une pause d'édition avant de créer un point de contrôle.",
   "settings.autogit.inactiveThreshold": "Délai de grâce en cas d'application inactive (secondes)",

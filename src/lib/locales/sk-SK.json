@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit nie je k dispozícii, keď sú funkcie Git zakázané.",
   "settings.autogit.enable": "Povoliť AutoGit",
   "settings.autogit.enableDescription": "Keď je povolená, Tolaria automaticky odošle a nahraje uložené lokálne zmeny po prestávke z dôvodu nečinnosti alebo po tom, ako sa aplikácia stane neaktívnou.",
+  "settings.autogit.aiCommitMessages": "Používať umelú inteligenciu na správy o commitoch v AutoGit",
+  "settings.autogit.aiCommitMessagesDescription": "Keď je povolené, AutoGit požiada nakonfigurovaný model umelej inteligencie o stručné sémantické správy o commitoch a v prípade nedostupnosti umelej inteligencie použije deterministické štítky.",
   "settings.autogit.idleThreshold": "Prahová hodnota nečinnosti (sekundy)",
   "settings.autogit.idleThresholdDescription": "Ako dlho Tolaria čaká po prestávkach v úpravách pred vytvorením kontrolného bodu.",
   "settings.autogit.inactiveThreshold": "Doba odkladu pri neaktívnej aplikácii (sekundy)",

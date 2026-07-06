@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "停用 Git 功能時，無法使用 AutoGit。",
   "settings.autogit.enable": "啟用 AutoGit",
   "settings.autogit.enableDescription": "啟用後，Tolaria 會在空閒暫停或應用變為非活躍後自動提交併推送儲存的本地更改。",
+  "settings.autogit.aiCommitMessages": "使用 AI 來撰寫 AutoGit 遞交訊息",
+  "settings.autogit.aiCommitMessagesDescription": "啟用後，AutoGit 會要求已設定的 AI 模型提供簡短的語義提交訊息，如果 AI 無法使用，則會改用確定性標籤。",
   "settings.autogit.idleThreshold": "空閒閾值（秒）",
   "settings.autogit.idleThresholdDescription": "編輯暫停後，Tolaria 等待多久再建立檢查點。",
   "settings.autogit.inactiveThreshold": "應用非活躍寬限期（秒）",

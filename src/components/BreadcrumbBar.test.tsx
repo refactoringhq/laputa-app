@@ -117,10 +117,12 @@ async function expectTooltip(trigger: HTMLElement, ...parts: string[]) {
 }
 
 async function openOverflowMenu() {
-  fireEvent.pointerDown(screen.getByRole('button', { name: 'More note actions' }), {
-    button: 0,
-    ctrlKey: false,
-  })
+  const trigger = screen.getByRole('button', { name: 'More note actions' })
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: 'mouse' })
+  fireEvent.mouseDown(trigger, { button: 0, ctrlKey: false })
+  fireEvent.pointerUp(trigger, { button: 0, ctrlKey: false, pointerType: 'mouse' })
+  fireEvent.mouseUp(trigger, { button: 0, ctrlKey: false })
+  fireEvent.click(trigger, { button: 0, ctrlKey: false })
   return screen.findByRole('menu')
 }
 

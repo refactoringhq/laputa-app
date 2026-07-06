@@ -15,6 +15,7 @@ type AiWorkspaceMode = 'docked' | 'side' | 'window'
 type AiWorkspaceTitleSource = 'generated' | 'manual'
 type NotePdfExportFailureReason = 'export_unavailable' | 'export_error'
 type NotePdfExportSource = 'breadcrumb' | 'app_command' | 'note_list_context_menu'
+type CommitMessageDraftSurface = 'autogit' | 'manual'
 type AnalyticsBoolean = boolean
 type AiAgentResponseText = string
 type AiAgentToolCount = number
@@ -124,12 +125,15 @@ export function trackCommitMessageGenerated(params: {
   aiAttempted: AnalyticsBoolean
   fileCount: number
   source: CommitMessageDraftSource
+  surface?: CommitMessageDraftSurface
 }): void {
-  trackEvent('commit_message_generated', {
+  const payload = {
     ai_attempted: numericFlag(params.aiAttempted),
     file_count: params.fileCount,
     source: params.source,
-  })
+    ...(params.surface ? { surface: params.surface } : {}),
+  }
+  trackEvent('commit_message_generated', payload)
 }
 
 export function trackDefaultNoteWidthChanged(mode: NoteWidthMode): void {
