@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit tidak tersedia selama fitur Git dinonaktifkan.",
   "settings.autogit.enable": "Aktifkan AutoGit",
   "settings.autogit.enableDescription": "Jika diaktifkan, Tolaria akan melakukan commit dan mendorong perubahan lokal yang disimpan secara otomatis setelah jeda idle atau setelah aplikasi menjadi tidak aktif.",
+  "settings.autogit.aiCommitMessages": "Gunakan AI untuk pesan commit AutoGit",
+  "settings.autogit.aiCommitMessagesDescription": "Saat diaktifkan, AutoGit meminta model AI yang dikonfigurasi untuk membuat pesan commit semantik singkat dan menggunakan label deterministik jika AI tidak tersedia.",
   "settings.autogit.idleThreshold": "Batas idle (detik)",
   "settings.autogit.idleThresholdDescription": "Berapa lama Tolaria menunggu setelah jeda pengeditan sebelum membuat pos pemeriksaan.",
   "settings.autogit.inactiveThreshold": "Masa tenggang aplikasi tidak aktif (detik)",

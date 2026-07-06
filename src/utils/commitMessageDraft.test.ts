@@ -91,35 +91,44 @@ describe('commit message draft generation', () => {
     expect(normalizeCommitMessageDraft('Commit message: Improve onboarding docs.')).toBe('Improve onboarding docs')
   })
 
-  it('uses a ready API model with structured diff metadata only', async () => {
+  it('uses a ready API model with structured diff metadata and bounded diff excerpts', async () => {
     streamAiModelMock.mockImplementation(async ({ callbacks }) => {
-      callbacks.onText('Commit message: Improve onboarding docs.')
+      callbacks.onText('Commit message: Use date casing in old essays.')
       callbacks.onDone()
     })
+    const loadFileDiff = vi.fn().mockResolvedValue([
+      'diff --git a/essays/old.md b/essays/old.md',
+      '--- a/essays/old.md',
+      '+++ b/essays/old.md',
+      '@@ -1,4 +1,4 @@',
+      '-Date: 2026-07-02',
+      '+date: 2026-07-02',
+    ].join('\n'))
 
     const result = await generateCommitMessageDraft({
       aiFeaturesEnabled: true,
       files: [
-        file('docs/onboarding.md', 'modified', { addedLines: 12, deletedLines: 3 }),
-        file('docs/setup.md', 'untracked', { addedLines: 8, deletedLines: 0 }),
+        file('essays/old.md', 'modified', { addedLines: 1, deletedLines: 1 }),
       ],
+      loadFileDiff,
       target: apiTarget,
       targetReady: true,
     })
 
     expect(result).toEqual({
       aiAttempted: true,
-      fileCount: 2,
-      message: 'Improve onboarding docs',
+      fileCount: 1,
+      message: 'Use date casing in old essays',
       source: 'ai_model',
     })
+    expect(loadFileDiff).toHaveBeenCalledWith(file('essays/old.md', 'modified', { addedLines: 1, deletedLines: 1 }))
     expect(streamAiModelMock).toHaveBeenCalledWith(expect.objectContaining({
       model: apiTarget.model,
       provider: apiTarget.provider,
-      message: expect.stringContaining('- modified docs/onboarding.md (+12 -3)'),
-      systemPrompt: expect.stringContaining('Do not inspect files or use tools.'),
+      message: expect.stringContaining('+date: 2026-07-02'),
+      systemPrompt: expect.stringContaining('Prefer the semantic change over file names'),
     }))
-    expect(streamAiModelMock.mock.calls[0][0].message).toContain('note contents are intentionally not included')
+    expect(streamAiModelMock.mock.calls[0][0].message).toContain('-Date: 2026-07-02')
   })
 
   it('does not call an agent target from the commit-message generator', async () => {

@@ -282,6 +282,8 @@ files:
     settings.autogit.description.gitDisabled: 55a1dd2d7f797062cde1374930221649
     settings.autogit.enable: 9b205a4ae0e3ad4e6708155880ce9c75
     settings.autogit.enableDescription: a7424a8f90c0b7f290a8144d12374554
+    settings.autogit.aiCommitMessages: 41ac82bb19cb2f88a32837c01e293f9a
+    settings.autogit.aiCommitMessagesDescription: ffe33e37d2fe7705106401d7fda6decf
     settings.autogit.idleThreshold: 28016cc6fccd951a904ee3020cd733b6
     settings.autogit.idleThresholdDescription: 521140491e8c9d5a1d7b7739bc333358
     settings.autogit.inactiveThreshold: d28cb60d1e70e020ae8d1294e32dd474

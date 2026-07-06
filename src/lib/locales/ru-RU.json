@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit недоступен, когда функции Git отключены.",
   "settings.autogit.enable": "Включить AutoGit",
   "settings.autogit.enableDescription": "Если эта функция включена, Tolaria будет автоматически выполнять коммит и пуш сохраненных локальных изменений после паузы бездействия или после того, как приложение станет неактивным.",
+  "settings.autogit.aiCommitMessages": "Использовать ИИ для сообщений коммита AutoGit",
+  "settings.autogit.aiCommitMessagesDescription": "Когда эта функция включена, AutoGit запрашивает у настроенной модели ИИ краткие семантические сообщения для коммитов, а если ИИ недоступен, использует детерминированные метки.",
   "settings.autogit.idleThreshold": "Порог бездействия (секунды)",
   "settings.autogit.idleThresholdDescription": "Сколько Tolaria ждёт после пауз в редактировании перед созданием контрольной точки.",
   "settings.autogit.inactiveThreshold": "Период отсрочки при неактивном приложении (секунды)",

@@ -164,6 +164,7 @@ describe('mockHandlers coverage', () => {
       git_provider: null,
       git_wsl_distro: null,
       autogit_enabled: true,
+      autogit_use_ai_commit_messages: false,
       autogit_idle_threshold_seconds: 90,
       autogit_inactive_threshold_seconds: 30,
       auto_advance_inbox_after_organize: true,

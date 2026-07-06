@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit недаступны, пакуль магчымасці Git выключаны.",
   "settings.autogit.enable": "Уключыць Аўта-Git",
   "settings.autogit.enableDescription": "Tolaria будзе аўтаматычна захоўваць і адпраўляць змены пасля паўзы ў рэдагаванні.",
+  "settings.autogit.aiCommitMessages": "Выкарыстоўваць ШІ для паведамленняў пра каміты AutoGit",
+  "settings.autogit.aiCommitMessagesDescription": "Калі ўключана, AutoGit запытвае ў настроенай мадэлі ШІ кароткія семантычныя паведамленні пра каміт і вяртаецца да дэтермінаваных метак, калі ШІ недаступны.",
   "settings.autogit.idleThreshold": "Парог чакання (секунды)",
   "settings.autogit.idleThresholdDescription": "Час бяздзейнасці да аўтаматычнага захавання.",
   "settings.autogit.inactiveThreshold": "Парог неактыўнасці праграмы (секунды)",

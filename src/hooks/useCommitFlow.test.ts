@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useCommitFlow } from './useCommitFlow'
+import type { AiTarget } from '../lib/aiTargets'
 import type { ModifiedFile } from '../types'
 
+const { streamAiModelMock } = vi.hoisted(() => ({
+  streamAiModelMock: vi.fn(),
+}))
 const mockInvokeFn = vi.fn()
 const mockTrackEvent = vi.fn()
 
@@ -17,6 +21,10 @@ vi.mock('../mock-tauri', () => ({
 
 vi.mock('../lib/telemetry', () => ({
   trackEvent: (event: string, properties?: Record<string, unknown>) => mockTrackEvent(event, properties),
+}))
+
+vi.mock('../utils/streamAiModel', () => ({
+  streamAiModel: streamAiModelMock,
 }))
 
 function createDeferred<T>() {
@@ -40,6 +48,26 @@ const testAuthorIdentity = {
   warning: null,
 }
 
+const apiTarget: Extract<AiTarget, { kind: 'api_model' }> = {
+  kind: 'api_model',
+  id: 'model:openai/gpt-4.1',
+  label: 'OpenAI · GPT-4.1',
+  shortLabel: 'GPT-4.1',
+  provider: {
+    id: 'openai',
+    name: 'OpenAI',
+    kind: 'open_ai',
+    api_key_storage: 'env',
+    api_key_env_var: 'OPENAI_API_KEY',
+    models: [],
+  },
+  model: {
+    id: 'gpt-4.1',
+    display_name: 'GPT-4.1',
+    capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: false },
+  },
+}
+
 function modifiedFile(relativePath: string, status: ModifiedFile['status'] = 'modified'): ModifiedFile {
   return { path: `/vault/${relativePath}`, relativePath, status }
 }
@@ -61,10 +89,13 @@ describe('useCommitFlow', () => {
     onPushRejected = vi.fn()
     mockTrackEvent.mockReset()
     mockInvokeFn.mockReset()
+    streamAiModelMock.mockReset()
+    streamAiModelMock.mockResolvedValue(undefined)
     mockInvokeFn.mockImplementation((command: string) => {
       if (command === 'git_commit') return Promise.resolve('[main abc1234] test commit')
       if (command === 'git_author_identity') return Promise.resolve(testAuthorIdentity)
       if (command === 'git_push') return Promise.resolve({ status: 'ok', message: 'Pushed to remote' })
+      if (command === 'get_file_diff') return Promise.resolve('diff unavailable')
       throw new Error(`Unexpected command: ${command}`)
     })
   })
@@ -321,6 +352,49 @@ describe('useCommitFlow', () => {
     expect(mockInvokeFn).toHaveBeenNthCalledWith(1, 'git_commit', { vaultPath: '/vault', message: 'Updated 1 note' })
     expect(mockInvokeFn).toHaveBeenNthCalledWith(2, 'git_push', { vaultPath: '/vault' })
     expect(setToastMessage).toHaveBeenCalledWith('Committed and pushed')
+  })
+
+  it('runAutomaticCheckpoint uses an AI draft when AutoGit AI commit messages are enabled', async () => {
+    loadModifiedFilesForVaultPath.mockResolvedValueOnce([
+      modifiedFile('essays/old.md'),
+    ])
+    streamAiModelMock.mockImplementation(async ({ callbacks }) => {
+      callbacks.onText('Use date casing in old essays')
+      callbacks.onDone()
+    })
+    mockInvokeFn.mockImplementation((command: string) => {
+      if (command === 'git_commit') return Promise.resolve('[main abc1234] test commit')
+      if (command === 'git_push') return Promise.resolve({ status: 'ok', message: 'Pushed to remote' })
+      if (command === 'get_file_diff') return Promise.resolve('-Date: 2026-07-02\n+date: 2026-07-02')
+      throw new Error(`Unexpected command: ${command}`)
+    })
+    const { result } = renderCommitFlow({
+      aiFeaturesEnabled: true,
+      autoGitAiCommitMessagesEnabled: true,
+      commitMessageTarget: apiTarget,
+      commitMessageTargetReady: true,
+    })
+
+    await act(async () => {
+      await result.current.runAutomaticCheckpoint({ savePendingBeforeCommit: true })
+    })
+
+    expect(loadModifiedFilesForVaultPath).toHaveBeenCalledWith('/vault', { includeStats: true })
+    expect(mockInvokeFn).toHaveBeenCalledWith('get_file_diff', {
+      path: '/vault/essays/old.md',
+      vaultPath: '/vault',
+    })
+    expect(streamAiModelMock.mock.calls[0][0].message).toContain('Diff excerpts')
+    expect(mockInvokeFn).toHaveBeenCalledWith('git_commit', {
+      vaultPath: '/vault',
+      message: 'Use date casing in old essays',
+    })
+    expect(mockTrackEvent).toHaveBeenCalledWith('commit_message_generated', {
+      ai_attempted: 1,
+      file_count: 1,
+      source: 'ai_model',
+      surface: 'autogit',
+    })
   })
 
   it('runAutomaticCheckpoint treats commit failures as handled after showing recovery feedback', async () => {

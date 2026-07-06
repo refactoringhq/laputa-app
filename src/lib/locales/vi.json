@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit không khả dụng khi các tính năng Git bị tắt.",
   "settings.autogit.enable": "Bật AutoGit",
   "settings.autogit.enableDescription": "Khi bật, Tolaria sẽ tự động commit và đẩy các thay đổi đã lưu sau một khoảng nghỉ hoặc khi ứng dụng chuyển sang trạng thái không hoạt động.",
+  "settings.autogit.aiCommitMessages": "Sử dụng AI cho thông điệp commit AutoGit",
+  "settings.autogit.aiCommitMessagesDescription": "Khi được bật, AutoGit sẽ yêu cầu mô hình AI đã được định cấu hình cung cấp các thông điệp commit ngắn gọn, mang tính ngữ nghĩa, và sẽ sử dụng các nhãn xác định nếu AI không khả dụng.",
   "settings.autogit.idleThreshold": "Ngưỡng nhàn rỗi (giây)",
   "settings.autogit.idleThresholdDescription": "Tolaria đợi bao lâu sau khi bạn tạm dừng chỉnh sửa trước khi tạo checkpoint.",
   "settings.autogit.inactiveThreshold": "Thời gian ân hạn khi ứng dụng không hoạt động (giây)",
