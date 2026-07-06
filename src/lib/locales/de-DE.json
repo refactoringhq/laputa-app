@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Abschnitt einklappen",
   "editor.sideMenu.expandItem": "Element erweitern",
   "editor.sideMenu.collapseItem": "Element einklappen",
+  "editor.sideMenu.turnIntoMenu": "Verwandeln in …",
   "editor.sideMenu.turnInto": "In {type} umwandeln",
   "editor.formatting.highlight": "Hervorheben",
   "editor.formatting.highlightTooltip": "Hervorhebung (bleibt in Markdown erhalten)",

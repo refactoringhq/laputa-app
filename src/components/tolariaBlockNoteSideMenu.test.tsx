@@ -31,7 +31,9 @@ type SideMenuButtonProps = {
 type MenuItemProps = PropsWithChildren<{
   checked?: boolean
   className?: string
+  icon?: ReactNode
   onClick?: () => void
+  subTrigger?: boolean
 }>
 
 type RenderSideMenuOptions = {
@@ -70,18 +72,18 @@ let mockSuggestionMenu: { openSuggestionMenu: ReturnType<typeof vi.fn> }
 let sideMenuBlock: MockBlock | undefined
 const originalElementsFromPoint = document.elementsFromPoint
 const turnIntoButtonLabels = [
-  'Turn into Paragraph',
-  'Turn into Heading 1',
-  'Turn into Heading 2',
-  'Turn into Heading 3',
-  'Turn into Heading 4',
-  'Turn into Heading 5',
-  'Turn into Heading 6',
-  'Turn into Quote',
-  'Turn into Bullet List',
-  'Turn into Numbered List',
-  'Turn into Checklist',
-  'Turn into Code Block',
+  'Paragraph',
+  'Heading 1',
+  'Heading 2',
+  'Heading 3',
+  'Heading 4',
+  'Heading 5',
+  'Heading 6',
+  'Quote',
+  'Bullet List',
+  'Numbered List',
+  'Checklist',
+  'Code Block',
 ]
 
 beforeAll(() => {
@@ -176,18 +178,31 @@ vi.mock('@blocknote/react', () => ({
   useComponentsContext: () => ({
     Generic: {
       Menu: {
-        Item: ({ children, onClick }: MenuItemProps) => (
-          <button type="button" onClick={onClick}>{children}</button>
+        Dropdown: ({ children, sub }: PropsWithChildren<{ sub?: boolean }>) => (
+          <div data-testid={sub ? 'menu-sub-dropdown' : 'menu-dropdown'}>{children}</div>
         ),
-        Root: ({ children, onOpenChange }: PropsWithChildren<{ onOpenChange?: (open: boolean) => void }>) => (
+        Item: ({ children, icon, onClick, subTrigger }: MenuItemProps) => (
+          <button
+            aria-haspopup={subTrigger ? 'menu' : undefined}
+            data-sub-trigger={subTrigger ? 'true' : undefined}
+            type="button"
+            onClick={onClick}
+          >
+            {icon ? <span data-testid={`menu-item-icon-${String(children)}`}>{icon}</span> : null}
+            {children}
+          </button>
+        ),
+        Root: ({ children, onOpenChange, sub }: PropsWithChildren<{ onOpenChange?: (open: boolean) => void; sub?: boolean }>) => (
           <div
-            data-testid="menu-root"
+            data-testid={sub ? 'menu-sub-root' : 'menu-root'}
             onClick={() => onOpenChange?.(true)}
           >
             {children}
           </div>
         ),
-        Trigger: ({ children }: PropsWithChildren) => <div>{children}</div>,
+        Trigger: ({ children, sub }: PropsWithChildren<{ sub?: boolean }>) => (
+          <div data-testid={sub ? 'menu-sub-trigger' : 'menu-trigger'}>{children}</div>
+        ),
       },
     },
     SideMenu: {
@@ -352,6 +367,14 @@ function dispatchHandlePointerReorder(dragHandle: HTMLElement) {
   dispatchPointerEvent(document, 'pointerup', { clientX: 130, clientY: 122 })
 }
 
+function rootSideMenuButtonText() {
+  const sideMenu = screen.getByTestId('side-menu')
+  return screen.getAllByRole('button')
+    .filter((button) => button.closest('[data-testid="side-menu"]') === sideMenu)
+    .filter((button) => !button.closest('[data-testid="menu-sub-dropdown"]'))
+    .map((button) => button.textContent)
+}
+
 function renderPointerReorderFixture() {
   const draggedBlock = testBlock('dragged-block', 'heading', ['Notes'])
   const targetBlock = testBlock('target-block', 'paragraph', ['Paragraph'])
@@ -436,18 +459,18 @@ describe('TolariaSideMenu', () => {
     renderSideMenuWithBlock(sideMenuBlock)
 
     expect(screen.getByTestId('side-menu')).toBeInTheDocument()
-    const sideMenuButtons = screen.getAllByRole('button')
-      .filter((button) => button.closest('[data-testid="side-menu"]') === screen.getByTestId('side-menu'))
-      .filter((button) => button.dataset.testid !== 'menu-root')
-      .filter((button) => button.textContent !== 'Delete')
-
-    expect(sideMenuButtons.map((button) => button.textContent)).toEqual([
+    expect(rootSideMenuButtonText()).toEqual([
       'Drag block',
-      ...turnIntoButtonLabels,
+      'Delete',
+      'Turn into...',
       'Add block',
     ])
 
     expect(screen.getByText('Delete')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Turn into...' })).toHaveAttribute('aria-haspopup', 'menu')
+    for (const label of turnIntoButtonLabels) {
+      expect(screen.getByTestId(`menu-item-icon-${label}`)).toBeInTheDocument()
+    }
     expect(screen.queryByText('Colors')).not.toBeInTheDocument()
   })
 
@@ -537,7 +560,7 @@ describe('TolariaSideMenu', () => {
     mockEditor.getBlock.mockReturnValue(liveBlock)
 
     renderSideMenuWithBlock(liveBlock)
-    fireEvent.click(screen.getByRole('button', { name: 'Turn into Heading 2' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Heading 2' }))
 
     expect(mockEditor.focus).toHaveBeenCalledOnce()
     expect(mockEditor.updateBlock).toHaveBeenCalledWith(liveBlock.id, {
@@ -549,7 +572,7 @@ describe('TolariaSideMenu', () => {
   it('ignores turn-into clicks when reload churn leaves a stale side-menu block', () => {
     renderSideMenuWithBlock(sideMenuBlock)
 
-    expect(() => fireEvent.click(screen.getByRole('button', { name: 'Turn into Heading 2' }))).not.toThrow()
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'Heading 2' }))).not.toThrow()
     expect(mockEditor.updateBlock).not.toHaveBeenCalled()
   })
 
@@ -670,14 +693,10 @@ describe('TolariaSideMenu', () => {
 
     renderSideMenuWithBlock(heading)
 
-    const sideMenuButtons = screen.getAllByRole('button')
-      .filter((button) => button.closest('[data-testid="side-menu"]') === screen.getByTestId('side-menu'))
-      .filter((button) => button.dataset.testid !== 'menu-root')
-      .filter((button) => button.textContent !== 'Delete')
-
-    expect(sideMenuButtons.map((button) => button.textContent)).toEqual([
+    expect(rootSideMenuButtonText()).toEqual([
       'Drag block',
-      ...turnIntoButtonLabels,
+      'Delete',
+      'Turn into...',
       'Collapse section',
     ])
   })
@@ -713,14 +732,10 @@ describe('TolariaSideMenu', () => {
 
     renderSideMenuWithBlock(parentListItem)
 
-    const sideMenuButtons = screen.getAllByRole('button')
-      .filter((button) => button.closest('[data-testid="side-menu"]') === screen.getByTestId('side-menu'))
-      .filter((button) => button.dataset.testid !== 'menu-root')
-      .filter((button) => button.textContent !== 'Delete')
-
-    expect(sideMenuButtons.map((button) => button.textContent)).toEqual([
+    expect(rootSideMenuButtonText()).toEqual([
       'Drag block',
-      ...turnIntoButtonLabels,
+      'Delete',
+      'Turn into...',
       'Collapse item',
     ])
   })

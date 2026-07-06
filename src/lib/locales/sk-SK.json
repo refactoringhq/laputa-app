@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Zbaliť sekciu",
   "editor.sideMenu.expandItem": "Rozbaliť položku",
   "editor.sideMenu.collapseItem": "Zbaliť položku",
+  "editor.sideMenu.turnIntoMenu": "Premeniť na...",
   "editor.sideMenu.turnInto": "Premeniť na {type}",
   "editor.formatting.highlight": "Zvýrazniť",
   "editor.formatting.highlightTooltip": "Zvýrazniť (zostane v markdown)",

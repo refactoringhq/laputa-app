@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Thu gọn phần",
   "editor.sideMenu.expandItem": "Mở rộng mục",
   "editor.sideMenu.collapseItem": "Thu gọn mục",
+  "editor.sideMenu.turnIntoMenu": "Biến thành...",
   "editor.sideMenu.turnInto": "Chuyển thành {type}",
   "editor.formatting.highlight": "Đánh dấu",
   "editor.formatting.highlightTooltip": "Đánh dấu (duy trì trong markdown)",

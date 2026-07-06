@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Згарнуць раздзел",
   "editor.sideMenu.expandItem": "Разгарнуць элемент",
   "editor.sideMenu.collapseItem": "Згарнуць элемент",
+  "editor.sideMenu.turnIntoMenu": "Ператварыць у...",
   "editor.sideMenu.turnInto": "Ператварыць у {type}",
   "editor.formatting.highlight": "Вылучэнне",
   "editor.formatting.highlightTooltip": "Вылучэнне (захоўваецца ў Markdown)",

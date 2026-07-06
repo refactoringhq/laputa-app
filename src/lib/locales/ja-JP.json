@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "セクションを折りたたむ",
   "editor.sideMenu.expandItem": "アイテムを展開",
   "editor.sideMenu.collapseItem": "アイテムを折りたたむ",
+  "editor.sideMenu.turnIntoMenu": "変換先...",
   "editor.sideMenu.turnInto": "{type}に変換",
   "editor.formatting.highlight": "ハイライト",
   "editor.formatting.highlightTooltip": "ハイライト（Markdownで保持）",
