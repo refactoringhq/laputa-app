@@ -44,7 +44,10 @@ import {
   type SideMenuBlock,
 } from './tolariaSideMenuBlocks'
 import { turnBlockIntoType } from './richEditorBlockTypeCommands'
-import { getTolariaBlockTypeSelectItems } from './tolariaEditorFormattingConfig'
+import {
+  createTolariaSlashMenuIcon,
+  getTolariaBlockTypeSelectItems,
+} from './tolariaEditorFormattingConfig'
 
 type TableHeaderContent = Record<string, unknown> & {
   headerCols?: unknown
@@ -382,27 +385,37 @@ function TolariaTableHeaderItem({
   )
 }
 
-function TolariaTurnBlockIntoItems({ locale }: { locale: AppLocale }) {
+function TolariaTurnBlockIntoSubmenu({ locale }: { locale: AppLocale }) {
   const Components = useComponentsContext()!
   const { block, editor } = useSideMenuBlock()
 
   if (!block) return null
 
-  return getTolariaBlockTypeSelectItems().map((item) => (
-    <Components.Generic.Menu.Item
-      key={item.key}
-      className="bn-menu-item"
-      onClick={() => {
-        runSideMenuAction(() => {
-          turnBlockIntoType(editor, block.id, item, 'block_menu')
-        })
-      }}
-    >
-      {translate(locale, 'editor.sideMenu.turnInto', {
-        type: richEditorBlockTypeName(locale, item),
-      })}
-    </Components.Generic.Menu.Item>
-  ))
+  return (
+    <Components.Generic.Menu.Root sub position="right">
+      <Components.Generic.Menu.Trigger sub>
+        <Components.Generic.Menu.Item className="bn-menu-item" subTrigger>
+          {translate(locale, 'editor.sideMenu.turnIntoMenu')}
+        </Components.Generic.Menu.Item>
+      </Components.Generic.Menu.Trigger>
+      <Components.Generic.Menu.Dropdown sub>
+        {getTolariaBlockTypeSelectItems().map((item) => (
+          <Components.Generic.Menu.Item
+            key={item.key}
+            className="bn-menu-item"
+            icon={createTolariaSlashMenuIcon(item.icon)}
+            onClick={() => {
+              runSideMenuAction(() => {
+                turnBlockIntoType(editor, block.id, item, 'block_menu')
+              })
+            }}
+          >
+            {richEditorBlockTypeName(locale, item)}
+          </Components.Generic.Menu.Item>
+        ))}
+      </Components.Generic.Menu.Dropdown>
+    </Components.Generic.Menu.Root>
+  )
 }
 
 function TolariaDragHandleMenu({
@@ -418,7 +431,7 @@ function TolariaDragHandleMenu({
     <DragHandleMenu>
       {children}
       <TolariaRemoveBlockItem>{dict.drag_handle.delete_menuitem}</TolariaRemoveBlockItem>
-      <TolariaTurnBlockIntoItems locale={locale} />
+      <TolariaTurnBlockIntoSubmenu locale={locale} />
       <TolariaTableHeaderItem header="row">{dict.drag_handle.header_row_menuitem}</TolariaTableHeaderItem>
       <TolariaTableHeaderItem header="column">{dict.drag_handle.header_column_menuitem}</TolariaTableHeaderItem>
     </DragHandleMenu>

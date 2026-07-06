@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "收起部分",
   "editor.sideMenu.expandItem": "展开项目",
   "editor.sideMenu.collapseItem": "收起项目",
+  "editor.sideMenu.turnIntoMenu": "转换为...",
   "editor.sideMenu.turnInto": "转换为{type}",
   "editor.formatting.highlight": "高亮",
   "editor.formatting.highlightTooltip": "高亮（在 Markdown 中保留）",

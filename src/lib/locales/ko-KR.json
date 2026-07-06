@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "섹션 접기",
   "editor.sideMenu.expandItem": "항목 펼치기",
   "editor.sideMenu.collapseItem": "항목 접기",
+  "editor.sideMenu.turnIntoMenu": "다음으로 바꾸기...",
   "editor.sideMenu.turnInto": "{type}(으)로 전환",
   "editor.formatting.highlight": "강조",
   "editor.formatting.highlightTooltip": "강조 표시(마크다운에 유지)",

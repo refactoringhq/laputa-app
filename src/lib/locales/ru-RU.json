@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Свернуть раздел",
   "editor.sideMenu.expandItem": "Развернуть элемент",
   "editor.sideMenu.collapseItem": "Свернуть элемент",
+  "editor.sideMenu.turnIntoMenu": "Превратить в...",
   "editor.sideMenu.turnInto": "Преобразовать в {type}",
   "editor.formatting.highlight": "Выделение",
   "editor.formatting.highlightTooltip": "Выделение (сохраняется в Markdown)",
