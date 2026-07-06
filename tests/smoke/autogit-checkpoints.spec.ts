@@ -126,7 +126,7 @@ async function openAutoGitSettings(page: Page) {
   const settingsPanel = page.getByTestId('settings-panel')
   await expect(settingsPanel).toBeVisible({ timeout: 5_000 })
 
-  const autoGitSwitch = settingsPanel.getByRole('switch', { name: 'AutoGit' })
+  const autoGitSwitch = settingsPanel.getByTestId('settings-autogit-enabled')
   await expect(autoGitSwitch).toBeEnabled({ timeout: 5_000 })
   await autoGitSwitch.click({ force: true })
   await page.getByTestId('settings-autogit-idle-threshold').fill('2')

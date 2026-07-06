@@ -96,6 +96,7 @@ pub struct Settings {
     pub git_provider: Option<String>,
     pub git_wsl_distro: Option<String>,
     pub autogit_enabled: Option<bool>,
+    pub autogit_use_ai_commit_messages: Option<bool>,
     pub autogit_idle_threshold_seconds: Option<u32>,
     pub autogit_inactive_threshold_seconds: Option<u32>,
     pub auto_advance_inbox_after_organize: Option<bool>,
@@ -220,6 +221,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         git_provider: normalize_git_provider(settings.git_provider.as_deref()),
         git_wsl_distro: normalize_optional_string(settings.git_wsl_distro),
         autogit_enabled: settings.autogit_enabled,
+        autogit_use_ai_commit_messages: settings.autogit_use_ai_commit_messages,
         autogit_idle_threshold_seconds: normalize_optional_positive_u32(
             settings.autogit_idle_threshold_seconds,
         ),
@@ -448,6 +450,7 @@ mod tests {
             git_provider: Some("wsl".to_string()),
             git_wsl_distro: Some("Ubuntu".to_string()),
             autogit_enabled: Some(true),
+            autogit_use_ai_commit_messages: Some(true),
             autogit_idle_threshold_seconds: Some(90),
             autogit_inactive_threshold_seconds: Some(30),
             auto_advance_inbox_after_organize: Some(true),
@@ -493,6 +496,7 @@ mod tests {
             auto_pull_interval_minutes: Some(10),
             git_enabled: Some(false),
             autogit_enabled: Some(true),
+            autogit_use_ai_commit_messages: Some(true),
             autogit_idle_threshold_seconds: Some(90),
             autogit_inactive_threshold_seconds: Some(30),
             auto_advance_inbox_after_organize: Some(true),
@@ -516,6 +520,7 @@ mod tests {
         assert_eq!(loaded.auto_pull_interval_minutes, Some(10));
         assert_eq!(loaded.git_enabled, Some(false));
         assert_eq!(loaded.autogit_enabled, Some(true));
+        assert_eq!(loaded.autogit_use_ai_commit_messages, Some(true));
         assert_eq!(loaded.autogit_idle_threshold_seconds, Some(90));
         assert_eq!(loaded.autogit_inactive_threshold_seconds, Some(30));
         assert_eq!(loaded.auto_advance_inbox_after_organize, Some(true));

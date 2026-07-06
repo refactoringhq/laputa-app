@@ -919,6 +919,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
 
   const commitFlow = useCommitFlow({
     aiFeaturesEnabled,
+    autoGitAiCommitMessagesEnabled: settings.autogit_use_ai_commit_messages === true,
     commitMessageTarget: quickPromptTarget,
     commitMessageTargetReady: quickPromptTargetReady,
     savePending: appSave.savePending,

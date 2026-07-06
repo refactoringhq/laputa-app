@@ -612,10 +612,10 @@ External vault mutations are any disk writes Tolaria did not just perform throug
 - Shows auth, network, and incompatible-history failures inline without rewriting the local vault's history
 
 `useAutoGit` is the checkpoint-time companion to both hooks:
-- Consumes installation-local AutoGit settings (`autogit_enabled`, idle threshold, inactive threshold)
+- Consumes installation-local AutoGit settings (`autogit_enabled`, `autogit_use_ai_commit_messages`, idle threshold, inactive threshold)
 - Tracks the last meaningful editor activity plus app focus/visibility transitions
 - Triggers `useCommitFlow.runAutomaticCheckpoint()` only when the vault is git-backed, pending changes exist, and no unsaved edits remain
-- Shares the same deterministic automatic commit message generator with the bottom-bar Commit button, so timer-driven checkpoints and manual quick commits produce the same `Updated N note(s)` / `Updated N file(s)` messages
+- Uses deterministic `Updated N note(s)` / `Updated N file(s)` checkpoint messages by default, or the same bounded AI draft path as the manual commit dialog when `autogit_use_ai_commit_messages` is enabled
 
 ### Frontend Integration
 
@@ -623,7 +623,7 @@ External vault mutations are any disk writes Tolaria did not just perform throug
 - **Diff view**: Toggle in breadcrumb bar → shows unified diff
 - **Git history**: Shown in Inspector panel for active note
 - **Commit dialog**: Triggered from sidebar or Cmd+K; can prefill an editable generated message from current changed-file metadata before any commit runs
-- **Generate commit message command**: Cmd+K action that opens the commit dialog, reloads the selected repository with line stats, and fills the message field. Direct configured model targets receive only structured path/status/line-count metadata with a bounded path list; disabled AI, offline AI, agent targets, or model failures use a deterministic changed-file summary instead.
+- **Generate commit message command**: Cmd+K action that opens the commit dialog, reloads the selected repository with line stats, and fills the message field. Direct configured model targets receive structured path/status/line-count metadata plus bounded diff excerpts; disabled AI, offline AI, agent targets, or model failures use a deterministic changed-file summary instead.
 - **Branch indicator**: Current Git branch chip in the bottom bar for Git-backed vaults
 - **No remote indicator**: Neutral chip in the bottom bar when `GitRemoteStatus.hasRemote === false`
 - **Pulse view**: Activity feed when Pulse filter is selected

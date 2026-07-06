@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit är inte tillgängligt medan Git-funktioner är inaktiverade.",
   "settings.autogit.enable": "Aktivera AutoGit",
   "settings.autogit.enableDescription": "När detta är aktiverat checkar Tolaria in och pushar sparade lokala ändringar automatiskt efter en inaktiv paus eller efter att appen blir inaktiv.",
+  "settings.autogit.aiCommitMessages": "Använd AI för AutoGit-commitmeddelanden",
+  "settings.autogit.aiCommitMessagesDescription": "När den är aktiverad ber AutoGit den konfigurerade AI-modellen om korta semantiska commit-meddelanden och använder deterministiska etiketter om AI inte är tillgänglig.",
   "settings.autogit.idleThreshold": "Tröskel för inaktivitet (sekunder)",
   "settings.autogit.idleThresholdDescription": "Hur länge Tolaria väntar efter pauser i redigeringen innan en kontrollpunkt skapas.",
   "settings.autogit.inactiveThreshold": "Respit för inaktiv app (sekunder)",

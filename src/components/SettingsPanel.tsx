@@ -108,6 +108,7 @@ interface SettingsDraft {
   gitProvider: GitProviderId
   gitWslDistro: string | null
   autoGitEnabled: boolean
+  autoGitAiCommitMessagesEnabled: boolean
   autoGitIdleThresholdSeconds: number
   autoGitInactiveThresholdSeconds: number
   autoAdvanceInboxAfterOrganize: boolean
@@ -144,6 +145,8 @@ interface SettingsBodyProps {
   isGitVault: boolean
   autoGitEnabled: boolean
   setAutoGitEnabled: (value: boolean) => void
+  autoGitAiCommitMessagesEnabled: boolean
+  setAutoGitAiCommitMessagesEnabled: (value: boolean) => void
   autoGitIdleThresholdSeconds: number
   setAutoGitIdleThresholdSeconds: (value: number) => void
   autoGitInactiveThresholdSeconds: number
@@ -214,6 +217,7 @@ function createSettingsDraft(
     gitProvider: normalizeSettingsGitProvider(settings.git_provider),
     gitWslDistro: settings.git_wsl_distro?.trim() || null,
     autoGitEnabled: settings.autogit_enabled ?? false,
+    autoGitAiCommitMessagesEnabled: settings.autogit_use_ai_commit_messages ?? false,
     autoGitIdleThresholdSeconds: sanitizePositiveInteger(
       settings.autogit_idle_threshold_seconds,
       DEFAULT_AUTOGIT_IDLE_THRESHOLD_SECONDS,
@@ -270,6 +274,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     git_provider: draft.gitProvider === 'native' ? null : draft.gitProvider,
     git_wsl_distro: draft.gitProvider === 'wsl' ? draft.gitWslDistro : null,
     autogit_enabled: draft.autoGitEnabled,
+    autogit_use_ai_commit_messages: draft.autoGitAiCommitMessagesEnabled,
     autogit_idle_threshold_seconds: draft.autoGitIdleThresholdSeconds,
     autogit_inactive_threshold_seconds: draft.autoGitInactiveThresholdSeconds,
     auto_advance_inbox_after_organize: draft.autoAdvanceInboxAfterOrganize,
@@ -572,6 +577,8 @@ function SettingsBodyFromDraft({
       isGitVault={isGitVault}
       autoGitEnabled={draft.autoGitEnabled}
       setAutoGitEnabled={(value) => updateDraft('autoGitEnabled', value)}
+      autoGitAiCommitMessagesEnabled={draft.autoGitAiCommitMessagesEnabled}
+      setAutoGitAiCommitMessagesEnabled={(value) => updateDraft('autoGitAiCommitMessagesEnabled', value)}
       autoGitIdleThresholdSeconds={draft.autoGitIdleThresholdSeconds}
       setAutoGitIdleThresholdSeconds={(value) => updateDraft('autoGitIdleThresholdSeconds', value)}
       autoGitInactiveThresholdSeconds={draft.autoGitInactiveThresholdSeconds}
@@ -651,6 +658,8 @@ function SettingsSyncAndAppearanceSections({
   isGitVault,
   autoGitEnabled,
   setAutoGitEnabled,
+  autoGitAiCommitMessagesEnabled,
+  setAutoGitAiCommitMessagesEnabled,
   autoGitIdleThresholdSeconds,
   setAutoGitIdleThresholdSeconds,
   autoGitInactiveThresholdSeconds,
@@ -708,6 +717,8 @@ function SettingsSyncAndAppearanceSections({
           isGitVault={isGitVault}
           autoGitEnabled={autoGitEnabled}
           setAutoGitEnabled={setAutoGitEnabled}
+          autoGitAiCommitMessagesEnabled={autoGitAiCommitMessagesEnabled}
+          setAutoGitAiCommitMessagesEnabled={setAutoGitAiCommitMessagesEnabled}
           autoGitIdleThresholdSeconds={autoGitIdleThresholdSeconds}
           setAutoGitIdleThresholdSeconds={setAutoGitIdleThresholdSeconds}
           autoGitInactiveThresholdSeconds={autoGitInactiveThresholdSeconds}
