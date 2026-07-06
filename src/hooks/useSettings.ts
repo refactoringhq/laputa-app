@@ -44,6 +44,7 @@ const EMPTY_SETTINGS: Settings = {
   git_provider: null,
   git_wsl_distro: null,
   autogit_enabled: null,
+  autogit_use_ai_commit_messages: null,
   autogit_idle_threshold_seconds: null,
   autogit_inactive_threshold_seconds: null,
   auto_advance_inbox_after_organize: null,
@@ -79,6 +80,7 @@ function normalizeSettings(settings: Settings): Settings {
     git_path: nullableTrimmedString(settings.git_path),
     git_provider: normalizeGitProvider(settings.git_provider),
     git_wsl_distro: nullableTrimmedString(settings.git_wsl_distro),
+    autogit_use_ai_commit_messages: settings.autogit_use_ai_commit_messages ?? null,
     release_channel: serializeReleaseChannel(
       normalizeReleaseChannel(settings.release_channel),
     ),

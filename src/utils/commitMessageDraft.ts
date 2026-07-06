@@ -5,14 +5,18 @@ import type { AgentStreamCallbacks } from './streamAiAgent'
 import { generateCommitMessage } from './commitMessage'
 
 const AI_FILE_LIMIT = 24
+const AI_DIFF_FILE_LIMIT = 8
+const DIFF_EXCERPT_CHAR_LIMIT = 1200
+const DIFF_PROMPT_CHAR_LIMIT = 6000
 const SUMMARY_CHAR_LIMIT = 72
 
 const COMMIT_MESSAGE_SYSTEM_PROMPT = [
-  'Draft one concise Git commit message from structured Tolaria vault change metadata.',
+  'Draft one concise Git commit message from Tolaria vault changes.',
+  'Prefer the semantic change over file names when diff excerpts reveal one.',
   'Use imperative mood and keep the summary under 72 characters.',
   'Return only the commit message.',
   'Do not use markdown, quotes, emojis, bullet points, issue numbers, or trailing punctuation.',
-  'Do not mention files or changes that are not present in the metadata.',
+  'Do not mention files or changes that are not present in the metadata or excerpts.',
   'Do not inspect files or use tools.',
 ].join(' ')
 
@@ -28,8 +32,14 @@ export interface CommitMessageDraftResult {
 interface GenerateCommitMessageDraftOptions {
   aiFeaturesEnabled?: boolean
   files: ModifiedFile[]
+  loadFileDiff?: (file: ModifiedFile) => Promise<string>
   target?: AiTarget
   targetReady?: boolean
+}
+
+interface DiffExcerpt {
+  excerpt: string
+  file: ModifiedFile
 }
 
 function fileKind(files: ModifiedFile[]): string {
@@ -82,7 +92,73 @@ function statusCounts(files: ModifiedFile[]): string {
     .join(', ')
 }
 
-function diffSummaryPrompt(files: ModifiedFile[], fallback: string): string {
+function diffContentLines(diff: string): string {
+  return diff
+    .split('\n')
+    .filter((line) => {
+      if (line.startsWith('+++') || line.startsWith('---')) return false
+      return line.startsWith('@@') || line.startsWith('+') || line.startsWith('-')
+    })
+    .join('\n')
+    .trim()
+}
+
+function trimExcerpt(excerpt: string, limit: number): string {
+  if (excerpt.length <= limit) return excerpt
+  return `${excerpt.slice(0, Math.max(0, limit - 15)).trimEnd()}\n[truncated]`
+}
+
+function boundedDiffExcerpts(excerpts: DiffExcerpt[]): DiffExcerpt[] {
+  let remaining = DIFF_PROMPT_CHAR_LIMIT
+  const bounded: DiffExcerpt[] = []
+
+  for (const { excerpt, file } of excerpts) {
+    if (remaining <= 0) break
+    const limit = Math.min(DIFF_EXCERPT_CHAR_LIMIT, remaining)
+    const nextExcerpt = trimExcerpt(excerpt, limit)
+    if (!nextExcerpt) continue
+    bounded.push({ excerpt: nextExcerpt, file })
+    remaining -= nextExcerpt.length
+  }
+
+  return bounded
+}
+
+async function loadDiffExcerpts(
+  files: ModifiedFile[],
+  loadFileDiff?: (file: ModifiedFile) => Promise<string>,
+): Promise<DiffExcerpt[]> {
+  if (!loadFileDiff) return []
+
+  const results = await Promise.all(files.slice(0, AI_DIFF_FILE_LIMIT).map(async (file) => {
+    if (file.binary) return null
+
+    try {
+      const diff = await loadFileDiff(file)
+      const excerpt = diffContentLines(diff)
+      return excerpt ? { excerpt, file } : null
+    } catch {
+      return null
+    }
+  }))
+
+  return boundedDiffExcerpts(results.filter((result): result is DiffExcerpt => result !== null))
+}
+
+function diffExcerptLines(excerpts: DiffExcerpt[]): string[] {
+  if (excerpts.length === 0) return []
+
+  return [
+    'Diff excerpts:',
+    ...excerpts.flatMap(({ excerpt, file }) => [
+      `- ${statusLabel(file.status)} ${file.relativePath}`,
+      excerpt,
+    ]),
+    '',
+  ]
+}
+
+function diffSummaryPrompt(files: ModifiedFile[], fallback: string, excerpts: DiffExcerpt[]): string {
   const listedFiles = files.slice(0, AI_FILE_LIMIT)
   const omitted = files.length - listedFiles.length
   const fileLines = listedFiles.map((file) => (
@@ -91,7 +167,7 @@ function diffSummaryPrompt(files: ModifiedFile[], fallback: string): string {
 
   return [
     'Draft a Git commit message for these Tolaria vault changes.',
-    'Use only this metadata; note contents are intentionally not included.',
+    'Use the diff excerpts when present; otherwise use the metadata.',
     '',
     `Fallback draft: ${fallback}`,
     `Changed ${fileKind(files)}: ${files.length}`,
@@ -101,6 +177,7 @@ function diffSummaryPrompt(files: ModifiedFile[], fallback: string): string {
     ...fileLines,
     ...(omitted > 0 ? [`- ${omitted} more path${omitted === 1 ? '' : 's'} omitted from the prompt`] : []),
     '',
+    ...diffExcerptLines(excerpts),
     'Commit message:',
   ].join('\n')
 }
@@ -160,12 +237,14 @@ async function generateAiCommitMessage(
   files: ModifiedFile[],
   fallback: string,
   target: Extract<AiTarget, { kind: 'api_model' }>,
+  loadFileDiff?: (file: ModifiedFile) => Promise<string>,
 ): Promise<string | null> {
   let message = ''
+  const excerpts = await loadDiffExcerpts(files, loadFileDiff)
   await streamAiModel({
     provider: target.provider,
     model: target.model,
-    message: diffSummaryPrompt(files, fallback),
+    message: diffSummaryPrompt(files, fallback, excerpts),
     systemPrompt: COMMIT_MESSAGE_SYSTEM_PROMPT,
     callbacks: streamCallbacks((text) => {
       message += text
@@ -177,6 +256,7 @@ async function generateAiCommitMessage(
 export async function generateCommitMessageDraft({
   aiFeaturesEnabled,
   files,
+  loadFileDiff,
   target,
   targetReady,
 }: GenerateCommitMessageDraftOptions): Promise<CommitMessageDraftResult> {
@@ -190,7 +270,7 @@ export async function generateCommitMessageDraft({
   }
 
   try {
-    const message = await generateAiCommitMessage(files, fallback, aiTarget)
+    const message = await generateAiCommitMessage(files, fallback, aiTarget, loadFileDiff)
     if (message) return { aiAttempted: true, fileCount, message, source: 'ai_model' }
   } catch {
     // Fall through to the deterministic draft. Generation should never block committing.

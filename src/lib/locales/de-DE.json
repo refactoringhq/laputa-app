@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit ist nicht verfügbar, wenn die Git-Funktionen deaktiviert sind.",
   "settings.autogit.enable": "AutoGit aktivieren",
   "settings.autogit.enableDescription": "Wenn diese Option aktiviert ist, führt Tolaria nach einer Inaktivitätspause oder nachdem die App inaktiv geworden ist, automatisch ein Commit und einen Push der gespeicherten lokalen Änderungen durch.",
+  "settings.autogit.aiCommitMessages": "KI für AutoGit-Commit-Nachrichten verwenden",
+  "settings.autogit.aiCommitMessagesDescription": "Wenn diese Option aktiviert ist, fordert AutoGit vom konfigurierten KI-Modell kurze semantische Commit-Nachrichten an und greift auf deterministische Labels zurück, wenn die KI nicht verfügbar ist.",
   "settings.autogit.idleThreshold": "Leerlaufschwelle (Sekunden)",
   "settings.autogit.idleThresholdDescription": "Wie lange Tolaria nach Bearbeitungspausen wartet, bevor ein Checkpoint erstellt wird.",
   "settings.autogit.inactiveThreshold": "Kulanzzeitraum bei inaktiver App (Sekunden)",

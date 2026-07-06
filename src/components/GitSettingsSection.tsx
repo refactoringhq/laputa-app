@@ -13,6 +13,7 @@ type Translate = ReturnType<typeof createTranslator>
 
 interface GitSettingsSectionProps {
   autoGitEnabled: boolean
+  autoGitAiCommitMessagesEnabled: boolean
   autoGitIdleThresholdSeconds: number
   autoGitInactiveThresholdSeconds: number
   gitProvider: GitProviderId
@@ -20,6 +21,7 @@ interface GitSettingsSectionProps {
   gitWslDistro: string | null
   isGitVault: boolean
   setAutoGitEnabled: (value: boolean) => void
+  setAutoGitAiCommitMessagesEnabled: (value: boolean) => void
   setAutoGitIdleThresholdSeconds: (value: number) => void
   setAutoGitInactiveThresholdSeconds: (value: number) => void
   setGitFeaturesEnabled: (value: boolean) => void
@@ -42,6 +44,7 @@ function describeAutoGitAvailability(
 export function GitSettingsSection(props: GitSettingsSectionProps) {
   const {
     autoGitEnabled,
+    autoGitAiCommitMessagesEnabled,
     autoGitIdleThresholdSeconds,
     autoGitInactiveThresholdSeconds,
     gitProvider,
@@ -49,6 +52,7 @@ export function GitSettingsSection(props: GitSettingsSectionProps) {
     gitWslDistro,
     isGitVault,
     setAutoGitEnabled,
+    setAutoGitAiCommitMessagesEnabled,
     setAutoGitIdleThresholdSeconds,
     setAutoGitInactiveThresholdSeconds,
     setGitFeaturesEnabled,
@@ -88,6 +92,15 @@ export function GitSettingsSection(props: GitSettingsSectionProps) {
           onChange={setAutoGitEnabled}
           disabled={!gitControlsAvailable}
           testId="settings-autogit-enabled"
+        />
+
+        <SettingsSwitchRow
+          label={t('settings.autogit.aiCommitMessages')}
+          description={t('settings.autogit.aiCommitMessagesDescription')}
+          checked={autoGitAiCommitMessagesEnabled}
+          onChange={setAutoGitAiCommitMessagesEnabled}
+          disabled={!gitControlsAvailable}
+          testId="settings-autogit-ai-commit-messages"
         />
 
         <SettingsRow

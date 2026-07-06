@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "AutoGit niedastupny, pakuĺ mahčymasci Git vykliučany.",
   "settings.autogit.enable": "Ukliučyć Aŭta-Git",
   "settings.autogit.enableDescription": "Tolaria budzie aŭtamatyčna zachoŭvać i adpraŭliać zmieny paslia paŭzy ŭ redahavanni.",
+  "settings.autogit.aiCommitMessages": "Vykarystoŭvać ŠI dla paviedamlenniaŭ pra kamity AutoGit",
+  "settings.autogit.aiCommitMessagesDescription": "Kali ŭkliučana, AutoGit zapytvaje ŭ nastrojenaj madeli ŠI karotkija siemantyčnyja paviedamlenni pra kamity i viartajecca da detyerminavanych mietak, kali ŠI niedastupny.",
   "settings.autogit.idleThreshold": "Paroh čakannia (siekundy)",
   "settings.autogit.idleThresholdDescription": "Čas biazdziejnasci da aŭtamatyčnaha zachavannia.",
   "settings.autogit.inactiveThreshold": "Paroh nieaktyŭnasci prahramy (siekundy)",

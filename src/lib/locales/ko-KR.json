@@ -280,6 +280,8 @@
   "settings.autogit.description.gitDisabled": "Git 기능이 비활성화된 상태에서는 AutoGit을 사용할 수 없습니다.",
   "settings.autogit.enable": "AutoGit 활성화",
   "settings.autogit.enableDescription": "이 기능을 활성화하면, Tolaria는 유휴 시간 중 일시 중지되거나 앱이 비활성화된 후 저장된 로컬 변경 사항을 자동으로 커밋하고 푸시합니다.",
+  "settings.autogit.aiCommitMessages": "AutoGit 커밋 메시지에 AI 사용",
+  "settings.autogit.aiCommitMessagesDescription": "활성화된 경우, AutoGit은 구성된 AI 모델에 간단한 의미론적 커밋 메시지를 요청하며, AI를 사용할 수 없는 경우 결정론적 레이블로 대체합니다.",
   "settings.autogit.idleThreshold": "유휴 시간 임계값(초)",
   "settings.autogit.idleThresholdDescription": "편집이 멈춘 뒤 체크포인트를 만들기 전에 Tolaria가 기다리는 시간입니다.",
   "settings.autogit.inactiveThreshold": "앱 비활성 유예 기간(초)",
