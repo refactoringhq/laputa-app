@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSaveNote } from './useSaveNote'
+import { clearNoteContentCache, getCachedNoteContentEntry } from './noteContentCache'
 
 const mockInvokeFn = vi.fn<(cmd: string, args?: Record<string, unknown>) => Promise<null>>(() => Promise.resolve(null))
 
@@ -20,6 +21,7 @@ describe('useSaveNote', () => {
   beforeEach(() => {
     updateContent = vi.fn<(path: string, content: string) => void>()
     mockInvokeFn.mockClear()
+    clearNoteContentCache()
   })
 
   it('saves content immediately via Tauri command', async () => {
@@ -47,6 +49,16 @@ describe('useSaveNote', () => {
     expect(updateContent).toHaveBeenCalledTimes(2)
     expect(updateContent).toHaveBeenCalledWith('/test/a.md', 'content A')
     expect(updateContent).toHaveBeenCalledWith('/test/b.md', 'content B')
+  })
+
+  it('refreshes the note-open cache so tab swaps keep the just-saved content', async () => {
+    const { result } = renderHook(() => useSaveNote(updateContent))
+
+    await act(async () => {
+      await result.current.saveNote('/test/swap.md', '# Draft saved before swapping tabs')
+    })
+
+    expect(getCachedNoteContentEntry('/test/swap.md')?.value).toBe('# Draft saved before swapping tabs')
   })
 
   it('propagates save errors to the caller', async () => {
