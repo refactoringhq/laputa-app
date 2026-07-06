@@ -30,6 +30,8 @@ interface FolderTreeProps {
   renamingFolderPath?: string | null
   onStartRenameFolder?: (folderPath: string) => void
   onCancelRenameFolder?: () => void
+  onCanDropNote?: (notePath: string, folderPath: string) => boolean
+  onMoveNoteToFolder?: (notePath: string, folderPath: string) => Promise<unknown> | unknown
   collapsed?: boolean
   locale?: AppLocale
   onToggle?: () => void
@@ -44,6 +46,8 @@ interface FolderTreeBodyProps extends Pick<
   | 'onRenameFolder'
   | 'onSelect'
   | 'onStartRenameFolder'
+  | 'onCanDropNote'
+  | 'onMoveNoteToFolder'
   | 'renamingFolderPath'
   | 'selection'
 > {
@@ -138,6 +142,8 @@ export const FolderTree = memo(function FolderTree({
   renamingFolderPath,
   onStartRenameFolder,
   onCancelRenameFolder,
+  onCanDropNote,
+  onMoveNoteToFolder,
   collapsed: externalCollapsed,
   locale = 'en',
   onToggle,
@@ -211,6 +217,8 @@ export const FolderTree = memo(function FolderTree({
         onSelect={onSelect}
         onStartRenameFolder={onStartRenameFolder}
         renamingFolderPath={renamingFolderPath}
+        onCanDropNote={onCanDropNote}
+        onMoveNoteToFolder={onMoveNoteToFolder}
         rootPath={vaultRootPath}
         sectionCollapsed={sectionCollapsed}
         selection={selection}
@@ -243,6 +251,8 @@ function FolderTreeBody({
   onRenameFolder,
   onSelect,
   onStartRenameFolder,
+  onCanDropNote,
+  onMoveNoteToFolder,
   renamingFolderPath,
   rootPath,
   sectionCollapsed,
@@ -264,6 +274,8 @@ function FolderTreeBody({
           onRenameFolder={onRenameFolder}
           onSelect={onSelect}
           onStartRenameFolder={onStartRenameFolder}
+          onCanDropNote={onCanDropNote}
+          onMoveNoteToFolder={onMoveNoteToFolder}
           onToggle={toggleFolder}
           onCancelRenameFolder={onCancelRenameFolder}
           locale={locale}

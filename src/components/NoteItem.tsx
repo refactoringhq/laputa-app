@@ -1,4 +1,4 @@
-import type { ComponentType, CSSProperties, MouseEvent as ReactMouseEvent, MouseEventHandler, ReactNode, SVGAttributes } from 'react'
+import type { ComponentType, CSSProperties, DragEventHandler, MouseEvent as ReactMouseEvent, MouseEventHandler, ReactNode, SVGAttributes } from 'react'
 import type { VaultEntry, NoteStatus } from '../types'
 import { cn } from '@/lib/utils'
 import {
@@ -17,6 +17,7 @@ import { ChangeNoteContent } from './note-item/ChangeNoteContent'
 import { workspaceForEntry } from '../utils/workspaces'
 import { WorkspaceInitialsBadge } from './WorkspaceInitialsBadge'
 import { useDateDisplayFormat } from '../hooks/useAppPreferences'
+import { writeNoteDragData } from '../utils/noteDragDrop'
 
 const TYPE_ICON_MAP: Record<string, ComponentType<SVGAttributes<SVGSVGElement>>> = {
   Project: Wrench,
@@ -89,9 +90,11 @@ type NoteItemRowState = 'binary' | 'multiSelected' | 'selected' | 'highlighted' 
 
 type NoteItemSurfaceProps = {
   className: string
+  draggable: boolean
   style: CSSProperties
   onClick: MouseEventHandler<HTMLDivElement>
   onContextMenu?: MouseEventHandler<HTMLDivElement>
+  onDragStart?: DragEventHandler<HTMLDivElement>
   onMouseEnter?: () => void
   title?: string
   testId?: string
@@ -435,6 +438,7 @@ function resolveNoteItemSurfaceProps({
   onContextMenu,
   typeColor,
   typeLightColor,
+  changeStatus,
 }: NoteItemVisualState & {
   entry: VaultEntry
   previewKind: FilePreviewKind | null
@@ -443,12 +447,19 @@ function resolveNoteItemSurfaceProps({
   onContextMenu?: NoteItemProps['onContextMenu']
   typeColor: string
   typeLightColor: string
+  changeStatus?: NoteItemProps['changeStatus']
 }): NoteItemSurfaceProps {
+  const draggable = !isUnavailableBinary
+    && (entry.fileKind === undefined || entry.fileKind === 'markdown')
+    && changeStatus !== 'deleted'
+
   return {
     className: noteItemClassName({ isUnavailableBinary, isSelected, isMultiSelected, isHighlighted }),
+    draggable,
     style: resolveNoteItemSurfaceStyle({ isUnavailableBinary, isSelected, isMultiSelected, typeColor, typeLightColor }),
     onClick: createNoteItemClickHandler(entry, isUnavailableBinary, onClickNote),
     onContextMenu: onContextMenu ? (event) => onContextMenu(entry, event) : undefined,
+    onDragStart: draggable ? (event) => writeNoteDragData(event.dataTransfer, entry.path) : undefined,
     onMouseEnter: entry.fileKind !== 'binary' && onPrefetch ? () => onPrefetch(entry) : undefined,
     testId: resolveNoteItemTestId({ isMultiSelected, previewKind, isUnavailableBinary }),
     title: resolveNoteItemTitle({ previewKind, isUnavailableBinary }),
@@ -477,9 +488,11 @@ function NoteItemRow({
       role="option"
       aria-selected={isSelected || isMultiSelected}
       className={surfaceProps.className}
+      draggable={surfaceProps.draggable}
       style={surfaceProps.style}
       onClick={surfaceProps.onClick}
       onContextMenu={surfaceProps.onContextMenu}
+      onDragStart={surfaceProps.onDragStart}
       onMouseEnter={surfaceProps.onMouseEnter}
       data-testid={surfaceProps.testId}
       data-highlighted={isHighlighted || undefined}
@@ -565,6 +578,7 @@ export function NoteItem({ entry, isSelected, isMultiSelected = false, isHighlig
     onContextMenu,
     typeColor,
     typeLightColor,
+    changeStatus,
   })
 
   return (

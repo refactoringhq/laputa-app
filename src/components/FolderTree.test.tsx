@@ -653,4 +653,42 @@ describe('FolderTree', () => {
     expect(screen.queryByText('Rename folder...')).not.toBeInTheDocument()
     expect(screen.queryByTestId('delete-folder-menu-item')).not.toBeInTheDocument()
   })
+
+  it('moves a dragged note onto an eligible folder row', () => {
+    const onMoveNoteToFolder = vi.fn()
+    renderTree({
+      onCanDropNote: (notePath, folderPath) => notePath === '/vault/alpha.md' && folderPath === 'projects',
+      onMoveNoteToFolder,
+    })
+
+    const dataTransfer = {
+      dropEffect: 'none',
+      getData: vi.fn((type: string) => type === 'application/x-tolaria-note-path' ? '/vault/alpha.md' : ''),
+    }
+    const row = screen.getByTestId('folder-row:projects')
+
+    fireEvent.dragOver(row, { dataTransfer })
+    fireEvent.drop(row, { dataTransfer })
+
+    expect(dataTransfer.dropEffect).toBe('move')
+    expect(onMoveNoteToFolder).toHaveBeenCalledWith('/vault/alpha.md', 'projects')
+  })
+
+  it('moves a dragged note onto the vault root row', () => {
+    const onMoveNoteToFolder = vi.fn()
+    renderTree({
+      onCanDropNote: (notePath, folderPath) => notePath === '/vault/projects/alpha.md' && folderPath === '',
+      onMoveNoteToFolder,
+      vaultRootPath,
+    })
+
+    const dataTransfer = {
+      dropEffect: 'none',
+      getData: vi.fn((type: string) => type === 'application/x-tolaria-note-path' ? '/vault/projects/alpha.md' : ''),
+    }
+
+    fireEvent.drop(screen.getByTestId('folder-row:'), { dataTransfer })
+
+    expect(onMoveNoteToFolder).toHaveBeenCalledWith('/vault/projects/alpha.md', '')
+  })
 })

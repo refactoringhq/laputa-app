@@ -16,6 +16,8 @@ type AiWorkspaceTitleSource = 'generated' | 'manual'
 type NotePdfExportFailureReason = 'export_unavailable' | 'export_error'
 type NotePdfExportSource = 'breadcrumb' | 'app_command' | 'note_list_context_menu'
 type CommitMessageDraftSurface = 'autogit' | 'manual'
+type NoteRetargetKind = 'folder' | 'type'
+type NoteRetargetFolderDestination = 'folder' | 'root'
 type AnalyticsBoolean = boolean
 type AiAgentResponseText = string
 type AiAgentToolCount = number
@@ -75,6 +77,16 @@ export function trackNotePdfExportFailed(
   reason: NotePdfExportFailureReason,
 ): void {
   trackEvent('note_pdf_export_failed', { reason, source })
+}
+
+export function trackNoteRetargeted(params: {
+  targetKind: NoteRetargetKind
+  folderDestination?: NoteRetargetFolderDestination
+}): void {
+  trackEvent('note_retargeted', {
+    target_kind: params.targetKind,
+    ...(params.folderDestination ? { folder_destination: params.folderDestination } : {}),
+  })
 }
 
 export function trackAllNotesVisibilityChanged(
