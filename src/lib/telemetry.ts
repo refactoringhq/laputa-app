@@ -13,6 +13,13 @@ type ReleaseChannel = string
 type FeatureFlagKey = string
 type ProductAnalyticsEventName = string
 type ProductAnalyticsProperties = Record<string, string | number>
+type SentryExceptionValue = NonNullable<NonNullable<Sentry.ErrorEvent['exception']>['values']>[number]
+
+interface BenignSentryEventMatcher {
+  exception?: (exception: SentryExceptionValue) => boolean
+  message?: (message: string | undefined) => boolean
+  originalException?: (originalException: unknown, text: string | undefined) => boolean
+}
 
 const STALE_TAURI_LISTENER_CLEANUP_SIGNATURE = "listeners[eventId].handlerId"
 const BLOCKNOTE_STALE_BLOCK_REFERENCE_PATTERN = /\bBlock with ID [^|\n]+? not found\b/
@@ -78,74 +85,91 @@ function errorText(value: unknown): string | undefined {
   return [name, message].filter(Boolean).join(': ') || undefined
 }
 
+function matchesBenignSentryEventSurface(
+  event: Sentry.ErrorEvent,
+  hint: Sentry.EventHint | undefined,
+  matcher: BenignSentryEventMatcher,
+): boolean {
+  const originalException = hint?.originalException
+  if (matcher.originalException?.(originalException, errorText(originalException))) return true
+  if (matcher.message?.(event.message)) return true
+
+  return (event.exception?.values ?? []).some((exception) =>
+    matcher.exception?.(exception) ?? false)
+}
+
+function matchesBenignSentryEventText(
+  event: Sentry.ErrorEvent,
+  hint: Sentry.EventHint | undefined,
+  matchesText: (value: string | undefined) => boolean,
+): boolean {
+  return matchesBenignSentryEventSurface(event, hint, {
+    exception: (exception) => matchesText(exception.value),
+    message: matchesText,
+    originalException: (_originalException, text) => matchesText(text),
+  })
+}
+
 function shouldDropWhiteboardPlatformPermissionEvent(
   event: Sentry.ErrorEvent,
   hint?: Sentry.EventHint,
 ): boolean {
   if (!hasActiveWhiteboardPlatformPermissionGuard()) return false
-  if (isWhiteboardPlatformPermissionRejection(hint?.originalException)) return true
 
-  return (event.exception?.values ?? []).some((exception) =>
-    isWhiteboardPlatformPermissionRejection({
+  return matchesBenignSentryEventSurface(event, hint, {
+    exception: (exception) => isWhiteboardPlatformPermissionRejection({
       message: exception.value ?? '',
       name: exception.type ?? '',
-    }))
+    }),
+    originalException: (originalException) =>
+      isWhiteboardPlatformPermissionRejection(originalException),
+  })
 }
 
 function shouldDropStaleTauriListenerCleanupEvent(
   event: Sentry.ErrorEvent,
   hint?: Sentry.EventHint,
 ): boolean {
-  if (isStaleTauriListenerCleanupText(errorText(hint?.originalException))) return true
-  if (isStaleTauriListenerCleanupText(event.message)) return true
-
-  return (event.exception?.values ?? []).some((exception) =>
-    isStaleTauriListenerCleanupText(exception.value))
+  return matchesBenignSentryEventText(event, hint, isStaleTauriListenerCleanupText)
 }
 
 function shouldDropBlockNoteStaleBlockReferenceEvent(
   event: Sentry.ErrorEvent,
   hint?: Sentry.EventHint,
 ): boolean {
-  if (isBlockNoteStaleBlockReferenceText(errorText(hint?.originalException))) return true
-  if (isBlockNoteStaleBlockReferenceText(event.message)) return true
-
-  return (event.exception?.values ?? []).some((exception) =>
-    isBlockNoteStaleBlockReferenceText(exception.value))
+  return matchesBenignSentryEventText(event, hint, isBlockNoteStaleBlockReferenceText)
 }
 
 function shouldDropRichEditorDomNotFoundEvent(
   event: Sentry.ErrorEvent,
   hint?: Sentry.EventHint,
 ): boolean {
-  if (classifyRichEditorRecoveryError(hint?.originalException, 'render') === 'dom_not_found') return true
-  if (recoveredRichEditorDomNotFoundText(event.message)) return true
-
-  return (event.exception?.values ?? []).some((exception) =>
-    recoveredRichEditorDomNotFoundError(exception.type, exception.value))
+  return matchesBenignSentryEventSurface(event, hint, {
+    exception: (exception) => recoveredRichEditorDomNotFoundError(exception.type, exception.value),
+    message: recoveredRichEditorDomNotFoundText,
+    originalException: (originalException) =>
+      classifyRichEditorRecoveryError(originalException, 'render') === 'dom_not_found',
+  })
 }
 
 function shouldDropResizeObserverLoopEvent(
   event: Sentry.ErrorEvent,
   hint?: Sentry.EventHint,
 ): boolean {
-  if (isResizeObserverLoopText(errorText(hint?.originalException))) return true
-  if (isResizeObserverLoopText(event.message)) return true
-
-  return (event.exception?.values ?? []).some((exception) =>
-    isResizeObserverLoopText(exception.value))
+  return matchesBenignSentryEventText(event, hint, isResizeObserverLoopText)
 }
 
 function shouldDropMissingFilePromiseRejectionEvent(
   event: Sentry.ErrorEvent,
   hint?: Sentry.EventHint,
 ): boolean {
-  if (typeof hint?.originalException === 'string' && isMissingFileText(hint.originalException)) return true
-  if (isNonErrorMissingFileRejectionText(event.message)) return true
-
-  return (event.exception?.values ?? []).some((exception) =>
-    isNonErrorMissingFileRejectionText(exception.value)
-    || (isUnhandledRejectionExceptionType(exception.type) && isMissingFileText(exception.value)))
+  return matchesBenignSentryEventSurface(event, hint, {
+    exception: (exception) => isNonErrorMissingFileRejectionText(exception.value)
+      || (isUnhandledRejectionExceptionType(exception.type) && isMissingFileText(exception.value)),
+    message: isNonErrorMissingFileRejectionText,
+    originalException: (originalException, text) =>
+      typeof originalException === 'string' && isMissingFileText(text),
+  })
 }
 
 function shouldDropSentryEvent(event: Sentry.ErrorEvent, hint?: Sentry.EventHint): boolean {
