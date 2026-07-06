@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Réduire la section",
   "editor.sideMenu.expandItem": "Développer l'élément",
   "editor.sideMenu.collapseItem": "Réduire l'élément",
+  "editor.sideMenu.turnIntoMenu": "Transformer en...",
   "editor.sideMenu.turnInto": "Transformer en {type}",
   "editor.formatting.highlight": "Surligner",
   "editor.formatting.highlightTooltip": "Surlignage (persiste dans le Markdown)",

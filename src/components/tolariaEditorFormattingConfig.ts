@@ -239,7 +239,7 @@ export function addItemsToMediaGroup(
   return nextItems
 }
 
-function createTolariaSlashMenuIcon(Icon: PhosphorIcon) {
+export function createTolariaSlashMenuIcon(Icon: PhosphorIcon) {
   return createElement(
     'span',
     { className: 'tolaria-slash-menu-icon' },
