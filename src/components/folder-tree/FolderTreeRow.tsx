@@ -17,6 +17,8 @@ interface FolderTreeRowProps {
   onStartRenameFolder?: (folderPath: string) => void
   onToggle: (path: string) => void
   onCancelRenameFolder?: () => void
+  onCanDropNote?: (notePath: string, folderPath: string) => boolean
+  onMoveNoteToFolder?: (notePath: string, folderPath: string) => Promise<unknown> | unknown
   locale?: AppLocale
   renamingFolderPath?: string | null
   rootPath?: string
@@ -66,6 +68,8 @@ function FolderChildren({
   onStartRenameFolder,
   onToggle,
   onCancelRenameFolder,
+  onCanDropNote,
+  onMoveNoteToFolder,
   locale,
   renamingFolderPath,
   rootPath,
@@ -95,6 +99,8 @@ function FolderChildren({
           onStartRenameFolder={onStartRenameFolder}
           onToggle={onToggle}
           onCancelRenameFolder={onCancelRenameFolder}
+          onCanDropNote={onCanDropNote}
+          onMoveNoteToFolder={onMoveNoteToFolder}
           locale={locale}
           renamingFolderPath={renamingFolderPath}
           rootPath={rootPath}
@@ -129,6 +135,8 @@ export const FolderTreeRow = memo(function FolderTreeRow({
   onStartRenameFolder,
   onToggle,
   onCancelRenameFolder,
+  onCanDropNote,
+  onMoveNoteToFolder,
   locale = 'en',
   renamingFolderPath,
   rootPath,
@@ -160,6 +168,8 @@ export const FolderTreeRow = memo(function FolderTreeRow({
       onSelect={selectFolder}
       onStartRenameFolder={canMutateFolder ? onStartRenameFolder : undefined}
       onToggle={() => onToggle(nodeKey)}
+      onCanDropNote={onCanDropNote}
+      onMoveNoteToFolder={onMoveNoteToFolder}
     />
   )
 
@@ -186,6 +196,8 @@ export const FolderTreeRow = memo(function FolderTreeRow({
         onStartRenameFolder={onStartRenameFolder}
         onToggle={onToggle}
         onCancelRenameFolder={onCancelRenameFolder}
+        onCanDropNote={onCanDropNote}
+        onMoveNoteToFolder={onMoveNoteToFolder}
         locale={locale}
         renamingFolderPath={renamingFolderPath}
         rootPath={rootPath}
