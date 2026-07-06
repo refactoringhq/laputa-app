@@ -192,10 +192,6 @@ fn run_folder_move(args: MoveNoteToFolderCommandArgs) -> Result<RenameResult, St
     let request = RequestedNotePath::new(&args.vault_path, &args.old_path);
     with_note_path_in_vault(request, |note| {
         let trimmed_folder_path = args.folder_path.trim();
-        if trimmed_folder_path.is_empty() {
-            return Err("Folder path cannot be empty".to_string());
-        }
-
         let folder_absolute_path = Path::new(note.vault_path).join(trimmed_folder_path);
         with_validated_path(
             folder_absolute_path.to_string_lossy().as_ref(),
@@ -436,17 +432,20 @@ mod tests {
     }
 
     #[test]
-    fn move_note_to_folder_rejects_empty_folder() {
+    fn move_note_to_folder_accepts_empty_folder_as_vault_root() {
         let dir = TempDir::new().unwrap();
         let vault = vault_path(&dir);
-        let note = write_note(&dir, "note.md", "# Note\n");
+        let note = write_note(&dir, "projects/note.md", "# Note\n");
 
-        let error = move_note_to_folder(MoveNoteToFolderCommandArgs {
+        let result = move_note_to_folder(MoveNoteToFolderCommandArgs {
             vault_path: vault,
             old_path: note,
             folder_path: "  ".to_string(),
         })
-        .unwrap_err();
-        assert!(error.contains("Folder path cannot be empty"));
+        .unwrap();
+
+        assert!(result.new_path.ends_with("note.md"));
+        assert!(dir.path().join("note.md").exists());
+        assert!(!dir.path().join("projects/note.md").exists());
     }
 }

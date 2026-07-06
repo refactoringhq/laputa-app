@@ -125,6 +125,28 @@ describe('NoteItem', () => {
     expect(onClickNote).toHaveBeenCalled()
   })
 
+  it('writes the note path into drag data for folder retargeting', () => {
+    const entry = makeEntry({
+      path: '/vault/projects/alpha.md',
+      filename: 'alpha.md',
+      title: 'Alpha',
+    })
+    const dataTransfer = {
+      effectAllowed: 'none',
+      setData: vi.fn(),
+    }
+
+    render(<NoteItem entry={entry} isSelected={false} typeEntryMap={{}} onClickNote={vi.fn()} />)
+
+    const item = screen.getByRole('option')
+    expect(item).toHaveAttribute('draggable', 'true')
+    fireEvent.dragStart(item, { dataTransfer })
+
+    expect(dataTransfer.effectAllowed).toBe('move')
+    expect(dataTransfer.setData).toHaveBeenCalledWith('application/x-tolaria-note-path', entry.path)
+    expect(dataTransfer.setData).toHaveBeenCalledWith('text/plain', entry.path)
+  })
+
   it('uses CSS named colors from the Type document for note type indicators', () => {
     const ideaType = makeEntry({
       path: '/vault/type/idea.md',
