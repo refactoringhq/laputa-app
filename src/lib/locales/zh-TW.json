@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "收合區段",
   "editor.sideMenu.expandItem": "展開項目",
   "editor.sideMenu.collapseItem": "收合項目",
+  "editor.sideMenu.turnIntoMenu": "轉換成...",
   "editor.sideMenu.turnInto": "轉換為{type}",
   "editor.formatting.highlight": "醒目提示",
   "editor.formatting.highlightTooltip": "醒目提示（在 Markdown 中保留）",

@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Contraer sección",
   "editor.sideMenu.expandItem": "Expandir elemento",
   "editor.sideMenu.collapseItem": "Contraer elemento",
+  "editor.sideMenu.turnIntoMenu": "Convertir en...",
   "editor.sideMenu.turnInto": "Convertir en {type}",
   "editor.formatting.highlight": "Resaltado",
   "editor.formatting.highlightTooltip": "Resaltado (persiste en Markdown)",

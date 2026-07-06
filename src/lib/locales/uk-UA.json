@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Згорнути розділ",
   "editor.sideMenu.expandItem": "Розгорнути елемент",
   "editor.sideMenu.collapseItem": "Згорнути елемент",
+  "editor.sideMenu.turnIntoMenu": "Перетворити на...",
   "editor.sideMenu.turnInto": "Перетворити на {type}",
   "editor.formatting.highlight": "Виділення",
   "editor.formatting.highlightTooltip": "Виділення (зберігається в Markdown)",

@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Comprimi sezione",
   "editor.sideMenu.expandItem": "Espandi elemento",
   "editor.sideMenu.collapseItem": "Comprimi elemento",
+  "editor.sideMenu.turnIntoMenu": "Trasforma in...",
   "editor.sideMenu.turnInto": "Trasforma in {type}",
   "editor.formatting.highlight": "Evidenzia",
   "editor.formatting.highlightTooltip": "Evidenziazione (persiste in markdown)",
