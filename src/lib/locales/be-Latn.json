@@ -738,6 +738,7 @@
   "editor.sideMenu.collapseSection": "Zharnuć razdziel",
   "editor.sideMenu.expandItem": "Razharnuć element",
   "editor.sideMenu.collapseItem": "Zharnuć element",
+  "editor.sideMenu.turnIntoMenu": "Pieratvaryć u...",
   "editor.sideMenu.turnInto": "Pieratvaryć u {type}",
   "filePreview.copyDeepLink": "Kapijavać spasylku",
   "deepLinks.copied": "Deep-link skapijavany",

@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Ciutkan bagian",
   "editor.sideMenu.expandItem": "Perluas item",
   "editor.sideMenu.collapseItem": "Ciutkan item",
+  "editor.sideMenu.turnIntoMenu": "Ubah menjadi...",
   "editor.sideMenu.turnInto": "Ubah menjadi {type}",
   "editor.formatting.highlight": "Sorot",
   "editor.formatting.highlightTooltip": "Sorot (bertahan dalam markdown)",

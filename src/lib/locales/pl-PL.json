@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Zwiń sekcję",
   "editor.sideMenu.expandItem": "Rozwiń element",
   "editor.sideMenu.collapseItem": "Zwiń element",
+  "editor.sideMenu.turnIntoMenu": "Zmień w...",
   "editor.sideMenu.turnInto": "Zmień na {type}",
   "editor.formatting.highlight": "Wyróżnienie",
   "editor.formatting.highlightTooltip": "Wyróżnienie (zachowuje się w Markdownie)",

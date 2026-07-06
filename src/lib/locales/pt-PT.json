@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Fechar secção",
   "editor.sideMenu.expandItem": "Expandir item",
   "editor.sideMenu.collapseItem": "Recolher item",
+  "editor.sideMenu.turnIntoMenu": "Transformar em...",
   "editor.sideMenu.turnInto": "Transformar em {type}",
   "editor.formatting.highlight": "Destaque",
   "editor.formatting.highlightTooltip": "Destaque (persiste em markdown)",

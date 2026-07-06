@@ -767,6 +767,7 @@ files:
     editor.sideMenu.collapseSection: 3d3b02981ab3390bf66247c92a2d8dd9
     editor.sideMenu.expandItem: 16291fbe2d88fc603b23f97ed2bc22a3
     editor.sideMenu.collapseItem: 91750c64ed8141fdb63ffb1e878a11ad
+    editor.sideMenu.turnIntoMenu: 43895a54b24688d7aba0f928e8114609
     editor.sideMenu.turnInto: c2d2b328447c4974e839564b054c72f8
     editor.formatting.highlight: 0b90582f4589d84be89f5b847d4d1ed1
     editor.formatting.highlightTooltip: c27173fea9ec1718030c5fa8440b2c78

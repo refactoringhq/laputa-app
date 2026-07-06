@@ -765,6 +765,7 @@
   "editor.sideMenu.collapseSection": "Minimera avsnitt",
   "editor.sideMenu.expandItem": "Expandera objekt",
   "editor.sideMenu.collapseItem": "Minimera objekt",
+  "editor.sideMenu.turnIntoMenu": "Förvandla till...",
   "editor.sideMenu.turnInto": "Gör om till {type}",
   "editor.formatting.highlight": "Markera",
   "editor.formatting.highlightTooltip": "Markera (bevaras i markdown)",
