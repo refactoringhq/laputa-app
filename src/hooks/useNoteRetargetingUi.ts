@@ -3,6 +3,10 @@ import type { RetargetOption } from '../components/note-retargeting/RetargetNote
 import type { FolderNode, SidebarSelection, VaultEntry } from '../types'
 import type { FrontmatterOpOptions } from './frontmatterOps'
 import { useNoteRetargeting, type RetargetFolderOption } from './useNoteRetargeting'
+import {
+  folderPathForRetargetEntry,
+  prependVaultRootFolderDestination,
+} from '../utils/noteRetargetingPaths'
 
 type DialogState =
   | { kind: 'type'; notePath: string }
@@ -36,15 +40,6 @@ interface NoteRetargetingUiInput {
   ) => Promise<{ new_path: string } | null>
 }
 
-function folderPathForNote(notePath: string, vaultPath: string): string {
-  const normalizedVaultPath = vaultPath.replace(/\/+$/, '')
-  const relativePath = notePath.startsWith(`${normalizedVaultPath}/`)
-    ? notePath.slice(normalizedVaultPath.length + 1)
-    : notePath
-  const lastSlashIndex = relativePath.lastIndexOf('/')
-  return lastSlashIndex >= 0 ? relativePath.slice(0, lastSlashIndex) : ''
-}
-
 function buildTypeOptions(types: string[], entry: VaultEntry | null): RetargetOption[] {
   if (!entry) return []
   return types.map((type) => ({
@@ -61,7 +56,7 @@ function buildFolderOptions(
 ): RetargetOption[] {
   if (!entry) return []
 
-  const currentFolderPath = folderPathForNote(entry.path, vaultPath)
+  const currentFolderPath = folderPathForRetargetEntry({ entry, vaultPath })
   return folders.map((folder) => ({
     id: folder.path,
     label: folder.label,
@@ -213,9 +208,7 @@ export function useNoteRetargetingUi({
     availableTypes, availableFolders, canDropNoteOnFolder, changeNoteType, moveIntoFolder,
   } = useNoteRetargeting({ entries, folders, selection, setSelection, setToastMessage, vaultPath, updateFrontmatter, moveNoteToFolder })
   const folderDestinations = useMemo<RetargetFolderOption[]>(() => {
-    const normalizedVaultPath = vaultPath.trim().replace(/[\\/]+$/g, '')
-    const rootLabel = normalizedVaultPath.split(/[\\/]/).filter(Boolean).pop()
-    return rootLabel ? [{ path: '', label: rootLabel }, ...availableFolders] : availableFolders
+    return prependVaultRootFolderDestination(availableFolders, vaultPath)
   }, [availableFolders, vaultPath])
   const canChangeActiveNoteType = hasTypeRetargetDestination(activeEntry, activeNoteBlocked, availableTypes)
   const canMoveActiveNoteToFolder = hasFolderRetargetDestination(activeEntry, activeNoteBlocked, folderDestinations, canDropNoteOnFolder)
