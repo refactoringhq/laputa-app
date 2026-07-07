@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LinuxMenuButton } from './LinuxMenuButton'
 
@@ -44,6 +44,7 @@ describe('LinuxMenuButton', () => {
     expect(screen.getByText('Ctrl+Shift+V')).toBeInTheDocument()
     fireEvent.click(await screen.findByText('Paste without Formatting'))
     expect(invoke).toHaveBeenCalledWith('trigger_menu_command', { id: 'edit-paste-plain-text' })
+    await waitFor(() => expect(screen.queryByText('Paste without Formatting')).not.toBeInTheDocument())
 
     await openSubmenu('View')
     expect(screen.getByText('Ctrl+Shift+L')).toBeInTheDocument()

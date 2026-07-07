@@ -398,7 +398,7 @@ function TolariaTurnBlockIntoSubmenu({ locale }: { locale: AppLocale }) {
           {translate(locale, 'editor.sideMenu.turnIntoMenu')}
         </Components.Generic.Menu.Item>
       </Components.Generic.Menu.Trigger>
-      <Components.Generic.Menu.Dropdown sub>
+      <Components.Generic.Menu.Dropdown className="tolaria-turn-into-menu-dropdown" sub>
         {getTolariaBlockTypeSelectItems().map((item) => (
           <Components.Generic.Menu.Item
             key={item.key}

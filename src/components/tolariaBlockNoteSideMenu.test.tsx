@@ -36,6 +36,11 @@ type MenuItemProps = PropsWithChildren<{
   subTrigger?: boolean
 }>
 
+type MenuDropdownProps = PropsWithChildren<{
+  className?: string
+  sub?: boolean
+}>
+
 type RenderSideMenuOptions = {
   locale?: 'en' | 'it-IT'
 }
@@ -178,8 +183,10 @@ vi.mock('@blocknote/react', () => ({
   useComponentsContext: () => ({
     Generic: {
       Menu: {
-        Dropdown: ({ children, sub }: PropsWithChildren<{ sub?: boolean }>) => (
-          <div data-testid={sub ? 'menu-sub-dropdown' : 'menu-dropdown'}>{children}</div>
+        Dropdown: ({ children, className, sub }: MenuDropdownProps) => (
+          <div className={className} data-testid={sub ? 'menu-sub-dropdown' : 'menu-dropdown'}>
+            {children}
+          </div>
         ),
         Item: ({ children, icon, onClick, subTrigger }: MenuItemProps) => (
           <button
@@ -468,6 +475,7 @@ describe('TolariaSideMenu', () => {
 
     expect(screen.getByText('Delete')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Turn into...' })).toHaveAttribute('aria-haspopup', 'menu')
+    expect(screen.getByTestId('menu-sub-dropdown')).toHaveClass('tolaria-turn-into-menu-dropdown')
     for (const label of turnIntoButtonLabels) {
       expect(screen.getByTestId(`menu-item-icon-${label}`)).toBeInTheDocument()
     }
