@@ -58,6 +58,7 @@ describe('useNoteRetargeting', () => {
       makeEntry(),
       makeEntry({ path: '/vault/type/project.md', filename: 'project.md', title: 'Project', isA: 'Type' }),
     ],
+    vaultPath = '/vault',
   ) {
     return renderHook(() => useNoteRetargeting({
       entries,
@@ -65,7 +66,7 @@ describe('useNoteRetargeting', () => {
       selection,
       setSelection,
       setToastMessage,
-      vaultPath: '/vault',
+      vaultPath,
       updateFrontmatter,
       moveNoteToFolder,
     }))
@@ -164,5 +165,32 @@ describe('useNoteRetargeting', () => {
       targetKind: 'folder',
       folderDestination: 'root',
     })
+  })
+
+  it('uses normalized paths when checking a Windows folder destination', async () => {
+    const windowsEntry = makeEntry({
+      path: 'C:\\vault\\projects\\alpha.md',
+      filename: 'alpha.md',
+    })
+    moveNoteToFolder.mockResolvedValue({ new_path: 'C:\\vault\\projects\\alpha.md' })
+    const { result } = renderUseNoteRetargeting(
+      { kind: 'filter', filter: 'all' },
+      [windowsEntry],
+      'C:\\vault',
+    )
+
+    expect(result.current.canDropNoteOnFolder('C:\\vault\\projects\\alpha.md', 'projects')).toBe(false)
+    expect(result.current.canDropNoteOnFolder('C:\\vault\\projects\\alpha.md', '\\archive\\')).toBe(true)
+
+    await act(async () => {
+      await result.current.moveIntoFolder('C:\\vault\\projects\\alpha.md', '\\archive\\')
+    })
+
+    expect(moveNoteToFolder).toHaveBeenCalledWith(
+      'C:\\vault\\projects\\alpha.md',
+      'archive',
+      'C:\\vault',
+      expect.any(Function),
+    )
   })
 })
