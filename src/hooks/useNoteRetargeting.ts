@@ -3,13 +3,15 @@ import type { FolderNode, SidebarSelection, VaultEntry } from '../types'
 import type { FrontmatterOpOptions } from './frontmatterOps'
 import { extractVaultTypes } from '../utils/vaultTypes'
 import { trackNoteRetargeted } from '../lib/productAnalytics'
+import {
+  flattenRetargetFolders,
+  folderPathForRetargetEntry,
+  normalizeRetargetFolderPath,
+} from '../utils/noteRetargetingPaths'
 
 type RetargetResult = 'updated' | 'noop' | 'error'
 
-export interface RetargetFolderOption {
-  path: string
-  label: string
-}
+export type { RetargetFolderOption } from '../utils/noteRetargetingPaths'
 
 interface NoteRetargetingInput {
   entries: VaultEntry[]
@@ -36,26 +38,6 @@ interface NoteRetargetingInput {
   ) => Promise<{ new_path: string } | null>
 }
 
-function normalizeFolderPath(params: { folderPath: string }): string {
-  return params.folderPath.trim().replace(/^\/+|\/+$/g, '')
-}
-
-function folderPathForEntry(params: { entry: VaultEntry; vaultPath: string }): string {
-  const normalizedVaultPath = params.vaultPath.replace(/\/+$/, '')
-  const relativePath = params.entry.path.startsWith(`${normalizedVaultPath}/`)
-    ? params.entry.path.slice(normalizedVaultPath.length + 1)
-    : params.entry.filename
-  const lastSlashIndex = relativePath.lastIndexOf('/')
-  return lastSlashIndex >= 0 ? relativePath.slice(0, lastSlashIndex) : ''
-}
-
-function flattenFolders(nodes: FolderNode[]): RetargetFolderOption[] {
-  return nodes.flatMap((node) => [
-    { path: node.path, label: node.name },
-    ...flattenFolders(node.children),
-  ])
-}
-
 function entryByPath(params: { entries: VaultEntry[]; notePath: string }): VaultEntry | undefined {
   return params.entries.find((entry) => entry.path === params.notePath)
 }
@@ -72,8 +54,8 @@ function canRetargetEntryToFolder(
   },
 ): boolean {
   if (!params.entry) return false
-  return folderPathForEntry({ entry: params.entry, vaultPath: params.vaultPath })
-    !== normalizeFolderPath({ folderPath: params.folderPath })
+  return folderPathForRetargetEntry({ entry: params.entry, vaultPath: params.vaultPath })
+    !== normalizeRetargetFolderPath(params.folderPath)
 }
 
 function updateEntitySelection(
@@ -157,9 +139,9 @@ async function moveEntryToFolder({
     ) => void,
   ) => Promise<{ new_path: string } | null>
 }): Promise<RetargetResult> {
-  const normalizedFolderPath = normalizeFolderPath({ folderPath })
+  const normalizedFolderPath = normalizeRetargetFolderPath(folderPath)
   if (!entry) return 'error'
-  if (folderPathForEntry({ entry, vaultPath }) === normalizedFolderPath) return 'noop'
+  if (folderPathForRetargetEntry({ entry, vaultPath }) === normalizedFolderPath) return 'noop'
 
   const result = await moveNoteToFolder(
     notePath,
@@ -190,7 +172,7 @@ export function useNoteRetargeting({
     () => extractVaultTypes(entries).sort((left, right) => left.localeCompare(right)),
     [entries],
   )
-  const availableFolders = useMemo(() => flattenFolders(folders), [folders])
+  const availableFolders = useMemo(() => flattenRetargetFolders(folders), [folders])
 
   const canDropNoteOnType = useCallback((notePath: string, type: string) => {
     return canRetargetEntryToType({
