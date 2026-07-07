@@ -210,6 +210,17 @@ body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadc
   justify-content: center;
 }
 
+.editor__blocknote-container .tolaria-turn-into-menu-dropdown {
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+.editor__blocknote-container .tolaria-turn-into-menu-dropdown .bn-menu-item {
+  min-width: max-content;
+  white-space: nowrap;
+  width: auto !important;
+}
+
 .editor__blocknote-container .tolaria-slash-menu-icon__fill {
   position: absolute;
   inset: 0;
