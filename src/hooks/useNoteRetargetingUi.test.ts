@@ -16,6 +16,7 @@ function renderUi(overrides: {
   entries?: VaultEntry[]
   folders?: FolderNode[]
   selection?: SidebarSelection
+  vaultPath?: string
 } = {}) {
   return renderHook(() => useNoteRetargetingUi({
     activeEntry: overrides.activeEntry ?? activeEntry,
@@ -25,7 +26,7 @@ function renderUi(overrides: {
     selection: overrides.selection ?? { kind: 'filter', filter: 'all' },
     setSelection: vi.fn(),
     setToastMessage: vi.fn(),
-    vaultPath,
+    vaultPath: overrides.vaultPath ?? vaultPath,
     updateFrontmatter: vi.fn(),
     moveNoteToFolder: vi.fn(),
   }))
@@ -46,6 +47,40 @@ describe('useNoteRetargetingUi', () => {
         current: false,
         id: '',
         label: 'Laputa',
+      }),
+    ])
+  })
+
+  it('marks the current Windows-style folder with the same normalization used by drops', () => {
+    const windowsVaultPath = 'C:\\Users\\luca\\Laputa'
+    const windowsEntry = makeEntry({
+      path: `${windowsVaultPath}\\projects\\alpha.md`,
+      filename: 'alpha.md',
+      title: 'Alpha',
+    })
+
+    const { result } = renderUi({
+      activeEntry: windowsEntry,
+      entries: [windowsEntry],
+      folders: [{ name: 'projects', path: 'projects', children: [] }],
+      vaultPath: windowsVaultPath,
+    })
+
+    act(() => {
+      result.current.openMoveNoteToFolderDialog()
+    })
+
+    expect(result.current.canMoveActiveNoteToFolder).toBe(true)
+    expect(result.current.folderOptions).toEqual([
+      expect.objectContaining({
+        current: false,
+        id: '',
+        label: 'Laputa',
+      }),
+      expect.objectContaining({
+        current: true,
+        id: 'projects',
+        label: 'projects',
       }),
     ])
   })
