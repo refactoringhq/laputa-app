@@ -127,6 +127,17 @@ describe('resolveEntry', () => {
     expect(resolveEntry([archivedAdr, currentAdr], 'docs/adr/0031-foo')).toBe(currentAdr)
   })
 
+  it('resolves Windows path-style targets that contain underscores and extensions', () => {
+    const topic = makeEntry({
+      path: 'C:\\Users\\lrfno\\Documents\\Tolaria Vault\\project\\02_notes\\00_topic.md',
+      filename: '00_topic.md',
+      title: '00 Topic',
+    })
+
+    expect(resolveEntry([topic], 'project/02_notes/00_topic.md')).toBe(topic)
+    expect(resolveEntry([topic], 'project/02_notes/00_topic.md|00-00-topic')).toBe(topic)
+  })
+
   it('disambiguates same-name files in different subfolders via path', () => {
     const alpha = makeEntry({ path: '/vault/projects/alpha.md', filename: 'alpha.md', title: 'Alpha' })
     const alphaArchived = makeEntry({ path: '/vault/archive/alpha.md', filename: 'alpha.md', title: 'Alpha' })
