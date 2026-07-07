@@ -5,7 +5,7 @@ const WL_START = '\u2039WIKILINK:'
 const WL_END = '\u203A'
 const WL_RE = /\u2039WIKILINK:([^\u203A]+)\u203A/g
 const WIKILINK_RE = /\[\[([^\]]+)\]\]/g
-const TABLE_PLACEHOLDER_PREFIX = 'ENC:'
+const ENCODED_PLACEHOLDER_PREFIX = 'ENC:'
 const FORMAT_MARKERS = new Set(['*', '_', '`', '~'])
 
 type MarkdownSource = string
@@ -99,21 +99,33 @@ function wikilinkPlaceholder(
   target: WikilinkTarget,
   options: WikilinkReplacementOptions,
 ): string {
-  const payload = options.encodePayload
-    ? `${TABLE_PLACEHOLDER_PREFIX}${encodeURIComponent(target)}`
+  const payload = shouldEncodePlaceholderPayload(target, options)
+    ? `${ENCODED_PLACEHOLDER_PREFIX}${encodeURIComponent(target)}`
     : target
   return `${WL_START}${payload}${WL_END}`
 }
 
 function decodePlaceholderPayload(payload: PlaceholderPayload): WikilinkTarget {
-  if (!payload.startsWith(TABLE_PLACEHOLDER_PREFIX)) return payload
+  if (!payload.startsWith(ENCODED_PLACEHOLDER_PREFIX)) return payload
 
-  const encoded = payload.slice(TABLE_PLACEHOLDER_PREFIX.length)
+  const encoded = payload.slice(ENCODED_PLACEHOLDER_PREFIX.length)
   try {
     return decodeURIComponent(encoded)
   } catch {
     return encoded
   }
+}
+
+function shouldEncodePlaceholderPayload(
+  target: WikilinkTarget,
+  options: WikilinkReplacementOptions,
+): boolean {
+  if (options.encodePayload) return true
+
+  for (const marker of FORMAT_MARKERS) {
+    if (target.includes(marker)) return true
+  }
+  return false
 }
 
 function nextMarkdownFenceMarker(line: MarkdownLine, currentMarker: FenceMarker): FenceMarker {
