@@ -39,6 +39,14 @@ describe('preProcessWikilinks', () => {
     expect(result).toContain('WIKILINK:project/my-project|My Project')
   })
 
+  it('encodes path-style targets with underscores before markdown parsing', () => {
+    const result = preProcessWikilinks('See [[project/02_notes/00_topic.md|00-00-topic]] now')
+
+    expect(result).toContain('WIKILINK:ENC:project%2F02_notes%2F00_topic.md%7C00-00-topic')
+    expect(result).not.toContain('project/02_notes/00_topic.md')
+    expect(result).not.toContain('[[project/02_notes/00_topic.md|00-00-topic]]')
+  })
+
   it('handles multiple wikilinks', () => {
     const result = preProcessWikilinks('See [[A]] and [[B]]')
     expect(result).toContain('WIKILINK:A')
@@ -216,6 +224,25 @@ describe('injectWikilinks', () => {
       props: { target: 'project/beta|Project Beta' },
       content: undefined,
     }])
+  })
+
+  it('restores encoded path-style targets with underscores as wikilink nodes', () => {
+    const blocks = [{
+      content: [
+        { type: 'text', text: `before ${WL_START}ENC:project%2F02_notes%2F00_topic.md%7C00-00-topic${WL_END} after` },
+      ],
+    }]
+
+    const result = injectWikilinks(blocks) as TestBlock[]
+    expect(result[0].content).toEqual([
+      { type: 'text', text: 'before ' },
+      {
+        type: 'wikilink',
+        props: { target: 'project/02_notes/00_topic.md|00-00-topic' },
+        content: undefined,
+      },
+      { type: 'text', text: ' after' },
+    ])
   })
 })
 
