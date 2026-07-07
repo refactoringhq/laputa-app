@@ -2,9 +2,10 @@
 type: ADR
 id: "0151"
 title: "Antigravity add-dir workspace flag"
-status: active
+status: superseded
 date: 2026-07-02
 supersedes: "0147"
+superseded_by: "0158"
 ---
 
 ## Context

@@ -152,7 +152,7 @@ exit 3
 
     #[cfg(unix)]
     #[test]
-    fn run_agent_stream_uses_supported_antigravity_workspace_flag() {
+    fn run_agent_stream_uses_supported_antigravity_flags() {
         let dir = tempfile::tempdir().unwrap();
         let vault = tempfile::tempdir().unwrap();
         let binary = executable_script(
@@ -163,6 +163,14 @@ while [ "$#" -gt 0 ]; do
     printf '%s\n' 'flags provided but not defined: -cwd' >&2
     exit 2
   fi
+  case "$1" in --toolPermission*)
+    printf '%s\n' 'flags provided but not defined: -toolPermission' >&2
+    exit 2
+  ;; esac
+  case "$1" in --sandbox=*)
+    printf '%s\n' 'flags provided but not defined: -sandbox (use --sandbox without value)' >&2
+    exit 2
+  ;; esac
   if [ "$1" = "--add-dir" ]; then
     seen_add_dir=true
     shift
@@ -173,7 +181,7 @@ if [ "$seen_add_dir" != "true" ]; then
   printf '%s\n' 'missing --add-dir workspace argument' >&2
   exit 3
 fi
-printf '%s\n' 'Antigravity accepted workspace'
+printf '%s\n' 'Antigravity accepted flags'
 "#,
         );
 
@@ -188,7 +196,7 @@ printf '%s\n' 'Antigravity accepted workspace'
         assert!(session_id.starts_with("antigravity-"));
         assert!(events.iter().any(|event| matches!(
             event,
-            AiAgentStreamEvent::TextDelta { text } if text == "Antigravity accepted workspace\n"
+            AiAgentStreamEvent::TextDelta { text } if text == "Antigravity accepted flags\n"
         )));
         assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
     }
