@@ -72,6 +72,27 @@ describe('tryParseFastMarkdownBlocks', () => {
     expect(image.metrics.fallbackReason).toBe('markdown-image')
   })
 
+  it('parses bare task-list markers as empty checklist blocks', () => {
+    const markdown = [
+      '> 工作项',
+      '',
+      '- [ ]',
+      '',
+      '> 非工作项',
+      '',
+      '- [x]',
+    ].join('\n')
+
+    const result = tryParseFastMarkdownBlocks(markdown)
+    const checklistBlocks = result.blocks.filter(block => block.type === 'checkListItem')
+
+    expect(result.supported).toBe(true)
+    expect(checklistBlocks).toEqual([
+      expect.objectContaining({ content: [], props: expect.objectContaining({ checked: false }) }),
+      expect.objectContaining({ content: [], props: expect.objectContaining({ checked: true }) }),
+    ])
+  })
+
   it('uses the same parser result through the off-thread wrapper fallback in tests', async () => {
     const result = await tryParseFastMarkdownBlocksOffThread('# Title\n\nBody')
 
