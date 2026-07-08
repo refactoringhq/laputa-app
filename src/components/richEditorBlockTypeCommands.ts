@@ -1,7 +1,11 @@
 import { trackEvent } from '../lib/telemetry'
-import type { RichEditorBlockTypeDefinition } from '../utils/richEditorBlockTypes'
+import {
+  RICH_EDITOR_BLOCK_TYPE_DEFINITIONS,
+  type RichEditorBlockTypeDefinition,
+  type RichEditorBlockTypeKey,
+} from '../utils/richEditorBlockTypes'
 
-export type RichEditorBlockTypeCommandSource = 'block_menu' | 'command_palette'
+export type RichEditorBlockTypeCommandSource = 'block_menu' | 'command_palette' | 'keyboard_shortcut'
 
 type RichEditorBlock = {
   id: string
@@ -34,6 +38,15 @@ function blockTypeTelemetry(
   if (typeof level === 'number') metadata.level = level
   return metadata
 }
+
+function findBlockTypeDefinition(key: RichEditorBlockTypeKey): RichEditorBlockTypeDefinition {
+  const definition = RICH_EDITOR_BLOCK_TYPE_DEFINITIONS.find((blockType) => blockType.key === key)
+  if (!definition) throw new Error(`Missing rich editor block type definition: ${key}`)
+  return definition
+}
+
+const CHECKLIST_BLOCK_TYPE = findBlockTypeDefinition('checklist')
+const PARAGRAPH_BLOCK_TYPE = findBlockTypeDefinition('paragraph')
 
 function resolveCurrentBlock(editor: RichEditorBlockTypeCommandEditor): RichEditorBlock | null {
   try {
@@ -70,15 +83,36 @@ function applyBlockTypeUpdate(
   return true
 }
 
+function applyResolvedBlockTypeUpdate(
+  editor: RichEditorBlockTypeCommandEditor,
+  block: RichEditorBlock | null | undefined,
+  target: RichEditorBlockTypeDefinition,
+  source: RichEditorBlockTypeCommandSource,
+): boolean {
+  if (!block) return false
+
+  return applyBlockTypeUpdate(editor, block, target, source)
+}
+
 export function turnCurrentBlockIntoType(
   editor: RichEditorBlockTypeCommandEditor,
   target: RichEditorBlockTypeDefinition,
   source: RichEditorBlockTypeCommandSource,
 ): boolean {
+  return applyResolvedBlockTypeUpdate(editor, resolveCurrentBlock(editor), target, source)
+}
+
+export function toggleCurrentBlockTodoType(
+  editor: RichEditorBlockTypeCommandEditor,
+  source: RichEditorBlockTypeCommandSource,
+): boolean {
   const block = resolveCurrentBlock(editor)
   if (!block) return false
 
-  return applyBlockTypeUpdate(editor, block, target, source)
+  const target = block.type === CHECKLIST_BLOCK_TYPE.type
+    ? PARAGRAPH_BLOCK_TYPE
+    : CHECKLIST_BLOCK_TYPE
+  return applyResolvedBlockTypeUpdate(editor, block, target, source)
 }
 
 export function turnBlockIntoType(
@@ -87,8 +121,5 @@ export function turnBlockIntoType(
   target: RichEditorBlockTypeDefinition,
   source: RichEditorBlockTypeCommandSource,
 ): boolean {
-  const block = editor.getBlock?.(blockId)
-  if (!block) return false
-
-  return applyBlockTypeUpdate(editor, block, target, source)
+  return applyResolvedBlockTypeUpdate(editor, editor.getBlock?.(blockId), target, source)
 }
