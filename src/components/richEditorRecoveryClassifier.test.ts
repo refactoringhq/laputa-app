@@ -46,6 +46,14 @@ describe('richEditorRecoveryClassifier', () => {
     expect(classifyRichEditorRecoveryError(transformError(), 'render')).toBeNull()
   })
 
+  it('classifies null firstChild editor DOM races across recovery surfaces', () => {
+    const error = new TypeError("Cannot read properties of null (reading 'firstChild')")
+
+    expect(classifyRichEditorRecoveryError(error, 'transform')).toBe('dom_not_found')
+    expect(classifyRichEditorRecoveryError(error, 'render')).toBe('dom_not_found')
+    expect(richEditorRecoveryErrorNeedsDocumentRepair(error)).toBe(false)
+  })
+
   it('classifies the WebKit filesystem NotFoundError message from production', () => {
     const error = webkitNotFoundError(
       'A requested file or directory could not be found at the time an operation was processed.',

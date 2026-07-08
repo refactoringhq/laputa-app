@@ -102,6 +102,19 @@ function rootOptions(): ReactRootOptions {
   return options
 }
 
+async function expectCaughtRenderRecoverySuppressed(
+  error: Error,
+  componentStack = '\n    in BlockNoteView\n    in BlockNoteRenderRecoveryBoundary',
+) {
+  await importEntrypoint()
+  window.__tolariaFrontendReady = true
+
+  rootOptions().onCaughtError?.(error, { componentStack })
+
+  expect(mocks.sentryHandler).not.toHaveBeenCalled()
+  expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+}
+
 function renderedTree(): ReactNode {
   const tree = mocks.render.mock.calls[0]?.[0]
   if (!tree) throw new Error('React root was not rendered')
@@ -194,61 +207,45 @@ describe('main entrypoint', () => {
   })
 
   it('suppresses recovered BlockNote missing-id render errors from Sentry', async () => {
-    await importEntrypoint()
-
     const error = new Error("Block doesn't have id")
     const componentStack = '\n    in MermaidBlock\n    in BlockNoteRenderRecoveryBoundary'
-    window.__tolariaFrontendReady = true
 
-    rootOptions().onCaughtError?.(error, { componentStack })
-    expect(mocks.sentryHandler).not.toHaveBeenCalled()
-
+    await expectCaughtRenderRecoverySuppressed(error, componentStack)
     rootOptions().onUncaughtError?.(error, { componentStack })
+
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack })
   })
 
   it('suppresses recovered BlockNote stale block-reference render errors from Sentry', async () => {
-    await importEntrypoint()
-
     const error = new Error('Block with ID 669f337a-dee2-4d92-b5cb-9a4e9828ecf9 not found')
     const componentStack = '\n    in BlockNoteView\n    in BlockNoteRenderRecoveryBoundary'
-    window.__tolariaFrontendReady = true
 
-    rootOptions().onCaughtError?.(error, { componentStack })
-    expect(mocks.sentryHandler).not.toHaveBeenCalled()
-    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
-
+    await expectCaughtRenderRecoverySuppressed(error, componentStack)
     rootOptions().onUncaughtError?.(error, { componentStack })
+
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack })
   })
 
   it('suppresses caught BlockNote block-type mismatch render errors without component stacks', async () => {
-    await importEntrypoint()
-
     const error = new Error('Block type does not match')
-    window.__tolariaFrontendReady = true
 
-    rootOptions().onCaughtError?.(error, {})
-    expect(mocks.sentryHandler).not.toHaveBeenCalled()
-    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
-
+    await expectCaughtRenderRecoverySuppressed(error, '')
     rootOptions().onUncaughtError?.(error, {})
+
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '' })
   })
 
   it('suppresses caught WebKit DOM NotFoundError render recoveries from Sentry', async () => {
-    await importEntrypoint()
-
     const error = new Error('The object can not be found here.')
     error.name = 'NotFoundError'
-    window.__tolariaFrontendReady = true
 
-    rootOptions().onCaughtError?.(error, {
-      componentStack: '\n    in BlockNoteView\n    in BlockNoteRenderRecoveryBoundary',
-    })
+    await expectCaughtRenderRecoverySuppressed(error)
+  })
 
-    expect(mocks.sentryHandler).not.toHaveBeenCalled()
-    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+  it('suppresses caught BlockNote null firstChild render recoveries from Sentry', async () => {
+    const error = new TypeError("Cannot read properties of null (reading 'firstChild')")
+
+    await expectCaughtRenderRecoverySuppressed(error)
   })
 
   it('suppresses recovered action tooltip render errors from Sentry', async () => {
