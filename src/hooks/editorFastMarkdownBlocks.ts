@@ -102,6 +102,7 @@ const HTML_BLOCK_RE = /^[ \t]{0,3}<\/?[A-Za-z][^>]*>/u
 const MARKDOWN_IMAGE_RE = /(^|[^\\])!\[[^\]]*\]\(/u
 const REFERENCE_LINK_RE = /^[ \t]{0,3}\[[^\]]+\]:[ \t]+/u
 const UNSUPPORTED_BLOCK_RE = /^[ \t]{0,3}(?:#{7,}|:::+|\[\^.+\]:)/u
+const DURABLE_MARKDOWN_TOKEN_RE = /^@@TOLARIA_[A-Z_]+:.+@@$/u
 const TEXT_STYLE_KEYS: Array<keyof TextStyles> = ['bold', 'code', 'italic', 'strike']
 
 const textEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null
@@ -180,6 +181,8 @@ function readLinkAt(text: InlineMarkdownText, index: LineIndex): InlineLink | nu
 }
 
 function parseInline(text: InlineMarkdownText, styles: TextStyles = {}): InlineItem[] {
+  if (isDurableMarkdownToken(text)) return [textItem(text, styles)]
+
   const items: InlineItem[] = []
   let index = 0
 
@@ -220,6 +223,10 @@ function parseInline(text: InlineMarkdownText, styles: TextStyles = {}): InlineI
   }
 
   return items
+}
+
+function isDurableMarkdownToken(text: InlineMarkdownText): boolean {
+  return DURABLE_MARKDOWN_TOKEN_RE.test(text)
 }
 
 function nextStyleMarker(text: InlineMarkdownText, index: LineIndex): { style: keyof TextStyles; token: MarkdownToken } | null {
