@@ -43,6 +43,7 @@ import { createRichEditorMarkdownInputTransformExtension } from './richEditorInp
 import { createRichEditorTextDirectionExtension } from './richEditorTextDirection'
 import { createRichEditorTransformErrorRecoveryExtension } from './richEditorTransformErrorRecoveryExtension'
 import { createRichEditorBlockSelectionExtension } from './richEditorBlockSelectionExtension'
+import { createTodoBlockShortcutExtension } from './todoBlockShortcutExtension'
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
 import { useEditorPdfExport } from './useEditorPdfExport'
 import type { NotePdfExportSource } from '../utils/notePdfExport'
@@ -288,6 +289,7 @@ function useEditorSetup({
       createRichEditorTransformErrorRecoveryExtension(),
       createImeCompositionKeyGuardExtension(),
       createMarkdownHighlightShortcutExtension(),
+      createTodoBlockShortcutExtension(),
       createRichEditorMarkdownInputTransformExtension(),
       createRichEditorTextDirectionExtension(),
       createRichEditorBlockSelectionExtension(),
