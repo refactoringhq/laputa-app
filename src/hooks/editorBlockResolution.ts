@@ -55,6 +55,8 @@ export type CachedTabState = {
 
 const TAB_STATE_CACHE_LIMIT = 8
 const DIRECT_MARKDOWN_PARSE_MIN_BYTES = 16 * 1024
+const EMPTY_CHECKLIST_ITEM_FILLER = '\u200B'
+const EMPTY_CHECKLIST_ITEM_LINE_RE = /^([ \t]*[-*+][ \t]+\[[ xX]\])[ \t]*$/u
 const sourceSizeEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null
 
 function now(): number {
@@ -187,10 +189,23 @@ export function preProcessEditorMarkdown(
   notePath?: NotePath,
 ): PreprocessedMarkdown {
   const withDurableBlocks = preProcessDurableEditorMarkdown({ markdown })
-  const withImages = vaultPath ? resolveImageUrls(withDurableBlocks, vaultPath, notePath) : withDurableBlocks
+  const withEmptyChecklists = preProcessEmptyChecklistItems(withDurableBlocks)
+  const withImages = vaultPath ? resolveImageUrls(withEmptyChecklists, vaultPath, notePath) : withEmptyChecklists
   const withWikilinks = preProcessWikilinks(withImages)
   const withMath = preProcessMathMarkdown({ markdown: withWikilinks })
   return preProcessSingleTildeStrikethrough({ markdown: withMath })
+}
+
+function preProcessEmptyChecklistItems(markdown: MarkdownBody): MarkdownBody {
+  return markdown.split(/(\r?\n)/u).map(part => {
+    if (part === '\n' || part === '\r\n') return part
+    return preProcessEmptyChecklistLine(part)
+  }).join('')
+}
+
+function preProcessEmptyChecklistLine(line: MarkdownBody): MarkdownBody {
+  const match = EMPTY_CHECKLIST_ITEM_LINE_RE.exec(line)
+  return match ? `${match[1]} ${EMPTY_CHECKLIST_ITEM_FILLER}` : line
 }
 
 function injectEditorMarkdownBlocks(blocks: EditorBlocks): EditorBlocks {
@@ -200,8 +215,28 @@ function injectEditorMarkdownBlocks(blocks: EditorBlocks): EditorBlocks {
   return injectDurableEditorMarkdownBlocks(withHighlights) as EditorBlocks
 }
 
+function stripEmptyChecklistFillers(blocks: EditorBlocks): EditorBlocks {
+  for (const block of blocks as Array<{ children?: unknown; content?: unknown; type?: string }>) {
+    if (block.type === 'checkListItem' && isEmptyChecklistFillerContent(block.content)) {
+      block.content = []
+    }
+    if (Array.isArray(block.children)) {
+      stripEmptyChecklistFillers(block.children as EditorBlocks)
+    }
+  }
+  return blocks
+}
+
+function isEmptyChecklistFillerContent(content: unknown): boolean {
+  if (!Array.isArray(content) || content.length !== 1) return false
+  const [item] = content as Array<{ text?: unknown; type?: unknown }>
+  return item?.type === 'text' && item.text === EMPTY_CHECKLIST_ITEM_FILLER
+}
+
 function repairParsedMarkdownBlocks(parsed: MarkdownParseResult): EditorBlocks {
-  const parseSafeBlocks = repairMalformedEditorBlocks(parsed.blocks) as EditorBlocks
+  const parseSafeBlocks = stripEmptyChecklistFillers(
+    repairMalformedEditorBlocks(parsed.blocks) as EditorBlocks,
+  )
   if (parsed.usedSourceFallback) return parseSafeBlocks
   return inferCodeBlockLanguages(
     repairMalformedEditorBlocks(injectEditorMarkdownBlocks(parseSafeBlocks)) as EditorBlocks,
