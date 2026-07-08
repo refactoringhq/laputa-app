@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { turnBlockIntoType, turnCurrentBlockIntoType } from './richEditorBlockTypeCommands'
+import {
+  toggleCurrentBlockTodoType,
+  turnBlockIntoType,
+  turnCurrentBlockIntoType,
+} from './richEditorBlockTypeCommands'
 import type { RichEditorBlockTypeDefinition } from '../utils/richEditorBlockTypes'
 import { trackEvent } from '../lib/telemetry'
 
@@ -85,5 +89,41 @@ describe('richEditorBlockTypeCommands', () => {
 
     expect(changed).toBe(false)
     expect(editor.updateBlock).not.toHaveBeenCalled()
+  })
+
+  it('toggles the focused paragraph block into a checklist block from the keyboard shortcut', () => {
+    const { block, editor } = createEditor()
+
+    const changed = toggleCurrentBlockTodoType(editor, 'keyboard_shortcut')
+
+    expect(changed).toBe(true)
+    expect(editor.focus).toHaveBeenCalledOnce()
+    expect(editor.updateBlock).toHaveBeenCalledWith(block.id, expect.objectContaining({
+      type: 'checkListItem',
+    }))
+    expect(editor.updateBlock).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      content: expect.anything(),
+    }))
+    expect(trackEvent).toHaveBeenCalledWith('editor_block_type_changed', {
+      block_type: 'checkListItem',
+      source: 'keyboard_shortcut',
+    })
+  })
+
+  it('toggles the focused checklist block back into a paragraph from the keyboard shortcut', () => {
+    const { block, editor } = createEditor()
+    block.type = 'checkListItem'
+    block.props = { checked: true }
+
+    const changed = toggleCurrentBlockTodoType(editor, 'keyboard_shortcut')
+
+    expect(changed).toBe(true)
+    expect(editor.updateBlock).toHaveBeenCalledWith(block.id, expect.objectContaining({
+      type: 'paragraph',
+    }))
+    expect(trackEvent).toHaveBeenCalledWith('editor_block_type_changed', {
+      block_type: 'paragraph',
+      source: 'keyboard_shortcut',
+    })
   })
 })
