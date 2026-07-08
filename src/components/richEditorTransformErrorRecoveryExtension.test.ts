@@ -20,6 +20,10 @@ function nullFragmentAppendError(message = "null is not an object (evaluating 'o
   return new TypeError(message)
 }
 
+function nullFirstChildError() {
+  return new TypeError("Cannot read properties of null (reading 'firstChild')")
+}
+
 function indexSizeError() {
   return new DOMException('The index is not in the allowed range.', 'IndexSizeError')
 }
@@ -129,6 +133,7 @@ describe('isRecoverableEditorTransformError', () => {
     expect(isRecoverableEditorTransformError(new TypeError(
       "Cannot read properties of null (reading 'append')",
     ))).toBe(true)
+    expect(isRecoverableEditorTransformError(nullFirstChildError())).toBe(true)
     expect(isRecoverableEditorTransformError(new Error('unrelated'))).toBe(false)
   })
 })
@@ -160,6 +165,17 @@ describe('installRichEditorTransformErrorRecovery', () => {
 
   it('recovers WebKit DOM NotFoundError from editor dispatch', () => {
     const { currentDoc, view } = createView(webkitNotFoundError())
+
+    installRichEditorTransformErrorRecovery(view)
+
+    expect(() => view.dispatch({ before: currentDoc })).not.toThrow()
+    expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+      reason: 'dom_not_found',
+    })
+  })
+
+  it('recovers null firstChild DOM races from editor dispatch', () => {
+    const { currentDoc, view } = createView(nullFirstChildError())
 
     installRichEditorTransformErrorRecovery(view)
 

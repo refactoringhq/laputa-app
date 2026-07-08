@@ -4,6 +4,7 @@ const BLOCKNOTE_EMPTY_FRAGMENT_INDEX_ERROR = /^Index \d+ out of range for <>$/
 const BLOCKNOTE_TABLE_ROW_INDEX_ERROR = /^Index \d+ out of range for <tableRow\(/
 const BLOCKNOTE_PARAGRAPH_INDEX_ERROR = /^Index \d+ out of range for <paragraph\(/
 const NULL_APPEND_PROPERTY_ERROR = "Cannot read properties of null (reading 'append')"
+const NULL_FIRST_CHILD_PROPERTY_ERROR = "Cannot read properties of null (reading 'firstChild')"
 const REACT_UPDATE_DEPTH_EXCEEDED_ERROR = 'Maximum update depth exceeded'
 const REACT_MINIFIED_UPDATE_DEPTH_ERROR = /\b(?:React error #185|errors\/185|#185)\b/
 const WEBKIT_DOM_NOT_FOUND_MESSAGES = [
@@ -96,6 +97,10 @@ function isNullFragmentAppendError(error: unknown): boolean {
   return details.includes('fillBefore') && details.includes('.append')
 }
 
+function isNullFirstChildError(error: unknown): boolean {
+  return error instanceof TypeError && error.message === NULL_FIRST_CHILD_PROPERTY_ERROR
+}
+
 export function isStaleBlockReferenceError(error: unknown): boolean {
   return error instanceof Error && /^Block with ID .+ not found$/.test(error.message)
 }
@@ -159,6 +164,11 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
   },
   {
     matches: isWebKitDomNotFoundError,
+    reason: 'dom_not_found',
+    surfaces: ['render', 'transform'],
+  },
+  {
+    matches: isNullFirstChildError,
     reason: 'dom_not_found',
     surfaces: ['render', 'transform'],
   },
