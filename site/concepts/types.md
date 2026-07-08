@@ -21,6 +21,7 @@ Use types for semantic groups such as Projects, People, Topics, Procedures, Even
 ## Type Documents
 
 Type documents are Markdown notes with `type: Type` in frontmatter. They describe how a type should appear and what new notes of that type should start with.
+Use Phosphor icon names in kebab-case for `_icon`, such as `folder` or `briefcase`.
 
 ```yaml
 ---

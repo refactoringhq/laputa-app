@@ -24,7 +24,7 @@ pub(crate) struct Frontmatter {
     pub status: Option<StringOrList>,
     #[serde(rename = "_icon", alias = "icon", default)]
     pub icon: Option<StringOrList>,
-    #[serde(default)]
+    #[serde(alias = "_color", default)]
     pub color: Option<StringOrList>,
     #[serde(rename = "_order", alias = "order", default)]
     pub order: Option<i64>,
