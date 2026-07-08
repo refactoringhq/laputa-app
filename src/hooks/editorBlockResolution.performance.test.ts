@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { clearParsedNoteBlockCache } from './editorParsedBlockCache'
 import { resolveBlocksForTarget } from './editorBlockResolution'
+import { MERMAID_BLOCK_TYPE } from '../utils/mermaidMarkdown'
 
 function makeEditor() {
   return {
@@ -44,28 +45,46 @@ describe('resolveBlocksForTarget performance paths', () => {
     ]))
   })
 
-  it('falls back to BlockNote parsing when direct Markdown parsing rejects a large note', async () => {
+  it('keeps Mermaid fences renderable when large notes use the direct Markdown parser', async () => {
     const editor = makeEditor()
-    const content = `${longMarkdownBody()}\n\n<aside>custom html</aside>`
+    const diagram = [
+      '```mermaid',
+      'flowchart LR',
+      '  A --> B',
+      '```',
+    ].join('\n')
+    const content = `${diagram}\n\n${longMarkdownBody()}`
 
-    await resolveBlocksForTarget({
+    const resolved = await resolveBlocksForTarget({
       editor: editor as never,
       cache: new Map(),
-      targetPath: '/vault/html.md',
+      targetPath: '/vault/large-mermaid.md',
       content,
     })
 
-    expect(editor.tryParseMarkdownToBlocks).toHaveBeenCalled()
+    expect(editor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
+    expect(resolved.blocks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: MERMAID_BLOCK_TYPE,
+        props: expect.objectContaining({
+          diagram: 'flowchart LR\n  A --> B\n',
+          source: expect.stringContaining(diagram),
+        }),
+      }),
+    ]))
   })
 
-  it('falls back to BlockNote parsing for large notes with Markdown images', async () => {
+  it.each([
+    ['HTML blocks', '<aside>custom html</aside>', '/vault/html.md'],
+    ['Markdown images', '![diagram](attachments/diagram.png)', '/vault/image.md'],
+  ])('falls back to BlockNote parsing for large notes with %s', async (_label, unsupportedMarkdown, targetPath) => {
     const editor = makeEditor()
-    const content = `${longMarkdownBody()}\n\n![diagram](attachments/diagram.png)`
+    const content = `${longMarkdownBody()}\n\n${unsupportedMarkdown}`
 
     await resolveBlocksForTarget({
       editor: editor as never,
       cache: new Map(),
-      targetPath: '/vault/image.md',
+      targetPath,
       content,
     })
 
