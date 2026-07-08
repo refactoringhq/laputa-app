@@ -640,6 +640,7 @@ Use types for semantic groups such as Projects, People, Topics, Procedures, Even
 ## Type Documents
 
 Type documents are Markdown notes with `type: Type` in frontmatter. They describe how a type should appear and what new notes of that type should start with.
+Use Phosphor icon names in kebab-case for `_icon`, such as `folder` or `briefcase`.
 
 ```yaml
 ---
@@ -892,6 +893,7 @@ Create a type when several notes share the same role in your system.
 3. Add optional icon, color, sidebar order, sidebar label, pinned properties, suggested fields, default values, or a new-note template.
 
 You can also right-click a type in the sidebar to change its icon and color.
+Type icons use Phosphor icon names in kebab-case, such as `briefcase` or `folder`.
 
 ```yaml
 ---
@@ -1548,7 +1550,7 @@ Tolaria uses conventions instead of a required schema.
 | `has` | Contained relationship. |
 | `_width` | Per-note editor width override. |
 | `_display` | Display mode. Omit for text notes; use `sheet` for spreadsheet notes. |
-| `_icon`, `_color` | Type or note appearance metadata. |
+| `_icon`, `_color` | Type or note appearance metadata. `_icon` values use Phosphor icon names in kebab-case, emoji, or HTTP(S) image URLs. |
 | `_sidebar_label`, `_order` | Type sidebar label and order. |
 | `_pinned_properties` | Properties pinned for a type. |
 | `_sheet` | Sheet-note presentation metadata such as grid settings, column widths, row heights, and cell formatting. |
