@@ -63,7 +63,7 @@ const KNOWN_FRONTMATTER_KEYS: &[FrontmatterKeyRule] = &[
     FrontmatterKeyRule {
         read_key: "color",
         write_key: "color",
-        aliases: &["color"],
+        aliases: &["color", "_color"],
         canonicalize_on_write: false,
     },
     FrontmatterKeyRule {
