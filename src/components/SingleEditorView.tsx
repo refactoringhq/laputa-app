@@ -1316,6 +1316,7 @@ export function SingleEditorView({ currentContent = '', editor, entries, onNavig
             entries={entries}
             locale={locale}
             sourceEntry={sourceEntry ?? null}
+            vaultPath={vaultPath ?? ''}
           >
             <SharedContextBlockNoteView
               key={recoveryKey}
