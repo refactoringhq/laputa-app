@@ -90,11 +90,11 @@ describe('BlockNote direct Markdown serialization', () => {
     expect(editor.__tolariaLastDirectMarkdownMetrics?.fallbackReason).toBe('unsupported:unsupportedWidget')
   })
 
-  it('escapes literal Markdown syntax without double-escaping table pipes', () => {
+  it('keeps plain hash references and punctuation literal while escaping formatting syntax', () => {
     const blocks = [
       {
         type: 'paragraph',
-        content: [{ type: 'text', text: 'Literal *stars* `ticks` #tag!', styles: {} }],
+        content: [{ type: 'text', text: 'Literal *stars* `ticks` #tag! {ok} <T>', styles: {} }],
         children: [],
       },
       {
@@ -110,10 +110,51 @@ describe('BlockNote direct Markdown serialization', () => {
     ]
 
     expect(blocksToMarkdownDirect(blocks).markdown).toBe([
-      'Literal \\*stars\\* \\`ticks\\` \\#tag\\!',
+      'Literal \\*stars\\* \\`ticks\\` #tag! {ok} <T>',
       '',
       '| A\\|B |',
       '| --- |',
+    ].join('\n'))
+  })
+
+  it('does not escape hash references inside saved heading titles', () => {
+    const blocks = [
+      {
+        type: 'heading',
+        props: { level: 1 },
+        content: [{ type: 'text', text: 'Monday #216', styles: {} }],
+        children: [],
+      },
+    ]
+
+    expect(blocksToMarkdownDirect(blocks).markdown).toBe('# Monday #216')
+  })
+
+  it('escapes paragraph prefixes that would reopen as Markdown block syntax', () => {
+    const blocks = [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: '# Not a heading', styles: {} }],
+        children: [],
+      },
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: '> Not a quote', styles: {} }],
+        children: [],
+      },
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: '![not an image]', styles: {} }],
+        children: [],
+      },
+    ]
+
+    expect(blocksToMarkdownDirect(blocks).markdown).toBe([
+      '\\# Not a heading',
+      '',
+      '\\> Not a quote',
+      '',
+      '\\![not an image]',
     ].join('\n'))
   })
 
