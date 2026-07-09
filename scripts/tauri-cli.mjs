@@ -7,12 +7,15 @@ export const DEV_APP_CONFIG_NAMESPACE = 'com.tolaria.app.dev'
 export const DEV_TAURI_CONFIG_PATH = path.join('src-tauri', 'tauri.dev.conf.json')
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
-const tauriBinary = path.join(
-  repoRoot,
-  'node_modules',
-  '.bin',
-  process.platform === 'win32' ? 'tauri.cmd' : 'tauri',
-)
+
+export function tauriBinary(platform = process.platform) {
+  return path.join(
+    repoRoot,
+    'node_modules',
+    '.bin',
+    platform === 'win32' ? 'tauri.cmd' : 'tauri',
+  )
+}
 
 export function isTauriDevCommand(args) {
   return args[0] === 'dev'
@@ -39,12 +42,21 @@ export function tauriEnv(args, env = process.env) {
   }
 }
 
-export function runTauriCli(args = process.argv.slice(2), env = process.env) {
-  const child = spawn(tauriBinary, tauriArgs(args), {
+export function shouldUseShell(platform = process.platform) {
+  return platform === 'win32'
+}
+
+export function tauriSpawnOptions(args, env = process.env, platform = process.platform) {
+  return {
     cwd: repoRoot,
     env: tauriEnv(args, env),
+    shell: shouldUseShell(platform),
     stdio: 'inherit',
-  })
+  }
+}
+
+export function runTauriCli(args = process.argv.slice(2), env = process.env) {
+  const child = spawn(tauriBinary(), tauriArgs(args), tauriSpawnOptions(args, env))
 
   child.on('error', (error) => {
     console.error(error)
