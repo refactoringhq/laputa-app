@@ -18,6 +18,21 @@ fn parse_test_entry(dir: &TempDir, name: &str, content: &str) -> VaultEntry {
     parse_md_file(&dir.path().join(name), None).unwrap()
 }
 
+fn assert_type_metadata(entry: &VaultEntry) {
+    assert_eq!(entry.icon.as_deref(), Some("rocket"));
+    assert_eq!(entry.color.as_deref(), Some("blue"));
+    assert_eq!(entry.order, Some(4));
+    assert_eq!(entry.sidebar_label.as_deref(), Some("Projects"));
+    assert_eq!(entry.sort.as_deref(), Some("title:asc"));
+}
+
+fn assert_metadata_keys_hidden(entry: &VaultEntry, keys: &[&str]) {
+    for key in keys {
+        assert!(!entry.properties.contains_key(*key));
+        assert!(!entry.relationships.contains_key(*key));
+    }
+}
+
 #[test]
 fn parses_canonical_system_metadata_keys() {
     let dir = TempDir::new().unwrap();
@@ -27,11 +42,7 @@ fn parses_canonical_system_metadata_keys() {
         "---\ntype: Type\n_icon: rocket\n_color: blue\n_order: 4\n_sidebar_label: Projects\n_sort: title:asc\n---\n# Project\n",
     );
 
-    assert_eq!(entry.icon.as_deref(), Some("rocket"));
-    assert_eq!(entry.color.as_deref(), Some("blue"));
-    assert_eq!(entry.order, Some(4));
-    assert_eq!(entry.sidebar_label.as_deref(), Some("Projects"));
-    assert_eq!(entry.sort.as_deref(), Some("title:asc"));
+    assert_type_metadata(&entry);
 }
 
 #[test]
@@ -43,16 +54,34 @@ fn parses_legacy_system_metadata_keys_without_property_leaks() {
         "---\ntype: Type\nicon: rocket\ncolor: blue\norder: 4\nsidebar label: Projects\nsort: title:asc\n---\n# Project\n",
     );
 
-    assert_eq!(entry.icon.as_deref(), Some("rocket"));
-    assert_eq!(entry.color.as_deref(), Some("blue"));
-    assert_eq!(entry.order, Some(4));
-    assert_eq!(entry.sidebar_label.as_deref(), Some("Projects"));
-    assert_eq!(entry.sort.as_deref(), Some("title:asc"));
-    assert!(!entry.properties.contains_key("icon"));
-    assert!(!entry.properties.contains_key("color"));
-    assert!(!entry.properties.contains_key("order"));
-    assert!(!entry.properties.contains_key("sidebar label"));
-    assert!(!entry.properties.contains_key("sort"));
+    assert_type_metadata(&entry);
+    assert_metadata_keys_hidden(&entry, &["icon", "color", "order", "sidebar label", "sort"]);
+}
+
+#[test]
+fn parses_known_aliases_from_central_key_rules_without_leaks() {
+    let dir = TempDir::new().unwrap();
+    let entry = parse_test_entry(
+        &dir,
+        "project.md",
+        "---\nIs A: Type\nicon: rocket\n_color: blue\norder: 4\nsidebar_label: Projects\nsort: title:asc\nwidth: wide\n---\n# Project\n",
+    );
+
+    assert_eq!(entry.is_a.as_deref(), Some("Type"));
+    assert_type_metadata(&entry);
+    assert_eq!(entry.note_width.as_deref(), Some("wide"));
+    assert_metadata_keys_hidden(
+        &entry,
+        &[
+            "Is A",
+            "icon",
+            "_color",
+            "order",
+            "sidebar_label",
+            "sort",
+            "width",
+        ],
+    );
 }
 
 #[test]
@@ -85,8 +114,7 @@ fn parses_note_width_without_property_leaks() {
     );
 
     assert_eq!(entry.note_width.as_deref(), Some("wide"));
-    assert!(!entry.properties.contains_key("_width"));
-    assert!(!entry.relationships.contains_key("_width"));
+    assert_metadata_keys_hidden(&entry, &["_width"]);
 }
 
 #[test]
