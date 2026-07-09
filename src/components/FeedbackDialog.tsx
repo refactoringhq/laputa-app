@@ -13,7 +13,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -25,10 +24,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   CIRCLECI_HOME_URL,
   CODACY_HOME_URL,
   CODESCENE_HOME_URL,
   REFACTORING_HOME_URL,
+  TOLARIA_DEVELOPMENT_ARTICLE_URL,
   TOLARIA_GITHUB_CONTRIBUTING_URL,
   TOLARIA_GITHUB_DISCUSSIONS_URL,
   TOLARIA_GITHUB_ISSUES_URL,
@@ -40,6 +45,7 @@ import {
   buildSanitizedDiagnosticBundle,
   startFeedbackDiagnosticsCapture,
 } from '../lib/feedbackDiagnostics'
+import { trackEvent } from '../lib/telemetry'
 import { cn } from '../lib/utils'
 import { takeFeedbackDialogOpener } from '../lib/feedbackDialogOpener'
 import { useBuildNumber } from '../hooks/useBuildNumber'
@@ -63,6 +69,8 @@ interface ContributionCardProps {
   tone: ContributionTone
   onAction: () => void
   autoFocus?: boolean
+  className?: string
+  inlineAction?: boolean
   secondaryAction?: ReactNode
 }
 
@@ -72,6 +80,7 @@ interface LinkFallback {
 }
 
 interface ContributionPath {
+  analyticsAction: ContributionAnalyticsAction
   titleKey: TranslationKey
   descriptionKey: TranslationKey
   ctaLabelKey: TranslationKey
@@ -83,14 +92,17 @@ interface ContributionPath {
 }
 
 interface ContributionLink {
+  analyticsAction: ContributionAnalyticsAction
   ctaLabelKey: TranslationKey
   labelKey: TranslationKey
   url: string
 }
 
 interface SponsorLogo {
+  analyticsAction: ContributionAnalyticsAction
   name: string
   url: string
+  tooltipKey: TranslationKey
   darkLogo: string
   lightLogo: string
 }
@@ -101,6 +113,22 @@ const EMPTY_DIALOG_OPENER: ReturnType<typeof takeFeedbackDialogOpener> = {
 }
 
 type ContributionTone = 'blue' | 'green' | 'yellow' | 'purple' | 'red'
+type ContributionAnalyticsAction =
+  | 'newsletter_refactoring'
+  | 'sponsor_codacy'
+  | 'sponsor_codescene'
+  | 'sponsor_circleci'
+  | 'sponsor_unblocked'
+  | 'sponsors_development_article'
+  | 'feature_requests'
+  | 'discussions'
+  | 'pull_requests'
+  | 'contributing_guide'
+  | 'issues'
+  | 'copy_diagnostics'
+
+const CONTRIBUTION_ANALYTICS_EVENT = 'contribution_action_clicked'
+const CONTRIBUTION_ANALYTICS_SURFACE = 'contribute_dialog'
 
 const CONTRIBUTION_TONE_CLASSES: Record<ContributionTone, string> = {
   blue: 'bg-[var(--accent-blue-light)] text-[var(--accent-blue)]',
@@ -119,6 +147,7 @@ const CONTRIBUTION_BUTTON_CLASSES: Record<ContributionTone, string> = {
 }
 
 const NEWSLETTER_PATH = {
+  analyticsAction: 'newsletter_refactoring',
   titleKey: 'feedback.newsletter.title',
   descriptionKey: 'feedback.newsletter.description',
   ctaLabelKey: 'feedback.newsletter.cta',
@@ -130,26 +159,34 @@ const NEWSLETTER_PATH = {
 
 const SPONSOR_LOGOS: SponsorLogo[] = [
   {
+    analyticsAction: 'sponsor_codacy',
     name: 'Codacy',
     url: CODACY_HOME_URL,
+    tooltipKey: 'feedback.sponsors.codacyTooltip',
     darkLogo: codacyDarkLogo,
     lightLogo: codacyLightLogo,
   },
   {
+    analyticsAction: 'sponsor_codescene',
     name: 'CodeScene',
     url: CODESCENE_HOME_URL,
+    tooltipKey: 'feedback.sponsors.codeSceneTooltip',
     darkLogo: codeSceneDarkLogo,
     lightLogo: codeSceneLightLogo,
   },
   {
+    analyticsAction: 'sponsor_circleci',
     name: 'CircleCI',
     url: CIRCLECI_HOME_URL,
+    tooltipKey: 'feedback.sponsors.circleCiTooltip',
     darkLogo: circleCiDarkLogo,
     lightLogo: circleCiLightLogo,
   },
   {
+    analyticsAction: 'sponsor_unblocked',
     name: 'Unblocked',
     url: UNBLOCKED_HOME_URL,
+    tooltipKey: 'feedback.sponsors.unblockedTooltip',
     darkLogo: unblockedDarkLogo,
     lightLogo: unblockedLightLogo,
   },
@@ -157,6 +194,7 @@ const SPONSOR_LOGOS: SponsorLogo[] = [
 
 const CONTRIBUTION_PATHS: ContributionPath[] = [
   {
+    analyticsAction: 'feature_requests',
     titleKey: 'feedback.featureRequests.title',
     descriptionKey: 'feedback.featureRequests.description',
     ctaLabelKey: 'feedback.featureRequests.cta',
@@ -166,6 +204,7 @@ const CONTRIBUTION_PATHS: ContributionPath[] = [
     tone: 'green',
   },
   {
+    analyticsAction: 'discussions',
     titleKey: 'feedback.discussions.title',
     descriptionKey: 'feedback.discussions.description',
     ctaLabelKey: 'feedback.discussions.cta',
@@ -175,6 +214,7 @@ const CONTRIBUTION_PATHS: ContributionPath[] = [
     tone: 'purple',
   },
   {
+    analyticsAction: 'pull_requests',
     titleKey: 'feedback.contributeCode.title',
     descriptionKey: 'feedback.contributeCode.description',
     ctaLabelKey: 'feedback.contributeCode.cta',
@@ -183,6 +223,7 @@ const CONTRIBUTION_PATHS: ContributionPath[] = [
     icon: GitPullRequest,
     tone: 'yellow',
     secondaryLink: {
+      analyticsAction: 'contributing_guide',
       ctaLabelKey: 'feedback.contributingGuide.cta',
       labelKey: 'feedback.contributingGuide.linkLabel',
       url: TOLARIA_GITHUB_CONTRIBUTING_URL,
@@ -190,18 +231,37 @@ const CONTRIBUTION_PATHS: ContributionPath[] = [
   },
 ]
 
+function trackContributionAction(action: ContributionAnalyticsAction): void {
+  trackEvent(CONTRIBUTION_ANALYTICS_EVENT, {
+    action,
+    surface: CONTRIBUTION_ANALYTICS_SURFACE,
+  })
+}
+
+function openTrackedContributionLink(
+  action: ContributionAnalyticsAction,
+  label: string,
+  url: string,
+  onOpenLink: (label: string, url: string) => void,
+): void {
+  trackContributionAction(action)
+  onOpenLink(label, url)
+}
+
 function ContributionLinkButton({
   label,
   tone,
   onAction,
   autoFocus = false,
   accented = true,
+  className,
 }: {
   label: string
   tone: ContributionTone
   onAction: () => void
   autoFocus?: boolean
   accented?: boolean
+  className?: string
 }) {
   return (
     <Button
@@ -209,6 +269,7 @@ function ContributionLinkButton({
       variant="outline"
       className={cn(
         'w-full justify-between',
+        className,
         accented && 'bg-background text-foreground hover:text-foreground',
         accented && Reflect.get(CONTRIBUTION_BUTTON_CLASSES, tone),
       )}
@@ -229,73 +290,122 @@ function ContributionCard({
   tone,
   onAction,
   autoFocus = false,
+  className,
+  inlineAction = false,
   secondaryAction,
 }: ContributionCardProps) {
+  const compactActionClassName = secondaryAction ? 'min-w-0 px-3 text-sm' : undefined
+  const primaryAction = (
+    <ContributionLinkButton
+      label={ctaLabel}
+      tone={tone}
+      autoFocus={autoFocus}
+      className={cn(inlineAction && 'sm:w-auto sm:min-w-64', compactActionClassName)}
+      onAction={onAction}
+    />
+  )
+
   return (
-    <Card className="gap-4 border-border/70 py-4 shadow-none">
+    <Card className={cn('gap-4 border-border/70 py-4 shadow-none', className)}>
       <CardHeader className="gap-3 px-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <span className={cn('rounded-md p-2', Reflect.get(CONTRIBUTION_TONE_CLASSES, tone))}>
-            <Icon size={16} />
-          </span>
-          <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+        <div className={cn(
+          'flex gap-3',
+          inlineAction ? 'flex-col sm:flex-row sm:items-center sm:justify-between' : 'items-center',
+        )}>
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <span className={cn('rounded-md p-2', Reflect.get(CONTRIBUTION_TONE_CLASSES, tone))}>
+              <Icon size={16} />
+            </span>
+            <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+          </div>
+          {inlineAction ? primaryAction : null}
         </div>
         <CardDescription className="whitespace-pre-line text-sm leading-6 text-muted-foreground">
           {description}
         </CardDescription>
       </CardHeader>
-      <CardContent className="px-4">
-        <ContributionLinkButton label={ctaLabel} tone={tone} autoFocus={autoFocus} onAction={onAction} />
-      </CardContent>
-      {secondaryAction ? <CardFooter className="px-4 pt-0">{secondaryAction}</CardFooter> : null}
+      {inlineAction ? null : (
+        <CardContent className={cn('px-4', secondaryAction && 'grid gap-2 sm:grid-cols-2')}>
+          {primaryAction}
+          {secondaryAction}
+        </CardContent>
+      )}
     </Card>
   )
 }
 
 function SponsorLogoCard({
+  className,
   onOpenLink,
   t,
 }: {
+  className?: string
   onOpenLink: (label: string, url: string) => void
   t: Translate
 }) {
   return (
-    <Card className="gap-4 border-border/70 py-4 shadow-none">
+    <Card className={cn('gap-4 border-border/70 py-4 shadow-none', className)}>
       <CardHeader className="gap-3 px-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <span className={cn('rounded-md p-2', CONTRIBUTION_TONE_CLASSES.blue)}>
-            <Handshake size={16} />
-          </span>
-          <CardTitle className="text-sm font-semibold">{t('feedback.sponsors.title')}</CardTitle>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <span className={cn('rounded-md p-2', CONTRIBUTION_TONE_CLASSES.blue)}>
+              <Handshake size={16} />
+            </span>
+            <CardTitle className="text-sm font-semibold">{t('feedback.sponsors.title')}</CardTitle>
+          </div>
+          <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 lg:w-auto lg:flex lg:justify-end">
+            {SPONSOR_LOGOS.map((sponsor) => (
+              <Tooltip key={sponsor.name}>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-11 bg-transparent px-1.5 shadow-none hover:bg-transparent hover:opacity-80 lg:w-32"
+                    aria-label={t('feedback.sponsors.logoLinkLabel', { sponsor: sponsor.name })}
+                    onClick={() => openTrackedContributionLink(
+                      sponsor.analyticsAction,
+                      sponsor.name,
+                      sponsor.url,
+                      onOpenLink,
+                    )}
+                  >
+                    <img
+                      className="max-h-6 max-w-[7.25rem] object-contain dark:hidden"
+                      src={sponsor.darkLogo}
+                      alt=""
+                    />
+                    <img
+                      className="hidden max-h-6 max-w-[7.25rem] object-contain dark:block"
+                      src={sponsor.lightLogo}
+                      alt=""
+                      aria-hidden="true"
+                    />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t(sponsor.tooltipKey)}</TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
         </div>
         <CardDescription className="text-sm leading-6 text-muted-foreground">
-          {t('feedback.sponsors.description')}
+          {t('feedback.sponsors.description')}{' '}
+          {t('feedback.sponsors.developmentSentencePrefix')}{' '}
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto p-0 align-baseline text-sm leading-6 text-[var(--accent-blue)]"
+            onClick={() => openTrackedContributionLink(
+              'sponsors_development_article',
+              t('feedback.sponsors.developmentLinkLabel'),
+              TOLARIA_DEVELOPMENT_ARTICLE_URL,
+              onOpenLink,
+            )}
+          >
+            {t('feedback.sponsors.developmentLinkText')}
+          </Button>
+          {t('feedback.sponsors.developmentSentenceSuffix')}
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-2 px-4">
-        {SPONSOR_LOGOS.map((sponsor) => (
-          <Button
-            key={sponsor.name}
-            type="button"
-            variant="outline"
-            className={cn(
-              'h-11 bg-background px-2 text-foreground hover:text-foreground',
-              CONTRIBUTION_BUTTON_CLASSES.blue,
-            )}
-            aria-label={t('feedback.sponsors.logoLinkLabel', { sponsor: sponsor.name })}
-            title={sponsor.name}
-            onClick={() => onOpenLink(sponsor.name, sponsor.url)}
-          >
-            <img className="max-h-5 max-w-28 object-contain dark:hidden" src={sponsor.darkLogo} alt="" />
-            <img
-              className="hidden max-h-5 max-w-28 object-contain dark:block"
-              src={sponsor.lightLogo}
-              alt=""
-              aria-hidden="true"
-            />
-          </Button>
-        ))}
-      </CardContent>
     </Card>
   )
 }
@@ -328,11 +438,13 @@ function getCopyDiagnosticsLabel(copyState: 'idle' | 'copied' | 'failed', t: Tra
 }
 
 function BugReportActions({
+  buttonClassName,
   copyState,
   canCopyDiagnostics,
   onCopyDiagnostics,
   t,
 }: {
+  buttonClassName?: string
   copyState: 'idle' | 'copied' | 'failed'
   canCopyDiagnostics: boolean
   onCopyDiagnostics: () => void
@@ -343,8 +455,11 @@ function BugReportActions({
       <Button
         type="button"
         variant="outline"
-        className="w-full justify-between"
-        onClick={onCopyDiagnostics}
+        className={cn('w-full justify-between', buttonClassName)}
+        onClick={() => {
+          trackContributionAction('copy_diagnostics')
+          onCopyDiagnostics()
+        }}
         disabled={!canCopyDiagnostics}
       >
         {getCopyDiagnosticsLabel(copyState, t)}
@@ -452,15 +567,22 @@ function ContributionGrid({
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <ContributionCard
+        className="sm:col-span-2"
         title={t(NEWSLETTER_PATH.titleKey)}
         description={t(NEWSLETTER_PATH.descriptionKey)}
         ctaLabel={t(NEWSLETTER_PATH.ctaLabelKey)}
         icon={NEWSLETTER_PATH.icon}
         tone={NEWSLETTER_PATH.tone}
         autoFocus={true}
-        onAction={() => onOpenLink(t(NEWSLETTER_PATH.labelKey), NEWSLETTER_PATH.url)}
+        inlineAction={true}
+        onAction={() => openTrackedContributionLink(
+          NEWSLETTER_PATH.analyticsAction,
+          t(NEWSLETTER_PATH.labelKey),
+          NEWSLETTER_PATH.url,
+          onOpenLink,
+        )}
       />
-      <SponsorLogoCard onOpenLink={onOpenLink} t={t} />
+      <SponsorLogoCard className="sm:col-span-2" onOpenLink={onOpenLink} t={t} />
       {CONTRIBUTION_PATHS.map((path) => {
         const secondaryLink = path.secondaryLink
 
@@ -472,13 +594,24 @@ function ContributionGrid({
             ctaLabel={t(path.ctaLabelKey)}
             icon={path.icon}
             tone={path.tone}
-            onAction={() => onOpenLink(t(path.labelKey), path.url)}
+            onAction={() => openTrackedContributionLink(
+              path.analyticsAction,
+              t(path.labelKey),
+              path.url,
+              onOpenLink,
+            )}
             secondaryAction={secondaryLink ? (
               <ContributionLinkButton
                 label={t(secondaryLink.ctaLabelKey)}
                 tone={path.tone}
                 accented={false}
-                onAction={() => onOpenLink(t(secondaryLink.labelKey), secondaryLink.url)}
+                className="min-w-0 px-3 text-sm"
+                onAction={() => openTrackedContributionLink(
+                  secondaryLink.analyticsAction,
+                  t(secondaryLink.labelKey),
+                  secondaryLink.url,
+                  onOpenLink,
+                )}
               />
             ) : undefined}
           />
@@ -490,9 +623,15 @@ function ContributionGrid({
         ctaLabel={t('feedback.reportBug.cta')}
         icon={Bug}
         tone="red"
-        onAction={() => onOpenLink(t('feedback.reportBug.linkLabel'), TOLARIA_GITHUB_ISSUES_URL)}
+        onAction={() => openTrackedContributionLink(
+          'issues',
+          t('feedback.reportBug.linkLabel'),
+          TOLARIA_GITHUB_ISSUES_URL,
+          onOpenLink,
+        )}
         secondaryAction={(
           <BugReportActions
+            buttonClassName="min-w-0 px-3 text-sm"
             copyState={copyState}
             canCopyDiagnostics={canCopyDiagnostics}
             onCopyDiagnostics={onCopyDiagnostics}
