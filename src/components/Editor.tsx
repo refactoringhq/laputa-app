@@ -44,6 +44,7 @@ import { createRichEditorTextDirectionExtension } from './richEditorTextDirectio
 import { createRichEditorTransformErrorRecoveryExtension } from './richEditorTransformErrorRecoveryExtension'
 import { createRichEditorBlockSelectionExtension } from './richEditorBlockSelectionExtension'
 import { createTodoBlockShortcutExtension } from './todoBlockShortcutExtension'
+import { createRichEditorCodeBlockTabExtension } from './richEditorCodeBlockTabExtension'
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
 import { useEditorPdfExport } from './useEditorPdfExport'
 import type { NotePdfExportSource } from '../utils/notePdfExport'
@@ -284,10 +285,12 @@ function useEditorSetup({
       }
     },
     pasteHandler: handleRichEditorPaste,
+    tabBehavior: 'prefer-indent',
     _tiptapOptions: { injectNonce: RUNTIME_STYLE_NONCE },
     extensions: [
       createRichEditorTransformErrorRecoveryExtension(),
       createImeCompositionKeyGuardExtension(),
+      createRichEditorCodeBlockTabExtension(),
       createMarkdownHighlightShortcutExtension(),
       createTodoBlockShortcutExtension(),
       createRichEditorMarkdownInputTransformExtension(),
