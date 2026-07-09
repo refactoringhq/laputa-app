@@ -203,6 +203,17 @@ describe('Editor', () => {
     })
   })
 
+  it('keeps Tab reserved for rich-editor indentation instead of UI focus navigation', () => {
+    renderEditor({
+      tabs: [mockTab],
+      activeTabPath: mockEntry.path,
+    })
+
+    expect(blockNoteCreation.options.at(-1)).toMatchObject({
+      tabBehavior: 'prefer-indent',
+    })
+  })
+
   it('registers a rich-editor flush hook for pending BlockNote changes', async () => {
     const onContentChange = vi.fn()
     const flushPendingEditorContentRef = { current: null as ((path: string) => void) | null }
