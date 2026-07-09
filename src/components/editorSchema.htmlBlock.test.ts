@@ -18,6 +18,7 @@ describe('editor schema HTML block parsing', () => {
       props: {
         height: HTML_BLOCK_DEFAULT_HEIGHT,
         html: '<button>Click me</button>\n',
+        scripts: 'blocked',
       },
     })
   })

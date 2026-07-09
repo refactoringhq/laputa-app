@@ -145,9 +145,11 @@ Formula cells can reference another sheet note with Tolaria's cross-sheet syntax
 ```txt
 =[[newsletter-revenue]].B5
 =ROUND([[business-plan]].$E$12, 2)
+=[[device]].power.watts
+=[[launch-brief]].2
 ```
 
-Cross-sheet references resolve another sheet note by wikilink target, then read a single A1-style cell. Circular references and very deep chains are treated as unresolved.
+Cross-sheet cell references resolve another sheet note by wikilink target, then read a single A1-style cell. Frontmatter references resolve one note by wikilink target, then read a scalar property path after the dot. Numeric line references such as `[[launch-brief]].2` read one frontmatter-stripped raw body line and preserve commas as text. Missing, ambiguous, circular, very deep, or non-scalar references are treated as unresolved and surface as spreadsheet errors.
 
 ## Guidance For Agents And Scripts
 
@@ -157,7 +159,7 @@ When editing a sheet note programmatically:
 - keep `_display: sheet` when the file should display as a spreadsheet
 - keep spreadsheet presentation state under `_sheet`
 - parse and serialize the body as CSV, not by splitting on every comma manually
-- preserve formulas as formulas, including `[[sheet]].A1` references
+- preserve formulas as formulas, including `[[sheet]].A1`, `[[note]].property.path`, and `[[note]].1` references
 - avoid converting formulas to their displayed values
 - quote CSV cells when they contain commas, quotes, or line breaks
 - do not add workbook tabs inside one note; create another note with `_display: sheet` instead

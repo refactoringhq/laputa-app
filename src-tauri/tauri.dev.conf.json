@@ -1,0 +1,5 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Tolaria Dev",
+  "identifier": "club.refactoring.tolaria.dev"
+}

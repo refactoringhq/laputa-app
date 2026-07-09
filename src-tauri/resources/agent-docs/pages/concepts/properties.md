@@ -29,3 +29,21 @@ Examples include `_icon`, `_color`, `_order`, `_sidebar_label`, `_width`, and `_
 The Properties panel is the safest place to edit structured properties. Toggle it with `Cmd+Shift+I` on macOS or `Ctrl+Shift+I` on Windows and Linux.
 
 Date fields use Tolaria's picker, relationship fields can use wikilinks, and raw Markdown mode is available when you need direct control over YAML.
+
+## Referencing Properties
+
+HTML blocks can reference properties from the current note or another note:
+
+```html
+<p>{{status}}</p>
+<p>{{formatDate(date, "long")}}</p>
+<p>{{[[project-alpha]].status}}</p>
+```
+
+Sheet formulas can also read scalar properties with the same note target form:
+
+```txt
+=[[project-alpha]].status
+```
+
+Use [Vault Expressions](/reference/vault-expressions) for HTML expression syntax and [Spreadsheet Formulas](/reference/spreadsheet-functions) for formula behavior.

@@ -74,6 +74,7 @@
     "section": "concepts",
     "headings": [
       "Rich Editing",
+      "HTML Blocks",
       "Raw Mode",
       "Table Of Contents",
       "Width"
@@ -135,7 +136,8 @@
     "headings": [
       "Suggested Properties",
       "System Properties",
-      "Property Editing"
+      "Property Editing",
+      "Referencing Properties"
     ]
   },
   {
@@ -160,7 +162,7 @@
       "One Note, One Sheet",
       "Editing",
       "Wikilinks In Cells",
-      "Cross-Sheet Formulas",
+      "Note Reference Formulas",
       "Storage",
       "Formulas"
     ]
@@ -307,6 +309,19 @@
     ]
   },
   {
+    "title": "Use HTML Blocks",
+    "path": "pages/guides/use-html-blocks.md",
+    "url": "/guides/use-html-blocks",
+    "section": "guides",
+    "headings": [
+      "Create An HTML Block",
+      "Add Live Vault Values",
+      "Style The Preview",
+      "Run Local Script",
+      "Troubleshooting"
+    ]
+  },
+  {
     "title": "Use Media Previews",
     "path": "pages/guides/use-media-previews.md",
     "url": "/guides/use-media-previews",
@@ -330,7 +345,7 @@
       "Select And Edit Ranges",
       "Format Cells",
       "Add Wikilinks",
-      "Reference Another Sheet Note",
+      "Reference Another Note",
       "Work With The Raw File"
     ]
   },
@@ -459,7 +474,7 @@
     "section": "reference",
     "headings": [
       "Basic Syntax",
-      "Tolaria Cross-Sheet References",
+      "Tolaria Note References",
       "Autocomplete Functions",
       "Logical",
       "Math and trigonometry",
@@ -489,6 +504,19 @@
     "headings": [
       "Support Policy",
       "Reporting Platform Bugs"
+    ]
+  },
+  {
+    "title": "Vault Expressions",
+    "path": "pages/reference/vault-expressions.md",
+    "url": "/reference/vault-expressions",
+    "section": "reference",
+    "headings": [
+      "Reference Syntax",
+      "Values",
+      "Formatting Helpers",
+      "Structured JSON",
+      "Sheet Formula Parity"
     ]
   },
   {

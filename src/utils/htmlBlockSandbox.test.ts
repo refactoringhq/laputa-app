@@ -22,6 +22,16 @@ describe('HTML block sandbox', () => {
     expect(sanitized).toContain('rel="noreferrer noopener"')
   })
 
+  it('keeps Tolaria deep links as inert external anchors', () => {
+    const sanitized = sanitizeHtmlBlockMarkup(
+      '<a href="tolaria://refactoring-vault/acceleration-whiplash.md">Acceleration whiplash</a>',
+    )
+
+    expect(sanitized).toContain('href="tolaria://refactoring-vault/acceleration-whiplash.md"')
+    expect(sanitized).toContain('target="_blank"')
+    expect(sanitized).toContain('rel="noreferrer noopener"')
+  })
+
   it('removes nested browsing contexts and remote-loading attributes', () => {
     const sanitized = sanitizeHtmlBlockMarkup([
       '<iframe src="https://example.com"></iframe>',
@@ -35,15 +45,48 @@ describe('HTML block sandbox', () => {
     expect(sanitized).not.toContain('srcset=')
     expect(sanitized).not.toContain('url(')
     expect(sanitized).not.toContain('@import')
+    expect(sanitized).toContain('<style>')
+    expect(sanitized).toContain('.ok { color: red }')
     expect(sanitized).toContain('Styled')
   })
 
   it('generates a srcdoc with a restrictive CSP and no script permission dependency', () => {
-    const srcDoc = htmlBlockIframeSrcDoc('<h1>Hello</h1>')
+    const srcDoc = htmlBlockIframeSrcDoc('<h1>Hello</h1><script>window.evil = true</script>')
 
     expect(srcDoc).toContain("script-src 'none'")
     expect(srcDoc).toContain("default-src 'none'")
     expect(srcDoc).toContain('<h1>Hello</h1>')
+    expect(srcDoc).not.toContain('<script>window.evil = true</script>')
+  })
+
+  it('preserves only inline scripts when sandboxed scripts are explicitly enabled', () => {
+    const srcDoc = htmlBlockIframeSrcDoc([
+      '<div id="app"></div>',
+      '<script src="https://example.com/app.js"></script>',
+      '<script type="text/javascript">document.getElementById("app").textContent = "Ready"</script>',
+      '<script type="application/json" id="data">{"title":"Ready"}</script>',
+    ].join(''), { scripts: 'sandboxed' })
+
+    expect(srcDoc).toContain("script-src 'unsafe-inline'")
+    expect(srcDoc).toContain('<script>document.getElementById("app").textContent = "Ready"</script>')
+    expect(srcDoc).toContain('<script type="application/json">{"title":"Ready"}</script>')
+    expect(srcDoc).not.toContain('src="https://example.com/app.js"')
+  })
+
+  it('places sanitized style blocks in the iframe head so user CSS applies', () => {
+    const preview = htmlBlockPreview(
+      '<style>.card { color: red }</style><main class="card"><h1>Styled</h1></main>',
+    )
+    const userStyleIndex = preview.srcDoc.indexOf('.card')
+    const headCloseIndex = preview.srcDoc.indexOf('</head>')
+    const bodyIndex = preview.srcDoc.indexOf('<body>')
+    const bodyHtml = preview.srcDoc.slice(bodyIndex)
+
+    expect(userStyleIndex).toBeGreaterThan(-1)
+    expect(userStyleIndex).toBeLessThan(headCloseIndex)
+    expect(bodyIndex).toBeGreaterThan(headCloseIndex)
+    expect(bodyHtml).not.toContain('<style>')
+    expect(bodyHtml).toContain('<main class="card"><h1>Styled</h1></main>')
   })
 
   it('builds sanitized preview output with one DOMPurify pass', () => {

@@ -1,5 +1,6 @@
 {
   "current_namespace": "com.tolaria.app",
+  "development_namespace": "com.tolaria.app.dev",
   "legacy_namespace": "com.laputa.app",
   "namespace_read_order": ["current", "legacy"],
   "files": {
