@@ -20,6 +20,7 @@ import {
 
 interface UseSheetInputActivityHandlersOptions {
   commitExternalFormulaEditorInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
+  commitSheetTextInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
   scheduleSelectionChromePatch: () => void
   scheduleSerialize: (options?: ScheduleSheetSerializeOptions) => void
   setFormulaAutocomplete: Dispatch<SetStateAction<FormulaAutocompleteState | null>>
@@ -43,6 +44,7 @@ function visibleAutocompleteInput(
 
 export function useSheetInputActivityHandlers({
   commitExternalFormulaEditorInput,
+  commitSheetTextInput,
   scheduleSelectionChromePatch,
   scheduleSerialize,
   setFormulaAutocomplete,
@@ -52,7 +54,10 @@ export function useSheetInputActivityHandlers({
   workbookRef,
 }: UseSheetInputActivityHandlersOptions) {
   const handleBlurCapture = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
-    commitExternalFormulaEditorInput(formulaInputFromTarget(event.target))
+    const input = formulaInputFromTarget(event.target)
+    if (!commitSheetTextInput(input)) {
+      commitExternalFormulaEditorInput(input)
+    }
     scheduleSerialize({ dirty: false })
     window.setTimeout(() => {
       if (sheetElementRef.current?.contains(document.activeElement) !== true) {
@@ -62,6 +67,7 @@ export function useSheetInputActivityHandlers({
     }, 0)
   }, [
     commitExternalFormulaEditorInput,
+    commitSheetTextInput,
     scheduleSerialize,
     setFormulaAutocomplete,
     setWikilinkAutocomplete,
