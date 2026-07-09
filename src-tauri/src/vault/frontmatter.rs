@@ -8,40 +8,33 @@ use std::collections::HashMap;
 pub(crate) struct Frontmatter {
     #[serde(default)]
     pub title: Option<String>,
-    #[serde(rename = "type", alias = "Is A", alias = "is_a")]
+    #[serde(rename = "type", default)]
     pub is_a: Option<StringOrList>,
     #[serde(default)]
     pub aliases: Option<StringOrList>,
     #[serde(
         rename = "_archived",
-        alias = "Archived",
-        alias = "archived",
         default,
         deserialize_with = "deserialize_bool_or_string"
     )]
     pub archived: Option<bool>,
-    #[serde(rename = "Status", alias = "status", default)]
+    #[serde(rename = "Status", default)]
     pub status: Option<StringOrList>,
-    #[serde(rename = "_icon", alias = "icon", default)]
+    #[serde(rename = "_icon", default)]
     pub icon: Option<StringOrList>,
-    #[serde(alias = "_color", default)]
+    #[serde(default)]
     pub color: Option<StringOrList>,
-    #[serde(rename = "_order", alias = "order", default)]
+    #[serde(rename = "_order", default)]
     pub order: Option<i64>,
-    #[serde(
-        rename = "_sidebar_label",
-        alias = "sidebar label",
-        alias = "sidebar_label",
-        default
-    )]
+    #[serde(rename = "_sidebar_label", default)]
     pub sidebar_label: Option<StringOrList>,
     #[serde(default)]
     pub template: Option<StringOrList>,
-    #[serde(rename = "_sort", alias = "sort", default)]
+    #[serde(rename = "_sort", default)]
     pub sort: Option<StringOrList>,
     #[serde(default)]
     pub view: Option<StringOrList>,
-    #[serde(rename = "_width", alias = "width", default)]
+    #[serde(rename = "_width", default)]
     pub note_width: Option<StringOrList>,
     #[serde(rename = "_display", default)]
     pub display: Option<StringOrList>,
