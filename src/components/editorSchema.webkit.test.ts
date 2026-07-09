@@ -176,12 +176,12 @@ describe('editor schema code block highlighting', () => {
     expect(createTolariaCodeBlockOptions()).not.toHaveProperty('createHighlighter')
   })
 
-  it('omits the Shiki highlighter on WebKit even when the simple regex probe passes', async () => {
+  it('keeps the Shiki highlighter on modern WebKit when regex probes pass', async () => {
     setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15')
     vi.resetModules()
 
     const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
 
-    expect(createTolariaCodeBlockOptions()).not.toHaveProperty('createHighlighter')
+    expect(createTolariaCodeBlockOptions()).toHaveProperty('createHighlighter')
   })
 })

@@ -11,19 +11,6 @@ export function supportsModernRegexFeatures(): boolean {
   }
 }
 
-function getUserAgent(): string {
-  if (typeof navigator === 'undefined') return ''
-  return navigator.userAgent
-}
-
-function isWebKitRuntime(): boolean {
-  const userAgent = getUserAgent()
-  return userAgent.includes('AppleWebKit')
-    && !userAgent.includes('Chrome/')
-    && !userAgent.includes('Chromium/')
-    && !userAgent.includes('Edg/')
-}
-
 export function supportsShikiRegexFeatures(): boolean {
-  return supportsModernRegexFeatures() && !isWebKitRuntime()
+  return supportsModernRegexFeatures()
 }
