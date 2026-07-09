@@ -3,10 +3,12 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 const APP_CONFIG_POLICY_JSON: &str = include_str!("../../mcp-server/app-config-policy.json");
+const APP_CONFIG_NAMESPACE_ENV: &str = "TOLARIA_APP_CONFIG_NAMESPACE";
 
 #[derive(Debug, Deserialize)]
 struct AppConfigPolicy {
     current_namespace: String,
+    development_namespace: String,
     legacy_namespace: String,
     namespace_read_order: Vec<AppConfigNamespace>,
 }
@@ -20,7 +22,15 @@ enum AppConfigNamespace {
 
 impl AppConfigPolicy {
     fn current_namespace(&self) -> &str {
-        &self.current_namespace
+        self.current_namespace_for(std::env::var(APP_CONFIG_NAMESPACE_ENV).ok().as_deref())
+    }
+
+    fn current_namespace_for(&self, requested_namespace: Option<&str>) -> &str {
+        if requested_namespace.map(str::trim) == Some(self.development_namespace.as_str()) {
+            &self.development_namespace
+        } else {
+            &self.current_namespace
+        }
     }
 
     fn namespace_read_order(&self) -> &[AppConfigNamespace] {
@@ -29,7 +39,7 @@ impl AppConfigPolicy {
 
     fn namespace_dir(&self, namespace: &AppConfigNamespace) -> &str {
         match namespace {
-            AppConfigNamespace::Current => &self.current_namespace,
+            AppConfigNamespace::Current => self.current_namespace(),
             AppConfigNamespace::Legacy => &self.legacy_namespace,
         }
     }
@@ -199,6 +209,22 @@ mod tests {
         assert_eq!(
             path,
             config_dir.join("com.tolaria.app").join("settings.json")
+        );
+    }
+
+    #[test]
+    fn declared_development_namespace_can_replace_current_namespace() {
+        assert_eq!(
+            app_config_policy().current_namespace_for(Some("com.tolaria.app.dev")),
+            "com.tolaria.app.dev"
+        );
+    }
+
+    #[test]
+    fn unknown_requested_namespace_keeps_production_namespace() {
+        assert_eq!(
+            app_config_policy().current_namespace_for(Some("com.example.other")),
+            "com.tolaria.app"
         );
     }
 

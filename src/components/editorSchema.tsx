@@ -433,6 +433,7 @@ const HtmlBlockSpec = createReactBlockSpec(
     propSchema: {
       height: { default: '320' },
       html: { default: '' },
+      scripts: { default: 'blocked' },
     },
     content: 'none',
   },
