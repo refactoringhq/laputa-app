@@ -396,9 +396,11 @@ Formula cells can reference another sheet note with Tolaria's cross-sheet syntax
 ```txt
 =[[newsletter-revenue]].B5
 =ROUND([[business-plan]].$E$12, 2)
+=[[device]].power.watts
+=[[launch-brief]].2
 ```
 
-Cross-sheet references resolve another sheet note by wikilink target, then read a single A1-style cell. Circular references and very deep chains are treated as unresolved.
+Cross-sheet cell references resolve another sheet note by wikilink target, then read a single A1-style cell. Frontmatter references resolve one note by wikilink target, then read a scalar property path after the dot. Numeric line references such as `[[launch-brief]].2` read one frontmatter-stripped raw body line and preserve commas as text. Missing, ambiguous, circular, very deep, or non-scalar references are treated as unresolved and surface as spreadsheet errors.
 
 ## Guidance For Agents And Scripts
 
@@ -408,7 +410,7 @@ When editing a sheet note programmatically:
 - keep `_display: sheet` when the file should display as a spreadsheet
 - keep spreadsheet presentation state under `_sheet`
 - parse and serialize the body as CSV, not by splitting on every comma manually
-- preserve formulas as formulas, including `[[sheet]].A1` references
+- preserve formulas as formulas, including `[[sheet]].A1`, `[[note]].property.path`, and `[[note]].1` references
 - avoid converting formulas to their displayed values
 - quote CSV cells when they contain commas, quotes, or line breaks
 - do not add workbook tabs inside one note; create another note with `_display: sheet` instead
@@ -428,6 +430,8 @@ URL: /reference/spreadsheet-functions
 Formula cells start with `=` and are evaluated by IronCalc through Tolaria's sheet editor.
 
 Tolaria adds vault-aware sheet references on top of the normal spreadsheet formula model. Everything else should be treated as IronCalc formula behavior. IronCalc aims for Excel-compatible formulas, but the upstream project is still evolving, so verify advanced formulas against the IronCalc docs when precision matters.
+
+The same `[[note]].field` target forms are also available to HTML block vault expressions. Use [Vault Expressions](/reference/vault-expressions) for `{{...}}` syntax and HTML formatting helpers.
 
 ## Basic Syntax
 
@@ -449,7 +453,7 @@ Use parentheses when a model depends on precedence:
 =(B2+B3-B4)/B5
 ```
 
-## Tolaria Cross-Sheet References
+## Tolaria Note References
 
 Tolaria supports wikilink cell references for values that live in another sheet note:
 
@@ -457,6 +461,7 @@ Tolaria supports wikilink cell references for values that live in another sheet 
 =[[newsletter-revenue]].B5
 =SUM(B2:D2)+[[sponsorship-pipeline]].E12
 =ROUND([[business-plan]].$E$12, 2)
+=[[launch-brief]].2
 ```
 
 The target inside `[[...]]` resolves like a normal Tolaria wikilink. The cell address after the dot uses A1 notation.
@@ -470,7 +475,28 @@ Absolute markers follow spreadsheet copy behavior:
 | `[[revenue]].B$5` | row fixed, column can shift |
 | `[[revenue]].$B5` | column fixed, row can shift |
 
-Cross-sheet references currently resolve single cells. Keep range formulas inside one sheet note until cross-note ranges are explicitly supported.
+Cross-sheet cell references currently resolve single cells. Keep range formulas inside one sheet note until cross-note ranges are explicitly supported.
+
+Formulas can also read scalar frontmatter properties from a specific note:
+
+```txt
+=[[device.md]].power.watts
+=[[project-alpha]].status
+=[[book-notes/the-design-of-everyday-things.md]].rating
+```
+
+The target resolves like a wikilink, and the dot path reads nested frontmatter keys. Numbers, booleans, and strings become formula literals. Missing notes, ambiguous note targets, missing properties, arrays, maps, and other non-scalar values resolve to `#N/A`.
+
+A first segment that looks like an A1 cell address, such as `B2`, is treated as a cross-sheet cell reference. Use property names that do not collide with A1 notation for frontmatter formulas.
+
+Formulas can read one raw Markdown body line from any note with numeric dot notation:
+
+```txt
+=[[launch-brief]].1
+=[[launch-brief]].2
+```
+
+Line references exclude YAML frontmatter, are 1-based, and preserve commas as text. `[[note]].A1` still means grid/cell access and can split comma-separated content; `[[note]].1` means the whole first body line.
 
 ## Autocomplete Functions
 
@@ -575,6 +601,7 @@ Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 =[[newsletter-revenue]].E5
 =SUM(B2:D2)+[[sponsorship-pipeline]].E12
 =IF([[business-plan]].$E$12>0, [[business-plan]].$E$12, 0)
+=[[launch-brief]].2
 ```
 
 ## IronCalc Function Families
@@ -628,6 +655,108 @@ Include:
 - CPU architecture.
 - Whether the vault is local-only or connected to a remote.
 - Steps to reproduce.
+
+---
+
+# Vault Expressions
+
+Source: reference/vault-expressions.md
+URL: /reference/vault-expressions
+
+# Vault Expressions
+
+Vault expressions let rendered content read values from Tolaria notes. The `{{...}}` template form currently runs in HTML blocks. Sheet formulas use the same `[[note]].field` reference forms inside `=` formulas, but spreadsheet calculations still use IronCalc functions.
+
+## Reference Syntax
+
+| Expression | Result |
+| --- | --- |
+| `{{status}}` | Current note property. |
+| `{{this.status}}` | Current note property with explicit `this`. |
+| `{{[[project-alpha]].status}}` | Scalar property from another note. |
+| `{{[[device]].power.watts}}` | Nested scalar frontmatter path. |
+| `{{[[essay]].has_notes}}` | Relationship or array property as comma-separated text. |
+| `{{[[essay]].title}}` | Referenced note title. |
+| `{{[[budget]].B5}}` | Single cell from a sheet note. |
+| `{{[[brief]].2}}` | Second raw body line from another note. |
+
+Wikilink targets resolve like normal Tolaria links, so they can use filenames, paths, or note titles when those targets are unambiguous.
+
+Line references are 1-based and exclude YAML frontmatter. `[[note]].A1` means grid or cell access and may split comma-separated content. `[[note]].1` means the whole first body line, preserving commas as text.
+
+## Values
+
+Properties can resolve to strings, numbers, booleans, `null`, or arrays of strings, numbers, and booleans. Arrays render as comma-separated text unless you pass them to `json(...)`.
+
+Unresolved expressions remain visible as escaped placeholders, such as `{{missing_property}}`, so broken dashboards fail visibly instead of silently showing the wrong value.
+
+Expression output is escaped as text by default. A property value such as `<strong>Draft</strong>` displays as text, not as live HTML.
+
+## Formatting Helpers
+
+| Helper | Example |
+| --- | --- |
+| `upper(value)` | `{{upper(status)}}` |
+| `lower(value)` | `{{lower(status)}}` |
+| `title(value)` | `{{title(status)}}` |
+| `trim(value)` | `{{trim(name)}}` |
+| `truncate(value, length, suffix?)` | `{{truncate(summary, 120)}}` |
+| `replace(value, from, to)` | `{{replace(status, "_", " ")}}` |
+| `round(value, digits?)` | `{{round(score, 1)}}` |
+| `formatNumber(value, digits?)` | `{{formatNumber(revenue, 0)}}` |
+| `formatPercent(value, digits?)` | `{{formatPercent(conversion_rate, 1)}}` |
+| `formatCurrency(value, currency, digits?)` | `{{formatCurrency(amount, "USD", 0)}}` |
+| `formatDate(value, format?)` | `{{formatDate(publish_date, "long")}}` |
+| `default(value, fallback)` | `{{default(status, "Draft")}}` |
+| `isEmpty(value)` | `{{isEmpty(owner)}}` |
+| `json(value)` | `{{json([[essay]].has_notes)}}` |
+
+`formatDate` supports `short`, `medium`, `long`, and `YYYY-MM-DD`. Formatting uses the app locale when available.
+
+The only operator is `+`, which concatenates text:
+
+```html
+<p>{{first_name + " " + last_name}}</p>
+```
+
+Vault expressions do not run arbitrary JavaScript. They do not support loops, mutation, user-defined functions, raw HTML interpolation, or remote data access.
+
+## Structured JSON
+
+Use `json(...)` when an HTML block script needs data instead of already-rendered text:
+
+```html
+<script type="application/json" id="notes-data">
+{{json([[essay]].has_notes)}}
+</script>
+```
+
+For scalar values, `json(...)` returns the JSON representation of that value. For a wikilink or a relationship array made of wikilinks, it returns note summary objects:
+
+```json
+{
+  "title": "Acceleration whiplash",
+  "target": "acceleration-whiplash",
+  "path": "/vault/acceleration-whiplash.md",
+  "status": "Evergreened",
+  "raw": "[[acceleration-whiplash]]",
+  "deepLink": "tolaria://refactoring-vault/acceleration-whiplash.md"
+}
+```
+
+The JSON is escaped so it cannot close the surrounding script tag. Put it in a non-executable script tag, then parse it from a `scripts="sandboxed"` HTML block when you need to build markup with standard DOM APIs.
+
+## Sheet Formula Parity
+
+The same note target forms work in sheet formulas:
+
+```txt
+=[[newsletter-revenue]].B5
+=[[project-alpha]].status
+=[[launch-brief]].2
+```
+
+Use [Spreadsheet Formulas](/reference/spreadsheet-functions) for spreadsheet-specific syntax and IronCalc function behavior.
 
 ---
 

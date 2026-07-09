@@ -6,7 +6,20 @@ import {
   vaultExpressionDependencySource,
 } from './vaultExpressions'
 
-function entry(path: string, title: string): VaultEntry {
+const refactoringWorkspace = {
+  alias: 'refactoring-vault',
+  available: true,
+  color: null,
+  defaultForNewNotes: true,
+  icon: null,
+  id: 'refactoring-vault',
+  label: 'Refactoring Vault',
+  mounted: true,
+  path: '/vault',
+  shortLabel: 'RV',
+}
+
+function entry(path: string, title: string, overrides: Partial<VaultEntry> = {}): VaultEntry {
   return {
     aliases: [],
     archived: false,
@@ -41,6 +54,7 @@ function entry(path: string, title: string): VaultEntry {
     view: null,
     visible: null,
     wordCount: 0,
+    ...overrides,
   }
 }
 
@@ -137,5 +151,92 @@ describe('vaultExpressions', () => {
       '=[[brief]].2',
       '=[[budget]].B12',
     ].join('\n'))
+  })
+
+  it('serializes enriched relationship JSON from normalized relationship keys', () => {
+    const sourceEntry = entry('/vault/dashboard.md', 'Dashboard', { workspace: refactoringWorkspace })
+    const essayEntry = entry('/vault/acceleration-whiplash.md', 'Acceleration whiplash', {
+      relationships: {
+        'Has Notes': [
+          '[[starting-work-is-easier-finishing-it-is-harder|Starting work is easier, finishing it is harder]]',
+          '[[human-reviews-do-not-scale-like-ai-coding]]',
+        ],
+      },
+      status: 'Evergreened',
+      workspace: refactoringWorkspace,
+    })
+    const firstNote = entry('/vault/starting-work-is-easier-finishing-it-is-harder.md', 'Ignored when alias exists', {
+      status: 'Extracted',
+      workspace: refactoringWorkspace,
+    })
+    const secondNote = entry('/vault/human-reviews-do-not-scale-like-ai-coding.md', 'Human reviews do not scale like AI coding', {
+      status: 'Evergreen',
+      workspace: refactoringWorkspace,
+    })
+
+    const rendered = renderVaultExpressionTemplate({
+      compiled: compileVaultExpressionTemplate([
+        '<script type="application/json" id="essay">{{json("[[acceleration-whiplash]]")}}</script>',
+        '<script type="application/json" id="notes">{{json([[acceleration-whiplash]].has_notes)}}</script>',
+      ].join('')),
+      context: {
+        contentsByPath: new Map(),
+        currentContent: '# Dashboard',
+        entries: [sourceEntry, essayEntry, firstNote, secondNote],
+        locale: 'en-US',
+        sourceEntry,
+        vaultPath: '/vault',
+      },
+    })
+
+    const parser = new DOMParser()
+    const documentObject = parser.parseFromString(rendered.html, 'text/html')
+    const essay = JSON.parse(documentObject.getElementById('essay')?.textContent ?? 'null') as Record<string, unknown>
+    const notes = JSON.parse(documentObject.getElementById('notes')?.textContent ?? '[]') as Array<Record<string, unknown>>
+
+    expect(essay).toMatchObject({
+      deepLink: 'tolaria://refactoring-vault/acceleration-whiplash.md',
+      path: '/vault/acceleration-whiplash.md',
+      status: 'Evergreened',
+      target: 'acceleration-whiplash',
+      title: 'Acceleration whiplash',
+    })
+    expect(notes).toHaveLength(2)
+    expect(notes[0]).toMatchObject({
+      deepLink: 'tolaria://refactoring-vault/starting-work-is-easier-finishing-it-is-harder.md',
+      path: '/vault/starting-work-is-easier-finishing-it-is-harder.md',
+      status: 'Extracted',
+      title: 'Starting work is easier, finishing it is harder',
+    })
+    expect(notes[1]).toMatchObject({
+      deepLink: 'tolaria://refactoring-vault/human-reviews-do-not-scale-like-ai-coding.md',
+      path: '/vault/human-reviews-do-not-scale-like-ai-coding.md',
+      status: 'Evergreen',
+      title: 'Human reviews do not scale like AI coding',
+    })
+    expect(rendered.unresolved).toEqual([])
+  })
+
+  it('escapes JSON so dynamic data cannot close the script element', () => {
+    const sourceEntry = entry('/vault/dashboard.md', 'Dashboard', { workspace: refactoringWorkspace })
+    const unsafeNote = entry('/vault/unsafe.md', '</script><img src=x onerror=alert(1)>', {
+      workspace: refactoringWorkspace,
+    })
+
+    const rendered = renderVaultExpressionTemplate({
+      compiled: compileVaultExpressionTemplate('<script type="application/json">{{json("[[unsafe]]")}}</script>'),
+      context: {
+        contentsByPath: new Map(),
+        currentContent: '# Dashboard',
+        entries: [sourceEntry, unsafeNote],
+        locale: 'en-US',
+        sourceEntry,
+        vaultPath: '/vault',
+      },
+    })
+
+    expect(rendered.html).not.toContain('</script><img')
+    expect(rendered.html).toContain('\\u003c/script\\u003e')
+    expect(rendered.html).toContain('\\u003cimg')
   })
 })

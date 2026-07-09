@@ -49,9 +49,19 @@ Tolaria offers a rich editor for daily writing and a raw Markdown mode for exact
 
 ## Rich Editing
 
-The rich editor supports blocks, slash commands, wikilinks, tables, code blocks, images, Mermaid diagrams, LaTeX-style math, and markdown-backed whiteboards.
+The rich editor supports blocks, slash commands, wikilinks, tables, code blocks, images, Mermaid diagrams, LaTeX-style math, sandboxed HTML blocks, and markdown-backed whiteboards.
 
 Use it when you want to write and reorganize quickly without thinking about Markdown syntax.
+
+## HTML Blocks
+
+HTML blocks render fenced `html` code as sandboxed previews. They are useful for dashboards, report fragments, custom layouts, and small interactive local views.
+
+HTML source is edited in raw mode. The rich editor shows the preview, copy source action, raw-editor action, height reset, and resize handle.
+
+HTML blocks can read vault values with `{{...}}` expressions, including current-note properties, external note properties, sheet cells, raw body lines, formatting helpers, and structured `json(...)` data for sandboxed scripts.
+
+See [Use HTML Blocks](/guides/use-html-blocks) for the workflow and [Vault Expressions](/reference/vault-expressions) for the syntax.
 
 ## Raw Mode
 
@@ -255,6 +265,24 @@ The Properties panel is the safest place to edit structured properties. Toggle i
 
 Date fields use Tolaria's picker, relationship fields can use wikilinks, and raw Markdown mode is available when you need direct control over YAML.
 
+## Referencing Properties
+
+HTML blocks can reference properties from the current note or another note:
+
+```html
+<p>{{status}}</p>
+<p>{{formatDate(date, "long")}}</p>
+<p>{{[[project-alpha]].status}}</p>
+```
+
+Sheet formulas can also read scalar properties with the same note target form:
+
+```txt
+=[[project-alpha]].status
+```
+
+Use [Vault Expressions](/reference/vault-expressions) for HTML expression syntax and [Spreadsheet Formulas](/reference/spreadsheet-functions) for formula behavior.
+
 ---
 
 # Relationships
@@ -373,7 +401,7 @@ Project,Owner,Status
 
 The cell still behaves like a spreadsheet cell, but the value remains a vault link that Tolaria can understand.
 
-## Cross-Sheet Formulas
+## Note Reference Formulas
 
 Tolaria adds a sheet-note reference syntax on top of IronCalc formulas:
 
@@ -383,7 +411,7 @@ Tolaria adds a sheet-note reference syntax on top of IronCalc formulas:
 =[[refactoring-business-plan]].$C$18
 ```
 
-The target before the dot is a normal Tolaria wikilink target. The part after the dot is an A1-style cell address.
+The target before the dot is a normal Tolaria wikilink target. For another sheet note, the part after the dot is an A1-style cell address.
 
 Relative and absolute references work like spreadsheet references when copied:
 
@@ -395,6 +423,23 @@ Relative and absolute references work like spreadsheet references when copied:
 This is not the same as an IronCalc workbook tab reference. It is Tolaria-specific syntax for referencing another sheet note in the vault.
 
 Current cross-sheet formulas resolve single cells. Ranges across sheet notes are not a stable file-format feature yet, so prefer composing them from explicit cell references or keeping range formulas inside the same sheet note.
+
+Sheet formulas can also read scalar frontmatter properties from a note:
+
+```txt
+=[[device]].power.watts
+=[[project-alpha]].status
+```
+
+This keeps sheet models connected to ordinary Tolaria metadata without requiring a saved view or query. Unresolved, ambiguous, or non-scalar property references show spreadsheet errors.
+
+Formulas can also read a raw Markdown body line from another note:
+
+```txt
+=[[launch-brief]].2
+```
+
+Line references are useful when a normal text note is still the source of record. `[[note]].A1` keeps grid or cell semantics; `[[note]].1` returns the whole first body line and preserves commas as text.
 
 ## Storage
 

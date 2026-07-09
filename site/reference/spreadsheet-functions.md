@@ -4,6 +4,10 @@ Formula cells start with `=` and are evaluated by IronCalc through Tolaria's she
 
 Tolaria adds vault-aware sheet references on top of the normal spreadsheet formula model. Everything else should be treated as IronCalc formula behavior. IronCalc aims for Excel-compatible formulas, but the upstream project is still evolving, so verify advanced formulas against the IronCalc docs when precision matters.
 
+::: v-pre
+The same `[[note]].field` target forms are also available to HTML block vault expressions. Use [Vault Expressions](/reference/vault-expressions) for `{{...}}` syntax and HTML formatting helpers.
+:::
+
 ## Basic Syntax
 
 | Syntax | Meaning |

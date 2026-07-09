@@ -19,6 +19,7 @@ interface VaultExpressionContextValue {
   entries: VaultEntry[]
   locale: string
   sourceEntry: VaultEntry | null
+  vaultPath: string
 }
 
 interface VaultExpressionProviderProps extends VaultExpressionContextValue {
@@ -38,13 +39,15 @@ export function VaultExpressionProvider({
   entries,
   locale,
   sourceEntry,
+  vaultPath,
 }: VaultExpressionProviderProps) {
   const value = useMemo(() => ({
     currentContent,
     entries,
     locale,
     sourceEntry,
-  }), [currentContent, entries, locale, sourceEntry])
+    vaultPath,
+  }), [currentContent, entries, locale, sourceEntry, vaultPath])
 
   return createElement(VaultExpressionContext.Provider, { value }, children)
 }
@@ -159,6 +162,7 @@ export function useResolvedVaultExpressionTemplate(source: string): ResolvedVaul
     entries: [],
     locale: 'en-US',
     sourceEntry: null,
+    vaultPath: '',
   })
 
   return useMemo(() => renderVaultExpressionTemplate({
@@ -169,6 +173,7 @@ export function useResolvedVaultExpressionTemplate(source: string): ResolvedVaul
       entries: context?.entries ?? [],
       locale: context?.locale ?? 'en-US',
       sourceEntry: context?.sourceEntry ?? null,
+      vaultPath: context?.vaultPath ?? '',
     },
   }), [compiled, contentsByPath, context])
 }

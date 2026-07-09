@@ -28,6 +28,7 @@ describe('HTML block markdown', () => {
     expect(block.type).toBe(HTML_BLOCK_TYPE)
     expect(block.props.height).toBe('360')
     expect(block.props.html).toBe('<article>\n  <h2>Hello</h2>\n</article>\n')
+    expect(block.props.scripts).toBe('blocked')
   })
 
   it('serializes an explicit portable height attribute', () => {
@@ -36,6 +37,24 @@ describe('HTML block markdown', () => {
       '<div>Resizable</div>',
       '```',
     ].join('\n'))
+  })
+
+  it('round-trips the explicit sandboxed scripts attribute', () => {
+    const markdown = [
+      '```html height="360" scripts="sandboxed"',
+      '<div id="app"></div>',
+      '<script>document.getElementById("app").textContent = "Ready"</script>',
+      '```',
+    ].join('\n')
+    const preprocessed = preProcessHtmlBlockMarkdown({ markdown })
+    const [block] = injectHtmlBlockInBlocks([{
+      type: 'paragraph',
+      content: [{ type: 'text', text: preprocessed, styles: {} }],
+      children: [],
+    }]) as Array<{ type: string; props: { height: string; html: string; scripts: string } }>
+
+    expect(block.props.scripts).toBe('sandboxed')
+    expect(htmlBlockMarkdown(block)).toBe(markdown)
   })
 
   it('uses a longer fence when HTML contains backticks', () => {
@@ -73,6 +92,7 @@ describe('HTML block markdown', () => {
     expect(block).toEqual({
       height: HTML_BLOCK_DEFAULT_HEIGHT,
       html: '<button>Click</button>',
+      scripts: 'blocked',
     })
   })
 

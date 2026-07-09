@@ -19,6 +19,25 @@ function stripFrontmatter(markdown) {
   return markdown.replace(/^---\n[\s\S]*?\n---\n/, '')
 }
 
+function stripVPreContainers(markdown) {
+  const output = []
+  let insideVPreContainer = false
+
+  for (const line of markdown.split('\n')) {
+    if (line.trim() === '::: v-pre') {
+      insideVPreContainer = true
+      continue
+    }
+    if (insideVPreContainer && line.trim() === ':::') {
+      insideVPreContainer = false
+      continue
+    }
+    output.push(line)
+  }
+
+  return output.join('\n')
+}
+
 function firstHeading(markdown, fallback) {
   const match = markdown.match(/^#\s+(.+)$/m)
   return match?.[1]?.trim() || fallback
@@ -151,7 +170,7 @@ async function main() {
 
   for (const relativePath of files) {
     const raw = await readFile(path.join(siteRoot, relativePath), 'utf8')
-    const content = stripFrontmatter(raw).trim()
+    const content = stripVPreContainers(stripFrontmatter(raw)).trim()
     const fallbackTitle = titleFromSlug(path.basename(relativePath, '.md'))
     docs.push({
       content,

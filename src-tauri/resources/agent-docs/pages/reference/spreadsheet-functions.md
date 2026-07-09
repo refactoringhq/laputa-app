@@ -9,6 +9,8 @@ Formula cells start with `=` and are evaluated by IronCalc through Tolaria's she
 
 Tolaria adds vault-aware sheet references on top of the normal spreadsheet formula model. Everything else should be treated as IronCalc formula behavior. IronCalc aims for Excel-compatible formulas, but the upstream project is still evolving, so verify advanced formulas against the IronCalc docs when precision matters.
 
+The same `[[note]].field` target forms are also available to HTML block vault expressions. Use [Vault Expressions](/reference/vault-expressions) for `{{...}}` syntax and HTML formatting helpers.
+
 ## Basic Syntax
 
 | Syntax | Meaning |
@@ -29,7 +31,7 @@ Use parentheses when a model depends on precedence:
 =(B2+B3-B4)/B5
 ```
 
-## Tolaria Cross-Sheet References
+## Tolaria Note References
 
 Tolaria supports wikilink cell references for values that live in another sheet note:
 
@@ -37,6 +39,7 @@ Tolaria supports wikilink cell references for values that live in another sheet 
 =[[newsletter-revenue]].B5
 =SUM(B2:D2)+[[sponsorship-pipeline]].E12
 =ROUND([[business-plan]].$E$12, 2)
+=[[launch-brief]].2
 ```
 
 The target inside `[[...]]` resolves like a normal Tolaria wikilink. The cell address after the dot uses A1 notation.
@@ -50,7 +53,28 @@ Absolute markers follow spreadsheet copy behavior:
 | `[[revenue]].B$5` | row fixed, column can shift |
 | `[[revenue]].$B5` | column fixed, row can shift |
 
-Cross-sheet references currently resolve single cells. Keep range formulas inside one sheet note until cross-note ranges are explicitly supported.
+Cross-sheet cell references currently resolve single cells. Keep range formulas inside one sheet note until cross-note ranges are explicitly supported.
+
+Formulas can also read scalar frontmatter properties from a specific note:
+
+```txt
+=[[device.md]].power.watts
+=[[project-alpha]].status
+=[[book-notes/the-design-of-everyday-things.md]].rating
+```
+
+The target resolves like a wikilink, and the dot path reads nested frontmatter keys. Numbers, booleans, and strings become formula literals. Missing notes, ambiguous note targets, missing properties, arrays, maps, and other non-scalar values resolve to `#N/A`.
+
+A first segment that looks like an A1 cell address, such as `B2`, is treated as a cross-sheet cell reference. Use property names that do not collide with A1 notation for frontmatter formulas.
+
+Formulas can read one raw Markdown body line from any note with numeric dot notation:
+
+```txt
+=[[launch-brief]].1
+=[[launch-brief]].2
+```
+
+Line references exclude YAML frontmatter, are 1-based, and preserve commas as text. `[[note]].A1` still means grid/cell access and can split comma-separated content; `[[note]].1` means the whole first body line.
 
 ## Autocomplete Functions
 
@@ -155,6 +179,7 @@ Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 =[[newsletter-revenue]].E5
 =SUM(B2:D2)+[[sponsorship-pipeline]].E12
 =IF([[business-plan]].$E$12>0, [[business-plan]].$E$12, 0)
+=[[launch-brief]].2
 ```
 
 ## IronCalc Function Families

@@ -119,6 +119,15 @@ Formulas can read scalar frontmatter properties from a note with dot notation:
 
 Numbers, booleans, and text properties can be used in formulas. Missing or ambiguous note targets, missing properties, and non-scalar values such as lists or nested objects show as spreadsheet errors.
 
+Formulas can also read one raw Markdown body line from another note:
+
+```txt
+=[[launch-brief]].1
+=[[launch-brief]].2
+```
+
+Line references are 1-based and ignore YAML frontmatter. `[[note]].A1` keeps grid or cell semantics; `[[note]].1` returns the whole first body line, including commas.
+
 ## Work With The Raw File
 
 A sheet file remains readable text:
