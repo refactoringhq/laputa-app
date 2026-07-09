@@ -19,7 +19,7 @@
     "perf:editor": "node scripts/editor-performance-benchmark.mjs",
     "perf:editor:update": "node scripts/editor-performance-benchmark.mjs --update",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri": "node scripts/tauri-cli.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

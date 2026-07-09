@@ -101,6 +101,14 @@ Sheet formulas can also read scalar frontmatter properties from a note:
 
 This keeps sheet models connected to ordinary Tolaria metadata without requiring a saved view or query. Unresolved, ambiguous, or non-scalar property references show spreadsheet errors.
 
+Formulas can also read a raw Markdown body line from another note:
+
+```txt
+=[[launch-brief]].2
+```
+
+Line references are useful when a normal text note is still the source of record. `[[note]].A1` keeps grid or cell semantics; `[[note]].1` returns the whole first body line and preserves commas as text.
+
 ## Storage
 
 A minimal sheet note looks like this:
