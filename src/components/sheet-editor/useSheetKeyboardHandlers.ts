@@ -25,6 +25,7 @@ interface UseSheetKeyboardHandlersOptions {
   cancelScheduledSerialize: () => void
   captureSheetKeyboard: () => void
   commitExternalFormulaEditorInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
+  commitSheetTextInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
   handleFormulaKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void
   handleWikilinkKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void
   refreshWorkbook: () => void
@@ -154,6 +155,7 @@ function handleCapturedEscape(
   event: ReactKeyboardEvent<HTMLDivElement>,
   sheetElement: HTMLDivElement | null,
   options: Pick<UseSheetKeyboardHandlersOptions,
+    | 'commitSheetTextInput'
     | 'releaseSheetKeyboard'
     | 'restoreSheetKeyboardFocus'
     | 'sheetKeyboardCapturedRef'
@@ -161,6 +163,10 @@ function handleCapturedEscape(
 ) {
   if (!shouldHandleCapturedEscape(event, options.sheetKeyboardCapturedRef)) return false
   if (isEditableWorkbookKeyboardTarget(sheetElement, event.target)) {
+    options.commitSheetTextInput(formulaInputFromTarget(event.target))
+    event.preventDefault()
+    event.stopPropagation()
+    event.nativeEvent.stopImmediatePropagation()
     options.restoreSheetKeyboardFocus()
     return true
   }
