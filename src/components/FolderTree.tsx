@@ -3,6 +3,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   useCallback,
   useMemo,
+  useState,
 } from 'react'
 import {
   Plus,
@@ -56,6 +57,7 @@ interface FolderTreeBodyProps extends Pick<
   isCreating: boolean
   onCancelCreateFolder: () => void
   onCreateFolderSubmit: (value: string) => Promise<boolean>
+  creationParent?: FolderCreationParent
   rootPath?: string
   sectionCollapsed: boolean
   toggleFolder: (path: string) => void
@@ -98,18 +100,24 @@ function useDisplayedFolders(folders: FolderNode[], expanded: Record<string, boo
   }, [expanded, folders, locale, vaultRootPath])
 }
 
+function folderCreationParent(path: string, rootPath?: string): FolderCreationParent {
+  return rootPath ? { path, rootPath } : { path }
+}
+
 function creationParentForSelection(selection: SidebarSelection): FolderCreationParent | undefined {
   if (selection.kind !== 'folder') return undefined
-  return { path: selection.path, rootPath: selection.rootPath }
+  return folderCreationParent(selection.path, selection.rootPath)
 }
 
 function useCreateFolderSubmit({
   closeCreateForm,
+  creationParent,
   expandFolder,
   onCreateFolder,
   selection,
 }: {
   closeCreateForm: () => void
+  creationParent?: FolderCreationParent
   expandFolder: (key: string) => void
   onCreateFolder?: (name: string, parent?: FolderCreationParent) => Promise<boolean> | boolean
   selection: SidebarSelection
@@ -121,14 +129,14 @@ function useCreateFolderSubmit({
       return true
     }
 
-    const parent = creationParentForSelection(selection)
+    const parent = creationParent ?? creationParentForSelection(selection)
     const created = await onCreateFolder(nextName, parent)
     if (!created) return created
 
     closeCreateForm()
     if (parent?.path) expandFolder(folderNodeKey(parent))
     return created
-  }, [closeCreateForm, expandFolder, onCreateFolder, selection])
+  }, [closeCreateForm, creationParent, expandFolder, onCreateFolder, selection])
 }
 
 export const FolderTree = memo(function FolderTree({
@@ -149,6 +157,7 @@ export const FolderTree = memo(function FolderTree({
   onToggle,
   vaultRootPath,
 }: FolderTreeProps) {
+  const [creationParent, setCreationParent] = useState<FolderCreationParent | undefined>(undefined)
   const {
     closeCreateForm,
     expanded,
@@ -164,11 +173,16 @@ export const FolderTree = memo(function FolderTree({
     renamingFolderPath,
     selection,
   })
+  const openCreateFormForParent = useCallback((folderPath: string, rootPath?: string) => {
+    setCreationParent(folderCreationParent(folderPath, rootPath))
+    openCreateForm()
+  }, [openCreateForm])
   const {
     closeContextMenu,
     contextMenu,
     handleCopyPathFromMenu,
     handleCreateNoteFromMenu,
+    handleCreateFolderFromMenu,
     handleDeleteFromMenu,
     handleOpenMenu,
     handleRevealFromMenu,
@@ -177,11 +191,18 @@ export const FolderTree = memo(function FolderTree({
   } = useFolderContextMenu({
     onDeleteFolder,
     folderFileActions,
+    onCreateFolder: onCreateFolder ? openCreateFormForParent : undefined,
     onStartRenameFolder,
   })
 
+  const handleCloseCreateForm = useCallback(() => {
+    closeCreateForm()
+    setCreationParent(undefined)
+  }, [closeCreateForm])
+
   const handleCreateFolderSubmit = useCreateFolderSubmit({
-    closeCreateForm,
+    closeCreateForm: handleCloseCreateForm,
+    creationParent,
     expandFolder,
     onCreateFolder,
     selection,
@@ -189,6 +210,7 @@ export const FolderTree = memo(function FolderTree({
 
   const handleCreateFolderClick = useCallback(() => {
     closeContextMenu()
+    setCreationParent(undefined)
     openCreateForm()
   }, [closeContextMenu, openCreateForm])
 
@@ -208,7 +230,8 @@ export const FolderTree = memo(function FolderTree({
         displayedFolders={displayedFolders}
         isCreating={isCreating}
         locale={locale}
-        onCancelCreateFolder={closeCreateForm}
+        creationParent={creationParent}
+        onCancelCreateFolder={handleCloseCreateForm}
         onCancelRenameFolder={onCancelRenameFolder}
         onCreateFolderSubmit={handleCreateFolderSubmit}
         onDeleteFolder={onDeleteFolder}
@@ -230,6 +253,7 @@ export const FolderTree = memo(function FolderTree({
         onDelete={handleDeleteFromMenu}
         onReveal={handleRevealFromMenu}
         onCopyPath={handleCopyPathFromMenu}
+        onCreateFolder={handleCreateFolderFromMenu}
         onCreateNote={handleCreateNoteFromMenu}
         onRename={handleRenameFromMenu}
         locale={locale}
@@ -243,6 +267,7 @@ function FolderTreeBody({
   displayedFolders,
   isCreating,
   locale = 'en',
+  creationParent,
   onCancelCreateFolder,
   onCancelRenameFolder,
   onCreateFolderSubmit,
@@ -269,6 +294,10 @@ function FolderTreeBody({
           depth={0}
           expanded={displayedExpanded}
           node={node}
+          creationParent={creationParent}
+          isCreating={isCreating}
+          onCancelCreateFolder={onCancelCreateFolder}
+          onCreateFolderSubmit={onCreateFolderSubmit}
           onDeleteFolder={onDeleteFolder}
           onOpenMenu={onOpenMenu}
           onRenameFolder={onRenameFolder}
@@ -284,7 +313,7 @@ function FolderTreeBody({
           selection={selection}
         />
       ))}
-      {isCreating && (
+      {isCreating && !creationParent && (
         <div style={{ paddingLeft: 8 }}>
           <FolderNameInput
             ariaLabel={translate(locale, 'sidebar.folder.newName')}

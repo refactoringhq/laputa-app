@@ -1,5 +1,5 @@
 import { memo, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
-import type { FolderNode, SidebarSelection } from '../../types'
+import type { FolderCreationParent, FolderNode, SidebarSelection } from '../../types'
 import { FolderNameInput } from './FolderNameInput'
 import { FolderItemRow } from './FolderItemRow'
 import { FOLDER_ROW_CONTENT_INSET, getFolderConnectorLeft, getFolderDepthIndent } from './folderTreeLayout'
@@ -10,6 +10,10 @@ interface FolderTreeRowProps {
   depth: number
   expanded: Record<string, boolean>
   node: FolderNode
+  creationParent?: FolderCreationParent
+  isCreating?: boolean
+  onCancelCreateFolder?: () => void
+  onCreateFolderSubmit?: (value: string) => Promise<boolean>
   onDeleteFolder?: (folderPath: string) => void
   onOpenMenu: (node: FolderNode, event: ReactMouseEvent<HTMLElement>) => void
   onRenameFolder?: (folderPath: string, nextName: string) => Promise<boolean> | boolean
@@ -57,10 +61,85 @@ function FolderRenameRow({
   )
 }
 
+function FolderCreateRow({
+  contentInset,
+  depth,
+  node,
+  locale,
+  onCancelCreateFolder,
+  onCreateFolderSubmit,
+}: {
+  contentInset: number
+  depth: number
+  node: FolderNode
+  locale: AppLocale
+  onCancelCreateFolder: () => void
+  onCreateFolderSubmit: (value: string) => Promise<boolean>
+}) {
+  return (
+    <div
+      data-testid={`folder-create-parent:${node.path}`}
+      style={{ paddingLeft: getFolderDepthIndent(depth + 1) }}
+    >
+      <FolderNameInput
+        ariaLabel={translate(locale, 'sidebar.folder.newName')}
+        initialValue=""
+        leftInset={contentInset}
+        placeholder={translate(locale, 'sidebar.folder.name')}
+        submitOnBlur={true}
+        testId="new-folder-input"
+        onCancel={onCancelCreateFolder}
+        onSubmit={onCreateFolderSubmit}
+      />
+    </div>
+  )
+}
+
+function FolderCreateRowSlot({
+  contentInset,
+  creationParent,
+  depth,
+  isCreating,
+  node,
+  locale,
+  onCancelCreateFolder,
+  onCreateFolderSubmit,
+  rootPath,
+}: {
+  contentInset: number
+  creationParent?: FolderCreationParent
+  depth: number
+  isCreating: boolean
+  node: FolderNode
+  locale: AppLocale
+  onCancelCreateFolder?: () => void
+  onCreateFolderSubmit?: (value: string) => Promise<boolean>
+  rootPath?: string
+}) {
+  if (!isCreating) return null
+  if (!creationParentMatchesNode(creationParent, node, rootPath)) return null
+  if (!onCancelCreateFolder || !onCreateFolderSubmit) return null
+
+  return (
+    <FolderCreateRow
+      contentInset={contentInset}
+      depth={depth}
+      node={node}
+      locale={locale}
+      onCancelCreateFolder={onCancelCreateFolder}
+      onCreateFolderSubmit={onCreateFolderSubmit}
+    />
+  )
+}
+
 function FolderChildren({
+  creationParent,
   depth,
   expanded,
+  isCreating,
   node,
+  onCancelCreateFolder,
+  onCreateFolderSubmit,
   onDeleteFolder,
   onOpenMenu,
   onRenameFolder,
@@ -92,6 +171,10 @@ function FolderChildren({
           depth={depth + 1}
           expanded={expanded}
           node={child}
+          creationParent={creationParent}
+          isCreating={isCreating}
+          onCancelCreateFolder={onCancelCreateFolder}
+          onCreateFolderSubmit={onCreateFolderSubmit}
           onDeleteFolder={onDeleteFolder}
           onOpenMenu={onOpenMenu}
           onRenameFolder={onRenameFolder}
@@ -111,6 +194,17 @@ function FolderChildren({
   )
 }
 
+function creationParentMatchesNode(
+  creationParent: FolderCreationParent | undefined,
+  node: FolderNode,
+  defaultRootPath?: string,
+): boolean {
+  if (!creationParent || creationParent.path !== node.path) return false
+  const nodeRootPath = node.rootPath ?? defaultRootPath
+  const creationRootPath = creationParent.rootPath ?? defaultRootPath
+  return nodeRootPath === creationRootPath
+}
+
 function folderSelectionMatches(
   selection: SidebarSelection,
   node: FolderNode,
@@ -125,9 +219,13 @@ function folderSelectionMatches(
 }
 
 export const FolderTreeRow = memo(function FolderTreeRow({
+  creationParent,
   depth,
   expanded,
+  isCreating = false,
   node,
+  onCancelCreateFolder,
+  onCreateFolderSubmit,
   onDeleteFolder,
   onOpenMenu,
   onRenameFolder,
@@ -185,10 +283,25 @@ export const FolderTreeRow = memo(function FolderTreeRow({
           onRenameFolder={onRenameFolder}
         />
       ) : row}
+      <FolderCreateRowSlot
+        contentInset={contentInset}
+        creationParent={creationParent}
+        depth={depth}
+        isCreating={isCreating}
+        node={node}
+        locale={locale}
+        onCancelCreateFolder={onCancelCreateFolder}
+        onCreateFolderSubmit={onCreateFolderSubmit}
+        rootPath={rootPath}
+      />
       <FolderChildren
+        creationParent={creationParent}
         depth={depth}
         expanded={expanded}
+        isCreating={isCreating}
         node={node}
+        onCancelCreateFolder={onCancelCreateFolder}
+        onCreateFolderSubmit={onCreateFolderSubmit}
         onDeleteFolder={onDeleteFolder}
         onOpenMenu={onOpenMenu}
         onRenameFolder={onRenameFolder}
