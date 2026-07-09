@@ -561,7 +561,8 @@ files:
     sidebar.action.createFolder: 5dc1e97c14fbe72d8b566ce29c39f010
     sidebar.action.renameFolder: db76034f8218cda07dadb746a5643019
     sidebar.action.deleteFolder: 2a2f15300f6f7c81d69860ac1796b517
-    sidebar.action.createNodeInFolderMenu: 857a479229a4ab0bc62bbfb621d3180a
+    sidebar.action.createNoteInFolderMenu: b1dbc8fe9fa4e735ef9d8baacff46377
+    sidebar.action.createFolderInFolderMenu: 21a068a0d74b87c91f795d7fb3e52ad6
     sidebar.action.revealFolderMenu: 76f4ed52da9937ae432dcf5a108fabb4
     sidebar.action.copyFolderPathMenu: 1779ec6018a385912c1a5499a1bbf2b2
     sidebar.action.renameFolderMenu: deb1d8fa030292e7eda2c244b313aca2
