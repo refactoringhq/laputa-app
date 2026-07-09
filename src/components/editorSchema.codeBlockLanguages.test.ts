@@ -5,6 +5,7 @@ import { schema } from './editorSchema'
 
 describe('editor schema code block languages', () => {
   it.each([
+    ['sql', 'sql'],
     ['powershell', 'powershell'],
     ['ps1', 'powershell'],
     ['vbscript', 'vbscript'],
