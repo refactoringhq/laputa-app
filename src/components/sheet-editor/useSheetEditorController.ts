@@ -294,6 +294,7 @@ function useSheetEditorKeyboardInputRuntime({
   cancelScheduledSerialize,
   captureSheetKeyboard,
   commitExternalFormulaEditorInput,
+  commitSheetTextInput,
   handleFormulaKeyDown,
   handleWikilinkKeyDown,
   refreshWorkbook,
@@ -310,7 +311,7 @@ function useSheetEditorKeyboardInputRuntime({
   updateSheetInlineAutocompletes,
   workbookRef,
 }: Pick<SheetEditorAutocompleteRuntime, 'handleFormulaKeyDown' | 'handleWikilinkKeyDown' | 'updateSheetInlineAutocompletes'> &
-  Pick<SheetEditorCommitRuntime, 'commitExternalFormulaEditorInput'> &
+  Pick<SheetEditorCommitRuntime, 'commitExternalFormulaEditorInput' | 'commitSheetTextInput'> &
   Pick<SheetEditorKeyboardRuntime, 'captureSheetKeyboard' | 'releaseSheetKeyboard' | 'restoreSheetKeyboardFocus' | 'sheetKeyboardCapturedRef'> &
   Pick<SheetEditorWorkbookRuntime,
     | 'cancelScheduledSerialize'
@@ -330,6 +331,7 @@ function useSheetEditorKeyboardInputRuntime({
     cancelScheduledSerialize,
     captureSheetKeyboard,
     commitExternalFormulaEditorInput,
+    commitSheetTextInput,
     handleFormulaKeyDown,
     handleWikilinkKeyDown,
     refreshWorkbook,
@@ -347,6 +349,7 @@ function useSheetEditorKeyboardInputRuntime({
   })
   const inputHandlers = useSheetInputActivityHandlers({
     commitExternalFormulaEditorInput,
+    commitSheetTextInput,
     scheduleSelectionChromePatch,
     scheduleSerialize,
     setFormulaAutocomplete,
@@ -369,6 +372,7 @@ type SheetEditorKeyboardInputRuntime = ReturnType<typeof useSheetEditorKeyboardI
 function useSheetEditorPointerRuntime({
   captureSheetKeyboard,
   commitExternalFormulaEditorInput,
+  commitSheetTextInput,
   flushCurrentSheetContent,
   onNavigateWikilink,
   scheduleSelectionChromePatch,
@@ -381,7 +385,7 @@ function useSheetEditorPointerRuntime({
   sheetPointerActiveRef,
   workbookRef,
 }: Pick<SheetEditorControllerOptions, 'onNavigateWikilink'> &
-  Pick<SheetEditorCommitRuntime, 'commitExternalFormulaEditorInput' | 'flushCurrentSheetContent'> &
+  Pick<SheetEditorCommitRuntime, 'commitExternalFormulaEditorInput' | 'commitSheetTextInput' | 'flushCurrentSheetContent'> &
   Pick<SheetEditorKeyboardRuntime, 'captureSheetKeyboard' | 'sheetFocusRequestRef' | 'sheetKeyboardCapturedRef'> &
   Pick<SheetEditorWorkbookRuntime, 'scheduleSelectionChromePatch' | 'sheetPointerActiveRef' | 'workbookRef'> &
   Pick<SheetEditorState, 'setFormulaAutocomplete' | 'setSheetContextMenu' | 'setWikilinkAutocomplete' | 'sheetElementRef'>) {
@@ -403,6 +407,7 @@ function useSheetEditorPointerRuntime({
   return useSheetPointerHandlers({
     captureSheetKeyboard,
     commitExternalFormulaEditorInput,
+    commitSheetTextInput,
     handleSheetWikilinkPointerDown,
     scheduleSelectionChromePatch,
     setSheetContextMenu,

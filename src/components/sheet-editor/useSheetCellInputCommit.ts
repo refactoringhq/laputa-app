@@ -207,9 +207,33 @@ function useExternalFormulaEditorCommit(
   }, [commitSelectedCellInput])
 }
 
+function selectedCellInputSource(current: SheetWorkbookState): string | null {
+  const cell = selectedCellIndexes(current.model)
+  if (!cell) return null
+
+  const address = metadataCellAddress(cell.row, cell.column)
+  return current.externalFormulaInputs.get(address)?.source
+    ?? current.model.getCellContent(SHEET_INDEX, cell.row, cell.column)
+}
+
+function useSheetTextInputCommit({
+  commitSelectedCellInput,
+  workbookRef,
+}: Pick<UseSheetCellInputCommitOptions, 'workbookRef'> & {
+  commitSelectedCellInput: (input: string, options?: { allowPendingExternal?: boolean }) => boolean
+}) {
+  return useCallback((input: HTMLInputElement | HTMLTextAreaElement | null) => {
+    const current = workbookRef.current
+    if (!input || !current) return false
+    if (input.value === selectedCellInputSource(current)) return false
+    return commitSelectedCellInput(input.value, { allowPendingExternal: true })
+  }, [commitSelectedCellInput, workbookRef])
+}
+
 function useFlushCurrentSheetContent({
   cancelScheduledSerialize,
   commitExternalFormulaEditorInput,
+  commitSheetTextInput,
   flushContentRef,
   serializeCurrentWorkbook,
   sheetElementRef,
@@ -222,16 +246,27 @@ function useFlushCurrentSheetContent({
   | 'workbookRef'
 > & {
   commitExternalFormulaEditorInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
+  commitSheetTextInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
 }) {
   const flushCurrentSheetContent = useCallback((targetPath?: string) => {
     const current = workbookRef.current
     if (!current) return false
     if (targetPath && !notePathsMatch(targetPath, current.path)) return false
 
-    commitExternalFormulaEditorInput(visibleSheetTextInput(sheetElementRef.current))
+    const visibleInput = visibleSheetTextInput(sheetElementRef.current)
+    if (!commitSheetTextInput(visibleInput)) {
+      commitExternalFormulaEditorInput(visibleInput)
+    }
     cancelScheduledSerialize()
     return serializeCurrentWorkbook(current.generation)
-  }, [cancelScheduledSerialize, commitExternalFormulaEditorInput, serializeCurrentWorkbook, sheetElementRef, workbookRef])
+  }, [
+    cancelScheduledSerialize,
+    commitExternalFormulaEditorInput,
+    commitSheetTextInput,
+    serializeCurrentWorkbook,
+    sheetElementRef,
+    workbookRef,
+  ])
 
   useEffect(() => {
     if (!flushContentRef) return
@@ -274,9 +309,11 @@ export function useSheetCellInputCommit({
     workbookRef,
   })
   const commitExternalFormulaEditorInput = useExternalFormulaEditorCommit(commitSelectedCellInput)
+  const commitSheetTextInput = useSheetTextInputCommit({ commitSelectedCellInput, workbookRef })
   const flushCurrentSheetContent = useFlushCurrentSheetContent({
     cancelScheduledSerialize,
     commitExternalFormulaEditorInput,
+    commitSheetTextInput,
     flushContentRef,
     serializeCurrentWorkbook,
     sheetElementRef,
@@ -285,6 +322,7 @@ export function useSheetCellInputCommit({
 
   return {
     commitExternalFormulaEditorInput,
+    commitSheetTextInput,
     commitSelectedCellInput,
     flushCurrentSheetContent,
     writeCellInputAt,
