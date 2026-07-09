@@ -42,27 +42,32 @@ test.describe('Contribute modal', () => {
     await expect(page.getByRole('button', { name: 'Check out Refactoring' })).toBeFocused()
 
     await page.keyboard.press('Enter')
-    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://refactoring.fm/')
+    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://refactoring.fm/?utm_source=tolaria&utm_medium=app&utm_campaign=refactoring')
 
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Open Codacy' })).toBeFocused()
     await page.keyboard.press('Enter')
-    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://www.codacy.com/')
+    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://www.codacy.com/?utm_source=tolaria&utm_medium=app&utm_campaign=refactoring')
 
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Open CodeScene' })).toBeFocused()
     await page.keyboard.press('Space')
-    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://codescene.com/')
+    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://codescene.com/?utm_source=tolaria&utm_medium=app&utm_campaign=refactoring')
 
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Open CircleCI' })).toBeFocused()
     await page.keyboard.press('Enter')
-    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://circleci.com/')
+    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://circleci.com/?utm_source=tolaria&utm_medium=app&utm_campaign=refactoring')
 
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Open Unblocked' })).toBeFocused()
     await page.keyboard.press('Space')
-    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://getunblocked.com/')
+    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://getunblocked.com/?utm_source=tolaria&utm_medium=app&utm_campaign=refactoring')
+
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'how I develop Tolaria' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://refactoring.fm/p/introducing-the-tolaria-alliance')
 
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Open Product Board' })).toBeFocused()
@@ -75,22 +80,22 @@ test.describe('Contribute modal', () => {
     await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://github.com/refactoringhq/tolaria/discussions')
 
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: 'Open Pull Requests' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Open PRs' })).toBeFocused()
     await page.keyboard.press('Enter')
     await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://github.com/refactoringhq/tolaria/pulls')
 
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: 'Open Contributing Guide' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Open Guide' })).toBeFocused()
     await page.keyboard.press('Space')
     await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://github.com/refactoringhq/tolaria/blob/main/CONTRIBUTING.md')
 
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: 'Open GitHub Issues' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Open Issues' })).toBeFocused()
     await page.keyboard.press('Enter')
     await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaOpenedUrls: string[] }).__tolariaOpenedUrls)).toContain('https://github.com/refactoringhq/tolaria/issues')
 
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: 'Copy sanitized diagnostics' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Copy Diagnostics' })).toBeFocused()
     await page.keyboard.press('Space')
     await expect.poll(async () => page.evaluate(() => (window as typeof window & { __tolariaCopiedBundles: string[] }).__tolariaCopiedBundles.length)).toBe(1)
 

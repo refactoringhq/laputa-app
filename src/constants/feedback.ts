@@ -1,8 +1,15 @@
-export const REFACTORING_HOME_URL = 'https://refactoring.fm/'
-export const CODACY_HOME_URL = 'https://www.codacy.com/'
-export const CODESCENE_HOME_URL = 'https://codescene.com/'
-export const CIRCLECI_HOME_URL = 'https://circleci.com/'
-export const UNBLOCKED_HOME_URL = 'https://getunblocked.com/'
+const CONTRIBUTION_LINK_UTM = 'utm_source=tolaria&utm_medium=app&utm_campaign=refactoring'
+
+function withContributionUtm(url: string): string {
+  return `${url}?${CONTRIBUTION_LINK_UTM}`
+}
+
+export const REFACTORING_HOME_URL = withContributionUtm('https://refactoring.fm/')
+export const CODACY_HOME_URL = withContributionUtm('https://www.codacy.com/')
+export const CODESCENE_HOME_URL = withContributionUtm('https://codescene.com/')
+export const CIRCLECI_HOME_URL = withContributionUtm('https://circleci.com/')
+export const UNBLOCKED_HOME_URL = withContributionUtm('https://getunblocked.com/')
+export const TOLARIA_DEVELOPMENT_ARTICLE_URL = 'https://refactoring.fm/p/introducing-the-tolaria-alliance'
 export const TOLARIA_DOCS_URL = 'https://refactoringhq.github.io/tolaria/'
 export const TOLARIA_FIRST_LAUNCH_DOCS_URL = `${TOLARIA_DOCS_URL}start/first-launch`
 export const TOLARIA_PRODUCT_BOARD_URL = 'https://tolaria.canny.io/'
