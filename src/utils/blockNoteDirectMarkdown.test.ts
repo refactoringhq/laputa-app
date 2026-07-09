@@ -127,7 +127,7 @@ describe('BlockNote direct Markdown serialization', () => {
           text: [
             'services:',
             '  server:',
-            '    container_name: forgejo',
+            '\tcontainer_name: forgejo',
             '    environment:',
             '      - USER_UID=1000',
             '      - PATH_WITH_BACKSLASH=container\\_name',
@@ -148,7 +148,7 @@ describe('BlockNote direct Markdown serialization', () => {
       '```yaml',
       'services:',
       '  server:',
-      '    container_name: forgejo',
+      '\tcontainer_name: forgejo',
       '    environment:',
       '      - USER_UID=1000',
       '      - PATH_WITH_BACKSLASH=container\\_name',
