@@ -181,28 +181,28 @@ const testimonials = [
 const sponsors: Sponsor[] = [
   {
     name: "Codacy",
-    url: "https://www.codacy.com/",
+    url: "https://www.codacy.com/?utm_source=tolaria&utm_medium=website&utm_campaign=refactoring",
     logo: "sponsors/codacy-dark.svg",
     lightLogo: "sponsors/codacy-light.svg",
     text: "Quality and security checks that keep AI-assisted engineering accountable.",
   },
   {
     name: "CodeScene",
-    url: "https://codescene.com/",
+    url: "https://codescene.com/?utm_source=tolaria&utm_medium=website&utm_campaign=refactoring",
     logo: "sponsors/codescene-dark.svg",
     lightLogo: "sponsors/codescene-light.svg",
     text: "Code Health insight for keeping technical debt visible and actionable.",
   },
   {
     name: "CircleCI",
-    url: "https://circleci.com/",
+    url: "https://circleci.com/?utm_source=tolaria&utm_medium=website&utm_campaign=refactoring",
     logo: "sponsors/circleci-dark.svg",
     lightLogo: "sponsors/circleci-light.svg",
     text: "Reliable CI infrastructure for build, test, and release confidence, now also locally for agents.",
   },
   {
     name: "Unblocked",
-    url: "https://getunblocked.com/",
+    url: "https://getunblocked.com/?utm_source=tolaria&utm_medium=website&utm_campaign=refactoring",
     logo: "sponsors/unblocked-dark.svg",
     lightLogo: "sponsors/unblocked-light.svg",
     text: "Engineering context that helps developers and agents understand the codebase.",
