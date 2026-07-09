@@ -19,7 +19,7 @@ Tolaria is supported by a small panel of tools that help keep the project health
 <table>
   <tr>
     <td align="center" width="25%">
-      <a href="https://www.codacy.com/">
+      <a href="https://www.codacy.com/?utm_source=tolaria&utm_medium=github&utm_campaign=refactoring">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codacy-light.svg">
           <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codacy-dark.svg" alt="Codacy" height="32">
@@ -27,7 +27,7 @@ Tolaria is supported by a small panel of tools that help keep the project health
       </a>
     </td>
     <td align="center" width="25%">
-      <a href="https://codescene.com/">
+      <a href="https://codescene.com/?utm_source=tolaria&utm_medium=github&utm_campaign=refactoring">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codescene-light.svg">
           <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/codescene-dark.svg" alt="CodeScene" height="32">
@@ -35,7 +35,7 @@ Tolaria is supported by a small panel of tools that help keep the project health
       </a>
     </td>
     <td align="center" width="25%">
-      <a href="https://circleci.com/">
+      <a href="https://circleci.com/?utm_source=tolaria&utm_medium=github&utm_campaign=refactoring">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/circleci-light.svg">
           <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/circleci-dark.svg" alt="CircleCI" height="32">
@@ -43,7 +43,7 @@ Tolaria is supported by a small panel of tools that help keep the project health
       </a>
     </td>
     <td align="center" width="25%">
-      <a href="https://getunblocked.com/">
+      <a href="https://getunblocked.com/?utm_source=tolaria&utm_medium=github&utm_campaign=refactoring">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/unblocked-light.svg">
           <img src="https://raw.githubusercontent.com/refactoringhq/tolaria/main/site/public/landing/sponsors/unblocked-dark.svg" alt="Unblocked" height="32">
