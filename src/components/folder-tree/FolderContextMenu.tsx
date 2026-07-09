@@ -1,5 +1,5 @@
 import type { RefObject, ReactNode } from 'react'
-import { ClipboardText, FolderOpen, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
+import { ClipboardText, FolderOpen, FolderPlus, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { translate, type AppLocale } from '../../lib/i18n'
 import { getContextMenuPositionStyle } from '../contextMenuPosition'
@@ -23,6 +23,7 @@ interface FolderContextMenuProps {
   onDelete?: (folderPath: string) => void
   onReveal?: (folderPath: string) => void
   onCopyPath?: (folderPath: string) => void
+  onCreateFolder?: (folderPath: string, rootPath?: string) => void
   onCreateNote?: (folderPath: string, rootPath?: string) => void
   onRename: (folderPath: string) => void
   locale?: AppLocale
@@ -39,6 +40,7 @@ export function FolderContextMenu(props: FolderContextMenuProps) {
     onDelete,
     onReveal,
     onCopyPath,
+    onCreateFolder,
     onCreateNote,
     onRename,
     locale = 'en',
@@ -63,10 +65,22 @@ export function FolderContextMenu(props: FolderContextMenuProps) {
           variant="ghost"
           className={folderContextMenuButtonClass}
           onClick={() => onCreateNote(menu.path, menu.rootPath)}
-          data-testid="create-node-in-folder-menu-item"
+          data-testid="create-note-in-folder-menu-item"
         >
           <Plus size={14} className="shrink-0" />
-          <FolderMenuLabel>{translate(locale, 'sidebar.action.createNodeInFolderMenu')}</FolderMenuLabel>
+          <FolderMenuLabel>{translate(locale, 'sidebar.action.createNoteInFolderMenu')}</FolderMenuLabel>
+        </Button>
+      )}
+      {onCreateFolder && (
+        <Button
+          type="button"
+          variant="ghost"
+          className={folderContextMenuButtonClass}
+          onClick={() => onCreateFolder(menu.path, menu.rootPath)}
+          data-testid="create-folder-in-folder-menu-item"
+        >
+          <FolderPlus size={14} className="shrink-0" />
+          <FolderMenuLabel>{translate(locale, 'sidebar.action.createFolderInFolderMenu')}</FolderMenuLabel>
         </Button>
       )}
       {onReveal && (
