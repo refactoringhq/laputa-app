@@ -17,6 +17,7 @@ const SHEET_SCROLL_RESTORE_DELAYS_MS = [0, 32, 96, 192, 240, 384] as const
 interface UseSheetPointerHandlersOptions {
   captureSheetKeyboard: (options?: { deferActiveState?: boolean }) => void
   commitExternalFormulaEditorInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
+  commitSheetTextInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
   handleSheetWikilinkPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => boolean
   scheduleSelectionChromePatch: () => void
   setSheetContextMenu: Dispatch<SetStateAction<SheetContextMenuState | null>>
@@ -132,6 +133,7 @@ export function useSheetPointerHandlers(options: UseSheetPointerHandlersOptions)
   const {
     captureSheetKeyboard,
     commitExternalFormulaEditorInput,
+    commitSheetTextInput,
     handleSheetWikilinkPointerDown,
     scheduleSelectionChromePatch,
     setSheetContextMenu,
@@ -147,7 +149,10 @@ export function useSheetPointerHandlers(options: UseSheetPointerHandlersOptions)
     if (stopSecondaryPointer(event)) return
 
     const scrollSnapshot = sheetScrollSnapshot(sheetElementRef.current, workbookRef)
-    commitExternalFormulaEditorInput(visibleSheetTextInput(sheetElementRef.current))
+    const activeInput = visibleSheetTextInput(sheetElementRef.current)
+    if (!commitSheetTextInput(activeInput)) {
+      commitExternalFormulaEditorInput(activeInput)
+    }
     patchReactSheetPointerEvent(event, sheetElementRef.current)
     sheetPointerActiveRef.current = true
     captureSheetKeyboard({ deferActiveState: true })
@@ -159,6 +164,7 @@ export function useSheetPointerHandlers(options: UseSheetPointerHandlersOptions)
   }, [
     captureSheetKeyboard,
     commitExternalFormulaEditorInput,
+    commitSheetTextInput,
     handleSheetWikilinkPointerDown,
     options,
     scheduleSelectionChromePatch,
