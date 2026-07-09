@@ -7,12 +7,14 @@ import { useSidebarContextMenu } from '../sidebar/sidebarHooks'
 interface UseFolderContextMenuInput {
   onDeleteFolder?: (folderPath: string) => void
   folderFileActions?: FolderFileActions
+  onCreateFolder?: (folderPath: string, rootPath?: string) => void
   onStartRenameFolder?: (folderPath: string) => void
 }
 
 export function useFolderContextMenu({
   onDeleteFolder,
   folderFileActions,
+  onCreateFolder,
   onStartRenameFolder,
 }: UseFolderContextMenuInput) {
   const {
@@ -30,6 +32,11 @@ export function useFolderContextMenu({
     closeContextMenu()
     requestCreateNoteInFolder(folderPath, rootPath)
   }, [closeContextMenu])
+
+  const handleCreateFolderFromMenu = useCallback((folderPath: string, rootPath?: string) => {
+    closeContextMenu()
+    onCreateFolder?.(folderPath, rootPath)
+  }, [closeContextMenu, onCreateFolder])
 
   const handleRenameFromMenu = useCallback((folderPath: string) => {
     closeContextMenu()
@@ -61,6 +68,7 @@ export function useFolderContextMenu({
     closeContextMenu,
     contextMenu: menu,
     handleCopyPathFromMenu,
+    handleCreateFolderFromMenu,
     handleCreateNoteFromMenu,
     handleDeleteFromMenu,
     handleOpenMenu,
