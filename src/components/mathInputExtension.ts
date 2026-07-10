@@ -5,6 +5,7 @@ import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, readCompletedInlineMathAtEnd } from 
 import {
   dispatchRichEditorInputTransaction,
   mountRichEditorInputTransforms,
+  recoverRichEditorInputTransformError,
   type RichEditorInputTransform,
 } from './richEditorInputTransform'
 
@@ -245,6 +246,20 @@ function replacementForMathSource(
   return view.state.schema.text(source)
 }
 
+function restoreMathSourceSelection(
+  editor: EditorLike,
+  location: MathNodeLocation,
+): void {
+  const setTextSelection = editor._tiptapEditor?.commands?.setTextSelection
+  if (typeof setTextSelection !== 'function') return
+
+  try {
+    setTextSelection(mathLatexSelectionRange(location))
+  } catch (error) {
+    if (!recoverRichEditorInputTransformError(error)) throw error
+  }
+}
+
 function restoreMathSource({
   activation,
   editor,
@@ -265,9 +280,7 @@ function restoreMathSource({
 
   if (!dispatchRichEditorInputTransaction(view, { transaction })) return false
 
-  editor._tiptapEditor?.commands?.setTextSelection?.(
-    mathLatexSelectionRange(location),
-  )
+  restoreMathSourceSelection(editor, location)
   trackEvent('math_source_edit_reopened', {
     activation,
     math_mode: location.kind,
