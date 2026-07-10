@@ -161,10 +161,36 @@ fn first_existing_path(stdout: &str) -> Option<PathBuf> {
 fn first_existing_path_for_platform(stdout: &str, windows: bool) -> Option<PathBuf> {
     let mut paths = stdout.lines().filter_map(existing_path);
     if windows {
-        return paths.find(|path| crate::cli_agent_runtime::has_windows_cli_extension(path));
+        return paths.find(|path| is_windows_claude_code_candidate(path));
     }
 
     paths.next()
+}
+
+fn is_windows_claude_code_candidate(path: &Path) -> bool {
+    crate::cli_agent_runtime::has_windows_cli_extension(path)
+        && !is_windows_claude_desktop_execution_alias(path)
+}
+
+fn is_windows_claude_desktop_execution_alias(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case("Claude.exe"))
+        && contains_component_sequence(path, &["Microsoft", "WindowsApps"])
+}
+
+fn contains_component_sequence(path: &Path, expected: &[&str]) -> bool {
+    let components = path
+        .components()
+        .filter_map(|component| component.as_os_str().to_str())
+        .collect::<Vec<_>>();
+
+    components.windows(expected.len()).any(|window| {
+        window
+            .iter()
+            .zip(expected)
+            .all(|(actual, expected)| actual.eq_ignore_ascii_case(expected))
+    })
 }
 
 fn existing_path(line: &str) -> Option<PathBuf> {
@@ -787,6 +813,29 @@ mod tests {
         assert_eq!(
             first_existing_path_for_platform(&stdout, true),
             Some(cmd_shim)
+        );
+    }
+
+    #[test]
+    fn windows_path_lookup_skips_claude_desktop_execution_alias() {
+        let dir = tempfile::tempdir().unwrap();
+        let desktop_alias = dir
+            .path()
+            .join("AppData")
+            .join("Local")
+            .join("Microsoft")
+            .join("WindowsApps")
+            .join("Claude.exe");
+        let cli_binary = dir.path().join(".local").join("bin").join("claude.exe");
+        std::fs::create_dir_all(desktop_alias.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(cli_binary.parent().unwrap()).unwrap();
+        std::fs::write(&desktop_alias, "desktop alias").unwrap();
+        std::fs::write(&cli_binary, "claude code cli").unwrap();
+        let stdout = format!("{}\n{}\n", desktop_alias.display(), cli_binary.display());
+
+        assert_eq!(
+            first_existing_path_for_platform(&stdout, true),
+            Some(cli_binary)
         );
     }
 
