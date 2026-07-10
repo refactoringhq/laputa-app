@@ -1,13 +1,5 @@
-import { ArrowUpRight, Bug, Chats as MessagesSquare, Check, Copy, GitPullRequest, Handshake, Lightbulb, Megaphone, Newspaper } from '@phosphor-icons/react'
+import { ArrowUpRight, Check, Copy, Handshake, Megaphone } from '@phosphor-icons/react'
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import circleCiDarkLogo from '@/assets/sponsors/circleci-dark.svg'
-import circleCiLightLogo from '@/assets/sponsors/circleci-light.svg'
-import codacyDarkLogo from '@/assets/sponsors/codacy-dark.svg'
-import codacyLightLogo from '@/assets/sponsors/codacy-light.svg'
-import codeSceneDarkLogo from '@/assets/sponsors/codescene-dark.svg'
-import codeSceneLightLogo from '@/assets/sponsors/codescene-light.svg'
-import unblockedDarkLogo from '@/assets/sponsors/unblocked-dark.svg'
-import unblockedLightLogo from '@/assets/sponsors/unblocked-light.svg'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -29,17 +21,16 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
-  CIRCLECI_HOME_URL,
-  CODACY_HOME_URL,
-  CODESCENE_HOME_URL,
-  REFACTORING_HOME_URL,
-  TOLARIA_DEVELOPMENT_ARTICLE_URL,
-  TOLARIA_GITHUB_CONTRIBUTING_URL,
-  TOLARIA_GITHUB_DISCUSSIONS_URL,
-  TOLARIA_GITHUB_ISSUES_URL,
-  TOLARIA_GITHUB_PULL_REQUESTS_URL,
-  TOLARIA_PRODUCT_BOARD_URL,
-  UNBLOCKED_HOME_URL,
+  BUG_REPORT_PATH,
+  CONTRIBUTION_ANALYTICS_EVENT,
+  CONTRIBUTION_ANALYTICS_SURFACE,
+  CONTRIBUTION_PATHS,
+  NEWSLETTER_PATH,
+  SPONSOR_DEVELOPMENT_ARTICLE_LINK,
+  SPONSOR_LOGOS,
+  type ContributionAnalyticsAction,
+  type ContributionIcon,
+  type ContributionTone,
 } from '../constants/feedback'
 import {
   buildSanitizedDiagnosticBundle,
@@ -50,7 +41,7 @@ import { cn } from '../lib/utils'
 import { takeFeedbackDialogOpener } from '../lib/feedbackDialogOpener'
 import { useBuildNumber } from '../hooks/useBuildNumber'
 import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../hooks/appCommandDispatcher'
-import { createTranslator, type AppLocale, type TranslationKey } from '../lib/i18n'
+import { createTranslator, type AppLocale } from '../lib/i18n'
 import { openExternalUrl } from '../utils/url'
 
 interface FeedbackDialogProps {
@@ -65,7 +56,7 @@ interface ContributionCardProps {
   title: string
   description: string
   ctaLabel: string
-  icon: typeof Lightbulb
+  icon: ContributionIcon
   tone: ContributionTone
   onAction: () => void
   autoFocus?: boolean
@@ -79,56 +70,10 @@ interface LinkFallback {
   url: string
 }
 
-interface ContributionPath {
-  analyticsAction: ContributionAnalyticsAction
-  titleKey: TranslationKey
-  descriptionKey: TranslationKey
-  ctaLabelKey: TranslationKey
-  labelKey: TranslationKey
-  url: string
-  icon: typeof Lightbulb
-  tone: ContributionTone
-  secondaryLink?: ContributionLink
-}
-
-interface ContributionLink {
-  analyticsAction: ContributionAnalyticsAction
-  ctaLabelKey: TranslationKey
-  labelKey: TranslationKey
-  url: string
-}
-
-interface SponsorLogo {
-  analyticsAction: ContributionAnalyticsAction
-  name: string
-  url: string
-  tooltipKey: TranslationKey
-  darkLogo: string
-  lightLogo: string
-}
-
 const EMPTY_DIALOG_OPENER: ReturnType<typeof takeFeedbackDialogOpener> = {
   element: null,
   reopenCommandPalette: false,
 }
-
-type ContributionTone = 'blue' | 'green' | 'yellow' | 'purple' | 'red'
-type ContributionAnalyticsAction =
-  | 'newsletter_refactoring'
-  | 'sponsor_codacy'
-  | 'sponsor_codescene'
-  | 'sponsor_circleci'
-  | 'sponsor_unblocked'
-  | 'sponsors_development_article'
-  | 'feature_requests'
-  | 'discussions'
-  | 'pull_requests'
-  | 'contributing_guide'
-  | 'issues'
-  | 'copy_diagnostics'
-
-const CONTRIBUTION_ANALYTICS_EVENT = 'contribution_action_clicked'
-const CONTRIBUTION_ANALYTICS_SURFACE = 'contribute_dialog'
 
 const CONTRIBUTION_TONE_CLASSES: Record<ContributionTone, string> = {
   blue: 'bg-[var(--accent-blue-light)] text-[var(--accent-blue)]',
@@ -145,91 +90,6 @@ const CONTRIBUTION_BUTTON_CLASSES: Record<ContributionTone, string> = {
   purple: 'border-[var(--accent-purple)] hover:bg-[var(--accent-purple-light)] [&_svg]:text-[var(--accent-purple)]',
   red: 'border-[var(--accent-red)] hover:bg-[var(--accent-red-light)] [&_svg]:text-[var(--accent-red)]',
 }
-
-const NEWSLETTER_PATH = {
-  analyticsAction: 'newsletter_refactoring',
-  titleKey: 'feedback.newsletter.title',
-  descriptionKey: 'feedback.newsletter.description',
-  ctaLabelKey: 'feedback.newsletter.cta',
-  labelKey: 'feedback.newsletter.linkLabel',
-  url: REFACTORING_HOME_URL,
-  icon: Newspaper,
-  tone: 'blue',
-} satisfies ContributionPath
-
-const SPONSOR_LOGOS: SponsorLogo[] = [
-  {
-    analyticsAction: 'sponsor_codacy',
-    name: 'Codacy',
-    url: CODACY_HOME_URL,
-    tooltipKey: 'feedback.sponsors.codacyTooltip',
-    darkLogo: codacyDarkLogo,
-    lightLogo: codacyLightLogo,
-  },
-  {
-    analyticsAction: 'sponsor_codescene',
-    name: 'CodeScene',
-    url: CODESCENE_HOME_URL,
-    tooltipKey: 'feedback.sponsors.codeSceneTooltip',
-    darkLogo: codeSceneDarkLogo,
-    lightLogo: codeSceneLightLogo,
-  },
-  {
-    analyticsAction: 'sponsor_circleci',
-    name: 'CircleCI',
-    url: CIRCLECI_HOME_URL,
-    tooltipKey: 'feedback.sponsors.circleCiTooltip',
-    darkLogo: circleCiDarkLogo,
-    lightLogo: circleCiLightLogo,
-  },
-  {
-    analyticsAction: 'sponsor_unblocked',
-    name: 'Unblocked',
-    url: UNBLOCKED_HOME_URL,
-    tooltipKey: 'feedback.sponsors.unblockedTooltip',
-    darkLogo: unblockedDarkLogo,
-    lightLogo: unblockedLightLogo,
-  },
-]
-
-const CONTRIBUTION_PATHS: ContributionPath[] = [
-  {
-    analyticsAction: 'feature_requests',
-    titleKey: 'feedback.featureRequests.title',
-    descriptionKey: 'feedback.featureRequests.description',
-    ctaLabelKey: 'feedback.featureRequests.cta',
-    labelKey: 'feedback.featureRequests.linkLabel',
-    url: TOLARIA_PRODUCT_BOARD_URL,
-    icon: Lightbulb,
-    tone: 'green',
-  },
-  {
-    analyticsAction: 'discussions',
-    titleKey: 'feedback.discussions.title',
-    descriptionKey: 'feedback.discussions.description',
-    ctaLabelKey: 'feedback.discussions.cta',
-    labelKey: 'feedback.discussions.linkLabel',
-    url: TOLARIA_GITHUB_DISCUSSIONS_URL,
-    icon: MessagesSquare,
-    tone: 'purple',
-  },
-  {
-    analyticsAction: 'pull_requests',
-    titleKey: 'feedback.contributeCode.title',
-    descriptionKey: 'feedback.contributeCode.description',
-    ctaLabelKey: 'feedback.contributeCode.cta',
-    labelKey: 'feedback.contributeCode.linkLabel',
-    url: TOLARIA_GITHUB_PULL_REQUESTS_URL,
-    icon: GitPullRequest,
-    tone: 'yellow',
-    secondaryLink: {
-      analyticsAction: 'contributing_guide',
-      ctaLabelKey: 'feedback.contributingGuide.cta',
-      labelKey: 'feedback.contributingGuide.linkLabel',
-      url: TOLARIA_GITHUB_CONTRIBUTING_URL,
-    },
-  },
-]
 
 function trackContributionAction(action: ContributionAnalyticsAction): void {
   trackEvent(CONTRIBUTION_ANALYTICS_EVENT, {
@@ -395,13 +255,13 @@ function SponsorLogoCard({
             variant="link"
             className="h-auto p-0 align-baseline text-sm leading-6 text-[var(--accent-blue)]"
             onClick={() => openTrackedContributionLink(
-              'sponsors_development_article',
-              t('feedback.sponsors.developmentLinkLabel'),
-              TOLARIA_DEVELOPMENT_ARTICLE_URL,
+              SPONSOR_DEVELOPMENT_ARTICLE_LINK.analyticsAction,
+              t(SPONSOR_DEVELOPMENT_ARTICLE_LINK.labelKey),
+              SPONSOR_DEVELOPMENT_ARTICLE_LINK.url,
               onOpenLink,
             )}
           >
-            {t('feedback.sponsors.developmentLinkText')}
+            {t(SPONSOR_DEVELOPMENT_ARTICLE_LINK.textKey)}
           </Button>
           {t('feedback.sponsors.developmentSentenceSuffix')}
         </CardDescription>
@@ -618,15 +478,15 @@ function ContributionGrid({
         )
       })}
       <ContributionCard
-        title={t('feedback.reportBug.title')}
-        description={t('feedback.reportBug.description')}
-        ctaLabel={t('feedback.reportBug.cta')}
-        icon={Bug}
-        tone="red"
+        title={t(BUG_REPORT_PATH.titleKey)}
+        description={t(BUG_REPORT_PATH.descriptionKey)}
+        ctaLabel={t(BUG_REPORT_PATH.ctaLabelKey)}
+        icon={BUG_REPORT_PATH.icon}
+        tone={BUG_REPORT_PATH.tone}
         onAction={() => openTrackedContributionLink(
-          'issues',
-          t('feedback.reportBug.linkLabel'),
-          TOLARIA_GITHUB_ISSUES_URL,
+          BUG_REPORT_PATH.analyticsAction,
+          t(BUG_REPORT_PATH.labelKey),
+          BUG_REPORT_PATH.url,
           onOpenLink,
         )}
         secondaryAction={(
