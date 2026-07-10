@@ -292,4 +292,29 @@ describe('vaultExpressions', () => {
     expect(rendered.html).toContain('\\u003c/script\\u003e')
     expect(rendered.html).toContain('\\u003cimg')
   })
+
+  it('emits parseable null JSON when dashboard data references are missing', () => {
+    const sourceEntry = entry('/vault/dashboard.md', 'Dashboard', { workspace: refactoringWorkspace })
+    const rendered = renderVaultExpressionTemplate({
+      compiled: compileVaultExpressionTemplate([
+        '<script type="application/json" id="notes">{{json([[missing-hub]].has_notes)}}</script>',
+        '<script type="application/json" id="status">{{json(missing_status)}}</script>',
+      ].join('')),
+      context: {
+        contentsByPath: new Map(),
+        currentContent: '# Dashboard',
+        entries: [sourceEntry],
+        locale: 'en-US',
+        sourceEntry,
+        vaultPath: '/vault',
+      },
+    })
+
+    const parser = new DOMParser()
+    const documentObject = parser.parseFromString(rendered.html, 'text/html')
+
+    expect(JSON.parse(documentObject.getElementById('notes')?.textContent ?? '')).toBeNull()
+    expect(JSON.parse(documentObject.getElementById('status')?.textContent ?? '')).toBeNull()
+    expect(rendered.unresolved).toEqual([])
+  })
 })

@@ -815,8 +815,23 @@ function evaluateExpression(ast: VaultExpressionAst, context: VaultExpressionEva
       : UNRESOLVED_RESULT
   }
 
+  return evaluateCallExpression(ast, context)
+}
+
+function resolvedArgumentValue(result: EvaluationResult): VaultExpressionValue {
+  return result.resolved ? result.value : null
+}
+
+function unresolvedResult(result: EvaluationResult): boolean {
+  return !result.resolved
+}
+
+function evaluateCallExpression(ast: CallExpression, context: VaultExpressionEvaluationContext): EvaluationResult {
   const evaluatedArgs = ast.args.map((arg) => evaluateExpression(arg, context))
-  if (ast.name !== 'default' && evaluatedArgs.some((arg) => !arg.resolved)) return UNRESOLVED_RESULT
+  if (ast.name === 'json') {
+    return evaluateFunction(ast.name, evaluatedArgs.map(resolvedArgumentValue), context)
+  }
+  if (ast.name !== 'default' && evaluatedArgs.some(unresolvedResult)) return UNRESOLVED_RESULT
   return evaluateFunction(ast.name, evaluatedArgs.map((arg) => arg.value), context)
 }
 
