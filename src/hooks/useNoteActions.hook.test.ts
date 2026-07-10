@@ -930,7 +930,7 @@ describe('useNoteActions hook', () => {
         await result.current.handleUndo()
       })
 
-      const savePaths = vi.mocked(mockInvoke).mock.calls
+      const savePathsAfterUndo = vi.mocked(mockInvoke).mock.calls
         .filter(([cmd]) => cmd === 'save_note_content')
         .map(([, args]) => args)
         .filter((args): args is { path: string } => (
@@ -941,9 +941,31 @@ describe('useNoteActions hook', () => {
         ))
         .map((args) => args.path)
 
-      expect(savePaths).toContain(newPath)
-      expect(savePaths).not.toContain(oldPath)
+      expect(savePathsAfterUndo).toContain(newPath)
+      expect(savePathsAfterUndo).not.toContain(oldPath)
       expect(updateEntry).toHaveBeenCalledWith(newPath, expect.objectContaining({ status: 'Active' }))
+
+      vi.mocked(mockInvoke).mockClear()
+      vi.mocked(updateEntry).mockClear()
+
+      await act(async () => {
+        await result.current.handleRedo()
+      })
+
+      const savePathsAfterRedo = vi.mocked(mockInvoke).mock.calls
+        .filter(([cmd]) => cmd === 'save_note_content')
+        .map(([, args]) => args)
+        .filter((args): args is { path: string } => (
+          typeof args === 'object'
+          && args !== null
+          && 'path' in args
+          && typeof args.path === 'string'
+        ))
+        .map((args) => args.path)
+
+      expect(savePathsAfterRedo).toContain(newPath)
+      expect(savePathsAfterRedo).not.toContain(oldPath)
+      expect(updateEntry).toHaveBeenCalledWith(newPath, expect.objectContaining({ status: 'Done' }))
     })
 
     it('handleUpdateFrontmatter does not trigger rename for non-title keys', async () => {
