@@ -217,6 +217,59 @@ describe('vaultExpressions', () => {
     expect(rendered.unresolved).toEqual([])
   })
 
+  it('reuses deep-link vault context while serializing many relationship JSON links', () => {
+    let workspaceReads = 0
+    const countedEntry = (path: string, title: string, overrides: Partial<VaultEntry> = {}) => {
+      const value = entry(path, title, overrides)
+      Object.defineProperty(value, 'workspace', {
+        configurable: true,
+        enumerable: true,
+        get: () => {
+          workspaceReads += 1
+          return refactoringWorkspace
+        },
+      })
+      return value
+    }
+    const linkedTargets = Array.from({ length: 24 }, (_value, index) => `related-${index + 1}`)
+    const sourceEntry = countedEntry('/vault/dashboard.md', 'Dashboard')
+    const hubEntry = countedEntry('/vault/hub.md', 'Hub', {
+      relationships: {
+        'Has Notes': linkedTargets.map((target) => `[[${target}]]`),
+      },
+    })
+    const linkedEntries = linkedTargets.map((target, index) => (
+      countedEntry(`/vault/${target}.md`, `Related ${index + 1}`, { status: 'Active' })
+    ))
+    const fillerEntries = Array.from({ length: 12 }, (_value, index) => (
+      countedEntry(`/vault/filler-${index + 1}.md`, `Filler ${index + 1}`)
+    ))
+    const entries = [sourceEntry, hubEntry, ...linkedEntries, ...fillerEntries]
+
+    const rendered = renderVaultExpressionTemplate({
+      compiled: compileVaultExpressionTemplate('<script type="application/json">{{json([[hub]].has_notes)}}</script>'),
+      context: {
+        contentsByPath: new Map(),
+        currentContent: '# Dashboard',
+        entries,
+        locale: 'en-US',
+        sourceEntry,
+        vaultPath: '/vault',
+      },
+    })
+
+    const parser = new DOMParser()
+    const documentObject = parser.parseFromString(rendered.html, 'text/html')
+    const notes = JSON.parse(documentObject.querySelector('script')?.textContent ?? '[]') as Array<Record<string, unknown>>
+
+    expect(notes).toHaveLength(linkedTargets.length)
+    expect(notes[23]).toMatchObject({
+      deepLink: 'tolaria://refactoring-vault/related-24.md',
+      title: 'Related 24',
+    })
+    expect(workspaceReads).toBeLessThanOrEqual(entries.length * 5)
+  })
+
   it('escapes JSON so dynamic data cannot close the script element', () => {
     const sourceEntry = entry('/vault/dashboard.md', 'Dashboard', { workspace: refactoringWorkspace })
     const unsafeNote = entry('/vault/unsafe.md', '</script><img src=x onerror=alert(1)>', {

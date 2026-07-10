@@ -79,6 +79,14 @@ export interface RenderedVaultExpressionTemplate {
   unresolved: string[]
 }
 
+interface VaultExpressionRenderCache {
+  deepLinkVaults: DeepLinkVault[] | null
+}
+
+interface VaultExpressionEvaluationContext extends VaultExpressionContext {
+  renderCache: VaultExpressionRenderCache
+}
+
 interface Token {
   type: 'comma' | 'dot' | 'identifier' | 'lparen' | 'number' | 'plus' | 'rparen' | 'string' | 'wikilink'
   value: string
@@ -99,17 +107,16 @@ interface ReferencedEntry {
   entry: VaultEntry | null
 }
 
+interface EntryFallbackFieldResult {
+  matched: boolean
+  value: VaultExpressionValue
+}
+
 type DateStylePreset = 'short' | 'medium' | 'long'
 
 const TEMPLATE_EXPRESSION_PATTERN = /\{\{([\s\S]*?)\}\}/g
 const CELL_ADDRESS_PATTERN = /^[A-Za-z]+[1-9]\d*$/
 const DATE_STYLE_PRESETS = new Set<DateStylePreset>(['short', 'medium', 'long'])
-const ENTRY_FALLBACK_FIELD_RESOLVERS: Record<string, (entry: VaultEntry) => VaultExpressionValue> = {
-  filename: (entry) => entry.filename,
-  path: (entry) => entry.path,
-  status: (entry) => entry.status,
-  title: (entry) => entry.title,
-}
 const IDENTIFIER_START_PATTERN = /[A-Za-z_]/
 const IDENTIFIER_PART_PATTERN = /[A-Za-z0-9_-]/
 const UNRESOLVED_RESULT: EvaluationResult = { resolved: false, value: null }
@@ -540,7 +547,12 @@ function expressionDeepLinkVaults(context: VaultExpressionContext): DeepLinkVaul
   return [...vaultsByPath.values()]
 }
 
-function entryDeepLink(entry: VaultEntry, context: VaultExpressionContext): string | null {
+function cachedDeepLinkVaults(context: VaultExpressionEvaluationContext): DeepLinkVault[] {
+  context.renderCache.deepLinkVaults ??= expressionDeepLinkVaults(context)
+  return context.renderCache.deepLinkVaults
+}
+
+function entryDeepLink(entry: VaultEntry, context: VaultExpressionEvaluationContext): string | null {
   const fallbackVaultPath = context.vaultPath ?? context.sourceEntry?.workspace?.path ?? ''
   const vaultPath = vaultPathForEntry(entry, fallbackVaultPath)
   if (!vaultPath) return null
@@ -548,7 +560,7 @@ function entryDeepLink(entry: VaultEntry, context: VaultExpressionContext): stri
   const result = buildTolariaDeepLinkForEntry({
     entry,
     vaultPath,
-    vaults: expressionDeepLinkVaults(context),
+    vaults: cachedDeepLinkVaults(context),
   })
   return result.ok ? result.url : null
 }
@@ -583,7 +595,7 @@ function isWikilinkValue(value: VaultExpressionValue): boolean {
   return text.startsWith('[[') && text.endsWith(']]')
 }
 
-function noteJsonValue(value: VaultExpressionValue, context: VaultExpressionContext): Record<string, unknown> {
+function noteJsonValue(value: VaultExpressionValue, context: VaultExpressionEvaluationContext): Record<string, unknown> {
   const target = noteTarget(value)
   const entry = target ? resolveEntry(context.entries, target, context.sourceEntry ?? undefined) ?? null : null
   return {
@@ -596,13 +608,13 @@ function noteJsonValue(value: VaultExpressionValue, context: VaultExpressionCont
   }
 }
 
-function arrayJsonValue(values: VaultExpressionArrayValue, context: VaultExpressionContext): unknown {
+function arrayJsonValue(values: VaultExpressionArrayValue, context: VaultExpressionEvaluationContext): unknown {
   return values.every((value) => isWikilinkValue(value))
     ? values.map((value) => noteJsonValue(value, context))
     : values
 }
 
-function expressionJsonValue(value: VaultExpressionValue, context: VaultExpressionContext): unknown {
+function expressionJsonValue(value: VaultExpressionValue, context: VaultExpressionEvaluationContext): unknown {
   if (Array.isArray(value)) return arrayJsonValue(value, context)
   if (isWikilinkValue(value)) return noteJsonValue(value, context)
   return value
@@ -649,7 +661,7 @@ function evaluateNumberFunction(
 function evaluateHtmlFunction(
   name: ExpressionFunctionName,
   args: VaultExpressionValue[],
-  context: VaultExpressionContext,
+  context: VaultExpressionEvaluationContext,
 ): EvaluationResult | null {
   if (name === 'json') return { resolved: true, value: htmlValue(safeJson(expressionJsonValue(args[0] ?? null, context))) }
   return null
@@ -658,7 +670,7 @@ function evaluateHtmlFunction(
 function evaluateFunction(
   name: ExpressionFunctionName,
   args: VaultExpressionValue[],
-  context: VaultExpressionContext,
+  context: VaultExpressionEvaluationContext,
 ): EvaluationResult {
   const locale = context.locale ?? 'en-US'
   const html = evaluateHtmlFunction(name, args, context)
@@ -692,12 +704,20 @@ function entryPropertyValue(value: unknown): VaultExpressionValue {
   return Array.isArray(value) ? arrayPropertyValue(value) : scalarPropertyValue(value)
 }
 
+function entryFallbackFieldValue(entry: VaultEntry, key: PropertyKey): EntryFallbackFieldResult {
+  if (key === 'filename') return { matched: true, value: entry.filename }
+  if (key === 'path') return { matched: true, value: entry.path }
+  if (key === 'status') return { matched: true, value: entry.status }
+  if (key === 'title') return { matched: true, value: entry.title }
+  return { matched: false, value: null }
+}
+
 function entryFallbackProperty(entry: VaultEntry | null, path: PropertyPath): VaultExpressionValue {
   if (!entry || path.length !== 1) return null
 
   const key = normalizedPropertyKey(path[0] ?? '')
-  const resolveFallbackField = ENTRY_FALLBACK_FIELD_RESOLVERS[key]
-  if (resolveFallbackField) return resolveFallbackField(entry)
+  const fallbackField = entryFallbackFieldValue(entry, key)
+  if (fallbackField.matched) return fallbackField.value
 
   return matchingRecordValue(entry.relationships, path) ?? entryPropertyValue(matchingRecordValue(entry.properties, path))
 }
@@ -784,7 +804,7 @@ function evaluateReference(reference: ReferenceExpression, context: VaultExpress
   return resolveProperty(reference, context)
 }
 
-function evaluateExpression(ast: VaultExpressionAst, context: VaultExpressionContext): EvaluationResult {
+function evaluateExpression(ast: VaultExpressionAst, context: VaultExpressionEvaluationContext): EvaluationResult {
   if (ast.type === 'literal') return { resolved: true, value: ast.value }
   if (ast.type === 'reference') return evaluateReference(ast, context)
   if (ast.type === 'binary') {
@@ -812,6 +832,10 @@ export function renderVaultExpressionTemplate({
   context: VaultExpressionContext
 }): RenderedVaultExpressionTemplate {
   const unresolved: string[] = []
+  const evaluationContext: VaultExpressionEvaluationContext = {
+    ...context,
+    renderCache: { deepLinkVaults: null },
+  }
   const html = compiled.parts.map((part) => {
     if (typeof part === 'string') return part
     if (!part.ast) {
@@ -819,7 +843,7 @@ export function renderVaultExpressionTemplate({
       return unresolvedHtml(part.source)
     }
 
-    const result = evaluateExpression(part.ast, context)
+    const result = evaluateExpression(part.ast, evaluationContext)
     if (!result.resolved) {
       unresolved.push(part.source)
       return unresolvedHtml(part.source)
