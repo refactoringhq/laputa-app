@@ -309,6 +309,37 @@ describe('createMathInputExtension', () => {
     })
   })
 
+  it('recovers stale selection transactions after rendered inline math source is restored', () => {
+    const fixture = createFixture()
+    const latex = 'x^2'
+    const mathElement = document.createElement('span')
+    mathElement.className = 'math math--inline'
+    mathElement.dataset.latex = latex
+    const glyphText = document.createTextNode('x')
+    mathElement.append(glyphText)
+    const renderedNode = createMathNode(MATH_INLINE_TYPE, latex)
+    fixture.docNodes.push({ node: renderedNode, pos: 7 })
+    fixture.view.posAtDOM.mockReturnValue(7)
+    fixture.setTextSelection.mockImplementation(() => {
+      throw new RangeError('Applying a mismatched transaction')
+    })
+    fixture.mount()
+
+    const event = fixture.fireMathDoubleClick(glyphText)
+
+    expect(fixture.view.dispatch).toHaveBeenCalledWith(fixture.transaction)
+    expect(fixture.setTextSelection).toHaveBeenCalledWith({ from: 8, to: 11 })
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+    expect(event.stopPropagation).toHaveBeenCalledTimes(1)
+    expect(trackEvent).toHaveBeenCalledWith('rich_editor_transform_error_recovered', {
+      reason: 'mismatched_transaction',
+    })
+    expect(trackEvent).toHaveBeenCalledWith('math_source_edit_reopened', {
+      activation: 'pointer',
+      math_mode: 'inline',
+    })
+  })
+
   it('leaves rendered block math intact on double click', () => {
     const fixture = createFixture()
     const latex = '\\sqrt{x}'
