@@ -486,7 +486,7 @@ The local MCP WebSocket bridge follows the same active-vault boundary. `useVault
 
 1. Reads cache from `~/.laputa/cache/<vault-hash>.json` (external to vault)
 2. Compares cache version, vault path, and git HEAD commit hash
-3. If cache is valid and same commit → only re-parse uncommitted changed files
+3. If cache is valid and same commit → skip full git date-history lookup unless uncommitted changed files must be re-parsed
 4. If different commit → use `git diff` to find changed files → selective re-parse
 5. If no cache → full scan
 6. Replaces the cache with a temp-file write + rename only if a short-lived writer lock and cache fingerprint check show another scan has not already refreshed it
