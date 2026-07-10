@@ -8,6 +8,8 @@ use uuid::Uuid;
 
 use crate::git::{get_all_file_dates, GitDates};
 use std::collections::HashMap;
+#[cfg(test)]
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::path_identity::{
     normalize_path_for_identity, push_unique_relative_path, relative_path_key,
@@ -22,6 +24,25 @@ use super::{is_md_file, parse_md_file, parse_non_md_file, scan_vault, VaultEntry
 /// v14: preserve scalar-array custom frontmatter properties in VaultEntry
 const CACHE_VERSION: u32 = 14;
 const CACHE_WRITE_LOCK_STALE_SECS: u64 = 30;
+
+#[cfg(test)]
+static PANIC_ON_GIT_DATE_LOOKUP: AtomicBool = AtomicBool::new(false);
+
+#[cfg(test)]
+struct GitDateLookupPanicGuard;
+
+#[cfg(test)]
+impl Drop for GitDateLookupPanicGuard {
+    fn drop(&mut self) {
+        PANIC_ON_GIT_DATE_LOOKUP.store(false, Ordering::SeqCst);
+    }
+}
+
+#[cfg(test)]
+fn panic_on_git_date_lookup() -> GitDateLookupPanicGuard {
+    PANIC_ON_GIT_DATE_LOOKUP.store(true, Ordering::SeqCst);
+    GitDateLookupPanicGuard
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct VaultCache {
@@ -136,6 +157,15 @@ fn run_git(vault: &Path, args: &[&str]) -> Option<String> {
         return None;
     }
     Some(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+fn load_git_dates(vault_path: &Path) -> HashMap<String, GitDates> {
+    #[cfg(test)]
+    if PANIC_ON_GIT_DATE_LOOKUP.load(Ordering::SeqCst) {
+        panic!("warm cache hit must not load full git date history");
+    }
+
+    get_all_file_dates(vault_path)
 }
 
 /// Parse a git status porcelain line into (status_code, file_path).
@@ -592,19 +622,16 @@ fn finalize_and_cache(
 /// Handle same-commit cache hit: re-parse any uncommitted changes (new or modified files).
 /// Always prunes stale entries even when git reports no changes, so that files
 /// deleted outside git (e.g., via Finder) are removed from the cache on vault open.
-fn update_same_commit(
-    vault: &Path,
-    loaded_cache: LoadedCache,
-    git_dates: &HashMap<String, GitDates>,
-) -> Vec<VaultEntry> {
+fn update_same_commit(vault: &Path, loaded_cache: LoadedCache) -> Vec<VaultEntry> {
     let LoadedCache { cache, fingerprint } = loaded_cache;
     let changed = git_uncommitted_files(vault);
     let mut entries = cache.entries;
     if !changed.is_empty() {
+        let git_dates = load_git_dates(vault);
         let changed_set: std::collections::HashSet<String> =
             changed.iter().map(|path| relative_path_key(path)).collect();
         entries.retain(|e| !changed_set.contains(&to_relative_path_key(&e.path, vault)));
-        entries.extend(parse_files_at(vault, &changed, git_dates));
+        entries.extend(parse_files_at(vault, &changed, &git_dates));
     }
     // Always finalize: prune_stale_entries inside finalize_and_cache removes
     // entries for files deleted outside git (e.g., via Finder or another app).
@@ -683,9 +710,6 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
         None => return scan_vault(vault_path, &HashMap::new()),
     };
 
-    // Build git dates map once — used by all code paths below
-    let git_dates = get_all_file_dates(vault_path);
-
     match load_cache(vault_path) {
         CacheLoadState::Missing => {}
         CacheLoadState::Unreadable(error) => log::warn!("{error}"),
@@ -695,6 +719,7 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
         }
         CacheLoadState::Loaded(loaded_cache) => {
             if cache_requires_full_rescan(&loaded_cache.cache, vault_path) {
+                let git_dates = load_git_dates(vault_path);
                 return scan_and_cache_full(
                     vault_path,
                     &git_dates,
@@ -703,8 +728,9 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
                 );
             }
             return if loaded_cache.cache.commit_hash == current_hash {
-                Ok(update_same_commit(vault_path, loaded_cache, &git_dates))
+                Ok(update_same_commit(vault_path, loaded_cache))
             } else {
+                let git_dates = load_git_dates(vault_path);
                 Ok(update_different_commit(
                     vault_path,
                     loaded_cache,
@@ -716,6 +742,7 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
     }
 
     // No cache — full scan and write cache
+    let git_dates = load_git_dates(vault_path);
     scan_and_cache_full(vault_path, &git_dates, current_hash, None)
 }
 
@@ -947,6 +974,24 @@ mod tests {
 
         // Second call: uses cache (same HEAD)
         let entries2 = scan_vault_cached(vault).unwrap();
+        assert_eq!(entries2.len(), 1);
+        assert_eq!(entries2[0].title, "Note");
+    }
+
+    #[test]
+    fn test_warm_same_commit_cache_skips_full_git_date_lookup_when_clean() {
+        let (_lock, _cache_tmp, dir) = setup_git_vault();
+        let vault = dir.path();
+
+        create_test_file(vault, "note.md", "# Note\n\nFirst version.");
+        git_add_commit(vault, "init");
+
+        let entries = scan_vault_cached(vault).unwrap();
+        assert_eq!(entries.len(), 1);
+
+        let _dates_guard = panic_on_git_date_lookup();
+        let entries2 = scan_vault_cached(vault).unwrap();
+
         assert_eq!(entries2.len(), 1);
         assert_eq!(entries2[0].title, "Note");
     }
