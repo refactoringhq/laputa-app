@@ -186,6 +186,33 @@ describe('SettingsPanel', () => {
     expect(screen.getByPlaceholderText('gemini-2.5-flash')).toBeInTheDocument()
   })
 
+  it('supports API key storage for local model providers', async () => {
+    renderOpenSettings()
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Local model' }), { button: 0, ctrlKey: false })
+    expect(screen.getByText('Local providers are called from this device. If your local server requires a key, save it locally or read it from an environment variable.')).toBeInTheDocument()
+    expect(screen.getByText('API key storage')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'local-llama' } })
+    fireEvent.pointerDown(screen.getByText('No key').closest('button')!, { button: 0, pointerType: 'mouse' })
+    fireEvent.click(screen.getByRole('option', { name: 'Save locally in Tolaria' }))
+    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'lm-secret' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add local model' }))
+    await waitFor(() => expect(screen.getByText('Ollama · local-llama')).toBeInTheDocument())
+    saveSettingsPanel()
+
+    expectSettingsSaved({
+      ai_model_providers: [
+        expect.objectContaining({
+          kind: 'ollama',
+          api_key_storage: 'local_file',
+          api_key_env_var: null,
+          models: [expect.objectContaining({ id: 'local-llama' })],
+        }),
+      ],
+    })
+  })
+
   it('lets users disable AI surfaces without showing missing-agent setup', () => {
     render(
       <SettingsPanel

@@ -347,7 +347,7 @@ files:
     settings.aiProviders.title: 63eb84d8510f9f086d282ec7d47adaa1
     settings.aiProviders.description: d29dfa440713d15de311d29a64a27767
     settings.aiProviders.localTitle: c7c20443d8aaf04271df9d713f5c02ce
-    settings.aiProviders.localDescription: 7abed40ef2e46741c64ff47e423cca39
+    settings.aiProviders.localDescription: 7ae068fbcfe173fea648879c106f54f3
     settings.aiProviders.apiTitle: 66537b9e5200ebbbfbd091144d8afbcc
     settings.aiProviders.apiDescription: 6ec773352e05a805af3abcebeff4e756
     settings.aiProviders.kind: 27703c8f150ac4bb0a3a83a7857353af
@@ -370,7 +370,7 @@ files:
     settings.aiProviders.keyEnv: cb72671bd5cf65512d4c94e8ad6182ef
     settings.aiProviders.keySafety: 0d59d7e4def35e51c4bb785d74180afc
     settings.aiProviders.keySafetyLocal: 8ef2ba0192ac725fa1a3e737e852387c
-    settings.aiProviders.localSafety: 60fb65e4e0d35cec3135584d8219e8fd
+    settings.aiProviders.localSafety: 4fcc0316f07d9c116c4b85d9a3482759
     settings.aiProviders.add: a9f8e8b4ca3cbc4fc3bff5d59d6a5419
     settings.aiProviders.addLocal: 681985f2e412f22fcd55a0553f6e4bee
     settings.aiProviders.addApi: 767b46f2a51aa9dd050cb226cd86e192
