@@ -36,6 +36,10 @@ interface RenderState {
 let initialized = false
 let renderQueue = Promise.resolve()
 
+const TIMELINE_HEADER_PATTERN = /^\s*timeline(?:\s+(?:LR|TD))?\b/iu
+const TIMELINE_PERIOD_DELIMITER_PATTERN = /^(\s*)(.*?)(:\s+.*)$/u
+const TIMELINE_NON_PERIOD_LINE_PATTERN = /^\s*(?:$|%%|#|title\b|section\b|accTitle\s*:|accDescr\s*:|accDescr\s*\{|\})/iu
+
 const MERMAID_RENDER_HOST_STYLE = [
   'position:absolute',
   'left:-10000px',
@@ -65,6 +69,34 @@ function initializeMermaid(mermaid: MermaidApi) {
     },
   })
   initialized = true
+}
+
+function isTimelineDiagram(diagram: string): boolean {
+  const firstStatement = diagram
+    .split(/\r?\n/u)
+    .map(line => line.trim())
+    .find(line => line.length > 0 && !line.startsWith('%%'))
+
+  return typeof firstStatement === 'string' && TIMELINE_HEADER_PATTERN.test(firstStatement)
+}
+
+function encodeTimelinePeriodLabelColons(line: string): string {
+  if (TIMELINE_NON_PERIOD_LINE_PATTERN.test(line)) return line
+
+  const match = TIMELINE_PERIOD_DELIMITER_PATTERN.exec(line)
+  if (!match) return line
+
+  const [, indent, periodLabel, rest] = match
+  if (!periodLabel.trim().includes(':')) return line
+
+  // Mermaid timeline uses ":" as a field separator, so clock labels need entity colons for rendering.
+  return `${indent}${periodLabel.replaceAll(':', '&#58;')}${rest}`
+}
+
+function normalizeTimelinePeriodLabelsForRender(diagram: string): string {
+  if (!isTimelineDiagram(diagram)) return diagram
+
+  return diagram.split('\n').map(encodeTimelinePeriodLabelColons).join('\n')
 }
 
 function appendMermaidRenderHost(): HTMLDivElement {
@@ -112,7 +144,7 @@ async function renderMermaidDiagram({
     initializeMermaid(mermaid)
     const renderHost = appendMermaidRenderHost()
     try {
-      const result = await mermaid.render(renderId, diagram, renderHost)
+      const result = await mermaid.render(renderId, normalizeTimelinePeriodLabelsForRender(diagram), renderHost)
       return centerMermaidNodeLabels(result.svg)
     } finally {
       removeMermaidRenderArtifacts(renderId, renderHost)

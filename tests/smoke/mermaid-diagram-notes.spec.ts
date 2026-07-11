@@ -56,6 +56,15 @@ const REPORTED_GANTT_DIAGRAM = [
   '    Testing & Deployment:b2, after b1, 7d',
   '```',
 ].join('\n')
+const REPORTED_TIMELINE_DIAGRAM = [
+  '```mermaid',
+  'timeline',
+  '    title Dayflow · 7月7日',
+  '    08:00 : Wake up',
+  '    09:30 : Focus block',
+  '    12:15 : Lunch',
+  '```',
+].join('\n')
 const SYSTEM_OVERVIEW_DIAGRAM = [
   '```mermaid',
   'flowchart TD',
@@ -122,6 +131,25 @@ const REPORTED_INVALID_DIAGRAM = [
   '```',
 ].join('\n')
 
+const MEASURED_MERMAID_DIAGRAM_CASES = [
+  {
+    expectedNodeCount: 4,
+    expectedText: 'Testing & Deployment',
+    name: 'Mermaid Gantt diagrams render with a nonzero timeline width',
+    nodeSelector: '.task',
+    noteTitle: 'Mermaid Gantt',
+    roleDescription: 'gantt',
+  },
+  {
+    expectedNodeCount: 6,
+    expectedText: 'Dayflow · 7月7日',
+    name: 'Mermaid Timeline diagrams render as SVG timeline nodes',
+    nodeSelector: '.timeline-node',
+    noteTitle: 'Mermaid Timeline',
+    roleDescription: 'timeline',
+  },
+] as const
+
 test.beforeEach(async ({ page }, testInfo) => {
   testInfo.setTimeout(90_000)
   tempVaultDir = createFixtureVaultCopy()
@@ -164,6 +192,20 @@ test.beforeEach(async ({ page }, testInfo) => {
       '# Mermaid Gantt',
       '',
       REPORTED_GANTT_DIAGRAM,
+      '',
+    ].join('\n'),
+  )
+  fs.writeFileSync(
+    path.join(tempVaultDir, 'note', 'mermaid-timeline.md'),
+    [
+      '---',
+      'Status: Active',
+      'Date: 2026-07-07T00:00:00',
+      '---',
+      '',
+      '# Mermaid Timeline',
+      '',
+      REPORTED_TIMELINE_DIAGRAM,
       '',
     ].join('\n'),
   )
@@ -394,9 +436,9 @@ async function readDatabaseDiagramMetrics(page: Page, diagramIndex: number) {
   }
 }
 
-async function readGanttDiagramMetrics(page: Page, diagramIndex: number) {
+async function readMermaidDiagramMetrics(page: Page, diagramIndex: number, nodeSelector: string) {
   const svg = mermaidSvg(page, diagramIndex)
-  return svg.evaluate((element) => {
+  return svg.evaluate((element, selector) => {
     const viewBox = element.getAttribute('viewBox')?.split(/\s+/u).map(Number) ?? []
     const [, , width, height] = viewBox
     return {
@@ -404,9 +446,33 @@ async function readGanttDiagramMetrics(page: Page, diagramIndex: number) {
       width,
       height,
       text: element.textContent ?? '',
-      taskCount: element.querySelectorAll('.task').length,
+      nodeCount: element.querySelectorAll(selector).length,
     }
+  }, nodeSelector)
+}
+
+async function expectMermaidDiagramMetrics({
+  expectedNodeCount,
+  expectedText,
+  nodeSelector,
+  page,
+  roleDescription,
+}: {
+  expectedNodeCount: number
+  expectedText: string
+  nodeSelector: string
+  page: Page
+  roleDescription: string
+}) {
+  await expectRenderedDiagramCount(page, 1)
+  await expect.poll(() => readMermaidDiagramMetrics(page, 0, nodeSelector)).toMatchObject({
+    roleDescription,
+    width: expect.any(Number),
+    height: expect.any(Number),
+    text: expect.stringContaining(expectedText),
+    nodeCount: expectedNodeCount,
   })
+  expect((await readMermaidDiagramMetrics(page, 0, nodeSelector)).width).toBeGreaterThan(0)
 }
 
 function readNoteBFile(): string {
@@ -441,18 +507,12 @@ test('Mermaid database node labels stay centered inside cylinders', async ({ pag
   })
 })
 
-test('Mermaid Gantt diagrams render with a nonzero timeline width', async ({ page }) => {
-  await openNote(page, 'Mermaid Gantt')
-  await expectRenderedDiagramCount(page, 1)
-  await expect.poll(() => readGanttDiagramMetrics(page, 0)).toMatchObject({
-    roleDescription: 'gantt',
-    width: expect.any(Number),
-    height: expect.any(Number),
-    taskCount: 4,
-    text: expect.stringContaining('Testing & Deployment'),
+for (const diagramCase of MEASURED_MERMAID_DIAGRAM_CASES) {
+  test(diagramCase.name, async ({ page }) => {
+    await openNote(page, diagramCase.noteTitle)
+    await expectMermaidDiagramMetrics({ ...diagramCase, page })
   })
-  expect((await readGanttDiagramMetrics(page, 0)).width).toBeGreaterThan(0)
-})
+}
 
 test('fullscreen Mermaid diagrams keep the active Tolaria surface in dark mode', async ({ page }) => {
   await openNote(page, 'Mermaid Reported')
