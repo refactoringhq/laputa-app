@@ -11,9 +11,7 @@ pub(crate) fn build_command(
     let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(binary)?;
     let mut command = crate::hidden_command(&target.program);
     crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
-    if let Some(first_arg) = target.first_arg {
-        command.arg(first_arg);
-    }
+    command.args(&target.prefix_args);
     command
         .arg("-p")
         .arg(build_prompt(request))
