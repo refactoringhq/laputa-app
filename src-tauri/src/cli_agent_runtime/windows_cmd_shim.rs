@@ -1,4 +1,5 @@
 use super::AgentCommandTarget;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 pub(super) fn command_target(binary: &Path) -> Result<Option<AgentCommandTarget>, String> {
@@ -6,29 +7,66 @@ pub(super) fn command_target(binary: &Path) -> Result<Option<AgentCommandTarget>
         return Ok(None);
     }
 
-    let Some(target) = target_path(binary) else {
+    let contents = match std::fs::read_to_string(binary) {
+        Ok(contents) => contents,
+        Err(_) => return Ok(None),
+    };
+
+    if let Some(target) = volta_command_target(binary, &contents) {
+        return Ok(Some(target));
+    }
+
+    let Some(target) = target_path(binary, &contents) else {
         return Ok(None);
     };
 
     if is_node_script(&target) {
         return Ok(Some(AgentCommandTarget {
             program: crate::mcp::find_node()?,
-            first_arg: Some(target),
+            prefix_args: vec![target.into_os_string()],
         }));
     }
 
     Ok(Some(AgentCommandTarget {
         program: target,
-        first_arg: None,
+        prefix_args: Vec::new(),
     }))
+}
+
+fn volta_command_target(binary: &Path, contents: &str) -> Option<AgentCommandTarget> {
+    if !is_volta_run_shim(contents) {
+        return None;
+    }
+
+    Some(AgentCommandTarget {
+        program: volta_program(binary, contents),
+        prefix_args: vec![OsString::from("run"), binary.file_stem()?.to_os_string()],
+    })
+}
+
+fn is_volta_run_shim(contents: &str) -> bool {
+    let normalized = contents.to_ascii_lowercase();
+    normalized.contains("volta")
+        && normalized.contains(" run ")
+        && normalized.contains("%~n0")
+        && normalized.contains("%*")
+}
+
+fn volta_program(binary: &Path, contents: &str) -> PathBuf {
+    if let Some(target) = target_path(binary, contents) {
+        if has_file_name(&target, "volta.exe") {
+            return target;
+        }
+    }
+
+    PathBuf::from("volta")
 }
 
 fn is_batch_shim(binary: &Path) -> bool {
     has_extension(binary, &["cmd", "bat"])
 }
 
-fn target_path(binary: &Path) -> Option<PathBuf> {
-    let contents = std::fs::read_to_string(binary).ok()?;
+fn target_path(binary: &Path, contents: &str) -> Option<PathBuf> {
     contents
         .split('"')
         .skip(1)
@@ -110,6 +148,42 @@ IF EXIST "%~dp0\node.exe" (
         let target = command_target(&shim).unwrap().unwrap();
 
         assert_eq!(target.program, native_exe);
-        assert_eq!(target.first_arg, None);
+        assert!(target.prefix_args.is_empty());
+    }
+
+    #[test]
+    fn command_target_routes_volta_codex_shim_through_volta_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let shim = dir.path().join("codex.cmd");
+        std::fs::write(&shim, "@echo off\r\nvolta run %~n0 %*\r\n").unwrap();
+
+        let target = command_target(&shim).unwrap().unwrap();
+
+        assert_eq!(target.program, PathBuf::from("volta"));
+        assert_eq!(
+            target.prefix_args,
+            vec![OsString::from("run"), OsString::from("codex")]
+        );
+    }
+
+    #[test]
+    fn command_target_prefers_resolved_volta_exe_when_shim_references_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let volta_exe = dir.path().join("volta.exe");
+        std::fs::write(&volta_exe, "volta runtime").unwrap();
+        let shim = dir.path().join("codex.cmd");
+        std::fs::write(
+            &shim,
+            "@echo off\r\n\"%~dp0\\volta.exe\" run \"%~n0\" %*\r\n",
+        )
+        .unwrap();
+
+        let target = command_target(&shim).unwrap().unwrap();
+
+        assert_eq!(target.program, volta_exe);
+        assert_eq!(
+            target.prefix_args,
+            vec![OsString::from("run"), OsString::from("codex")]
+        );
     }
 }

@@ -449,9 +449,7 @@ fn build_claude_command(
     let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(request.bin)?;
     let mut cmd = crate::hidden_command(&target.program);
     configure_claude_command_environment(&mut cmd, request.bin);
-    if let Some(first_arg) = target.first_arg {
-        cmd.arg(first_arg);
-    }
+    cmd.args(&target.prefix_args);
     cmd.args(request.args)
         .env_remove("CLAUDECODE") // prevent "nested session" guard
         .stdin(Stdio::null())
