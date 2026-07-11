@@ -450,6 +450,30 @@ describe('WikilinkChatInput', () => {
     removeAllRanges.mockRestore()
   })
 
+  it('does not remount while Windows IME composition updates are active', async () => {
+    const onDraftChange = vi.fn()
+    render(<Controlled onDraftChange={onDraftChange} />)
+    const initialEditor = screen.getByTestId('agent-input') as HTMLDivElement
+    initialEditor.focus()
+
+    fireEvent.compositionUpdate(initialEditor)
+    initialEditor.textContent = 'ni'
+    setSelection(initialEditor, 2)
+    fireEvent.input(initialEditor)
+
+    expect(onDraftChange).not.toHaveBeenCalled()
+    expect(screen.getByTestId('agent-input')).toBe(initialEditor)
+
+    initialEditor.textContent = '你'
+    setSelection(initialEditor, 1)
+    fireEvent.compositionEnd(initialEditor)
+
+    await waitFor(() => {
+      expect(onDraftChange).toHaveBeenCalledWith('你')
+    })
+    expect(screen.getByTestId('agent-input').textContent).toBe('你')
+  })
+
   it('lets committed composed characters reach the native input pipeline once', () => {
     const onDraftChange = vi.fn()
     render(<Controlled onDraftChange={onDraftChange} />)
