@@ -768,7 +768,16 @@ export function useNoteActions(config: NoteActionsConfig) {
   })
 
   const updateTabContent = useCallback((path: string, newContent: string) => {
-    setTabs((prev) => prev.map((t) => notePathsMatch(t.entry.path, path) ? { ...t, content: newContent } : t))
+    setTabs((prev) => {
+      let changed = false
+      const next = prev.map((tab) => {
+        if (!notePathsMatch(tab.entry.path, path)) return tab
+        if (tab.content === newContent) return tab
+        changed = true
+        return { ...tab, content: newContent }
+      })
+      return changed ? next : prev
+    })
   }, [setTabs])
 
   const creation = useNoteCreation(config, { openTabWithContent })
