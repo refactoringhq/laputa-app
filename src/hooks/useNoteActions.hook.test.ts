@@ -100,6 +100,21 @@ describe('useNoteActions hook', () => {
     await Promise.resolve()
   }
 
+  function savedNoteContentPaths() {
+    return vi.mocked(mockInvoke).mock.calls.flatMap(([cmd, args]) => {
+      if (cmd !== 'save_note_content') return []
+      if (hasStringPath(args)) return [args.path]
+      return []
+    })
+  }
+
+  function hasStringPath(value: unknown): value is { path: string } {
+    if (typeof value !== 'object') return false
+    if (value === null) return false
+    if (!('path' in value)) return false
+    return typeof value.path === 'string'
+  }
+
   async function createImmediateEntry(type?: string) {
     vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
     const { result } = renderActions()
@@ -839,16 +854,7 @@ describe('useNoteActions hook', () => {
         await result.current.handleUpdateFrontmatter(sourcePath, 'status', 'Done')
       })
 
-      const savePaths = vi.mocked(mockInvoke).mock.calls
-        .filter(([cmd]) => cmd === 'save_note_content')
-        .map(([, args]) => args)
-        .filter((args): args is { path: string } => (
-          typeof args === 'object'
-          && args !== null
-          && 'path' in args
-          && typeof args.path === 'string'
-        ))
-        .map((args) => args.path)
+      const savePaths = savedNoteContentPaths()
 
       expect(onPathRenamed).toHaveBeenCalledWith(sourcePath, destinationPath)
       expect(savePaths).toContain(destinationPath)
@@ -930,16 +936,7 @@ describe('useNoteActions hook', () => {
         await result.current.handleUndo()
       })
 
-      const savePathsAfterUndo = vi.mocked(mockInvoke).mock.calls
-        .filter(([cmd]) => cmd === 'save_note_content')
-        .map(([, args]) => args)
-        .filter((args): args is { path: string } => (
-          typeof args === 'object'
-          && args !== null
-          && 'path' in args
-          && typeof args.path === 'string'
-        ))
-        .map((args) => args.path)
+      const savePathsAfterUndo = savedNoteContentPaths()
 
       expect(savePathsAfterUndo).toContain(newPath)
       expect(savePathsAfterUndo).not.toContain(oldPath)
@@ -952,16 +949,7 @@ describe('useNoteActions hook', () => {
         await result.current.handleRedo()
       })
 
-      const savePathsAfterRedo = vi.mocked(mockInvoke).mock.calls
-        .filter(([cmd]) => cmd === 'save_note_content')
-        .map(([, args]) => args)
-        .filter((args): args is { path: string } => (
-          typeof args === 'object'
-          && args !== null
-          && 'path' in args
-          && typeof args.path === 'string'
-        ))
-        .map((args) => args.path)
+      const savePathsAfterRedo = savedNoteContentPaths()
 
       expect(savePathsAfterRedo).toContain(newPath)
       expect(savePathsAfterRedo).not.toContain(oldPath)
