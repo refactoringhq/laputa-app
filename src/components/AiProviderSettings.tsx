@@ -330,10 +330,10 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
         <LabeledInput label={t('settings.aiProviders.name')} value={draft.name} onChange={(name) => updateForm({ name })} />
         <LabeledInput label={t('settings.aiProviders.baseUrl')} value={draft.baseUrl} onChange={(baseUrl) => updateForm({ baseUrl })} />
         <LabeledInput label={t('settings.aiProviders.model')} value={draft.modelId} onChange={(modelId) => updateForm({ modelId })} placeholder={aiModelProviderCatalogEntry(draft.kind).default_model_id} />
-        {mode === 'api' ? <ApiKeyStorageFields t={t} draft={draft} updateDraft={updateForm} /> : null}
+        <ApiKeyStorageFields t={t} draft={draft} updateDraft={updateForm} />
       </div>
       <div className="text-xs leading-5 text-muted-foreground">
-        {mode === 'api' ? t('settings.aiProviders.keySafetyLocal') : t('settings.aiProviders.localSafety')}
+        {mode === 'local' ? t('settings.aiProviders.localSafety') : t('settings.aiProviders.keySafetyLocal')}
       </div>
       {testState === 'success' ? <div className="text-xs text-emerald-700">{t('settings.aiProviders.testSuccess')}</div> : null}
       {error ? <div className="text-xs text-destructive">{error}</div> : null}
