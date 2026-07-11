@@ -41,9 +41,7 @@ pub(crate) fn build_command(
     let mut command = crate::hidden_command(&target.program);
     crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
     apply_opencode_shell_env(&mut command, request);
-    if let Some(first_arg) = target.first_arg {
-        command.arg(first_arg);
-    }
+    command.args(&target.prefix_args);
     command
         .args(build_args())
         .arg(build_prompt(request))
