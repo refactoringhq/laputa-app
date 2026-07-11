@@ -113,6 +113,7 @@ import { SETTINGS_SECTION_IDS } from './components/settingsSectionIds'
 import {
   vaultPathForEntry,
 } from './utils/workspaces'
+import { notePathsMatch } from './utils/notePathIdentity'
 import { activeGitRepositories } from './utils/gitRepositories'
 import { isMarkdownEntry } from './utils/typeDefinitions'
 import type { RichEditorBlockTypeDefinition } from './utils/richEditorBlockTypes'
@@ -538,9 +539,32 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   } = notes
   const noteActiveTabPath = notes.activeTabPath
   const noteActiveTabPathRef = notes.activeTabPathRef
+  const noteTabsRef = useRef(notes.tabs)
+  useEffect(() => {
+    noteTabsRef.current = notes.tabs
+  }, [notes.tabs])
   const refocusActiveEditor = useCallback((path: string) => {
     window.dispatchEvent(new CustomEvent('laputa:focus-editor', { detail: { path } }))
   }, [])
+  const isActiveTabContentCurrent = useCallback(async (path: string) => {
+    const activeTab = noteTabsRef.current.find((tab) => notePathsMatch(tab.entry.path, path))
+    if (!activeTab) return false
+
+    const request = {
+      path: activeTab.entry.path,
+      vaultPath: vaultPathForEntry(activeTab.entry, resolvedPath),
+    }
+
+    try {
+      const content = isTauri()
+        ? await invoke<string>('get_note_content', request)
+        : await mockInvoke<string>('get_note_content', request)
+      return content === activeTab.content
+    } catch (error) {
+      console.warn('Failed to compare active tab content before vault refresh:', error)
+      return false
+    }
+  }, [resolvedPath])
   useNoteWindowLifecycle({
     activeTabPath: notes.activeTabPath,
     handleSelectNote,
@@ -559,6 +583,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       closeAllTabs,
       getActiveTabPath: () => noteActiveTabPathRef.current,
       hasUnsavedChanges: (path) => vault.unsavedPaths.has(path),
+      isActiveTabContentCurrent,
       reloadFolders: vault.reloadFolders,
       reloadVault: vault.reloadVault,
       reloadViews: vault.reloadViews,
@@ -572,6 +597,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }, [
       closeAllTabs,
       handleReplaceActiveTab,
+      isActiveTabContentCurrent,
       noteActiveTabPath,
       noteActiveTabPathRef,
       refocusActiveEditor,
