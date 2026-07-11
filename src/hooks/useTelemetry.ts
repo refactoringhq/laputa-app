@@ -47,7 +47,9 @@ function syncAnalytics(
     return
   }
 
-  initPostHog(anonymousId, releaseChannel)
+  void Promise.resolve(initPostHog(anonymousId, releaseChannel)).catch((err: unknown) => {
+    console.warn('[telemetry] Analytics init failed:', err)
+  })
 }
 
 /**
