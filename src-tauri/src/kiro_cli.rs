@@ -21,7 +21,7 @@ where
     ensure_mcp_config(&request)?;
     let prompt =
         crate::cli_agent_runtime::build_prompt(&request.message, request.system_prompt.as_deref());
-    let command = build_kiro_command(&binary, Path::new(&request.vault_path));
+    let command = build_kiro_command(&binary, Path::new(&request.vault_path))?;
     crate::cli_agent_runtime::run_ai_agent_line_stream(
         LineStreamProcess::new(command, "kiro-cli", "kiro").with_stdin(prompt),
         emit,
@@ -29,9 +29,11 @@ where
     )
 }
 
-fn build_kiro_command(binary: &Path, vault_path: &Path) -> std::process::Command {
-    let mut command = crate::hidden_command(binary);
+fn build_kiro_command(binary: &Path, vault_path: &Path) -> Result<std::process::Command, String> {
+    let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(binary)?;
+    let mut command = crate::hidden_command(&target.program);
     crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
+    command.args(&target.prefix_args);
     command
         .arg("chat")
         .arg("--no-interactive")
@@ -40,7 +42,7 @@ fn build_kiro_command(binary: &Path, vault_path: &Path) -> std::process::Command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    command
+    Ok(command)
 }
 
 fn ensure_mcp_config(request: &AgentStreamRequest) -> Result<(), String> {
