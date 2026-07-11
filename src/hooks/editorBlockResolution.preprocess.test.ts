@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { BlockNoteEditor } from '@blocknote/core'
 import { schema } from '../components/editorSchema'
+import { installBlockNoteDirectMarkdown } from '../utils/blockNoteDirectMarkdown'
+import { serializeRichEditorDocumentToMarkdown } from '../utils/richEditorMarkdown'
 import { preProcessEditorMarkdown, resolveBlocksForTarget } from './editorBlockResolution'
 
 describe('preProcessEditorMarkdown', () => {
@@ -53,5 +55,32 @@ describe('preProcessEditorMarkdown', () => {
         type: 'bulletListItem',
       }),
     )
+  })
+
+  it('preserves fenced code literals through resolve and save after reload', async () => {
+    const editor = BlockNoteEditor.create({ schema })
+    installBlockNoteDirectMarkdown(editor)
+    const content = [
+      '---',
+      'title: SQL repro',
+      '---',
+      '```sql',
+      'alter table db_sys.crm_client add client_csm_factor decimal(5, 2) null;',
+      'select PATH_WITH_BACKSLASH from container\\_name;',
+      '```',
+    ].join('\n')
+
+    const resolved = await resolveBlocksForTarget({
+      cache: new Map(),
+      content,
+      editor,
+      targetPath: 'sql-repro.md',
+    })
+
+    expect(serializeRichEditorDocumentToMarkdown({
+      blocks: resolved.blocks,
+      editor,
+      tabContent: content,
+    })).toBe(`${content}\n`)
   })
 })
