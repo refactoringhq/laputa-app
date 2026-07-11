@@ -22,6 +22,7 @@ import type { SheetExternalFormulaInput } from '../../utils/sheetExternalFormula
 import type { ScheduleSheetSerializeOptions, SheetWorkbookState } from './sheetEditorTypes'
 
 const SERIALIZE_DEBOUNCE_MS = 450
+const RELEASED_WORKBOOK_MODEL_ERROR = 'null pointer passed to rust'
 
 let ironCalcInitPromise: Promise<void> | null = null
 
@@ -64,15 +65,44 @@ function cancelPendingSerialize(
   }
 }
 
+function isReleasedWorkbookModelError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(RELEASED_WORKBOOK_MODEL_ERROR)
+}
+
+function releaseWorkbookModelNow(model: Model | null | undefined): void {
+  if (!model) return
+  try {
+    model.free()
+  } catch (error) {
+    console.warn('[sheet-editor] Failed to release workbook model:', error)
+  }
+}
+
 function releaseWorkbookModel(model: Model | null | undefined): void {
   if (!model) return
   window.setTimeout(() => {
-    try {
-      model.free()
-    } catch (error) {
-      console.warn('[sheet-editor] Failed to release workbook model:', error)
-    }
+    releaseWorkbookModelNow(model)
   }, 0)
+}
+
+function buildCurrentSheetContent({
+  current,
+  dirtyBodyRowsRef,
+  sourceContent,
+}: {
+  current: SheetWorkbookState
+  dirtyBodyRowsRef: MutableRefObject<SheetBodyDirtyRows>
+  sourceContent: string
+}): string | null {
+  try {
+    return buildSheetContent(sourceContent, current.model, current.externalFormulaInputs, {
+      bodyRows: dirtyBodyRowsRef.current,
+    })
+  } catch (error) {
+    if (!isReleasedWorkbookModelError(error)) throw error
+    console.warn('[sheet-editor] Skipped stale workbook serialization:', error)
+    return null
+  }
 }
 
 function shouldSkipWorkbookRebuild({
@@ -152,9 +182,11 @@ function useSerializeCurrentWorkbook({
 
     const sourceContent = latestContentRef.current
     const sourcePath = current.path
-    const nextContent = buildSheetContent(sourceContent, current.model, current.externalFormulaInputs, {
-      bodyRows: dirtyBodyRowsRef.current,
-    })
+    const nextContent = buildCurrentSheetContent({ current, dirtyBodyRowsRef, sourceContent })
+    if (nextContent === null) {
+      resetDirtyTracking(dirtyWorkbookGenerationRef, dirtyBodyRowsRef)
+      return false
+    }
     if (nextContent === sourceContent) {
       resetDirtyTracking(dirtyWorkbookGenerationRef, dirtyBodyRowsRef)
       return false
@@ -436,7 +468,7 @@ function runWorkbookBuildLifecycle({
 
   return () => {
     cancelled = true
-    pendingModel?.free()
+    releaseWorkbookModelNow(pendingModel)
   }
 }
 

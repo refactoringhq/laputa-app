@@ -169,6 +169,28 @@ describe('SheetEditor serialization', () => {
     }
   })
 
+  it('does not surface workbook serialization when a stale model is already freed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { onContentChange, unmount } = await renderLoadedSheet('---\n_display: sheet\n---\nMetric,January')
+    const model = ironCalcMock.state.lastModel
+    expect(model).not.toBeNull()
+
+    model?.setUserInput(0, 1, 1, 'Updated Metric')
+    markWorkbookDirtyForTest()
+    model?.free()
+
+    try {
+      expect(() => unmount()).not.toThrow()
+      expect(onContentChange).not.toHaveBeenCalled()
+      expect(warn).toHaveBeenCalledWith(
+        '[sheet-editor] Skipped stale workbook serialization:',
+        expect.any(Error),
+      )
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
   it('preserves trailing empty cells when saving an edited row', async () => {
     await expectSaveAfterDirtyEdit({
       content: '---\n_display: sheet\n---\nMetric,January,,\nRevenue,1200,,',
