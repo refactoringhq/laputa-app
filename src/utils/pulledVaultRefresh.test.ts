@@ -100,6 +100,17 @@ describe('refreshPulledVaultState', () => {
     expect(options.replaceActiveTab).toHaveBeenCalledWith(makeEntry('/vault/active.md', 'Active'))
   })
 
+  it('keeps the active tab mounted when its current content already matches disk', async () => {
+    const isActiveTabContentCurrent = vi.fn().mockResolvedValue(true)
+    const options = makeOptions({ isActiveTabContentCurrent })
+
+    await refreshPulledVaultState(options)
+
+    expect(isActiveTabContentCurrent).toHaveBeenCalledWith('/vault/active.md')
+    expect(options.closeAllTabs).not.toHaveBeenCalled()
+    expect(options.replaceActiveTab).not.toHaveBeenCalled()
+  })
+
   it('refocuses the editor after refreshing a focused clean active tab', async () => {
     const shouldRefocusActiveEditor = vi.fn(() => true)
     const refocusActiveEditor = vi.fn()
