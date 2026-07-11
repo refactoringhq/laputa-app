@@ -102,12 +102,74 @@ function expectSingleActiveTab(result: HookState, path: string) {
   expect(result.current.activeTabPath).toBe(path)
 }
 
+function expectEmptyNoteState(result: HookState) {
+  expect(result.current.tabs).toEqual([])
+  expect(result.current.activeTabPath).toBeNull()
+}
+
+function silenceConsoleWarn() {
+  return vi.spyOn(console, 'warn').mockImplementation(() => {})
+}
+
+type TabManagementOptions = Parameters<typeof useTabManagement>[0]
+type NoteFailureCallback = ReturnType<typeof vi.fn>
+
+async function expectFailedSelectionClearsNote(options: {
+  errorMessage: string
+  selectedEntry: Partial<VaultEntry>
+  hookOptions?: TabManagementOptions
+  expectedCallback?: {
+    mock: NoteFailureCallback
+    entry: Partial<VaultEntry>
+  }
+}) {
+  vi.mocked(mockInvoke).mockRejectedValueOnce(new Error(options.errorMessage))
+  const warnSpy = silenceConsoleWarn()
+
+  try {
+    const { result } = renderHook(() => useTabManagement(options.hookOptions))
+    await selectNote(result, options.selectedEntry)
+
+    expectEmptyNoteState(result)
+    if (options.expectedCallback) {
+      expect(options.expectedCallback.mock).toHaveBeenCalledWith(
+        expect.objectContaining(options.expectedCallback.entry),
+        expect.any(Error),
+      )
+    }
+  } finally {
+    warnSpy.mockRestore()
+  }
+}
+
 function createDeferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((res) => {
     resolve = res
   })
   return { promise, resolve }
+}
+
+type Deferred = ReturnType<typeof createDeferred<void>>
+type NavigationMock = ReturnType<typeof vi.fn>
+
+function createPendingNavigation() {
+  const deferred = createDeferred<void>()
+  const beforeNavigate = vi.fn().mockReturnValueOnce(deferred.promise)
+  return { deferred, beforeNavigate }
+}
+
+function expectNavigationWaitsForCurrentSave(result: HookState, beforeNavigate: NavigationMock, toPath: string) {
+  expect(beforeNavigate).toHaveBeenCalledWith('/vault/a.md', toPath)
+  expect(result.current.activeTabPath).toBe('/vault/a.md')
+  expect(result.current.tabs[0].content).toBe('# Mock content')
+}
+
+async function resolvePendingNavigation(deferred: Deferred) {
+  await act(async () => {
+    deferred.resolve(undefined)
+    await Promise.resolve()
+  })
 }
 
 function makeAsciiContent(byteCount: number): string {
@@ -300,42 +362,36 @@ describe('useTabManagement (single-note model)', () => {
     })
 
     it('clears the active note when the file is missing on disk', async () => {
-      vi.mocked(mockInvoke).mockRejectedValueOnce(new Error('File does not exist: /vault/note/missing.md'))
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const onMissingNotePath = vi.fn()
 
-      const { result } = renderHook(() => useTabManagement({ onMissingNotePath }))
-      await selectNote(result, { path: '/vault/note/missing.md', title: 'Missing Note' })
-
-      expect(result.current.tabs).toEqual([])
-      expect(result.current.activeTabPath).toBeNull()
-      expect(onMissingNotePath).toHaveBeenCalledWith(
-        expect.objectContaining({ path: '/vault/note/missing.md', title: 'Missing Note' }),
-        expect.any(Error),
-      )
-      warnSpy.mockRestore()
+      await expectFailedSelectionClearsNote({
+        errorMessage: 'File does not exist: /vault/note/missing.md',
+        selectedEntry: { path: '/vault/note/missing.md', title: 'Missing Note' },
+        hookOptions: { onMissingNotePath },
+        expectedCallback: {
+          mock: onMissingNotePath,
+          entry: { path: '/vault/note/missing.md', title: 'Missing Note' },
+        },
+      })
     })
 
     it('returns to the empty state when note content is not valid UTF-8 text', async () => {
-      vi.mocked(mockInvoke).mockRejectedValueOnce(new Error('File is not valid UTF-8 text: /vault/note/bad.csv'))
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const onUnreadableNoteContent = vi.fn()
 
-      const { result } = renderHook(() => useTabManagement({ onUnreadableNoteContent }))
-      await selectNote(result, {
-        path: '/vault/note/bad.csv',
-        filename: 'bad.csv',
-        title: 'bad.csv',
-        fileKind: 'text',
+      await expectFailedSelectionClearsNote({
+        errorMessage: 'File is not valid UTF-8 text: /vault/note/bad.csv',
+        selectedEntry: {
+          path: '/vault/note/bad.csv',
+          filename: 'bad.csv',
+          title: 'bad.csv',
+          fileKind: 'text',
+        },
+        hookOptions: { onUnreadableNoteContent },
+        expectedCallback: {
+          mock: onUnreadableNoteContent,
+          entry: { path: '/vault/note/bad.csv', title: 'bad.csv' },
+        },
       })
-
-      expect(result.current.tabs).toEqual([])
-      expect(result.current.activeTabPath).toBeNull()
-      expect(onUnreadableNoteContent).toHaveBeenCalledWith(
-        expect.objectContaining({ path: '/vault/note/bad.csv', title: 'bad.csv' }),
-        expect.any(Error),
-      )
-      warnSpy.mockRestore()
     })
 
     it('opens binary image files without trying to load them as text notes', async () => {
@@ -353,32 +409,24 @@ describe('useTabManagement (single-note model)', () => {
     })
 
     it('returns to the empty state when no active vault is selected', async () => {
-      vi.mocked(mockInvoke).mockRejectedValueOnce(new Error('No active vault selected'))
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-      const { result } = renderHook(() => useTabManagement())
-      await selectNote(result, { path: '/vault/note/orphaned.md', title: 'Orphaned Note' })
-
-      expect(result.current.tabs).toEqual([])
-      expect(result.current.activeTabPath).toBeNull()
-      warnSpy.mockRestore()
+      await expectFailedSelectionClearsNote({
+        errorMessage: 'No active vault selected',
+        selectedEntry: { path: '/vault/note/orphaned.md', title: 'Orphaned Note' },
+      })
     })
 
     it('reports an unavailable active vault instead of opening a blank stale tab', async () => {
-      vi.mocked(mockInvoke).mockRejectedValueOnce(new Error('Active vault is not available'))
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const onMissingActiveVault = vi.fn()
 
-      const { result } = renderHook(() => useTabManagement({ onMissingActiveVault }))
-      await selectNote(result, { path: '/vault/note/orphaned.md', title: 'Orphaned Note' })
-
-      expect(result.current.tabs).toEqual([])
-      expect(result.current.activeTabPath).toBeNull()
-      expect(onMissingActiveVault).toHaveBeenCalledWith(
-        expect.objectContaining({ path: '/vault/note/orphaned.md', title: 'Orphaned Note' }),
-        expect.any(Error),
-      )
-      warnSpy.mockRestore()
+      await expectFailedSelectionClearsNote({
+        errorMessage: 'Active vault is not available',
+        selectedEntry: { path: '/vault/note/orphaned.md', title: 'Orphaned Note' },
+        hookOptions: { onMissingActiveVault },
+        expectedCallback: {
+          mock: onMissingActiveVault,
+          entry: { path: '/vault/note/orphaned.md', title: 'Orphaned Note' },
+        },
+      })
     })
 
     it('uses the note-window vault path when Tauri reloads the selected note', async () => {
@@ -520,7 +568,7 @@ describe('useTabManagement (single-note model)', () => {
       vi.mocked(mockInvoke)
         .mockResolvedValueOnce('# Existing content')
         .mockRejectedValueOnce(new Error('File does not exist: /vault/a.md'))
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = silenceConsoleWarn()
       const onMissingNotePath = vi.fn()
 
       const { result } = renderHook(() => useTabManagement({ onMissingNotePath }))
@@ -531,8 +579,7 @@ describe('useTabManagement (single-note model)', () => {
         await result.current.handleReplaceActiveTab(entry)
       })
 
-      expect(result.current.tabs).toEqual([])
-      expect(result.current.activeTabPath).toBeNull()
+      expectEmptyNoteState(result)
       expect(onMissingNotePath).toHaveBeenCalledWith(
         expect.objectContaining({ path: '/vault/a.md', title: 'A' }),
         expect.any(Error),
@@ -547,8 +594,7 @@ describe('useTabManagement (single-note model)', () => {
     })
 
     it('waits for the active note save before replacing it from note-list navigation', async () => {
-      const deferred = createDeferred<void>()
-      const beforeNavigate = vi.fn().mockReturnValueOnce(deferred.promise)
+      const { deferred, beforeNavigate } = createPendingNavigation()
 
       const { result } = renderHook(() => useTabManagement({ beforeNavigate }))
       await selectNote(result, { path: '/vault/a.md', title: 'A' })
@@ -557,14 +603,8 @@ describe('useTabManagement (single-note model)', () => {
         void result.current.handleReplaceActiveTab(makeEntry({ path: '/vault/b.md', title: 'B' }))
       })
 
-      expect(beforeNavigate).toHaveBeenCalledWith('/vault/a.md', '/vault/b.md')
-      expect(result.current.activeTabPath).toBe('/vault/a.md')
-      expect(result.current.tabs[0].content).toBe('# Mock content')
-
-      await act(async () => {
-        deferred.resolve(undefined)
-        await Promise.resolve()
-      })
+      expectNavigationWaitsForCurrentSave(result, beforeNavigate, '/vault/b.md')
+      await resolvePendingNavigation(deferred)
 
       await vi.waitFor(() => expect(result.current.activeTabPath).toBe('/vault/b.md'))
       expect(result.current.tabs).toHaveLength(1)
@@ -605,8 +645,7 @@ describe('useTabManagement (single-note model)', () => {
     })
 
     it('waits for the current note save before opening a newly created note', async () => {
-      const deferred = createDeferred<void>()
-      const beforeNavigate = vi.fn().mockReturnValueOnce(deferred.promise)
+      const { deferred, beforeNavigate } = createPendingNavigation()
 
       const { result } = renderHook(() => useTabManagement({ beforeNavigate }))
       await selectNote(result, { path: '/vault/a.md', title: 'A' })
@@ -615,14 +654,8 @@ describe('useTabManagement (single-note model)', () => {
         result.current.openTabWithContent(makeEntry({ path: '/vault/new.md', title: 'New' }), '# New note')
       })
 
-      expect(beforeNavigate).toHaveBeenCalledWith('/vault/a.md', '/vault/new.md')
-      expect(result.current.activeTabPath).toBe('/vault/a.md')
-      expect(result.current.tabs[0].content).toBe('# Mock content')
-
-      await act(async () => {
-        deferred.resolve(undefined)
-        await Promise.resolve()
-      })
+      expectNavigationWaitsForCurrentSave(result, beforeNavigate, '/vault/new.md')
+      await resolvePendingNavigation(deferred)
 
       await vi.waitFor(() => expect(result.current.activeTabPath).toBe('/vault/new.md'))
       expect(result.current.tabs).toHaveLength(1)
@@ -1104,8 +1137,7 @@ describe('useTabManagement (single-note model)', () => {
     })
 
     it('records the requested note while the current note is still saving', async () => {
-      const deferred = createDeferred<void>()
-      const beforeNavigate = vi.fn().mockReturnValueOnce(deferred.promise)
+      const { deferred, beforeNavigate } = createPendingNavigation()
 
       const { result } = renderHook(() => useTabManagement({ beforeNavigate }))
       await selectNote(result, { path: '/vault/a.md', title: 'A' })
@@ -1118,10 +1150,7 @@ describe('useTabManagement (single-note model)', () => {
       expect(result.current.activeTabPath).toBe('/vault/a.md')
       expect(result.current.requestedActiveTabPathRef.current).toBe('/vault/b.md')
 
-      await act(async () => {
-        deferred.resolve(undefined)
-        await Promise.resolve()
-      })
+      await resolvePendingNavigation(deferred)
 
       await vi.waitFor(() => expect(result.current.activeTabPath).toBe('/vault/b.md'))
       expect(result.current.requestedActiveTabPathRef.current).toBe('/vault/b.md')
