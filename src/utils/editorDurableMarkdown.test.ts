@@ -178,6 +178,61 @@ describe('editor durable markdown blocks', () => {
     })
   })
 
+  it('restores tldraw placeholders after Markdown-active token text passes through BlockNote', async () => {
+    const editor = BlockNoteEditor.create({ schema })
+    const markdown = [
+      '```tldraw id="day-plan" height="640" width="900"',
+      '{ "store": { "shape:focus": { "id": "shape:focus", "type": "geo" } } }',
+      '```',
+    ].join('\n')
+
+    const parsed = await editor.tryParseMarkdownToBlocks(
+      preProcessDurableEditorMarkdown({ markdown }),
+    )
+    const [block] = injectDurableEditorMarkdownBlocks(parsed) as Array<{
+      type: string
+      props?: Record<string, string>
+    }>
+
+    expect(block).toMatchObject({
+      type: TLDRAW_BLOCK_TYPE,
+      props: {
+        boardId: 'day-plan',
+        height: '640',
+        snapshot: '{ "store": { "shape:focus": { "id": "shape:focus", "type": "geo" } } }',
+        width: '900',
+      },
+    })
+  })
+
+  it('recovers tldraw placeholders after Markdown emphasis strips token separators', () => {
+    const markdown = [
+      '```tldraw id="day-plan" height="640" width="900"',
+      '{ "store": { "shape:focus": { "id": "shape:focus", "type": "geo" } } }',
+      '```',
+    ].join('\n')
+    const emphasisStrippedToken = preProcessDurableEditorMarkdown({ markdown }).replaceAll('_', '')
+
+    const [block] = injectDurableEditorMarkdownBlocks([{
+      type: 'paragraph',
+      content: [{ type: 'text', text: emphasisStrippedToken, styles: {} }],
+      children: [],
+    }]) as Array<{
+      type: string
+      props?: Record<string, string>
+    }>
+
+    expect(block).toMatchObject({
+      type: TLDRAW_BLOCK_TYPE,
+      props: {
+        boardId: 'day-plan',
+        height: '640',
+        snapshot: '{ "store": { "shape:focus": { "id": "shape:focus", "type": "geo" } } }',
+        width: '900',
+      },
+    })
+  })
+
   it('restores HTML placeholders after Markdown-active token text passes through BlockNote', async () => {
     const editor = BlockNoteEditor.create({ schema })
     const markdown = [
