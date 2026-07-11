@@ -19,19 +19,16 @@ export type SheetStructureAction =
   | 'insertRowAbove'
   | 'insertRowBelow'
 
-function isSingleRowDeleteError(caught: unknown, row: number): caught is Error {
-  return row === 1
-    && caught instanceof Error
-    && caught.message === "Row number '1' is not valid."
+function isInvalidSelectedRowDeleteError(caught: unknown, row: number): caught is Error {
+  return caught instanceof Error
+    && caught.message === `Row number '${row}' is not valid.`
 }
 
 function deleteSelectedRow(model: Model, sheet: number, row: number): void {
   try {
     model.deleteRow(sheet, row)
   } catch (caught) {
-    if (!isSingleRowDeleteError(caught, row)) throw caught
-    model.insertRow(sheet, row + 1)
-    model.deleteRow(sheet, row)
+    if (!isInvalidSelectedRowDeleteError(caught, row)) throw caught
   }
 }
 
