@@ -6,6 +6,7 @@ interface PulledVaultRefreshOptions {
   getActiveTabPath?: () => string | null
   closeAllTabs: () => void
   hasUnsavedChanges: (path: string) => boolean
+  isActiveTabContentCurrent?: (path: string) => Promise<boolean> | boolean
   reloadFolders: () => Promise<unknown> | unknown
   reloadVault: () => Promise<VaultEntry[]>
   reloadViews: () => Promise<unknown> | unknown
@@ -87,6 +88,22 @@ function shouldReplaceActiveEntry(options: {
   return didPullUpdateActiveNote({ updatedFiles, vaultPath, activeTabPath: activePath })
 }
 
+async function shouldKeepCurrentActiveEntryMounted(options: {
+  activePath: string
+  isActiveTabContentCurrent?: PulledVaultRefreshOptions['isActiveTabContentCurrent']
+  movedEntry: VaultEntry | null
+  shouldReplace: boolean | null
+}): Promise<boolean> {
+  const {
+    activePath,
+    isActiveTabContentCurrent,
+    movedEntry,
+    shouldReplace,
+  } = options
+  if (!shouldReplace || movedEntry || !isActiveTabContentCurrent) return false
+  return await isActiveTabContentCurrent(activePath) === true
+}
+
 async function applyActiveEntryReplacement(options: {
   closeAllTabs: PulledVaultRefreshOptions['closeAllTabs']
   replaceActiveTab: PulledVaultRefreshOptions['replaceActiveTab']
@@ -118,6 +135,7 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
     closeAllTabs,
     getActiveTabPath,
     hasUnsavedChanges,
+    isActiveTabContentCurrent,
     reloadFolders,
     reloadVault,
     reloadViews,
@@ -154,6 +172,13 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
     updatedFiles,
     vaultPath,
   })
+
+  if (await shouldKeepCurrentActiveEntryMounted({
+    activePath,
+    isActiveTabContentCurrent,
+    movedEntry,
+    shouldReplace,
+  })) return entries
 
   const handledReplacement = await applyActiveEntryReplacement({
     closeAllTabs,
