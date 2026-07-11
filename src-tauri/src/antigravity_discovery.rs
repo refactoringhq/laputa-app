@@ -114,8 +114,15 @@ fn antigravity_binary_candidates() -> Vec<PathBuf> {
 fn antigravity_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
     vec![
         home.join(".local/bin/agy"),
+        home.join(".local/bin/agy.cmd"),
         home.join(".local/bin/agy.exe"),
         home.join("AppData/Local/agy/bin/agy.exe"),
+        home.join("AppData/Roaming/npm/agy.cmd"),
+        home.join("AppData/Roaming/npm/agy.exe"),
+        home.join("AppData/Local/pnpm/agy.cmd"),
+        home.join("AppData/Local/pnpm/agy.exe"),
+        home.join("scoop/shims/agy.cmd"),
+        home.join("scoop/shims/agy.exe"),
         PathBuf::from("/usr/local/bin/agy"),
         PathBuf::from("/opt/homebrew/bin/agy"),
         PathBuf::from("/home/linuxbrew/.linuxbrew/bin/agy"),
@@ -134,6 +141,29 @@ mod tests {
             home.join(".local/bin/agy"),
             home.join("AppData/Local/agy/bin/agy.exe"),
             PathBuf::from("/opt/homebrew/bin/agy"),
+        ];
+
+        for candidate in expected {
+            assert!(
+                candidates.contains(&candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    #[test]
+    fn binary_candidates_include_windows_npm_and_toolchain_shims() {
+        let home = PathBuf::from(r"C:\Users\alex");
+        let candidates = antigravity_binary_candidates_for_home(&home);
+        let expected = [
+            home.join(".local/bin/agy.cmd"),
+            home.join("AppData/Roaming/npm/agy.cmd"),
+            home.join("AppData/Roaming/npm/agy.exe"),
+            home.join("AppData/Local/pnpm/agy.cmd"),
+            home.join("AppData/Local/pnpm/agy.exe"),
+            home.join("scoop/shims/agy.cmd"),
+            home.join("scoop/shims/agy.exe"),
         ];
 
         for candidate in expected {
