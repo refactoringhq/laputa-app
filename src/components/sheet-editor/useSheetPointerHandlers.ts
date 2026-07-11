@@ -73,11 +73,16 @@ function sheetScrollSnapshot(
   }
 }
 
+function isValidViewportIndex(index: number): boolean {
+  return Number.isInteger(index) && index >= 1
+}
+
 function restoreSheetScrollPosition(
   snapshot: SheetScrollSnapshot | null,
   workbookRef: MutableRefObject<SheetWorkbookState | null>,
 ) {
   if (!snapshot?.element.isConnected) return
+  if (!isValidViewportIndex(snapshot.topRow) || !isValidViewportIndex(snapshot.leftColumn)) return
   workbookRef.current?.model.setTopLeftVisibleCell(snapshot.topRow, snapshot.leftColumn)
   snapshot.element.scrollLeft = snapshot.scrollLeft
   snapshot.element.scrollTop = snapshot.scrollTop
