@@ -407,9 +407,15 @@ describe('useNoteRename hook', () => {
     expect(setToastMessage).toHaveBeenCalledWith('A note with that name already exists')
   })
 
-  it('handleMoveNoteToFolder moves the note and keeps its title intact', async () => {
+  it('handleMoveNoteToFolder moves the note, keeps its title intact, and refreshes open backlinks', async () => {
     const entry = makeEntry({ path: '/vault/notes/project-kickoff.md', filename: 'project-kickoff.md', title: 'Project Kickoff' })
-    vi.mocked(mockInvoke).mockImplementation(async (cmd: string) => {
+    const backlinkEntry = makeEntry({
+      path: '/vault/index.md',
+      filename: 'index.md',
+      title: 'Index',
+    })
+    const reloadedBacklinkContent = '# Index\n\nMoved link: [[projects/project-kickoff]]\n'
+    vi.mocked(mockInvoke).mockImplementation(async (cmd: string, args?: Record<string, unknown>) => {
       if (cmd === 'move_note_to_folder') {
         return {
           new_path: '/vault/projects/project-kickoff.md',
@@ -417,13 +423,24 @@ describe('useNoteRename hook', () => {
           failed_updates: 0,
         }
       }
-      if (cmd === 'get_note_content') return '# Project Kickoff\n'
+      if (cmd === 'get_note_content') {
+        return args?.path === '/vault/index.md' ? reloadedBacklinkContent : '# Project Kickoff\n'
+      }
       return ''
     })
 
     const { result } = renderHook(() => useNoteRename(
-      { entries: [entry], setToastMessage },
-      { tabs: [], setTabs, activeTabPathRef, handleSwitchTab, updateTabContent },
+      { entries: [entry, backlinkEntry], setToastMessage },
+      {
+        tabs: [
+          { entry, content: '# Project Kickoff\n' },
+          { entry: backlinkEntry, content: '# Index\n\nOld link: [[notes/project-kickoff]]\n' },
+        ],
+        setTabs,
+        activeTabPathRef,
+        handleSwitchTab,
+        updateTabContent,
+      },
     ))
 
     const onEntryRenamed = vi.fn()
@@ -444,6 +461,7 @@ describe('useNoteRename hook', () => {
       }),
       '# Project Kickoff\n',
     )
+    expect(updateTabContent).toHaveBeenCalledWith('/vault/index.md', reloadedBacklinkContent)
     expect(setToastMessage).toHaveBeenCalledWith('Moved to "projects" and updated 1 note')
   })
 
