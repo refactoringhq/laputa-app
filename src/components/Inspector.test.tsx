@@ -703,6 +703,28 @@ Status: Active
       expect(screen.getByText('Initialize properties')).toBeInTheDocument()
     })
 
+    it('shows properties for notes containing only system metadata', () => {
+      const organizedOnlyContent = `---
+_organized: true
+---
+# Organized note`
+
+      render(
+        <Inspector
+          {...defaultProps}
+          entry={{ ...noFrontmatterEntry, fileKind: 'markdown', organized: true }}
+          content={organizedOnlyContent}
+          onInitializeProperties={vi.fn()}
+          onToggleRawEditor={vi.fn()}
+        />
+      )
+
+      expect(screen.getByText('Display as')).toBeInTheDocument()
+      expect(screen.queryByText('Invalid properties')).not.toBeInTheDocument()
+      expect(screen.queryByText('Initialize properties')).not.toBeInTheDocument()
+      expect(screen.queryByText('Organized')).not.toBeInTheDocument()
+    })
+
     it('calls onInitializeProperties when button is clicked', () => {
       const onInit = vi.fn()
       render(
