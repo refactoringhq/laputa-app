@@ -508,6 +508,9 @@ export function InlineWikilinkInput({
   const handleCompositionStart = () => {
     isComposingRef.current = true
   }
+  const handleCompositionUpdate = () => {
+    isComposingRef.current = true
+  }
   const handleCompositionEnd = (compositionEditor: HTMLDivElement) => {
     isComposingRef.current = false
     queueMicrotask(() => flushPendingCompositionInput(compositionEditor))
@@ -580,6 +583,7 @@ export function InlineWikilinkInput({
       editorStyle={editorStyle}
       onCompositionEnd={handleCompositionEnd}
       onCompositionStart={handleCompositionStart}
+      onCompositionUpdate={handleCompositionUpdate}
       onInput={handleInput}
       onKeyDown={handleKeyDown}
       onCut={cutSelectedContent}
