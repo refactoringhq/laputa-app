@@ -871,7 +871,7 @@ Use model providers when you want chat over note context without giving an agent
 
 ## Local Models
 
-Local model targets are for tools such as Ollama and LM Studio. They usually need a base URL and model ID, and they usually do not need an API key.
+Local model targets are for tools such as Ollama and LM Studio. They need a base URL and model ID, and they can run with or without an API key depending on how your local server is secured.
 
 ## API Models
 
@@ -881,7 +881,7 @@ Tolaria does not store provider API keys in vault settings. Choose one of the su
 
 - Save the key locally on this device.
 - Read the key from an environment variable.
-- Use no key for local providers that do not require one.
+- Use no key for providers that do not require one.
 
 ## Test The Connection
 
