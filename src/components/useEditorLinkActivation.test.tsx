@@ -19,18 +19,24 @@ const mockOpenLocalFile = vi.mocked(openLocalFile)
 
 function Harness({
   onNavigateWikilink,
+  sourceEntryPath,
   vaultPath,
 }: {
   onNavigateWikilink: (target: string) => void
+  sourceEntryPath?: string
   vaultPath?: string
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  useEditorLinkActivation(containerRef, onNavigateWikilink, vaultPath)
+  useEditorLinkActivation(containerRef, onNavigateWikilink, vaultPath, sourceEntryPath)
   return <div ref={containerRef} data-testid="editor-link-container" />
 }
 
-function renderHarness(onNavigateWikilink = vi.fn(), vaultPath?: string) {
-  render(<Harness onNavigateWikilink={onNavigateWikilink} vaultPath={vaultPath} />)
+function renderHarness(
+  onNavigateWikilink = vi.fn(),
+  vaultPath?: string,
+  sourceEntryPath?: string,
+) {
+  render(<Harness onNavigateWikilink={onNavigateWikilink} sourceEntryPath={sourceEntryPath} vaultPath={vaultPath} />)
   return {
     container: screen.getByTestId('editor-link-container') as HTMLDivElement,
     onNavigateWikilink,
@@ -207,6 +213,56 @@ describe('useEditorLinkActivation', () => {
     expect(modifiedClick.defaultPrevented).toBe(true)
     expect(mockOpenLocalFile).toHaveBeenCalledWith('/vault/attachments/report.pdf', '/vault')
     expect(mockOpenExternalUrl).not.toHaveBeenCalled()
+  })
+
+  it('routes markdown note links through note navigation', async () => {
+    const { container, onNavigateWikilink } = renderHarness()
+    const link = appendUrl(container, 'other.md')
+
+    const modifiedClick = dispatchMouseEvent(link, 'click', { metaKey: true })
+
+    expect(modifiedClick.defaultPrevented).toBe(true)
+    expect(mockOpenExternalUrl).not.toHaveBeenCalled()
+    expect(mockOpenLocalFile).not.toHaveBeenCalled()
+    expect(onNavigateWikilink).not.toHaveBeenCalled()
+
+    await Promise.resolve()
+    expect(onNavigateWikilink).toHaveBeenCalledWith('other')
+  })
+
+  it('normalizes relative markdown note links from the source note path', async () => {
+    const { container, onNavigateWikilink } = renderHarness(
+      vi.fn(),
+      undefined,
+      '/vault/areas/current.md',
+    )
+    const link = appendUrl(container, '../projects/roadmap.md#goals')
+
+    const modifiedClick = dispatchMouseEvent(link, 'click', { metaKey: true })
+
+    expect(modifiedClick.defaultPrevented).toBe(true)
+    await Promise.resolve()
+    expect(onNavigateWikilink).toHaveBeenCalledWith('vault/projects/roadmap')
+    expect(mockOpenExternalUrl).not.toHaveBeenCalled()
+    expect(mockOpenLocalFile).not.toHaveBeenCalled()
+  })
+
+  it('scrolls same-note markdown anchors to matching headings', () => {
+    const { container, onNavigateWikilink } = renderHarness()
+    const link = appendUrl(container, '#project-goals')
+    const heading = document.createElement('div')
+    heading.setAttribute('data-content-type', 'heading')
+    heading.textContent = 'Project Goals'
+    heading.scrollIntoView = vi.fn()
+    container.appendChild(heading)
+
+    const modifiedClick = dispatchMouseEvent(link, 'click', { metaKey: true })
+
+    expect(modifiedClick.defaultPrevented).toBe(true)
+    expect(heading.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+    expect(onNavigateWikilink).not.toHaveBeenCalled()
+    expect(mockOpenExternalUrl).not.toHaveBeenCalled()
+    expect(mockOpenLocalFile).not.toHaveBeenCalled()
   })
 
   it('ignores malformed URLs and links inside code blocks', () => {
