@@ -1211,7 +1211,7 @@ export function SingleEditorView({ currentContent = '', editor, entries, onNavig
     handleMouseMove: handleCodeBlockCopyMouseMove,
   } = useCodeBlockCopyTarget(containerRef)
   useBlockNoteSideMenuHoverGuard(containerRef)
-  useEditorLinkActivation(containerRef, onNavigateWikilink, vaultPath)
+  useEditorLinkActivation(containerRef, onNavigateWikilink, vaultPath, sourceEntry?.path)
 
   useEffect(() => {
     _wikilinkEntriesRef.current = entries
