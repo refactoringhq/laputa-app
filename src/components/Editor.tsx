@@ -255,8 +255,9 @@ function handleEditorImageUploadFailure(
 }
 
 function installDirectMarkdownForRealEditor(editor: ReturnType<typeof useCreateBlockNote>) {
-  if (!('pmSchema' in editor) || !('_tiptapEditor' in editor)) return
-  installBlockNoteDirectMarkdown(editor as DirectMarkdownCapableSerializer)
+  const markdownEditor = editor as DirectMarkdownCapableSerializer
+  if (typeof markdownEditor.blocksToMarkdownLossy !== 'function') return
+  installBlockNoteDirectMarkdown(markdownEditor)
 }
 
 function useEditorSetup({
