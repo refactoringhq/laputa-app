@@ -235,6 +235,23 @@ describe('useNoteActions hook', () => {
     expect(setToastMessage).toHaveBeenCalledWith('Property updated')
   })
 
+  it('does not rerender for unopened-note frontmatter content refreshes', async () => {
+    let renders = 0
+    const { result } = renderHook(() => {
+      renders += 1
+      return useNoteActions(makeConfig())
+    })
+    const initialRenders = renders
+
+    await act(async () => {
+      await result.current.handleUpdateFrontmatter('/vault/unopened.md', 'status', 'Done', { silent: true })
+    })
+
+    expect(result.current.tabs).toEqual([])
+    expect(renders).toBe(initialRenders)
+    expect(updateEntry).toHaveBeenCalledWith('/vault/unopened.md', { status: 'Done' })
+  })
+
   it('marks Tauri frontmatter writes as internal before invoking the command', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
     const order: string[] = []
