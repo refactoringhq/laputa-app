@@ -76,6 +76,15 @@ describe('Editor', () => {
     expect(screen.getByTestId('blocknote-view')).toBeInTheDocument()
   })
 
+  it('installs direct Markdown serialization on editors without pmSchema', () => {
+    renderEditor({
+      tabs: [mockTab],
+      activeTabPath: mockEntry.path,
+    })
+
+    expect((mockEditor as { blocksToMarkdownDirect?: unknown }).blocksToMarkdownDirect).toEqual(expect.any(Function))
+  })
+
   it('renders an in-app image preview for binary image tabs', () => {
     const imageEntry: VaultEntry = {
       ...mockEntry,
@@ -217,41 +226,40 @@ describe('Editor', () => {
   it('registers a rich-editor flush hook for pending BlockNote changes', async () => {
     const onContentChange = vi.fn()
     const flushPendingEditorContentRef = { current: null as ((path: string) => void) | null }
-    const originalMarkdownSerializer = mockEditor.blocksToMarkdownLossy.getMockImplementation()
     mockEditor.replaceBlocks.mockClear()
 
-    try {
-      renderEditor({
-        tabs: [mockTab],
-        activeTabPath: mockEntry.path,
-        onContentChange,
-        flushPendingEditorContentRef,
-      })
+    renderEditor({
+      tabs: [mockTab],
+      activeTabPath: mockEntry.path,
+      onContentChange,
+      flushPendingEditorContentRef,
+    })
 
-      await vi.waitFor(() => {
-        expect(blockNoteViewState.onChange).toEqual(expect.any(Function))
-        expect(flushPendingEditorContentRef.current).toEqual(expect.any(Function))
-      })
-      await flushEditorSwapWork()
+    await vi.waitFor(() => {
+      expect(blockNoteViewState.onChange).toEqual(expect.any(Function))
+      expect(flushPendingEditorContentRef.current).toEqual(expect.any(Function))
+    })
+    await flushEditorSwapWork()
 
-      mockEditor.blocksToMarkdownLossy.mockReturnValueOnce('# Test Project\n\nEdited rich body.\n')
+    mockEditor.document = [{
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Edited rich body.', styles: {} }],
+      children: [],
+    }]
 
-      act(() => {
-        blockNoteViewState.onChange?.()
-      })
-      expect(onContentChange).not.toHaveBeenCalled()
+    act(() => {
+      blockNoteViewState.onChange?.()
+    })
+    expect(onContentChange).not.toHaveBeenCalled()
 
-      act(() => {
-        flushPendingEditorContentRef.current?.(mockEntry.path)
-      })
+    act(() => {
+      flushPendingEditorContentRef.current?.(mockEntry.path)
+    })
 
-      expect(onContentChange).toHaveBeenCalledWith(
-        mockEntry.path,
-        expect.stringContaining('Edited rich body.'),
-      )
-    } finally {
-      mockEditor.blocksToMarkdownLossy.mockImplementation(originalMarkdownSerializer)
-    }
+    expect(onContentChange).toHaveBeenCalledWith(
+      mockEntry.path,
+      expect.stringContaining('Edited rich body.'),
+    )
   })
 
   it('does not parse active sheets through the hidden rich editor', async () => {
