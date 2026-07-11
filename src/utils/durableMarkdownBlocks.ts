@@ -102,10 +102,23 @@ function durableToken(codec: DurableBlockCodec, payload: unknown): string {
   return `${codec.tokenPrefix}${encodePayload(payload)}${codec.tokenSuffix}`
 }
 
+function readDurableTokenPrefix(codec: DurableBlockCodec, text: string): string | null {
+  if (text.startsWith(codec.tokenPrefix)) return codec.tokenPrefix
+
+  const emphasisStrippedPrefix = codec.tokenPrefix.replaceAll('_', '')
+  if (emphasisStrippedPrefix !== codec.tokenPrefix && text.startsWith(emphasisStrippedPrefix)) {
+    return emphasisStrippedPrefix
+  }
+  return null
+}
+
 function readDurableToken(codec: DurableBlockCodec, text: string): unknown | null {
   const trimmed = text.trim()
-  if (!trimmed.startsWith(codec.tokenPrefix) || !trimmed.endsWith(codec.tokenSuffix)) return null
-  return decodePayload(codec, trimmed.slice(codec.tokenPrefix.length, -codec.tokenSuffix.length))
+  if (!trimmed.endsWith(codec.tokenSuffix)) return null
+
+  const prefix = readDurableTokenPrefix(codec, trimmed)
+  if (prefix === null) return null
+  return decodePayload(codec, trimmed.slice(prefix.length, -codec.tokenSuffix.length))
 }
 
 function readFenceOpening(line: string, codec: DurableBlockCodec): FenceOpening | null {
