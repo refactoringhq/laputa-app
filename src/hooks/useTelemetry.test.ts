@@ -116,4 +116,19 @@ describe('useTelemetry', () => {
 
     expect(mockUpdatePostHogIdentify).toHaveBeenCalledWith('stable')
   })
+
+  it('keeps optional analytics initialization failures out of the global error path', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const error = new TypeError("undefined is not an object (evaluating 'o.default')")
+    mockInitPostHog.mockRejectedValueOnce(error)
+
+    try {
+      renderTelemetry(analyticsSettings())
+      await Promise.resolve()
+
+      expect(warn).toHaveBeenCalledWith('[telemetry] Analytics init failed:', error)
+    } finally {
+      warn.mockRestore()
+    }
+  })
 })
