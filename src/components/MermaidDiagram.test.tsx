@@ -231,6 +231,25 @@ describe('MermaidDiagram', () => {
     expect(screen.getByTestId('mermaid-diagram-viewport')).toHaveTextContent('Testing & Deployment')
   })
 
+  it('renders timeline diagrams with clock-style period labels', async () => {
+    render(
+      <MermaidDiagram
+        diagram={'timeline\n    title Dayflow · 7月7日\n    08:00 : Wake up\n    09:30 : Focus block'}
+        source={'```mermaid\ntimeline\n    title Dayflow · 7月7日\n    08:00 : Wake up\n    09:30 : Focus block\n```'}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram-viewport').querySelector('svg')).not.toBeNull()
+    })
+
+    expect(mermaidMock.render).toHaveBeenCalledWith(
+      expect.stringMatching(/^tolaria-mermaid-/),
+      'timeline\n    title Dayflow · 7月7日\n    08&#58;00 : Wake up\n    09&#58;30 : Focus block',
+      expect.any(HTMLElement),
+    )
+  })
+
   it('falls back to the original source when Mermaid cannot render', async () => {
     mermaidMock.render.mockRejectedValueOnce(new Error('parse error'))
 
