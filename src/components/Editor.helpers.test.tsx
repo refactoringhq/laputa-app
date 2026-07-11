@@ -55,6 +55,11 @@ const blockNoteCreation = vi.hoisted(() => ({
 const blockNoteViewState = vi.hoisted(() => ({
   onChange: null as (() => void) | null,
 }))
+type MockEditorWithDirectMarkdownState = typeof mockEditor & {
+  __tolariaDirectMarkdownCache?: unknown
+  __tolariaLastDirectMarkdownMetrics?: unknown
+  blocksToMarkdownDirect?: unknown
+}
 
 vi.mock('@blocknote/core', () => ({
   audioParse: vi.fn(() => undefined),
@@ -323,6 +328,10 @@ export function resetEditorTestState() {
   blockNoteCreation.options = []
   blockNoteViewState.onChange = null
   mockEditor.document = [{ id: '1', type: 'paragraph', content: [], props: {}, children: [] }]
+  const editorWithDirectMarkdownState = mockEditor as MockEditorWithDirectMarkdownState
+  delete editorWithDirectMarkdownState.__tolariaDirectMarkdownCache
+  delete editorWithDirectMarkdownState.__tolariaLastDirectMarkdownMetrics
+  delete editorWithDirectMarkdownState.blocksToMarkdownDirect
   capturedSuggestionState.getItems = null
   capturedSuggestionState.getItemsByTrigger = {}
   clearParsedNoteBlockCache()
