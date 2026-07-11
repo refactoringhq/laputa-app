@@ -155,6 +155,10 @@ describe('detectFrontmatterState', () => {
     expect(detectFrontmatterState('---\ntitle: Test\n---\n')).toBe('valid')
   })
 
+  it('returns "valid" for frontmatter with only system metadata', () => {
+    expect(detectFrontmatterState('---\n_organized: true\n---\nBody')).toBe('valid')
+  })
+
   it('returns "invalid" for malformed YAML (missing colon)', () => {
     expect(detectFrontmatterState('---\nthis is not yaml\n---\nBody')).toBe('invalid')
   })
