@@ -1,6 +1,7 @@
 import { BlockNoteEditor } from '@blocknote/core'
 import { describe, expect, it, vi } from 'vitest'
 import { schema } from '../components/editorSchema'
+import { installBlockNoteDirectMarkdown } from './blockNoteDirectMarkdown'
 import {
   injectDurableEditorMarkdownBlocks,
   preProcessDurableEditorMarkdown,
@@ -106,6 +107,21 @@ describe('editor durable markdown blocks', () => {
         scripts: 'blocked',
       },
     })
+  })
+
+  it('keeps parsed fenced code literal across rich-editor serialization', async () => {
+    const editor = BlockNoteEditor.create({ schema })
+    installBlockNoteDirectMarkdown(editor)
+    const markdown = [
+      '```sql',
+      'alter table db_sys.crm_client add client_csm_factor decimal(5, 2) null;',
+      'select PATH_WITH_BACKSLASH from container\\_name;',
+      '```',
+    ].join('\n')
+
+    const blocks = await editor.tryParseMarkdownToBlocks(markdown)
+
+    expect(serializeDurableEditorBlocks(editor, blocks)).toBe(markdown)
   })
 
   it('round-trips sandboxed-script HTML fences through the durable editor pipeline', () => {
