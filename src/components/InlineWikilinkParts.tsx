@@ -175,6 +175,7 @@ export function InlineWikilinkEditorField({
   editorStyle,
   onCompositionEnd,
   onCompositionStart,
+  onCompositionUpdate,
   onInput,
   onKeyDown,
   onCut,
@@ -194,6 +195,7 @@ export function InlineWikilinkEditorField({
   editorStyle?: CSSProperties
   onCompositionEnd: (editor: HTMLDivElement) => void
   onCompositionStart: () => void
+  onCompositionUpdate: () => void
   onInput: () => void
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void
   onCut: (event: React.ClipboardEvent<HTMLDivElement>) => void
@@ -210,6 +212,7 @@ export function InlineWikilinkEditorField({
   useInlineWikilinkEditorEvents(editorRef, {
     onCompositionEnd,
     onCompositionStart,
+    onCompositionUpdate,
     onCut,
     onDrop,
     onInput,
@@ -255,6 +258,7 @@ type InlineWikilinkEditorHandlers = Pick<
   Parameters<typeof InlineWikilinkEditorField>[0],
   | 'onCompositionEnd'
   | 'onCompositionStart'
+  | 'onCompositionUpdate'
   | 'onCut'
   | 'onDrop'
   | 'onInput'
@@ -298,6 +302,7 @@ function useInlineWikilinkEditorEvents(
 function inlineWikilinkEditorListenerMap({
   onCompositionEnd,
   onCompositionStart,
+  onCompositionUpdate,
   onCut,
   onDrop,
   onInput,
@@ -308,6 +313,7 @@ function inlineWikilinkEditorListenerMap({
   const handleSelectionChange = () => onSelectionChange()
   return [
     ['compositionstart', () => onCompositionStart()],
+    ['compositionupdate', () => onCompositionUpdate()],
     ['compositionend', (event) => onCompositionEnd(event.currentTarget as HTMLDivElement)],
     ['input', () => onInput()],
     ['keydown', (event) => onKeyDown(withNativeEvent(event) as unknown as React.KeyboardEvent<HTMLDivElement>)],
