@@ -403,6 +403,67 @@
     width: 100%;
     height: 100%;
   }
+  html,
+  body,
+  #root {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  :where(
+    input,
+    textarea,
+    select,
+    option,
+    [contenteditable]:not([contenteditable="false"]),
+    [contenteditable]:not([contenteditable="false"]) *,
+    .editor__blocknote-container .bn-editor,
+    .editor__blocknote-container .bn-editor *,
+    .raw-editor-codemirror,
+    .raw-editor-codemirror .cm-editor,
+    .raw-editor-codemirror .cm-scroller,
+    .raw-editor-codemirror .cm-content,
+    .raw-editor-codemirror .cm-content *,
+    .ai-markdown,
+    .ai-markdown *,
+    [data-testid="ai-message"],
+    [data-testid="ai-message"] *,
+    [data-testid="action-card-details"],
+    [data-testid="action-card-details"] *,
+    .diff-view,
+    .diff-view *,
+    .sheet-editor,
+    .sheet-editor *,
+    pre,
+    pre *,
+    code,
+    code *
+  ) {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  :where(
+    button,
+    [role="button"],
+    [role="menuitem"],
+    [role="menuitemcheckbox"],
+    [role="menuitemradio"],
+    [role="option"],
+    [role="tab"],
+    [data-slot="button"]
+  ),
+  :where(
+    button,
+    [role="button"],
+    [role="menuitem"],
+    [role="menuitemcheckbox"],
+    [role="menuitemradio"],
+    [role="option"],
+    [role="tab"],
+    [data-slot="button"]
+  ) * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
   html.ai-workspace-native-window,
   html.ai-workspace-native-window body,
   html.ai-workspace-native-window #root {
