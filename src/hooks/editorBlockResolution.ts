@@ -1,10 +1,4 @@
 import type { useCreateBlockNote } from '@blocknote/react'
-import { preProcessWikilinks, injectWikilinks } from '../utils/wikilinks'
-import { preProcessMathMarkdown, injectMathInBlocks } from '../utils/mathMarkdown'
-import { preProcessSingleTildeStrikethrough } from '../utils/markdownStrikethrough'
-import { injectDurableEditorMarkdownBlocks, preProcessDurableEditorMarkdown } from '../utils/editorDurableMarkdown'
-import { injectMarkdownHighlightsInBlocks } from '../utils/markdownHighlightMarkdown'
-import { normalizeBareImageUrls, resolveImageUrls } from '../utils/vaultImages'
 import { repairMalformedEditorBlocks } from './editorBlockRepair'
 import { inferCodeBlockLanguages } from '../utils/codeBlockLanguage'
 import {
@@ -22,6 +16,10 @@ import {
 } from './editorParsedBlockCache'
 import { tryParseFastMarkdownBlocksOffThread } from './editorFastMarkdownBlocks'
 import { logEditorBlockResolutionTrace } from '../utils/editorPerformanceTrace'
+import {
+  injectRichEditorMarkdownBlocks,
+  preProcessRichEditorMarkdown,
+} from '../utils/richEditorMarkdown'
 
 export type { EditorBlocks }
 
@@ -56,7 +54,6 @@ export type CachedTabState = {
 const TAB_STATE_CACHE_LIMIT = 8
 const DIRECT_MARKDOWN_PARSE_MIN_BYTES = 16 * 1024
 const EMPTY_CHECKLIST_ITEM_FILLER = '\u200B'
-const EMPTY_CHECKLIST_ITEM_LINE_RE = /^([ \t]*[-*+][ \t]+\[[ xX]\])[ \t]*$/u
 const sourceSizeEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null
 
 function now(): number {
@@ -183,39 +180,6 @@ async function parseMarkdownBlocks(
   return result as EditorBlocks
 }
 
-export function preProcessEditorMarkdown(
-  markdown: MarkdownBody,
-  vaultPath?: VaultPath,
-  notePath?: NotePath,
-): PreprocessedMarkdown {
-  const withDurableBlocks = preProcessDurableEditorMarkdown({ markdown })
-  const withEmptyChecklists = preProcessEmptyChecklistItems(withDurableBlocks)
-  const withBareImages = normalizeBareImageUrls(withEmptyChecklists)
-  const withImages = vaultPath ? resolveImageUrls(withBareImages, vaultPath, notePath) : withBareImages
-  const withWikilinks = preProcessWikilinks(withImages)
-  const withMath = preProcessMathMarkdown({ markdown: withWikilinks })
-  return preProcessSingleTildeStrikethrough({ markdown: withMath })
-}
-
-function preProcessEmptyChecklistItems(markdown: MarkdownBody): MarkdownBody {
-  return markdown.split(/(\r?\n)/u).map(part => {
-    if (part === '\n' || part === '\r\n') return part
-    return preProcessEmptyChecklistLine(part)
-  }).join('')
-}
-
-function preProcessEmptyChecklistLine(line: MarkdownBody): MarkdownBody {
-  const match = EMPTY_CHECKLIST_ITEM_LINE_RE.exec(line)
-  return match ? `${match[1]} ${EMPTY_CHECKLIST_ITEM_FILLER}` : line
-}
-
-function injectEditorMarkdownBlocks(blocks: EditorBlocks): EditorBlocks {
-  const withWikilinks = injectWikilinks(blocks)
-  const withMath = injectMathInBlocks(withWikilinks)
-  const withHighlights = injectMarkdownHighlightsInBlocks(withMath)
-  return injectDurableEditorMarkdownBlocks(withHighlights) as EditorBlocks
-}
-
 function stripEmptyChecklistFillers(blocks: EditorBlocks): EditorBlocks {
   for (const block of blocks as Array<{ children?: unknown; content?: unknown; type?: string }>) {
     if (block.type === 'checkListItem' && isEmptyChecklistFillerContent(block.content)) {
@@ -240,7 +204,7 @@ function repairParsedMarkdownBlocks(parsed: MarkdownParseResult): EditorBlocks {
   )
   if (parsed.usedSourceFallback) return parseSafeBlocks
   return inferCodeBlockLanguages(
-    repairMalformedEditorBlocks(injectEditorMarkdownBlocks(parseSafeBlocks)) as EditorBlocks,
+    repairMalformedEditorBlocks(injectRichEditorMarkdownBlocks(parseSafeBlocks)) as EditorBlocks,
   ) as EditorBlocks
 }
 
@@ -292,7 +256,7 @@ function fastPathResolution(
   if (!fastPathBlocks) return null
 
   const resolved = cacheResolvedEditorState(context.cache, context.targetPath, {
-    blocks: repairMalformedEditorBlocks(injectEditorMarkdownBlocks(fastPathBlocks)) as EditorBlocks,
+    blocks: repairMalformedEditorBlocks(injectRichEditorMarkdownBlocks(fastPathBlocks)) as EditorBlocks,
     scrollTop: 0,
     sourceContent: context.content,
   }, context.vaultPath)
@@ -353,7 +317,7 @@ export async function resolveBlocksForTarget(
   if (cached) return cached
 
   const body = extractEditorBody(content)
-  const preprocessed = preProcessEditorMarkdown(body, vaultPath, targetPath)
+  const preprocessed = preProcessRichEditorMarkdown(body, vaultPath, targetPath)
   const fastPath = fastPathResolution(context, body, preprocessed)
   if (fastPath) return fastPath
 
@@ -381,7 +345,7 @@ export async function resolveEmptyHeadingBlocks(
 
   const parsed = await parseMarkdownBlocksWithFallback({
     parseMarkdownBlocks: markdown => parseMarkdownBlocks(editor, markdown),
-    preprocessed: preProcessEditorMarkdown(remainder, vaultPath, targetPath),
+    preprocessed: preProcessRichEditorMarkdown(remainder, vaultPath, targetPath),
     sourceMarkdown: remainder,
     context: targetPath,
   })

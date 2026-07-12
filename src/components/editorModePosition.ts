@@ -1,6 +1,8 @@
-import { compactMarkdown } from '../utils/compact-markdown'
-import { restoreWikilinksInBlocks, splitFrontmatter } from '../utils/wikilinks'
-import { serializeDurableEditorBlocks } from '../utils/editorDurableMarkdown'
+import { splitFrontmatter } from '../utils/wikilinks'
+import {
+  serializeRichEditorBlocksToMarkdown,
+  serializeRichEditorBodyToMarkdown,
+} from '../utils/richEditorMarkdown'
 import { findNearestTextCursorBlockById } from './blockNoteCursorTarget'
 
 interface BlockLike {
@@ -133,11 +135,11 @@ function getLineIndexFromRatio({ totalLines, ratio }: { totalLines: number; rati
 }
 
 function serializeBlock(editor: BlockNotePositionEditor, block: BlockLike): string {
-  return compactMarkdown(serializeDurableEditorBlocks(editor, restoreWikilinksInBlocks([block])))
+  return serializeRichEditorBlocksToMarkdown({ blocks: [block], editor })
 }
 
 function serializeEditorBody(editor: BlockNotePositionEditor): string {
-  return compactMarkdown(serializeDurableEditorBlocks(editor, restoreWikilinksInBlocks(editor.document)))
+  return serializeRichEditorBodyToMarkdown(editor)
 }
 
 function buildBlockLineRanges({
