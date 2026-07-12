@@ -4,12 +4,14 @@ import {
   markWorkbookDirtyForTest,
   resetSheetEditorTestState,
 } from './SheetEditor.testUtils'
+import { init as initIronCalc } from '@ironcalc/workbook'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SheetEditor } from './SheetEditor'
 
 const ironCalcMock = getIronCalcMock()
+const ironCalcInitMock = vi.mocked(initIronCalc)
 
 type SheetHarnessProps = Omit<ComponentProps<typeof SheetEditor>, 'content' | 'onContentChange' | 'path'>
 
@@ -88,6 +90,25 @@ async function expectSaveAfterDirtyEdit({
 describe('SheetEditor serialization', () => {
   afterEach(() => {
     resetSheetEditorTestState()
+    ironCalcInitMock.mockClear()
+  })
+
+  it('retries WASM initialization after a failed sheet mount', async () => {
+    ironCalcInitMock.mockRejectedValueOnce(new Error('WASM runtime unavailable'))
+    const rendered = renderSheetHarness('---\ntype: Sheet\n---\nMetric,January')
+
+    await screen.findByText('IronCalc workbook unavailable: WASM runtime unavailable')
+
+    rendered.rerender(
+      <SheetEditor
+        content={'---\ntype: Sheet\n---\nMetric,February'}
+        path="/vault/forecast.md"
+        onContentChange={rendered.onContentChange}
+      />,
+    )
+
+    await screen.findByTestId('ironcalc-workbook')
+    expect(ironCalcInitMock).toHaveBeenCalledTimes(2)
   })
 
   it('flushes the current workbook content when unmounted before debounce runs', async () => {
