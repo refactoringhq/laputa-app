@@ -16,15 +16,9 @@ pub(crate) fn build_command(
         .arg("-p")
         .arg(build_prompt(request))
         .arg("--add-dir")
-        .arg(&request.vault_path)
-        .arg(format!(
-            "--sandbox={}",
-            sandbox_enabled(request.permission_mode)
-        ))
-        .arg(format!(
-            "--toolPermission={}",
-            tool_permission(request.permission_mode)
-        ))
+        .arg(&request.vault_path);
+    apply_permission_flags(&mut command, request.permission_mode);
+    command
         .env("NO_COLOR", "1")
         .current_dir(&request.vault_path)
         .stdin(Stdio::null())
@@ -37,14 +31,17 @@ fn build_prompt(request: &AgentStreamRequest) -> String {
     crate::cli_agent_runtime::build_prompt(&request.message, request.system_prompt.as_deref())
 }
 
-fn sandbox_enabled(permission_mode: AiAgentPermissionMode) -> bool {
-    permission_mode == AiAgentPermissionMode::Safe
-}
-
-fn tool_permission(permission_mode: AiAgentPermissionMode) -> &'static str {
+fn apply_permission_flags(
+    command: &mut std::process::Command,
+    permission_mode: AiAgentPermissionMode,
+) {
     match permission_mode {
-        AiAgentPermissionMode::Safe => "proceed-in-sandbox",
-        AiAgentPermissionMode::PowerUser => "always-proceed",
+        AiAgentPermissionMode::Safe => {
+            command.arg("--sandbox");
+        }
+        AiAgentPermissionMode::PowerUser => {
+            command.arg("--dangerously-skip-permissions");
+        }
     }
 }
 
@@ -136,8 +133,13 @@ mod tests {
             .windows(2)
             .any(|pair| pair == [OsStr::new("--add-dir"), vault.path().as_os_str()]));
         assert!(!args.contains(&OsStr::new("--cwd")));
-        assert!(args.contains(&OsStr::new("--sandbox=true")));
-        assert!(args.contains(&OsStr::new("--toolPermission=proceed-in-sandbox")));
+        assert!(args.contains(&OsStr::new("--sandbox")));
+        assert!(!args
+            .iter()
+            .any(|arg| arg.to_string_lossy().starts_with("--sandbox=")));
+        assert!(!args
+            .iter()
+            .any(|arg| arg.to_string_lossy().starts_with("--toolPermission")));
         assert_eq!(command.get_current_dir(), Some(vault.path()));
         assert!(vault
             .path()
@@ -147,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    fn power_user_command_allows_non_sandboxed_autonomy_without_skip_flag() {
+    fn power_user_command_uses_antigravity_permission_bypass_flag() {
         let vault = tempfile::tempdir().unwrap();
         let request = request(
             vault.path().to_string_lossy().into_owned(),
@@ -156,9 +158,13 @@ mod tests {
         let command = build_command(&PathBuf::from("agy"), &request).unwrap();
         let args = command.get_args().collect::<Vec<_>>();
 
-        assert!(args.contains(&OsStr::new("--sandbox=false")));
-        assert!(args.contains(&OsStr::new("--toolPermission=always-proceed")));
-        assert!(!args.contains(&OsStr::new("--dangerously-skip-permissions")));
+        assert!(args.contains(&OsStr::new("--dangerously-skip-permissions")));
+        assert!(!args
+            .iter()
+            .any(|arg| arg.to_string_lossy().starts_with("--sandbox")));
+        assert!(!args
+            .iter()
+            .any(|arg| arg.to_string_lossy().starts_with("--toolPermission")));
     }
 
     #[test]
