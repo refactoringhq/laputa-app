@@ -91,6 +91,10 @@ pub struct VaultEntry {
     /// Determines how the frontend renders and opens the file.
     #[serde(rename = "fileKind", default = "default_file_kind")]
     pub file_kind: String,
+    /// First image found in the note body (for card/thumbnail views).
+    /// Path as-is from the markdown (relative to vault or note).
+    #[serde(rename = "firstImage", default)]
+    pub first_image: Option<String>,
 }
 
 fn default_file_kind() -> String {

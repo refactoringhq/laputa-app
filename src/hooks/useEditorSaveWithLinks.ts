@@ -4,6 +4,7 @@ import { extractOutgoingLinks, extractSnippet, countWords, splitFrontmatter } fr
 import { deriveRawEditorEntryState } from './rawEditorEntryState'
 import { deriveDisplayTitleState } from '../utils/noteTitle'
 import { detectFrontmatterState } from '../utils/frontmatter'
+import { extractFirstImage } from '../utils/vaultImages'
 import type { VaultEntry } from '../types'
 import type { AppLocale } from '../lib/i18n'
 
@@ -74,6 +75,21 @@ function syncOutgoingLinks(options: {
   updateEntryInTransition(updateEntry, path, { outgoingLinks: links })
 }
 
+function syncFirstImage(options: {
+  content: string
+  path: string
+  prevFirstImageRef: MutableRefObject<string | undefined>
+  updateEntry: UpdateEntry
+}): void {
+  const { content, path, prevFirstImageRef, updateEntry } = options
+  const firstImage = extractFirstImage(content) ?? null
+  const key = firstImage ?? ''
+  if (key === prevFirstImageRef.current) return
+
+  prevFirstImageRef.current = key
+  updateEntryInTransition(updateEntry, path, { firstImage })
+}
+
 function resolveFrontmatterPatch(options: {
   content: string
   prevFmSourceRef: MutableRefObject<string | null>
@@ -128,13 +144,17 @@ function syncDisplayTitle(options: {
 function syncSavedMetadata(options: {
   content: string
   path: string
+  prevFirstImageRef: MutableRefObject<string | undefined>
   prevLinksKeyRef: MutableRefObject<string>
   updateEntry: UpdateEntry
 }): void {
-  const { content, path, prevLinksKeyRef, updateEntry } = options
+  const { content, path, prevFirstImageRef, prevLinksKeyRef, updateEntry } = options
+  const firstImage = extractFirstImage(content) ?? null
   const outgoingLinks = content.includes('[[') ? extractOutgoingLinks(content) : []
+  prevFirstImageRef.current = firstImage ?? ''
   prevLinksKeyRef.current = outgoingLinks.join('\0')
   updateEntryInTransition(updateEntry, path, {
+    firstImage,
     outgoingLinks,
     snippet: extractSnippet(content),
     wordCount: countWords(content),
@@ -145,6 +165,7 @@ function syncSavedMetadata(options: {
 function syncDeferredEntryMetadata(options: DeferredEntryMetadataSync & {
   prevFmKeyRef: MutableRefObject<string>
   prevFmSourceRef: MutableRefObject<string | null>
+  prevFirstImageRef: MutableRefObject<string | undefined>
   prevLinksKeyRef: MutableRefObject<string>
   prevTitleKeyRef: MutableRefObject<string>
   updateEntry: UpdateEntry
@@ -155,14 +176,16 @@ function syncDeferredEntryMetadata(options: DeferredEntryMetadataSync & {
     path,
     prevFmKeyRef,
     prevFmSourceRef,
+    prevFirstImageRef,
     prevLinksKeyRef,
     prevTitleKeyRef,
     updateEntry,
   } = options
   if (includeSavedMetadata) {
-    syncSavedMetadata({ content, path, prevLinksKeyRef, updateEntry })
+    syncSavedMetadata({ content, path, prevFirstImageRef, prevLinksKeyRef, updateEntry })
   } else {
     syncOutgoingLinks({ content, path, prevLinksKeyRef, updateEntry })
+    syncFirstImage({ content, path, prevFirstImageRef, updateEntry })
   }
   const frontmatterTitle = syncFrontmatterMetadata({
     content,
@@ -198,6 +221,7 @@ export function useEditorSaveWithLinks(config: {
   const pendingMetadataSyncRef = useRef<DeferredEntryMetadataSync | null>(null)
   const cancelMetadataSyncRef = useRef<CancelDeferredWork | null>(null)
   const prevLinksKeyRef = useRef('')
+  const prevFirstImageRef = useRef<string | undefined>(undefined)
   const prevFmSourceRef = useRef<string | null>(null)
   const prevFmKeyRef = useRef(EMPTY_DERIVED_ENTRY_STATE_KEY)
   const prevTitleKeyRef = useRef('')
@@ -212,6 +236,7 @@ export function useEditorSaveWithLinks(config: {
       ...pending,
       prevFmKeyRef,
       prevFmSourceRef,
+      prevFirstImageRef,
       prevLinksKeyRef,
       prevTitleKeyRef,
       updateEntry,

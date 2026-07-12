@@ -1,4 +1,4 @@
-import { CircleNotch as Loader2, MagnifyingGlass, Plus, SidebarSimple, X } from '@phosphor-icons/react'
+import { CircleNotch as Loader2, MagnifyingGlass, Plus, SidebarSimple, SquaresFour, X } from '@phosphor-icons/react'
 import type { VaultEntry } from '../../types'
 import type { SortOption, SortDirection } from '../../utils/noteListHelpers'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
@@ -38,6 +38,7 @@ interface NoteListHeaderProps {
   typeDocument: VaultEntry | null
   isEntityView: boolean
   isChangesView?: boolean
+  useCardView?: boolean
   listSort: SortOption
   listDirection: SortDirection
   customProperties: string[]
@@ -57,6 +58,7 @@ interface NoteListHeaderProps {
   onSearchChange: (value: string) => void
   onSearchKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void
   onGitRepositoryChange?: (path: string) => void
+  onToggleCardView?: () => void
 }
 
 function dispatchExpandSidebarFromHeader() {
@@ -170,6 +172,8 @@ function HeaderActions({
   onSortChange,
   onCreateNote,
   onToggleSearch,
+  useCardView,
+  onToggleCardView,
 }: Pick<
   NoteListHeaderProps,
   | 'isEntityView'
@@ -181,12 +185,29 @@ function HeaderActions({
   | 'onSortChange'
   | 'onCreateNote'
   | 'onToggleSearch'
+  | 'useCardView'
+  | 'onToggleCardView'
 > & {
   locale: AppLocale
 }) {
   return (
     <div className="ml-3 flex shrink-0 items-center justify-end gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
       {!isEntityView && <SortDropdown groupLabel="__list__" current={listSort} direction={listDirection} customProperties={customProperties} locale={locale} onChange={onSortChange} />}
+      {onToggleCardView && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className={NOTE_LIST_ACTION_BUTTON_CLASSNAME}
+          onClick={onToggleCardView}
+          title={useCardView ? 'Switch to list view' : 'Switch to card view'}
+          aria-label={useCardView ? 'Switch to list view' : 'Switch to card view'}
+          data-no-drag
+          style={useCardView ? { color: 'var(--accent-blue)' } : undefined}
+        >
+          <SquaresFour size={16} weight={useCardView ? 'fill' : 'regular'} />
+        </Button>
+      )}
       <Button type="button" variant="ghost" size="icon-xs" className={NOTE_LIST_ACTION_BUTTON_CLASSNAME} onClick={onToggleSearch} title={translate(locale, 'noteList.searchAction')} aria-label={translate(locale, 'noteList.searchAction')}>
         <MagnifyingGlass size={16} />
       </Button>
@@ -280,6 +301,7 @@ export function NoteListHeader({
   typeDocument,
   isEntityView,
   isChangesView = false,
+  useCardView,
   listSort,
   listDirection,
   customProperties,
@@ -299,6 +321,7 @@ export function NoteListHeader({
   onSearchChange,
   onSearchKeyDown,
   onGitRepositoryChange,
+  onToggleCardView,
 }: NoteListHeaderProps) {
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const collapsedSidebarPadding = sidebarCollapsed && isMac()
@@ -325,6 +348,8 @@ export function NoteListHeader({
           onSortChange={onSortChange}
           onCreateNote={onCreateNote}
           onToggleSearch={onToggleSearch}
+          useCardView={useCardView}
+          onToggleCardView={onToggleCardView}
         />
       </div>
       <RepositorySelectorRow

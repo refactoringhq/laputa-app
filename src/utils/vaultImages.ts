@@ -9,6 +9,8 @@ import {
   portableAttachmentPathFromCurrentVaultAssetUrl,
   vaultAttachmentAssetUrl,
 } from './vaultAttachments'
+import { splitFrontmatter } from './wikilinks'
+import { isPathInsideVaultRoot } from './vaultPathContainment'
 
 type Markdown = string
 type VaultPath = string
@@ -89,6 +91,11 @@ interface PathSegmentComparisonRequest {
   left: string
   right: string
   caseInsensitive: boolean
+}
+
+interface ImageCandidate {
+  kind: 'markdown' | 'wikilink'
+  pos: number
 }
 
 function rewriteMarkdownImages(
@@ -265,6 +272,53 @@ function parseWikilinkImageEmbed(request: WikilinkImageRequest): WikilinkImageEm
   }
 }
 
+function nextImageCandidate(markdown: Markdown, startIndex: number): ImageCandidate | null {
+  const markdownPos = markdown.indexOf('![', startIndex)
+  const wikilinkPos = markdown.indexOf('![[', startIndex)
+
+  if (markdownPos === -1 && wikilinkPos === -1) return null
+  if (wikilinkPos !== -1 && (markdownPos === -1 || wikilinkPos <= markdownPos)) {
+    return { kind: 'wikilink', pos: wikilinkPos }
+  }
+  return { kind: 'markdown', pos: markdownPos }
+}
+
+function extractWikilinkImageAt(markdown: Markdown, pos: number): { end: number; url: string | null } {
+  const targetStart = pos + 3
+  const targetEnd = markdown.indexOf(']]', targetStart)
+  if (targetEnd === -1) return { end: pos + 3, url: null }
+
+  const image = parseWikilinkImageEmbed({ target: markdown.slice(targetStart, targetEnd) })
+  return { end: targetEnd + 2, url: image?.url ?? null }
+}
+
+function extractMarkdownImageAt(markdown: Markdown, pos: number): { end: number; url: string | null } {
+  const image = nextMarkdownImage(markdown, pos)
+  if (!image || image.start !== pos) return { end: pos + 2, url: null }
+  return {
+    end: image.end,
+    url: IMAGE_FILE_EXTENSION_PATTERN.test(image.url) ? image.url : null,
+  }
+}
+
+export function extractFirstImage(markdown: Markdown): MarkdownImageUrl | null {
+  const [, body] = splitFrontmatter(markdown)
+  let cursor = 0
+
+  while (cursor < body.length) {
+    const candidate = nextImageCandidate(body, cursor)
+    if (!candidate) return null
+
+    const image = candidate.kind === 'wikilink'
+      ? extractWikilinkImageAt(body, candidate.pos)
+      : extractMarkdownImageAt(body, candidate.pos)
+    if (image.url) return image.url
+    cursor = Math.max(image.end, candidate.pos + 2)
+  }
+
+  return null
+}
+
 function rewriteWikilinkImageEmbeds(
   markdown: Markdown,
   transformUrl: (url: MarkdownImageUrl) => MarkdownImageUrl | null,
@@ -424,11 +478,12 @@ function resolveAbsoluteFilesystemUrl(request: UrlOnlyRequest): MarkdownImageUrl
 }
 
 function resolveNoteRelativeUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
-  const { url, notePath } = request
+  const { url, notePath, vaultPath } = request
   if (!notePath || hasUrlScheme({ url })) return null
-  return resolveAssetUrl(() => attachmentAssetUrlFromPath({
-    path: joinNoteRelativePath({ notePath, relativeUrl: url }),
-  }))
+  const path = joinNoteRelativePath({ notePath, relativeUrl: url })
+  return isPathInsideVaultRoot(path, vaultPath)
+    ? resolveAssetUrl(() => attachmentAssetUrlFromPath({ path }))
+    : null
 }
 
 function resolveAssetUrl(resolve: () => MarkdownImageUrl): MarkdownImageUrl | null {
@@ -440,7 +495,7 @@ function resolveAssetUrl(resolve: () => MarkdownImageUrl): MarkdownImageUrl | nu
   }
 }
 
-function resolveImageUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
+export function resolveImageUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
   return resolveLegacyAttachmentAssetUrl(request)
     ?? resolveAbsoluteFilesystemUrl({ url: request.url })
     ?? resolvePortableAttachmentUrl(request)

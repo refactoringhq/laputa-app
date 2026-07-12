@@ -180,6 +180,25 @@ describe('NoteList sort controls', () => {
     expect(screen.getByTestId('sort-button-__list__')).toBeInTheDocument()
   })
 
+  it('lets image attachment folders switch back to list view', () => {
+    renderNoteList({
+      vaultPath: '/vault',
+      selection: { kind: 'folder', path: 'attachments', rootPath: '/vault' },
+      entries: [
+        makeEntry({
+          path: '/vault/attachments/photo.png',
+          filename: 'photo.png',
+          title: 'photo.png',
+          fileKind: 'binary',
+        }),
+      ],
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to list view' }))
+
+    expect(screen.getByRole('button', { name: 'Switch to card view' })).toBeInTheDocument()
+  })
+
   it('shows a per-group sort button in entity view', () => {
     renderNoteList({ selection: { kind: 'entity', entry: mockEntries[0] } })
     expect(screen.getByTestId('sort-button-Children')).toBeInTheDocument()

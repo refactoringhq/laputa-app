@@ -51,7 +51,9 @@ pub use views::{
 
 use file::read_file_metadata;
 use frontmatter::{extract_fm_and_rels, resolve_is_a, resolve_note_display, resolve_note_width};
-use parsing::{count_body_words, extract_outgoing_links, extract_snippet, extract_title};
+use parsing::{
+    count_body_words, extract_first_image, extract_outgoing_links, extract_snippet, extract_title,
+};
 use type_templates::TypeTemplateSource;
 
 use gray_matter::engine::YAML;
@@ -182,6 +184,7 @@ pub fn parse_md_file(path: &Path, git_dates: Option<(u64, u64)>) -> Result<Vault
         properties,
         has_h1,
         file_kind: "markdown".to_string(),
+        first_image: extract_first_image(&content),
     })
 }
 

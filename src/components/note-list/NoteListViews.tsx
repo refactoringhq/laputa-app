@@ -4,6 +4,7 @@ import type { SortOption, SortDirection, SortConfig, RelationshipGroup } from '.
 import { translate, type AppLocale } from '../../lib/i18n'
 import { PinnedCard } from './PinnedCard'
 import { RelationshipGroupSection } from './RelationshipGroupSection'
+import { NoteCardView } from './NoteCardView'
 import { EmptyMessage } from './TrashWarningBanner'
 
 function resolveEmptyText({
@@ -48,13 +49,20 @@ export function EntityView({ entity, groups, query, collapsedGroups, sortPrefs, 
   )
 }
 
-export function ListView({ isArchivedView, isChangesView, isInboxView, changesError, searched, query, renderItem, virtuosoRef, locale = 'en' }: {
+type ListViewProps = {
   isArchivedView?: boolean; isChangesView?: boolean; isInboxView?: boolean; changesError?: string | null
   searched: VaultEntry[]; query: string
   renderItem: (entry: VaultEntry) => React.ReactNode
   virtuosoRef?: React.RefObject<VirtuosoHandle | null>
   locale?: AppLocale
-}) {
+  useCardView?: boolean
+  vaultPath?: string
+  selectedNotePath?: string | null
+  onSelectNote?: (entry: VaultEntry) => void
+}
+
+export function ListView(props: ListViewProps) {
+  const { isArchivedView, isChangesView, isInboxView, changesError, searched, query, renderItem, virtuosoRef, locale = 'en', useCardView, vaultPath, selectedNotePath, onSelectNote } = props
   const emptyText = resolveEmptyText({
     isChangesView: !!isChangesView,
     changesError: changesError ?? null,
@@ -69,6 +77,17 @@ export function ListView({ isArchivedView, isChangesView, isInboxView, changesEr
       <div className="h-full overflow-y-auto">
         <EmptyMessage text={emptyText} />
       </div>
+    )
+  }
+
+  if (useCardView && onSelectNote) {
+    return (
+      <NoteCardView
+        entries={searched}
+        vaultPath={vaultPath}
+        selectedNotePath={selectedNotePath ?? null}
+        onSelectNote={onSelectNote}
+      />
     )
   }
 

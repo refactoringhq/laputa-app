@@ -66,6 +66,8 @@ export interface VaultEntry {
   /** File kind: "markdown", "text", or "binary". Determines editor behavior.
    *  Defaults to "markdown" when absent (for backwards compatibility). */
   fileKind?: 'markdown' | 'text' | 'binary'
+  /** First image found in the note body (for card/thumbnail views). */
+  firstImage?: string | null
 }
 
 export interface WorkspaceIdentity {

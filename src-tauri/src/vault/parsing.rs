@@ -341,6 +341,121 @@ pub(super) fn extract_outgoing_links(content: &str) -> Vec<String> {
     links
 }
 
+/// Extract the first image path from markdown content.
+/// Scans for both `![alt](path)` and `![[path]]` patterns in document order,
+/// returning whichever appears first.
+/// Markdown image paths are returned as-is. Bare wikilink image embeds are
+/// treated as portable attachment paths, matching the frontend image resolver.
+pub(super) fn extract_first_image(content: &str) -> Option<String> {
+    let without_fm = strip_frontmatter(TextSlice(content));
+    let body: &str = without_fm;
+    let mut search_from = 0;
+
+    while let Some(candidate) = next_image_candidate(body, search_from) {
+        let extracted = match candidate.kind {
+            ImageCandidateKind::Wikilink => extract_wikilink_image(body, candidate.pos),
+            ImageCandidateKind::Markdown => extract_markdown_image(body, candidate.pos),
+        };
+
+        if let Some((image, _next_search_from)) = extracted.as_ref() {
+            return Some(image.clone());
+        }
+        search_from = extracted.map_or(candidate.pos + 2, |(_, next_search_from)| next_search_from);
+    }
+
+    None
+}
+
+struct ImageCandidate {
+    pos: usize,
+    kind: ImageCandidateKind,
+}
+
+enum ImageCandidateKind {
+    Markdown,
+    Wikilink,
+}
+
+fn next_image_candidate(body: &str, search_from: usize) -> Option<ImageCandidate> {
+    let md_pos = body[search_from..].find("![").map(|p| search_from + p);
+    let wl_pos = body[search_from..].find("![[").map(|p| search_from + p);
+
+    match (md_pos, wl_pos) {
+        (Some(md), Some(wl)) if wl <= md => Some(ImageCandidate {
+            pos: wl,
+            kind: ImageCandidateKind::Wikilink,
+        }),
+        (Some(md), Some(_)) | (Some(md), None) => Some(ImageCandidate {
+            pos: md,
+            kind: ImageCandidateKind::Markdown,
+        }),
+        (None, Some(wl)) => Some(ImageCandidate {
+            pos: wl,
+            kind: ImageCandidateKind::Wikilink,
+        }),
+        (None, None) => None,
+    }
+}
+
+fn extract_wikilink_image(body: &str, pos: usize) -> Option<(String, usize)> {
+    let inner_start = pos + 3;
+    let end = inner_start + body[inner_start..].find("]]")?;
+    let inner = &body[inner_start..end];
+    let target = inner.split('|').next().unwrap_or("").trim();
+
+    is_image_path(target).then(|| (portable_wikilink_image_target(target), end + 2))
+}
+
+fn extract_markdown_image(body: &str, pos: usize) -> Option<(String, usize)> {
+    let url_start = pos + body[pos..].find("](")? + 2;
+    let paren_end = body[url_start..].find(')')?;
+    let url = &body[url_start..url_start + paren_end];
+    let path = url.split_whitespace().next().unwrap_or(url);
+
+    is_image_path(path).then(|| (path.to_string(), pos + 2))
+}
+
+fn is_image_path(path: &str) -> bool {
+    matches!(
+        path.rsplit('.')
+            .next()
+            .unwrap_or("")
+            .to_ascii_lowercase()
+            .as_str(),
+        "avif" | "bmp" | "gif" | "jpg" | "jpeg" | "png" | "svg" | "tif" | "tiff" | "webp"
+    )
+}
+
+fn portable_wikilink_image_target(target: &str) -> String {
+    let has_url_scheme = target
+        .chars()
+        .next()
+        .map(|first| first.is_ascii_alphabetic())
+        .unwrap_or(false)
+        && target
+            .chars()
+            .take_while(|ch| *ch != ':')
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '+' | '.' | '-'))
+        && target.contains(':');
+    let is_absolute = target.starts_with('/')
+        || target.starts_with(r"\\")
+        || target
+            .get(1..3)
+            .map(|rest| rest == ":/" || rest == r":\")
+            .unwrap_or(false);
+    let is_explicit = has_url_scheme
+        || is_absolute
+        || target.starts_with('.')
+        || target.contains('/')
+        || target.contains('\\');
+
+    if is_explicit {
+        target.to_string()
+    } else {
+        format!("attachments/{target}")
+    }
+}
+
 #[cfg(test)]
 #[path = "parsing_tests.rs"]
 mod tests;

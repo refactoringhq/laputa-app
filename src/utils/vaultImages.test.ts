@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { resolveImageUrls, portableImageUrls } from './vaultImages'
+import { extractFirstImage, resolveImageUrl, resolveImageUrls, portableImageUrls } from './vaultImages'
 
 let tauriMode = false
 
@@ -196,6 +196,13 @@ describe('resolveImageUrls', () => {
     )
   })
 
+  it('leaves note-relative image paths unchanged when they escape the vault', () => {
+    tauriMode = true
+    const markdown = '![outside](../../outside.png)'
+
+    expect(resolveImageUrls(markdown, '/vault', '/vault/projects/plan.md')).toBe(markdown)
+  })
+
   it('unwraps CommonMark angle-bracket image destinations before resolving paths', () => {
     tauriMode = true
     const markdown = '![diagram](<../assets/foo bar.png>)'
@@ -252,6 +259,36 @@ describe('resolveImageUrls', () => {
     } finally {
       warnSpy.mockRestore()
     }
+  })
+})
+
+describe('resolveImageUrl', () => {
+  it('resolves a single note-relative image URL against the note directory', () => {
+    expect(resolveImageUrl({
+      url: 'photo.jpg',
+      vaultPath: '/vault',
+      notePath: '/vault/Recipes/Pasta.md',
+    })).toBe(assetUrl('/vault/Recipes/photo.jpg'))
+  })
+
+  it('rejects a single note-relative image URL that escapes the vault', () => {
+    expect(resolveImageUrl({
+      url: '../../outside.jpg',
+      vaultPath: '/vault',
+      notePath: '/vault/Recipes/Pasta.md',
+    })).toBeNull()
+  })
+})
+
+describe('extractFirstImage', () => {
+  it('returns the first image in document order', () => {
+    expect(extractFirstImage('# Recipe\n\n![[first.jpg]]\n\n![second](b.png)')).toBe('attachments/first.jpg')
+    expect(extractFirstImage('# Recipe\n\n![first](a.png)\n\n![[second.jpg]]')).toBe('a.png')
+  })
+
+  it('skips frontmatter and non-image links', () => {
+    expect(extractFirstImage('---\n_icon: icon.png\n---\n\n[link](https://example.com)\n\n![real](photo.jpg)')).toBe('photo.jpg')
+    expect(extractFirstImage('# Recipe\n\n![[not-a-note]]')).toBeNull()
   })
 })
 

@@ -4,6 +4,9 @@ packages:
 ignoredBuiltDependencies:
   - esbuild
 
+overrides:
+  ip-address: 10.1.1
+
 patchedDependencies:
   '@blocknote/core@0.46.2': patches/@blocknote__core@0.46.2.patch
   '@blocknote/react@0.46.2': patches/@blocknote__react@0.46.2.patch
