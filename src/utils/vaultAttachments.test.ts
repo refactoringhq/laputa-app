@@ -22,6 +22,9 @@ describe('resolveVaultAttachmentPath', () => {
     expect(resolveVaultAttachmentPath({ url: 'attachments/report.pdf', vaultPath: '/vault' })).toBe(
       '/vault/attachments/report.pdf',
     )
+    expect(resolveVaultAttachmentPath({ url: './attachments/report.pdf', vaultPath: '/vault' })).toBe(
+      '/vault/attachments/report.pdf',
+    )
   })
 
   it('resolves encoded Tauri asset URLs inside the active vault', () => {
@@ -62,6 +65,7 @@ describe('resolveVaultAttachmentPath', () => {
 
   it('identifies attachment URLs before falling back to external link handling', () => {
     expect(isVaultAttachmentUrl({ url: 'attachments/report.pdf' })).toBe(true)
+    expect(isVaultAttachmentUrl({ url: './attachments/report.pdf' })).toBe(true)
     expect(
       isVaultAttachmentUrl({
         url: 'asset://localhost/%2Fvault%2Fattachments%2Freport.pdf',

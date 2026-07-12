@@ -4,7 +4,7 @@ import { preProcessMathMarkdown, injectMathInBlocks } from '../utils/mathMarkdow
 import { preProcessSingleTildeStrikethrough } from '../utils/markdownStrikethrough'
 import { injectDurableEditorMarkdownBlocks, preProcessDurableEditorMarkdown } from '../utils/editorDurableMarkdown'
 import { injectMarkdownHighlightsInBlocks } from '../utils/markdownHighlightMarkdown'
-import { resolveImageUrls } from '../utils/vaultImages'
+import { normalizeBareImageUrls, resolveImageUrls } from '../utils/vaultImages'
 import { repairMalformedEditorBlocks } from './editorBlockRepair'
 import { inferCodeBlockLanguages } from '../utils/codeBlockLanguage'
 import {
@@ -190,7 +190,8 @@ export function preProcessEditorMarkdown(
 ): PreprocessedMarkdown {
   const withDurableBlocks = preProcessDurableEditorMarkdown({ markdown })
   const withEmptyChecklists = preProcessEmptyChecklistItems(withDurableBlocks)
-  const withImages = vaultPath ? resolveImageUrls(withEmptyChecklists, vaultPath, notePath) : withEmptyChecklists
+  const withBareImages = normalizeBareImageUrls(withEmptyChecklists)
+  const withImages = vaultPath ? resolveImageUrls(withBareImages, vaultPath, notePath) : withBareImages
   const withWikilinks = preProcessWikilinks(withImages)
   const withMath = preProcessMathMarkdown({ markdown: withWikilinks })
   return preProcessSingleTildeStrikethrough({ markdown: withMath })
