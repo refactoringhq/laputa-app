@@ -47,8 +47,7 @@ function broadcastUiAction(action, payload) {
 const toolService = createMcpToolService({ emitUiAction: broadcastUiAction })
 
 async function readNoteTool(args) {
-  const note = await toolService.readNote(args)
-  return { content: note.content, frontmatter: note.frontmatter }
+  return toolService.readNote(args)
 }
 
 function uiOpenNoteTool(args) {
@@ -63,6 +62,14 @@ function uiOpenTabTool(args) {
 
 async function createNoteTool(args = {}) {
   return { ok: true, ...(await toolService.createNote(args)) }
+}
+
+async function updateNoteTool(args = {}) {
+  return { ok: true, ...(await toolService.updateNote(args)) }
+}
+
+async function appendToNoteTool(args = {}) {
+  return { ok: true, ...(await toolService.appendToNote(args)) }
 }
 
 function highlightTool(args) {
@@ -84,6 +91,8 @@ const TOOL_EXECUTORS = [
   ['open_note', readNoteTool],
   ['read_note', readNoteTool],
   ['create_note', createNoteTool],
+  ['update_note', updateNoteTool],
+  ['append_to_note', appendToNoteTool],
   ['search_notes', (args) => toolService.searchNotes(args)],
   ['vault_context', (args) => toolService.vaultContext(args)],
   ['list_vaults', () => toolService.listVaults()],
