@@ -4,6 +4,7 @@ import {
 } from './richEditorRecoveryClassifier'
 
 const BLOCKNOTE_RECOVERY_BOUNDARY_NAME = 'BlockNoteRenderRecoveryBoundary'
+const BLOCKNOTE_VIEW_COMPONENT_NAME = 'BlockNoteView'
 const RECOVERED_BLOCKNOTE_RENDER_ERROR_MARK = '__tolariaRecoveredBlockNoteRenderError'
 const BLOCKNOTE_RENDER_UPDATE_DEPTH_REASON: BlockNoteRenderRecoveryReason = 'react_update_depth_exceeded'
 export type { BlockNoteRenderRecoveryReason } from './richEditorRecoveryClassifier'
@@ -43,5 +44,9 @@ export function isRecoveredBlockNoteRenderError(
     && (
       hasRecoveredRenderErrorMark(error)
       || componentStack.includes(BLOCKNOTE_RECOVERY_BOUNDARY_NAME)
+      || (
+        isBlockNoteRenderUpdateDepthError(error)
+        && componentStack.includes(BLOCKNOTE_VIEW_COMPONENT_NAME)
+      )
     )
 }
