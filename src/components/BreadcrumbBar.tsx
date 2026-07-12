@@ -104,7 +104,6 @@ interface BreadcrumbTooltipControl {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   onPointerEnter?: () => void
-  onPointerMove?: () => void
   onPointerLeave?: () => void
   onFocus?: () => void
   onBlur?: () => void
@@ -146,7 +145,6 @@ function useBreadcrumbTooltipControl(label: string): BreadcrumbTooltipControl {
     open: controller.activeTooltipLabel === label,
     onOpenChange,
     onPointerEnter: activate,
-    onPointerMove: activate,
     onPointerLeave: deactivate,
     onFocus: activate,
     onBlur: deactivate,
@@ -233,7 +231,6 @@ function IconActionButton({
         style={style}
         onClick={onClick}
         onPointerEnter={tooltipControl.onPointerEnter}
-        onPointerMove={tooltipControl.onPointerMove}
         onPointerLeave={tooltipControl.onPointerLeave}
         onFocus={tooltipControl.onFocus}
         onBlur={tooltipControl.onBlur}
@@ -802,7 +799,6 @@ function SyncFilenameButton({
         data-testid="breadcrumb-sync-button"
         aria-label={tooltipLabel}
         onPointerEnter={tooltipControl.onPointerEnter}
-        onPointerMove={tooltipControl.onPointerMove}
         onPointerLeave={tooltipControl.onPointerLeave}
         onFocus={tooltipControl.onFocus}
         onBlur={tooltipControl.onBlur}
@@ -1130,7 +1126,6 @@ function BreadcrumbOverflowMenuTrigger({ label }: { label: string }) {
           aria-label={label}
           data-testid="breadcrumb-overflow-menu-trigger"
           onPointerEnter={tooltipControl.onPointerEnter}
-          onPointerMove={tooltipControl.onPointerMove}
           onPointerLeave={tooltipControl.onPointerLeave}
           onFocus={tooltipControl.onFocus}
           onBlur={tooltipControl.onBlur}
