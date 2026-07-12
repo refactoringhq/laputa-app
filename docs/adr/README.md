@@ -208,7 +208,7 @@ proposed → active → superseded
 | [0147](0147-antigravity-cli-agent-adapter.md) | Antigravity CLI agent adapter | superseded -> [0151](0151-antigravity-add-dir-workspace-flag.md) |
 | [0148](0148-cancellable-ai-agent-streams.md) | Cancellable AI agent streams | active |
 | [0149](0149-shared-app-config-policy-manifest.md) | Shared app config policy manifest | active |
-| [0151](0151-antigravity-add-dir-workspace-flag.md) | Antigravity add-dir workspace flag | active |
+| [0151](0151-antigravity-add-dir-workspace-flag.md) | Antigravity add-dir workspace flag | superseded -> [0159](0159-antigravity-permission-flags-aligned-with-cli.md) |
 | [0152](0152-wsl2-git-provider.md) | WSL2 Git provider | active |
 | [0153](0153-conservative-markdown-delimiter-parsing.md) | Conservative Markdown delimiter parsing | active |
 | [0154](0154-sandboxed-fenced-html-blocks.md) | Sandboxed fenced HTML blocks | active |
@@ -216,3 +216,4 @@ proposed → active → superseded
 | [0156](0156-vault-expression-html-blocks-and-line-references.md) | Vault expressions in sandboxed HTML blocks and line references | amended -> [0157](0157-opt-in-sandboxed-html-block-scripts.md) |
 | [0157](0157-opt-in-sandboxed-html-block-scripts.md) | Opt-in sandboxed scripts for HTML block dashboards | active |
 | [0158](0158-vault-write-mcp-tools-update-and-append.md) | Vault-write MCP tools: update_note and append_to_note | active |
+| [0159](0159-antigravity-permission-flags-aligned-with-cli.md) | Antigravity permission flags aligned with CLI | active |
