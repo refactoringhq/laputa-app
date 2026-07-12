@@ -1,8 +1,10 @@
 import path from 'node:path'
 import {
+  appendToNote as appendVaultNote,
   createNote as createVaultNote,
   getNote,
   searchNotes as searchVaultNotes,
+  updateNote as updateVaultNote,
 } from './vault.js'
 import { requireVaultPaths } from './vault-path.js'
 import { readAgentInstructions, vaultContextWithInstructions } from './agent-instructions.js'
@@ -84,6 +86,28 @@ export function createMcpToolService({
     return { path: note.path, absolutePath: note.absolutePath, vaultPath }
   }
 
+  async function updateNote(args = {}) {
+    const { vaultPath, notePath } = await resolveWritableNote(args)
+    const note = await updateVaultNote(vaultPath, notePath, noteContent(args), {
+      expectedMtime: args.expectedMtime,
+    })
+    emitUiAction('vault_changed', { path: resolveUiPath({ ...args, path: note.path, vaultPath }) })
+    return { path: note.path, absolutePath: note.absolutePath, vaultPath, mtimeMs: note.mtimeMs }
+  }
+
+  async function appendToNote(args = {}) {
+    const { vaultPath, notePath } = await resolveWritableNote(args)
+    const note = await appendVaultNote(vaultPath, notePath, noteContent(args))
+    emitUiAction('vault_changed', { path: resolveUiPath({ ...args, path: note.path, vaultPath }) })
+    return { path: note.path, absolutePath: note.absolutePath, vaultPath, mtimeMs: note.mtimeMs }
+  }
+
+  async function resolveWritableNote(args = {}) {
+    const vaultPath = writableVaultPath(args)
+    const notePath = writableNotePath(args, vaultPath)
+    return { vaultPath, notePath }
+  }
+
   function openNoteAsTab(args = {}) {
     const targetPath = resolveUiPath(args)
     emitUiAction('vault_changed', { path: targetPath })
@@ -146,6 +170,7 @@ export function createMcpToolService({
 
   return {
     activeVaultPaths,
+    appendToNote,
     createNote,
     highlightEditor,
     listVaults,
@@ -157,6 +182,7 @@ export function createMcpToolService({
     resolveUiPath,
     searchNotes,
     setFilter,
+    updateNote,
     vaultContext,
   }
 }
@@ -210,4 +236,9 @@ function createNoteContent(args = {}) {
   return typeof args.content === 'string' && args.content.trim()
     ? args.content
     : fallbackCreateNoteContent(args)
+}
+
+function noteContent(args = {}) {
+  if (typeof args.content === 'string' && args.content.length > 0) return args.content
+  throw new Error('content is required')
 }
