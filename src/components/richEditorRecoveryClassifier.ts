@@ -3,6 +3,7 @@ const BLOCKNOTE_BLOCK_TYPE_MISMATCH_ERROR = 'Block type does not match'
 const BLOCKNOTE_EMPTY_FRAGMENT_INDEX_ERROR = /^Index \d+ out of range for <>$/
 const BLOCKNOTE_TABLE_ROW_INDEX_ERROR = /^Index \d+ out of range for <tableRow\(/
 const BLOCKNOTE_PARAGRAPH_INDEX_ERROR = /^Index \d+ out of range for <paragraph\(/
+const PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR = /^Position \d+ out of range$/
 const NULL_APPEND_PROPERTY_ERROR = "Cannot read properties of null (reading 'append')"
 const NULL_FIRST_CHILD_PROPERTY_ERROR = "Cannot read properties of null (reading 'firstChild')"
 const REACT_UPDATE_DEPTH_EXCEEDED_ERROR = 'Maximum update depth exceeded'
@@ -18,6 +19,7 @@ export type BlockNoteRenderRecoveryReason =
   | 'dom_not_found'
   | 'empty_fragment_index_out_of_range'
   | 'paragraph_index_out_of_range'
+  | 'prosemirror_position_out_of_range'
   | 'react_update_depth_exceeded'
   | 'stale_block_reference'
   | 'table_row_index_out_of_range'
@@ -33,6 +35,7 @@ export type RichEditorTransformRecoveryReason =
   | 'mismatched_transaction'
   | 'null_fragment_append'
   | 'paragraph_index_out_of_range'
+  | 'prosemirror_position_out_of_range'
   | 'stale_block_reference'
   | 'stale_transaction'
   | 'table_row_index_out_of_range'
@@ -150,6 +153,14 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
     matches: (error) => messageMatches(error, BLOCKNOTE_PARAGRAPH_INDEX_ERROR),
     reason: 'paragraph_index_out_of_range',
     repairsDocument: true,
+    surfaces: ['render', 'transform'],
+  },
+  {
+    matches: (error) => (
+      error instanceof RangeError
+      && messageMatches(error, PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR)
+    ),
+    reason: 'prosemirror_position_out_of_range',
     surfaces: ['render', 'transform'],
   },
   {
