@@ -175,6 +175,18 @@ describe('main entrypoint', () => {
     expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
   }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
 
+  it('suppresses recovered BlockNote update-depth errors when React omits the recovery-boundary frame', async () => {
+    await importEntrypoint()
+
+    const error = new Error('Maximum update depth exceeded. This can happen when a component repeatedly calls setState.')
+    window.__tolariaFrontendReady = true
+
+    rootOptions().onCaughtError?.(error, { componentStack: '\n    in BlockNoteView' })
+
+    expect(mocks.sentryHandler).not.toHaveBeenCalled()
+    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+  }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
+
   it('normalizes missing React component stacks before handing errors to Sentry', async () => {
     await importEntrypoint()
 
