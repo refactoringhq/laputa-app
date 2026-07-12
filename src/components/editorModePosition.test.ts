@@ -104,6 +104,31 @@ describe('editorModePosition', () => {
     expect(content.slice(restoreState!.anchor, restoreState!.head).trim()).toBe('Paragraph one')
   })
 
+  it('maps rich wikilink blocks through the shared Markdown serializer', () => {
+    const wikilinkContent = '---\ntitle: Demo\n---\n# Title\n\nSee [[Project Alpha]]'
+    const wikilinkBlocks = [
+      blocks[0],
+      {
+        id: 'link',
+        markdown: 'See Project Alpha',
+        content: [
+          { type: 'text', text: 'See ', styles: {} },
+          { type: 'wikilink', props: { target: 'Project Alpha' } },
+        ],
+      },
+    ]
+    const editor = makeEditor(wikilinkBlocks)
+    editor.getTextCursorPosition = () => ({ block: wikilinkBlocks[1] })
+
+    const restoreState = buildCodeMirrorRestoreState(editor, wikilinkContent, {
+      anchorBlockIndex: 1,
+      headBlockIndex: 1,
+      scrollTop: 24,
+    })
+
+    expect(wikilinkContent.slice(restoreState!.anchor, restoreState!.head)).toBe('See [[Project Alpha]]')
+  })
+
   it('ignores stale BlockNote cursor positions that no longer have a block', () => {
     const editor = makeEditor(blocks)
     editor.getTextCursorPosition = () => (
