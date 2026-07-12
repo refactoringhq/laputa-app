@@ -130,6 +130,7 @@
   --editor-code-block-border: var(--border-subtle);
   --editor-code-block-text: var(--text-primary);
   --editor-code-block-language: var(--text-secondary);
+  --editor-paragraph-spacing: 0.5em;
 
   /* --- Overlays and shadows (light mode) --- */
   --shadow-overlay: var(--surface-overlay);
@@ -282,6 +283,7 @@
   --editor-code-block-border: transparent;
   --editor-code-block-text: #FFFFFF;
   --editor-code-block-language: rgba(255, 255, 255, 0.7);
+  --editor-paragraph-spacing: 0.5em;
 
   /* --- Overlays and shadows (dark mode) --- */
   --shadow-overlay: var(--surface-overlay);
