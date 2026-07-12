@@ -116,6 +116,42 @@ async function expectTooltip(trigger: HTMLElement, ...parts: string[]) {
   })
 }
 
+function renderFavoriteAndOrganizedBreadcrumb() {
+  renderBreadcrumb({}, {
+    onToggleFavorite: vi.fn(),
+    onToggleOrganized: vi.fn(),
+  })
+
+  return {
+    favoriteButton: screen.getByRole('button', { name: 'Add to favorites' }),
+    organizedButton: screen.getByRole('button', { name: 'Set note as organized' }),
+  }
+}
+
+function enterBreadcrumbAction(button: HTMLElement) {
+  act(() => {
+    fireEvent.pointerEnter(button)
+  })
+}
+
+function movePointerBetweenBreadcrumbActions(from: HTMLElement, to: HTMLElement) {
+  act(() => {
+    fireEvent.pointerLeave(from)
+    fireEvent.pointerEnter(to)
+  })
+}
+
+async function expectOnlyBreadcrumbTooltip(label: string, previousLabel?: string) {
+  await waitFor(() => {
+    const visibleTooltips = screen.getAllByRole('tooltip')
+    expect(visibleTooltips).toHaveLength(1)
+    expect(visibleTooltips[0]).toHaveTextContent(label)
+    if (previousLabel) {
+      expect(visibleTooltips[0]).not.toHaveTextContent(previousLabel)
+    }
+  })
+}
+
 async function openOverflowMenu() {
   const trigger = screen.getByRole('button', { name: 'More note actions' })
   fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: 'mouse' })
@@ -606,35 +642,18 @@ describe('BreadcrumbBar — action buttons always right-aligned', () => {
     expect(tooltip).toHaveTextContent('Add to favorites')
   })
 
-  it('updates the visible tooltip when the pointer slides between adjacent action icons', async () => {
-    render(
-      <BreadcrumbBar
-        entry={baseEntry}
-        {...defaultProps}
-        onToggleFavorite={vi.fn()}
-        onToggleOrganized={vi.fn()}
-      />,
-    )
+  it('updates the visible tooltip during a slide and ignores trailing moves from the previous icon', async () => {
+    const { favoriteButton, organizedButton } = renderFavoriteAndOrganizedBreadcrumb()
 
-    const favoriteButton = screen.getByRole('button', { name: 'Add to favorites' })
-    const organizedButton = screen.getByRole('button', { name: 'Set note as organized' })
-
-    act(() => {
-      fireEvent.pointerEnter(favoriteButton)
-    })
-
+    enterBreadcrumbAction(favoriteButton)
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Add to favorites')
 
+    movePointerBetweenBreadcrumbActions(favoriteButton, organizedButton)
     act(() => {
-      fireEvent.pointerMove(organizedButton)
+      fireEvent.pointerMove(favoriteButton)
     })
 
-    await waitFor(() => {
-      const visibleTooltips = screen.getAllByRole('tooltip')
-      expect(visibleTooltips).toHaveLength(1)
-      expect(visibleTooltips[0]).toHaveTextContent('Set note as organized')
-      expect(visibleTooltips[0]).not.toHaveTextContent('Add to favorites')
-    })
+    await expectOnlyBreadcrumbTooltip('Set note as organized', 'Add to favorites')
   })
 
   it('lets the title use the free space before the fixed drag gap', () => {
