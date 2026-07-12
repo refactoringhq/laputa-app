@@ -96,12 +96,15 @@ describe('local file actions', () => {
     })
   })
 
-  it('reveals local paths through the Tauri opener plugin', async () => {
+  it('reveals local paths through the app-owned file-manager command', async () => {
     vi.stubGlobal('isTauri', true)
 
     await revealLocalPath('/vault/notes/project.md')
 
-    expect(revealItemInDir).toHaveBeenCalledWith('/vault/notes/project.md')
+    expect(invoke).toHaveBeenCalledWith('reveal_path_in_file_manager', {
+      path: '/vault/notes/project.md',
+    })
+    expect(revealItemInDir).not.toHaveBeenCalled()
   })
 
   it('copies local paths to the clipboard', async () => {
