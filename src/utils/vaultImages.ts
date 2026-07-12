@@ -9,6 +9,7 @@ import {
   portableAttachmentPathFromCurrentVaultAssetUrl,
   vaultAttachmentAssetUrl,
 } from './vaultAttachments'
+import { advanceMarkdownFence, type MarkdownFence } from './markdownFences'
 
 type Markdown = string
 type VaultPath = string
@@ -288,6 +289,14 @@ function isFilesystemAbsolutePath(request: PathOnlyRequest): boolean {
     || request.path.startsWith('\\\\')
 }
 
+function isBareImageUrl(request: UrlOnlyRequest): boolean {
+  const { url } = request
+  if (!url) return false
+  if (/^(?:\.{1,2}\/|[/\\?#])/u.test(url)) return false
+  if (hasUrlScheme({ url })) return false
+  return !isFilesystemAbsolutePath({ path: url })
+}
+
 function usesWindowsSeparators(request: PathOnlyRequest): boolean {
   return WINDOWS_DRIVE_PATH_PATTERN.test(request.path) || request.path.startsWith('\\\\')
 }
@@ -401,9 +410,10 @@ function relativePathFromNoteDirectory(request: NoteDirectoryRelativePathRequest
 function resolvePortableAttachmentUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
   const { url, vaultPath } = request
   if (!isPortableAttachmentPath({ path: url })) return null
+  const attachmentPath = decodePathUrl({ url })
   return resolveAssetUrl(() => vaultAttachmentAssetUrl({
     vaultPath,
-    attachmentPath: decodePathUrl({ url }),
+    attachmentPath,
   }))
 }
 
@@ -456,6 +466,24 @@ export function resolveImageUrls(
 
   const transformUrl = (url: MarkdownImageUrl) => resolveImageUrl({ url, vaultPath, notePath })
   return rewriteMarkdownImages(rewriteWikilinkImageEmbeds(markdown, transformUrl), transformUrl)
+}
+
+export function normalizeBareImageUrls(markdown: Markdown): Markdown {
+  if (!markdown.includes('![')) return markdown
+
+  let fence: MarkdownFence | null = null
+  return markdown.split(/(\r?\n)/u).map(part => {
+    if (part === '\n' || part === '\r\n') return part
+
+    const nextFence = advanceMarkdownFence(part, fence)
+    const isFenceBoundary = nextFence !== fence
+    fence = nextFence
+    if (isFenceBoundary || fence) return part
+
+    return rewriteMarkdownImages(part, imageUrl => (
+      isBareImageUrl({ url: imageUrl }) ? `./${imageUrl}` : null
+    ))
+  }).join('')
 }
 
 function portableCurrentAttachmentPath(request: ImageUrlRequest): MarkdownImageUrl | null {

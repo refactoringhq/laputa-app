@@ -6,6 +6,24 @@ import { serializeRichEditorDocumentToMarkdown } from '../utils/richEditorMarkdo
 import { preProcessEditorMarkdown, resolveBlocksForTarget } from './editorBlockResolution'
 
 describe('preProcessEditorMarkdown', () => {
+  it('normalizes bare image paths for BlockNote parsing while preserving fenced code', () => {
+    const markdown = [
+      '```md',
+      '![example](attachments/code.png)',
+      '```',
+      '',
+      '![shot](attachments/shot.png)',
+    ].join('\n')
+
+    expect(preProcessEditorMarkdown(markdown)).toBe([
+      '```md',
+      '![example](attachments/code.png)',
+      '```',
+      '',
+      '![shot](./attachments/shot.png)',
+    ].join('\n'))
+  })
+
   it('prepares currency prose without single-tilde strike or inline math placeholders', () => {
     const markdown = [
       '# Finance',
