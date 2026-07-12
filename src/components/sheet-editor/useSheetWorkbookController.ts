@@ -38,7 +38,12 @@ interface UseSheetWorkbookControllerOptions {
 
 function ensureIronCalcReady(): Promise<void> {
   if (!ironCalcInitPromise) {
-    ironCalcInitPromise = initIronCalc(ironCalcWasmUrl).then(() => undefined)
+    ironCalcInitPromise = initIronCalc(ironCalcWasmUrl)
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        ironCalcInitPromise = null
+        throw error
+      })
   }
   return ironCalcInitPromise
 }
