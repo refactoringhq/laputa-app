@@ -33,6 +33,14 @@ describe('richEditorRecoveryClassifier', () => {
     expect(richEditorRecoveryErrorNeedsDocumentRepair(emptyFragmentError)).toBe(true)
   })
 
+  it('classifies stale ProseMirror document positions across recovery surfaces', () => {
+    const error = new RangeError('Position 21183 out of range')
+
+    expect(classifyRichEditorRecoveryError(error, 'render')).toBe('prosemirror_position_out_of_range')
+    expect(classifyRichEditorRecoveryError(error, 'transform')).toBe('prosemirror_position_out_of_range')
+    expect(richEditorRecoveryErrorNeedsDocumentRepair(error)).toBe(false)
+  })
+
   it('classifies missing-id failures across render and transform recovery', () => {
     expect(classifyRichEditorRecoveryError(new Error("Block doesn't have id"), 'render')).toBe('block_missing_id')
     expect(classifyRichEditorRecoveryError(new Error("Block doesn't have id"), 'transform')).toBe('block_missing_id')
