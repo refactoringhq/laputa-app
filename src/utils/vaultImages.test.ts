@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { resolveImageUrls, portableImageUrls } from './vaultImages'
+import { normalizeBareImageUrls, resolveImageUrls, portableImageUrls } from './vaultImages'
 
 let tauriMode = false
 
@@ -149,7 +149,7 @@ describe('resolveImageUrls', () => {
       `![shot](${assetUrl('/vault/attachments/shot.png')})`,
     )
     expect(resolveImageUrls('![shot](./attachments/shot.png)', '/vault', notePath)).toBe(
-      `![shot](${assetUrl('/vault/projects/notes/attachments/shot.png')})`,
+      `![shot](${assetUrl('/vault/attachments/shot.png')})`,
     )
   })
 
@@ -252,6 +252,47 @@ describe('resolveImageUrls', () => {
     } finally {
       warnSpy.mockRestore()
     }
+  })
+})
+
+describe('normalizeBareImageUrls', () => {
+  it('adds an explicit relative prefix to bare image paths', () => {
+    expect(normalizeBareImageUrls('![shot](attachments/shot.png)')).toBe(
+      '![shot](./attachments/shot.png)',
+    )
+    expect(normalizeBareImageUrls('![diagram](images/system map.png "System map")')).toBe(
+      '![diagram](./images/system map.png "System map")',
+    )
+  })
+
+  it('preserves explicit, remote, and special image URLs', () => {
+    const markdown = [
+      '![local](./images/local.png)',
+      '![parent](../shared/parent.png)',
+      '![absolute](/Users/luca/Pictures/photo.png)',
+      '![remote](https://example.com/photo.png)',
+      '![data](data:image/png;base64,abc123)',
+      '![query](?image=photo.png)',
+      '![fragment](#photo)',
+    ].join('\n')
+
+    expect(normalizeBareImageUrls(markdown)).toBe(markdown)
+  })
+
+  it('leaves fenced code image examples unchanged', () => {
+    const markdown = [
+      '```md',
+      '![example](attachments/code.png)',
+      '```',
+      '![real](attachments/real.png)',
+    ].join('\n')
+
+    expect(normalizeBareImageUrls(markdown)).toBe([
+      '```md',
+      '![example](attachments/code.png)',
+      '```',
+      '![real](./attachments/real.png)',
+    ].join('\n'))
   })
 })
 
