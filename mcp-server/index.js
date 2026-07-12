@@ -9,6 +9,8 @@
  *   - get_vault_context: vault structure overview (types, note count, folders)
  *   - get_note: parsed frontmatter + content (convenience over raw cat)
  *   - create_note: create a new markdown note without overwriting existing files
+ *   - update_note: replace the full content of an existing note (optional conflict guard)
+ *   - append_to_note: append markdown to an existing note body
  *   - open_note: signal Tolaria UI to open a note as a tab
  *   - highlight_editor: visually highlight a UI element (editor, tab, etc.)
  *   - refresh_vault: trigger vault rescan so new/modified files appear
@@ -36,6 +38,7 @@ const LOCAL_CREATE_TOOL_ANNOTATIONS = Object.freeze({
   idempotentHint: false,
   openWorldHint: false,
 })
+const LOCAL_UPDATE_TOOL_ANNOTATIONS = LOCAL_CREATE_TOOL_ANNOTATIONS
 
 // Connect as a WebSocket CLIENT to the UI bridge (run by ws-bridge.js).
 // The bridge relays messages to all other clients (the React frontend).
@@ -147,7 +150,7 @@ const TOOLS = [
   },
   {
     name: 'get_note',
-    description: 'Read a note with parsed YAML frontmatter and markdown content. Returns {path, frontmatter, content}.',
+    description: 'Read a note with parsed YAML frontmatter, markdown content, and mtimeMs for conflict-guarded edits. Returns {path, frontmatter, content, mtimeMs}.',
     annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
     inputSchema: {
       type: 'object',
@@ -173,6 +176,35 @@ const TOOLS = [
         vaultPath: { type: 'string', description: 'Optional target vault root when multiple vaults are active.' },
       },
       required: ['path'],
+    },
+  },
+  {
+    name: 'update_note',
+    description: 'Replace the full content (frontmatter + body) of an existing note. The note must already exist — use create_note for new notes. Optionally pass expectedMtime (the note mtimeMs returned by get_note) to fail-fast when the note changed between read and write.',
+    annotations: LOCAL_UPDATE_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path inside the vault, or an absolute path inside an active vault.' },
+        content: { type: 'string', description: 'Full new markdown note content (frontmatter + body).' },
+        expectedMtime: { type: 'number', description: 'Optional on-disk mtimeMs from get_note. When set, the update fails if the note has changed.' },
+        vaultPath: { type: 'string', description: 'Optional target vault root when multiple vaults are active.' },
+      },
+      required: ['path', 'content'],
+    },
+  },
+  {
+    name: 'append_to_note',
+    description: 'Append markdown to the end of an existing note body. Lower-risk than update_note for agents that only need to log or extend content. The note must already exist.',
+    annotations: LOCAL_UPDATE_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path inside the vault, or an absolute path inside an active vault.' },
+        content: { type: 'string', description: 'Markdown to append after the existing body.' },
+        vaultPath: { type: 'string', description: 'Optional target vault root when multiple vaults are active.' },
+      },
+      required: ['path', 'content'],
     },
   },
   {
@@ -247,6 +279,26 @@ async function handleCreateNote(args = {}) {
   }
 }
 
+async function handleUpdateNote(args = {}) {
+  const note = await toolService.updateNote(args)
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify(note, null, 2),
+    }],
+  }
+}
+
+async function handleAppendToNote(args = {}) {
+  const note = await toolService.appendToNote(args)
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify(note, null, 2),
+    }],
+  }
+}
+
 function handleOpenNote(args) {
   // Refresh vault first so the new/modified note appears in the note list,
   // then signal the UI to open it in a tab.
@@ -270,6 +322,8 @@ const TOOL_HANDLERS = new Map([
   ['list_vaults', handleListVaults],
   ['get_note', handleGetNote],
   ['create_note', handleCreateNote],
+  ['update_note', handleUpdateNote],
+  ['append_to_note', handleAppendToNote],
   ['open_note', handleOpenNote],
   ['highlight_editor', handleHighlightEditor],
   ['refresh_vault', handleRefreshVault],

@@ -387,21 +387,18 @@ The stdio entrypoint and desktop WebSocket bridge share `mcp-server/tool-service
 
 | Tool | Params | Description |
 |------|--------|-------------|
-| `open_note` | `path` | Open and read a note by relative path |
-| `read_note` | `path` | Read note content (alias for `open_note`) |
-| `create_note` | `path, content, [title], [type], [vaultPath]` | Create a new markdown note inside an active vault without overwriting existing files |
 | `search_notes` | `query, [limit]` | Search notes by title or content substring |
-| `list_vaults` | — | List active mounted vaults and whether each has root `AGENTS.md` instructions |
-| `append_to_note` | `path, text` | Append text to end of existing note |
-| `edit_note_frontmatter` | `path, patch` | Merge key-value patch into YAML frontmatter |
-| `delete_note` | `path` | Delete a note file from the vault |
-| `link_notes` | `source_path, property, target_title` | Add a target to an array property in frontmatter |
-| `list_notes` | `[type_filter], [sort]` | List all notes, optionally filtered by type |
 | `vault_context` / `get_vault_context` | `[vaultPath]` | Get mounted-vault summary: entity types, folders, recent notes, and root `AGENTS.md` instructions |
-| `ui_open_note` | `path` | Open a note in the Tolaria UI editor |
-| `ui_open_tab` | `path` | Open a note in a new UI tab |
-| `ui_highlight` | `element, [path]` | Highlight a UI element (editor, tab, properties, notelist) |
+| `list_vaults` | - | List active mounted vaults and whether each has root `AGENTS.md` instructions |
+| `get_note` / `read_note` | `path, [vaultPath]` | Read parsed frontmatter, markdown body content, and `mtimeMs` for conflict-guarded edits |
+| `create_note` | `path, content, [title], [type], [vaultPath]` | Create a new markdown note inside an active vault without overwriting existing files |
+| `update_note` | `path, content, [expectedMtime], [vaultPath]` | Replace an existing note's full markdown content, optionally failing if `mtimeMs` changed since `get_note` |
+| `append_to_note` | `path, content, [vaultPath]` | Append markdown verbatim to the end of an existing note |
+| `open_note` / `ui_open_tab` | `path, [vaultPath]` | Open a note in a new Tolaria UI tab |
+| `ui_open_note` | `path, [vaultPath]` | Open a note in the Tolaria UI editor |
+| `highlight_editor` / `ui_highlight` | `element, [path]` | Highlight a UI element (editor, tab, properties, notelist) |
 | `ui_set_filter` | `type` | Set the sidebar filter to a specific type |
+| `refresh_vault` | `[path], [vaultPath]` | Trigger a vault rescan after a file change |
 
 ### Transports
 
