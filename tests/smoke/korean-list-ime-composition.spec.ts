@@ -29,6 +29,23 @@ async function createBulletListItem(page: Page) {
   return bullet
 }
 
+async function createNumberedListItemNestedUnderChecklist(page: Page) {
+  await page.locator('.bn-block-content').nth(1).click()
+  await page.keyboard.type('/check')
+  await expect(page.getByRole('option', { name: /Check List/i })).toBeVisible()
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('Parent task')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('/num')
+  await expect(page.getByRole('option', { name: /Numbered List/i })).toBeVisible()
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Tab')
+
+  const numbered = page.locator('.bn-block-content[data-content-type="numberedListItem"]').last()
+  await expect(numbered).toBeVisible()
+  return numbered
+}
+
 test('composing Enter inside a Korean bullet item does not split the list item', async ({ page }) => {
   await openNote(page, 'Note B')
   const bullet = await createBulletListItem(page)
@@ -70,4 +87,44 @@ test('composing Enter inside a Korean bullet item does not split the list item',
 
   await page.keyboard.type(' 계속')
   await expect(bullet).toContainText('한글 시작 계속')
+})
+
+test('composing Space inside a numbered list nested under a checklist does not split the item', async ({ page }) => {
+  await openNote(page, 'Note B')
+  const numbered = await createNumberedListItemNestedUnderChecklist(page)
+  await page.keyboard.type('nihao')
+  await expect(numbered).toContainText('nihao')
+
+  const numberedCountBefore = await page.locator('.bn-block-content[data-content-type="numberedListItem"]').count()
+  const dispatchResult = await numbered.evaluate((element) => {
+    const editor = document.querySelector('.bn-editor')
+    let reachedEditorBubble = false
+    const handleKeydown = () => {
+      reachedEditorBubble = true
+    }
+
+    editor?.addEventListener('keydown', handleKeydown, { once: true })
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'Space',
+      key: ' ',
+    })
+    Object.defineProperty(event, 'isComposing', { value: true })
+    element.dispatchEvent(event)
+    editor?.removeEventListener('keydown', handleKeydown)
+
+    return {
+      defaultPrevented: event.defaultPrevented,
+      reachedEditorBubble,
+    }
+  })
+
+  expect(dispatchResult).toEqual({
+    defaultPrevented: false,
+    reachedEditorBubble: false,
+  })
+  await expect(page.locator('.bn-block-content[data-content-type="numberedListItem"]')).toHaveCount(
+    numberedCountBefore,
+  )
 })

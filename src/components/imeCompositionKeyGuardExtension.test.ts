@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createImeCompositionKeyGuardExtension,
-  shouldStopComposingEnterKey,
+  shouldStopComposingCommitKey,
 } from './imeCompositionKeyGuardExtension'
 
 type KeyListener = (event: KeyboardEvent) => void
@@ -62,29 +62,51 @@ function createFixture() {
   }
 }
 
-describe('shouldStopComposingEnterKey', () => {
+describe('shouldStopComposingCommitKey', () => {
   it('matches Enter while the native event is composing', () => {
     const event = createKeyboardEvent({ isComposing: true })
 
-    expect(shouldStopComposingEnterKey(event, { composing: false })).toBe(true)
+    expect(shouldStopComposingCommitKey(event, { composing: false })).toBe(true)
   })
 
   it('matches Enter while the ProseMirror view is still composing', () => {
     const event = createKeyboardEvent({ isComposing: false })
 
-    expect(shouldStopComposingEnterKey(event, { composing: true })).toBe(true)
+    expect(shouldStopComposingCommitKey(event, { composing: true })).toBe(true)
   })
 
   it('leaves normal Enter available for list editing', () => {
     const event = createKeyboardEvent({ isComposing: false })
 
-    expect(shouldStopComposingEnterKey(event, { composing: false })).toBe(false)
+    expect(shouldStopComposingCommitKey(event, { composing: false })).toBe(false)
+  })
+
+  it('matches Space while the native event is composing', () => {
+    const event = createKeyboardEvent({
+      code: 'Space',
+      isComposing: true,
+      key: ' ',
+      keyCode: 32,
+    })
+
+    expect(shouldStopComposingCommitKey(event, { composing: false })).toBe(true)
+  })
+
+  it('matches Space while the ProseMirror view is still composing', () => {
+    const event = createKeyboardEvent({
+      code: 'Space',
+      isComposing: false,
+      key: ' ',
+      keyCode: 32,
+    })
+
+    expect(shouldStopComposingCommitKey(event, { composing: true })).toBe(true)
   })
 
   it('leaves non-Enter composition keys alone', () => {
     const event = createKeyboardEvent({ isComposing: true, key: 'a', keyCode: 65 })
 
-    expect(shouldStopComposingEnterKey(event, { composing: false })).toBe(false)
+    expect(shouldStopComposingCommitKey(event, { composing: false })).toBe(false)
   })
 })
 
@@ -120,6 +142,21 @@ describe('createImeCompositionKeyGuardExtension', () => {
     fixture.mount()
 
     const event = fixture.fireKeydown({ isComposing: false })
+
+    expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(1)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('stops composing Space before BlockNote list shortcuts can handle the IME commit', () => {
+    const fixture = createFixture()
+    fixture.mount()
+
+    const event = fixture.fireKeydown({
+      code: 'Space',
+      isComposing: true,
+      key: ' ',
+      keyCode: 32,
+    })
 
     expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(1)
     expect(event.preventDefault).not.toHaveBeenCalled()

@@ -15,18 +15,25 @@ function isEnterKey(event: KeyboardEvent): boolean {
     || event.keyCode === 13
 }
 
-export function shouldStopComposingEnterKey(
+function isSpaceKey(event: KeyboardEvent): boolean {
+  return event.key === ' '
+    || event.key === 'Spacebar'
+    || event.code === 'Space'
+    || event.keyCode === 32
+}
+
+export function shouldStopComposingCommitKey(
   event: KeyboardEvent,
   view?: ComposingEditorView | null,
 ): boolean {
-  return isEnterKey(event) && isComposingKeyEvent(event, view)
+  return (isEnterKey(event) || isSpaceKey(event)) && isComposingKeyEvent(event, view)
 }
 
 export const createImeCompositionKeyGuardExtension = createExtension(({ editor }) => {
   const readView = () => editor._tiptapEditor?.view ?? editor.prosemirrorView
 
   const handleKeyDown = (event: KeyboardEvent) => {
-    if (!shouldStopComposingEnterKey(event, readView())) return
+    if (!shouldStopComposingCommitKey(event, readView())) return
 
     event.stopImmediatePropagation()
   }
