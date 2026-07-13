@@ -68,6 +68,7 @@ describe('NoteList context menu', () => {
 
     expect(screen.getByTestId('note-list-context-menu')).toBeInTheDocument()
     expect(screen.getByTestId('note-list-context-menu')).toHaveClass('z-[12000]')
+    expect(screen.getByTestId('note-list-context-menu').parentElement).toBe(document.body)
     expect(screen.getByText(getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteOpenInNewWindow)!)).toBeInTheDocument()
     expect(screen.getByText(getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteToggleFavorite)!)).toBeInTheDocument()
     expect(screen.getByText(getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteToggleOrganized)!)).toBeInTheDocument()
