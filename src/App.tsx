@@ -874,6 +874,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     setToastMessage,
   })
   const fileActions = useFileActions({
+    locale: appLocale,
     selection: effectiveSelection,
     setToastMessage,
     vaultPath: resolvedPath,

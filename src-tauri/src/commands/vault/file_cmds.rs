@@ -7,6 +7,10 @@ use super::boundary::{
     with_boundary, with_existing_paths, with_requested_root, with_validated_path, ValidatedPathMode,
 };
 
+const LOCALIZED_ERROR_PREFIX: &str = "tolaria:i18n-error:";
+const FILE_ACTION_INSPECT_PATH_ERROR_KEY: &str = "fileActions.error.inspectPath";
+const FILE_ACTION_PATH_MISSING_ERROR_KEY: &str = "fileActions.error.pathMissing";
+
 fn with_note_path<T>(
     path: &Path,
     vault_path: Option<&Path>,
@@ -136,11 +140,16 @@ fn file_manager_reveal_action(
     path: &Path,
     platform: RevealPlatform,
 ) -> Result<FileManagerRevealAction, String> {
-    if !path
-        .try_exists()
-        .map_err(|error| format!("Failed to inspect path: {error}"))?
-    {
-        return Err(format!("Path does not exist: {}", path.display()));
+    if !path.try_exists().map_err(|error| {
+        localized_reveal_error(
+            FILE_ACTION_INSPECT_PATH_ERROR_KEY,
+            serde_json::json!({ "error": error.to_string() }),
+        )
+    })? {
+        return Err(localized_reveal_error(
+            FILE_ACTION_PATH_MISSING_ERROR_KEY,
+            serde_json::json!({ "path": path.display().to_string() }),
+        ));
     }
 
     if platform == RevealPlatform::Windows && path.is_dir() {
@@ -148,6 +157,14 @@ fn file_manager_reveal_action(
     }
 
     Ok(FileManagerRevealAction::RevealItemInDir(path.to_path_buf()))
+}
+
+fn localized_reveal_error(key: &str, values: serde_json::Value) -> String {
+    let payload = serde_json::json!({
+        "key": key,
+        "values": values,
+    });
+    format!("{LOCALIZED_ERROR_PREFIX}{payload}")
 }
 
 fn perform_file_manager_reveal(
@@ -548,7 +565,9 @@ mod tests {
         let error =
             file_manager_reveal_action(missing.as_path(), RevealPlatform::Windows).unwrap_err();
 
-        assert!(error.contains("Path does not exist"));
+        assert!(error.starts_with(LOCALIZED_ERROR_PREFIX));
+        assert!(error.contains(FILE_ACTION_PATH_MISSING_ERROR_KEY));
+        assert!(error.contains("missing"));
     }
 
     #[test]
