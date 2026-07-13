@@ -102,7 +102,8 @@ const HTML_BLOCK_RE = /^[ \t]{0,3}<\/?[A-Za-z][^>]*>/u
 const MARKDOWN_IMAGE_RE = /(^|[^\\])!\[[^\]]*\]\(/u
 const REFERENCE_LINK_RE = /^[ \t]{0,3}\[[^\]]+\]:[ \t]+/u
 const UNSUPPORTED_BLOCK_RE = /^[ \t]{0,3}(?:#{7,}|:::+|\[\^.+\]:)/u
-const DURABLE_MARKDOWN_TOKEN_RE = /^@@TOLARIA_[A-Z_]+:.+@@$/u
+const DURABLE_MARKDOWN_TOKEN_PREFIX = '@@TOLARIA_'
+const DURABLE_MARKDOWN_TOKEN_RE = /^@@TOLARIA_[A-Z_]+:[^@]+@@$/u
 const TEXT_STYLE_KEYS: Array<keyof TextStyles> = ['bold', 'code', 'italic', 'strike']
 
 const textEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null
@@ -187,6 +188,13 @@ function parseInline(text: InlineMarkdownText, styles: TextStyles = {}): InlineI
   let index = 0
 
   while (index < text.length) {
+    const durableToken = readDurableMarkdownTokenAt(text, index)
+    if (durableToken) {
+      appendText(items, durableToken, styles)
+      index += durableToken.length
+      continue
+    }
+
     const link = readLinkAt(text, index)
     if (link) {
       items.push({
@@ -227,6 +235,16 @@ function parseInline(text: InlineMarkdownText, styles: TextStyles = {}): InlineI
 
 function isDurableMarkdownToken(text: InlineMarkdownText): boolean {
   return DURABLE_MARKDOWN_TOKEN_RE.test(text)
+}
+
+function readDurableMarkdownTokenAt(text: InlineMarkdownText, index: LineIndex): MarkdownToken | null {
+  if (!text.startsWith(DURABLE_MARKDOWN_TOKEN_PREFIX, index)) return null
+
+  const tokenEnd = text.indexOf('@@', index + DURABLE_MARKDOWN_TOKEN_PREFIX.length)
+  if (tokenEnd === -1) return null
+
+  const token = text.slice(index, tokenEnd + 2)
+  return isDurableMarkdownToken(token) ? token : null
 }
 
 function nextStyleMarker(text: InlineMarkdownText, index: LineIndex): { style: keyof TextStyles; token: MarkdownToken } | null {

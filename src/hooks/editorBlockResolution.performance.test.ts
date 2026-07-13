@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { clearParsedNoteBlockCache } from './editorParsedBlockCache'
 import { resolveBlocksForTarget } from './editorBlockResolution'
 import { MERMAID_BLOCK_TYPE } from '../utils/mermaidMarkdown'
+import { MATH_INLINE_TYPE } from '../utils/mathMarkdown'
 
 function makeEditor() {
   return {
@@ -72,6 +73,34 @@ describe('resolveBlocksForTarget performance paths', () => {
         }),
       }),
     ]))
+  })
+
+  it('keeps inline math placeholders intact when large notes use the direct Markdown parser', async () => {
+    const editor = makeEditor()
+    const latex = String.raw`\Delta P_{\text{pipe}}`
+    const content = `${longMarkdownBody()}\n\nPressure drop is $${latex}$ across the pipe.`
+
+    const resolved = await resolveBlocksForTarget({
+      editor: editor as never,
+      cache: new Map(),
+      targetPath: '/vault/large-math.md',
+      content,
+    })
+    const mathParagraph = resolved.blocks.find((block) => (
+      block.type === 'paragraph'
+        && Array.isArray(block.content)
+        && block.content.some(item => item.type === MATH_INLINE_TYPE)
+    ))
+
+    expect(editor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
+    expect(mathParagraph).toMatchObject({
+      content: [
+        { type: 'text', text: 'Pressure drop is ' },
+        { type: MATH_INLINE_TYPE, props: { latex } },
+        { type: 'text', text: ' across the pipe.' },
+      ],
+    })
+    expect(JSON.stringify(resolved.blocks)).not.toContain('TOLARIA_MATH')
   })
 
   it.each([
