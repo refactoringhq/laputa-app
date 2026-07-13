@@ -66,8 +66,10 @@ describe('NoteList context menu', () => {
 
     openBuildLaputaActions()
 
-    expect(screen.getByTestId('note-list-context-menu')).toBeInTheDocument()
-    expect(screen.getByTestId('note-list-context-menu')).toHaveClass('z-[12000]')
+    const contextMenu = screen.getByTestId('note-list-context-menu')
+    expect(contextMenu).toBeInTheDocument()
+    expect(contextMenu).toHaveClass('z-[12000]')
+    expect(contextMenu.parentElement).toBe(document.body)
     expect(screen.getByText(getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteOpenInNewWindow)!)).toBeInTheDocument()
     expect(screen.getByText(getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteToggleFavorite)!)).toBeInTheDocument()
     expect(screen.getByText(getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteToggleOrganized)!)).toBeInTheDocument()
