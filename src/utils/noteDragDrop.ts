@@ -7,6 +7,7 @@ export function writeNoteDragData(dataTransfer: DataTransfer, notePath: string) 
 }
 
 export function readDraggedNotePath(dataTransfer: DataTransfer | null): string | null {
-  const notePath = dataTransfer?.getData(NOTE_DRAG_MIME_TYPE).trim()
+  const rawNotePath = dataTransfer?.getData(NOTE_DRAG_MIME_TYPE)
+  const notePath = typeof rawNotePath === 'string' ? rawNotePath.trim() : ''
   return notePath || null
 }
