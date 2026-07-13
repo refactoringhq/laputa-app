@@ -9,6 +9,7 @@ import path from 'node:path'
 import matter from 'gray-matter'
 
 const ACTIVE_VAULT_ERROR = 'Note path must stay inside the active vault'
+const VAULT_CONTEXT_PREFIX_BYTES = 64 * 1024
 
 /**
  * Recursively find all .md files under a directory.
@@ -171,13 +172,15 @@ export async function vaultContext(vaultPath) {
   }
 
   notesWithMtime.sort((a, b) => b.mtime - a.mtime)
-  const recentNotes = notesWithMtime.slice(0, 20).map(contextNoteWithoutMtime)
+  const recentNotes = await Promise.all(
+    notesWithMtime.slice(0, 20).map(hydrateContextNoteTitle),
+  )
 
   return {
     types: [...typesSet].sort(),
     noteCount: files.length,
     folders: [...foldersSet].sort(),
-    recentNotes,
+    recentNotes: recentNotes.map(contextNoteWithoutMtime),
     configFiles: await readConfigFiles(vaultPath),
     vaultPath,
   }
@@ -286,22 +289,36 @@ function contextNoteWithoutMtime(note) {
 }
 
 async function readVaultContextNote(vaultPath, filePath) {
-  const raw = await readUtf8File(filePath)
-  const parsed = parseMarkdownNote(raw)
+  const { text, truncated } = await readUtf8FilePrefix(filePath, VAULT_CONTEXT_PREFIX_BYTES)
+  const parsed = parseMarkdownNote(text)
   const rel = path.relative(vaultPath, filePath)
   const topFolder = extractTopFolder(rel)
   const stat = await statFile(filePath)
   const type = parsed.data.type || parsed.data.is_a || null
+  const fallbackTitle = path.basename(filePath, '.md')
+  const title = parsed.data.title || extractTitle(text, fallbackTitle)
 
   return {
     topFolder,
     type,
     note: {
+      absolutePath: filePath,
       path: rel,
-      title: parsed.data.title || extractTitle(raw, path.basename(filePath, '.md')),
+      title,
       type,
       mtime: stat.mtimeMs,
+      shouldHydrateTitle: truncated && title === fallbackTitle,
     },
+  }
+}
+
+async function hydrateContextNoteTitle(note) {
+  if (!note.shouldHydrateTitle) return note
+
+  return {
+    ...note,
+    title: extractTitle(await readUtf8File(note.absolutePath), note.title),
+    shouldHydrateTitle: false,
   }
 }
 
@@ -450,6 +467,21 @@ async function readUtf8File(filePath) {
   const handle = await open(filePath, 'r')
   try {
     return await handle.readFile('utf-8')
+  } finally {
+    await handle.close()
+  }
+}
+
+async function readUtf8FilePrefix(filePath, byteLimit) {
+  const handle = await open(filePath, 'r')
+  try {
+    const buffer = Buffer.allocUnsafe(byteLimit)
+    const { bytesRead } = await handle.read(buffer, 0, byteLimit, 0)
+    const stats = await handle.stat()
+    return {
+      text: buffer.subarray(0, bytesRead).toString('utf-8'),
+      truncated: stats.size > bytesRead,
+    }
   } finally {
     await handle.close()
   }
