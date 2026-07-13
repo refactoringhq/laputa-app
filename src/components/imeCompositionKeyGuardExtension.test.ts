@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createImeCompositionKeyGuardExtension,
-  shouldStopComposingEnterKey,
+  shouldStopComposingEditorShortcutKey,
 } from './imeCompositionKeyGuardExtension'
 
 type KeyListener = (event: KeyboardEvent) => void
+type ShortcutKeyFixture = Pick<KeyboardEvent, 'key' | 'keyCode'>
+
+const COMPOSING_SHORTCUT_KEYS: Array<[string, ShortcutKeyFixture]> = [
+  ['Enter', { key: 'Enter', keyCode: 13 }],
+  ['Space', { key: ' ', keyCode: 32 }],
+]
 
 function createKeyboardEvent(event: Partial<KeyboardEvent> = {}) {
   return {
@@ -62,29 +68,29 @@ function createFixture() {
   }
 }
 
-describe('shouldStopComposingEnterKey', () => {
-  it('matches Enter while the native event is composing', () => {
-    const event = createKeyboardEvent({ isComposing: true })
+describe('shouldStopComposingEditorShortcutKey', () => {
+  it.each(COMPOSING_SHORTCUT_KEYS)('matches %s while the native event is composing', (_name, keyEvent) => {
+    const event = createKeyboardEvent({ ...keyEvent, isComposing: true })
 
-    expect(shouldStopComposingEnterKey(event, { composing: false })).toBe(true)
+    expect(shouldStopComposingEditorShortcutKey(event, { composing: false })).toBe(true)
   })
 
   it('matches Enter while the ProseMirror view is still composing', () => {
     const event = createKeyboardEvent({ isComposing: false })
 
-    expect(shouldStopComposingEnterKey(event, { composing: true })).toBe(true)
+    expect(shouldStopComposingEditorShortcutKey(event, { composing: true })).toBe(true)
   })
 
-  it('leaves normal Enter available for list editing', () => {
-    const event = createKeyboardEvent({ isComposing: false })
+  it.each(COMPOSING_SHORTCUT_KEYS)('leaves normal %s available for editor input', (_name, keyEvent) => {
+    const event = createKeyboardEvent({ ...keyEvent, isComposing: false })
 
-    expect(shouldStopComposingEnterKey(event, { composing: false })).toBe(false)
+    expect(shouldStopComposingEditorShortcutKey(event, { composing: false })).toBe(false)
   })
 
-  it('leaves non-Enter composition keys alone', () => {
+  it('leaves non-shortcut composition keys alone', () => {
     const event = createKeyboardEvent({ isComposing: true, key: 'a', keyCode: 65 })
 
-    expect(shouldStopComposingEnterKey(event, { composing: false })).toBe(false)
+    expect(shouldStopComposingEditorShortcutKey(event, { composing: false })).toBe(false)
   })
 })
 
@@ -104,22 +110,28 @@ describe('createImeCompositionKeyGuardExtension', () => {
     )
   })
 
-  it('stops composing Enter before BlockNote list shortcuts can split the item', () => {
-    const fixture = createFixture()
-    fixture.mount()
-
-    const event = fixture.fireKeydown({ isComposing: true })
-
-    expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(1)
-    expect(event.preventDefault).not.toHaveBeenCalled()
-  })
-
   it('guards Enter while ProseMirror still reports composition', () => {
     const fixture = createFixture()
     fixture.view.composing = true
     fixture.mount()
 
     const event = fixture.fireKeydown({ isComposing: false })
+
+    expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(1)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+
+  it.each(COMPOSING_SHORTCUT_KEYS)('stops composing %s before editor shortcuts observe IME confirmation', (
+    _name,
+    keyEvent,
+  ) => {
+    const fixture = createFixture()
+    fixture.mount()
+
+    const event = fixture.fireKeydown({
+      ...keyEvent,
+      isComposing: true,
+    })
 
     expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(1)
     expect(event.preventDefault).not.toHaveBeenCalled()
