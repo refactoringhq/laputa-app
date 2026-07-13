@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Archive,
   ArrowSquareOut,
@@ -314,7 +315,7 @@ export function NoteListContextMenuNode(props: NoteListContextMenuNodeProps) {
     onCopyGitUrl,
   }, entry, selectAction)
 
-  return (
+  return createPortal(
     <div
       ref={ctxMenuRef}
       className="fixed z-[12000] rounded-md border bg-popover p-1 shadow-md"
@@ -322,7 +323,8 @@ export function NoteListContextMenuNode(props: NoteListContextMenuNodeProps) {
       data-testid="note-list-context-menu"
     >
       {items.map((item) => <NoteListContextMenuButton key={item.label} item={item} />)}
-    </div>
+    </div>,
+    document.body,
   )
 }
 
