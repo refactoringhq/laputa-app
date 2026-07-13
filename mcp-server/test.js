@@ -6,6 +6,7 @@ import {
 } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { performance } from 'node:perf_hooks'
 import process from 'node:process'
 import { clearTimeout, setTimeout } from 'node:timers'
 import { fileURLToPath } from 'node:url'
@@ -355,6 +356,30 @@ describe('vaultContext', () => {
   it('should report correct note count', async () => {
     const ctx = await vaultContext(tmpDir)
     assert.equal(ctx.noteCount, 4)
+  })
+
+  it('scales context collection with frontmatter size instead of note body size', async () => {
+    const noteCount = 120
+    const smallVault = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-context-small-'))
+    const largeVault = await mkdtemp(path.join(os.tmpdir(), 'laputa-mcp-context-large-'))
+
+    try {
+      await writeContextFixtureVault(smallVault, noteCount, 64)
+      await writeContextFixtureVault(largeVault, noteCount, 1024 * 1024)
+
+      await measureVaultContextMs(smallVault, noteCount)
+      await measureVaultContextMs(largeVault, noteCount)
+      const smallMs = await measureVaultContextMs(smallVault, noteCount)
+      const largeMs = await measureVaultContextMs(largeVault, noteCount)
+
+      assert.ok(
+        largeMs <= smallMs * 3.5,
+        `large note bodies should not dominate context scans: small=${smallMs.toFixed(1)}ms large=${largeMs.toFixed(1)}ms`,
+      )
+    } finally {
+      await rm(smallVault, { recursive: true, force: true })
+      await rm(largeVault, { recursive: true, force: true })
+    }
   })
 
   it('includes root AGENTS.md instructions when present', async () => {
@@ -785,6 +810,27 @@ async function writeTextFile(filePath, content) {
   } finally {
     await handle.close()
   }
+}
+
+async function writeContextFixtureVault(vaultDir, noteCount, bodyBytes) {
+  const notesDir = path.join(vaultDir, 'notes')
+  const body = 'A'.repeat(bodyBytes)
+  await mkdir(notesDir, { recursive: true })
+
+  for (let index = 0; index < noteCount; index += 1) {
+    await writeFile(
+      path.join(notesDir, `note-${index}.md`),
+      `---\ntitle: Note ${index}\ntype: Note\n---\n\n# Note ${index}\n\n${body}\n`,
+      'utf-8',
+    )
+  }
+}
+
+async function measureVaultContextMs(vaultDir, expectedNoteCount) {
+  const startedAt = performance.now()
+  const ctx = await vaultContext(vaultDir)
+  assert.equal(ctx.noteCount, expectedNoteCount)
+  return performance.now() - startedAt
 }
 
 function sleep(ms) {
