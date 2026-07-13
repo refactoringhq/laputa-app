@@ -186,6 +186,9 @@ importers:
       dompurify:
         specifier: 3.4.2
         version: 3.4.2
+      hono:
+        specifier: 4.12.21
+        version: 4.12.21
       katex:
         specifier: ^0.16.28
         version: 0.16.28
@@ -4424,6 +4427,10 @@ packages:
 
   hono@4.12.25:
     resolution: {integrity: sha512-2NFaIyNVgJmBs/ecmtGzlmluTFs5cHEWGTdu0t1HBwYzoGXOL5nUQBRMXsXWla5i4KkG//QMzVP88m1+I3fdAQ==}
+    engines: {node: '>=16.9.0'}
+
+  hono@4.12.21:
+    resolution: {integrity: sha512-uV63apnb0kyPtAUwoWgaGh9HyIFcv8lgmzPZSiTBQAFOFGIzka5EZ1dZocmGnn0XdX0+XTqJ6Tqv7selMuGLRQ==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -10830,6 +10837,8 @@ snapshots:
       react-is: 16.13.1
 
   hono@4.12.25: {}
+
+  hono@4.12.21: {}
 
   hookable@5.5.3: {}
 
