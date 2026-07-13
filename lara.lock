@@ -790,6 +790,14 @@ files:
     editor.exportPdf.failed: bf3fa78ff5725f5cbde8979b67ec2e2a
     editor.imageImport.unsupportedHeic: 75481136eb7ca33ef4f82806765e406f
     editor.imageImport.unsupported: 9008202219a82edb8e70700bf351ce60
+    fileActions.copied.filePath: 702fb6fd2ae69083e8f5ee9603d7e5f6
+    fileActions.copied.folderPath: 7d6ed7052d7570a7d1fec70dc65d9363
+    fileActions.error.copyFolderPath: 0b63215944372916aee6d99bcc99af25
+    fileActions.error.copyPath: 108845052431f0df4bb6748a3e324b2f
+    fileActions.error.inspectPath: 83a867d02f78df359a447115b1667dab
+    fileActions.error.openFile: 6c11a33d40baa77a4f1160a477dc5cb9
+    fileActions.error.pathMissing: 29056211d592f32e4993f5da0de73952
+    fileActions.error.revealPath: 70e1d29dabf529261d6d9195a3d81c7f
     filePreview.copyDeepLink: b75833669968adbef634495636e3fe50
     deepLinks.copied: 6ada57681192daf3b4afa07ce7a30575
     deepLinks.error.ambiguousVault: 4365c6d5cf8c2c1165259b32d24a6274
