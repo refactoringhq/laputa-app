@@ -1,12 +1,26 @@
 import { test, expect, type Page } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
 import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from '../helpers/fixtureVault'
+
+const NESTED_TASK_ORDERED_LIST_NOTE = `---
+title: Note B
+type: Note
+status: Active
+---
+
+# Note B
+
+- [ ] 123
+  1. composition target
+`
 
 let tempVaultDir: string
 
-test.beforeEach(async ({ page }, testInfo) => {
+test.beforeEach(async (fixtures, testInfo) => {
+  void fixtures
   testInfo.setTimeout(90_000)
   tempVaultDir = createFixtureVaultCopy()
-  await openFixtureVault(page, tempVaultDir)
 })
 
 test.afterEach(async () => {
@@ -30,6 +44,7 @@ async function createBulletListItem(page: Page) {
 }
 
 test('composing Enter inside a Korean bullet item does not split the list item', async ({ page }) => {
+  await openFixtureVault(page, tempVaultDir)
   await openNote(page, 'Note B')
   const bullet = await createBulletListItem(page)
   await page.keyboard.type('한글 시작')
@@ -70,4 +85,54 @@ test('composing Enter inside a Korean bullet item does not split the list item',
 
   await page.keyboard.type(' 계속')
   await expect(bullet).toContainText('한글 시작 계속')
+})
+
+test('composing Space inside a task-list nested ordered item stays inside IME handling', async ({ page }) => {
+  fs.writeFileSync(path.join(tempVaultDir, 'note', 'note-b.md'), NESTED_TASK_ORDERED_LIST_NOTE)
+  await openFixtureVault(page, tempVaultDir)
+  await openNote(page, 'Note B')
+
+  const orderedItem = page.locator('.bn-block-content[data-content-type="numberedListItem"]', {
+    hasText: 'composition target',
+  }).first()
+  await expect(orderedItem).toBeVisible({ timeout: 5_000 })
+  await orderedItem.click()
+
+  const orderedItemCountBefore = await page
+    .locator('.bn-block-content[data-content-type="numberedListItem"]')
+    .count()
+  const dispatchResult = await orderedItem.evaluate((element) => {
+    const editor = document.querySelector('.bn-editor')
+    let reachedEditorBubble = false
+    const handleKeydown = () => {
+      reachedEditorBubble = true
+    }
+
+    editor?.addEventListener('keydown', handleKeydown, { once: true })
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'Space',
+      key: ' ',
+    })
+    Object.defineProperty(event, 'isComposing', { value: true })
+    element.dispatchEvent(event)
+    editor?.removeEventListener('keydown', handleKeydown)
+
+    return {
+      defaultPrevented: event.defaultPrevented,
+      reachedEditorBubble,
+    }
+  })
+
+  expect(dispatchResult).toEqual({
+    defaultPrevented: false,
+    reachedEditorBubble: false,
+  })
+  await expect(page.locator('.bn-block-content[data-content-type="numberedListItem"]')).toHaveCount(
+    orderedItemCountBefore,
+  )
+
+  await page.keyboard.insertText(' 继续')
+  await expect(orderedItem).toContainText('composition target 继续')
 })
