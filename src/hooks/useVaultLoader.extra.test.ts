@@ -2,7 +2,8 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useVaultLoader } from './useVaultLoader'
 import type { ModifiedFile, VaultEntry, ViewFile } from '../types'
-import { loadedWorkspacePathsFromEntries } from './vaultWorkspaceEntries'
+import type { VaultOption } from '../components/status-bar/types'
+import { loadedWorkspacePathsFromEntries, uniqueWorkspacePathsFromVaults } from './vaultWorkspaceEntries'
 
 const clearPrefetchCache = vi.fn()
 const backendInvokeFn = vi.fn()
@@ -322,5 +323,52 @@ describe('useVaultLoader extra', () => {
         },
       }),
     ], '/field', { inferFallbackWorkspacePath: false })).toEqual(['/research'])
+  })
+
+  it('ignores loaded entries with malformed workspace paths instead of crashing', () => {
+    const malformedEntry = makeEntry({
+      path: '/research/research-beacon.md',
+      workspace: {
+        id: 'workspace',
+        label: 'Workspace',
+        alias: 'workspace',
+        path: null as unknown as string,
+        shortLabel: 'WS',
+        color: null,
+        icon: null,
+        mounted: true,
+        available: true,
+        defaultForNewNotes: false,
+      },
+    })
+
+    expect(loadedWorkspacePathsFromEntries([
+      malformedEntry,
+      makeEntry({
+        path: '/field/field-guide.md',
+        workspace: {
+          id: 'field',
+          label: 'Field',
+          alias: 'field',
+          path: '/field',
+          shortLabel: 'FI',
+          color: null,
+          icon: null,
+          mounted: true,
+          available: true,
+          defaultForNewNotes: true,
+        },
+      }),
+    ], '/fallback', { inferFallbackWorkspacePath: false })).toEqual(['/field'])
+  })
+
+  it('ignores malformed configured vault paths when computing workspace loads', () => {
+    const configuredVaults = [
+      { label: 'Personal', path: '/personal' },
+      { label: 'Missing', path: null },
+      { label: 'Team', path: '/team' },
+    ] as unknown as VaultOption[]
+
+    expect(uniqueWorkspacePathsFromVaults('/fallback', configuredVaults)).toEqual(['/personal', '/team'])
   })
 })

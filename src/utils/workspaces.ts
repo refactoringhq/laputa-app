@@ -33,6 +33,10 @@ function stringValue(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+function isNonBlankPath(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
 function slugifyWorkspaceAlias({ label }: WorkspaceLabelInput): string {
   const normalized = label
     .trim()
@@ -115,18 +119,22 @@ export function mountedWorkspacePaths(vaults: VaultOption[]): string[] {
   return vaults
     .filter((vault) => vault.available !== false && vault.mounted !== false)
     .map((vault) => vault.path)
+    .filter(isNonBlankPath)
 }
 
-function uniqueWorkspacePaths(paths: string[]): string[] {
-  return [...new Set(paths.filter((path) => path.trim().length > 0))]
+function uniqueWorkspacePaths(paths: readonly unknown[]): string[] {
+  return [...new Set(paths.filter(isNonBlankPath))]
 }
 
 export function workspacesMountedInGraph<T extends { path: string; available?: boolean; mounted?: boolean; managedDefault?: boolean }>({
   defaultVaultPath,
   vaults,
 }: WorkspaceSetOptions<T>): T[] {
+  const defaultPath = stringValue(defaultVaultPath)
   return vaults.filter((vault) => {
-    if (vault.path === defaultVaultPath) return true
+    const path = stringValue(vault.path)
+    if (!path.trim()) return false
+    if (path === defaultPath) return true
     return vault.available !== false && vault.mounted !== false
   })
 }
@@ -141,13 +149,9 @@ export function graphWorkspaceVaults<T extends { path: string; available?: boole
 }
 
 function shouldLoadGraphWorkspace(vault: { path: string; available?: boolean; managedDefault?: boolean }): boolean {
-  if (!vault.path.trim()) return false
+  if (!stringValue(vault.path).trim()) return false
   if (vault.available === false) return false
   return true
-}
-
-function mountedGraphWorkspace<T extends { path: string }>(vault: T): T & { mounted: true } {
-  return { ...vault, mounted: true }
 }
 
 export function graphWorkspaceVaultsForLoading<T extends { path: string; available?: boolean; mounted?: boolean; managedDefault?: boolean }>({
@@ -159,11 +163,13 @@ export function graphWorkspaceVaultsForLoading<T extends { path: string; availab
   const byPath = new Map<string, T & { mounted: true }>()
   for (const vault of vaults) {
     if (shouldLoadGraphWorkspace(vault)) {
-      byPath.set(vault.path, mountedGraphWorkspace(vault))
+      const path = stringValue(vault.path)
+      byPath.set(path, { ...vault, path, mounted: true } as T & { mounted: true })
     }
   }
-  if (defaultVaultPath.trim() && !byPath.has(defaultVaultPath)) {
-    byPath.set(defaultVaultPath, { path: defaultVaultPath, mounted: true } as T & { mounted: true })
+  const fallbackPath = stringValue(defaultVaultPath)
+  if (fallbackPath.trim() && !byPath.has(fallbackPath)) {
+    byPath.set(fallbackPath, { path: fallbackPath, mounted: true } as T & { mounted: true })
   }
   return [...byPath.values()]
 }
@@ -201,4 +207,5 @@ export function writableWorkspacePaths<T extends { path: string; available?: boo
   return workspaces
     .filter(isWritableWorkspace)
     .map((workspace) => workspace.path)
+    .filter(isNonBlankPath)
 }

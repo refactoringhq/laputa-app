@@ -16,6 +16,14 @@ const vaults: VaultOption[] = [
   { label: 'Team', path: '/team', alias: 'team', available: true, mounted: true },
 ]
 
+function vaultsWithMalformedPath(): VaultOption[] {
+  return [
+    vaults[0],
+    { label: 'Missing', path: null },
+    vaults[1],
+  ] as unknown as VaultOption[]
+}
+
 describe('graphWorkspaceVaults', () => {
   it('keeps the graph single-workspace until multiple workspaces are enabled', () => {
     expect(graphWorkspaceVaults({
@@ -121,6 +129,16 @@ describe('graphWorkspaceVaultsForLoading', () => {
       vaults,
     })).toBeUndefined()
   })
+
+  it('skips malformed configured workspace paths while loading the graph', () => {
+    const loadingVaults = graphWorkspaceVaultsForLoading({
+      defaultVaultPath: '/personal',
+      enabled: true,
+      vaults: vaultsWithMalformedPath(),
+    })
+
+    expect(loadingVaults?.map((vault) => vault.path)).toEqual(['/personal', '/team'])
+  })
 })
 
 describe('visibleWorkspacePaths', () => {
@@ -141,6 +159,14 @@ describe('visibleWorkspacePaths', () => {
       enabled: false,
       vaults,
     })).toBeUndefined()
+  })
+
+  it('ignores malformed configured workspace paths when filtering visible workspaces', () => {
+    expect(visibleWorkspacePaths({
+      defaultVaultPath: '/personal',
+      enabled: true,
+      vaults: vaultsWithMalformedPath(),
+    })).toEqual(['/personal', '/team'])
   })
 })
 
@@ -187,5 +213,12 @@ describe('writableWorkspacePaths', () => {
         { label: 'Archive', path: '/archive', available: false },
       ],
     })).toEqual(['/personal'])
+  })
+
+  it('ignores malformed writable workspace paths', () => {
+    expect(writableWorkspacePaths({
+      defaultVaultPath: '/personal',
+      graphVaults: vaultsWithMalformedPath(),
+    })).toEqual(['/personal', '/team'])
   })
 })
