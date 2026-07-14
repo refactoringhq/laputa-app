@@ -4,20 +4,20 @@ export interface TitleHeadingPasteEditor {
   setTextCursorPosition: (blockId: string, placement: 'end') => void
 }
 
-function hasSelectedTitleText(titleHeading: HTMLElement): boolean {
+function isSelectionInsideTitle(titleHeading: HTMLElement): boolean {
   const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return false
+  if (!selection || selection.rangeCount === 0) return false
   const anchor = selection.anchorNode
   const focus = selection.focusNode
 
   return Boolean(anchor && focus && titleHeading.contains(anchor) && titleHeading.contains(focus))
 }
 
-export function prepareTitleHeadingRichPaste(
+export function prepareTitleHeadingPaste(
   titleHeading: HTMLElement,
   editor: TitleHeadingPasteEditor,
 ): void {
-  if (hasSelectedTitleText(titleHeading)) {
+  if (isSelectionInsideTitle(titleHeading)) {
     editor.focus()
     return
   }
