@@ -31,7 +31,7 @@
 }
 
 body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadcrumb-bar {
-  --breadcrumb-bar-left-padding: 90px;
+  --breadcrumb-bar-left-padding: var(--tolaria-macos-traffic-light-padding, 90px);
 }
 
 .breadcrumb-bar[data-title-hidden] {

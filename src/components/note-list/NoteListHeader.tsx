@@ -302,7 +302,7 @@ export function NoteListHeader({
 }: NoteListHeaderProps) {
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const collapsedSidebarPadding = sidebarCollapsed && isMac()
-    ? MACOS_TRAFFIC_LIGHT_SAFE_PADDING
+    ? `var(--tolaria-macos-traffic-light-padding, ${MACOS_TRAFFIC_LIGHT_SAFE_PADDING}px)`
     : undefined
 
   return (
