@@ -377,7 +377,8 @@ describe('PulseView', () => {
         />,
       )
 
-      expect(await screen.findByTestId('pulse-header')).toHaveStyle({ paddingLeft: '90px' })
+      const header = await screen.findByTestId('pulse-header')
+      expect(header.style.paddingLeft).toBe('var(--tolaria-macos-traffic-light-padding, 90px)')
     })
   })
 
@@ -393,7 +394,8 @@ describe('PulseView', () => {
         />,
       )
 
-      expect(await screen.findByTestId('pulse-header')).toHaveStyle({ paddingLeft: '16px' })
+      const header = await screen.findByTestId('pulse-header')
+      expect(header.style.paddingLeft).toBe('16px')
     })
   })
 })

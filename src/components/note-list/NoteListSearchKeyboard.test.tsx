@@ -2,6 +2,18 @@ import { act, fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeIndexedEntry, renderNoteList } from '../../test-utils/noteListTestUtils'
 
+const MAC_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15'
+const originalUserAgent = navigator.userAgent
+
+function withUserAgent<T>(userAgent: string, callback: () => T): T {
+  Object.defineProperty(window.navigator, 'userAgent', { value: userAgent, configurable: true })
+  try {
+    return callback()
+  } finally {
+    Object.defineProperty(window.navigator, 'userAgent', { value: originalUserAgent, configurable: true })
+  }
+}
+
 function installAnimationFrameStub() {
   let nextId = 1
   const callbacks = new Map<number, FrameRequestCallback>()
@@ -40,28 +52,46 @@ describe('NoteList search keyboard behavior', () => {
   })
 
   it('toggles note-list search with Cmd+F while the note list is active', () => {
-    renderNoteList()
-    const noteList = screen.getByTestId('note-list-container')
+    withUserAgent(MAC_USER_AGENT, () => {
+      renderNoteList()
+      const noteList = screen.getByTestId('note-list-container')
 
-    act(() => {
-      noteList.focus()
-      fireEvent.focus(noteList)
-      fireEvent.keyDown(window, { key: 'f', code: 'KeyF', metaKey: true })
+      act(() => {
+        noteList.focus()
+        fireEvent.focus(noteList)
+        fireEvent.keyDown(window, { key: 'f', code: 'KeyF', metaKey: true })
+      })
+
+      const searchInput = screen.getByPlaceholderText('Search notes...')
+      act(() => {
+        flushAnimationFrame()
+      })
+      expect(searchInput).toHaveFocus()
+
+      act(() => {
+        fireEvent.keyDown(window, { key: 'f', code: 'KeyF', metaKey: true })
+        flushAnimationFrame()
+      })
+
+      expect(screen.queryByPlaceholderText('Search notes...')).not.toBeInTheDocument()
+      expect(noteList).toHaveFocus()
     })
+  })
 
-    const searchInput = screen.getByPlaceholderText('Search notes...')
-    act(() => {
-      flushAnimationFrame()
+  it('leaves macOS Cmd+Ctrl+F for native fullscreen while the note list is active', () => {
+    withUserAgent(MAC_USER_AGENT, () => {
+      renderNoteList()
+      const noteList = screen.getByTestId('note-list-container')
+
+      act(() => {
+        noteList.focus()
+        fireEvent.focus(noteList)
+        fireEvent.keyDown(window, { key: 'f', code: 'KeyF', metaKey: true, ctrlKey: true })
+      })
+
+      expect(screen.queryByPlaceholderText('Search notes...')).not.toBeInTheDocument()
+      expect(noteList).toHaveFocus()
     })
-    expect(searchInput).toHaveFocus()
-
-    act(() => {
-      fireEvent.keyDown(window, { key: 'f', code: 'KeyF', metaKey: true })
-      flushAnimationFrame()
-    })
-
-    expect(screen.queryByPlaceholderText('Search notes...')).not.toBeInTheDocument()
-    expect(noteList).toHaveFocus()
   })
 
   it('debounces note-list filtering and shows loading feedback while waiting', async () => {
