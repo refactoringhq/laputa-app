@@ -603,15 +603,18 @@ describe('SingleEditorView', () => {
     })
   })
 
-  it('leaves plain title-heading paste on BlockNote native handling', () => {
+  it('routes plain title-heading paste through safe inline insertion', () => {
     const { container, editor } = renderEditorHarness()
     const inlineHeading = createTitleHeadingFixture(container)
     const clipboardData = clipboardDataFor({ 'text/plain': 'Plain Title' })
 
     const didBubble = fireEvent.paste(inlineHeading, { clipboardData })
 
-    expect(didBubble).toBe(true)
-    expect(editor.insertInlineContent).not.toHaveBeenCalled()
+    expect(didBubble).toBe(false)
+    expect(editor.focus).toHaveBeenCalled()
+    expect(editor.insertInlineContent).toHaveBeenCalledWith('Plain Title', {
+      updateSelection: true,
+    })
   })
 
   it.each([
