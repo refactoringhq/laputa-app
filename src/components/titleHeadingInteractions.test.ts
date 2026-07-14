@@ -50,15 +50,18 @@ function selectTextRange(node: Text, start: number, end: number): void {
   selection?.addRange(range)
 }
 
-function richPasteEvent(target: HTMLElement) {
+function pasteEvent(
+  target: HTMLElement,
+  clipboardData: { html?: string; text: string },
+) {
   return {
     clipboardData: {
       getData: vi.fn((format: string) => (
         format === 'text/plain'
-          ? ' Rich Paste Payload'
-          : '<h1>Rich <em>Paste</em> Payload</h1>'
+          ? clipboardData.text
+          : clipboardData.html ?? ''
       )),
-      types: ['text/html', 'text/plain'],
+      types: clipboardData.html ? ['text/html', 'text/plain'] : ['text/plain'],
     },
     currentTarget: document.body,
     preventDefault: vi.fn(),
@@ -74,20 +77,37 @@ describe('useEditorPasteHandler', () => {
 
   it.each([
     {
-      expectedCursorMove: true,
-      name: 'moves collapsed title-heading rich paste to the end before insertion',
+      clipboardData: { text: ' Plain Paste Payload' },
+      expectedCursorMove: false,
+      expectedText: ' Plain Paste Payload',
+      name: 'preserves collapsed title-heading plain paste position before insertion',
       select: (text: Text) => selectCollapsedText(text, 'Sentry Fresh Paste '.length),
     },
     {
+      clipboardData: {
+        html: '<h1>Rich <em>Paste</em> Payload</h1>',
+        text: ' Rich Paste Payload',
+      },
+      expectedText: ' Rich Paste Payload',
+      expectedCursorMove: false,
+      name: 'preserves collapsed title-heading rich paste position before insertion',
+      select: (text: Text) => selectCollapsedText(text, 'Sentry Fresh Paste '.length),
+    },
+    {
+      clipboardData: {
+        html: '<h1>Rich <em>Paste</em> Payload</h1>',
+        text: ' Rich Paste Payload',
+      },
+      expectedText: ' Rich Paste Payload',
       expectedCursorMove: false,
       name: 'preserves selected title text during rich paste',
       select: (text: Text) => selectTextRange(text, 0, 'Sentry'.length),
     },
-  ])('$name', ({ expectedCursorMove, select }) => {
+  ])('$name', ({ clipboardData, expectedCursorMove, expectedText, select }) => {
     const editor = createEditor()
     const { inline, text } = createTitleHeadingFixture()
     select(text)
-    const event = richPasteEvent(inline)
+    const event = pasteEvent(inline, clipboardData)
     const { result } = renderHook(() => useEditorPasteHandler({
       editable: true,
       editor,
@@ -102,6 +122,6 @@ describe('useEditorPasteHandler', () => {
       expect(editor.setTextCursorPosition).not.toHaveBeenCalled()
       expect(editor.focus).toHaveBeenCalled()
     }
-    expect(editor.insertInlineContent).toHaveBeenCalledWith(' Rich Paste Payload', { updateSelection: true })
+    expect(editor.insertInlineContent).toHaveBeenCalledWith(expectedText, { updateSelection: true })
   })
 })
