@@ -9,6 +9,7 @@ import {
 } from '../test-utils/noteListTestUtils'
 import type { SidebarSelection, VaultEntry } from '../types'
 import * as tabManagement from '../hooks/useTabManagement'
+import { isMac } from '../utils/platform'
 
 function NoteListKeyboardHarness({
   entries = mockEntries,
@@ -92,7 +93,7 @@ describe('NoteList keyboard activation', () => {
     })
   })
 
-  it('supports Cmd+Enter to pivot the highlighted note into Neighborhood mode', async () => {
+  it('supports the platform primary modifier with Enter to pivot the highlighted note into Neighborhood mode', async () => {
     const onOpen = vi.fn()
     const onEnterNeighborhood = vi.fn()
     render(
@@ -106,7 +107,7 @@ describe('NoteList keyboard activation', () => {
     const container = screen.getByTestId('note-list-container')
     fireEvent.keyDown(container, { key: 'ArrowDown' })
     fireEvent.keyDown(container, { key: 'ArrowDown' })
-    fireEvent.keyDown(container, { key: 'Enter', metaKey: true })
+    fireEvent.keyDown(container, { key: 'Enter', ...(isMac() ? { metaKey: true } : { ctrlKey: true }) })
 
     await waitFor(() => {
       expect(onOpen).toHaveBeenLastCalledWith(mockEntries[4])
