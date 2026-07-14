@@ -72,7 +72,7 @@ describe('BreadcrumbBar filename visibility', () => {
     const editorCss = readFileSync(`${process.cwd()}/src/components/Editor.css`, 'utf8')
 
     expect(editorCss).toContain('body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadcrumb-bar')
-    expect(editorCss).toContain('--breadcrumb-bar-left-padding: 90px;')
+    expect(editorCss).toContain('--breadcrumb-bar-left-padding: var(--tolaria-macos-traffic-light-padding, 90px);')
   })
 
   it('keeps a permanent overflow menu while moving lower-priority actions from measured overflow state', () => {
