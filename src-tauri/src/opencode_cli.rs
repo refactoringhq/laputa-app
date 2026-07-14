@@ -22,14 +22,15 @@ fn run_agent_stream_with_binary<F>(
 where
     F: FnMut(AiAgentStreamEvent),
 {
-    let command = crate::opencode_config::build_command(binary, &request)?;
-    crate::cli_agent_runtime::run_ai_agent_json_stream(
-        command,
-        "opencode",
+    let configured = crate::opencode_config::build_command(binary, &request)?;
+    crate::cli_agent_runtime::run_ai_agent_json_stream_with_success_check(
+        crate::cli_agent_runtime::JsonLineProcess::new(configured.command, "opencode")
+            .with_stdin(configured.stdin_input.as_deref()),
         emit,
         crate::opencode_events::session_id,
         crate::opencode_events::dispatch_event,
         crate::opencode_events::format_error,
+        |_| None,
     )
 }
 

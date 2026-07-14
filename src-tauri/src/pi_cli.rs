@@ -28,8 +28,7 @@ where
         .map_err(|error| format!("Failed to create Pi config directory: {error}"))?;
     let command = crate::pi_config::build_command(binary, &request, agent_dir.path())?;
     crate::cli_agent_runtime::run_ai_agent_json_stream_with_success_check(
-        command,
-        "pi",
+        crate::cli_agent_runtime::JsonLineProcess::new(command, "pi"),
         emit,
         crate::pi_events::session_id,
         crate::pi_events::dispatch_event,

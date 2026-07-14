@@ -947,6 +947,7 @@ Vault guidance is intentionally short and vault-specific. General Tolaria produc
 - Only shows after vault onboarding has already resolved to a ready state
 - Uses `get_ai_agents_status`, whose backend checks Claude Code, Codex, GitHub Copilot, OpenCode, Pi, Antigravity, Kiro, and Hermes Agent by treating the app process path, login-shell path, and supported local/toolchain/app install locations, including nvm-managed Node installs plus Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
 - App-managed Claude Code runs preserve the same user-managed Anthropic/provider env behavior by forwarding selected exported variables from the app process or the user's zsh/bash startup files without persisting those secrets
+- App-managed OpenCode keeps normal prompts as `opencode run --format json <message>`, but on Windows it pipes oversized prompts through stdin before spawning so active-note context and conversation history cannot trip `CreateProcessW` command-line length handling
 - The shared `useAiAgentsStatus` hook defers that command until after the first render, skips it when AI features are disabled or the current window cannot render AI status surfaces, and falls back to missing-agent statuses if the native probe does not return promptly so first-launch onboarding keeps a recovery path
 - Persists dismissal locally once the user continues
 
