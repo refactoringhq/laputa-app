@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { Children, createElement, isValidElement, type ReactNode } from 'react'
+import { waitFor } from '@testing-library/react'
 
 type ReactRootErrorInfo = { componentStack?: string }
 type ReactRootOptions = {
@@ -16,16 +17,28 @@ const mocks = vi.hoisted(() => {
   const sentryHandler = vi.fn()
   const reactErrorHandler = vi.fn(() => sentryHandler)
   const getShortcutEventInit = vi.fn(() => ({ key: 'x' }))
+  const isFullscreen = vi.fn(async () => false)
+  let resizeListener: (() => void) | null = null
+  const onResized = vi.fn(async (listener: () => void) => {
+    resizeListener = listener
+    return vi.fn()
+  })
   const loadAppModule = vi.fn()
   const renderApp = vi.fn()
 
   return {
     createRoot,
     getShortcutEventInit,
+    isFullscreen,
     loadAppModule,
+    onResized,
     renderApp,
     reactErrorHandler,
     render,
+    resizeListener: () => resizeListener,
+    setResizeListener: (listener: (() => void) | null) => {
+      resizeListener = listener
+    },
     sentryHandler,
   }
 })
@@ -56,6 +69,12 @@ vi.mock('./hooks/appCommandCatalog', async (importOriginal) => {
     getShortcutEventInit: mocks.getShortcutEventInit,
   }
 })
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    isFullscreen: mocks.isFullscreen,
+    onResized: mocks.onResized,
+  }),
+}))
 
 async function importEntrypoint() {
   await import('./main')
@@ -139,6 +158,12 @@ describe('main entrypoint', () => {
     document.body.innerHTML = '<div id="root"></div>'
     document.body.className = ''
     window.__tolariaFrontendReady = false
+    delete (window as typeof window & { __TAURI__?: unknown }).__TAURI__
+    delete (window as typeof window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+    mocks.isFullscreen.mockReset()
+    mocks.isFullscreen.mockResolvedValue(false)
+    mocks.onResized.mockClear()
+    mocks.setResizeListener(null)
     sessionStorage.clear()
   })
 
@@ -203,6 +228,55 @@ describe('main entrypoint', () => {
     })
 
     expect(document.body).toHaveClass('mac-chrome')
+  }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
+
+  it('tracks macOS native fullscreen chrome state in Tauri', async () => {
+    ;(window as typeof window & { __TAURI__?: object }).__TAURI__ = {}
+    mocks.isFullscreen
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+
+    await withUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15', async () => {
+      await importEntrypoint()
+    })
+
+    await waitFor(() => {
+      expect(mocks.onResized).toHaveBeenCalledOnce()
+    })
+    expect(document.body).not.toHaveClass('mac-chrome-fullscreen')
+
+    mocks.resizeListener()?.()
+    await waitFor(() => {
+      expect(document.body).toHaveClass('mac-chrome-fullscreen')
+    })
+
+    mocks.resizeListener()?.()
+    await waitFor(() => {
+      expect(document.body).not.toHaveClass('mac-chrome-fullscreen')
+    })
+  }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
+
+  it('cancels Escape native defaults after an open dialog surface handles the key', async () => {
+    await importEntrypoint()
+    const dialog = document.createElement('div')
+    dialog.setAttribute('data-slot', 'dialog-content')
+    document.body.appendChild(dialog)
+    dialog.addEventListener('keydown', () => dialog.remove())
+
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    dialog.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+  }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
+
+  it('leaves Escape native defaults available when no dialog or popover is open', async () => {
+    await importEntrypoint()
+
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    window.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(false)
   }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
 
   it('ignores ResizeObserver loop notifications instead of showing the fatal overlay', async () => {

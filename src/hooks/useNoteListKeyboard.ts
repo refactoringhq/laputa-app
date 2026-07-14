@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import type { VirtuosoHandle } from 'react-virtuoso'
 import type { VaultEntry } from '../types'
 import { logKeyboardNavigationTrace } from '../utils/noteOpenPerformance'
+import { isMac } from '../utils/platform'
 
 interface NoteListKeyboardOptions {
   items: VaultEntry[]
@@ -122,19 +123,25 @@ function resolveHighlightedEntry(items: VaultEntry[], highlightedPath: string | 
   return getItemIndex(items).entryByPath.get(highlightedPath)
 }
 
-function usesCommandModifier(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey'>): boolean {
+function usesPlatformCommandModifier(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey'>): boolean {
+  return isMac()
+    ? event.metaKey && !event.ctrlKey
+    : event.ctrlKey && !event.metaKey
+}
+
+function hasCommandLikeModifier(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey'>): boolean {
   return event.metaKey || event.ctrlKey
 }
 
 function isToggleSearchShortcut(
   event: Pick<KeyboardEvent, 'key' | 'code' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>,
 ): boolean {
-  if (!usesCommandModifier(event) || event.altKey || event.shiftKey) return false
+  if (!usesPlatformCommandModifier(event) || event.altKey || event.shiftKey) return false
   return event.code === 'KeyF' || event.key.toLowerCase() === 'f'
 }
 
 function isNeighborhoodKey(event: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey'>): boolean {
-  return event.key === 'Enter' && usesCommandModifier(event) && !event.altKey
+  return event.key === 'Enter' && usesPlatformCommandModifier(event) && !event.altKey
 }
 
 function useKeyboardItemRefs(items: VaultEntry[], selectedNotePath: string | null) {
@@ -534,7 +541,7 @@ function handleNeighborhoodShortcutEvent(options: {
 function shouldIgnoreListKeyboardEvent(
   event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 'altKey'>,
 ): boolean {
-  return usesCommandModifier(event) || event.altKey
+  return hasCommandLikeModifier(event) || event.altKey
 }
 
 function handleEnterShortcutEvent(

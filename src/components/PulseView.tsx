@@ -280,14 +280,14 @@ function PulseHeader({
   }, [dragRegionRef, onMouseDown])
 
   const leftPadding = sidebarCollapsed && isMac()
-    ? MACOS_TRAFFIC_LIGHT_SAFE_PADDING
-    : 16
+    ? `var(--tolaria-macos-traffic-light-padding, ${MACOS_TRAFFIC_LIGHT_SAFE_PADDING}px)`
+    : '16px'
 
   return (
     <div
       ref={headerRef}
       className="flex shrink-0 items-center justify-between border-b border-border"
-      style={{ height: 52, padding: `0 16px 0 ${leftPadding}px`, cursor: 'default' }}
+      style={{ height: 52, padding: '0 16px', paddingLeft: leftPadding, cursor: 'default' }}
       data-testid="pulse-header"
     >
       <div className="flex items-center" style={{ gap: 8 }}>

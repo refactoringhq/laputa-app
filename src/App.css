@@ -15,6 +15,14 @@
   overflow: hidden;
 }
 
+body.mac-chrome {
+  --tolaria-macos-traffic-light-padding: 90px;
+}
+
+body.mac-chrome.mac-chrome-fullscreen {
+  --tolaria-macos-traffic-light-padding: 16px;
+}
+
 .app__sidebar {
   flex: 0 0 auto;
   min-width: 220px;

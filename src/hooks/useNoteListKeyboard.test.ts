@@ -2,6 +2,19 @@ import { renderHook, act } from '@testing-library/react'
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest'
 import { useNoteListKeyboard } from './useNoteListKeyboard'
 
+const MAC_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15'
+const WINDOWS_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36'
+const originalUserAgent = navigator.userAgent
+
+function withUserAgent<T>(userAgent: string, callback: () => T): T {
+  Object.defineProperty(window.navigator, 'userAgent', { value: userAgent, configurable: true })
+  try {
+    return callback()
+  } finally {
+    Object.defineProperty(window.navigator, 'userAgent', { value: originalUserAgent, configurable: true })
+  }
+}
+
 function makeEntry(path, title) {
   return {
     path,
@@ -181,6 +194,36 @@ describe('useNoteListKeyboard', () => {
     )
     pressKey(result, 'ArrowDown', { metaKey: true })
     expect(result.current.highlightedPath).toBeNull()
+  })
+
+  it('toggles search with the macOS primary command shortcut only', () => {
+    withUserAgent(MAC_USER_AGENT, () => {
+      const toggleSearch = vi.fn()
+      const { result } = renderKeyboard({ toggleSearch })
+
+      const commandF = keyEvent('f', { code: 'KeyF', metaKey: true })
+      act(() => result.current.handleKeyDown(commandF))
+      expect(commandF.preventDefault).toHaveBeenCalledOnce()
+      expect(toggleSearch).toHaveBeenCalledOnce()
+
+      const fullscreenShortcut = keyEvent('f', { code: 'KeyF', metaKey: true, ctrlKey: true })
+      act(() => result.current.handleKeyDown(fullscreenShortcut))
+      expect(fullscreenShortcut.preventDefault).not.toHaveBeenCalled()
+      expect(toggleSearch).toHaveBeenCalledOnce()
+    })
+  })
+
+  it('toggles search with Ctrl+F on Windows', () => {
+    withUserAgent(WINDOWS_USER_AGENT, () => {
+      const toggleSearch = vi.fn()
+      const { result } = renderKeyboard({ toggleSearch })
+      const event = keyEvent('f', { code: 'KeyF', ctrlKey: true })
+
+      act(() => result.current.handleKeyDown(event))
+
+      expect(event.preventDefault).toHaveBeenCalledOnce()
+      expect(toggleSearch).toHaveBeenCalledOnce()
+    })
   })
 
   it('resets highlight when items change', () => {
