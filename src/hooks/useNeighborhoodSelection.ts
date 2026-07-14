@@ -10,6 +10,7 @@ import {
   popNeighborhoodHistory,
   pushNeighborhoodHistory,
   resolveNeighborhoodSelection,
+  selectionsEqual,
   shouldProcessNeighborhoodEscape,
 } from '../utils/neighborhoodHistory'
 
@@ -92,7 +93,7 @@ export function useSelectionSanitizer({
   }, [effectiveSelection, selectionRef])
 
   useEffect(() => {
-    if (effectiveSelection === selection) return
+    if (selectionsEqual(effectiveSelection, selection)) return
 
     if (effectiveSelection.kind !== 'entity') {
       neighborhoodHistoryRef.current = []
