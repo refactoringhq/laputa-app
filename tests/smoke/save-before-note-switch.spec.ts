@@ -188,8 +188,6 @@ async function delayedSaveCount(page: Page): Promise<number> {
 
 test.beforeEach(async ({ page }, testInfo) => {
   testInfo.setTimeout(60_000)
-  await page.goto('/')
-  await page.waitForLoadState('networkidle')
   tempVaultDir = createFixtureVaultCopy()
   await openFixtureVaultDesktopHarness(page, tempVaultDir)
 })
