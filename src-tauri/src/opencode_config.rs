@@ -5,6 +5,8 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
+const WINDOWS_COMMAND_LINE_STDIN_THRESHOLD: usize = 24 * 1024;
+
 const OPENCODE_SHELL_ENV_KEYS: [EnvName<'static>; 25] = [
     EnvName::trusted("OPENCODE_CONFIG"),
     EnvName::trusted("OPENCODE_CONFIG_DIR"),
@@ -33,18 +35,38 @@ const OPENCODE_SHELL_ENV_KEYS: [EnvName<'static>; 25] = [
     EnvName::trusted("AWS_REGION"),
 ];
 
+pub(crate) struct OpencodeCommand {
+    pub(crate) command: std::process::Command,
+    pub(crate) stdin_input: Option<String>,
+}
+
 pub(crate) fn build_command(
     binary: &Path,
     request: &AgentStreamRequest,
-) -> Result<std::process::Command, String> {
+) -> Result<OpencodeCommand, String> {
+    build_command_with_windows_limit(binary, request, cfg!(windows))
+}
+
+fn build_command_with_windows_limit(
+    binary: &Path,
+    request: &AgentStreamRequest,
+    enforce_windows_limit: bool,
+) -> Result<OpencodeCommand, String> {
     let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(binary)?;
     let mut command = crate::hidden_command(&target.program);
     crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
     apply_opencode_shell_env(&mut command, request);
     command.args(&target.prefix_args);
+    let args = build_args();
+    let prompt = build_prompt(request);
+    command.args(&args);
+    let stdin_input = if should_pipe_prompt_for_windows(enforce_windows_limit, &args, &prompt) {
+        Some(prompt)
+    } else {
+        command.arg(prompt);
+        None
+    };
     command
-        .args(build_args())
-        .arg(build_prompt(request))
         .env(
             "OPENCODE_CONFIG_CONTENT",
             build_config(
@@ -57,11 +79,37 @@ pub(crate) fn build_command(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    Ok(command)
+
+    Ok(OpencodeCommand {
+        command,
+        stdin_input,
+    })
 }
 
 fn build_args() -> Vec<String> {
     vec!["run".into(), "--format".into(), "json".into()]
+}
+
+fn should_pipe_prompt_for_windows(
+    enforce_windows_limit: bool,
+    args: &[String],
+    prompt: &str,
+) -> bool {
+    if !enforce_windows_limit {
+        return false;
+    }
+
+    let mut command_args = args.to_vec();
+    command_args.push(prompt.to_string());
+    args_exceed_windows_stdin_threshold(&command_args)
+}
+
+fn args_exceed_windows_stdin_threshold(args: &[String]) -> bool {
+    windows_command_line_utf16_units(args) >= WINDOWS_COMMAND_LINE_STDIN_THRESHOLD
+}
+
+fn windows_command_line_utf16_units(args: &[String]) -> usize {
+    args.iter().map(|arg| arg.encode_utf16().count() + 3).sum()
 }
 
 fn build_prompt(request: &AgentStreamRequest) -> String {
@@ -230,7 +278,8 @@ mod tests {
 
     #[test]
     fn command_sets_vault_cwd_and_mcp_config() {
-        let command = build_command(&PathBuf::from("opencode"), &request()).unwrap();
+        let built = build_command(&PathBuf::from("opencode"), &request()).unwrap();
+        let command = built.command;
         let actual_args: Vec<&OsStr> = command.get_args().collect();
         let config_value = command
             .get_envs()
@@ -257,6 +306,41 @@ mod tests {
                 true,
             )
         );
+        assert!(built.stdin_input.is_none());
+    }
+
+    #[test]
+    fn short_windows_prompt_stays_on_command_line() {
+        let built =
+            build_command_with_windows_limit(&PathBuf::from("opencode"), &request(), true).unwrap();
+        let actual_args = built.command.get_args().collect::<Vec<_>>();
+
+        assert!(built.stdin_input.is_none());
+        assert!(actual_args
+            .iter()
+            .any(|arg| *arg == OsStr::new("Rename the note")));
+    }
+
+    #[test]
+    fn oversized_windows_prompt_uses_stdin() {
+        let long_message = "x".repeat(WINDOWS_COMMAND_LINE_STDIN_THRESHOLD);
+        let request = AgentStreamRequest {
+            message: long_message.clone(),
+            system_prompt: Some("Use context.".into()),
+            ..request()
+        };
+
+        let built =
+            build_command_with_windows_limit(&PathBuf::from("opencode"), &request, true).unwrap();
+        let actual_args = built.command.get_args().collect::<Vec<_>>();
+        let stdin = built.stdin_input.as_deref().unwrap();
+
+        assert!(actual_args
+            .iter()
+            .all(|arg| *arg != OsStr::new(long_message.as_str())));
+        assert!(stdin.contains("System instructions:\nUse context."));
+        assert!(stdin.contains("User request:\n"));
+        assert!(stdin.contains(&long_message));
     }
 
     #[test]
@@ -328,7 +412,8 @@ mod tests {
         )
         .unwrap();
 
-        let command = build_command(&shim, &request()).unwrap();
+        let built = build_command(&shim, &request()).unwrap();
+        let command = built.command;
         let actual_args = command.get_args().collect::<Vec<_>>();
 
         assert_ne!(

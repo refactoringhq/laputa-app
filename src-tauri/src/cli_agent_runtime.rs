@@ -316,25 +316,6 @@ where
     }
 }
 
-pub(crate) fn run_json_line_process<Event, F, H>(
-    command: Command,
-    process_name: &'static str,
-    emit: &mut F,
-    error_event: impl Fn(String) -> Event,
-    handle_json: H,
-) -> Result<JsonLineRun, String>
-where
-    F: FnMut(Event),
-    H: FnMut(&serde_json::Value, &mut F, &mut String),
-{
-    run_json_line_process_with_stdin(
-        JsonLineProcess::new(command, process_name),
-        emit,
-        error_event,
-        handle_json,
-    )
-}
-
 pub(crate) fn run_json_line_process_with_stdin<Event, F, H>(
     mut process: JsonLineProcess<'_>,
     emit: &mut F,
@@ -444,8 +425,7 @@ where
     F: FnMut(AiAgentStreamEvent),
 {
     run_ai_agent_json_stream_with_success_check(
-        command,
-        process_name,
+        JsonLineProcess::new(command, process_name),
         emit,
         session_id,
         dispatch_event,
@@ -455,8 +435,7 @@ where
 }
 
 pub(crate) fn run_ai_agent_json_stream_with_success_check<F>(
-    command: Command,
-    process_name: &'static str,
+    process: JsonLineProcess<'_>,
     mut emit: F,
     session_id: impl Fn(&serde_json::Value) -> Option<&str>,
     dispatch_event: impl Fn(&serde_json::Value, &mut F),
@@ -466,9 +445,8 @@ pub(crate) fn run_ai_agent_json_stream_with_success_check<F>(
 where
     F: FnMut(AiAgentStreamEvent),
 {
-    let run = run_json_line_process(
-        command,
-        process_name,
+    let run = run_json_line_process_with_stdin(
+        process,
         &mut emit,
         |message| AiAgentStreamEvent::Error { message },
         |json, emit, active_session_id| {
