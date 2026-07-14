@@ -11,6 +11,10 @@ export interface MultiSelectState {
   selectAll: () => void
 }
 
+function clearSelectedPaths(prev: Set<string>): Set<string> {
+  return prev.size === 0 ? prev : new Set()
+}
+
 export function useMultiSelect(visibleEntries: VaultEntry[], activePath: string | null = null): MultiSelectState {
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
   const lastClickedRef = useRef<string | null>(null)
@@ -52,7 +56,7 @@ export function useMultiSelect(visibleEntries: VaultEntry[], activePath: string 
   }, [visibleEntries, activePath, toggle])
 
   const clear = useCallback(() => {
-    setSelectedPaths(new Set())
+    setSelectedPaths(clearSelectedPaths)
     lastClickedRef.current = null
   }, [])
 

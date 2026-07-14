@@ -5,6 +5,7 @@ import type { SidebarSelection, VaultEntry } from '../types'
 import {
   useNeighborhoodEntry,
   useNeighborhoodEscape,
+  useSelectionSanitizer,
 } from './useNeighborhoodSelection'
 
 function buildEntry(path: string, title: string): VaultEntry {
@@ -128,5 +129,26 @@ describe('useNeighborhoodEscape', () => {
 
     expect(onBack).toHaveBeenCalledOnce()
     expect(event.defaultPrevented).toBe(true)
+  })
+})
+
+describe('useSelectionSanitizer', () => {
+  it('does not rewrite structurally equivalent selections', () => {
+    const selection: SidebarSelection = { kind: 'filter', filter: 'all' }
+    const effectiveSelection: SidebarSelection = { kind: 'filter', filter: 'all' }
+    const setSelection = vi.fn()
+    const setNoteListFilter = vi.fn()
+
+    renderHook(() => useSelectionSanitizer({
+      effectiveSelection,
+      neighborhoodHistoryRef: ref([inboxSelection]),
+      selection,
+      selectionRef: ref(selection),
+      setNoteListFilter,
+      setSelection,
+    }))
+
+    expect(setSelection).not.toHaveBeenCalled()
+    expect(setNoteListFilter).not.toHaveBeenCalled()
   })
 })
