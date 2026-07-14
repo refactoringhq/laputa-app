@@ -69,8 +69,19 @@ describe('HTML block sandbox', () => {
 
     expect(srcDoc).toContain("script-src 'unsafe-inline'")
     expect(srcDoc).toContain('<script>document.getElementById("app").textContent = "Ready"</script>')
-    expect(srcDoc).toContain('<script type="application/json">{"title":"Ready"}</script>')
+    expect(srcDoc).toContain('<script type="application/json" id="data">{"title":"Ready"}</script>')
     expect(srcDoc).not.toContain('src="https://example.com/app.js"')
+  })
+
+  it('preserves sandboxed data script ids for dashboard JSON lookups', () => {
+    const srcDoc = htmlBlockIframeSrcDoc([
+      '<script type="application/json" id="notes">[{"title":"Ready"}]</script>',
+      '<script>window.dashboardData = JSON.parse(document.getElementById("notes").textContent)</script>',
+    ].join(''), { scripts: 'sandboxed' })
+    const documentObject = new DOMParser().parseFromString(srcDoc, 'text/html')
+
+    expect(srcDoc).toContain('<script type="application/json" id="notes">[{"title":"Ready"}]</script>')
+    expect(JSON.parse(documentObject.getElementById('notes')?.textContent ?? '')).toEqual([{ title: 'Ready' }])
   })
 
   it('places sanitized style blocks in the iframe head so user CSS applies', () => {

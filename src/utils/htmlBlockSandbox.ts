@@ -88,6 +88,14 @@ function escapeScriptText(text: string): string {
   return text.replace(/<\/script/giu, '<\\/script')
 }
 
+function escapeScriptAttributeValue(value: string): string {
+  return value
+    .replace(/&/gu, '&amp;')
+    .replace(/"/gu, '&quot;')
+    .replace(/</gu, '&lt;')
+    .replace(/>/gu, '&gt;')
+}
+
 function normalizedScriptType(element: HTMLScriptElement): string {
   return (element.getAttribute('type') ?? '').trim().toLowerCase()
 }
@@ -106,7 +114,9 @@ function scriptElementHtml(element: HTMLScriptElement): string {
   if (type === null) return ''
 
   const typeAttribute = type ? ` type="${type}"` : ''
-  return `<script${typeAttribute}>${escapeScriptText(element.textContent ?? '')}</script>`
+  const id = element.getAttribute('id')?.trim() ?? ''
+  const idAttribute = id ? ` id="${escapeScriptAttributeValue(id)}"` : ''
+  return `<script${typeAttribute}${idAttribute}>${escapeScriptText(element.textContent ?? '')}</script>`
 }
 
 function extractSandboxedScriptHtml(markup: string, scripts: HtmlBlockScripts): string {
