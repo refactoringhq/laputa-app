@@ -2,11 +2,23 @@ import type { VaultOption } from '../components/status-bar/types'
 import type { VaultEntry, WorkspaceIdentity } from '../types'
 import { workspaceIdentityFromVault } from '../utils/workspaces'
 
+function isNonBlankPath(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function pathOrEmpty(value: unknown): string {
+  return isNonBlankPath(value) ? value : ''
+}
+
+function uniqueNonBlankPaths(paths: readonly unknown[]): string[] {
+  return [...new Set(paths.filter(isNonBlankPath))]
+}
+
 export function uniqueWorkspacePathsFromVaults(vaultPath: string, vaults?: VaultOption[]): string[] {
   const paths = vaults?.length
     ? vaults.map((vault) => vault.path)
     : [vaultPath]
-  return [...new Set(paths.filter((path) => path.trim().length > 0))]
+  return uniqueNonBlankPaths(paths)
 }
 
 export function workspacePathSetKey(paths: readonly string[]): string {
@@ -14,7 +26,7 @@ export function workspacePathSetKey(paths: readonly string[]): string {
 }
 
 function entryWorkspacePath(entry: VaultEntry, fallbackVaultPath: string): string {
-  return entry.workspace?.path ?? fallbackVaultPath
+  return pathOrEmpty(entry.workspace?.path) || pathOrEmpty(fallbackVaultPath)
 }
 
 export function initialVaultsForPath(path: string, vaults?: VaultOption[]): VaultOption[] | undefined {
@@ -32,8 +44,8 @@ function workspacePathsFromEntries(
   for (const entry of entries) {
     const path = inferFallbackWorkspacePath
       ? entryWorkspacePath(entry, fallbackVaultPath)
-      : entry.workspace?.path ?? ''
-    if (path.trim()) paths.add(path)
+      : pathOrEmpty(entry.workspace?.path)
+    if (path) paths.add(path)
   }
   return [...paths]
 }
@@ -46,7 +58,8 @@ export function loadedWorkspacePathsFromEntries(
   const inferFallbackWorkspacePath = options.inferFallbackWorkspacePath ?? true
   const paths = workspacePathsFromEntries(entries, fallbackVaultPath, inferFallbackWorkspacePath)
   if (paths.length > 0) return paths
-  return inferFallbackWorkspacePath && fallbackVaultPath.trim() ? [fallbackVaultPath] : []
+  const fallbackPath = pathOrEmpty(fallbackVaultPath)
+  return inferFallbackWorkspacePath && fallbackPath ? [fallbackPath] : []
 }
 
 type WorkspaceIdentityMetadataKey =
@@ -91,10 +104,12 @@ export function retagEntriesForWorkspaceMetadata({
 }): VaultEntry[] {
   if (!vaults?.length) return entries
 
-  const identitiesByPath = new Map(vaults.map((vault) => [
-    vault.path,
-    workspaceIdentityFromVault(vault, { defaultWorkspacePath }),
-  ]))
+  const identitiesByPath = new Map(vaults.flatMap((vault) => {
+    const path = pathOrEmpty(vault.path)
+    return path
+      ? [[path, workspaceIdentityFromVault(vault, { defaultWorkspacePath })] as const]
+      : []
+  }))
   let nextEntries: VaultEntry[] | null = null
 
   entries.forEach((entry, index) => {
@@ -120,7 +135,7 @@ export function pruneEntriesOutsideWorkspaceSet({
   entries: VaultEntry[]
   fallbackVaultPath: string
 }): VaultEntry[] {
-  const desiredPathSet = new Set(desiredPaths)
+  const desiredPathSet = new Set(uniqueNonBlankPaths(desiredPaths))
   const nextEntries = entries.filter((entry) => desiredPathSet.has(entryWorkspacePath(entry, fallbackVaultPath)))
   return nextEntries.length === entries.length ? entries : nextEntries
 }
