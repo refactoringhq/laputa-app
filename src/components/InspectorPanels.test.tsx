@@ -533,6 +533,18 @@ describe('DynamicRelationshipsPanel', () => {
       })
     })
 
+    it('uses the post-create updater when the created note opens before the relationship is written', async () => {
+      const onUpdatePropertyAfterCreate = vi.fn()
+      renderInlineCreatePanel({ onUpdatePropertyAfterCreate })
+      openInlineCreate('Brand New Note')
+      fireEvent.click(screen.getByTestId('create-and-open-option'))
+
+      await vi.waitFor(() => {
+        expect(onUpdatePropertyAfterCreate).toHaveBeenCalledWith('Belongs to', ['[[project/my-project]]', '[[brand-new-note]]'])
+      })
+      expect(onUpdateProperty).not.toHaveBeenCalled()
+    })
+
     it('does not add wikilink when note creation fails', async () => {
       onCreateAndOpenNote.mockResolvedValue(false)
       renderInlineCreatePanel()
@@ -626,6 +638,22 @@ describe('DynamicRelationshipsPanel', () => {
       await vi.waitFor(() => {
         expect(onAddProperty).toHaveBeenCalledWith('Mentions', '[[new-person]]')
       })
+    })
+
+    it('uses the post-create add action for a newly created relationship target', async () => {
+      const onAddPropertyAfterCreate = vi.fn()
+      renderRelationshipsPanel({ onAddProperty, onAddPropertyAfterCreate, onCreateAndOpenNote })
+      fireEvent.click(screen.getByText('+ Add relationship'))
+      fireEvent.change(screen.getByPlaceholderText('Relationship name'), { target: { value: 'Mentions' } })
+      const noteInput = screen.getByPlaceholderText('Note title')
+      fireEvent.focus(noteInput)
+      fireEvent.change(noteInput, { target: { value: 'New Person' } })
+      fireEvent.click(screen.getByTestId('create-and-open-option'))
+
+      await vi.waitFor(() => {
+        expect(onAddPropertyAfterCreate).toHaveBeenCalledWith('Mentions', '[[new-person]]')
+      })
+      expect(onAddProperty).not.toHaveBeenCalled()
     })
   })
 })

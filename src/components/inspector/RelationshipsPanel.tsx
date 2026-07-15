@@ -40,7 +40,9 @@ type RelationshipEntryGroup = {
 
 type RelationshipPanelEditHandlers = {
   onAddProperty?: (key: string, value: FrontmatterValue) => void
+  onAddPropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
   onUpdateProperty?: (key: string, value: FrontmatterValue) => void
+  onUpdatePropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
   onDeleteProperty?: (key: string) => void
 }
 
@@ -299,6 +301,7 @@ function useInlineAddNoteState(
   vaultPath: string,
   sourceEntry: VaultEntry | undefined,
   onAdd: (ref: string) => void,
+  onAddAfterCreate?: (ref: string) => void,
   onCreateAndOpenNote?: (title: string) => Promise<boolean>,
 ) {
   const [active, setActive] = useState(false)
@@ -331,7 +334,7 @@ function useInlineAddNoteState(
 
   const handleCreateAndOpen = useCreateAndOpen(
     onCreateAndOpenNote,
-    (title) => onAdd(canonicalRefForTitle({ title, ...lookupContext })),
+    (title) => (onAddAfterCreate ?? onAdd)(canonicalRefForTitle({ title, ...lookupContext })),
     dismiss,
   )
 
@@ -377,11 +380,12 @@ function useInlineAddNoteState(
   }
 }
 
-function InlineAddNote({ entries, sourceEntry, vaultPath, locale, onAdd, onCreateAndOpenNote }: {
+function InlineAddNote({ entries, sourceEntry, vaultPath, locale, onAdd, onAddAfterCreate, onCreateAndOpenNote }: {
   entries: VaultEntry[]
   sourceEntry?: VaultEntry
   vaultPath: string
   onAdd: (ref: string) => void
+  onAddAfterCreate?: (ref: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   locale: AppLocale
 }) {
@@ -397,7 +401,7 @@ function InlineAddNote({ entries, sourceEntry, vaultPath, locale, onAdd, onCreat
     showDropdown,
     selectEntryAndClose,
     handleCreateAndOpen,
-  } = useInlineAddNoteState(entries, vaultPath, sourceEntry, onAdd, onCreateAndOpenNote)
+  } = useInlineAddNoteState(entries, vaultPath, sourceEntry, onAdd, onAddAfterCreate, onCreateAndOpenNote)
 
   useEffect(() => {
     if (active) inputRef.current?.focus()
@@ -450,12 +454,13 @@ function InlineAddNote({ entries, sourceEntry, vaultPath, locale, onAdd, onCreat
   )
 }
 
-function RelationshipGroup({ label, refs, entries, sourceEntry, typeEntryMap, vaultPath, locale, onNavigate, onRemoveRef, onAddRef, onCreateAndOpenNote }: {
+function RelationshipGroup({ label, refs, entries, sourceEntry, typeEntryMap, vaultPath, locale, onNavigate, onRemoveRef, onAddRef, onAddRefAfterCreate, onCreateAndOpenNote }: {
   label: string; refs: string[]; entries: VaultEntry[]; typeEntryMap: Record<string, VaultEntry>; vaultPath: string
   sourceEntry?: VaultEntry
   onNavigate: (target: string) => void
   onRemoveRef?: (ref: string) => void
   onAddRef?: (ref: string) => void
+  onAddRefAfterCreate?: (ref: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   locale: AppLocale
 }) {
@@ -481,6 +486,7 @@ function RelationshipGroup({ label, refs, entries, sourceEntry, typeEntryMap, va
           sourceEntry={sourceEntry}
           vaultPath={vaultPath}
           onAdd={onAddRef}
+          onAddAfterCreate={onAddRefAfterCreate}
           onCreateAndOpenNote={onCreateAndOpenNote}
           locale={locale}
         />
@@ -630,31 +636,82 @@ function NoteTargetInput({ entries, value, locale, onChange, onSelectEntry, onSu
   )
 }
 
+function relationshipRefsForKey(relationshipEntries: RelationshipEntryGroup[], key: string): string[] | undefined {
+  return relationshipEntries.find(group => group.key === key)?.refs
+}
+
+function applyRelationshipAddition(
+  key: string,
+  existingRefs: string[],
+  ref: string,
+  onUpdateProperty?: RelationshipPanelEditHandlers['onUpdateProperty'],
+): void {
+  if (!onUpdateProperty) return
+  const result = updateRefsForAddition(existingRefs, ref)
+  if (result !== false) onUpdateProperty(key, result)
+}
+
+function applyRelationshipRemoval({
+  existingRefs,
+  key,
+  onDeleteProperty,
+  onUpdateProperty,
+  refToRemove,
+}: {
+  existingRefs: string[]
+  key: string
+  onDeleteProperty: NonNullable<RelationshipPanelEditHandlers['onDeleteProperty']>
+  onUpdateProperty: NonNullable<RelationshipPanelEditHandlers['onUpdateProperty']>
+  refToRemove: string
+}): void {
+  const result = updateRefsForRemoval(existingRefs, refToRemove)
+  if (result === null) onDeleteProperty(key)
+  else onUpdateProperty(key, result)
+}
+
+function useRelationshipAddMutation(
+  relationshipEntries: RelationshipEntryGroup[],
+  onUpdateProperty?: RelationshipPanelEditHandlers['onUpdateProperty'],
+) {
+  return useCallback((key: string, ref: string) => {
+    const existingRefs = relationshipRefsForKey(relationshipEntries, key) ?? []
+    applyRelationshipAddition(key, existingRefs, ref, onUpdateProperty)
+  }, [relationshipEntries, onUpdateProperty])
+}
+
+function useRelationshipRemoveMutation(
+  relationshipEntries: RelationshipEntryGroup[],
+  handlers: Pick<RelationshipPanelEditHandlers, 'onUpdateProperty' | 'onDeleteProperty'>,
+) {
+  const { onUpdateProperty, onDeleteProperty } = handlers
+
+  return useCallback((key: string, refToRemove: string) => {
+    if (!onUpdateProperty || !onDeleteProperty) return
+    const existingRefs = relationshipRefsForKey(relationshipEntries, key)
+    if (!existingRefs) return
+    applyRelationshipRemoval({ existingRefs, key, onDeleteProperty, onUpdateProperty, refToRemove })
+  }, [relationshipEntries, onUpdateProperty, onDeleteProperty])
+}
+
 function useRelationshipMutations(
   relationshipEntries: RelationshipEntryGroup[],
   handlers: RelationshipPanelEditHandlers,
 ) {
-  const { onUpdateProperty, onDeleteProperty } = handlers
-
-  const handleRemoveRef = useCallback((key: string, refToRemove: string) => {
-    if (!onUpdateProperty || !onDeleteProperty) return
-    const group = relationshipEntries.find(g => g.key === key)
-    if (!group) return
-    const result = updateRefsForRemoval(group.refs, refToRemove)
-    if (result === null) onDeleteProperty(key)
-    else onUpdateProperty(key, result)
-  }, [relationshipEntries, onUpdateProperty, onDeleteProperty])
-
-  const handleAddRef = useCallback((key: string, ref: string) => {
-    if (!onUpdateProperty) return
-    const existing = relationshipEntries.find(g => g.key === key)?.refs ?? []
-    const result = updateRefsForAddition(existing, ref)
-    if (result !== false) onUpdateProperty(key, result)
-  }, [relationshipEntries, onUpdateProperty])
+  const { onUpdateProperty, onUpdatePropertyAfterCreate, onDeleteProperty } = handlers
+  const handleRemoveRef = useRelationshipRemoveMutation(relationshipEntries, {
+    onDeleteProperty,
+    onUpdateProperty,
+  })
+  const handleAddRef = useRelationshipAddMutation(relationshipEntries, onUpdateProperty)
+  const handleAddRefAfterCreate = useRelationshipAddMutation(
+    relationshipEntries,
+    onUpdatePropertyAfterCreate ?? onUpdateProperty,
+  )
 
   return {
     handleRemoveRef,
     handleAddRef,
+    handleAddRefAfterCreate,
     canEdit: Boolean(onUpdateProperty && onDeleteProperty),
   }
 }
@@ -680,6 +737,7 @@ function useRelationshipPanelState({
   vaultPath,
   onAddProperty,
   onUpdateProperty,
+  onUpdatePropertyAfterCreate,
   onDeleteProperty,
 }: {
   entry?: VaultEntry
@@ -693,9 +751,9 @@ function useRelationshipPanelState({
     [entry, entries, frontmatter, relationshipEntries],
   )
   const resolvedVaultPath = useMemo(() => vaultPath ?? inferVaultPath(entries), [vaultPath, entries])
-  const { handleRemoveRef, handleAddRef, canEdit } = useRelationshipMutations(relationshipEntries, {
-    onAddProperty,
+  const mutations = useRelationshipMutations(relationshipEntries, {
     onUpdateProperty,
+    onUpdatePropertyAfterCreate,
     onDeleteProperty,
   })
   const missingSuggestedRels = useMissingSuggestedRelationships(
@@ -707,9 +765,10 @@ function useRelationshipPanelState({
     relationshipEntries,
     typeDerivedRelationshipEntries,
     resolvedVaultPath,
-    handleRemoveRef,
-    handleAddRef,
-    canEdit,
+    handleRemoveRef: mutations.handleRemoveRef,
+    handleAddRef: mutations.handleAddRef,
+    handleAddRefAfterCreate: mutations.handleAddRefAfterCreate,
+    canEdit: mutations.canEdit,
     missingSuggestedRels,
   }
 }
@@ -719,6 +778,7 @@ interface AddRelationshipFormProps {
   sourceEntry?: VaultEntry
   vaultPath: string
   onAddProperty: (key: string, value: FrontmatterValue) => void
+  onAddPropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   locale: AppLocale
 }
@@ -787,7 +847,7 @@ function AddRelationshipActions({
   )
 }
 
-function AddRelationshipForm({ entries, sourceEntry, vaultPath, locale, onAddProperty, onCreateAndOpenNote }: AddRelationshipFormProps) {
+function AddRelationshipForm({ entries, sourceEntry, vaultPath, locale, onAddProperty, onAddPropertyAfterCreate, onCreateAndOpenNote }: AddRelationshipFormProps) {
   const [relKey, setRelKey] = useState('')
   const [relTarget, setRelTarget] = useState('')
   const [selectedTargetEntry, setSelectedTargetEntry] = useState<VaultEntry | null>(null)
@@ -829,8 +889,8 @@ function AddRelationshipForm({ entries, sourceEntry, vaultPath, locale, onAddPro
 
   const addPropertyForKey = useCallback((title: string) => {
     const key = relKey.trim()
-    if (key) onAddProperty(key, canonicalRefForTitle({ title, entries, sourceEntry, vaultPath }))
-  }, [relKey, entries, sourceEntry, vaultPath, onAddProperty])
+    if (key) (onAddPropertyAfterCreate ?? onAddProperty)(key, canonicalRefForTitle({ title, entries, sourceEntry, vaultPath }))
+  }, [relKey, entries, sourceEntry, vaultPath, onAddProperty, onAddPropertyAfterCreate])
 
   const handleCreateAndSubmit = useCreateAndOpen(onCreateAndOpenNote, addPropertyForKey, resetForm)
 
@@ -887,12 +947,13 @@ function DisabledLinkButton({ locale }: { locale: AppLocale }) {
   )
 }
 
-function SuggestedRelationshipSlot({ label, entries, sourceEntry, vaultPath, locale, onAdd, onCreateAndOpenNote, dataTestId = 'suggested-relationship' }: {
+function SuggestedRelationshipSlot({ label, entries, sourceEntry, vaultPath, locale, onAdd, onAddAfterCreate, onCreateAndOpenNote, dataTestId = 'suggested-relationship' }: {
   label: string
   entries: VaultEntry[]
   sourceEntry?: VaultEntry
   vaultPath: string
   onAdd: (ref: string) => void
+  onAddAfterCreate?: (ref: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   locale: AppLocale
   dataTestId?: string
@@ -904,6 +965,7 @@ function SuggestedRelationshipSlot({ label, entries, sourceEntry, vaultPath, loc
         sourceEntry={sourceEntry}
         vaultPath={vaultPath}
         onAdd={onAdd}
+        onAddAfterCreate={onAddAfterCreate}
         onCreateAndOpenNote={onCreateAndOpenNote}
         locale={locale}
       />
@@ -911,11 +973,13 @@ function SuggestedRelationshipSlot({ label, entries, sourceEntry, vaultPath, loc
   )
 }
 
-export function DynamicRelationshipsPanel({ entry, frontmatter, entries, typeEntryMap, vaultPath, onNavigate, onAddProperty, onUpdateProperty, onDeleteProperty, onCreateAndOpenNote, locale = 'en' }: {
+export function DynamicRelationshipsPanel({ entry, frontmatter, entries, typeEntryMap, vaultPath, onNavigate, onAddProperty, onAddPropertyAfterCreate, onUpdateProperty, onUpdatePropertyAfterCreate, onDeleteProperty, onCreateAndOpenNote, locale = 'en' }: {
   entry?: VaultEntry; frontmatter: ParsedFrontmatter; entries: VaultEntry[]; typeEntryMap: Record<string, VaultEntry>; vaultPath?: string
   onNavigate: (target: string) => void
   onAddProperty?: (key: string, value: FrontmatterValue) => void
+  onAddPropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
   onUpdateProperty?: (key: string, value: FrontmatterValue) => void
+  onUpdatePropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
   onDeleteProperty?: (key: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   locale?: AppLocale
@@ -926,6 +990,7 @@ export function DynamicRelationshipsPanel({ entry, frontmatter, entries, typeEnt
     resolvedVaultPath,
     handleRemoveRef,
     handleAddRef,
+    handleAddRefAfterCreate,
     canEdit,
     missingSuggestedRels,
   } = useRelationshipPanelState({
@@ -934,7 +999,9 @@ export function DynamicRelationshipsPanel({ entry, frontmatter, entries, typeEnt
     entries,
     vaultPath,
     onAddProperty,
+    onAddPropertyAfterCreate,
     onUpdateProperty,
+    onUpdatePropertyAfterCreate,
     onDeleteProperty,
   })
 
@@ -946,6 +1013,7 @@ export function DynamicRelationshipsPanel({ entry, frontmatter, entries, typeEnt
           sourceEntry={entry}
           onRemoveRef={canEdit ? (ref) => handleRemoveRef(key, ref) : undefined}
           onAddRef={canEdit ? (ref) => handleAddRef(key, ref) : undefined}
+          onAddRefAfterCreate={canEdit ? (ref) => handleAddRefAfterCreate(key, ref) : undefined}
           onCreateAndOpenNote={canEdit ? onCreateAndOpenNote : undefined}
           locale={locale}
         />
@@ -958,6 +1026,7 @@ export function DynamicRelationshipsPanel({ entry, frontmatter, entries, typeEnt
           sourceEntry={entry}
           vaultPath={resolvedVaultPath}
           onAdd={(ref) => onAddProperty(key, ref)}
+          onAddAfterCreate={(ref) => (onAddPropertyAfterCreate ?? onAddProperty)(key, ref)}
           onCreateAndOpenNote={onCreateAndOpenNote}
           locale={locale}
           dataTestId="type-derived-relationship"
@@ -971,13 +1040,14 @@ export function DynamicRelationshipsPanel({ entry, frontmatter, entries, typeEnt
           sourceEntry={entry}
           vaultPath={resolvedVaultPath}
           onAdd={(ref) => onAddProperty!(label, ref)}
+          onAddAfterCreate={(ref) => (onAddPropertyAfterCreate ?? onAddProperty!)(label, ref)}
           onCreateAndOpenNote={onCreateAndOpenNote}
           locale={locale}
         />
       ))}
       <RelationshipActionRow>
         {onAddProperty
-          ? <AddRelationshipForm entries={entries} sourceEntry={entry} vaultPath={resolvedVaultPath} onAddProperty={onAddProperty} onCreateAndOpenNote={onCreateAndOpenNote} locale={locale} />
+          ? <AddRelationshipForm entries={entries} sourceEntry={entry} vaultPath={resolvedVaultPath} onAddProperty={onAddProperty} onAddPropertyAfterCreate={onAddPropertyAfterCreate} onCreateAndOpenNote={onCreateAndOpenNote} locale={locale} />
           : <DisabledLinkButton locale={locale} />
         }
       </RelationshipActionRow>
