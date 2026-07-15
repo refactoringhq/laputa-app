@@ -239,7 +239,7 @@ The renderer may cache recently opened or preloaded markdown content, but cached
 
 ### Table of Contents Outline
 
-The editor Table of Contents is derived from the live BlockNote document, not from saved Markdown text. `src/utils/tableOfContents.ts` reads structural `heading` blocks with stable ids and levels, extracts inline text from nested BlockNote content, and nests headings by level while preserving document order. `TableOfContentsPanel` receives a document revision from `Editor`, so rich-editor edits refresh the outline immediately without waiting for autosave or a vault reload. Selecting a heading focuses BlockNote and moves the cursor to that block id, while nested headings can be collapsed independently in panel-local UI state.
+The editor Table of Contents is a lazy right-side index derived from the active note's Markdown source. `TableOfContentsPanel` builds the title-rooted H1/H2/H3 tree through the debounced worker path in `src/components/tableOfContentsWorkerClient.ts`, falling back to a live BlockNote document scan only when no Markdown source is available. The panel deliberately avoids reading `editor.document` while source content exists, so opening the TOC does not put full-document BlockNote traversal on ordinary render, typing, or scrolling paths. Selecting a heading resolves the current live BlockNote block id at click time, then focuses BlockNote and moves the cursor to that block.
 
 ### Entity Types (isA / type)
 
