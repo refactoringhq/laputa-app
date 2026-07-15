@@ -141,12 +141,15 @@ function renderedTree(): ReactNode {
 }
 
 function hasElementTypeName(node: ReactNode, name: string): boolean {
-  if (!isValidElement<{ children?: ReactNode }>(node)) return false
+  if (!isValidElement<{ children?: ReactNode; fallback?: ReactNode }>(node)) return false
 
   const typeName = typeof node.type === 'function' ? node.type.name : ''
   if (typeName === name) return true
 
-  return Children.toArray(node.props.children).some((child) =>
+  return [
+    node.props.fallback,
+    ...Children.toArray(node.props.children),
+  ].some((child) =>
     hasElementTypeName(child, name),
   )
 }
@@ -360,6 +363,12 @@ describe('main entrypoint', () => {
 
     expect(mocks.loadAppModule).not.toHaveBeenCalled()
     expect(mocks.renderApp).not.toHaveBeenCalled()
+  })
+
+  it('renders a non-blank startup shell while the app route chunk loads', async () => {
+    await importEntrypoint()
+
+    expect(hasElementTypeName(renderedTree(), 'StartupShellFallback')).toBe(true)
   })
 
   it('prevents browser navigation for file drags and still lets app drop handlers run', async () => {
