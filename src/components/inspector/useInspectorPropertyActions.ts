@@ -19,9 +19,10 @@ function activeEntryOptions(entry: VaultEntry): FrontmatterOpOptions {
 function bindUpdateAction(
   entry: VaultEntry | null,
   action: InspectorPropertyActionsConfig['onUpdateFrontmatter'],
+  options: (entry: VaultEntry) => FrontmatterOpOptions | undefined = activeEntryOptions,
 ) {
   if (!entry || !action) return undefined
-  return (key: string, value: FrontmatterValue) => action(entry.path, key, value, activeEntryOptions(entry))
+  return (key: string, value: FrontmatterValue) => action(entry.path, key, value, options(entry))
 }
 
 function bindDeleteAction(
@@ -35,9 +36,10 @@ function bindDeleteAction(
 function bindAddAction(
   entry: VaultEntry | null,
   action: InspectorPropertyActionsConfig['onAddProperty'],
+  options: (entry: VaultEntry) => FrontmatterOpOptions | undefined = activeEntryOptions,
 ) {
   if (!entry || !action) return undefined
-  return (key: string, value: FrontmatterValue) => action(entry.path, key, value, activeEntryOptions(entry))
+  return (key: string, value: FrontmatterValue) => action(entry.path, key, value, options(entry))
 }
 
 function bindMissingTypeAction(
@@ -60,12 +62,20 @@ export function useInspectorPropertyActions({
     () => bindUpdateAction(entry, onUpdateFrontmatter),
     [entry, onUpdateFrontmatter],
   )
+  const handleUpdatePropertyAfterCreate = useMemo(
+    () => bindUpdateAction(entry, onUpdateFrontmatter, () => undefined),
+    [entry, onUpdateFrontmatter],
+  )
   const handleDeleteProperty = useMemo(
     () => bindDeleteAction(entry, onDeleteProperty),
     [entry, onDeleteProperty],
   )
   const handleAddProperty = useMemo(
     () => bindAddAction(entry, onAddProperty),
+    [entry, onAddProperty],
+  )
+  const handleAddPropertyAfterCreate = useMemo(
+    () => bindAddAction(entry, onAddProperty, () => undefined),
     [entry, onAddProperty],
   )
   const handleCreateMissingType = useMemo(
@@ -75,8 +85,10 @@ export function useInspectorPropertyActions({
 
   return {
     handleUpdateProperty,
+    handleUpdatePropertyAfterCreate,
     handleDeleteProperty,
     handleAddProperty,
+    handleAddPropertyAfterCreate,
     handleCreateMissingType,
   }
 }
