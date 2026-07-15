@@ -21,7 +21,7 @@ import { NoteInfoPanel } from './inspector/NoteInfoPanel'
 interface TableOfContentsEditor {
   document?: unknown[]
   focus?: () => void
-  setTextCursorPosition?: (targetBlock: string, placement?: 'start' | 'end') => void
+  setTextCursorPosition?(targetBlock: string, placement?: 'start' | 'end'): void
 }
 
 interface TableOfContentsPanelProps {
@@ -70,7 +70,7 @@ function scrollBlockIntoView(blockId: string) {
   requestAnimationFrame(() => {
     document
       .querySelector<HTMLElement>(`[data-id="${cssAttributeValue(blockId)}"]`)
-      ?.scrollIntoView?.({ block: 'center' })
+      ?.scrollIntoView({ block: 'center' })
   })
 }
 
@@ -81,6 +81,7 @@ function useDebouncedToc({
   title,
   titleOnlyToc,
 }: DebouncedTocOptions): TocItem {
+  const liveDocument = sourceContent === undefined ? editor.document : undefined
   const [tocState, setTocState] = useState<TocState>(() => ({
     noteKey,
     toc: titleOnlyToc,
@@ -110,11 +111,13 @@ function useDebouncedToc({
     if (sourceContent !== undefined) return undefined
 
     const timeout = window.setTimeout(() => {
-      setTocState({ noteKey, toc: buildTableOfContents(title, editor.document ?? []) })
+      setTocState({ noteKey, toc: buildTableOfContents(title, liveDocument ?? []) })
     }, TOC_BUILD_DEBOUNCE_MS)
 
-    return () => window.clearTimeout(timeout)
-  }, [editor.document, noteKey, sourceContent, title])
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [liveDocument, noteKey, sourceContent, title])
 
   return tocState.noteKey === noteKey ? tocState.toc : titleOnlyToc
 }
@@ -142,7 +145,7 @@ function TocRow({
 }: {
   depth: number
   item: TocItem
-  onNavigate: (item: TocItem) => void
+  onNavigate(item: TocItem): void
 }) {
   const hasChildren = item.children.length > 0
   const depthIndent = getFolderDepthIndent(depth)
@@ -165,7 +168,9 @@ function TocRow({
         }}
         title={item.title}
         aria-expanded={hasChildren ? true : undefined}
-        onClick={() => onNavigate(item)}
+        onClick={() => {
+          onNavigate(item)
+        }}
       >
         <HeadingIcon level={item.level} />
         <span className="truncate">{item.title}</span>
@@ -181,7 +186,7 @@ function TocChildren({
 }: {
   depth: number
   item: TocItem
-  onNavigate: (item: TocItem) => void
+  onNavigate(item: TocItem): void
 }) {
   if (item.children.length === 0) return null
 
@@ -211,7 +216,7 @@ function TocItemNode({
 }: {
   depth: number
   item: TocItem
-  onNavigate: (item: TocItem) => void
+  onNavigate(item: TocItem): void
 }) {
   return (
     <>

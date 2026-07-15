@@ -149,6 +149,31 @@ describe('TableOfContentsPanel', () => {
     expect(screen.queryByRole('button', { name: /The default path is degradation/ })).not.toBeInTheDocument()
   })
 
+  it('does not read the live editor document while source content is available', () => {
+    const documentGetter = vi.fn(() => {
+      throw new Error('live editor document should not be read')
+    })
+    const editor = {
+      get document() {
+        documentGetter()
+        return []
+      },
+      setTextCursorPosition: vi.fn(),
+    }
+
+    render(
+      <TableOfContentsPanel
+        editor={editor}
+        entry={{ ...entry, title: 'New Note' } as VaultEntry}
+        sourceContent="# New Note\n\n## Source Heading"
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(documentGetter).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /New Note/ })).toBeInTheDocument()
+  })
+
   it('renders heading icons, nesting guides, and navigates to clicked headings', async () => {
     const setTextCursorPosition = vi.fn()
     render(
