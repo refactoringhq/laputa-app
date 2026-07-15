@@ -1,4 +1,5 @@
 import type { VaultEntry } from '../../types'
+import { useMemo } from 'react'
 import { Info } from '@phosphor-icons/react'
 import { countWords } from '../../utils/wikilinks'
 import { translate, type AppLocale } from '../../lib/i18n'
@@ -40,7 +41,7 @@ export function NoteInfoPanel({
   locale?: AppLocale
 }) {
   const dateDisplayFormat = useDateDisplayFormat()
-  const wordCount = countWords(content ?? '')
+  const wordCount = useMemo(() => countWords(content ?? ''), [content])
   return (
     <div>
       <h4 className="font-mono-overline mb-2 flex items-center gap-1 text-muted-foreground">
