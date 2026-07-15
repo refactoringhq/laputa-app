@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import './index.css'
 import { FrontendReadyMarker } from './components/FrontendReadyMarker'
 import { LinuxTitlebar } from './components/LinuxTitlebar'
+import { StartupShellFallback } from './components/StartupShellFallback'
 import { applyStoredThemeMode } from './lib/themeMode'
 import {
   APP_COMMAND_EVENT_NAME,
@@ -246,7 +247,13 @@ function captureRecoverableReactRootError(
   captureReactRootError(error, { componentStack })
 }
 
-createRoot(document.getElementById('root')!, {
+function getRequiredRootElement(): HTMLElement {
+  const root = document.getElementById('root')
+  if (!root) throw new Error('Tolaria root element is missing')
+  return root
+}
+
+createRoot(getRequiredRootElement(), {
   onCaughtError: captureRecoverableReactRootError,
   onUncaughtError: captureReactRootError,
   onRecoverableError: captureRecoverableReactRootError,
@@ -254,7 +261,7 @@ createRoot(document.getElementById('root')!, {
   <StrictMode>
     <TooltipProvider>
       <LinuxTitlebar />
-      <Suspense fallback={null}>
+      <Suspense fallback={<StartupShellFallback />}>
         <RootApp />
         <FrontendReadyMarker />
       </Suspense>
