@@ -100,6 +100,14 @@ describe('useKeyboardNavigation', () => {
     expect(onReplaceActiveTab).toHaveBeenCalledWith(entries[1])
   })
 
+  it('supports Ctrl+Alt note navigation for non-macOS keyboard layouts', () => {
+    renderNav('/vault/a.md')
+
+    dispatchKeydown({ key: 'ArrowDown', ctrlKey: true, altKey: true })
+
+    expect(onReplaceActiveTab).toHaveBeenCalledWith(entries[1])
+  })
+
   it('navigates to previous note on Cmd+Alt+ArrowUp', () => {
     renderNav('/vault/b.md')
 
