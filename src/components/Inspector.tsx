@@ -121,8 +121,10 @@ function ValidFrontmatterPanels({
   onNavigate,
   onCreateAndOpenNote,
   onUpdateProperty,
+  onUpdatePropertyAfterCreate,
   onDeleteProperty,
   onAddProperty,
+  onAddPropertyAfterCreate,
   onCreateMissingType,
   onChangeWorkspace,
   workspaces,
@@ -136,8 +138,10 @@ function ValidFrontmatterPanels({
   onNavigate: (target: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   onUpdateProperty?: (key: string, value: FrontmatterValue) => void
+  onUpdatePropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
   onDeleteProperty?: (key: string) => void
   onAddProperty?: (key: string, value: FrontmatterValue) => void
+  onAddPropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
   onCreateMissingType?: (typeName: string) => Promise<boolean | void>
   onChangeWorkspace?: (entry: VaultEntry, workspace: WorkspaceIdentity) => Promise<void> | void
   workspaces?: WorkspaceIdentity[]
@@ -168,7 +172,9 @@ function ValidFrontmatterPanels({
         vaultPath={vaultPath}
         onNavigate={onNavigate}
         onAddProperty={onAddProperty}
+        onAddPropertyAfterCreate={onAddPropertyAfterCreate}
         onUpdateProperty={onUpdateProperty}
+        onUpdatePropertyAfterCreate={onUpdatePropertyAfterCreate}
         onDeleteProperty={onDeleteProperty}
         onCreateAndOpenNote={onCreateAndOpenNote}
         locale={locale}
@@ -223,8 +229,10 @@ function PrimaryInspectorPanel({
   onInitializeProperties,
   onCreateAndOpenNote,
   onUpdateProperty,
+  onUpdatePropertyAfterCreate,
   onDeleteProperty,
   onAddProperty,
+  onAddPropertyAfterCreate,
   onCreateMissingType,
   onChangeWorkspace,
   workspaces,
@@ -241,8 +249,10 @@ function PrimaryInspectorPanel({
   onInitializeProperties?: (path: string) => void
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   onUpdateProperty?: (key: string, value: FrontmatterValue) => void
+  onUpdatePropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
   onDeleteProperty?: (key: string) => void
   onAddProperty?: (key: string, value: FrontmatterValue) => void
+  onAddPropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
   onCreateMissingType?: (typeName: string) => Promise<boolean | void>
   onChangeWorkspace?: (entry: VaultEntry, workspace: WorkspaceIdentity) => Promise<void> | void
   workspaces?: WorkspaceIdentity[]
@@ -259,8 +269,10 @@ function PrimaryInspectorPanel({
         onNavigate={onNavigate}
         onCreateAndOpenNote={onCreateAndOpenNote}
         onUpdateProperty={onUpdateProperty}
+        onUpdatePropertyAfterCreate={onUpdatePropertyAfterCreate}
         onDeleteProperty={onDeleteProperty}
         onAddProperty={onAddProperty}
+        onAddPropertyAfterCreate={onAddPropertyAfterCreate}
         onCreateMissingType={onCreateMissingType}
         onChangeWorkspace={onChangeWorkspace}
         workspaces={workspaces}
@@ -300,8 +312,10 @@ function InspectorBody({
   const typeEntryMap = useMemo(() => buildTypeEntryMap(entries), [entries])
   const {
     handleUpdateProperty,
+    handleUpdatePropertyAfterCreate,
     handleDeleteProperty,
     handleAddProperty,
+    handleAddPropertyAfterCreate,
     handleCreateMissingType,
   } = useInspectorPropertyActions({
     entry,
@@ -329,10 +343,12 @@ function InspectorBody({
           onToggleRawEditor={onToggleRawEditor}
           onInitializeProperties={onInitializeProperties}
           onCreateAndOpenNote={onCreateAndOpenNote}
-          onUpdateProperty={onUpdateFrontmatter ? handleUpdateProperty : undefined}
-          onDeleteProperty={onDeleteProperty ? handleDeleteProperty : undefined}
-          onAddProperty={onAddProperty ? handleAddProperty : undefined}
-          onCreateMissingType={onCreateMissingType ? handleCreateMissingType : undefined}
+          onUpdateProperty={handleUpdateProperty}
+          onUpdatePropertyAfterCreate={handleUpdatePropertyAfterCreate}
+          onDeleteProperty={handleDeleteProperty}
+          onAddProperty={handleAddProperty}
+          onAddPropertyAfterCreate={handleAddPropertyAfterCreate}
+          onCreateMissingType={handleCreateMissingType}
           onChangeWorkspace={onChangeWorkspace}
           workspaces={workspaces}
           locale={locale}

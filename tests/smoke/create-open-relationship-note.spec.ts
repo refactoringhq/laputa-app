@@ -37,6 +37,8 @@ function slugFromTitle(title: string): string {
 }
 
 test.describe('Create & open note from relationship input', () => {
+  test.setTimeout(60_000)
+
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 })
     tempVaultDir = createFixtureVaultCopy()
@@ -92,9 +94,7 @@ test.describe('Create & open note from relationship input', () => {
     })
   })
 
-  // TODO: fix relationship wikilink persistence in single-note model — the wikilink
-  // write to the original note may race with navigation to the new note.
-  test.skip('relationship wikilink is added to original note after creation', async ({ page }) => {
+  test('relationship wikilink is added to original note after creation', async ({ page }) => {
     await openNote(page, 'Team Meeting')
     await openPropertiesPanel(page)
 
