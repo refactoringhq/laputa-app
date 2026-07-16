@@ -109,14 +109,45 @@ function isNativeCompositionBeforeInput(
   nativeEvent: InputEvent,
   isComposing: boolean,
   hasPendingCompositionInput: boolean,
+  isSettlingComposition: boolean,
 ) {
   return isComposing
     || hasPendingCompositionInput
     || nativeEvent.isComposing
     || nativeEvent.inputType === 'insertCompositionText'
+    || (isSettlingComposition && nativeEvent.inputType === 'insertText' && typeof nativeEvent.data === 'string')
 }
 
 export const UNSUPPORTED_INLINE_PASTE_MESSAGE = 'Only text paste is supported in the AI composer right now.'
+const POST_COMPOSITION_TEXT_INPUT_SETTLE_MS = 120
+
+function usePostCompositionTextInputSettle() {
+  const isSettlingCompositionRef = useRef(false)
+  const compositionSettleTimerRef = useRef<number | null>(null)
+  const clearCompositionSettleWindow = useCallback(() => {
+    isSettlingCompositionRef.current = false
+    if (compositionSettleTimerRef.current === null) return
+
+    window.clearTimeout(compositionSettleTimerRef.current)
+    compositionSettleTimerRef.current = null
+  }, [])
+  const startCompositionSettleWindow = useCallback(() => {
+    clearCompositionSettleWindow()
+    isSettlingCompositionRef.current = true
+    compositionSettleTimerRef.current = window.setTimeout(() => {
+      isSettlingCompositionRef.current = false
+      compositionSettleTimerRef.current = null
+    }, POST_COMPOSITION_TEXT_INPUT_SETTLE_MS)
+  }, [clearCompositionSettleWindow])
+
+  useLayoutEffect(() => () => clearCompositionSettleWindow(), [clearCompositionSettleWindow])
+
+  return {
+    clearCompositionSettleWindow,
+    isSettlingCompositionRef,
+    startCompositionSettleWindow,
+  }
+}
 
 function hasUnsupportedClipboardPayload(clipboardData: DataTransfer) {
   if (clipboardData.files.length > 0) return true
@@ -239,6 +270,11 @@ export function InlineWikilinkInput({
   const handledFileDropRef = useRef(false)
   const pendingFocusAfterRemountRef = useRef<InlineSelectionRange | null>(null)
   const pendingScrollTopAfterRemountRef = useRef<number | null>(null)
+  const {
+    clearCompositionSettleWindow,
+    isSettlingCompositionRef,
+    startCompositionSettleWindow,
+  } = usePostCompositionTextInputSettle()
   useLayoutEffect(() => {
     void renderVersion
     restorePendingRemountState(
@@ -365,6 +401,7 @@ export function InlineWikilinkInput({
       nativeEvent,
       isComposingRef.current,
       pendingCompositionInputRef.current,
+      isSettlingCompositionRef.current,
     )) return
 
     if (nativeEvent.inputType === 'insertLineBreak') {
@@ -399,7 +436,7 @@ export function InlineWikilinkInput({
 
     nativeEvent.preventDefault()
     notifyUnsupportedPaste()
-  }, [disabled, insertTransferText, notifyUnsupportedPaste])
+  }, [disabled, insertTransferText, isSettlingCompositionRef, notifyUnsupportedPaste])
   useLayoutEffect(() => {
     void renderVersion
     const editor = editorRef.current
@@ -506,6 +543,7 @@ export function InlineWikilinkInput({
     forceRender((current) => current + 1)
   }
   const handleCompositionStart = () => {
+    clearCompositionSettleWindow()
     isComposingRef.current = true
   }
   const handleCompositionUpdate = () => {
@@ -513,6 +551,7 @@ export function InlineWikilinkInput({
   }
   const handleCompositionEnd = (compositionEditor: HTMLDivElement) => {
     isComposingRef.current = false
+    startCompositionSettleWindow()
     queueMicrotask(() => flushPendingCompositionInput(compositionEditor))
   }
   const handleInput = () => {
