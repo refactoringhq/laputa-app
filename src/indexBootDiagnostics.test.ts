@@ -1,14 +1,26 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+const STARTUP_SHELL_FALLBACK_HTML_KEY = '__tolariaStartupShellFallbackHtml'
+
 function indexHtml(): string {
   return readFileSync(`${process.cwd()}/index.html`, 'utf8')
 }
 
-function firstInlineScriptFromIndex(): string {
-  const match = indexHtml().match(/<script>\s*([\s\S]*?)\s*<\/script>/)
-  if (!match) throw new Error('index.html startup script was not found')
+function inlineScriptsFromIndex(): string[] {
+  return [...indexHtml().matchAll(/<script>\s*([\s\S]*?)\s*<\/script>/g)].map((match) => match[1])
+}
+
+function startupRootContentFromIndex(): string {
+  const match = indexHtml().match(/<div id="root">([\s\S]*?)<\/div>\s*<script>\s*\(function \(\) \{\s*var bootShell/)
+  if (!match) throw new Error('index.html startup shell root was not found')
   return match[1]
+}
+
+function firstInlineScriptFromIndex(): string {
+  const script = inlineScriptsFromIndex()[0]
+  if (!script) throw new Error('index.html startup script was not found')
+  return script
 }
 
 describe('index startup script', () => {
@@ -20,12 +32,25 @@ describe('index startup script', () => {
   })
 
   it('ships a static startup shell before the React module loads', () => {
-    const html = indexHtml()
-    const rootMatch = html.match(/<div id="root">([\s\S]*?)<\/div>\s*<script type="module" src="\/src\/main\.tsx"><\/script>/)
+    const rootContent = startupRootContentFromIndex()
 
-    expect(rootMatch?.[1]).toContain('id="tolaria-boot-shell"')
-    expect(rootMatch?.[1]).toContain('class="startup-shell-fallback"')
-    expect(rootMatch?.[1]).toContain('aria-hidden="true"')
+    expect(rootContent).toContain('id="tolaria-boot-shell"')
+    expect(rootContent).toContain('class="startup-shell-fallback"')
+    expect(rootContent).toContain('aria-hidden="true"')
+  })
+
+  it('captures the static startup shell markup for the React fallback', () => {
+    const captureScript = inlineScriptsFromIndex().find((script) =>
+      script.includes('__tolariaStartupShellFallbackHtml'))
+    if (!captureScript) throw new Error('index.html startup shell capture script was not found')
+
+    Reflect.deleteProperty(window, STARTUP_SHELL_FALLBACK_HTML_KEY)
+    document.body.innerHTML = `<div id="root">${startupRootContentFromIndex()}</div>`
+    new Function(captureScript)()
+
+    const capturedHtml = Reflect.get(window, STARTUP_SHELL_FALLBACK_HTML_KEY)
+    expect(capturedHtml).toContain('startup-shell-fallback__editor-title')
+    expect(capturedHtml).not.toContain('tolaria-boot-shell')
   })
 
   it('does not show the boot overlay for ResizeObserver loop notifications', () => {

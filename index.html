@@ -38,6 +38,8 @@
       })();
     </script>
     <style>
+      /* Critical pre-bundle shell: index.html owns this structure/style so the
+         Tauri WebView can paint app chrome before the React chunk loads. */
       :root {
         color-scheme: light;
         background: #FFFFFF;
@@ -331,6 +333,12 @@
         </div>
       </div>
     </div>
+    <script>
+      (function () {
+        var bootShell = document.getElementById('tolaria-boot-shell');
+        window.__tolariaStartupShellFallbackHtml = bootShell ? bootShell.innerHTML : '';
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
