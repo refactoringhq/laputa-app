@@ -631,6 +631,42 @@ describe('useAppSave', () => {
     ])
   })
 
+  it('waits for in-flight untitled auto-rename before persisting follow-up editor changes', async () => {
+    const pendingRename = createDeferred<{ new_path: string; updated_files: number }>()
+    const { result, oldPath, newPath } = setupUntitledRenameHarness({
+      autoRenameResult: pendingRename.promise,
+    })
+
+    await act(async () => {
+      result.current.handleContentChange(oldPath, '# Fresh Title\n\nBody')
+      await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 2_500)
+    })
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('auto_rename_untitled', {
+      args: { vaultPath: '/vault', notePath: oldPath },
+    })
+
+    await act(async () => {
+      result.current.handleContentChange(oldPath, '# Fresh Title\n\nBody\n\nTyped during rename')
+      await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS)
+    })
+
+    await act(async () => {
+      pendingRename.resolve({ new_path: newPath, updated_files: 0 })
+      await Promise.resolve()
+    })
+
+    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content')
+    expect(saveCalls.at(-1)).toEqual([
+      'save_note_content',
+      { path: newPath, content: '# Fresh Title\n\nBody\n\nTyped during rename' },
+    ])
+    expect(saveCalls).not.toContainEqual([
+      'save_note_content',
+      { path: oldPath, content: '# Fresh Title\n\nBody\n\nTyped during rename' },
+    ])
+  })
+
   it('tracks filename renames so follow-up saves do not recreate the old path', async () => {
     vi.useFakeTimers()
     vi.mocked(isTauri).mockReturnValue(true)
