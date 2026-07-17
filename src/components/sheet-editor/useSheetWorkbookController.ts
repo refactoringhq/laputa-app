@@ -19,10 +19,10 @@ import {
   type SheetExternalFormulaContext,
 } from '../../utils/sheetWorkbook'
 import type { SheetExternalFormulaInput } from '../../utils/sheetExternalFormulaWorker'
+import { isReleasedWorkbookModelError } from './sheetReleasedModel'
 import type { ScheduleSheetSerializeOptions, SheetWorkbookState } from './sheetEditorTypes'
 
 const SERIALIZE_DEBOUNCE_MS = 450
-const RELEASED_WORKBOOK_MODEL_ERROR = 'null pointer passed to rust'
 
 let ironCalcInitPromise: Promise<void> | null = null
 
@@ -68,10 +68,6 @@ function cancelPendingSerialize(
     cancelIdle(idleSerializeRef.current)
     idleSerializeRef.current = null
   }
-}
-
-function isReleasedWorkbookModelError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes(RELEASED_WORKBOOK_MODEL_ERROR)
 }
 
 function releaseWorkbookModelNow(model: Model | null | undefined): void {
