@@ -355,6 +355,7 @@ const ironCalcMock = vi.hoisted(() => {
     }
 
     getSelectedView() {
+      this.assertLive()
       return state.selectedView
     }
 

@@ -30,6 +30,7 @@ import { useSheetKeyboardReleaseOutside } from './useSheetKeyboardReleaseOutside
 import { useSheetPointerCoordinatePatching } from './useSheetPointerCoordinatePatching'
 import { useSheetPointerHandlers } from './useSheetPointerHandlers'
 import { useSheetSelectionChrome } from './useSheetSelectionChrome'
+import { isReleasedWorkbookModelError } from './sheetReleasedModel'
 import { useSheetWorkbookController } from './useSheetWorkbookController'
 
 interface SheetEditorControllerOptions {
@@ -424,6 +425,17 @@ type SheetEditorPointerRuntime = ReturnType<typeof useSheetEditorPointerRuntime>
 type SheetEditorClipboardRuntime = ReturnType<typeof useSheetEditorClipboardRuntime>
 type SheetEditorContextRuntime = ReturnType<typeof useSheetEditorContextRuntime>
 
+function guardSheetInteraction<Args extends unknown[]>(handler: (...args: Args) => void) {
+  return (...args: Args) => {
+    try {
+      handler(...args)
+    } catch (error) {
+      if (!isReleasedWorkbookModelError(error)) throw error
+      console.warn('[sheet-editor] Skipped stale workbook interaction:', error)
+    }
+  }
+}
+
 function useSheetEditorInteractionHandlers({
   handleBlurCapture,
   handleContextMenuCapture,
@@ -448,18 +460,18 @@ function useSheetEditorInteractionHandlers({
   > &
   SheetEditorPointerRuntime) {
   return useMemo(() => ({
-    onBlurCapture: handleBlurCapture,
-    onCopyCapture: handleCopyCapture,
-    onCutCapture: handleCutCapture,
-    onContextMenuCapture: handleContextMenuCapture,
-    onInputCapture: handleInputCapture,
-    onKeyDown: handleSheetKeyDown,
-    onKeyDownCapture: handleKeyDownCapture,
-    onKeyUpCapture: handleKeyUpCapture,
-    onPasteCapture: handlePasteCapture,
-    onPointerDownCapture: handlePointerDownCapture,
-    onPointerMoveCapture: handlePointerMoveCapture,
-    onPointerUpCapture: handlePointerUpCapture,
+    onBlurCapture: guardSheetInteraction(handleBlurCapture),
+    onCopyCapture: guardSheetInteraction(handleCopyCapture),
+    onCutCapture: guardSheetInteraction(handleCutCapture),
+    onContextMenuCapture: guardSheetInteraction(handleContextMenuCapture),
+    onInputCapture: guardSheetInteraction(handleInputCapture),
+    onKeyDown: guardSheetInteraction(handleSheetKeyDown),
+    onKeyDownCapture: guardSheetInteraction(handleKeyDownCapture),
+    onKeyUpCapture: guardSheetInteraction(handleKeyUpCapture),
+    onPasteCapture: guardSheetInteraction(handlePasteCapture),
+    onPointerDownCapture: guardSheetInteraction(handlePointerDownCapture),
+    onPointerMoveCapture: guardSheetInteraction(handlePointerMoveCapture),
+    onPointerUpCapture: guardSheetInteraction(handlePointerUpCapture),
   }), [
     handleBlurCapture,
     handleContextMenuCapture,

@@ -17,6 +17,7 @@ import {
   type SheetWikilinkAutocompleteState,
   visibleSheetTextInput,
 } from './sheetEditorHelpers'
+import { isReleasedWorkbookModelError } from './sheetReleasedModel'
 
 interface UseSheetInputActivityHandlersOptions {
   commitExternalFormulaEditorInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
@@ -32,7 +33,15 @@ interface UseSheetInputActivityHandlersOptions {
 
 function selectedRowsOrAll(workbookRef: MutableRefObject<SheetWorkbookState | null>) {
   const current = workbookRef.current
-  return current ? dirtyRowsForSelectedRange(current.model) : 'all'
+  if (!current) return 'all'
+
+  try {
+    return dirtyRowsForSelectedRange(current.model)
+  } catch (error) {
+    if (!isReleasedWorkbookModelError(error)) throw error
+    console.warn('[sheet-editor] Skipped stale workbook selection read:', error)
+    return 'all'
+  }
 }
 
 function visibleAutocompleteInput(
