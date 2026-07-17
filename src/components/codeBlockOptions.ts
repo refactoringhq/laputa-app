@@ -80,6 +80,21 @@ function languageInputs(languages: readonly TolariaLanguageInput[]): TolariaLang
   return [...languages]
 }
 
+function languageModuleInputs(languageModule: unknown): TolariaLanguageInput[] {
+  if (typeof languageModule !== 'object' || languageModule === null) return []
+
+  const defaultExport = (languageModule as { default?: unknown }).default
+  return Array.isArray(defaultExport) ? languageInputs(defaultExport as TolariaLanguageInput[]) : []
+}
+
+async function optionalLanguageInputs(importLanguage: () => Promise<unknown>): Promise<TolariaLanguageInput[]> {
+  try {
+    return languageModuleInputs(await importLanguage())
+  } catch {
+    return []
+  }
+}
+
 function namedLanguageRegistration(value: TolariaLanguageInput): TolariaNamedLanguageRegistration | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
   const record = value as Record<string, unknown>
@@ -101,8 +116,8 @@ function renameLanguageRegistration(
 }
 
 async function loadVbScriptLanguage(): Promise<TolariaLanguageInput[]> {
-  const language = await import('@shikijs/langs/vb')
-  return renameLanguageRegistration(language.default, 'vb', {
+  const language = await optionalLanguageInputs(() => import('@shikijs/langs/vb'))
+  return renameLanguageRegistration(language, 'vb', {
     name: 'vbscript',
     displayName: 'VBScript',
     aliases: ['vb', 'vbs', 'vba', 'visual-basic', 'visualbasic'],
@@ -110,25 +125,25 @@ async function loadVbScriptLanguage(): Promise<TolariaLanguageInput[]> {
 }
 
 const EXTRA_LANGUAGE_LOADERS = new Map<string, TolariaLanguageLoader>([
-  ['powershell', async () => languageInputs((await import('@shikijs/langs/powershell')).default)],
+  ['powershell', async () => optionalLanguageInputs(() => import('@shikijs/langs/powershell'))],
   ['vbscript', loadVbScriptLanguage],
-  ['dart', async () => languageInputs((await import('@shikijs/langs/dart')).default)],
-  ['groovy', async () => languageInputs((await import('@shikijs/langs/groovy')).default)],
-  ['matlab', async () => languageInputs((await import('@shikijs/langs/matlab')).default)],
-  ['perl', async () => languageInputs((await import('@shikijs/langs/perl')).default)],
-  ['elixir', async () => languageInputs((await import('@shikijs/langs/elixir')).default)],
-  ['erlang', async () => languageInputs((await import('@shikijs/langs/erlang')).default)],
-  ['fsharp', async () => languageInputs((await import('@shikijs/langs/fsharp')).default)],
-  ['clojure', async () => languageInputs((await import('@shikijs/langs/clojure')).default)],
-  ['asm', async () => languageInputs((await import('@shikijs/langs/asm')).default)],
-  ['zig', async () => languageInputs((await import('@shikijs/langs/zig')).default)],
-  ['hcl', async () => languageInputs((await import('@shikijs/langs/hcl')).default)],
-  ['terraform', async () => languageInputs((await import('@shikijs/langs/terraform')).default)],
-  ['dockerfile', async () => languageInputs((await import('@shikijs/langs/dockerfile')).default)],
-  ['batch', async () => languageInputs((await import('@shikijs/langs/bat')).default)],
-  ['diff', async () => languageInputs((await import('@shikijs/langs/diff')).default)],
-  ['ini', async () => languageInputs((await import('@shikijs/langs/ini')).default)],
-  ['toml', async () => languageInputs((await import('@shikijs/langs/toml')).default)],
+  ['dart', async () => optionalLanguageInputs(() => import('@shikijs/langs/dart'))],
+  ['groovy', async () => optionalLanguageInputs(() => import('@shikijs/langs/groovy'))],
+  ['matlab', async () => optionalLanguageInputs(() => import('@shikijs/langs/matlab'))],
+  ['perl', async () => optionalLanguageInputs(() => import('@shikijs/langs/perl'))],
+  ['elixir', async () => optionalLanguageInputs(() => import('@shikijs/langs/elixir'))],
+  ['erlang', async () => optionalLanguageInputs(() => import('@shikijs/langs/erlang'))],
+  ['fsharp', async () => optionalLanguageInputs(() => import('@shikijs/langs/fsharp'))],
+  ['clojure', async () => optionalLanguageInputs(() => import('@shikijs/langs/clojure'))],
+  ['asm', async () => optionalLanguageInputs(() => import('@shikijs/langs/asm'))],
+  ['zig', async () => optionalLanguageInputs(() => import('@shikijs/langs/zig'))],
+  ['hcl', async () => optionalLanguageInputs(() => import('@shikijs/langs/hcl'))],
+  ['terraform', async () => optionalLanguageInputs(() => import('@shikijs/langs/terraform'))],
+  ['dockerfile', async () => optionalLanguageInputs(() => import('@shikijs/langs/dockerfile'))],
+  ['batch', async () => optionalLanguageInputs(() => import('@shikijs/langs/bat'))],
+  ['diff', async () => optionalLanguageInputs(() => import('@shikijs/langs/diff'))],
+  ['ini', async () => optionalLanguageInputs(() => import('@shikijs/langs/ini'))],
+  ['toml', async () => optionalLanguageInputs(() => import('@shikijs/langs/toml'))],
 ])
 
 function expandGoLanguage(language: string): TolariaLanguageInput[] | null {

@@ -158,6 +158,20 @@ describe('editor schema code block highlighting', () => {
     expect(highlighter?.getLoadedLanguages()).toContain(loadedLanguage)
   })
 
+  it('keeps code blocks usable when an optional Shiki grammar module is malformed', async () => {
+    vi.resetModules()
+    vi.doMock('@shikijs/langs/powershell', () => ({ namedOnly: [] }))
+
+    try {
+      const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
+      const highlighter = await createTolariaCodeBlockOptions().createHighlighter?.()
+
+      await expect(highlighter?.loadLanguage('powershell')).resolves.toBeUndefined()
+    } finally {
+      vi.doUnmock('@shikijs/langs/powershell')
+    }
+  })
+
   it('omits the Shiki highlighter when WebKit lacks precompiled regex flags', async () => {
     installLegacyWebKitRegExp()
     vi.resetModules()
