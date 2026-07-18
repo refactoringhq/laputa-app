@@ -6,6 +6,7 @@ import { buildAiWorkspaceTargetGroups } from './aiWorkspaceTargetGroups'
 import {
   createAiAgentAvailability,
   createMissingAiAgentsStatus,
+  type AiAgentReadiness,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 import type { AiModelProvider } from '../lib/aiTargets'
@@ -61,16 +62,25 @@ vi.mock('./useAiPanelController', () => ({
 vi.mock('./AiPanel', () => ({
   AiPanelView: ({
     composerControls,
+    defaultAiAgentReadiness,
+    defaultAiAgentReady,
     onMessageHistoryScrollStateChange,
     onSendPrompt,
     showHeader,
   }: {
     composerControls?: ReactNode
+    defaultAiAgentReadiness?: AiAgentReadiness
+    defaultAiAgentReady?: boolean
     onMessageHistoryScrollStateChange?: (scrolled: boolean) => void
     onSendPrompt?: (prompt: string) => void
     showHeader?: boolean
   }) => (
-    <div data-testid="ai-panel-view" data-show-header={String(showHeader)}>
+    <div
+      data-testid="ai-panel-view"
+      data-agent-readiness={defaultAiAgentReadiness}
+      data-agent-ready={String(defaultAiAgentReady)}
+      data-show-header={String(showHeader)}
+    >
       <button type="button" onClick={() => onSendPrompt?.('summarize quarterly sponsor outreach')}>
         Send mocked prompt
       </button>
@@ -182,6 +192,48 @@ describe('AiWorkspace', () => {
     expect(groups.localAgents.some((target) => target.agent === 'antigravity')).toBe(false)
     expect(groups.localModels.map((target) => target.shortLabel)).toEqual(['Llama 3.2'])
     expect(groups.apiModels.map((target) => target.shortLabel)).toEqual(['GPT-4.1'])
+  })
+
+  it('uses parent readiness for browser mock agents when raw CLI status is missing', () => {
+    render(
+      <AiWorkspace
+        open
+        mode="docked"
+        aiAgentsStatus={createMissingAiAgentsStatus()}
+        aiModelProviders={[]}
+        defaultAiAgentReady
+        vaultPath="/tmp/vault"
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('ai-panel-view')).toHaveAttribute('data-agent-readiness', 'ready')
+    expect(screen.getByTestId('ai-panel-view')).toHaveAttribute('data-agent-ready', 'true')
+    expect(controllerCalls[0]).toEqual(expect.objectContaining({
+      defaultAiAgentReadiness: 'ready',
+      defaultAiAgentReady: true,
+    }))
+  })
+
+  it('keeps unavailable default agents missing when parent readiness is false', () => {
+    render(
+      <AiWorkspace
+        open
+        mode="docked"
+        aiAgentsStatus={createMissingAiAgentsStatus()}
+        aiModelProviders={[]}
+        defaultAiAgentReady={false}
+        vaultPath="/tmp/vault"
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('ai-panel-view')).toHaveAttribute('data-agent-readiness', 'missing')
+    expect(screen.getByTestId('ai-panel-view')).toHaveAttribute('data-agent-ready', 'false')
+    expect(controllerCalls[0]).toEqual(expect.objectContaining({
+      defaultAiAgentReadiness: 'missing',
+      defaultAiAgentReady: false,
+    }))
   })
 
   it('creates chats from the sidebar and hides the legacy AI panel header', () => {
