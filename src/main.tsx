@@ -190,6 +190,16 @@ function isResizeObserverLoopError(error: unknown): boolean {
     || message.includes('ResizeObserver loop limit exceeded')
 }
 
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.stack ?? error.message : String(error)
+}
+
+function isStartupDefaultExportImportError(error: unknown): boolean {
+  const message = errorText(error)
+  return message.includes("Cannot read properties of undefined (reading 'default')")
+    || message.includes("undefined is not an object (evaluating 'o.default')")
+}
+
 function showFatalRenderError(
   error: unknown,
   errorInfo: { componentStack?: string },
@@ -227,6 +237,7 @@ function captureReactRootError(
   errorInfo: { componentStack?: string },
 ): void {
   if (isResizeObserverLoopError(error)) return
+  if (isStartupDefaultExportImportError(error) && reloadFrontendOnceIfStartupFailed()) return
 
   const componentStack = errorInfo.componentStack ?? ''
   showFatalRenderError(error, { componentStack })

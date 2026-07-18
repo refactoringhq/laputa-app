@@ -190,6 +190,17 @@ describe('main entrypoint', () => {
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '\n    in App' })
   }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
 
+  it('reloads and suppresses startup default-export chunk errors before frontend readiness', async () => {
+    await importEntrypoint()
+
+    const error = new TypeError("Cannot read properties of undefined (reading 'default')")
+    rootOptions().onUncaughtError?.(error, { componentStack: '' })
+
+    expect(sessionStorage.getItem('tolaria:startup-reload-attempted')).toBe('1')
+    expect(mocks.sentryHandler).not.toHaveBeenCalled()
+    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+  }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
+
   it('suppresses recovered BlockNote maximum update depth errors from Sentry', async () => {
     await importEntrypoint()
 
