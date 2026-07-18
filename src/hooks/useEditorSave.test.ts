@@ -167,6 +167,41 @@ describe('useEditorSave', () => {
     })
   })
 
+  it('saves buffered editor content to the renamed path after a tab path change', async () => {
+    const pathAliases = new Map([['/test/vault/draft.md', '/test/vault/draft.md']])
+    const resolvePath = vi.fn((path: string) => pathAliases.get(path) ?? path)
+    const onBeforePersist = vi.fn()
+    const onNotePersisted = vi.fn()
+    const { result } = renderHook(() =>
+      useEditorSave({
+        updateVaultContent,
+        setTabs,
+        setToastMessage,
+        onBeforePersist,
+        onNotePersisted,
+        resolvePath,
+        persistenceScope: '/test/vault',
+      })
+    )
+
+    act(() => {
+      result.current.handleContentChange('/test/vault/draft.md', '# Draft\n\nUnsaved rename edit')
+    })
+    pathAliases.set('/test/vault/draft.md', '/test/vault/renamed-draft.md')
+
+    await act(async () => {
+      await result.current.savePendingForPath('/test/vault/renamed-draft.md')
+    })
+
+    expect(mockInvokeFn).toHaveBeenCalledWith('save_note_content', {
+      path: '/test/vault/renamed-draft.md',
+      content: '# Draft\n\nUnsaved rename edit',
+    })
+    expect(onBeforePersist).toHaveBeenCalledWith('/test/vault/renamed-draft.md')
+    expect(updateVaultContent).toHaveBeenCalledWith('/test/vault/renamed-draft.md', '# Draft\n\nUnsaved rename edit')
+    expect(onNotePersisted).toHaveBeenCalledWith('/test/vault/renamed-draft.md', '# Draft\n\nUnsaved rename edit')
+  })
+
   it('coalesces overlapping savePendingForPath calls for the same buffered content', async () => {
     let resolveSave!: (value: null) => void
     mockInvokeFn.mockReturnValue(new Promise<null>((resolve) => { resolveSave = resolve }))
