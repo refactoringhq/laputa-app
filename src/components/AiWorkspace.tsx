@@ -20,7 +20,6 @@ import {
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 import {
-  aiTargetReady,
   targetAgent,
   type AiModelProvider,
   type AiTarget,
@@ -106,11 +105,17 @@ interface AiWorkspaceProps {
   vaultPaths?: string[]
 }
 
-function agentReadinessForTarget(target: AiTarget, statuses: AiAgentsStatus): AiAgentReadiness {
+function agentReadinessForTarget(
+  target: AiTarget,
+  statuses: AiAgentsStatus,
+  readyFallbackTargetId: string,
+  defaultAiAgentReady: boolean,
+): AiAgentReadiness {
   if (target.kind === 'api_model') return 'ready'
   const status = getAiAgentAvailability(statuses, target.agent).status
   if (status === 'checking') return 'checking'
-  return status === 'installed' ? 'ready' : 'missing'
+  if (status === 'installed') return 'ready'
+  return defaultAiAgentReady && target.id === readyFallbackTargetId ? 'ready' : 'missing'
 }
 
 function TargetGroup({ label, targets }: { label: string; targets: AiTarget[] }) {
@@ -326,6 +331,7 @@ type ConversationSessionProps = {
   onUnsupportedAiPaste?: (message: string) => void
   onVaultChanged?: () => void
   openTabs?: VaultEntry[]
+  readyFallbackTargetId: string
   target: AiTarget
   vaultAiGuidanceStatus?: VaultAiGuidanceStatus
   vaultPath: string
@@ -344,18 +350,22 @@ function firstCompletedAssistantMessage(messages: AiAgentMessage[]): AiAgentMess
 function useGeneratedConversationTitle({
   aiAgentsStatus,
   conversation,
+  defaultAiAgentReady,
   messages,
   onTitleFromAnswer,
   permissionMode,
+  readyFallbackTargetId,
   target,
   vaultPath,
   vaultPaths,
 }: {
   aiAgentsStatus: AiAgentsStatus
   conversation: AiConversation
+  defaultAiAgentReady: boolean
   messages: AiAgentMessage[]
   onTitleFromAnswer: (request: GenerateAiConversationTitleRequest & { id: string }) => void
   permissionMode: AiAgentPermissionMode
+  readyFallbackTargetId: string
   target: AiTarget
   vaultPath: string
   vaultPaths?: string[]
@@ -380,7 +390,7 @@ function useGeneratedConversationTitle({
       permissionMode,
       prompt,
       target,
-      targetReady: aiTargetReady(target, aiAgentsStatus),
+      targetReady: agentReadinessForTarget(target, aiAgentsStatus, readyFallbackTargetId, defaultAiAgentReady) === 'ready',
       vaultPath,
       vaultPaths,
     })
@@ -388,9 +398,11 @@ function useGeneratedConversationTitle({
     aiAgentsStatus,
     conversation.id,
     conversation.usesDefaultTitle,
+    defaultAiAgentReady,
     messages,
     onTitleFromAnswer,
     permissionMode,
+    readyFallbackTargetId,
     target,
     vaultPath,
     vaultPaths,
@@ -552,6 +564,7 @@ function ConversationSession({
   onUnsupportedAiPaste,
   onVaultChanged,
   openTabs,
+  readyFallbackTargetId,
   target,
   vaultAiGuidanceStatus,
   vaultPath,
@@ -566,13 +579,14 @@ function ConversationSession({
     noteListFilter,
     openTabs,
   })
-  const readiness = agentReadinessForTarget(target, aiAgentsStatus)
+  const readiness = agentReadinessForTarget(target, aiAgentsStatus, readyFallbackTargetId, defaultAiAgentReady)
+  const targetReady = readiness === 'ready'
   const controller = useAiPanelController({
     vaultPath,
     vaultPaths,
     defaultAiAgent: targetAgent(target),
     defaultAiTarget: target,
-    defaultAiAgentReady: target.kind === 'api_model' || defaultAiAgentReady,
+    defaultAiAgentReady: targetReady,
     defaultAiAgentReadiness: readiness,
     activeEntry: context.activeEntry,
     activeNoteContent: context.activeNoteContent,
@@ -612,7 +626,9 @@ function ConversationSession({
     messages: controller.agent.messages,
     onTitleFromAnswer,
     permissionMode: controller.permissionMode,
+    readyFallbackTargetId,
     target,
+    defaultAiAgentReady,
     vaultPath,
     vaultPaths,
   })
@@ -635,7 +651,7 @@ function ConversationSession({
           controller={controller}
           defaultAiAgent={targetAgent(target)}
           defaultAiAgentReadiness={readiness}
-          defaultAiAgentReady={aiTargetReady(target, aiAgentsStatus)}
+          defaultAiAgentReady={targetReady}
           defaultAiTarget={target}
           entries={context.entries}
           activeEntry={context.activeEntry}
@@ -1037,6 +1053,7 @@ function ConversationSessions({
             onUnsupportedAiPaste={workspace.onUnsupportedAiPaste}
             onVaultChanged={workspace.onVaultChanged}
             openTabs={workspace.openTabs}
+            readyFallbackTargetId={model.fallbackTarget.id}
             target={target}
             vaultAiGuidanceStatus={workspace.vaultAiGuidanceStatus}
             vaultPath={workspace.vaultPath}

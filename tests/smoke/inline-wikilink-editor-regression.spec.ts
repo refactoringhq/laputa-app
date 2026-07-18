@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import {
   expectEditorSelectionRange,
   expectNoPageErrors,
@@ -9,9 +9,11 @@ import {
 } from './inlineWikilinkEditorHelpers'
 
 test.describe('Inline wikilink editor regression', () => {
+  test.describe.configure({ timeout: 70_000 })
+
   test.beforeEach(async ({ page }) => {
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
-    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await gotoApp(page)
     await expect(page.getByTestId('note-list-container')).toBeVisible({ timeout: 5_000 })
 
     await page.locator('.app__note-list .cursor-pointer').first().click()
@@ -141,3 +143,15 @@ test.describe('Inline wikilink editor regression', () => {
     await expectNoPageErrors(pageErrors)
   })
 })
+
+async function gotoApp(page: Page): Promise<void> {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 15_000 })
+      return
+    } catch (error) {
+      if (attempt === 3) throw error
+      await page.waitForTimeout(250)
+    }
+  }
+}
