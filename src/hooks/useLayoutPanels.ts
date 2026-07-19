@@ -73,13 +73,36 @@ function savePanelWidths(widths: PanelWidths): void {
   }
 }
 
+function loadInspectorCollapsed(): boolean {
+  try {
+    return localStorage.getItem(APP_STORAGE_KEYS.rightPanelCollapsed) !== 'false'
+  } catch {
+    return true
+  }
+}
+
+function saveInspectorCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(APP_STORAGE_KEYS.rightPanelCollapsed, String(collapsed))
+  } catch {
+    // Ignore unavailable or restricted localStorage implementations.
+  }
+}
+
 export function useLayoutPanels(options?: { initialInspectorCollapsed?: boolean }) {
   const [panelWidths, setPanelWidths] = useState(loadPanelWidths)
-  const [inspectorCollapsed, setInspectorCollapsed] = useState(options?.initialInspectorCollapsed ?? true)
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(
+    () => options?.initialInspectorCollapsed ?? loadInspectorCollapsed(),
+  )
+  const persistInspectorCollapsed = options?.initialInspectorCollapsed === undefined
 
   useEffect(() => {
     savePanelWidths(panelWidths)
   }, [panelWidths])
+
+  useEffect(() => {
+    if (persistInspectorCollapsed) saveInspectorCollapsed(inspectorCollapsed)
+  }, [inspectorCollapsed, persistInspectorCollapsed])
 
   const resizePanel = useCallback((key: PanelWidthKey, delta: number) => {
     setPanelWidths((widths) => {
