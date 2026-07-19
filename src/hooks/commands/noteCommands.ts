@@ -1,4 +1,8 @@
-import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../appCommandCatalog'
+import {
+  APP_COMMAND_IDS,
+  formatShortcutDisplay,
+  getAppCommandShortcutDisplay,
+} from '../appCommandCatalog'
 import { buildEditorFindCommands } from './editorFindCommands'
 import { translate, type AppLocale } from '../../lib/i18n'
 import type { ImmediateCreateOptions } from '../useNoteCreation'
@@ -283,6 +287,9 @@ function buildFocusedBlockTypeCommands(config: NoteCommandsConfig): CommandActio
       target.type.toLowerCase(),
     ],
     enabled: commandEnabled,
+    shortcut: target.key === 'code-block'
+      ? formatShortcutDisplay({ display: '⌘⇧`' })
+      : undefined,
     execute: () => config.onTurnCurrentBlockInto?.(target),
   }))
 }

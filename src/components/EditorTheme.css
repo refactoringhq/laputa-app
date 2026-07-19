@@ -681,6 +681,10 @@ body.tldraw-whiteboard-fullscreen-open {
 
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > pre {
   color: inherit;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  position: relative;
+  white-space: pre-wrap;
 }
 
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > div > select {
@@ -695,8 +699,37 @@ body.tldraw-whiteboard-fullscreen-open {
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] pre code {
   background-color: transparent;
   color: inherit;
-  padding: 0;
   border-radius: 0;
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 0 0 0 2.75rem;
+  white-space: pre-wrap;
+}
+
+.editor__code-line-number-host {
+  position: relative;
+}
+
+.editor__code-line-number-layer {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
+.editor__code-line-number-layer [data-code-line-numbers] {
+  color: var(--editor-code-block-language);
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  position: absolute;
+  text-align: right;
+  user-select: none;
+  width: 2rem;
+}
+
+.editor__code-line-number-layer [data-code-line-numbers] > span {
+  display: block;
 }
 
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] pre code .shiki {

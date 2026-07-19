@@ -662,6 +662,9 @@ Defined in `src/components/editorSchema.tsx` and styled in `src/components/Edito
 - Fenced code blocks now use BlockNote's supported Shiki-backed highlighter path, which renders `.shiki` token spans directly inside the editor DOM.
 - Missing common grammars live in `src/utils/codeBlockLanguageCatalog.ts` and are registered lazily from direct `@shikijs/langs` imports by `src/components/codeBlockOptions.ts`; known aliases such as `ps1` and `vb` normalize to canonical picker values during Markdown import.
 - Tolaria keeps `defaultLanguage: "text"` so unlabeled code blocks do not silently become JavaScript at creation time. Parsed unlabeled code blocks then run through Tolaria's lightweight language inference, while explicit fence languages and user dropdown choices still win.
+- `createRichEditorCodeBlockShortcutExtension()` adds the editor-local creation paths that BlockNote does not provide: Enter converts a paragraph containing three backticks plus an optional language into an empty language-aware code block, while Cmd/Ctrl+Shift+Backquote converts the current block. Both paths emit `editor_code_block_created` with source-only metadata.
+- `codeBlockLineNumbers.ts` maintains a non-editable gutter beside BlockNote's `pre > code` content DOM. It derives logical line numbers without inserting text into the note, measures wrapped visual rows so later numbers stay aligned, and refreshes after editor mutations or width changes.
+- Code block CSS wraps long source lines instead of introducing horizontal scrolling. Cmd/Ctrl+A inside a code block scopes the browser selection to that block's raw source; normal full-note selections continue through the existing rich-copy path.
 - Inline-code chip styling remains scoped to `.bn-inline-content code`, so fenced `pre > code` nodes keep the dedicated code-block shell instead of inheriting the muted inline surface.
 
 ### Markdown Math
