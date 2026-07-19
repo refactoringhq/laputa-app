@@ -99,6 +99,7 @@ function NoteListContent({
   noteListVirtuosoRef,
   locale,
   loading,
+  showFilterPills,
 }: Pick<
   NoteListLayoutProps,
   | 'entitySelection'
@@ -117,6 +118,7 @@ function NoteListContent({
   | 'noteListVirtuosoRef'
   | 'locale'
   | 'loading'
+  | 'showFilterPills'
 >) {
   return (
     <div className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
@@ -145,6 +147,7 @@ function NoteListContent({
           renderItem={renderItem}
           virtuosoRef={noteListVirtuosoRef}
           locale={locale}
+          hasBottomOverlay={showFilterPills}
         />
       )}
     </div>
@@ -236,6 +239,7 @@ function NoteListBody({
         noteListVirtuosoRef={noteListVirtuosoRef}
         locale={locale}
         loading={loading}
+        showFilterPills={showFilterPills}
       />
       {showFilterPills && (
         <FilterPills
