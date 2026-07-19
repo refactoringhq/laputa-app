@@ -28,7 +28,10 @@ function paint(answer: number) {
 }
 
 console.log(paint(1))
+const wrapped = "This deliberately long source line should wrap inside a narrow editor without adding horizontal scrolling to the code block."
 \`\`\`
+
+Convert this paragraph with the shortcut.
 `)
 }
 
@@ -47,6 +50,7 @@ async function tokenColors(locator: Locator) {
 }
 
 test.describe('Editor code block theme', () => {
+  test.setTimeout(45_000)
   let tempVaultDir: string
 
   test.beforeEach(() => {
@@ -76,6 +80,11 @@ test.describe('Editor code block theme', () => {
     await expect(codeBlock).toBeVisible({ timeout: 10_000 })
     await expect(inlineCode).toBeVisible({ timeout: 10_000 })
     await expect(fencedCode).toBeVisible()
+    await expect(page.locator('[data-code-line-numbers]').first().locator(':scope > *')).toHaveCount(6)
+    await expect.poll(() => fencedCode.evaluate((element) => {
+      const pre = element.closest('pre')
+      return pre ? pre.scrollWidth <= pre.clientWidth : false
+    })).toBe(true)
 
     await expect.poll(() => backgroundColor(inlineCode)).toBe('rgb(240, 240, 239)')
     await expect.poll(() => backgroundColor(fencedCode)).toBe('rgba(0, 0, 0, 0)')
@@ -95,5 +104,30 @@ test.describe('Editor code block theme', () => {
     await expect.poll(() => textColor(fencedCode)).toBe('rgb(55, 53, 47)')
     await expect.poll(() => tokenColors(highlightedTokens)).not.toEqual(darkTokenColors)
     await expect(highlightedToken).toBeVisible()
+  })
+
+  test('creates a code block by shortcut and scopes select-all to its source', async ({ page }) => {
+    await openFixtureVault(page, tempVaultDir)
+    const noteItem = page.locator('[data-testid="note-list-container"]')
+      .getByText(CODE_NOTE_TITLE, { exact: true })
+    await expect(noteItem).toBeVisible({ timeout: 10_000 })
+    await noteItem.click()
+
+    const source = 'Convert this paragraph with the shortcut.'
+    await expect(page.locator('.bn-editor')).toContainText(source, { timeout: 10_000 })
+    const paragraph = page.locator('.bn-editor [data-content-type="paragraph"]')
+      .filter({ hasText: source })
+      .last()
+    await expect(paragraph).toBeVisible()
+    await paragraph.click()
+    await page.keyboard.press(process.platform === 'darwin'
+      ? 'Meta+Shift+Backquote'
+      : 'Control+Shift+Backquote')
+
+    const createdCode = page.locator('[data-content-type="codeBlock"] pre code', { hasText: source })
+    await expect(createdCode).toBeVisible()
+    await createdCode.click()
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A')
+    await expect.poll(() => page.evaluate(() => document.getSelection()?.toString())).toBe(source)
   })
 })
