@@ -813,6 +813,7 @@ Wikilink resolution (`resolveEntry` in `src/utils/wikilink.ts`) uses multi-pass 
 ### Raw Editor Mode
 
 Toggle via Cmd+K → "Raw Editor" or breadcrumb bar button. Uses CodeMirror 6 (`useCodeMirror` hook) to edit the raw markdown + frontmatter directly. Changes saved via the same `save_note_content` command.
+The raw editor reuses CodeMirror's Lezer YAML parser to decorate malformed frontmatter in place with the shared error colors. Parser error nodes are mapped back to their source ranges, while valid nested collections, flow values, comments, and block scalars remain undecorated.
 `useRawModeWithFlush` owns the rich/raw transition model: pending raw-exit content and raw-mode overrides move together as one content transition, while cursor/scroll restoration moves through one restore-transition ref consumed by `useEditorModePositionSync`. The raw editor should not carry independent pending-content or pending-position refs outside that handoff.
 While the user types, `useEditorSaveWithLinks` derives a transient `VaultEntry` patch from parseable frontmatter so the Inspector, relationship chips, and note-list-visible metadata stay in sync with the raw editor before the next vault reload. Temporarily invalid or half-typed frontmatter is ignored until it becomes parseable again, which avoids clobbering the last known good derived state.
 Raw CodeMirror keeps Markdown mode active for `.md` notes, uses the HTML language support for fenced `html` block contents, and handles `Tab` as a literal editor insertion instead of browser focus traversal.
