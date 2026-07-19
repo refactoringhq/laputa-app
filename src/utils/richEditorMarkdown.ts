@@ -1,4 +1,5 @@
 import { compactMarkdown } from './compact-markdown'
+import { injectCalloutBlocks } from './calloutMarkdown'
 import {
   hasDurableEditorBlocks,
   injectDurableEditorMarkdownBlocks,
@@ -86,7 +87,8 @@ export function injectRichEditorMarkdownBlocks(blocks: EditorBlocksSnapshot): Ed
   const withWikilinks = injectWikilinks(blocks)
   const withMath = injectMathInBlocks(withWikilinks)
   const withHighlights = injectMarkdownHighlightsInBlocks(withMath)
-  return injectDurableEditorMarkdownBlocks(withHighlights)
+  const withDurableBlocks = injectDurableEditorMarkdownBlocks(withHighlights)
+  return injectCalloutBlocks(withDurableBlocks)
 }
 
 export function hasRichEditorDurableBlocks(blocks: EditorBlocksSnapshot): boolean {
