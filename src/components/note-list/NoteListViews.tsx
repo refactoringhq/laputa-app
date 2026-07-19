@@ -48,13 +48,39 @@ export function EntityView({ entity, groups, query, collapsedGroups, sortPrefs, 
   )
 }
 
-export function ListView({ isArchivedView, isChangesView, isInboxView, changesError, searched, query, renderItem, virtuosoRef, locale = 'en' }: {
+// The bottom filter pills float over the list, so scrollable content needs
+// matching clearance or the last note stays hidden underneath them.
+function BottomOverlaySpacer() {
+  return <div aria-hidden="true" data-testid="note-list-bottom-overlay-spacer" className="h-14" />
+}
+
+const BOTTOM_OVERLAY_COMPONENTS = { Footer: BottomOverlaySpacer }
+// Virtuoso crashes on an explicit `components={undefined}`, so fall back to
+// a stable empty object when no clearance is needed.
+const NO_EXTRA_COMPONENTS = {}
+
+interface ListViewProps {
   isArchivedView?: boolean; isChangesView?: boolean; isInboxView?: boolean; changesError?: string | null
   searched: VaultEntry[]; query: string
   renderItem: (entry: VaultEntry) => React.ReactNode
   virtuosoRef?: React.RefObject<VirtuosoHandle | null>
   locale?: AppLocale
-}) {
+  hasBottomOverlay?: boolean
+}
+
+export function ListView(props: ListViewProps) {
+  const {
+    isArchivedView,
+    isChangesView,
+    isInboxView,
+    changesError,
+    searched,
+    query,
+    renderItem,
+    virtuosoRef,
+    locale = 'en',
+    hasBottomOverlay,
+  } = props
   const emptyText = resolveEmptyText({
     isChangesView: !!isChangesView,
     changesError: changesError ?? null,
@@ -68,6 +94,7 @@ export function ListView({ isArchivedView, isChangesView, isInboxView, changesEr
     return (
       <div className="h-full overflow-y-auto">
         <EmptyMessage text={emptyText} />
+        {hasBottomOverlay && <BottomOverlaySpacer />}
       </div>
     )
   }
@@ -78,6 +105,7 @@ export function ListView({ isArchivedView, isChangesView, isInboxView, changesEr
       style={{ height: '100%' }}
       data={searched}
       overscan={200}
+      components={hasBottomOverlay ? BOTTOM_OVERLAY_COMPONENTS : NO_EXTRA_COMPONENTS}
       itemContent={(_index, entry) => renderItem(entry)}
     />
   )
