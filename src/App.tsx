@@ -90,7 +90,7 @@ import { focusNoteIconPropertyEditor } from './components/noteIconPropertyEvents
 import { trackEvent } from './lib/telemetry'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
 import { areAiFeaturesEnabled } from './lib/aiFeatures'
-import { aiTargetCanQueuePrompt, type AiTarget } from './lib/aiTargets'
+import { resolveAiTargetReadiness, type AiTarget } from './lib/aiTargets'
 import { areGitFeaturesEnabled } from './lib/gitSettings'
 import { useAppCommandAiActions } from './hooks/useAppCommandAiActions'
 import { TOLARIA_DOCS_URL } from './constants/feedback'
@@ -420,7 +420,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     settingsLoaded,
   })
   const quickPromptTarget = lastAiWorkspaceTarget ?? aiAgentPreferences.defaultAiTarget
-  const quickPromptTargetReady = aiTargetCanQueuePrompt(quickPromptTarget, aiAgentsStatus)
+  const quickPromptTargetReady = resolveAiTargetReadiness(quickPromptTarget, aiAgentsStatus, {
+    tauri: isTauri(),
+  }).canQueuePrompt
 
   useVaultOpenedTelemetry({
     entryCount: vault.entries.length,

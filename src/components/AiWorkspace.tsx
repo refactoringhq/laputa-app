@@ -14,12 +14,12 @@ import {
 import { cn } from '@/lib/utils'
 import {
   DEFAULT_AI_AGENT,
-  getAiAgentAvailability,
   type AiAgentId,
   type AiAgentReadiness,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 import {
+  resolveAiTargetReadiness,
   targetAgent,
   type AiModelProvider,
   type AiTarget,
@@ -103,19 +103,6 @@ interface AiWorkspaceProps {
   vaultAiGuidanceStatus?: VaultAiGuidanceStatus
   vaultPath: string
   vaultPaths?: string[]
-}
-
-function agentReadinessForTarget(
-  target: AiTarget,
-  statuses: AiAgentsStatus,
-  readyFallbackTargetId: string,
-  defaultAiAgentReady: boolean,
-): AiAgentReadiness {
-  if (target.kind === 'api_model') return 'ready'
-  const status = getAiAgentAvailability(statuses, target.agent).status
-  if (status === 'checking') return 'checking'
-  if (status === 'installed') return 'ready'
-  return defaultAiAgentReady && target.id === readyFallbackTargetId ? 'ready' : 'missing'
 }
 
 function TargetGroup({ label, targets }: { label: string; targets: AiTarget[] }) {
@@ -390,7 +377,10 @@ function useGeneratedConversationTitle({
       permissionMode,
       prompt,
       target,
-      targetReady: agentReadinessForTarget(target, aiAgentsStatus, readyFallbackTargetId, defaultAiAgentReady) === 'ready',
+      targetReady: resolveAiTargetReadiness(target, aiAgentsStatus, {
+        readyFallbackTargetId,
+        readyFallbackTargetReady: defaultAiAgentReady,
+      }).ready,
       vaultPath,
       vaultPaths,
     })
@@ -579,15 +569,17 @@ function ConversationSession({
     noteListFilter,
     openTabs,
   })
-  const readiness = agentReadinessForTarget(target, aiAgentsStatus, readyFallbackTargetId, defaultAiAgentReady)
-  const targetReady = readiness === 'ready'
+  const targetReadiness = resolveAiTargetReadiness(target, aiAgentsStatus, {
+    readyFallbackTargetId,
+    readyFallbackTargetReady: defaultAiAgentReady,
+  })
   const controller = useAiPanelController({
     vaultPath,
     vaultPaths,
     defaultAiAgent: targetAgent(target),
     defaultAiTarget: target,
-    defaultAiAgentReady: targetReady,
-    defaultAiAgentReadiness: readiness,
+    defaultAiAgentReady: targetReadiness.ready,
+    defaultAiAgentReadiness: targetReadiness.readiness,
     activeEntry: context.activeEntry,
     activeNoteContent: context.activeNoteContent,
     entries: context.entries,
@@ -650,8 +642,8 @@ function ConversationSession({
         <AiPanelView
           controller={controller}
           defaultAiAgent={targetAgent(target)}
-          defaultAiAgentReadiness={readiness}
-          defaultAiAgentReady={targetReady}
+          defaultAiAgentReadiness={targetReadiness.readiness}
+          defaultAiAgentReady={targetReadiness.ready}
           defaultAiTarget={target}
           entries={context.entries}
           activeEntry={context.activeEntry}
