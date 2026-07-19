@@ -186,6 +186,25 @@ describe('useNoteActions hook', () => {
     expect(result.current.activeTabPath).toBe('/vault/target.md')
   })
 
+  it.each(['html', 'HTM'])('opens .%s vault files externally without loading raw source', async (extension) => {
+    const entry = makeEntry({
+      path: `/test/vault/generated/report.${extension}`,
+      filename: `report.${extension}`,
+      fileKind: 'text',
+    })
+    const onOpenExternalFile = vi.fn()
+    const config = { ...makeConfig([entry]), onOpenExternalFile }
+    const { result } = renderHook(() => useNoteActions(config))
+
+    await act(async () => {
+      await result.current.handleSelectNote(entry)
+    })
+
+    expect(onOpenExternalFile).toHaveBeenCalledWith(entry.path)
+    expect(result.current.tabs).toHaveLength(0)
+    expect(mockInvoke).not.toHaveBeenCalledWith('get_note_content', expect.anything())
+  })
+
   it('handleNavigateWikilink warns when target not found', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
