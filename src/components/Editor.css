@@ -537,3 +537,80 @@ body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadc
     padding: 12px 0;
   }
 }
+
+.tolaria-callout {
+  --callout-accent: var(--feedback-info-text);
+  --callout-background: var(--feedback-info-bg);
+  margin: 0.5rem 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--callout-accent) 35%, var(--color-border));
+  border-left: 3px solid var(--callout-accent);
+  border-radius: 0.5rem;
+  background: var(--callout-background);
+}
+
+.tolaria-callout--success {
+  --callout-accent: var(--feedback-success-text);
+  --callout-background: var(--feedback-success-bg);
+}
+
+.tolaria-callout--warning {
+  --callout-accent: var(--feedback-warning-text);
+  --callout-background: var(--feedback-warning-bg);
+}
+
+.tolaria-callout--error {
+  --callout-accent: var(--feedback-error-text);
+  --callout-background: var(--feedback-error-bg);
+}
+
+.tolaria-callout--example {
+  --callout-accent: var(--accent-purple);
+  --callout-background: var(--accent-purple-light);
+}
+
+.tolaria-callout--quote {
+  --callout-accent: var(--text-secondary);
+  --callout-background: var(--surface-secondary);
+}
+
+.tolaria-callout__header {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem 0.25rem;
+  color: var(--callout-accent);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.tolaria-callout__toggle {
+  height: auto;
+  min-height: 1.5rem;
+  justify-content: flex-start;
+  padding: 0;
+  color: inherit;
+}
+
+.tolaria-callout__toggle:hover {
+  background: transparent;
+  color: inherit;
+}
+
+.tolaria-callout__caret {
+  transition: transform 140ms ease;
+}
+
+.tolaria-callout__toggle[aria-expanded='true'] .tolaria-callout__caret {
+  transform: rotate(90deg);
+}
+
+.tolaria-callout__body {
+  padding: 0.15rem 0.75rem 0.65rem;
+  color: var(--color-foreground);
+}
+
+.tolaria-callout__body[hidden] {
+  display: none;
+}

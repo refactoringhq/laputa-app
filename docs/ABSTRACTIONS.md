@@ -60,7 +60,7 @@ All data lives in markdown files with YAML frontmatter. There is no database —
 
 ### Rich-Editor Markdown Serialization
 
-`src/utils/richEditorMarkdown.ts` is the canonical owner for rich-editor Markdown import/export boundaries. It installs the app-facing serializer on real BlockNote editors, preprocesses Markdown before parsing, injects Tolaria schema blocks after parsing, and turns BlockNote documents back into vault Markdown. It restores Tolaria's durable Markdown syntax for wikilinks, math, highlights, attachments, Mermaid, tldraw, and sandboxed HTML blocks before the save path writes bytes to disk. Hot save paths should pass an already-read block snapshot when they have one; a debounced rich-editor flush should not ask BlockNote for `editor.document` twice.
+`src/utils/richEditorMarkdown.ts` is the canonical owner for rich-editor Markdown import/export boundaries. It installs the app-facing serializer on real BlockNote editors, preprocesses Markdown before parsing, injects Tolaria schema blocks after parsing, and turns BlockNote documents back into vault Markdown. It restores Tolaria's durable Markdown syntax for wikilinks, math, highlights, attachments, Mermaid, tldraw, sandboxed HTML blocks, and blockquote callouts before the save path writes bytes to disk. Hot save paths should pass an already-read block snapshot when they have one; a debounced rich-editor flush should not ask BlockNote for `editor.document` twice.
 
 The experimental direct serializer remains a lower-level implementation in `src/utils/blockNoteDirectMarkdown.ts`. App/editor flows should go through `richEditorMarkdown.ts` entry points instead of installing the direct serializer, invoking `blocksToMarkdownLossy()`, or composing durable Markdown codecs locally. The direct helper uses cached direct serialization when every block shape is supported and falls back to BlockNote's exporter when a custom or unknown block appears.
 
@@ -668,6 +668,16 @@ Defined in `src/components/editorSchema.tsx` and styled in `src/components/Edito
 - `codeBlockLineNumbers.ts` maintains a non-editable gutter beside BlockNote's `pre > code` content DOM. It derives logical line numbers without inserting text into the note, measures wrapped visual rows so later numbers stay aligned, and refreshes after editor mutations or width changes.
 - Code block CSS wraps long source lines instead of introducing horizontal scrolling. Cmd/Ctrl+A inside a code block scopes the browser selection to that block's raw source; normal full-note selections continue through the existing rich-copy path.
 - Inline-code chip styling remains scoped to `.bn-inline-content code`, so fenced `pre > code` nodes keep the dedicated code-block shell instead of inheriting the muted inline surface.
+
+### Blockquote Callouts
+
+Defined in `src/utils/calloutMarkdown.ts`, `src/utils/richEditorMarkdown.ts`, `src/utils/editorDurableMarkdown.ts`, `src/components/CalloutBlock.tsx`, `src/components/editorSchema.tsx`, and styled in `src/components/Editor.css`:
+
+- Blockquotes whose first line matches `[!type]`, with optional `+`/`-` fold state and title, become `calloutBlock` schema nodes after BlockNote parsing. Ordinary blockquotes pass through untouched.
+- Marker metadata lives in block props, but the body remains editable BlockNote inline content. Conversion slices only the marker prefix, preserving body text styles, links, wikilinks, and other supported inline nodes.
+- Known Obsidian aliases and GitHub alert types map to semantic Tolaria color/icon families; unknown type tokens retain neutral note styling and still serialize unchanged.
+- The mixed durable serializer serializes the live body through BlockNote, restores `> [!type]` syntax, and keeps the callout in the same autosave/raw-mode/tab-swap pipeline as other Markdown.
+- `-` begins collapsed and `+` begins expanded. The shadcn disclosure control changes only local presentation state, so opening or closing a callout never dirties the note.
 
 ### Markdown Math
 
