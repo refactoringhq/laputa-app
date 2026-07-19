@@ -92,6 +92,42 @@ describe('useLayoutPanels', () => {
     expect(result.current.inspectorCollapsed).toBe(true)
   })
 
+  it('restores the last persisted inspector visibility', () => {
+    localStorage.setItem(APP_STORAGE_KEYS.rightPanelCollapsed, 'false')
+
+    const { result } = renderHook(() => useLayoutPanels())
+
+    expect(result.current.inspectorCollapsed).toBe(false)
+  })
+
+  it('persists inspector visibility changes for the next main-window launch', () => {
+    const { result, unmount } = renderHook(() => useLayoutPanels())
+
+    act(() => result.current.setInspectorCollapsed(false))
+    expect(localStorage.getItem(APP_STORAGE_KEYS.rightPanelCollapsed)).toBe('false')
+
+    unmount()
+    const restored = renderHook(() => useLayoutPanels())
+    expect(restored.result.current.inspectorCollapsed).toBe(false)
+  })
+
+  it('keeps auxiliary-window overrides from replacing the persisted main-window state', () => {
+    localStorage.setItem(APP_STORAGE_KEYS.rightPanelCollapsed, 'false')
+
+    const { result } = renderHook(() => useLayoutPanels({ initialInspectorCollapsed: true }))
+
+    expect(result.current.inspectorCollapsed).toBe(true)
+    expect(localStorage.getItem(APP_STORAGE_KEYS.rightPanelCollapsed)).toBe('false')
+  })
+
+  it('defaults inspector to collapsed when persisted visibility is invalid', () => {
+    localStorage.setItem(APP_STORAGE_KEYS.rightPanelCollapsed, 'sometimes')
+
+    const { result } = renderHook(() => useLayoutPanels())
+
+    expect(result.current.inspectorCollapsed).toBe(true)
+  })
+
   it('accepts initial inspector collapsed override', () => {
     const { result } = renderHook(() => useLayoutPanels({ initialInspectorCollapsed: false }))
     expect(result.current.inspectorCollapsed).toBe(false)
