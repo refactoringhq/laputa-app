@@ -81,6 +81,34 @@ describe('BlockNote direct Markdown serialization', () => {
     ].join('\n'))
   })
 
+  it('serializes saved attachment media blocks with portable Markdown labels and destinations', () => {
+    const blocks = [
+      {
+        type: 'image',
+        props: { name: 'Launch shot.png', url: 'attachments/Launch shot.png' },
+        children: [],
+      },
+      {
+        type: 'file',
+        props: { name: 'Briefing.pdf', url: 'attachments/Briefing (final).pdf' },
+        children: [],
+      },
+      {
+        type: 'video',
+        props: { url: 'attachments/demo.mov' },
+        children: [],
+      },
+    ]
+
+    expect(blocksToMarkdownDirect(blocks).markdown).toBe([
+      '![Launch shot.png](<attachments/Launch shot.png>)',
+      '',
+      '[Briefing.pdf](<attachments/Briefing (final).pdf>)',
+      '',
+      '[demo.mov](attachments/demo.mov)',
+    ].join('\n'))
+  })
+
   it('falls back to BlockNote legacy Markdown for unsupported block types', () => {
     const editor = makeEditor([{ type: 'unsupportedWidget', children: [] }])
     installBlockNoteDirectMarkdown(editor)
