@@ -89,16 +89,18 @@ vi.mock('react-virtuoso', () => ({
   Virtuoso: ({ data, itemContent, components }: {
     data?: unknown[]
     itemContent?: (index: number, item: unknown) => ReactNode
-    components?: { Header?: ComponentType }
+    components?: { Header?: ComponentType; Footer?: ComponentType }
   }) => {
     const Header = components?.Header
+    const Footer = components?.Footer
     const resolvedData = data ?? []
     const renderedIndexes = getVirtualizedIndexes(resolvedData.length)
     return createElement('div', { 'data-testid': 'virtuoso-mock' },
       Header ? createElement(Header) : null,
       renderedIndexes.map((index) =>
         createElement('div', { key: index }, itemContent?.(index, resolvedData[index]))
-      )
+      ),
+      Footer ? createElement(Footer) : null
     )
   },
   GroupedVirtuoso: ({ groupCounts, groupContent, itemContent }: {
