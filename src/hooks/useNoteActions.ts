@@ -17,6 +17,8 @@ import { findByNotePath, notePathFilename, notePathsMatch } from '../utils/noteP
 import type { VaultOption } from '../components/status-bar/types'
 import { canonicalFrontmatterKey } from '../utils/systemMetadata'
 import { useActionHistory, type ActionHistoryController, type ActionHistoryEntry } from './useActionHistory'
+import { isHtmlFileEntry } from '../utils/filePreview'
+import { trackEvent } from '../lib/telemetry'
 
 export interface NoteActionsConfig {
   addEntry: (entry: VaultEntry) => void
@@ -49,6 +51,8 @@ export interface NoteActionsConfig {
   onInternalVaultWrite?: (path: string) => void
   /** Called after type files or type assignments change, so derived type surfaces can reload. */
   onTypeStateChanged?: () => void | Promise<void>
+  /** Opens generated HTML in the system viewer without loading active content in Tolaria. */
+  onOpenExternalFile?: (path: string) => void
 }
 
 function isTitleKey(key: string): boolean {
@@ -704,6 +708,7 @@ interface NoteActionsResultParts {
   creation: ReturnType<typeof useNoteCreation>
   frontmatterActions: ReturnType<typeof useFrontmatterActionHandlers>
   handleNavigateWikilink: (target: string) => void
+  handleSelectNote: (entry: VaultEntry) => Promise<void>
   rename: ReturnType<typeof useNoteRename>
   tabMgmt: ReturnType<typeof useTabManagement>
 }
@@ -713,11 +718,13 @@ function buildNoteActionsResult({
   creation,
   frontmatterActions,
   handleNavigateWikilink,
+  handleSelectNote,
   rename,
   tabMgmt,
 }: NoteActionsResultParts) {
   return {
     ...tabMgmt,
+    handleSelectNote,
     handleNavigateWikilink,
     handleCreateNote: creation.handleCreateNote,
     handleCreateNoteImmediate: creation.handleCreateNoteImmediate,
@@ -742,10 +749,25 @@ function buildNoteActionsResult({
 }
 
 export function useNoteActions(config: NoteActionsConfig) {
-  const { entries, setToastMessage, updateEntry } = config
+  const { entries, onOpenExternalFile, setToastMessage, updateEntry } = config
   const { handlePathRenamed, resolveActionPath } = useRenamedNotePathResolver(config.onPathRenamed)
   const tabMgmt = useTabManagement(buildTabManagementOptions(config))
-  const { setTabs, handleSelectNote, openTabWithContent, activeTabPathRef, handleSwitchTab } = tabMgmt
+  const {
+    setTabs,
+    handleSelectNote: selectTab,
+    openTabWithContent,
+    activeTabPathRef,
+    handleSwitchTab,
+  } = tabMgmt
+  const handleSelectNote = useCallback(async (entry: VaultEntry) => {
+    if (onOpenExternalFile && isHtmlFileEntry(entry)) {
+      trackEvent('html_file_opened_external')
+      onOpenExternalFile(entry.path)
+      return
+    }
+
+    await selectTab(entry)
+  }, [onOpenExternalFile, selectTab])
   const revealActionHistoryTarget = useCallback(async (item: ActionHistoryEntry) => {
     const { path } = item
     if (!path) return
@@ -824,6 +846,7 @@ export function useNoteActions(config: NoteActionsConfig) {
     creation,
     frontmatterActions,
     handleNavigateWikilink,
+    handleSelectNote,
     rename,
     tabMgmt,
   })

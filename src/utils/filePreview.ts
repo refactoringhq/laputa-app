@@ -31,6 +31,11 @@ export function previewExtension(entry: Pick<VaultEntry, 'filename' | 'path'>): 
   return extensionFromFilename(entry.filename) ?? extensionFromFilename(entry.path)
 }
 
+export function isHtmlFileEntry(entry: Pick<VaultEntry, 'filename' | 'path'>): boolean {
+  const extension = previewExtension(entry)
+  return extension === 'html' || extension === 'htm'
+}
+
 export function isImagePreviewEntry(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): boolean {
   return filePreviewKind(entry) === 'image'
 }

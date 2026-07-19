@@ -419,6 +419,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     settings,
     settingsLoaded,
   })
+  const fileActions = useFileActions({
+    locale: appLocale,
+    selection: effectiveSelection,
+    setToastMessage,
+    vaultPath: resolvedPath,
+  })
   const quickPromptTarget = lastAiWorkspaceTarget ?? aiAgentPreferences.defaultAiTarget
   const quickPromptTargetReady = resolveAiTargetReadiness(quickPromptTarget, aiAgentsStatus, {
     tauri: isTauri(),
@@ -532,6 +538,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onInternalVaultWrite: markRecentVaultWrite,
     onFrontmatterPersisted: refreshGitModifiedFiles,
     onPathRenamed: (oldPath, newPath) => appSave.trackRenamedPath(oldPath, newPath),
+    onOpenExternalFile: fileActions.openExternalFile,
   })
   const {
     handleSelectNote,
@@ -875,13 +882,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     reloadFolders: vault.reloadFolders,
     setToastMessage,
   })
-  const fileActions = useFileActions({
-    locale: appLocale,
-    selection: effectiveSelection,
-    setToastMessage,
-    vaultPath: resolvedPath,
-  })
-
   const handleRemoveNoteIconCommand = useCallback(() => {
     if (notes.activeTabPath) handleRemoveNoteIcon(notes.activeTabPath)
   }, [notes.activeTabPath, handleRemoveNoteIcon])
