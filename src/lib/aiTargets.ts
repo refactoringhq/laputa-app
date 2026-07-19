@@ -4,6 +4,7 @@ import {
   getAiAgentAvailability,
   normalizeStoredAiAgent,
   type AiAgentId,
+  type AiAgentReadiness,
   type AiAgentsStatus,
 } from './aiAgents'
 import providerCatalog from '../shared/aiModelProviderCatalog.json' with { type: 'json' }
@@ -210,12 +211,57 @@ export function isLocalAiProvider(provider: AiModelProvider): boolean {
   return aiModelProviderCatalogEntry(provider.kind).local
 }
 
-export function aiTargetReady(target: AiTarget, statuses: AiAgentsStatus): boolean {
-  if (target.kind === 'api_model') return true
-  return getAiAgentAvailability(statuses, target.agent).status === 'installed'
+export interface AiTargetReadinessOptions {
+  settingsLoaded?: boolean
+  tauri?: boolean
+  readyFallbackTargetId?: string | null
+  readyFallbackTargetReady?: boolean
 }
 
-export function aiTargetCanQueuePrompt(target: AiTarget, statuses: AiAgentsStatus): boolean {
-  if (target.kind === 'api_model') return true
-  return getAiAgentAvailability(statuses, target.agent).status !== 'missing'
+export interface AiTargetReadinessResult {
+  readiness: AiAgentReadiness
+  ready: boolean
+  canQueuePrompt: boolean
+}
+
+function aiTargetReadinessResult(readiness: AiAgentReadiness): AiTargetReadinessResult {
+  return {
+    readiness,
+    ready: readiness === 'ready',
+    canQueuePrompt: readiness !== 'missing',
+  }
+}
+
+function aiTargetUsesReadyFallback(target: AiTarget, options: AiTargetReadinessOptions): boolean {
+  return options.readyFallbackTargetReady === true && options.readyFallbackTargetId === target.id
+}
+
+export function resolveAiTargetReadiness(
+  target: AiTarget,
+  statuses: AiAgentsStatus,
+  options: AiTargetReadinessOptions = {},
+): AiTargetReadinessResult {
+  if (options.settingsLoaded === false) return aiTargetReadinessResult('checking')
+  if (target.kind === 'api_model' || options.tauri === false) return aiTargetReadinessResult('ready')
+
+  const status = getAiAgentAvailability(statuses, target.agent).status
+  if (status === 'checking') return aiTargetReadinessResult('checking')
+  if (status === 'installed' || aiTargetUsesReadyFallback(target, options)) return aiTargetReadinessResult('ready')
+  return aiTargetReadinessResult('missing')
+}
+
+export function aiTargetReady(
+  target: AiTarget,
+  statuses: AiAgentsStatus,
+  options?: AiTargetReadinessOptions,
+): boolean {
+  return resolveAiTargetReadiness(target, statuses, options).ready
+}
+
+export function aiTargetCanQueuePrompt(
+  target: AiTarget,
+  statuses: AiAgentsStatus,
+  options?: AiTargetReadinessOptions,
+): boolean {
+  return resolveAiTargetReadiness(target, statuses, options).canQueuePrompt
 }

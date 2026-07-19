@@ -5,6 +5,7 @@ import {
   agentTargets,
   aiTargetCanQueuePrompt,
   aiTargetReady,
+  resolveAiTargetReadiness,
   aiModelProviderCatalog,
   aiModelProviderCatalogEntry,
   isLocalAiProvider,
@@ -74,13 +75,47 @@ describe('ai target provider contract', () => {
     const target = resolveTarget({
       default_ai_target: 'agent:claude_code',
     })
+    const checking = resolveAiTargetReadiness(target, createCheckingAiAgentsStatus())
 
     expect(aiTargetReady(target, createCheckingAiAgentsStatus())).toBe(false)
     expect(aiTargetCanQueuePrompt(target, createCheckingAiAgentsStatus())).toBe(true)
+    expect(checking).toEqual({
+      readiness: 'checking',
+      ready: false,
+      canQueuePrompt: true,
+    })
     expect(aiTargetCanQueuePrompt(target, normalizeAiAgentsStatus({
       claude_code: { installed: true, version: 'mock' },
     }))).toBe(true)
     expect(aiTargetCanQueuePrompt(target, createMissingAiAgentsStatus())).toBe(false)
+  })
+
+  it('centralizes browser mock and default-target fallback readiness', () => {
+    const target = resolveTarget({
+      default_ai_target: 'agent:claude_code',
+    })
+
+    expect(resolveAiTargetReadiness(target, createMissingAiAgentsStatus(), { tauri: false })).toEqual({
+      readiness: 'ready',
+      ready: true,
+      canQueuePrompt: true,
+    })
+    expect(resolveAiTargetReadiness(target, createMissingAiAgentsStatus(), {
+      readyFallbackTargetId: target.id,
+      readyFallbackTargetReady: true,
+    })).toEqual({
+      readiness: 'ready',
+      ready: true,
+      canQueuePrompt: true,
+    })
+    expect(resolveAiTargetReadiness(target, createMissingAiAgentsStatus(), {
+      readyFallbackTargetId: 'agent:codex',
+      readyFallbackTargetReady: true,
+    })).toEqual({
+      readiness: 'missing',
+      ready: false,
+      canQueuePrompt: false,
+    })
   })
 
   it('resolves legacy and stale agent settings to the intended agent target', () => {
