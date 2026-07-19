@@ -136,6 +136,15 @@
   --shadow-overlay: var(--surface-overlay);
   --shadow-dialog: rgba(0, 0, 0, 0.15);
 
+  /* --- Scrollbars (light mode) ---
+     Semi-transparent warm greys so thumbs stay secondary chrome.
+     Idle stays quiet; hover/active raise affordance without matching borders. */
+  --scrollbar-size: 0.5rem;
+  --scrollbar-thumb: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--text-primary) 28%, transparent);
+  --scrollbar-thumb-active: color-mix(in srgb, var(--text-primary) 38%, transparent);
+  --scrollbar-track: transparent;
+
   /* --- shadcn theme aliases (light mode) --- */
   --radius: 0.5rem;
   --background: var(--surface-app);
@@ -289,6 +298,17 @@
   --shadow-overlay: var(--surface-overlay);
   --shadow-dialog: rgba(0, 0, 0, 0.42);
 
+  /* --- Scrollbars (dark mode) ---
+     Dim warm greys tuned for surfaces around #1F1E1B / #23221F / #191814.
+     Prefer border-strong as the warm-grey base (hue ~#46433B) at low alpha so
+     idle thumbs sit below --border-default and stop competing with content.
+     Hover/active step up for grab affordance (Obsidian/macOS-style progression). */
+  --scrollbar-size: 0.5rem;
+  --scrollbar-thumb: color-mix(in srgb, var(--border-strong) 42%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--border-strong) 68%, transparent);
+  --scrollbar-thumb-active: color-mix(in srgb, var(--border-strong) 88%, transparent);
+  --scrollbar-track: transparent;
+
   /* --- shadcn theme aliases (dark mode) --- */
   --background: var(--surface-app);
   --foreground: var(--text-primary);
@@ -376,6 +396,10 @@
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
+  --color-scrollbar-thumb: var(--scrollbar-thumb);
+  --color-scrollbar-thumb-hover: var(--scrollbar-thumb-hover);
+  --color-scrollbar-thumb-active: var(--scrollbar-thumb-active);
+  --color-scrollbar-track: var(--scrollbar-track);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -388,6 +412,41 @@
     @apply border-border;
     box-sizing: border-box;
   }
+
+  /* Native scrollbars (editor panes, overflow lists) — match Radix ScrollArea */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-thumb:active {
+    background-color: var(--scrollbar-thumb-active);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
   body {
     @apply bg-background text-foreground;
     margin: 0;
