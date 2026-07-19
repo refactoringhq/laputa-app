@@ -115,6 +115,51 @@ mod tests {
     use super::*;
 
     #[test]
+    fn command_avoids_legacy_windows_npm_shim_for_chat_args() {
+        use std::ffi::OsStr;
+
+        let dir = tempfile::tempdir().unwrap();
+        let shim = dir.path().join("kiro-cli.cmd");
+        let launcher = dir
+            .path()
+            .join("node_modules")
+            .join("@kiro")
+            .join("cli")
+            .join("bin")
+            .join("kiro.exe");
+        std::fs::create_dir_all(launcher.parent().unwrap()).unwrap();
+        std::fs::write(&launcher, "native kiro launcher").unwrap();
+        std::fs::write(
+            &shim,
+            r#"@ECHO off
+"%~dp0\node_modules\@kiro\cli\bin\kiro.exe" %*
+"#,
+        )
+        .unwrap();
+
+        let command = build_kiro_command(&shim, dir.path()).unwrap();
+        let actual_args = command.get_args().collect::<Vec<_>>();
+
+        assert_ne!(
+            command.get_program(),
+            shim.as_os_str(),
+            "Kiro npm .cmd shims cannot be spawned directly on Windows"
+        );
+        assert_eq!(
+            (
+                command.get_program(),
+                actual_args.first().copied(),
+                actual_args.get(1).copied(),
+            ),
+            (
+                launcher.as_os_str(),
+                Some(OsStr::new("chat")),
+                Some(OsStr::new("--no-interactive")),
+            )
+        );
+    }
+
+    #[test]
     fn strip_ansi_codes_removes_terminal_colors() {
         assert_eq!(
             crate::cli_agent_runtime::strip_ansi_codes("\x1b[38;5;141m>  \x1b[0mHello! \x1b[2K"),
