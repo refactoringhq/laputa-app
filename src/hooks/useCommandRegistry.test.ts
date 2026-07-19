@@ -261,6 +261,9 @@ describe('useCommandRegistry', () => {
       'heading',
       'turn into',
     ]))
+    expect(findCommand(result.current, 'turn-current-block-into-code-block')?.shortcut).toBe(
+      formatShortcutDisplay({ display: '⌘⇧`' }),
+    )
 
     cmd?.execute()
 
