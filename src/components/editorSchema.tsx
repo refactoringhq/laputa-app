@@ -35,6 +35,7 @@ import { updateTldrawBlockPropsSafely } from './tldrawBlockProps'
 import { useExternalMediaPreview } from '../utils/mediaPreviewRuntime'
 import { Textarea } from './ui/textarea'
 import { dispatchRichEditorExternalChange } from './editorExternalChangeEvents'
+import { CalloutBlockSpec } from './CalloutBlock'
 import {
   isStaleBlockReferenceError,
   reportRecoveredEditorTransformError,
@@ -455,6 +456,8 @@ const mermaidBlock = MermaidBlock()
 const tldrawBlock = TldrawBlock()
 const videoBlock = VideoBlockSpec()
 
+const calloutBlock = CalloutBlockSpec()
+
 function markdownHighlightElement(): { dom: HTMLElement; contentDOM: HTMLElement } {
   const mark = document.createElement('mark')
   mark.className = 'markdown-highlight'
@@ -485,6 +488,7 @@ export const schema = BlockNoteSchema.create({
   },
   blockSpecs: {
     audio: audioBlock,
+    calloutBlock,
     htmlBlock,
     mathBlock,
     mermaidBlock,

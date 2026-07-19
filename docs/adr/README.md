@@ -217,3 +217,4 @@ proposed → active → superseded
 | [0157](0157-opt-in-sandboxed-html-block-scripts.md) | Opt-in sandboxed scripts for HTML block dashboards | active |
 | [0158](0158-vault-write-mcp-tools-update-and-append.md) | Vault-write MCP tools: update_note and append_to_note | active |
 | [0159](0159-antigravity-permission-flags-aligned-with-cli.md) | Antigravity permission flags aligned with CLI | active |
+| [0160](0160-editable-markdown-durable-callout-blocks.md) | Editable Markdown-durable callout blocks | active |
