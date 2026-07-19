@@ -815,8 +815,11 @@ files:
     noteGitUrls.copied: 6832bf85abaa03a6304cd1cce073d747
     noteGitUrls.error.copyFailed: 1952ee267f473efe8e28ca90659f75f6
     noteGitUrls.error.unavailable: ed08c134bba26350fd28f780c6f1b55b
+    editor.slash.date: 44749712dbec183e983dcd78a7736c41
+    editor.slash.datetime: 2b0b7c9cbd6d6e9fa6b99aa06e828673
     editor.slash.htmlBlock: 3ae2ca009c2969a3af7c0b4d1098eafb
     editor.slash.math: a49950aa047c2292e989e368a97a3aae
+    editor.slash.time: a76d4ef5f3f6a672bbfab2865563e530
     editor.htmlBlock.toolbar: f5430a69b23b29ca2917a63ea8d8b4c6
     editor.htmlBlock.editSource: 74a854cf60c14b27b56b55ec6beb8281
     editor.htmlBlock.doneEditing: 04e6def67d4705fa934c575c137f6151

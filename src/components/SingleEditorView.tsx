@@ -975,8 +975,11 @@ function useSuggestionMenuItems(options: {
     try {
       return guardSuggestionMenuItems(
         await Promise.resolve(getTolariaSlashMenuItems(editor, query, {
+          dateTitle: t('editor.slash.date'),
+          datetimeTitle: t('editor.slash.datetime'),
           htmlTitle: t('editor.slash.htmlBlock'),
           mathTitle: t('editor.slash.math'),
+          timeTitle: t('editor.slash.time'),
         })),
         runEditorAction,
       )

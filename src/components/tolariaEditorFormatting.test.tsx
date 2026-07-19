@@ -8,6 +8,7 @@ vi.mock('../lib/telemetry', () => ({
 
 import {
   addItemsToMediaGroup,
+  createDateTimeSlashMenuItems,
   createHtmlBlockSlashMenuItem,
   createMathSlashMenuItem,
   filterTolariaFormattingToolbarItems,
@@ -26,6 +27,7 @@ function createSlashCommandEditorFixture() {
   const block = { id: 'active-block' }
   const editor = {
     getTextCursorPosition: () => ({ block }),
+    insertInlineContent: () => {},
     replaceBlocks: () => {},
     updateBlock: () => {},
   }
@@ -33,6 +35,7 @@ function createSlashCommandEditorFixture() {
   return {
     block,
     editor: editor as never,
+    insertInlineContent: vi.spyOn(editor, 'insertInlineContent'),
     replaceBlocks: vi.spyOn(editor, 'replaceBlocks'),
     updateBlock: vi.spyOn(editor, 'updateBlock'),
   }
@@ -304,5 +307,47 @@ describe('tolariaEditorFormatting', () => {
     }])
     expect(updateBlock).not.toHaveBeenCalled()
     expect(trackEvent).toHaveBeenCalledWith('editor_math_slash_command_used')
+  })
+
+  it('inserts resolved local date and time values from slash commands', () => {
+    const { editor, insertInlineContent, replaceBlocks } = createSlashCommandEditorFixture()
+    const currentDate = new Date(2026, 6, 19, 14, 5)
+    const items = createDateTimeSlashMenuItems(editor, {
+      dateTitle: 'Date',
+      datetimeTitle: 'Date and time',
+      timeTitle: 'Time',
+    }, () => currentDate)
+
+    expect(items).toEqual([
+      expect.objectContaining({ key: 'date', title: 'Date', aliases: ['today'] }),
+      expect.objectContaining({ key: 'time', title: 'Time', aliases: ['clock'] }),
+      expect.objectContaining({
+        key: 'datetime',
+        title: 'Date and time',
+        aliases: ['datetime', 'timestamp', 'date time'],
+      }),
+    ])
+
+    items.forEach((item) => item.onItemClick())
+
+    expect(insertInlineContent).toHaveBeenNthCalledWith(1, '2026-07-19', {
+      updateSelection: true,
+    })
+    expect(insertInlineContent).toHaveBeenNthCalledWith(2, '14:05', {
+      updateSelection: true,
+    })
+    expect(insertInlineContent).toHaveBeenNthCalledWith(3, '2026-07-19 14:05', {
+      updateSelection: true,
+    })
+    expect(replaceBlocks).not.toHaveBeenCalled()
+    expect(trackEvent).toHaveBeenCalledWith('editor_timestamp_slash_command_used', {
+      kind: 'date',
+    })
+    expect(trackEvent).toHaveBeenCalledWith('editor_timestamp_slash_command_used', {
+      kind: 'time',
+    })
+    expect(trackEvent).toHaveBeenCalledWith('editor_timestamp_slash_command_used', {
+      kind: 'datetime',
+    })
   })
 })

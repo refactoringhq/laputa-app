@@ -5,7 +5,10 @@ import {
 } from '@blocknote/react'
 import { createElement, type ReactElement } from 'react'
 import {
+  CalendarBlank,
+  CalendarDots,
   CodeBlock,
+  Clock,
   File,
   FlowArrow,
   ImageSquare,
@@ -46,6 +49,7 @@ type TolariaBlockTypeSelectItem = RichEditorBlockTypeDefinition & {
 }
 type SlashInsertEditor = {
   getTextCursorPosition: () => { block: unknown }
+  insertInlineContent: (content: string, options: { updateSelection: true }) => void
   replaceBlocks: (blocksToReplace: unknown[], blocksToInsert: Array<Record<string, unknown>>) => void
 }
 type BlockSlashMenuItemConfig = {
@@ -57,9 +61,18 @@ type BlockSlashMenuItemConfig = {
   type: string
 }
 type TolariaSlashMenuLabels = {
+  dateTitle: string
+  datetimeTitle: string
   htmlTitle: string
   mathTitle: string
+  timeTitle: string
 }
+type DateTimeSlashCommandKind = 'date' | 'datetime' | 'time'
+type DateTimeSlashMenuLabels = Pick<
+  TolariaSlashMenuLabels,
+  'dateTitle' | 'datetimeTitle' | 'timeTitle'
+>
+type DateProvider = () => Date
 
 export const MERMAID_SLASH_COMMAND_DIAGRAM = [
   'flowchart TD',
@@ -105,6 +118,8 @@ const TOLARIA_SLASH_MENU_ICONS: Partial<Record<string, PhosphorIcon>> = {
   bullet_list: ListBullets,
   check_list: ListChecks,
   code_block: CodeBlock,
+  date: CalendarBlank,
+  datetime: CalendarDots,
   divider: Minus,
   emoji: Smiley,
   file: File,
@@ -120,12 +135,71 @@ const TOLARIA_SLASH_MENU_ICONS: Partial<Record<string, PhosphorIcon>> = {
   paragraph: Paragraph,
   quote: Quotes,
   table: Table,
+  time: Clock,
   toggle_heading: TextHOne,
   toggle_heading_2: TextHTwo,
   toggle_heading_3: TextHThree,
   toggle_list: ListBullets,
   video: Video,
   whiteboard: ScribbleLoop,
+}
+
+const DATE_TIME_SLASH_COMMANDS: ReadonlyArray<{
+  aliases: string[]
+  key: DateTimeSlashCommandKind
+  labelKey: keyof DateTimeSlashMenuLabels
+}> = [
+  { key: 'date', labelKey: 'dateTitle', aliases: ['today'] },
+  { key: 'time', labelKey: 'timeTitle', aliases: ['clock'] },
+  {
+    key: 'datetime',
+    labelKey: 'datetimeTitle',
+    aliases: ['datetime', 'timestamp', 'date time'],
+  },
+]
+
+function padDateTimePart(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+function formatLocalDateTime(date: Date, kind: DateTimeSlashCommandKind): string {
+  const dateValue = [
+    date.getFullYear(),
+    padDateTimePart(date.getMonth() + 1),
+    padDateTimePart(date.getDate()),
+  ].join('-')
+  const timeValue = [
+    padDateTimePart(date.getHours()),
+    padDateTimePart(date.getMinutes()),
+  ].join(':')
+
+  if (kind === 'date') return dateValue
+  if (kind === 'time') return timeValue
+  return `${dateValue} ${timeValue}`
+}
+
+export function createDateTimeSlashMenuItems(
+  editor: Parameters<typeof getDefaultReactSlashMenuItems>[0],
+  labels: DateTimeSlashMenuLabels = {
+    dateTitle: 'Date',
+    datetimeTitle: 'Date and time',
+    timeTitle: 'Time',
+  },
+  getCurrentDate: DateProvider = () => new Date(),
+): TolariaSlashMenuItem[] {
+  const inlineEditor = editor as unknown as SlashInsertEditor
+
+  return DATE_TIME_SLASH_COMMANDS.map(({ aliases, key, labelKey }) => ({
+    aliases,
+    key,
+    title: labels[labelKey],
+    onItemClick: () => {
+      inlineEditor.insertInlineContent(formatLocalDateTime(getCurrentDate(), key), {
+        updateSelection: true,
+      })
+      trackEvent('editor_timestamp_slash_command_used', { kind: key })
+    },
+  } as TolariaSlashMenuItem))
 }
 
 function createBoardId(): string {
@@ -294,13 +368,20 @@ export function getTolariaSlashMenuItems(
   query: string,
   labels?: TolariaSlashMenuLabels,
 ) {
+  const defaultItems = getDefaultReactSlashMenuItems(editor) as TolariaSlashMenuItem[]
+  const otherGroup = defaultItems.find((item) => item.key === 'emoji')?.group
+  const dateTimeItems = createDateTimeSlashMenuItems(editor, labels).map((item) => ({
+    ...item,
+    group: otherGroup,
+  }))
   const items = addItemsToMediaGroup(
-    getDefaultReactSlashMenuItems(editor) as TolariaSlashMenuItem[],
+    defaultItems,
     [
       createMermaidSlashMenuItem(editor),
       createMathSlashMenuItem(editor, labels),
       createHtmlBlockSlashMenuItem(editor, labels),
       createWhiteboardSlashMenuItem(editor),
+      ...dateTimeItems,
     ],
   )
 
