@@ -96,5 +96,6 @@ describe('useAiAgentPreferences', () => {
     }))
 
     expect(result.current.defaultAiAgentReady).toBe(true)
+    expect(result.current.defaultAiTargetReady).toBe(true)
   })
 })

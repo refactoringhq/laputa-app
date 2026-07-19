@@ -2,18 +2,15 @@ import { useCallback, useMemo } from 'react'
 import { isTauri } from '../mock-tauri'
 import {
   getAiAgentDefinition,
-  getAiAgentAvailability,
   getNextAiAgentId,
-  type AiAgentReadiness,
   type AiAgentId,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 import {
   agentTargetId,
-  aiTargetReady,
+  resolveAiTargetReadiness,
   resolveAiTarget,
   targetAgent,
-  type AiTarget,
 } from '../lib/aiTargets'
 import type { Settings } from '../types'
 
@@ -23,20 +20,6 @@ interface UseAiAgentPreferencesArgs {
   saveSettings: (settings: Settings) => void
   aiAgentsStatus: AiAgentsStatus
   onToast?: (message: string) => void
-}
-
-function getDefaultAiTargetReadiness(
-  settingsLoaded: boolean,
-  aiAgentsStatus: AiAgentsStatus,
-  defaultTarget: AiTarget,
-): AiAgentReadiness {
-  if (!settingsLoaded) return 'checking'
-  if (defaultTarget.kind === 'api_model') return 'ready'
-  if (!isTauri()) return 'ready'
-
-  const status = getAiAgentAvailability(aiAgentsStatus, defaultTarget.agent).status
-  if (status === 'checking') return 'checking'
-  return status === 'installed' ? 'ready' : 'missing'
 }
 
 export function useAiAgentPreferences({
@@ -50,12 +33,10 @@ export function useAiAgentPreferences({
   const targetAgentId = targetAgent(defaultAiTarget)
 
   const defaultAiAgentLabel = defaultAiTarget.label
-  const defaultAiAgentReadiness = getDefaultAiTargetReadiness(
+  const defaultAiTargetReadiness = resolveAiTargetReadiness(defaultAiTarget, aiAgentsStatus, {
     settingsLoaded,
-    aiAgentsStatus,
-    defaultAiTarget,
-  )
-  const defaultAiAgentReady = defaultAiAgentReadiness === 'ready'
+    tauri: isTauri(),
+  })
 
   const setDefaultAiAgent = useCallback((agent: AiAgentId) => {
     saveSettings({
@@ -80,9 +61,9 @@ export function useAiAgentPreferences({
     defaultAiAgent: targetAgentId,
     defaultAiTarget,
     defaultAiAgentLabel,
-    defaultAiAgentReadiness,
-    defaultAiAgentReady,
-    defaultAiTargetReady: aiTargetReady(defaultAiTarget, aiAgentsStatus),
+    defaultAiAgentReadiness: defaultAiTargetReadiness.readiness,
+    defaultAiAgentReady: defaultAiTargetReadiness.ready,
+    defaultAiTargetReady: defaultAiTargetReadiness.ready,
     setDefaultAiAgent,
     setDefaultAiTarget,
     cycleDefaultAiAgent,
