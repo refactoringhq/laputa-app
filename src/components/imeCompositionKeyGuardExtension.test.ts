@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createImeCompositionKeyGuardExtension,
+  shouldStopComposingParagraphInput,
   shouldStopComposingEditorShortcutKey,
 } from './imeCompositionKeyGuardExtension'
 
-type KeyListener = (event: KeyboardEvent) => void
 type ShortcutKeyFixture = Pick<KeyboardEvent, 'key' | 'keyCode'>
+type ListenerRegistry = Map<string, EventListener>
 
 const COMPOSING_SHORTCUT_KEYS: Array<[string, ShortcutKeyFixture]> = [
   ['Enter', { key: 'Enter', keyCode: 13 }],
@@ -27,14 +28,36 @@ function createKeyboardEvent(event: Partial<KeyboardEvent> = {}) {
   }
 }
 
+function createInputEvent(event: Partial<InputEvent> = {}) {
+  return {
+    inputType: 'insertParagraph',
+    isComposing: false,
+    preventDefault: vi.fn(),
+    stopImmediatePropagation: vi.fn(),
+    timeStamp: 120,
+    ...event,
+  } as InputEvent & {
+    preventDefault: ReturnType<typeof vi.fn>
+    stopImmediatePropagation: ReturnType<typeof vi.fn>
+  }
+}
+
+function dispatchRegisteredEvent(
+  listeners: ListenerRegistry,
+  type: string,
+  event: Event,
+) {
+  const listener = listeners.get(type)
+  if (!listener) throw new Error(`IME composition key guard did not register a ${type} listener`)
+  listener(event)
+}
+
 function createFixture() {
-  let keydownListener: KeyListener | null = null
+  const listeners: ListenerRegistry = new Map()
   const view = { composing: false }
   const dom = {
-    addEventListener: vi.fn((type: string, listener: KeyListener) => {
-      if (type === 'keydown') {
-        keydownListener = listener
-      }
+    addEventListener: vi.fn((type: string, listener: EventListener) => {
+      listeners.set(type, listener)
     }),
   }
   const editor = {
@@ -47,13 +70,21 @@ function createFixture() {
     dom,
     extension,
     fireKeydown(event: Partial<KeyboardEvent> = {}) {
-      if (!keydownListener) {
-        throw new Error('IME composition key guard did not register a keydown listener')
-      }
-
       const keyboardEvent = createKeyboardEvent(event)
-      keydownListener(keyboardEvent)
+      dispatchRegisteredEvent(listeners, 'keydown', keyboardEvent)
       return keyboardEvent
+    },
+    fireCompositionEnd(event: Partial<CompositionEvent> = {}) {
+      dispatchRegisteredEvent(
+        listeners,
+        'compositionend',
+        { timeStamp: 110, ...event } as CompositionEvent,
+      )
+    },
+    fireBeforeInput(event: Partial<InputEvent> = {}) {
+      const inputEvent = createInputEvent(event)
+      dispatchRegisteredEvent(listeners, 'beforeinput', inputEvent)
+      return inputEvent
     },
     mount() {
       const controller = new AbortController()
@@ -91,6 +122,29 @@ describe('shouldStopComposingEditorShortcutKey', () => {
     const event = createKeyboardEvent({ isComposing: true, key: 'a', keyCode: 65 })
 
     expect(shouldStopComposingEditorShortcutKey(event, { composing: false })).toBe(false)
+  })
+})
+
+describe('shouldStopComposingParagraphInput', () => {
+  it('matches paragraph insertion while ProseMirror is still composing', () => {
+    const event = createInputEvent()
+
+    expect(shouldStopComposingParagraphInput(event, { composing: true })).toBe(true)
+  })
+
+  it('matches paragraph insertion armed by a recent composing Enter', () => {
+    const event = createInputEvent({ timeStamp: 120 })
+
+    expect(shouldStopComposingParagraphInput(event, { composing: false }, 100)).toBe(true)
+  })
+
+  it('leaves normal or stale paragraph insertion alone', () => {
+    const normalEvent = createInputEvent({ timeStamp: 700 })
+    const unrelatedInput = createInputEvent({ inputType: 'insertText', timeStamp: 120 })
+
+    expect(shouldStopComposingParagraphInput(normalEvent, { composing: false }, 100)).toBe(false)
+    expect(shouldStopComposingParagraphInput(unrelatedInput, { composing: false }, 100)).toBe(false)
+    expect(shouldStopComposingParagraphInput(normalEvent, { composing: false })).toBe(false)
   })
 })
 
@@ -135,6 +189,45 @@ describe('createImeCompositionKeyGuardExtension', () => {
 
     expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(1)
     expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('blocks one paragraph insertion emitted after a composing Enter ends', () => {
+    const fixture = createFixture()
+    fixture.mount()
+
+    fixture.fireKeydown({ isComposing: true, timeStamp: 100 })
+    fixture.fireCompositionEnd()
+    const guardedEvent = fixture.fireBeforeInput()
+    const laterEvent = fixture.fireBeforeInput({ timeStamp: 130 })
+
+    expect(guardedEvent.preventDefault).toHaveBeenCalledTimes(1)
+    expect(guardedEvent.stopImmediatePropagation).toHaveBeenCalledTimes(1)
+    expect(laterEvent.preventDefault).not.toHaveBeenCalled()
+    expect(laterEvent.stopImmediatePropagation).not.toHaveBeenCalled()
+  })
+
+  it('does not arm paragraph suppression for compositionend without a composing Enter', () => {
+    const fixture = createFixture()
+    fixture.mount()
+
+    fixture.fireCompositionEnd()
+    const event = fixture.fireBeforeInput()
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(event.stopImmediatePropagation).not.toHaveBeenCalled()
+  })
+
+  it('allows a deliberate normal Enter after composition ends', () => {
+    const fixture = createFixture()
+    fixture.mount()
+
+    fixture.fireKeydown({ isComposing: true, timeStamp: 100 })
+    fixture.fireCompositionEnd()
+    fixture.fireKeydown({ isComposing: false, timeStamp: 115 })
+    const event = fixture.fireBeforeInput()
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(event.stopImmediatePropagation).not.toHaveBeenCalled()
   })
 
   it('does not intercept normal Enter outside IME composition', () => {

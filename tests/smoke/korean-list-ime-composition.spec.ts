@@ -17,8 +17,8 @@ status: Active
 
 let tempVaultDir: string
 
-test.beforeEach(async (fixtures, testInfo) => {
-  void fixtures
+test.beforeEach(async ({ page }, testInfo) => {
+  void page
   testInfo.setTimeout(90_000)
   tempVaultDir = createFixtureVaultCopy()
 })
@@ -69,14 +69,24 @@ test('composing Enter inside a Korean bullet item does not split the list item',
     element.dispatchEvent(event)
     editor?.removeEventListener('keydown', handleKeydown)
 
+    editor?.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
+    const paragraphInput = new InputEvent('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertParagraph',
+    })
+    element.dispatchEvent(paragraphInput)
+
     return {
       defaultPrevented: event.defaultPrevented,
+      paragraphDefaultPrevented: paragraphInput.defaultPrevented,
       reachedEditorBubble,
     }
   })
 
   expect(dispatchResult).toEqual({
     defaultPrevented: false,
+    paragraphDefaultPrevented: true,
     reachedEditorBubble: false,
   })
   await expect(page.locator('.bn-block-content[data-content-type="bulletListItem"]')).toHaveCount(
