@@ -876,8 +876,8 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `remove_mcp_tools` | Remove Tolaria's MCP entry from Claude/Antigravity/Cursor/OpenCode/generic config |
 | `check_mcp_status` | Check whether Tolaria's durable MCP entry is registered in Claude/Antigravity/Cursor/OpenCode/generic config |
 | `get_mcp_config_snippet` | Return the exact manual MCP JSON snippet for the active vault |
-| `copy_text_to_clipboard` | Copy setup snippets through the native desktop clipboard command path |
-| `read_text_from_clipboard` | Read current desktop clipboard text for command-driven plain-text paste |
+| `copy_text_to_clipboard` | Copy text through the native desktop clipboard path; macOS forces a UTF-8 locale for `pbcopy` so non-ASCII paths and snippets survive GUI launches |
+| `read_text_from_clipboard` | Read current desktop clipboard text for command-driven plain-text paste; macOS forces the matching UTF-8 `pbpaste` locale |
 | `sync_mcp_bridge_vault` | Sync the desktop WebSocket bridge process to the selected vault, or stop it when no vault is selected |
 
 The desktop MCP WebSocket bridge is intentionally local-only. `mcp-server/ws-bridge.js` binds both bridge ports to loopback, rejects non-loopback clients, accepts browser/Tauri origins only on the UI bridge, and rejects browser-origin requests on the tool bridge so remote pages cannot drive vault tools directly.

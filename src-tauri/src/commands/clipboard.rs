@@ -13,13 +13,20 @@ const NATIVE_CLIPBOARD_COMMAND_TIMEOUT: Duration = Duration::from_secs(2);
 const NATIVE_CLIPBOARD_COMMAND_POLL_INTERVAL: Duration = Duration::from_millis(25);
 
 #[cfg(target_os = "macos")]
+fn macos_clipboard_command(program: &str) -> Command {
+    let mut command = crate::hidden_command(program);
+    command.env("LC_ALL", "en_US.UTF-8");
+    command
+}
+
+#[cfg(target_os = "macos")]
 fn clipboard_command() -> Command {
-    crate::hidden_command("pbcopy")
+    macos_clipboard_command("pbcopy")
 }
 
 #[cfg(target_os = "macos")]
 fn clipboard_read_command() -> Command {
-    crate::hidden_command("pbpaste")
+    macos_clipboard_command("pbpaste")
 }
 
 #[cfg(target_os = "windows")]
@@ -183,6 +190,19 @@ pub async fn read_text_from_clipboard() -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_clipboard_commands_force_utf8_locale() {
+        for command in [clipboard_command(), clipboard_read_command()] {
+            let locale = command
+                .get_envs()
+                .find(|(name, _)| *name == std::ffi::OsStr::new("LC_ALL"))
+                .and_then(|(_, value)| value);
+
+            assert_eq!(locale, Some(std::ffi::OsStr::new("en_US.UTF-8")));
+        }
+    }
 
     #[cfg(all(desktop, unix))]
     #[test]
