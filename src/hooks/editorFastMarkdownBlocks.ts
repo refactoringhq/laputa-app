@@ -20,8 +20,8 @@ interface TextStyles {
 
 interface InlineItem {
   type: 'link' | 'text'
+  href?: string
   text?: string
-  props?: Record<string, string>
   content?: InlineItem[]
   styles?: TextStyles
 }
@@ -205,7 +205,7 @@ function parseInline(text: InlineMarkdownText, styles: TextStyles = {}): InlineI
     if (link) {
       items.push({
         type: 'link',
-        props: { href: link.href },
+        href: link.href,
         content: parseInline(link.label, styles),
       })
       index = link.end

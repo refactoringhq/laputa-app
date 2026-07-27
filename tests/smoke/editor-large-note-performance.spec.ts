@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { executeCommand, openCommandPalette } from './helpers'
 
 const LARGE_NOTE_PATH = '/Users/luca/Laputa/perf-large-note.md'
 const LARGE_NOTE_TITLE = 'Perf Large Note'
@@ -142,4 +143,22 @@ test('large Markdown notes use the fast resolver and progressive editor apply pa
 
   await expectPerfLog(perfLogs, 'editorBlockResolve', 'strategy=direct-markdown')
   await expectPerfLog(perfLogs, 'editorBlockApply', 'mode=progressive')
+})
+
+test('large-note external links keep their URLs through raw-mode round trips', async ({ page }) => {
+  const content = largeMarkdown()
+
+  await installLargeNoteMock(page, content)
+  await openLargeNote(page)
+
+  const firstExternalLink = page.locator('.bn-editor a[href="https://example.com/1"]').first()
+  await expect(firstExternalLink).toContainText('reference link')
+
+  await openCommandPalette(page)
+  await executeCommand(page, 'Toggle Raw')
+  await expect(page.locator('.cm-content')).toContainText('[reference link](https://example.com/1)')
+
+  await openCommandPalette(page)
+  await executeCommand(page, 'Toggle Raw')
+  await expect(firstExternalLink).toContainText('reference link')
 })
