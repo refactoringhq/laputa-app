@@ -265,6 +265,7 @@ fn opencode_npm_prefix_candidates(prefix: &Path) -> Vec<PathBuf> {
 
 fn opencode_desktop_candidates_for_root(root: &Path) -> Vec<PathBuf> {
     vec![
+        root.join("@opencode-aidesktop/OpenCode.exe"),
         root.join("OpenCode/opencode.exe"),
         root.join("opencode/opencode.exe"),
     ]
@@ -453,5 +454,19 @@ mod tests {
                 candidate.display()
             );
         }
+    }
+
+    #[test]
+    fn env_candidates_include_current_windows_desktop_install() {
+        let localappdata = PathBuf::from(r"C:\Users\alex\AppData\Local");
+
+        let candidates = opencode_binary_candidates_from_env_values(OpencodeEnvCandidateRoots {
+            localappdata: Some(localappdata.clone()),
+            ..OpencodeEnvCandidateRoots::default()
+        });
+
+        assert!(
+            candidates.contains(&localappdata.join("Programs/@opencode-aidesktop/OpenCode.exe"))
+        );
     }
 }
