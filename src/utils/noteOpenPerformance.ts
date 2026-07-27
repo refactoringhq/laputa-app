@@ -20,8 +20,13 @@ function isVitestRuntime(): boolean {
   return '__vitest_worker__' in globalThis
 }
 
+function isPerformanceHarnessRuntime(): boolean {
+  return Reflect.get(globalThis, '__TOLARIA_PERFORMANCE_HARNESS__') === true
+}
+
 function canMeasurePerformance(): boolean {
-  return import.meta.env.DEV && typeof performance !== 'undefined' && !isVitestRuntime()
+  const enabled = isPerformanceHarnessRuntime() || (import.meta.env.DEV && !isVitestRuntime())
+  return enabled && typeof performance !== 'undefined'
 }
 
 function formatDuration(durationMs: number | null): string {

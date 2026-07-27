@@ -16,6 +16,7 @@ vi.mock('./productAnalytics', () => ({
 describe('startup performance telemetry', () => {
   beforeEach(() => {
     vi.resetModules()
+    performance.clearMarks()
     analytics.reconciled.mockReset()
     analytics.usable.mockReset()
     invoke.mockReset()
@@ -66,6 +67,15 @@ describe('startup performance telemetry', () => {
       name: 'app_interactive',
       rendererElapsedMs: expect.any(Number),
     })
+  })
+
+  it('publishes browser-observable marks for the performance harness', async () => {
+    const startup = await import('./startupPerformance')
+
+    startup.markStartupPhase('app_interactive')
+    startup.markStartupPhase('app_interactive')
+
+    expect(performance.getEntriesByName('tolaria:app_interactive', 'mark')).toHaveLength(1)
   })
 
   it('releases deferred startup work when its prerequisite phase arrives', async () => {

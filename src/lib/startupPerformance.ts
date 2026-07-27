@@ -9,6 +9,7 @@ export const STARTUP_TARGETS_MS = {
   activeVaultUsable: 800,
   reactShell: 300,
 } as const
+export const STARTUP_MARK_PREFIX = 'tolaria:'
 
 type StartupSource = 'scan' | 'snapshot'
 export type StartupPhase =
@@ -56,6 +57,7 @@ export function markStartupPhase(phase: StartupPhase, detail: number | null = nu
   if (existing !== undefined) return existing
   const elapsed = elapsedSinceFrontendStart()
   phases.set(phase, elapsed)
+  performance.mark(`${STARTUP_MARK_PREFIX}${phase}`)
   const waiters = phaseWaiters.get(phase) ?? []
   phaseWaiters.delete(phase)
   for (const resolve of waiters) resolve()

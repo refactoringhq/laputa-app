@@ -265,6 +265,32 @@ jobs:
           path: test-results
           destination: playwright
 
+  performance-regression:
+    executor: browser
+    steps:
+      - checkout
+      - install_frontend_dependencies
+      - restore_cache:
+          keys:
+            - playwright-v1-{{ checksum "pnpm-lock.yaml" }}
+            - playwright-v1-
+      - run:
+          name: Install Playwright Chromium
+          command: pnpm exec playwright install chromium
+      - save_cache:
+          key: playwright-v1-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - ~/.cache/ms-playwright
+      - run:
+          name: Verify performance harness logic
+          command: pnpm perf:test
+      - run:
+          name: Run core performance regression gate
+          command: pnpm perf:ci
+      - store_artifacts:
+          path: test-results/performance-summary.json
+          destination: performance-summary.json
+
   linux-build-verification:
     machine:
       image: ubuntu-2204:current
@@ -1210,6 +1236,12 @@ workflows:
             tags:
               ignore: /.*/
       - playwright-smoke:
+          filters:
+            branches:
+              ignore: gh-pages
+            tags:
+              ignore: /.*/
+      - performance-regression:
           filters:
             branches:
               ignore: gh-pages

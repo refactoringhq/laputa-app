@@ -3,11 +3,14 @@
 
 import { spawn } from 'node:child_process'
 import console from 'node:console'
-import { rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, writeFile } from 'node:fs/promises'
 import process from 'node:process'
 import { resolve } from 'node:path'
 import { chromium } from '@playwright/test'
+import {
+  aggregateSamples,
+  buildSamplePlan,
+} from './editor-performance-statistics.mjs'
 import {
   printSummary,
   printThresholdFailures,
@@ -21,8 +24,52 @@ const rootDir = process.cwd()
 const defaultThresholdsPath = resolve(rootDir, '.editor-performance-thresholds.json')
 const defaultPort = '41742'
 const scenarios = {
-  small: { sectionCount: 5, title: 'Perf Small Note' },
-  large: { sectionCount: 460, title: 'Perf Large Note' },
+  startup: {
+    entryCount: 500,
+    fixtureLabel: '500 deterministic vault entries',
+    kind: 'startup',
+    metricNames: ['reactShellMs', 'activeVaultUsableMs', 'appInteractiveMs'],
+  },
+  list: {
+    entryCount: 2_000,
+    fixtureLabel: '2,000 deterministic virtualized rows',
+    kind: 'list',
+    metricNames: ['listScrollReadyMs'],
+  },
+  small: {
+    entryCount: 500,
+    fixtureLabel: '5-section note in a 500-entry vault',
+    kind: 'note',
+    metricNames: [
+      'editorVisibleMs',
+      'firstContentMs',
+      'fullAppliedMs',
+      'editFrameMs',
+      'blockResolveMs',
+      'blockApplyMs',
+      'noteOpenEditorSwapMs',
+      'noteOpenTotalMs',
+    ],
+    sectionCount: 5,
+    title: 'Perf Small Note',
+  },
+  large: {
+    entryCount: 500,
+    fixtureLabel: '460-section note in a 500-entry vault',
+    kind: 'note',
+    metricNames: [
+      'editorVisibleMs',
+      'firstContentMs',
+      'fullAppliedMs',
+      'editFrameMs',
+      'blockResolveMs',
+      'blockApplyMs',
+      'noteOpenEditorSwapMs',
+      'noteOpenTotalMs',
+    ],
+    sectionCount: 460,
+    title: 'Perf Large Note',
+  },
 }
 const defaultScenarioNames = Object.keys(scenarios)
 const metricLabels = {
@@ -34,6 +81,10 @@ const metricLabels = {
   fullAppliedMs: 'full note applied',
   noteOpenEditorSwapMs: 'note open editor swap',
   noteOpenTotalMs: 'note open total',
+  activeVaultUsableMs: 'active vault usable',
+  appInteractiveMs: 'app interactive',
+  listScrollReadyMs: 'list scroll rendered',
+  reactShellMs: 'React shell',
 }
 
 function defaultOptions() {
@@ -45,6 +96,7 @@ function defaultOptions() {
     scenarioNames: defaultScenarioNames,
     thresholdsPath: defaultThresholdsPath,
     update: false,
+    warmups: nonNegativeInteger(process.env.EDITOR_PERF_WARMUPS ?? '1', 'EDITOR_PERF_WARMUPS'),
   }
 }
 
@@ -59,7 +111,7 @@ function parseArgs(args) {
 }
 
 function parseArg(parsed, args, index) {
-  const arg = args[index]
+  const arg = args.at(index)
   if (arg === '--') return index
   if (arg === '--help' || arg === '-h') exitWithHelp(0)
   if (applyFlagOption(parsed, arg)) return index
@@ -77,14 +129,22 @@ function applyFlagOption(parsed, arg) {
 }
 
 function applyValueOption(parsed, args, index, arg) {
-  const valueOptionNames = ['--base-url', '--iterations', '--port', '--scenario', '--thresholds']
+  const valueOptionNames = [
+    '--base-url',
+    '--iterations',
+    '--port',
+    '--scenario',
+    '--thresholds',
+    '--warmups',
+  ]
   if (!valueOptionNames.includes(arg)) return false
   const value = requiredValue(args, index, arg)
   if (arg === '--base-url') parsed.baseUrl = value
   else if (arg === '--iterations') parsed.iterations = positiveInteger(value, arg)
   else if (arg === '--port') parsed.port = value
   else if (arg === '--scenario') parsed.scenarioNames = value.split(',').filter(Boolean)
-  else parsed.thresholdsPath = value
+  else if (arg === '--thresholds') parsed.thresholdsPath = value
+  else parsed.warmups = nonNegativeInteger(value, arg)
   return true
 }
 
@@ -108,7 +168,7 @@ let devServer = null
 let stoppingDevServer = false
 
 function requiredValue(args, index, name) {
-  const value = args[index + 1]
+  const value = args.at(index + 1)
   if (!value || value.startsWith('--')) {
     console.error(`${name} requires a value`)
     process.exit(2)
@@ -122,27 +182,24 @@ function positiveInteger(value, name) {
   process.exit(2)
 }
 
+function nonNegativeInteger(value, name) {
+  if (/^(0|[1-9][0-9]*)$/.test(String(value))) return Number(value)
+  console.error(`${name} must be a non-negative integer`)
+  process.exit(2)
+}
+
 function printHelp() {
-  console.log(`Usage: pnpm perf:editor [options]
+  process.stdout.write(`Usage: pnpm perf:editor [options]
 
 Options:
   --base-url <url>       Reuse an existing dev server instead of starting Vite.
   --iterations <count>   Runs per scenario. Default: 5.
-  --scenario <names>     Comma-separated scenarios: small,large. Default: both.
+  --warmups <count>      Discarded warmup runs per scenario. Default: 1.
+  --scenario <names>     Comma-separated scenarios: startup,list,small,large.
   --thresholds <path>    Threshold JSON path. Default: .editor-performance-thresholds.json.
   --update               Ratchet stored baselines and thresholds from the current run.
   --headful              Run Chromium headed for debugging.
 `)
-}
-
-function median(values) {
-  const numeric = values.filter(value => typeof value === 'number' && Number.isFinite(value))
-  if (numeric.length === 0) return null
-  const sorted = [...numeric].sort((a, b) => a - b)
-  const middle = Math.floor(sorted.length / 2)
-  return sorted.length % 2 === 0
-    ? (sorted[middle - 1] + sorted[middle]) / 2
-    : sorted[middle]
 }
 
 function round(value) {
@@ -173,26 +230,27 @@ function largeMarkdown(sectionCount, title) {
   ].join('\n')
 }
 
-function syntheticEntry({ markdown, title }) {
+function syntheticEntry({ index = 0, markdown = '', title }) {
+  const slug = title.toLowerCase().replace(/\s+/g, '-')
   return {
     aliases: [],
     archived: false,
     belongsTo: [],
     color: null,
-    createdAt: Math.floor(Date.now() / 1000) - 60,
+    createdAt: 1_700_000_000 + index,
     favorite: false,
     favoriteIndex: null,
     fileSize: markdown.length,
-    filename: `${title.toLowerCase().replace(/\s+/g, '-')}.md`,
+    filename: `${slug}.md`,
     hasH1: true,
     icon: null,
     isA: 'Note',
     listPropertiesDisplay: [],
-    modifiedAt: Math.floor(Date.now() / 1000) + 60,
+    modifiedAt: 1_710_000_000 + index,
     order: null,
     organized: false,
     outgoingLinks: ['build-laputa-app'],
-    path: `/Users/luca/Laputa/${title.toLowerCase().replace(/\s+/g, '-')}.md`,
+    path: `/performance-fixture/${slug}.md`,
     properties: {},
     relationships: {},
     relatedTo: [],
@@ -208,7 +266,20 @@ function syntheticEntry({ markdown, title }) {
   }
 }
 
-async function waitForServer(url) {
+function syntheticVaultEntries(count, primaryEntry = null) {
+  const entries = Array.from({ length: count }, (_, index) => {
+    const ordinal = index + 1
+    return syntheticEntry({
+      index,
+      markdown: `# Performance Note ${ordinal}\n\nStable fixture body ${ordinal}.`,
+      title: `Performance Note ${String(ordinal).padStart(4, '0')}`,
+    })
+  })
+  if (!primaryEntry) return entries
+  return [primaryEntry, ...entries.slice(1)]
+}
+
+const waitForServer = async (url) => {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
     try {
@@ -226,13 +297,12 @@ async function startDevServer() {
   if (options.baseUrl) return options.baseUrl
 
   const baseUrl = `http://127.0.0.1:${options.port}`
-  const viteCacheDir = resolve(tmpdir(), `tolaria-editor-perf-vite-${options.port}`)
   devServer = spawn(
     'pnpm',
-    ['dev', '--host', '127.0.0.1', '--port', options.port, '--strictPort'],
+    ['preview', '--host', '127.0.0.1', '--port', options.port, '--strictPort'],
     {
       cwd: rootDir,
-      env: { ...process.env, TOLARIA_VITE_CACHE_DIR: viteCacheDir },
+      env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   )
@@ -256,8 +326,10 @@ function stopDevServer() {
   devServer.kill('SIGTERM')
 }
 
-async function installSyntheticVault(page, entry, markdown) {
-  await page.addInitScript(({ syntheticEntryValue, syntheticMarkdown }) => {
+async function installSyntheticVault(page, entries, contentByPath) {
+  await page.addInitScript(({ syntheticContent, syntheticEntries }) => {
+    globalThis.__TOLARIA_PERFORMANCE_HARNESS__ = true
+    localStorage.setItem('tolaria:claude-code-onboarding-dismissed', '1')
     const jsonResponse = value => new Response(JSON.stringify(value), {
       headers: { 'Content-Type': 'application/json' },
       status: 200,
@@ -271,11 +343,12 @@ async function installSyntheticVault(page, entry, markdown) {
       return new URL(rawUrl, window.location.href).pathname
     }
     const originalFetch = window.fetch.bind(window)
+    const contentRows = Object.entries(syntheticContent).map(([path, content]) => ({ content, path }))
     const syntheticResponse = (path) => {
-      if (path === '/api/vault/all-content') return jsonResponse([{ content: syntheticMarkdown, path: syntheticEntryValue.path }])
-      if (path === '/api/vault/content') return jsonResponse({ content: syntheticMarkdown })
-      if (path === '/api/vault/entry') return jsonResponse(syntheticEntryValue)
-      if (path === '/api/vault/list' || path === '/api/vault/search') return jsonResponse([syntheticEntryValue])
+      if (path === '/api/vault/all-content') return jsonResponse(contentRows)
+      if (path === '/api/vault/content') return jsonResponse({ content: contentRows[0]?.content ?? '' })
+      if (path === '/api/vault/entry') return jsonResponse(syntheticEntries[0])
+      if (path === '/api/vault/list' || path === '/api/vault/search') return jsonResponse(syntheticEntries)
       if (path === '/api/vault/ping') return new Response('ok', { status: 200 })
       return null
     }
@@ -285,34 +358,25 @@ async function installSyntheticVault(page, entry, markdown) {
       return originalFetch(input, init)
     }
 
-    const withSyntheticEntry = (result) => {
-      const entries = Array.isArray(result) ? result : []
-      return [
-        syntheticEntryValue,
-        ...entries.filter(candidate => candidate.path !== syntheticEntryValue.path),
-      ]
-    }
-    const matchesSyntheticPath = args => args?.path === syntheticEntryValue.path
+    const contentFor = args => syntheticContent[args?.path] ?? ''
+    const entryFor = args => (
+      syntheticEntries.find(candidate => candidate.path === args?.path)
+      ?? syntheticEntries[0]
+    )
     const handlerPatches = {
-      get_note_content: original => args => (
-        matchesSyntheticPath(args) ? syntheticMarkdown : original?.(args) ?? ''
-      ),
-      list_vault: original => args => withSyntheticEntry(original?.(args)),
-      reload_vault: original => args => withSyntheticEntry(original?.(args)),
-      reload_vault_entry: original => args => (
-        matchesSyntheticPath(args) ? syntheticEntryValue : original?.(args)
-      ),
-      validate_note_content: original => args => (
-        matchesSyntheticPath(args)
-          ? args.content === syntheticMarkdown
-          : Boolean(original?.(args))
-      ),
+      get_all_content: () => () => syntheticContent,
+      get_note_content: () => contentFor,
+      list_vault: () => () => syntheticEntries,
+      read_vault_snapshot: () => () => syntheticEntries,
+      reload_vault: () => () => syntheticEntries,
+      reload_vault_entry: () => entryFor,
+      validate_note_content: () => args => args?.content === contentFor(args),
     }
 
     const patchHandlers = (handlers) => {
       if (!handlers || handlers.__editorPerformancePatched) return handlers ?? null
       for (const [name, createHandler] of Object.entries(handlerPatches)) {
-        handlers[name] = createHandler(handlers[name])
+        Reflect.set(handlers, name, createHandler(Reflect.get(handlers, name)))
       }
       handlers.__editorPerformancePatched = true
       return handlers
@@ -328,7 +392,7 @@ async function installSyntheticVault(page, entry, markdown) {
         handlersRef = patchHandlers(value)
       },
     })
-  }, { syntheticEntryValue: entry, syntheticMarkdown: markdown })
+  }, { syntheticContent: contentByPath, syntheticEntries: entries })
 }
 
 async function measureEditFrame(page) {
@@ -362,9 +426,7 @@ function parsePerfMetrics(perfLogs) {
   }
 }
 
-async function runIteration({ baseUrl, browser, index, scenario, scenarioName }) {
-  const markdown = largeMarkdown(scenario.sectionCount, scenario.title)
-  const entry = syntheticEntry({ markdown, title: scenario.title })
+async function openFixturePage({ baseUrl, browser, contentByPath, entries }) {
   const context = await browser.newContext()
   const page = await context.newPage()
   const perfLogs = []
@@ -372,112 +434,236 @@ async function runIteration({ baseUrl, browser, index, scenario, scenarioName })
     const text = message.text()
     if (text.includes('[perf]')) perfLogs.push(text)
   })
+  await installSyntheticVault(page, entries, contentByPath)
+  await page.goto(baseUrl, { timeout: 90_000, waitUntil: 'domcontentloaded' })
+  await page.getByText('Set up later', { exact: true }).click({ timeout: 2_000 }).catch(() => {})
+  return { context, page, perfLogs }
+}
 
-  await installSyntheticVault(page, entry, markdown)
-  await page.goto(baseUrl)
-  await page.waitForLoadState('domcontentloaded')
-  await page.getByText('Set up later', { exact: true }).click({ timeout: 12_000 }).catch(() => {})
+async function startupMarkMs(page, phase) {
+  const markName = `tolaria:${phase}`
+  await page.waitForFunction(
+    name => performance.getEntriesByName(name, 'mark').length > 0,
+    markName,
+    { timeout: 30_000 },
+  )
+  return await page.evaluate(
+    name => performance.getEntriesByName(name, 'mark')[0]?.startTime ?? null,
+    markName,
+  )
+}
 
-  const title = page.getByText(scenario.title, { exact: true }).first()
-  await title.waitFor({ state: 'visible', timeout: 30_000 })
+const runStartupIteration = async ({ baseUrl, browser, scenario }) => {
+  const entries = syntheticVaultEntries(scenario.entryCount)
+  const fixture = await openFixturePage({
+    baseUrl,
+    browser,
+    contentByPath: {},
+    entries,
+  })
+  try {
+    return {
+      activeVaultUsableMs: await startupMarkMs(fixture.page, 'active_usable'),
+      appInteractiveMs: await startupMarkMs(fixture.page, 'app_interactive'),
+      perfLogs: fixture.perfLogs,
+      reactShellMs: await startupMarkMs(fixture.page, 'react_shell'),
+    }
+  } finally {
+    await fixture.context.close()
+  }
+}
 
-  const startedAt = await page.evaluate(() => performance.now())
-  await title.click()
+async function measureListScroll(page, entryCount) {
+  const scroller = page.locator('[data-testid="virtuoso-scroller"]')
+  await scroller.waitFor({ state: 'visible', timeout: 30_000 })
+  return await scroller.evaluate(async (element, expectedCount) => {
+    const lastRenderedIndex = () => {
+      const items = [...document.querySelectorAll('[data-testid="virtuoso-item-list"] [data-index]')]
+      return Math.max(...items.map(item => Number(item.getAttribute('data-index') ?? '-1')))
+    }
+    const startedAt = performance.now()
+    element.scrollTop = element.scrollHeight - element.clientHeight
+    element.dispatchEvent(new Event('scroll'))
+    const targetIndex = Math.floor(expectedCount * 0.9)
+    for (let frame = 0; frame < 120 && lastRenderedIndex() < targetIndex; frame += 1) {
+      await new Promise(resolveFrame => requestAnimationFrame(resolveFrame))
+    }
+    if (lastRenderedIndex() < targetIndex) return null
+    await new Promise(resolveFrame => requestAnimationFrame(resolveFrame))
+    await new Promise(resolveFrame => requestAnimationFrame(resolveFrame))
+    return performance.now() - startedAt
+  }, entryCount)
+}
 
-  await page.locator('.editor__blocknote-container').waitFor({ state: 'visible', timeout: 30_000 })
-  await page.locator('.bn-editor').waitFor({ state: 'visible', timeout: 30_000 })
-  const editorVisibleAt = await page.evaluate(() => performance.now())
+const runListIteration = async ({ baseUrl, browser, scenario }) => {
+  const entries = syntheticVaultEntries(scenario.entryCount)
+  const fixture = await openFixturePage({
+    baseUrl,
+    browser,
+    contentByPath: {},
+    entries,
+  })
+  try {
+    await startupMarkMs(fixture.page, 'app_interactive')
+    return {
+      listScrollReadyMs: await measureListScroll(fixture.page, scenario.entryCount),
+      perfLogs: fixture.perfLogs,
+    }
+  } finally {
+    await fixture.context.close()
+  }
+}
 
-  await page.waitForFunction(() => {
-    const editor = document.querySelector('.bn-editor')
-    return editor?.textContent?.includes('Section 1') === true
-  }, undefined, { timeout: 30_000 })
-  const firstContentAt = await page.evaluate(() => performance.now())
+const runNoteIteration = async ({ baseUrl, browser, scenario }) => {
+  const markdown = largeMarkdown(scenario.sectionCount, scenario.title)
+  const entry = syntheticEntry({
+    index: scenario.entryCount + 1,
+    markdown,
+    title: scenario.title,
+  })
+  const entries = syntheticVaultEntries(scenario.entryCount, entry)
+  const contentByPath = {}
+  Reflect.set(contentByPath, entry.path, markdown)
+  const fixture = await openFixturePage({
+    baseUrl,
+    browser,
+    contentByPath,
+    entries,
+  })
+  try {
+    const title = fixture.page.getByText(scenario.title, { exact: true }).first()
+    await title.waitFor({ state: 'visible', timeout: 30_000 })
+    const startedAt = await fixture.page.evaluate(() => performance.now())
+    await title.click()
 
+    await fixture.page.locator('.editor__blocknote-container').waitFor({ state: 'visible', timeout: 30_000 })
+    await fixture.page.locator('.bn-editor').waitFor({ state: 'visible', timeout: 30_000 })
+    const editorVisibleAt = await fixture.page.evaluate(() => performance.now())
+    await waitForEditorSection(fixture.page, 1)
+    const firstContentAt = await fixture.page.evaluate(() => performance.now())
+    await waitForEditorSection(fixture.page, scenario.sectionCount)
+    const fullAppliedAt = await fixture.page.evaluate(() => performance.now())
+
+    await fixture.page.locator('.bn-editor').click({ timeout: 10_000 })
+    const editFrameMs = []
+    for (let sample = 0; sample < 8; sample += 1) {
+      const value = await measureEditFrame(fixture.page)
+      if (typeof value === 'number') editFrameMs.push(value)
+      await fixture.page.waitForTimeout(80)
+    }
+
+    return {
+      ...parsePerfMetrics(fixture.perfLogs),
+      editFrameMs,
+      editorVisibleMs: editorVisibleAt - startedAt,
+      firstContentMs: firstContentAt - startedAt,
+      fullAppliedMs: fullAppliedAt - startedAt,
+      perfLogs: fixture.perfLogs,
+    }
+  } finally {
+    await fixture.context.close()
+  }
+}
+
+async function waitForEditorSection(page, sectionCount) {
   await page.waitForFunction((expectedSectionCount) => {
     const editor = document.querySelector('.bn-editor')
     return editor?.textContent?.includes(`Section ${expectedSectionCount}`) === true
-  }, scenario.sectionCount, { timeout: 30_000 })
-  const fullAppliedAt = await page.evaluate(() => performance.now())
+  }, sectionCount, { timeout: 30_000 })
+}
 
-  await page.locator('.bn-editor').click({ timeout: 10_000 })
-  const editFrameMs = []
-  for (let sample = 0; sample < 8; sample += 1) {
-    const value = await measureEditFrame(page)
-    if (typeof value === 'number') editFrameMs.push(value)
-    await page.waitForTimeout(80)
-  }
+function runScenarioIteration(args) {
+  if (args.scenario.kind === 'startup') return runStartupIteration(args)
+  if (args.scenario.kind === 'list') return runListIteration(args)
+  return runNoteIteration(args)
+}
 
-  await context.close()
-  return {
-    ...parsePerfMetrics(perfLogs),
-    editFrameMs,
-    editorVisibleMs: editorVisibleAt - startedAt,
-    firstContentMs: firstContentAt - startedAt,
-    fullAppliedMs: fullAppliedAt - startedAt,
-    index,
-    perfLogs,
-    scenario: scenarioName,
-  }
+function metricSamples(runs, metricName) {
+  if (metricName === 'editFrameMs') return runs.flatMap(run => run.editFrameMs)
+  return runs.map(run => Reflect.get(run, metricName))
 }
 
 function summarizeScenario(scenarioName, scenario, runs) {
-  const editFrameSamples = runs.flatMap(run => run.editFrameMs)
-  const medians = {
-    blockApplyMs: round(median(runs.map(run => run.blockApplyMs))),
-    blockResolveMs: round(median(runs.map(run => run.blockResolveMs))),
-    editFrameMs: round(median(editFrameSamples)),
-    editorVisibleMs: round(median(runs.map(run => run.editorVisibleMs))),
-    firstContentMs: round(median(runs.map(run => run.firstContentMs))),
-    fullAppliedMs: round(median(runs.map(run => run.fullAppliedMs))),
-    noteOpenEditorSwapMs: round(median(runs.map(run => run.noteOpenEditorSwapMs))),
-    noteOpenTotalMs: round(median(runs.map(run => run.noteOpenTotalMs))),
-  }
+  const aggregates = Object.fromEntries(scenario.metricNames.map((metricName) => [
+    metricName,
+    aggregateSamples(metricSamples(runs, metricName)),
+  ]))
+  const medians = Object.fromEntries(Object.entries(aggregates).map(([name, values]) => [
+    name,
+    round(values.median),
+  ]))
+  const p90s = Object.fromEntries(Object.entries(aggregates).map(([name, values]) => [
+    name,
+    round(values.p90),
+  ]))
 
   return {
-    contentBytes: largeMarkdown(scenario.sectionCount, scenario.title).length,
+    fixtureLabel: scenario.fixtureLabel,
     medians,
-    runs: runs.map(run => ({
-      ...run,
-      blockApplyMs: round(run.blockApplyMs),
-      blockResolveMs: round(run.blockResolveMs),
-      editFrameMs: run.editFrameMs.map(round),
-      editorVisibleMs: round(run.editorVisibleMs),
-      firstContentMs: round(run.firstContentMs),
-      fullAppliedMs: round(run.fullAppliedMs),
-      noteOpenEditorSwapMs: round(run.noteOpenEditorSwapMs),
-      noteOpenTotalMs: round(run.noteOpenTotalMs),
-    })),
+    p90s,
+    runs: runs.map(roundRun),
     scenario: scenarioName,
-    sectionCount: scenario.sectionCount,
   }
 }
 
-async function runBenchmarks(baseUrl) {
+function roundRun(run) {
+  return Object.fromEntries(Object.entries(run).map(([name, value]) => {
+    if (Array.isArray(value) && name === 'editFrameMs') return [name, value.map(round)]
+    if (typeof value === 'number') return [name, round(value)]
+    return [name, value]
+  }))
+}
+
+function runMetricSummary(scenario, run) {
+  return scenario.metricNames
+    .map((metricName) => {
+      const value = metricName === 'editFrameMs'
+        ? aggregateSamples(run.editFrameMs).median
+        : Reflect.get(run, metricName)
+      return `${metricName}=${round(value)}ms`
+    })
+    .join(' ')
+}
+
+const runBenchmarks = async (baseUrl) => {
   const browser = await chromium.launch({ headless: !options.headful })
   const summaries = {}
   try {
     for (const scenarioName of options.scenarioNames) {
-      const scenario = scenarios[scenarioName]
-      console.log(`[perf] scenario=${scenarioName} sections=${scenario.sectionCount}`)
+      const scenario = Reflect.get(scenarios, scenarioName)
+      process.stdout.write(`[perf] scenario=${scenarioName} fixture="${scenario.fixtureLabel}"\n`)
       const runs = []
-      for (let index = 1; index <= options.iterations; index += 1) {
-        const run = await runIteration({ baseUrl, browser, index, scenario, scenarioName })
-        runs.push(run)
-        console.log(
-          `[perf] ${scenarioName} run=${index} `
-            + `visible=${round(run.editorVisibleMs)}ms `
-            + `first=${round(run.firstContentMs)}ms `
-            + `full=${round(run.fullAppliedMs)}ms `
-            + `edit=${round(median(run.editFrameMs))}ms`,
-        )
+      const samplePlan = buildSamplePlan({
+        iterations: options.iterations,
+        warmups: options.warmups,
+      })
+      for (const sample of samplePlan) {
+        const run = await runScenarioIteration({ baseUrl, browser, scenario })
+        const sampleLabel = `${sample.phase}=${sample.ordinal}`
+        process.stdout.write(`[perf] ${scenarioName} ${sampleLabel} ${runMetricSummary(scenario, run)}\n`)
+        if (sample.phase === 'measured') runs.push(run)
       }
-      summaries[scenarioName] = summarizeScenario(scenarioName, scenario, runs)
+      Reflect.set(summaries, scenarioName, summarizeScenario(scenarioName, scenario, runs))
     }
   } finally {
     await browser.close()
   }
   return summaries
+}
+
+async function writeResultFile({ failures, summaries }) {
+  await mkdir('test-results', { recursive: true })
+  const result = {
+    failures,
+    generatedAt: new Date().toISOString(),
+    iterations: options.iterations,
+    scenarios: summaries,
+    status: failures.length === 0 ? 'passed' : 'failed',
+    thresholdsPath,
+    warmups: options.warmups,
+  }
+  await writeFile('test-results/performance-summary.json', `${JSON.stringify(result, null, 2)}\n`)
+  process.stdout.write('\nWrote test-results/performance-summary.json\n')
 }
 
 const startedBaseUrl = await startDevServer()
@@ -490,7 +676,7 @@ try {
 
   if (options.update) {
     await writeThresholds(thresholdsPath, activeThresholds)
-    console.log(`\nUpdated ${thresholdsPath}`)
+    process.stdout.write(`\nUpdated ${thresholdsPath}\n`)
   }
 
   const failures = thresholdFailures(activeThresholds, summaries)
@@ -500,8 +686,8 @@ try {
     exitCode = 1
   }
 
-  await rm(resolve(rootDir, 'test-results'), { recursive: true, force: true })
-  if (exitCode !== 0) process.exit(exitCode)
+  await writeResultFile({ failures, summaries })
+  if (exitCode !== 0) process.exitCode = exitCode
 } finally {
   stopDevServer()
 }

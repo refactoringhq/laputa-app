@@ -1,83 +1,127 @@
 {
   "scenarios": {
     "small": {
-      "contentBytes": 1451,
+      "fixtureLabel": "5-section note in a 500-entry vault",
       "metrics": {
-        "blockApplyMs": {
-          "baselineMs": 12.3,
-          "maxMs": 37
-        },
-        "blockResolveMs": {
-          "baselineMs": 11.6,
-          "maxMs": 37
-        },
-        "editFrameMs": {
-          "baselineMs": 3.2,
-          "maxMs": 16
-        },
         "editorVisibleMs": {
-          "baselineMs": 223.2,
-          "maxMs": 282
+          "baselineMs": 153.2,
+          "maxMs": 207,
+          "p90Ms": 155.4
         },
         "firstContentMs": {
-          "baselineMs": 237.4,
-          "maxMs": 293
+          "baselineMs": 162.3,
+          "maxMs": 220,
+          "p90Ms": 163.7
         },
         "fullAppliedMs": {
-          "baselineMs": 240.6,
-          "maxMs": 294
+          "baselineMs": 163.4,
+          "maxMs": 221,
+          "p90Ms": 164.9
+        },
+        "editFrameMs": {
+          "baselineMs": 2.8,
+          "maxMs": 16,
+          "p90Ms": 6.9
+        },
+        "blockResolveMs": {
+          "baselineMs": 9.4,
+          "maxMs": 35,
+          "p90Ms": 11
+        },
+        "blockApplyMs": {
+          "baselineMs": 11.1,
+          "maxMs": 37,
+          "p90Ms": 11.4
         },
         "noteOpenEditorSwapMs": {
-          "baselineMs": 90.4,
-          "maxMs": 115
+          "baselineMs": 81.5,
+          "maxMs": 111,
+          "p90Ms": 82.6
         },
         "noteOpenTotalMs": {
-          "baselineMs": 138.7,
-          "maxMs": 180
+          "baselineMs": 88.5,
+          "maxMs": 120,
+          "p90Ms": 90.3
         }
-      },
-      "sectionCount": 5
+      }
     },
     "large": {
-      "contentBytes": 130377,
+      "fixtureLabel": "460-section note in a 500-entry vault",
       "metrics": {
-        "blockApplyMs": {
-          "baselineMs": 279.1,
-          "maxMs": 362
-        },
-        "blockResolveMs": {
-          "baselineMs": 37.8,
-          "maxMs": 63
-        },
-        "editFrameMs": {
-          "baselineMs": 5,
-          "maxMs": 16
-        },
         "editorVisibleMs": {
-          "baselineMs": 197.9,
-          "maxMs": 261
+          "baselineMs": 148.8,
+          "maxMs": 201,
+          "p90Ms": 153.1
         },
         "firstContentMs": {
-          "baselineMs": 305.1,
-          "maxMs": 401
+          "baselineMs": 227.5,
+          "maxMs": 308,
+          "p90Ms": 232.6
         },
         "fullAppliedMs": {
-          "baselineMs": 508.4,
-          "maxMs": 664
+          "baselineMs": 383.5,
+          "maxMs": 518,
+          "p90Ms": 389.5
+        },
+        "editFrameMs": {
+          "baselineMs": 5.6,
+          "maxMs": 16,
+          "p90Ms": 11.6
+        },
+        "blockResolveMs": {
+          "baselineMs": 38.4,
+          "maxMs": 63,
+          "p90Ms": 42.5
+        },
+        "blockApplyMs": {
+          "baselineMs": 213.2,
+          "maxMs": 288,
+          "p90Ms": 216.3
         },
         "noteOpenEditorSwapMs": {
-          "baselineMs": 384.3,
-          "maxMs": 498
+          "baselineMs": 346.8,
+          "maxMs": 469,
+          "p90Ms": 351.8
         },
         "noteOpenTotalMs": {
-          "baselineMs": 448.4,
-          "maxMs": 587
+          "baselineMs": 355.5,
+          "maxMs": 480,
+          "p90Ms": 362.9
         }
-      },
-      "sectionCount": 460
+      }
+    },
+    "startup": {
+      "fixtureLabel": "500 deterministic vault entries",
+      "metrics": {
+        "reactShellMs": {
+          "baselineMs": 469.5,
+          "maxMs": 634,
+          "p90Ms": 479.3
+        },
+        "activeVaultUsableMs": {
+          "baselineMs": 791.6,
+          "maxMs": 1069,
+          "p90Ms": 804.1
+        },
+        "appInteractiveMs": {
+          "baselineMs": 1027.2,
+          "maxMs": 1387,
+          "p90Ms": 1038.5
+        }
+      }
+    },
+    "list": {
+      "fixtureLabel": "2,000 deterministic virtualized rows",
+      "metrics": {
+        "listScrollReadyMs": {
+          "baselineMs": 30.1,
+          "maxMs": 56,
+          "p90Ms": 31.5
+        }
+      }
     }
   },
-  "version": 1,
-  "updatedAt": "2026-06-29T07:53:27.234Z",
-  "description": "Ratcheted editor performance budgets for synthetic small and large note opens. Lower is better; maxMs values should only move down unless intentionally rebaselined."
+  "version": 2,
+  "updatedAt": "2026-07-27T15:42:56Z",
+  "description": "Ratcheted perceived-latency budgets for stable synthetic Tolaria flows. Lower is better; maxMs values only move down unless a reviewer explicitly changes the threshold file."
 }
