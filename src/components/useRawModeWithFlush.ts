@@ -150,6 +150,7 @@ function useHandleFlushPending({
   editor,
   activeTabPath,
   activeTabContent,
+  editorContentPathRef,
   rawInitialContentRef,
   rawLatestContentRef,
   rawSourceContentRef,
@@ -161,6 +162,7 @@ function useHandleFlushPending({
   editor: ReturnType<typeof useCreateBlockNote>
   activeTabPath: string | null
   activeTabContent: string | null
+  editorContentPathRef?: React.MutableRefObject<string | null>
   rawInitialContentRef: React.MutableRefObject<string | null>
   rawLatestContentRef: React.MutableRefObject<string | null>
   rawSourceContentRef: React.MutableRefObject<string | null>
@@ -176,6 +178,7 @@ function useHandleFlushPending({
       editor,
       activeTabPath,
       activeTabContent,
+      editorContentPath: editorContentPathRef ? editorContentPathRef.current : undefined,
       rawLatestContentRef,
       serializeRichEditorContent,
       vaultPath,
@@ -197,6 +200,7 @@ function useHandleFlushPending({
     activeTabContent,
     activeTabPath,
     editor,
+    editorContentPathRef,
     flushPendingEditorChangeRef,
     restoreTransitionRef,
     rawInitialContentRef,
@@ -289,6 +293,7 @@ export function useRawModeWithFlush(
   onContentChange?: (path: string, content: string) => void,
   vaultPath?: string,
   flushPendingEditorChangeRef?: React.MutableRefObject<(() => boolean) | null>,
+  editorContentPathRef?: React.MutableRefObject<string | null>,
 ) {
   const rawLatestContentRef = useRef<string | null>(null)
   const rawInitialContentRef = useRef<string | null>(null)
@@ -326,6 +331,7 @@ export function useRawModeWithFlush(
     editor,
     activeTabPath,
     activeTabContent: effectiveActiveTabContent,
+    editorContentPathRef,
     rawInitialContentRef,
     rawLatestContentRef,
     rawSourceContentRef,

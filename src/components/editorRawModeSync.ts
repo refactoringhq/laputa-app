@@ -113,6 +113,7 @@ export function syncActiveTabIntoRawBuffer(options: {
   editor: ReturnType<typeof useCreateBlockNote>
   activeTabPath: string | null
   activeTabContent: string | null
+  editorContentPath?: string | null
   rawLatestContentRef: MutableRefObject<string | null>
   serializeRichEditorContent?: boolean
   vaultPath?: string
@@ -121,11 +122,20 @@ export function syncActiveTabIntoRawBuffer(options: {
     editor,
     activeTabPath,
     activeTabContent,
+    editorContentPath,
     rawLatestContentRef,
     serializeRichEditorContent = true,
     vaultPath,
   } = options
   if (!activeTabPath || activeTabContent === null) return null
+
+  // The rich editor is a single shared instance and is deliberately never loaded
+  // for notes it cannot render (sheets above all). Serializing it into a note it
+  // does not hold would replace that note's body with the previous note's body.
+  if (editorContentPath !== undefined && editorContentPath !== activeTabPath) {
+    rawLatestContentRef.current = activeTabContent
+    return activeTabContent
+  }
 
   const shouldSerializeRichEditorContent = serializeRichEditorContent || hasRichEditorDurableBlocks(editor.document)
   const syncedContent = shouldSerializeRichEditorContent

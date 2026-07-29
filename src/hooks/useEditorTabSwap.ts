@@ -79,6 +79,9 @@ interface UseEditorTabSwapOptions {
   /** When true, the BlockNote editor is hidden (raw/CodeMirror mode active). */
   rawMode?: boolean
   vaultPath?: string
+  /** Tracks which note the rich editor currently holds. Hoisted by the caller so
+   *  other consumers can check rich-editor ownership before serializing it. */
+  editorContentPathRef?: EditorContentPathRef
 }
 
 interface RunTabSwapEffectOptions {
@@ -1137,13 +1140,22 @@ function usePrepareParsedBlocks(options: {
  * Returns the onChange callback for SingleEditorView and a flush hook for
  * save/navigation paths that need the latest rich-editor content immediately.
  */
-export function useEditorTabSwap({ tabs, activeTabPath, editor, onContentChange, rawMode, vaultPath }: UseEditorTabSwapOptions) {
+export function useEditorTabSwap({
+  tabs,
+  activeTabPath,
+  editor,
+  onContentChange,
+  rawMode,
+  vaultPath,
+  editorContentPathRef: providedEditorContentPathRef,
+}: UseEditorTabSwapOptions) {
   const tabCacheRef = useRef<Map<string, CachedTabState>>(new Map())
   const pendingLocalContentRef = useRef<PendingLocalContent | null>(null)
   const prevActivePathRef = useRef<string | null>(null)
   const activeTabPathLatestRef = useLatestRef(activeTabPath)
   const editorContentSignal = useEditorContentPathSignal()
-  const editorContentPathRef = useRef<string | null>(null)
+  const ownEditorContentPathRef = useRef<string | null>(null)
+  const editorContentPathRef = providedEditorContentPathRef ?? ownEditorContentPathRef
   const editorMountedRef = useRef(false)
   const pendingSwapRef = useRef<(() => void) | null>(null)
   const swapSeqRef = useRef(0)

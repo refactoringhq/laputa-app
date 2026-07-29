@@ -266,6 +266,9 @@ function useEditorSetup({
   const onImageImportErrorRef = useRef(onImageImportError)
   const flushPendingEditorChangeRef = useRef<(() => boolean) | null>(null)
   const sheetFlushRef = useRef<((path: string) => void) | null>(null)
+  /** Which note the shared rich editor currently holds. Sheets are never loaded
+   *  into it, so raw-mode flushes must check this before serializing it. */
+  const editorContentPathRef = useRef<string | null>(null)
   useEffect(() => { vaultPathRef.current = vaultPath }, [vaultPath])
   useEffect(() => { activeTabPathRef.current = activeTabPath }, [activeTabPath])
   useEffect(() => { onImageImportErrorRef.current = onImageImportError }, [onImageImportError])
@@ -331,6 +334,7 @@ function useEditorSetup({
     onContentChange,
     vaultPath,
     flushPendingEditorChangeRef,
+    editorContentPathRef,
   )
   const rawModeContent = resolveRawModeContent({ activeTab, rawModeContentOverride })
 
@@ -365,6 +369,7 @@ function useEditorSetup({
     onContentChange,
     rawMode,
     vaultPath,
+    editorContentPathRef,
   })
   const richEditorContentReady = useRichEditorContentReadiness({
     activeTab,
