@@ -94,7 +94,10 @@ function scheduleInspectorReferences(callback: () => void): () => void {
   return () => window.clearTimeout(id)
 }
 
-function useDeferredInspectorReferences(entry: VaultEntry, entries: VaultEntry[]): boolean {
+function useDeferredInspectorReferences(
+  entry: VaultEntry,
+  entries: VaultEntry[],
+): DeferredInspectorReferenceKey | null {
   const [readyFor, setReadyFor] = useState<DeferredInspectorReferenceKey | null>(null)
 
   useEffect(() => {
@@ -109,7 +112,7 @@ function useDeferredInspectorReferences(entry: VaultEntry, entries: VaultEntry[]
     }
   }, [entries, entry])
 
-  return readyFor?.entry === entry && readyFor.entries === entries
+  return readyFor?.entry.path === entry.path ? readyFor : null
 }
 
 function ValidFrontmatterPanels({
@@ -213,8 +216,16 @@ function DeferredInspectorReferencePanels(props: {
   onNavigate: (target: string) => void
   typeEntryMap: Record<string, VaultEntry>
 }) {
-  const ready = useDeferredInspectorReferences(props.entry, props.entries)
-  return ready ? <InspectorReferencePanels {...props} /> : null
+  const deferred = useDeferredInspectorReferences(props.entry, props.entries)
+  if (!deferred) return null
+
+  return (
+    <InspectorReferencePanels
+      {...props}
+      entries={deferred.entries}
+      entry={deferred.entry}
+    />
+  )
 }
 
 function PrimaryInspectorPanel({

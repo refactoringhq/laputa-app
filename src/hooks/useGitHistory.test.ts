@@ -103,6 +103,29 @@ describe('useGitHistory', () => {
     expect(result.current).toEqual([])
   })
 
+  it('does not reload when only the loader identity changes', async () => {
+    const firstLoader = vi.fn().mockResolvedValue(mockHistory)
+    const secondLoader = vi.fn().mockResolvedValue(mockHistory)
+    const { result, rerender } = renderHook(
+      ({ loader }) => useGitHistory('/vault/a.md', loader, true),
+      { initialProps: { loader: firstLoader } },
+    )
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200)
+    })
+    expect(result.current).toEqual(mockHistory)
+
+    rerender({ loader: secondLoader })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000)
+    })
+
+    expect(firstLoader).toHaveBeenCalledOnce()
+    expect(secondLoader).not.toHaveBeenCalled()
+    expect(result.current).toEqual(mockHistory)
+  })
+
   it('reloads history when the refresh key changes', async () => {
     const loadGitHistory = vi.fn((path: string) => Promise.resolve([
       { ...mockHistory[0], hash: `${path}-${loadGitHistory.mock.calls.length}` },
