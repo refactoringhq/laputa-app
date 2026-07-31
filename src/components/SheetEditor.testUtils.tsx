@@ -160,6 +160,7 @@ interface SheetEditorMockState {
   rowsWithDataCalls: number
   selectedView: SelectedView
   workbookRenderGate: Promise<void> | null
+  workbookRenderError: unknown
   workbookRenders: number
 }
 
@@ -210,6 +211,7 @@ const ironCalcMock = vi.hoisted(() => {
     rowsWithDataCalls: 0,
     selectedView: defaultSelectedView(),
     workbookRenderGate: null,
+    workbookRenderError: null,
     workbookRenders: 0,
   }
 
@@ -504,6 +506,9 @@ function shouldSuspendMockWorkbook(model: MockSheetModel): boolean {
 vi.mock('@ironcalc/workbook', () => ({
   init: vi.fn(() => Promise.resolve()),
   IronCalc: ({ model }: { model: MockSheetModel }) => {
+    if (ironCalcMock.state.workbookRenderError) {
+      throw ironCalcMock.state.workbookRenderError
+    }
     if (shouldSuspendMockWorkbook(model)) {
       throw ironCalcMock.state.workbookRenderGate
     }
@@ -579,8 +584,8 @@ vi.mock('@ironcalc/workbook', () => ({
 import { SheetEditor } from './SheetEditor'
 
 export async function activateWorkbookRoot() {
-  const editor = await screen.findByTestId('sheet-editor')
   const workbookRoot = await screen.findByTestId('ironcalc-workbook')
+  const editor = screen.getByTestId('sheet-editor')
   act(() => {
     fireEvent.pointerDown(editor)
     workbookRoot.focus()
@@ -708,6 +713,7 @@ export function resetSheetEditorTestState(): void {
   ironCalcMock.state.rowsWithDataCalls = 0
   ironCalcMock.state.selectedView = ironCalcMock.defaultSelectedView()
   ironCalcMock.state.workbookRenderGate = null
+  ironCalcMock.state.workbookRenderError = null
   ironCalcMock.state.workbookRenders = 0
   nativeWorkerMock.canUse = false
   nativeWorkerMock.resolve.mockReset()

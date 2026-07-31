@@ -21,13 +21,13 @@ describe('Tauri Content Security Policy', () => {
     expect(csp['object-src']).toContain('http://asset.localhost')
   })
 
-  it('allows packaged PDF viewer frames from scoped Tauri asset URLs', () => {
+  it('allows packaged PDF and isolated scripted HTML preview frames', () => {
     const config = JSON.parse(readFileSync(`${process.cwd()}/src-tauri/tauri.conf.json`, 'utf8'))
     const csp = config.app.security.csp as Record<string, string>
     const devCsp = config.app.security.devCsp as string
 
-    expect(csp['frame-src']).toBe("'self' asset: http://asset.localhost")
-    expect(devCsp).toContain("frame-src 'self' asset: http://asset.localhost")
+    expect(csp['frame-src']).toBe("'self' asset: http://asset.localhost data:")
+    expect(devCsp).toContain("frame-src 'self' asset: http://asset.localhost data:")
   })
 
   it('allows audio and video media previews from scoped Tauri asset URLs', () => {

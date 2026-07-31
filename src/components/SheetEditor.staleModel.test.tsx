@@ -48,7 +48,8 @@ describe('SheetEditor stale workbook model recovery', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     renderSheetEditor()
 
-    const editor = await screen.findByTestId('sheet-editor')
+    await screen.findByTestId('ironcalc-workbook')
+    const editor = screen.getByTestId('sheet-editor')
     ironCalcMock.state.lastModel?.free()
 
     try {
@@ -68,7 +69,8 @@ describe('SheetEditor stale workbook model recovery', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     renderSheetEditor()
 
-    const editor = await screen.findByTestId('sheet-editor')
+    await screen.findByTestId('ironcalc-workbook')
+    const editor = screen.getByTestId('sheet-editor')
     const clipboardData = createClipboardData()
     clipboardData.setData(TOLARIA_SHEET_CLIPBOARD_MIME, JSON.stringify({
       action: 'copy',
