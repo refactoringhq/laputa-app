@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getIronCalcMock, resetSheetEditorTestState } from './SheetEditor.testUtils'
+import { createClipboardData, getIronCalcMock, resetSheetEditorTestState } from './SheetEditor.testUtils'
 import { SheetEditor } from './SheetEditor'
+import { TOLARIA_SHEET_CLIPBOARD_MIME } from '../utils/sheetClipboard'
 
 const ironCalcMock = getIronCalcMock()
 const sheetContent = '---\ntype: Sheet\n---\nMetric,January'
@@ -56,6 +57,43 @@ describe('SheetEditor stale workbook model recovery', () => {
       }).not.toThrow()
       expect(warn).toHaveBeenCalledWith(
         '[sheet-editor] Skipped stale workbook interaction:',
+        expect.any(Error),
+      )
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('does not surface queued paste work after native model release', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    renderSheetEditor()
+
+    const editor = await screen.findByTestId('sheet-editor')
+    const clipboardData = createClipboardData()
+    clipboardData.setData(TOLARIA_SHEET_CLIPBOARD_MIME, JSON.stringify({
+      action: 'copy',
+      cells: [['queued paste']],
+      source: {
+        column: 1,
+        height: 1,
+        path: sheetPath,
+        row: 1,
+        width: 1,
+      },
+      type: 'tolaria-sheet-clipboard',
+      version: 1,
+    }))
+
+    try {
+      vi.useFakeTimers()
+      fireEvent.paste(editor, { clipboardData })
+      ironCalcMock.state.lastModel?.free()
+
+      expect(() => {
+        vi.runOnlyPendingTimers()
+      }).not.toThrow()
+      expect(warn).toHaveBeenCalledWith(
+        '[sheet-editor] Skipped stale workbook paste:',
         expect.any(Error),
       )
     } finally {
