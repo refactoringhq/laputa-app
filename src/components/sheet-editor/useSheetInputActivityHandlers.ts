@@ -22,11 +22,13 @@ import { isReleasedWorkbookModelError } from './sheetReleasedModel'
 interface UseSheetInputActivityHandlersOptions {
   commitExternalFormulaEditorInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
   commitSheetTextInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
+  releaseSheetTextInputTarget: (input: HTMLInputElement | HTMLTextAreaElement | null) => void
   scheduleSelectionChromePatch: () => void
   scheduleSerialize: (options?: ScheduleSheetSerializeOptions) => void
   setFormulaAutocomplete: Dispatch<SetStateAction<FormulaAutocompleteState | null>>
   setWikilinkAutocomplete: Dispatch<SetStateAction<SheetWikilinkAutocompleteState | null>>
   sheetElementRef: MutableRefObject<HTMLDivElement | null>
+  trackSheetTextInputEdit: (input: HTMLInputElement | HTMLTextAreaElement | null) => void
   updateSheetInlineAutocompletes: (input: HTMLInputElement | HTMLTextAreaElement | null) => void
   workbookRef: MutableRefObject<SheetWorkbookState | null>
 }
@@ -54,11 +56,13 @@ function visibleAutocompleteInput(
 export function useSheetInputActivityHandlers({
   commitExternalFormulaEditorInput,
   commitSheetTextInput,
+  releaseSheetTextInputTarget,
   scheduleSelectionChromePatch,
   scheduleSerialize,
   setFormulaAutocomplete,
   setWikilinkAutocomplete,
   sheetElementRef,
+  trackSheetTextInputEdit,
   updateSheetInlineAutocompletes,
   workbookRef,
 }: UseSheetInputActivityHandlersOptions) {
@@ -67,6 +71,7 @@ export function useSheetInputActivityHandlers({
     if (!commitSheetTextInput(input)) {
       commitExternalFormulaEditorInput(input)
     }
+    releaseSheetTextInputTarget(input)
     scheduleSerialize({ dirty: false })
     window.setTimeout(() => {
       if (sheetElementRef.current?.contains(document.activeElement) !== true) {
@@ -77,6 +82,7 @@ export function useSheetInputActivityHandlers({
   }, [
     commitExternalFormulaEditorInput,
     commitSheetTextInput,
+    releaseSheetTextInputTarget,
     scheduleSerialize,
     setFormulaAutocomplete,
     setWikilinkAutocomplete,
@@ -84,9 +90,10 @@ export function useSheetInputActivityHandlers({
   ])
 
   const handleInputCapture = useCallback((event: ReactFormEvent<HTMLDivElement>) => {
+    trackSheetTextInputEdit(formulaInputFromTarget(event.target))
     scheduleSerialize({ bodyRows: selectedRowsOrAll(workbookRef) })
     updateSheetInlineAutocompletes(visibleAutocompleteInput(event.target, sheetElementRef))
-  }, [scheduleSerialize, sheetElementRef, updateSheetInlineAutocompletes, workbookRef])
+  }, [scheduleSerialize, sheetElementRef, trackSheetTextInputEdit, updateSheetInlineAutocompletes, workbookRef])
 
   const handleKeyUpCapture = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (isEditableTarget(event.target) && shouldScheduleSerializeForKey(event)) {
