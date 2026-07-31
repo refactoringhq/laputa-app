@@ -206,4 +206,33 @@ describe('preProcessRichEditorMarkdown', () => {
       vaultPath: '/vault',
     })).toBe(`${content}\n`)
   })
+
+  it('preserves manually inserted blank paragraphs through rich/raw round-trips', async () => {
+    const editor = BlockNoteEditor.create({ schema })
+    installRichEditorMarkdownSerializer(editor)
+    const content = [
+      'First paragraph.',
+      '',
+      '',
+      'Second paragraph.',
+    ].join('\n')
+
+    const resolved = await resolveBlocksForTarget({
+      cache: new Map(),
+      content,
+      editor,
+      targetPath: 'blank-paragraph-spacing.md',
+    })
+
+    expect(resolved.blocks).toEqual([
+      expect.objectContaining({ type: 'paragraph', content: expect.any(Array) }),
+      expect.objectContaining({ type: 'paragraph', content: [] }),
+      expect.objectContaining({ type: 'paragraph', content: expect.any(Array) }),
+    ])
+    expect(serializeRichEditorDocumentToMarkdown({
+      blocks: resolved.blocks,
+      editor,
+      tabContent: content,
+    })).toBe(`${content}\n`)
+  })
 })

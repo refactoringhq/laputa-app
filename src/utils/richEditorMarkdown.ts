@@ -10,6 +10,7 @@ import { portableFileAttachmentUrls } from './fileAttachmentMarkdown'
 import { logRichEditorSerializationTrace } from './editorPerformanceTrace'
 import { injectMarkdownHighlightsInBlocks } from './markdownHighlightMarkdown'
 import { injectMathInBlocks, preProcessMathMarkdown } from './mathMarkdown'
+import { advanceMarkdownFence, type MarkdownFence } from './markdownFences'
 import { preProcessSingleTildeStrikethrough } from './markdownStrikethrough'
 import { normalizeBareImageUrls, portableImageUrls, resolveImageUrls } from './vaultImages'
 import { injectWikilinks, preProcessWikilinks, splitFrontmatter } from './wikilinks'
@@ -46,9 +47,26 @@ interface RichEditorBlockSerializationOptions {
 
 const EMPTY_CHECKLIST_ITEM_FILLER = '\u200B'
 const EMPTY_CHECKLIST_ITEM_LINE_RE = /^([ \t]*[-*+][ \t]+\[[ xX]\])[ \t]*$/u
+const BLANK_PARAGRAPH_PLACEHOLDER = '\u200B'
+
+interface MarkdownSourceLine {
+  content: string
+  newline: string
+}
+
+interface BlankParagraphPreprocessState {
+  fence: MarkdownFence | null
+  output: string[]
+  pendingBlanks: MarkdownSourceLine[]
+  precedingContent: boolean
+}
 
 function now(): number {
   return globalThis.performance?.now?.() ?? Date.now()
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
 
 function readDirectMarkdownMetrics(
@@ -76,7 +94,8 @@ export function preProcessRichEditorMarkdown(
 ): PreprocessedMarkdown {
   const withDurableBlocks = preProcessDurableEditorMarkdown({ markdown })
   const withEmptyChecklists = preProcessEmptyChecklistItems(withDurableBlocks)
-  const withBareImages = normalizeBareImageUrls(withEmptyChecklists)
+  const withBlankParagraphs = preProcessBlankParagraphs(withEmptyChecklists)
+  const withBareImages = normalizeBareImageUrls(withBlankParagraphs)
   const withImages = vaultPath ? resolveImageUrls(withBareImages, vaultPath, notePath) : withBareImages
   const withWikilinks = preProcessWikilinks(withImages)
   const withMath = preProcessMathMarkdown({ markdown: withWikilinks })
@@ -88,7 +107,8 @@ export function injectRichEditorMarkdownBlocks(blocks: EditorBlocksSnapshot): Ed
   const withMath = injectMathInBlocks(withWikilinks)
   const withHighlights = injectMarkdownHighlightsInBlocks(withMath)
   const withDurableBlocks = injectDurableEditorMarkdownBlocks(withHighlights)
-  return injectCalloutBlocks(withDurableBlocks)
+  const withCallouts = injectCalloutBlocks(withDurableBlocks)
+  return injectBlankParagraphBlocks(withCallouts)
 }
 
 export function hasRichEditorDurableBlocks(blocks: EditorBlocksSnapshot): boolean {
@@ -121,7 +141,10 @@ function serializeRichEditorBodyToMarkdownWithTrace(
   const directEditor = editor as DirectMarkdownCapableSerializer
   delete directEditor.__tolariaLastDirectMarkdownMetrics
   const document = blocks
-  const body = compactMarkdown(serializeDurableEditorBlocks(editor, document, vaultPath))
+  const body = compactMarkdown(
+    serializeDurableEditorBlocks(editor, document, vaultPath),
+    { preserveConsecutiveBlankLines: true },
+  )
   const metrics = readDirectMarkdownMetrics(directEditor)
   logRichEditorSerializationTrace({
     blockCount: metrics?.blockCount ?? document.length,
@@ -144,6 +167,149 @@ function preProcessEmptyChecklistItems(markdown: MarkdownBody): MarkdownBody {
 function preProcessEmptyChecklistLine(line: MarkdownBody): MarkdownBody {
   const match = EMPTY_CHECKLIST_ITEM_LINE_RE.exec(line)
   return match ? `${match[1]} ${EMPTY_CHECKLIST_ITEM_FILLER}` : line
+}
+
+function preProcessBlankParagraphs(markdown: MarkdownBody): MarkdownBody {
+  const lines = splitMarkdownSourceLines(markdown)
+  if (lines.length === 0) return markdown
+
+  const state: BlankParagraphPreprocessState = {
+    fence: null,
+    output: [],
+    pendingBlanks: [],
+    precedingContent: false,
+  }
+
+  for (const line of lines) {
+    processBlankParagraphSourceLine(state, line)
+  }
+
+  flushPendingBlankParagraphsAtEnd(state)
+  return state.output.join('')
+}
+
+function processBlankParagraphSourceLine(
+  state: BlankParagraphPreprocessState,
+  line: MarkdownSourceLine,
+): void {
+  if (state.fence) {
+    processFencedBlankParagraphLine(state, line)
+    return
+  }
+
+  if (isBlankMarkdownSourceLine(line)) {
+    state.pendingBlanks.push(line)
+    return
+  }
+
+  flushPendingBlankParagraphsBeforeContent(state)
+  state.output.push(markdownSourceLineText(line))
+  state.precedingContent = true
+  state.fence = advanceMarkdownFence(line.content, null)
+}
+
+function processFencedBlankParagraphLine(
+  state: BlankParagraphPreprocessState,
+  line: MarkdownSourceLine,
+): void {
+  state.output.push(markdownSourceLineText(line))
+  state.fence = advanceMarkdownFence(line.content, state.fence)
+  if (!state.fence) state.precedingContent = true
+}
+
+function flushPendingBlankParagraphsBeforeContent(state: BlankParagraphPreprocessState): void {
+  if (state.pendingBlanks.length === 0) return
+  if (!state.precedingContent || state.pendingBlanks.length === 1) {
+    flushPendingBlankParagraphsAtEnd(state)
+    return
+  }
+
+  const [separator, ...blankParagraphs] = state.pendingBlanks
+  state.output.push(markdownSourceLineText(separator))
+  for (const blank of blankParagraphs) {
+    appendBlankParagraphPlaceholder(state, blank)
+  }
+  state.pendingBlanks = []
+}
+
+function flushPendingBlankParagraphsAtEnd(state: BlankParagraphPreprocessState): void {
+  state.output.push(...state.pendingBlanks.map(markdownSourceLineText))
+  state.pendingBlanks = []
+}
+
+function appendBlankParagraphPlaceholder(
+  state: BlankParagraphPreprocessState,
+  blank: MarkdownSourceLine,
+): void {
+  const newline = blank.newline || '\n'
+  state.output.push(`${BLANK_PARAGRAPH_PLACEHOLDER}${newline}`)
+  state.output.push(newline)
+}
+
+function isBlankMarkdownSourceLine(line: MarkdownSourceLine): boolean {
+  return line.content.trim() === ''
+}
+
+function splitMarkdownSourceLines(markdown: MarkdownBody): MarkdownSourceLine[] {
+  const lines: MarkdownSourceLine[] = []
+  const lineRe = /([^\r\n]*)(\r\n|\n|$)/gu
+
+  for (;;) {
+    const match = lineRe.exec(markdown)
+    if (!match) break
+
+    const [rawLine, content = '', newline = ''] = match
+    if (rawLine === '' && match.index === markdown.length) break
+
+    lines.push({ content, newline })
+    if (newline === '') break
+  }
+
+  return lines
+}
+
+function markdownSourceLineText(line: MarkdownSourceLine): string {
+  return `${line.content}${line.newline}`
+}
+
+function injectBlankParagraphBlocks(blocks: EditorBlocksSnapshot): EditorBlocksSnapshot {
+  let changed = false
+  const nextBlocks = blocks.map(block => {
+    const nextBlock = injectBlankParagraphBlock(block)
+    if (nextBlock !== block) changed = true
+    return nextBlock
+  })
+  return changed ? nextBlocks : blocks
+}
+
+function injectBlankParagraphBlock(block: unknown): unknown {
+  if (!isRecord(block)) return block
+
+  const children = Array.isArray(block.children)
+    ? injectBlankParagraphBlocks(block.children)
+    : undefined
+  const childrenChanged = children !== undefined && children !== block.children
+
+  if (isBlankParagraphPlaceholderBlock(block)) {
+    return childrenChanged
+      ? { ...block, content: [], children }
+      : { ...block, content: [] }
+  }
+
+  return childrenChanged ? { ...block, children } : block
+}
+
+function isBlankParagraphPlaceholderBlock(block: Record<string, unknown>): boolean {
+  return block.type === 'paragraph' && isBlankParagraphPlaceholderContent(block.content)
+}
+
+function isBlankParagraphPlaceholderContent(content: unknown): boolean {
+  if (!Array.isArray(content) || content.length !== 1) return false
+
+  const [item] = content
+  return isRecord(item)
+    && item.type === 'text'
+    && item.text === BLANK_PARAGRAPH_PLACEHOLDER
 }
 
 export function serializeRichEditorDocumentToMarkdown({
