@@ -205,7 +205,7 @@ Deep links identify existing vault items with `tolaria://<vault-slug>/<relative-
 
 The relative path is encoded per segment, preserving `/` as the separator while allowing spaces, Unicode, and reserved characters inside filenames. Decoding rejects `.`, `..`, encoded slashes, backslashes, empty segments, and any resolved path outside the target vault root. Links keep the file extension so Markdown, text, media, PDFs, and other vault files can all route through the same `VaultEntry` lookup.
 
-Deep links are navigation-only. Opening one can focus Tolaria, switch to a registered vault, reload the index once, and open an existing item; it never creates missing files, imports external files, or silently falls back to another vault. v1 links are path-based, so renaming or moving a file changes the canonical link. macOS and Windows are the verified v1 desktop targets; Linux registration is best-effort until package-level QA covers the supported desktop environments.
+Deep links are navigation-only. Opening one can focus Tolaria, hand the request to an already-open window whose current vault matches the link, switch to a registered vault when no matching window claims it, reload the index once, and open an existing item; it never creates missing files, imports external files, or silently falls back to another vault. v1 links are path-based, so renaming or moving a file changes the canonical link. macOS and Windows are the verified v1 desktop targets; Linux registration is best-effort until package-level QA covers the supported desktop environments.
 
 ### File kinds and binary previews
 
