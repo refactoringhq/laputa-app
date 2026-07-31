@@ -48,6 +48,8 @@ _color: blue              # color assigned to a type
 _order: 10                # sort order in the sidebar
 _sidebar_label: Projects  # override label in sidebar
 _width: wide              # rich-editor width override for this note
+_list_properties_display: # properties shown in note-list rows for this type
+  - status
 ```
 
 **This convention is universal** — apply it to all future system-level frontmatter fields. When a new feature needs to store configuration in a note's frontmatter (especially in Type notes), use `_field_name` to keep it hidden from normal user-facing surfaces while still stored on-disk as plain text.

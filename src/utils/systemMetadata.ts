@@ -6,6 +6,7 @@ const SYSTEM_METADATA_ALIAS_GROUPS = {
   _list_properties_display: ['_list_properties_display'],
   _organized: ['_organized'],
   _order: ['_order', 'order'],
+  _pinned_properties: ['_pinned_properties'],
   _sidebar_label: ['_sidebar_label', 'sidebar_label', 'sidebar label'],
   _sort: ['_sort', 'sort'],
   _width: ['_width', 'width'],

@@ -22,7 +22,9 @@ Suggested properties are the fields Tolaria knows how to create quickly from the
 
 Fields that start with `_` are system properties. They remain in plain text but are hidden from normal property editing.
 
-Examples include `_icon`, `_color`, `_order`, `_sidebar_label`, `_width`, and `_pinned_properties` on type documents or notes.
+Examples include `_icon`, `_color`, `_order`, `_sidebar_label`, `_width`, `_pinned_properties`, and `_list_properties_display` on type documents or notes.
+
+Type documents use `_pinned_properties` to choose which fields appear in the editor inline bar and `_list_properties_display` to choose which fields appear in note-list rows.
 
 ## Property Editing
 
