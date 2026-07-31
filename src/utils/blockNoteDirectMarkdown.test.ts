@@ -109,6 +109,14 @@ describe('BlockNote direct Markdown serialization', () => {
     ].join('\n'))
   })
 
+  it('preserves an intentionally empty image label', () => {
+    expect(blocksToMarkdownDirect([{
+      type: 'image',
+      props: { name: '', url: 'attachments/photo2.png' },
+      children: [],
+    }]).markdown).toBe('![](attachments/photo2.png)')
+  })
+
   it('falls back to BlockNote legacy Markdown for unsupported block types', () => {
     const editor = makeEditor([{ type: 'unsupportedWidget', children: [] }])
     installBlockNoteDirectMarkdown(editor)

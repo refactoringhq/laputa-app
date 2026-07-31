@@ -1,3 +1,5 @@
+import { restoreWikilinksInBlocks } from './wikilinks'
+
 interface TextStyles {
   [style: string]: string | boolean | undefined
 }
@@ -32,7 +34,7 @@ interface TableContentLike {
 
 interface BlockLike {
   type?: string
-  content?: InlineItem[] | TableContentLike | unknown
+  content?: unknown
   props?: Record<string, string | number | boolean | undefined>
   children?: BlockLike[]
   [key: string]: unknown
@@ -87,7 +89,7 @@ const MEDIA_BLOCK_TYPES = new Set(['audio', 'file', 'image', 'video'])
 
 
 function now(): number {
-  return globalThis.performance?.now?.() ?? Date.now()
+  return globalThis.performance.now()
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -221,7 +223,8 @@ function codeBlockMarkdown(block: BlockLike): string {
 }
 
 function mediaLabel(name: string, url: string): string {
-  return name || url.split('/').pop() || url
+  if (name) return name
+  return url.split('/').pop() ?? url
 }
 
 function mediaUrl(block: BlockLike): string {
@@ -232,7 +235,7 @@ function mediaMarkdown(block: BlockLike): string {
   const url = mediaUrl(block)
   const name = typeof block.props?.name === 'string' ? block.props.name : ''
   if (!url) return name
-  const label = mediaLabel(name, url)
+  const label = block.type === 'image' ? name : mediaLabel(name, url)
   return block.type === 'image'
     ? `![${escapeText(label)}](${escapeLinkTarget(url)})`
     : `[${escapeText(label)}](${escapeLinkTarget(url)})`
@@ -425,5 +428,5 @@ export function serializeBlockNoteMarkdown(
 ): string {
   const direct = editor.blocksToMarkdownDirect?.(blocks)
   if (direct?.supported) return direct.markdown
-  return editor.blocksToMarkdownLossy(blocks)
+  return editor.blocksToMarkdownLossy(restoreWikilinksInBlocks(blocks))
 }
