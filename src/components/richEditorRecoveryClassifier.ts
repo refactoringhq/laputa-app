@@ -4,6 +4,7 @@ const BLOCKNOTE_EMPTY_FRAGMENT_INDEX_ERROR = /^Index \d+ out of range for <>$/
 const BLOCKNOTE_TABLE_ROW_INDEX_ERROR = /^Index \d+ out of range for <tableRow\(/
 const BLOCKNOTE_PARAGRAPH_INDEX_ERROR = /^Index \d+ out of range for <paragraph\(/
 const PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR = /^Position \d+ out of range$/
+const PROSEMIRROR_SELECTION_OUTSIDE_DOCUMENT_ERROR = 'Selection points outside of document'
 const NULL_APPEND_PROPERTY_ERROR = "Cannot read properties of null (reading 'append')"
 const NULL_FIRST_CHILD_PROPERTY_ERROR = "Cannot read properties of null (reading 'firstChild')"
 const REACT_UPDATE_DEPTH_EXCEEDED_ERROR = 'Maximum update depth exceeded'
@@ -158,7 +159,10 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
   {
     matches: (error) => (
       error instanceof RangeError
-      && messageMatches(error, PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR)
+      && (
+        messageMatches(error, PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR)
+        || isMessage(error, PROSEMIRROR_SELECTION_OUTSIDE_DOCUMENT_ERROR)
+      )
     ),
     reason: 'prosemirror_position_out_of_range',
     surfaces: ['render', 'transform'],

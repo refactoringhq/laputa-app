@@ -34,11 +34,16 @@ describe('richEditorRecoveryClassifier', () => {
   })
 
   it('classifies stale ProseMirror document positions across recovery surfaces', () => {
-    const error = new RangeError('Position 21183 out of range')
+    const stalePositionErrors = [
+      new RangeError('Position 21183 out of range'),
+      new RangeError('Selection points outside of document'),
+    ]
 
-    expect(classifyRichEditorRecoveryError(error, 'render')).toBe('prosemirror_position_out_of_range')
-    expect(classifyRichEditorRecoveryError(error, 'transform')).toBe('prosemirror_position_out_of_range')
-    expect(richEditorRecoveryErrorNeedsDocumentRepair(error)).toBe(false)
+    for (const error of stalePositionErrors) {
+      expect(classifyRichEditorRecoveryError(error, 'render')).toBe('prosemirror_position_out_of_range')
+      expect(classifyRichEditorRecoveryError(error, 'transform')).toBe('prosemirror_position_out_of_range')
+      expect(richEditorRecoveryErrorNeedsDocumentRepair(error)).toBe(false)
+    }
   })
 
   it('classifies missing-id failures across render and transform recovery', () => {
