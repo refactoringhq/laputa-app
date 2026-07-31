@@ -688,13 +688,35 @@ body.tldraw-whiteboard-fullscreen-open {
   white-space: pre-wrap;
 }
 
+.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > div {
+  display: flex;
+  margin-bottom: 0.35rem;
+}
+
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > div > select {
+  min-height: 28px;
+  max-width: min(18rem, 100%);
+  padding: 3px 28px 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--editor-code-block-language) 42%, transparent);
+  border-radius: 6px;
+  appearance: auto;
+  background-color: color-mix(in srgb, var(--editor-code-block-background) 88%, var(--surface-app));
   color: var(--editor-code-block-language) !important;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.3;
 }
 
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > div > select > option {
   background: var(--popover);
   color: var(--foreground);
+}
+
+.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > div > select:hover,
+.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > div > select:focus-visible {
+  border-color: var(--editor-code-block-language);
+  outline: 2px solid transparent;
 }
 
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] pre code {
