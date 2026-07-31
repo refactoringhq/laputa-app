@@ -42,6 +42,7 @@ interface FilteredEntriesParams {
   inboxPeriod?: InboxPeriod
   views?: ViewFile[]
   allNotesFileVisibility?: AllNotesFileVisibility
+  folderRecursive?: boolean
 }
 
 function buildFilteredEntries({
@@ -56,6 +57,7 @@ function buildFilteredEntries({
   inboxPeriod,
   views,
   allNotesFileVisibility,
+  folderRecursive,
 }: FilteredEntriesParams & {
   isChangesView: boolean
   isInboxView: boolean
@@ -71,6 +73,7 @@ function buildFilteredEntries({
     subFilter,
     views,
     allNotesFileVisibility,
+    folderRecursive,
     changesEntries,
     inboxEntries: isInboxView ? filterInboxEntries(entries, inboxPeriod ?? 'month') : undefined,
   }).entries
@@ -86,6 +89,7 @@ export function useFilteredEntries({
   inboxPeriod,
   views,
   allNotesFileVisibility,
+  folderRecursive,
 }: FilteredEntriesParams) {
   const isChangesView = selection.kind === 'filter' && selection.filter === 'changes'
   const isInboxView = selection.kind === 'filter' && selection.filter === 'inbox'
@@ -102,8 +106,9 @@ export function useFilteredEntries({
       inboxPeriod,
       views,
       allNotesFileVisibility,
+      folderRecursive,
     })
-  }, [allNotesFileVisibility, entries, inboxPeriod, isChangesView, isInboxView, modifiedFiles, modifiedPathSet, modifiedSuffixes, selection, subFilter, views])
+  }, [allNotesFileVisibility, entries, folderRecursive, inboxPeriod, isChangesView, isInboxView, modifiedFiles, modifiedPathSet, modifiedSuffixes, selection, subFilter, views])
 }
 
 // --- useNoteListData ---
@@ -117,6 +122,7 @@ interface NoteListDataParams {
   inboxPeriod?: InboxPeriod
   views?: ViewFile[]
   allNotesFileVisibility?: AllNotesFileVisibility
+  folderRecursive?: boolean
 }
 
 export function useNoteListData({
@@ -132,6 +138,7 @@ export function useNoteListData({
   inboxPeriod,
   views,
   allNotesFileVisibility,
+  folderRecursive,
 }: NoteListDataParams) {
   const isEntityView = selection.kind === 'entity'
   const isArchivedView = (selection.kind === 'filter' && selection.filter === 'archived') || subFilter === 'archived'
@@ -150,6 +157,7 @@ export function useNoteListData({
     inboxPeriod,
     views,
     allNotesFileVisibility,
+    folderRecursive,
   })
 
   const searched = useMemo(() => {

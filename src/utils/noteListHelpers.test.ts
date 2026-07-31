@@ -177,7 +177,9 @@ describe('filterEntries', () => {
       makeEntry({ path: 'C:\\Users\\luca\\Vault\\客户\\计划.md', title: 'Unicode' }),
     ]
 
-    expect(filterEntries(entries, { kind: 'folder', path: 'Client Work' }).map((entry) => entry.title)).toEqual(['Alpha', 'Beta'])
+    // Direct child only; Beta is nested under Client Work\Nested so it is
+    // excluded under single-level folder filtering.
+    expect(filterEntries(entries, { kind: 'folder', path: 'Client Work' }).map((entry) => entry.title)).toEqual(['Alpha'])
     expect(filterEntries(entries, { kind: 'folder', path: '客户' }).map((entry) => entry.title)).toEqual(['Unicode'])
   })
 
@@ -220,6 +222,19 @@ describe('filterEntries', () => {
     const result = filterEntries(entries, { kind: 'folder', path: 'assets' })
 
     expect(result.map((entry) => entry.title)).toEqual(['Spec', 'Logo', 'Data'])
+  })
+
+  it('shows only direct children of a folder, not files in subfolders', () => {
+    const entries = [
+      makeEntry({ path: '/vault/projects/p1.md', title: 'Direct' }),
+      makeEntry({ path: '/vault/projects/archive/old.md', title: 'Nested' }),
+      makeEntry({ path: '/vault/projects/archive/deep/older.md', title: 'DeepNested' }),
+      makeEntry({ path: '/vault/other/x.md', title: 'Other' }),
+    ]
+
+    const result = filterEntries(entries, { kind: 'folder', path: 'projects' })
+
+    expect(result.map((entry) => entry.title)).toEqual(['Direct'])
   })
 })
 

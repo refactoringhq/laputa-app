@@ -112,6 +112,9 @@ pub struct Settings {
     pub date_display_format: Option<String>,
     pub note_width_mode: Option<String>,
     pub sidebar_type_pluralization_enabled: Option<bool>,
+    /// Whether the note list shows all descendants (true, recursive) or only
+    /// direct children (false, single-level) when a folder is selected.
+    pub note_list_folder_recursive: Option<bool>,
     pub initial_h1_auto_rename_enabled: Option<bool>,
     pub ai_features_enabled: Option<bool>,
     pub default_ai_agent: Option<String>,
@@ -241,6 +244,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         date_display_format: normalize_date_display_format(settings.date_display_format.as_deref()),
         note_width_mode: normalize_note_width_mode(settings.note_width_mode.as_deref()),
         sidebar_type_pluralization_enabled: settings.sidebar_type_pluralization_enabled,
+        note_list_folder_recursive: settings.note_list_folder_recursive,
         initial_h1_auto_rename_enabled: settings.initial_h1_auto_rename_enabled,
         ai_features_enabled: settings.ai_features_enabled,
         default_ai_agent: normalize_default_ai_agent(settings.default_ai_agent.as_deref()),
@@ -467,6 +471,7 @@ mod tests {
             date_display_format: Some("iso".to_string()),
             note_width_mode: Some("wide".to_string()),
             sidebar_type_pluralization_enabled: Some(false),
+            note_list_folder_recursive: Some(false),
             initial_h1_auto_rename_enabled: Some(false),
             ai_features_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
@@ -509,6 +514,7 @@ mod tests {
             date_display_format: Some("european".to_string()),
             note_width_mode: Some("wide".to_string()),
             sidebar_type_pluralization_enabled: Some(false),
+            note_list_folder_recursive: Some(false),
             initial_h1_auto_rename_enabled: Some(false),
             ai_features_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),

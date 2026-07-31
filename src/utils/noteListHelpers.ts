@@ -25,6 +25,9 @@ export interface FilterEntriesOptions {
   subFilter?: NoteListFilter
   views?: ViewFile[]
   allNotesFileVisibility?: AllNotesFileVisibility
+  /** When false (default), a selected folder shows only its direct children;
+   *  when true, all descendants (recursive, the legacy behavior). */
+  folderRecursive?: boolean
 }
 
 export interface RelationshipGroup {
@@ -499,9 +502,27 @@ function pathRelativeToRoot(entryPath: string, rootPath?: string): string | null
   return normalizedEntryPath.slice(normalizedRootPath.length + 1)
 }
 
-function isEntryInSelectedFolder(entryPath: string, folderRelPath: string, rootPath?: string): boolean {
+function isEntryInSelectedFolder(entryPath: string, folderRelPath: string, rootPath?: string, recursive = false): boolean {
   const relativeEntryPath = pathRelativeToRoot(entryPath, rootPath)
-  return relativeEntryPath ? isInFolder(relativeEntryPath, folderRelPath) : false
+  if (!relativeEntryPath) return false
+  if (recursive) return isInFolder(relativeEntryPath, folderRelPath)
+  // Single-level only: show the folder's direct children (one path segment
+  // below the selected folder), not files nested deeper inside subfolders.
+  // Match by comparing the entry's parent folder path to the selected folder,
+  // allowing the entry path to carry a vault-name prefix. String-only (no
+  // dynamic RegExp) so static-analysis ReDoS rules do not flag it.
+  const folder = normalizeFolderPath(folderRelPath)
+  if (!folder) return false
+  const parent = parentFolderOf(relativeEntryPath)
+  return parent === folder || parent.endsWith(`/${folder}`)
+}
+
+/** Return the parent folder path of a vault-relative entry path (the path
+ * with its last segment removed). `"a/b/Note.md"` -> `"a/b"`, `"Note.md"` -> `""`. */
+function parentFolderOf(relativePath: string): string {
+  const normalized = normalizeFolderPath(relativePath)
+  const idx = normalized.lastIndexOf('/')
+  return idx < 0 ? '' : normalized.slice(0, idx)
 }
 
 function filterRootEntries(entries: VaultEntry[], rootPath: string | undefined, subFilter?: NoteListFilter): VaultEntry[] {
@@ -509,10 +530,10 @@ function filterRootEntries(entries: VaultEntry[], rootPath: string | undefined, 
   return subFilter ? applySubFilter(rootEntries, subFilter) : rootEntries.filter(isActive)
 }
 
-function filterFolderEntries(entries: VaultEntry[], selection: Extract<SidebarSelection, { kind: 'folder' }>, subFilter?: NoteListFilter): VaultEntry[] {
+function filterFolderEntries(entries: VaultEntry[], selection: Extract<SidebarSelection, { kind: 'folder' }>, subFilter?: NoteListFilter, recursive = false): VaultEntry[] {
   if (!selection.path) return filterRootEntries(entries, selection.rootPath, subFilter)
   // Folder view shows ALL files (text + binary), not just markdown
-  const folderEntries = entries.filter((entry) => isEntryInSelectedFolder(entry.path, selection.path, selection.rootPath))
+  const folderEntries = entries.filter((entry) => isEntryInSelectedFolder(entry.path, selection.path, selection.rootPath, recursive))
   return subFilter ? applySubFilter(folderEntries, subFilter) : folderEntries.filter(isActive)
 }
 
@@ -541,7 +562,7 @@ function filterByKind(
 ): VaultEntry[] {
   if (selection.kind === 'entity') return []
   if (selection.kind === 'view') return filterViewEntries(entries, selection, options.views)
-  if (selection.kind === 'folder') return filterFolderEntries(entries, selection, options.subFilter)
+  if (selection.kind === 'folder') return filterFolderEntries(entries, selection, options.subFilter, options.folderRecursive)
   if (selection.kind === 'sectionGroup') return filterSectionGroupEntries(entries, selection.type, options.subFilter)
   return filterTopLevelEntries(entries, selection, options)
 }

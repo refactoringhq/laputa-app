@@ -170,6 +170,7 @@ interface UseNoteListContentParams {
   views?: ViewFile[]
   visibleNotesRef?: React.MutableRefObject<VaultEntry[]>
   allNotesFileVisibility?: AllNotesFileVisibility
+  folderRecursive?: boolean
 }
 
 function useFilteredNoteListSearch({
@@ -223,6 +224,7 @@ function useNoteListContent({
   views,
   visibleNotesRef,
   allNotesFileVisibility,
+  folderRecursive,
 }: UseNoteListContentParams) {
   const dateDisplayFormat = useDateDisplayFormat()
   const subFilter = (selection.kind === 'sectionGroup' || selection.kind === 'folder')
@@ -285,6 +287,7 @@ function useNoteListContent({
     inboxPeriod: effectiveInboxPeriod,
     views,
     allNotesFileVisibility,
+    folderRecursive,
   })
   const { isFullTextSearching, searched, searchedGroups } = useFilteredNoteListSearch({
     entries,
@@ -578,6 +581,8 @@ export interface NoteListProps {
   views?: ViewFile[]
   visibleNotesRef?: React.MutableRefObject<VaultEntry[]>
   allNotesFileVisibility?: AllNotesFileVisibility
+  folderRecursive?: boolean
+  onToggleFolderRecursive?: () => void
   locale?: AppLocale
 }
 
@@ -602,6 +607,8 @@ function buildNoteListLayoutModel(params: {
     renderItem: (entry: VaultEntry, options?: { forceSelected?: boolean }) => React.ReactNode
     entitySelection: EntitySelection | null
   }
+  folderRecursive: boolean
+  onToggleFolderRecursive?: () => void
 }) {
   return {
     title: resolveHeaderTitle(params.selection, params.content.typeDocument, params.views, params.locale),
@@ -651,6 +658,8 @@ function buildNoteListLayoutModel(params: {
     searched: params.content.searched,
     query: params.content.query,
     showFilterPills: params.selection.kind === 'sectionGroup' || params.selection.kind === 'folder',
+    folderRecursive: params.folderRecursive,
+    onToggleFolderRecursive: params.onToggleFolderRecursive,
     noteListFilter: params.noteListFilter,
     filterCounts: params.filterCounts,
     onNoteListFilterChange: params.onNoteListFilterChange,
@@ -710,6 +719,8 @@ export function useNoteListModel({
   views,
   visibleNotesRef,
   allNotesFileVisibility,
+  folderRecursive = false,
+  onToggleFolderRecursive,
   locale = 'en',
 }: NoteListProps) {
   const selectedNotePath = selectedNote?.path ?? null
@@ -736,6 +747,7 @@ export function useNoteListModel({
     views,
     visibleNotesRef,
     allNotesFileVisibility,
+    folderRecursive,
   })
   const interaction = useNoteListInteractionState({
     searched: content.searched,
@@ -834,5 +846,7 @@ export function useNoteListModel({
         ? { ...selection, entry: content.entityEntry ?? selection.entry }
         : null,
     },
+    folderRecursive,
+    onToggleFolderRecursive,
   })
 }

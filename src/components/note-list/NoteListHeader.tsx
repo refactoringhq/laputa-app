@@ -1,4 +1,4 @@
-import { CircleNotch as Loader2, MagnifyingGlass, Plus, SidebarSimple, X } from '@phosphor-icons/react'
+import { BoundingBox, CircleNotch as Loader2, MagnifyingGlass, Plus, SidebarSimple, SquaresFour, X } from '@phosphor-icons/react'
 import type { VaultEntry } from '../../types'
 import type { SortOption, SortDirection } from '../../utils/noteListHelpers'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
@@ -57,6 +57,8 @@ interface NoteListHeaderProps {
   onSearchChange: (value: string) => void
   onSearchKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void
   onGitRepositoryChange?: (path: string) => void
+  folderRecursive?: boolean
+  onToggleFolderRecursive?: () => void
 }
 
 function dispatchExpandSidebarFromHeader() {
@@ -170,6 +172,8 @@ function HeaderActions({
   onSortChange,
   onCreateNote,
   onToggleSearch,
+  folderRecursive = false,
+  onToggleFolderRecursive,
 }: Pick<
   NoteListHeaderProps,
   | 'isEntityView'
@@ -181,11 +185,27 @@ function HeaderActions({
   | 'onSortChange'
   | 'onCreateNote'
   | 'onToggleSearch'
+  | 'folderRecursive'
+  | 'onToggleFolderRecursive'
 > & {
   locale: AppLocale
 }) {
   return (
     <div className="ml-3 flex shrink-0 items-center justify-end gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      {onToggleFolderRecursive && !isEntityView && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className={NOTE_LIST_ACTION_BUTTON_CLASSNAME}
+          onClick={onToggleFolderRecursive}
+          title={folderRecursive ? 'Show only direct children' : 'Show all files in subfolders'}
+          aria-label={folderRecursive ? 'Show only direct children' : 'Show all files in subfolders'}
+          aria-pressed={folderRecursive}
+        >
+          {folderRecursive ? <SquaresFour size={16} /> : <BoundingBox size={16} />}
+        </Button>
+      )}
       {!isEntityView && <SortDropdown groupLabel="__list__" current={listSort} direction={listDirection} customProperties={customProperties} locale={locale} onChange={onSortChange} />}
       <Button type="button" variant="ghost" size="icon-xs" className={NOTE_LIST_ACTION_BUTTON_CLASSNAME} onClick={onToggleSearch} title={translate(locale, 'noteList.searchAction')} aria-label={translate(locale, 'noteList.searchAction')}>
         <MagnifyingGlass size={16} />
@@ -299,6 +319,8 @@ export function NoteListHeader({
   onSearchChange,
   onSearchKeyDown,
   onGitRepositoryChange,
+  folderRecursive = false,
+  onToggleFolderRecursive,
 }: NoteListHeaderProps) {
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const collapsedSidebarPadding = sidebarCollapsed && isMac()
@@ -325,6 +347,8 @@ export function NoteListHeader({
           onSortChange={onSortChange}
           onCreateNote={onCreateNote}
           onToggleSearch={onToggleSearch}
+          folderRecursive={folderRecursive}
+          onToggleFolderRecursive={onToggleFolderRecursive}
         />
       </div>
       <RepositorySelectorRow

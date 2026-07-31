@@ -138,6 +138,7 @@ export interface Settings {
   date_display_format?: DateDisplayFormat | null
   note_width_mode?: NoteWidthMode | null
   sidebar_type_pluralization_enabled?: boolean | null
+  note_list_folder_recursive?: boolean | null
   initial_h1_auto_rename_enabled?: boolean | null
   ai_features_enabled?: boolean | null
   default_ai_agent?: AiAgentId | null

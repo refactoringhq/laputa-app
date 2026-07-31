@@ -278,6 +278,8 @@ function NoteListLayoutHeader({
   toggleSearch,
   setSearch,
   handleSearchKeyDown,
+  folderRecursive,
+  onToggleFolderRecursive,
 }: Pick<
   NoteListLayoutProps,
   | 'title'
@@ -303,6 +305,8 @@ function NoteListLayoutHeader({
   | 'toggleSearch'
   | 'setSearch'
   | 'handleSearchKeyDown'
+  | 'folderRecursive'
+  | 'onToggleFolderRecursive'
 >) {
   return (
     <NoteListHeader
@@ -329,6 +333,8 @@ function NoteListLayoutHeader({
       onToggleSearch={toggleSearch}
       onSearchChange={setSearch}
       onSearchKeyDown={handleSearchKeyDown}
+      folderRecursive={folderRecursive}
+      onToggleFolderRecursive={onToggleFolderRecursive}
     />
   )
 }
