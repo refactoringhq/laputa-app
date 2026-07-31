@@ -74,6 +74,11 @@ interface SerializeContext {
   numberedStack: number[]
 }
 
+type SerializedBlockListItem =
+  | { kind: 'blankParagraph' }
+  | { kind: 'empty' }
+  | { kind: 'markdown'; markdown: string }
+
 const ESCAPE_INLINE_TEXT_RE = /([\\`*_])/g
 const IMAGE_MARKER_BANG_RE = /!(?=\[)/g
 const LEADING_ATX_HEADING_RE = /^([ \t]{0,3})(#{1,6})(?=\s|$)/gm
@@ -102,6 +107,16 @@ function blockObject(value: unknown): BlockLike | null {
 
 function contentArray(content: unknown): InlineItem[] {
   return Array.isArray(content) ? content as InlineItem[] : []
+}
+
+function blockChildren(block: BlockLike): BlockLike[] {
+  return Array.isArray(block.children) ? block.children : []
+}
+
+function isEmptyParagraphBlock(block: BlockLike): boolean {
+  return block.type === 'paragraph'
+    && contentArray(block.content).length === 0
+    && blockChildren(block).length === 0
 }
 
 function tableContent(content: unknown): TableContentLike | null {
@@ -304,7 +319,7 @@ function blockMarkdownWithoutChildren(block: BlockLike, context: SerializeContex
 }
 
 function serializeChildren(block: BlockLike, depth: number, context: SerializeContext): string {
-  const children = Array.isArray(block.children) ? block.children : []
+  const children = blockChildren(block)
   if (children.length === 0) return ''
   const childDepth = depth + 1
   context.numberedStack.splice(childDepth, 1, 1)
@@ -367,8 +382,34 @@ function serializeBlock(block: BlockLike, depth: number, context: SerializeConte
   return markdown
 }
 
+function serializeBlockListItem(
+  block: BlockLike,
+  depth: number,
+  context: SerializeContext,
+): SerializedBlockListItem | null {
+  const markdown = serializeBlock(block, depth, context)
+  if (markdown === null) return null
+  if (markdown) return { kind: 'markdown', markdown }
+  return depth === 0 && isEmptyParagraphBlock(block)
+    ? { kind: 'blankParagraph' }
+    : { kind: 'empty' }
+}
+
+function appendMarkdownChunk(
+  chunks: string[],
+  markdown: string,
+  pendingBlankParagraphs: number,
+): void {
+  const separator = chunks.length === 0
+    ? ''
+    : `\n\n${'\n'.repeat(pendingBlankParagraphs)}`
+  chunks.push(`${separator}${markdown}`)
+}
+
 function serializeBlockList(blocks: BlockLike[], depth: number, context: SerializeContext): string {
   const chunks: string[] = []
+  let pendingBlankParagraphs = 0
+
   for (const value of blocks) {
     const block = blockObject(value)
     if (!block) {
@@ -376,11 +417,21 @@ function serializeBlockList(blocks: BlockLike[], depth: number, context: Seriali
       return ''
     }
 
-    const markdown = serializeBlock(block, depth, context)
-    if (markdown === null) return ''
-    if (markdown) chunks.push(markdown)
+    const item = serializeBlockListItem(block, depth, context)
+    if (item === null) return ''
+    if (item.kind === 'blankParagraph') {
+      pendingBlankParagraphs++
+      continue
+    }
+    if (item.kind === 'empty') {
+      continue
+    }
+
+    appendMarkdownChunk(chunks, item.markdown, pendingBlankParagraphs)
+    pendingBlankParagraphs = 0
   }
-  return chunks.join('\n\n')
+
+  return chunks.join('')
 }
 
 export function blocksToMarkdownDirect(

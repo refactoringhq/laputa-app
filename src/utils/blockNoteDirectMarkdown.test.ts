@@ -117,6 +117,28 @@ describe('BlockNote direct Markdown serialization', () => {
     }]).markdown).toBe('![](attachments/photo2.png)')
   })
 
+  it('serializes empty paragraph blocks as intentional vertical spacing', () => {
+    const blocks = [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'First paragraph.', styles: {} }],
+        children: [],
+      },
+      {
+        type: 'paragraph',
+        content: [],
+        children: [],
+      },
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'Second paragraph.', styles: {} }],
+        children: [],
+      },
+    ]
+
+    expect(blocksToMarkdownDirect(blocks).markdown).toBe('First paragraph.\n\n\nSecond paragraph.')
+  })
+
   it('falls back to BlockNote legacy Markdown for unsupported block types', () => {
     const editor = makeEditor([{ type: 'unsupportedWidget', children: [] }])
     installBlockNoteDirectMarkdown(editor)
