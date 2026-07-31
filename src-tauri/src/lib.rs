@@ -213,6 +213,21 @@ fn setup_macos_webview_shortcut_prevention(
     Ok(())
 }
 
+#[cfg(desktop)]
+fn optional_mcp_runtime_resource_dir<E: std::fmt::Display>(
+    resource_dir: Result<std::path::PathBuf, E>,
+) -> Option<std::path::PathBuf> {
+    match resource_dir {
+        Ok(path) => Some(path),
+        Err(error) => {
+            log::warn!(
+                "Tauri resource directory unavailable; continuing with MCP fallback paths: {error}"
+            );
+            None
+        }
+    }
+}
+
 fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     setup_common_plugins(app)?;
 
@@ -220,7 +235,9 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     {
         use tauri::Manager;
 
-        mcp::set_runtime_resource_dir(app.path().resource_dir()?);
+        if let Some(resource_dir) = optional_mcp_runtime_resource_dir(app.path().resource_dir()) {
+            mcp::set_runtime_resource_dir(resource_dir);
+        }
         setup_desktop_plugins(app)?;
         app_icon::update_app_icon_for_theme(app.handle(), "light")?;
     }

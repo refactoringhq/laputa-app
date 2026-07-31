@@ -1,3 +1,5 @@
+#[cfg(desktop)]
+use super::optional_mcp_runtime_resource_dir;
 use super::should_use_native_desktop_menu;
 use super::MACOS_WEBVIEW_RESERVED_COMMAND_KEYS;
 use super::MACOS_WEBVIEW_RESERVED_COMMAND_SHIFT_KEYS;
@@ -18,6 +20,25 @@ use std::path::PathBuf;
 fn macos_webview_shortcut_prevention_includes_ai_panel_shortcut() {
     assert_eq!(MACOS_WEBVIEW_RESERVED_COMMAND_KEYS, ["O", "F"]);
     assert_eq!(MACOS_WEBVIEW_RESERVED_COMMAND_SHIFT_KEYS, ["L"]);
+}
+
+#[cfg(desktop)]
+#[test]
+fn mcp_runtime_resource_dir_is_optional_in_dev() {
+    let unavailable: Result<PathBuf, &str> = Err("unknown path");
+
+    assert_eq!(optional_mcp_runtime_resource_dir(unavailable), None);
+}
+
+#[cfg(desktop)]
+#[test]
+fn mcp_runtime_resource_dir_keeps_available_path() {
+    let resource_dir = PathBuf::from("/Applications/Tolaria.app/Contents/Resources");
+
+    assert_eq!(
+        optional_mcp_runtime_resource_dir(Ok::<PathBuf, &str>(resource_dir.clone())),
+        Some(resource_dir)
+    );
 }
 
 #[cfg(desktop)]
