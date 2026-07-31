@@ -135,6 +135,7 @@ interface MockSheetModel {
   setColumnsWidth(): void
   setFrozenColumnsCount(sheet: SheetIndex, count: ColumnIndex): void
   setFrozenRowsCount(sheet: SheetIndex, count: RowIndex): void
+  setSelectedCell(row: RowIndex, column: ColumnIndex): void
   setRowsHeight(): void
   setSelectedSheet(): void
   setTopLeftVisibleCell(topRow: RowIndex, leftColumn: ColumnIndex): void
@@ -363,6 +364,15 @@ const ironCalcMock = vi.hoisted(() => {
       return state.selectedView
     }
 
+    setSelectedCell(row: RowIndex, column: ColumnIndex): void {
+      state.selectedView = {
+        ...state.selectedView,
+        column,
+        range: [row, column, row, column],
+        row,
+      }
+    }
+
     setTopLeftVisibleCell(topRow: RowIndex, leftColumn: ColumnIndex): void {
       state.selectedView = {
         ...state.selectedView,
@@ -440,7 +450,15 @@ function focusMockWorkbookOnRender(node: HTMLDivElement | null): void {
   if (node && ironCalcMock.state.focusBeforeGuardOnRender) node.focus()
 }
 
+function isMockWorkbookEdgeNavigationPlaceholder(event: ReactKeyboardEvent<HTMLDivElement>): boolean {
+  if (!event.metaKey && !event.ctrlKey) return false
+  return event.key.startsWith('Arrow')
+}
+
 function handleMockWorkbookKeyDown(event: ReactKeyboardEvent<HTMLDivElement>): void {
+  if (isMockWorkbookEdgeNavigationPlaceholder(event)) {
+    throw new Error('Function not implemented.')
+  }
   if (event.key === 'F2') ironCalcMock.state.editStarts += 1
   if (event.key === 'Enter') ironCalcMock.state.downMoves += 1
 }

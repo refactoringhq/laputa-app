@@ -5,6 +5,10 @@ import {
   dirtyRowsForSelectedRange,
 } from '../../utils/sheetSelection'
 import type { SheetContextMenuState } from '../../utils/sheetContextMenuState'
+import {
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
+} from '../../utils/sheetWorkbook'
 import type { ScheduleSheetSerializeOptions, SheetWorkbookState } from './sheetEditorTypes'
 import {
   focusWorkbookRoot,
@@ -47,6 +51,8 @@ function isSaveShortcut(event: ReactKeyboardEvent<HTMLDivElement>) {
 }
 
 const PASSIVE_WORKBOOK_NAVIGATION_KEYS = new Set(['ArrowDown', 'ArrowUp'])
+const SHEET_EDGE_NAVIGATION_KEYS = ['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp'] as const
+type SheetEdgeNavigationKey = typeof SHEET_EDGE_NAVIGATION_KEYS[number]
 const EDITABLE_NAVIGATION_COMMIT_KEYS = new Set([
   'ArrowDown',
   'ArrowLeft',
@@ -155,6 +161,84 @@ function commitEditableFormulaInput(
   event.stopPropagation()
   dismissFormulaAutocomplete(options)
   window.setTimeout(() => restoreCommittedCellFocus(sheetElement, options.sheetKeyboardCapturedRef), 0)
+  return true
+}
+
+function sheetEdgeNavigationKey(event: ReactKeyboardEvent<HTMLDivElement>): SheetEdgeNavigationKey | null {
+  if (!event.metaKey && !event.ctrlKey) return null
+  return SHEET_EDGE_NAVIGATION_KEYS.includes(event.key as SheetEdgeNavigationKey)
+    ? event.key as SheetEdgeNavigationKey
+    : null
+}
+
+function edgeNavigationTarget(
+  key: SheetEdgeNavigationKey,
+  view: ReturnType<SheetWorkbookState['model']['getSelectedView']>,
+) {
+  switch (key) {
+    case 'ArrowDown':
+      return {
+        column: view.column,
+        leftColumn: view.left_column,
+        row: MAX_SHEET_ROWS,
+        topRow: MAX_SHEET_ROWS,
+      }
+    case 'ArrowLeft':
+      return { column: 1, leftColumn: 1, row: view.row, topRow: view.top_row }
+    case 'ArrowRight':
+      return {
+        column: MAX_SHEET_COLUMNS,
+        leftColumn: MAX_SHEET_COLUMNS,
+        row: view.row,
+        topRow: view.top_row,
+      }
+    case 'ArrowUp':
+      return { column: view.column, leftColumn: view.left_column, row: 1, topRow: 1 }
+  }
+}
+
+function updateSheetEdgeSelection(
+  current: SheetWorkbookState,
+  key: SheetEdgeNavigationKey,
+  options: Pick<UseSheetKeyboardHandlersOptions,
+    | 'refreshWorkbook'
+    | 'scheduleSelectionChromePatch'
+  >,
+) {
+  const target = edgeNavigationTarget(key, current.model.getSelectedView())
+  current.model.setSelectedCell(target.row, target.column)
+  current.model.setTopLeftVisibleCell(target.topRow, target.leftColumn)
+  options.refreshWorkbook()
+  options.scheduleSelectionChromePatch()
+}
+
+function handleSheetEdgeNavigation(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  sheetElement: HTMLDivElement | null,
+  options: Pick<UseSheetKeyboardHandlersOptions,
+    | 'captureSheetKeyboard'
+    | 'refreshWorkbook'
+    | 'scheduleSelectionChromePatch'
+    | 'setFormulaAutocomplete'
+    | 'setSheetContextMenu'
+    | 'setWikilinkAutocomplete'
+    | 'workbookRef'
+  >,
+) {
+  const key = sheetEdgeNavigationKey(event)
+  if (!key) return false
+  if (!isSheetCellKeyboardTarget(sheetElement, event.target)) return false
+
+  event.preventDefault()
+  event.stopPropagation()
+  event.nativeEvent.stopImmediatePropagation()
+  options.captureSheetKeyboard()
+  options.setFormulaAutocomplete(null)
+  options.setSheetContextMenu(null)
+  options.setWikilinkAutocomplete(null)
+
+  const current = options.workbookRef.current
+  if (current) updateSheetEdgeSelection(current, key, options)
   return true
 }
 
@@ -315,6 +399,7 @@ function handleWorkbookCommandKeyDown(
   options: UseSheetKeyboardHandlersOptions,
 ): boolean {
   if (isSaveShortcut(event)) saveWorkbookNow(options)
+  if (handleSheetEdgeNavigation(event, sheetElement, options)) return true
   if (redirectPassiveWorkbookNavigation(event, sheetElement, options)) return true
   if (commitEditableFormulaInput(event, sheetElement, options)) return true
   return false
