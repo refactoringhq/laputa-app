@@ -12,7 +12,7 @@ import { injectMarkdownHighlightsInBlocks } from './markdownHighlightMarkdown'
 import { injectMathInBlocks, preProcessMathMarkdown } from './mathMarkdown'
 import { preProcessSingleTildeStrikethrough } from './markdownStrikethrough'
 import { normalizeBareImageUrls, portableImageUrls, resolveImageUrls } from './vaultImages'
-import { injectWikilinks, preProcessWikilinks, restoreWikilinksInBlocks, splitFrontmatter } from './wikilinks'
+import { injectWikilinks, preProcessWikilinks, splitFrontmatter } from './wikilinks'
 import type {
   BlockNoteDirectMarkdownMetrics,
   DirectMarkdownCapableSerializer,
@@ -121,8 +121,7 @@ function serializeRichEditorBodyToMarkdownWithTrace(
   const directEditor = editor as DirectMarkdownCapableSerializer
   delete directEditor.__tolariaLastDirectMarkdownMetrics
   const document = blocks
-  const restored = restoreWikilinksInBlocks(document)
-  const body = compactMarkdown(serializeDurableEditorBlocks(editor, restored, vaultPath))
+  const body = compactMarkdown(serializeDurableEditorBlocks(editor, document, vaultPath))
   const metrics = readDirectMarkdownMetrics(directEditor)
   logRichEditorSerializationTrace({
     blockCount: metrics?.blockCount ?? document.length,

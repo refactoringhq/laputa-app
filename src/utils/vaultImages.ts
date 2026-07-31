@@ -279,10 +279,6 @@ function rewriteWikilinkImageEmbeds(
   })
 }
 
-function hasUrlScheme(request: UrlOnlyRequest): boolean {
-  return URL_SCHEME_PATTERN.test(request.url)
-}
-
 function isFilesystemAbsolutePath(request: PathOnlyRequest): boolean {
   return request.path.startsWith('/')
     || WINDOWS_DRIVE_PATH_PATTERN.test(request.path)
@@ -325,7 +321,7 @@ function pathSegments(request: PathOnlyRequest): string[] {
   return normalized.split('/')
 }
 
-function popPathSegment(segments: string[]): void {
+const popPathSegment = (segments: string[]): void => {
   const last = segments.at(-1)
   if (!last || last === '' || /^[A-Za-z]:$/.test(last)) return
   if (last === '.') {
@@ -346,20 +342,6 @@ function appendRelativeSegment(segments: string[], segment: string): void {
     return
   }
   segments.push(segment)
-}
-
-function joinNoteRelativePath(request: NoteRelativePathRequest): AbsolutePath {
-  const { notePath, relativeUrl } = request
-  const noteDir = noteDirectoryPath({ notePath })
-  const segments = pathSegments({ path: noteDir })
-  const useBackslash = usesWindowsSeparators({ path: noteDir })
-
-  for (const segment of decodePathUrl({ url: relativeUrl }).replace(/\\/g, '/').split('/')) {
-    appendRelativeSegment(segments, segment)
-  }
-
-  const joined = segments.join('/') || '.'
-  return useBackslash ? joined.replace(/\//g, '\\') : joined
 }
 
 function samePathSegment(request: PathSegmentComparisonRequest): boolean {
@@ -507,8 +489,8 @@ function portableFallbackFilesystemPath(request: UrlOnlyRequest): MarkdownImageU
 
 function portableImageUrl(request: ImageUrlRequest): MarkdownImageUrl | null {
   if (!isTauriAssetUrl({ url: request.url })) return null
-  return portableCurrentVaultImagePath(request)
-    ?? portableCurrentAttachmentPath(request)
+  return portableCurrentAttachmentPath(request)
+    ?? portableCurrentVaultImagePath(request)
     ?? portableFallbackFilesystemPath({ url: request.url })
 }
 
@@ -520,4 +502,22 @@ export function portableImageUrls(
   if (!vaultPath) return markdown
 
   return rewriteMarkdownImages(markdown, url => portableImageUrl({ url, vaultPath, notePath }))
+}
+
+function hasUrlScheme(request: UrlOnlyRequest): boolean {
+  return URL_SCHEME_PATTERN.test(request.url)
+}
+
+function joinNoteRelativePath(request: NoteRelativePathRequest): AbsolutePath {
+  const { notePath, relativeUrl } = request
+  const noteDir = noteDirectoryPath({ notePath })
+  const segments = pathSegments({ path: noteDir })
+  const useBackslash = usesWindowsSeparators({ path: noteDir })
+
+  for (const segment of decodePathUrl({ url: relativeUrl }).replace(/\\/g, '/').split('/')) {
+    appendRelativeSegment(segments, segment)
+  }
+
+  const joined = segments.join('/') || '.'
+  return useBackslash ? joined.replace(/\//g, '\\') : joined
 }
