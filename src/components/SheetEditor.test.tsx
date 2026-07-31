@@ -669,7 +669,8 @@ describe('SheetEditor', () => {
       />,
     )
 
-    const editor = await screen.findByTestId('sheet-editor')
+    await screen.findByTestId('ironcalc-workbook')
+    const editor = screen.getByTestId('sheet-editor')
     fireEvent.contextMenu(editor, { clientX: 32, clientY: 48 })
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Percentage' }))
 
@@ -827,7 +828,8 @@ describe('SheetEditor', () => {
       </div>,
     )
 
-    const editor = await screen.findByTestId('sheet-editor')
+    await screen.findByTestId('ironcalc-workbook')
+    const editor = screen.getByTestId('sheet-editor')
     const panelInput = screen.getByLabelText('Panel input')
     act(() => {
       fireEvent.pointerDown(editor)
@@ -895,9 +897,9 @@ describe('SheetEditor', () => {
         </div>,
       )
 
-      const noteListFocus = screen.getByLabelText('Note list focus')
-      const editor = await screen.findByTestId('sheet-editor')
       const workbookRoot = await screen.findByTestId('ironcalc-workbook')
+      const noteListFocus = screen.getByLabelText('Note list focus')
+      const editor = screen.getByTestId('sheet-editor')
 
       act(() => {
         noteListFocus.focus()
@@ -1201,7 +1203,8 @@ describe('SheetEditor', () => {
       />,
     )
 
-    const editor = await screen.findByTestId('sheet-editor')
+    await screen.findByTestId('ironcalc-workbook')
+    const editor = screen.getByTestId('sheet-editor')
     const rendersBeforeZoom = ironCalcMock.state.workbookRenders
     const originalGetComputedStyle = window.getComputedStyle.bind(window)
     const getComputedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudoElement) => {

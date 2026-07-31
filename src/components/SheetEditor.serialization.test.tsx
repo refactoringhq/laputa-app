@@ -112,6 +112,26 @@ describe('SheetEditor serialization', () => {
     expect(ironCalcInitMock).toHaveBeenCalledTimes(2)
   })
 
+  it('contains IronCalc wasm bridge render crashes inside the sheet fallback', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    ironCalcMock.state.workbookRenderError = new TypeError(
+      "undefined is not an object (evaluating 'B.__wbindgen_add_to_stack_pointer')",
+    )
+
+    try {
+      renderSheetHarness('---\n_display: sheet\n---\nMetric,January')
+
+      await screen.findByText(
+        "IronCalc workbook unavailable: undefined is not an object (evaluating 'B.__wbindgen_add_to_stack_pointer')",
+      )
+      expect(screen.queryByTestId('ironcalc-workbook')).not.toBeInTheDocument()
+    } finally {
+      consoleError.mockRestore()
+      consoleWarn.mockRestore()
+    }
+  })
+
   it('flushes the current workbook content when unmounted before debounce runs', async () => {
     await expectSaveAfterDirtyEdit({
       content: '---\ntype: Sheet\n---\nMetric,January',

@@ -180,7 +180,7 @@ export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
     htmlBlockPreview(Reflect.get(resolvedMarkup, 'html'), { scripts: currentScripts })
   ), [currentScripts, resolvedMarkup])
   const sanitizedMarkup = Reflect.get(preview, 'sanitizedHtml') as string
-  const { srcDoc } = preview
+  const { src, srcDoc } = preview
   const [resizingHeight, setResizingHeight] = useState<string | null>(null)
   const displayHeight = resizingHeight ?? currentHeight
   const blockedMarkup = currentMarkup.trim().length > 0 && sanitizedMarkup.trim().length === 0
@@ -335,7 +335,8 @@ export function HtmlBlock({ block, editor }: HtmlBlockViewProps) {
           referrerPolicy="no-referrer"
           ref={frameRef}
           sandbox={htmlBlockSandboxAttribute(currentScripts)}
-          srcDoc={srcDoc}
+          src={src}
+          srcDoc={src ? undefined : srcDoc}
           tabIndex={-1}
           title={t('editor.htmlBlock.previewTitle')}
         />

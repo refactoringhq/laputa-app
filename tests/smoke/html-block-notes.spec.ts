@@ -158,3 +158,25 @@ test('slash command inserts a sandboxed HTML block whose source is edited in raw
   expect(raw).toContain('```html height="344"')
   expect(raw).toContain('<button>Static button</button>')
 })
+
+test('sandboxed HTML block runs its documented inline script in an isolated document', async ({ page }) => {
+  await openNote(page, 'Note B')
+  await openRawMode(page)
+
+  const fencedHtml = [
+    '```html height="150" scripts="sandboxed"',
+    '<div id="status">loading</div>',
+    '<script>document.getElementById("status").textContent = "script running"</script>',
+    '```',
+  ].join('\n')
+  await setRawEditorContent(page, withHtmlBlockSource(await getRawEditorContent(page), fencedHtml))
+  await page.waitForTimeout(600)
+  await openBlockNoteMode(page)
+
+  const frame = page.locator('.html-block__frame')
+  await expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox')
+  await expect(frame).not.toHaveAttribute('sandbox', /allow-same-origin/u)
+  await expect(frame).not.toHaveAttribute('srcdoc')
+  await expect(frame).toHaveAttribute('src', /^data:text\/html;charset=utf-8,/u)
+  await expect(page.frameLocator('.html-block__frame').locator('#status')).toHaveText('script running')
+})
