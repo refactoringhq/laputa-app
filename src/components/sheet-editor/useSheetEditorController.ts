@@ -299,6 +299,7 @@ function useSheetEditorKeyboardInputRuntime({
   handleFormulaKeyDown,
   handleWikilinkKeyDown,
   refreshWorkbook,
+  releaseSheetTextInputTarget,
   releaseSheetKeyboard,
   restoreSheetKeyboardFocus,
   scheduleSelectionChromePatch,
@@ -309,10 +310,16 @@ function useSheetEditorKeyboardInputRuntime({
   setWikilinkAutocomplete,
   sheetElementRef,
   sheetKeyboardCapturedRef,
+  trackSheetTextInputEdit,
   updateSheetInlineAutocompletes,
   workbookRef,
 }: Pick<SheetEditorAutocompleteRuntime, 'handleFormulaKeyDown' | 'handleWikilinkKeyDown' | 'updateSheetInlineAutocompletes'> &
-  Pick<SheetEditorCommitRuntime, 'commitExternalFormulaEditorInput' | 'commitSheetTextInput'> &
+  Pick<SheetEditorCommitRuntime,
+    | 'commitExternalFormulaEditorInput'
+    | 'commitSheetTextInput'
+    | 'releaseSheetTextInputTarget'
+    | 'trackSheetTextInputEdit'
+  > &
   Pick<SheetEditorKeyboardRuntime, 'captureSheetKeyboard' | 'releaseSheetKeyboard' | 'restoreSheetKeyboardFocus' | 'sheetKeyboardCapturedRef'> &
   Pick<SheetEditorWorkbookRuntime,
     | 'cancelScheduledSerialize'
@@ -351,11 +358,13 @@ function useSheetEditorKeyboardInputRuntime({
   const inputHandlers = useSheetInputActivityHandlers({
     commitExternalFormulaEditorInput,
     commitSheetTextInput,
+    releaseSheetTextInputTarget,
     scheduleSelectionChromePatch,
     scheduleSerialize,
     setFormulaAutocomplete,
     setWikilinkAutocomplete,
     sheetElementRef,
+    trackSheetTextInputEdit,
     updateSheetInlineAutocompletes,
     workbookRef,
   })

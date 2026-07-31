@@ -47,6 +47,15 @@ function isSaveShortcut(event: ReactKeyboardEvent<HTMLDivElement>) {
 }
 
 const PASSIVE_WORKBOOK_NAVIGATION_KEYS = new Set(['ArrowDown', 'ArrowUp'])
+const EDITABLE_NAVIGATION_COMMIT_KEYS = new Set([
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'Enter',
+  'Return',
+  'Tab',
+])
 
 function saveWorkbookNow({
   cancelScheduledSerialize,
@@ -61,6 +70,17 @@ function shouldCommitEditableFormulaInput(
   editableInput: HTMLInputElement | HTMLTextAreaElement | null,
 ) {
   return Boolean(editableInput) && (isPlainEnterKey(event) || event.key === 'Tab')
+}
+
+function shouldCommitEditableTextInput(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  editableInput: HTMLInputElement | HTMLTextAreaElement | null,
+) {
+  return Boolean(editableInput)
+    && EDITABLE_NAVIGATION_COMMIT_KEYS.has(event.key)
+    && !event.metaKey
+    && !event.ctrlKey
+    && !event.altKey
 }
 
 function dismissFormulaAutocomplete({
@@ -135,6 +155,22 @@ function commitEditableFormulaInput(
   event.stopPropagation()
   dismissFormulaAutocomplete(options)
   window.setTimeout(() => restoreCommittedCellFocus(sheetElement, options.sheetKeyboardCapturedRef), 0)
+  return true
+}
+
+function commitEditableTextInput(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  options: Pick<UseSheetKeyboardHandlersOptions,
+    | 'commitSheetTextInput'
+    | 'setFormulaAutocomplete'
+    | 'setWikilinkAutocomplete'
+  >,
+) {
+  const editableInput = formulaInputFromTarget(event.target)
+  if (!shouldCommitEditableTextInput(event, editableInput)) return false
+  if (!options.commitSheetTextInput(editableInput)) return false
+
+  dismissFormulaAutocomplete(options)
   return true
 }
 
@@ -273,25 +309,48 @@ function stopWorkbookKeyPropagation(
   stopSpreadsheetKeyPropagation(event)
 }
 
+function handleWorkbookCommandKeyDown(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  sheetElement: HTMLDivElement | null,
+  options: UseSheetKeyboardHandlersOptions,
+): boolean {
+  if (isSaveShortcut(event)) saveWorkbookNow(options)
+  if (redirectPassiveWorkbookNavigation(event, sheetElement, options)) return true
+  if (commitEditableFormulaInput(event, sheetElement, options)) return true
+  return false
+}
+
+function handleAutocompleteKeyDown(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  options: UseSheetKeyboardHandlersOptions,
+): boolean {
+  options.handleWikilinkKeyDown(event)
+  if (event.defaultPrevented) return true
+
+  options.handleFormulaKeyDown(event)
+  return event.defaultPrevented
+}
+
+function handleWorkbookActionKeyDown(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  sheetElement: HTMLDivElement | null,
+  options: UseSheetKeyboardHandlersOptions,
+): void {
+  if (handleCapturedEscape(event, sheetElement, options)) return
+  if (clearSelectedCells(event, sheetElement, options)) return
+  startSelectedCellEdit(event, sheetElement, options)
+}
+
 function processKeyDownCapture(
   event: ReactKeyboardEvent<HTMLDivElement>,
   options: UseSheetKeyboardHandlersOptions,
 ) {
   const sheetElement = options.sheetElementRef.current
 
-  if (isSaveShortcut(event)) saveWorkbookNow(options)
-  if (redirectPassiveWorkbookNavigation(event, sheetElement, options)) return
-  if (commitEditableFormulaInput(event, sheetElement, options)) return
-
-  options.handleWikilinkKeyDown(event)
-  if (event.defaultPrevented) return
-
-  options.handleFormulaKeyDown(event)
-  if (event.defaultPrevented) return
-
-  if (handleCapturedEscape(event, sheetElement, options)) return
-  if (clearSelectedCells(event, sheetElement, options)) return
-  startSelectedCellEdit(event, sheetElement, options)
+  if (handleWorkbookCommandKeyDown(event, sheetElement, options)) return
+  if (handleAutocompleteKeyDown(event, options)) return
+  if (commitEditableTextInput(event, options)) return
+  handleWorkbookActionKeyDown(event, sheetElement, options)
 }
 
 function processSheetKeyDown(
