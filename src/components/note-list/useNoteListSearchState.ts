@@ -1,6 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-
-const NOTE_LIST_SEARCH_DEBOUNCE_MS = 180
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 
 function normalizeSearch(search: string): string {
   return search.trim().toLowerCase()
@@ -9,23 +7,20 @@ function normalizeSearch(search: string): string {
 export function useNoteListSearchState() {
   const [search, setSearch] = useState('')
   const [searchVisible, setSearchVisible] = useState(false)
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [isSearchPending, startSearchTransition] = useTransition()
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const normalizedSearch = normalizeSearch(search)
-  const query = useDeferredValue(debouncedQuery)
+  const query = normalizeSearch(search)
 
   const updateSearch = useCallback((value: string) => {
-    setSearch(value)
-    if (normalizeSearch(value).length === 0) setDebouncedQuery('')
-  }, [])
+    if (normalizeSearch(value).length === 0) {
+      setSearch('')
+      return
+    }
 
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setDebouncedQuery(normalizedSearch)
-    }, NOTE_LIST_SEARCH_DEBOUNCE_MS)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [normalizedSearch])
+    startSearchTransition(() => {
+      setSearch(value)
+    })
+  }, [startSearchTransition])
 
   useEffect(() => {
     if (!searchVisible) return
@@ -39,7 +34,6 @@ export function useNoteListSearchState() {
 
   const clearSearch = useCallback(() => {
     setSearch('')
-    setDebouncedQuery('')
   }, [])
 
   const openSearch = useCallback(() => {
@@ -58,12 +52,9 @@ export function useNoteListSearchState() {
     })
   }, [clearSearch])
 
-  const isSearching = normalizedSearch.length > 0
-    && (normalizedSearch !== debouncedQuery || debouncedQuery !== query)
-
   return {
     closeSearch,
-    isSearching,
+    isSearching: isSearchPending,
     openSearch,
     query,
     search,

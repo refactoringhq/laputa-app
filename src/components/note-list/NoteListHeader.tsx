@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleNotch as Loader2, MagnifyingGlass, Plus, SidebarSimple, X } from '@phosphor-icons/react'
 import type { VaultEntry } from '../../types'
 import type { SortOption, SortDirection } from '../../utils/noteListHelpers'
@@ -15,6 +16,7 @@ import { isMac, MACOS_TRAFFIC_LIGHT_SAFE_PADDING } from '../../utils/platform'
 
 const NOTE_LIST_ACTION_BUTTON_CLASSNAME = '!h-auto !w-auto !min-w-0 !rounded-none !p-0 !text-muted-foreground hover:!bg-transparent hover:!text-foreground focus-visible:!bg-transparent data-[state=open]:!bg-transparent data-[state=open]:!text-foreground [&_svg]:!size-4'
 const NOTE_LIST_EXPAND_BUTTON_CLASSNAME = '!h-6 !w-6 !min-w-0 !rounded !p-0 !text-muted-foreground hover:!bg-accent hover:!text-foreground focus-visible:!bg-accent [&_svg]:!size-4'
+const NOTE_LIST_SEARCH_DEBOUNCE_MS = 180
 const PROPERTY_TRIGGER_TITLE_KEYS: Record<string, TranslationKey> = {
   'Customize columns': 'noteList.properties.customizeColumns',
   'Customize All Notes columns': 'noteList.properties.customizeAllColumns',
@@ -206,7 +208,6 @@ function HeaderActions({
 }
 
 function SearchRow({
-  searchVisible,
   search,
   isSearching,
   searchInputRef,
@@ -215,7 +216,6 @@ function SearchRow({
   onSearchKeyDown,
 }: Pick<
   NoteListHeaderProps,
-  | 'searchVisible'
   | 'search'
   | 'isSearching'
   | 'searchInputRef'
@@ -225,16 +225,43 @@ function SearchRow({
 > & {
   locale: AppLocale
 }) {
-  if (!searchVisible) return null
+  const [draft, setDraft] = useState(search)
+  const debounceRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
 
-  const hasSearch = search.length > 0
+  const cancelDebounce = useCallback(() => {
+    if (debounceRef.current === null) return
+    window.clearTimeout(debounceRef.current)
+    debounceRef.current = null
+  }, [])
+
+  useEffect(() => cancelDebounce, [cancelDebounce])
+
+  const hasSearch = draft.length > 0
+  const isDebouncing = draft.trim().toLowerCase() !== search.trim().toLowerCase()
   const clearLabel = translate(locale, 'noteList.clearSearch')
 
   const handleClearSearch = () => {
+    cancelDebounce()
+    setDraft('')
     onSearchChange('')
     requestAnimationFrame(() => {
       searchInputRef.current?.focus()
     })
+  }
+
+  const handleSearchChange = (value: string) => {
+    setDraft(value)
+    cancelDebounce()
+
+    if (value.trim().length === 0) {
+      onSearchChange('')
+      return
+    }
+
+    debounceRef.current = window.setTimeout(() => {
+      debounceRef.current = null
+      onSearchChange(value)
+    }, NOTE_LIST_SEARCH_DEBOUNCE_MS)
   }
 
   return (
@@ -243,8 +270,8 @@ function SearchRow({
         <Input
           ref={searchInputRef}
           placeholder={translate(locale, 'noteList.searchPlaceholder')}
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
+          value={draft}
+          onChange={(event) => handleSearchChange(event.target.value)}
           onKeyDown={onSearchKeyDown}
           className="h-8 pr-16 text-[13px]"
         />
@@ -262,7 +289,7 @@ function SearchRow({
             <X size={12} />
           </Button>
         )}
-        {isSearching && (
+        {(isDebouncing || isSearching) && (
           <span
             className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted-foreground"
             data-testid="note-list-search-loading"
@@ -334,15 +361,16 @@ export function NoteListHeader({
         locale={locale}
         onGitRepositoryChange={onGitRepositoryChange}
       />
-      <SearchRow
-        searchVisible={searchVisible}
-        search={search}
-        isSearching={isSearching}
-        searchInputRef={searchInputRef}
-        locale={locale}
-        onSearchChange={onSearchChange}
-        onSearchKeyDown={onSearchKeyDown}
-      />
+      {searchVisible && (
+        <SearchRow
+          search={search}
+          isSearching={isSearching}
+          searchInputRef={searchInputRef}
+          locale={locale}
+          onSearchChange={onSearchChange}
+          onSearchKeyDown={onSearchKeyDown}
+        />
+      )}
     </>
   )
 }
