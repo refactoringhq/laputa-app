@@ -1,7 +1,7 @@
 const BLOCKNOTE_MISSING_ID_ERROR = "Block doesn't have id"
 const BLOCKNOTE_BLOCK_TYPE_MISMATCH_ERROR = 'Block type does not match'
 const BLOCKNOTE_EMPTY_FRAGMENT_INDEX_ERROR = /^Index \d+ out of range for <>$/
-const BLOCKNOTE_TABLE_ROW_INDEX_ERROR = /^Index \d+ out of range for <tableRow\(/
+const BLOCKNOTE_TABLE_INDEX_ERROR = /^Index \d+ out of range for <table(?:Row)?\(/
 const BLOCKNOTE_PARAGRAPH_INDEX_ERROR = /^Index \d+ out of range for <paragraph\(/
 const PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR = /^Position \d+ out of range$/
 const PROSEMIRROR_SELECTION_OUTSIDE_DOCUMENT_ERROR = 'Selection points outside of document'
@@ -145,7 +145,7 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
     surfaces: ['render', 'transform'],
   },
   {
-    matches: (error) => messageMatches(error, BLOCKNOTE_TABLE_ROW_INDEX_ERROR),
+    matches: (error) => messageMatches(error, BLOCKNOTE_TABLE_INDEX_ERROR),
     reason: 'table_row_index_out_of_range',
     repairsDocument: true,
     surfaces: ['render', 'transform'],

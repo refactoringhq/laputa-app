@@ -10,6 +10,19 @@ function transformError(message = 'Invalid transform') {
   return error
 }
 
+function nodeIndexMessage(nodeDescription: string, index = 1) {
+  const openNode = String.fromCharCode(60)
+  const closeNode = String.fromCharCode(62)
+
+  return `Index ${index} out of range for ${openNode}${nodeDescription}${closeNode}`
+}
+
+function tableRootIndexMessage() {
+  return nodeIndexMessage(
+    'table(tableRow(tableCell(tableParagraph), tableCell(tableParagraph("done")), tableCell(tableParagraph("@zhaoliu"))))',
+  )
+}
+
 describe('richEditorRecoveryClassifier', () => {
   function webkitNotFoundError(message = 'The object can not be found here.') {
     const error = new Error(message)
@@ -19,18 +32,22 @@ describe('richEditorRecoveryClassifier', () => {
 
   it('normalizes ProseMirror index failures across render and transform recovery', () => {
     const tableError = new RangeError(
-      'Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>',
+      nodeIndexMessage('tableRow(tableCell(tableParagraph("A")))'),
     )
-    const paragraphError = new Error('Index 1 out of range for <paragraph("/")>')
-    const emptyFragmentError = new RangeError('Index 0 out of range for <>')
+    const tableRootError = new RangeError(tableRootIndexMessage())
+    const paragraphError = new Error(nodeIndexMessage('paragraph("/")'))
+    const emptyFragmentError = new RangeError(nodeIndexMessage('', 0))
 
     expect(classifyRichEditorRecoveryError(tableError, 'render')).toBe('table_row_index_out_of_range')
     expect(classifyRichEditorRecoveryError(tableError, 'transform')).toBe('table_row_index_out_of_range')
+    expect(classifyRichEditorRecoveryError(tableRootError, 'render')).toBe('table_row_index_out_of_range')
+    expect(classifyRichEditorRecoveryError(tableRootError, 'transform')).toBe('table_row_index_out_of_range')
     expect(classifyRichEditorRecoveryError(paragraphError, 'render')).toBe('paragraph_index_out_of_range')
     expect(classifyRichEditorRecoveryError(paragraphError, 'transform')).toBe('paragraph_index_out_of_range')
     expect(classifyRichEditorRecoveryError(emptyFragmentError, 'render')).toBe('empty_fragment_index_out_of_range')
     expect(classifyRichEditorRecoveryError(emptyFragmentError, 'transform')).toBe('empty_fragment_index_out_of_range')
     expect(richEditorRecoveryErrorNeedsDocumentRepair(emptyFragmentError)).toBe(true)
+    expect(richEditorRecoveryErrorNeedsDocumentRepair(tableRootError)).toBe(true)
   })
 
   it('classifies stale ProseMirror document positions across recovery surfaces', () => {
