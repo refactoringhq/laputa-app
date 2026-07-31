@@ -599,13 +599,13 @@ describe('StatusBar', () => {
     expect(screen.queryByText('Claude Code missing')).not.toBeInTheDocument()
   })
 
-  it('stacks the footer into two rows once the narrow-width breakpoint is crossed', () => {
+  it('keeps both icon groups on one compact row at narrow widths', () => {
     setWindowWidth(900)
     renderDenseStatusBar()
 
     expect(screen.getByTestId('status-bar')).toHaveStyle({
-      flexWrap: 'wrap',
-      height: 'auto',
+      flexWrap: 'nowrap',
+      height: '30px',
     })
     expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
     expect(screen.getByTestId('status-pulse')).toBeInTheDocument()

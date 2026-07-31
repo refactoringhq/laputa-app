@@ -14,7 +14,6 @@ import type { VaultOption } from './status-bar/types'
 export type { VaultOption } from './status-bar/types'
 
 const COMPACT_STATUS_BAR_MAX_WIDTH = 1000
-const STACKED_STATUS_BAR_MAX_WIDTH = 900
 const STATUS_BAR_STACKING_Z_INDEX = 30
 
 function getWindowWidth() {
@@ -23,11 +22,10 @@ function getWindowWidth() {
 
 function getStatusBarLayout(windowWidth: number) {
   const compact = windowWidth <= COMPACT_STATUS_BAR_MAX_WIDTH
-  const stacked = windowWidth <= STACKED_STATUS_BAR_MAX_WIDTH
 
   return {
     compact,
-    stacked,
+    stacked: false,
   }
 }
 
