@@ -158,6 +158,30 @@ fn test_unquoted_wikilink_relationships_are_preserved() {
 }
 
 #[test]
+fn test_unquoted_flow_wikilink_arrays_are_preserved() {
+    let dir = TempDir::new().unwrap();
+    let entry = parse_test_entry(
+        &dir,
+        "brief.md",
+        "---\ntype: Note\nStakeholders: [[person/alice], [person/bob]]\nTopics: [[product/strategy]]\n---\n# Brief\n",
+    );
+
+    assert_eq!(
+        entry.relationships.get("Stakeholders"),
+        Some(&vec![
+            "[[person/alice]]".to_string(),
+            "[[person/bob]]".to_string(),
+        ])
+    );
+    assert_eq!(
+        entry.relationships.get("Topics"),
+        Some(&vec!["[[product/strategy]]".to_string()])
+    );
+    assert!(!entry.properties.contains_key("Stakeholders"));
+    assert!(!entry.properties.contains_key("Topics"));
+}
+
+#[test]
 fn test_alias_parser_recovers_special_alias_items() {
     let cases = [
         AliasRecoveryCase {
