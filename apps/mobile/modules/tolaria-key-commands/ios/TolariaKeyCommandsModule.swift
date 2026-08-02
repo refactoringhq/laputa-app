@@ -141,8 +141,16 @@ public class TolariaKeyCommandsModule: Module {
     runOnMain {
       guard !self.registered else { return }
 
+      // RCTKeyCommands is simulator-only: its implementation sits behind
+      // `#if RCT_DEV && (TARGET_OS_SIMULATOR || TARGET_OS_MACCATALYST)` and the
+      // fallback `sharedInstance` returns nil. Objective-C leaves that return
+      // unannotated, so Swift imports it implicitly unwrapped and calling
+      // through it traps the process — a physical iPad crashed at launch rather
+      // than simply going without native shortcuts.
+      guard let keyCommands = RCTKeyCommands.sharedInstance() else { return }
+
       for command in self.commands {
-        RCTKeyCommands.sharedInstance().registerKeyCommand(
+        keyCommands.registerKeyCommand(
           withInput: command.input,
           modifierFlags: command.modifierFlags
         ) { [weak self] _ in
@@ -162,8 +170,15 @@ public class TolariaKeyCommandsModule: Module {
     runOnMain {
       guard self.registered else { return }
 
+      // Unreachable while `registered` is true — nothing registers without a
+      // live instance — but the same implicit unwrap would trap here too.
+      guard let keyCommands = RCTKeyCommands.sharedInstance() else {
+        self.registered = false
+        return
+      }
+
       for command in self.commands {
-        RCTKeyCommands.sharedInstance().unregisterKeyCommand(
+        keyCommands.unregisterKeyCommand(
           withInput: command.input,
           modifierFlags: command.modifierFlags
         )
