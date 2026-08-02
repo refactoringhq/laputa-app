@@ -1008,6 +1008,9 @@ push to main
     and a GitHub-sorted tag alpha-vYYYY.M.D-alpha.NNNN
       → use today's UTC date unless the latest stable-vYYYY.M.D tag already uses today
       → if stable already uses today, advance alpha to the next calendar day so semver still increases
+      → ignore future stable dates for normal numbering
+      → if historical future tags poisoned semver ordering, publish one recovery bridge before
+        returning the next alpha release to the real UTC calendar series
   → four parameterized CircleCI build jobs fan out in parallel:
       → pnpm install, stamp version, pnpm build, tauri build --target aarch64-apple-darwin --bundles app
       → pnpm install, stamp version, pnpm build, tauri build --target x86_64-apple-darwin --bundles app
@@ -1035,8 +1038,8 @@ push to main
 Stable promotions trigger the `stable-release` workflow in `.circleci/config.yml`:
 
 ```
-push stable-vYYYY.M.D tag
-  → version job: validate YYYY.M.D from the tag
+push vYYYY-MM-DD or stable-vYYYY.M.D tag
+  → version job: validate the tag date and reject dates later than the current UTC day
   → four parameterized CircleCI build jobs fan out in parallel:
       → pnpm install, stamp version, pnpm build, tauri build --target aarch64-apple-darwin
       → pnpm install, stamp version, pnpm build, tauri build --target x86_64-apple-darwin
@@ -1068,6 +1071,7 @@ Linux AppImage release jobs use Tauri's stock linuxdeploy AppImage output plugin
 - Stable promotions use git tags in the form `stable-vYYYY.M.D` and stamp the technical version `YYYY.M.D`.
 - Alpha builds stamp the technical version `YYYY.M.D-alpha.N` and display it as `Alpha YYYY.M.D.N`. The GitHub release tag zero-pads the sequence as `alpha-vYYYY.M.D-alpha.NNNN` so GitHub release ordering remains chronological.
 - If the latest stable tag already uses today's date, alpha advances to the next calendar day before assigning `-alpha.N` so Alpha remains semver-newer than Stable across channel switches.
+- Stable tags dated after the current UTC day fail before builds start. If an older workflow already accepted one, alpha emits one future technical bridge with a current-date `.0` display label, then returns to the real calendar series on the following publication.
 - The workflows stamp the computed version into `tauri.conf.json` and `Cargo.toml` at build time.
 - This keeps display strings clean while preserving semver monotonicity when a user switches between Stable and Alpha.
 
@@ -1082,6 +1086,12 @@ App startup (3s delay)
         → ready → "Restart to apply" + Restart Now
     → network error → fail silently
 ```
+
+Alpha metadata discovery follows GitHub publication time rather than the highest embedded calendar
+version. This lets a corrected release supersede a future-dated recovery bridge. Normal updater
+checks still require a semver increase; the only exception lets an installed calendar version
+beyond tomorrow accept a candidate dated today or tomorrow, which is the bounded recovery path
+defined by ADR-0173.
 
 ### Telemetry (Opt-in)
 

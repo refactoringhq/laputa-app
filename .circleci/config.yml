@@ -347,7 +347,7 @@ jobs:
 
   compute-alpha-version:
     docker:
-      - image: cimg/python:3.13
+      - image: cimg/node:22.14.0
     resource_class: small
     steps:
       - checkout
@@ -357,59 +357,8 @@ jobs:
             set -euo pipefail
             mkdir -p /tmp/tolaria-release
             git fetch --tags --force
-            python3 \<<'PY' > /tmp/tolaria-release/release.env
-            import re
-            import subprocess
-            from datetime import datetime, timedelta, timezone
-
-            def lines(command):
-                output = subprocess.check_output(command, text=True).strip()
-                return [line for line in output.splitlines() if line]
-
-            pattern = re.compile(r"^alpha-v(\d{4}\.\d{1,2}\.\d{1,2})-alpha\.(\d+)$")
-            tags_at_head = [tag for tag in lines(["git", "tag", "--points-at", "HEAD"]) if tag.startswith("alpha-v")]
-            if tags_at_head:
-                tag = tags_at_head[0]
-                match = pattern.fullmatch(tag)
-                version = f"{match.group(1)}-alpha.{int(match.group(2))}" if match else tag.removeprefix("alpha-v")
-            else:
-                today = datetime.now(timezone.utc).date()
-                stable_date = None
-                stable_patterns = (
-                    re.compile(r"^v(\d{4})-(\d{2})-(\d{2})$"),
-                    re.compile(r"^stable-v(\d{4})\.(\d{1,2})\.(\d{1,2})$"),
-                )
-                stable_tags = lines([
-                    "git", "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)",
-                    "refs/tags/v20*", "refs/tags/stable-v*",
-                ])
-                for stable_tag in stable_tags:
-                    match = next((item.fullmatch(stable_tag) for item in stable_patterns if item.fullmatch(stable_tag)), None)
-                    if match:
-                        stable_date = datetime(*map(int, match.groups()), tzinfo=timezone.utc).date()
-                        break
-                alpha_date = today if stable_date is None or today > stable_date else stable_date + timedelta(days=1)
-                calendar_version = f"{alpha_date.year}.{alpha_date.month}.{alpha_date.day}"
-                sequence = len(lines(["git", "tag", "--list", f"alpha-v{calendar_version}-alpha.*"])) + 1
-                version = f"{calendar_version}-alpha.{sequence}"
-                tag = f"alpha-v{calendar_version}-alpha.{sequence:04d}"
-            display_match = re.fullmatch(r"(\d{4})\.(\d{1,2})\.(\d{1,2})-alpha\.(\d+)", version)
-            display_version = (
-                f"Alpha {int(display_match.group(1))}.{int(display_match.group(2))}."
-                f"{int(display_match.group(3))}.{int(display_match.group(4))}"
-                if display_match else version
-            )
-            changed = lines(["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"])
-            ignored = all(
-                path.startswith(("site/", ".circleci/")) or path == ".github/workflows/README.md"
-                for path in changed
-            )
-            print(f"VERSION={version}")
-            print(f"DISPLAY_VERSION={display_version}")
-            print(f"TAG={tag}")
-            print(f"CHANNEL=alpha")
-            print(f"SKIP_RELEASE={'true' if changed and ignored else 'false'}")
-            PY
+            node --test scripts/release-version.test.mjs
+            node scripts/release-version.mjs alpha > /tmp/tolaria-release/release.env
             cat /tmp/tolaria-release/release.env
       - persist_to_workspace:
           root: /tmp/tolaria-release
@@ -418,7 +367,7 @@ jobs:
 
   compute-stable-version:
     docker:
-      - image: cimg/python:3.13
+      - image: cimg/node:22.14.0
     resource_class: small
     steps:
       - checkout
@@ -427,27 +376,8 @@ jobs:
           command: |
             set -euo pipefail
             mkdir -p /tmp/tolaria-release
-            CIRCLE_TAG_VALUE="$CIRCLE_TAG" python3 \<<'PY' > /tmp/tolaria-release/release.env
-            import os
-            import re
-            from datetime import date
-
-            tag = os.environ["CIRCLE_TAG_VALUE"]
-            legacy = re.fullmatch(r"stable-v(\d{4})\.(\d{1,2})\.(\d{1,2})", tag)
-            calendar = re.fullmatch(r"v(\d{4})-(\d{2})-(\d{2})", tag)
-            match = calendar or legacy
-            if not match:
-                raise SystemExit(f"Stable tags must use vYYYY-MM-DD or stable-vYYYY.M.D, got {tag}")
-            year, month, day = map(int, match.groups())
-            date(year, month, day)
-            version = f"{year}.{month}.{day}"
-            display_version = tag if calendar else version
-            print(f"VERSION={version}")
-            print(f"DISPLAY_VERSION={display_version}")
-            print(f"TAG={tag}")
-            print("CHANNEL=stable")
-            print("SKIP_RELEASE=false")
-            PY
+            node --test scripts/release-version.test.mjs
+            CIRCLE_TAG_VALUE="$CIRCLE_TAG" node scripts/release-version.mjs stable > /tmp/tolaria-release/release.env
             cat /tmp/tolaria-release/release.env
       - persist_to_workspace:
           root: /tmp/tolaria-release

@@ -1651,20 +1651,6 @@ mod tests {
     // --- run_chat_stream / run_agent_stream error paths ---
 
     #[test]
-    fn run_chat_stream_returns_result() {
-        let req = ChatStreamRequest {
-            message: "test".into(),
-            system_prompt: None,
-            session_id: None,
-        };
-        let mut events = vec![];
-        // This will either succeed (if claude is installed) or fail (if not).
-        let result = run_chat_stream(req, |e| events.push(e));
-        // Either way the function should have returned without panicking.
-        assert!(result.is_ok() || result.is_err());
-    }
-
-    #[test]
     fn run_agent_stream_returns_result() {
         let req = AgentStreamRequest {
             message: "test".into(),

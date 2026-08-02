@@ -51,6 +51,7 @@ struct AlphaReleaseVersion {
 struct GitHubRelease {
     tag_name: String,
     draft: bool,
+    published_at: chrono::DateTime<chrono::Utc>,
     assets: Vec<GitHubAsset>,
 }
 
@@ -110,16 +111,40 @@ fn parse_calendar_date(value: &str) -> Option<(i32, u32, u32)> {
     Some((year, month, day))
 }
 
+fn calendar_version_date(version: &str) -> Option<chrono::NaiveDate> {
+    let core = version.split_once('-').map_or(version, |(value, _)| value);
+    let (year, month, day) = parse_calendar_date(core)?;
+    chrono::NaiveDate::from_ymd_opt(year, month, day)
+}
+
+fn should_recover_poisoned_calendar_version(
+    current_version: &str,
+    remote_version: &str,
+    today: chrono::NaiveDate,
+) -> bool {
+    let Some(current_date) = calendar_version_date(current_version) else {
+        return false;
+    };
+    let Some(remote_date) = calendar_version_date(remote_version) else {
+        return false;
+    };
+    let tomorrow = today.succ_opt().unwrap_or(today);
+
+    current_date > tomorrow && remote_date >= today && remote_date <= tomorrow
+}
+
 fn latest_alpha_release_metadata_url(releases: &[GitHubRelease]) -> Option<Url> {
     releases
         .iter()
         .filter(|release| !release.draft)
         .filter_map(alpha_release_metadata_candidate)
-        .max_by_key(|(version, _)| *version)
-        .map(|(_, url)| url)
+        .max_by_key(|(_, published_at, _)| *published_at)
+        .map(|(_, _, url)| url)
 }
 
-fn alpha_release_metadata_candidate(release: &GitHubRelease) -> Option<(AlphaReleaseVersion, Url)> {
+fn alpha_release_metadata_candidate(
+    release: &GitHubRelease,
+) -> Option<(AlphaReleaseVersion, chrono::DateTime<chrono::Utc>, Url)> {
     let version = AlphaReleaseVersion::parse_tag(&release.tag_name)?;
     let asset = release
         .assets
@@ -127,7 +152,7 @@ fn alpha_release_metadata_candidate(release: &GitHubRelease) -> Option<(AlphaRel
         .find(|asset| asset.name == ALPHA_METADATA_ASSET_NAME)?;
     let url = Url::parse(&asset.browser_download_url).ok()?;
 
-    Some((version, url))
+    Some((version, release.published_at, url))
 }
 
 async fn alpha_release_metadata_endpoint() -> Result<Url, String> {
@@ -168,6 +193,14 @@ fn build_updater<R: Runtime>(
 ) -> Result<tauri_plugin_updater::Updater, String> {
     app_handle
         .updater_builder()
+        .version_comparator(|current, release| {
+            release.version > current
+                || should_recover_poisoned_calendar_version(
+                    &current.to_string(),
+                    &release.version.to_string(),
+                    chrono::Utc::now().date_naive(),
+                )
+        })
         .endpoints(vec![endpoint])
         .map_err(|e| format!("Failed to configure updater endpoint: {e}"))?
         .build()
@@ -256,8 +289,8 @@ pub async fn download_and_install_app_update<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::{
-        latest_alpha_release_metadata_url, AppUpdateDownloadEvent, AppUpdateMetadata, GitHubAsset,
-        GitHubRelease, ReleaseChannel,
+        latest_alpha_release_metadata_url, should_recover_poisoned_calendar_version,
+        AppUpdateDownloadEvent, AppUpdateMetadata, GitHubAsset, GitHubRelease, ReleaseChannel,
     };
     use serde_json::json;
 
@@ -310,14 +343,17 @@ mod tests {
         let releases = vec![
             github_alpha_release(
                 "alpha-v2026.5.8-alpha.0007",
+                "2026-05-08T07:00:00Z",
                 "https://github.com/refactoringhq/tolaria/releases/download/alpha-v2026.5.8-alpha.0007/alpha-latest.json",
             ),
             github_alpha_release(
                 "alpha-v2026.5.8-alpha.0017",
+                "2026-05-08T17:00:00Z",
                 "https://github.com/refactoringhq/tolaria/releases/download/alpha-v2026.5.8-alpha.0017/alpha-latest.json",
             ),
             github_alpha_release(
                 "alpha-v2026.5.7-alpha.0099",
+                "2026-05-07T23:00:00Z",
                 "https://github.com/refactoringhq/tolaria/releases/download/alpha-v2026.5.7-alpha.0099/alpha-latest.json",
             ),
         ];
@@ -331,11 +367,56 @@ mod tests {
     }
 
     #[test]
+    fn alpha_release_metadata_url_prefers_the_most_recently_published_recovery_release() {
+        let releases = vec![
+            github_alpha_release(
+                "alpha-v2027.8.2-alpha.0001",
+                "2026-08-02T08:00:00Z",
+                "https://example.com/recovery-bridge.json",
+            ),
+            github_alpha_release(
+                "alpha-v2026.8.2-alpha.0001",
+                "2026-08-02T09:00:00Z",
+                "https://example.com/corrected-release.json",
+            ),
+        ];
+
+        assert_eq!(
+            latest_alpha_release_metadata_url(&releases)
+                .unwrap()
+                .as_str(),
+            "https://example.com/corrected-release.json"
+        );
+    }
+
+    #[test]
+    fn updater_allows_only_the_targeted_future_calendar_recovery() {
+        let today = chrono::NaiveDate::from_ymd_opt(2026, 8, 2).unwrap();
+
+        assert!(should_recover_poisoned_calendar_version(
+            "2027.8.2-alpha.1",
+            "2026.8.2-alpha.1",
+            today,
+        ));
+        assert!(!should_recover_poisoned_calendar_version(
+            "2026.8.1-alpha.1",
+            "2026.8.2-alpha.1",
+            today,
+        ));
+        assert!(!should_recover_poisoned_calendar_version(
+            "2027.8.2-alpha.1",
+            "2025.8.2-alpha.1",
+            today,
+        ));
+    }
+
+    #[test]
     fn alpha_release_metadata_url_ignores_drafts_and_non_alpha_assets() {
         let releases = vec![
             GitHubRelease {
                 tag_name: "alpha-v2026.5.8-alpha.0018".into(),
                 draft: true,
+                published_at: "2026-05-08T18:00:00Z".parse().unwrap(),
                 assets: vec![GitHubAsset {
                     name: "alpha-latest.json".into(),
                     browser_download_url: "https://example.com/draft.json".into(),
@@ -344,6 +425,7 @@ mod tests {
             GitHubRelease {
                 tag_name: "stable-v2026.5.8".into(),
                 draft: false,
+                published_at: "2026-05-08T19:00:00Z".parse().unwrap(),
                 assets: vec![GitHubAsset {
                     name: "stable-latest.json".into(),
                     browser_download_url: "https://example.com/stable.json".into(),
@@ -351,6 +433,7 @@ mod tests {
             },
             github_alpha_release(
                 "alpha-v2026.5.8-alpha.0017",
+                "2026-05-08T17:00:00Z",
                 "https://example.com/alpha-latest.json",
             ),
         ];
@@ -413,10 +496,15 @@ mod tests {
         }
     }
 
-    fn github_alpha_release(tag_name: &str, browser_download_url: &str) -> GitHubRelease {
+    fn github_alpha_release(
+        tag_name: &str,
+        published_at: &str,
+        browser_download_url: &str,
+    ) -> GitHubRelease {
         GitHubRelease {
             tag_name: tag_name.into(),
             draft: false,
+            published_at: published_at.parse().unwrap(),
             assets: vec![GitHubAsset {
                 name: "alpha-latest.json".into(),
                 browser_download_url: browser_download_url.into(),
