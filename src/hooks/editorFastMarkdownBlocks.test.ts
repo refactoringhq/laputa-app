@@ -42,7 +42,7 @@ describe('tryParseFastMarkdownBlocks', () => {
           expect.objectContaining({ styles: expect.objectContaining({ italic: true }), text: 'italic' }),
           expect.objectContaining({ styles: expect.objectContaining({ strike: true }), text: 'strike' }),
           expect.objectContaining({ styles: expect.objectContaining({ code: true }), text: 'code' }),
-          expect.objectContaining({ type: 'link', props: { href: 'https://example.com' } }),
+          expect.objectContaining({ type: 'link', href: 'https://example.com' }),
         ]),
       }),
       expect.objectContaining({
@@ -70,6 +70,31 @@ describe('tryParseFastMarkdownBlocks', () => {
     expect(referenceLink.metrics.fallbackReason).toBe('reference-link')
     expect(image.supported).toBe(false)
     expect(image.metrics.fallbackReason).toBe('markdown-image')
+  })
+
+  it('emits BlockNote-compatible hrefs for external links in large-note blocks', () => {
+    const result = tryParseFastMarkdownBlocks(
+      '[Obsidian](https://obsidian.md/) and [Tolaria](https://tolaria.md/)',
+    )
+    const paragraph = result.blocks.at(0)
+
+    expect(result.supported).toBe(true)
+    expect(paragraph).toMatchObject({
+      type: 'paragraph',
+      content: [
+        {
+          type: 'link',
+          href: 'https://obsidian.md/',
+          content: [{ type: 'text', text: 'Obsidian', styles: {} }],
+        },
+        { type: 'text', text: ' and ', styles: {} },
+        {
+          type: 'link',
+          href: 'https://tolaria.md/',
+          content: [{ type: 'text', text: 'Tolaria', styles: {} }],
+        },
+      ],
+    })
   })
 
   it('parses bare task-list markers as empty checklist blocks', () => {

@@ -79,6 +79,12 @@ const KNOWN_FRONTMATTER_KEYS: &[FrontmatterKeyRule] = &[
         canonicalize_on_write: true,
     },
     FrontmatterKeyRule {
+        read_key: "_pinned_properties",
+        write_key: "_pinned_properties",
+        aliases: &["_pinned_properties"],
+        canonicalize_on_write: false,
+    },
+    FrontmatterKeyRule {
         read_key: "template",
         write_key: "template",
         aliases: &["template"],
@@ -181,4 +187,19 @@ pub(crate) fn frontmatter_keys_match(left: FrontmatterKey<'_>, right: Frontmatte
 
 pub(crate) fn is_known_frontmatter_key(key: FrontmatterKey<'_>) -> bool {
     frontmatter_key_rule(key).is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn documented_type_system_fields_are_known_frontmatter_keys() {
+        for key in ["_pinned_properties", "_list_properties_display"] {
+            assert!(
+                is_known_frontmatter_key(FrontmatterKey::new(key)),
+                "{key} must stay in the canonical frontmatter key table"
+            );
+        }
+    }
 }

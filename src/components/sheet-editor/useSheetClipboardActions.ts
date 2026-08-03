@@ -20,6 +20,7 @@ import {
 } from './sheetEditorHelpers'
 import type { ScheduleSheetSerializeOptions, SheetWorkbookState } from './sheetEditorTypes'
 import type { SheetContextMenuState } from '../../utils/sheetContextMenuState'
+import { isReleasedWorkbookModelError } from './sheetReleasedModel'
 
 const SHEET_PASTE_CHUNK_SIZE = 100
 
@@ -83,6 +84,17 @@ function destinationArea(payload: TolariaSheetClipboardPayload, targetArea: Retu
   }
 }
 
+function runGuardedPasteWork(operation: () => void): boolean {
+  try {
+    operation()
+    return true
+  } catch (error) {
+    if (!isReleasedWorkbookModelError(error)) throw error
+    console.warn('[sheet-editor] Skipped stale workbook paste:', error)
+    return false
+  }
+}
+
 function clearCutSourceIfNeeded(
   current: SheetWorkbookState,
   payload: TolariaSheetClipboardPayload,
@@ -118,20 +130,22 @@ function usePendingExternalFormulaRetry({
       const current = workbookRef.current
       if (!current) return
 
-      current.model.pauseEvaluation()
-      try {
-        for (const cell of pendingCells) {
-          if (current.model.getCellContent(SHEET_INDEX, cell.row, cell.column) !== cell.input) continue
-          writeCellInputAt(current, cell.row, cell.column, cell.input)
+      runGuardedPasteWork(() => {
+        current.model.pauseEvaluation()
+        try {
+          for (const cell of pendingCells) {
+            if (current.model.getCellContent(SHEET_INDEX, cell.row, cell.column) !== cell.input) continue
+            writeCellInputAt(current, cell.row, cell.column, cell.input)
+          }
+        } finally {
+          current.model.resumeEvaluation()
         }
-      } finally {
-        current.model.resumeEvaluation()
-      }
 
-      current.model.evaluate()
-      refreshWorkbook()
-      scheduleSelectionChromePatch()
-      scheduleSerialize({ bodyRows: pendingCells.map((cell) => cell.row) })
+        current.model.evaluate()
+        refreshWorkbook()
+        scheduleSelectionChromePatch()
+        scheduleSerialize({ bodyRows: pendingCells.map((cell) => cell.row) })
+      })
     })
   }, [refreshWorkbook, scheduleSelectionChromePatch, scheduleSerialize, workbookRef, writeCellInputAt])
 }
@@ -176,12 +190,14 @@ function useTolariaClipboardPaste({
       const latest = workbookRef.current
       if (!latest || pasteJobRef.current !== jobId) return
 
-      clearCutSourceIfNeeded(latest, payload, targetArea, dirtyRows)
-      latest.model.evaluate()
-      refreshWorkbook()
-      scheduleSelectionChromePatch()
-      scheduleSerialize({ bodyRows: dirtyRows })
-      retryPendingExternalFormulaCells(pendingCells, jobId, () => pasteJobRef.current)
+      runGuardedPasteWork(() => {
+        clearCutSourceIfNeeded(latest, payload, targetArea, dirtyRows)
+        latest.model.evaluate()
+        refreshWorkbook()
+        scheduleSelectionChromePatch()
+        scheduleSerialize({ bodyRows: dirtyRows })
+        retryPendingExternalFormulaCells(pendingCells, jobId, () => pasteJobRef.current)
+      })
     }
 
     const runChunk = () => {
@@ -191,18 +207,21 @@ function useTolariaClipboardPaste({
       const latest = workbookRef.current
       if (!latest) return
       const endIndex = Math.min(operationIndex + SHEET_PASTE_CHUNK_SIZE, operations.length)
+      const chunkOperations = operations.slice(operationIndex, endIndex)
 
-      latest.model.pauseEvaluation()
-      try {
-        for (; operationIndex < endIndex; operationIndex += 1) {
-          const operation = operations[operationIndex]
-          if (!operation) continue
-          const result = writeCellInputAt(latest, operation.row, operation.column, operation.input)
-          if (result.pendingLoads.length > 0) pendingCells.push({ ...operation, pendingLoads: result.pendingLoads })
+      const didPaste = runGuardedPasteWork(() => {
+        latest.model.pauseEvaluation()
+        try {
+          for (const operation of chunkOperations) {
+            const result = writeCellInputAt(latest, operation.row, operation.column, operation.input)
+            if (result.pendingLoads.length > 0) pendingCells.push({ ...operation, pendingLoads: result.pendingLoads })
+          }
+        } finally {
+          latest.model.resumeEvaluation()
         }
-      } finally {
-        latest.model.resumeEvaluation()
-      }
+      })
+      if (!didPaste) return
+      operationIndex = endIndex
 
       refreshWorkbook()
       scheduleSelectionChromePatch()

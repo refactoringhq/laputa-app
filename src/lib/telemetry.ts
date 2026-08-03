@@ -42,6 +42,13 @@ function isBlockNoteStaleBlockReferenceText(value: string | undefined): boolean 
   return value ? BLOCKNOTE_STALE_BLOCK_REFERENCE_PATTERN.test(value) : false
 }
 
+function isBlockNoteMissingIdText(value: string | undefined): boolean {
+  if (!value) return false
+
+  const message = value.replace(/^Error:\s*/, '')
+  return classifyRichEditorRecoveryError(new Error(message), 'render') === 'block_missing_id'
+}
+
 function isResizeObserverLoopText(value: string | undefined): boolean {
   return value
     ? RESIZE_OBSERVER_LOOP_MESSAGES.some((message) => value.includes(message))
@@ -145,6 +152,13 @@ function shouldDropRecoveredBlockNoteRenderEvent(hint?: Sentry.EventHint): boole
   return isRecoveredBlockNoteRenderError(hint?.originalException, '')
 }
 
+function shouldDropBlockNoteMissingIdEvent(
+  event: Sentry.ErrorEvent,
+  hint?: Sentry.EventHint,
+): boolean {
+  return matchesBenignSentryEventText(event, hint, isBlockNoteMissingIdText)
+}
+
 function shouldDropRichEditorDomNotFoundEvent(
   event: Sentry.ErrorEvent,
   hint?: Sentry.EventHint,
@@ -182,6 +196,7 @@ function shouldDropSentryEvent(event: Sentry.ErrorEvent, hint?: Sentry.EventHint
     || shouldDropStaleTauriListenerCleanupEvent(event, hint)
     || shouldDropBlockNoteStaleBlockReferenceEvent(event, hint)
     || shouldDropRecoveredBlockNoteRenderEvent(hint)
+    || shouldDropBlockNoteMissingIdEvent(event, hint)
     || shouldDropRichEditorDomNotFoundEvent(event, hint)
     || shouldDropResizeObserverLoopEvent(event, hint)
     || shouldDropMissingFilePromiseRejectionEvent(event, hint)

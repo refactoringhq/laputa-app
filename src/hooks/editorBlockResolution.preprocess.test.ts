@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BlockNoteEditor } from '@blocknote/core'
 import { schema } from '../components/editorSchema'
 import {
@@ -7,6 +7,22 @@ import {
   serializeRichEditorDocumentToMarkdown,
 } from '../utils/richEditorMarkdown'
 import { resolveBlocksForTarget } from './editorBlockResolution'
+
+const tauriMode = vi.hoisted(() => ({ enabled: false }))
+
+vi.mock('../mock-tauri', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../mock-tauri')>(),
+  isTauri: () => tauriMode.enabled,
+}))
+
+vi.mock('@tauri-apps/api/core', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@tauri-apps/api/core')>(),
+  convertFileSrc: (path: string) => `asset://localhost/${encodeURIComponent(path)}`,
+}))
+
+afterEach(() => {
+  tauriMode.enabled = false
+})
 
 describe('preProcessRichEditorMarkdown', () => {
   it('normalizes bare image paths for BlockNote parsing while preserving fenced code', () => {
@@ -118,6 +134,101 @@ describe('preProcessRichEditorMarkdown', () => {
       targetPath: 'sql-repro.md',
     })
 
+    expect(serializeRichEditorDocumentToMarkdown({
+      blocks: resolved.blocks,
+      editor,
+      tabContent: content,
+    })).toBe(`${content}\n`)
+  })
+
+  it('keeps underscored wikilinks stable across repeated rich-editor reloads', async () => {
+    const editor = BlockNoteEditor.create({ schema })
+    installRichEditorMarkdownSerializer(editor)
+    const content = [
+      '# Wikilink reload',
+      '',
+      'Keep [[a_b]], [[2026-05-29_meeting_notes]], and [[path\\target_under_score]] stable.',
+    ].join('\n')
+
+    const firstResolution = await resolveBlocksForTarget({
+      cache: new Map(),
+      content,
+      editor,
+      targetPath: 'wikilink-reload.md',
+    })
+    const firstSave = serializeRichEditorDocumentToMarkdown({
+      blocks: firstResolution.blocks,
+      editor,
+      tabContent: content,
+    })
+    const secondResolution = await resolveBlocksForTarget({
+      cache: new Map(),
+      content: firstSave,
+      editor,
+      targetPath: 'wikilink-reload.md',
+    })
+
+    expect(serializeRichEditorDocumentToMarkdown({
+      blocks: secondResolution.blocks,
+      editor,
+      tabContent: firstSave,
+    })).toBe(`${content}\n`)
+  })
+
+  it('keeps empty-alt image embeds as editable image blocks', async () => {
+    tauriMode.enabled = true
+    const editor = BlockNoteEditor.create({ schema })
+    installRichEditorMarkdownSerializer(editor)
+    const content = '![](attachments/photo2.png)'
+    const targetPath = '/vault/empty-alt-image.md'
+    const imageUrl = `asset://localhost/${encodeURIComponent('/vault/attachments/photo2.png')}`
+
+    const resolved = await resolveBlocksForTarget({
+      cache: new Map(),
+      content,
+      editor,
+      targetPath,
+      vaultPath: '/vault',
+    })
+
+    expect(resolved.blocks).toContainEqual(expect.objectContaining({
+      type: 'image',
+      props: expect.objectContaining({
+        name: '',
+        url: imageUrl,
+      }),
+    }))
+    expect(serializeRichEditorDocumentToMarkdown({
+      blocks: resolved.blocks,
+      editor,
+      notePath: targetPath,
+      tabContent: content,
+      vaultPath: '/vault',
+    })).toBe(`${content}\n`)
+  })
+
+  it('preserves manually inserted blank paragraphs through rich/raw round-trips', async () => {
+    const editor = BlockNoteEditor.create({ schema })
+    installRichEditorMarkdownSerializer(editor)
+    const content = [
+      'First paragraph.',
+      '',
+      '',
+      'Second paragraph.',
+    ].join('\n')
+
+    const resolved = await resolveBlocksForTarget({
+      cache: new Map(),
+      content,
+      editor,
+      targetPath: 'blank-paragraph-spacing.md',
+    })
+
+    expect(resolved.blocks).toEqual([
+      expect.objectContaining({ type: 'paragraph', content: expect.any(Array) }),
+      expect.objectContaining({ type: 'paragraph', content: [] }),
+      expect.objectContaining({ type: 'paragraph', content: expect.any(Array) }),
+    ])
     expect(serializeRichEditorDocumentToMarkdown({
       blocks: resolved.blocks,
       editor,

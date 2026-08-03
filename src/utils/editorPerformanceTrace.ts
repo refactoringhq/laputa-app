@@ -1,19 +1,8 @@
-function isVitestRuntime(): boolean {
-  return '__vitest_worker__' in globalThis
-}
-
-function canMeasurePerformance(): boolean {
-  return import.meta.env.DEV && typeof performance !== 'undefined' && !isVitestRuntime()
-}
-
-function formatDuration(durationMs: number | null): string {
-  return durationMs === null ? 'n/a' : `${durationMs.toFixed(1)}ms`
-}
-
-function logPerf(message: string): void {
-  if (!canMeasurePerformance()) return
-  console.debug(`[perf] ${message}`)
-}
+import {
+  canMeasurePerformance,
+  formatDuration,
+  logPerf,
+} from './performanceLogging'
 
 export function logRichEditorSerializationTrace(options: {
   blockCount: number

@@ -151,6 +151,9 @@ describe('resolveImageUrls', () => {
     expect(resolveImageUrls('![shot](./attachments/shot.png)', '/vault', notePath)).toBe(
       `![shot](${assetUrl('/vault/attachments/shot.png')})`,
     )
+    expect(resolveImageUrls('![shot](/attachments/Team%20截图.png)', '/vault', notePath)).toBe(
+      `![shot](${assetUrl('/vault/attachments/Team 截图.png')})`,
+    )
   })
 
   it('resolves image wikilink embeds through vault attachments', () => {
@@ -385,19 +388,19 @@ describe('portableImageUrls', () => {
     )
   })
 
-  it('serializes root attachment asset URLs relative to nested notes', () => {
+  it('serializes root attachment asset URLs as vault-portable attachment paths', () => {
     const markdown = `![shot](${assetUrl('/vault/attachments/shot.png')})`
 
     expect(portableImageUrls(markdown, '/vault', '/vault/projects/notes/plan.md')).toBe(
-      '![shot](../../attachments/shot.png)',
+      '![shot](attachments/shot.png)',
     )
   })
 
-  it('serializes Windows root attachment asset URLs relative to nested notes', () => {
+  it('serializes Windows root attachment asset URLs as vault-portable attachment paths', () => {
     const markdown = `![shot](${assetUrl('C:\\Vault\\attachments\\shot.png')})`
 
     expect(portableImageUrls(markdown, 'c:\\vault', 'C:\\Vault\\Projects\\Notes\\plan.md')).toBe(
-      '![shot](../../attachments/shot.png)',
+      '![shot](attachments/shot.png)',
     )
   })
 

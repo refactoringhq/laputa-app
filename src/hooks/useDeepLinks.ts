@@ -39,6 +39,18 @@ interface PendingNavigation {
   vault: DeepLinkVault
 }
 
+interface PendingPeerRoute {
+  cancel: () => void
+}
+
+type DeepLinkRouteMessage =
+  | { type: 'tolaria-deep-link-route-request'; id: string; request: PendingNavigation }
+  | { type: 'tolaria-deep-link-route-claimed'; id: string }
+
+const DEEP_LINK_ROUTE_CHANNEL = 'tolaria-deep-link-routing'
+const DEEP_LINK_ROUTE_FALLBACK_MS = 250
+let deepLinkRouteSequence = 0
+
 function deepLinkOpenErrorMessage(error: DeepLinkOpenError, locale: AppLocale): string {
   const key = {
     ambiguous_vault: 'deepLinks.error.ambiguousVault',
@@ -70,6 +82,78 @@ function errorDetail(error: unknown): string {
 
 function navigationKey(request: PendingNavigation): string {
   return `${request.vault.path}\n${request.relativePath}`
+}
+
+function createDeepLinkRouteChannel(): BroadcastChannel | null {
+  if (typeof BroadcastChannel === 'undefined') return null
+  return new BroadcastChannel(DEEP_LINK_ROUTE_CHANNEL)
+}
+
+function deepLinkRouteId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  deepLinkRouteSequence += 1
+  return `${Date.now().toString(36)}-${deepLinkRouteSequence.toString(36)}`
+}
+
+function isRouteClaimMessage(message: unknown, id: string): message is Extract<DeepLinkRouteMessage, { type: 'tolaria-deep-link-route-claimed' }> {
+  if (!message || typeof message !== 'object') return false
+  return Reflect.get(message, 'type') === 'tolaria-deep-link-route-claimed'
+    && Reflect.get(message, 'id') === id
+}
+
+function routeRequestFromMessage(message: unknown): Extract<DeepLinkRouteMessage, { type: 'tolaria-deep-link-route-request' }> | null {
+  if (!message || typeof message !== 'object') return null
+  if (Reflect.get(message, 'type') !== 'tolaria-deep-link-route-request') return null
+  const id = Reflect.get(message, 'id')
+  const request = Reflect.get(message, 'request')
+  if (typeof id !== 'string' || !request || typeof request !== 'object') return null
+  return { id, request: request as PendingNavigation, type: 'tolaria-deep-link-route-request' }
+}
+
+function focusCurrentWindow(): void {
+  if (typeof window !== 'undefined') window.focus?.()
+  if (!isTauri()) return
+
+  void import('@tauri-apps/api/window')
+    .then(({ getCurrentWindow }) => getCurrentWindow().setFocus())
+    .catch(() => {})
+}
+
+function requestPeerDeepLinkRoute({
+  onClaimed,
+  onUnclaimed,
+  request,
+}: {
+  onClaimed: () => void
+  onUnclaimed: () => void
+  request: PendingNavigation
+}): PendingPeerRoute | null {
+  const channel = createDeepLinkRouteChannel()
+  if (!channel) {
+    onUnclaimed()
+    return null
+  }
+
+  const id = deepLinkRouteId()
+  let settled = false
+  const finish = (callback: () => void) => {
+    if (settled) return
+    settled = true
+    window.clearTimeout(timer)
+    channel.close()
+    callback()
+  }
+  const timer = window.setTimeout(() => finish(onUnclaimed), DEEP_LINK_ROUTE_FALLBACK_MS)
+  channel.onmessage = (event) => {
+    if (isRouteClaimMessage(event.data, id)) finish(onClaimed)
+  }
+  channel.postMessage({ type: 'tolaria-deep-link-route-request', id, request } satisfies DeepLinkRouteMessage)
+
+  return {
+    cancel: () => finish(() => {}),
+  }
 }
 
 function findEntryForDeepLink(
@@ -114,6 +198,7 @@ function useDeepLinkResolver({
   setToastMessage,
   vaultListLoaded,
 }: DeepLinkResolverConfig) {
+  const peerRouteRef = useRef<PendingPeerRoute | null>(null)
   const openResolvedDeepLink = useCallback((request: Extract<ResolvedTolariaDeepLink, { ok: true }>) => {
     const nextNavigation = {
       absolutePath: request.absolutePath,
@@ -121,10 +206,26 @@ function useDeepLinkResolver({
       vault: request.vault,
     }
     setPendingNavigation(nextNavigation)
-    if (!notePathsMatch(currentVaultPath, request.vault.path)) {
-      onSwitchVault(request.vault.path)
-    }
+    if (notePathsMatch(currentVaultPath, request.vault.path)) return
+
+    peerRouteRef.current?.cancel()
+    peerRouteRef.current = requestPeerDeepLinkRoute({
+      onClaimed: () => {
+        setPendingNavigation(null)
+        peerRouteRef.current = null
+      },
+      onUnclaimed: () => {
+        onSwitchVault(request.vault.path)
+        peerRouteRef.current = null
+      },
+      request: nextNavigation,
+    })
   }, [currentVaultPath, onSwitchVault, setPendingNavigation])
+
+  useEffect(() => () => {
+    peerRouteRef.current?.cancel()
+    peerRouteRef.current = null
+  }, [])
 
   useEffect(() => {
     if (!enabled || !pendingUrl || !vaultListLoaded) return
@@ -139,6 +240,33 @@ function useDeepLinkResolver({
 
     openResolvedDeepLink(resolved)
   }, [enabled, knownVaults, locale, openResolvedDeepLink, pendingUrl, setPendingUrl, setToastMessage, vaultListLoaded])
+}
+
+function useDeepLinkPeerRouteListener({
+  currentVaultPath,
+  enabled,
+  setPendingNavigation,
+}: {
+  currentVaultPath: string
+  enabled: boolean
+  setPendingNavigation: (request: PendingNavigation | null) => void
+}) {
+  useEffect(() => {
+    if (!enabled) return undefined
+    const channel = createDeepLinkRouteChannel()
+    if (!channel) return undefined
+
+    channel.onmessage = (event) => {
+      const message = routeRequestFromMessage(event.data)
+      if (!message || !notePathsMatch(currentVaultPath, message.request.vault.path)) return
+
+      setPendingNavigation(message.request)
+      channel.postMessage({ type: 'tolaria-deep-link-route-claimed', id: message.id } satisfies DeepLinkRouteMessage)
+      focusCurrentWindow()
+    }
+
+    return () => channel.close()
+  }, [currentVaultPath, enabled, setPendingNavigation])
 }
 
 interface DeepLinkNavigationConfig {
@@ -428,6 +556,11 @@ export function useDeepLinks({
     setPendingUrl,
     setToastMessage,
     vaultListLoaded,
+  })
+  useDeepLinkPeerRouteListener({
+    currentVaultPath,
+    enabled,
+    setPendingNavigation,
   })
   useDeepLinkNavigation({
     currentVaultPath,

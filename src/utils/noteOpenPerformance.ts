@@ -1,3 +1,9 @@
+import {
+  canMeasurePerformance,
+  formatDuration,
+  logPerf,
+} from './performanceLogging'
+
 type NoteOpenStage =
   | 'beforeNavigateStart'
   | 'beforeNavigateEnd'
@@ -16,18 +22,6 @@ interface NoteOpenTrace {
 
 const inFlightNoteOpens = new Map<string, NoteOpenTrace>()
 
-function isVitestRuntime(): boolean {
-  return '__vitest_worker__' in globalThis
-}
-
-function canMeasurePerformance(): boolean {
-  return import.meta.env.DEV && typeof performance !== 'undefined' && !isVitestRuntime()
-}
-
-function formatDuration(durationMs: number | null): string {
-  return durationMs === null ? 'n/a' : `${durationMs.toFixed(1)}ms`
-}
-
 function measureDuration(
   trace: NoteOpenTrace,
   start: keyof NoteOpenTrace['marks'] | 'startedAt',
@@ -37,11 +31,6 @@ function measureDuration(
   const endTime = Reflect.get(trace.marks, end) as number | undefined
   if (startTime === undefined || endTime === undefined) return null
   return endTime - startTime
-}
-
-function logPerf(message: string): void {
-  if (!canMeasurePerformance()) return
-  console.debug(`[perf] ${message}`)
 }
 
 export function beginNoteOpenTrace(path: string, source: string): void {

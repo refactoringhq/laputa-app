@@ -116,7 +116,7 @@ The registered vault list can act as a mounted-workspace set. `useVaultSwitcher`
 
 The status-bar vault menu can open a registered vault as an independent desktop application instance. Ordinary launches still register the single-instance plugin, while an explicit vault-instance launch bypasses it and scopes that process's active vault without changing the shared registry's ordinary startup selection. Packaged macOS builds use Launch Services `open -n` so each vault receives its own Dock tile and Command-Tab entry. `src/shared/workspaceColorContract.json` is the cross-runtime source for renderer picker keys, launch validation, persisted vault-color normalization, and light/dark native icon tints. Each process's AppKit icon is generated from the bundled Tolaria icon by recoloring its droplet with the launched or active vault's declared native tint; renderer-only `pink` and `gray` colors explicitly fall back to the contract's default blue tint. See [ADR-0171](./adr/0171-separate-vault-application-instances.md).
 
-Vault item deep links use the registered vault list as their resolver namespace. `src/utils/deepLinks.ts` builds `tolaria://<vault-slug>/<relative-path-with-extension>` URLs from workspace aliases, labels, and paths, appending a short stable hash when generated slugs would collide. `useDeepLinks` validates incoming links, switches vaults when required, reloads the vault index once for recently changed files, and opens the matching `VaultEntry` through the normal note-selection path.
+Vault item deep links use the registered vault list as their resolver namespace. `src/utils/deepLinks.ts` builds `tolaria://<vault-slug>/<relative-path-with-extension>` URLs from workspace aliases, labels, and paths, appending a short stable hash when generated slugs would collide. `useDeepLinks` validates incoming links, broadcasts cross-window route requests so an already-open matching vault instance can claim and focus the link, then falls back to switching the receiving process's vault when no matching window answers. The owning window reloads the vault index once for recently changed files and opens the matching `VaultEntry` through the normal note-selection path.
 
 Saved Views participate in that mounted graph as source-scoped chrome. `useVaultLoader` loads view definitions from every mounted vault, annotates each `ViewFile` with its owning `rootPath` and workspace identity, and keeps sidebar selection/persistence keyed by `(rootPath, filename)` so same-named view files from different vaults stay independent.
 
@@ -124,7 +124,7 @@ Git surfaces resolve repository paths explicitly. `useGitRepositories` derives t
 
 Git command launch is also installation-local. The Rust Git module resolves a `GitLaunchConfig` from app settings before spawning Git, defaulting to native `git` while allowing Windows installations to explicitly select WSL2 Git and a distribution. WSL-selected launches go through `wsl.exe --exec git` and translate Windows/WSL UNC vault paths before passing repository paths across the command boundary; Tolaria never silently switches providers based on detection alone.
 
-Renderer git file workflows stay behind `useGitFileWorkflows`. The hook resolves per-note repository paths, queues editor diff requests, opens Pulse history entries including deleted-file previews, and keeps discard/reload handling close to the selected Git surface while `App.tsx` only wires the resulting callbacks into `NoteList`, `PulseView`, and `Editor`.
+Renderer git file workflows stay behind `useGitFileWorkflows`. The hook resolves per-note repository paths, queues editor diff requests, opens Pulse history entries including deleted-file previews, and keeps discard/reload handling close to the selected Git surface while `App.tsx` only wires the resulting callbacks into `NoteList`, `PulseView`, and `Editor`. Note history reloads only when its note, visibility, or explicit refresh generation changes; changing renderer callback identities during an editor-state update does not rerun `git log`, and the native history command executes that blocking process on Tokio's blocking pool.
 
 Cross-workspace note reads and writes keep the disk-first invariant. When an absolute note path is saved or read without an explicit `vaultPath`, the Tauri boundary resolves the deepest registered vault root that contains the path and validates against that root before touching disk. This lets an editor tab opened from a mounted workspace save back to its source repository while preserving the same path-escape protections as active-vault operations.
 
@@ -138,7 +138,7 @@ Rich-editor Markdown boundaries stay on the editor fast path while keeping one o
 
 Rich-editor typing keeps BlockNote's per-transaction work minimal. Tolaria creates BlockNote with animation bookkeeping disabled so the `previousBlockType` extension, which scans the old and new ProseMirror documents on every edit, is not installed. Collapsed-heading rendering attaches its mutation observer and `editor.onChange` subscription only while at least one heading/list section is collapsed, then detaches when the final section expands. Development builds wrap ProseMirror dispatch once per editor view and log `richEditorDispatch` timings for large or slow transactions, giving QA a direct signal for edit-time stutter instead of only note-open speed.
 
-Editor responsiveness is also protected by a synthetic browser benchmark. `pnpm perf:editor` launches an isolated Vite server, injects small and large synthetic Markdown vault entries, opens each note repeatedly, and records medians for editor visibility, first content rendered, full note application, post-open edit frame latency, and development timing logs such as block resolution/application. `.editor-performance-thresholds.json` stores ratcheted local budgets for those medians; `pnpm perf:editor:update` refreshes baselines only when intentionally accepting a new local floor.
+Core perceived latency is protected by a synthetic production-browser benchmark. `pnpm perf` injects deterministic 500-entry startup/note fixtures and a 2,000-entry virtualized-list fixture, discards a warmup, then aggregates five measured runs. Startup phases publish standard `tolaria:<phase>` User Timing marks; note scenarios combine visible editor/content milestones with opt-in note/editor trace durations; list scrolling waits through the destination paint. `.editor-performance-thresholds.json` stores ratcheted median budgets and p90 diagnostics. CircleCI runs the gate in a dedicated browser job, while native `TOLARIA_STARTUP_TRACE=1` remains the richer host-level diagnostic tier. See `docs/PERFORMANCE.md` for the instrumentation audit and baseline policy.
 
 ## Tech Stack
 
@@ -307,7 +307,7 @@ Model capabilities are adapter-owned (ADR-0163). `get_ai_agent_model_catalog` us
 
 Each `stream_ai_agent` call also receives a request-scoped `ai-agent-stream-*` event name. Desktop runs bind that scoped name to any spawned CLI child through `ai_agent_processes.rs`, and `abort_ai_agent_stream` validates the same scoped name before killing the registered child. Renderer stop controls therefore cancel the local subprocess instead of only ignoring stale events, while natural completion and repeated stop requests remain no-ops.
 
-CLI-agent availability intentionally does not depend only on the desktop app's inherited `PATH`. The detectors check the current process path, the user's login shell, and supported local/toolchain install locations such as native `~/.local/bin`, local `~/.claude/local`, Mise/asdf shims, nvm-managed Node installs, npm-global, Homebrew, Windows `%APPDATA%\npm`/pnpm/Scoop shims, Kiro's official `%ProgramFiles%\Kiro-Cli` MSI install, Windows `.exe` launchers, and the macOS Codex app resource path so first-run onboarding works on fresh macOS and Windows installs. App-managed CLI spawns also expand the active vault path before using it as the subprocess working directory, then extend the child process `PATH` with the resolved binary directory plus those common toolchain directories, which lets GUI-launched macOS sessions run Homebrew/npm shims and their `node`-backed MCP subprocesses even when Finder/Dock did not inherit a terminal shell path. Claude Code launches copy a narrow set of exported provider/auth environment variables from the app process or the user's zsh/bash startup files, including Anthropic API/base URL values. OpenCode launches do the same for common provider variables and any `{env:NAME}` placeholders found in OpenCode config files, so company proxy and API-key setups that work in Terminal also work when Tolaria is opened from Finder or Dock. Windows PATH lookup ignores extensionless npm wrappers when a launchable `.cmd`/`.exe` result follows, and npm or Volta `.cmd` shims are not spawned directly; the shared CLI runtime resolves npm shims to their quoted Node script or native executable target and routes Volta shims through `volta run <tool>` so prompt arguments do not hit batch-file argument validation.
+CLI-agent availability intentionally does not depend only on the desktop app's inherited `PATH`. The detectors check the current process path, the user's login shell, and supported local/toolchain install locations such as native `~/.local/bin`, local `~/.claude/local`, Mise/asdf shims, nvm-managed Node installs, npm-global, Homebrew, Windows `%APPDATA%\npm`/pnpm/Scoop shims, Kiro's official `%ProgramFiles%\Kiro-Cli` MSI install, OpenCode Desktop's current `%LOCALAPPDATA%\Programs\@opencode-aidesktop` install root, Windows `.exe` launchers, and the macOS Codex app resource path so first-run onboarding works on fresh macOS and Windows installs. App-managed CLI spawns also expand the active vault path before using it as the subprocess working directory, then extend the child process `PATH` with the resolved binary directory plus those common toolchain directories, which lets GUI-launched macOS sessions run Homebrew/npm shims and their `node`-backed MCP subprocesses even when Finder/Dock did not inherit a terminal shell path. Claude Code launches copy a narrow set of exported provider/auth environment variables from the app process or the user's zsh/bash startup files, including Anthropic API/base URL values. OpenCode launches do the same for common provider variables and any `{env:NAME}` placeholders found in OpenCode config files, so company proxy and API-key setups that work in Terminal also work when Tolaria is opened from Finder or Dock. Windows PATH lookup ignores extensionless npm wrappers when a launchable `.cmd`/`.exe` result follows, and npm or Volta `.cmd` shims are not spawned directly; the shared CLI runtime resolves npm shims to their quoted Node script or native executable target and routes Volta shims through `volta run <tool>` so prompt arguments do not hit batch-file argument validation.
 
 CLI-agent system prompts also include a local Tolaria docs orientation when the bundled docs resource is present. `scripts/build-agent-docs.mjs` generates `src-tauri/resources/agent-docs/` from the public VitePress Markdown sources, including `index.md`, `AGENTS.md`, per-section bundles, `all.md`, `search-index.json`, and generated per-page files. Tauri bundles that folder as `agent-docs/`; `get_agent_docs_path` resolves the installed resource path, with a repository fallback for development, and `getAgentDocsPath()` caches it before each agent run. Agents are instructed to read the active vault's `AGENTS.md` for local conventions and search the bundled docs for Tolaria product behavior.
 
@@ -599,7 +599,7 @@ After the clone completes, Tolaria removes every configured git remote from the 
 
 ### Remote Clone & Auth Model
 
-Tolaria no longer implements provider-specific OAuth or remote-repository APIs. All remote git work goes through the user's existing system git configuration. Git subprocesses first honor an installation-local `git_path` in `settings.json` when it points at an existing executable. On macOS, they then prefer the user's login-shell `git` and `PATH`, fall back to standard Apple/Homebrew locations such as `/opt/homebrew/bin/git`, `/usr/local/bin/git`, and `/usr/bin/git`, and only then use the inherited `PATH`. This keeps Homebrew/Xcode Git, Git Credential Manager, and `git-credential-osxkeychain` resolving the same way they do in Terminal even when Tolaria is launched from Finder, Dock, or Homebrew Cask.
+Tolaria no longer implements provider-specific OAuth or remote-repository APIs. All remote git work goes through the user's existing system git configuration. Git subprocesses first honor an installation-local `git_path` in `settings.json` when it points at an existing executable. On macOS, they then prefer the user's login-shell `git` and `PATH`, fall back to standard Apple/Homebrew locations such as `/opt/homebrew/bin/git`, `/usr/local/bin/git`, and `/usr/bin/git`, and only then use the inherited `PATH`. This keeps Homebrew/Xcode Git, Git Credential Manager, and `git-credential-osxkeychain` resolving the same way they do in Terminal even when Tolaria is launched from Finder, Dock, or Homebrew Cask. Settings mounts the Git provider controls eagerly, so its native Git and WSL availability probes also use the shared hidden-process launcher; opening Settings on Windows therefore cannot flash a transient console window.
 
 **Flow:**
 1. User opens `CloneVaultModal` from onboarding or the vault menu
@@ -876,8 +876,8 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `remove_mcp_tools` | Remove Tolaria's MCP entry from Claude/Antigravity/Cursor/OpenCode/generic config |
 | `check_mcp_status` | Check whether Tolaria's durable MCP entry is registered in Claude/Antigravity/Cursor/OpenCode/generic config |
 | `get_mcp_config_snippet` | Return the exact manual MCP JSON snippet for the active vault |
-| `copy_text_to_clipboard` | Copy setup snippets through the native desktop clipboard command path |
-| `read_text_from_clipboard` | Read current desktop clipboard text for command-driven plain-text paste |
+| `copy_text_to_clipboard` | Copy text through the native desktop clipboard path; macOS forces a UTF-8 locale for `pbcopy` so non-ASCII paths and snippets survive GUI launches |
+| `read_text_from_clipboard` | Read current desktop clipboard text for command-driven plain-text paste; macOS forces the matching UTF-8 `pbpaste` locale |
 | `sync_mcp_bridge_vault` | Sync the desktop WebSocket bridge process to the selected vault, or stop it when no vault is selected |
 
 The desktop MCP WebSocket bridge is intentionally local-only. `mcp-server/ws-bridge.js` binds both bridge ports to loopback, rejects non-loopback clients, accepts browser/Tauri origins only on the UI bridge, and rejects browser-origin requests on the tool bridge so remote pages cannot drive vault tools directly.
@@ -1008,6 +1008,10 @@ push to main
     and a GitHub-sorted tag alpha-vYYYY.M.D-alpha.NNNN
       → use today's UTC date unless the latest stable-vYYYY.M.D tag already uses today
       → if stable already uses today, advance alpha to the next calendar day so semver still increases
+      → ignore future stable dates for normal numbering
+      → if historical future tags poisoned semver ordering, publish one recovery bridge before
+        returning the next qualifying main push to the real UTC calendar series; the bridge and
+        corrected release are intentionally separate publications so updater ordering remains monotonic
   → four parameterized CircleCI build jobs fan out in parallel:
       → pnpm install, stamp version, pnpm build, tauri build --target aarch64-apple-darwin --bundles app
       → pnpm install, stamp version, pnpm build, tauri build --target x86_64-apple-darwin --bundles app
@@ -1035,8 +1039,8 @@ push to main
 Stable promotions trigger the `stable-release` workflow in `.circleci/config.yml`:
 
 ```
-push stable-vYYYY.M.D tag
-  → version job: validate YYYY.M.D from the tag
+push vYYYY-MM-DD or stable-vYYYY.M.D tag
+  → version job: validate the tag date and reject dates later than the current UTC day
   → four parameterized CircleCI build jobs fan out in parallel:
       → pnpm install, stamp version, pnpm build, tauri build --target aarch64-apple-darwin
       → pnpm install, stamp version, pnpm build, tauri build --target x86_64-apple-darwin
@@ -1068,6 +1072,7 @@ Linux AppImage release jobs use Tauri's stock linuxdeploy AppImage output plugin
 - Stable promotions use git tags in the form `stable-vYYYY.M.D` and stamp the technical version `YYYY.M.D`.
 - Alpha builds stamp the technical version `YYYY.M.D-alpha.N` and display it as `Alpha YYYY.M.D.N`. The GitHub release tag zero-pads the sequence as `alpha-vYYYY.M.D-alpha.NNNN` so GitHub release ordering remains chronological.
 - If the latest stable tag already uses today's date, alpha advances to the next calendar day before assigning `-alpha.N` so Alpha remains semver-newer than Stable across channel switches.
+- Stable tags dated after the current UTC day fail before builds start. If an older workflow already accepted one, alpha emits one future technical bridge with a current-date `.0` display label, then returns to the real calendar series on the following publication.
 - The workflows stamp the computed version into `tauri.conf.json` and `Cargo.toml` at build time.
 - This keeps display strings clean while preserving semver monotonicity when a user switches between Stable and Alpha.
 
@@ -1082,6 +1087,12 @@ App startup (3s delay)
         → ready → "Restart to apply" + Restart Now
     → network error → fail silently
 ```
+
+Alpha metadata discovery follows GitHub publication time rather than the highest embedded calendar
+version. This lets a corrected release supersede a future-dated recovery bridge. Normal updater
+checks still require a semver increase; the only exception lets an installed calendar version
+beyond tomorrow accept a candidate dated today or tomorrow, which is the bounded recovery path
+defined by ADR-0173.
 
 ### Telemetry (Opt-in)
 

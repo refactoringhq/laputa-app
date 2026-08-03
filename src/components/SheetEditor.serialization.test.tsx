@@ -57,6 +57,17 @@ function sheetWithA1Metadata(metadataLines: string[], body = 'Metric,January'): 
   ].join('\n')
 }
 
+function selectSheetCell(row: number, column: number): void {
+  ironCalcMock.state.selectedView = {
+    column,
+    left_column: 1,
+    range: [row, column, row, column],
+    row,
+    sheet: 0,
+    top_row: 1,
+  }
+}
+
 async function renderLoadedSheet(content: string, options: SheetHarnessOptions = {}) {
   const rendered = renderSheetHarness(content, options)
   await screen.findByTestId('ironcalc-workbook')
@@ -110,6 +121,26 @@ describe('SheetEditor serialization', () => {
 
     await screen.findByTestId('ironcalc-workbook')
     expect(ironCalcInitMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('contains IronCalc wasm bridge render crashes inside the sheet fallback', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    ironCalcMock.state.workbookRenderError = new TypeError(
+      "undefined is not an object (evaluating 'B.__wbindgen_add_to_stack_pointer')",
+    )
+
+    try {
+      renderSheetHarness('---\n_display: sheet\n---\nMetric,January')
+
+      await screen.findByText(
+        "IronCalc workbook unavailable: undefined is not an object (evaluating 'B.__wbindgen_add_to_stack_pointer')",
+      )
+      expect(screen.queryByTestId('ironcalc-workbook')).not.toBeInTheDocument()
+    } finally {
+      consoleError.mockRestore()
+      consoleWarn.mockRestore()
+    }
   })
 
   it('flushes the current workbook content when unmounted before debounce runs', async () => {
@@ -347,6 +378,40 @@ describe('SheetEditor serialization', () => {
     expect(onContentChange).toHaveBeenCalledWith(
       '/vault/budget.md',
       '---\n_display: sheet\n---\n=SUM(B2:D2),January\nRevenue,1200,1300,1400',
+    )
+    unmount()
+  })
+
+  it.each([
+    ['Enter', 'Enter'],
+    ['Tab', 'Tab'],
+    ['ArrowDown', 'ArrowDown'],
+  ])('preserves destination cell contents when %s moves selection before editor blur', async (key, code) => {
+    const flushContentRef = { current: null as ((path: string) => void) | null }
+    const { onContentChange, unmount } = await renderLoadedSheet(
+      '---\n_display: sheet\n---\nMetric,old\nRevenue,foo',
+      { props: { flushContentRef } },
+    )
+    selectSheetCell(1, 2)
+    await activateWorkbookRoot()
+    const cellEditor = screen.getByLabelText<HTMLTextAreaElement>('Cell editor')
+    cellEditor.focus()
+
+    fireEvent.input(cellEditor, { target: { value: 'bar' } })
+    fireEvent.keyDown(cellEditor, { key, code })
+    selectSheetCell(2, 2)
+    fireEvent.blur(cellEditor)
+
+    act(() => {
+      flushContentRef.current?.('/vault/budget.md')
+    })
+    expect(onContentChange).toHaveBeenCalledWith(
+      '/vault/budget.md',
+      '---\n_display: sheet\n---\nMetric,bar\nRevenue,foo',
+    )
+    expect(onContentChange).not.toHaveBeenCalledWith(
+      '/vault/budget.md',
+      '---\n_display: sheet\n---\nMetric,old\nRevenue,bar',
     )
     unmount()
   })

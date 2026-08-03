@@ -16,4 +16,8 @@ describe('sheet editor input events', () => {
     expect(input.value).toBe('=SUM(')
     expect(insertedData).toEqual([null])
   })
+
+  it('ignores missing sheet input targets after editor DOM churn', () => {
+    expect(dispatchSheetInput(null)).toBe(false)
+  })
 })

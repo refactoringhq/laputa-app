@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { VaultEntry } from '../types'
+import { hasSystemMetadataKey } from '../utils/systemMetadata'
 import { contentToEntryPatch, frontmatterToEntryPatch } from './frontmatterOps'
 
 describe('frontmatterOps system metadata', () => {
@@ -21,6 +22,11 @@ describe('frontmatterOps system metadata', () => {
     expect(frontmatterToEntryPatch('delete', '_sidebar_label').patch).toEqual({ sidebarLabel: null })
     expect(frontmatterToEntryPatch('delete', '_order').patch).toEqual({ order: null })
     expect(frontmatterToEntryPatch('delete', '_sort').patch).toEqual({ sort: null })
+  })
+
+  it('recognizes documented type-only system metadata keys', () => {
+    expect(hasSystemMetadataKey(['_pinned_properties'], '_pinned_properties')).toBe(true)
+    expect(hasSystemMetadataKey(['_list_properties_display'], '_list_properties_display')).toBe(true)
   })
 
   it('keeps canonical system metadata out of custom properties', () => {

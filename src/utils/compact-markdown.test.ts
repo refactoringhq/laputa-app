@@ -95,6 +95,11 @@ describe('compactMarkdown', () => {
     expect(compactMarkdown(input)).toBe('Paragraph one.\n\nParagraph two.\n')
   })
 
+  it('preserves consecutive blank lines when requested', () => {
+    const input = 'Paragraph one.\n\n\nParagraph two.\n'
+    expect(compactMarkdown(input, { preserveConsecutiveBlankLines: true })).toBe(input)
+  })
+
   it('handles list after code block', () => {
     const input = '```\ncode\n```\n\n* Item one\n\n* Item two\n'
     expect(compactMarkdown(input)).toBe('```\ncode\n```\n\n- Item one\n- Item two\n')

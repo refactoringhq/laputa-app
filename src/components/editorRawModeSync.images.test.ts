@@ -36,7 +36,7 @@ describe('editorRawModeSync image paths', () => {
     expect(rawLatestContentRef.current).toBe(synced)
   })
 
-  it('serializes root attachment image assets relative to nested notes', () => {
+  it('serializes root attachment image assets with vault-portable paths', () => {
     const editor = imageEditor('![shot](asset://localhost/%2Fvault%2Fattachments%2Fshot.png)\n')
 
     expect(serializeEditorDocumentToMarkdown(
@@ -44,6 +44,6 @@ describe('editorRawModeSync image paths', () => {
       '---\ntitle: Project Plan\n---\n',
       '/vault',
       '/vault/projects/notes/plan.md',
-    )).toBe('---\ntitle: Project Plan\n---\n![shot](../../attachments/shot.png)\n')
+    )).toBe('---\ntitle: Project Plan\n---\n![shot](attachments/shot.png)\n')
   })
 })

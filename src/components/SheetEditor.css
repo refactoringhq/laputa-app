@@ -142,7 +142,10 @@
   position: absolute;
   z-index: 40;
   width: 220px;
-  overflow: hidden;
+  max-height: min(360px, calc(100% - 16px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--border, #d8d8d8);
   border-radius: 6px;
   background: var(--popover, #ffffff);

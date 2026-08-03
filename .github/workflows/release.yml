@@ -31,85 +31,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - id: ver
         shell: bash
         run: |
-          python3 <<'PY' > version.env
-          import re
-          import subprocess
-          from datetime import datetime, timedelta, timezone
-
-          def lines(command: list[str]) -> list[str]:
-              output = subprocess.check_output(command, text=True).strip()
-              return [line for line in output.splitlines() if line]
-
-          alpha_pattern = re.compile(r"^alpha-v(\d{4}\.\d{1,2}\.\d{1,2})-alpha\.(\d+)$")
-
-          def parse_alpha_tag(tag: str) -> tuple[str, int] | None:
-              match = alpha_pattern.fullmatch(tag)
-              if not match:
-                  return None
-              calendar_version, sequence = match.groups()
-              return calendar_version, int(sequence)
-
-          def alpha_version(calendar_version: str, sequence: int) -> str:
-              return f"{calendar_version}-alpha.{sequence}"
-
-          def alpha_tag(calendar_version: str, sequence: int) -> str:
-              return f"alpha-v{calendar_version}-alpha.{sequence:04d}"
-
-          existing_tags = [
-              tag for tag in lines(["git", "tag", "--points-at", "HEAD"])
-              if tag.startswith("alpha-v")
-          ]
-
-          if existing_tags:
-              tag = existing_tags[0]
-              parsed = parse_alpha_tag(tag)
-              version = alpha_version(*parsed) if parsed is not None else tag.removeprefix("alpha-v")
-          else:
-              today = datetime.now(timezone.utc).date()
-              stable_date = None
-              stable_patterns = (
-                  re.compile(r"^v(\d{4})-(\d{2})-(\d{2})$"),
-                  re.compile(r"^stable-v(\d{4})\.(\d{1,2})\.(\d{1,2})$"),
-              )
-
-              stable_tags = lines([
-                  "git", "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)",
-                  "refs/tags/v20*", "refs/tags/stable-v*",
-              ])
-
-              for stable_tag in stable_tags:
-                  match = next((pattern.fullmatch(stable_tag) for pattern in stable_patterns if pattern.fullmatch(stable_tag)), None)
-                  if not match:
-                      continue
-
-                  year, month, day = map(int, match.groups())
-                  try:
-                      stable_date = datetime(year, month, day, tzinfo=timezone.utc).date()
-                  except ValueError:
-                      continue
-                  break
-
-              alpha_date = today if stable_date is None or today > stable_date else stable_date + timedelta(days=1)
-              calendar_version = f"{alpha_date.year}.{alpha_date.month}.{alpha_date.day}"
-              sequence = len(lines(["git", "tag", "--list", f"alpha-v{calendar_version}-alpha.*"])) + 1
-
-              version = alpha_version(calendar_version, sequence)
-              tag = alpha_tag(calendar_version, sequence)
-
-          display_match = re.fullmatch(r"(\d{4})\.(\d{1,2})\.(\d{1,2})-alpha\.(\d+)", version)
-          display_version = (
-              f"Alpha {int(display_match.group(1))}.{int(display_match.group(2))}.{int(display_match.group(3))}.{int(display_match.group(4))}"
-              if display_match
-              else version
-          )
-
-          print(f"version={version}")
-          print(f"display_version={display_version}")
-          print(f"tag={tag}")
-          PY
+          node --test scripts/release-version.test.mjs
+          node scripts/release-version.mjs alpha github > version.env
 
           cat version.env >> "$GITHUB_OUTPUT"
           VERSION=$(grep '^version=' version.env | cut -d= -f2-)

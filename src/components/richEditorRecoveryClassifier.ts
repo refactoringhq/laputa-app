@@ -1,9 +1,10 @@
 const BLOCKNOTE_MISSING_ID_ERROR = "Block doesn't have id"
 const BLOCKNOTE_BLOCK_TYPE_MISMATCH_ERROR = 'Block type does not match'
 const BLOCKNOTE_EMPTY_FRAGMENT_INDEX_ERROR = /^Index \d+ out of range for <>$/
-const BLOCKNOTE_TABLE_ROW_INDEX_ERROR = /^Index \d+ out of range for <tableRow\(/
+const BLOCKNOTE_TABLE_INDEX_ERROR = /^Index \d+ out of range for <table(?:Row)?\(/
 const BLOCKNOTE_PARAGRAPH_INDEX_ERROR = /^Index \d+ out of range for <paragraph\(/
 const PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR = /^Position \d+ out of range$/
+const PROSEMIRROR_SELECTION_OUTSIDE_DOCUMENT_ERROR = 'Selection points outside of document'
 const NULL_APPEND_PROPERTY_ERROR = "Cannot read properties of null (reading 'append')"
 const NULL_FIRST_CHILD_PROPERTY_ERROR = "Cannot read properties of null (reading 'firstChild')"
 const REACT_UPDATE_DEPTH_EXCEEDED_ERROR = 'Maximum update depth exceeded'
@@ -132,7 +133,7 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
     surfaces: ['render', 'transform'],
   },
   {
-    matches: (error) => messageIncludes(error, BLOCKNOTE_MISSING_ID_ERROR),
+    matches: (error) => isMessage(error, BLOCKNOTE_MISSING_ID_ERROR),
     reason: 'block_missing_id',
     repairsDocument: true,
     surfaces: ['render', 'transform'],
@@ -144,7 +145,7 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
     surfaces: ['render', 'transform'],
   },
   {
-    matches: (error) => messageMatches(error, BLOCKNOTE_TABLE_ROW_INDEX_ERROR),
+    matches: (error) => messageMatches(error, BLOCKNOTE_TABLE_INDEX_ERROR),
     reason: 'table_row_index_out_of_range',
     repairsDocument: true,
     surfaces: ['render', 'transform'],
@@ -158,7 +159,10 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
   {
     matches: (error) => (
       error instanceof RangeError
-      && messageMatches(error, PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR)
+      && (
+        messageMatches(error, PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR)
+        || isMessage(error, PROSEMIRROR_SELECTION_OUTSIDE_DOCUMENT_ERROR)
+      )
     ),
     reason: 'prosemirror_position_out_of_range',
     surfaces: ['render', 'transform'],

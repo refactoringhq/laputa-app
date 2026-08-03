@@ -22,35 +22,17 @@ jobs:
       display_version: ${{ steps.ver.outputs.display_version }}
       tag: ${{ steps.ver.outputs.tag }}
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - id: ver
         shell: bash
         run: |
-          python3 <<'PY' > version.env
-          import os
-          import re
-          from datetime import date
-
-          tag = os.environ["GITHUB_REF_NAME"]
-          legacy_match = re.fullmatch(r"stable-v(\d{4})\.(\d{1,2})\.(\d{1,2})", tag)
-          date_match = re.fullmatch(r"v(\d{4})-(\d{2})-(\d{2})", tag)
-
-          if date_match:
-              year, month, day = map(int, date_match.groups())
-              date(year, month, day)
-              version = f"{year}.{month}.{day}"
-              display_version = tag
-          elif legacy_match:
-              year, month, day = map(int, legacy_match.groups())
-              date(year, month, day)
-              version = f"{year}.{month}.{day}"
-              display_version = version
-          else:
-              raise SystemExit(f"Stable tags must use vYYYY-MM-DD or stable-vYYYY.M.D, got {tag}")
-
-          print(f"version={version}")
-          print(f"display_version={display_version}")
-          print(f"tag={tag}")
-          PY
+          node --test scripts/release-version.test.mjs
+          RELEASE_TAG="$GITHUB_REF_NAME" node scripts/release-version.mjs stable github > version.env
 
           cat version.env >> "$GITHUB_OUTPUT"
           DISPLAY_VERSION=$(grep '^display_version=' version.env | cut -d= -f2-)

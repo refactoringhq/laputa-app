@@ -319,6 +319,28 @@ This is a test note with some words to count.
     expect(await screen.findByText('Referrer Note')).toBeInTheDocument()
   })
 
+  it('keeps reference panels mounted while refreshing the same note', async () => {
+    const { rerender } = renderSelectedInspector({
+      entries: [mockEntry, referrerEntry],
+    })
+    expect(await screen.findByText('Referrer Note')).toBeInTheDocument()
+
+    const refreshedEntry = { ...mockEntry, wordCount: 1 }
+    const refreshedReferrer = { ...referrerEntry, title: 'Refreshed Referrer' }
+    rerender(
+      <Inspector
+        {...defaultProps}
+        entry={refreshedEntry}
+        content={mockContent}
+        entries={[refreshedEntry, refreshedReferrer]}
+      />
+    )
+
+    expect(screen.getByText('Referrer Note')).toBeInTheDocument()
+    expect(screen.queryByText('Refreshed Referrer')).not.toBeInTheDocument()
+    expect(await screen.findByText('Refreshed Referrer')).toBeInTheDocument()
+  })
+
   it('hides backlinks section when no notes reference the current note', () => {
     renderSelectedInspector({ entries: [mockEntry] })
     expect(screen.queryByText('Backlinks')).not.toBeInTheDocument()

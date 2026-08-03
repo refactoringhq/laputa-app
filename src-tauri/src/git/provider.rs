@@ -117,7 +117,7 @@ pub fn test_git_provider(
 }
 
 fn native_git_probe() -> GitProviderProbe {
-    let output = Command::new("git").arg("--version").output();
+    let output = crate::hidden_command("git").arg("--version").output();
     match output {
         Ok(output) if output.status.success() => available_probe(
             NATIVE_GIT_IDENTITY,
@@ -266,7 +266,7 @@ fn wsl_supported_on_this_platform() -> bool {
 
 #[cfg(target_os = "windows")]
 fn wsl_distribution_names() -> Result<Vec<String>, String> {
-    let output = Command::new("wsl.exe")
+    let output = crate::hidden_command("wsl.exe")
         .args(["--list", "--quiet"])
         .output()
         .map_err(|err| format!("WSL is unavailable: {err}"))?;
@@ -285,7 +285,7 @@ fn wsl_distribution_names() -> Result<Vec<String>, String> {
 
 #[cfg(target_os = "windows")]
 fn wsl_git_version_command(distro: Option<&str>, translated_vault_path: Option<&str>) -> Command {
-    let mut command = Command::new("wsl.exe");
+    let mut command = crate::hidden_command("wsl.exe");
     if let Some(distro) = distro.map(str::trim).filter(|distro| !distro.is_empty()) {
         command.args(["--distribution", distro]);
     }
@@ -298,7 +298,7 @@ fn wsl_git_version_command(distro: Option<&str>, translated_vault_path: Option<&
 
 #[cfg(not(target_os = "windows"))]
 fn wsl_git_version_command(_distro: Option<&str>, _translated_vault_path: Option<&str>) -> Command {
-    Command::new("wsl.exe")
+    crate::hidden_command("wsl.exe")
 }
 
 #[cfg(any(target_os = "windows", test))]
@@ -401,27 +401,17 @@ mod tests {
     }
 
     #[test]
-    fn translates_windows_drive_paths_for_wsl() {
-        assert_eq!(
-            windows_path_to_wsl_path(r"C:\Users\Luca\Vault").as_deref(),
-            Some("/mnt/c/Users/Luca/Vault")
-        );
-        assert_eq!(
-            windows_path_to_wsl_path("D:/Work/Tolaria").as_deref(),
-            Some("/mnt/d/Work/Tolaria")
-        );
-    }
+    fn translates_windows_paths_for_wsl() {
+        let cases = [
+            (r"C:\Users\Luca\Vault", "/mnt/c/Users/Luca/Vault"),
+            ("D:/Work/Tolaria", "/mnt/d/Work/Tolaria"),
+            (r"\\wsl$\Ubuntu\home\luca\vault", "/home/luca/vault"),
+            (r"\\wsl.localhost\Debian\var\repo", "/var/repo"),
+        ];
 
-    #[test]
-    fn translates_wsl_unc_paths_for_wsl() {
-        assert_eq!(
-            windows_path_to_wsl_path(r"\\wsl$\Ubuntu\home\luca\vault").as_deref(),
-            Some("/home/luca/vault")
-        );
-        assert_eq!(
-            windows_path_to_wsl_path(r"\\wsl.localhost\Debian\var\repo").as_deref(),
-            Some("/var/repo")
-        );
+        for (path, expected) in cases {
+            assert_eq!(windows_path_to_wsl_path(path).as_deref(), Some(expected));
+        }
     }
 
     #[test]
@@ -438,6 +428,23 @@ mod tests {
                 .map(|arg| arg.to_string_lossy().to_string())
                 .collect::<Vec<_>>(),
             vec!["--distribution", "Ubuntu", "--exec", "git"]
+        );
+    }
+
+    #[test]
+    fn provider_probes_use_hidden_process_launches() {
+        let runtime_source = include_str!("provider.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .expect("provider runtime source");
+
+        assert!(
+            !runtime_source.contains("Command::new("),
+            "Settings-triggered Git probes must not create visible Windows consoles"
+        );
+        assert!(
+            runtime_source.matches("crate::hidden_command(").count() >= 4,
+            "every provider probe must use the shared hidden launcher"
         );
     }
 }

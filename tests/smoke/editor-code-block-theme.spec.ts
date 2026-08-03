@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 import {
@@ -9,6 +9,7 @@ import {
 
 const CODE_NOTE_RELATIVE_PATH = path.join('note', 'code-block-theme.md')
 const CODE_NOTE_TITLE = 'Code Block Theme'
+const PASTED_CPP_SNIPPET = '#include <iostream>\nint main() { return 0; }'
 
 function writeCodeThemeFixtureNote(tempVaultDir: string) {
   const notePath = path.join(tempVaultDir, CODE_NOTE_RELATIVE_PATH)
@@ -89,6 +90,13 @@ async function codeBlockLineNumberGeometry(codeBlock: Locator) {
       sourceLeftOffset: firstSourceRect.left - blockRect.left,
     }
   })
+}
+
+async function pasteMarkdownCodeBlock(page: Page, source: string) {
+  await page.evaluate(async (markdown) => {
+    await navigator.clipboard.writeText(markdown)
+  }, `\`\`\`\n${source}\n\`\`\``)
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+V' : 'Control+V')
 }
 
 test.describe('Editor code block theme', () => {
@@ -179,5 +187,52 @@ test.describe('Editor code block theme', () => {
     await createdCode.click()
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A')
     await expect.poll(() => page.evaluate(() => document.getSelection()?.toString())).toBe(source)
+  })
+
+  test('pasted code blocks keep an editable language selector', async ({ context, page }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await openFixtureVault(page, tempVaultDir)
+    const noteItem = page.locator('[data-testid="note-list-container"]')
+      .getByText(CODE_NOTE_TITLE, { exact: true })
+    await expect(noteItem).toBeVisible({ timeout: 10_000 })
+    await noteItem.click()
+
+    const pasteTarget = page.locator('.bn-editor [data-content-type="paragraph"]')
+      .filter({ hasText: 'Convert this paragraph with the shortcut.' })
+      .last()
+    await expect(pasteTarget).toBeVisible()
+    await pasteTarget.click()
+    await page.keyboard.press('End')
+    await page.keyboard.press('Enter')
+    await pasteMarkdownCodeBlock(page, PASTED_CPP_SNIPPET)
+
+    const pastedCodeBlock = page
+      .locator('.bn-block-content[data-content-type="codeBlock"]')
+      .filter({ hasText: '#include <iostream>' })
+      .last()
+    await expect(pastedCodeBlock).toBeVisible({ timeout: 10_000 })
+
+    const languageSelect = pastedCodeBlock.locator('select').first()
+    await expect(languageSelect).toBeVisible()
+    await expect(languageSelect).toBeEnabled()
+    await expect(languageSelect).toHaveValue('text')
+    await expect.poll(() => languageSelect.evaluate((select) => {
+      const style = getComputedStyle(select)
+      return {
+        cursor: style.cursor,
+        minHeight: Number.parseFloat(style.minHeight),
+        paddingInlineEnd: Number.parseFloat(style.paddingInlineEnd),
+      }
+    })).toEqual({
+      cursor: 'pointer',
+      minHeight: 28,
+      paddingInlineEnd: 28,
+    })
+
+    await languageSelect.selectOption('cpp')
+    await expect(languageSelect).toHaveValue('cpp')
+    await expect.poll(() => fs.readFileSync(path.join(tempVaultDir, CODE_NOTE_RELATIVE_PATH), 'utf8'), {
+      timeout: 10_000,
+    }).toContain(`\`\`\`cpp\n${PASTED_CPP_SNIPPET}\n\`\`\``)
   })
 })

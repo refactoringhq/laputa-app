@@ -12,17 +12,32 @@ type CommitMessageArg = String;
 type ConflictStrategyArg = String;
 const GIT_PROVIDER_PROBE_TIMEOUT_SECONDS: u64 = 12;
 
+#[cfg(desktop)]
+async fn run_note_git_operation<T, F>(
+    vault_path: VaultPathArg,
+    path: NotePathArg,
+    operation: F,
+) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce(&str, &str) -> Result<T, String> + Send + 'static,
+{
+    let vault_path = expand_tilde(&vault_path).into_owned();
+    let path = expand_tilde(&path).into_owned();
+    tokio::task::spawn_blocking(move || operation(&vault_path, &path))
+        .await
+        .map_err(|error| format!("Task panicked: {error}"))?
+}
+
 // ── Git commands (desktop) ──────────────────────────────────────────────────
 
 #[cfg(desktop)]
 #[tauri::command]
-pub fn get_file_history(
+pub async fn get_file_history(
     vault_path: VaultPathArg,
     path: NotePathArg,
 ) -> Result<Vec<GitCommit>, String> {
-    let vault_path = expand_tilde(&vault_path);
-    let path = expand_tilde(&path);
-    crate::git::get_file_history(&vault_path, &path)
+    run_note_git_operation(vault_path, path, crate::git::get_file_history).await
 }
 
 #[cfg(desktop)]
@@ -195,11 +210,7 @@ pub async fn git_file_url(
     vault_path: VaultPathArg,
     path: NotePathArg,
 ) -> Result<Option<String>, String> {
-    let vault_path = expand_tilde(&vault_path).into_owned();
-    let path = expand_tilde(&path).into_owned();
-    tokio::task::spawn_blocking(move || crate::git::git_file_url(&vault_path, &path))
-        .await
-        .map_err(|e| format!("Task panicked: {e}"))?
+    run_note_git_operation(vault_path, path, crate::git::git_file_url).await
 }
 
 #[cfg(desktop)]
@@ -542,7 +553,7 @@ mod tests {
         assert!(diff.contains("# Updated"));
 
         git_commit(vault.clone(), "Update note".to_string()).unwrap();
-        let history = get_file_history(vault.clone(), note.clone()).unwrap();
+        let history = get_file_history(vault.clone(), note.clone()).await.unwrap();
         assert!(history.iter().any(|commit| commit.message == "Update note"));
 
         let last_commit = get_last_commit_info(vault.clone()).unwrap().unwrap();

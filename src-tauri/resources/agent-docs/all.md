@@ -486,7 +486,9 @@ Suggested properties are the fields Tolaria knows how to create quickly from the
 
 Fields that start with `_` are system properties. They remain in plain text but are hidden from normal property editing.
 
-Examples include `_icon`, `_color`, `_order`, `_sidebar_label`, `_width`, and `_pinned_properties` on type documents or notes.
+Examples include `_icon`, `_color`, `_order`, `_sidebar_label`, `_width`, `_pinned_properties`, and `_list_properties_display` on type documents or notes.
+
+Type documents use `_pinned_properties` to choose which fields appear in the editor inline bar and `_list_properties_display` to choose which fields appear in note-list rows.
 
 ## Property Editing
 
@@ -1875,7 +1877,8 @@ Tolaria uses conventions instead of a required schema.
 | `_display` | Display mode. Omit for text notes; use `sheet` for spreadsheet notes. |
 | `_icon`, `_color` | Type or note appearance metadata. `_icon` values use Phosphor icon names in kebab-case, emoji, or HTTP(S) image URLs. |
 | `_sidebar_label`, `_order` | Type sidebar label and order. |
-| `_pinned_properties` | Properties pinned for a type. |
+| `_pinned_properties` | Properties pinned in the editor inline bar for notes of a type. |
+| `_list_properties_display` | Properties shown as note-list chips or columns for notes of a type. |
 | `_sheet` | Sheet-note presentation metadata such as grid settings, column widths, row heights, and cell formatting. |
 
 ## Custom Fields

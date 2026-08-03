@@ -39,6 +39,7 @@ const SANITIZE_CONFIG = {
 
 interface HtmlBlockPreview {
   sanitizedHtml: string
+  src?: string
   srcDoc: string
 }
 
@@ -213,13 +214,20 @@ function htmlBlockIframeSrcDocFromSanitizedHtml({
   ].join('')
 }
 
+function sandboxedScriptDataUrl(srcDoc: string, scripts: HtmlBlockScripts): string | undefined {
+  if (scripts !== SCRIPTS_SANDBOXED) return undefined
+  return `data:text/html;charset=utf-8,${encodeURIComponent(srcDoc)}`
+}
+
 export function htmlBlockPreview(markup: string, options: HtmlBlockPreviewOptions = {}): HtmlBlockPreview {
   const scripts = normalizeBlockScripts(options.scripts)
   const sanitized = sanitizeMarkupParts(markup, { scripts })
   const sanitizedHtml = `${sanitized.styleHtml}${sanitized.bodyHtml}${sanitized.scriptHtml}`
+  const srcDoc = htmlBlockIframeSrcDocFromSanitizedHtml(sanitized, scripts)
   return {
     sanitizedHtml,
-    srcDoc: htmlBlockIframeSrcDocFromSanitizedHtml(sanitized, scripts),
+    src: sandboxedScriptDataUrl(srcDoc, scripts),
+    srcDoc,
   }
 }
 

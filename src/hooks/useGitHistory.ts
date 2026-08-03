@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import type { GitCommit } from '../types'
 
 const GIT_HISTORY_LOAD_DELAY_MS = 200
@@ -18,6 +18,7 @@ export function useGitHistory(
     commits: [],
     refreshKey: -1,
   })
+  const loadCurrentHistory = useEffectEvent(loadGitHistory)
 
   useEffect(() => {
     if (!enabled || !activeTabPath) return
@@ -25,7 +26,7 @@ export function useGitHistory(
     let cancelled = false
 
     const timeoutId = window.setTimeout(() => {
-      void loadGitHistory(activeTabPath).then((history) => {
+      void loadCurrentHistory(activeTabPath).then((history) => {
         if (cancelled) return
         setLoadedHistory({
           path: activeTabPath,
@@ -39,7 +40,7 @@ export function useGitHistory(
       cancelled = true
       window.clearTimeout(timeoutId)
     }
-  }, [activeTabPath, enabled, loadGitHistory, refreshKey])
+  }, [activeTabPath, enabled, refreshKey])
 
   return enabled && activeTabPath && loadedHistory.path === activeTabPath && loadedHistory.refreshKey === refreshKey
     ? loadedHistory.commits

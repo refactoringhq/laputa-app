@@ -6,11 +6,15 @@
  * - HTML entities like `&#x20;` decoded back to spaces
  * - Leading/trailing inline whitespace moved outside bold markers
  * - Stray hard-break-only lines removed after a markdown hard break
- * - No runs of 3+ blank lines (collapsed to one blank line)
+ * - No runs of 3+ blank lines (collapsed to one blank line unless explicitly preserved)
  * - No trailing blank lines
  * - Code block content is never modified
  */
-export function compactMarkdown(md: string): string {
+export interface CompactMarkdownOptions {
+  preserveConsecutiveBlankLines?: boolean
+}
+
+export function compactMarkdown(md: string, options: CompactMarkdownOptions = {}): string {
   if (!md) return md
 
   const source = { lines: md.split('\n') }
@@ -18,7 +22,7 @@ export function compactMarkdown(md: string): string {
   let inCodeBlock = false
 
   for (let i = 0; i < source.lines.length; i++) {
-    const next = processMarkdownLine({ doc: source, idx: i, inCodeBlock })
+    const next = processMarkdownLine({ doc: source, idx: i, inCodeBlock, options })
     inCodeBlock = next.inCodeBlock
     if (next.line !== null) {
       result.lines.push(next.line)
@@ -48,14 +52,16 @@ interface MarkdownLineValue {
 
 interface NormalizedLinePosition extends LinePosition {
   line: string
+  options: CompactMarkdownOptions
 }
 
 interface ProcessMarkdownLineArgs extends LinePosition {
   inCodeBlock: boolean
+  options: CompactMarkdownOptions
 }
 
 function processMarkdownLine(
-  { doc, idx, inCodeBlock }: ProcessMarkdownLineArgs,
+  { doc, idx, inCodeBlock, options }: ProcessMarkdownLineArgs,
 ): { inCodeBlock: boolean; line: string | null } {
   const rawLine = doc.lines.at(idx) ?? ''
 
@@ -68,7 +74,7 @@ function processMarkdownLine(
   }
 
   const line = normalizeMarkdownLine({ line: rawLine })
-  if (shouldSkipLine({ doc, idx, line })) {
+  if (shouldSkipLine({ doc, idx, line, options })) {
     return { inCodeBlock, line: null }
   }
 
@@ -86,12 +92,12 @@ function normalizeMarkdownLine({ line }: MarkdownLineValue): string {
   return normalizeStrongWhitespace({ line: decodedEntities })
 }
 
-function shouldSkipLine({ doc, idx, line }: NormalizedLinePosition): boolean {
+function shouldSkipLine({ doc, idx, line, options }: NormalizedLinePosition): boolean {
   if (line.trim() === '') {
-    return isBlankBetweenListItems({ doc, idx }) || isExcessiveBlankLine({ doc, idx })
+    return isBlankBetweenListItems({ doc, idx }) || isExcessiveBlankLine({ doc, idx, line, options })
   }
 
-  return isRedundantHardBreakLine({ doc, idx, line })
+  return isRedundantHardBreakLine({ doc, idx, line, options })
 }
 
 /** True if this blank line sits between two list items (including nested) */
@@ -104,7 +110,8 @@ function isBlankBetweenListItems({ doc, idx }: LinePosition): boolean {
 
 /** True if this blank line is part of a run of 2+ consecutive blank lines
  *  (i.e. would create 3+ newlines in a row — collapse to just one blank line) */
-function isExcessiveBlankLine({ doc, idx }: LinePosition): boolean {
+function isExcessiveBlankLine({ doc, idx, options }: NormalizedLinePosition): boolean {
+  if (options.preserveConsecutiveBlankLines) return false
   // Keep the first blank line in a run, skip subsequent ones
   if (idx > 0 && (doc.lines.at(idx - 1) ?? '').trim() === '') return true
   return false

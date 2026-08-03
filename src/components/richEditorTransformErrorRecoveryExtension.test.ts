@@ -16,6 +16,19 @@ function transformError(message = 'Invalid transform') {
   return error
 }
 
+function nodeIndexMessage(nodeDescription: string, index = 1) {
+  const openNode = String.fromCharCode(60)
+  const closeNode = String.fromCharCode(62)
+
+  return `Index ${index} out of range for ${openNode}${nodeDescription}${closeNode}`
+}
+
+function tableRootIndexMessage() {
+  return nodeIndexMessage(
+    'table(tableRow(tableCell(tableParagraph), tableCell(tableParagraph("done")), tableCell(tableParagraph("@zhaoliu"))))',
+  )
+}
+
 function nullFragmentAppendError(message = "null is not an object (evaluating 'o.fillBefore(e).append')") {
   return new TypeError(message)
 }
@@ -104,19 +117,20 @@ describe('isRecoverableEditorTransformError', () => {
       'Inserted content deeper than insertion position',
     ))).toBe(true)
     expect(isRecoverableEditorTransformError(new RangeError(
-      'Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>',
+      nodeIndexMessage('tableRow(tableCell(tableParagraph("A")))'),
     ))).toBe(true)
     expect(isRecoverableEditorTransformError(new Error(
-      'Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>',
+      nodeIndexMessage('tableRow(tableCell(tableParagraph("A")))'),
     ))).toBe(true)
+    expect(isRecoverableEditorTransformError(new RangeError(tableRootIndexMessage()))).toBe(true)
     expect(isRecoverableEditorTransformError(new RangeError(
-      'Index 1 out of range for <paragraph("/")>',
+      nodeIndexMessage('paragraph("/")'),
     ))).toBe(true)
     expect(isRecoverableEditorTransformError(new Error(
-      'Index 1 out of range for <paragraph("/")>',
+      nodeIndexMessage('paragraph("/")'),
     ))).toBe(true)
     expect(isRecoverableEditorTransformError(new RangeError(
-      'Index 0 out of range for <>',
+      nodeIndexMessage('', 0),
     ))).toBe(true)
     expect(isRecoverableEditorTransformError(new Error(
       'Block with ID 6c1c3bb4-e218-4f00-aaf5-40606852d286 not found',
@@ -292,28 +306,35 @@ describe('installRichEditorTransformErrorRecovery', () => {
 
   it('recovers table selection transactions whose target row changed underneath BlockNote', () => {
     expectDocumentRepairRecovery(
-      new RangeError('Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>'),
+      new RangeError(nodeIndexMessage('tableRow(tableCell(tableParagraph("A")))')),
+      'table_row_index_out_of_range',
+    )
+  })
+
+  it('recovers table-root index transactions from stale BlockNote table selections', () => {
+    expectDocumentRepairRecovery(
+      new RangeError(tableRootIndexMessage()),
       'table_row_index_out_of_range',
     )
   })
 
   it('recovers production table row index transactions reported as plain errors', () => {
     expectDocumentRepairRecovery(
-      new Error('Index 1 out of range for <tableRow(tableCell(tableParagraph("A")))>'),
+      new Error(nodeIndexMessage('tableRow(tableCell(tableParagraph("A")))')),
       'table_row_index_out_of_range',
     )
   })
 
   it('recovers production paragraph index transactions from stale slash input', () => {
     expectDocumentRepairRecovery(
-      new RangeError('Index 1 out of range for <paragraph("/")>'),
+      new RangeError(nodeIndexMessage('paragraph("/")')),
       'paragraph_index_out_of_range',
     )
   })
 
   it('recovers production empty-fragment index transactions from stale selections', () => {
     expectDocumentRepairRecovery(
-      new RangeError('Index 0 out of range for <>'),
+      new RangeError(nodeIndexMessage('', 0)),
       'empty_fragment_index_out_of_range',
     )
   })

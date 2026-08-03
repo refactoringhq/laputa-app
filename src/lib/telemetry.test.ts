@@ -263,6 +263,39 @@ describe('initSentry', () => {
     expect(beforeSend(unrecoveredEvent, { originalException: unrecoveredError })).toBe(unrecoveredEvent)
   })
 
+  it('drops recovered BlockNote missing-id events across Sentry event surfaces', () => {
+    const beforeSend = initSentryBeforeSend()
+    const exceptionEvent = {
+      exception: {
+        values: [{
+          type: 'Error',
+          value: "Block doesn't have id",
+        }],
+      },
+    }
+    const messageEvent = {
+      message: "Error: Block doesn't have id",
+    }
+    const hintedEvent = {
+      message: 'Script error.',
+    }
+    const unrelatedEvent = {
+      exception: {
+        values: [{
+          type: 'Error',
+          value: "Block doesn't have identifier",
+        }],
+      },
+    }
+
+    expect(beforeSend(exceptionEvent)).toBeNull()
+    expect(beforeSend(messageEvent)).toBeNull()
+    expect(beforeSend(hintedEvent, {
+      originalException: new Error("Block doesn't have id"),
+    })).toBeNull()
+    expect(beforeSend(unrelatedEvent)).toBe(unrelatedEvent)
+  })
+
   it('drops recovered WebKit DOM NotFoundError events before sending them to Sentry', () => {
     const beforeSend = initSentryBeforeSend()
     const webKitDomEvent = {

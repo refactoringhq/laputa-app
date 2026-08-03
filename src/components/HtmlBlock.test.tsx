@@ -61,6 +61,7 @@ describe('HtmlBlock', () => {
     expect(frame.getAttribute('sandbox')).toBe('allow-popups allow-popups-to-escape-sandbox')
     expect(frame.getAttribute('sandbox')).not.toContain('allow-scripts')
     expect(frame.getAttribute('sandbox')).not.toContain('allow-same-origin')
+    expect(frame.getAttribute('src')).toBeNull()
     expect(frame.srcdoc).not.toContain('<script')
     expect(frame.srcdoc).not.toContain('onclick')
     expect(frame.srcdoc).toContain('<button>Click</button>')
@@ -74,11 +75,16 @@ describe('HtmlBlock', () => {
     })
 
     const frame = screen.getByTitle('Sandboxed HTML block preview') as HTMLIFrameElement
+    const source = frame.getAttribute('src')
 
     expect(frame.getAttribute('sandbox')).toBe('allow-scripts allow-popups allow-popups-to-escape-sandbox')
     expect(frame.getAttribute('sandbox')).not.toContain('allow-same-origin')
-    expect(frame.srcdoc).toContain("script-src 'unsafe-inline'")
-    expect(frame.srcdoc).toContain('<script>document.getElementById("app").textContent = "Ready"</script>')
+    expect(frame.hasAttribute('srcdoc')).toBe(false)
+    expect(source).toMatch(/^data:text\/html;charset=utf-8,/u)
+    expect(decodeURIComponent(source?.split(',').slice(1).join(',') ?? '')).toContain("script-src 'unsafe-inline'")
+    expect(decodeURIComponent(source?.split(',').slice(1).join(',') ?? '')).toContain(
+      '<script>document.getElementById("app").textContent = "Ready"</script>',
+    )
   })
 
   it('resolves current-note property expressions before sandboxing the preview', () => {

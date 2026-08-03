@@ -12,6 +12,7 @@ const ASSET_URL_PREFIXES = [
 const ATTACHMENTS_SEGMENT = '/attachments/'
 const RELATIVE_ATTACHMENTS_PREFIX = 'attachments/'
 const DOT_RELATIVE_ATTACHMENTS_PREFIX = `./${RELATIVE_ATTACHMENTS_PREFIX}`
+const ROOT_RELATIVE_ATTACHMENTS_PREFIX = `/${RELATIVE_ATTACHMENTS_PREFIX}`
 const WINDOWS_EXTENDED_PATH_PREFIX = '\\\\?\\'
 const WINDOWS_EXTENDED_UNC_PREFIX = '\\\\?\\UNC\\'
 const WINDOWS_DRIVE_PATH_PATTERN = /^[A-Za-z]:[\\/]/
@@ -69,7 +70,8 @@ function relativePathForVault({
 }
 
 function normalizePortableAttachmentPath(path: AttachmentPath): AttachmentPath {
-  return path.startsWith(DOT_RELATIVE_ATTACHMENTS_PREFIX) ? path.slice(2) : path
+  if (path.startsWith(DOT_RELATIVE_ATTACHMENTS_PREFIX)) return path.slice(2)
+  return path.startsWith(ROOT_RELATIVE_ATTACHMENTS_PREFIX) ? path.slice(1) : path
 }
 
 function removeWindowsExtendedPrefix(path: AbsolutePath): AbsolutePath {
@@ -190,6 +192,7 @@ export function vaultAttachmentAssetUrl({
 export function isPortableAttachmentPath({ path }: PathRequest): boolean {
   return path.startsWith(RELATIVE_ATTACHMENTS_PREFIX)
     || path.startsWith(DOT_RELATIVE_ATTACHMENTS_PREFIX)
+    || path.startsWith(ROOT_RELATIVE_ATTACHMENTS_PREFIX)
 }
 
 export function isTauriAssetUrl({ url }: UrlRequest): boolean {
