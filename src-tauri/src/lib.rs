@@ -131,16 +131,28 @@ fn setup_desktop_plugins(app: &mut tauri::App) -> Result<(), Box<dyn std::error:
     setup_macos_webview_shortcut_prevention(app)?;
     macos_fullscreen_escape::setup(app)?;
     setup_deep_link_runtime_registration(app)?;
+    install_desktop_runtime_plugins(app)?;
+    setup_native_desktop_menu(app)?;
+    setup_custom_window_chrome(app)?;
+    window_state::restore_main_window_state(app);
+    show_debug_main_window(app);
+    Ok(())
+}
+
+#[cfg(desktop)]
+fn install_desktop_runtime_plugins(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.handle()
         .plugin(tauri_plugin_updater::Builder::new().build())?;
     app.handle().plugin(tauri_plugin_process::init())?;
     app.handle().plugin(tauri_plugin_opener::init())?;
+    Ok(())
+}
+
+#[cfg(desktop)]
+fn setup_native_desktop_menu(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     if should_use_native_desktop_menu(std::env::consts::OS) {
         menu::setup_menu(app)?;
     }
-    setup_custom_window_chrome(app)?;
-    window_state::restore_main_window_state(app);
-    show_debug_main_window(app);
     Ok(())
 }
 

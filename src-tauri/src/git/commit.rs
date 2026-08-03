@@ -12,19 +12,7 @@ pub fn git_commit(vault_path: &str, message: &str) -> Result<String, String> {
     let workspace = GitWorkspace::resolve(vault)?
         .ok_or_else(|| "Vault is not inside a Git work tree".to_string())?;
 
-    let add = git_command_at(workspace.git_root())
-        .and_then(|mut command| {
-            command
-                .args(["add", "-A", "--", workspace.vault_pathspec()])
-                .output()
-        })
-        .map_err(|e| format!("Failed to run git add: {e}"))?;
-
-    if !add.status.success() {
-        let stderr = String::from_utf8_lossy(&add.stderr);
-        return Err(format!("git add failed: {}", stderr));
-    }
-
+    stage_vault_changes(&workspace)?;
     ensure_author_config(workspace.git_root())?;
 
     match run_commit(&workspace, message, false) {
@@ -39,6 +27,23 @@ pub fn git_commit(vault_path: &str, message: &str) -> Result<String, String> {
         }
         Err(failure) => Err(format!("git commit failed: {}", failure.detail())),
     }
+}
+
+fn stage_vault_changes(workspace: &GitWorkspace) -> Result<(), String> {
+    let add = git_command_at(workspace.git_root())
+        .and_then(|mut command| {
+            command
+                .args(["add", "-A", "--", workspace.vault_pathspec()])
+                .output()
+        })
+        .map_err(|e| format!("Failed to run git add: {e}"))?;
+
+    if !add.status.success() {
+        let stderr = String::from_utf8_lossy(&add.stderr);
+        return Err(format!("git add failed: {}", stderr));
+    }
+
+    Ok(())
 }
 
 fn run_commit(

@@ -33,10 +33,14 @@ fn parse_calendar_build_label(version: &str) -> Option<String> {
         day.parse::<u32>().ok()?
     );
 
+    calendar_prerelease_label(core_version, prerelease)
+}
+
+fn calendar_prerelease_label(core_version: String, prerelease: Option<&str>) -> Option<String> {
     match prerelease {
         Some(suffix) if suffix.starts_with("alpha.") => suffix
             .strip_prefix("alpha.")
-            .map(|sequence| format!("Alpha {}.{}", core_version, sequence)),
+            .map(|sequence| format!("Alpha {core_version}.{sequence}")),
         Some(suffix) if suffix.starts_with("stable.") => Some(core_version),
         Some(_) => None,
         None => Some(core_version),

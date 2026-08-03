@@ -21,17 +21,16 @@ enum ConnectStatus {
     Error,
 }
 
-impl ConnectStatus {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Connected => "connected",
-            Self::AlreadyConfigured => "already_configured",
-            Self::IncompatibleHistory => "incompatible_history",
-            Self::AuthError => "auth_error",
-            Self::NetworkError => "network_error",
-            Self::Error => "error",
-        }
-    }
+fn connect_status_label(status: ConnectStatus) -> String {
+    let label = match status {
+        ConnectStatus::Connected => "connected",
+        ConnectStatus::AlreadyConfigured => "already_configured",
+        ConnectStatus::IncompatibleHistory => "incompatible_history",
+        ConnectStatus::AuthError => "auth_error",
+        ConnectStatus::NetworkError => "network_error",
+        ConnectStatus::Error => "error",
+    };
+    label.to_string()
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -83,36 +82,63 @@ pub fn disconnect_all_remotes(vault_path: &str) -> Result<(), String> {
 pub fn git_add_remote(vault_path: &str, remote_url: &str) -> Result<GitAddRemoteResult, String> {
     let vault = Path::new(vault_path);
 
-    if remote_url.trim().is_empty() {
-        return Ok(connect_result(
-            ConnectStatus::Error,
-            "Enter a repository URL before connecting a remote.",
-        ));
-    }
-
-    if !list_remotes(vault)?.is_empty() {
-        return Ok(connect_result(
-            ConnectStatus::AlreadyConfigured,
-            "This vault already has a remote configured.",
-        ));
+    if let Some(result) = validate_remote_request(vault, remote_url)? {
+        return Ok(result);
     }
 
     ensure_author_config(vault)?;
 
-    let branch = current_branch(vault)?;
-    if branch.is_empty() {
-        return Ok(connect_result(
-            ConnectStatus::Error,
-            "Tolaria could not determine the current branch for this vault.",
-        ));
-    }
-    let connection = RemoteConnection::new(branch);
+    let Some(connection) = connection_for_current_branch(vault)? else {
+        return Ok(missing_branch_result());
+    };
 
+    configure_and_connect(vault_path, vault, remote_url, &connection)
+}
+
+fn validate_remote_request(
+    vault: &Path,
+    remote_url: &str,
+) -> Result<Option<GitAddRemoteResult>, String> {
+    if remote_url.trim().is_empty() {
+        return Ok(Some(connect_result(
+            ConnectStatus::Error,
+            "Enter a repository URL before connecting a remote.",
+        )));
+    }
+
+    Ok((!list_remotes(vault)?.is_empty()).then(|| {
+        connect_result(
+            ConnectStatus::AlreadyConfigured,
+            "This vault already has a remote configured.",
+        )
+    }))
+}
+
+fn connection_for_current_branch(vault: &Path) -> Result<Option<RemoteConnection>, String> {
+    Ok(match current_branch(vault)? {
+        branch if branch.is_empty() => None,
+        branch => Some(RemoteConnection::new(branch)),
+    })
+}
+
+fn missing_branch_result() -> GitAddRemoteResult {
+    connect_result(
+        ConnectStatus::Error,
+        "Tolaria could not determine the current branch for this vault.",
+    )
+}
+
+fn configure_and_connect(
+    vault_path: &str,
+    vault: &Path,
+    remote_url: &str,
+    connection: &RemoteConnection,
+) -> Result<GitAddRemoteResult, String> {
     let trimmed_url = remote_url.trim();
     configure_origin_remote(vault, trimmed_url)?;
     request_remote_credentials(vault, trimmed_url);
 
-    let result = finish_remote_connection(vault, &connection);
+    let result = finish_remote_connection(vault, connection);
     if result.status != "connected" {
         let _ = disconnect_all_remotes(vault_path);
     }
@@ -174,7 +200,7 @@ fn finish_remote_connection(vault: &Path, connection: &RemoteConnection) -> GitA
 
 fn connect_result(status: ConnectStatus, message: impl Into<String>) -> GitAddRemoteResult {
     GitAddRemoteResult {
-        status: status.as_str().to_string(),
+        status: connect_status_label(status),
         message: message.into(),
     }
 }
@@ -341,251 +367,5 @@ fn concise_git_detail(stderr: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::git::tests::{setup_git_repo, GitConfigEnvGuard};
-    use crate::git::{git_commit, git_remote_status};
-    use std::fs;
-    use std::process::Command as StdCommand;
-    use tempfile::TempDir;
-
-    fn init_bare_remote(path: &Path) {
-        StdCommand::new("git")
-            .args(["init", "--bare", "--initial-branch=main"])
-            .current_dir(path)
-            .output()
-            .unwrap();
-    }
-
-    fn configure_author(path: &Path, email: &str, name: &str) {
-        StdCommand::new("git")
-            .args(["config", "user.email", email])
-            .current_dir(path)
-            .output()
-            .unwrap();
-        StdCommand::new("git")
-            .args(["config", "user.name", name])
-            .current_dir(path)
-            .output()
-            .unwrap();
-    }
-
-    fn seed_remote_history(bare_path: &Path) {
-        let working = TempDir::new().unwrap();
-
-        StdCommand::new("git")
-            .args(["clone", bare_path.to_str().unwrap(), "."])
-            .current_dir(working.path())
-            .output()
-            .unwrap();
-        configure_author(working.path(), "remote@test.com", "Remote User");
-        fs::write(working.path().join("remote.md"), "# Remote\n").unwrap();
-        StdCommand::new("git")
-            .args(["add", "."])
-            .current_dir(working.path())
-            .output()
-            .unwrap();
-        StdCommand::new("git")
-            .args(["commit", "-m", "Seed remote"])
-            .current_dir(working.path())
-            .output()
-            .unwrap();
-        StdCommand::new("git")
-            .args(["push", "origin", "main"])
-            .current_dir(working.path())
-            .output()
-            .unwrap();
-    }
-
-    fn create_local_commit(path: &Path, filename: &str, title: &str, message: &str) {
-        fs::write(path.join(filename), format!("# {title}\n")).unwrap();
-        git_commit(path.to_str().unwrap(), message).unwrap();
-    }
-
-    fn clear_local_author(path: &Path) {
-        for key in ["user.name", "user.email"] {
-            StdCommand::new("git")
-                .args(["config", "--local", "--unset-all", key])
-                .current_dir(path)
-                .output()
-                .unwrap();
-        }
-    }
-
-    fn local_author_is_configured(path: &Path) -> bool {
-        ["user.name", "user.email"].into_iter().all(|key| {
-            let output = StdCommand::new("git")
-                .args(["config", "--local", key])
-                .current_dir(path)
-                .output()
-                .unwrap();
-
-            output.status.success() && !String::from_utf8_lossy(&output.stdout).trim().is_empty()
-        })
-    }
-
-    #[test]
-    fn disconnect_all_remotes_removes_every_remote() {
-        let dir = setup_git_repo();
-        let vault = dir.path();
-        let vault_path = vault.to_str().unwrap();
-
-        StdCommand::new("git")
-            .args(["remote", "add", "origin", "https://example.com/one.git"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-        StdCommand::new("git")
-            .args(["remote", "add", "backup", "https://example.com/two.git"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-
-        disconnect_all_remotes(vault_path).unwrap();
-
-        assert!(list_remotes(vault).unwrap().is_empty());
-    }
-
-    #[test]
-    fn git_add_remote_connects_an_empty_remote_and_pushes_local_history() {
-        let local = setup_git_repo();
-        configure_author(local.path(), "local@test.com", "Local User");
-        create_local_commit(local.path(), "note.md", "Local", "Initial local commit");
-
-        let bare = TempDir::new().unwrap();
-        init_bare_remote(bare.path());
-
-        let result = git_add_remote(
-            local.path().to_str().unwrap(),
-            bare.path().to_str().unwrap(),
-        )
-        .unwrap();
-
-        assert_eq!(result.status, "connected");
-        assert!(result.message.contains("tracking"));
-
-        let status = git_remote_status(local.path().to_str().unwrap()).unwrap();
-        assert!(status.has_remote);
-        assert_eq!((status.ahead, status.behind), (0, 0));
-    }
-
-    #[test]
-    fn git_add_remote_sets_local_identity_when_existing_repo_has_none() {
-        let _env = GitConfigEnvGuard::isolated();
-
-        let local = setup_git_repo();
-        create_local_commit(local.path(), "note.md", "Local", "Initial local commit");
-        clear_local_author(local.path());
-        assert!(!local_author_is_configured(local.path()));
-
-        let bare = TempDir::new().unwrap();
-        init_bare_remote(bare.path());
-
-        let result = git_add_remote(
-            local.path().to_str().unwrap(),
-            bare.path().to_str().unwrap(),
-        )
-        .unwrap();
-
-        assert_eq!(result.status, "connected");
-        assert!(local_author_is_configured(local.path()));
-
-        let email = StdCommand::new("git")
-            .args(["config", "--local", "user.email"])
-            .current_dir(local.path())
-            .output()
-            .unwrap();
-        assert_eq!(
-            String::from_utf8_lossy(&email.stdout).trim(),
-            "vault@tolaria.default"
-        );
-    }
-
-    #[test]
-    fn git_add_remote_pushes_when_remote_is_the_local_branch_ancestor() {
-        let local = setup_git_repo();
-        configure_author(local.path(), "local@test.com", "Local User");
-        create_local_commit(local.path(), "note.md", "Base", "Base commit");
-
-        let bare = TempDir::new().unwrap();
-        StdCommand::new("git")
-            .args([
-                "clone",
-                "--bare",
-                local.path().to_str().unwrap(),
-                bare.path().to_str().unwrap(),
-            ])
-            .output()
-            .unwrap();
-
-        create_local_commit(local.path(), "next.md", "Next", "Local follow-up");
-
-        let result = git_add_remote(
-            local.path().to_str().unwrap(),
-            bare.path().to_str().unwrap(),
-        )
-        .unwrap();
-
-        assert_eq!(result.status, "connected");
-
-        let status = git_remote_status(local.path().to_str().unwrap()).unwrap();
-        assert!(status.has_remote);
-        assert_eq!((status.ahead, status.behind), (0, 0));
-    }
-
-    #[test]
-    fn git_add_remote_rejects_unrelated_remote_history_and_cleans_up() {
-        let local = setup_git_repo();
-        configure_author(local.path(), "local@test.com", "Local User");
-        create_local_commit(local.path(), "note.md", "Local", "Local commit");
-
-        let bare = TempDir::new().unwrap();
-        init_bare_remote(bare.path());
-        seed_remote_history(bare.path());
-
-        let result = git_add_remote(
-            local.path().to_str().unwrap(),
-            bare.path().to_str().unwrap(),
-        )
-        .unwrap();
-
-        assert_eq!(result.status, "incompatible_history");
-        assert!(result.message.contains("unrelated history"));
-        assert!(list_remotes(local.path()).unwrap().is_empty());
-    }
-
-    #[test]
-    fn git_add_remote_reports_when_the_vault_is_already_remote_backed() {
-        let local = setup_git_repo();
-        let vault = local.path();
-
-        StdCommand::new("git")
-            .args(["remote", "add", "origin", "https://example.com/repo.git"])
-            .current_dir(vault)
-            .output()
-            .unwrap();
-
-        let result =
-            git_add_remote(vault.to_str().unwrap(), "https://example.com/other.git").unwrap();
-
-        assert_eq!(result.status, "already_configured");
-    }
-
-    #[test]
-    fn classify_connect_error_maps_auth_failures() {
-        let result = classify_connect_error(
-            "fatal: unable to access 'https://github.com/org/repo.git/': The requested URL returned error: 403",
-        );
-
-        assert_eq!(result.status, "auth_error");
-    }
-
-    #[test]
-    fn classify_connect_error_maps_network_failures() {
-        let result = classify_connect_error(
-            "fatal: unable to access 'https://github.com/org/repo.git/': Could not resolve host: github.com",
-        );
-
-        assert_eq!(result.status, "network_error");
-    }
-}
+#[path = "connect_tests.rs"]
+mod tests;

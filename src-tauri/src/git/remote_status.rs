@@ -37,23 +37,23 @@ pub fn git_remote_status(vault_path: impl AsRef<Path>) -> Result<GitRemoteStatus
         return Ok(status_without_upstream(branch));
     };
 
+    let (ahead, behind) = upstream_counts(git_root, &target.display)?;
+
+    Ok(status_with_upstream(branch, target.display, ahead, behind))
+}
+
+fn upstream_counts(git_root: &Path, target: &str) -> Result<(u32, u32), String> {
+    let revision_range = format!("HEAD...{target}");
     let output = git_output_result(
         git_root,
-        &[
-            "rev-list",
-            "--left-right",
-            "--count",
-            &format!("HEAD...{}", target.display),
-        ],
+        &["rev-list", "--left-right", "--count", &revision_range],
     )?;
 
-    let (ahead, behind) = if output.status.success() {
+    Ok(if output.status.success() {
         parse_ahead_behind(&stdout_text(&output))
     } else {
         (0, 0)
-    };
-
-    Ok(status_with_upstream(branch, target.display, ahead, behind))
+    })
 }
 
 fn status_without_remote(branch: String) -> GitRemoteStatus {
