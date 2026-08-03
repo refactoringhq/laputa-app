@@ -53,6 +53,24 @@ export function markNoteOpenTrace(path: string, stage: NoteOpenStage): void {
   Reflect.set(trace.marks, stage, performance.now())
 }
 
+function editorSwapDuration(trace: NoteOpenTrace): number | null {
+  const candidateStarts: Array<keyof NoteOpenTrace['marks'] | 'startedAt'> = [
+    'contentLoadEnd',
+    'freshnessCheckEnd',
+    'beforeNavigateEnd',
+    'startedAt',
+  ]
+  for (const start of candidateStarts) {
+    const duration = measureDuration(trace, start, 'editorSwapped')
+    if (duration !== null) return duration
+  }
+  return null
+}
+
+function cacheStatus(trace: NoteOpenTrace): 'hit' | 'miss' {
+  return Reflect.get(trace.marks, 'cacheReady') === undefined ? 'miss' : 'hit'
+}
+
 export function finishNoteOpenTrace(path: string): void {
   if (!canMeasurePerformance()) return
   const trace = inFlightNoteOpens.get(path)
@@ -64,10 +82,7 @@ export function finishNoteOpenTrace(path: string): void {
   const beforeNavigate = measureDuration(trace, 'beforeNavigateStart', 'beforeNavigateEnd')
   const freshnessCheck = measureDuration(trace, 'freshnessCheckStart', 'freshnessCheckEnd')
   const contentLoad = measureDuration(trace, 'contentLoadStart', 'contentLoadEnd')
-  const editorSwap = measureDuration(trace, 'contentLoadEnd', 'editorSwapped')
-    ?? measureDuration(trace, 'freshnessCheckEnd', 'editorSwapped')
-    ?? measureDuration(trace, 'beforeNavigateEnd', 'editorSwapped')
-    ?? measureDuration(trace, 'startedAt', 'editorSwapped')
+  const editorSwap = editorSwapDuration(trace)
 
   logPerf(
     `noteOpen path=${path} source=${trace.source} total=${formatDuration(total)} `
@@ -75,7 +90,7 @@ export function finishNoteOpenTrace(path: string): void {
     + `freshnessCheck=${formatDuration(freshnessCheck)} `
     + `contentLoad=${formatDuration(contentLoad)} `
     + `editorSwap=${formatDuration(editorSwap)} `
-    + `cache=${Reflect.get(trace.marks, 'cacheReady') !== undefined ? 'hit' : 'miss'}`,
+    + `cache=${cacheStatus(trace)}`,
   )
   inFlightNoteOpens.delete(path)
 }

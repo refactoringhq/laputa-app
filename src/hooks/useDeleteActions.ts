@@ -26,32 +26,26 @@ interface DeleteCommandBatch {
   vaultPath?: string
 }
 
-function describeNotes(count: number): string {
-  return count === 1 ? 'note' : `${count} notes`
-}
+const describeNotes = (count: number): string => (
+  count === 1 ? 'note' : `${count} notes`
+)
 
-function buildDeleteProgressMessage(count: number): string {
-  return `Deleting ${describeNotes(count)}...`
-}
+const buildDeleteProgressMessage = (count: number): string => `Deleting ${describeNotes(count)}...`
 
-function buildDeleteSuccessMessage(count: number): string {
-  return count === 1 ? 'Note permanently deleted' : `${count} notes permanently deleted`
-}
+const buildDeleteFailureMessage = (error: unknown, count: number): string => (
+  `Failed to delete ${describeNotes(count)}: ${error}`
+)
 
-function buildDeleteFailureMessage(error: unknown, count: number): string {
-  return `Failed to delete ${describeNotes(count)}: ${error}`
-}
-
-function buildPartialDeleteMessage(deletedCount: number, requestedCount: number): string {
+const buildPartialDeleteMessage = (deletedCount: number, requestedCount: number): string => {
   if (deletedCount === 0) {
     return `Failed to delete ${describeNotes(requestedCount)}. The note list was reloaded.`
   }
   return `Deleted ${deletedCount} of ${requestedCount} notes. The note list was reloaded to recover failed items.`
 }
 
-function deleteCommandArgs({ paths, vaultPath }: DeleteCommandBatch): { paths: string[]; vaultPath?: string } {
-  return vaultPath ? { paths, vaultPath } : { paths }
-}
+const deleteCommandArgs = ({ paths, vaultPath }: DeleteCommandBatch): { paths: string[]; vaultPath?: string } => (
+  vaultPath ? { paths, vaultPath } : { paths }
+)
 
 function groupDeletePathsByVault(
   paths: string[],
@@ -159,6 +153,10 @@ function useDeleteRunner({
     deleteNotesFromDisk,
     pendingDeleteCount,
   }
+}
+
+function buildDeleteSuccessMessage(count: number): string {
+  return count === 1 ? 'Note permanently deleted' : `${count} notes permanently deleted`
 }
 
 export function useDeleteActions({

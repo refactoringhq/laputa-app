@@ -74,17 +74,35 @@ function decorateYamlErrors(
 
   do {
     if (!cursor.type.isError) continue
-    const absoluteFrom = bodyFrom + cursor.from
-    const absoluteTo = bodyFrom + cursor.to
-    const affectedLine = doc.lineAt(absoluteFrom)
-    const from = absoluteFrom === absoluteTo ? affectedLine.from : absoluteFrom
-    const to = absoluteFrom === absoluteTo ? affectedLine.to : absoluteTo
-    if (from === to || to > bodyTo) continue
-    const key = `${from}:${to}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    decorations.push(frontmatterError.range(from, to))
+    appendYamlErrorDecoration({ bodyFrom, bodyTo, cursor, decorations, doc, seen })
   } while (cursor.next())
+}
+
+function appendYamlErrorDecoration({
+  bodyFrom,
+  bodyTo,
+  cursor,
+  decorations,
+  doc,
+  seen,
+}: {
+  bodyFrom: number
+  bodyTo: number
+  cursor: { from: number; to: number }
+  decorations: Range<Decoration>[]
+  doc: EditorView['state']['doc']
+  seen: Set<string>
+}): void {
+  const absoluteFrom = bodyFrom + cursor.from
+  const absoluteTo = bodyFrom + cursor.to
+  const affectedLine = doc.lineAt(absoluteFrom)
+  const from = absoluteFrom === absoluteTo ? affectedLine.from : absoluteFrom
+  const to = absoluteFrom === absoluteTo ? affectedLine.to : absoluteTo
+  if (from === to || to > bodyTo) return
+  const key = `${from}:${to}`
+  if (seen.has(key)) return
+  seen.add(key)
+  decorations.push(frontmatterError.range(from, to))
 }
 
 export const frontmatterHighlightPlugin = ViewPlugin.fromClass(

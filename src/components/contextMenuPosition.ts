@@ -12,14 +12,6 @@ export interface ContextMenuPositionOptions {
   minWidth?: CSSProperties['minWidth']
 }
 
-function parseZoomValue(source: string | undefined): number | null {
-  if (!source || source === 'normal') return null
-  const value = source.endsWith('%')
-    ? Number.parseFloat(source) / 100
-    : Number.parseFloat(source)
-  return Number.isFinite(value) && value > 0 ? value : null
-}
-
 function getRootZoom(): number {
   const overlayZoom = parseZoomValue(
     getComputedStyle(document.documentElement).getPropertyValue('--tolaria-overlay-zoom-factor').trim(),
@@ -88,4 +80,11 @@ export function getContextMenuPositionStyle(point: ContextMenuPoint, options: Co
   }
 
   return style
+}
+
+function parseZoomValue(source: string | undefined): number | null {
+  if (!source || source === 'normal') return null
+  const parsed = Number.parseFloat(source)
+  const value = source.endsWith('%') ? parsed / 100 : parsed
+  return Number.isFinite(value) && value > 0 ? value : null
 }

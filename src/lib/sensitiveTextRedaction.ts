@@ -72,15 +72,25 @@ function redactToken({ token, redactTokens }: RedactTokenInput): string {
 }
 
 function tokenParts({ token }: TokenInput): TokenParts {
-  let start = 0
-  let end = token.length
-  while (start < end && LEADING_TOKEN_WRAPPERS.has(token.at(start) ?? '')) start += 1
-  while (end > start && TRAILING_TOKEN_WRAPPERS.has(token.at(end - 1) ?? '')) end -= 1
+  const start = leadingWrapperEnd(token)
+  const end = trailingWrapperStart(token, start)
   return {
     prefix: token.slice(0, start),
     core: token.slice(start, end),
     suffix: token.slice(end),
   }
+}
+
+function leadingWrapperEnd(token: string): number {
+  let start = 0
+  while (LEADING_TOKEN_WRAPPERS.has(token.at(start) ?? '')) start += 1
+  return start
+}
+
+function trailingWrapperStart(token: string, minimum: number): number {
+  let end = token.length
+  while (end > minimum && TRAILING_TOKEN_WRAPPERS.has(token.at(end - 1) ?? '')) end -= 1
+  return end
 }
 
 function isAbsolutePath({ value }: TextValueInput): boolean {

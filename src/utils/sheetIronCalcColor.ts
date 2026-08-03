@@ -72,12 +72,10 @@ function rgbParts(value: string): string[] | null {
 function rgbColorToHex(value: string): string | null {
   const parts = rgbParts(value)
   if (!parts) return null
-  const red = rgbComponentToHex(parts.at(0) ?? '')
-  const green = rgbComponentToHex(parts.at(1) ?? '')
-  const blue = rgbComponentToHex(parts.at(2) ?? '')
-  if (!red || !green || !blue) return null
+  const components = parts.slice(0, 3).map(rgbComponentToHex)
+  if (!components.every((component): component is string => component !== null)) return null
 
-  return `#${red}${green}${blue}`
+  return `#${components.join('')}`
 }
 
 export function normalizeSheetColorForIronCalc(value: string | undefined): string | null {

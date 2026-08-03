@@ -101,6 +101,16 @@ function parseRelativeDateInput(value: DateFilterInput, reference: Date): Date |
   return shiftRelativeDate(base, unit, amount, tokenPattern.future)
 }
 
+function parseAbsoluteDateInput(value: DateFilterInput): Date | null {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const parsed = parseISO(value)
+    return isValid(parsed) ? parsed : null
+  }
+
+  const timestamp = Date.parse(value)
+  return Number.isNaN(timestamp) ? null : new Date(timestamp)
+}
+
 export function parseDateFilterInput(value: DateFilterInput, reference = new Date()): Date | null {
   const trimmed = value.trim()
   if (!trimmed) return null
@@ -108,14 +118,7 @@ export function parseDateFilterInput(value: DateFilterInput, reference = new Dat
   const relative = parseRelativeDateInput(trimmed, reference)
   if (relative) return relative
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    const parsed = parseISO(trimmed)
-    return isValid(parsed) ? parsed : null
-  }
-
-  const timestamp = Date.parse(trimmed)
-  if (Number.isNaN(timestamp)) return null
-  return new Date(timestamp)
+  return parseAbsoluteDateInput(trimmed)
 }
 
 export function toDateFilterTimestamp(value: DateFilterInput, reference = new Date()): number | null {

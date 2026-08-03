@@ -18,11 +18,6 @@ interface UseAiPanelPromptQueueArgs {
   enabled?: boolean
 }
 
-function queuedPromptTargetChange(prompt: QueuedAiPrompt, currentTargetId: string | undefined): string | null {
-  if (!prompt.targetId || !currentTargetId) return null
-  return prompt.targetId === currentTargetId ? null : prompt.targetId
-}
-
 function shouldWaitForTargetChange(
   prompt: QueuedAiPrompt,
   currentTargetId: string | undefined,
@@ -52,6 +47,11 @@ function readyQueuedPrompt({
   if (input !== queuedPrompt.text) return null
   if (shouldWaitForTargetChange(queuedPrompt, currentTargetId, onTargetChange)) return null
   return queuedPrompt
+}
+
+function queuedPromptTargetChange(prompt: QueuedAiPrompt, currentTargetId: string | undefined): string | null {
+  if (!prompt.targetId || !currentTargetId) return null
+  return prompt.targetId === currentTargetId ? null : prompt.targetId
 }
 
 export function useAiPanelPromptQueue({

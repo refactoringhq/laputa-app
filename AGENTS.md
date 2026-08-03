@@ -2,6 +2,10 @@
 
 ## 1. Development Process
 
+### Mandatory-rule exception protocol
+
+Use an exception only when a required service or analyzer remains unavailable after one retry, or when satisfying the rule is technically impossible without increasing security or data-loss risk. The repository owner is the sole approver. Before proceeding, record the blocked command, evidence, affected files, risk, compensating check, approver, and an expiry of at most 72 hours in the Todoist task or final handoff; review and remove the exception within seven days. A preference, deadline, or failing quality gate is not sufficient exception criteria.
+
 ### Start working on a task
 
 **Before writing a single line of code:** inspect the configured CodeScene project's current Hotspot and Average Code Health and compare them with `.codescene-thresholds`. Then capture the file-level Code Health score for every existing code file you intend to edit. If the project is already below the threshold, **stop and refactor first** — find the worst files with the MCP, improve them, commit, then start the task. If the gate cannot be restored, stop and obtain explicit repository-owner direction before starting feature work.
@@ -29,7 +33,7 @@ Red → Green → Refactor → Commit. One cycle per commit. For bugs: write fai
 
 ### Localization (mandatory for UI copy)
 
-All user-facing UI labels/copy must live in `src/lib/locales/en.json` and be translated into every target listed in `lara.yaml`. If the localization tooling cannot satisfy this rule, stop and obtain explicit repository-owner direction. When adding or changing interface copy:
+All user-facing UI labels/copy must live in `src/lib/locales/en.json` and be translated into every target listed in `lara.yaml`. Exception: when the localization service remains unavailable after one retry, use the mandatory-rule exception protocol above and do not release untranslated copy without repository-owner approval. When adding or changing interface copy:
 
 ```bash
 pnpm l10n:translate
@@ -45,7 +49,7 @@ When adding or changing a meaningful user-facing feature, include the event name
 
 ### Code health (mandatory)
 
-Pre-push enforces **Hotspot Code Health** and **Average Code Health** ≥ thresholds in `.codescene-thresholds`. Pre-commit is lint-only; CodeScene remains mandatory through the file-level review rules below and the pre-push ratchet gate. Thresholds are a **ratchet** — only go up. When pre-push sees improved remote scores, it updates `.codescene-thresholds`, stages it, and stops so you can commit the new floor with normal verified hooks before pushing again. If an exception such as `// eslint-disable`, `#[allow(...)]`, or `as any` appears necessary, stop and obtain explicit repository-owner approval before adding it.
+Pre-push compares **Hotspot Code Health** and **Average Code Health** with the exact numeric floors in `.codescene-thresholds` and fails when either score is lower. Pre-commit is lint-only; CodeScene remains mandatory through the file-level review rules below and the pre-push ratchet gate. Thresholds are a **ratchet** — only go up. When pre-push sees improved remote scores, it updates `.codescene-thresholds`, stages it, and stops so you can commit the new floor with normal verified hooks before pushing again. Exception: adding `// eslint-disable`, `#[allow(...)]`, `as any`, or another bypass requires the mandatory-rule exception protocol and repository-owner approval before the edit.
 
 **Release rule:** CodeScene is a before/after gate, not just a final score. Record the starting CodeScene state before edits and the final state after edits. If touched code gets worse, refactor before committing; if the comparison cannot be produced, stop and obtain explicit repository-owner direction.
 
@@ -53,13 +57,13 @@ Do not edit `.codescene-thresholds` to lower the values. If the gate blocks you,
 
 **CodeScene access order:** use CodeScene MCP tools if available. If MCP is unavailable, use the installed `cs` CLI for file-level review/delta work, and use the CodeScene API (`CODESCENE_PAT` + `CODESCENE_PROJECT_ID`) for project-wide Hotspot/Average threshold checks from `.codescene-thresholds`.
 
-**Before editing any existing code file:** capture its current file-level CodeScene score. After your edits, re-run the same file-level review and verify the score is higher. If the file already starts at `10.0`, it must remain `10.0`; if the score cannot be obtained or preserved, stop and obtain explicit repository-owner direction.
+**Before editing any existing code file:** capture its current file-level CodeScene score. After your edits, re-run the same file-level review and verify the score is higher. If the file already starts at `10.0`, it must remain `10.0`. Exception: if the score cannot be obtained after one retry, use the mandatory-rule exception protocol and obtain repository-owner approval before editing.
 
 **New files:** every new **scorable code file** must reach CodeScene score `10.0` before commit. If CodeScene reports `null` / "no scorable code" for a new file, it must still have zero CodeScene findings/warnings. If either requirement cannot be met, stop and obtain explicit repository-owner direction.
 
 **Before every commit:** run CodeScene file-level review on every touched or newly created code file and verify the rule above. Then run `mcp__codescene__pre_commit_code_health_safeguard` for the repository and do not commit unless its quality gates pass. **Boy Scout Rule:** every file you touch must leave with a higher score, unless it was already `10.0`, in which case it must stay `10.0`. If an analyzer or gate is unavailable, stop and obtain explicit repository-owner approval for a documented exception.
 
-**Before the final direct-to-main push:** run `mcp__codescene__analyze_change_set` with `base_ref=origin/main`. This is Tolaria's PR-preflight equivalent: every affected file must be improved or stable, and the overall quality gate must pass. Refactor and repeat if any file is degraded; if the analysis cannot complete, stop and obtain explicit repository-owner direction.
+**Before the final direct-to-main push:** run `mcp__codescene__analyze_change_set` with `base_ref=origin/main`. This is Tolaria's PR-preflight equivalent: every affected file must be improved or stable, and the overall quality gate must pass. Refactor and repeat if any file is degraded. Exception: if the analysis cannot complete after one retry, use the mandatory-rule exception protocol and obtain repository-owner approval before pushing.
 
 **If CodeScene gate blocks your push:** use `mcp__codescene__code_health_score` to find the worst file, refactor it, commit, push again. Do not wait for laputa-refactor because it is a background loop rather than a substitute for fixing your own regressions; if no in-scope refactor can restore the gate, stop and obtain explicit repository-owner direction.
 
@@ -77,7 +81,7 @@ Use Codacy as a security and static-analysis gate before a task is considered re
 - **New code — absolute zero rule:** every new code file and every file containing newly added code must be scanned explicitly after creation or modification and must have exactly zero findings attributable to the new code at every severity. A newly created file must have exactly zero findings in the whole file. For added code in an existing file, any finding on an added line, caused by an added symbol or dependency, or newly appearing at file level fails the gate. `0 Critical + 0 High + 0 Medium + 0 Minor + 0 Info + 0 unclassified` is the only passing result. If a scanner cannot prove this, stop and obtain explicit repository-owner approval before proceeding.
 - **Boy Scout Rule for existing files:** after editing, every touched file must have fewer local findings than its recorded baseline; a zero-finding file must stay at zero. Fix every existing Critical/High finding in a touched file; if this cannot be achieved, stop and obtain explicit repository-owner approval for the documented exception.
 - **Before every commit:** re-scan every touched/new code file individually and compare the complete SARIF results with its recorded baseline. Do not rely on added-line filtering, repository totals, or `pnpm codacy:gate` alone; if an individual scan cannot complete, stop and obtain explicit repository-owner approval.
-- **Post-push dashboard verification:** after `git push origin main`, wait until `codacy_get_repository_with_analysis` reports the exact pushed SHA as `lastAnalysedCommit`. Then query all paginated dashboard findings for every touched/new file. Every new code file must have zero dashboard findings at every severity; every existing touched file must have no new finding and must have fewer findings than its pre-edit dashboard baseline (or remain at zero). If the dashboard reports a finding or has not analyzed the pushed SHA, fix it, commit, push, wait for that SHA's analysis, and verify again; if verification cannot complete, stop and obtain explicit repository-owner direction.
+- **Post-push dashboard verification:** after `git push origin main`, wait until `codacy_get_repository_with_analysis` reports the exact pushed SHA as `lastAnalysedCommit`. Then query all paginated dashboard findings for every touched/new file. Every new code file must have zero dashboard findings at every severity; every existing touched file must have no new finding and must have fewer findings than its pre-edit dashboard baseline (or remain at zero). If the dashboard reports a finding or has not analyzed the pushed SHA, fix it, commit, push, wait for that SHA's analysis, and verify again. Exception: if verification remains unavailable after one retry, use the mandatory-rule exception protocol and obtain repository-owner approval before release.
 - **Repository-wide dashboard counts:** use `codacy_get_repository_with_analysis` for the total and `codacy_list_repository_issues` with full pagination for severity/tool breakdowns. Derive the provider/organization/repository from the Git remote without printing credential-bearing remote URLs; for this repository use `gh` / `refactoringhq` / `tolaria` and branch `main`.
 - **Escalation:** if a scanner is unavailable or a finding is demonstrably false, stop and obtain explicit repository-owner approval recorded in the completion comment. Rule suppression requires that same explicit approval and documentation.
 - `pnpm codacy:gate` is a required fail-closed added-line safety net in pre-push and CI; it does not replace the touched-file before/after check.
@@ -89,8 +93,8 @@ cargo test && cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --f
 ```
 
 Coverage is a release gate, not a vanity metric:
-- Frontend coverage must stay ≥70%; if the gate cannot be restored, stop and obtain explicit repository-owner direction.
-- Rust line coverage must stay ≥85%; if the gate cannot be restored, stop and obtain explicit repository-owner direction.
+- Frontend coverage must stay ≥70%. Exception: if coverage cannot be measured after one retry because the coverage service is unavailable, use the mandatory-rule exception protocol and obtain repository-owner approval before release.
+- Rust line coverage must stay ≥85%. Exception: if coverage cannot be measured after one retry because the coverage service is unavailable, use the mandatory-rule exception protocol and obtain repository-owner approval before release.
 - For bug fixes, add a regression test when practical.
 - For new behavior, add targeted coverage close to the changed code; do not rely only on broad E2E coverage.
 
@@ -98,7 +102,7 @@ Coverage is a release gate, not a vanity metric:
 
 **Phase 1 — Playwright (only for core user flows):**
 
-Write Playwright test in `tests/smoke/<slug>.spec.ts` when the feature touches vault open, note create/save/delete, search, wikilink navigation, git commit/push, or conflict resolution. Tag a test with `@smoke` when it protects one of those core pre-push workflows; keep cosmetic or mock-heavy checks in the full regression lane. Prefer `.chunk/run-playwright-smoke.sh` on a Chunk sidecar for the curated smoke lane because local Playwright is expensive; keep `pnpm playwright:smoke` available for focused local reproduction. The curated smoke suite must stay under **5 minutes** when sharded on sidecars; if that limit cannot be restored, stop and obtain explicit repository-owner direction before changing the lane.
+Write Playwright test in `tests/smoke/<slug>.spec.ts` when the feature touches vault open, note create/save/delete, search, wikilink navigation, git commit/push, or conflict resolution. Tag a test with `@smoke` when it protects one of those core pre-push workflows; keep cosmetic or mock-heavy checks in the full regression lane. Prefer `.chunk/run-playwright-smoke.sh` on a Chunk sidecar for the curated smoke lane because local Playwright is expensive; keep `pnpm playwright:smoke` available for focused local reproduction. The curated smoke suite must stay under **5 minutes** when sharded on sidecars. Exception: if a platform outage prevents the smoke test from running after one retry, use the mandatory-rule exception protocol and obtain repository-owner approval before release.
 
 ```bash
 pnpm dev --port 5201 &
@@ -121,7 +125,7 @@ Use `osascript` for app focus, keyboard shortcuts, and keyboard-specific checks.
 
 ### Release-readiness checklist
 
-Before pushing or moving a task to In Review, verify the release gates and add a **completion comment** to the Todoist task. If no Todoist task exists, include the same evidence in the final handoff. The record must include:
+Before pushing or moving a task to In Review, verify the release gates and add a **completion comment** to the Todoist task. Exception: when the work has no Todoist task, put the identical evidence in the final handoff and identify it as the release record. The record must include:
 
 - What was implemented (a few lines covering logic and UX/UI).
 - QA: what was tested and how (Playwright / native screenshot / osascript).
@@ -180,7 +184,7 @@ Use shadcn/ui components for user-facing interactive elements instead of raw HTM
 | Toggle/switch | `Switch` or `ToggleGroup` from shadcn/ui |
 | Dialog/modal | `Dialog` from shadcn/ui |
 
-**When in doubt:** search `src/components/` for an existing component before building new. **Visual language:** new UI must follow Tolaria's existing components and design tokens; if a deliberate exception is needed, obtain explicit repository-owner design approval.
+**Component search trigger:** when the requested interaction does not map to a component in the table above, search `src/components/` by the interaction name and ARIA role before building a component. **Visual language:** new UI must follow Tolaria's existing components and design tokens; a deliberate exception requires explicit repository-owner design approval recorded through the mandatory-rule exception protocol.
 
 ---
 
