@@ -37,8 +37,13 @@ struct ImageContentType<'a>(&'a str);
 #[derive(Clone, Copy)]
 struct ImageExtension(&'static str);
 
-#[derive(Clone, Copy)]
-struct RemoteUrlInput<'a>(&'a str);
+struct RemoteUrlInput(String);
+
+impl RemoteUrlInput {
+    fn new(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
 
 fn remote_image_error(reason: FailureReason) -> String {
     format!("Remote image import failed: {}", reason.0)
@@ -88,16 +93,26 @@ fn validate_literal_host(host: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_remote_image_url(input: RemoteUrlInput<'_>) -> Result<Url, String> {
-    let url = Url::parse(input.0).map_err(|_| remote_image_error(FailureReason("invalid URL")))?;
+fn validate_remote_image_url(input: RemoteUrlInput) -> Result<Url, String> {
+    let url = Url::parse(&input.0).map_err(|_| remote_image_error(FailureReason("invalid URL")))?;
+    validate_remote_url_protocol(&url)?;
+    validate_remote_url_host(&url)?;
+    Ok(url)
+}
+
+fn validate_remote_url_protocol(url: &Url) -> Result<(), String> {
     if !matches!(url.scheme(), "http" | "https") {
         return Err(remote_image_error(FailureReason("unsupported URL scheme")));
     }
-    if has_disallowed_credentials(&url) {
+    if has_disallowed_credentials(url) {
         return Err(remote_image_error(FailureReason(
             "URL credentials are not allowed",
         )));
     }
+    Ok(())
+}
+
+fn validate_remote_url_host(url: &Url) -> Result<(), String> {
     let raw_host = url
         .host_str()
         .ok_or_else(|| remote_image_error(FailureReason("URL host is missing")))?;
@@ -107,8 +122,7 @@ fn validate_remote_image_url(input: RemoteUrlInput<'_>) -> Result<Url, String> {
             "local hosts are not allowed",
         )));
     }
-    validate_literal_host(host)?;
-    Ok(url)
+    validate_literal_host(host)
 }
 
 fn resolved_public_address(url: &Url) -> Result<SocketAddr, String> {
@@ -154,16 +168,13 @@ fn redirected_url(response: &Response, current_url: &Url) -> Result<Option<Url>,
     let next_url = current_url
         .join(location)
         .map_err(|_| remote_image_error(FailureReason("redirect URL is invalid")))?;
-    validate_remote_image_url(RemoteUrlInput(next_url.as_str())).map(Some)
+    validate_remote_image_url(RemoteUrlInput::new(next_url.as_str())).map(Some)
 }
 
-fn fetch_response(input: RemoteUrlInput<'_>) -> Result<(Response, Url), String> {
+fn fetch_response(input: RemoteUrlInput) -> Result<(Response, Url), String> {
     let mut url = validate_remote_image_url(input)?;
     for redirect_count in 0..=MAX_REDIRECTS {
-        let response = client_for(&url)?
-            .get(url.clone())
-            .send()
-            .map_err(|_| remote_image_error(FailureReason("request failed")))?;
+        let response = request_url(&url)?;
         if let Some(next_url) = redirected_url(&response, &url)? {
             if redirect_count == MAX_REDIRECTS {
                 return Err(remote_image_error(FailureReason("too many redirects")));
@@ -179,6 +190,13 @@ fn fetch_response(input: RemoteUrlInput<'_>) -> Result<(Response, Url), String> 
         return Ok((response, url));
     }
     Err(remote_image_error(FailureReason("too many redirects")))
+}
+
+fn request_url(url: &Url) -> Result<Response, String> {
+    client_for(url)?
+        .get(url.clone())
+        .send()
+        .map_err(|_| remote_image_error(FailureReason("request failed")))
 }
 
 fn extension_for_content_type(content_type: ImageContentType<'_>) -> Option<ImageExtension> {
@@ -238,7 +256,13 @@ fn read_image_bytes(response: &mut Response) -> Result<Vec<u8>, String> {
 }
 
 pub fn download_remote_image(vault_path: &str, raw_url: &str) -> Result<String, String> {
-    let (mut response, final_url) = fetch_response(RemoteUrlInput(raw_url))?;
+    let (mut response, final_url) = fetch_response(RemoteUrlInput::new(raw_url))?;
+    let extension = response_image_extension(&response)?;
+    let bytes = read_image_bytes(&mut response)?;
+    save_downloaded_image(vault_path, &final_url, extension, bytes)
+}
+
+fn response_image_extension(response: &Response) -> Result<ImageExtension, String> {
     let content_type = response
         .headers()
         .get(CONTENT_TYPE)
@@ -246,8 +270,16 @@ pub fn download_remote_image(vault_path: &str, raw_url: &str) -> Result<String, 
         .ok_or_else(|| remote_image_error(FailureReason("response is not an image")))?;
     let extension = extension_for_content_type(ImageContentType(content_type))
         .ok_or_else(|| remote_image_error(FailureReason("response is not a supported image")))?;
-    let bytes = read_image_bytes(&mut response)?;
-    let filename = downloaded_filename(&final_url, extension);
+    Ok(extension)
+}
+
+fn save_downloaded_image(
+    vault_path: &str,
+    final_url: &Url,
+    extension: ImageExtension,
+    bytes: Vec<u8>,
+) -> Result<String, String> {
+    let filename = downloaded_filename(final_url, extension);
     let target_path = prepare_attachment_path(vault_path, &filename)?;
     fs::write(&target_path, bytes)
         .map_err(|_| remote_image_error(FailureReason("attachment could not be written")))?;
@@ -261,12 +293,14 @@ mod tests {
 
     #[test]
     fn remote_image_urls_require_public_http_hosts() {
+        assert!(validate_remote_image_url(RemoteUrlInput::new(
+            "https://images.example.com/photo.png"
+        ))
+        .is_ok());
         assert!(
-            validate_remote_image_url(RemoteUrlInput("https://images.example.com/photo.png"))
-                .is_ok()
+            validate_remote_image_url(RemoteUrlInput::new("http://127.0.0.1/photo.png")).is_err()
         );
-        assert!(validate_remote_image_url(RemoteUrlInput("http://127.0.0.1/photo.png")).is_err());
-        assert!(validate_remote_image_url(RemoteUrlInput("http://[::1]/photo.png")).is_err());
+        assert!(validate_remote_image_url(RemoteUrlInput::new("http://[::1]/photo.png")).is_err());
         for address in [
             "0.0.0.1",
             "100.64.0.1",
@@ -283,8 +317,8 @@ mod tests {
         assert!(is_public_ip(
             "2606:4700:4700::1111".parse().expect("valid IPv6")
         ));
-        assert!(validate_remote_image_url(RemoteUrlInput("file:///tmp/photo.png")).is_err());
-        assert!(validate_remote_image_url(RemoteUrlInput(
+        assert!(validate_remote_image_url(RemoteUrlInput::new("file:///tmp/photo.png")).is_err());
+        assert!(validate_remote_image_url(RemoteUrlInput::new(
             "https://user:secret@example.com/photo.png"
         ))
         .is_err());

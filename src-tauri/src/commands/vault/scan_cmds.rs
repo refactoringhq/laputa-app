@@ -146,9 +146,9 @@ pub async fn search_vault(
     let exclude_frontmatter = exclude_frontmatter.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
         search::search_vault_with_options(search::SearchOptions {
-            vault_path: &vault_path,
-            query: &query,
-            mode: "keyword",
+            vault_path,
+            query,
+            mode: "keyword".to_string(),
             limit,
             hide_gitignored_files: crate::settings::hide_gitignored_files_enabled(),
             exclude_frontmatter,

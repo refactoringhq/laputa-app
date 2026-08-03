@@ -9,9 +9,9 @@ pub(crate) struct FrontmatterKeyRule {
 #[derive(Clone, Copy)]
 pub(crate) struct FrontmatterKey<'a>(&'a str);
 
-impl<'a> FrontmatterKey<'a> {
-    pub(crate) fn new(key: &'a str) -> Self {
-        Self(key)
+impl FrontmatterKey<'_> {
+    pub(crate) fn new(key: &str) -> FrontmatterKey<'_> {
+        FrontmatterKey(key)
     }
 
     pub(crate) fn normalized(self) -> String {

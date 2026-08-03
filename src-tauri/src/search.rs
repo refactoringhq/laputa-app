@@ -20,10 +20,10 @@ pub struct SearchResponse {
     pub mode: String,
 }
 
-pub struct SearchOptions<'a> {
-    pub vault_path: &'a str,
-    pub query: &'a str,
-    pub mode: &'a str,
+pub struct SearchOptions {
+    pub vault_path: String,
+    pub query: String,
+    pub mode: String,
     pub limit: usize,
     pub hide_gitignored_files: bool,
     pub exclude_frontmatter: bool,
@@ -42,6 +42,11 @@ struct MatchScoreRequest<'a> {
     title_lower: &'a str,
     content_lower: &'a str,
     query_lower: &'a str,
+}
+
+struct SearchContext {
+    query_lower: String,
+    exclude_frontmatter: bool,
 }
 
 impl Utf8Boundary<'_> {
@@ -115,6 +120,44 @@ impl MatchScoreRequest<'_> {
     }
 }
 
+impl SearchContext {
+    fn result_for_path(&self, path: &Path) -> Option<SearchResult> {
+        let content = std::fs::read_to_string(path).ok()?;
+        let searchable = searchable_content(&content, self.exclude_frontmatter);
+        let content_lower = searchable.to_lowercase();
+        let filename = path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("");
+        let title = crate::vault::derive_markdown_title_from_content(&content, filename);
+        let title_lower = title.to_lowercase();
+
+        if !title_lower.contains(&self.query_lower) && !content_lower.contains(&self.query_lower) {
+            return None;
+        }
+
+        let score = MatchScoreRequest {
+            title_lower: &title_lower,
+            content_lower: &content_lower,
+            query_lower: &self.query_lower,
+        }
+        .score();
+        let snippet = SnippetRequest {
+            content: searchable,
+            query_lower: &self.query_lower,
+        }
+        .extract();
+
+        Some(SearchResult {
+            title,
+            path: path.to_string_lossy().into_owned(),
+            snippet,
+            score,
+            note_type: None,
+        })
+    }
+}
+
 pub fn search_vault(
     vault_path: &str,
     query: &str,
@@ -122,9 +165,9 @@ pub fn search_vault(
     limit: usize,
 ) -> Result<SearchResponse, String> {
     search_vault_with_options(SearchOptions {
-        vault_path,
-        query,
-        mode: _mode,
+        vault_path: vault_path.to_string(),
+        query: query.to_string(),
+        mode: _mode.to_string(),
         limit,
         hide_gitignored_files: crate::settings::hide_gitignored_files_enabled(),
         exclude_frontmatter: false,
@@ -172,53 +215,17 @@ fn collect_markdown_paths(vault_dir: &Path, hide_gitignored_files: bool) -> Vec<
     crate::vault::filter_gitignored_paths(vault_dir, paths, hide_gitignored_files)
 }
 
-pub fn search_vault_with_options(options: SearchOptions<'_>) -> Result<SearchResponse, String> {
+pub fn search_vault_with_options(options: SearchOptions) -> Result<SearchResponse, String> {
     let start = Instant::now();
-    let query_lower = options.query.to_lowercase();
-    let vault_dir = Path::new(options.vault_path);
-
-    let mut results: Vec<SearchResult> = Vec::new();
-
-    for path in collect_markdown_paths(vault_dir, options.hide_gitignored_files) {
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        let searchable_content = searchable_content(&content, options.exclude_frontmatter);
-        let content_lower = searchable_content.to_lowercase();
-        let filename = path
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("");
-        let title = crate::vault::derive_markdown_title_from_content(&content, filename);
-        let title_lower = title.to_lowercase();
-
-        if !title_lower.contains(&query_lower) && !content_lower.contains(&query_lower) {
-            continue;
-        }
-
-        let score = MatchScoreRequest {
-            title_lower: &title_lower,
-            content_lower: &content_lower,
-            query_lower: &query_lower,
-        }
-        .score();
-        let snippet = SnippetRequest {
-            content: searchable_content,
-            query_lower: &query_lower,
-        }
-        .extract();
-        let full_path = path.to_string_lossy().to_string();
-
-        results.push(SearchResult {
-            title,
-            path: full_path,
-            snippet,
-            score,
-            note_type: None,
-        });
-    }
+    let context = SearchContext {
+        query_lower: options.query.to_lowercase(),
+        exclude_frontmatter: options.exclude_frontmatter,
+    };
+    let vault_dir = Path::new(&options.vault_path);
+    let mut results = collect_markdown_paths(vault_dir, options.hide_gitignored_files)
+        .iter()
+        .filter_map(|path| context.result_for_path(path))
+        .collect::<Vec<_>>();
 
     results.sort_by(|a, b| {
         b.score
@@ -232,8 +239,8 @@ pub fn search_vault_with_options(options: SearchOptions<'_>) -> Result<SearchRes
     Ok(SearchResponse {
         results,
         elapsed_ms,
-        query: options.query.to_string(),
-        mode: options.mode.to_string(),
+        query: options.query,
+        mode: options.mode,
     })
 }
 
@@ -381,18 +388,18 @@ mod tests {
         fs::write(dir.path().join("ignored/hidden.md"), "# Hidden\n\nneedle").unwrap();
 
         let hidden = search_vault_with_options(SearchOptions {
-            vault_path: dir.path().to_str().unwrap(),
-            query: "needle",
-            mode: "keyword",
+            vault_path: dir.path().to_string_lossy().into_owned(),
+            query: "needle".to_string(),
+            mode: "keyword".to_string(),
             limit: 10,
             hide_gitignored_files: true,
             exclude_frontmatter: false,
         })
         .unwrap();
         let shown = search_vault_with_options(SearchOptions {
-            vault_path: dir.path().to_str().unwrap(),
-            query: "needle",
-            mode: "keyword",
+            vault_path: dir.path().to_string_lossy().into_owned(),
+            query: "needle".to_string(),
+            mode: "keyword".to_string(),
             limit: 10,
             hide_gitignored_files: false,
             exclude_frontmatter: false,
@@ -431,9 +438,9 @@ mod tests {
         .unwrap();
 
         let response = search_vault_with_options(SearchOptions {
-            vault_path: dir.path().to_str().unwrap(),
-            query: "hidden-frontmatter-keyword",
-            mode: "keyword",
+            vault_path: dir.path().to_string_lossy().into_owned(),
+            query: "hidden-frontmatter-keyword".to_string(),
+            mode: "keyword".to_string(),
             limit: 10,
             hide_gitignored_files: false,
             exclude_frontmatter: true,

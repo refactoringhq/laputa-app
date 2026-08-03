@@ -167,7 +167,19 @@ pub fn git_commit_conflict_resolution(vault_path: impl AsRef<Path>) -> Result<St
     let workspace = GitWorkspace::resolve(vault)?
         .ok_or_else(|| "Vault is not inside a Git work tree".to_string())?;
 
-    // Verify no remaining conflicts
+    ensure_no_remaining_conflicts(vault)?;
+    ensure_author_config(workspace.git_root())?;
+
+    let mode = get_conflict_mode(vault);
+    let output = run_conflict_resolution(&workspace, &mode)?;
+    if !output.status.success() {
+        return Err(conflict_resolution_failure(&output, &mode));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+fn ensure_no_remaining_conflicts(vault: &Path) -> Result<(), String> {
     let remaining = get_conflict_files(vault)?;
     if !remaining.is_empty() {
         return Err(format!(
@@ -175,11 +187,14 @@ pub fn git_commit_conflict_resolution(vault_path: impl AsRef<Path>) -> Result<St
             remaining.len()
         ));
     }
+    Ok(())
+}
 
-    ensure_author_config(workspace.git_root())?;
-
-    let mode = get_conflict_mode(vault);
-    let output = match mode.as_str() {
+fn run_conflict_resolution(
+    workspace: &GitWorkspace,
+    mode: &str,
+) -> Result<std::process::Output, String> {
+    match mode {
         "rebase" => git_command_at(workspace.git_root())
             .and_then(|mut command| {
                 command
@@ -187,33 +202,31 @@ pub fn git_commit_conflict_resolution(vault_path: impl AsRef<Path>) -> Result<St
                     .env("GIT_EDITOR", "true")
                     .output()
             })
-            .map_err(|e| format!("Failed to run git rebase --continue: {}", e))?,
+            .map_err(|e| format!("Failed to run git rebase --continue: {e}")),
         _ => git_command_at(workspace.git_root())
             .and_then(|mut command| {
                 command
                     .args(["commit", "-m", "Resolve merge conflicts"])
                     .output()
             })
-            .map_err(|e| format!("Failed to run git commit: {}", e))?,
-    };
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let detail = if stderr.trim().is_empty() {
-            stdout
-        } else {
-            stderr
-        };
-        let cmd_name = if mode == "rebase" {
-            "git rebase --continue"
-        } else {
-            "git commit"
-        };
-        return Err(format!("{} failed: {}", cmd_name, detail.trim()));
+            .map_err(|e| format!("Failed to run git commit: {e}")),
     }
+}
 
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+fn conflict_resolution_failure(output: &std::process::Output, mode: &str) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let detail = if stderr.trim().is_empty() {
+        stdout
+    } else {
+        stderr
+    };
+    let command = if mode == "rebase" {
+        "git rebase --continue"
+    } else {
+        "git commit"
+    };
+    format!("{command} failed: {}", detail.trim())
 }
 
 #[cfg(test)]
@@ -247,6 +260,44 @@ mod tests {
             .status
             .success()
             .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+    }
+
+    fn create_nested_conflicts(repository: &Path, vault: &Path) {
+        fs::create_dir(vault).unwrap();
+        fs::write(vault.join("conflict.md"), "base\n").unwrap();
+        fs::write(repository.join("outside.md"), "base\n").unwrap();
+        git_command()
+            .args(["add", "-A"])
+            .current_dir(repository)
+            .output()
+            .unwrap();
+        git_command()
+            .args(["commit", "-m", "base"])
+            .current_dir(repository)
+            .output()
+            .unwrap();
+        git_command()
+            .args(["checkout", "-b", "feature"])
+            .current_dir(repository)
+            .output()
+            .unwrap();
+        write_conflicting_versions(repository, vault, "feature");
+        git_command()
+            .args(["checkout", "main"])
+            .current_dir(repository)
+            .output()
+            .unwrap();
+        write_conflicting_versions(repository, vault, "main");
+    }
+
+    fn write_conflicting_versions(repository: &Path, vault: &Path, version: &str) {
+        fs::write(vault.join("conflict.md"), format!("{version}\n")).unwrap();
+        fs::write(repository.join("outside.md"), format!("{version}\n")).unwrap();
+        git_command()
+            .args(["commit", "-am", version])
+            .current_dir(repository)
+            .output()
+            .unwrap();
     }
 
     #[test]
@@ -517,43 +568,7 @@ mod tests {
         let dir = setup_git_repo();
         let repository = dir.path();
         let vault = repository.join("docs");
-        fs::create_dir(&vault).unwrap();
-        fs::write(vault.join("conflict.md"), "base\n").unwrap();
-        fs::write(repository.join("outside.md"), "base\n").unwrap();
-        git_command()
-            .args(["add", "-A"])
-            .current_dir(repository)
-            .output()
-            .unwrap();
-        git_command()
-            .args(["commit", "-m", "base"])
-            .current_dir(repository)
-            .output()
-            .unwrap();
-        git_command()
-            .args(["checkout", "-b", "feature"])
-            .current_dir(repository)
-            .output()
-            .unwrap();
-        fs::write(vault.join("conflict.md"), "feature\n").unwrap();
-        fs::write(repository.join("outside.md"), "feature\n").unwrap();
-        git_command()
-            .args(["commit", "-am", "feature"])
-            .current_dir(repository)
-            .output()
-            .unwrap();
-        git_command()
-            .args(["checkout", "main"])
-            .current_dir(repository)
-            .output()
-            .unwrap();
-        fs::write(vault.join("conflict.md"), "main\n").unwrap();
-        fs::write(repository.join("outside.md"), "main\n").unwrap();
-        git_command()
-            .args(["commit", "-am", "main"])
-            .current_dir(repository)
-            .output()
-            .unwrap();
+        create_nested_conflicts(repository, &vault);
         let merge = git_command()
             .args(["merge", "feature"])
             .current_dir(repository)
