@@ -51,6 +51,16 @@ async function editorHasContentEditableFocus(page: Page): Promise<boolean> {
   })
 }
 
+async function dropCaretBeforeNextClick(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    document.addEventListener('click', () => {
+      const active = document.activeElement as HTMLElement | null
+      active?.blur()
+      window.getSelection()?.removeAllRanges()
+    }, { capture: true, once: true })
+  })
+}
+
 let tempVaultDir: string
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -73,4 +83,30 @@ test('@smoke clicking an untitled title wrapper restores the caret to the H1', a
 
   await expect.poll(() => editorHasContentEditableFocus(page), { timeout: 5_000 }).toBe(true)
   await expect.poll(() => activeSelectionBlockType(page), { timeout: 5_000 }).toBe('heading')
+})
+
+test('@smoke clicking editable text restores a dropped dark-mode caret after Enter', async ({ page }) => {
+  await createUntitledNote(page)
+  const title = page.locator('.bn-block-content[data-content-type="heading"]').first()
+  await title.click()
+  await page.keyboard.type('Focus recovery')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('Body before recovery')
+
+  const root = page.locator('html')
+  if (await root.getAttribute('data-theme') !== 'dark') {
+    await page.getByTestId('status-theme-mode').click()
+  }
+  await expect(root).toHaveAttribute('data-theme', 'dark')
+
+  const body = page.locator('.bn-block-content[data-content-type="paragraph"]')
+    .filter({ hasText: 'Body before recovery' })
+    .first()
+  await dropCaretBeforeNextClick(page)
+  await body.click()
+
+  await expect.poll(() => editorHasContentEditableFocus(page), { timeout: 5_000 }).toBe(true)
+  await expect.poll(() => activeSelectionBlockType(page), { timeout: 5_000 }).toBe('paragraph')
+  await page.keyboard.type(' restored')
+  await expect(body).toContainText('restored')
 })

@@ -376,6 +376,45 @@ function shouldIgnoreContainerClick(target: HTMLElement) {
   return Boolean(target.closest(CONTAINER_CLICK_IGNORE_SELECTOR))
 }
 
+function selectionIsInsideContainer(container: HTMLElement): boolean {
+  const selection = window.getSelection()
+  const anchorNode = selection?.rangeCount ? selection.anchorNode : null
+  return anchorNode !== null && container.contains(anchorNode)
+}
+
+function isUnmodifiedPrimaryClick(event: React.MouseEvent<HTMLDivElement>): boolean {
+  const modifierPressed = [event.metaKey, event.ctrlKey, event.altKey, event.shiftKey].some(Boolean)
+  return event.button === 0 && !modifierPressed
+}
+
+function editableClickNeedsCaretRecovery(
+  container: HTMLElement,
+  target: HTMLElement,
+): boolean {
+  const clickedEditableContent = target.closest('[contenteditable="true"]') !== null
+  return clickedEditableContent && !selectionIsInsideContainer(container)
+}
+
+function recoverMissingEditableSelection(options: {
+  container: HTMLElement
+  editor: ReturnType<typeof useCreateBlockNote>
+  event: React.MouseEvent<HTMLDivElement>
+  target: HTMLElement
+}): boolean {
+  const { container, editor, event, target } = options
+  if (!isUnmodifiedPrimaryClick(event)) return false
+  if (!editableClickNeedsCaretRecovery(container, target)) return false
+
+  const tiptapEditor = getTiptapSelectionBridge(editor)
+  if (!tiptapEditor) return false
+
+  const position = textPositionAtEditorPoint(tiptapEditor, event)
+  if (position === null) return false
+
+  editor.focus()
+  return applyTiptapTextSelection(tiptapEditor, position, position)
+}
+
 function normalizeSuggestionQuery(query: string, triggerCharacter: string): string {
   return query.startsWith(triggerCharacter)
     ? query.slice(triggerCharacter.length)
@@ -729,7 +768,15 @@ function useEditorContainerClickHandler(options: {
     const target = eventTargetElement(e.target)
     if (!target) return
     if (queueTitleHeadingCursorRepair(target, editor)) return
-    if (shouldIgnoreContainerClick(target)) return
+    if (shouldIgnoreContainerClick(target)) {
+      recoverMissingEditableSelection({
+        container: e.currentTarget,
+        editor,
+        event: e,
+        target,
+      })
+      return
+    }
     const blocks = editor.document
     if (blocks.length > 0) {
       const targetBlock = findNearestTextCursorBlock(blocks, blocks.length - 1)

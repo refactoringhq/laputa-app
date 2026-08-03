@@ -685,6 +685,26 @@ describe('SingleEditorView', () => {
     expect(editor.focus).toHaveBeenCalled()
   })
 
+  it('restores a missing DOM caret when editable content is clicked', () => {
+    const { container, editor } = renderEditorHarness()
+    const editable = document.createElement('div')
+    editable.setAttribute('contenteditable', 'true')
+    const paragraph = document.createElement('p')
+    paragraph.textContent = 'Editable body'
+    editable.appendChild(paragraph)
+    container.appendChild(editable)
+    window.getSelection()?.removeAllRanges()
+    editor._tiptapEditor.view.posAtCoords.mockReturnValue({ pos: 17 })
+
+    fireEvent.click(paragraph, { button: 0, clientX: 280, clientY: 120 })
+
+    expect(editor.focus).toHaveBeenCalled()
+    expect(editor._tiptapEditor.commands.setTextSelection).toHaveBeenCalledWith({
+      from: 17,
+      to: 17,
+    })
+  })
+
   it('ignores editor-container click handling for link toolbar interactions', () => {
     const { container, editor } = renderEditorHarness()
     const linkAction = appendToolbarButton(container, 'bn-link-toolbar', 'Open in a new tab')
